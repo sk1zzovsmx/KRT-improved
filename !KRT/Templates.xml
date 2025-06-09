@@ -128,7 +128,7 @@
 	</FontString>
 
 	<!-- ScrollFrame template -->
-	<ScrollFrame name="KRTScrolLFrameTemplate" inherits="UIPanelScrollFrameTemplate" virtual="true">
+	<ScrollFrame name="KRTScrollFrameTemplate" inherits="UIPanelScrollFrameTemplate" virtual="true">
 		<ScrollChild>
 			<Frame name="$parentScrollChild" setAllPoints="$parent">
 				<Anchors>

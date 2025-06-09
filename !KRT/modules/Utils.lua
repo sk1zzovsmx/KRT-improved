@@ -340,11 +340,8 @@ do
 	end
 
 	function Utils.print_color(r, g, b, ...)
-		local opt = {}
-		opt.r = r
-		opt.g = g
-		opt.b = b
-		return Utils._print(opt, ...)
+		local opt = { r = r, g = g, b = b }
+		return print(opt, ...)
 	end
 
 	function Utils.print_gold(...)
@@ -403,7 +400,7 @@ function Utils.whisper(target, msg)
 		return true
 	end
 end
-local BNSendWhisper = Utils.whisper
+-- local BNSendWhisper = Utils.whisper --
 
 -- Returns the current UTC date and time in seconds:
 function Utils.getUTCTimestamp()
