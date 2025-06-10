@@ -13,14 +13,12 @@ max_comment_line_length = false
 allow_defined = true
 
 exclude_files = {
-	"./.git",
-	"./.github",
-	"./.luarocks",
+	".git",
+	".github",
+	".luarocks",
 	"**/Libs/**/*.lua",
-	"**/Libs/**/**/*.lua",
-	".luacheckrc",
-    "ElvUI_AddOnSkins/*",
-    "_dev/*",
+	"ElvUI_AddOnSkins/**",
+	"_dev/**",
 }
 
 ignore = {
