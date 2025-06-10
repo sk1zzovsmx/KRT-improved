@@ -15,7 +15,6 @@ allow_defined = true
 exclude_files = {
 	"./.git",
 	"./.github",
-	"./.lua",
 	"./.luarocks",
 	"**/Libs/**/*.lua",
 	"**/Libs/**/**/*.lua",
