@@ -1,0 +1,26 @@
+------------------------------------------------------------------------
+r49 | yoshimo | 2010-12-18 20:39:32 +0000 (Sat, 18 Dec 2010) | 1 line
+Changed paths:
+   A /tags/beta7 (from /trunk:48)
+
+Tagging as beta7
+------------------------------------------------------------------------
+r48 | yoshimo | 2010-12-11 12:49:39 +0000 (Sat, 11 Dec 2010) | 8 lines
+Changed paths:
+   M /trunk/LibBossIDs-1.0.lua
+
+Cataclysm IDs , courtesy of dlui
+- completed Halls Of Originations
+- added Lost City of Tol'vir
+- added Baradin Hold
+- added Blackwind Descent
+- added Throne of the Four Winds
+- added Bastion of Twilight
+
+------------------------------------------------------------------------
+r47 | ckknight | 2010-09-16 01:25:21 +0000 (Thu, 16 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/LibBossIDs-1.0.lua
+
+More Cataclysm bosses (thanks to ccKep)
+------------------------------------------------------------------------
