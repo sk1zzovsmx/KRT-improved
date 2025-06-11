@@ -1,5 +1,5 @@
 local addonName, addon = ...
-local L = addon.L
+local L = LibStub("AceLocale-3.0"):GetLocale("KRT")
 local Utils = addon.Utils
 
 local _G = _G
