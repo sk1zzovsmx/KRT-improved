@@ -8,7 +8,6 @@ exclude_files = {
     ".git",
     ".github",
     ".luarocks",
-    "**/Libs/**/*.lua",
     "_dev/**",
 }
 
