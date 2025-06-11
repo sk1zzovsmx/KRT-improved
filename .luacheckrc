@@ -29,13 +29,9 @@ ignore = {
 	"131/[A-Z][A-Z0-9_]+",	-- Unused implicitly defined global variable (GlobalStrings and Constants 2char+)
 	"314", -- Value of a field in a table literal is unused
 	"42.", -- Shadowing a local variable, an argument, a loop variable.
-	"11./SLASH_.*", -- Setting an undefined (Slash handler) global variable
-	"11./BINDING_.*", -- Setting an undefined (Keybinding header) global variable
 	"113/LE_.*", -- Accessing an undefined (Lua ENUM type) global variable
 	"113/NUM_LE_.*", -- Accessing an undefined (Lua ENUM type) global variable
 	"113/L_.*", -- Accessing an undefined (L_) global variable
-	"111/[A-Z][A-Z0-9_]+",	-- Setting an undefined global variable
-	"113/[A-Z][A-Z0-9_]+",	-- Accessing an undefined global variable (GlobalStrings and Constants 2char+)
 	"211", -- Unused local variable
 	"211/L", -- Unused local variable "L"
 	"211/CL", -- Unused local variable "CL"
