@@ -1,0 +1,27 @@
+------------------------------------------------------------------------
+r139 | torhal | 2010-08-03 20:57:15 +0000 (Tue, 03 Aug 2010) | 1 line
+Changed paths:
+   A /tags/r139-release (from /trunk:138)
+
+Tagging as r139-release
+------------------------------------------------------------------------
+r138 | torhal | 2010-08-03 20:56:32 +0000 (Tue, 03 Aug 2010) | 1 line
+Changed paths:
+   M /trunk/LibQTip-1.0.lua
+
+Upped the MINOR version.
+------------------------------------------------------------------------
+r137 | torhal | 2010-08-03 05:39:42 +0000 (Tue, 03 Aug 2010) | 1 line
+Changed paths:
+   M /trunk/LibQTip-1.0.lua
+
+In InitializeTooltip(): Store the result of GameTooltip:GetBackdrop() before using it to set the backdrop so tooltip AddOns which set it to nil will not cause an error to be raised.
+------------------------------------------------------------------------
+r136 | elkano | 2010-07-27 15:27:08 +0000 (Tue, 27 Jul 2010) | 3 lines
+Changed paths:
+   M /trunk/LibQTip-1.0.lua
+
+- changed the way colspans resize cols to get enough width
+- row height is now recalculated when colspans have been resized
+!WARNING! custom cells need to provide the function cell::getContentHeight() that should return the height of the cell given its current width
+------------------------------------------------------------------------
