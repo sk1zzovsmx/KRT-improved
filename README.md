@@ -135,6 +135,18 @@ Items can be filtered by boss or by player, so selecting a boss fight will only 
 
 Right-clicking on an item from the list allows you the change the winner, the win type and the win score (_the hour doesn't matter_). This is useful when you are holding items for later roll, so whenever you roll items and hand them to winners, just change the info about the item. Note that this was the simplest method possible without having to make complex ways to automatically change info about items.
 
+## Development
+
+The `.luacheckrc` configuration expects a generated `luacheck_globals.lua` file.
+Run the helper script before linting to download the current allowed globals:
+
+```bash
+scripts/update_luacheck_globals.sh
+```
+
+Keeping the list external keeps the repository lightweight while still allowing
+strict `luacheck` verification.
+
 ## Note
 
 Since I didn't have time to work on the addon, some features aren't available yet but as soon as I can work on it, I will add them.

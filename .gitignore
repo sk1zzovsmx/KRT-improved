@@ -4,3 +4,4 @@ Makefile
 *.sublime-project
 *.sublime-workspace
 Skada/Skada_Bak.lua
+luacheck_globals.lua
