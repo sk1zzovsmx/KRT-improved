@@ -5,7 +5,7 @@
 ## Author: Kader (|cff808080bkader#5341|r)
 ## DefaultState: enabled
 ## SavedVariables: KRT_Options, KRT_Raids, KRT_Players, KRT_CurrentRaid, KRT_LastBoss, KRT_NextReset, KRT_Warnings, KRT_Spammer, KRT_ExportString, KRT_SavedReserves, KRT_Debug
-## Version: 0.5.6b
+## Version: 0.5.6c
 ## X-Date: 2022-06-03 @ 11:10 PM |cff808080UTC|r
 ## X-Category: Raid, Inventory
 ## X-License: MIT/X
@@ -17,6 +17,13 @@
 # Libraries:
 Libs\LibStub.lua
 Libs\LibDeformat-3.0.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+Libs\LibTalentQuery-1.0\lib.xml
+Libs\LibBossIDs-1.0\lib.xml
+Libs\LibQTip-1.0\lib.xml
+Libs\LibSharedMedia-3.0\lib.xml
 
 # Localization (moved to the top for 'L' to be available):
 Localization\localization.en.lua
