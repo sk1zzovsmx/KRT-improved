@@ -98,6 +98,7 @@ local format, match, find, strlen = string.format, string.match, string.find, st
 local strsub, gsub, lower, upper = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst = tostring, tonumber, _G.string.ucfirst
 local deformat = LibStub("LibDeformat-3.0")
+local BossIDs = LibStub("LibBossIDs-1.0").BossIDs
 
 -- Returns the used frame's name:
 function addon:GetFrameName()
@@ -6065,8 +6066,8 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
 	local _, event, _, _, _, destGUID, destName = ...
 	if not KRT_CurrentRaid then return end
 	if event == "UNIT_DIED" then
-		local npcID = Utils.GetNPCID(destGUID)
-		if addon.bossListIDs[npcID] then
+               local npcID = Utils.GetNPCID(destGUID)
+               if BossIDs[npcID] then
 			if KRT then
 				addon:Debug("INFO", "Boss killed: %s", destName)
 			end
