@@ -467,7 +467,8 @@ do
 	function Raid:End()
 		if not KRT_CurrentRaid then return end
 		addon:Debug("INFO", "Ending raid ID: %d", KRT_CurrentRaid)
-		Utils.unschedule(addon.Raid.UpdateRaidRoster)
+               -- unschedule the roster update task registered earlier
+               Utils.unschedule(addon.UpdateRaidRoster)
 		local currentTime = Utils.GetCurrentTime()
 		for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
 			if not v.leave then v.leave = currentTime end

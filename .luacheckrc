@@ -1,4 +1,4 @@
-std = "wow_wotlk"
+std = "lua51"
 globals = {
     "KRT",
     "KRT_CurrentRaid", "KRT_LastBoss", "KRT_Debug",
@@ -7,3 +7,4 @@ globals = {
     "KRT_SavedReserves", "KRT_NextReset",
     "KRT_FakeTooltip", "KRT_MINIMAP_GUI",
     "LibStub", "CUSTOM_CLASS_COLORS",
+}
