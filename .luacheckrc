@@ -1,4 +1,4 @@
-std = "wow_wotlk"
+std = "lua51"
 
 include_files = {
     "!KRT/**/*.lua",
@@ -12,24 +12,17 @@ exclude_files = {
     "_dev/**",
 }
 
-custom = {
-  wow_wotlk = {
-    files = {
-      "lua51"
-    },
-    globals = {
-      -- WoW API core
-      "CreateFrame", "DEFAULT_CHAT_FRAME", "UIParent", "SendChatMessage", "GetTime",
-      "UnitName", "GetItemInfo", "PlaySound", "GameTooltip", "LibStub",
-      "SlashCmdList", "RaidNotice_AddMessage", "IsInRaid", "IsInGroup",
-      "GetNumRaidMembers", "GetNumPartyMembers", "GetLootRollItemInfo",
-      "SetItemRef", "hooksecurefunc",
+globals = {
+  -- WoW API core
+  "CreateFrame", "DEFAULT_CHAT_FRAME", "UIParent", "SendChatMessage", "GetTime",
+  "UnitName", "GetItemInfo", "PlaySound", "GameTooltip", "LibStub",
+  "SlashCmdList", "RaidNotice_AddMessage", "IsInRaid", "IsInGroup",
+  "GetNumRaidMembers", "GetNumPartyMembers", "GetLootRollItemInfo",
+  "SetItemRef", "hooksecurefunc",
 
-      -- Addon namespace / globals
-      "KRT", "KRT_CurrentRaid", "KRT_LastBoss", "KRT_Debug",
-      "KRT_Players", "KRT_Raids", "KRT_Options", "KRT_Warnings",
-      "KRT_Spammer", "KRT_ExportString", "KRT_SavedReserves", "KRT_NextReset",
-      "KRT_FakeTooltip", "KRT_MINIMAP_GUI", "CUSTOM_CLASS_COLORS"
-    }
-  }
+  -- Addon namespace / globals
+  "KRT", "KRT_CurrentRaid", "KRT_LastBoss", "KRT_Debug",
+  "KRT_Players", "KRT_Raids", "KRT_Options", "KRT_Warnings",
+  "KRT_Spammer", "KRT_ExportString", "KRT_SavedReserves", "KRT_NextReset",
+  "KRT_FakeTooltip", "KRT_MINIMAP_GUI", "CUSTOM_CLASS_COLORS"
 }
