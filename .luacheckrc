@@ -2,7 +2,10 @@ std = "lua51"
 max_line_length = false
 
 include_files = {
-    "!KRT/**/*.lua"
+    "!KRT/**/*.lua",
+    "core/**/*.lua",
+    "ui/**/*.lua",
+    "services/**/*.lua"
 }
 
 exclude_files = {
@@ -13,25 +16,43 @@ exclude_files = {
 }
 
 ignore = {
-    "212/self",   -- ignora self non usato (per mixin)
-    "212/event",  -- ignora event non usato (per eventi WoW)
+    "212/self",   -- ignora 'self' non usato (per mixin)
+    "212/event"   -- ignora 'event' non usato (per eventi WoW)
 }
 
 globals = {
-    -- WoW API core
-    "CreateFrame", "DEFAULT_CHAT_FRAME", "UIParent", "SendChatMessage", "GetTime",
-    "UnitName", "GetItemInfo", "PlaySound", "GameTooltip", "LibStub",
-    "SlashCmdList", "RaidNotice_AddMessage", "IsInRaid", "IsInGroup",
-    "GetNumRaidMembers", "GetNumPartyMembers", "GetLootRollItemInfo",
-    "SetItemRef", "hooksecurefunc", "GetAddOnMetadata", "GetLocale", "Mixin",
+    -- Unit Functions
+    "UnitName", "UnitClass", "UnitLevel", "UnitRace", "UnitSex",
+    "UnitFactionGroup", "UnitHealth", "UnitHealthMax", "UnitIsDead",
+    "UnitIsConnected", "UnitExists", "UnitGUID", "UnitIsUnit",
+    "UnitIsPlayer", "UnitInRaid", "UnitInParty", "UnitAffectingCombat",
 
-    -- Lua base globali usate
-    "strlower", "strtrim", "strsplit", "strjoin", "min", "max", "floor", "ceil",
+    -- Chat and Communication
+    "SendChatMessage", "DEFAULT_CHAT_FRAME", "ChatFrame_AddMessageEventFilter",
+    "GetNumPartyMembers", "GetNumRaidMembers", "IsInGroup", "IsInRaid",
 
-    -- Oggetti globali comuni
-    "GameTooltip", "UIParent", "Minimap",
+    -- Frames and Widgets
+    "CreateFrame", "UIParent", "GameTooltip", "SetItemRef",
+    "ToggleDropDownMenu", "UIDropDownMenu_AddButton", "UIDropDownMenu_Initialize",
 
-    -- Tuo Addon: variabili salvate e namespace
+    -- Loot and Inventory
+    "GetItemInfo", "GetLootRollItemInfo", "RollOnLoot", "ConfirmLootRoll",
+    "LootSlotHasItem", "LootSlotIsItem", "LootSlotIsCoin",
+
+    -- Sound and Media
+    "PlaySound", "PlaySoundFile", "StopSound",
+
+    -- Utility / Misc
+    "LibStub", "SlashCmdList", "hooksecurefunc", "GetAddOnMetadata", "GetLocale", "Mixin",
+
+    -- Minimap / Tooltip
+    "Minimap", "UIErrorsFrame",
+
+    -- Math / String (Lua built-ins)
+    "strlower", "strtrim", "strsplit", "strjoin",
+    "min", "max", "floor", "ceil",
+
+    -- KRT Addon: SavedVariables & Globals
     "KRT", "KRT_CurrentRaid", "KRT_LastBoss", "KRT_Debug",
     "KRT_Players", "KRT_Raids", "KRT_Options", "KRT_Warnings",
     "KRT_Spammer", "KRT_ExportString", "KRT_SavedReserves", "KRT_NextReset",
