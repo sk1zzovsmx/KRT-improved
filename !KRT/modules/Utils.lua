@@ -49,14 +49,21 @@ _G.table.deepCopy = function(t)
     return res
 end
 
--- Reverse table:
+-- Reverses a table in place. If a count is provided, only
+-- the first `count` elements are reversed.
 _G.table.reverse = function(t, count)
-	local i, j = 1, #t
-	while i < j do
-		t[i], t[j] = t[j], t[i]
-		i = i + 1
-		j = j - 1
-	end
+        local i = 1
+        local j = #t
+
+        if type(count) == "number" and count > 0 and count < j then
+                j = count
+        end
+
+        while i < j do
+                t[i], t[j] = t[j], t[i]
+                i = i + 1
+                j = j - 1
+        end
 end
 
 -- Trim a string:
