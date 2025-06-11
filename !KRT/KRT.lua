@@ -216,7 +216,14 @@ do
 
         if logLevelPriority[level] < logLevelPriority[minLevel] then return end
 
-        if ... then msg = string.format(msg, ...) end
+        if select('#', ...) > 0 then
+			local safeArgs = {}
+			for i = 1, select('#', ...) do
+				local v = select(i, ...)
+				table.insert(safeArgs, type(v) == "string" and v or tostring(v))
+			end
+			msg = string.format(msg, unpack(safeArgs))
+		end
         local line = string.format("[%s][%s] %s", date("%H:%M:%S"), level, msg)
 
         if not scrollFrame then
