@@ -193,8 +193,7 @@ do
 		for i = 1, select("#", ...) do
 			task[i] = select(i, ...)
 		end
-		tasks[#tasks+1] = task
-		tinsert(tasks, task)
+                tinsert(tasks, task)
 	end
 
 	-- Unschedule a task:
@@ -210,13 +209,13 @@ do
 	-- Run all scheduled tasks:
 	function Utils.run()
 		local now = time()
-		for i = 1, #tasks do
-			local task = tasks[i]
-			if task and type(task.func) == "function" and task.time <= now then
-				task.func(unpack(task))
-				tremove(tasks, i) -- Only once!
-			end
-		end
+                for i = #tasks, 1, -1 do
+                        local task = tasks[i]
+                        if task and type(task.func) == "function" and task.time <= now then
+                                task.func(unpack(task))
+                                tremove(tasks, i) -- Only once!
+                        end
+                end
 	end
 end
 
