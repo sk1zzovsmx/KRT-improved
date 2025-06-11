@@ -8,21 +8,22 @@ on:
 
 jobs:
   luacheck:
-    name: Run Luacheck on WoW addon
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Set up Lua 5.1 and Luarocks
+    - name: Set up Lua and Luarocks
       run: |
         sudo apt-get update
         sudo apt-get install -y lua5.1 luarocks
-        luarocks install luacheck
+
+    - name: Install Luacheck (local)
+      run: luarocks install --local luacheck
 
     - name: Add luarocks bin to PATH
       run: echo "$HOME/.luarocks/bin" >> $GITHUB_PATH
 
-    - name: Run luacheck on !KRT/
+    - name: Run Luacheck
       run: luacheck !KRT/
