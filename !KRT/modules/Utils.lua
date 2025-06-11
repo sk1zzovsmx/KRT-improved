@@ -23,15 +23,17 @@ _G.table.shuffle = function(t)
 	end
 end
 
--- Fills a table (t1) with missing values from another (t2):
+-- Fills table `t1` with missing values from `t2`.
+-- If a value is a table, it is recursively filled as well.
 function Utils.fillTable(t1, t2)
-	for i, v in pairs(t2) do
-		if t1[i] == nil then
-			t1[i] = v
-		elseif type(v) == "table" then
-			Utils.fillTable(v, t2[i])
-		end
-	end
+        for i, v in pairs(t2) do
+                if t1[i] == nil then
+                        t1[i] = v
+                elseif type(v) == "table" then
+                        -- ensure nested tables are filled correctly
+                        Utils.fillTable(t1[i], v)
+                end
+        end
 end
 
 -- DeepCopy:
