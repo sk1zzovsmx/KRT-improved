@@ -45,17 +45,22 @@ do
 		addon:Debug("DEBUG", "Default options loaded")
 	end
 
-	-- Load addon options:
-	function LoadOptions()
-		addon:Debug("DEBUG", "Loading addon options")
-		addon.options = KRT_Options
-		Utils.fillTable(addon.options, defaultOptions)
+        -- Load addon options:
+        local function LoadOptionsInternal()
+                addon:Debug("DEBUG", "Loading addon options")
+                addon.options = KRT_Options
+                Utils.fillTable(addon.options, defaultOptions)
 
-		if not addon.options.useRaidWarning then
-			addon.options.countdownSimpleRaidMsg = false
-		end
-		addon:Debug("DEBUG", "Addon options loaded: %s", tostring(addon.options))
-	end
+                if not addon.options.useRaidWarning then
+                        addon.options.countdownSimpleRaidMsg = false
+                end
+                addon:Debug("DEBUG", "Addon options loaded: %s", tostring(addon.options))
+        end
+
+        -- Public wrapper so other modules can load options
+        function Config:LoadOptions()
+                LoadOptionsInternal()
+        end
 
 	-- External reset of default options:
 	function Config:Default()
