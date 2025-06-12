@@ -1064,42 +1064,45 @@ do
 		return Utils.print_blue(msg)
 	end
 
-	-- Function used for various announcements:
-	function addon:Announce(text, channel)
-		local originalChannel = channel
-		if not channel then
-			channel = "SAY"
-			-- Switch to party mode if we're in a party:
-			if self:IsInParty() then
-				channel = "PARTY"		
-			-- Switch to raid channel if we're in a raid:
-			elseif self:IsInRaid() then
-				-- Check for countdown messages
-				local countdownTicPattern = L.ChatCountdownTic:gsub("%%d", "%%d+")
-				local isCountdownMessage = text:find(countdownTicPattern) or text:find(L.ChatCountdownEnd)
+        -- Determine which channel to announce on
+        function addon:GetAnnounceChannel(text)
+                local channel = "SAY"
+                if self:IsInParty() then
+                        channel = "PARTY"
+                elseif self:IsInRaid() then
+                        local countdownTicPattern = L.ChatCountdownTic:gsub("%%d", "%%d+")
+                        local isCountdownMessage = text:find(countdownTicPattern) or text:find(L.ChatCountdownEnd)
+                        local isLeader = IsRaidLeader() or IsRaidOfficer()
 
-				if isCountdownMessage then
-					-- If it's a countdown message:
-					if addon.options.countdownSimpleRaidMsg then
-						channel = "RAID" -- Force RAID if countdownSimpleRaidMsg is true
-					-- Use RAID_WARNING if leader/officer AND useRaidWarning is true
-					elseif addon.options.useRaidWarning and (IsRaidLeader() or IsRaidOfficer()) then
-						channel = "RAID_WARNING"
-					else
-						channel = "RAID" -- Fallback to RAID
-					end
-				else
-					if addon.options.useRaidWarning and (IsRaidLeader() or IsRaidOfficer()) then
-						channel = "RAID_WARNING"
-					else
-						channel = "RAID" -- Fallback to RAID
-					end
-				end
-			end
-		end
-		-- Let's Go!
-		SendChatMessage(tostring(text), channel)
-	end
+                        if isCountdownMessage then
+                                if addon.options.countdownSimpleRaidMsg then
+                                        channel = "RAID" -- Force RAID if countdownSimpleRaidMsg is true
+                                elseif addon.options.useRaidWarning and isLeader then
+                                        channel = "RAID_WARNING"
+                                else
+                                        channel = "RAID"
+                                end
+                        else
+                                if addon.options.useRaidWarning and isLeader then
+                                        channel = "RAID_WARNING"
+                                else
+                                        channel = "RAID"
+                                end
+                        end
+                end
+
+                return channel
+        end
+
+        -- Function used for various announcements:
+        function addon:Announce(text, channel)
+                if not channel then
+                        channel = self:GetAnnounceChannel(text)
+                end
+
+                -- Let's Go!
+                SendChatMessage(tostring(text), channel)
+        end
 end
 
 -- ==================== MiniMap Button ==================== --
