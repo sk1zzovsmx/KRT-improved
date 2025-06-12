@@ -78,7 +78,8 @@ end
 
 -- String ends with:
 _G.string.endsWith = function(str, piece)
-	return #str >= #piece and find(str, #str - #piece + 1, true) and true or false
+        return #str >= #piece
+                and find(str, piece, #str - #piece + 1, true) ~= nil
 end
 
 -- Uppercase first:
