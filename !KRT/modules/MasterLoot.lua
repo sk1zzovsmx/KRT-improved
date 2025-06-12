@@ -118,7 +118,7 @@ do
 			local itemID = tonumber(string.match(itemLink or "", "item:(%d+)"))
 			local message = ""
 
-			if rollType == rollTypes.reserved and addon.Reserves and addon.Reserves.FormatReservedPlayersLine then
+			if rollType == addon.rollTypes.reserved and addon.Reserves and addon.Reserves.FormatReservedPlayersLine then
 				local srList = addon.Reserves:FormatReservedPlayersLine(itemID)
 				local suff = addon.options.sortAscending and "Low" or "High"
 				message = itemCount > 1
@@ -192,12 +192,12 @@ do
 		countdownRun = false
 		local itemLink = GetItemLink()
 		if itemLink == nil then return end
-		currentRollType = rollTypes.hold
+		currentRollType = addon.rollTypes.hold
 		addon:Debug("DEBUG", "Holding item %s for %s", itemLink, holder)
 		if fromInventory == true then
-			return TradeItem(itemLink, holder, rollTypes.hold, 0)
+			return TradeItem(itemLink, holder, addon.rollTypes.hold, 0)
 		end
-		return AssignItem(itemLink, holder, rollTypes.hold, 0)
+		return AssignItem(itemLink, holder, addon.rollTypes.hold, 0)
 	end
 
 	-- Button: Bank item
@@ -207,12 +207,12 @@ do
 		countdownRun = false
 		local itemLink = GetItemLink()
 		if itemLink == nil then return end
-		currentRollType = rollTypes.bank
+		currentRollType = addon.rollTypes.bank
 		addon:Debug("DEBUG", "Banking item %s to %s", itemLink, banker)
 		if fromInventory == true then
-			return TradeItem(itemLink, banker, rollTypes.bank, 0)
+			return TradeItem(itemLink, banker, addon.rollTypes.bank, 0)
 		end
-		return AssignItem(itemLink, banker, rollTypes.bank, 0)
+		return AssignItem(itemLink, banker, addon.rollTypes.bank, 0)
 	end
 
 	-- Button: Disenchant item
@@ -222,12 +222,12 @@ do
 		countdownRun = false
 		local itemLink = GetItemLink()
 		if itemLink == nil then return end
-		currentRollType = rollTypes.disenchant
+		currentRollType = addon.rollTypes.disenchant
 		addon:Debug("DEBUG", "Disenchanting item %s by %s", itemLink, disenchanter)
 		if fromInventory == true then
-			return TradeItem(itemLink, disenchanter, rollTypes.disenchant, 0)
+			return TradeItem(itemLink, disenchanter, addon.rollTypes.disenchant, 0)
 		end
-		return AssignItem(itemLink, disenchanter, rollTypes.disenchant, 0)
+		return AssignItem(itemLink, disenchanter, addon.rollTypes.disenchant, 0)
 	end
 
 	-- Select winner:
@@ -648,17 +648,17 @@ do
 				local output, whisper
 				if rollType <= 4 and addon.options.announceOnWin then
 					output = L.ChatAward:format(playerName, itemLink)
-				elseif rollType == rollTypes.hold and addon.options.announceOnHold then
+				elseif rollType == addon.rollTypes.hold and addon.options.announceOnHold then
 					output = L.ChatHold:format(playerName, itemLink)
 					if addon.options.lootWhispers then
 						whisper = L.WhisperHoldAssign:format(itemLink)
 					end
-				elseif rollType == rollTypes.bank and addon.options.announceOnBank then
+				elseif rollType == addon.rollTypes.bank and addon.options.announceOnBank then
 					output = L.ChatBank:format(playerName, itemLink)
 					if addon.options.lootWhispers then
 						whisper = L.WhisperBankAssign:format(itemLink)
 					end
-				elseif rollType == rollTypes.disenchant and addon.options.announceOnDisenchant then
+				elseif rollType == addon.rollTypes.disenchant and addon.options.announceOnDisenchant then
 					output = L.ChatDisenchant:format(itemLink, playerName)
 					if addon.options.lootWhispers then
 						whisper = L.WhisperDisenchantAssign:format(itemLink)
@@ -692,21 +692,21 @@ do
 		if rollType <= 4 and addon.options.announceOnWin then
 			output = L.ChatAward:format(playerName, itemLink)
 			keep = false
-		elseif rollType == rollTypes.hold and addon.options.announceOnHold then
+		elseif rollType == addon.rollTypes.hold and addon.options.announceOnHold then
 			output = L.ChatNoneRolledHold:format(itemLink, playerName)
-		elseif rollType == rollTypes.bank and addon.options.announceOnBank then
+		elseif rollType == addon.rollTypes.bank and addon.options.announceOnBank then
 			output = L.ChatNoneRolledBank:format(itemLink, playerName)
-		elseif rollType == rollTypes.disenchant and addon.options.announceOnDisenchant then
+		elseif rollType == addon.rollTypes.disenchant and addon.options.announceOnDisenchant then
 			output = L.ChatNoneRolledDisenchant:format(itemLink, playerName)
 		end
 
 		-- Keeping the item:
 		if keep then
-			if rollType == rollTypes.hold then
+			if rollType == addon.rollTypes.hold then
 				whisper = L.WhisperHoldTrade:format(itemLink)
-			elseif rollType == rollTypes.bank then
+			elseif rollType == addon.rollTypes.bank then
 				whisper = L.WhisperBankTrade:format(itemLink)
-			elseif rollType == rollTypes.disenchant then
+			elseif rollType == addon.rollTypes.disenchant then
 				whisper = L.WhisperDisenchantTrade:format(itemLink)
 			end
 		-- Multiple winners:
@@ -721,7 +721,7 @@ do
 						tinsert(winners, "{star} "..rolls[i].name.."("..rolls[i].roll..")")
 					else
 						SetRaidTarget(rolls[i].name, i + 1)
-						tinsert(winners, markers[i].." "..rolls[i].name.."("..rolls[i].roll..")")
+                                                tinsert(winners, addon.markers[i].." "..rolls[i].name.."("..rolls[i].roll..")")
 					end
 				end
 			end
@@ -766,7 +766,7 @@ do
 					Utils.whisper(playerName, whisper)
 				end
 			end
-			if rollType <= rollTypes.free and playerName == trader then
+			if rollType <= addon.rollTypes.free and playerName == trader then
 				addon:Log(currentRollItem, trader, rollType, rollValue)
 			end
 			announced = true

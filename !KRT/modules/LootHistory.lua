@@ -1139,7 +1139,7 @@ do
 			btn:SetID(v.id)
 			btn:Show()
 
-			_G[btnName.."Name"]:SetText("|c"..itemColors[v.itemRarity+1]..v.itemName.."|r")
+                        _G[btnName.."Name"]:SetText("|c"..addon.itemColors[v.itemRarity+1]..v.itemName.."|r")
 			_G[btnName.."Source"]:SetText(addon.Logger.Boss:GetName(v.bossNum, selectedRaid))
 			local player = v.looter
 			local class = addon:GetPlayerClass(player)

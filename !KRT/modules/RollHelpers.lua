@@ -44,7 +44,7 @@ do
 		SortRolls()
 		if not selectedPlayer then
 			local resolvedItemId = itemId or addon:GetCurrentRollItemID()
-			if currentRollType == rollTypes.reserved then
+			if currentRollType == addon.rollTypes.reserved then
 				local topRoll = -1
 				for _, entry in ipairs(rollsTable) do
 					if addon:IsReserved(resolvedItemId, entry.name) and entry.roll > topRoll then
@@ -70,7 +70,7 @@ do
 		local name = UnitName("player")
 		local allowed = 1
 
-		if currentRollType == rollTypes.reserved then
+		if currentRollType == addon.rollTypes.reserved then
 			allowed = addon.Reserves:GetReserveCountForItem(itemId, name)
 		end
 
@@ -120,7 +120,7 @@ do
 			end
 
 			local allowed = 1
-			if currentRollType == rollTypes.reserved then
+			if currentRollType == addon.rollTypes.reserved then
 				local playerReserves = addon.Reserves:GetReserveCountForItem(itemId, player)
 				allowed = playerReserves > 0 and playerReserves or 1
 			end
@@ -168,7 +168,7 @@ do
 		end
 		itemRollTracker[itemId] = itemRollTracker[itemId] or {}
 		local used = itemRollTracker[itemId][name] or 0
-		local allowed = (currentRollType == rollTypes.reserved and addon.Reserves:GetReserveCountForItem(itemId, name) > 0)
+		local allowed = (currentRollType == addon.rollTypes.reserved and addon.Reserves:GetReserveCountForItem(itemId, name) > 0)
 			and addon.Reserves:GetReserveCountForItem(itemId, name) or 1
 		local result = used >= allowed
 		addon:Debug("DEBUG", "DidRoll: name=%s, itemId=%d, used=%d, allowed=%d, result=%s", name, itemId, used, allowed, tostring(result))
@@ -224,7 +224,7 @@ do
 	function addon:IsValidRoll(itemId, name)
 		itemRollTracker[itemId] = itemRollTracker[itemId] or {}
 		local used = itemRollTracker[itemId][name] or 0
-		local allowed = (currentRollType == rollTypes.reserved)
+		local allowed = (currentRollType == addon.rollTypes.reserved)
 			and addon.Reserves:GetReserveCountForItem(itemId, name)
 			or 1
 		local result = used < allowed
@@ -264,7 +264,7 @@ do
 		scrollChild:SetWidth(scrollFrame:GetWidth())
 
 		local itemId = self:GetCurrentRollItemID()
-		local isSR = currentRollType == rollTypes.reserved
+		local isSR = currentRollType == addon.rollTypes.reserved
 		addon:Debug("DEBUG", "Current itemId: %s, SR mode: %s", tostring(itemId), tostring(isSR))
 
 		local starTarget = selectedPlayer

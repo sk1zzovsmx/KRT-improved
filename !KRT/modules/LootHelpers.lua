@@ -72,7 +72,7 @@ do
 
 		lootTable[lootCount]             = {}
 		lootTable[lootCount].itemName    = itemName
-		lootTable[lootCount].itemColor   = itemColors[itemRarity+1]
+                lootTable[lootCount].itemColor   = addon.itemColors[itemRarity+1]
 		lootTable[lootCount].itemLink    = itemLink
 		lootTable[lootCount].itemTexture = itemTexture
 		TriggerEvent("AddItem", itemLink)

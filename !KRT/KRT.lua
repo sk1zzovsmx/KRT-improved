@@ -101,6 +101,11 @@ local classColors = {
 -- Raid Target Icons:
 local markers = {"{circle}", "{diamond}", "{triangle}", "{moon}", "{square}", "{cross}", "{skull}"}
 
+-- Make these tables accessible to other modules
+addon.rollTypes = rollTypes
+addon.itemColors = itemColors
+addon.markers = markers
+
 -- Windows Title String:
 local titleString = "|cfff58cbaK|r|caaf49141RT|r : %s"
 
