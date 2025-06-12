@@ -7,6 +7,10 @@ local AceEvent = LibStub("AceEvent-3.0")
 AceEvent:Embed(addon)
 addon.timers = addon.timers or {}
 
+-- Load boss ID library
+local BossIDLib = LibStub("LibBossIDs-1.0", true)
+addon.BossIDs = BossIDLib and BossIDLib.BossIDs or {}
+
 function addon:Schedule(name, delay, func, ...)
     self:Cancel(name)
     self.timers[name] = self:ScheduleTimer(func, delay, ...)
@@ -333,8 +337,8 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
 	local _, event, _, _, _, destGUID, destName = ...
 	if not KRT_CurrentRaid then return end
 	if event == "UNIT_DIED" then
-		local npcID = Utils.GetNPCID(destGUID)
-		if addon.bossListIDs[npcID] then
+                local npcID = Utils.GetNPCID(destGUID)
+                if addon.BossIDs[npcID] then
 			if KRT then
 				addon:Debug("INFO", "Boss killed: %s", destName)
 			end
