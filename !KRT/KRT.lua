@@ -7,11 +7,7 @@ addon.timers = addon.timers or {}
 
 function addon:Schedule(name, delay, func, ...)
     self:Cancel(name)
-    if type(func) == "string" then
-        self.timers[name] = self:ScheduleTimer(func, delay, ...)
-    else
-        self.timers[name] = self:ScheduleTimer(func, delay, ...)
-    end
+    self.timers[name] = self:ScheduleTimer(func, delay, ...)
     return self.timers[name]
 end
 
