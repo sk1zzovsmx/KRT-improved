@@ -1,4 +1,5 @@
 local addonName, addon = ...
+addon = LibStub("AceAddon-3.0"):NewAddon(addon, addonName, "AceEvent-3.0")
 local L = addon.L
 local Utils = addon.Utils
 
@@ -21,6 +22,8 @@ KRT_SavedReserves 	= KRT_SavedReserves or {}
 
 -- AddOn main frames:
 local mainFrame = CreateFrame("Frame")
+mainFrame:SetScript("OnUpdate", Utils.run)
+addon:RegisterEvent("ADDON_LOADED")
 local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings
 local UILogger, UILoggerItemBox, UIReserve
 -- local UILoggerBossBox, UILoggerPlayerBox
@@ -86,8 +89,11 @@ local markers = {"{circle}", "{diamond}", "{triangle}", "{moon}", "{square}", "{
 local titleString = "|cfff58cbaK|r|caaf49141RT|r : %s"
 
 -- Some local functions:
-local TriggerEvent
 local LoadOptions
+
+-- Callbacks handler
+local CallbackHandler = LibStub("CallbackHandler-1.0")
+addon.callbacks = CallbackHandler:New(addon)
 
 -- Cache frequently used globals:
 local SendChatMessage = SendChatMessage
@@ -253,97 +259,6 @@ do
     end
 end
 
--- ==================== Callbacks Helpers ==================== --
-
-do
-	-- Table of registered callbacks:
-	local callbacks = {}
-
-	-- Register a new callback:
-	function addon:RegisterCallback(e, func)
-		if not e or type(func) ~= "function" then
-			error(L.StrCbErrUsage)
-		end
-		callbacks[e] = callbacks[e] or {}
-		tinsert(callbacks[e], func)
-		addon:Debug("DEBUG", "Registered callback for event '%s': %s", tostring(e), tostring(func))
-		return #callbacks
-	end
-
-	-- Trigger a registered event:
-	function TriggerEvent(e, ...)
-		if not callbacks[e] then
-			addon:Debug("DEBUG", "No callbacks registered for event '%s'", tostring(e))
-			return
-		end
-		addon:Debug("DEBUG", "Triggering event '%s' (%d callbacks)", tostring(e), #callbacks[e])
-		for i, v in ipairs(callbacks[e]) do
-			local ok, err = pcall(v, e, ...)
-			if not ok then
-				addon:Debug("ERROR", "Error in callback %s for event '%s': %s", tostring(v), tostring(e), tostring(err))
-				addon:PrintError(L.StrCbErrExec:format(tostring(v), tostring(e), err))
-			end
-		end
-	end
-end
-
--- ==================== Events System ==================== --
-
-do
-	-- Table of registered events:
-	local events = {}
-
-	-- Events Handler:
-	local function HandleEvent(self, e, ...)
-		addon:Debug("DEBUG", "Handling event: '%s'", e)
-
-		if e == "ADDON_LOADED" then
-			LoadOptions()
-		end
-		if not events[e] then
-			addon:Debug("DEBUG", "No frames registered for event '%s'", e)
-			return
-		end
-		for i, v in ipairs(events[e]) do
-			if type(v[e]) == "function" then
-				addon:Debug("DEBUG", "Dispatching event '%s' to frame %d", e, i)
-				v[e](v, ...)
-			end
-		end
-	end
-
-	-- Registers new frame event(s):
-	function addon:RegisterEvents(...)
-		for i = 1, select("#", ...) do
-			local e = select(i, ...)
-			events[e] = events[e] or {}
-			tinsert(events[e], self)
-			mainFrame:RegisterEvent(e)
-			addon:Debug("INFO", "Registered event '%s' for frame", e)
-		end
-	end
-
-	-- Unregister all frame events:
-	function addon:UnregisterEvents()
-		for e, v in pairs(events) do
-			for i = #v, 1, -1 do
-				if v[i] == self then
-					tremove(v, i)
-				end
-			end
-			if #v == 0 then
-				events[e] = nil
-				mainFrame:UnregisterEvent(e)
-				addon:Debug("INFO", "Unregistered event '%s' from frame", e)
-			end
-		end
-	end
-
-	-- Register some events and frame-related functions:
-	addon:RegisterEvents("ADDON_LOADED")
-	mainFrame:SetScript("OnEvent", HandleEvent)
-	mainFrame:SetScript("OnUpdate", Utils.run)
-end
 
 -- ==================== Raid Helpers ==================== --
 do
@@ -458,10 +373,10 @@ do
 		end
 		tinsert(KRT_Raids, raidInfo)
 		KRT_CurrentRaid = #KRT_Raids
-		addon:Debug("INFO", "Raid created with ID: %d", KRT_CurrentRaid)
-		TriggerEvent("RaidCreate", KRT_CurrentRaid)
-		Utils.schedule(3, addon.UpdateRaidRoster)
-	end
+                addon:Debug("INFO", "Raid created with ID: %d", KRT_CurrentRaid)
+                addon.callbacks:Fire("RaidCreate", KRT_CurrentRaid)
+                Utils.schedule(3, addon.UpdateRaidRoster)
+        end
 
 	-- Ends the current raid entry:
 	function Raid:End()
@@ -1294,8 +1209,8 @@ do
 			addon:Debug("DEBUG", "Updated itemRollTracker: itemId=%d, player=%s, count=%d", itemId, name, itemRollTracker[itemId][name])
 		end
 
-		TriggerEvent("AddRoll", name, roll)
-		SortRolls()
+                addon.callbacks:Fire("AddRoll", name, roll)
+                SortRolls()
 		if not selectedPlayer then
 			local resolvedItemId = itemId or addon:GetCurrentRollItemID()
 			if currentRollType == rollTypes.reserved then
@@ -1677,8 +1592,8 @@ do
 		lootTable[lootCount].itemColor   = itemColors[itemRarity+1]
 		lootTable[lootCount].itemLink    = itemLink
 		lootTable[lootCount].itemTexture = itemTexture
-		TriggerEvent("AddItem", itemLink)
-	end
+                addon.callbacks:Fire("AddItem", itemLink)
+        end
 
 	-- Prepare item display:
 	function addon:PrepareItem()
@@ -1707,8 +1622,8 @@ do
 				currentItemBtn.tooltip_item = i.itemLink
 				self:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
 			end
-			TriggerEvent("SetItem", i.itemLink)
-		end
+                        addon.callbacks:Fire("SetItem", i.itemLink)
+                end
 
 	end
 
@@ -3265,8 +3180,8 @@ do
 			addon:Debug("DEBUG", "Setting countdown duration to: %d", value)
 		end
 		name = strsub(name, strlen(frameName) + 1)
-		TriggerEvent("Config"..name, value)
-		KRT_Options[name] = value
+                addon.callbacks:Fire("Config"..name, value)
+                KRT_Options[name] = value
 		addon:Debug("DEBUG", "Option %s set to: %s", name, tostring(value))
 	end
 
@@ -4364,7 +4279,7 @@ do
 		else
 			addon.Logger.selectedRaid = nil
 		end
-		TriggerEvent("LoggerSelectRaid", rID)
+                addon.callbacks:Fire("LoggerSelectRaid", rID)
 	end
 
 	-- Select a boss:
@@ -4376,7 +4291,7 @@ do
 		else
 			addon.Logger.selectedBoss = nil
 		end
-		TriggerEvent("LoggerSelectBoss", bID)
+                addon.callbacks:Fire("LoggerSelectBoss", bID)
 	end
 
 	-- Select a boss attendee:
@@ -4388,7 +4303,7 @@ do
 		else
 			addon.Logger.selectedBossPlayer = nil
 		end
-		TriggerEvent("LoggerSelectBossPlayer", pID)
+                addon.callbacks:Fire("LoggerSelectBossPlayer", pID)
 	end
 
 	-- Select a player:
@@ -4400,7 +4315,7 @@ do
 		else
 			addon.Logger.selectedPlayer = nil
 		end
-		TriggerEvent("LoggerSelectPlayer", pID)
+                addon.callbacks:Fire("LoggerSelectPlayer", pID)
 	end
 
 	do
@@ -4437,7 +4352,7 @@ do
 				else
 					addon.Logger.selectedItem = nil
 				end
-				TriggerEvent("LoggerSelectItem", iID)
+                                addon.callbacks:Fire("LoggerSelectItem", iID)
 			elseif button == "RightButton" then
 				addon.Logger.selectedItem = btn:GetID()
 				OpenItemMenu(btn)
@@ -5703,8 +5618,8 @@ do
 
 		CancelAddEdit()
 		self:Hide()
-		TriggerEvent("LoggerSelectRaid")
-	end
+                addon.callbacks:Fire("LoggerSelectRaid")
+        end
 
 	function CancelAddEdit()
 		selectedRaid = nil
@@ -5987,26 +5902,28 @@ end
 
 -- On ADDON_LOADED:
 function addon:ADDON_LOADED(name)
-	if name ~= addonName then return end
-	mainFrame:UnregisterEvent("ADDON_LOADED")
-	LoadOptions()
-	self:RegisterEvents(
-		"CHAT_MSG_ADDON",
-		"CHAT_MSG_SYSTEM",
-		"CHAT_MSG_LOOT",
-		"CHAT_MSG_MONSTER_YELL",
-		"RAID_ROSTER_UPDATE",
-		"PLAYER_ENTERING_WORLD",
-		"COMBAT_LOG_EVENT_UNFILTERED",
-		"RAID_INSTANCE_WELCOME",
-		-- Master frame events:
-		"ITEM_LOCKED",
-		"LOOT_CLOSED",
-		"LOOT_OPENED",
-		"LOOT_SLOT_CLEARED",
-		"TRADE_ACCEPT_UPDATE"
-	)
-	self:RAID_ROSTER_UPDATE()
+        if name ~= addonName then return end
+        self:UnregisterEvent("ADDON_LOADED")
+        LoadOptions()
+        local events = {
+                "CHAT_MSG_ADDON",
+                "CHAT_MSG_SYSTEM",
+                "CHAT_MSG_LOOT",
+                "CHAT_MSG_MONSTER_YELL",
+                "RAID_ROSTER_UPDATE",
+                "PLAYER_ENTERING_WORLD",
+                "COMBAT_LOG_EVENT_UNFILTERED",
+                "RAID_INSTANCE_WELCOME",
+                "ITEM_LOCKED",
+                "LOOT_CLOSED",
+                "LOOT_OPENED",
+                "LOOT_SLOT_CLEARED",
+                "TRADE_ACCEPT_UPDATE",
+        }
+        for _, e in ipairs(events) do
+                self:RegisterEvent(e)
+        end
+        self:RAID_ROSTER_UPDATE()
 end
 
 function addon:RAID_ROSTER_UPDATE()
@@ -6035,7 +5952,7 @@ function addon:RAID_INSTANCE_WELCOME(...)
 end
 
 function addon:PLAYER_ENTERING_WORLD()
-	mainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
+        self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	if KRT then
 		addon:Debug("INFO", "Player entered the world. Initial raid check scheduled.")
 	end
