@@ -3,6 +3,8 @@ local L = LibStub("AceLocale-3.0"):GetLocale("KRT")
 local Utils = addon.Utils
 local AceTimer = LibStub("AceTimer-3.0")
 AceTimer:Embed(addon)
+local AceEvent = LibStub("AceEvent-3.0")
+AceEvent:Embed(addon)
 addon.timers = addon.timers or {}
 
 function addon:Schedule(name, delay, func, ...)
@@ -37,7 +39,7 @@ KRT_NextReset	 	= KRT_NextReset or  0
 KRT_SavedReserves 	= KRT_SavedReserves or {}
 
 -- AddOn main frames:
-local mainFrame = CreateFrame("Frame")
+-- mainFrame no longer needed with AceEvent
 local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings
 local UILogger, UILoggerItemBox, UIReserve
 -- local UILoggerBossBox, UILoggerPlayerBox
@@ -273,92 +275,38 @@ end
 -- ==================== Callbacks Helpers ==================== --
 
 do
-	-- Table of registered callbacks:
-	local callbacks = {}
+        function addon:RegisterCallback(event, func)
+                if not event or type(func) ~= "function" then
+                        error(L.StrCbErrUsage)
+                end
+                addon:RegisterMessage(event, func)
+        end
 
-	-- Register a new callback:
-	function addon:RegisterCallback(e, func)
-		if not e or type(func) ~= "function" then
-			error(L.StrCbErrUsage)
-		end
-		callbacks[e] = callbacks[e] or {}
-		tinsert(callbacks[e], func)
-		addon:Debug("DEBUG", "Registered callback for event '%s': %s", tostring(e), tostring(func))
-		return #callbacks
-	end
-
-	-- Trigger a registered event:
-	function TriggerEvent(e, ...)
-		if not callbacks[e] then
-			addon:Debug("DEBUG", "No callbacks registered for event '%s'", tostring(e))
-			return
-		end
-		addon:Debug("DEBUG", "Triggering event '%s' (%d callbacks)", tostring(e), #callbacks[e])
-		for i, v in ipairs(callbacks[e]) do
-			local ok, err = pcall(v, e, ...)
-			if not ok then
-				addon:Debug("ERROR", "Error in callback %s for event '%s': %s", tostring(v), tostring(e), tostring(err))
-				addon:PrintError(L.StrCbErrExec:format(tostring(v), tostring(e), err))
-			end
-		end
-	end
+        local function TriggerEvent(event, ...)
+                addon:SendMessage(event, ...)
+        end
 end
 
 -- ==================== Events System ==================== --
 
 do
-	-- Table of registered events:
-	local events = {}
+        function addon:RegisterEvents(...)
+                for i = 1, select("#", ...) do
+                        addon:RegisterEvent(select(i, ...))
+                end
+        end
 
-	-- Events Handler:
-	local function HandleEvent(self, e, ...)
-		addon:Debug("DEBUG", "Handling event: '%s'", e)
+        function addon:UnregisterEvents(...)
+                if select("#", ...) == 0 then
+                        addon:UnregisterAllEvents()
+                else
+                        for i = 1, select("#", ...) do
+                                addon:UnregisterEvent(select(i, ...))
+                        end
+                end
+        end
 
-		if e == "ADDON_LOADED" then
-			LoadOptions()
-		end
-		if not events[e] then
-			addon:Debug("DEBUG", "No frames registered for event '%s'", e)
-			return
-		end
-		for i, v in ipairs(events[e]) do
-			if type(v[e]) == "function" then
-				addon:Debug("DEBUG", "Dispatching event '%s' to frame %d", e, i)
-				v[e](v, ...)
-			end
-		end
-	end
-
-	-- Registers new frame event(s):
-	function addon:RegisterEvents(...)
-		for i = 1, select("#", ...) do
-			local e = select(i, ...)
-			events[e] = events[e] or {}
-			tinsert(events[e], self)
-			mainFrame:RegisterEvent(e)
-			addon:Debug("INFO", "Registered event '%s' for frame", e)
-		end
-	end
-
-	-- Unregister all frame events:
-	function addon:UnregisterEvents()
-		for e, v in pairs(events) do
-			for i = #v, 1, -1 do
-				if v[i] == self then
-					tremove(v, i)
-				end
-			end
-			if #v == 0 then
-				events[e] = nil
-				mainFrame:UnregisterEvent(e)
-				addon:Debug("INFO", "Unregistered event '%s' from frame", e)
-			end
-		end
-	end
-
-	-- Register some events and frame-related functions:
-	addon:RegisterEvents("ADDON_LOADED")
-        mainFrame:SetScript("OnEvent", HandleEvent)
+        addon:RegisterEvents("ADDON_LOADED")
 end
 
 -- ==================== Raid Helpers ==================== --
@@ -6002,8 +5950,8 @@ end
 
 -- On ADDON_LOADED:
 function addon:ADDON_LOADED(name)
-	if name ~= addonName then return end
-	mainFrame:UnregisterEvent("ADDON_LOADED")
+        if name ~= addonName then return end
+        self:UnregisterEvent("ADDON_LOADED")
 	LoadOptions()
 	self:RegisterEvents(
 		"CHAT_MSG_ADDON",
@@ -6050,7 +5998,7 @@ function addon:RAID_INSTANCE_WELCOME(...)
 end
 
 function addon:PLAYER_ENTERING_WORLD()
-	mainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
+        self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	if KRT then
 		addon:Debug("INFO", "Player entered the world. Initial raid check scheduled.")
 	end
