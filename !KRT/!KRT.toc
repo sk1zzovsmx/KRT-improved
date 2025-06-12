@@ -20,6 +20,7 @@ Libs\LibDeformat-3.0.lua
 
 # Localization (moved to the top for 'L' to be available):
 Localization\localization.en.lua
+Localization\localization.it.lua
 
 # Templates File:
 Templates.xml

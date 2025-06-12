@@ -1,16 +1,7 @@
 local addonName, addon = ...
 
-local setmetatable = setmetatable
-local tostring = tostring
-local rawset = rawset
-
--- Define L *once* with the metatable and assign it directly to addon.L
-addon.L = addon.L or {} -- Ensure addon.L exists before setting metatable
-addon.L = setmetatable(addon.L, {__index = function(self, k)
-    if k ~= nil then rawset(self, k, tostring(k)) end
-    return tostring(k)
-end})
-local L = addon.L -- Make a local reference for convenience within this file
+-- Use AceLocale for localization handling
+local L = LibStub("AceLocale-3.0"):NewLocale("KRT", "enUS", true)
 
 -- ==================== Callbacks ==================== --
 L.StrCbErrUsage = "Usage: KRT:RegisterCallback(event, callbacks)"
