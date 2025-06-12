@@ -28,8 +28,8 @@ function Utils.fillTable(t1, t2)
 	for i, v in pairs(t2) do
 		if t1[i] == nil then
 			t1[i] = v
-		elseif type(v) == "table" then
-			Utils.fillTable(v, t2[i])
+                elseif type(v) == "table" then
+                        Utils.fillTable(t1[i], v)
 		end
 	end
 end
