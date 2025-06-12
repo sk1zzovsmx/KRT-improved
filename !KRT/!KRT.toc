@@ -17,6 +17,13 @@
 # Libraries:
 Libs\LibStub.lua
 Libs\LibDeformat-3.0.lua
+Ace3\Ace3.toc
+LibBossIDs-1.0\LibBossIDs-1.0.toc
+LibDBIcon-1.0\LibDBIcon-1.0.lua
+LibDataBroker-1.1\LibDataBroker-1.1.lua
+LibQTip-1.0\LibQTip-1.0.toc
+LibSharedMedia-3.0\LibSharedMedia-3.0.toc
+LibTalentQuery-1.0\LibTalentQuery-1.0.toc
 
 # Localization (moved to the top for 'L' to be available):
 Localization\localization.en.lua
