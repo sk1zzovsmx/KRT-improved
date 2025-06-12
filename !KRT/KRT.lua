@@ -129,17 +129,18 @@ do
     local logLevelPriority = { DEBUG = 1, INFO = 2, WARN = 3, ERROR = 4 }
     local logLevelNames    = { [1] = "DEBUG", [2] = "INFO", [3] = "WARN", [4] = "ERROR" }
     local minLevel = "DEBUG" -- Default log level
+    local MAX_DEBUG_LOGS = 500 -- <--- Limite massimo log, modifica qui
 
     -- Called when the XML frame is loaded
     function Debugger:OnLoad(self)
         frame = self
         frameName = frame:GetName()
         scrollFrame = _G[frameName.."ScrollFrame"]
-		frame:SetMovable(true)
-		frame:EnableMouse(true)
-		frame:RegisterForDrag("LeftButton")
-		frame:SetScript("OnDragStart", frame.StartMoving)
-		frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+        frame:SetMovable(true)
+        frame:EnableMouse(true)
+        frame:RegisterForDrag("LeftButton")
+        frame:SetScript("OnDragStart", frame.StartMoving)
+        frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 
         if scrollFrame then
             print("[Debugger] scrollFrame found:", scrollFrame:GetName())
@@ -217,21 +218,26 @@ do
         if logLevelPriority[level] < logLevelPriority[minLevel] then return end
 
         if select('#', ...) > 0 then
-			local safeArgs = {}
-			for i = 1, select('#', ...) do
-				local v = select(i, ...)
-				table.insert(safeArgs, type(v) == "string" and v or tostring(v))
-			end
-			msg = string.format(msg, unpack(safeArgs))
-		end
+            local safeArgs = {}
+            for i = 1, select('#', ...) do
+                local v = select(i, ...)
+                table.insert(safeArgs, type(v) == "string" and v or tostring(v))
+            end
+            msg = string.format(msg, unpack(safeArgs))
+        end
         local line = string.format("[%s][%s] %s", date("%H:%M:%S"), level, msg)
 
+        -- Se la finestra non è pronta
         if not scrollFrame then
             tinsert(buffer, line)
+            -- Limita la lunghezza del buffer!
+            while #buffer > MAX_DEBUG_LOGS do
+                table.remove(buffer, 1)
+            end
             return
         end
 
-        -- Choose color by level
+        -- Scegli colore
         local r, g, b = 1, 1, 1 -- default white
         if level == "ERROR" then
             r, g, b = 1, 0.2, 0.2
@@ -244,6 +250,14 @@ do
         end
 
         scrollFrame:AddMessage(line, r, g, b)
+
+        -- [OPZIONALE] Se hai una tabella di log persistente, tronca anche quella
+        if KRT_Debug and KRT_Debug.Debugs then
+            table.insert(KRT_Debug.Debugs, line)
+            while #KRT_Debug.Debugs > MAX_DEBUG_LOGS do
+                table.remove(KRT_Debug.Debugs, 1)
+            end
+        end
     end
 
     -- Replay any buffered messages
