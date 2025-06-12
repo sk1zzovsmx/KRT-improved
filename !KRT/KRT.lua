@@ -1,6 +1,27 @@
 local addonName, addon = ...
 local L = addon.L
 local Utils = addon.Utils
+local AceTimer = LibStub("AceTimer-3.0")
+AceTimer:Embed(addon)
+addon.timers = addon.timers or {}
+
+function addon:Schedule(name, delay, func, ...)
+    self:Cancel(name)
+    if type(func) == "string" then
+        self.timers[name] = self:ScheduleTimer(func, delay, ...)
+    else
+        self.timers[name] = self:ScheduleTimer(func, delay, ...)
+    end
+    return self.timers[name]
+end
+
+function addon:Cancel(name)
+    local handle = self.timers[name]
+    if handle then
+        self:CancelTimer(handle, true)
+        self.timers[name] = nil
+    end
+end
 
 local _G = _G
 _G["KRT"] = addon
@@ -341,8 +362,7 @@ do
 
 	-- Register some events and frame-related functions:
 	addon:RegisterEvents("ADDON_LOADED")
-	mainFrame:SetScript("OnEvent", HandleEvent)
-	mainFrame:SetScript("OnUpdate", Utils.run)
+        mainFrame:SetScript("OnEvent", HandleEvent)
 end
 
 -- ==================== Raid Helpers ==================== --
@@ -408,8 +428,7 @@ do
 				v.leave = Utils.GetCurrentTime()
 			end
 		end
-		Utils.unschedule(addon.UpdateRaidRoster)
-	end
+        end
 
 	-- Creates a new raid log entry:
 	function Raid:Create(zoneName, raidSize)
@@ -460,14 +479,14 @@ do
 		KRT_CurrentRaid = #KRT_Raids
 		addon:Debug("INFO", "Raid created with ID: %d", KRT_CurrentRaid)
 		TriggerEvent("RaidCreate", KRT_CurrentRaid)
-		Utils.schedule(3, addon.UpdateRaidRoster)
+                addon:Schedule("updateRoster", 3, "UpdateRaidRoster")
 	end
 
 	-- Ends the current raid entry:
 	function Raid:End()
 		if not KRT_CurrentRaid then return end
 		addon:Debug("INFO", "Ending raid ID: %d", KRT_CurrentRaid)
-		Utils.unschedule(addon.Raid.UpdateRaidRoster)
+                addon:Cancel("updateRoster")
 		local currentTime = Utils.GetCurrentTime()
 		for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
 			if not v.leave then v.leave = currentTime end
@@ -501,13 +520,13 @@ do
 
 	-- Checks the raid status upon player's login:
 	function Raid:FirstCheck()
-		Utils.unschedule(addon.Raid.FirstCheck)
+                addon:Cancel("firstCheck")
 		if GetNumRaidMembers() == 0 then return end
 
 		-- We are in a raid? We update roster
 		if KRT_CurrentRaid and Raid:CheckPlayer(unitName, KRT_CurrentRaid) then
 			addon:Debug("DEBUG", "Player detected in active raid. Scheduling roster update.")
-			Utils.schedule(2, addon.UpdateRaidRoster)
+                        addon:Schedule("updateRoster", 2, "UpdateRaidRoster")
 			return
 		end
 
@@ -6024,9 +6043,9 @@ function addon:RAID_INSTANCE_WELCOME(...)
 		if KRT then
 			addon:Debug("INFO", "Raid '%s' started. Type: %s, Difficulty: %d", instanceName, instanceType, instanceDiff)
 		end
-		Utils.schedule(3, function()
-			addon.Raid:Check(instanceName, instanceDiff)
-		end)
+                addon:Schedule("raidCheck", 3, function()
+                        addon.Raid:Check(instanceName, instanceDiff)
+                end)
 	else
 		if KRT then
 			addon:Debug("INFO", "Raid '%s' is not supported for monitoring.", instanceName)
@@ -6039,7 +6058,7 @@ function addon:PLAYER_ENTERING_WORLD()
 	if KRT then
 		addon:Debug("INFO", "Player entered the world. Initial raid check scheduled.")
 	end
-	Utils.schedule(3, self.Raid.FirstCheck)
+        addon:Schedule("firstCheck", 3, self.Raid.FirstCheck)
 end
 
 function addon:CHAT_MSG_LOOT(msg)

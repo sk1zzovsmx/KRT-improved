@@ -178,48 +178,6 @@ function Utils.returnIf(cond, a, b)
 	return (cond ~= nil and cond ~= false) and a or b
 end
 
--------------------
--- Tasks Manager --
--------------------
-do
-	-- Table of scheduled tasks:
-	local tasks = {}
-
-	-- Schedule a task:
-	function Utils.schedule(sec, func, ...)
-		local task = {}
-		task.time = time() + sec
-		task.func = func
-		for i = 1, select("#", ...) do
-			task[i] = select(i, ...)
-		end
-		tasks[#tasks+1] = task
-		tinsert(tasks, task)
-	end
-
-	-- Unschedule a task:
-	function Utils.unschedule(func)
-		for i, v in pairs(tasks) do
-			if func == v.func then
-				tremove(tasks, i)
-				break
-			end
-		end
-	end
-
-	-- Run all scheduled tasks:
-	function Utils.run()
-		local now = time()
-		for i = 1, #tasks do
-			local task = tasks[i]
-			if task and type(task.func) == "function" and task.time <= now then
-				task.func(unpack(task))
-				tremove(tasks, i) -- Only once!
-			end
-		end
-	end
-end
-
 -- Periodic frame update:
 function Utils.periodic(frame, name, period, elapsed)
 	local t = frame[name] or 0
