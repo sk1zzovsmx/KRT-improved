@@ -5269,11 +5269,11 @@ do
 				end
 			end
 			-- We delete all the loot from that player:
-			for i = #raid.loot, 1, -1 do
-				if l.bossNum == selectedPlayer then
-					tremove(raid.loot, i)
-				end
-			end
+                        for i = #raid.loot, 1, -1 do
+                                if raid.loot[i].bossNum == selectedPlayer then
+                                        tremove(raid.loot, i)
+                                end
+                        end
 			fetched = false
 		end
 
