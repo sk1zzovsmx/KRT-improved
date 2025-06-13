@@ -981,7 +981,7 @@ do
 
 	-- Whether the player is a party group:
 	function addon:IsInParty()
-		local inParty = (GetNumPartyMembers() > 0)
+		local inParty = (GetNumPartyMembers() > 0) and (GetNumRaidMembers() == 0)
 		addon:Debug("DEBUG", "IsInParty: %s", tostring(inParty))
 		return inParty
 	end
@@ -1070,12 +1070,8 @@ do
 	function addon:Announce(text, channel)
 		local originalChannel = channel
 		if not channel then
-			channel = "SAY"
-			-- Switch to party mode if we're in a party:
-			if self:IsInParty() then
-				channel = "PARTY"		
 			-- Switch to raid channel if we're in a raid:
-			elseif self:IsInRaid() then
+			if self:IsInRaid() then
 				-- Check for countdown messages
 				local countdownTicPattern = L.ChatCountdownTic:gsub("%%d", "%%d+")
 				local isCountdownMessage = text:find(countdownTicPattern) or text:find(L.ChatCountdownEnd)
@@ -1097,6 +1093,14 @@ do
 						channel = "RAID" -- Fallback to RAID
 					end
 				end
+
+			-- Switch to party mode if we're in a party:
+			elseif self:IsInParty() then
+				channel = "PARTY"
+				
+			-- Switch to alone mode
+			else
+				channel = "SAY"
 			end
 		end
 		-- Let's Go!
