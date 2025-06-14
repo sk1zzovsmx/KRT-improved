@@ -280,35 +280,12 @@ end
 -- ==================== Callbacks Helpers ==================== --
 
 do
-	-- Table of registered callbacks:
-	local callbacks = {}
+        addon.callbacks = callbackHandler:New(addon)
 
-	-- Register a new callback:
-	function addon:RegisterCallback(e, func)
-		if not e or type(func) ~= "function" then
-			error(L.StrCbErrUsage)
-		end
-		callbacks[e] = callbacks[e] or {}
-		tinsert(callbacks[e], func)
-		addon:Debug("DEBUG", "Registered callback for event '%s': %s", tostring(e), tostring(func))
-		return #callbacks
-	end
-
-	-- Trigger a registered event:
-	function TriggerEvent(e, ...)
-		if not callbacks[e] then
-			addon:Debug("DEBUG", "No callbacks registered for event '%s'", tostring(e))
-			return
-		end
-		addon:Debug("DEBUG", "Triggering event '%s' (%d callbacks)", tostring(e), #callbacks[e])
-		for i, v in ipairs(callbacks[e]) do
-			local ok, err = pcall(v, e, ...)
-			if not ok then
-				addon:Debug("ERROR", "Error in callback %s for event '%s': %s", tostring(v), tostring(e), tostring(err))
-				addon:PrintError(L.StrCbErrExec:format(tostring(v), tostring(e), err))
-			end
-		end
-	end
+        -- Trigger a registered event using CallbackHandler
+        function TriggerEvent(e, ...)
+                addon.callbacks:Fire(e, ...)
+        end
 end
 
 -- ==================== Events System ==================== --
