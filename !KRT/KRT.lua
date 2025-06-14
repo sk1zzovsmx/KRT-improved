@@ -98,6 +98,9 @@ local format, match, find, strlen = string.format, string.match, string.find, st
 local strsub, gsub, lower, upper = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst = tostring, tonumber, _G.string.ucfirst
 local deformat = LibStub("LibDeformat-3.0")
+local callbackHandler = LibStub("CallbackHandler-1.0")
+local bossIDs = LibStub("LibBossIDs-1.0")
+local libCompress = LibStub("LibCompress")
 
 -- Returns the used frame's name:
 function addon:GetFrameName()
