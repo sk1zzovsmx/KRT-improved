@@ -28,6 +28,9 @@ Localization\localization.en.lua
 Templates.xml
 
 # Utilities & Core Files:
+KRT.lua
+KRT.xml
+
 modules\Utils.lua
 core\Debugger.lua
 core\Raid.lua
@@ -41,8 +44,6 @@ core\Warnings.lua
 core\Changes.lua
 core\Spammer.lua
 core\Logger.lua
-KRT.lua
-KRT.xml
 
 # Modules
 modules\ignoredItems.lua
