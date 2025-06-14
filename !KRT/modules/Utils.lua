@@ -448,14 +448,14 @@ end
 
 -- Returns the current time:
 function Utils.GetCurrentTime(server)
-	server = server or true
-	local t = time()
-	if server == true then
-		local _, month, day, year = CalendarGetDate()
-		local hour, minute = GetGameTime()
-		t = time({year = year, month = month, day = day, hour = hour, min = minute})
-	end
-	return t
+        if server == nil then server = true end
+        local t = time()
+        if server == true then
+                local _, month, day, year = CalendarGetDate()
+                local hour, minute = GetGameTime()
+                t = time({year = year, month = month, day = day, hour = hour, min = minute})
+        end
+        return t
 end
 
 -- Returns the server offset:
