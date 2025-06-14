@@ -98,6 +98,13 @@ local format, match, find, strlen = string.format, string.match, string.find, st
 local strsub, gsub, lower, upper = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst = tostring, tonumber, _G.string.ucfirst
 local deformat = LibStub("LibDeformat-3.0")
+local CallbackHandler = LibStub("CallbackHandler-1.0")
+local LibBossIDs = LibStub("LibBossIDs-1.0")
+local LibCompress = LibStub("LibCompress")
+
+addon.CallbackHandler = CallbackHandler
+addon.LibBossIDs = LibBossIDs
+addon.LibCompress = LibCompress
 
 -- Returns the used frame's name:
 function addon:GetFrameName()
@@ -321,7 +328,6 @@ end
 
 -- ==================== Warnings Frame ==================== --
 
-end
 
 -- ==================== MS Changes Frame ==================== --
 
