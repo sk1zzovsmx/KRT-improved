@@ -100,7 +100,7 @@ local Config = addon.Config
 			addon:Debug("DEBUG", "Setting countdown duration to: %d", value)
 		end
 		name = strsub(name, strlen(frameName) + 1)
-		TriggerEvent("Config"..name, value)
+               addon.callbacks:Fire("Config"..name, value)
 		KRT_Options[name] = value
 		addon:Debug("DEBUG", "Option %s set to: %s", name, tostring(value))
 	end

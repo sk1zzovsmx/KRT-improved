@@ -112,7 +112,7 @@ local Raid = addon.Raid
 		tinsert(KRT_Raids, raidInfo)
 		KRT_CurrentRaid = #KRT_Raids
 		addon:Debug("INFO", "Raid created with ID: %d", KRT_CurrentRaid)
-		TriggerEvent("RaidCreate", KRT_CurrentRaid)
+               addon.callbacks:Fire("RaidCreate", KRT_CurrentRaid)
 		Utils.schedule(3, addon.UpdateRaidRoster)
 	end
 
