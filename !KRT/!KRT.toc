@@ -16,6 +16,9 @@
 
 # Libraries:
 Libs\LibStub.lua
+Libs\CallbackHandler-1.0.lua
+Libs\LibBossIDs-1.0.lua
+Libs\LibCompress.lua
 Libs\LibDeformat-3.0.lua
 
 # Localization (moved to the top for 'L' to be available):
