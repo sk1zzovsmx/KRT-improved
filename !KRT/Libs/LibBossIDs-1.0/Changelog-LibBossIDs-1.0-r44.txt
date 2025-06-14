@@ -1,0 +1,21 @@
+------------------------------------------------------------------------
+r44 | yoshimo | 2010-05-20 17:48:48 +0000 (Thu, 20 May 2010) | 2 lines
+Changed paths:
+   M /trunk/LibBossIDs-1.0.lua
+
+Ruby Sanctum 3.3.5 PTR
+Halion (twilight realm)
+------------------------------------------------------------------------
+r43 | yoshimo | 2010-05-19 15:33:30 +0000 (Wed, 19 May 2010) | 2 lines
+Changed paths:
+   M /trunk/LibBossIDs-1.0.lua
+
+Ruby Sanctum 3.3.5 PTR
+Halion, Saviana, Baltharus, Zarithrian
+------------------------------------------------------------------------
+r42 | yoshimo | 2010-02-11 12:18:34 +0000 (Thu, 11 Feb 2010) | 1 line
+Changed paths:
+   M /trunk/LibBossIDs-1.0.lua
+
+Added Valithrias Adds
+------------------------------------------------------------------------
