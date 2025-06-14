@@ -70,7 +70,7 @@ local Loot = addon.Loot
 		lootTable[lootCount].itemColor   = itemColors[itemRarity+1]
 		lootTable[lootCount].itemLink    = itemLink
 		lootTable[lootCount].itemTexture = itemTexture
-		TriggerEvent("AddItem", itemLink)
+               addon.callbacks:Fire("AddItem", itemLink)
 	end
 
 	-- Prepare item display:
@@ -100,7 +100,7 @@ local Loot = addon.Loot
 				currentItemBtn.tooltip_item = i.itemLink
 				self:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
 			end
-			TriggerEvent("SetItem", i.itemLink)
+                       addon.callbacks:Fire("SetItem", i.itemLink)
 		end
 
 	end

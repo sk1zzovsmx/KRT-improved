@@ -73,7 +73,7 @@ local Logger = addon.Logger
 		else
 			addon.Logger.selectedRaid = nil
 		end
-		TriggerEvent("LoggerSelectRaid", rID)
+               addon.callbacks:Fire("LoggerSelectRaid", rID)
 	end
 
 	-- Select a boss:
@@ -85,7 +85,7 @@ local Logger = addon.Logger
 		else
 			addon.Logger.selectedBoss = nil
 		end
-		TriggerEvent("LoggerSelectBoss", bID)
+               addon.callbacks:Fire("LoggerSelectBoss", bID)
 	end
 
 	-- Select a boss attendee:
@@ -97,7 +97,7 @@ local Logger = addon.Logger
 		else
 			addon.Logger.selectedBossPlayer = nil
 		end
-		TriggerEvent("LoggerSelectBossPlayer", pID)
+               addon.callbacks:Fire("LoggerSelectBossPlayer", pID)
 	end
 
 	-- Select a player:
@@ -109,7 +109,7 @@ local Logger = addon.Logger
 		else
 			addon.Logger.selectedPlayer = nil
 		end
-		TriggerEvent("LoggerSelectPlayer", pID)
+               addon.callbacks:Fire("LoggerSelectPlayer", pID)
 	end
 
 	do
@@ -146,7 +146,7 @@ local Logger = addon.Logger
 				else
 					addon.Logger.selectedItem = nil
 				end
-				TriggerEvent("LoggerSelectItem", iID)
+                               addon.callbacks:Fire("LoggerSelectItem", iID)
 			elseif button == "RightButton" then
 				addon.Logger.selectedItem = btn:GetID()
 				OpenItemMenu(btn)
@@ -1412,7 +1412,7 @@ do
 
 		CancelAddEdit()
 		self:Hide()
-		TriggerEvent("LoggerSelectRaid")
+               addon.callbacks:Fire("LoggerSelectRaid")
 	end
 
 	function CancelAddEdit()

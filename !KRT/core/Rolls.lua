@@ -35,7 +35,7 @@ local Rolls = addon.Rolls
 			addon:Debug("DEBUG", "Updated itemRollTracker: itemId=%d, player=%s, count=%d", itemId, name, itemRollTracker[itemId][name])
 		end
 
-		TriggerEvent("AddRoll", name, roll)
+               addon.callbacks:Fire("AddRoll", name, roll)
 		SortRolls()
 		if not selectedPlayer then
 			local resolvedItemId = itemId or addon:GetCurrentRollItemID()
