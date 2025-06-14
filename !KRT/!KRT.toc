@@ -26,18 +26,18 @@ Templates.xml
 
 # Utilities & Core Files:
 modules\Utils.lua
-core\Debugger.lua
-core\Raid.lua
-core\Minimap.lua
-core\Rolls.lua
-core\Loot.lua
-core\Master.lua
-core\Reserves.lua
-core\Config.lua
-core\Warnings.lua
-core\Changes.lua
-core\Spammer.lua
-core\Logger.lua
+modules\Debugger.lua
+modules\Raid.lua
+modules\Minimap.lua
+modules\Rolls.lua
+modules\Loot.lua
+modules\Master.lua
+modules\Reserves.lua
+modules\Config.lua
+modules\Warnings.lua
+modules\Changes.lua
+modules\Spammer.lua
+modules\Logger.lua
 KRT.lua
 KRT.xml
 
