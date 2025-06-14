@@ -1,6 +1,7 @@
 local addonName, addon = ...
 local L = addon.L
 local Utils = addon.Utils
+local BossIDs = LibStub("LibBossIDs-1.0").BossIDs
 
 local _G = _G
 _G["KRT"] = addon
@@ -647,7 +648,7 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
 	if not KRT_CurrentRaid then return end
 	if event == "UNIT_DIED" then
 		local npcID = Utils.GetNPCID(destGUID)
-		if addon.bossListIDs[npcID] then
+               if BossIDs[npcID] then
 			if KRT then
 				addon:Debug("INFO", "Boss killed: %s", destName)
 			end
