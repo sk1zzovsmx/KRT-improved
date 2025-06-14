@@ -622,13 +622,13 @@ end
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
 	local _, event, _, _, _, destGUID, destName = ...
 	if not KRT_CurrentRaid then return end
-	if event == "UNIT_DIED" then
-		local npcID = Utils.GetNPCID(destGUID)
-		if addon.bossListIDs[npcID] then
-			if KRT then
-				addon:Debug("INFO", "Boss killed: %s", destName)
-			end
-			self.Raid:AddBoss(destName)
-		end
-	end
+        if event == "UNIT_DIED" then
+                local npcID = Utils.GetNPCID(destGUID)
+                if addon.LibBossIDs.BossIDs[npcID] then
+                        if KRT then
+                                addon:Debug("INFO", "Boss killed: %s", destName)
+                        end
+                        self.Raid:AddBoss(destName)
+                end
+        end
 end
