@@ -291,7 +291,7 @@ do
 			-- Switch to party mode if we're in a party:
 			elseif self:IsInParty() then
 				channel = "PARTY"
-				
+
 			-- Switch to alone mode
 			else
 				channel = "SAY"
@@ -600,7 +600,7 @@ end
 function addon:RAID_INSTANCE_WELCOME(...)
 	local instanceName, instanceType, instanceDiff = GetInstanceInfo()
 	_, KRT_NextReset = ...
-	
+
 	if L.RaidZones[instanceName] ~= nil then
 		if KRT then
 			addon:Debug("INFO", "Raid '%s' started. Type: %s, Difficulty: %d", instanceName, instanceType, instanceDiff)

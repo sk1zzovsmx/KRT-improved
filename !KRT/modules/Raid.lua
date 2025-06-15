@@ -606,7 +606,7 @@ local Raid = addon.Raid
 		addon:Debug("DEBUG", "GetUnitID: name=%s, unitID=%s", tostring(resolvedName), tostring(id))
 		return id
 	end
-	
+
 	-----------------------
 	-- Raid & Loot Check --
 	-----------------------

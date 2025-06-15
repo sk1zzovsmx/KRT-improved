@@ -87,7 +87,7 @@ local Config = addon.Config
 		if not btn then return end
 		frameName = frameName or btn:GetParent():GetName()
 		local value, name = nil, btn:GetName()
-		addon:Debug("DEBUG", "Button clicked: %s", name)		
+		addon:Debug("DEBUG", "Button clicked: %s", name)
 		if name ~= frameName.."countdownDuration" then
 			value = (btn:GetChecked() == 1) or false
 			if name == frameName.."minimapButton" then
@@ -107,10 +107,10 @@ local Config = addon.Config
 
 	-- Localizing ui frame:
 	function LocalizeUIFrame()
-		if localized then 
+		if localized then
 			addon:Debug("DEBUG", "UI is already localized. Skipping.")
-			return 
-		end		
+			return
+		end
 		if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
 			addon:Debug("DEBUG", "Setting localized UI strings.")
 			_G[frameName.."sortAscendingStr"]:SetText(L.StrConfigSortAscending)
@@ -130,7 +130,7 @@ local Config = addon.Config
 		end
 		_G[frameName.."Title"]:SetText(format(titleString, SETTINGS))
 		_G[frameName.."AboutStr"]:SetText(L.StrConfigAbout)
-		_G[frameName.."DefaultsBtn"]:SetScript("OnClick", LoadDefaultOptions)		
+		_G[frameName.."DefaultsBtn"]:SetScript("OnClick", LoadDefaultOptions)
 		addon:Debug("DEBUG", "UI frame localized.")
 		localized = true
 	end

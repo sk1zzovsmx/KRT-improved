@@ -218,7 +218,7 @@
             </CheckButton>
             <CheckButton name="$parentcountdownSimpleRaidMsg" inherits="KRTConfigCheckButtonTemplate">
                 <Anchors>
-                    <Anchor point="TOPRIGHT" relativeTo="$parentcountdownSimpleRaidMsgStr" relativePoint="TOPLEFT"> 
+                    <Anchor point="TOPRIGHT" relativeTo="$parentcountdownSimpleRaidMsgStr" relativePoint="TOPLEFT">
                         <Offset><AbsDimension x="-2.5" y="5" /></Offset>
                     </Anchor>
                 </Anchors>
@@ -1105,7 +1105,7 @@
                     </Anchor>
                 </Anchors>
                 <Scripts><OnClick>KRT.Master:BtnSR(self, button)</OnClick></Scripts>
-            </Button>			
+            </Button>
 			<Button name="$parentFreeBtn" inherits="KRTButtonTemplate" text="Free">
 				<Size><AbsDimension x="35" y="25" /></Size>
 				<Anchors>

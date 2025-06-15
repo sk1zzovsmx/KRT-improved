@@ -132,13 +132,13 @@ local Master = addon.Master
 		end
 	end
 
-	function Master:BtnMS(btn) addon:Debug("DEBUG", "MS roll button pressed.") return AnnounceRoll(1, "ChatRollMS") 
+	function Master:BtnMS(btn) addon:Debug("DEBUG", "MS roll button pressed.") return AnnounceRoll(1, "ChatRollMS")
 	end
-	function Master:BtnOS(btn) addon:Debug("DEBUG", "OS roll button pressed.") return AnnounceRoll(2, "ChatRollOS") 
+	function Master:BtnOS(btn) addon:Debug("DEBUG", "OS roll button pressed.") return AnnounceRoll(2, "ChatRollOS")
 	end
-	function Master:BtnSR(btn) addon:Debug("DEBUG", "SR roll button pressed.") return AnnounceRoll(3, "ChatRollSR") 
+	function Master:BtnSR(btn) addon:Debug("DEBUG", "SR roll button pressed.") return AnnounceRoll(3, "ChatRollSR")
 	end
-	function Master:BtnFree(btn) addon:Debug("DEBUG", "Free roll button pressed.") return AnnounceRoll(4, "ChatRollFree") 
+	function Master:BtnFree(btn) addon:Debug("DEBUG", "Free roll button pressed.") return AnnounceRoll(4, "ChatRollFree")
 	end
 
 	function Master:BtnCountdown(btn)

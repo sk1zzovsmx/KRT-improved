@@ -1369,7 +1369,7 @@ do
 
 		if isEdit and bossData ~= nil then
 			-- Use provided time or fallback to previous values:
-			if bTime == "" then 
+			if bTime == "" then
 				hour, minute = tempDate.hour, tempDate.min
 			else
 				hour, minute = match(bTime, "(%d+):(%d+)")
