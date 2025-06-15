@@ -957,11 +957,11 @@ do
 				end
 			end
 			-- We delete all the loot from that player:
-                        for i = #raid.loot, 1, -1 do
-                                if raid.loot[i].bossNum == selectedPlayer then
-                                        tremove(raid.loot, i)
-                                end
-                        end
+						for i = #raid.loot, 1, -1 do
+								if raid.loot[i].bossNum == selectedPlayer then
+										tremove(raid.loot, i)
+								end
+						end
 			fetched = false
 		end
 
@@ -1369,7 +1369,7 @@ do
 
 		if isEdit and bossData ~= nil then
 			-- Use provided time or fallback to previous values:
-			if bTime == "" then 
+			if bTime == "" then
 				hour, minute = tempDate.hour, tempDate.min
 			else
 				hour, minute = match(bTime, "(%d+):(%d+)")
@@ -1531,4 +1531,5 @@ do
 		addon:PrintError(L.ErrAttendeesNotFound or "Player not in raid")
 		addon.Logger.BossAttendees:Fetch()
 	end
+
 

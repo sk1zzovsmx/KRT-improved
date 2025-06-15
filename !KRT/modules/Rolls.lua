@@ -344,3 +344,4 @@ local Rolls = addon.Rolls
 		addon:Debug("DEBUG", "FetchRolls completed. Total entries: %d", rollsCount)
 	end
 
+
