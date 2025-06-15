@@ -296,3 +296,4 @@ local Changes = addon.Changes
 		_G[frameName.."Spec"]:ClearFocus()
 	end
 
+

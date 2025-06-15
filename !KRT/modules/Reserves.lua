@@ -131,9 +131,9 @@ local Reserves = addon.Reserves
 		----------------------------------------------------------------
 		-- Localize UI Frame:
 		function LocalizeUIFrame()
-			if localized then 
+			if localized then
 				addon:Debug("DEBUG", "UI already localized.")
-				return 
+				return
 			end
 			if frameName then
 				_G[frameName.."Title"]:SetText(format(titleString, L.StrRaidReserves))
@@ -575,4 +575,5 @@ local Reserves = addon.Reserves
 			addon:Debug("DEBUG", "Players for itemId %d: %s", itemId, table.concat(list, ", "))
 			return #list > 0 and table.concat(list, ", ") or ""
 		end
+
 

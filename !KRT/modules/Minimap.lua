@@ -170,3 +170,4 @@ local Minimap = addon.Minimap
 		return KRT_MINIMAP_GUI:Hide()
 	end
 
+
