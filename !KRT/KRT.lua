@@ -115,9 +115,6 @@ function addon:Debug(level, msg, ...)
     end
 end
 
--- ==================== Debugger ==================== --
-
-
 -- ==================== Callbacks Helpers ==================== --
 
 do
@@ -210,8 +207,6 @@ do
 	mainFrame:SetScript("OnUpdate", Utils.run)
 end
 
--- ==================== Raid Helpers ==================== --
-
 -- ==================== Chat Output Helpers ==================== --
 do
 	-- Output strings:
@@ -302,33 +297,6 @@ do
 	end
 end
 
--- ==================== MiniMap Button ==================== --
-
-
--- ==================== Rolls Helpers ==================== --
-
-
--- ==================== Loot Helpers ==================== --
-
-
--- ==================== Master Loot Frame ==================== --
-
-
-	-- ==================== Raid Helper Reserves ==================== --
-
--- ==================== Configuration Frame ==================== --
-
-
--- ==================== Warnings Frame ==================== --
-
-end
-
--- ==================== MS Changes Frame ==================== --
-
-
--- ==================== LFM Spam Frame ==================== --
-
-
 -- ==================== Tooltips ==================== --
 do
 	local colors = HIGHLIGHT_FONT_COLOR
@@ -400,10 +368,6 @@ do
 		frame:SetScript("OnLeave", HideTooltip)
 	end
 end
-
--- ==================== Loot History Frame ==================== --
-
--- Main frame:
 
 -- ==================== Slash Commands ==================== --
 
