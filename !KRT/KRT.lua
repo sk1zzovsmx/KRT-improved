@@ -7,17 +7,17 @@ _G["KRT"] = addon
 
 
 -- SavedVariables:
-KRT_Debug			= KRT_Debug or {}
-KRT_Options	   		= KRT_Options or {}
-KRT_Raids		 	= KRT_Raids or {}
-KRT_Players	   		= KRT_Players or {}
-KRT_Warnings	  	= KRT_Warnings or {}
-KRT_ExportString  	= KRT_ExportString or "$I,$N,$S,$W,$T,$R,$H:$M,$d/$m/$y"
-KRT_Spammer	   		= KRT_Spammer or {}
-KRT_CurrentRaid   	= KRT_CurrentRaid or nil
-KRT_LastBoss	  	= KRT_LastBoss or  nil
-KRT_NextReset	 	= KRT_NextReset or  0
-KRT_SavedReserves 	= KRT_SavedReserves or {}
+KRT_Debug           = KRT_Debug or {}
+KRT_Options         = KRT_Options or {}
+KRT_Raids           = KRT_Raids or {}
+KRT_Players         = KRT_Players or {}
+KRT_Warnings        = KRT_Warnings or {}
+KRT_ExportString    = KRT_ExportString or "$I,$N,$S,$W,$T,$R,$H:$M,$d/$m/$y"
+KRT_Spammer         = KRT_Spammer or {}
+KRT_CurrentRaid     = KRT_CurrentRaid or nil
+KRT_LastBoss        = KRT_LastBoss or  nil
+KRT_NextReset       = KRT_NextReset or  0
+KRT_SavedReserves   = KRT_SavedReserves or {}
 
 -- AddOn main frames:
 local mainFrame = CreateFrame("Frame")
@@ -45,38 +45,38 @@ local ItemExists, ItemIsSoulbound, GetItem
 local GetItemIndex, GetItemName, GetItemLink, GetItemTexture
 local lootTypesText = {L.BtnMS, L.BtnOS, L.BtnSR, L.BtnFree, L.BtnBank, L.BtnDisenchant, L.BtnHold}
 local lootTypesColored = {
-	GREEN_FONT_COLOR_CODE..L.BtnMS..FONT_COLOR_CODE_CLOSE,
-	LIGHTYELLOW_FONT_COLOR_CODE..L.BtnOS..FONT_COLOR_CODE_CLOSE,
-	"|cffa335ee"..L.BtnSR..FONT_COLOR_CODE_CLOSE,
-	NORMAL_FONT_COLOR_CODE..L.BtnFree..FONT_COLOR_CODE_CLOSE,
-	ORANGE_FONT_COLOR_CODE..L.BtnBank..FONT_COLOR_CODE_CLOSE,
-	RED_FONT_COLOR_CODE..L.BtnDisenchant..FONT_COLOR_CODE_CLOSE,
-	HIGHLIGHT_FONT_COLOR_CODE..L.BtnHold..FONT_COLOR_CODE_CLOSE,
-	GREEN_FONT_COLOR_CODE.."DKP"..FONT_COLOR_CODE_CLOSE,
+    GREEN_FONT_COLOR_CODE..L.BtnMS..FONT_COLOR_CODE_CLOSE,
+    LIGHTYELLOW_FONT_COLOR_CODE..L.BtnOS..FONT_COLOR_CODE_CLOSE,
+    "|cffa335ee"..L.BtnSR..FONT_COLOR_CODE_CLOSE,
+    NORMAL_FONT_COLOR_CODE..L.BtnFree..FONT_COLOR_CODE_CLOSE,
+    ORANGE_FONT_COLOR_CODE..L.BtnBank..FONT_COLOR_CODE_CLOSE,
+    RED_FONT_COLOR_CODE..L.BtnDisenchant..FONT_COLOR_CODE_CLOSE,
+    HIGHLIGHT_FONT_COLOR_CODE..L.BtnHold..FONT_COLOR_CODE_CLOSE,
+    GREEN_FONT_COLOR_CODE.."DKP"..FONT_COLOR_CODE_CLOSE,
 }
 -- Items color
 local itemColors = {
-		[1] = "ff9d9d9d",  -- poor
-		[2] = "ffffffff",  -- common
-		[3] = "ff1eff00",  -- uncommon
-		[4] = "ff0070dd",  -- rare
-		[5] = "ffa335ee",  -- epic
-		[6] = "ffff8000",  -- legendary
-		[7] = "ffe6cc80",  -- artifact / heirloom
+        [1] = "ff9d9d9d",  -- poor
+        [2] = "ffffffff",  -- common
+        [3] = "ff1eff00",  -- uncommon
+        [4] = "ff0070dd",  -- rare
+        [5] = "ffa335ee",  -- epic
+        [6] = "ffff8000",  -- legendary
+        [7] = "ffe6cc80",  -- artifact / heirloom
 }
 -- Classes color:
 local classColors = {
-	["UNKNOWN"]     = "ffffffff",
-	["DEATHKNIGHT"] = "ffc41f3b",
-	["DRUID"]       = "ffff7d0a",
-	["HUNTER"]      = "ffabd473",
-	["MAGE"]        = "ff40c7eb",
-	["PALADIN"]     = "fff58cba",
-	["PRIEST"]      = "ffffffff",
-	["ROGUE"]       = "fffff569",
-	["SHAMAN"]      = "ff0070de",
-	["WARLOCK"]     = "ff8787ed",
-	["WARRIOR"]     = "ffc79c6e",
+    ["UNKNOWN"]     = "ffffffff",
+    ["DEATHKNIGHT"] = "ffc41f3b",
+    ["DRUID"]       = "ffff7d0a",
+    ["HUNTER"]      = "ffabd473",
+    ["MAGE"]        = "ff40c7eb",
+    ["PALADIN"]     = "fff58cba",
+    ["PRIEST"]      = "ffffffff",
+    ["ROGUE"]       = "fffff569",
+    ["SHAMAN"]      = "ff0070de",
+    ["WARLOCK"]     = "ff8787ed",
+    ["WARRIOR"]     = "ffc79c6e",
 }
 
 -- Raid Target Icons:
@@ -101,11 +101,11 @@ local deformat = LibStub("LibDeformat-3.0")
 
 -- Returns the used frame's name:
 function addon:GetFrameName()
-	local name
-	if UIMaster ~= nil then
-		name = UIMaster:GetName()
-	end
-	return name
+    local name
+    if UIMaster ~= nil then
+        name = UIMaster:GetName()
+    end
+    return name
 end
 
 --Returns debug function
@@ -118,255 +118,255 @@ end
 -- ==================== Callbacks Helpers ==================== --
 
 do
-	-- Table of registered callbacks:
-	local callbacks = {}
+    -- Table of registered callbacks:
+    local callbacks = {}
 
-	-- Register a new callback:
-	function addon:RegisterCallback(e, func)
-		if not e or type(func) ~= "function" then
-			error(L.StrCbErrUsage)
-		end
-		callbacks[e] = callbacks[e] or {}
-		tinsert(callbacks[e], func)
-		addon:Debug("DEBUG", "Registered callback for event '%s': %s", tostring(e), tostring(func))
-		return #callbacks
-	end
+    -- Register a new callback:
+    function addon:RegisterCallback(e, func)
+        if not e or type(func) ~= "function" then
+            error(L.StrCbErrUsage)
+        end
+        callbacks[e] = callbacks[e] or {}
+        tinsert(callbacks[e], func)
+        addon:Debug("DEBUG", "Registered callback for event '%s': %s", tostring(e), tostring(func))
+        return #callbacks
+    end
 
-	-- Trigger a registered event:
-	function TriggerEvent(e, ...)
-		if not callbacks[e] then
-			addon:Debug("DEBUG", "No callbacks registered for event '%s'", tostring(e))
-			return
-		end
-		addon:Debug("DEBUG", "Triggering event '%s' (%d callbacks)", tostring(e), #callbacks[e])
-		for i, v in ipairs(callbacks[e]) do
-			local ok, err = pcall(v, e, ...)
-			if not ok then
-				addon:Debug("ERROR", "Error in callback %s for event '%s': %s", tostring(v), tostring(e), tostring(err))
-				addon:PrintError(L.StrCbErrExec:format(tostring(v), tostring(e), err))
-			end
-		end
-	end
+    -- Trigger a registered event:
+    function TriggerEvent(e, ...)
+        if not callbacks[e] then
+            addon:Debug("DEBUG", "No callbacks registered for event '%s'", tostring(e))
+            return
+        end
+        addon:Debug("DEBUG", "Triggering event '%s' (%d callbacks)", tostring(e), #callbacks[e])
+        for i, v in ipairs(callbacks[e]) do
+            local ok, err = pcall(v, e, ...)
+            if not ok then
+                addon:Debug("ERROR", "Error in callback %s for event '%s': %s", tostring(v), tostring(e), tostring(err))
+                addon:PrintError(L.StrCbErrExec:format(tostring(v), tostring(e), err))
+            end
+        end
+    end
 end
 
 -- ==================== Events System ==================== --
 
 do
-	-- Table of registered events:
-	local events = {}
+    -- Table of registered events:
+    local events = {}
 
-	-- Events Handler:
-	local function HandleEvent(self, e, ...)
-		addon:Debug("DEBUG", "Handling event: '%s'", e)
+    -- Events Handler:
+    local function HandleEvent(self, e, ...)
+        addon:Debug("DEBUG", "Handling event: '%s'", e)
 
-		if e == "ADDON_LOADED" then
-			LoadOptions()
-		end
-		if not events[e] then
-			addon:Debug("DEBUG", "No frames registered for event '%s'", e)
-			return
-		end
-		for i, v in ipairs(events[e]) do
-			if type(v[e]) == "function" then
-				addon:Debug("DEBUG", "Dispatching event '%s' to frame %d", e, i)
-				v[e](v, ...)
-			end
-		end
-	end
+        if e == "ADDON_LOADED" then
+            LoadOptions()
+        end
+        if not events[e] then
+            addon:Debug("DEBUG", "No frames registered for event '%s'", e)
+            return
+        end
+        for i, v in ipairs(events[e]) do
+            if type(v[e]) == "function" then
+                addon:Debug("DEBUG", "Dispatching event '%s' to frame %d", e, i)
+                v[e](v, ...)
+            end
+        end
+    end
 
-	-- Registers new frame event(s):
-	function addon:RegisterEvents(...)
-		for i = 1, select("#", ...) do
-			local e = select(i, ...)
-			events[e] = events[e] or {}
-			tinsert(events[e], self)
-			mainFrame:RegisterEvent(e)
-			addon:Debug("INFO", "Registered event '%s' for frame", e)
-		end
-	end
+    -- Registers new frame event(s):
+    function addon:RegisterEvents(...)
+        for i = 1, select("#", ...) do
+            local e = select(i, ...)
+            events[e] = events[e] or {}
+            tinsert(events[e], self)
+            mainFrame:RegisterEvent(e)
+            addon:Debug("INFO", "Registered event '%s' for frame", e)
+        end
+    end
 
-	-- Unregister all frame events:
-	function addon:UnregisterEvents()
-		for e, v in pairs(events) do
-			for i = #v, 1, -1 do
-				if v[i] == self then
-					tremove(v, i)
-				end
-			end
-			if #v == 0 then
-				events[e] = nil
-				mainFrame:UnregisterEvent(e)
-				addon:Debug("INFO", "Unregistered event '%s' from frame", e)
-			end
-		end
-	end
+    -- Unregister all frame events:
+    function addon:UnregisterEvents()
+        for e, v in pairs(events) do
+            for i = #v, 1, -1 do
+                if v[i] == self then
+                    tremove(v, i)
+                end
+            end
+            if #v == 0 then
+                events[e] = nil
+                mainFrame:UnregisterEvent(e)
+                addon:Debug("INFO", "Unregistered event '%s' from frame", e)
+            end
+        end
+    end
 
-	-- Register some events and frame-related functions:
-	addon:RegisterEvents("ADDON_LOADED")
-	mainFrame:SetScript("OnEvent", HandleEvent)
-	mainFrame:SetScript("OnUpdate", Utils.run)
+    -- Register some events and frame-related functions:
+    addon:RegisterEvents("ADDON_LOADED")
+    mainFrame:SetScript("OnEvent", HandleEvent)
+    mainFrame:SetScript("OnUpdate", Utils.run)
 end
 
 -- ==================== Chat Output Helpers ==================== --
 do
-	-- Output strings:
-	local output          = "|cfff58cba%s|r: %s"
-	local chatPrefix      = "Kader Raid Tools"
-	local chatPrefixShort = "KRT"
+    -- Output strings:
+    local output          = "|cfff58cba%s|r: %s"
+    local chatPrefix      = "Kader Raid Tools"
+    local chatPrefixShort = "KRT"
 
-	-- Default function that handles final output:
-	local function PreparePrint(text, prefix)
-		prefix = prefix or chatPrefixShort
-		return format(output, prefix, tostring(text))
-	end
+    -- Default function that handles final output:
+    local function PreparePrint(text, prefix)
+        prefix = prefix or chatPrefixShort
+        return format(output, prefix, tostring(text))
+    end
 
-	-- Default print function:
-	function addon:Print(text, prefix)
-		local msg = PreparePrint(text, prefix)
-		addon:Debug("DEBUG", "Print: [%s] %s", tostring(prefix or chatPrefixShort), tostring(text))
-		return Utils.print(msg)
-	end
+    -- Default print function:
+    function addon:Print(text, prefix)
+        local msg = PreparePrint(text, prefix)
+        addon:Debug("DEBUG", "Print: [%s] %s", tostring(prefix or chatPrefixShort), tostring(text))
+        return Utils.print(msg)
+    end
 
-	-- Print Green Success Message:
-	function addon:PrintSuccess(text, prefix)
-		local msg = PreparePrint(text, prefix)
-		addon:Debug("DEBUG", "PrintSuccess: [%s] %s", tostring(prefix or chatPrefixShort), tostring(text))
-		return Utils.print_green(msg)
-	end
+    -- Print Green Success Message:
+    function addon:PrintSuccess(text, prefix)
+        local msg = PreparePrint(text, prefix)
+        addon:Debug("DEBUG", "PrintSuccess: [%s] %s", tostring(prefix or chatPrefixShort), tostring(text))
+        return Utils.print_green(msg)
+    end
 
-	-- Print Red Error Message:
-	function addon:PrintError(text, prefix)
-		local msg = PreparePrint(text, prefix)
-		addon:Debug("DEBUG", "PrintError: [%s] %s", tostring(prefix or chatPrefixShort), tostring(text))
-		return Utils.print_red(msg)
-	end
+    -- Print Red Error Message:
+    function addon:PrintError(text, prefix)
+        local msg = PreparePrint(text, prefix)
+        addon:Debug("DEBUG", "PrintError: [%s] %s", tostring(prefix or chatPrefixShort), tostring(text))
+        return Utils.print_red(msg)
+    end
 
-	-- Print Orange Warning Message:
-	function addon:PrintWarning(text, prefix)
-		local msg = PreparePrint(text, prefix)
-		addon:Debug("DEBUG", "PrintWarning: [%s] %s", tostring(prefix or chatPrefixShort), tostring(text))
-		return Utils.print_orange(msg)
-	end
+    -- Print Orange Warning Message:
+    function addon:PrintWarning(text, prefix)
+        local msg = PreparePrint(text, prefix)
+        addon:Debug("DEBUG", "PrintWarning: [%s] %s", tostring(prefix or chatPrefixShort), tostring(text))
+        return Utils.print_orange(msg)
+    end
 
-	-- Print Blue Info Message:
-	function addon:PrintInfo(text, prefix)
-		local msg = PreparePrint(text, prefix)
-		addon:Debug("DEBUG", "PrintInfo: [%s] %s", tostring(prefix or chatPrefixShort), tostring(text))
-		return Utils.print_blue(msg)
-	end
+    -- Print Blue Info Message:
+    function addon:PrintInfo(text, prefix)
+        local msg = PreparePrint(text, prefix)
+        addon:Debug("DEBUG", "PrintInfo: [%s] %s", tostring(prefix or chatPrefixShort), tostring(text))
+        return Utils.print_blue(msg)
+    end
 
-	-- Function used for various announcements:
-	function addon:Announce(text, channel)
-		local originalChannel = channel
-		if not channel then
-			-- Switch to raid channel if we're in a raid:
-			if self:IsInRaid() then
-				-- Check for countdown messages
-				local countdownTicPattern = L.ChatCountdownTic:gsub("%%d", "%%d+")
-				local isCountdownMessage = text:find(countdownTicPattern) or text:find(L.ChatCountdownEnd)
+    -- Function used for various announcements:
+    function addon:Announce(text, channel)
+        local originalChannel = channel
+        if not channel then
+            -- Switch to raid channel if we're in a raid:
+            if self:IsInRaid() then
+                -- Check for countdown messages
+                local countdownTicPattern = L.ChatCountdownTic:gsub("%%d", "%%d+")
+                local isCountdownMessage = text:find(countdownTicPattern) or text:find(L.ChatCountdownEnd)
 
-				if isCountdownMessage then
-					-- If it's a countdown message:
-					if addon.options.countdownSimpleRaidMsg then
-						channel = "RAID" -- Force RAID if countdownSimpleRaidMsg is true
-					-- Use RAID_WARNING if leader/officer AND useRaidWarning is true
-					elseif addon.options.useRaidWarning and (IsRaidLeader() or IsRaidOfficer()) then
-						channel = "RAID_WARNING"
-					else
-						channel = "RAID" -- Fallback to RAID
-					end
-				else
-					if addon.options.useRaidWarning and (IsRaidLeader() or IsRaidOfficer()) then
-						channel = "RAID_WARNING"
-					else
-						channel = "RAID" -- Fallback to RAID
-					end
-				end
+                if isCountdownMessage then
+                    -- If it's a countdown message:
+                    if addon.options.countdownSimpleRaidMsg then
+                        channel = "RAID" -- Force RAID if countdownSimpleRaidMsg is true
+                    -- Use RAID_WARNING if leader/officer AND useRaidWarning is true
+                    elseif addon.options.useRaidWarning and (IsRaidLeader() or IsRaidOfficer()) then
+                        channel = "RAID_WARNING"
+                    else
+                        channel = "RAID" -- Fallback to RAID
+                    end
+                else
+                    if addon.options.useRaidWarning and (IsRaidLeader() or IsRaidOfficer()) then
+                        channel = "RAID_WARNING"
+                    else
+                        channel = "RAID" -- Fallback to RAID
+                    end
+                end
 
-			-- Switch to party mode if we're in a party:
-			elseif self:IsInParty() then
-				channel = "PARTY"
-				
-			-- Switch to alone mode
-			else
-				channel = "SAY"
-			end
-		end
-		-- Let's Go!
-		SendChatMessage(tostring(text), channel)
-	end
+            -- Switch to party mode if we're in a party:
+            elseif self:IsInParty() then
+                channel = "PARTY"
+
+            -- Switch to alone mode
+            else
+                channel = "SAY"
+            end
+        end
+        -- Let's Go!
+        SendChatMessage(tostring(text), channel)
+    end
 end
 
 -- ==================== Tooltips ==================== --
 do
-	local colors = HIGHLIGHT_FONT_COLOR
+    local colors = HIGHLIGHT_FONT_COLOR
 
-	-- Show the tooltip:
-	local function ShowTooltip(frame)
-		addon:Debug("DEBUG", "Showing tooltip for frame: " .. (frame:GetName() or "Unnamed"))
-		-- Is the anchor manually set?
-		if not frame.tooltip_anchor then
-			addon:Debug("DEBUG", "Setting default anchor for tooltip.")
-			GameTooltip_SetDefaultAnchor(GameTooltip, frame)
-		else
-			addon:Debug("DEBUG", "Setting custom anchor for tooltip: " .. frame.tooltip_anchor)
-			GameTooltip:SetOwner(frame, frame.tooltip_anchor)
-		end
+    -- Show the tooltip:
+    local function ShowTooltip(frame)
+        addon:Debug("DEBUG", "Showing tooltip for frame: " .. (frame:GetName() or "Unnamed"))
+        -- Is the anchor manually set?
+        if not frame.tooltip_anchor then
+            addon:Debug("DEBUG", "Setting default anchor for tooltip.")
+            GameTooltip_SetDefaultAnchor(GameTooltip, frame)
+        else
+            addon:Debug("DEBUG", "Setting custom anchor for tooltip: " .. frame.tooltip_anchor)
+            GameTooltip:SetOwner(frame, frame.tooltip_anchor)
+        end
 
-		-- Do we have a title?
-		if frame.tooltip_title then
-			addon:Debug("DEBUG", "Tooltip title: " .. frame.tooltip_title)
-			GameTooltip:SetText(frame.tooltip_title)
-		end
+        -- Do we have a title?
+        if frame.tooltip_title then
+            addon:Debug("DEBUG", "Tooltip title: " .. frame.tooltip_title)
+            GameTooltip:SetText(frame.tooltip_title)
+        end
 
-		-- Do We have a text?
-		if frame.tooltip_text then
-			addon:Debug("DEBUG", "Tooltip text: " .. tostring(frame.tooltip_text))
-			if type(frame.tooltip_text) == "string" then
-				GameTooltip:AddLine(frame.tooltip_text, colors.r, colors.g, colors.b, true)
-			elseif type(frame.tooltip_text) == "table" then
-				for _, l in ipairs(frame.tooltip_text) do
-					addon:Debug("DEBUG", "Adding line to tooltip: " .. tostring(l))
-					GameTooltip:AddLine(l, colors.r, colors.g, colors.b, true)
-				end
-			end
-		end
+        -- Do We have a text?
+        if frame.tooltip_text then
+            addon:Debug("DEBUG", "Tooltip text: " .. tostring(frame.tooltip_text))
+            if type(frame.tooltip_text) == "string" then
+                GameTooltip:AddLine(frame.tooltip_text, colors.r, colors.g, colors.b, true)
+            elseif type(frame.tooltip_text) == "table" then
+                for _, l in ipairs(frame.tooltip_text) do
+                    addon:Debug("DEBUG", "Adding line to tooltip: " .. tostring(l))
+                    GameTooltip:AddLine(l, colors.r, colors.g, colors.b, true)
+                end
+            end
+        end
 
-		-- Do we have an item tooltip?
-		if frame.tooltip_item then
-			addon:Debug("DEBUG", "Setting item tooltip: " .. frame.tooltip_item)
-			GameTooltip:SetHyperlink(frame.tooltip_item)
-		end
+        -- Do we have an item tooltip?
+        if frame.tooltip_item then
+            addon:Debug("DEBUG", "Setting item tooltip: " .. frame.tooltip_item)
+            GameTooltip:SetHyperlink(frame.tooltip_item)
+        end
 
-		-- Show the tooltip
-		GameTooltip:Show()
-		addon:Debug("DEBUG", "Tooltip shown for frame: " .. (frame:GetName() or "Unnamed"))
-	end
+        -- Show the tooltip
+        GameTooltip:Show()
+        addon:Debug("DEBUG", "Tooltip shown for frame: " .. (frame:GetName() or "Unnamed"))
+    end
 
-	-- Hides the tooltip:
-	local function HideTooltip()
-		addon:Debug("DEBUG", "Hiding tooltip.")
-		GameTooltip:Hide()
-	end
+    -- Hides the tooltip:
+    local function HideTooltip()
+        addon:Debug("DEBUG", "Hiding tooltip.")
+        GameTooltip:Hide()
+    end
 
-	-- Sets addon tooltips scripts:
-	function addon:SetTooltip(frame, text, anchor, title)
-		addon:Debug("DEBUG", "Setting tooltip for frame: " .. (frame:GetName() or "Unnamed"))
-		-- No frame no blame...
-		if not frame then return end
-		-- Prepare the text
-		frame.tooltip_text = text and text or frame.tooltip_text
-		frame.tooltip_anchor = anchor and anchor or frame.tooltip_anchor
-		frame.tooltip_title = title and title or frame.tooltip_title
-		-- No title or text? nothing to do...
-		if not frame.tooltip_title and not frame.tooltip_text and not frame.tooltip_item then
-			addon:Debug("DEBUG", "No tooltip content to set.")
-			return
-		end
-		addon:Debug("DEBUG", "Setting tooltip content for frame: " .. (frame:GetName() or "Unnamed"))
-		frame:SetScript("OnEnter", ShowTooltip)
-		frame:SetScript("OnLeave", HideTooltip)
-	end
+    -- Sets addon tooltips scripts:
+    function addon:SetTooltip(frame, text, anchor, title)
+        addon:Debug("DEBUG", "Setting tooltip for frame: " .. (frame:GetName() or "Unnamed"))
+        -- No frame no blame...
+        if not frame then return end
+        -- Prepare the text
+        frame.tooltip_text = text and text or frame.tooltip_text
+        frame.tooltip_anchor = anchor and anchor or frame.tooltip_anchor
+        frame.tooltip_title = title and title or frame.tooltip_title
+        -- No title or text? nothing to do...
+        if not frame.tooltip_title and not frame.tooltip_text and not frame.tooltip_item then
+            addon:Debug("DEBUG", "No tooltip content to set.")
+            return
+        end
+        addon:Debug("DEBUG", "Setting tooltip content for frame: " .. (frame:GetName() or "Unnamed"))
+        frame:SetScript("OnEnter", ShowTooltip)
+        frame:SetScript("OnLeave", HideTooltip)
+    end
 end
 
 -- ==================== Slash Commands ==================== --
@@ -532,90 +532,90 @@ end
 
 -- On ADDON_LOADED:
 function addon:ADDON_LOADED(name)
-	if name ~= addonName then return end
-	mainFrame:UnregisterEvent("ADDON_LOADED")
-	LoadOptions()
-	self:RegisterEvents(
-		"CHAT_MSG_ADDON",
-		"CHAT_MSG_SYSTEM",
-		"CHAT_MSG_LOOT",
-		"CHAT_MSG_MONSTER_YELL",
-		"RAID_ROSTER_UPDATE",
-		"PLAYER_ENTERING_WORLD",
-		"COMBAT_LOG_EVENT_UNFILTERED",
-		"RAID_INSTANCE_WELCOME",
-		-- Master frame events:
-		"ITEM_LOCKED",
-		"LOOT_CLOSED",
-		"LOOT_OPENED",
-		"LOOT_SLOT_CLEARED",
-		"TRADE_ACCEPT_UPDATE"
-	)
-	self:RAID_ROSTER_UPDATE()
+    if name ~= addonName then return end
+    mainFrame:UnregisterEvent("ADDON_LOADED")
+    LoadOptions()
+    self:RegisterEvents(
+        "CHAT_MSG_ADDON",
+        "CHAT_MSG_SYSTEM",
+        "CHAT_MSG_LOOT",
+        "CHAT_MSG_MONSTER_YELL",
+        "RAID_ROSTER_UPDATE",
+        "PLAYER_ENTERING_WORLD",
+        "COMBAT_LOG_EVENT_UNFILTERED",
+        "RAID_INSTANCE_WELCOME",
+        -- Master frame events:
+        "ITEM_LOCKED",
+        "LOOT_CLOSED",
+        "LOOT_OPENED",
+        "LOOT_SLOT_CLEARED",
+        "TRADE_ACCEPT_UPDATE"
+    )
+    self:RAID_ROSTER_UPDATE()
 end
 
 function addon:RAID_ROSTER_UPDATE()
-	if KRT then
-		addon:Debug("INFO", "Updating raid member list.")
-	end
-	self:UpdateRaidRoster()
+    if KRT then
+        addon:Debug("INFO", "Updating raid member list.")
+    end
+    self:UpdateRaidRoster()
 end
 
 function addon:RAID_INSTANCE_WELCOME(...)
-	local instanceName, instanceType, instanceDiff = GetInstanceInfo()
-	_, KRT_NextReset = ...
-	
-	if L.RaidZones[instanceName] ~= nil then
-		if KRT then
-			addon:Debug("INFO", "Raid '%s' started. Type: %s, Difficulty: %d", instanceName, instanceType, instanceDiff)
-		end
-		Utils.schedule(3, function()
-			addon.Raid:Check(instanceName, instanceDiff)
-		end)
-	else
-		if KRT then
-			addon:Debug("INFO", "Raid '%s' is not supported for monitoring.", instanceName)
-		end
-	end
+    local instanceName, instanceType, instanceDiff = GetInstanceInfo()
+    _, KRT_NextReset = ...
+
+    if L.RaidZones[instanceName] ~= nil then
+        if KRT then
+            addon:Debug("INFO", "Raid '%s' started. Type: %s, Difficulty: %d", instanceName, instanceType, instanceDiff)
+        end
+        Utils.schedule(3, function()
+            addon.Raid:Check(instanceName, instanceDiff)
+        end)
+    else
+        if KRT then
+            addon:Debug("INFO", "Raid '%s' is not supported for monitoring.", instanceName)
+        end
+    end
 end
 
 function addon:PLAYER_ENTERING_WORLD()
-	mainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
-	if KRT then
-		addon:Debug("INFO", "Player entered the world. Initial raid check scheduled.")
-	end
-	Utils.schedule(3, self.Raid.FirstCheck)
+    mainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
+    if KRT then
+        addon:Debug("INFO", "Player entered the world. Initial raid check scheduled.")
+    end
+    Utils.schedule(3, self.Raid.FirstCheck)
 end
 
 function addon:CHAT_MSG_LOOT(msg)
-	if KRT_CurrentRaid then
-		if KRT then
-			addon:Debug("INFO", "Loot received: %s", msg)
-		end
-		self.Raid:AddLoot(msg)
-	end
+    if KRT_CurrentRaid then
+        if KRT then
+            addon:Debug("INFO", "Loot received: %s", msg)
+        end
+        self.Raid:AddLoot(msg)
+    end
 end
 
 function addon:CHAT_MSG_MONSTER_YELL(...)
-	local text, boss = ...
-	if L.BossYells[text] and KRT_CurrentRaid then
-		if KRT then
-			addon:Debug("INFO", "Boss yell '%s' detected: %s", boss, text)
-		end
-		self.Raid:AddBoss(L.BossYells[text])
-	end
+    local text, boss = ...
+    if L.BossYells[text] and KRT_CurrentRaid then
+        if KRT then
+            addon:Debug("INFO", "Boss yell '%s' detected: %s", boss, text)
+        end
+        self.Raid:AddBoss(L.BossYells[text])
+    end
 end
 
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
-	local _, event, _, _, _, destGUID, destName = ...
-	if not KRT_CurrentRaid then return end
-	if event == "UNIT_DIED" then
-		local npcID = Utils.GetNPCID(destGUID)
-		if addon.bossListIDs[npcID] then
-			if KRT then
-				addon:Debug("INFO", "Boss killed: %s", destName)
-			end
-			self.Raid:AddBoss(destName)
-		end
-	end
+    local _, event, _, _, _, destGUID, destName = ...
+    if not KRT_CurrentRaid then return end
+    if event == "UNIT_DIED" then
+        local npcID = Utils.GetNPCID(destGUID)
+        if addon.bossListIDs[npcID] then
+            if KRT then
+                addon:Debug("INFO", "Boss killed: %s", destName)
+            end
+            self.Raid:AddBoss(destName)
+        end
+    end
 end
