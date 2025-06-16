@@ -15,6 +15,7 @@ luac.out
 *.log
 
 # Lua tooling
+.styluaignore
 .stylua.toml~
 luacheck-report.txt
 
