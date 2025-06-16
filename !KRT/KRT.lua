@@ -391,8 +391,9 @@ do
 			Raid:End()
 			return
 		end
-		local realm = GetRealmName() or UNKNOWN
-		local players = {}
+               local realm = GetRealmName() or UNKNOWN
+               KRT_Players[realm] = KRT_Players[realm] or {}
+               local players = {}
 		for i = 1, numRaid do
 			local name, rank, subgroup, level, classL, class, _, online = GetRaidRosterInfo(i)
 			if name then
@@ -440,8 +441,9 @@ do
 		end
 		numRaid = GetNumRaidMembers()
 		if numRaid == 0 then return end
-		local realm = GetRealmName() or UNKNOWN
-		local currentTime = Utils.GetCurrentTime()
+               local realm = GetRealmName() or UNKNOWN
+               KRT_Players[realm] = KRT_Players[realm] or {}
+               local currentTime = Utils.GetCurrentTime()
 		addon:Debug("INFO", "Creating new raid: %s (%d-man)", zoneName, raidSize)
 		local raidInfo = {
 			realm = realm,
