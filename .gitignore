@@ -2,6 +2,7 @@
 _dev/
 Makefile
 .vscode/
+settings.json
 
 # IDE/editor files
 *.sublime-project
