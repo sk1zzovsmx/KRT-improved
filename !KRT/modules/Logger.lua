@@ -236,7 +236,6 @@ local Logger = addon.Logger
 		addon.Logger.selectedPlayer = nil
 		addon.Logger.selectedItem   = nil
 	end)
-end
 
 -- Logger Raids List:
 do
@@ -1529,6 +1528,8 @@ do
 			end
 		end
 		addon:PrintError(L.ErrAttendeesNotFound or "Player not in raid")
-		addon.Logger.BossAttendees:Fetch()
-	end
+                addon.Logger.BossAttendees:Fetch()
+        end
+
+end
 
