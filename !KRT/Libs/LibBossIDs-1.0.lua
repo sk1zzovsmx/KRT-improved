@@ -247,7 +247,6 @@ local BossIDs = {
 	-- The Blackrock Depths: Inner Blackrock Depths
 	[9156]  = true, -- Ambassador Flamelash
 	[8923]  = true, -- Panzor the Invincible
-	[17808] = true, -- Anger'rel
 	[9039]  = true, -- Doom'rel
 	[9040]  = true, -- Dope'rel
 	[9037]  = true, -- Gloom'rel
@@ -629,7 +628,6 @@ local BossIDs = {
 	[23577] = true, -- Halazzi
 	[28517] = true, -- Halazzi
 	[29022] = true, -- Halazzi
-	[24239] = true, -- Malacrass
 	
 	-- Zul'Aman: Final Bosses
 	[24239] = true, -- Hex Lord Malacrass
@@ -822,7 +820,6 @@ local BossIDs = {
 	[38112] = true, -- Falric
 	[38113] = true, -- Marwyn
 	[37226] = true, -- The Lich King
-	[38113] = true, -- Marvyn
 	
 	-- Obsidian Sanctum
 	[30451] = true, -- Shadron
