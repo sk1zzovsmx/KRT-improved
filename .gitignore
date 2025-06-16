@@ -1,6 +1,26 @@
-_dev
+# Development workspace
+_dev/
 Makefile
-*.zip
+
+# IDE/editor files
 *.sublime-project
 *.sublime-workspace
+*.swp
+*.bak
+*.tmp
+
+# Build/artifact outputs
+*.zip
+luac.out
+*.log
+
+# Lua tooling
+.stylua.toml~
+luacheck-report.txt
+
+# Rust/Cargo (for stylua if built manually)
+target/
+Cargo.lock
+
+# Backup or temp addon files
 Skada/Skada_Bak.lua
