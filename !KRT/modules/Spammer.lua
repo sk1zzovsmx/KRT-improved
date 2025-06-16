@@ -327,5 +327,4 @@ local Spammer = addon.Spammer
 	spamFrame:SetScript("OnUpdate", function(self, elapsed)
 		if UISpammer then UpdateUIFrame(UISpammer, elapsed) end
 	end)
-end
 
