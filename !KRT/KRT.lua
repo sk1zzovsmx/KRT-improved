@@ -5,19 +5,18 @@ local Utils = addon.Utils
 local _G = _G
 _G["KRT"] = addon
 
-
 -- SavedVariables:
-KRT_Debug			= KRT_Debug or {}
-KRT_Options	   		= KRT_Options or {}
-KRT_Raids		 	= KRT_Raids or {}
-KRT_Players	   		= KRT_Players or {}
-KRT_Warnings	  	= KRT_Warnings or {}
-KRT_ExportString  	= KRT_ExportString or "$I,$N,$S,$W,$T,$R,$H:$M,$d/$m/$y"
-KRT_Spammer	   		= KRT_Spammer or {}
-KRT_CurrentRaid   	= KRT_CurrentRaid or nil
-KRT_LastBoss	  	= KRT_LastBoss or  nil
-KRT_NextReset	 	= KRT_NextReset or  0
-KRT_SavedReserves 	= KRT_SavedReserves or {}
+KRT_Debug = KRT_Debug or {}
+KRT_Options = KRT_Options or {}
+KRT_Raids = KRT_Raids or {}
+KRT_Players = KRT_Players or {}
+KRT_Warnings = KRT_Warnings or {}
+KRT_ExportString = KRT_ExportString or "$I,$N,$S,$W,$T,$R,$H:$M,$d/$m/$y"
+KRT_Spammer = KRT_Spammer or {}
+KRT_CurrentRaid = KRT_CurrentRaid or nil
+KRT_LastBoss = KRT_LastBoss or nil
+KRT_NextReset = KRT_NextReset or 0
+KRT_SavedReserves = KRT_SavedReserves or {}
 
 -- AddOn main frames:
 local mainFrame = CreateFrame("Frame")
@@ -31,56 +30,56 @@ local unitName = UnitName("player")
 -- Rolls & Loot related locals:
 local trader, winner
 local holder, banker, disenchanter
-local lootOpened      = false
-local rollTypes       = {mainspec = 1, offspec = 2, reserved = 3, free = 4, bank = 5, disenchant = 6, hold = 7, dkp = 8}
+local lootOpened = false
+local rollTypes = { mainspec = 1, offspec = 2, reserved = 3, free = 4, bank = 5, disenchant = 6, hold = 7, dkp = 8 }
 local currentRollType = 4
 local currentRollItem = 0
-local fromInventory   = false
-local itemInfo        = {}
-local lootCount       = 0
-local rollsCount      = 0
-local itemCount       = 1
-local itemTraded      = 0
+local fromInventory = false
+local itemInfo = {}
+local lootCount = 0
+local rollsCount = 0
+local itemCount = 1
+local itemTraded = 0
 local ItemExists, ItemIsSoulbound, GetItem
 local GetItemIndex, GetItemName, GetItemLink, GetItemTexture
-local lootTypesText = {L.BtnMS, L.BtnOS, L.BtnSR, L.BtnFree, L.BtnBank, L.BtnDisenchant, L.BtnHold}
+local lootTypesText = { L.BtnMS, L.BtnOS, L.BtnSR, L.BtnFree, L.BtnBank, L.BtnDisenchant, L.BtnHold }
 local lootTypesColored = {
-	GREEN_FONT_COLOR_CODE..L.BtnMS..FONT_COLOR_CODE_CLOSE,
-	LIGHTYELLOW_FONT_COLOR_CODE..L.BtnOS..FONT_COLOR_CODE_CLOSE,
-	"|cffa335ee"..L.BtnSR..FONT_COLOR_CODE_CLOSE,
-	NORMAL_FONT_COLOR_CODE..L.BtnFree..FONT_COLOR_CODE_CLOSE,
-	ORANGE_FONT_COLOR_CODE..L.BtnBank..FONT_COLOR_CODE_CLOSE,
-	RED_FONT_COLOR_CODE..L.BtnDisenchant..FONT_COLOR_CODE_CLOSE,
-	HIGHLIGHT_FONT_COLOR_CODE..L.BtnHold..FONT_COLOR_CODE_CLOSE,
-	GREEN_FONT_COLOR_CODE.."DKP"..FONT_COLOR_CODE_CLOSE,
+	GREEN_FONT_COLOR_CODE .. L.BtnMS .. FONT_COLOR_CODE_CLOSE,
+	LIGHTYELLOW_FONT_COLOR_CODE .. L.BtnOS .. FONT_COLOR_CODE_CLOSE,
+	"|cffa335ee" .. L.BtnSR .. FONT_COLOR_CODE_CLOSE,
+	NORMAL_FONT_COLOR_CODE .. L.BtnFree .. FONT_COLOR_CODE_CLOSE,
+	ORANGE_FONT_COLOR_CODE .. L.BtnBank .. FONT_COLOR_CODE_CLOSE,
+	RED_FONT_COLOR_CODE .. L.BtnDisenchant .. FONT_COLOR_CODE_CLOSE,
+	HIGHLIGHT_FONT_COLOR_CODE .. L.BtnHold .. FONT_COLOR_CODE_CLOSE,
+	GREEN_FONT_COLOR_CODE .. "DKP" .. FONT_COLOR_CODE_CLOSE,
 }
 -- Items color
 local itemColors = {
-		[1] = "ff9d9d9d",  -- poor
-		[2] = "ffffffff",  -- common
-		[3] = "ff1eff00",  -- uncommon
-		[4] = "ff0070dd",  -- rare
-		[5] = "ffa335ee",  -- epic
-		[6] = "ffff8000",  -- legendary
-		[7] = "ffe6cc80",  -- artifact / heirloom
+	[1] = "ff9d9d9d", -- poor
+	[2] = "ffffffff", -- common
+	[3] = "ff1eff00", -- uncommon
+	[4] = "ff0070dd", -- rare
+	[5] = "ffa335ee", -- epic
+	[6] = "ffff8000", -- legendary
+	[7] = "ffe6cc80", -- artifact / heirloom
 }
 -- Classes color:
 local classColors = {
-	["UNKNOWN"]     = "ffffffff",
+	["UNKNOWN"] = "ffffffff",
 	["DEATHKNIGHT"] = "ffc41f3b",
-	["DRUID"]       = "ffff7d0a",
-	["HUNTER"]      = "ffabd473",
-	["MAGE"]        = "ff40c7eb",
-	["PALADIN"]     = "fff58cba",
-	["PRIEST"]      = "ffffffff",
-	["ROGUE"]       = "fffff569",
-	["SHAMAN"]      = "ff0070de",
-	["WARLOCK"]     = "ff8787ed",
-	["WARRIOR"]     = "ffc79c6e",
+	["DRUID"] = "ffff7d0a",
+	["HUNTER"] = "ffabd473",
+	["MAGE"] = "ff40c7eb",
+	["PALADIN"] = "fff58cba",
+	["PRIEST"] = "ffffffff",
+	["ROGUE"] = "fffff569",
+	["SHAMAN"] = "ff0070de",
+	["WARLOCK"] = "ff8787ed",
+	["WARRIOR"] = "ffc79c6e",
 }
 
 -- Raid Target Icons:
-local markers = {"{circle}", "{diamond}", "{triangle}", "{moon}", "{square}", "{cross}", "{skull}"}
+local markers = { "{circle}", "{diamond}", "{triangle}", "{moon}", "{square}", "{cross}", "{skull}" }
 
 -- Windows Title String:
 local titleString = "|cfff58cbaK|r|caaf49141RT|r : %s"
@@ -210,8 +209,8 @@ end
 -- ==================== Chat Output Helpers ==================== --
 do
 	-- Output strings:
-	local output          = "|cfff58cba%s|r: %s"
-	local chatPrefix      = "Kader Raid Tools"
+	local output = "|cfff58cba%s|r: %s"
+	local chatPrefix = "Kader Raid Tools"
 	local chatPrefixShort = "KRT"
 
 	-- Default function that handles final output:
@@ -353,7 +352,9 @@ do
 	function addon:SetTooltip(frame, text, anchor, title)
 		addon:Debug("DEBUG", "Setting tooltip for frame: " .. (frame:GetName() or "Unnamed"))
 		-- No frame no blame...
-		if not frame then return end
+		if not frame then
+			return
+		end
 		-- Prepare the text
 		frame.tooltip_text = text and text or frame.tooltip_text
 		frame.tooltip_anchor = anchor and anchor or frame.tooltip_anchor
@@ -373,20 +374,22 @@ end
 
 do
 	-- Valid subcommands for each feature
-	local cmdAchiev   = {"ach", "achi", "achiev", "achievement"}
-	local cmdLFM      = {"pug", "lfm", "group", "grouper"}
-	local cmdConfig   = {"config", "conf", "options", "opt"}
-	local cmdChanges  = {"ms", "changes", "mschanges"}
-	local cmdWarnings = {"warning", "warnings", "warn", "rw"}
-	local cmdLog      = {"log", "logger", "history"}
-	local cmdDebug    = {"debug", "dbg", "debugger"}
-	local cmdLoot     = {"loot", "ml", "master"}
-	local cmdReserves = {"res", "reserves", "reserve"}
+	local cmdAchiev = { "ach", "achi", "achiev", "achievement" }
+	local cmdLFM = { "pug", "lfm", "group", "grouper" }
+	local cmdConfig = { "config", "conf", "options", "opt" }
+	local cmdChanges = { "ms", "changes", "mschanges" }
+	local cmdWarnings = { "warning", "warnings", "warn", "rw" }
+	local cmdLog = { "log", "logger", "history" }
+	local cmdDebug = { "debug", "dbg", "debugger" }
+	local cmdLoot = { "loot", "ml", "master" }
+	local cmdReserves = { "res", "reserves", "reserve" }
 
 	local helpString = "|caaf49141%s|r: %s"
 
 	local function HandleSlashCmd(cmd)
-		if not cmd or cmd == "" then return end
+		if not cmd or cmd == "" then
+			return
+		end
 
 		if cmd == "show" or cmd == "toggle" then
 			addon.Master:Toggle()
@@ -400,9 +403,15 @@ do
 			local subCmd = cmd2 and cmd2:lower()
 
 			local actions = {
-				clear  = function() addon.Debugger:Clear() end,
-				show   = function() addon.Debugger:Show() end,
-				hide   = function() addon.Debugger:Hide() end,
+				clear = function()
+					addon.Debugger:Clear()
+				end,
+				show = function()
+					addon.Debugger:Show()
+				end,
+				hide = function()
+					addon.Debugger:Hide()
+				end,
 				toggle = function()
 					if addon.Debugger:IsShown() then
 						addon.Debugger:Hide()
@@ -528,11 +537,14 @@ do
 end
 
 -- ==================== What else to do? ==================== --
---[===[ And here we go... ]===]--
+--[===[ And here we go... ]===]
+--
 
 -- On ADDON_LOADED:
 function addon:ADDON_LOADED(name)
-	if name ~= addonName then return end
+	if name ~= addonName then
+		return
+	end
 	mainFrame:UnregisterEvent("ADDON_LOADED")
 	LoadOptions()
 	self:RegisterEvents(
@@ -608,7 +620,9 @@ end
 
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
 	local _, event, _, _, _, destGUID, destName = ...
-	if not KRT_CurrentRaid then return end
+	if not KRT_CurrentRaid then
+		return
+	end
 	if event == "UNIT_DIED" then
 		local npcID = Utils.GetNPCID(destGUID)
 		if addon.bossListIDs[npcID] then
