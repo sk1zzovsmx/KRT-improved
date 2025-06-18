@@ -1,3 +1,23 @@
 {
-    "CodeGPT.apiKey": "Ollama"
+    "CodeGPT.apiKey": "Ollama",
+    // Enable Lua formatting by the language server
+    "Lua.format.enable": true,
+
+    // You can also specify formatting preferences:
+    "Lua.format.defaultConfig": {
+        "indent_style": "tab",     // matches your .editorconfig
+        "indent_size": "4",        // matches your .editorconfig
+        "continuation_indent": "4",
+        "quote_style": "double",   // or "single", up to your preference
+        "call_arg_parentheses": "remove_table_only", // optional
+        // ... more options here: https://github.com/LuaLS/lua-language-server/wiki/Formatter
+    },
+
+    // Recommended: let Lua Language Server handle formatting
+    "[lua]": {
+        "editor.defaultFormatter": "sumneko.lua",
+        "editor.formatOnSave": true, // optional, auto-format on save
+        "editor.insertSpaces": false, // tab
+        "editor.tabSize": 4
+    }
 }

@@ -37,16 +37,16 @@ end
 -- DeepCopy:
 _G.table.deepCopy = function(t)
 	if type(t) ~= "table" then return t end
-    local mt = getmetatable(t)
-    local res = {}
-    for k, v in pairs(t) do
-        if type(v) == "table" then
-            v = _G.table.deepCopy(v)
-        end
-        res[k] = v
-    end
-    setmetatable(res, mt)
-    return res
+	local mt = getmetatable(t)
+	local res = {}
+	for k, v in pairs(t) do
+		if type(v) == "table" then
+			v = _G.table.deepCopy(v)
+		end
+		res[k] = v
+	end
+	setmetatable(res, mt)
+	return res
 end
 
 -- Reverse table:
@@ -107,7 +107,7 @@ end
 -- math.round
 _G.math.round = function(num, idp)
 	if idp and idp > 0 then
-		local mult = 10^idp
+		local mult = 10 ^ idp
 		return floor(num * mult + 0.5) / mult
 	end
 	return floor(num + 0.5)
@@ -193,7 +193,7 @@ do
 		for i = 1, select("#", ...) do
 			task[i] = select(i, ...)
 		end
-		tasks[#tasks+1] = task
+		tasks[#tasks + 1] = task
 		tinsert(tasks, task)
 	end
 
@@ -272,6 +272,7 @@ end
 function Utils.bool2str(bool)
 	return bool and "true" or "false"
 end
+
 function Utils.str2bool(str)
 	return (str ~= "false")
 end
@@ -280,6 +281,7 @@ end
 function Utils.bool2num(bool)
 	return bool and 1 or 0
 end
+
 function Utils.num2bool(num)
 	return (num ~= 0)
 end
@@ -294,7 +296,7 @@ function Utils.sec2clock(seconds)
 	hours = format("%02.f", floor(sec / 3600))
 	mins  = format("%02.f", floor(sec / 60 - (hours * 60)))
 	secs  = format("%02.f", floor(sec - hours * 3600 - mins * 60))
-	return hours..":"..mins..":"..secs
+	return hours .. ":" .. mins .. ":" .. secs
 end
 
 -- Messages functions:
@@ -309,15 +311,15 @@ do
 			if type(v) == "boolean" then
 				m = Utils.bool2str(v)
 			elseif type(v) == "table" then
-				m ="<table>"
+				m = "<table>"
 			elseif type(v) == "function" then
-				m ="<function>"
+				m = "<function>"
 			elseif v == nil then
-				m ="<nil>"
+				m = "<nil>"
 			else
 				m = v
 			end
-			msg = msg.." "..m
+			msg = msg .. " " .. m
 		end
 		if opt.str then
 			return msg
@@ -347,27 +349,35 @@ do
 	function Utils.print_gold(...)
 		return Utils.print_color(1.00, 0.82, 0.00, ...)
 	end
+
 	function Utils.print_gray(...)
 		return Utils.print_color(0.50, 0.50, 0.50, ...)
 	end
+
 	function Utils.print_orange(...)
 		return Utils.print_color(1.00, 0.49, 0.24, ...)
 	end
+
 	function Utils.print_red(...)
 		return Utils.print_color(1.00, 0.12, 0.12, ...)
 	end
+
 	function Utils.print_yellow(...)
 		return Utils.print_color(1.00, 1.00, 0.00, ...)
 	end
+
 	function Utils.print_white(...)
 		return Utils.print_color(1.00, 1.00, 1.00, ...)
 	end
+
 	function Utils.print_green(...)
 		return Utils.print_color(0.12, 1.00, 0.12, ...)
 	end
+
 	function Utils.print_blue(...)
 		return Utils.print_color(0.00, 0.44, 0.87, ...)
 	end
+
 	function Utils.print_purple(...)
 		return Utils.print_color(0.64, 0.21, 0.93, ...)
 	end
@@ -400,6 +410,7 @@ function Utils.whisper(target, msg)
 		return true
 	end
 end
+
 -- local BNSendWhisper = Utils.whisper --
 
 -- Returns the current UTC date and time in seconds:
@@ -407,6 +418,7 @@ function Utils.getUTCTimestamp()
 	local utcDateTime = date("!*t")
 	return time(utcDateTime)
 end
+
 function Utils.getSecondsAsString(t)
 	local str = "00:00:00"
 	local sec
@@ -438,10 +450,10 @@ end
 
 -- Returns the NPCID or nil:
 function Utils.GetNPCID(GUID)
-	local first3 = tonumber("0x"..strsub(GUID, 3, 5))
+	local first3 = tonumber("0x" .. strsub(GUID, 3, 5))
 	local unitType = bit.band(first3, 0x007)
 	if ((unitType == 0x003) or (unitType == 0x005)) then
-		return tonumber("0x"..strsub(GUID, 9, 12))
+		return tonumber("0x" .. strsub(GUID, 9, 12))
 	end
 	return nil
 end
@@ -453,7 +465,7 @@ function Utils.GetCurrentTime(server)
 	if server == true then
 		local _, month, day, year = CalendarGetDate()
 		local hour, minute = GetGameTime()
-		t = time({year = year, month = month, day = day, hour = hour, min = minute})
+		t = time { year = year, month = month, day = day, hour = hour, min = minute }
 	end
 	return t
 end
@@ -473,7 +485,7 @@ function Utils.GetServerOffset()
 	return offset
 end
 
---[==[ Base64 encode/decode ]==]--
+--[==[ Base64 encode/decode ]==] --
 do
 	-- Characters table string:
 	local char, byte = string.char, string.byte
@@ -481,39 +493,39 @@ do
 
 	-- Encoding:
 	function Utils.encode(data)
-	    return ((gsub(data, ".", function(x)
-	        local r, b = "", byte(x)
-	        for i = 8, 1, -1 do
-			r = r..(b%2^i-b%2^(i-1)>0 and "1" or "0")
-	        end
-	        return r
-	    end).."0000"):gsub("%d%d%d?%d?%d?%d?", function(x)
-	        if #x < 6 then return "" end
-	        local c = 0
-	        for i = 1, 6 do
-				c = c + (strsub(x, i, i) == "1" and 2^(6-i) or 0)
-	        end
-	        return strsub(b, c+1, c+1)
-	    end)..({"", "==", "="})[#data%3+1])
+		return ((gsub(data, ".", function(x)
+			local r, b = "", byte(x)
+			for i = 8, 1, -1 do
+				r = r .. (b % 2 ^ i - b % 2 ^ (i - 1) > 0 and "1" or "0")
+			end
+			return r
+		end) .. "0000"):gsub("%d%d%d?%d?%d?%d?", function(x)
+			if #x < 6 then return "" end
+			local c = 0
+			for i = 1, 6 do
+				c = c + (strsub(x, i, i) == "1" and 2 ^ (6 - i) or 0)
+			end
+			return strsub(b, c + 1, c + 1)
+		end) .. ({ "", "==", "=" })[#data % 3 + 1])
 	end
 
 	-- Decoding:
 	function Utils.decode(data)
-	    data = gsub(data, "[^"..b.."=]", '')
-	    return (gsub(data, ".", function(x)
-	        if x == "=" then return "" end
-	        local r, f = "", (find(b, x) - 1)
-	        for i = 6, 1, -1 do
-				r = r..(f%2^i-f%2^(i-1) > 0 and "1" or "0")
-	        end
-	        return r
-	    end):gsub("%d%d%d?%d?%d?%d?%d?%d?", function(x)
-	        if #x ~= 8 then return "" end
-	        local c = 0
-	        for i = 1, 8 do
-				c = c + (strsub(x, i, i) == "1" and 2^(8-i) or 0)
-	        end
-	        return char(c)
-	    end))
+		data = gsub(data, "[^" .. b .. "=]", "")
+		return (gsub(data, ".", function(x)
+			if x == "=" then return "" end
+			local r, f = "", (find(b, x) - 1)
+			for i = 6, 1, -1 do
+				r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and "1" or "0")
+			end
+			return r
+		end):gsub("%d%d%d?%d?%d?%d?%d?%d?", function(x)
+			if #x ~= 8 then return "" end
+			local c = 0
+			for i = 1, 8 do
+				c = c + (strsub(x, i, i) == "1" and 2 ^ (8 - i) or 0)
+			end
+			return char(c)
+		end))
 	end
 end

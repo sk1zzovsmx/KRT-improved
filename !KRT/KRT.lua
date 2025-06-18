@@ -7,65 +7,65 @@ _G["KRT"] = addon
 
 
 -- SavedVariables:
-KRT_Debug			= KRT_Debug or {}
-KRT_Options	   		= KRT_Options or {}
-KRT_Raids		 	= KRT_Raids or {}
-KRT_Players	   		= KRT_Players or {}
-KRT_Warnings	  	= KRT_Warnings or {}
-KRT_ExportString  	= KRT_ExportString or "$I,$N,$S,$W,$T,$R,$H:$M,$d/$m/$y"
-KRT_Spammer	   		= KRT_Spammer or {}
-KRT_CurrentRaid   	= KRT_CurrentRaid or nil
-KRT_LastBoss	  	= KRT_LastBoss or  nil
-KRT_NextReset	 	= KRT_NextReset or  0
-KRT_SavedReserves 	= KRT_SavedReserves or {}
+KRT_Debug                               = KRT_Debug or {}
+KRT_Options                             = KRT_Options or {}
+KRT_Raids                               = KRT_Raids or {}
+KRT_Players                             = KRT_Players or {}
+KRT_Warnings                            = KRT_Warnings or {}
+KRT_ExportString                        = KRT_ExportString or "$I,$N,$S,$W,$T,$R,$H:$M,$d/$m/$y"
+KRT_Spammer                             = KRT_Spammer or {}
+KRT_CurrentRaid                         = KRT_CurrentRaid or nil
+KRT_LastBoss                            = KRT_LastBoss or nil
+KRT_NextReset                           = KRT_NextReset or 0
+KRT_SavedReserves                       = KRT_SavedReserves or {}
 
 -- AddOn main frames:
-local mainFrame = CreateFrame("Frame")
+local mainFrame                         = CreateFrame("Frame")
 local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings
 local UILogger, UILoggerItemBox, UIReserve
 -- local UILoggerBossBox, UILoggerPlayerBox
 local _
 
-local unitName = UnitName("player")
+local unitName                          = UnitName("player")
 
 -- Rolls & Loot related locals:
 local trader, winner
 local holder, banker, disenchanter
-local lootOpened      = false
-local rollTypes       = {mainspec = 1, offspec = 2, reserved = 3, free = 4, bank = 5, disenchant = 6, hold = 7, dkp = 8}
-local currentRollType = 4
-local currentRollItem = 0
-local fromInventory   = false
-local itemInfo        = {}
-local lootCount       = 0
-local rollsCount      = 0
-local itemCount       = 1
-local itemTraded      = 0
+local lootOpened                        = false
+local rollTypes                         = { mainspec = 1, offspec = 2, reserved = 3, free = 4, bank = 5, disenchant = 6, hold = 7, dkp = 8 }
+local currentRollType                   = 4
+local currentRollItem                   = 0
+local fromInventory                     = false
+local itemInfo                          = {}
+local lootCount                         = 0
+local rollsCount                        = 0
+local itemCount                         = 1
+local itemTraded                        = 0
 local ItemExists, ItemIsSoulbound, GetItem
 local GetItemIndex, GetItemName, GetItemLink, GetItemTexture
-local lootTypesText = {L.BtnMS, L.BtnOS, L.BtnSR, L.BtnFree, L.BtnBank, L.BtnDisenchant, L.BtnHold}
-local lootTypesColored = {
-	GREEN_FONT_COLOR_CODE..L.BtnMS..FONT_COLOR_CODE_CLOSE,
-	LIGHTYELLOW_FONT_COLOR_CODE..L.BtnOS..FONT_COLOR_CODE_CLOSE,
-	"|cffa335ee"..L.BtnSR..FONT_COLOR_CODE_CLOSE,
-	NORMAL_FONT_COLOR_CODE..L.BtnFree..FONT_COLOR_CODE_CLOSE,
-	ORANGE_FONT_COLOR_CODE..L.BtnBank..FONT_COLOR_CODE_CLOSE,
-	RED_FONT_COLOR_CODE..L.BtnDisenchant..FONT_COLOR_CODE_CLOSE,
-	HIGHLIGHT_FONT_COLOR_CODE..L.BtnHold..FONT_COLOR_CODE_CLOSE,
-	GREEN_FONT_COLOR_CODE.."DKP"..FONT_COLOR_CODE_CLOSE,
+local lootTypesText                     = { L.BtnMS, L.BtnOS, L.BtnSR, L.BtnFree, L.BtnBank, L.BtnDisenchant, L.BtnHold }
+local lootTypesColored                  = {
+	GREEN_FONT_COLOR_CODE .. L.BtnMS .. FONT_COLOR_CODE_CLOSE,
+	LIGHTYELLOW_FONT_COLOR_CODE .. L.BtnOS .. FONT_COLOR_CODE_CLOSE,
+	"|cffa335ee" .. L.BtnSR .. FONT_COLOR_CODE_CLOSE,
+	NORMAL_FONT_COLOR_CODE .. L.BtnFree .. FONT_COLOR_CODE_CLOSE,
+	ORANGE_FONT_COLOR_CODE .. L.BtnBank .. FONT_COLOR_CODE_CLOSE,
+	RED_FONT_COLOR_CODE .. L.BtnDisenchant .. FONT_COLOR_CODE_CLOSE,
+	HIGHLIGHT_FONT_COLOR_CODE .. L.BtnHold .. FONT_COLOR_CODE_CLOSE,
+	GREEN_FONT_COLOR_CODE .. "DKP" .. FONT_COLOR_CODE_CLOSE,
 }
 -- Items color
-local itemColors = {
-		[1] = "ff9d9d9d",  -- poor
-		[2] = "ffffffff",  -- common
-		[3] = "ff1eff00",  -- uncommon
-		[4] = "ff0070dd",  -- rare
-		[5] = "ffa335ee",  -- epic
-		[6] = "ffff8000",  -- legendary
-		[7] = "ffe6cc80",  -- artifact / heirloom
+local itemColors                        = {
+	[1] = "ff9d9d9d", -- poor
+	[2] = "ffffffff", -- common
+	[3] = "ff1eff00", -- uncommon
+	[4] = "ff0070dd", -- rare
+	[5] = "ffa335ee", -- epic
+	[6] = "ffff8000", -- legendary
+	[7] = "ffe6cc80", -- artifact / heirloom
 }
 -- Classes color:
-local classColors = {
+local classColors                       = {
 	["UNKNOWN"]     = "ffffffff",
 	["DEATHKNIGHT"] = "ffc41f3b",
 	["DRUID"]       = "ffff7d0a",
@@ -80,25 +80,26 @@ local classColors = {
 }
 
 -- Raid Target Icons:
-local markers = {"{circle}", "{diamond}", "{triangle}", "{moon}", "{square}", "{cross}", "{skull}"}
+local markers                           = { "{circle}", "{diamond}", "{triangle}", "{moon}", "{square}", "{cross}",
+	"{skull}" }
 
 -- Windows Title String:
-local titleString = "|cfff58cbaK|r|caaf49141RT|r : %s"
+local titleString                       = "|cfff58cbaK|r|caaf49141RT|r : %s"
 
 -- Some local functions:
 local TriggerEvent
 local LoadOptions
 
 -- Cache frequently used globals:
-local SendChatMessage = SendChatMessage
-local tinsert, tremove, tconcat, twipe = table.insert, table.remove, table.concat, table.wipe
+local SendChatMessage                   = SendChatMessage
+local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, table.wipe
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
-local pcall = pcall
-local format, match, find, strlen = string.format, string.match, string.find, string.len
-local strsub, gsub, lower, upper = string.sub, string.gsub, string.lower, string.upper
-local tostring, tonumber, ucfirst = tostring, tonumber, _G.string.ucfirst
-local deformat = LibStub("LibDeformat-3.0")
-local BossIDs = LibStub("LibBossIDs-1.0").BossIDs
+local pcall                             = pcall
+local format, match, find, strlen       = string.format, string.match, string.find, string.len
+local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
+local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
+local deformat                          = LibStub("LibDeformat-3.0")
+local BossIDs                           = LibStub("LibBossIDs-1.0").BossIDs
 
 -- Returns the used frame's name:
 function addon:GetFrameName()
@@ -270,7 +271,7 @@ do
 					-- If it's a countdown message:
 					if addon.options.countdownSimpleRaidMsg then
 						channel = "RAID" -- Force RAID if countdownSimpleRaidMsg is true
-					-- Use RAID_WARNING if leader/officer AND useRaidWarning is true
+						-- Use RAID_WARNING if leader/officer AND useRaidWarning is true
 					elseif addon.options.useRaidWarning and (IsRaidLeader() or IsRaidOfficer()) then
 						channel = "RAID_WARNING"
 					else
@@ -284,11 +285,11 @@ do
 					end
 				end
 
-			-- Switch to party mode if we're in a party:
+				-- Switch to party mode if we're in a party:
 			elseif self:IsInParty() then
 				channel = "PARTY"
 
-			-- Switch to alone mode
+				-- Switch to alone mode
 			else
 				channel = "SAY"
 			end
@@ -374,17 +375,17 @@ end
 
 do
 	-- Valid subcommands for each feature
-	local cmdAchiev   = {"ach", "achi", "achiev", "achievement"}
-	local cmdLFM      = {"pug", "lfm", "group", "grouper"}
-	local cmdConfig   = {"config", "conf", "options", "opt"}
-	local cmdChanges  = {"ms", "changes", "mschanges"}
-	local cmdWarnings = {"warning", "warnings", "warn", "rw"}
-	local cmdLog      = {"log", "logger", "history"}
-	local cmdDebug    = {"debug", "dbg", "debugger"}
-	local cmdLoot     = {"loot", "ml", "master"}
-	local cmdReserves = {"res", "reserves", "reserve"}
+	local cmdAchiev   = { "ach", "achi", "achiev", "achievement" }
+	local cmdLFM      = { "pug", "lfm", "group", "grouper" }
+	local cmdConfig   = { "config", "conf", "options", "opt" }
+	local cmdChanges  = { "ms", "changes", "mschanges" }
+	local cmdWarnings = { "warning", "warnings", "warn", "rw" }
+	local cmdLog      = { "log", "logger", "history" }
+	local cmdDebug    = { "debug", "dbg", "debugger" }
+	local cmdLoot     = { "loot", "ml", "master" }
+	local cmdReserves = { "res", "reserves", "reserve" }
 
-	local helpString = "|caaf49141%s|r: %s"
+	local helpString  = "|caaf49141%s|r: %s"
 
 	local function HandleSlashCmd(cmd)
 		if not cmd or cmd == "" then return end
@@ -428,7 +429,7 @@ do
 				addon.Debugger:Add("WARN", "Unknown debug command: %s", subCmd)
 			end
 
-		-- ==== Achievement Link ====
+			-- ==== Achievement Link ====
 		elseif Utils.checkEntry(cmdAchiev, cmd1) and find(cmd, "achievement:%d*:") then
 			local from, to = string.find(cmd, "achievement:%d*:")
 			local id = string.sub(cmd, from + 11, to - 1)
@@ -436,7 +437,7 @@ do
 			local name = string.sub(cmd, from, to)
 			print(helpString:format("KRT", name .. " - ID#" .. id))
 
-		-- ==== Config ====
+			-- ==== Config ====
 		elseif Utils.checkEntry(cmdConfig, cmd1) then
 			if cmd2 == "reset" then
 				addon.Config:Default()
@@ -444,7 +445,7 @@ do
 				addon.Config:Toggle()
 			end
 
-		-- ==== Warnings ====
+			-- ==== Warnings ====
 		elseif Utils.checkEntry(cmdWarnings, cmd1) then
 			if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
 				addon.Warnings:Toggle()
@@ -456,7 +457,7 @@ do
 				addon.Warnings:Announce(tonumber(cmd2))
 			end
 
-		-- ==== MS Changes ====
+			-- ==== MS Changes ====
 		elseif Utils.checkEntry(cmdChanges, cmd1) then
 			if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
 				addon.Changes:Toggle()
@@ -471,19 +472,19 @@ do
 				print(helpString:format("announce", L.StrCmdChangesAnnounce))
 			end
 
-		-- ==== Loot Log ====
+			-- ==== Loot Log ====
 		elseif Utils.checkEntry(cmdLog, cmd1) then
 			if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
 				addon.Logger:Toggle()
 			end
 
-		-- ==== Master Looter ====
+			-- ==== Master Looter ====
 		elseif Utils.checkEntry(cmdLoot, cmd1) then
 			if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
 				addon.Master:Toggle()
 			end
 
-		-- ==== Reserves ====
+			-- ==== Reserves ====
 		elseif Utils.checkEntry(cmdReserves, cmd1) then
 			if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
 				addon.Reserves:ShowWindow()
@@ -495,7 +496,7 @@ do
 				print(helpString:format("import", L.StrCmdReservesImport))
 			end
 
-		-- ==== LFM (Spammer) ====
+			-- ==== LFM (Spammer) ====
 		elseif Utils.checkEntry(cmdLFM, cmd1) then
 			if not cmd2 or cmd2 == "" or cmd2 == "toggle" or cmd2 == "show" then
 				addon.Spammer:Toggle()
@@ -510,7 +511,7 @@ do
 				print(helpString:format("stop", L.StrCmdLFMStop))
 			end
 
-		-- ==== Help fallback ====
+			-- ==== Help fallback ====
 		else
 			addon:Print(format(L.StrCmdCommands, "krt"), "KRT")
 			print(helpString:format("config", L.StrCmdConfig))
@@ -529,7 +530,7 @@ do
 end
 
 -- ==================== What else to do? ==================== --
---[===[ And here we go... ]===]--
+--[===[ And here we go... ]===] --
 
 -- On ADDON_LOADED:
 function addon:ADDON_LOADED(name)
@@ -611,8 +612,8 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
 	local _, event, _, _, _, destGUID, destName = ...
 	if not KRT_CurrentRaid then return end
 	if event == "UNIT_DIED" then
-               local npcID = Utils.GetNPCID(destGUID)
-               if BossIDs[npcID] then
+		local npcID = Utils.GetNPCID(destGUID)
+		if BossIDs[npcID] then
 			if KRT then
 				addon:Debug("INFO", "Boss killed: %s", destName)
 			end

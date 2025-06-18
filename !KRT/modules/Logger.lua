@@ -1,241 +1,241 @@
-local addonName, addon = ...
-addon.Logger = {}
-local Logger = addon.Logger
+local addonName, addon    = ...
+addon.Logger              = {}
+local Logger              = addon.Logger
 
-	local frameName
+local frameName
 
-	local LocalizeUIFrame
-	local localized = false
+local LocalizeUIFrame
+local localized           = false
 
-	local UpdateUIFrame
-	local updateInterval = 0.1
+local UpdateUIFrame
+local updateInterval      = 0.1
 
-	Logger.selectedRaid       = nil
-	Logger.selectedBoss       = nil
-	Logger.selectedPlayer     = nil
-	Logger.selectedBossPlayer = nil
-	Logger.selectedItem       = nil
+Logger.selectedRaid       = nil
+Logger.selectedBoss       = nil
+Logger.selectedPlayer     = nil
+Logger.selectedBossPlayer = nil
+Logger.selectedItem       = nil
 
-	-- OnLoad frame:
-	function Logger:OnLoad(frame)
-		if not frame then return end
-		UILogger = frame
-		frameName = frame:GetName()
-		frame:RegisterForDrag("LeftButton")
-		frame:SetScript("OnUpdate", UpdateUIFrame)
-		frame:SetScript("OnHide", function()
+-- OnLoad frame:
+function Logger:OnLoad(frame)
+	if not frame then return end
+	UILogger = frame
+	frameName = frame:GetName()
+	frame:RegisterForDrag("LeftButton")
+	frame:SetScript("OnUpdate", UpdateUIFrame)
+	frame:SetScript("OnHide", function()
+		Logger.selectedRaid = KRT_CurrentRaid
+		Logger.selectedBoss = nil
+		Logger.selectedPlayer = nil
+		Logger.selectedItem = nil
+	end)
+end
+
+-- Toggle frame visibility:
+function Logger:Toggle()
+	Utils.toggle(UILogger)
+end
+
+-- Hide Frame:
+function Logger:Hide()
+	if UILogger and UILogger:IsShown() then
+		Logger.selectedRaid = KRT_CurrentRaid
+		Logger.selectedBoss = nil
+		Logger.selectedPlayer = nil
+		Logger.selectedItem = nil
+		UILogger:Hide()
+	end
+end
+
+-- Localizing frame:
+function LocalizeUIFrame()
+	if localized then return end
+	_G[frameName .. "Title"]:SetText(format(titleString, L.StrLootHistory))
+	localized = true
+end
+
+-- OnUpdate frame:
+function UpdateUIFrame(self, elapsed)
+	LocalizeUIFrame()
+	if Utils.periodic(self, frameName, updateInterval, elapsed) then
+		if Logger.selectedRaid == nil then
 			Logger.selectedRaid = KRT_CurrentRaid
-			Logger.selectedBoss = nil
-			Logger.selectedPlayer = nil
-			Logger.selectedItem = nil
-		end)
-	end
-
-	-- Toggle frame visibility:
-	function Logger:Toggle()
-		Utils.toggle(UILogger)
-	end
-
-	-- Hide Frame:
-	function Logger:Hide()
-		if UILogger and UILogger:IsShown() then
-			Logger.selectedRaid = KRT_CurrentRaid
-			Logger.selectedBoss = nil
-			Logger.selectedPlayer = nil
-			Logger.selectedItem = nil
-			UILogger:Hide()
 		end
 	end
+end
 
-	-- Localizing frame:
-	function LocalizeUIFrame()
-		if localized then return end
-		_G[frameName.."Title"]:SetText(format(titleString, L.StrLootHistory))
-		localized = true
+-- Select a raid:
+function Logger:SelectRaid(btn)
+	if not btn then return end
+	local rID = btn:GetID()
+	if rID ~= addon.Logger.selectedRaid then
+		addon.Logger.selectedRaid = rID
+	else
+		addon.Logger.selectedRaid = nil
 	end
+	TriggerEvent("LoggerSelectRaid", rID)
+end
 
-	-- OnUpdate frame:
-	function UpdateUIFrame(self, elapsed)
-		LocalizeUIFrame()
-		if Utils.periodic(self, frameName, updateInterval, elapsed) then
-			if Logger.selectedRaid == nil then
-				Logger.selectedRaid = KRT_CurrentRaid
-			end
-		end
+-- Select a boss:
+function Logger:SelectBoss(btn)
+	if not btn then return end
+	local bID = btn:GetID()
+	if bID ~= addon.Logger.selectedBoss then
+		addon.Logger.selectedBoss = bID
+	else
+		addon.Logger.selectedBoss = nil
 	end
+	TriggerEvent("LoggerSelectBoss", bID)
+end
 
-	-- Select a raid:
-	function Logger:SelectRaid(btn)
-		if not btn then return end
-		local rID = btn:GetID()
-		if rID ~= addon.Logger.selectedRaid then
-			addon.Logger.selectedRaid = rID
-		else
-			addon.Logger.selectedRaid = nil
-		end
-		TriggerEvent("LoggerSelectRaid", rID)
+-- Select a boss attendee:
+function Logger:SelectBossPlayer(btn)
+	if not btn then return end
+	local pID = btn:GetID()
+	if pID ~= addon.Logger.selectedBossPlayer then
+		addon.Logger.selectedBossPlayer = pID
+	else
+		addon.Logger.selectedBossPlayer = nil
 	end
+	TriggerEvent("LoggerSelectBossPlayer", pID)
+end
 
-	-- Select a boss:
-	function Logger:SelectBoss(btn)
-		if not btn then return end
-		local bID = btn:GetID()
-		if bID ~= addon.Logger.selectedBoss then
-			addon.Logger.selectedBoss = bID
-		else
-			addon.Logger.selectedBoss = nil
-		end
-		TriggerEvent("LoggerSelectBoss", bID)
+-- Select a player:
+function Logger:SelectPlayer(btn)
+	if not btn then return end
+	local pID = btn:GetID()
+	if pID ~= addon.Logger.selectedPlayer then
+		addon.Logger.selectedPlayer = pID
+	else
+		addon.Logger.selectedPlayer = nil
 	end
+	TriggerEvent("LoggerSelectPlayer", pID)
+end
 
-	-- Select a boss attendee:
-	function Logger:SelectBossPlayer(btn)
-		if not btn then return end
-		local pID = btn:GetID()
-		if pID ~= addon.Logger.selectedBossPlayer then
-			addon.Logger.selectedBossPlayer = pID
-		else
-			addon.Logger.selectedBossPlayer = nil
-		end
-		TriggerEvent("LoggerSelectBossPlayer", pID)
-	end
-
-	-- Select a player:
-	function Logger:SelectPlayer(btn)
-		if not btn then return end
-		local pID = btn:GetID()
-		if pID ~= addon.Logger.selectedPlayer then
-			addon.Logger.selectedPlayer = pID
-		else
-			addon.Logger.selectedPlayer = nil
-		end
-		TriggerEvent("LoggerSelectPlayer", pID)
-	end
-
-	do
-		local itemMenu
-		local function OpenItemMenu(btn)
-			if not addon.Logger.selectedItem then return end
-			itemMenu = itemMenu or CreateFrame("Frame", "KRTLoggerItemMenuFrame", UIParent, "UIDropDownMenuTemplate")
-			local menuList = {
-				{
-					text = L.StrEditItemLooter,
-					func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_WINNER") end
-				},
-				{
-					text = L.StrEditItemRollType,
-					func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_ROLL") end
-				},
-				{
-					text = L.StrEditItemRollValue,
-					func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_VALUE") end
-				}
+do
+	local itemMenu
+	local function OpenItemMenu(btn)
+		if not addon.Logger.selectedItem then return end
+		itemMenu = itemMenu or CreateFrame("Frame", "KRTLoggerItemMenuFrame", UIParent, "UIDropDownMenuTemplate")
+		local menuList = {
+			{
+				text = L.StrEditItemLooter,
+				func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_WINNER") end
+			},
+			{
+				text = L.StrEditItemRollType,
+				func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_ROLL") end
+			},
+			{
+				text = L.StrEditItemRollValue,
+				func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_VALUE") end
 			}
-			EasyMenu(menuList, itemMenu, "cursor", 0 , 0, "MENU")
-		end
+		}
+		EasyMenu(menuList, itemMenu, "cursor", 0, 0, "MENU")
+	end
 
-		-- Select an item:
-		function Logger:SelectItem(btn, button)
-			if not btn then
-				return
-			elseif button == "LeftButton" then
-				if not btn then return end
-				local iID = btn:GetID()
-				if iID ~= addon.Logger.selectedItem then
-					addon.Logger.selectedItem = iID
-				else
-					addon.Logger.selectedItem = nil
-				end
-				TriggerEvent("LoggerSelectItem", iID)
-			elseif button == "RightButton" then
-				addon.Logger.selectedItem = btn:GetID()
-				OpenItemMenu(btn)
+	-- Select an item:
+	function Logger:SelectItem(btn, button)
+		if not btn then
+			return
+		elseif button == "LeftButton" then
+			if not btn then return end
+			local iID = btn:GetID()
+			if iID ~= addon.Logger.selectedItem then
+				addon.Logger.selectedItem = iID
+			else
+				addon.Logger.selectedItem = nil
 			end
+			TriggerEvent("LoggerSelectItem", iID)
+		elseif button == "RightButton" then
+			addon.Logger.selectedItem = btn:GetID()
+			OpenItemMenu(btn)
 		end
+	end
 
-		StaticPopupDialogs["KRTLOGGER_ITEM_EDIT_WINNER"] = {
-			text         = L.StrEditItemLooterHelp,
-			button1      = SAVE,
-			button2      = CANCEL,
-			timeout      = 0,
-			whileDead    = 1,
-			hideOnEscape = 1,
-			hasEditBox = 1,
-			cancels = "KRTLOGGER_ITEM_EDIT_WINNER",
-			OnShow = function(self)
-				self.raidId = addon.Logger.selectedRaid
-				self.itemId = addon.Logger.selectedItem
-			end,
-			OnHide = function(self)
-				self.raidId = nil
-				self.itemId = nil
-			end,
-			OnAccept = function(self)
-				local name = self.editBox:GetText():trim()
+	StaticPopupDialogs["KRTLOGGER_ITEM_EDIT_WINNER"] = {
+		text         = L.StrEditItemLooterHelp,
+		button1      = SAVE,
+		button2      = CANCEL,
+		timeout      = 0,
+		whileDead    = 1,
+		hideOnEscape = 1,
+		hasEditBox   = 1,
+		cancels      = "KRTLOGGER_ITEM_EDIT_WINNER",
+		OnShow       = function(self)
+			self.raidId = addon.Logger.selectedRaid
+			self.itemId = addon.Logger.selectedItem
+		end,
+		OnHide       = function(self)
+			self.raidId = nil
+			self.itemId = nil
+		end,
+		OnAccept     = function(self)
+			local name = self.editBox:GetText():trim()
 
-				if name ~= "" and self.raidId and KRT_Raids[self.raidId] then
-					for i, player in ipairs(KRT_Raids[self.raidId].players) do
-						if name:lower() == player.name:lower() then
-							addon:Log(self.itemId, player.name)
-							addon.Logger.Loot:Fetch()
-							break
-						end
+			if name ~= "" and self.raidId and KRT_Raids[self.raidId] then
+				for i, player in ipairs(KRT_Raids[self.raidId].players) do
+					if name:lower() == player.name:lower() then
+						addon:Log(self.itemId, player.name)
+						addon.Logger.Loot:Fetch()
+						break
 					end
 				end
+			end
 
-				-- default
-				self.editBox:SetText("")
-				self.editBox:ClearFocus()
-				self:Hide()
-			end,
-		}
+			-- default
+			self.editBox:SetText("")
+			self.editBox:ClearFocus()
+			self:Hide()
+		end,
+	}
 
-		StaticPopupDialogs["KRTLOGGER_ITEM_EDIT_ROLL"] = {
-			text         = L.StrEditItemRollTypeHelp,
-			button1      = SAVE,
-			button2      = CANCEL,
-			timeout      = 0,
-			whileDead    = 1,
-			hideOnEscape = 1,
-			hasEditBox = 1,
-			cancels = "KRTLOGGER_ITEM_EDIT_ROLL",
-			OnShow = function(self) self.itemId = addon.Logger.selectedItem end,
-			OnHide = function(self) self.itemId = nil end,
-			OnAccept = function(self)
-				local rollType = self.editBox:GetNumber()
-				if rollType > 0 and rollType <= 7 then
-					addon:Log(self.itemId, nil, rollType)
-					addon.Logger.Loot:Fetch()
-				end
-			end,
-		}
+	StaticPopupDialogs["KRTLOGGER_ITEM_EDIT_ROLL"] = {
+		text         = L.StrEditItemRollTypeHelp,
+		button1      = SAVE,
+		button2      = CANCEL,
+		timeout      = 0,
+		whileDead    = 1,
+		hideOnEscape = 1,
+		hasEditBox   = 1,
+		cancels      = "KRTLOGGER_ITEM_EDIT_ROLL",
+		OnShow       = function(self) self.itemId = addon.Logger.selectedItem end,
+		OnHide       = function(self) self.itemId = nil end,
+		OnAccept     = function(self)
+			local rollType = self.editBox:GetNumber()
+			if rollType > 0 and rollType <= 7 then
+				addon:Log(self.itemId, nil, rollType)
+				addon.Logger.Loot:Fetch()
+			end
+		end,
+	}
 
-		StaticPopupDialogs["KRTLOGGER_ITEM_EDIT_VALUE"] = {
-			text         = L.StrEditItemRollValueHelp,
-			button1      = SAVE,
-			button2      = CANCEL,
-			timeout      = 0,
-			whileDead    = 1,
-			hideOnEscape = 1,
-			hasEditBox = 1,
-			cancels = "KRTLOGGER_ITEM_EDIT_VALUE",
-			OnShow = function(self) self.itemId = addon.Logger.selectedItem end,
-			OnHide = function(self) self.itemId = nil end,
-			OnAccept = function(self)
-				local rollValue = self.editBox:GetNumber()
-				if rollValue ~= nil then
-					addon:Log(self.itemId, nil, nil, rollValue)
-					addon.Logger.Loot:Fetch()
-				end
-			end,
-		}
-	end
+	StaticPopupDialogs["KRTLOGGER_ITEM_EDIT_VALUE"] = {
+		text         = L.StrEditItemRollValueHelp,
+		button1      = SAVE,
+		button2      = CANCEL,
+		timeout      = 0,
+		whileDead    = 1,
+		hideOnEscape = 1,
+		hasEditBox   = 1,
+		cancels      = "KRTLOGGER_ITEM_EDIT_VALUE",
+		OnShow       = function(self) self.itemId = addon.Logger.selectedItem end,
+		OnHide       = function(self) self.itemId = nil end,
+		OnAccept     = function(self)
+			local rollValue = self.editBox:GetNumber()
+			if rollValue ~= nil then
+				addon:Log(self.itemId, nil, nil, rollValue)
+				addon.Logger.Loot:Fetch()
+			end
+		end,
+	}
+end
 
-	addon:RegisterCallback("LoggerSelectRaid", function()
-		addon.Logger.selectedBoss   = nil
-		addon.Logger.selectedPlayer = nil
-		addon.Logger.selectedItem   = nil
-	end)
+addon:RegisterCallback("LoggerSelectRaid", function()
+	addon.Logger.selectedBoss   = nil
+	addon.Logger.selectedPlayer = nil
+	addon.Logger.selectedItem   = nil
+end)
 
 -- Logger Raids List:
 do
@@ -264,15 +264,15 @@ do
 	function LocalizeUIFrame()
 		if localized then return end
 		if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-			_G[frameName.."Title"]:SetText(L.StrRaidsList)
-			_G[frameName.."HeaderDate"]:SetText(L.StrDate)
-			_G[frameName.."HeaderSize"]:SetText(L.StrSize)
-			_G[frameName.."CurrentBtn"]:SetText(L.StrSetCurrent)
-			_G[frameName.."ExportBtn"]:SetText(L.BtnExport)
+			_G[frameName .. "Title"]:SetText(L.StrRaidsList)
+			_G[frameName .. "HeaderDate"]:SetText(L.StrDate)
+			_G[frameName .. "HeaderSize"]:SetText(L.StrSize)
+			_G[frameName .. "CurrentBtn"]:SetText(L.StrSetCurrent)
+			_G[frameName .. "ExportBtn"]:SetText(L.BtnExport)
 		end
-		_G[frameName.."ExportBtn"]:Disable() -- FIXME
+		_G[frameName .. "ExportBtn"]:Disable() -- FIXME
 		addon:SetTooltip(
-			_G[frameName.."CurrentBtn"],
+			_G[frameName .. "CurrentBtn"],
 			L.StrRaidsCurrentHelp,
 			nil,
 			L.StrRaidCurrentTitle
@@ -292,19 +292,19 @@ do
 			-- Highlight selected raid:
 			for _, v in ipairs(raidsTable) do
 				if selectedRaid and selectedRaid == v.id then
-					_G[frameName.."RaidBtn"..v.id]:LockHighlight()
+					_G[frameName .. "RaidBtn" .. v.id]:LockHighlight()
 				else
-					_G[frameName.."RaidBtn"..v.id]:UnlockHighlight()
+					_G[frameName .. "RaidBtn" .. v.id]:UnlockHighlight()
 				end
 			end
 
-			Utils.enableDisable(_G[frameName.."CurrentBtn"], (
+			Utils.enableDisable(_G[frameName .. "CurrentBtn"], (
 				selectedRaid and
 				selectedRaid ~= KRT_CurrentRaid and
 				not addon.Raid:Expired(selectedRaid) and
 				addon:GetRaidSize() == KRT_Raids[selectedRaid].size
 			))
-			Utils.enableDisable(_G[frameName.."DeleteBtn"], (selectedRaid ~= KRT_CurrentRaid))
+			Utils.enableDisable(_G[frameName .. "DeleteBtn"], (selectedRaid ~= KRT_CurrentRaid))
 		end
 	end
 
@@ -312,7 +312,7 @@ do
 	function InitRaidsList()
 		raidsTable = {}
 		for i, r in ipairs(KRT_Raids) do
-			local info = {id = i, zone = r.zone, size = r.size, date = r.startTime}
+			local info = { id = i, zone = r.zone, size = r.size, date = r.startTime }
 			tinsert(raidsTable, info)
 		end
 	end
@@ -320,33 +320,33 @@ do
 	-- Utility function to visually hide list:
 	local function ResetList()
 		local index = 1
-		local btn = _G[frameName.."RaidBtn"..index]
+		local btn = _G[frameName .. "RaidBtn" .. index]
 		while btn ~= nil do
 			btn:Hide()
 			index = index + 1
-			btn = _G[frameName.."RaidBtn"..index]
+			btn = _G[frameName .. "RaidBtn" .. index]
 		end
 	end
 
 	-- Fetch raids list:
 	function Raids:Fetch()
 		ResetList()
-		local scrollFrame = _G[frameName.."ScrollFrame"]
-		local scrollChild = _G[frameName.."ScrollFrameScrollChild"]
+		local scrollFrame = _G[frameName .. "ScrollFrame"]
+		local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
 		local totalHeight = 0
 		scrollChild:SetHeight(scrollFrame:GetHeight())
 		scrollChild:SetWidth(scrollFrame:GetWidth())
 
 		for i = #raidsTable, 1, -1 do
 			local raid = raidsTable[i]
-			local btnName = frameName.."RaidBtn"..raid.id
+			local btnName = frameName .. "RaidBtn" .. raid.id
 			local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTLoggerRaidButton")
 			btn:SetID(raid.id)
 			btn:Show()
-			_G[btnName.."ID"]:SetText(raid.id)
-			_G[btnName.."Date"]:SetText(date("%d/%m/%Y %H:%M", raid.date))
-			_G[btnName.."Zone"]:SetText(raid.zone)
-			_G[btnName.."Size"]:SetText(raid.size)
+			_G[btnName .. "ID"]:SetText(raid.id)
+			_G[btnName .. "Date"]:SetText(date("%d/%m/%Y %H:%M", raid.date))
+			_G[btnName .. "Zone"]:SetText(raid.zone)
+			_G[btnName .. "Size"]:SetText(raid.size)
 			btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
 			btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
 			totalHeight = totalHeight + btn:GetHeight()
@@ -383,8 +383,8 @@ do
 				if KRT_CurrentRaid and KRT_CurrentRaid > selectedRaid then
 					KRT_CurrentRaid = KRT_CurrentRaid - 1
 				end
-				if _G[frameName.."RaidBtn"..selectedRaid] then
-					_G[frameName.."RaidBtn"..selectedRaid]:Hide()
+				if _G[frameName .. "RaidBtn" .. selectedRaid] then
+					_G[frameName .. "RaidBtn" .. selectedRaid]:Hide()
 				end
 				addon.Logger.selectedRaid = nil
 				fetched = false
@@ -397,6 +397,7 @@ do
 				StaticPopup_Show("KRTLOGGER_DELETE_RAID")
 			end
 		end
+
 		StaticPopupDialogs["KRTLOGGER_DELETE_RAID"] = {
 			text         = L.StrConfirmDeleteRaid,
 			button1      = L.BtnOK,
@@ -481,8 +482,8 @@ do
 	function LocalizeUIFrame()
 		if localized then return end
 		if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-			_G[frameName.."Title"]:SetText(L.StrBosses)
-			_G[frameName.."HeaderTime"]:SetText(L.StrTime)
+			_G[frameName .. "Title"]:SetText(L.StrBosses)
+			_G[frameName .. "HeaderTime"]:SetText(L.StrTime)
 		end
 		localized = true
 	end
@@ -500,14 +501,14 @@ do
 			-- Highlight selected raid:
 			for _, v in ipairs(bossTable) do
 				if selectedBoss ~= nil and selectedBoss == v.id then
-					_G[frameName.."BossBtn"..v.id]:LockHighlight()
+					_G[frameName .. "BossBtn" .. v.id]:LockHighlight()
 				else
-					_G[frameName.."BossBtn"..v.id]:UnlockHighlight()
+					_G[frameName .. "BossBtn" .. v.id]:UnlockHighlight()
 				end
 			end
-			Utils.enableDisable(_G[frameName.."AddBtn"], selectedRaid)
-			Utils.enableDisable(_G[frameName.."EditBtn"], selectedBoss)
-			Utils.enableDisable(_G[frameName.."DeleteBtn"], selectedBoss)
+			Utils.enableDisable(_G[frameName .. "AddBtn"], selectedRaid)
+			Utils.enableDisable(_G[frameName .. "EditBtn"], selectedBoss)
+			Utils.enableDisable(_G[frameName .. "DeleteBtn"], selectedBoss)
 		end
 	end
 
@@ -522,32 +523,32 @@ do
 	-- Utility function to visually hide list:
 	local function ResetList()
 		local index = 1
-		local btn = _G[frameName.."BossBtn"..index]
+		local btn = _G[frameName .. "BossBtn" .. index]
 		while btn ~= nil do
 			btn:Hide()
 			index = index + 1
-			btn = _G[frameName.."BossBtn"..index]
+			btn = _G[frameName .. "BossBtn" .. index]
 		end
 	end
 
 	-- Fetch bosses list:
 	function Boss:Fetch()
 		ResetList()
-		local scrollFrame = _G[frameName.."ScrollFrame"]
-		local scrollChild = _G[frameName.."ScrollFrameScrollChild"]
+		local scrollFrame = _G[frameName .. "ScrollFrame"]
+		local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
 		local totalHeight = 0
 		scrollChild:SetHeight(scrollFrame:GetHeight())
 		scrollChild:SetWidth(scrollFrame:GetWidth())
 
 		for i, boss in ipairs(bossTable) do
-			local btnName = frameName.."BossBtn"..boss.id
+			local btnName = frameName .. "BossBtn" .. boss.id
 			local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTLoggerBossButton")
 			btn:SetID(boss.id)
 			btn:Show()
-			_G[btnName.."ID"]:SetText(boss.id)
-			_G[btnName.."Name"]:SetText(boss.name)
-			_G[btnName.."Time"]:SetText(date("%H:%M", boss.time))
-			_G[btnName.."Mode"]:SetText(boss.mode)
+			_G[btnName .. "ID"]:SetText(boss.id)
+			_G[btnName .. "Name"]:SetText(boss.name)
+			_G[btnName .. "Time"]:SetText(date("%H:%M", boss.time))
+			_G[btnName .. "Mode"]:SetText(boss.mode)
 			btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
 			btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
 			totalHeight = totalHeight + btn:GetHeight()
@@ -590,6 +591,7 @@ do
 				StaticPopup_Show("KRTLOGGER_DELETE_BOSS")
 			end
 		end
+
 		StaticPopupDialogs["KRTLOGGER_DELETE_BOSS"] = {
 			text         = L.StrConfirmDeleteBoss,
 			button1      = L.BtnOK,
@@ -686,7 +688,7 @@ do
 	function LocalizeUIFrame()
 		if localized then return end
 		if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-			_G[frameName.."Title"]:SetText(L.StrBossAttendees)
+			_G[frameName .. "Title"]:SetText(L.StrBossAttendees)
 		end
 		localized = true
 	end
@@ -704,15 +706,15 @@ do
 				BossAttendees:Fetch()
 			end
 			for i, p in ipairs(playersTable) do
-				if selectedBossPlayer and p.id == selectedBossPlayer and _G[frameName.."PlayerBtn"..p.id] then
-					_G[frameName.."PlayerBtn"..p.id]:LockHighlight()
-				elseif _G[frameName.."PlayerBtn"..p.id] then
-					_G[frameName.."PlayerBtn"..p.id]:UnlockHighlight()
+				if selectedBossPlayer and p.id == selectedBossPlayer and _G[frameName .. "PlayerBtn" .. p.id] then
+					_G[frameName .. "PlayerBtn" .. p.id]:LockHighlight()
+				elseif _G[frameName .. "PlayerBtn" .. p.id] then
+					_G[frameName .. "PlayerBtn" .. p.id]:UnlockHighlight()
 				end
 			end
 			-- Add/Ban button:
-			Utils.enableDisable(_G[frameName.."AddBtn"], selectedBoss and not selectedBossPlayer)
-			Utils.enableDisable(_G[frameName.."RemoveBtn"], selectedBoss and selectedBossPlayer)
+			Utils.enableDisable(_G[frameName .. "AddBtn"], selectedBoss and not selectedBossPlayer)
+			Utils.enableDisable(_G[frameName .. "RemoveBtn"], selectedBoss and selectedBossPlayer)
 		end
 	end
 
@@ -728,28 +730,28 @@ do
 	-- Utility function to visually hide list:
 	local function ResetList()
 		local index = 1
-		local btn = _G[frameName.."PlayerBtn"..index]
+		local btn = _G[frameName .. "PlayerBtn" .. index]
 		while btn do
 			btn:Hide()
 			index = index + 1
-			btn = _G[frameName.."PlayerBtn"..index]
+			btn = _G[frameName .. "PlayerBtn" .. index]
 		end
 	end
 
 	-- Fetch boss attendees list:
 	function BossAttendees:Fetch()
 		ResetList()
-		local scrollFrame = _G[frameName.."ScrollFrame"]
-		local scrollChild = _G[frameName.."ScrollFrameScrollChild"]
+		local scrollFrame = _G[frameName .. "ScrollFrame"]
+		local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
 		local totalHeight = 0
 		scrollChild:SetHeight(scrollFrame:GetHeight())
 		scrollChild:SetWidth(scrollFrame:GetWidth())
 		for i, p in ipairs(playersTable) do
-			local btnName = frameName.."PlayerBtn"..p.id
+			local btnName = frameName .. "PlayerBtn" .. p.id
 			local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTLoggerBossAttendeeButton")
 			btn:SetID(p.id)
 			btn:Show()
-			local name = _G[btnName.."Name"]
+			local name = _G[btnName .. "Name"]
 			name:SetText(p.name)
 			local r, g, b = addon:GetClassColor(p.class)
 			name:SetVertexColor(r, g, b)
@@ -785,10 +787,11 @@ do
 
 		-- Handles the click on the delete button:
 		function BossAttendees:Delete(btn)
-			if btn and selectedBossPlayer  ~= nil then
+			if btn and selectedBossPlayer ~= nil then
 				StaticPopup_Show("KRTLOGGER_DELETE_ATTENDEE")
 			end
 		end
+
 		StaticPopupDialogs["KRTLOGGER_DELETE_ATTENDEE"] = {
 			text         = L.StrConfirmDeleteAttendee,
 			button1      = L.BtnOK,
@@ -857,13 +860,13 @@ do
 	function LocalizeUIFrame()
 		if localized then return end
 		if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-			_G[frameName.."Title"]:SetText(L.StrRaidAttendees)
-			_G[frameName.."HeaderJoin"]:SetText(L.StrJoin)
-			_G[frameName.."HeaderLeave"]:SetText(L.StrLeave)
+			_G[frameName .. "Title"]:SetText(L.StrRaidAttendees)
+			_G[frameName .. "HeaderJoin"]:SetText(L.StrJoin)
+			_G[frameName .. "HeaderLeave"]:SetText(L.StrLeave)
 		end
 		-- FIXME: disable buttons for now
-		_G[frameName.."AddBtn"]:Disable()
-		_G[frameName.."DeleteBtn"]:Disable()
+		_G[frameName .. "AddBtn"]:Disable()
+		_G[frameName .. "DeleteBtn"]:Disable()
 
 		localized = true
 	end
@@ -880,10 +883,10 @@ do
 			end
 			-- Highlight selected raid:
 			for i, p in ipairs(playersTable) do
-				if selectedPlayer and p.id == selectedPlayer and _G[frameName.."PlayerBtn"..i] then
-					_G[frameName.."PlayerBtn"..i]:LockHighlight()
-				elseif _G[frameName.."PlayerBtn"..i] then
-					_G[frameName.."PlayerBtn"..i]:UnlockHighlight()
+				if selectedPlayer and p.id == selectedPlayer and _G[frameName .. "PlayerBtn" .. i] then
+					_G[frameName .. "PlayerBtn" .. i]:LockHighlight()
+				elseif _G[frameName .. "PlayerBtn" .. i] then
+					_G[frameName .. "PlayerBtn" .. i]:UnlockHighlight()
 				end
 			end
 		end
@@ -897,33 +900,33 @@ do
 	-- Utility function to visually hide list:
 	local function ResetList()
 		local index = 1
-		local btn = _G[frameName.."PlayerBtn"..index]
+		local btn = _G[frameName .. "PlayerBtn" .. index]
 		while btn ~= nil do
 			btn:Hide()
 			index = index + 1
-			btn = _G[frameName.."PlayerBtn"..index]
+			btn = _G[frameName .. "PlayerBtn" .. index]
 		end
 	end
 
 	-- Fetch bosses list:
 	function RaidAttendees:Fetch()
-		local scrollFrame = _G[frameName.."ScrollFrame"]
-		local scrollChild = _G[frameName.."ScrollFrameScrollChild"]
+		local scrollFrame = _G[frameName .. "ScrollFrame"]
+		local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
 		local totalHeight = 0
 		scrollChild:SetHeight(scrollFrame:GetHeight())
 		scrollChild:SetWidth(scrollFrame:GetWidth())
 		for i, p in ipairs(playersTable) do
-			local btnName = frameName.."PlayerBtn"..p.id
+			local btnName = frameName .. "PlayerBtn" .. p.id
 			local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTLoggerRaidAttendeeButton")
 			btn:SetID(p.id)
 			btn:Show()
-			local name = _G[btnName.."Name"]
+			local name = _G[btnName .. "Name"]
 			name:SetText(p.name)
 			local r, g, b = addon:GetClassColor(p.class)
 			name:SetVertexColor(r, g, b)
-			_G[btnName.."Join"]:SetText(date("%H:%M", p.join))
+			_G[btnName .. "Join"]:SetText(date("%H:%M", p.join))
 			if p.leave then
-				_G[btnName.."Leave"]:SetText(date("%H:%M", p.leave))
+				_G[btnName .. "Leave"]:SetText(date("%H:%M", p.leave))
 			end
 			btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
 			btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
@@ -956,11 +959,11 @@ do
 				end
 			end
 			-- We delete all the loot from that player:
-                        for i = #raid.loot, 1, -1 do
-                                if raid.loot[i].bossNum == selectedPlayer then
-                                        tremove(raid.loot, i)
-                                end
-                        end
+			for i = #raid.loot, 1, -1 do
+				if raid.loot[i].bossNum == selectedPlayer then
+					tremove(raid.loot, i)
+				end
+			end
 			fetched = false
 		end
 
@@ -970,6 +973,7 @@ do
 				StaticPopup_Show("KRTLOGGER_DELETE_RAIDATTENDEE")
 			end
 		end
+
 		StaticPopupDialogs["KRTLOGGER_DELETE_RAIDATTENDEE"] = {
 			text         = L.StrConfirmDeleteAttendee,
 			button1      = L.BtnOK,
@@ -1051,23 +1055,23 @@ do
 	function LocalizeUIFrame()
 		if localized then return end
 		if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-			_G[frameName.."Title"]:SetText(L.StrRaidLoot)
-			_G[frameName.."ExportBtn"]:SetText(L.BtnExport)
-			_G[frameName.."ClearBtn"]:SetText(L.BtnClear)
-			_G[frameName.."EditBtn"]:SetText(L.BtnEdit)
-			_G[frameName.."HeaderItem"]:SetText(L.StrItem)
-			_G[frameName.."HeaderSource"]:SetText(L.StrSource)
-			_G[frameName.."HeaderWinner"]:SetText(L.StrWinner)
-			_G[frameName.."HeaderType"]:SetText(L.StrType)
-			_G[frameName.."HeaderRoll"]:SetText(L.StrRoll)
-			_G[frameName.."HeaderTime"]:SetText(L.StrTime)
+			_G[frameName .. "Title"]:SetText(L.StrRaidLoot)
+			_G[frameName .. "ExportBtn"]:SetText(L.BtnExport)
+			_G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
+			_G[frameName .. "EditBtn"]:SetText(L.BtnEdit)
+			_G[frameName .. "HeaderItem"]:SetText(L.StrItem)
+			_G[frameName .. "HeaderSource"]:SetText(L.StrSource)
+			_G[frameName .. "HeaderWinner"]:SetText(L.StrWinner)
+			_G[frameName .. "HeaderType"]:SetText(L.StrType)
+			_G[frameName .. "HeaderRoll"]:SetText(L.StrRoll)
+			_G[frameName .. "HeaderTime"]:SetText(L.StrTime)
 		end
 
 		-- FIXME: disable buttons for now
-		_G[frameName.."ExportBtn"]:Disable()
-		_G[frameName.."ClearBtn"]:Disable()
-		_G[frameName.."AddBtn"]:Disable()
-		_G[frameName.."EditBtn"]:Disable()
+		_G[frameName .. "ExportBtn"]:Disable()
+		_G[frameName .. "ClearBtn"]:Disable()
+		_G[frameName .. "AddBtn"]:Disable()
+		_G[frameName .. "EditBtn"]:Disable()
 
 		localized = true
 	end
@@ -1087,13 +1091,13 @@ do
 			end
 			-- Highlight selected raid:
 			for i, v in ipairs(raidLoot) do
-				if selectedItem and selectedItem == v.id and _G[frameName.."ItemBtn"..i] then
-					_G[frameName.."ItemBtn"..i]:LockHighlight()
-				elseif _G[frameName.."ItemBtn"..i] then
-					_G[frameName.."ItemBtn"..i]:UnlockHighlight()
+				if selectedItem and selectedItem == v.id and _G[frameName .. "ItemBtn" .. i] then
+					_G[frameName .. "ItemBtn" .. i]:LockHighlight()
+				elseif _G[frameName .. "ItemBtn" .. i] then
+					_G[frameName .. "ItemBtn" .. i]:UnlockHighlight()
 				end
 			end
-			Utils.enableDisable(_G[frameName.."DeleteBtn"], selectedItem)
+			Utils.enableDisable(_G[frameName .. "DeleteBtn"], selectedItem)
 		end
 	end
 
@@ -1110,39 +1114,39 @@ do
 	-- Utility function to visually hide list:
 	local function ResetList()
 		local index = 1
-		local btn = _G[frameName.."ItemBtn"..index]
+		local btn = _G[frameName .. "ItemBtn" .. index]
 		while btn ~= nil do
 			btn:Hide()
 			index = index + 1
-			btn = _G[frameName.."ItemBtn"..index]
+			btn = _G[frameName .. "ItemBtn" .. index]
 		end
 	end
 
 	-- Fetch bosses list:
 	function Loot:Fetch()
 		ResetList()
-		local scrollFrame = _G[frameName.."ScrollFrame"]
-		local scrollChild = _G[frameName.."ScrollFrameScrollChild"]
+		local scrollFrame = _G[frameName .. "ScrollFrame"]
+		local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
 		local totalHeight = 0
 		scrollChild:SetHeight(scrollFrame:GetHeight())
 		scrollChild:SetWidth(scrollFrame:GetWidth())
 		for k, v in ipairs(lootTable) do
-			local btnName = frameName.."ItemBtn"..v.id
+			local btnName = frameName .. "ItemBtn" .. v.id
 			local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTLoggerLootButton")
 			btn:SetID(v.id)
 			btn:Show()
 
-			_G[btnName.."Name"]:SetText("|c"..itemColors[v.itemRarity+1]..v.itemName.."|r")
-			_G[btnName.."Source"]:SetText(addon.Logger.Boss:GetName(v.bossNum, selectedRaid))
+			_G[btnName .. "Name"]:SetText("|c" .. itemColors[v.itemRarity + 1] .. v.itemName .. "|r")
+			_G[btnName .. "Source"]:SetText(addon.Logger.Boss:GetName(v.bossNum, selectedRaid))
 			local player = v.looter
 			local class = addon:GetPlayerClass(player)
 			local r, g, b = addon:GetClassColor(class)
-			_G[btnName.."Winner"]:SetText(player)
-			_G[btnName.."Winner"]:SetVertexColor(r, g, b)
-			_G[btnName.."Type"]:SetText(lootTypesColored[v.rollType] or lootTypesColored[6])
-			_G[btnName.."Roll"]:SetText(v.rollValue or 0)
-			_G[btnName.."Time"]:SetText(date("%H:%M", v.time))
-			_G[btnName.."ItemIconTexture"]:SetTexture(v.itemTexture)
+			_G[btnName .. "Winner"]:SetText(player)
+			_G[btnName .. "Winner"]:SetVertexColor(r, g, b)
+			_G[btnName .. "Type"]:SetText(lootTypesColored[v.rollType] or lootTypesColored[6])
+			_G[btnName .. "Roll"]:SetText(v.rollValue or 0)
+			_G[btnName .. "Time"]:SetText(date("%H:%M", v.time))
+			_G[btnName .. "ItemIconTexture"]:SetTexture(v.itemTexture)
 
 			btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
 			btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
@@ -1217,8 +1221,8 @@ do
 		local function DeleteItem()
 			if selectedRaid and KRT_Raids[selectedRaid] then
 				tremove(KRT_Raids[selectedRaid].loot, selectedItem)
-				if _G[frameName.."ItemBtn"..selectedItem] then
-					_G[frameName.."ItemBtn"..selectedItem]:Hide()
+				if _G[frameName .. "ItemBtn" .. selectedItem] then
+					_G[frameName .. "ItemBtn" .. selectedItem]:Hide()
 				end
 				addon.Logger.selectedItem = nil
 				fetched = false
@@ -1231,6 +1235,7 @@ do
 				StaticPopup_Show("KRTLOGGER_DELETE_ITEM")
 			end
 		end
+
 		StaticPopupDialogs["KRTLOGGER_DELETE_ITEM"] = {
 			text         = L.StrConfirmDeleteItem,
 			button1      = L.BtnOK,
@@ -1270,8 +1275,8 @@ do
 			fetched = false
 		end
 		if tonumber(rollType) ~= nil then
-			lootList[iID].rollType  = tonumber(rollType)
-			fetched = false
+			lootList[iID].rollType = tonumber(rollType)
+			fetched                = false
 		end
 		if tonumber(rollValue) ~= nil then
 			lootList[iID].rollValue = tonumber(rollValue)
@@ -1330,7 +1335,7 @@ do
 		if not bossData then return end
 
 		-- Fill our boss name:
-		_G[frameName.."Name"]:SetText(bossData.name)
+		_G[frameName .. "Name"]:SetText(bossData.name)
 
 		-- Prepare boss kill time then fill box:
 		local t = date("%d/%m/%Y %H:%M", bossData.date)
@@ -1342,8 +1347,8 @@ do
 			hour = tonumber(hour),
 			min = tonumber(minute)
 		}
-		_G[frameName.."Time"]:SetText(string.format("%02d:%02d", tempDate.hour, tempDate.min))
-		_G[frameName.."Difficulty"]:SetText((bossData.difficulty == 3 or bossData.difficulty == 4) and "h" or "n")
+		_G[frameName .. "Time"]:SetText(string.format("%02d:%02d", tempDate.hour, tempDate.min))
+		_G[frameName .. "Difficulty"]:SetText((bossData.difficulty == 3 or bossData.difficulty == 4) and "h" or "n")
 		isEdit = true
 		self:Toggle()
 	end
@@ -1351,9 +1356,9 @@ do
 	function BossBox:Save()
 		selectedRaid = addon.Logger.selectedRaid
 		if not selectedRaid then return end
-		local name = _G[frameName.."Name"]:GetText():trim()
-		local diff = _G[frameName.."Difficulty"]:GetText():trim():lower()
-		local bTime = _G[frameName.."Time"]:GetText():trim()
+		local name = _G[frameName .. "Name"]:GetText():trim()
+		local diff = _G[frameName .. "Difficulty"]:GetText():trim():lower()
+		local bTime = _G[frameName .. "Time"]:GetText():trim()
 
 		-- Check the name:
 		name = (name == "") and "_TrashMob_" or name
@@ -1368,7 +1373,7 @@ do
 
 		if isEdit and bossData ~= nil then
 			-- Use provided time or fallback to previous values:
-			if bTime == "" then 
+			if bTime == "" then
 				hour, minute = tempDate.hour, tempDate.min
 			else
 				hour, minute = match(bTime, "(%d+):(%d+)")
@@ -1402,7 +1407,7 @@ do
 			-- Create new bossData:
 			local boss = {
 				name = name,
-				date = time({day=day, month=month, year=year, hour=hour, min=minute}),
+				date = time { day = day, month = month, year = year, hour = hour, min = minute },
 				difficulty = difficulty,
 				players = {},
 			}
@@ -1417,9 +1422,9 @@ do
 	function CancelAddEdit()
 		selectedRaid = nil
 		selectedBoss = nil
-		_G[frameName.."Name"]:SetText("")
-		_G[frameName.."Difficulty"]:SetText("")
-		_G[frameName.."Time"]:SetText("")
+		_G[frameName .. "Name"]:SetText("")
+		_G[frameName .. "Difficulty"]:SetText("")
+		_G[frameName .. "Time"]:SetText("")
 		isEdit = false
 		-- isAdd = false
 	end
@@ -1427,18 +1432,19 @@ do
 	function LocalizeUIFrame()
 		if localized then return end
 		if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-			_G[frameName.."Title"]:SetText(L.StrAddBoss)
+			_G[frameName .. "Title"]:SetText(L.StrAddBoss)
 		end
 		-- Help tooltips:
-		addon:SetTooltip(_G[frameName.."Name"], L.StrBossNameHelp, "ANCHOR_LEFT")
-		addon:SetTooltip(_G[frameName.."Difficulty"], L.StrBossDifficultyHelp, "ANCHOR_LEFT")
-		addon:SetTooltip(_G[frameName.."Time"], L.StrBossTimeHelp, "ANCHOR_RIGHT")
+		addon:SetTooltip(_G[frameName .. "Name"], L.StrBossNameHelp, "ANCHOR_LEFT")
+		addon:SetTooltip(_G[frameName .. "Difficulty"], L.StrBossDifficultyHelp, "ANCHOR_LEFT")
+		addon:SetTooltip(_G[frameName .. "Time"], L.StrBossTimeHelp, "ANCHOR_RIGHT")
 		localized = true
 	end
+
 	function UpdateUIFrame(self, elapsed)
 		LocalizeUIFrame()
 		if Utils.periodic(self, frameName, updateInterval, elapsed) then
-			Utils.setText(_G[frameName.."Title"], L.StrEditBoss, L.StrAddBoss, (selectedBoss and isEdit))
+			Utils.setText(_G[frameName .. "Title"], L.StrEditBoss, L.StrAddBoss, (selectedBoss and isEdit))
 		end
 	end
 end
@@ -1453,15 +1459,15 @@ do
 	local selectedRaid, selectedBoss
 
 	local function CancelAdd()
-		_G[frameName.."Name"]:SetText("")
-		_G[frameName.."Name"]:ClearFocus()
+		_G[frameName .. "Name"]:SetText("")
+		_G[frameName .. "Name"]:ClearFocus()
 		UIFrame:Hide()
 	end
 
 	local function LocalizeUIFrame()
 		if not localized then
 			if GetLocale() ~= "enUS" and GetLocale() then
-				_G[frameName.."Title"]:SetText(L.StrAddPlayer)
+				_G[frameName .. "Title"]:SetText(L.StrAddPlayer)
 			end
 			localized = true
 		end
@@ -1483,12 +1489,12 @@ do
 		frame:RegisterForDrag("LeftButton")
 		frame:SetScript("OnUpdate", UpdateUIFrame)
 		frame:SetScript("OnShow", function(self)
-			_G[frameName.."Name"]:SetText("")
-			_G[frameName.."Name"]:SetFocus()
+			_G[frameName .. "Name"]:SetText("")
+			_G[frameName .. "Name"]:SetFocus()
 		end)
 		frame:SetScript("OnHide", function(self)
-			_G[frameName.."Name"]:SetText("")
-			_G[frameName.."Name"]:ClearFocus()
+			_G[frameName .. "Name"]:SetText("")
+			_G[frameName .. "Name"]:ClearFocus()
 		end)
 	end
 
@@ -1497,7 +1503,7 @@ do
 	end
 
 	function AttendeesBox:Save()
-		local name = _G[frameName.."Name"]:GetText()
+		local name = _G[frameName .. "Name"]:GetText()
 		-- invalid name provided.
 		if name:trim() == "" then
 			addon:PrintError(L.ErrAttendeesInvalidName)
@@ -1528,8 +1534,6 @@ do
 			end
 		end
 		addon:PrintError(L.ErrAttendeesNotFound or "Player not in raid")
-                addon.Logger.BossAttendees:Fetch()
-        end
-
+		addon.Logger.BossAttendees:Fetch()
+	end
 end
-
