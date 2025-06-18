@@ -3,9 +3,7 @@
 local KRT = _G["KRT"]
 
 if not KRT then
-    -- This should ideally not happen if the .toc load order is correct,
-    -- but it's a good defensive check.
-    error("KRT global table not found when loading ignoredItems.lua")
+    error("KRT global table not found. Check .toc load order")
 end
 
 -- Items to ignore when adding raids loot:
