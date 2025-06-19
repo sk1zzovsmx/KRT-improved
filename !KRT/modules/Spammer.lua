@@ -1,6 +1,8 @@
 local addonName, addon = ...
 addon.Spammer = {}
 local Spammer = addon.Spammer
+local L = addon.L
+local Utils = addon.Utils
 
 
 local spamFrame = CreateFrame("Frame")

@@ -1,6 +1,8 @@
 local addonName, addon = ...
 addon.Loot = {}
 local Loot = addon.Loot
+local L = addon.L
+local Utils = addon.Utils
 
 local frameName
 

@@ -25,8 +25,9 @@ Localization\localization.en.lua
 # Templates File:
 Templates.xml
 
-# Utilities & Core Files:
-modules\Utils.lua
+# Core Files:
+KRT.lua
+Utils.lua
 modules\Debugger.lua
 modules\Raid.lua
 modules\Minimap.lua
@@ -39,7 +40,6 @@ modules\Warnings.lua
 modules\Changes.lua
 modules\Spammer.lua
 modules\Logger.lua
-KRT.lua
 KRT.xml
 
 # Modules

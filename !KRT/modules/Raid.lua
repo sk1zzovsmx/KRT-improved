@@ -1,6 +1,8 @@
 local addonName, addon   = ...
 addon.Raid               = {}
 local Raid               = addon.Raid
+local L = addon.L
+local Utils = addon.Utils
 
 local inRaid             = false
 local numRaid            = 0
