@@ -1,6 +1,8 @@
 local addonName, addon = ...
 addon.Minimap = {}
 local Minimap = addon.Minimap
+local L = addon.L
+local Utils = addon.Utils
 
 local MinimapBtn = addon.Minimap
 

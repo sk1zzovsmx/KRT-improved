@@ -1,6 +1,8 @@
 local addonName, addon = ...
 addon.Warnings = {}
 local Warnings = addon.Warnings
+local L = addon.L
+local Utils = addon.Utils
 
 local frameName
 

@@ -88,7 +88,6 @@ local titleString                       = "|cfff58cbaK|r|caaf49141RT|r : %s"
 
 -- Some local functions:
 local TriggerEvent
-local LoadOptions
 
 -- Cache frequently used globals:
 local SendChatMessage                   = SendChatMessage

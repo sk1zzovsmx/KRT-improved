@@ -1,6 +1,8 @@
 local addonName, addon = ...
 addon.Rolls = {}
 local Rolls = addon.Rolls
+local L = addon.L
+local Utils = addon.Utils
 
 local frameName
 
