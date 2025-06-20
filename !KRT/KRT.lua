@@ -620,3 +620,445 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
 		end
 	end
 end
+
+-- ==================== Debugger ==================== --
+
+addon.Debugger = {}
+local Debugger = addon.Debugger
+
+local frameName, frame, scrollFrame
+local isDebuggerOpen = false
+local buffer = {}
+
+local logLevelPriority = { DEBUG = 1, INFO = 2, WARN = 3, ERROR = 4 }
+local logLevelNames    = { [1] = "DEBUG", [2] = "INFO", [3] = "WARN", [4] = "ERROR" }
+local minLevel         = "DEBUG"
+local MAX_DEBUG_LOGS   = 500
+
+function Debugger:OnLoad(self)
+    frame = self
+    frameName = frame:GetName()
+    scrollFrame = _G[frameName .. "ScrollFrame"]
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", frame.StartMoving)
+    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+
+    if KRT_Debug and KRT_Debug.Pos and KRT_Debug.Pos.point then
+        local p = KRT_Debug.Pos
+        frame:ClearAllPoints()
+        frame:SetPoint(p.point, p.relativeTo or UIParent, p.relativePoint, p.xOfs, p.yOfs)
+    end
+end
+
+function Debugger:Show()
+    if not frame then return end
+    frame:Show()
+
+    if not isDebuggerOpen then
+        isDebuggerOpen = true
+        self:Add("DEBUG", "Debugger window opened.")
+        self:AddBufferedMessages()
+    end
+end
+
+function Debugger:Hide()
+    if frame then
+        frame:Hide()
+        isDebuggerOpen = false
+    end
+end
+
+function Debugger:Clear()
+    if scrollFrame then
+        scrollFrame:Clear()
+    end
+    buffer = {}
+end
+
+function Debugger:SetMinLevel(level)
+    if type(level) == "number" and logLevelNames[level] then
+        minLevel = logLevelNames[level]
+        self:Add("INFO", "Log level set to [%s]", minLevel)
+    elseif type(level) == "string" then
+        level = string.upper(level)
+        if logLevelPriority[level] then
+            minLevel = level
+            self:Add("INFO", "Log level set to [%s]", minLevel)
+        else
+            self:Add("ERROR", "Invalid log level: %s", level)
+        end
+    else
+        self:Add("ERROR", "Invalid log level type.")
+    end
+end
+
+function Debugger:GetMinLevel()
+    return minLevel
+end
+
+function Debugger:Add(level, msg, ...)
+    if not msg then
+        msg = level
+        level = "DEBUG"
+    end
+
+    if logLevelPriority[level] < logLevelPriority[minLevel] then return end
+
+    if select("#", ...) > 0 then
+        local safeArgs = {}
+        for i = 1, select("#", ...) do
+            local v = select(i, ...)
+            table.insert(safeArgs, type(v) == "string" and v or tostring(v))
+        end
+        msg = string.format(msg, unpack(safeArgs))
+    end
+    local line = string.format("[%s][%s] %s", date("%H:%M:%S"), level, msg)
+
+    if not scrollFrame then
+        tinsert(buffer, line)
+        while #buffer > MAX_DEBUG_LOGS do
+            table.remove(buffer, 1)
+        end
+        return
+    end
+
+    local r, g, b = 1, 1, 1
+    if level == "ERROR" then
+        r, g, b = 1, 0.2, 0.2
+    elseif level == "WARN" then
+        r, g, b = 1, 0.8, 0
+    elseif level == "INFO" then
+        r, g, b = 0.6, 0.8, 1
+    elseif level == "DEBUG" then
+        r, g, b = 0.8, 0.8, 0.8
+    end
+
+    scrollFrame:AddMessage(line, r, g, b)
+
+    if KRT_Debug and KRT_Debug.Debugs then
+        table.insert(KRT_Debug.Debugs, line)
+        while #KRT_Debug.Debugs > MAX_DEBUG_LOGS do
+            table.remove(KRT_Debug.Debugs, 1)
+        end
+    end
+end
+
+function Debugger:AddBufferedMessages()
+    for _, msg in ipairs(buffer) do
+        scrollFrame:AddMessage(msg)
+    end
+    buffer = {}
+end
+
+function Debugger:IsShown()
+    return frame and frame:IsShown()
+end
+
+-- ==================== Minimap ==================== --
+
+addon.Minimap = {}
+local MinimapBtn = addon.Minimap
+
+local addonMenu
+local dragMode
+
+local abs, sqrt = math.abs, math.sqrt
+
+local function OpenMenu()
+    local info = {}
+    addonMenu = addonMenu or CreateFrame("Frame", "KRTMenu", UIParent, "UIDropDownMenuTemplate")
+    addonMenu.displayMode = "MENU"
+    addonMenu.initialize = function(self, level)
+        if not level then return end
+        wipe(info)
+        if level == 1 then
+            info.text = MASTER_LOOTER
+            info.notCheckable = 1
+            info.func = function() addon.Master:Toggle() end
+            UIDropDownMenu_AddButton(info, level)
+            wipe(info)
+            info.text = RAID_WARNING
+            info.notCheckable = 1
+            info.func = function() addon.Warnings:Toggle() end
+            UIDropDownMenu_AddButton(info, level)
+            wipe(info)
+            info.text = L.StrLootHistory
+            info.notCheckable = 1
+            info.func = function() addon.Logger:Toggle() end
+            UIDropDownMenu_AddButton(info, level)
+            wipe(info)
+            info.disabled = 1
+            info.notCheckable = 1
+            UIDropDownMenu_AddButton(info, level)
+            wipe(info)
+            info.text = L.StrClearIcons
+            info.notCheckable = 1
+            info.func = function() addon:ClearRaidIcons() end
+            UIDropDownMenu_AddButton(info, level)
+            wipe(info)
+            info.disabled = 1
+            info.notCheckable = 1
+            UIDropDownMenu_AddButton(info, level)
+            wipe(info)
+            info.isTitle = 1
+            info.text = L.StrMSChanges
+            info.notCheckable = 1
+            UIDropDownMenu_AddButton(info, level)
+            wipe(info)
+            info.notCheckable = 1
+            info.text = L.BtnConfigure
+            info.notCheckable = 1
+            info.func = function() addon.Changes:Toggle() end
+            UIDropDownMenu_AddButton(info, level)
+            wipe(info)
+            info.text = L.BtnDemand
+            info.notCheckable = 1
+            info.func = function() addon.Changes:Demand() end
+            UIDropDownMenu_AddButton(info, level)
+            wipe(info)
+            info.text = CHAT_ANNOUNCE
+            info.notCheckable = 1
+            info.func = function() addon.Changes:Announce() end
+            UIDropDownMenu_AddButton(info, level)
+            wipe(info)
+            info.disabled = 1
+            info.notCheckable = 1
+            UIDropDownMenu_AddButton(info, level)
+            wipe(info)
+            info.text = L.StrLFMSpam
+            info.notCheckable = 1
+            info.func = function() addon.Spammer:Toggle() end
+            UIDropDownMenu_AddButton(info, level)
+            wipe(info)
+        end
+    end
+    ToggleDropDownMenu(1, nil, addonMenu, KRT_MINIMAP_GUI, 0, 0)
+end
+
+local function moveButton(self)
+    local centerX, centerY = Minimap:GetCenter()
+    local x, y = GetCursorPosition()
+    x, y = x / self:GetEffectiveScale() - centerX, y / self:GetEffectiveScale() - centerY
+
+    if dragMode == "free" then
+        self:ClearAllPoints()
+        self:SetPoint("CENTER", x, y)
+    else
+        centerX, centerY = abs(x), abs(y)
+        centerX, centerY = (centerX / sqrt(centerX ^ 2 + centerY ^ 2)) * 80,
+                (centerY / sqrt(centerX ^ 2 + centerY ^ 2)) * 80
+        centerX = x < 0 and -centerX or centerX
+        centerY = y < 0 and -centerY or centerY
+        self:ClearAllPoints()
+        self:SetPoint("CENTER", centerX, centerY)
+    end
+end
+
+function MinimapBtn:OnLoad(btn)
+    if not btn then return end
+    KRT_MINIMAP_GUI:SetUserPlaced(true)
+    KRT_MINIMAP_GUI:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    KRT_MINIMAP_GUI:SetScript("OnMouseDown", function(self, button)
+        if IsAltKeyDown() then
+            dragMode = "free"
+            self:SetScript("OnUpdate", moveButton)
+        elseif IsShiftKeyDown() then
+            dragMode = nil
+            self:SetScript("OnUpdate", moveButton)
+        end
+    end)
+    KRT_MINIMAP_GUI:SetScript("OnMouseUp", function(self)
+        self:SetScript("OnUpdate", nil)
+    end)
+    KRT_MINIMAP_GUI:SetScript("OnClick", function(self, button)
+        if IsShiftKeyDown() or IsAltKeyDown() then return end
+        if button == "RightButton" then
+            addon.Config:Toggle()
+        elseif button == "LeftButton" then
+            OpenMenu()
+        end
+    end)
+    KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
+        GameTooltip_SetDefaultAnchor(GameTooltip, self)
+        GameTooltip:SetText("|cfff58cbaKader|r |caad4af37Raid Tools|r")
+        GameTooltip:AddLine(L.StrMinimapLClick, 1, 1, 1)
+        GameTooltip:AddLine(L.StrMinimapRClick, 1, 1, 1)
+        GameTooltip:AddLine(L.StrMinimapSClick, 1, 1, 1)
+        GameTooltip:AddLine(L.StrMinimapAClick, 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    KRT_MINIMAP_GUI:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+end
+
+function addon:ToggleMinimapButton()
+    self.options.minimapButton = not self.options.minimapButton
+    if self.options.minimapButton then
+        KRT_MINIMAP_GUI:Show()
+    else
+        KRT_MINIMAP_GUI:Hide()
+    end
+end
+
+function addon:HideMinimapButton()
+    return KRT_MINIMAP_GUI:Hide()
+end
+
+-- ==================== Config ==================== --
+
+addon.Config = {}
+local Config = addon.Config
+
+local frameName
+local LocalizeUIFrame
+local localized = false
+local UpdateUIFrame
+local updateInterval = 0.1
+
+local defaultOptions = {
+    sortAscending          = false,
+    useRaidWarning         = true,
+    announceOnWin          = true,
+    announceOnHold         = true,
+    announceOnBank         = false,
+    announceOnDisenchant   = false,
+    lootWhispers           = false,
+    screenReminder         = true,
+    ignoreStacks           = false,
+    showTooltips           = true,
+    minimapButton          = true,
+    countdownSimpleRaidMsg = false,
+    countdownDuration      = 5,
+    countdownRollsBlock    = true,
+}
+
+local function LoadDefaultOptions()
+    addon:Debug("DEBUG", "Loading default options")
+    for k, v in pairs(defaultOptions) do
+        KRT_Options[k] = v
+    end
+    addon:Debug("DEBUG", "Default options loaded")
+end
+
+function LoadOptions()
+    addon:Debug("DEBUG", "Loading addon options")
+    addon.options = KRT_Options
+    Utils.fillTable(addon.options, defaultOptions)
+
+    if not addon.options.useRaidWarning then
+        addon.options.countdownSimpleRaidMsg = false
+    end
+    addon:Debug("DEBUG", "Addon options loaded: %s", tostring(addon.options))
+end
+
+function Config:Default()
+    addon:Debug("DEBUG", "Resetting to default options")
+    return LoadDefaultOptions()
+end
+
+function Config:OnLoad(frame)
+    if not frame then return end
+    addon:Debug("DEBUG", "Config frame loaded: %s", frame:GetName())
+    UIConfig = frame
+    frameName = frame:GetName()
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnUpdate", UpdateUIFrame)
+end
+
+function Config:Toggle()
+    addon:Debug("DEBUG", "Toggling config frame visibility")
+    Utils.toggle(UIConfig)
+end
+
+function Config:Hide()
+    if UIConfig and UIConfig:IsShown() then
+        addon:Debug("DEBUG", "Hiding config frame")
+        UIConfig:Hide()
+    end
+end
+
+function Config:OnClick(btn)
+    if not btn then return end
+    frameName = frameName or btn:GetParent():GetName()
+    local value, name = nil, btn:GetName()
+    addon:Debug("DEBUG", "Button clicked: %s", name)
+    if name ~= frameName .. "countdownDuration" then
+        value = (btn:GetChecked() == 1) or false
+        if name == frameName .. "minimapButton" then
+            addon:Debug("DEBUG", "Toggling minimap button")
+            addon:ToggleMinimapButton()
+        end
+    else
+        value = btn:GetValue()
+        _G[frameName .. "countdownDurationText"]:SetText(value)
+        addon:Debug("DEBUG", "Setting countdown duration to: %d", value)
+    end
+    name = strsub(name, strlen(frameName) + 1)
+    TriggerEvent("Config" .. name, value)
+    KRT_Options[name] = value
+    addon:Debug("DEBUG", "Option %s set to: %s", name, tostring(value))
+end
+
+function LocalizeUIFrame()
+    if localized then return end
+    if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
+        _G[frameName .. "sortAscendingStr"]:SetText(L.StrConfigSortAscending)
+        _G[frameName .. "useRaidWarningStr"]:SetText(L.StrConfigUseRaidWarning)
+        _G[frameName .. "announceOnWinStr"]:SetText(L.StrConfigAnnounceOnWin)
+        _G[frameName .. "announceOnHoldStr"]:SetText(L.StrConfigAnnounceOnHold)
+        _G[frameName .. "announceOnBankStr"]:SetText(L.StrConfigAnnounceOnBank)
+        _G[frameName .. "announceOnDisenchantStr"]:SetText(L.StrConfigAnnounceOnDisenchant)
+        _G[frameName .. "lootWhispersStr"]:SetText(L.StrConfigLootWhisper)
+        _G[frameName .. "countdownRollsBlockStr"]:SetText(L.StrConfigCountdownRollsBlock)
+        _G[frameName .. "screenReminderStr"]:SetText(L.StrConfigScreenReminder)
+        _G[frameName .. "ignoreStacksStr"]:SetText(L.StrConfigIgnoreStacks)
+        _G[frameName .. "showTooltipsStr"]:SetText(L.StrConfigShowTooltips)
+        _G[frameName .. "minimapButtonStr"]:SetText(L.StrConfigMinimapButton)
+        _G[frameName .. "countdownDurationStr"]:SetText(L.StrConfigCountdownDuration)
+        _G[frameName .. "countdownSimpleRaidMsgStr"]:SetText(L.StrConfigCountdownSimpleRaidMsg)
+    end
+    _G[frameName .. "Title"]:SetText(format(titleString, SETTINGS))
+    _G[frameName .. "AboutStr"]:SetText(L.StrConfigAbout)
+    _G[frameName .. "DefaultsBtn"]:SetScript("OnClick", LoadDefaultOptions)
+    localized = true
+end
+
+function UpdateUIFrame(self, elapsed)
+    LocalizeUIFrame()
+    if Utils.periodic(self, frameName, updateInterval, elapsed) then
+        _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)
+        _G[frameName .. "useRaidWarning"]:SetChecked(addon.options.useRaidWarning == true)
+        _G[frameName .. "announceOnWin"]:SetChecked(addon.options.announceOnWin == true)
+        _G[frameName .. "announceOnHold"]:SetChecked(addon.options.announceOnHold == true)
+        _G[frameName .. "announceOnBank"]:SetChecked(addon.options.announceOnBank == true)
+        _G[frameName .. "announceOnDisenchant"]:SetChecked(addon.options.announceOnDisenchant == true)
+        _G[frameName .. "lootWhispers"]:SetChecked(addon.options.lootWhispers == true)
+        _G[frameName .. "countdownRollsBlock"]:SetChecked(addon.options.countdownRollsBlock == true)
+        _G[frameName .. "screenReminder"]:SetChecked(addon.options.screenReminder == true)
+        _G[frameName .. "ignoreStacks"]:SetChecked(addon.options.ignoreStacks == true)
+        _G[frameName .. "showTooltips"]:SetChecked(addon.options.showTooltips == true)
+        _G[frameName .. "minimapButton"]:SetChecked(addon.options.minimapButton == true)
+        _G[frameName .. "countdownDuration"]:SetValue(addon.options.countdownDuration)
+        _G[frameName .. "countdownDurationText"]:SetText(addon.options.countdownDuration)
+
+        local useRaidWarningBtn = _G[frameName .. "useRaidWarning"]
+        local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
+        local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
+
+        if useRaidWarningBtn and countdownSimpleRaidMsgBtn and countdownSimpleRaidMsgStr then
+            if not useRaidWarningBtn:GetChecked() then
+                countdownSimpleRaidMsgBtn:SetChecked(addon.options.countdownSimpleRaidMsg)
+                countdownSimpleRaidMsgBtn:Disable()
+                countdownSimpleRaidMsgStr:SetTextColor(0.5, 0.5, 0.5)
+            else
+                countdownSimpleRaidMsgBtn:Enable()
+                countdownSimpleRaidMsgStr:SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
+                countdownSimpleRaidMsgBtn:SetChecked(addon.options.countdownSimpleRaidMsg)
+            end
+        end
+    end
+end
+

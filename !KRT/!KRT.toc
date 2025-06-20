@@ -28,14 +28,11 @@ Templates.xml
 # Core Files:
 KRT.lua
 Utils.lua
-modules\Debugger.lua
 modules\Raid.lua
-modules\Minimap.lua
 modules\Rolls.lua
 modules\Loot.lua
 modules\Master.lua
 modules\Reserves.lua
-modules\Config.lua
 modules\Warnings.lua
 modules\Changes.lua
 modules\Spammer.lua
