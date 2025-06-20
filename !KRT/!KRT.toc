@@ -28,17 +28,17 @@ Templates.xml
 # Core Files:
 KRT.lua
 Utils.lua
-modules\Raid.lua
-modules\Rolls.lua
-modules\Loot.lua
-modules\Master.lua
-modules\Reserves.lua
-modules\Warnings.lua
-modules\Changes.lua
-modules\Spammer.lua
-modules\Logger.lua
+Modules\Raid.lua
+Modules\Rolls.lua
+Modules\Loot.lua
+Modules\Master.lua
+Modules\Reserves.lua
+Modules\Warnings.lua
+Modules\Changes.lua
+Modules\Spammer.lua
+Modules\Logger.lua
 KRT.xml
 
 # Modules
-list\ignoredItems.lua
-list\bossList.lua
+List\ignoredItems.lua
+List\bossList.lua
