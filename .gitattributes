@@ -14,7 +14,7 @@ README.md           export-ignore
 *.md            text
 
 # Source files
-*.lua           -text
+*.lua           text
 *.xml           text
 *.toc           text
 
