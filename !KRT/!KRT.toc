@@ -40,4 +40,4 @@ modules\Logger.lua
 KRT.xml
 
 # Modules
-modules\ignoredItems.lua
+list\ignoredItems.lua
