@@ -32,7 +32,7 @@ local BossIDs = {
 	[11518] = true, -- Jergosh the Invoker
 	[11519] = true, -- Bazzalan
 	[17830] = true, -- Zelemar the Wrathful
-	
+
 	-- The Deadmines
 	[644]   = true, -- Rhahk'Zor
 	[3586]  = true, -- Miner Johnson
@@ -46,7 +46,7 @@ local BossIDs = {
 	[596]   = true, -- Brainwashed Noble, outside
 	[626]   = true, -- Foreman Thistlenettle, outside
 	[599]   = true, -- Marisa du'Paige, outside
-	
+
 	-- Wailing Caverns
 	[5775]  = true, -- Verdan the Everliving
 	[3670]  = true, -- Lord Pythas
@@ -60,7 +60,7 @@ local BossIDs = {
 	[3672]  = true, -- Boahn, outside
 	[3655]  = true, -- Mad Magglish, outside
 	[3652]  = true, -- Trigore the Lasher, outside
-	
+
 	-- Shadowfang Keep
 	[3914]  = true, -- Rethilgore
 	[3886]  = true, -- Razorclaw the Butcher
@@ -72,7 +72,7 @@ local BossIDs = {
 	[14682] = true, -- Sever (Scourge invasion only)
 	[4275]  = true, -- Archmage Arugal
 	[3872]  = true, -- Deathsworn Captain
-	
+
 	-- Blackfathom Deeps
 	[4887]  = true, -- Ghamoo-ra
 	[4831]  = true, -- Lady Sarevess
@@ -82,7 +82,7 @@ local BossIDs = {
 	[4830]  = true, -- Old Serra'kis
 	[4832]  = true, -- Twilight Lord Kelris
 	[4829]  = true, -- Aku'mai
-	
+
 	-- Stormwind Stockade
 	[1716]  = true, -- Bazil Thredd
 	[1663]  = true, -- Dextren Ward
@@ -90,7 +90,7 @@ local BossIDs = {
 	[1666]  = true, -- Kam Deepfury
 	[1696]  = true, -- Targorr the Dread
 	[1720]  = true, -- Bruegal Ironknuckle
-	
+
 	-- Razorfen Kraul
 	[4421]  = true, -- Charlga Razorflank
 	[4420]  = true, -- Overlord Ramtusk
@@ -100,7 +100,7 @@ local BossIDs = {
 	[6168]  = true, -- Roogug
 	[4425]  = true, -- Blind Hunter
 	[4842]  = true, -- Earthcaller Halmgar
-	
+
 	-- Gnomeregan
 	[7800]  = true, -- Mekgineer Thermaplugg
 	[7079]  = true, -- Viscous Fallout
@@ -109,7 +109,7 @@ local BossIDs = {
 	[6229]  = true, -- Crowd Pummeler 9-60
 	[6228]  = true, -- Dark Iron Ambassador
 	[6231]  = true, -- Techbot, outside
-	
+
 	-- Scarlet Monastery: The Graveyard
 	[3983]  = true, -- Interrogator Vishas
 	[6488]  = true, -- Fallen Champion
@@ -119,19 +119,19 @@ local BossIDs = {
 	[4543]  = true, -- Bloodmage Thalnos
 	[23682] = true, -- Headless Horseman
 	[23800] = true, -- Headless Horseman
-	
+
 	-- Scarley Monastery: Library
 	[3974]  = true, -- Houndmaster Loksey
 	[6487]  = true, -- Arcanist Doan
-	
+
 	-- Scarley Monastery: Armory
 	[3975]  = true, -- Herod
-	
+
 	-- Scarley Monastery: Cathedral
 	[4542]  = true, -- High Inquisitor Fairbanks
 	[3976]  = true, -- Scarlet Commander Mograine
 	[3977]  = true, -- High Inquisitor Whitemane
-	
+
 	-- Razorfen Downs
 	[7355]  = true, -- Tuten'kash
 	[14686] = true, -- Lady Falther'ess (Scourge invasion only)
@@ -140,7 +140,7 @@ local BossIDs = {
 	[8567]  = true, -- Glutton
 	[7354]  = true, -- Ragglesnout
 	[7358]  = true, -- Amnennar the Coldbringer
-	
+
 	-- Uldaman
 	[7057]  = true, -- Digmaster Shovelphlange
 	-- [2932]  = true, -- Magregan Deepshadow (Outside the instance, not elite)
@@ -152,7 +152,7 @@ local BossIDs = {
 	[4854]  = true, -- Grimlok
 	[2748]  = true, -- Archaedas
 	[6906]  = true, -- Baelog
-	
+
 	-- Zul'Farrak
 	[10082] = true, -- Zerillis
 	[10080] = true, -- Sandarr Dunereaver
@@ -170,7 +170,7 @@ local BossIDs = {
 	[7608]  = true, -- Murta Grimgut
 	[7606]  = true, -- Oro Eyegouge
 	[7604]  = true, -- Sergeant Bly
-	
+
 	-- Maraudon
 	-- [13718] = true, -- The Nameless Prophet (Pre-instance)
 	[13742] = true, -- Kolk <The First Khan>
@@ -187,7 +187,7 @@ local BossIDs = {
 	[13601] = true, -- Tinkerer Gizlock
 	[13596] = true, -- Rotgrip
 	[12201] = true, -- Princess Theradras
-	
+
 	-- Temple of Atal'Hakkar
 	[1063]  = true, -- Jade
 	[5400]  = true, -- Zekkis
@@ -208,14 +208,14 @@ local BossIDs = {
 	[5719]  = true, -- Morphaz
 	[5722]  = true, -- Hazzas
 	[5709]  = true, -- Shade of Eranikus
-	
+
 	-- The Blackrock Depths: Detention Block
 	[9018]  = true, -- High Interrogator Gerstahn
-	
+
 	-- The Blackrock Depths: Halls of the Law
 	[9025]  = true, -- Lord Roccor
 	[9319]  = true, -- Houndmaster Grebmar
-	
+
 	-- The Blackrock Depths: Ring of Law (Arena)
 	[9031]  = true, -- Anub'shiah
 	[9029]  = true, -- Eviscerator
@@ -224,7 +224,7 @@ local BossIDs = {
 	[9032]  = true, -- Hedrum the Creeper
 	[9030]  = true, -- Ok'thor the Breaker
 	[16059] = true, -- Theldren
-	
+
 	-- The Blackrock Depths: Outer Blackrock Depths
 	[9024]  = true, -- Pyromancer Loregrain
 	[9041]  = true, -- Warder Stilgiss
@@ -236,14 +236,14 @@ local BossIDs = {
 	[9016]  = true, -- Bael'Gar
 	[9033]  = true, -- General Angerforge
 	[8983]  = true, -- Golem Lord Argelmach
-	
+
 	-- The Blackrock Depths: Grim Guzzler
 	[9543]  = true, -- Ribbly Screwspigot
 	[9537]  = true, -- Hurley Blackbreath
 	[9502]  = true, -- Phalanx
 	[9499]  = true, -- Plugger Spazzring
 	[23872] = true, -- Coren Direbrew
-	
+
 	-- The Blackrock Depths: Inner Blackrock Depths
 	[9156]  = true, -- Ambassador Flamelash
 	[8923]  = true, -- Panzor the Invincible
@@ -257,12 +257,12 @@ local BossIDs = {
 	[10076] = true, -- High Priestess of Thaurissan
 	[8929]  = true, -- Princess Moira Bronzebeard
 	[9019]  = true, -- Emperor Dagran Thaurissan
-	
+
 	-- Dire Maul: Arena
 	[11447] = true, -- Mushgog
 	[11498] = true, -- Skarr the Unbreakable
 	[11497] = true, -- The Razza
-	
+
 	-- Dire Maul: East
 	[14354] = true, -- Pusillin
 	[14327] = true, -- Lethtendris
@@ -271,7 +271,7 @@ local BossIDs = {
 	[11490] = true, -- Zevrim Thornhoof
 	[11492] = true, -- Alzzin the Wildshaper
 	[16097] = true, -- Isalien
-	
+
 	-- Dire Maul: North
 	[14326] = true, -- Guard Mol'dar
 	[14322] = true, -- Stomper Kreeg
@@ -280,7 +280,7 @@ local BossIDs = {
 	[14325] = true, -- Captain Kromcrush
 	[14324] = true, -- Cho'Rush the Observer
 	[11501] = true, -- King Gordok
-	
+
 	-- Dire Maul: West
 	[11489] = true, -- Tendris Warpwood
 	[11487] = true, -- Magister Kalendris
@@ -290,7 +290,7 @@ local BossIDs = {
 	[11496] = true, -- Immol'thar
 	[14506] = true, -- Lord Hel'nurath
 	[11486] = true, -- Prince Tortheldrin
-	
+
 	-- Lower Blackrock Spire
 	[10263] = true, -- Burning Felguard
 	[9218]  = true, -- Spirestone Battle Lord
@@ -309,7 +309,7 @@ local BossIDs = {
 	[10268] = true, -- Gizrul the Slavener
 	[9718]  = true, -- Ghok Bashguud
 	[9568]  = true, -- Overlord Wyrmthalak
-	
+
 	-- Stratholme: Scarlet Stratholme
 	[10393] = true, -- Skul
 	[14684] = true, -- Balzaphon (Scourge Invasion)
@@ -327,7 +327,7 @@ local BossIDs = {
 	[10813] = true, -- Balnazzar
 	[16101] = true, -- Jarien
 	[16102] = true, -- Sothos
-	
+
 	-- Stratholme: Undead Stratholme
 	[10809] = true, -- Stonespine
 	[10437] = true, -- Nerub'enkan
@@ -344,7 +344,7 @@ local BossIDs = {
 	[17910] = true, -- Gregor the Justiciar
 	[17914] = true, -- Vicar Hieronymus
 	[17912] = true, -- Nemas the Arbiter
-	
+
 	-- Scholomance
 	[14861] = true, -- Blood Steward of Kirtonos
 	[10506] = true, -- Kirtonos the Herald
@@ -363,7 +363,7 @@ local BossIDs = {
 	[10504] = true, -- Lord Alexei Barov
 	[10502] = true, -- Lady Illucia Barov
 	[1853]  = true, -- Darkmaster Gandling
-	
+
 	-- Upper Blackrock Spire
 	[9816]  = true, -- Pyroguard Emberseer
 	[10264] = true, -- Solakar Flamewreath
@@ -374,7 +374,7 @@ local BossIDs = {
 	[10430] = true, -- The Beast
 	[16042] = true, -- Lord Valthalak
 	[10363] = true, -- General Drakkisath
-	
+
 	-- Zul'Gurub
 	[14517] = true, -- High Priestess Jeklik
 	[14507] = true, -- High Priest Venoxis
@@ -389,10 +389,10 @@ local BossIDs = {
 	[15083] = true, -- Hazza'rah
 	[15084] = true, -- Renataki
 	[15085] = true, -- Wushoolay
-	
+
 	-- Onyxia's Lair
 	[10184] = true, -- Onyxia
-	
+
 	-- Molten Core
 	[12118] = true, -- Lucifron
 	[11982] = true, -- Magmadar
@@ -404,7 +404,7 @@ local BossIDs = {
 	[11988] = true, -- Golemagg the Incinerator
 	[12018] = true, -- Majordomo Executus
 	[11502] = true, -- Ragnaros
-	
+
 	-- Blackwing Lair
 	[12435] = true, -- Razorgore the Untamed
 	[13020] = true, -- Vaelastrasz the Corrupt
@@ -416,7 +416,7 @@ local BossIDs = {
 	[11583] = true, -- Nefarian
 	[12557] = true, -- Grethok the Controller
 	[10162] = true, -- Lord Victor Nefarius <Lord of Blackrock> (Also found in Blackrock Spire)
-	
+
 	-- Ruins of Ahn'Qiraj
 	[15348] = true, -- Kurinnaxx
 	[15341] = true, -- General Rajaxx
@@ -424,7 +424,7 @@ local BossIDs = {
 	[15370] = true, -- Buru the Gorger
 	[15369] = true, -- Ayamiss the Hunter
 	[15339] = true, -- Ossirian the Unscarred
-	
+
 	-- Temple of Ahn'Qiraj
 	[15263] = true, -- The Prophet Skeram
 	[15511] = true, -- Lord Kri
@@ -439,140 +439,140 @@ local BossIDs = {
 	[15517] = true, -- Ouro
 	[15727] = true, -- C'Thun
 	[15589] = true, -- Eye of C'Thun
-	
+
 	-- Naxxramas
 	[30549] = true, -- Baron Rivendare (Naxxramas)
 	[16803] = true, -- Death Knight Understudy
 	[15930] = true, -- Feugen
 	[15929] = true, -- Stalagg
-	
+
 	-- Naxxramas: Spider Wing
 	[15956] = true, -- Anub'Rekhan
 	[15953] = true, -- Grand Widow Faerlina
 	[15952] = true, -- Maexxna
-	
+
 	-- Naxxramas: Abomination Wing
 	[16028] = true, -- Patchwerk
 	[15931] = true, -- Grobbulus
 	[15932] = true, -- Gluth
 	[15928] = true, -- Thaddius
-	
+
 	-- Naxxramas: Plague Wing
 	[15954] = true, -- Noth the Plaguebringer
 	[15936] = true, -- Heigan the Unclean
 	[16011] = true, -- Loatheb
-	
+
 	-- Naxxramas: Deathknight Wing
 	[16061] = true, -- Instructor Razuvious
 	[16060] = true, -- Gothik the Harvester
-	
+
 	-- Naxxramas: The Four Horsemen
 	[16065] = true, -- Lady Blaumeux
 	[16064] = true, -- Thane Korth'azz
 	[16062] = true, -- Highlord Mograine
 	[16063] = true, -- Sir Zeliek
-	
+
 	-- Naxxramas: Frostwyrm Lair
 	[15989] = true, -- Sapphiron
 	[15990] = true, -- Kel'Thuzad
 	[25465] = true, -- Kel'Thuzad
-	
-	
+
+
 	-- Hellfire Citadel: Hellfire Ramparts
 	[17306] = true, -- Watchkeeper Gargolmar
 	[17308] = true, -- Omor the Unscarred
 	[17537] = true, -- Vazruden
 	[17307] = true, -- Vazruden the Herald
 	[17536] = true, -- Nazan
-	
+
 	-- Hellfire Citadel: The Blood Furnace
 	[17381] = true, -- The Maker
 	[17380] = true, -- Broggok
 	[17377] = true, -- Keli'dan the Breaker
-	
+
 	-- Coilfang Reservoir: Slave Pens
 	[25740] = true, -- Ahune
 	[17941] = true, -- Mennu the Betrayer
 	[17991] = true, -- Rokmar the Crackler
 	[17942] = true, -- Quagmirran
-	
+
 	-- Coilfang Reservoir: The Underbog
 	[17770] = true, -- Hungarfen
 	[18105] = true, -- Ghaz'an
 	[17826] = true, -- Swamplord Musel'ek
 	[17827] = true, -- Claw <Swamplord Musel'ek's Pet>
 	[17882] = true, -- The Black Stalker
-	
+
 	-- Auchindoun: Mana-Tombs
 	[18341] = true, -- Pandemonius
 	[18343] = true, -- Tavarok
 	[22930] = true, -- Yor (Heroic)
 	[18344] = true, -- Nexus-Prince Shaffar
-	
+
 	-- Auchindoun: Auchenai Crypts
 	[18371] = true, -- Shirrak the Dead Watcher
 	[18373] = true, -- Exarch Maladaar
-	
+
 	-- Caverns of Time: Escape from Durnholde Keep
 	[17848] = true, -- Lieutenant Drake
 	[17862] = true, -- Captain Skarloc
 	[18096] = true, -- Epoch Hunter
 	[28132] = true, -- Don Carlos
-	
+
 	-- Auchindoun: Sethekk Halls
 	[18472] = true, -- Darkweaver Syth
 	[23035] = true, -- Anzu (Heroic)
 	[18473] = true, -- Talon King Ikiss
-	
+
 	-- Coilfang Reservoir: The Steamvault
 	[17797] = true, -- Hydromancer Thespia
 	[17796] = true, -- Mekgineer Steamrigger
 	[17798] = true, -- Warlord Kalithresh
-	
+
 	-- Auchindoun: Shadow Labyrinth
 	[18731] = true, -- Ambassador Hellmaw
 	[18667] = true, -- Blackheart the Inciter
 	[18732] = true, -- Grandmaster Vorpil
 	[18708] = true, -- Murmur
-	
+
 	-- Hellfire Citadel: Shattered Halls
 	[16807] = true, -- Grand Warlock Nethekurse
 	[20923] = true, -- Blood Guard Porung (Heroic)
 	[16809] = true, -- Warbringer O'mrogg
 	[16808] = true, -- Warchief Kargath Bladefist
-	
+
 	-- Caverns of Time: Opening the Dark Portal
 	[17879] = true, -- Chrono Lord Deja
 	[17880] = true, -- Temporus
 	[17881] = true, -- Aeonus
-	
+
 	-- Tempest Keep: The Mechanar
 	[19218] = true, -- Gatewatcher Gyro-Kill
 	[19710] = true, -- Gatewatcher Iron-Hand
 	[19219] = true, -- Mechano-Lord Capacitus
 	[19221] = true, -- Nethermancer Sepethrea
 	[19220] = true, -- Pathaleon the Calculator
-	
+
 	-- Tempest Keep: The Botanica
 	[17976] = true, -- Commander Sarannis
 	[17975] = true, -- High Botanist Freywinn
 	[17978] = true, -- Thorngrin the Tender
 	[17980] = true, -- Laj
 	[17977] = true, -- Warp Splinter
-	
+
 	-- Tempest Keep: The Arcatraz
 	[20870] = true, -- Zereketh the Unbound
 	[20886] = true, -- Wrath-Scryer Soccothrates
 	[20885] = true, -- Dalliah the Doomsayer
 	[20912] = true, -- Harbinger Skyriss
 	[20904] = true, -- Warden Mellichar
-	
+
 	-- Magisters' Terrace
 	[24723] = true, -- Selin Fireheart
 	[24744] = true, -- Vexallus
 	[24560] = true, -- Priestess Delrissa
 	[24664] = true, -- Kael'thas Sunstrider
-	
+
 	-- Karazhan
 	[15550] = true, -- Attumen the Huntsman
 	[16151] = true, -- Midnight
@@ -587,12 +587,12 @@ local BossIDs = {
 	[17225] = true, -- Nightbane
 	[17229] = true, -- Kil'rek
 	-- Chess event
-	
+
 	-- Karazhan: Servants' Quarters Beasts
 	[16179] = true, -- Hyakiss the Lurker
 	[16181] = true, -- Rokad the Ravager
 	[16180] = true, -- Shadikith the Glider
-	
+
 	-- Karazhan: Opera Event
 	[17535] = true, -- Dorothee
 	[17546] = true, -- Roar
@@ -603,20 +603,20 @@ local BossIDs = {
 	[17521] = true, -- The Big Bad Wolf
 	[17533] = true, -- Romulo
 	[17534] = true, -- Julianne
-	
+
 	-- Gruul's Lair
 	[18831] = true, -- High King Maulgar
 	[19044] = true, -- Gruul the Dragonkiller
-	
+
 	-- Gruul's Lair: Maulgar's Ogre Council
 	[18835] = true, -- Kiggler the Crazed
 	[18836] = true, -- Blindeye the Seer
 	[18834] = true, -- Olm the Summoner
 	[18832] = true, -- Krosh Firehand
-	
+
 	-- Hellfire Citadel: Magtheridon's Lair
 	[17257] = true, -- Magtheridon
-	
+
 	-- Zul'Aman: Animal Bosses
 	[29024] = true, -- Nalorakk
 	[28514] = true, -- Nalorakk
@@ -628,11 +628,11 @@ local BossIDs = {
 	[23577] = true, -- Halazzi
 	[28517] = true, -- Halazzi
 	[29022] = true, -- Halazzi
-	
+
 	-- Zul'Aman: Final Bosses
 	[24239] = true, -- Hex Lord Malacrass
 	[23863] = true, -- Zul'jin
-	
+
 	-- Coilfang Reservoir: Serpentshrine Cavern
 	[21216] = true, -- Hydross the Unstable
 	[21217] = true, -- The Lurker Below
@@ -641,7 +641,7 @@ local BossIDs = {
 	[21213] = true, -- Morogrim Tidewalker
 	[21212] = true, -- Lady Vashj
 	[21875] = true, -- Shadow of Leotheras
-	
+
 	-- Tempest Keep: The Eye
 	[19514] = true, -- Al'ar
 	[19516] = true, -- Void Reaver
@@ -658,14 +658,14 @@ local BossIDs = {
 	[21273] = true, -- Phaseshift Bulwark
 	[21274] = true, -- Staff of Disintegration
 	[21272] = true, -- Warp Slicer
-	
+
 	-- Caverns of Time: Battle for Mount Hyjal
 	[17767] = true, -- Rage Winterchill
 	[17808] = true, -- Anetheron
 	[17888] = true, -- Kaz'rogal
 	[17842] = true, -- Azgalor
 	[17968] = true, -- Archimonde
-	
+
 	-- Black Temple
 	[22887] = true, -- High Warlord Naj'entus
 	[22898] = true, -- Supremus
@@ -682,7 +682,7 @@ local BossIDs = {
 	[22950] = true, -- High Nethermancer Zerevor
 	[22951] = true, -- Lady Malande
 	[22952] = true, -- Veras Darkshadow
-	
+
 	-- Sunwell Plateau
 	[24891] = true, -- Kalecgos
 	[25319] = true, -- Kalecgos
@@ -695,19 +695,19 @@ local BossIDs = {
 	[25315] = true, -- Kil'jaeden
 	[25840] = true, -- Entropius
 	[24892] = true, -- Sathrovarr the Corruptor
-	
-	
+
+
 	-- Utgarde Keep: Main Bosses
 	[23953] = true, -- Prince Keleseth (Utgarde Keep)
 	[27390] = true, -- Skarvald the Constructor
 	[24200] = true, -- Skarvald the Constructor
 	[23954] = true, -- Ingvar the Plunderer
 	[23980] = true, -- Ingvar the Plunderer
-	
+
 	-- Utgarde Keep: Secondary Bosses
 	[27389] = true, -- Dalronn the Controller
 	[24201] = true, -- Dalronn the Controller
-	
+
 	-- The Nexus
 	[26798] = true, -- Commander Kolurg (Heroic)
 	[26796] = true, -- Commander Stoutbeard (Heroic)
@@ -719,26 +719,26 @@ local BossIDs = {
 	[26763] = true, -- Anomalus
 	[26794] = true, -- Ormorok the Tree-Shaper
 	[26723] = true, -- Keristrasza
-	
+
 	-- Azjol-Nerub
 	[28684] = true, -- Krik'thir the Gatewatcher
 	[28921] = true, -- Hadronox
 	[29120] = true, -- Anub'arak
-	
+
 	-- Ahn'kahet: The Old Kingdom
 	[29309] = true, -- Elder Nadox
 	[29308] = true, -- Prince Taldaram (Ahn'kahet: The Old Kingdom)
 	[29310] = true, -- Jedoga Shadowseeker
 	[29311] = true, -- Herald Volazj
 	[30258] = true, -- Amanitar (Heroic)
-	
+
 	-- Drak'Tharon Keep
 	[26630] = true, -- Trollgore
 	[26631] = true, -- Novos the Summoner
 	[27483] = true, -- King Dred
 	[26632] = true, -- The Prophet Tharon'ja
 	[27696] = true, -- The Prophet Tharon'ja
-	
+
 	-- The Violet Hold
 	[29315] = true, -- Erekem
 	[29313] = true, -- Ichoron
@@ -747,32 +747,32 @@ local BossIDs = {
 	[29266] = true, -- Xevozz
 	[29314] = true, -- Zuramat the Obliterator
 	[31134] = true, -- Cyanigosa
-	
+
 	-- Gundrak
 	[29304] = true, -- Slad'ran
 	[29305] = true, -- Moorabi
 	[29307] = true, -- Drakkari Colossus
 	[29306] = true, -- Gal'darah
 	[29932] = true, -- Eck the Ferocious (Heroic)
-	
+
 	-- Halls of Stone
 	[27977] = true, -- Krystallus
 	[27975] = true, -- Maiden of Grief
 	[28234] = true, -- The Tribunal of Ages
 	[27978] = true, -- Sjonnir The Ironshaper
-	
+
 	-- Halls of Lightning
 	[28586] = true, -- General Bjarngrim
 	[28587] = true, -- Volkhan
 	[28546] = true, -- Ionar
 	[28923] = true, -- Loken
-	
+
 	-- The Oculus
 	[27654] = true, -- Drakos the Interrogator
 	[27447] = true, -- Varos Cloudstrider
 	[27655] = true, -- Mage-Lord Urom
 	[27656] = true, -- Ley-Guardian Eregos
-	
+
 	-- Caverns of Time: Culling of Stratholme
 	[26529] = true, -- Meathook
 	[26530] = true, -- Salramm the Fleshcrafter
@@ -780,62 +780,62 @@ local BossIDs = {
 	[32273] = true, -- Infinite Corruptor
 	[26533] = true, -- Mal'Ganis
 	[29620] = true, -- Mal'Ganis
-	
+
 	-- Utgarde Pinnacle
 	[26668] = true, -- Svala Sorrowgrave
 	[26687] = true, -- Gortok Palehoof
 	[26693] = true, -- Skadi the Ruthless
 	[26861] = true, -- King Ymiron
-	
+
 	-- Trial of the Champion: Alliance
 	[35617] = true, -- Deathstalker Visceri <Grand Champion of Undercity>
 	[35569] = true, -- Eressea Dawnsinger <Grand Champion of Silvermoon>
 	[35572] = true, -- Mokra the Skullcrusher <Grand Champion of Orgrimmar>
 	[35571] = true, -- Runok Wildmane <Grand Champion of the Thunder Bluff>
 	[35570] = true, -- Zul'tore <Grand Champion of Sen'jin>
-	
+
 	-- Trial of the Champion: Horde
 	[34702] = true, -- Ambrose Boltspark <Grand Champion of Gnomeregan>
 	[34701] = true, -- Colosos <Grand Champion of the Exodar>
 	[34705] = true, -- Marshal Jacob Alerius <Grand Champion of Stormwind>
 	[34657] = true, -- Jaelyne Evensong <Grand Champion of Darnassus>
 	[34703] = true, -- Lana Stouthammer <Grand Champion of Ironforge>
-	
+
 	-- Trial of the Champion: Neutral
 	[34928] = true, -- Argent Confessor Paletress
 	[35119] = true, -- Eadric the Pure
 	[35451] = true, -- The Black Knight
-	
+
 	-- Forge of Souls
 	[36497] = true, -- Bronjahm
 	[36502] = true, -- Devourer of Souls
-	
+
 	-- Pit of Saron
 	[36494] = true, -- Forgemaster Garfrost
 	[36477] = true, -- Krick
 	[36476] = true, -- Ick <Krick's Minion>
 	[36658] = true, -- Scourgelord Tyrannus
-	
+
 	-- Halls of Reflection
 	[38112] = true, -- Falric
 	[38113] = true, -- Marwyn
 	[37226] = true, -- The Lich King
-	
+
 	-- Obsidian Sanctum
 	[30451] = true, -- Shadron
 	[30452] = true, -- Tenebron
 	[30449] = true, -- Vesperon
 	[28860] = true, -- Sartharion
-	
+
 	-- Vault of Archavon
 	[31125] = true, -- Archavon the Stone Watcher
 	[33993] = true, -- Emalon the Storm Watcher
 	[35013] = true, -- Koralon the Flamewatcher
 	[38433] = true, --Toravon the Ice Watcher
-	
+
 	-- The Eye of Eternity
 	[28859] = true, -- Malygos
-	
+
 	-- Ulduar: The Siege of Ulduar
 	[33113] = true, -- Flame Leviathan
 	[33118] = true, -- Ignis the Furnace Master
@@ -844,7 +844,7 @@ local BossIDs = {
 	[33670] = true, -- Aerial Command Unit
 	[33329] = true, -- Heart of the Deconstructor
 	[33651] = true, -- VX-001
-	
+
 	-- Ulduar: The Antechamber of Ulduar
 	[32867] = true, -- Steelbreaker
 	[32927] = true, -- Runemaster Molgeim
@@ -855,13 +855,13 @@ local BossIDs = {
 	[32933] = true, -- Left Arm
 	[32934] = true, -- Right Arm
 	[33524] = true, -- Saronite Animus
-	
+
 	-- Ulduar: The Keepers of Ulduar
 	[33350] = true, -- Mimiron
 	[32906] = true, -- Freya
 	[32865] = true, -- Thorim
 	[32845] = true, -- Hodir
-	
+
 	-- Ulduar: The Descent into Madness
 	[33271] = true, -- General Vezax
 	[33890] = true, -- Brain of Yogg-Saron
@@ -873,18 +873,18 @@ local BossIDs = {
 	[32882] = true, -- Jormungar Behemoth
 	[33432] = true, -- Leviathan Mk II
 	[34014] = true, -- Sanctum Sentry
-	
+
 	-- Ulduar: The Celestial Planetarium
 	[32871] = true, -- Algalon the Observer
-	
+
 	-- Trial of the Crusader
 	[34796] = true, -- Gormok
 	[35144] = true, -- Acidmaw
 	[34799] = true, -- Dreadscale
 	[34797] = true, -- Icehowl
-	
+
 	[34780] = true, -- Jaraxxus
-	
+
 	[34461] = true, -- Tyrius Duskblade <Death Knight>
 	[34460] = true, -- Kavina Grovesong <Druid>
 	[34469] = true, -- Melador Valestrider <Druid>
@@ -899,7 +899,7 @@ local BossIDs = {
 	[34463] = true, -- Shaabad <Shaman>
 	[34474] = true, -- Serissa Grimdabbler <Warlock>
 	[34475] = true, -- Shocuul <Warrior>
-	
+
 	[34458] = true, -- Gorgrim Shadowcleave <Death Knight>
 	[34451] = true, -- Birana Stormhoof <Druid>
 	[34459] = true, -- Erin Misthoof <Druid>
@@ -914,14 +914,14 @@ local BossIDs = {
 	[34455] = true, -- Broln Stouthorn <Shaman>
 	[34450] = true, -- Harkzog <Warlock>
 	[34453] = true, -- Narrhok Steelbreaker <Warrior>
-	
+
 	[35610] = true, -- Cat <Ruj'kah's Pet / Alyssia Moonstalker's Pet>
 	[35465] = true, -- Zhaagrym <Harkzog's Minion / Serissa Grimdabbler's Minion>
-	
+
 	[34497] = true, -- Fjola Lightbane
 	[34496] = true, -- Eydis Darkbane
 	[34564] = true, -- Anub'arak (Trial of the Crusader)
-	
+
 	-- Icecrown Citadel
 	[36612] = true, -- Lord Marrowgar
 	[36855] = true, -- Lady Deathwhisper
@@ -940,15 +940,15 @@ local BossIDs = {
 	[36791] = true, -- Blazing Skeleton, Valithria Add
 	[37934] = true, -- Blistering Zombie, Valithria Add
 	[37886] = true, -- Gluttonous Abomination, Valithria Add
-	[37985] = true, -- Dream Cloud , Valithria "Add" 
+	[37985] = true, -- Dream Cloud , Valithria "Add"
 	[36853] = true, -- Sindragosa
 	[36597] = true, -- The Lich King (Icecrown Citadel)
 	[37217] = true, -- Precious
 	[37025] = true, -- Stinki
 	[36661] = true, -- Rimefang <Drake of Tyrannus>
-	
+
 	--Ruby Sanctum (PTR 3.3.5)
-	[39746] = true,	--Zarithrian
+	[39746] = true, --Zarithrian
 	[39747] = true, --Saviana
 	[39751] = true, --Baltharus
 	[39863] = true, -- Halion
@@ -960,34 +960,34 @@ local BossIDs = {
 	[14888] = true, -- Lethon
 	[14890] = true, -- Taerar
 	[14887] = true, -- Ysondre
-	
+
 	-- Azshara
 	[14464] = true, -- Avalanchion
 	[6109]  = true, -- Azuregos
-	
+
 	-- Un'Goro Crater
 	[14461] = true, -- Baron Charr
-	
+
 	-- Silithus
 	[15205] = true, -- Baron Kazum <Abyssal High Council>
 	[15204] = true, -- High Marshal Whirlaxis <Abyssal High Council>
 	[15305] = true, -- Lord Skwol <Abyssal High Council>
 	[15203] = true, -- Prince Skaldrenox <Abyssal High Council>
 	[14454] = true, -- The Windreaver
-	
+
 	-- Searing Gorge
 	[9026]  = true, -- Overmaster Pyron
-	
+
 	-- Winterspring
 	[14457] = true, -- Princess Tempestria
-	
+
 	-- Hellfire Peninsula
 	[18728] = true, -- Doom Lord Kazzak
 	[12397] = true, -- Lord Kazzak
-	
+
 	-- Shadowmoon Valley
 	[17711] = true, -- Doomwalker
-	
+
 	-- Nagrand
 	[18398] = true, -- Brokentoe
 	[18069] = true, -- Mogor <Hero of the Warmaul>, friendly

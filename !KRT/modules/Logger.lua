@@ -1,8 +1,8 @@
 local addonName, addon    = ...
 addon.Logger              = {}
 local Logger              = addon.Logger
-local L = addon.L
-local Utils = addon.Utils
+local L                   = addon.L
+local Utils               = addon.Utils
 
 local frameName
 
