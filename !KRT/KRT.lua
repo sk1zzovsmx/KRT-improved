@@ -5417,14 +5417,22 @@ do
 	end
 
 	-- Initialize bosses list:
-	function InitLootList()
-		lootTable = {}
-		if not selectedPlayer then
-			lootTable = addon.Raid:GetLoot(selectedRaid, selectedBoss)
-		else
-			lootTable = addon.Raid:GetPlayerLoot(selectedPlayer, selectedRaid, selectedBoss)
-		end
-	end
+        function InitLootList()
+                lootTable = {}
+
+                -- Defensive checks to avoid pulling loot from an invalid raid.
+                -- Without this guard, selecting a raid that was removed could
+                -- cause the UI to display loot from the active raid instead.
+                if not selectedRaid or not KRT_Raids[selectedRaid] then
+                        return
+                end
+
+                if not selectedPlayer then
+                        lootTable = addon.Raid:GetLoot(selectedRaid, selectedBoss)
+                else
+                        lootTable = addon.Raid:GetPlayerLoot(selectedPlayer, selectedRaid, selectedBoss)
+                end
+        end
 
 	-- Utility function to visually hide list:
 	local function ResetList()
