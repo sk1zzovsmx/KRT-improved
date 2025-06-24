@@ -17,6 +17,9 @@
 # Libraries:
 Libs\LibStub.lua
 Libs\LibDeformat-3.0.lua
+Libs\LibSerialize.lua
+Libs\LibDataBroker-1.1.lua
+Libs\LibCompress.lua
 
 # Localization (moved to the top for 'L' to be available):
 Localization\localization.en.lua
