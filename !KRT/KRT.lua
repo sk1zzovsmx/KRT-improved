@@ -3946,6 +3946,38 @@ do
 
 	local ceil = math.ceil
 
+	-- Initialize the Raid Size DropDown
+	function Spammer:InitRaidSizeDropDown()
+		local dropDown = _G[frameName.."RaidSizeDropDown"]
+		local items = {
+			{ text = "10M", value = 10 },
+			{ text = "25M", value = 25 }
+		}
+
+		local function OnClick(self)
+			UIDropDownMenu_SetSelectedID(dropDown, self:GetID())
+			KRT_Spammer.RaidSize = self.value
+			loaded = false
+		end
+
+		UIDropDownMenu_Initialize(dropDown, function(self, level)
+			for i, info in ipairs(items) do
+				local option = {
+					text = info.text,
+					value = info.value,
+					func = OnClick,
+					arg1 = info.value,
+				}
+				UIDropDownMenu_AddButton(option, level)
+			end
+		end)
+
+		-- Set default or restored selection
+		local selectedID = (KRT_Spammer.RaidSize == 25) and 2 or 1
+		UIDropDownMenu_SetSelectedID(dropDown, selectedID)
+		UIDropDownMenu_SetWidth(dropDown, 60)
+	end
+
 	-- OnLoad frame:
 	function Spammer:OnLoad(frame)
 		addon:Debug("DEBUG", "LFM Spam frame loaded.")
@@ -3954,6 +3986,12 @@ do
 		frameName = frame:GetName()
 		frame:RegisterForDrag("LeftButton")
 		frame:SetScript("OnUpdate", UpdateUIFrame)
+
+		-- Initialize Raid Size if not set
+		if not KRT_Spammer.RaidSize then
+			KRT_Spammer.RaidSize = 10
+		end
+		self:InitRaidSizeDropDown()
 	end
 
 	-- Toggle frame visibility:
@@ -3970,7 +4008,7 @@ do
 		end
 	end
 
-	-- Save edit box:-
+	-- Save edit box:
 	function Spammer:Save(box)
 		addon:Debug("DEBUG", "Saving data from edit box.")
 		if not box then return end
@@ -4069,6 +4107,11 @@ do
 				KRT_Spammer[k] = nil
 			end
 		end
+		-- Reset raid size to 10M by default
+		KRT_Spammer.RaidSize = 10
+		local dropDown = _G[frameName.."RaidSizeDropDown"]
+		UIDropDownMenu_SetSelectedID(dropDown, 1)
+
 		message, output, finalOutput = nil, "LFM", ""
 		Spammer:Stop()
 		_G[frameName.."Name"]:SetText("")
@@ -4124,6 +4167,10 @@ do
 						_G[frameName..k]:SetText(v)
 					end
 				end
+				-- Restore dropdown selection
+				local dropDown = _G[frameName.."RaidSizeDropDown"]
+				local selectedID = (KRT_Spammer.RaidSize == 25) and 2 or 1
+				UIDropDownMenu_SetSelectedID(dropDown, selectedID)
 				loaded = true
 			end
 
@@ -4168,7 +4215,7 @@ do
 
 				if temp ~= "LFM" then
 					local total = tank + healer + melee + ranged
-					local max = name:find("25") and 25 or 10
+					local max = tonumber(KRT_Spammer.RaidSize) or 10
 					temp = temp .. " ("..max-(total or 0).."/"..max..")"
 
 					_G[frameName.."Output"]:SetText(temp)
@@ -4188,7 +4235,7 @@ do
 					_G[frameName.."Output"]:SetText(temp)
 				end
 
-				-- Set set duration:
+				-- Set duration:
 				duration = _G[frameName.."Duration"]:GetText()
 				if duration == "" then
 					duration = 60

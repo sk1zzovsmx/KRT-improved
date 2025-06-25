@@ -586,6 +586,20 @@
 				<Scripts><OnTabPressed>KRT.Spammer:Tab("Duration", "Message")</OnTabPressed>
 				</Scripts>
 			</EditBox>
+			<!-- BEGIN: Raid Size DropDown (10M / 25M) -->
+			<Frame name="$parentRaidSizeDropDown" inherits="UIDropDownMenuTemplate">
+				<Size>
+					<AbsDimension x="90" y="20"/>
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentName" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="8" y="0"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Frame>
+			<!-- END: Raid Size DropDown -->
 			<Button name="$parentStartBtn" inherits="KRTButtonTemplate" text="Start">
 				<Size><AbsDimension x="75" y="26" /></Size>
 				<Anchors>
