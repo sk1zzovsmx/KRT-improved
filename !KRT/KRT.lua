@@ -20,180 +20,183 @@ KRT_NextReset                           = KRT_NextReset or 0
 KRT_SavedReserves                       = KRT_SavedReserves or {}
 
 -- Items to ignore when adding raids loot
-addon.ignoredItems = {
-    -- Emblems (Wrath of the Lich King)
-    [40752] = true,  -- Emblem of Heroism
-    [40753] = true,  -- Emblem of Valor
-    [45624] = true,  -- Emblem of Conquest
-    [47241] = true,  -- Emblem of Triumph
-    [49426] = true,  -- Emblem of Frost
-    -- Emblems and Tokens (The Burning Crusade)
-    [29434] = true,  -- Badge of Justice
-    [29736] = true,  -- Arcane Tome
-    [29737] = true,  -- Firewing Signet
-    [29738] = true,  -- Fel Armament
-    [29739] = true,  -- Sunfury Signet
-    [29740] = true,  -- Mark of Sargeras
-    [29741] = true,  -- Fel Armament
-    -- High-end Gems
-    [36931] = true,  -- Ametrine
-    [36919] = true,  -- Cardinal Ruby
-    [36928] = true,  -- Dreadstone
-    [36934] = true,  -- Eye of Zul
-    [36922] = true,  -- King's Amber
-    [36925] = true,  -- Majestic Zircon
-    -- Enchanting Materials - Classic
-    [10940] = true,  -- Strange Dust
-    [10938] = true,  -- Lesser Magic Essence
-    [10939] = true,  -- Greater Magic Essence
-    [10978] = true,  -- Small Glimmering Shard
-    [10998] = true,  -- Lesser Astral Essence
-    [11082] = true,  -- Greater Astral Essence
-    [11083] = true,  -- Soul Dust
-    [11084] = true,  -- Large Glimmering Shard
-    [11134] = true,  -- Lesser Mystic Essence
-    [11135] = true,  -- Greater Mystic Essence
-    [11137] = true,  -- Vision Dust
-    [11138] = true,  -- Small Glowing Shard
-    [11139] = true,  -- Large Glowing Shard
-    [11174] = true,  -- Lesser Nether Essence
-    [11175] = true,  -- Greater Nether Essence
-    [11176] = true,  -- Dream Dust
-    [11177] = true,  -- Small Radiant Shard
-    [11178] = true,  -- Large Radiant Shard
-    [14343] = true,  -- Small Brilliant Shard
-    [14344] = true,  -- Large Brilliant Shard
-    [16202] = true,  -- Lesser Eternal Essence
-    [16203] = true,  -- Greater Eternal Essence
-    [16204] = true,  -- Illusion Dust
-    [20725] = true,  -- Nexus Crystal
-    -- Enchanting Materials - The Burning Crusade
-    [22445] = true,  -- Arcane Dust
-    [22446] = true,  -- Greater Planar Essence
-    [22447] = true,  -- Lesser Planar Essence
-    [22448] = true,  -- Small Prismatic Shard
-    [22449] = true,  -- Large Prismatic Shard
-    [22450] = true,  -- Void Crystal
-    -- Enchanting Materials - Wrath of the Lich King
-    [34052] = true,  -- Dream Shard
-    [34053] = true,  -- Small Dream Shard
-    [34054] = true,  -- Infinite Dust
-    [34055] = true,  -- Greater Cosmic Essence
-    [34056] = true,  -- Lesser Cosmic Essence
-    [34057] = true,  -- Abyss Crystal
+addon.ignoredItems                      = {
+	-- Black Temple special items
+	[32428] = true, -- Heart of Darkness
+	[32897] = true, -- Mark of the Illidari
+	-- Emblems (Wrath of the Lich King)
+	[40752] = true, -- Emblem of Heroism
+	[40753] = true, -- Emblem of Valor
+	[45624] = true, -- Emblem of Conquest
+	[47241] = true, -- Emblem of Triumph
+	[49426] = true, -- Emblem of Frost
+	-- Emblems and Tokens (The Burning Crusade)
+	[29434] = true, -- Badge of Justice
+	[29736] = true, -- Arcane Tome
+	[29737] = true, -- Firewing Signet
+	[29738] = true, -- Fel Armament
+	[29739] = true, -- Sunfury Signet
+	[29740] = true, -- Mark of Sargeras
+	[29741] = true, -- Fel Armament
+	-- High-end Gems
+	[36931] = true, -- Ametrine
+	[36919] = true, -- Cardinal Ruby
+	[36928] = true, -- Dreadstone
+	[36934] = true, -- Eye of Zul
+	[36922] = true, -- King's Amber
+	[36925] = true, -- Majestic Zircon
+	-- Enchanting Materials - Classic
+	[10940] = true, -- Strange Dust
+	[10938] = true, -- Lesser Magic Essence
+	[10939] = true, -- Greater Magic Essence
+	[10978] = true, -- Small Glimmering Shard
+	[10998] = true, -- Lesser Astral Essence
+	[11082] = true, -- Greater Astral Essence
+	[11083] = true, -- Soul Dust
+	[11084] = true, -- Large Glimmering Shard
+	[11134] = true, -- Lesser Mystic Essence
+	[11135] = true, -- Greater Mystic Essence
+	[11137] = true, -- Vision Dust
+	[11138] = true, -- Small Glowing Shard
+	[11139] = true, -- Large Glowing Shard
+	[11174] = true, -- Lesser Nether Essence
+	[11175] = true, -- Greater Nether Essence
+	[11176] = true, -- Dream Dust
+	[11177] = true, -- Small Radiant Shard
+	[11178] = true, -- Large Radiant Shard
+	[14343] = true, -- Small Brilliant Shard
+	[14344] = true, -- Large Brilliant Shard
+	[16202] = true, -- Lesser Eternal Essence
+	[16203] = true, -- Greater Eternal Essence
+	[16204] = true, -- Illusion Dust
+	[20725] = true, -- Nexus Crystal
+	-- Enchanting Materials - The Burning Crusade
+	[22445] = true, -- Arcane Dust
+	[22446] = true, -- Greater Planar Essence
+	[22447] = true, -- Lesser Planar Essence
+	[22448] = true, -- Small Prismatic Shard
+	[22449] = true, -- Large Prismatic Shard
+	[22450] = true, -- Void Crystal
+	-- Enchanting Materials - Wrath of the Lich King
+	[34052] = true, -- Dream Shard
+	[34053] = true, -- Small Dream Shard
+	[34054] = true, -- Infinite Dust
+	[34055] = true, -- Greater Cosmic Essence
+	[34056] = true, -- Lesser Cosmic Essence
+	[34057] = true, -- Abyss Crystal
 }
 
 -- List of bosses IDs to track
-addon.bossListIDs = {
-    -- Karazhan (10 giocatori)
-    [16152] = "Attumen the Huntsman",
-    [16457] = "Maiden of Virtue",
-    [15687] = "Moroes",
-    [15691] = "The Curator",
-    [15688] = "Terestian Illhoof",
-    [16524] = "Shade of Aran",
-    [15689] = "Netherspite",
-    [15690] = "Prince Malchezaar",
-    [17225] = "Nightbane",
-    -- Gruul's Lair (25 giocatori)
-    [18831] = "High King Maulgar",
-    [19044] = "Gruul the Dragonkiller",
-    -- Magtheridon's Lair (25 giocatori)
-    [17257] = "Magtheridon",
-    -- Serpentshrine Cavern (25 giocatori)
-    [21216] = "Hydross the Unstable",
-    [21217] = "The Lurker Below",
-    [21215] = "Leotheras the Blind",
-    [21214] = "Fathom-Lord Karathress",
-    [21213] = "Morogrim Tidewalker",
-    [21212] = "Lady Vashj",
-    -- The Eye (Tempest Keep) (25 giocatori)
-    [19514] = "Al'ar",
-    [19516] = "Void Reaver",
-    [18805] = "High Astromancer Solarian",
-    [19622] = "Kael'thas Sunstrider",
-    -- Battle for Mount Hyjal (25 giocatori)
-    [17767] = "Rage Winterchill",
-    [17808] = "Anetheron",
-    [17888] = "Kaz'rogal",
-    [17842] = "Azgalor",
-    [17968] = "Archimonde",
-    -- Black Temple (25 giocatori)
-    [22887] = "High Warlord Naj'entus",
-    [22898] = "Supremus",
-    [22841] = "Shade of Akama",
-    [22871] = "Teron'khan",
-    [22948] = "Gurtogg Bloodboil",
-    [23420] = "Reliquary of Souls",
-    [22947] = "Mother Shahraz",
-    [22949] = "Illidari Council",
-    [22917] = "Illidan Stormrage",
-    -- Sunwell Plateau (25 giocatori)
-    [24850] = "Kalecgos",
-    [24882] = "Brutallus",
-    [25038] = "Felmyst",
-    [25165] = "Eredar Twins",
-    [25741] = "M'uru",
-    [25315] = "Kil'jaeden",
-    -- Zul'Aman (10 giocatori)
-    [23574] = "Nalorakk",
-    [23576] = "Jan'alai",
-    [23578] = "Akil'zon",
-    [23577] = "Halazzi",
-    [24239] = "Hex Lord Malacrass",
-    [23863] = "Zul'jin",
-    -- World Bosses
-    [18728] = "Doom Lord Kazzak",
-    [17711] = "Doomwalker",
-    -- Naxxramas:
-    [15956] = "Anub'Rekhan",
-    [15953] = "Grand Widow Faerlina",
-    [15952] = "Maexxna",
-    [15954] = "Noth the Plaguebringer",
-    [15936] = "Heigan the Unclean",
-    [16011] = "Loatheb",
-    [16061] = "Instructor Razuvious",
-    [16060] = "Gothik the Harvester",
-    [16028] = "Patchwerk",
-    [15931] = "Grobbulus",
-    [15932] = "Gluth",
-    [15928] = "Thaddius",
-    [15989] = "Sapphiron",
-    [15990] = "Kel'Thuzad",
-    -- The Obsidian Sanctum:
-    [28860] = "Sartharion",
-    -- Eye of Eternity:
-    [28859] = "Malygos",
-    -- Archavon's Chamber:
-    [31125] = "Archavon the Stone Watcher",
-    [33993] = "Emalon the Storm Watcher",
-    [35013] = "Koralon the Flame Watcher",
-    [38433] = "Toravon the Ice Watcher",
-    -- Ulduar
-    [33113] = "Flame Leviathan",
-    [33118] = "Ignis the Furnace Master",
-    [33186] = "Razorscale",
-    [33293] = "XT-002 Deconstructor",
-    [32930] = "Kologarn",
-    [33515] = "Auriaya",
-    [33271] = "General Vezax",
-    [33288] = "Yogg-Saron",
-    -- Onyxia's Lair:
-    [10184] = "Onyxia",
-    -- Trial of the Crusader:
-    [34797] = "Icehowl",
-    [34780] = "Lord Jaraxxus",
-    [34564] = "Anub'arak",
-    -- Icecrown Citadel:
-    [36612] = "Lord Marrowgar",
-    [36855] = "Lady Deathwhisper",
-    [37813] = "Deathbringer Saurfang",
-    [36626] = "Festergut",
-    [36627] = "Rotface",
-    [36678] = "Professor Putricide",
-    [37955] = "Blood-Queen Lana'thel",
-    [36853] = "Sindragosa",
-    [36597] = "The Lich King"
+addon.bossListIDs                       = {
+	-- Karazhan (10 giocatori)
+	[16152] = "Attumen the Huntsman",
+	[16457] = "Maiden of Virtue",
+	[15687] = "Moroes",
+	[15691] = "The Curator",
+	[15688] = "Terestian Illhoof",
+	[16524] = "Shade of Aran",
+	[15689] = "Netherspite",
+	[15690] = "Prince Malchezaar",
+	[17225] = "Nightbane",
+	-- Gruul's Lair (25 giocatori)
+	[18831] = "High King Maulgar",
+	[19044] = "Gruul the Dragonkiller",
+	-- Magtheridon's Lair (25 giocatori)
+	[17257] = "Magtheridon",
+	-- Serpentshrine Cavern (25 giocatori)
+	[21216] = "Hydross the Unstable",
+	[21217] = "The Lurker Below",
+	[21215] = "Leotheras the Blind",
+	[21214] = "Fathom-Lord Karathress",
+	[21213] = "Morogrim Tidewalker",
+	[21212] = "Lady Vashj",
+	-- The Eye (Tempest Keep) (25 giocatori)
+	[19514] = "Al'ar",
+	[19516] = "Void Reaver",
+	[18805] = "High Astromancer Solarian",
+	[19622] = "Kael'thas Sunstrider",
+	-- Battle for Mount Hyjal (25 giocatori)
+	[17767] = "Rage Winterchill",
+	[17808] = "Anetheron",
+	[17888] = "Kaz'rogal",
+	[17842] = "Azgalor",
+	[17968] = "Archimonde",
+	-- Black Temple (25 giocatori)
+	[22887] = "High Warlord Naj'entus",
+	[22898] = "Supremus",
+	[22841] = "Shade of Akama",
+	[22871] = "Teron'khan",
+	[22948] = "Gurtogg Bloodboil",
+	[23420] = "Reliquary of Souls",
+	[22947] = "Mother Shahraz",
+	[22949] = "Illidari Council",
+	[22917] = "Illidan Stormrage",
+	-- Sunwell Plateau (25 giocatori)
+	[24850] = "Kalecgos",
+	[24882] = "Brutallus",
+	[25038] = "Felmyst",
+	[25165] = "Eredar Twins",
+	[25741] = "M'uru",
+	[25315] = "Kil'jaeden",
+	-- Zul'Aman (10 giocatori)
+	[23574] = "Nalorakk",
+	[23576] = "Jan'alai",
+	[23578] = "Akil'zon",
+	[23577] = "Halazzi",
+	[24239] = "Hex Lord Malacrass",
+	[23863] = "Zul'jin",
+	-- World Bosses
+	[18728] = "Doom Lord Kazzak",
+	[17711] = "Doomwalker",
+	-- Naxxramas:
+	[15956] = "Anub'Rekhan",
+	[15953] = "Grand Widow Faerlina",
+	[15952] = "Maexxna",
+	[15954] = "Noth the Plaguebringer",
+	[15936] = "Heigan the Unclean",
+	[16011] = "Loatheb",
+	[16061] = "Instructor Razuvious",
+	[16060] = "Gothik the Harvester",
+	[16028] = "Patchwerk",
+	[15931] = "Grobbulus",
+	[15932] = "Gluth",
+	[15928] = "Thaddius",
+	[15989] = "Sapphiron",
+	[15990] = "Kel'Thuzad",
+	-- The Obsidian Sanctum:
+	[28860] = "Sartharion",
+	-- Eye of Eternity:
+	[28859] = "Malygos",
+	-- Archavon's Chamber:
+	[31125] = "Archavon the Stone Watcher",
+	[33993] = "Emalon the Storm Watcher",
+	[35013] = "Koralon the Flame Watcher",
+	[38433] = "Toravon the Ice Watcher",
+	-- Ulduar
+	[33113] = "Flame Leviathan",
+	[33118] = "Ignis the Furnace Master",
+	[33186] = "Razorscale",
+	[33293] = "XT-002 Deconstructor",
+	[32930] = "Kologarn",
+	[33515] = "Auriaya",
+	[33271] = "General Vezax",
+	[33288] = "Yogg-Saron",
+	-- Onyxia's Lair:
+	[10184] = "Onyxia",
+	-- Trial of the Crusader:
+	[34797] = "Icehowl",
+	[34780] = "Lord Jaraxxus",
+	[34564] = "Anub'arak",
+	-- Icecrown Citadel:
+	[36612] = "Lord Marrowgar",
+	[36855] = "Lady Deathwhisper",
+	[37813] = "Deathbringer Saurfang",
+	[36626] = "Festergut",
+	[36627] = "Rotface",
+	[36678] = "Professor Putricide",
+	[37955] = "Blood-Queen Lana'thel",
+	[36853] = "Sindragosa",
+	[36597] = "The Lich King"
 }
 
 -- AddOn main frames:
@@ -491,7 +494,6 @@ do
 
 	-- Events Handler:
 	local function HandleEvent(self, e, ...)
-
 		if e == "ADDON_LOADED" then
 			LoadOptions()
 		end
@@ -751,30 +753,41 @@ do
 		end
 	end
 
-	-- Add a boss kill to the active raid:
-	function Raid:AddBoss(bossName, manDiff, raidNum)
+	-- Adds a boss kill to the active raid using LibBossIDs-1.0
+	function Raid:AddBoss(bossID, manDiff, raidNum)
 		raidNum = raidNum or KRT_CurrentRaid
-		if not raidNum or not bossName then
-			addon:Debug("ERROR", "Raid:AddBoss called with invalid parameters (raidNum=%s, bossName=%s)",
-				tostring(raidNum), tostring(bossName))
+		if not raidNum or not bossID then
+			addon:Debug("ERROR", "Raid:AddBoss called with invalid parameters (raidNum=%s, bossID=%s)",
+				tostring(raidNum), tostring(bossID))
 			return
 		end
+
+		-- Boss detection using LibBossIDs-1.0
+		local bossName
+		if bossLib.BossIDs[bossID] then
+			bossName = UnitName("target") or addon.bossListIDs[bossID] or ("Known Boss (" .. tostring(bossID) .. ")")
+		else
+			bossName = addon.bossListIDs[bossID] or ("Unknown Boss (" .. tostring(bossID) .. ")")
+		end
+
 		local _, _, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
 		if manDiff then
 			instanceDiff = (KRT_Raids[raidNum].size == 10) and 1 or 2
-			if lower(manDiff) == "h" then
+			if string.lower(manDiff) == "h" then
 				instanceDiff = instanceDiff + 2
 			end
 		elseif isDyn then
 			instanceDiff = instanceDiff + (2 * dynDiff)
 		end
+
 		local players = {}
 		for i = 1, GetNumRaidMembers() do
 			local name, _, _, _, _, _, _, online = GetRaidRosterInfo(i)
-			if online == 1 then -- track only online players:
-				tinsert(players, name)
+			if online == 1 then
+				table.insert(players, name)
 			end
 		end
+
 		local currentTime = Utils.GetCurrentTime()
 		local killInfo = {
 			name = bossName,
@@ -783,10 +796,12 @@ do
 			date = currentTime,
 			hash = Utils.encode(raidNum .. "|" .. bossName .. "|" .. (KRT_LastBoss or "0"))
 		}
-		tinsert(KRT_Raids[raidNum].bossKills, killInfo)
+
+		table.insert(KRT_Raids[raidNum].bossKills, killInfo)
 		KRT_LastBoss = #KRT_Raids[raidNum].bossKills
-		addon:Debug("INFO", "Boss kill recorded: '%s' [Difficulty %d] in Raid #%d with %d players. Time: %s", bossName,
-			instanceDiff, raidNum, #players, currentTime)
+
+		addon:Debug("INFO", "Boss kill recorded: '%s' [Difficulty %d] in Raid #%d with %d players. Time: %s",
+			bossName, instanceDiff, raidNum, #players, currentTime)
 	end
 
 	-- Adds a loot to the active raid:
@@ -6037,15 +6052,25 @@ function addon:CHAT_MSG_MONSTER_YELL(...)
 end
 
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
-	local _, event, _, _, _, destGUID, destName = ...
+	local _, event, _, _, _, _, _, destGUID, destName = ...
 	if not KRT_CurrentRaid then return end
+
 	if event == "UNIT_DIED" then
 		local npcID = Utils.GetNPCID(destGUID)
-		if addon.bossListIDs[npcID] then
+		if npcID and bossLib.BossIDs[npcID] then
 			if KRT then
-				addon:Debug("INFO", "Boss killed: %s", destName)
+				addon:Debug("INFO", "Boss kill detected (LibBossIDs): %s (ID: %d)", destName or "Unknown", npcID)
 			end
-			self.Raid:AddBoss(destName)
+			-- Pass npcID directly to the Raid:AddBoss method:
+			self.Raid:AddBoss(npcID)
+		else
+			-- Fallback to existing bossListIDs (if LibBossIDs does not recognize this boss)
+			if npcID and addon.bossListIDs[npcID] then
+				if KRT then
+					addon:Debug("INFO", "Boss kill detected (bossListIDs): %s (ID: %d)", destName or "Unknown", npcID)
+				end
+				self.Raid:AddBoss(npcID)
+			end
 		end
 	end
 end
