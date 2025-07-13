@@ -25,10 +25,8 @@ Localization\localization.en.lua
 Templates.xml
 
 # Utilities & Core Files:
-modules\Utils.lua
+Utils.lua
 KRT.lua
 KRT.xml
 
 # Modules
-modules\ignoredItems.lua
-modules\bossList.lua
