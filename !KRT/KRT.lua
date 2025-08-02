@@ -2517,7 +2517,6 @@ end
 
 -- ==================== Loot Counter (Saved-Raid Attendance, 3.3.5a Safe) ==================== --
 do
-    local GetSavedRaidPlayers = addon.Raid.GetPlayers
     local frameName = "KRTMasterCountsFrame"
     local countsFrame = _G[frameName]
     if not countsFrame then
@@ -2622,8 +2621,8 @@ do
     addon.Raid.counts = addon.Raid.counts or {}
     function addon.Raid:SyncFromSavedRaid()
         local keep = {}
-        -- `GetSavedRaidPlayers(self)` returns the current saved-raid attendees (info.name, info.class, etc).
-        for _, info in ipairs(GetSavedRaidPlayers(self)) do
+        -- `self:GetPlayers()` returns the current saved-raid attendees (info.name, info.class, etc).
+        for _, info in ipairs(self:GetPlayers()) do
             keep[info.name] = true
             -- preserve old count or start at 0
             self.counts[info.name] = self.counts[info.name] or { name = info.name, count = 0 }
