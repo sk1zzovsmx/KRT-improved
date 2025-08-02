@@ -18,6 +18,7 @@ KRT_CurrentRaid                         = KRT_CurrentRaid or nil
 KRT_LastBoss                            = KRT_LastBoss or nil
 KRT_NextReset                           = KRT_NextReset or 0
 KRT_SavedReserves                       = KRT_SavedReserves or {}
+KRT_PlayerCounts                        = KRT_PlayerCounts or {}
 
 -- AddOn main frames:
 local mainFrame                         = CreateFrame("Frame")
@@ -393,24 +394,25 @@ do
 				local raceL, race = UnitRace(unitID)
 				if not inRaid then
 					local toRaid = {
-						name = name,
-						rank = rank,
+						name     = name,
+						rank     = rank,
 						subgroup = subgroup,
-						class = class or "UNKNOWN",
-						join = Utils.GetCurrentTime(),
-						leave = nil
+						class    = class or "UNKNOWN",
+						join     = Utils.GetCurrentTime(),
+						leave    = nil,
+						count    = 0, -- <--- Inizializza count!
 					}
 					Raid:AddPlayer(toRaid)
 				end
 				if not KRT_Players[realm][name] then
 					KRT_Players[realm][name] = {
-						name = name,
-						level = level,
-						race = race,
-						raceL = raceL,
-						class = class or "UNKNOWN",
+						name   = name,
+						level  = level,
+						race   = race,
+						raceL  = raceL,
+						class  = class or "UNKNOWN",
 						classL = classL,
-						sex = UnitSex(unitID)
+						sex    = UnitSex(unitID)
 					}
 				end
 			end
@@ -441,14 +443,14 @@ do
 		KRT_Players[realm] = KRT_Players[realm] or {}
 		local currentTime = Utils.GetCurrentTime()
 		local raidInfo = {
-			realm = realm,
-			zone = zoneName,
-			size = raidSize,
-			players = {},
+			realm     = realm,
+			zone      = zoneName,
+			size      = raidSize,
+			players   = {},
 			bossKills = {},
-			loot = {},
+			loot      = {},
 			startTime = currentTime,
-			changes = {},
+			changes   = {},
 		}
 		for i = 1, numRaid do
 			local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
@@ -462,6 +464,7 @@ do
 					class    = class or "UNKNOWN",
 					join     = Utils.GetCurrentTime(),
 					leave    = nil,
+					count    = 0, -- <--- Inizializza count!
 				})
 				KRT_Players[realm][name] = {
 					name   = name,
@@ -500,7 +503,6 @@ do
 		end
 
 		local current = KRT_Raids[KRT_CurrentRaid]
-
 		if current then
 			if current.zone == instanceName then
 				if current.size == 10 and (instanceDiff % 2 == 0) then
@@ -525,7 +527,6 @@ do
 		Utils.unschedule(addon.Raid.FirstCheck)
 		if GetNumRaidMembers() == 0 then return end
 
-		-- We are in a raid? We update roster
 		if KRT_CurrentRaid and Raid:CheckPlayer(unitName, KRT_CurrentRaid) then
 			Utils.schedule(2, addon.UpdateRaidRoster)
 			return
@@ -541,20 +542,20 @@ do
 	-- Add a player to the raid:
 	function Raid:AddPlayer(t, raidNum)
 		raidNum = raidNum or KRT_CurrentRaid
-		-- We must check if the players existed or not
 		if not raidNum or not t or not t.name then return end
 		local players = Raid:GetPlayers(raidNum)
 		local found = false
 		for i, p in ipairs(players) do
-			-- If found, we simply updated the table:
 			if t.name == p.name then
+				-- Preserve count if present
+				t.count = t.count or p.count or 0
 				KRT_Raids[raidNum].players[i] = t
 				found = true
 				break
 			end
 		end
-		-- If the players wasn't in the raid, we add him/her:
 		if not found then
+			t.count = t.count or 0
 			tinsert(KRT_Raids[raidNum].players, t)
 		end
 	end
@@ -624,7 +625,7 @@ do
 		local lootThreshold = GetLootThreshold()
 		if itemRarity and itemRarity < lootThreshold then return end
 		if itemId and addon.ignoredItems[itemId] then return end
-		if not KRT_LastBoss then self:AddBoss("_TrashMob_")	end
+		if not KRT_LastBoss then self:AddBoss("_TrashMob_") end
 		if not rollType then rollType = currentRollType end
 		if not rollValue then rollValue = addon:HighestRoll() end
 		local lootInfo = {
@@ -642,6 +643,43 @@ do
 			time        = Utils.GetCurrentTime(),
 		}
 		tinsert(KRT_Raids[KRT_CurrentRaid].loot, lootInfo)
+	end
+
+	----------------------
+	-- Player Count API  --
+	----------------------
+
+	function Raid:GetPlayerCount(name, raidNum)
+		raidNum = raidNum or KRT_CurrentRaid
+		local players = Raid:GetPlayers(raidNum)
+		for i, p in ipairs(players) do
+			if p.name == name then
+				return p.count or 0
+			end
+		end
+		return 0
+	end
+
+	function Raid:SetPlayerCount(name, value, raidNum)
+		raidNum = raidNum or KRT_CurrentRaid
+		local players = KRT_Raids[raidNum] and KRT_Raids[raidNum].players
+		if not players then return end
+		for i, p in ipairs(players) do
+			if p.name == name then
+				p.count = value
+				return
+			end
+		end
+	end
+
+	function Raid:IncrementPlayerCount(name, raidNum)
+		local c = Raid:GetPlayerCount(name, raidNum)
+		Raid:SetPlayerCount(name, c + 1, raidNum)
+	end
+
+	function Raid:DecrementPlayerCount(name, raidNum)
+		local c = Raid:GetPlayerCount(name, raidNum)
+		Raid:SetPlayerCount(name, c - 1, raidNum)
 	end
 
 	--------------------
@@ -2469,6 +2507,157 @@ do
 			announced = false
 		end
 	end)
+end
+
+-- ==================== Loot Counter (Saved-Raid Attendance, 3.3.5a Safe) ==================== --
+do
+    local frameName = "KRTMasterCountsFrame"
+    local countsFrame = _G[frameName]
+    if not countsFrame then
+        -- create window
+        countsFrame = CreateFrame("Frame", frameName, UIParent)
+        countsFrame:SetSize(220, 660)
+        countsFrame:SetPoint("CENTER")
+        countsFrame:SetBackdrop({
+            bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+            tile     = true, tileSize = 32,
+            edgeSize = 16,
+            insets   = { left = 4, right = 4, top = 4, bottom = 4 },
+        })
+        countsFrame:EnableMouse(true)
+        countsFrame:SetMovable(true)
+        countsFrame:RegisterForDrag("LeftButton")
+        countsFrame:SetScript("OnDragStart", countsFrame.StartMoving)
+        countsFrame:SetScript("OnDragStop", countsFrame.StopMovingOrSizing)
+        countsFrame:Hide()
+
+        -- title
+        countsFrame.title = countsFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+        countsFrame.title:SetPoint("TOP", countsFrame, "TOP", 0, -8)
+        countsFrame.title:SetText("Loot Counter")
+
+        -- whenever we show it, rebuild from saved-raid
+        countsFrame:SetScript("OnShow", function()
+            addon.Raid:SyncFromSavedRaid()
+            addon:UpdateCountsFrame()
+        end)
+    end
+
+    local rows = {}
+
+    function addon:ToggleCountsFrame(show)
+        if show then countsFrame:Show()
+        else         countsFrame:Hide() end
+    end
+
+    function addon:UpdateCountsFrame()
+        if not countsFrame:IsShown() then return end
+
+        local players = addon.Raid:GetPlayers()
+        table.sort(players, function(a,b) return (a.name or "") < (b.name or "") end)
+        local num = #players
+
+        -- dynamic height
+        local rowH, titleH, pad = 25, 36, 10
+        countsFrame:SetHeight(math.max(60, titleH + num*rowH + pad))
+
+        -- create or update each row
+        for i=1,num do
+            local p = players[i]
+            local row = rows[i]
+            if not row then
+                row = CreateFrame("Frame", frameName.."Row"..i, countsFrame)
+                row:SetSize(160,24)
+                row:SetPoint("TOPLEFT", countsFrame, "TOPLEFT", 10, -titleH - (i-1)*rowH)
+
+                row.name = row:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+                row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
+
+                row.count = row:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+                row.count:SetPoint("LEFT", row.name, "RIGHT", 10, 0)
+
+                row.plus = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+                row.plus:SetSize(22,22)
+                row.plus:SetText("+")
+                row.plus:SetPoint("LEFT", row.count, "RIGHT", 5, 0)
+
+                row.minus = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+                row.minus:SetSize(22,22)
+                row.minus:SetText("-")
+                row.minus:SetPoint("LEFT", row.plus, "RIGHT", 2, 0)
+
+                row.plus:SetScript("OnClick", function()
+                    addon.Raid:IncrementPlayerCount(row._playerName)
+                    addon:UpdateCountsFrame()
+                end)
+                row.minus:SetScript("OnClick", function()
+                    addon.Raid:DecrementPlayerCount(row._playerName)
+                    addon:UpdateCountsFrame()
+                end)
+
+                rows[i] = row
+            end
+
+            row._playerName = p.name
+            row.name:SetText(p.name or "?")
+            row.count:SetText(tostring(p.count or 0))
+            row:Show()
+        end
+
+        -- hide extras
+        for i = num+1, #rows do
+            rows[i]:Hide()
+        end
+    end
+
+    -- **New**: seed from the saved-raid attendance table (KRT_Raids[…].players)
+    addon.Raid.counts = addon.Raid.counts or {}
+    function addon.Raid:SyncFromSavedRaid()
+        local keep = {}
+        -- `self:GetPlayers()` returns the current saved-raid attendees (info.name, info.class, etc).
+        for _, info in ipairs(self:GetPlayers()) do
+            keep[info.name] = true
+            -- preserve old count or start at 0
+            self.counts[info.name] = self.counts[info.name] or { name = info.name, count = 0 }
+        end
+        -- remove anyone no longer in the saved raid
+        for oldName in pairs(self.counts) do
+            if not keep[oldName] then
+                self.counts[oldName] = nil
+            end
+        end
+    end
+
+    -- override GetPlayers() to return our counter list
+    function addon.Raid:GetPlayers()
+        local t = {}
+        for _, info in pairs(self.counts) do
+            t[#t+1] = info
+        end
+        return t
+    end
+
+    -- hook the master-loot frame for your toggle button
+    local function SetupMasterLootFrameHooks()
+        local f = _G["KRTMasterLootFrame"]
+        if f and not f.KRT_LootCounterBtn then
+            local btn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+            btn:SetSize(100,24)
+            btn:SetText("Loot Counter")
+            btn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -20, -20)
+            btn:SetScript("OnClick", function()
+                if countsFrame:IsShown() then countsFrame:Hide()
+                else countsFrame:Show() end
+            end)
+            f.KRT_LootCounterBtn = btn
+
+            f:HookScript("OnHide", function()
+                if countsFrame:IsShown() then countsFrame:Hide() end
+            end)
+        end
+    end
+    hooksecurefunc(addon.Master, "OnLoad", SetupMasterLootFrameHooks)
 end
 
 -- ==================== Raid Helper Reserves ==================== --
