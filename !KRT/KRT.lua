@@ -660,27 +660,33 @@ do
 		return 0
 	end
 
-	function Raid:SetPlayerCount(name, value, raidNum)
-		raidNum = raidNum or KRT_CurrentRaid
-		local players = KRT_Raids[raidNum] and KRT_Raids[raidNum].players
-		if not players then return end
-		for i, p in ipairs(players) do
-			if p.name == name then
-				p.count = value
-				return
-			end
-		end
-	end
+        function Raid:SetPlayerCount(name, value, raidNum)
+                raidNum = raidNum or KRT_CurrentRaid
+
+                -- Prevent setting a negative count
+                if value < 0 then
+                        return
+                end
+
+                local players = KRT_Raids[raidNum] and KRT_Raids[raidNum].players
+                if not players then return end
+                for i, p in ipairs(players) do
+                        if p.name == name then
+                                p.count = value
+                                return
+                        end
+                end
+        end
 
 	function Raid:IncrementPlayerCount(name, raidNum)
 		local c = Raid:GetPlayerCount(name, raidNum)
 		Raid:SetPlayerCount(name, c + 1, raidNum)
 	end
 
-	function Raid:DecrementPlayerCount(name, raidNum)
-		local c = Raid:GetPlayerCount(name, raidNum)
-		Raid:SetPlayerCount(name, c - 1, raidNum)
-	end
+        function Raid:DecrementPlayerCount(name, raidNum)
+                local c = Raid:GetPlayerCount(name, raidNum)
+                Raid:SetPlayerCount(name, math.max(0, c - 1), raidNum)
+        end
 
 	--------------------
 	-- Raid Functions --
