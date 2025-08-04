@@ -665,6 +665,7 @@ do
 
                 -- Prevent setting a negative count
                 if value < 0 then
+                        addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
                         return
                 end
 
@@ -678,14 +679,28 @@ do
                 end
         end
 
-	function Raid:IncrementPlayerCount(name, raidNum)
-		local c = Raid:GetPlayerCount(name, raidNum)
-		Raid:SetPlayerCount(name, c + 1, raidNum)
-	end
+        function Raid:IncrementPlayerCount(name, raidNum)
+                if Raid:GetPlayerID(name, raidNum) == 0 then
+                        addon:PrintError(L.ErrCannotFindPlayer:format(name))
+                        return
+                end
+
+                local c = Raid:GetPlayerCount(name, raidNum)
+                Raid:SetPlayerCount(name, c + 1, raidNum)
+        end
 
         function Raid:DecrementPlayerCount(name, raidNum)
+                if Raid:GetPlayerID(name, raidNum) == 0 then
+                        addon:PrintError(L.ErrCannotFindPlayer:format(name))
+                        return
+                end
+
                 local c = Raid:GetPlayerCount(name, raidNum)
-                Raid:SetPlayerCount(name, math.max(0, c - 1), raidNum)
+                if c <= 0 then
+                        addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
+                        return
+                end
+                Raid:SetPlayerCount(name, c - 1, raidNum)
         end
 
 	--------------------
