@@ -2543,9 +2543,8 @@ do
         countsFrame.title:SetPoint("TOP", countsFrame, "TOP", 0, -8)
         countsFrame.title:SetText("Loot Counter")
 
-        -- whenever we show it, rebuild from saved-raid
+        -- whenever we show it, refresh the counts
         countsFrame:SetScript("OnShow", function()
-            addon.Raid:SyncFromSavedRaid()
             addon:UpdateCountsFrame()
         end)
     end
@@ -2560,7 +2559,7 @@ do
     function addon:UpdateCountsFrame()
         if not countsFrame:IsShown() then return end
 
-        local players = addon.Raid:GetCountedPlayers()
+        local players = addon.Raid:GetPlayers()
         table.sort(players, function(a,b) return (a.name or "") < (b.name or "") end)
         local num = #players
 
@@ -2617,31 +2616,9 @@ do
         end
     end
 
-    -- **New**: seed from the saved-raid attendance table (KRT_Raids[…].players)
-    addon.Raid.counts = addon.Raid.counts or {}
-    function addon.Raid:SyncFromSavedRaid()
-        local keep = {}
-        -- `self:GetPlayers()` returns the current saved-raid attendees (info.name, info.class, etc).
-        for _, info in ipairs(self:GetPlayers()) do
-            keep[info.name] = true
-            -- preserve old count or start at 0
-            self.counts[info.name] = self.counts[info.name] or { name = info.name, count = 0 }
-        end
-        -- remove anyone no longer in the saved raid
-        for oldName in pairs(self.counts) do
-            if not keep[oldName] then
-                self.counts[oldName] = nil
-            end
-        end
-    end
-
-    -- Return our counter list
+    -- Return our counter list directly from the saved raid data
     function addon.Raid:GetCountedPlayers()
-        local t = {}
-        for _, info in pairs(self.counts) do
-            t[#t+1] = info
-        end
-        return t
+        return self:GetPlayers()
     end
 
     -- hook the master-loot frame for your toggle button
