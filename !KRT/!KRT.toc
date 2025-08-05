@@ -30,5 +30,5 @@ KRT.lua
 KRT.xml
 
 # Modules
-modules\ignoredItems.lua
-modules\bossList.lua
+modules\IgnoredItems.lua
+modules\BossList.lua
