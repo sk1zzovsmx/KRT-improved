@@ -1267,13 +1267,11 @@
 				<Offset><AbsDimension x="0" y="-5"/></Offset>
 				</Anchor>
 			</Anchors>
-			<Scripts>
-				<OnClick>
-				KRT:ToggleCountsFrame(not KRTMasterCountsFrame:IsShown())
-				</OnClick>
-			</Scripts>
-			</Button>
-		</Frames>
+                        <Scripts>
+                                <OnClick>KRT:ToggleCountsFrame()</OnClick>
+                        </Scripts>
+                        </Button>
+                </Frames>
 
 		<Scripts>
 			<OnLoad>KRT.Master:OnLoad(self)</OnLoad>
@@ -1281,34 +1279,38 @@
 	</Frame>
 	<!-- ====== End of Master Loot Frame ====== -->
 
-	<!-- ====== Start of Master Counts Frame ====== -->
-	<Frame name="KRTMasterCountsFrame" inherits="KRTFrameTemplate" hidden="true">
-		<Size><AbsDimension x="210" y="480" /></Size>
-		<Anchors>
-			<Anchor point="TOPLEFT" relativeTo="KRTMaster" relativePoint="TOPRIGHT">
-				<Offset>
-					<AbsDimension x="8" y="0"/>
-				</Offset>
-			</Anchor>
-		</Anchors>
-		<Layers>
-			<Layer level="ARTWORK">
-				<FontString name="$parentTitle" inherits="GameFontNormal" text="Player Counts">
-					<Size>
-						<AbsDimension x="160" y="18"/>
-					</Size>
-					<Anchors>
-						<Anchor point="TOPLEFT">
-							<Offset>
-								<AbsDimension x="25" y="-15"/>
-							</Offset>
-						</Anchor>
-					</Anchors>
-				</FontString>
-			</Layer>
-		</Layers>
-	</Frame>
-	<!-- ====== End of Master Counts Frame ====== -->
+        <!-- ====== Start of Loot Counter Frame ====== -->
+        <Frame name="KRTLootCounterFrame" inherits="KRTFrameTemplate" hidden="true">
+                <Size><AbsDimension x="210" y="300" /></Size>
+                <Anchors>
+                        <Anchor point="CENTER"/>
+                </Anchors>
+                <Layers>
+                        <Layer level="ARTWORK">
+                                <FontString name="$parentTitle" inherits="GameFontNormal" text="Loot Counter">
+                                        <Anchors>
+                                                <Anchor point="TOP" x="0" y="-15"/>
+                                        </Anchors>
+                                </FontString>
+                        </Layer>
+                </Layers>
+                <Frames>
+                        <ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+                                <Anchors>
+                                        <Anchor point="TOPLEFT">
+                                                <Offset><AbsDimension x="15" y="-32"/></Offset>
+                                        </Anchor>
+                                        <Anchor point="BOTTOMRIGHT">
+                                                <Offset><AbsDimension x="-30" y="12"/></Offset>
+                                        </Anchor>
+                                </Anchors>
+                        </ScrollFrame>
+                </Frames>
+                <Scripts>
+                        <OnShow>KRT:UpdateCountsFrame()</OnShow>
+                </Scripts>
+        </Frame>
+        <!-- ====== End of Loot Counter Frame ====== -->
 
 	<!-- ====== Start of Changes ====== -->
 	<!-- Player Button -->

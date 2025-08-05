@@ -2530,128 +2530,116 @@ do
 	end)
 end
 
--- ==================== Loot Counter (Saved-Raid Attendance, 3.3.5a Safe) ==================== --
+-- ==================== Loot Counter ==================== --
 do
-    local frameName = "KRTMasterCountsFrame"
-    local countsFrame = _G[frameName]
-    if not countsFrame then
-        -- create window
-        countsFrame = CreateFrame("Frame", frameName, UIParent)
-        countsFrame:SetSize(220, 660)
-        countsFrame:SetPoint("CENTER")
-        countsFrame:SetBackdrop({
-            bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            tile     = true, tileSize = 32,
-            edgeSize = 16,
-            insets   = { left = 4, right = 4, top = 4, bottom = 4 },
-        })
-        countsFrame:EnableMouse(true)
-        countsFrame:SetMovable(true)
-        countsFrame:RegisterForDrag("LeftButton")
-        countsFrame:SetScript("OnDragStart", countsFrame.StartMoving)
-        countsFrame:SetScript("OnDragStop", countsFrame.StopMovingOrSizing)
-        countsFrame:Hide()
+    local rows = {}
+    local countsFrame, scrollChild
 
-        -- title
-        countsFrame.title = countsFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-        countsFrame.title:SetPoint("TOP", countsFrame, "TOP", 0, -8)
-        countsFrame.title:SetText("Loot Counter")
-
-        -- whenever we show it, refresh the counts
-        countsFrame:SetScript("OnShow", function()
-            addon:UpdateCountsFrame()
-        end)
+    local function EnsureFrames()
+        countsFrame = countsFrame or _G["KRTLootCounterFrame"]
+        scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
     end
 
-    local rows = {}
+    local function GetCurrentRaidPlayers()
+        local players = {}
+        for i = 1, GetNumRaidMembers() do
+            local name = GetRaidRosterInfo(i)
+            if name then
+                tinsert(players, name)
+                if KRT_PlayerCounts[name] == nil then
+                    KRT_PlayerCounts[name] = 0
+                end
+            end
+        end
+        return players
+    end
 
-    function addon:ToggleCountsFrame(show)
-        if show then countsFrame:Show()
-        else         countsFrame:Hide() end
+    function addon:ToggleCountsFrame()
+        EnsureFrames()
+        if not countsFrame then return end
+        if countsFrame:IsShown() then
+            countsFrame:Hide()
+        else
+            countsFrame:Show()
+        end
     end
 
     function addon:UpdateCountsFrame()
-        if not countsFrame:IsShown() then return end
+        EnsureFrames()
+        if not countsFrame then return end
 
-        local players = addon.Raid:GetPlayers()
-        table.sort(players, function(a,b) return (a.name or "") < (b.name or "") end)
+        local players = GetCurrentRaidPlayers()
+        table.sort(players)
         local num = #players
 
-        -- dynamic height
-        local rowH, titleH, pad = 25, 36, 10
-        countsFrame:SetHeight(math.max(60, titleH + num*rowH + pad))
+        local rowH = 25
+        scrollChild:SetHeight(num * rowH)
 
-        -- create or update each row
-        for i=1,num do
-            local p = players[i]
+        for i = 1, num do
+            local name = players[i]
             local row = rows[i]
             if not row then
-                row = CreateFrame("Frame", frameName.."Row"..i, countsFrame)
-                row:SetSize(160,24)
-                row:SetPoint("TOPLEFT", countsFrame, "TOPLEFT", 10, -titleH - (i-1)*rowH)
+                row = CreateFrame("Frame", nil, scrollChild)
+                row:SetSize(160, 24)
+                row:SetPoint("TOPLEFT", 0, -(i - 1) * rowH)
 
-                row.name = row:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+                row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
                 row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
 
-                row.count = row:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+                row.count = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
                 row.count:SetPoint("LEFT", row.name, "RIGHT", 10, 0)
 
-                row.plus = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-                row.plus:SetSize(22,22)
+                row.plus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
+                row.plus:SetSize(22, 22)
                 row.plus:SetText("+")
                 row.plus:SetPoint("LEFT", row.count, "RIGHT", 5, 0)
 
-                row.minus = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-                row.minus:SetSize(22,22)
+                row.minus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
+                row.minus:SetSize(22, 22)
                 row.minus:SetText("-")
                 row.minus:SetPoint("LEFT", row.plus, "RIGHT", 2, 0)
 
                 row.plus:SetScript("OnClick", function()
-                    addon.Raid:IncrementPlayerCount(row._playerName)
+                    local n = row._playerName
+                    KRT_PlayerCounts[n] = (KRT_PlayerCounts[n] or 0) + 1
                     addon:UpdateCountsFrame()
                 end)
                 row.minus:SetScript("OnClick", function()
-                    addon.Raid:DecrementPlayerCount(row._playerName)
+                    local n = row._playerName
+                    local c = (KRT_PlayerCounts[n] or 0) - 1
+                    if c < 0 then c = 0 end
+                    KRT_PlayerCounts[n] = c
                     addon:UpdateCountsFrame()
                 end)
 
                 rows[i] = row
             end
 
-            row._playerName = p.name
-            row.name:SetText(p.name or "?")
-            row.count:SetText(tostring(p.count or 0))
+            row._playerName = name
+            row.name:SetText(name)
+            row.count:SetText(tostring(KRT_PlayerCounts[name] or 0))
             row:Show()
         end
 
-        -- hide extras
-        for i = num+1, #rows do
+        for i = num + 1, #rows do
             rows[i]:Hide()
         end
     end
 
-    -- Return our counter list directly from the saved raid data
-    function addon.Raid:GetCountedPlayers()
-        return self:GetPlayers()
-    end
-
-    -- hook the master-loot frame for your toggle button
     local function SetupMasterLootFrameHooks()
         local f = _G["KRTMasterLootFrame"]
         if f and not f.KRT_LootCounterBtn then
-            local btn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-            btn:SetSize(100,24)
+            local btn = CreateFrame("Button", nil, f, "KRTButtonTemplate")
+            btn:SetSize(100, 24)
             btn:SetText("Loot Counter")
             btn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -20, -20)
             btn:SetScript("OnClick", function()
-                if countsFrame:IsShown() then countsFrame:Hide()
-                else countsFrame:Show() end
+                addon:ToggleCountsFrame()
             end)
             f.KRT_LootCounterBtn = btn
 
             f:HookScript("OnHide", function()
-                if countsFrame:IsShown() then countsFrame:Hide() end
+                if countsFrame and countsFrame:IsShown() then countsFrame:Hide() end
             end)
         end
     end
@@ -5994,8 +5982,13 @@ do
 	end
 
 	-- Register slash commands
-	SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
-	SlashCmdList["KRT"] = HandleSlashCmd
+        SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
+        SlashCmdList["KRT"] = HandleSlashCmd
+
+        SLASH_KRTCOUNTS1 = "/krtcounts"
+        SlashCmdList["KRTCOUNTS"] = function()
+                addon:ToggleCountsFrame()
+        end
 end
 
 -- ==================== What else to do? ==================== --
