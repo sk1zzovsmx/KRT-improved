@@ -263,13 +263,13 @@ L.StrCmdReserves        = "access reserve list related commands"
 
 -- ==================== Raid & Loot Locales ==================== --
 L.ItemValues = {
-    [1] = "Poor",
-    [2] = "Common",
-    [3] = "Uncommon",
-    [4] = "Rare",
-    [5] = "Epic",
-    [6] = "Legendary",
-    [7] = "Artifact",
+	[1] = "Poor",
+	[2] = "Common",
+	[3] = "Uncommon",
+	[4] = "Rare",
+	[5] = "Epic",
+	[6] = "Legendary",
+	[7] = "Artifact",
 }
 L.RaidZones = {
     -- The Burning Crusade
