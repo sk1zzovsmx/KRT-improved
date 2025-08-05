@@ -95,11 +95,12 @@ local LoadOptions
 local SendChatMessage                   = SendChatMessage
 local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, table.wipe
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
-local pcall                             = pcall
 local format, match, find, strlen       = string.format, string.match, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
-local deformat                          = LibStub("LibDeformat-3.0")
+local deformat                          = LibStub("LibDeformat-3.0")          -- String deformatting utility.
+local CallbackHandler                   = LibStub("CallbackHandler-1.0")      -- Handles addon callback registration.
+local BossIDs                           = LibStub("LibBossIDs-1.0")           -- Provides boss NPC ID lookup.
 
 -- Returns the used frame's name:
 function addon:GetFrameName()
@@ -276,32 +277,23 @@ do
 	end
 end
 
--- ==================== Callbacks Helpers ==================== --
+-- ==================== Callback System ==================== --
 
-do
-	-- Table of registered callbacks:
-	local callbacks = {}
+-- CallbackHandler-1.0 handles addon callback registration and firing.
+addon.callbacks = CallbackHandler:New(addon)
 
-	-- Register a new callback:
-	function addon:RegisterCallback(e, func)
-		if not e or type(func) ~= "function" then
-			error(L.StrCbErrUsage)
-		end
-		callbacks[e] = callbacks[e] or {}
-		tinsert(callbacks[e], func)
-		return #callbacks
+local Register = addon.RegisterCallback
+
+function addon:RegisterCallback(e, func)
+	if not e or type(func) ~= "function" then
+		error(L.StrCbErrUsage)
 	end
+	Register(func, e, func)
+end
 
-	-- Trigger a registered event:
-	function TriggerEvent(e, ...)
-		if not callbacks[e] then return end
-		for i, v in ipairs(callbacks[e]) do
-			local ok, err = pcall(v, e, ...)
-			if not ok then
-				addon:PrintError(L.StrCbErrExec:format(tostring(v), tostring(e), err))
-			end
-		end
-	end
+-- Fire callbacks registered with CallbackHandler.
+TriggerEvent = function(e, ...)
+	addon.callbacks:Fire(e, ...)
 end
 
 -- ==================== Events System ==================== --
@@ -660,48 +652,48 @@ do
 		return 0
 	end
 
-        function Raid:SetPlayerCount(name, value, raidNum)
-                raidNum = raidNum or KRT_CurrentRaid
+		function Raid:SetPlayerCount(name, value, raidNum)
+			    raidNum = raidNum or KRT_CurrentRaid
 
-                -- Prevent setting a negative count
-                if value < 0 then
-                        addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
-                        return
-                end
+			    -- Prevent setting a negative count
+			    if value < 0 then
+			            addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
+			            return
+			    end
 
-                local players = KRT_Raids[raidNum] and KRT_Raids[raidNum].players
-                if not players then return end
-                for i, p in ipairs(players) do
-                        if p.name == name then
-                                p.count = value
-                                return
-                        end
-                end
-        end
+			    local players = KRT_Raids[raidNum] and KRT_Raids[raidNum].players
+			    if not players then return end
+			    for i, p in ipairs(players) do
+			            if p.name == name then
+			                    p.count = value
+			                    return
+			            end
+			    end
+		end
 
-        function Raid:IncrementPlayerCount(name, raidNum)
-                if Raid:GetPlayerID(name, raidNum) == 0 then
-                        addon:PrintError(L.ErrCannotFindPlayer:format(name))
-                        return
-                end
+		function Raid:IncrementPlayerCount(name, raidNum)
+			    if Raid:GetPlayerID(name, raidNum) == 0 then
+			            addon:PrintError(L.ErrCannotFindPlayer:format(name))
+			            return
+			    end
 
-                local c = Raid:GetPlayerCount(name, raidNum)
-                Raid:SetPlayerCount(name, c + 1, raidNum)
-        end
+			    local c = Raid:GetPlayerCount(name, raidNum)
+			    Raid:SetPlayerCount(name, c + 1, raidNum)
+		end
 
-        function Raid:DecrementPlayerCount(name, raidNum)
-                if Raid:GetPlayerID(name, raidNum) == 0 then
-                        addon:PrintError(L.ErrCannotFindPlayer:format(name))
-                        return
-                end
+		function Raid:DecrementPlayerCount(name, raidNum)
+			    if Raid:GetPlayerID(name, raidNum) == 0 then
+			            addon:PrintError(L.ErrCannotFindPlayer:format(name))
+			            return
+			    end
 
-                local c = Raid:GetPlayerCount(name, raidNum)
-                if c <= 0 then
-                        addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
-                        return
-                end
-                Raid:SetPlayerCount(name, c - 1, raidNum)
-        end
+			    local c = Raid:GetPlayerCount(name, raidNum)
+			    if c <= 0 then
+			            addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
+			            return
+			    end
+			    Raid:SetPlayerCount(name, c - 1, raidNum)
+		end
 
 	--------------------
 	-- Raid Functions --
@@ -2532,118 +2524,118 @@ end
 
 -- ==================== Loot Counter ==================== --
 do
-    local rows = {}
-    local countsFrame, scrollChild
+	local rows = {}
+	local countsFrame, scrollChild
 
-    local function EnsureFrames()
-        countsFrame = countsFrame or _G["KRTLootCounterFrame"]
-        scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
-    end
+	local function EnsureFrames()
+		countsFrame = countsFrame or _G["KRTLootCounterFrame"]
+		scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
+	end
 
-    local function GetCurrentRaidPlayers()
-        local players = {}
-        for i = 1, GetNumRaidMembers() do
-            local name = GetRaidRosterInfo(i)
-            if name then
-                tinsert(players, name)
-                if KRT_PlayerCounts[name] == nil then
-                    KRT_PlayerCounts[name] = 0
-                end
-            end
-        end
-        return players
-    end
+	local function GetCurrentRaidPlayers()
+		local players = {}
+		for i = 1, GetNumRaidMembers() do
+			local name = GetRaidRosterInfo(i)
+			if name then
+			    tinsert(players, name)
+			    if KRT_PlayerCounts[name] == nil then
+			        KRT_PlayerCounts[name] = 0
+			    end
+			end
+		end
+		return players
+	end
 
-    function addon:ToggleCountsFrame()
-        EnsureFrames()
-        if not countsFrame then return end
-        if countsFrame:IsShown() then
-            countsFrame:Hide()
-        else
-            countsFrame:Show()
-        end
-    end
+	function addon:ToggleCountsFrame()
+		EnsureFrames()
+		if not countsFrame then return end
+		if countsFrame:IsShown() then
+			countsFrame:Hide()
+		else
+			countsFrame:Show()
+		end
+	end
 
-    function addon:UpdateCountsFrame()
-        EnsureFrames()
-        if not countsFrame then return end
+	function addon:UpdateCountsFrame()
+		EnsureFrames()
+		if not countsFrame then return end
 
-        local players = GetCurrentRaidPlayers()
-        table.sort(players)
-        local num = #players
+		local players = GetCurrentRaidPlayers()
+		table.sort(players)
+		local num = #players
 
-        local rowH = 25
-        scrollChild:SetHeight(num * rowH)
+		local rowH = 25
+		scrollChild:SetHeight(num * rowH)
 
-        for i = 1, num do
-            local name = players[i]
-            local row = rows[i]
-            if not row then
-                row = CreateFrame("Frame", nil, scrollChild)
-                row:SetSize(160, 24)
-                row:SetPoint("TOPLEFT", 0, -(i - 1) * rowH)
+		for i = 1, num do
+			local name = players[i]
+			local row = rows[i]
+			if not row then
+			    row = CreateFrame("Frame", nil, scrollChild)
+			    row:SetSize(160, 24)
+			    row:SetPoint("TOPLEFT", 0, -(i - 1) * rowH)
 
-                row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
+			    row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+			    row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
 
-                row.count = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                row.count:SetPoint("LEFT", row.name, "RIGHT", 10, 0)
+			    row.count = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+			    row.count:SetPoint("LEFT", row.name, "RIGHT", 10, 0)
 
-                row.plus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
-                row.plus:SetSize(22, 22)
-                row.plus:SetText("+")
-                row.plus:SetPoint("LEFT", row.count, "RIGHT", 5, 0)
+			    row.plus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
+			    row.plus:SetSize(22, 22)
+			    row.plus:SetText("+")
+			    row.plus:SetPoint("LEFT", row.count, "RIGHT", 5, 0)
 
-                row.minus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
-                row.minus:SetSize(22, 22)
-                row.minus:SetText("-")
-                row.minus:SetPoint("LEFT", row.plus, "RIGHT", 2, 0)
+			    row.minus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
+			    row.minus:SetSize(22, 22)
+			    row.minus:SetText("-")
+			    row.minus:SetPoint("LEFT", row.plus, "RIGHT", 2, 0)
 
-                row.plus:SetScript("OnClick", function()
-                    local n = row._playerName
-                    KRT_PlayerCounts[n] = (KRT_PlayerCounts[n] or 0) + 1
-                    addon:UpdateCountsFrame()
-                end)
-                row.minus:SetScript("OnClick", function()
-                    local n = row._playerName
-                    local c = (KRT_PlayerCounts[n] or 0) - 1
-                    if c < 0 then c = 0 end
-                    KRT_PlayerCounts[n] = c
-                    addon:UpdateCountsFrame()
-                end)
+			    row.plus:SetScript("OnClick", function()
+			        local n = row._playerName
+			        KRT_PlayerCounts[n] = (KRT_PlayerCounts[n] or 0) + 1
+			        addon:UpdateCountsFrame()
+			    end)
+			    row.minus:SetScript("OnClick", function()
+			        local n = row._playerName
+			        local c = (KRT_PlayerCounts[n] or 0) - 1
+			        if c < 0 then c = 0 end
+			        KRT_PlayerCounts[n] = c
+			        addon:UpdateCountsFrame()
+			    end)
 
-                rows[i] = row
-            end
+			    rows[i] = row
+			end
 
-            row._playerName = name
-            row.name:SetText(name)
-            row.count:SetText(tostring(KRT_PlayerCounts[name] or 0))
-            row:Show()
-        end
+			row._playerName = name
+			row.name:SetText(name)
+			row.count:SetText(tostring(KRT_PlayerCounts[name] or 0))
+			row:Show()
+		end
 
-        for i = num + 1, #rows do
-            rows[i]:Hide()
-        end
-    end
+		for i = num + 1, #rows do
+			rows[i]:Hide()
+		end
+	end
 
-    local function SetupMasterLootFrameHooks()
-        local f = _G["KRTMasterLootFrame"]
-        if f and not f.KRT_LootCounterBtn then
-            local btn = CreateFrame("Button", nil, f, "KRTButtonTemplate")
-            btn:SetSize(100, 24)
-            btn:SetText("Loot Counter")
-            btn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -20, -20)
-            btn:SetScript("OnClick", function()
-                addon:ToggleCountsFrame()
-            end)
-            f.KRT_LootCounterBtn = btn
+	local function SetupMasterLootFrameHooks()
+		local f = _G["KRTMasterLootFrame"]
+		if f and not f.KRT_LootCounterBtn then
+			local btn = CreateFrame("Button", nil, f, "KRTButtonTemplate")
+			btn:SetSize(100, 24)
+			btn:SetText("Loot Counter")
+			btn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -20, -20)
+			btn:SetScript("OnClick", function()
+			    addon:ToggleCountsFrame()
+			end)
+			f.KRT_LootCounterBtn = btn
 
-            f:HookScript("OnHide", function()
-                if countsFrame and countsFrame:IsShown() then countsFrame:Hide() end
-            end)
-        end
-    end
-    hooksecurefunc(addon.Master, "OnLoad", SetupMasterLootFrameHooks)
+			f:HookScript("OnHide", function()
+			    if countsFrame and countsFrame:IsShown() then countsFrame:Hide() end
+			end)
+		end
+	end
+	hooksecurefunc(addon.Master, "OnLoad", SetupMasterLootFrameHooks)
 end
 
 -- ==================== Raid Helper Reserves ==================== --
@@ -5982,13 +5974,13 @@ do
 	end
 
 	-- Register slash commands
-        SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
-        SlashCmdList["KRT"] = HandleSlashCmd
+		SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
+		SlashCmdList["KRT"] = HandleSlashCmd
 
-        SLASH_KRTCOUNTS1 = "/krtcounts"
-        SlashCmdList["KRTCOUNTS"] = function()
-                addon:ToggleCountsFrame()
-        end
+		SLASH_KRTCOUNTS1 = "/krtcounts"
+		SlashCmdList["KRTCOUNTS"] = function()
+			    addon:ToggleCountsFrame()
+		end
 end
 
 -- ==================== What else to do? ==================== --
@@ -6055,7 +6047,8 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
 	if not KRT_CurrentRaid then return end
 	if event == "UNIT_DIED" then
 		local npcID = Utils.GetNPCID(destGUID)
-		if addon.bossListIDs[npcID] then
+		-- LibBossIDs-1.0 confirms whether the NPC is a boss.
+		if BossIDs.BossIDs[npcID] then
 			self.Raid:AddBoss(destName)
 		end
 	end
