@@ -98,9 +98,9 @@ local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
 local format, match, find, strlen       = string.format, string.match, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
-local deformat                          = LibStub("LibDeformat-3.0")          -- String deformatting utility.
-local CallbackHandler                   = LibStub("CallbackHandler-1.0")      -- Handles addon callback registration.
-local BossIDs                           = LibStub("LibBossIDs-1.0")           -- Provides boss NPC ID lookup.
+local deformat                          = LibStub("LibDeformat-3.0")     -- String deformatting utility.
+local CallbackHandler                   = LibStub("CallbackHandler-1.0") -- Handles addon callback registration.
+local BossIDs                           = LibStub("LibBossIDs-1.0")      -- Provides boss NPC ID lookup.
 
 -- Returns the used frame's name:
 function addon:GetFrameName()
@@ -652,48 +652,48 @@ do
 		return 0
 	end
 
-		function Raid:SetPlayerCount(name, value, raidNum)
-			    raidNum = raidNum or KRT_CurrentRaid
+	function Raid:SetPlayerCount(name, value, raidNum)
+		raidNum = raidNum or KRT_CurrentRaid
 
-			    -- Prevent setting a negative count
-			    if value < 0 then
-			            addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
-			            return
-			    end
-
-			    local players = KRT_Raids[raidNum] and KRT_Raids[raidNum].players
-			    if not players then return end
-			    for i, p in ipairs(players) do
-			            if p.name == name then
-			                    p.count = value
-			                    return
-			            end
-			    end
+		-- Prevent setting a negative count
+		if value < 0 then
+			addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
+			return
 		end
 
-		function Raid:IncrementPlayerCount(name, raidNum)
-			    if Raid:GetPlayerID(name, raidNum) == 0 then
-			            addon:PrintError(L.ErrCannotFindPlayer:format(name))
-			            return
-			    end
+		local players = KRT_Raids[raidNum] and KRT_Raids[raidNum].players
+		if not players then return end
+		for i, p in ipairs(players) do
+			if p.name == name then
+				p.count = value
+				return
+			end
+		end
+	end
 
-			    local c = Raid:GetPlayerCount(name, raidNum)
-			    Raid:SetPlayerCount(name, c + 1, raidNum)
+	function Raid:IncrementPlayerCount(name, raidNum)
+		if Raid:GetPlayerID(name, raidNum) == 0 then
+			addon:PrintError(L.ErrCannotFindPlayer:format(name))
+			return
 		end
 
-		function Raid:DecrementPlayerCount(name, raidNum)
-			    if Raid:GetPlayerID(name, raidNum) == 0 then
-			            addon:PrintError(L.ErrCannotFindPlayer:format(name))
-			            return
-			    end
+		local c = Raid:GetPlayerCount(name, raidNum)
+		Raid:SetPlayerCount(name, c + 1, raidNum)
+	end
 
-			    local c = Raid:GetPlayerCount(name, raidNum)
-			    if c <= 0 then
-			            addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
-			            return
-			    end
-			    Raid:SetPlayerCount(name, c - 1, raidNum)
+	function Raid:DecrementPlayerCount(name, raidNum)
+		if Raid:GetPlayerID(name, raidNum) == 0 then
+			addon:PrintError(L.ErrCannotFindPlayer:format(name))
+			return
 		end
+
+		local c = Raid:GetPlayerCount(name, raidNum)
+		if c <= 0 then
+			addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
+			return
+		end
+		Raid:SetPlayerCount(name, c - 1, raidNum)
+	end
 
 	--------------------
 	-- Raid Functions --
@@ -2537,10 +2537,10 @@ do
 		for i = 1, GetNumRaidMembers() do
 			local name = GetRaidRosterInfo(i)
 			if name then
-			    tinsert(players, name)
-			    if KRT_PlayerCounts[name] == nil then
-			        KRT_PlayerCounts[name] = 0
-			    end
+				tinsert(players, name)
+				if KRT_PlayerCounts[name] == nil then
+					KRT_PlayerCounts[name] = 0
+				end
 			end
 		end
 		return players
@@ -2571,40 +2571,40 @@ do
 			local name = players[i]
 			local row = rows[i]
 			if not row then
-			    row = CreateFrame("Frame", nil, scrollChild)
-			    row:SetSize(160, 24)
-			    row:SetPoint("TOPLEFT", 0, -(i - 1) * rowH)
+				row = CreateFrame("Frame", nil, scrollChild)
+				row:SetSize(160, 24)
+				row:SetPoint("TOPLEFT", 0, -(i - 1) * rowH)
 
-			    row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-			    row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
+				row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+				row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
 
-			    row.count = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-			    row.count:SetPoint("LEFT", row.name, "RIGHT", 10, 0)
+				row.count = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+				row.count:SetPoint("LEFT", row.name, "RIGHT", 10, 0)
 
-			    row.plus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
-			    row.plus:SetSize(22, 22)
-			    row.plus:SetText("+")
-			    row.plus:SetPoint("LEFT", row.count, "RIGHT", 5, 0)
+				row.plus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
+				row.plus:SetSize(22, 22)
+				row.plus:SetText("+")
+				row.plus:SetPoint("LEFT", row.count, "RIGHT", 5, 0)
 
-			    row.minus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
-			    row.minus:SetSize(22, 22)
-			    row.minus:SetText("-")
-			    row.minus:SetPoint("LEFT", row.plus, "RIGHT", 2, 0)
+				row.minus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
+				row.minus:SetSize(22, 22)
+				row.minus:SetText("-")
+				row.minus:SetPoint("LEFT", row.plus, "RIGHT", 2, 0)
 
-			    row.plus:SetScript("OnClick", function()
-			        local n = row._playerName
-			        KRT_PlayerCounts[n] = (KRT_PlayerCounts[n] or 0) + 1
-			        addon:UpdateCountsFrame()
-			    end)
-			    row.minus:SetScript("OnClick", function()
-			        local n = row._playerName
-			        local c = (KRT_PlayerCounts[n] or 0) - 1
-			        if c < 0 then c = 0 end
-			        KRT_PlayerCounts[n] = c
-			        addon:UpdateCountsFrame()
-			    end)
+				row.plus:SetScript("OnClick", function()
+					local n = row._playerName
+					KRT_PlayerCounts[n] = (KRT_PlayerCounts[n] or 0) + 1
+					addon:UpdateCountsFrame()
+				end)
+				row.minus:SetScript("OnClick", function()
+					local n = row._playerName
+					local c = (KRT_PlayerCounts[n] or 0) - 1
+					if c < 0 then c = 0 end
+					KRT_PlayerCounts[n] = c
+					addon:UpdateCountsFrame()
+				end)
 
-			    rows[i] = row
+				rows[i] = row
 			end
 
 			row._playerName = name
@@ -2626,12 +2626,12 @@ do
 			btn:SetText("Loot Counter")
 			btn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -20, -20)
 			btn:SetScript("OnClick", function()
-			    addon:ToggleCountsFrame()
+				addon:ToggleCountsFrame()
 			end)
 			f.KRT_LootCounterBtn = btn
 
 			f:HookScript("OnHide", function()
-			    if countsFrame and countsFrame:IsShown() then countsFrame:Hide() end
+				if countsFrame and countsFrame:IsShown() then countsFrame:Hide() end
 			end)
 		end
 	end
@@ -5974,13 +5974,13 @@ do
 	end
 
 	-- Register slash commands
-		SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
-		SlashCmdList["KRT"] = HandleSlashCmd
+	SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
+	SlashCmdList["KRT"] = HandleSlashCmd
 
-		SLASH_KRTCOUNTS1 = "/krtcounts"
-		SlashCmdList["KRTCOUNTS"] = function()
-			    addon:ToggleCountsFrame()
-		end
+	SLASH_KRTCOUNTS1 = "/krtcounts"
+	SlashCmdList["KRTCOUNTS"] = function()
+		addon:ToggleCountsFrame()
+	end
 end
 
 -- ==================== What else to do? ==================== --
