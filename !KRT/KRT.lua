@@ -99,7 +99,6 @@ local format, match, find, strlen       = string.format, string.match, string.fi
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 local deformat                          = LibStub("LibDeformat-3.0")     -- String deformatting utility.
-local CallbackHandler                   = LibStub("CallbackHandler-1.0") -- Handles addon callback registration.
 local BossIDs                           = LibStub("LibBossIDs-1.0")      -- Provides boss NPC ID lookup.
 
 -- Returns the used frame's name:
@@ -279,20 +278,30 @@ end
 
 -- ==================== Callback System ==================== --
 
--- CallbackHandler-1.0 handles addon callback registration and firing.
-addon.callbacks = CallbackHandler:New(addon)
+do
+	-- Table of registered callbacks:
+	local callbacks = {}
 
--- Register a callback for a given event
-function addon:RegisterCallback(event, func)
-	if not event or type(func) ~= "function" then
-		error(L.StrCbErrUsage)
+	-- Register a new callback:
+	function addon:RegisterCallback(e, func)
+		if not e or type(func) ~= "function" then
+			error(L.StrCbErrUsage)
+		end
+		callbacks[e] = callbacks[e] or {}
+		tinsert(callbacks[e], func)
+		return #callbacks
 	end
-	self.callbacks:RegisterCallback(event, func)
-end
 
--- Fire callbacks registered with CallbackHandler.
-TriggerEvent = function(e, ...)
-	addon.callbacks:Fire(e, ...)
+	-- Trigger a registered event:
+	function TriggerEvent(e, ...)
+		if not callbacks[e] then return end
+		for i, v in ipairs(callbacks[e]) do
+			local ok, err = pcall(v, e, ...)
+			if not ok then
+				addon:PrintError(L.StrCbErrExec:format(tostring(v), tostring(e), err))
+			end
+		end
+	end
 end
 
 -- ==================== Events System ==================== --
