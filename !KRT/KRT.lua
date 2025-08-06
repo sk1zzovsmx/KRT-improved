@@ -287,7 +287,7 @@ function addon:RegisterCallback(event, func)
 	if not event or type(func) ~= "function" then
 		error(L.StrCbErrUsage)
 	end
-	self.callbacks:RegisterCallback(self, event, func)
+	self.callbacks:RegisterCallback(event, func)
 end
 
 -- Fire callbacks registered with CallbackHandler.
@@ -2521,58 +2521,65 @@ do
 	end)
 end
 
--- ==================== Loot Counter ==================== --
+-- ==================== Loot Counter (Reworked: Style & Logic) ==================== --
 do
 	local rows = {}
 	local countsFrame, scrollChild
 
+	-- Helper to ensure frames exist
 	local function EnsureFrames()
 		countsFrame = countsFrame or _G["KRTLootCounterFrame"]
 		scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
 	end
 
+	-- Return sorted array of player names currently in the raid.
 	local function GetCurrentRaidPlayers()
 		local players = {}
 		for i = 1, GetNumRaidMembers() do
 			local name = GetRaidRosterInfo(i)
-			if name then
-				tinsert(players, name)
+			if name and name ~= "" then
+				table.insert(players, name)
 				if KRT_PlayerCounts[name] == nil then
 					KRT_PlayerCounts[name] = 0
 				end
 			end
 		end
+		table.sort(players)
 		return players
 	end
 
+	-- Show or hide the loot counter frame.
 	function addon:ToggleCountsFrame()
 		EnsureFrames()
-		if not countsFrame then return end
-		if countsFrame:IsShown() then
-			countsFrame:Hide()
-		else
-			countsFrame:Show()
+		if countsFrame then
+			if countsFrame:IsShown() then
+				countsFrame:Hide()
+			else
+				addon:UpdateCountsFrame() -- Always refresh before showing
+				countsFrame:Show()
+			end
 		end
 	end
 
+	-- Update the loot counter UI with current player counts.
 	function addon:UpdateCountsFrame()
 		EnsureFrames()
-		if not countsFrame then return end
+		if not countsFrame or not scrollChild then return end
 
 		local players = GetCurrentRaidPlayers()
-		table.sort(players)
-		local num = #players
+		local numPlayers = #players
+		local rowHeight = 25
 
-		local rowH = 25
-		scrollChild:SetHeight(num * rowH)
+		scrollChild:SetHeight(numPlayers * rowHeight)
 
-		for i = 1, num do
+		-- Create/reuse rows for each player
+		for i = 1, numPlayers do
 			local name = players[i]
-			local row = rows[i]
+			local row  = rows[i]
 			if not row then
 				row = CreateFrame("Frame", nil, scrollChild)
 				row:SetSize(160, 24)
-				row:SetPoint("TOPLEFT", 0, -(i - 1) * rowH)
+				row:SetPoint("TOPLEFT", 0, -(i - 1) * rowHeight)
 
 				row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 				row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
@@ -2590,20 +2597,26 @@ do
 				row.minus:SetText("-")
 				row.minus:SetPoint("LEFT", row.plus, "RIGHT", 2, 0)
 
-				row.plus:SetScript("OnClick", function()
+				row.plus:SetScript("OnClick", function(self)
 					local n = row._playerName
-					KRT_PlayerCounts[n] = (KRT_PlayerCounts[n] or 0) + 1
-					addon:UpdateCountsFrame()
+					if n then
+						KRT_PlayerCounts[n] = (KRT_PlayerCounts[n] or 0) + 1
+						addon:UpdateCountsFrame()
+					end
 				end)
-				row.minus:SetScript("OnClick", function()
+				row.minus:SetScript("OnClick", function(self)
 					local n = row._playerName
-					local c = (KRT_PlayerCounts[n] or 0) - 1
-					if c < 0 then c = 0 end
-					KRT_PlayerCounts[n] = c
-					addon:UpdateCountsFrame()
+					if n then
+						local c = (KRT_PlayerCounts[n] or 0) - 1
+						KRT_PlayerCounts[n] = c > 0 and c or 0
+						addon:UpdateCountsFrame()
+					end
 				end)
 
 				rows[i] = row
+			else
+				-- Move if needed (in case of roster change)
+				row:SetPoint("TOPLEFT", 0, -(i - 1) * rowHeight)
 			end
 
 			row._playerName = name
@@ -2612,11 +2625,13 @@ do
 			row:Show()
 		end
 
-		for i = num + 1, #rows do
-			rows[i]:Hide()
+		-- Hide extra rows not needed
+		for i = numPlayers + 1, #rows do
+			if rows[i] then rows[i]:Hide() end
 		end
 	end
 
+	-- Add a button to the master loot frame to open the loot counter UI
 	local function SetupMasterLootFrameHooks()
 		local f = _G["KRTMasterLootFrame"]
 		if f and not f.KRT_LootCounterBtn then
@@ -2630,7 +2645,9 @@ do
 			f.KRT_LootCounterBtn = btn
 
 			f:HookScript("OnHide", function()
-				if countsFrame and countsFrame:IsShown() then countsFrame:Hide() end
+				if countsFrame and countsFrame:IsShown() then
+					countsFrame:Hide()
+				end
 			end)
 		end
 	end
