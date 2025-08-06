@@ -7,7 +7,7 @@
 		"ghcr.io/devcontainers/features/git:1": {},
 		"ghcr.io/devcontainers/features/common-utils:1": {}
 	},
-	"postCreateCommand": "sudo apt-get update && sudo apt-get install -y dos2unix luarocks && sudo luarocks install luacheck",
+	"postCreateCommand": "sudo apt-get update && sudo apt-get install -y dos2unix luarocks lua5.1 nodejs npm git && sudo luarocks install luacheck",
 	"settings": {
 		"editor.tabSize": 4,
 		"files.eol": "\n"
@@ -17,7 +17,10 @@
 			"extensions": [
 				"sumneko.lua",
 				"streetsidesoftware.code-spell-checker",
-				"esbenp.prettier-vscode"
+				"esbenp.prettier-vscode",
+				"Septh.wow-bundle",
+				"redhat.vscode-xml",
+				"actboy168.lua-debug"
 			]
 		}
 	}
