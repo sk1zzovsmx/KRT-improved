@@ -16,7 +16,6 @@
 		"vscode": {
 			"extensions": [
 				"sumneko.lua",
-				"streetsidesoftware.code-spell-checker",
 				"esbenp.prettier-vscode",
 				"Septh.wow-bundle",
 				"redhat.vscode-xml",
