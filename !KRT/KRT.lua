@@ -284,10 +284,10 @@ addon.callbacks = CallbackHandler:New(addon)
 
 -- Register a callback for a given event
 function addon:RegisterCallback(event, func)
-    if not event or type(func) ~= "function" then
-        error(L.StrCbErrUsage)
-    end
-    self.callbacks:RegisterCallback(self, event, func)
+	if not event or type(func) ~= "function" then
+		error(L.StrCbErrUsage)
+	end
+	self.callbacks:RegisterCallback(self, event, func)
 end
 
 -- Fire callbacks registered with CallbackHandler.
