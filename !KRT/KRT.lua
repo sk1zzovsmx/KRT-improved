@@ -1,12 +1,21 @@
-local addonName, addon = ...
-local L = addon.L
-local Utils = addon.Utils
+--[[
+	KRT.lua
+	- Main addon file for Kader Raid Tools (KRT).
+	- Handles core logic, event registration, and module initialization.
+]]
 
-local _G = _G
-_G["KRT"] = addon
+local addonName, addon                  = ...
+local L                                 = addon.L
+local Utils                             = addon.Utils
 
+local _G                                = _G
+_G["KRT"]                               = addon
 
--- SavedVariables:
+---============================================================================
+-- Saved Variables
+-- These variables are persisted across sessions for the addon.
+---============================================================================
+
 KRT_Debug                               = KRT_Debug or {}
 KRT_Options                             = KRT_Options or {}
 KRT_Raids                               = KRT_Raids or {}
@@ -20,7 +29,11 @@ KRT_NextReset                           = KRT_NextReset or 0
 KRT_SavedReserves                       = KRT_SavedReserves or {}
 KRT_PlayerCounts                        = KRT_PlayerCounts or {}
 
--- AddOn main frames:
+---============================================================================
+-- Core Addon Frames & Locals
+---============================================================================
+
+-- Addon UI Frames
 local mainFrame                         = CreateFrame("Frame")
 local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings
 local UILogger, UILoggerItemBox
@@ -29,11 +42,10 @@ local _
 
 local unitName                          = UnitName("player")
 
--- Rolls & Loot related locals:
+-- Rolls & Loot
 local trader, winner
 local holder, banker, disenchanter
 local lootOpened                        = false
-local rollTypes                         = { mainspec = 1, offspec = 2, reserved = 3, free = 4, bank = 5, disenchant = 6, hold = 7, dkp = 8 }
 local currentRollType                   = 4
 local currentRollItem                   = 0
 local fromInventory                     = false
@@ -42,10 +54,40 @@ local lootCount                         = 0
 local rollsCount                        = 0
 local itemCount                         = 1
 local itemTraded                        = 0
+
+-- Function placeholders for loot helpers
 local ItemExists, ItemIsSoulbound, GetItem
 local GetItemIndex, GetItemName, GetItemLink, GetItemTexture
-local lootTypesText                     = { L.BtnMS, L.BtnOS, L.BtnSR, L.BtnFree, L.BtnBank, L.BtnDisenchant, L.BtnHold }
-local lootTypesColored                  = {
+
+---============================================================================
+-- Constants & Static Data
+---============================================================================
+
+-- Roll Types Enum
+local rollTypes                        = {
+	mainspec = 1,
+	offspec = 2,
+	reserved = 3,
+	free = 4,
+	bank = 5,
+	disenchant = 6,
+	hold = 7,
+	dkp = 8
+}
+
+-- Roll Type Display Text
+local lootTypesText                   = {
+	L.BtnMS, 
+	L.BtnOS, 
+	L.BtnSR, 
+	L.BtnFree, 
+	L.BtnBank, 
+	L.BtnDisenchant, 
+	L.BtnHold 
+}
+
+-- Roll Type Colored Display Text
+local lootTypesColored                = {
 	GREEN_FONT_COLOR_CODE .. L.BtnMS .. FONT_COLOR_CODE_CLOSE,
 	LIGHTYELLOW_FONT_COLOR_CODE .. L.BtnOS .. FONT_COLOR_CODE_CLOSE,
 	"|cffa335ee" .. L.BtnSR .. FONT_COLOR_CODE_CLOSE,
@@ -55,18 +97,19 @@ local lootTypesColored                  = {
 	HIGHLIGHT_FONT_COLOR_CODE .. L.BtnHold .. FONT_COLOR_CODE_CLOSE,
 	GREEN_FONT_COLOR_CODE .. "DKP" .. FONT_COLOR_CODE_CLOSE,
 }
--- Items color
-local itemColors                        = {
-	[1] = "ff9d9d9d", -- poor
-	[2] = "ffffffff", -- common
-	[3] = "ff1eff00", -- uncommon
-	[4] = "ff0070dd", -- rare
-	[5] = "ffa335ee", -- epic
-	[6] = "ffff8000", -- legendary
-	[7] = "ffe6cc80", -- artifact / heirloom
+-- Item Quality Colors
+local itemColors               = {
+	[1] = "ff9d9d9d", -- Poor
+	[2] = "ffffffff", -- Common
+	[3] = "ff1eff00", -- Uncommon
+	[4] = "ff0070dd", -- Rare
+	[5] = "ffa335ee", -- Epic
+	[6] = "ffff8000", -- Legendary
+	[7] = "ffe6cc80", -- Artifact / Heirloom
 }
--- Classes color:
-local classColors                       = {
+
+-- Class Colors
+local classColors                      = {
 	["UNKNOWN"]     = "ffffffff",
 	["DEATHKNIGHT"] = "ffc41f3b",
 	["DRUID"]       = "ffff7d0a",
@@ -80,9 +123,16 @@ local classColors                       = {
 	["WARRIOR"]     = "ffc79c6e",
 }
 
--- Raid Target Icons:
-local markers                           = { "{circle}", "{diamond}", "{triangle}", "{moon}", "{square}", "{cross}",
-	"{skull}" }
+-- Raid Target Markers
+local markers                           = {
+	"{circle}",
+	"{diamond}",
+	"{triangle}",
+	"{moon}",
+	"{square}",
+	"{cross}",
+	"{skull}"
+}
 
 -- Windows Title String:
 local titleString                       = "|cfff58cbaK|r|caaf49141RT|r : %s"
@@ -477,6 +527,7 @@ do
 				}
 			end
 		end
+
 		tinsert(KRT_Raids, raidInfo)
 		KRT_CurrentRaid = #KRT_Raids
 		TriggerEvent("RaidCreate", KRT_CurrentRaid)
@@ -2377,7 +2428,9 @@ do
 		end
 	end
 
-	-- Directly assign item to player:
+	--
+	-- Assigns an item from the loot window to a player.
+	--
 	function AssignItem(itemLink, playerName, rollType, rollValue)
 		local itemIndex, tempItemLink
 		for i = 1, GetNumLootItems() do
@@ -2459,6 +2512,7 @@ do
 			end
 			-- Multiple winners:
 		elseif itemCount > 1 then
+			-- Announce multiple winners
 			addon:ClearRaidIcons()
 			SetRaidTarget(trader, 1)
 			local rolls = addon:GetRolls()
@@ -2476,6 +2530,7 @@ do
 			output = L.ChatTradeMutiple:format(tconcat(winners, ", "), trader)
 			-- Trader is the winner:
 		elseif trader == winner then
+			-- Trader won, clear state
 			addon:ClearLoot()
 			addon:ClearRolls(false)
 			addon:ClearRaidIcons()
@@ -2496,6 +2551,7 @@ do
 			end
 			-- Cannot trade the player?
 		elseif addon:GetUnitID(playerName) ~= "none" then
+			-- Player is out of range
 			addon:ClearRaidIcons()
 			SetRaidTarget(trader, 1)
 			SetRaidTarget(winner, 4)
@@ -2663,7 +2719,10 @@ do
 	hooksecurefunc(addon.Master, "OnLoad", SetupMasterLootFrameHooks)
 end
 
--- ==================== Raid Helper Reserves ==================== --
+---============================================================================
+-- Reserves Module
+-- Manages item reserves, import, and display.
+---============================================================================
 do
 	addon.Reserves = {}
 	local Reserves = addon.Reserves
@@ -2681,9 +2740,10 @@ do
 	local pendingItemInfo = {}
 	local collapsedBossGroups = {}
 
-	----------------------------------------------------------------
-	-- Saved Data
-	----------------------------------------------------------------
+	--------------------------------------------------------------------------
+	-- Saved Data Management
+	--------------------------------------------------------------------------
+
 	function Reserves:Save()
 		addon:Debug("DEBUG", "Saving reserves data. Entries: %d", Utils.tableLen(reservesData))
 		KRT_SavedReserves = table.deepCopy(reservesData)
@@ -2791,10 +2851,10 @@ do
 		end)
 	end
 
-	----------------------------------------------------------------
-	-- Localization and UI Update Functions
-	----------------------------------------------------------------
-	-- Localize UI Frame:
+	--------------------------------------------------------------------------
+	-- Localization and UI Update
+	--------------------------------------------------------------------------
+
 	function LocalizeUIFrame()
 		if localized then
 			addon:Debug("DEBUG", "UI already localized.")
@@ -2829,10 +2889,10 @@ do
 		end
 	end
 
-	----------------------------------------------------------------
-	-- Reserve Data
-	----------------------------------------------------------------
-	-- Get specific reserve for a player:
+	--------------------------------------------------------------------------
+	-- Reserve Data Handling
+	--------------------------------------------------------------------------
+
 	function Reserves:GetReserve(playerName)
 		local player = playerName:lower():trim()
 		local reserve = reservesData[player]
@@ -2932,10 +2992,10 @@ do
 		self:Save()
 	end
 
-	----------------------------------------------------------------
-	-- Query / Tooltip
-	----------------------------------------------------------------
-	-- Query for item info
+	--------------------------------------------------------------------------
+	-- Item Info Querying
+	--------------------------------------------------------------------------
+
 	function Reserves:QueryItemInfo(itemId)
 		if not itemId then return end
 		addon:Debug("DEBUG", "Querying info for itemId: %d", itemId)
@@ -3038,9 +3098,10 @@ do
 		return 0
 	end
 
-	----------------------------------------------------------------
-	-- Display / Table Rendering
-	----------------------------------------------------------------
+	--------------------------------------------------------------------------
+	-- UI Display
+	--------------------------------------------------------------------------
+
 	function Reserves:RefreshWindow()
 		addon:Debug("DEBUG", "Refreshing reserve window.")
 		if not reserveListFrame or not scrollChild then return end
@@ -3217,9 +3278,10 @@ do
 		return row
 	end
 
-	----------------------------------------------------------------
-	-- SR Announcement
-	----------------------------------------------------------------
+	--------------------------------------------------------------------------
+	-- SR Announcement Formatting
+	--------------------------------------------------------------------------
+
 	function Reserves:GetPlayersForItem(itemId)
 		addon:Debug("DEBUG", "Getting players for itemId: %d", itemId)
 		local players = {}
@@ -3249,8 +3311,9 @@ do
 	end
 end
 
--- ==================== Configuration Frame ==================== --
-
+---============================================================================
+-- Configuration Frame Module
+---============================================================================
 do
 	addon.Config = {}
 	local Config = addon.Config
@@ -3265,6 +3328,10 @@ do
 	local updateInterval = 0.1
 
 	-- Addon default options:
+
+	--
+	-- Default options for the addon.
+	--
 	local defaultOptions = {
 		sortAscending          = false,
 		useRaidWarning         = true,
@@ -3278,19 +3345,22 @@ do
 		showTooltips           = true,
 		minimapButton          = true,
 		countdownSimpleRaidMsg = false,
-		-- Countdown:
 		countdownDuration      = 5,
 		countdownRollsBlock    = true,
 	}
 
-	-- Load default options:
+	--
+	-- Loads the default options into the settings table.
+	--
 	local function LoadDefaultOptions()
 		for k, v in pairs(defaultOptions) do
 			KRT_Options[k] = v
 		end
 	end
 
-	-- Load addon options:
+	--
+	-- Loads addon options from saved variables, filling in defaults.
+	--
 	function LoadOptions()
 		addon.options = KRT_Options
 		Utils.fillTable(addon.options, defaultOptions)
@@ -3300,12 +3370,16 @@ do
 		end
 	end
 
-	-- External reset of default options:
+	--
+	-- Public method to reset options to default.
+	--
 	function Config:Default()
 		return LoadDefaultOptions()
 	end
 
-	-- OnLoad frame:
+	--
+	-- OnLoad handler for the configuration frame.
+	--
 	function Config:OnLoad(frame)
 		if not frame then return end
 		UIConfig = frame
@@ -3314,19 +3388,24 @@ do
 		frame:SetScript("OnUpdate", UpdateUIFrame)
 	end
 
-	-- Toggle frame visibility:
+	--
+	-- Toggles the visibility of the configuration frame.
+	--
 	function Config:Toggle()
 		Utils.toggle(UIConfig)
 	end
 
-	-- Hide frame:
-	function Config:Hide()
+	--
+	-- Hides the configuration frame.
+	--	function Config:Hide()
 		if UIConfig and UIConfig:IsShown() then
 			UIConfig:Hide()
 		end
 	end
 
-	-- OnClick options:
+	--
+	-- OnClick handler for option controls.
+	--
 	function Config:OnClick(btn)
 		if not btn then return end
 		frameName = frameName or btn:GetParent():GetName()
@@ -3372,7 +3451,9 @@ do
 		localized = true
 	end
 
-	-- OnUpdate frame:
+	--
+	-- OnUpdate handler for the configuration frame.
+	--
 	function UpdateUIFrame(self, elapsed)
 		LocalizeUIFrame()
 		if Utils.periodic(self, frameName, updateInterval, elapsed) then
@@ -3409,6 +3490,7 @@ do
 			end
 		end
 	end
+	
 end
 
 -- ==================== Warnings Frame ==================== --
@@ -6008,10 +6090,13 @@ do
 	end
 end
 
--- ==================== What else to do? ==================== --
---[===[ And here we go... ]===] --
+---============================================================================
+-- Main Event Handlers
+---============================================================================
 
--- On ADDON_LOADED:
+--
+-- ADDON_LOADED: Initializes the addon after loading.
+--
 function addon:ADDON_LOADED(name)
 	if name ~= addonName then return end
 	mainFrame:UnregisterEvent("ADDON_LOADED")
@@ -6035,10 +6120,16 @@ function addon:ADDON_LOADED(name)
 	self:RAID_ROSTER_UPDATE()
 end
 
+--
+-- RAID_ROSTER_UPDATE: Updates the raid roster when it changes.
+--
 function addon:RAID_ROSTER_UPDATE()
 	self:UpdateRaidRoster()
 end
 
+--
+-- RAID_INSTANCE_WELCOME: Triggered when entering a raid instance.
+--
 function addon:RAID_INSTANCE_WELCOME(...)
 	local instanceName, instanceType, instanceDiff = GetInstanceInfo()
 	_, KRT_NextReset = ...
@@ -6054,12 +6145,18 @@ function addon:PLAYER_ENTERING_WORLD()
 	Utils.schedule(3, self.Raid.FirstCheck)
 end
 
+--
+-- CHAT_MSG_LOOT: Adds looted items to the raid log.
+--
 function addon:CHAT_MSG_LOOT(msg)
 	if KRT_CurrentRaid then
 		self.Raid:AddLoot(msg)
 	end
 end
 
+--
+-- CHAT_MSG_MONSTER_YELL: Logs a boss kill based on specific boss yells.
+--
 function addon:CHAT_MSG_MONSTER_YELL(...)
 	local text, boss = ...
 	if L.BossYells[text] and KRT_CurrentRaid then
@@ -6067,6 +6164,9 @@ function addon:CHAT_MSG_MONSTER_YELL(...)
 	end
 end
 
+--
+-- COMBAT_LOG_EVENT_UNFILTERED: Logs a boss kill when a boss unit dies.
+--
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
 	local _, event, _, _, _, destGUID, destName = ...
 	if not KRT_CurrentRaid then return end

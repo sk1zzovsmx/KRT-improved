@@ -13,7 +13,7 @@
         "utf8": "disable"
     },
     "Lua.workspace.library": [
-        "~/.vscode-remote/extensions/ketho.wow-api-0.20.8/Annotations/Core"
+        "~\\.vscode\\extensions\\ketho.wow-api-0.20.8\\Annotations\\Core"
     ],
     "Lua.type.weakUnionCheck": true,
     "Lua.diagnostics.globals": [
@@ -63,6 +63,10 @@
         "GROUP",
         "UIDropDownMenu_GetText",
         "Raid",
-        "DEFAULT_CHAT_FRAME"
+        "DEFAULT_CHAT_FRAME",
+        "HIGHLIGHT_FONT_COLOR",
+        "UIParent",
+        "GameTooltip",
+        "Minimap"
     ]
 }
