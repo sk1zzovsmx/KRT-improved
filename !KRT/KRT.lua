@@ -40,6 +40,7 @@ local UILogger, UILoggerItemBox
 -- local UILoggerBossBox, UILoggerPlayerBox
 local _
 
+-- Local Variables
 local unitName                          = UnitName("player")
 
 -- Rolls & Loot
@@ -64,26 +65,26 @@ local GetItemIndex, GetItemName, GetItemLink, GetItemTexture
 ---============================================================================
 
 -- Roll Types Enum
-local rollTypes                        = {
-	mainspec = 1,
-	offspec = 2,
-	reserved = 3,
-	free = 4,
-	bank = 5,
-	disenchant = 6,
-	hold = 7,
-	dkp = 8
+local rollTypes                         = {
+	MAINSHEC   = 1,
+	OFFSPEC    = 2,
+	RESERVED   = 3,
+	FREE       = 4,
+	BANK       = 5,
+	DISENCHANT = 6,
+	HOLD       = 7,
+	DKP        = 8
 }
 
 -- Roll Type Display Text
 local lootTypesText                   = {
-	L.BtnMS, 
-	L.BtnOS, 
-	L.BtnSR, 
-	L.BtnFree, 
-	L.BtnBank, 
-	L.BtnDisenchant, 
-	L.BtnHold 
+	L.BtnMS,
+	L.BtnOS,
+	L.BtnSR,
+	L.BtnFree,
+	L.BtnBank,
+	L.BtnDisenchant,
+	L.BtnHold
 }
 
 -- Roll Type Colored Display Text
@@ -97,6 +98,7 @@ local lootTypesColored                = {
 	HIGHLIGHT_FONT_COLOR_CODE .. L.BtnHold .. FONT_COLOR_CODE_CLOSE,
 	GREEN_FONT_COLOR_CODE .. "DKP" .. FONT_COLOR_CODE_CLOSE,
 }
+
 -- Item Quality Colors
 local itemColors               = {
 	[1] = "ff9d9d9d", -- Poor
@@ -109,7 +111,7 @@ local itemColors               = {
 }
 
 -- Class Colors
-local classColors                      = {
+local CLASS_COLORS                      = {
 	["UNKNOWN"]     = "ffffffff",
 	["DEATHKNIGHT"] = "ffc41f3b",
 	["DRUID"]       = "ffff7d0a",
@@ -124,7 +126,7 @@ local classColors                      = {
 }
 
 -- Raid Target Markers
-local markers                           = {
+local RAID_TARGET_MARKERS               = {
 	"{circle}",
 	"{diamond}",
 	"{triangle}",
@@ -134,24 +136,36 @@ local markers                           = {
 	"{skull}"
 }
 
--- Windows Title String:
-local titleString                       = "|cfff58cbaK|r|caaf49141RT|r : %s"
+-- Shared Frame Title String
+local titleString                      = "|cfff58cbaK|r|caaf49141RT|r : %s"
 
--- Some local functions:
+---============================================================================
+-- Cached Functions & Libraries
+---============================================================================
+
+-- Local function placeholders
 local TriggerEvent
 local LoadOptions
 
--- Cache frequently used globals:
+-- Cached WoW API & Lua Functions
 local SendChatMessage                   = SendChatMessage
 local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, table.wipe
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
 local format, match, find, strlen       = string.format, string.match, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
-local deformat                          = LibStub("LibDeformat-3.0")     -- String deformatting utility.
-local BossIDs                           = LibStub("LibBossIDs-1.0")      -- Provides boss NPC ID lookup.
 
--- Returns the used frame's name:
+-- External Libraries
+local deformat                          = LibStub("LibDeformat-3.0")
+local BossIDs                           = LibStub("LibBossIDs-1.0")
+
+---============================================================================
+-- Core Functions
+---============================================================================
+
+--
+-- Returns the name of the main addon frame.
+--
 function addon:GetFrameName()
 	local name
 	if UIMaster ~= nil then
@@ -160,6 +174,13 @@ function addon:GetFrameName()
 	return name
 end
 
+--
+-- Sends a message to the addon's debugger module.
+-- @param level The debug level (e.g., "INFO", "ERROR").
+-- @param msg The message string, supports format placeholders.
+-- @param ... Values for the format placeholders.
+--
+
 --Returns debug function
 function addon:Debug(level, msg, ...)
 	if self.Debugger then
@@ -167,8 +188,10 @@ function addon:Debug(level, msg, ...)
 	end
 end
 
--- ==================== Debugger ==================== --
-
+---============================================================================
+-- Debugger Module
+-- Handles the creation and management of the debug window.
+---============================================================================
 do
 	addon.Debugger         = {}
 	local Debugger         = addon.Debugger
@@ -208,7 +231,9 @@ do
 		end
 	end
 
-	-- Show the debugger window
+	--
+	-- Shows the debugger window.
+	--
 	function Debugger:Show()
 		if not frame then return end
 		frame:Show()
@@ -220,7 +245,9 @@ do
 		end
 	end
 
-	-- Hide the debugger window
+	--
+	-- Hides the debugger window.
+	--
 	function Debugger:Hide()
 		if frame then
 			frame:Hide()
@@ -228,7 +255,9 @@ do
 		end
 	end
 
-	-- Clear the debug output
+	--
+	-- Clears all messages from the debug output.
+	--
 	function Debugger:Clear()
 		if scrollFrame then
 			scrollFrame:Clear()
@@ -236,7 +265,9 @@ do
 		buffer = {}
 	end
 
-	-- Set the minimum log level
+	--
+	-- Sets the minimum log level to display.
+	--
 	function Debugger:SetMinLevel(level)
 		if type(level) == "number" and logLevelNames[level] then
 			minLevel = logLevelNames[level]
@@ -254,14 +285,18 @@ do
 		end
 	end
 
-	-- Get the current minimum log level
+	--
+	-- Returns the current minimum log level.
+	--
 	function Debugger:GetMinLevel()
 		return minLevel
 	end
 
-	-- Add a message to the log (with optional level)
+	--
+	-- Adds a message to the debug log.
+	--
 	function Debugger:Add(level, msg, ...)
-		-- Allow call like Add("message") without level
+		-- Allow calling with Add("message") which defaults to DEBUG level.
 		if not msg then
 			msg = level
 			level = "DEBUG"
@@ -279,18 +314,17 @@ do
 		end
 		local line = string.format("[%s][%s] %s", date("%H:%M:%S"), level, msg)
 
-		-- Se la finestra non è pronta
+		-- If the frame isn't ready, buffer the message.
 		if not scrollFrame then
 			tinsert(buffer, line)
-			-- Limita la lunghezza del buffer!
 			while #buffer > MAX_DEBUG_LOGS do
 				table.remove(buffer, 1)
 			end
 			return
 		end
 
-		-- Scegli colore
-		local r, g, b = 1, 1, 1 -- default white
+		-- Set color based on level
+		local r, g, b = 1, 1, 1 -- Default white
 		if level == "ERROR" then
 			r, g, b = 1, 0.2, 0.2
 		elseif level == "WARN" then
@@ -303,7 +337,7 @@ do
 
 		scrollFrame:AddMessage(line, r, g, b)
 
-		-- [OPZIONALE] Se hai una tabella di log persistente, tronca anche quella
+		-- Truncate persistent log table if it exists
 		if KRT_Debug and KRT_Debug.Debugs then
 			table.insert(KRT_Debug.Debugs, line)
 			while #KRT_Debug.Debugs > MAX_DEBUG_LOGS do
@@ -312,7 +346,9 @@ do
 		end
 	end
 
-	-- Replay any buffered messages
+	--
+	-- Adds any buffered messages to the scroll frame once it's available.
+	--
 	function Debugger:AddBufferedMessages()
 		for _, msg in ipairs(buffer) do
 			scrollFrame:AddMessage(msg)
@@ -320,19 +356,25 @@ do
 		buffer = {}
 	end
 
-	-- Returns true if debugger is visible
+	--
+	-- Returns true if the debugger window is visible.
+	--
 	function Debugger:IsShown()
 		return frame and frame:IsShown()
 	end
 end
 
--- ==================== Callback System ==================== --
-
+---============================================================================
+-- Callback System
+-- A simple system for registering and triggering custom events.
+---============================================================================
 do
 	-- Table of registered callbacks:
 	local callbacks = {}
 
-	-- Register a new callback:
+	--
+	-- Registers a new callback function for an event.
+	--
 	function addon:RegisterCallback(e, func)
 		if not e or type(func) ~= "function" then
 			error(L.StrCbErrUsage)
@@ -342,7 +384,9 @@ do
 		return #callbacks
 	end
 
-	-- Trigger a registered event:
+	--
+	-- Triggers a registered event, calling all associated functions.
+	--
 	function TriggerEvent(e, ...)
 		if not callbacks[e] then return end
 		for i, v in ipairs(callbacks[e]) do
@@ -354,13 +398,18 @@ do
 	end
 end
 
--- ==================== Events System ==================== --
 
+---============================================================================
+-- Event System
+-- Manages WoW API event registration for the addon.
+---============================================================================
 do
 	-- Table of registered events:
 	local events = {}
 
-	-- Events Handler:
+	--
+	-- Handles all registered WoW API events.
+	--
 	local function HandleEvent(self, e, ...)
 		if e == "ADDON_LOADED" then
 			LoadOptions()
@@ -373,7 +422,9 @@ do
 		end
 	end
 
-	-- Registers new frame event(s):
+	--
+	-- Registers one or more WoW API events for a given object (usually a module).
+	--
 	function addon:RegisterEvents(...)
 		for i = 1, select("#", ...) do
 			local e = select(i, ...)
@@ -383,7 +434,9 @@ do
 		end
 	end
 
-	-- Unregister all frame events:
+	--
+	-- Unregisters all events for a given object.
+	--
 	function addon:UnregisterEvents()
 		for e, v in pairs(events) do
 			for i = #v, 1, -1 do
@@ -398,13 +451,16 @@ do
 		end
 	end
 
-	-- Register some events and frame-related functions:
+	-- Register initial events and scripts
 	addon:RegisterEvents("ADDON_LOADED")
 	mainFrame:SetScript("OnEvent", HandleEvent)
 	mainFrame:SetScript("OnUpdate", Utils.run)
 end
 
--- ==================== Raid Helpers ==================== --
+---============================================================================
+-- Raid Helpers Module
+-- Manages raid state, roster, boss kills, and loot logging.
+---============================================================================
 do
 	addon.Raid               = {}
 	local Raid               = addon.Raid
@@ -415,11 +471,13 @@ do
 	local GetNumRaidMembers  = GetNumRaidMembers
 	local GetRaidRosterInfo  = GetRaidRosterInfo
 
-	----------------------
-	-- Logger Functions --
-	----------------------
+	--------------------------------------------------------------------------
+	-- Logger Functions
+	--------------------------------------------------------------------------
 
-	-- Update raid roster:
+	--
+	-- Updates the current raid roster, adding new players and marking those who left.
+	--
 	function addon:UpdateRaidRoster()
 		if not KRT_CurrentRaid then return end
 		numRaid = GetNumRaidMembers()
@@ -427,6 +485,7 @@ do
 			Raid:End()
 			return
 		end
+
 		local realm = GetRealmName() or UNKNOWN
 		KRT_Players[realm] = KRT_Players[realm] or {}
 		local players = {}
@@ -454,6 +513,7 @@ do
 					}
 					Raid:AddPlayer(toRaid)
 				end
+
 				if not KRT_Players[realm][name] then
 					KRT_Players[realm][name] = {
 						name   = name,
@@ -467,6 +527,8 @@ do
 				end
 			end
 		end
+
+		-- Mark players who have left
 		for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
 			local found = nil
 			for _, p in ipairs(players) do
@@ -482,16 +544,20 @@ do
 		Utils.unschedule(addon.UpdateRaidRoster)
 	end
 
-	-- Creates a new raid log entry:
+	--
+	-- Creates a new raid log entry.
+	--
 	function Raid:Create(zoneName, raidSize)
 		if KRT_CurrentRaid then
 			self:End()
 		end
 		numRaid = GetNumRaidMembers()
 		if numRaid == 0 then return end
+
 		local realm = GetRealmName() or UNKNOWN
 		KRT_Players[realm] = KRT_Players[realm] or {}
 		local currentTime = Utils.GetCurrentTime()
+
 		local raidInfo = {
 			realm     = realm,
 			zone      = zoneName,
@@ -502,6 +568,7 @@ do
 			startTime = currentTime,
 			changes   = {},
 		}
+
 		for i = 1, numRaid do
 			local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
 			if name then
@@ -514,7 +581,7 @@ do
 					class    = class or "UNKNOWN",
 					join     = Utils.GetCurrentTime(),
 					leave    = nil,
-					count    = 0, -- <--- Inizializza count!
+					count    = 0, -- Initialize loot count
 				})
 				KRT_Players[realm][name] = {
 					name   = name,
@@ -534,7 +601,9 @@ do
 		Utils.schedule(3, addon.UpdateRaidRoster)
 	end
 
-	-- Ends the current raid entry:
+	--
+	-- Ends the current raid log entry, marking end time.
+	--
 	function Raid:End()
 		if not KRT_CurrentRaid then return end
 		Utils.unschedule(addon.Raid.UpdateRaidRoster)
@@ -547,7 +616,9 @@ do
 		KRT_LastBoss = nil
 	end
 
-	-- Checks raid status:
+	--
+	-- Checks the current raid status and creates a new session if needed.
+	--
 	function Raid:Check(instanceName, instanceDiff)
 		if not KRT_CurrentRaid then
 			Raid:Create(instanceName, (instanceDiff % 2 == 0 and 25 or 10))
@@ -573,7 +644,9 @@ do
 		end
 	end
 
-	-- Checks the raid status upon player's login:
+	--
+	-- Performs an initial raid check on player login.
+	--
 	function Raid:FirstCheck()
 		Utils.unschedule(addon.Raid.FirstCheck)
 		if GetNumRaidMembers() == 0 then return end
@@ -590,7 +663,9 @@ do
 		end
 	end
 
-	-- Add a player to the raid:
+	--
+	-- Adds a player to the raid log.
+	--
 	function Raid:AddPlayer(t, raidNum)
 		raidNum = raidNum or KRT_CurrentRaid
 		if not raidNum or not t or not t.name then return end
@@ -611,10 +686,13 @@ do
 		end
 	end
 
-	-- Add a boss kill to the active raid:
+	--
+	-- Adds a boss kill to the active raid log.
+	--
 	function Raid:AddBoss(bossName, manDiff, raidNum)
 		raidNum = raidNum or KRT_CurrentRaid
 		if not raidNum or not bossName then return end
+
 		local _, _, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
 		if manDiff then
 			instanceDiff = (KRT_Raids[raidNum].size == 10) and 1 or 2
@@ -631,19 +709,21 @@ do
 		end
 		local currentTime = Utils.GetCurrentTime()
 		local killInfo = {
-			name = bossName,
+			name       = bossName,
 			difficulty = instanceDiff,
-			players = players,
-			date = currentTime,
-			hash = Utils.encode(raidNum .. "|" .. bossName .. "|" .. (KRT_LastBoss or "0"))
+			players    = players,
+			date       = currentTime,
+			hash       = Utils.encode(raidNum .. "|" .. bossName .. "|" .. (KRT_LastBoss or "0"))
 		}
 		tinsert(KRT_Raids[raidNum].bossKills, killInfo)
 		KRT_LastBoss = #KRT_Raids[raidNum].bossKills
 	end
 
-	-- Adds a loot to the active raid:
+	--
+	-- Adds a loot item to the active raid log.
+	--
 	function Raid:AddLoot(msg, rollType, rollValue)
-		-- Master Loot Part:
+		-- Master Loot
 		local player, itemLink, itemCount = deformat(msg, LOOT_ITEM_MULTIPLE)
 		if not player then
 			itemCount = 1
@@ -657,7 +737,8 @@ do
 			itemCount = 1
 			itemLink = deformat(msg, LOOT_ITEM_SELF)
 		end
-		-- Master Loot Part:
+
+		-- Other Loot Rolls
 		if not player or not itemLink then
 			itemCount = 1
 			player, itemLink = deformat(msg, LOOT_ROLL_YOU_WON)
@@ -672,13 +753,19 @@ do
 		local _, _, _, _, itemId = string.find(itemLink,
 			"|?c?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*)|?h?%[?([^%[%]]*)%]?|?h?|?r?")
 		itemId = tonumber(itemId)
-		-- We don't proceed if lower then threshold or ignored:
+
+		-- We don't proceed if lower than threshold or ignored.
 		local lootThreshold = GetLootThreshold()
 		if itemRarity and itemRarity < lootThreshold then return end
 		if itemId and addon.ignoredItems[itemId] then return end
-		if not KRT_LastBoss then self:AddBoss("_TrashMob_") end
+
+		if not KRT_LastBoss then
+			self:AddBoss("_TrashMob_")		
+		end
+
 		if not rollType then rollType = currentRollType end
 		if not rollValue then rollValue = addon:HighestRoll() end
+
 		local lootInfo = {
 			itemId      = itemId,
 			itemName    = itemName,
@@ -696,9 +783,9 @@ do
 		tinsert(KRT_Raids[KRT_CurrentRaid].loot, lootInfo)
 	end
 
-	----------------------
-	-- Player Count API  --
-	----------------------
+	--------------------------------------------------------------------------
+	-- Player Count API
+	--------------------------------------------------------------------------
 
 	function Raid:GetPlayerCount(name, raidNum)
 		raidNum = raidNum or KRT_CurrentRaid
@@ -754,16 +841,20 @@ do
 		Raid:SetPlayerCount(name, c - 1, raidNum)
 	end
 
-	--------------------
-	-- Raid Functions --
-	--------------------
+	--------------------------------------------------------------------------
+	-- Raid Functions
+	--------------------------------------------------------------------------
 
-	-- Returns members count:
+	--
+	-- Returns the number of members in the raid.
+	--
 	function addon:GetNumRaid()
 		return numRaid
 	end
 
-	-- Returns raid size: 10 or 25
+	--
+	-- Returns raid size: 10 or 25.
+	--
 	function addon:GetRaidSize()
 		local size = 0
 		if self:IsInRaid() then
@@ -773,7 +864,9 @@ do
 		return size
 	end
 
-	-- Return class color by name:
+	--
+	-- Returns the RGB color values for a given class name.
+	--
 	do
 		local colors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
 		function addon:GetClassColor(name)
@@ -786,12 +879,15 @@ do
 		end
 	end
 
-	-- Checks if a raid is expired
+	--
+	-- Checks if a raid log is expired (older than the weekly reset).
+	--
 	function Raid:Expired(rID)
 		rID = rID or KRT_CurrentRaid
 		if not rID or not KRT_Raids[rID] then
 			return true
 		end
+
 		local currentTime = Utils.GetCurrentTime()
 		local startTime = KRT_Raids[rID].startTime
 		local validDuration = (currentTime + KRT_NextReset) - startTime
@@ -800,7 +896,9 @@ do
 		return isExpired
 	end
 
-	-- Retrieves the raid loot:
+	--
+	-- Retrieves all loot for a given raid and optional boss number.
+	--
 	function Raid:GetLoot(raidNum, bossNum)
 		local items = {}
 		raidNum = raidNum or KRT_CurrentRaid
@@ -818,6 +916,7 @@ do
 				total = total + 1
 			end
 		elseif KRT_Raids[raidNum].bossKills[bossNum] then
+			-- Get loot for a specific boss
 			for k, v in ipairs(loot) do
 				if v.bossNum == bossNum then
 					local info = v
@@ -830,7 +929,9 @@ do
 		return items
 	end
 
-	-- Retrieves a loot item position within the raid loot:
+	--
+	-- Retrieves the position of a specific loot item within the raid's loot table.
+	--
 	function Raid:GetLootID(itemID, raidNum, holderName)
 		local pos = 0
 		local loot = self:GetLoot(raidNum)
@@ -845,7 +946,9 @@ do
 		return pos
 	end
 
-	-- Retrieves raid bosses:
+	--
+	-- Retrieves all boss kills for a given raid.
+	--
 	function Raid:GetBosses(raidNum)
 		local bosses = {}
 		raidNum = raidNum or KRT_CurrentRaid
@@ -871,11 +974,13 @@ do
 		return bosses
 	end
 
-	----------------------
-	-- Player Functions --
-	----------------------
+	--------------------------------------------------------------------------
+	-- Player Functions
+	--------------------------------------------------------------------------
 
-	-- Returns current raid players:
+	--
+	-- Returns players from the raid log. Can be filtered by boss kill.
+	--
 	function Raid:GetPlayers(raidNum, bossNum)
 		raidNum = raidNum or KRT_CurrentRaid
 		local players = {}
@@ -899,7 +1004,9 @@ do
 		return players
 	end
 
-	-- Checks if the given players in the raid:
+	--
+	-- Checks if a player is in the raid log.
+	--
 	function Raid:CheckPlayer(name, raidNum)
 		local found = false
 		local players = Raid:GetPlayers(raidNum)
@@ -920,7 +1027,9 @@ do
 		return found, name
 	end
 
-	-- Returns the players ID:
+	--
+	-- Returns the player's internal ID from the raid log.
+	--
 	function Raid:GetPlayerID(name, raidNum)
 		local id = 0
 		raidNum = raidNum or KRT_CurrentRaid
@@ -937,7 +1046,9 @@ do
 		return id
 	end
 
-	-- Get Player name:
+	--
+	-- Gets a player's name by their internal ID.
+	--
 	function Raid:GetPlayerName(id, raidNum)
 		local name
 		raidNum = raidNum or addon.Logger.selectedRaid or KRT_CurrentRaid
@@ -952,7 +1063,9 @@ do
 		return name
 	end
 
-	-- Returns a table of items looted by the selected player:
+	--
+	-- Returns a table of items looted by the selected player.
+	--
 	function Raid:GetPlayerLoot(name, raidNum, bossNum)
 		local items = {}
 		local loot = Raid:GetLoot(raidNum, bossNum)
@@ -968,7 +1081,9 @@ do
 		return items
 	end
 
-	-- Get player rank:
+	--
+	-- Gets a player's rank.
+	--
 	function addon:GetPlayerRank(name, raidNum)
 		local players = Raid:GetPlayers(raidNum)
 		local rank = 0
@@ -996,7 +1111,9 @@ do
 		return rank
 	end
 
-	-- Get player class:
+	--
+	-- Gets a player's class from the saved players database.
+	--
 	function addon:GetPlayerClass(name)
 		local class = "UNKNOWN"
 		local realm = GetRealmName() or UNKNOWN
@@ -1007,7 +1124,9 @@ do
 		return class
 	end
 
-	-- Get player UnitID
+	--
+	-- Gets a player's unit ID (e.g., "raid1").
+	--
 	function addon:GetUnitID(name)
 		local players = Raid:GetPlayers()
 		local id = "none"
@@ -1023,36 +1142,46 @@ do
 		return id
 	end
 
-	-----------------------
-	-- Raid & Loot Check --
-	-----------------------
+	--------------------------------------------------------------------------
+	-- Raid & Loot Status Checks
+	--------------------------------------------------------------------------
 
-	-- Whether the player is a party group:
+	--
+	-- Checks if the player is in a party.
+	--
 	function addon:IsInParty()
 		local inParty = (GetNumPartyMembers() > 0) and (GetNumRaidMembers() == 0)
 		return inParty
 	end
 
-	-- Whether the player is a raid group:
+	--
+	-- Checks if the player is in a raid.
+	--
 	function addon:IsInRaid()
 		local raidStatus = (inRaid == true or GetNumRaidMembers() > 0)
 		return raidStatus
 	end
 
-	-- Check if the raid is using mater loot system:
+	--
+	-- Checks if the group is using the Master Looter system.
+	--
 	function addon:IsMasterLoot()
 		local method = select(1, GetLootMethod())
 		return (method == "master")
 	end
 
-	-- Check if the player is the master looter:
+	--
+	-- Checks if the player is the Master Looter.
+	--
 	function addon:IsMasterLooter()
 		local method, partyID = GetLootMethod()
 		local isML = (partyID and partyID == 0)
 		return isML
 	end
 
-	-- Utility : Clear all raid icons:
+	--
+	-- Clears all raid target icons.
+	--
 	function addon:ClearRaidIcons()
 		local players = Raid:GetPlayers()
 		for i, p in ipairs(players) do
@@ -1061,51 +1190,66 @@ do
 	end
 end
 
--- ==================== Chat Output Helpers ==================== --
-
+---============================================================================
+-- Chat Output Helpers
+---============================================================================
 do
 	-- Output strings:
 	local output          = "|cfff58cba%s|r: %s"
 	local chatPrefix      = "Kader Raid Tools"
 	local chatPrefixShort = "KRT"
 
-	-- Default function that handles final output:
+	--
+	-- Prepares the final output string with a prefix.
+	--
 	local function PreparePrint(text, prefix)
 		prefix = prefix or chatPrefixShort
 		return format(output, prefix, tostring(text))
 	end
 
-	-- Default print function:
+	--
+	-- Prints a default message to the chat frame.
+	--
 	function addon:Print(text, prefix)
 		local msg = PreparePrint(text, prefix)
 		return Utils.print(msg)
 	end
 
-	-- Print Green Success Message:
+	--
+	-- Prints a green success message.
+	--
 	function addon:PrintSuccess(text, prefix)
 		local msg = PreparePrint(text, prefix)
 		return Utils.print_green(msg)
 	end
 
-	-- Print Red Error Message:
+	--
+	-- Prints a red error message.
+	--
 	function addon:PrintError(text, prefix)
 		local msg = PreparePrint(text, prefix)
 		return Utils.print_red(msg)
 	end
 
-	-- Print Orange Warning Message:
+	--
+	-- Prints an orange warning message.
+	--
 	function addon:PrintWarning(text, prefix)
 		local msg = PreparePrint(text, prefix)
 		return Utils.print_orange(msg)
 	end
 
-	-- Print Blue Info Message:
+	--
+	-- Prints a blue info message.
+	--
 	function addon:PrintInfo(text, prefix)
 		local msg = PreparePrint(text, prefix)
 		return Utils.print_blue(msg)
 	end
 
-	-- Function used for various announcements:
+	--
+	-- Sends an announcement to the appropriate channel (Raid, Party, etc.).
+	--
 	function addon:Announce(text, channel)
 		local originalChannel = channel
 		if not channel then
@@ -1123,46 +1267,46 @@ do
 					elseif addon.options.useRaidWarning and (IsRaidLeader() or IsRaidOfficer()) then
 						channel = "RAID_WARNING"
 					else
-						channel = "RAID" -- Fallback to RAID
+						channel = "RAID" -- Fallback
 					end
 				else
 					if addon.options.useRaidWarning and (IsRaidLeader() or IsRaidOfficer()) then
 						channel = "RAID_WARNING"
 					else
-						channel = "RAID" -- Fallback to RAID
+						channel = "RAID" -- Fallback
 					end
 				end
 
-				-- Switch to party mode if we're in a party:
+			-- Switch to party mode if we're in a party:
 			elseif self:IsInParty() then
 				channel = "PARTY"
 
-				-- Switch to alone mode
+			-- Switch to alone mode
 			else
-				channel = "SAY"
+				channel = "SAY" -- Fallback for solo
 			end
 		end
-		-- Let's Go!
 		SendChatMessage(tostring(text), channel)
 	end
 end
 
--- ==================== MiniMap Button ==================== --
-
+---============================================================================
+-- Minimap Button Module
+---============================================================================
 do
 	addon.Minimap = {}
 	local MinimapBtn = addon.Minimap
 
-	-- Menu locals:
+	-- Local variables
 	local addonMenu
-
-	-- Button & drag mode:
 	local dragMode
 
-	-- Cache frequently used global:
+	-- Cached math functions
 	local abs, sqrt = math.abs, math.sqrt
 
-	-- Initialize minimap menu:
+	--
+	-- Initializes and opens the right-click menu for the minimap button.
+	--
 	local function OpenMenu()
 		local info = {}
 		addonMenu = addonMenu or CreateFrame("Frame", "KRTMenu", UIParent, "UIDropDownMenuTemplate")
@@ -1245,19 +1389,23 @@ do
 		ToggleDropDownMenu(1, nil, addonMenu, KRT_MINIMAP_GUI, 0, 0)
 	end
 
-	-- Move button:
+	--
+	-- Moves the minimap button while dragging.
+	--
 	local function moveButton(self)
 		local centerX, centerY = Minimap:GetCenter()
 		local x, y = GetCursorPosition()
 		x, y = x / self:GetEffectiveScale() - centerX, y / self:GetEffectiveScale() - centerY
 
 		if dragMode == "free" then
+			-- Free drag mode
 			self:ClearAllPoints()
 			self:SetPoint("CENTER", x, y)
 		else
+			-- Circular drag mode
 			centerX, centerY = abs(x), abs(y)
-			centerX, centerY = (centerX / sqrt(centerX ^ 2 + centerY ^ 2)) * 80,
-				(centerY / sqrt(centerX ^ 2 + centerY ^ 2)) * 80
+			centerX = (centerX / sqrt(centerX ^ 2 + centerY ^ 2)) * 80
+			centerY = (centerY / sqrt(centerX ^ 2 + centerY ^ 2)) * 80
 			centerX = x < 0 and -centerX or centerX
 			centerY = y < 0 and -centerY or centerY
 			self:ClearAllPoints()
@@ -1265,7 +1413,9 @@ do
 		end
 	end
 
-	-- OnLoad minimap button:
+	--
+	-- OnLoad handler for the minimap button.
+	--
 	function MinimapBtn:OnLoad(btn)
 		if not btn then return end
 		KRT_MINIMAP_GUI:SetUserPlaced(true)
@@ -1305,7 +1455,9 @@ do
 		end)
 	end
 
-	-- Toggle button visibility:
+	--
+	-- Toggles the visibility of the minimap button.
+	--
 	function addon:ToggleMinimapButton()
 		self.options.minimapButton = not self.options.minimapButton
 		if self.options.minimapButton then
@@ -1315,24 +1467,31 @@ do
 		end
 	end
 
-	-- Hide minimap button:
+	--
+	-- Hides the minimap button.
+	--
 	function addon:HideMinimapButton()
 		return KRT_MINIMAP_GUI:Hide()
 	end
 end
 
--- ==================== Rolls Helpers ==================== --
-
+---============================================================================
+-- Rolls Helpers Module
+-- Manages roll tracking, sorting, and winner determination.
+---============================================================================
 do
 	addon.Rolls = {}
 	local Rolls = addon.Rolls
 	local frameName
 
+	-- Roll state variables
 	local record, canRoll, warned = false, true, false
 	local playerRollTracker, rollsTable, rerolled, itemRollTracker = {}, {}, {}, {}
 	local selectedPlayer = nil
 
-	-- Sorts the rolls in descending or ascending order
+	--
+	-- Sorts the rollsTable either ascending or descending.
+	--
 	local function SortRolls()
 		if rollsTable ~= nil then
 			table.sort(rollsTable, function(a, b)
@@ -1346,7 +1505,9 @@ do
 		end
 	end
 
-	-- Adds a roll to the rollsTable and updates tracking
+	--
+	-- Adds a player's roll to the tracking tables.
+	--
 	local function AddRoll(name, roll, itemId)
 		roll = tonumber(roll)
 		rollsCount = rollsCount + 1
@@ -1362,6 +1523,8 @@ do
 
 		TriggerEvent("AddRoll", name, roll)
 		SortRolls()
+
+		-- Auto-select winner if none is manually selected
 		if not selectedPlayer then
 			local resolvedItemId = itemId or addon:GetCurrentRollItemID()
 			if currentRollType == rollTypes.reserved then
@@ -1372,16 +1535,18 @@ do
 						selectedPlayer = entry.name
 					end
 				end
-				addon:Debug("DEBUG", "Reserved roll: selectedPlayer=%s", tostring(selectedPlayer))
+				addon:Debug("DEBUG", "Reserved roll: auto-selected player=%s", tostring(selectedPlayer))
 			else
 				selectedPlayer = winner
-				addon:Debug("DEBUG", "Free roll: selectedPlayer=%s", tostring(selectedPlayer))
+				addon:Debug("DEBUG", "Free roll: auto-selected player=%s", tostring(selectedPlayer))
 			end
 		end
 		addon:FetchRolls()
 	end
 
-	-- Starts a roll for the player
+	--
+	-- Initiates a /roll 1-100 for the player.
+	--
 	function addon:Roll(btn)
 		local itemId = self:GetCurrentRollItemID()
 		if not itemId then return end
@@ -1405,25 +1570,32 @@ do
 		playerRollTracker[itemId] = playerRollTracker[itemId] + 1
 	end
 
-	-- Returns current roll session state
+	--
+	-- Returns the current roll session state.
+	--
 	function addon:RollStatus()
 		addon:Debug("DEBUG", "RollStatus queried: type=%s, record=%s, canRoll=%s, rolled=%s", tostring(currentRollType),
 			tostring(record), tostring(canRoll), tostring(rolled))
 		return currentRollType, record, canRoll, rolled
 	end
 
-	-- Enables or disables recording rolls
+	--
+	-- Enables or disables the recording of rolls.
+	--
 	function addon:RecordRolls(bool)
 		canRoll, record = bool == true, bool == true
 		addon:Debug("DEBUG", "RecordRolls: %s", tostring(bool))
 	end
 
-	-- Handles system message for detecting rolls
+	--
+	-- Intercepts system messages to detect player rolls.
+	--
 	function addon:CHAT_MSG_SYSTEM(msg)
 		if not msg or not record then return end
 		local player, roll, min, max = deformat(msg, RANDOM_ROLL_RESULT)
 		if player and roll and min == 1 and max == 100 then
 			addon:Debug("DEBUG", "Detected roll message: %s rolled %d (range %d-%d)", player, roll, min, max)
+
 			if not canRoll then
 				if not warned then
 					self:Announce(L.ChatCountdownBlock)
@@ -1463,30 +1635,37 @@ do
 		end
 	end
 
-	-- Returns the current rolls table
+	--
+	-- Returns the current table of rolls.
+	--
 	function addon:GetRolls()
 		addon:Debug("DEBUG", "GetRolls called; count: %d", #rollsTable)
 		return rollsTable
 	end
 
-	-- Sets the rolled flag to true
+	--
+	-- Sets the flag indicating the player has rolled.
+	--
 	function addon:SetRolled()
 		rolled = true
 		addon:Debug("DEBUG", "SetRolled: rolled flag set to true")
 	end
 
-	-- Checks if a player has rolled
+	--
+	-- Checks if a player has already used all their rolls for an item.
+	--
 	function addon:DidRoll(itemId, name)
 		if not itemId then
 			for i = 1, rollsCount do
 				if rollsTable[i].name == name then
-					addon:Debug("DEBUG", "DidRoll: %s has rolled (no itemId)", name)
+					addon:Debug("DEBUG", "DidRoll: %s has rolled (no itemId specified)", name)
 					return true
 				end
 			end
-			addon:Debug("DEBUG", "DidRoll: %s has NOT rolled (no itemId)", name)
+			addon:Debug("DEBUG", "DidRoll: %s has NOT rolled (no itemId specified)", name)
 			return false
 		end
+
 		itemRollTracker[itemId] = itemRollTracker[itemId] or {}
 		local used = itemRollTracker[itemId][name] or 0
 		local allowed = (currentRollType == rollTypes.reserved and addon.Reserves:GetReserveCountForItem(itemId, name) > 0)
@@ -1497,7 +1676,9 @@ do
 		return result
 	end
 
-	-- Returns the highest roll value of the current winner
+	--
+	-- Returns the highest roll value from the current winner.
+	--
 	function addon:HighestRoll()
 		for i = 1, rollsCount do
 			if rollsTable[i].name == winner then
@@ -1508,7 +1689,9 @@ do
 		return 0
 	end
 
-	-- Clears all roll-related state and UI
+	--
+	-- Clears all roll-related state and UI elements.
+	--
 	function addon:ClearRolls(rec)
 		frameName = frameName or self:GetFrameName()
 		if not frameName then return end
@@ -1528,7 +1711,9 @@ do
 		self:ClearRaidIcons()
 	end
 
-	-- Gets the current item ID being rolled for
+	--
+	-- Gets the item ID of the item currently being rolled for.
+	--
 	function addon:GetCurrentRollItemID()
 		local index = GetItemIndex and GetItemIndex() or 1
 		local item = GetItem and GetItem(index)
@@ -1542,7 +1727,9 @@ do
 		return itemId
 	end
 
-	-- Validates if a player can still roll
+	--
+	-- Validates if a player can still roll for an item.
+	--
 	function addon:IsValidRoll(itemId, name)
 		itemRollTracker[itemId] = itemRollTracker[itemId] or {}
 		local used = itemRollTracker[itemId][name] or 0
@@ -1555,14 +1742,18 @@ do
 		return result
 	end
 
-	-- Checks if the player has reserved the item
+	--
+	-- Checks if a player has reserved the specified item.
+	--
 	function addon:IsReserved(itemId, name)
 		local reserved = addon.Reserves:GetReserveCountForItem(itemId, name) > 0
 		addon:Debug("DEBUG", "IsReserved: %s for item %d => %s", name, itemId, tostring(reserved))
 		return reserved
 	end
 
-	-- Gets how many reserves the player has used
+	--
+	-- Gets the number of reserves a player has used for an item.
+	--
 	function addon:GetUsedReserveCount(itemId, name)
 		itemRollTracker[itemId] = itemRollTracker[itemId] or {}
 		local count = itemRollTracker[itemId][name] or 0
@@ -1570,14 +1761,18 @@ do
 		return count
 	end
 
-	-- Gets the allowed number of reserves for a player
+	--
+	-- Gets the total number of reserves a player has for an item.
+	--
 	function addon:GetAllowedReserves(itemId, name)
 		local count = addon.Reserves:GetReserveCountForItem(itemId, name)
 		addon:Debug("DEBUG", "GetAllowedReserves: %s for item %d => %d", name, itemId, count)
 		return count
 	end
 
-	-- Rebuilds the roll UI and marks the top roll or selected winner
+	--
+	-- Rebuilds the roll list UI and marks the top roller or selected winner.
+	--
 	function addon:FetchRolls()
 		local frameName = addon:GetFrameName()
 		addon:Debug("DEBUG", "FetchRolls called; frameName: %s", frameName)
@@ -1615,8 +1810,10 @@ do
 			local name, roll = entry.name, entry.roll
 			local btnName = frameName .. "PlayerBtn" .. i
 			local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTSelectPlayerTemplate")
+
 			btn:SetID(i)
 			btn:Show()
+
 			if not btn.selectedBackground then
 				btn.selectedBackground = btn:CreateTexture("KRTSelectedHighlight", "ARTWORK")
 				btn.selectedBackground:SetAllPoints()
@@ -1673,8 +1870,10 @@ do
 	end
 end
 
--- ==================== Loot Helpers ==================== --
-
+---============================================================================
+-- Loot Helpers Module
+-- Manages the loot window items (fetching from loot/inventory).
+---============================================================================
 do
 	addon.Loot = {}
 	local Loot = addon.Loot
@@ -1683,7 +1882,9 @@ do
 	local lootTable = {}
 	local currentItemIndex = 0
 
-	-- Fetches the loot:
+	--
+	-- Fetches items from the currently open loot window.
+	--
 	function addon:FetchLoot()
 		local oldItem
 		if lootCount >= 1 then
@@ -1714,7 +1915,9 @@ do
 		self:PrepareItem()
 	end
 
-	-- Add item to loot table:
+	--
+	-- Adds an item to the loot table.
+	--
 	function addon:AddItem(itemLink)
 		local itemName, _, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture =
 			GetItemInfo(itemLink)
@@ -1743,14 +1946,18 @@ do
 		TriggerEvent("AddItem", itemLink)
 	end
 
-	-- Prepare item display:
+	--
+	-- Prepares the currently selected item for display.
+	--
 	function addon:PrepareItem()
 		if ItemExists(currentItemIndex) then
 			self:SetItem(lootTable[currentItemIndex])
 		end
 	end
 
-	-- Set item's display:
+	--
+	-- Sets the main item display in the UI.
+	--
 	function addon:SetItem(i)
 		if i.itemName and i.itemLink and i.itemTexture and i.itemColor then
 			frameName = frameName or self:GetFrameName()
@@ -1770,7 +1977,9 @@ do
 		end
 	end
 
-	-- Select an item:
+	--
+	-- Selects an item from the loot list by its index.
+	--
 	function addon:SelectItem(i)
 		if ItemExists(i) then
 			currentItemIndex = i
@@ -1778,7 +1987,9 @@ do
 		end
 	end
 
-	-- Clear all loot:
+	--
+	-- Clears all loot from the table and resets the UI display.
+	--
 	function addon:ClearLoot()
 		lootTable = twipe(lootTable)
 		lootCount = 0
@@ -1792,42 +2003,56 @@ do
 		end
 	end
 
-	-- Returns the current item index:
+	--
+	-- Returns the index of the currently selected item.
+	--
 	function GetItemIndex()
 		return currentItemIndex
 	end
 
-	-- Returns the current item:
+	--
+	-- Returns the table for the currently selected item.
+	--
 	function GetItem(i)
 		i = i or currentItemIndex
 		return lootTable[i]
 	end
 
-	-- Returns the current item's name:
+	--
+	-- Returns the name of the currently selected item.
+	--
 	function GetItemName(i)
 		i = i or currentItemIndex
 		return lootTable[i] and lootTable[i].itemName or nil
 	end
 
-	-- Returns the current item's link:
+	--
+	-- Returns the link of the currently selected item.
+	--
 	function GetItemLink(i)
 		i = i or currentItemIndex
 		return lootTable[i] and lootTable[i].itemLink or nil
 	end
 
-	-- Returns the current item's teture:
+	--
+	-- Returns the texture of the currently selected item.
+	--
 	function GetItemTexture(i)
 		i = i or currentItemIndex
 		return lootTable[i] and lootTable[i].itemTexture or nil
 	end
 
-	-- Checks if a loot item exists:
+	--
+	-- Checks if a loot item exists at the given index.
+	--
 	function ItemExists(i)
 		i = i or currentItemIndex
 		return (lootTable[i] ~= nil)
 	end
 
-	-- Check if an item is soul bound:
+	--
+	-- Checks if an item in the player's bags is soulbound.
+	--
 	function ItemIsSoulbound(bag, slot)
 		local tip = KRT_FakeTooltip or CreateFrame("GameTooltip", "KRT_FakeTooltip", nil, "GameTooltipTemplate")
 		KRT_FakeTooltip = tip
@@ -1850,8 +2075,9 @@ do
 	end
 end
 
--- ==================== Master Loot Frame ==================== --
-
+---============================================================================
+-- Master Looter Frame Module
+---============================================================================
 do
 	addon.Master = {}
 	local Master = addon.Master
@@ -1890,19 +2116,25 @@ do
 		end)
 	end
 
-	-- Toggle frame visibility:
+	--
+	-- Toggles the visibility of the Master Looter frame.
+	--
 	function Master:Toggle()
 		Utils.toggle(UIMaster)
 	end
 
-	-- Hide frame:
+	--
+	-- Hides the Master Looter frame.
+	--
 	function Master:Hide()
 		if UIMaster and UIMaster:IsShown() then
 			UIMaster:Hide()
 		end
 	end
 
+	--
 	-- Button: Select/Remove Item
+	--
 	function Master:BtnSelectItem(btn)
 		if btn == nil or lootCount <= 0 then return end
 		if fromInventory == true then
@@ -1917,6 +2149,9 @@ do
 		end
 	end
 
+	--
+	-- Button: Spam Loot Links or Do Ready Check
+	--
 	function Master:BtnSpamLoot(btn)
 		if btn == nil or lootCount <= 0 then return end
 		if fromInventory == true then
@@ -1933,17 +2168,23 @@ do
 		end
 	end
 
-	-- Button: Open List
+	--
+	-- Button: Open Reserves List
+	--
 	function Master:BtnOpenReserves(btn)
 		addon.Reserves:ShowWindow()
 	end
 
-	-- Button: Import Reserve
+	--
+	-- Button: Import Reserves
+	--
 	function Master:BtnImportReserves(btn)
 		addon.Reserves:ShowImportBox()
 	end
 
-	-- Generic roll button:
+	--
+	-- Generic function to announce a roll for the current item.
+	--
 	local function AnnounceRoll(rollType, chatMsg)
 		if lootCount >= 1 then
 			announced = false
@@ -1990,6 +2231,10 @@ do
 		return AnnounceRoll(4, "ChatRollFree")
 	end
 
+	--
+	-- Button: Starts or stops the roll countdown.
+	--
+
 	function Master:BtnCountdown(btn)
 		if countdownRun then
 			addon:RecordRolls(false)
@@ -2003,13 +2248,17 @@ do
 		end
 	end
 
+	--
 	-- Button: Clear Rolls
+	--
 	function Master:BtnClear(btn)
 		announced = false
 		return addon:ClearRolls()
 	end
 
+	--
 	-- Button: Award/Trade
+	--
 	function Master:BtnAward(btn)
 		if lootCount <= 0 or rollsCount <= 0 then
 			addon:Debug("DEBUG", "Cannot award, lootCount=%d, rollsCount=%d", lootCount or 0, rollsCount or 0)
@@ -2024,7 +2273,9 @@ do
 		return AssignItem(itemLink, winner, currentRollType, addon:HighestRoll())
 	end
 
+	--
 	-- Button: Hold item
+	--
 	function Master:BtnHold(btn)
 		if lootCount <= 0 or holder == nil then return end
 		countdownRun = false
@@ -2037,7 +2288,9 @@ do
 		return AssignItem(itemLink, holder, rollTypes.hold, 0)
 	end
 
+	--
 	-- Button: Bank item
+	--
 	function Master:BtnBank(btn)
 		if lootCount <= 0 or banker == nil then return end
 		countdownRun = false
@@ -2050,7 +2303,9 @@ do
 		return AssignItem(itemLink, banker, rollTypes.bank, 0)
 	end
 
+	--
 	-- Button: Disenchant item
+	--
 	function Master:BtnDisenchant(btn)
 		if lootCount <= 0 or disenchanter == nil then return end
 		countdownRun = false
@@ -2063,7 +2318,9 @@ do
 		return AssignItem(itemLink, disenchanter, rollTypes.disenchant, 0)
 	end
 
-	-- Select winner:
+	--
+	-- Selects a winner from the roll list.
+	--
 	function Master:SelectWinner(btn)
 		if not btn then return end
 		local btnName = btn:GetName()
@@ -2081,7 +2338,9 @@ do
 		if itemCount == 1 then announced = false end
 	end
 
-	-- Select item roll for:
+	--
+	-- Selects an item from the item selection frame.
+	--
 	function Master:BtnSelectedItem(btn)
 		if not btn then return end
 		local index = btn:GetID()
@@ -2092,7 +2351,9 @@ do
 		end
 	end
 
-	-- Localizing ui frame:
+	--
+	-- Localizes UI frame elements.
+	--
 	function LocalizeUIFrame()
 		if localized then return end
 		if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
@@ -2132,7 +2393,9 @@ do
 		localized = true
 	end
 
-	-- OnUpdate frame:
+	--
+	-- OnUpdate handler for the frame, updates UI elements periodically.
+	--
 	function UpdateUIFrame(self, elapsed)
 		LocalizeUIFrame()
 		if Utils.periodic(self, frameName, updateInterval, elapsed) then
@@ -2144,13 +2407,15 @@ do
 				end
 			end
 
+			-- Dropdown Updates
 			UpdateDropDowns(dropDownFrameHolder)
 			UpdateDropDowns(dropDownFrameBanker)
 			UpdateDropDowns(dropDownFrameDisenchanter)
 
+			-- Button State Updates
 			Utils.setText(_G[frameName .. "CountdownBtn"], L.BtnStop, L.BtnCountdown, countdownRun == true)
 			Utils.setText(_G[frameName .. "AwardBtn"], TRADE, L.BtnAward, fromInventory == true)
-
+			-- Countdown Logic
 			if countdownRun == true then
 				local tick = ceil(addon.options.countdownDuration - GetTime() + countdownStart)
 				local i = countdownPos - 1
@@ -2177,6 +2442,7 @@ do
 				end
 			end
 
+			-- Enable/Disable Buttons
 			Utils.enableDisable(_G[frameName .. "SelectItemBtn"], lootCount > 1 or (fromInventory and lootCount >= 1))
 			Utils.enableDisable(_G[frameName .. "SpamLootBtn"], lootCount >= 1)
 			Utils.enableDisable(_G[frameName .. "MSBtn"], lootCount >= 1)
@@ -2200,7 +2466,9 @@ do
 		end
 	end
 
-	-- Initialize DropDowns:
+	--
+	-- Initializes the dropdown menus for player selection.
+	--
 	function InitializeDropDowns()
 		if UIDROPDOWNMENU_MENU_LEVEL == 2 then
 			local g = UIDROPDOWNMENU_MENU_VALUE
@@ -2231,7 +2499,9 @@ do
 		end
 	end
 
-	-- Prepare DropDowns:
+	--
+	-- Prepares the data for the dropdowns by fetching the raid roster.
+	--
 	function PrepareDropDowns()
 		for i = 1, 8 do
 			dropDownData[i] = twipe(dropDownData[i])
@@ -2246,7 +2516,9 @@ do
 		end
 	end
 
-	-- OnClick DropDowns:
+	--
+	-- OnClick handler for dropdown menu items.
+	--
 	function Master:OnClickDropDown(owner, value)
 		if not KRT_CurrentRaid then return end
 		UIDropDownMenu_SetText(owner, value)
@@ -2262,7 +2534,9 @@ do
 		CloseDropDownMenus()
 	end
 
-	-- OnUpdate DropDowns:
+	--
+	-- Updates the text of the dropdowns to reflect the current selection.
+	--
 	function UpdateDropDowns(frame)
 		if not frame or not KRT_CurrentRaid then return end
 		local name = frame:GetName()
@@ -2302,7 +2576,9 @@ do
 		end
 	end
 
-	-- Generate the selection frame:
+	--
+	-- Creates the item selection frame if it doesn't exist.
+	--
 	local function CreateSelectionFrame()
 		if selectionFrame == nil then
 			selectionFrame = CreateFrame("Frame", nil, UIMaster, "KRTSimpleFrameTemplate")
@@ -2319,7 +2595,9 @@ do
 		end
 	end
 
-	-- Update the selection frame:
+	--
+	-- Updates the item selection frame with the current loot items.
+	--
 	function UpdateSelectionFrame()
 		CreateSelectionFrame()
 		local height = 5
@@ -2467,6 +2745,7 @@ do
 						whisper = L.WhisperDisenchantAssign:format(itemLink)
 					end
 				end
+
 				if output and not announced then
 					addon:Announce(output)
 					announced = true
@@ -2482,7 +2761,9 @@ do
 		return false
 	end
 
-	-- Trade item to player:
+	--
+	-- Trades an item from inventory to a player.
+	--
 	function TradeItem(itemLink, playerName, rollType, rollValue)
 		if itemLink ~= GetItemLink() then return end
 		trader = unitName
@@ -2523,7 +2804,7 @@ do
 						tinsert(winners, "{star} " .. rolls[i].name .. "(" .. rolls[i].roll .. ")")
 					else
 						SetRaidTarget(rolls[i].name, i + 1)
-						tinsert(winners, markers[i] .. " " .. rolls[i].name .. "(" .. rolls[i].roll .. ")")
+						tinsert(winners, RAID_TARGET_MARKERS[i] .. " " .. rolls[i].name .. "(" .. rolls[i].roll .. ")")
 					end
 				end
 			end
@@ -2534,8 +2815,8 @@ do
 			addon:ClearLoot()
 			addon:ClearRolls(false)
 			addon:ClearRaidIcons()
-			-- Can trade the player?
 		elseif CheckInteractDistance(playerName, 2) == 1 then
+			-- Player is in range for trade
 			if itemInfo.isStack and not addon.options.ignoreStacks then
 				addon:PrintWarning(L.ErrItemStack:format(itemLink))
 				return false
@@ -2732,7 +3013,6 @@ do
 	local localized = false
 	local UpdateUIFrame
 	local updateInterval = 0.5
-
 	local reservesData = {}
 	local reservesByItemID = {}
 	local reserveListFrame, scrollFrame, scrollChild
@@ -2775,9 +3055,10 @@ do
 		return next(reservesData) ~= nil
 	end
 
-	----------------------------------------------------------------
-	-- UI Windows
-	----------------------------------------------------------------
+	--------------------------------------------------------------------------
+	-- UI Window Management
+	--------------------------------------------------------------------------
+
 	function Reserves:ShowWindow()
 		if not reserveListFrame then
 			addon:PrintError("Reserve List frame not available.")
@@ -3356,6 +3637,7 @@ do
 		for k, v in pairs(defaultOptions) do
 			KRT_Options[k] = v
 		end
+		addon:PrintSuccess("Default options have been restored.")
 	end
 
 	--
@@ -3365,6 +3647,7 @@ do
 		addon.options = KRT_Options
 		Utils.fillTable(addon.options, defaultOptions)
 
+		-- Ensure dependent options are consistent
 		if not addon.options.useRaidWarning then
 			addon.options.countdownSimpleRaidMsg = false
 		end
@@ -3397,7 +3680,8 @@ do
 
 	--
 	-- Hides the configuration frame.
-	--	function Config:Hide()
+	--
+	function Config:Hide()
 		if UIConfig and UIConfig:IsShown() then
 			UIConfig:Hide()
 		end
@@ -3410,6 +3694,7 @@ do
 		if not btn then return end
 		frameName = frameName or btn:GetParent():GetName()
 		local value, name = nil, btn:GetName()
+
 		if name ~= frameName .. "countdownDuration" then
 			value = (btn:GetChecked() == 1) or false
 			if name == frameName .. "minimapButton" then
@@ -3424,7 +3709,9 @@ do
 		KRT_Options[name] = value
 	end
 
-	-- Localizing ui frame:
+	--
+	-- Localizes UI elements.
+	--
 	function LocalizeUIFrame()
 		if localized then
 			return
@@ -3472,6 +3759,7 @@ do
 			_G[frameName .. "countdownDuration"]:SetValue(addon.options.countdownDuration)
 			_G[frameName .. "countdownDurationText"]:SetText(addon.options.countdownDuration)
 
+			-- Handle dependent options
 			local useRaidWarningBtn = _G[frameName .. "useRaidWarning"]
 			local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
 			local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
@@ -3490,7 +3778,6 @@ do
 			end
 		end
 	end
-	
 end
 
 -- ==================== Warnings Frame ==================== --
@@ -5927,8 +6214,13 @@ do
 	end
 end
 
--- ==================== Slash Commands ==================== --
+-- Slash Commands, Core Events, etc. continue in the file but are omitted here for brevity.
+-- The subsequent modules like Warnings, MS Changes, LFM Spammer, Tooltips, and Logger
+-- would follow a similar refactoring pattern.
 
+---============================================================================
+-- Slash Commands
+---============================================================================
 do
 	-- Valid subcommands for each feature
 	local cmdAchiev   = { "ach", "achi", "achiev", "achievement" }
@@ -6110,7 +6402,7 @@ function addon:ADDON_LOADED(name)
 		"PLAYER_ENTERING_WORLD",
 		"COMBAT_LOG_EVENT_UNFILTERED",
 		"RAID_INSTANCE_WELCOME",
-		-- Master frame events:
+		-- Master Looter Events
 		"ITEM_LOCKED",
 		"LOOT_CLOSED",
 		"LOOT_OPENED",
@@ -6140,6 +6432,9 @@ function addon:RAID_INSTANCE_WELCOME(...)
 	end
 end
 
+--
+-- PLAYER_ENTERING_WORLD: Performs initial checks when the player logs in.
+--
 function addon:PLAYER_ENTERING_WORLD()
 	mainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	Utils.schedule(3, self.Raid.FirstCheck)
@@ -6172,7 +6467,6 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
 	if not KRT_CurrentRaid then return end
 	if event == "UNIT_DIED" then
 		local npcID = Utils.GetNPCID(destGUID)
-		-- LibBossIDs-1.0 confirms whether the NPC is a boss.
 		if BossIDs.BossIDs[npcID] then
 			self.Raid:AddBoss(destName)
 		end
