@@ -5,7 +5,7 @@
 		"ghcr.io/devcontainers/features/node:1": {},
 		"ghcr.io/devcontainers/features/python:1": {},
 		"ghcr.io/devcontainers/features/git:1": {},
-		"ghcr.io/devcontainers/features/common-utils:1": {}
+		"ghcr.io/devcontainers/features/common-utils:1": {},
 		"ghcr.io/prulloac/devcontainer-features/lua:1": {}
 	},
 	"postCreateCommand": "sudo apt-get update && sudo apt-get install -y dos2unix luarocks lua5.1 nodejs npm git && sudo luarocks install luacheck",
