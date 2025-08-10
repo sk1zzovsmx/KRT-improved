@@ -67,6 +67,7 @@
         "HIGHLIGHT_FONT_COLOR",
         "UIParent",
         "GameTooltip",
-        "Minimap"
+        "Minimap",
+        "ReloadUI"
     ]
 }
