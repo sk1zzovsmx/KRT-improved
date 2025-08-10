@@ -5172,7 +5172,7 @@ do
         frame:SetScript("OnUpdate", function(...) self:UpdateUIFrame(...) end)
     end
 
-    function Boss:UpdateUIFrame(self, elapsed)
+    function Boss:UpdateUIFrame(frame, elapsed)
         if not bossesFrame then return end
         if not localized then
             _G[frameName .. "Title"]:SetText(L.StrBosses)
@@ -5180,7 +5180,7 @@ do
             localized = true
         end
 
-        if Utils.periodic(self, frameName, updateInterval, elapsed) then
+        if Utils.periodic(frame, frameName, updateInterval, elapsed) then
             local selectedRaidID = addon.Logger.selectedRaid
             local selectedBossID = addon.Logger.selectedBoss
             if not fetched then
@@ -5326,14 +5326,14 @@ do
         frame:SetScript("OnUpdate", function(...) self:UpdateUIFrame(...) end)
     end
 
-    function BossAttendees:UpdateUIFrame(self, elapsed)
+    function BossAttendees:UpdateUIFrame(frame, elapsed)
         if not attendeesFrame then return end
         if not localized then
             _G[frameName .. "Title"]:SetText(L.StrBossAttendees)
             localized = true
         end
 
-        if Utils.periodic(self, frameName, updateInterval, elapsed) then
+        if Utils.periodic(frame, frameName, updateInterval, elapsed) then
             local selectedBossID = addon.Logger.selectedBoss
             local selectedPlayerID = addon.Logger.selectedBossPlayer
             if not fetched then
@@ -5458,7 +5458,7 @@ do
         frame:SetScript("OnUpdate", function(...) self:UpdateUIFrame(...) end)
     end
 
-    function RaidAttendees:UpdateUIFrame(self, elapsed)
+    function RaidAttendees:UpdateUIFrame(frame, elapsed)
         if not attendeesFrame then return end
         if not localized then
             _G[frameName .. "Title"]:SetText(L.StrRaidAttendees)
@@ -5470,7 +5470,7 @@ do
             localized = true
         end
 
-        if Utils.periodic(self, frameName, updateInterval, elapsed) then
+        if Utils.periodic(frame, frameName, updateInterval, elapsed) then
             if not fetched then
                 self:InitList()
                 self:Fetch()
@@ -5610,7 +5610,7 @@ do
         frame:SetScript("OnUpdate", function(...) self:UpdateUIFrame(...) end)
     end
 
-    function Loot:UpdateUIFrame(self, elapsed)
+    function Loot:UpdateUIFrame(frame, elapsed)
         if not lootFrame then return end
         if not localized then
             _G[frameName .. "Title"]:SetText(L.StrRaidLoot)
@@ -5631,7 +5631,7 @@ do
             localized = true
         end
 
-        if Utils.periodic(self, frameName, updateInterval, elapsed) then
+        if Utils.periodic(frame, frameName, updateInterval, elapsed) then
             if not fetched then
                 raidLoot = addon.Raid:GetLoot(addon.Logger.selectedRaid)
                 self:InitList()
@@ -5861,14 +5861,14 @@ do
         twipe(tempDate)
     end
 
-    function BossBox:UpdateUIFrame(self, elapsed)
+    function BossBox:UpdateUIFrame(frame, elapsed)
         if not localized then
-            addon:SetTooltip(_G[frameName .. "Name"], L.StrBossNameHelp, "ANCHOR_LEFT")
+            addon:SetTooltip(_G[frameName .. "Name"],       L.StrBossNameHelp,       "ANCHOR_LEFT")
             addon:SetTooltip(_G[frameName .. "Difficulty"], L.StrBossDifficultyHelp, "ANCHOR_LEFT")
-            addon:SetTooltip(_G[frameName .. "Time"], L.StrBossTimeHelp, "ANCHOR_RIGHT")
+            addon:SetTooltip(_G[frameName .. "Time"],       L.StrBossTimeHelp,       "ANCHOR_RIGHT")
             localized = true
         end
-        if Utils.periodic(self, frameName, updateInterval, elapsed) then
+        if Utils.periodic(frame, frameName, updateInterval, elapsed) then
             Utils.setText(_G[frameName .. "Title"], L.StrEditBoss, L.StrAddBoss, isEdit)
         end
     end
