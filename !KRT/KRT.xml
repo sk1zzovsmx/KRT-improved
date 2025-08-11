@@ -3385,6 +3385,9 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
+						<Scripts>
+							<OnClick>KRT.Logger.BossAttendees:Delete(self, button)</OnClick>
+						</Scripts>
 					</Button>
 					<!-- Table Headers -->
 					<Button name="$parentHeaderName" inherits="KRTLoggerTableHeader" text="NAME">
@@ -4018,5 +4021,6 @@
 			<OnLoad>KRT.Logger:OnLoad(self)</OnLoad>
 		</Scripts>
 	</Frame>
+	<!-- ====== End of History Loot ====== -->
 
 </Ui>
