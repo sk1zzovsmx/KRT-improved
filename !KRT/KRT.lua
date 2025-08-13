@@ -66,7 +66,7 @@ local GetItemIndex, GetItemName, GetItemLink, GetItemTexture
 
 -- Roll Types Enum
 local rollTypes                         = {
-    MAINSHEC   = 1,
+    MAINSPEC   = 1,
     OFFSPEC    = 2,
     RESERVED   = 3,
     FREE       = 4,
