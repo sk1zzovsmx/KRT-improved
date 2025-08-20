@@ -349,7 +349,7 @@ do
 	end
 
 	-- Register some events and frame-related functions:
-	addon:RegisterEvents("ADDON_LOADED")
+        addon:RegisterEvent("ADDON_LOADED")
 	mainFrame:SetScript("OnEvent", HandleEvent)
 	mainFrame:SetScript("OnUpdate", Utils.run)
 end
@@ -5822,25 +5822,28 @@ end
 -- On ADDON_LOADED:
 function addon:ADDON_LOADED(name)
 	if name ~= addonName then return end
-	mainFrame:UnregisterEvent("ADDON_LOADED")
-	LoadOptions()
-	self:RegisterEvents(
-		"CHAT_MSG_ADDON",
-		"CHAT_MSG_SYSTEM",
-		"CHAT_MSG_LOOT",
-		"CHAT_MSG_MONSTER_YELL",
-		"RAID_ROSTER_UPDATE",
-		"PLAYER_ENTERING_WORLD",
-		"COMBAT_LOG_EVENT_UNFILTERED",
-		"RAID_INSTANCE_WELCOME",
-		-- Master frame events:
-		"ITEM_LOCKED",
-		"LOOT_CLOSED",
-		"LOOT_OPENED",
-		"LOOT_SLOT_CLEARED",
-		"TRADE_ACCEPT_UPDATE"
-	)
-	self:RAID_ROSTER_UPDATE()
+        mainFrame:UnregisterEvent("ADDON_LOADED")
+        LoadOptions()
+        local events = {
+                CHAT_MSG_ADDON = "CHAT_MSG_ADDON",
+                CHAT_MSG_SYSTEM = "CHAT_MSG_SYSTEM",
+                CHAT_MSG_LOOT = "CHAT_MSG_LOOT",
+                CHAT_MSG_MONSTER_YELL = "CHAT_MSG_MONSTER_YELL",
+                RAID_ROSTER_UPDATE = "RAID_ROSTER_UPDATE",
+                PLAYER_ENTERING_WORLD = "PLAYER_ENTERING_WORLD",
+                COMBAT_LOG_EVENT_UNFILTERED = "COMBAT_LOG_EVENT_UNFILTERED",
+                RAID_INSTANCE_WELCOME = "RAID_INSTANCE_WELCOME",
+                -- Master frame events:
+                ITEM_LOCKED = "ITEM_LOCKED",
+                LOOT_CLOSED = "LOOT_CLOSED",
+                LOOT_OPENED = "LOOT_OPENED",
+                LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
+                TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
+        }
+        for evt, handler in pairs(events) do
+                self:RegisterEvent(evt, handler)
+        end
+        self:RAID_ROSTER_UPDATE()
 end
 
 function addon:RAID_ROSTER_UPDATE()
