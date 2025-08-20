@@ -99,6 +99,7 @@ local format, match, find, strlen       = string.format, string.match, string.fi
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 local deformat                          = LibStub("LibDeformat-3.0")
+local LibCompat                         = LibStub("LibCompat-1.0")
 
 -- Returns the used frame's name:
 function addon:GetFrameName()
@@ -376,45 +377,46 @@ do
 			Raid:End()
 			return
 		end
-		local realm = GetRealmName() or UNKNOWN
-		KRT_Players[realm] = KRT_Players[realm] or {}
-		local players = {}
-		for i = 1, numRaid do
-			local name, rank, subgroup, level, classL, class, _, online = GetRaidRosterInfo(i)
-			if name then
-				tinsert(players, name)
-				inRaid = false
-				for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
-					if v.name == name and v.leave == nil then
-						inRaid = true
-					end
-				end
-				local unitID = "raid" .. tostring(i)
-				local raceL, race = UnitRace(unitID)
-				if not inRaid then
-					local toRaid = {
-						name = name,
-						rank = rank,
-						subgroup = subgroup,
-						class = class or "UNKNOWN",
-						join = Utils.GetCurrentTime(),
-						leave = nil
-					}
-					Raid:AddPlayer(toRaid)
-				end
-				if not KRT_Players[realm][name] then
-					KRT_Players[realm][name] = {
-						name = name,
-						level = level,
-						race = race,
-						raceL = raceL,
-						class = class or "UNKNOWN",
-						classL = classL,
-						sex = UnitSex(unitID)
-					}
-				end
-			end
-		end
+               local realm = GetRealmName() or UNKNOWN
+               KRT_Players[realm] = KRT_Players[realm] or {}
+               local players = {}
+               local index = 0
+               for unit in LibCompat.UnitIterator(false) do
+                       index = index + 1
+                       local name, rank, subgroup, level, classL, class, _, online = GetRaidRosterInfo(index)
+                       if name then
+                               tinsert(players, name)
+                               inRaid = false
+                               for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
+                                       if v.name == name and v.leave == nil then
+                                               inRaid = true
+                                       end
+                               end
+                               local raceL, race = UnitRace(unit)
+                               if not inRaid then
+                                       local toRaid = {
+                                               name = name,
+                                               rank = rank,
+                                               subgroup = subgroup,
+                                               class = class or "UNKNOWN",
+                                               join = Utils.GetCurrentTime(),
+                                               leave = nil
+                                       }
+                                       Raid:AddPlayer(toRaid)
+                               end
+                               if not KRT_Players[realm][name] then
+                                       KRT_Players[realm][name] = {
+                                               name = name,
+                                               level = level,
+                                               race = race,
+                                               raceL = raceL,
+                                               class = class or "UNKNOWN",
+                                               classL = classL,
+                                               sex = UnitSex(unit)
+                                       }
+                               end
+                       end
+               end
 		for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
 			local found = nil
 			for _, p in ipairs(players) do
@@ -437,43 +439,44 @@ do
 		end
 		numRaid = GetNumRaidMembers()
 		if numRaid == 0 then return end
-		local realm = GetRealmName() or UNKNOWN
-		KRT_Players[realm] = KRT_Players[realm] or {}
-		local currentTime = Utils.GetCurrentTime()
-		local raidInfo = {
-			realm = realm,
-			zone = zoneName,
-			size = raidSize,
-			players = {},
-			bossKills = {},
-			loot = {},
-			startTime = currentTime,
-			changes = {},
-		}
-		for i = 1, numRaid do
-			local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
-			if name then
-				local unitID = "raid" .. tostring(i)
-				local raceL, race = UnitRace(unitID)
-				tinsert(raidInfo.players, {
-					name     = name,
-					rank     = rank,
-					subgroup = subgroup,
-					class    = class or "UNKNOWN",
-					join     = Utils.GetCurrentTime(),
-					leave    = nil,
-				})
-				KRT_Players[realm][name] = {
-					name   = name,
-					level  = level,
-					race   = race,
-					raceL  = raceL,
-					class  = class or "UNKNOWN",
-					classL = classL,
-					sex    = UnitSex(unitID),
-				}
-			end
-		end
+               local realm = GetRealmName() or UNKNOWN
+               KRT_Players[realm] = KRT_Players[realm] or {}
+               local currentTime = Utils.GetCurrentTime()
+               local raidInfo = {
+                       realm = realm,
+                       zone = zoneName,
+                       size = raidSize,
+                       players = {},
+                       bossKills = {},
+                       loot = {},
+                       startTime = currentTime,
+                       changes = {},
+               }
+               local index = 0
+               for unit in LibCompat.UnitIterator(false) do
+                       index = index + 1
+                       local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(index)
+                       if name then
+                               local raceL, race = UnitRace(unit)
+                               tinsert(raidInfo.players, {
+                                       name     = name,
+                                       rank     = rank,
+                                       subgroup = subgroup,
+                                       class    = class or "UNKNOWN",
+                                       join     = Utils.GetCurrentTime(),
+                                       leave    = nil,
+                               })
+                               KRT_Players[realm][name] = {
+                                       name   = name,
+                                       level  = level,
+                                       race   = race,
+                                       raceL  = raceL,
+                                       class  = class or "UNKNOWN",
+                                       classL = classL,
+                                       sex    = UnitSex(unit),
+                               }
+                       end
+               end
 		tinsert(KRT_Raids, raidInfo)
 		KRT_CurrentRaid = #KRT_Raids
 		TriggerEvent("RaidCreate", KRT_CurrentRaid)
@@ -570,13 +573,14 @@ do
 		elseif isDyn then
 			instanceDiff = instanceDiff + (2 * dynDiff)
 		end
-		local players = {}
-		for i = 1, GetNumRaidMembers() do
-			local name, _, _, _, _, _, _, online = GetRaidRosterInfo(i)
-			if online == 1 then -- track only online players:
-				tinsert(players, name)
-			end
-		end
+               local players = {}
+               if GetNumRaidMembers() > 0 then
+                       for unit in LibCompat.UnitIterator(false) do
+                               if UnitIsConnected(unit) then -- track only online players:
+                                       tinsert(players, UnitName(unit))
+                               end
+                       end
+               end
 		local currentTime = Utils.GetCurrentTime()
 		local killInfo = {
 			name = bossName,
@@ -864,27 +868,28 @@ do
 		local rank = 0
 		local originalName = name
 		name = name or unitName or UnitName("player")
-		if next(players) == nil then
-			if GetNumRaidMembers() > 0 then
-				numRaid = GetNumRaidMembers()
-				for i = 1, numRaid do
-					local pname, prank, _, _, _, _, _, _, _, _, _ = GetRaidRosterInfo(i)
-					if pname == name then
-						rank = prank
-						break
-					end
-				end
-			end
-		else
-			for i, p in ipairs(players) do
-				if p.name == name then
-					rank = p.rank or 0
-					break
-				end
-			end
-		end
-		return rank
-	end
+               if next(players) == nil then
+                       if GetNumRaidMembers() > 0 then
+                               local index = 0
+                               for unit in LibCompat.UnitIterator(false) do
+                                       index = index + 1
+                                       local pname, prank = GetRaidRosterInfo(index)
+                                       if pname == name then
+                                               rank = prank
+                                               break
+                                       end
+                               end
+                       end
+               else
+                       for i, p in ipairs(players) do
+                               if p.name == name then
+                                       rank = p.rank or 0
+                                       break
+                               end
+                       end
+               end
+               return rank
+       end
 
 	-- Get player class:
 	function addon:GetPlayerClass(name)
