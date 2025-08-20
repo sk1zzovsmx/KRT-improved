@@ -2337,24 +2337,43 @@ do
 			if GetMasterLootCandidate(p) == playerName then
 				GiveMasterLoot(itemIndex, p)
 				local output, whisper
-				if rollType <= 4 and addon.options.announceOnWin then
-					output = L.ChatAward:format(playerName, itemLink)
-				elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
-					output = L.ChatHold:format(playerName, itemLink)
-					if addon.options.lootWhispers then
-						whisper = L.WhisperHoldAssign:format(itemLink)
-					end
-				elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
-					output = L.ChatBank:format(playerName, itemLink)
-					if addon.options.lootWhispers then
-						whisper = L.WhisperBankAssign:format(itemLink)
-					end
-				elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
-					output = L.ChatDisenchant:format(itemLink, playerName)
-					if addon.options.lootWhispers then
-						whisper = L.WhisperDisenchantAssign:format(itemLink)
+				local function announceWin()
+					if addon.options.announceOnWin then
+						output = L.ChatAward:format(playerName, itemLink)
 					end
 				end
+				local HandleRoll = {
+					[rollTypes.MAINSPEC] = announceWin,
+					[rollTypes.OFFSPEC] = announceWin,
+					[rollTypes.RESERVED] = announceWin,
+					[rollTypes.FREE] = announceWin,
+					[rollTypes.HOLD] = function()
+						if addon.options.announceOnHold then
+							output = L.ChatHold:format(playerName, itemLink)
+							if addon.options.lootWhispers then
+								whisper = L.WhisperHoldAssign:format(itemLink)
+							end
+						end
+					end,
+					[rollTypes.BANK] = function()
+						if addon.options.announceOnBank then
+							output = L.ChatBank:format(playerName, itemLink)
+							if addon.options.lootWhispers then
+								whisper = L.WhisperBankAssign:format(itemLink)
+							end
+						end
+					end,
+					[rollTypes.DISENCHANT] = function()
+						if addon.options.announceOnDisenchant then
+							output = L.ChatDisenchant:format(itemLink, playerName)
+							if addon.options.lootWhispers then
+								whisper = L.WhisperDisenchantAssign:format(itemLink)
+							end
+						end
+					end,
+				}
+				local f = HandleRoll[rollType]
+				if f then f() end
 				if output and not announced then
 					addon:Announce(output)
 					announced = true
@@ -2376,34 +2395,59 @@ do
 		trader = unitName
 
 		-- Prepare initial output and whisper:
-		local output, whisper
-		local keep = true
-		if rollType <= 4 and addon.options.announceOnWin then
-			output = L.ChatAward:format(playerName, itemLink)
-			keep = false
-		elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
-			output = L.ChatNoneRolledHold:format(itemLink, playerName)
-		elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
-			output = L.ChatNoneRolledBank:format(itemLink, playerName)
-		elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
-			output = L.ChatNoneRolledDisenchant:format(itemLink, playerName)
-		end
+				local output, whisper
+				local keep = true
+				local function announceWin()
+					if addon.options.announceOnWin then
+						output = L.ChatAward:format(playerName, itemLink)
+						keep = false
+					end
+				end
+				local HandleRoll = {
+					[rollTypes.MAINSPEC] = announceWin,
+					[rollTypes.OFFSPEC] = announceWin,
+					[rollTypes.RESERVED] = announceWin,
+					[rollTypes.FREE] = announceWin,
+					[rollTypes.HOLD] = function()
+						if addon.options.announceOnHold then
+							output = L.ChatNoneRolledHold:format(itemLink, playerName)
+						end
+					end,
+					[rollTypes.BANK] = function()
+						if addon.options.announceOnBank then
+							output = L.ChatNoneRolledBank:format(itemLink, playerName)
+						end
+					end,
+					[rollTypes.DISENCHANT] = function()
+						if addon.options.announceOnDisenchant then
+							output = L.ChatNoneRolledDisenchant:format(itemLink, playerName)
+						end
+					end,
+				}
+				local f = HandleRoll[rollType]
+				if f then f() end
 
-		-- Keeping the item:
-		if keep then
-			if rollType == rollTypes.HOLD then
-				whisper = L.WhisperHoldTrade:format(itemLink)
-			elseif rollType == rollTypes.BANK then
-				whisper = L.WhisperBankTrade:format(itemLink)
-			elseif rollType == rollTypes.DISENCHANT then
-				whisper = L.WhisperDisenchantTrade:format(itemLink)
-			end
-			-- Multiple winners:
-		elseif itemCount > 1 then
-			addon:ClearRaidIcons()
-			SetRaidTarget(trader, 1)
-			local rolls = addon:GetRolls()
-			local winners = {}
+				-- Keeping the item:
+				if keep then
+					local Whisper = {
+						[rollTypes.HOLD] = function()
+							whisper = L.WhisperHoldTrade:format(itemLink)
+						end,
+						[rollTypes.BANK] = function()
+							whisper = L.WhisperBankTrade:format(itemLink)
+						end,
+						[rollTypes.DISENCHANT] = function()
+							whisper = L.WhisperDisenchantTrade:format(itemLink)
+						end,
+					}
+					local w = Whisper[rollType]
+					if w then w() end
+				-- Multiple winners:
+				elseif itemCount > 1 then
+				addon:ClearRaidIcons()
+				SetRaidTarget(trader, 1)
+				local rolls = addon:GetRolls()
+				local winners = {}
 			for i = 1, itemCount do
 				if rolls[i] then
 					if rolls[i].name == trader then
