@@ -32,7 +32,7 @@ local unitName                          = UnitName("player")
 local trader, winner
 local holder, banker, disenchanter
 local lootOpened                        = false
-local rollTypes                         = { mainspec = 1, offspec = 2, reserved = 3, free = 4, bank = 5, disenchant = 6, hold = 7, dkp = 8 }
+local rollTypes                         = { MAINSPEC = 1, OFFSPEC = 2, RESERVED = 3, FREE = 4, BANK = 5, DISENCHANT = 6, HOLD = 7, DKP = 8 }
 local currentRollType                   = 4
 local currentRollItem                   = 0
 local fromInventory                     = false
@@ -1254,7 +1254,7 @@ do
 		SortRolls()
 		if not selectedPlayer then
 			local resolvedItemId = itemId or addon:GetCurrentRollItemID()
-			if currentRollType == rollTypes.reserved then
+			if currentRollType == rollTypes.RESERVED then
 				local topRoll = -1
 				for _, entry in ipairs(rollsTable) do
 					if addon:IsReserved(resolvedItemId, entry.name) and entry.roll > topRoll then
@@ -1280,7 +1280,7 @@ do
 		local name = UnitName("player")
 		local allowed = 1
 
-		if currentRollType == rollTypes.reserved then
+		if currentRollType == rollTypes.RESERVED then
 			allowed = addon.Reserves:GetReserveCountForItem(itemId, name)
 		end
 
@@ -1331,7 +1331,7 @@ do
 			end
 
 			local allowed = 1
-			if currentRollType == rollTypes.reserved then
+			if currentRollType == rollTypes.RESERVED then
 				local playerReserves = addon.Reserves:GetReserveCountForItem(itemId, player)
 				allowed = playerReserves > 0 and playerReserves or 1
 			end
@@ -1379,7 +1379,7 @@ do
 		end
 		itemRollTracker[itemId] = itemRollTracker[itemId] or {}
 		local used = itemRollTracker[itemId][name] or 0
-		local allowed = (currentRollType == rollTypes.reserved and addon.Reserves:GetReserveCountForItem(itemId, name) > 0)
+		local allowed = (currentRollType == rollTypes.RESERVED and addon.Reserves:GetReserveCountForItem(itemId, name) > 0)
 			and addon.Reserves:GetReserveCountForItem(itemId, name) or 1
 		local result = used >= allowed
 		addon:Debug("DEBUG", "DidRoll: name=%s, itemId=%d, used=%d, allowed=%d, result=%s", name, itemId, used, allowed,
@@ -1436,7 +1436,7 @@ do
 	function addon:IsValidRoll(itemId, name)
 		itemRollTracker[itemId] = itemRollTracker[itemId] or {}
 		local used = itemRollTracker[itemId][name] or 0
-		local allowed = (currentRollType == rollTypes.reserved)
+		local allowed = (currentRollType == rollTypes.RESERVED)
 			and addon.Reserves:GetReserveCountForItem(itemId, name)
 			or 1
 		local result = used < allowed
@@ -1477,7 +1477,7 @@ do
 		scrollChild:SetWidth(scrollFrame:GetWidth())
 
 		local itemId = self:GetCurrentRollItemID()
-		local isSR = currentRollType == rollTypes.reserved
+		local isSR = currentRollType == rollTypes.RESERVED
 		addon:Debug("DEBUG", "Current itemId: %s, SR mode: %s", tostring(itemId), tostring(isSR))
 
 		local starTarget = selectedPlayer
@@ -1845,7 +1845,7 @@ do
 			local itemID = tonumber(string.match(itemLink or "", "item:(%d+)"))
 			local message = ""
 
-			if rollType == rollTypes.reserved and addon.Reserves and addon.Reserves.FormatReservedPlayersLine then
+			if rollType == rollTypes.RESERVED and addon.Reserves and addon.Reserves.FormatReservedPlayersLine then
 				local srList = addon.Reserves:FormatReservedPlayersLine(itemID)
 				local suff = addon.options.sortAscending and "Low" or "High"
 				message = itemCount > 1
@@ -1920,11 +1920,11 @@ do
 		countdownRun = false
 		local itemLink = GetItemLink()
 		if itemLink == nil then return end
-		currentRollType = rollTypes.hold
+		currentRollType = rollTypes.HOLD
 		if fromInventory == true then
-			return TradeItem(itemLink, holder, rollTypes.hold, 0)
+			return TradeItem(itemLink, holder, rollTypes.HOLD, 0)
 		end
-		return AssignItem(itemLink, holder, rollTypes.hold, 0)
+		return AssignItem(itemLink, holder, rollTypes.HOLD, 0)
 	end
 
 	-- Button: Bank item
@@ -1933,11 +1933,11 @@ do
 		countdownRun = false
 		local itemLink = GetItemLink()
 		if itemLink == nil then return end
-		currentRollType = rollTypes.bank
+		currentRollType = rollTypes.BANK
 		if fromInventory == true then
-			return TradeItem(itemLink, banker, rollTypes.bank, 0)
+			return TradeItem(itemLink, banker, rollTypes.BANK, 0)
 		end
-		return AssignItem(itemLink, banker, rollTypes.bank, 0)
+		return AssignItem(itemLink, banker, rollTypes.BANK, 0)
 	end
 
 	-- Button: Disenchant item
@@ -1946,11 +1946,11 @@ do
 		countdownRun = false
 		local itemLink = GetItemLink()
 		if itemLink == nil then return end
-		currentRollType = rollTypes.disenchant
+		currentRollType = rollTypes.DISENCHANT
 		if fromInventory == true then
-			return TradeItem(itemLink, disenchanter, rollTypes.disenchant, 0)
+			return TradeItem(itemLink, disenchanter, rollTypes.DISENCHANT, 0)
 		end
-		return AssignItem(itemLink, disenchanter, rollTypes.disenchant, 0)
+		return AssignItem(itemLink, disenchanter, rollTypes.DISENCHANT, 0)
 	end
 
 	-- Select winner:
@@ -2339,17 +2339,17 @@ do
 				local output, whisper
 				if rollType <= 4 and addon.options.announceOnWin then
 					output = L.ChatAward:format(playerName, itemLink)
-				elseif rollType == rollTypes.hold and addon.options.announceOnHold then
+				elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
 					output = L.ChatHold:format(playerName, itemLink)
 					if addon.options.lootWhispers then
 						whisper = L.WhisperHoldAssign:format(itemLink)
 					end
-				elseif rollType == rollTypes.bank and addon.options.announceOnBank then
+				elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
 					output = L.ChatBank:format(playerName, itemLink)
 					if addon.options.lootWhispers then
 						whisper = L.WhisperBankAssign:format(itemLink)
 					end
-				elseif rollType == rollTypes.disenchant and addon.options.announceOnDisenchant then
+				elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
 					output = L.ChatDisenchant:format(itemLink, playerName)
 					if addon.options.lootWhispers then
 						whisper = L.WhisperDisenchantAssign:format(itemLink)
@@ -2381,21 +2381,21 @@ do
 		if rollType <= 4 and addon.options.announceOnWin then
 			output = L.ChatAward:format(playerName, itemLink)
 			keep = false
-		elseif rollType == rollTypes.hold and addon.options.announceOnHold then
+		elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
 			output = L.ChatNoneRolledHold:format(itemLink, playerName)
-		elseif rollType == rollTypes.bank and addon.options.announceOnBank then
+		elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
 			output = L.ChatNoneRolledBank:format(itemLink, playerName)
-		elseif rollType == rollTypes.disenchant and addon.options.announceOnDisenchant then
+		elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
 			output = L.ChatNoneRolledDisenchant:format(itemLink, playerName)
 		end
 
 		-- Keeping the item:
 		if keep then
-			if rollType == rollTypes.hold then
+			if rollType == rollTypes.HOLD then
 				whisper = L.WhisperHoldTrade:format(itemLink)
-			elseif rollType == rollTypes.bank then
+			elseif rollType == rollTypes.BANK then
 				whisper = L.WhisperBankTrade:format(itemLink)
-			elseif rollType == rollTypes.disenchant then
+			elseif rollType == rollTypes.DISENCHANT then
 				whisper = L.WhisperDisenchantTrade:format(itemLink)
 			end
 			-- Multiple winners:
@@ -2454,7 +2454,7 @@ do
 					Utils.whisper(playerName, whisper)
 				end
 			end
-			if rollType <= rollTypes.free and playerName == trader then
+			if rollType <= rollTypes.FREE and playerName == trader then
 				addon:Log(currentRollItem, trader, rollType, rollValue)
 			end
 			announced = true
