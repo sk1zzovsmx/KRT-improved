@@ -100,6 +100,8 @@ local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower,
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 local deformat                          = LibStub("LibDeformat-3.0")
 local LibCompat                         = LibStub("LibCompat-1.0")
+local AceBucket                         = LibStub("AceBucket-3.0")
+AceBucket:Embed(addon)
 
 -- Returns the used frame's name:
 function addon:GetFrameName()
@@ -5871,7 +5873,6 @@ function addon:ADDON_LOADED(name)
         local events = {
                 CHAT_MSG_ADDON = "CHAT_MSG_ADDON",
                 CHAT_MSG_SYSTEM = "CHAT_MSG_SYSTEM",
-                CHAT_MSG_LOOT = "CHAT_MSG_LOOT",
                 CHAT_MSG_MONSTER_YELL = "CHAT_MSG_MONSTER_YELL",
                 RAID_ROSTER_UPDATE = "RAID_ROSTER_UPDATE",
                 PLAYER_ENTERING_WORLD = "PLAYER_ENTERING_WORLD",
@@ -5887,6 +5888,7 @@ function addon:ADDON_LOADED(name)
         for evt, handler in pairs(events) do
                 self:RegisterEvent(evt, handler)
         end
+       self:RegisterBucketEvent("CHAT_MSG_LOOT", 0.2, "OnLootBucket")
         self:RAID_ROSTER_UPDATE()
 end
 
@@ -5909,10 +5911,12 @@ function addon:PLAYER_ENTERING_WORLD()
 	Utils.schedule(3, self.Raid.FirstCheck)
 end
 
-function addon:CHAT_MSG_LOOT(msg)
-	if KRT_CurrentRaid then
-		self.Raid:AddLoot(msg)
-	end
+function addon:OnLootBucket(messages)
+       for _, msg in ipairs(messages) do
+               if KRT_CurrentRaid then
+                       self.Raid:AddLoot(msg)
+               end
+       end
 end
 
 function addon:CHAT_MSG_MONSTER_YELL(...)
