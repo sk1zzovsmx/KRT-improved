@@ -4739,20 +4739,37 @@ do
 
 	-- Delete a boss:
 	do
-		local function DeleteBoss()
-			if not selectedBoss then return end
-			local raid = KRT_Raids[selectedRaid]
-			if not raid or not raid.bossKills[selectedBoss] then return end
-			-- We remove the raid boss first:
-			tremove(raid.bossKills, selectedBoss)
-			-- We delete all the loot from the boss:
-			for i, l in ipairs(raid.loot) do
-				if l.bossNum == selectedBoss then
-					tremove(raid.loot, i)
-				end
-			end
-			fetched = false
-		end
+               local function DeleteBoss()
+                       local rID, bID = selectedRaid, selectedBoss
+                       if not (rID and bID) then return end
+                       local raid = KRT_Raids[rID]
+                       if not raid or not raid.bossKills or not raid.bossKills[bID] then return end
+                       -- We remove the raid boss first:
+                       tremove(raid.bossKills, bID)
+                       -- We delete all the loot from the boss (from the bottom):
+                       if type(raid.loot) == "table" then
+                               for i = #raid.loot, 1, -1 do
+                                       local L = raid.loot[i]
+                                       if L and L.bossNum == bID then
+                                               tremove(raid.loot, i)
+                                       end
+                               end
+                               -- REINDEX FIX: adjust bossNum after delete
+                               for i = 1, #raid.loot do
+                                       local L = raid.loot[i]
+                                       if L and L.bossNum and L.bossNum > bID then
+                                               L.bossNum = L.bossNum - 1
+                                       end
+                               end
+                       end
+                       addon.Logger.selectedBoss = nil
+                       fetched = false
+                       if addon.SendMessage then
+                               addon:SendMessage("KRT_RaidLootUpdated")
+                       end
+                       TriggerEvent("LoggerSelectRaid", rID)
+                       TriggerEvent("LoggerSelectBoss")
+               end
 
 		-- Handles the click on the delete button:
 		function Boss:Delete(btn)
