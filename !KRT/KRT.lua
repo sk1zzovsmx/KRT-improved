@@ -4694,22 +4694,20 @@ do
 end
 
 -- ============================================================================
--- Helper locali per liste Logger
+-- Helper locali per liste Logger (ottimizzato)
 -- ============================================================================
 do
+    -- Local alias
+    local _G          = _G
+    local CreateFrame = CreateFrame
+    local wipe        = table.wipe
+    local math_max    = math.max
+
     -- toggle campo selezionato + evento
     local function selectAndTrigger(ns, field, id, event)
         ns[field] = (id ~= ns[field]) and id or nil
         TriggerEvent(event, id)
         return ns[field]
-    end
-
-    -- nasconde frame con prefisso + indice (Btn1, Btn2, ...)
-    local function hideByPrefix(prefix)
-        for i = 1, 200 do        -- 200 è una soglia prudente; alza se serve
-            local b = _G[prefix .. i]
-            if b then b:Hide() end
-        end
     end
 
     -- popup di conferma compatto
@@ -4726,47 +4724,94 @@ do
         }
     end
 
-    -- factory liste: OnLoad → Localize → periodic Update → Fetch → Highlight → postUpdate; con Sort integrato
+    -- cache dei child più usati per ridurre _G[...] ripetuti
+    local function CacheParts(row, name, parts)
+        if row._p then return row._p end
+        local p = {}
+        for i = 1, #parts do
+            p[parts[i]] = _G[name .. parts[i]]
+        end
+        row._p = p
+        return p
+    end
+
+    -- Controller liste con pooling righe e highlight differito
     function MakeListController(cfg)
         -- cfg: keyName, updateInterval, localize(frameName), getData()->array
         --      rowName(frameName,item)->"PrefixBtn"..id, rowTmpl, drawRow(btnName,item,scrollChild,scrollW)
         --      highlightId()->id|nil, postUpdate(frameName)
         --      sorters = { key = function(a,b,asc) return cond end, ... }
-        local self = { frameName = nil, fetched = false, localized = false, data = {}, _asc = false }
+        local self = {
+            frameName  = nil,
+            fetched    = false,
+            localized  = false,
+            data       = {},
+            _asc       = false,
+            _rows      = {},   -- pool ordinato per indice
+            _rowByName = {},   -- cache name->frame
+            _lastHL    = nil,  -- ultimo id evidenziato
+            _active    = true, -- aggiorna solo se visibile
+            _lastWidth = nil,
+        }
 
-        local function hideExisting(frameName)
-            local sample = cfg.rowName(frameName, { id = 1 })
-            local base   = sample:gsub("%d+$", "")
-            hideByPrefix(base)
+        local function acquireRow(name, parent, tmpl)
+            local row = self._rowByName[name]
+            if row then
+                row:Show()
+                return row
+            end
+            row = CreateFrame("Button", name, parent, tmpl)
+            self._rowByName[name] = row
+            return row
+        end
+
+        local function hideExtraRows(fromIndex)
+            for i = fromIndex, #self._rows do
+                local r = self._rows[i]
+                if r then r:Hide() end
+            end
         end
 
         function self:OnLoad(frame)
             if not frame then return end
             self.frameName = frame:GetName()
-            frame:SetScript("OnUpdate", function(_, elapsed) self:UpdateUIFrame(_, elapsed) end)
+
+            frame:SetScript("OnShow", function() self._active = true end)
+            frame:SetScript("OnHide", function() self._active = false end)
+
+            frame:SetScript("OnUpdate", function(f, elapsed) self:UpdateUIFrame(f, elapsed) end)
         end
 
         function self:UpdateUIFrame(frame, elapsed)
-            if not self.frameName then return end
+            if not self.frameName or not self._active then return end
 
             if not self.localized and cfg.localize then
                 cfg.localize(self.frameName)
                 self.localized = true
             end
 
-            if not Utils.periodic(frame, self.frameName .. cfg.keyName, cfg.updateInterval, elapsed) then return end
+            if not Utils.periodic(frame, self.frameName .. (cfg.keyName or ""), cfg.updateInterval, elapsed) then
+                return
+            end
 
             if not self.fetched then
-                self.data = cfg.getData() or {}
+                wipe(self.data)
+                local src = cfg.getData() or {}
+                for i = 1, #src do self.data[i] = src[i] end
                 self:Fetch()
             end
 
+            -- Highlight solo se cambia il selezionato
             if cfg.highlightId then
                 local sel = cfg.highlightId()
-                if sel ~= nil then
-                    for _, it in ipairs(self.data) do
-                        local btn = _G[cfg.rowName(self.frameName, it)]
-                        if btn then Utils.toggleHighlight(btn, sel == it.id) end
+                if sel ~= self._lastHL then
+                    self._lastHL = sel
+                    for i = 1, #self.data do
+                        local it  = self.data[i]
+                        local row = self._rows[i]
+                        if row then
+                            Utils.toggleHighlight(row, sel ~= nil and it.id == sel)
+                        end
                     end
                 end
             end
@@ -4777,25 +4822,44 @@ do
         function self:Fetch()
             local n = self.frameName
             if not n then return end
+
             local sf = _G[n .. "ScrollFrame"]
             local sc = _G[n .. "ScrollFrameScrollChild"]
-            local h  = 0
+            if not (sf and sc) then return end
 
+            local scrollW = sf:GetWidth()
+            self._lastWidth = scrollW
+
+            local totalH = 0
             sc:SetHeight(sf:GetHeight())
-            hideExisting(n)
 
-            for _, it in ipairs(self.data) do
+            local count = #self.data
+            for i = 1, count do
+                local it      = self.data[i]
                 local btnName = cfg.rowName(n, it)
-                local btn = _G[btnName] or CreateFrame("Button", btnName, sc, cfg.rowTmpl)
-                btn:SetID(it.id); btn:Show()
+                local row     = self._rows[i]
 
-                local rh = cfg.drawRow(btnName, it, sc, sf:GetWidth())
-                btn:SetPoint("TOPLEFT", 0, -h)
-                btn:SetWidth(sf:GetWidth() - 20)
-                h = h + (rh or btn:GetHeight())
+                if not row or row:GetName() ~= btnName then
+                    row = acquireRow(btnName, sc, cfg.rowTmpl)
+                    self._rows[i] = row
+                end
+
+                row:SetID(it.id)
+                row:ClearAllPoints()
+                row:SetPoint("TOPLEFT", 0, -totalH)
+                row:SetWidth(scrollW - 20)
+
+                local rH = cfg.drawRow(btnName, it, sc, scrollW, CacheParts, row)
+                local usedH = rH or row:GetHeight() or 20
+                totalH = totalH + usedH
+
+                row:Show()
             end
 
-            sc:SetHeight(math.max(h, sf:GetHeight()))
+            hideExtraRows(count + 1)
+            sc:SetHeight(math_max(totalH, sf:GetHeight()))
+
+            self._lastHL = nil
             self.fetched = true
         end
 
@@ -4803,13 +4867,14 @@ do
 
         function self:Sort(key)
             local cmp = cfg.sorters and cfg.sorters[key]
-            if not cmp then return end
+            if not cmp or #self.data <= 1 then return end
             self._asc = not self._asc
             table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
+            self.fetched = true
             self:Fetch()
         end
 
-        -- esponi anche tool locali utili agli altri blocchi
+        -- Esponi tool locali
         self._selectAndTrigger = selectAndTrigger
         self._makeConfirmPopup = makeConfirmPopup
 
@@ -4851,11 +4916,10 @@ do
     function Logger:Toggle() Utils.toggle(UILogger) end
 
     function Logger:Hide()
-        if UILogger and UILogger:IsShown() then
-            Logger.selectedRaid, Logger.selectedBoss, Logger.selectedPlayer, Logger.selectedItem =
-                KRT_CurrentRaid, nil, nil, nil
-            UILogger:Hide()
-        end
+        if not UILogger then return end
+        Logger.selectedRaid, Logger.selectedBoss, Logger.selectedPlayer, Logger.selectedItem =
+            KRT_CurrentRaid, nil, nil, nil
+        Utils.showHide(UILogger, false)
     end
 
     -- selettori (toggle + evento)
@@ -4875,10 +4939,10 @@ do
         local function openItemMenu()
             if not addon.Logger.selectedItem then return end
             local f = _G.KRTLoggerItemMenuFrame or
-            CreateFrame("Frame", "KRTLoggerItemMenuFrame", UIParent, "UIDropDownMenuTemplate")
+                CreateFrame("Frame", "KRTLoggerItemMenuFrame", UIParent, "UIDropDownMenuTemplate")
             EasyMenu({
-                { text = L.StrEditItemLooter,  func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_WINNER") end },
-                { text = L.StrEditItemRollType, func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_ROLL") end },
+                { text = L.StrEditItemLooter,    func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_WINNER") end },
+                { text = L.StrEditItemRollType,  func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_ROLL") end },
                 { text = L.StrEditItemRollValue, func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_VALUE") end },
             }, f, "cursor", 0, 0, "MENU")
         end
@@ -4983,10 +5047,17 @@ do
             addon:SetTooltip(_G[n .. "CurrentBtn"], L.StrRaidsCurrentHelp, nil, L.StrRaidCurrentTitle)
         end,
 
+        -- Preformat date una volta sola
         getData        = function()
             local t = {}
             for i, r in ipairs(KRT_Raids) do
-                t[#t + 1] = { id = i, zone = r.zone, size = r.size, date = r.startTime }
+                t[#t + 1] = {
+                    id      = i,
+                    zone    = r.zone,
+                    size    = r.size,
+                    date    = r.startTime,                         -- numerico per sort
+                    dateFmt = date("%d/%m/%Y %H:%M", r.startTime), -- stringa per UI
+                }
             end
             return t
         end,
@@ -4994,12 +5065,20 @@ do
         rowName        = function(n, it) return n .. "RaidBtn" .. it.id end,
         rowTmpl        = "KRTLoggerRaidButton",
 
-        drawRow        = function(btn, it)
-            _G[btn .. "ID"]:SetText(it.id)
-            _G[btn .. "Date"]:SetText(date("%d/%m/%Y %H:%M", it.date))
-            _G[btn .. "Zone"]:SetText(it.zone)
-            _G[btn .. "Size"]:SetText(it.size)
-        end,
+        -- Altezza riga costante (cache dal template alla 1a chiamata)
+        drawRow        = (function()
+            local ROW_H
+            local parts = { "ID", "Date", "Zone", "Size" }
+            return function(btn, it, sc, w, CacheParts, row)
+                if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
+                local ui = CacheParts(row, btn, parts)
+                ui.ID:SetText(it.id)
+                ui.Date:SetText(it.dateFmt)
+                ui.Zone:SetText(it.zone)
+                ui.Size:SetText(it.size)
+                return ROW_H
+            end
+        end)(),
 
         highlightId    = function() return addon.Logger.selectedRaid end,
 
@@ -5050,8 +5129,11 @@ do
             addon.Logger.selectedRaid = nil
             controller:Dirty()
         end
-        function Raids:Delete(btn) if btn and addon.Logger.selectedRaid ~= nil then StaticPopup_Show(
-                "KRTLOGGER_DELETE_RAID") end end
+        function Raids:Delete(btn)
+            if btn and addon.Logger.selectedRaid ~= nil then
+                StaticPopup_Show("KRTLOGGER_DELETE_RAID")
+            end
+        end
 
         (controller._makeConfirmPopup)("KRTLOGGER_DELETE_RAID", L.StrConfirmDeleteRaid, DeleteRaid)
     end
@@ -5078,8 +5160,20 @@ do
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
         end,
 
+        -- Copia e preformat time (senza toccare i campi usati per sort)
         getData        = function()
-            local t = addon.Raid:GetBosses(addon.Logger.selectedRaid) or {}
+            local src = addon.Raid:GetBosses(addon.Logger.selectedRaid) or {}
+            local t = {}
+            for i = 1, #src do
+                local b = src[i]
+                t[i] = {
+                    id      = b.id,
+                    name    = b.name,
+                    time    = b.time,                -- numerico per sort
+                    mode    = b.mode,
+                    timeFmt = date("%H:%M", b.time), -- stringa UI
+                }
+            end
             table.sort(t, function(a, b) return a.id > b.id end)
             return t
         end,
@@ -5087,12 +5181,19 @@ do
         rowName        = function(n, it) return n .. "BossBtn" .. it.id end,
         rowTmpl        = "KRTLoggerBossButton",
 
-        drawRow        = function(btn, it)
-            _G[btn .. "ID"]:SetText(it.id)
-            _G[btn .. "Name"]:SetText(it.name)
-            _G[btn .. "Time"]:SetText(date("%H:%M", it.time))
-            _G[btn .. "Mode"]:SetText(it.mode)
-        end,
+        drawRow        = (function()
+            local ROW_H
+            local parts = { "ID", "Name", "Time", "Mode" }
+            return function(btn, it, sc, w, CacheParts, row)
+                if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
+                local ui = CacheParts(row, btn, parts)
+                ui.ID:SetText(it.id)
+                ui.Name:SetText(it.name)
+                ui.Time:SetText(it.timeFmt)
+                ui.Mode:SetText(it.mode)
+                return ROW_H
+            end
+        end)(),
 
         highlightId    = function() return addon.Logger.selectedBoss end,
 
@@ -5170,12 +5271,18 @@ do
         rowName        = function(n, it) return n .. "PlayerBtn" .. it.id end,
         rowTmpl        = "KRTLoggerBossAttendeeButton",
 
-        drawRow        = function(btn, it)
-            local t = _G[btn .. "Name"]
-            t:SetText(it.name)
-            local r, g, b = addon:GetClassColor(it.class)
-            t:SetVertexColor(r, g, b)
-        end,
+        drawRow        = (function()
+            local ROW_H
+            local parts = { "Name" }
+            return function(btn, it, sc, w, CacheParts, row)
+                if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
+                local ui = CacheParts(row, btn, parts)
+                ui.Name:SetText(it.name)
+                local r, g, b = addon:GetClassColor(it.class)
+                ui.Name:SetVertexColor(r, g, b)
+                return ROW_H
+            end
+        end)(),
 
         highlightId    = function() return addon.Logger.selectedBossPlayer end,
 
@@ -5237,17 +5344,41 @@ do
             _G[n .. "AddBtn"]:Disable(); _G[n .. "DeleteBtn"]:Disable()
         end,
 
-        getData        = function() return addon.Raid:GetPlayers(addon.Logger.selectedRaid) or {} end,
+        -- Preformat join/leave per la UI
+        getData        = function()
+            local src = addon.Raid:GetPlayers(addon.Logger.selectedRaid) or {}
+            local t = {}
+            for i = 1, #src do
+                local p = src[i]
+                t[i] = {
+                    id       = p.id,
+                    name     = p.name,
+                    class    = p.class,
+                    join     = p.join,                -- numerico per sort
+                    leave    = p.leave,               -- numerico/nil per sort
+                    joinFmt  = date("%H:%M", p.join), -- stringa UI
+                    leaveFmt = p.leave and date("%H:%M", p.leave) or "",
+                }
+            end
+            return t
+        end,
 
         rowName        = function(n, it) return n .. "PlayerBtn" .. it.id end,
         rowTmpl        = "KRTLoggerRaidAttendeeButton",
 
-        drawRow        = function(btn, it)
-            local t = _G[btn .. "Name"]; t:SetText(it.name)
-            local r, g, b = addon:GetClassColor(it.class); t:SetVertexColor(r, g, b)
-            _G[btn .. "Join"]:SetText(date("%H:%M", it.join))
-            _G[btn .. "Leave"]:SetText(it.leave and date("%H:%M", it.leave) or "")
-        end,
+        drawRow        = (function()
+            local ROW_H
+            local parts = { "Name", "Join", "Leave" }
+            return function(btn, it, sc, w, CacheParts, row)
+                if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
+                local ui = CacheParts(row, btn, parts)
+                ui.Name:SetText(it.name)
+                local r, g, b = addon:GetClassColor(it.class); ui.Name:SetVertexColor(r, g, b)
+                ui.Join:SetText(it.joinFmt)
+                ui.Leave:SetText(it.leaveFmt)
+                return ROW_H
+            end
+        end)(),
 
         highlightId    = function() return addon.Logger.selectedPlayer end,
 
@@ -5294,7 +5425,7 @@ do
     addon.Logger.Loot = addon.Logger.Loot or {}
     local Loot = addon.Logger.Loot
 
-    local raidLoot = {} -- cache per tooltip OnEnter
+    local raidLoot = {} -- cache per tooltip OnEnter (lista completa del raid)
 
     local controller = MakeListController({
         keyName        = "LootList",
@@ -5312,35 +5443,67 @@ do
             _G[n .. "HeaderRoll"]:SetText(L.StrRoll)
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
             -- FIXME: disabilitati finché non implementati
-            _G[n .. "ExportBtn"]:Disable(); _G[n .. "ClearBtn"]:Disable(); _G[n .. "AddBtn"]:Disable(); _G[n .. "EditBtn"]
-                :Disable()
+            _G[n .. "ExportBtn"]:Disable(); _G[n .. "ClearBtn"]:Disable(); _G[n .. "AddBtn"]:Disable(); _G
+                [n .. "EditBtn"]:Disable()
         end,
 
+        -- Preformat time per la UI (mantieni i campi numerici per sort/logica)
         getData        = function()
             raidLoot = addon.Raid:GetLoot(addon.Logger.selectedRaid) or {}
+
             local pID = addon.Logger.selectedPlayer
+            local data
             if pID then
-                return addon.Raid:GetPlayerLoot(pID, addon.Logger.selectedRaid, addon.Logger.selectedBoss) or {}
+                data = addon.Raid:GetPlayerLoot(pID, addon.Logger.selectedRaid, addon.Logger.selectedBoss) or {}
+            else
+                data = addon.Raid:GetLoot(addon.Logger.selectedRaid, addon.Logger.selectedBoss) or {}
             end
-            return addon.Raid:GetLoot(addon.Logger.selectedRaid, addon.Logger.selectedBoss) or {}
+
+            local t = {}
+            for i = 1, #data do
+                local v = data[i]
+                t[i] = {
+                    id          = v.id,
+                    itemId      = v.itemId,
+                    itemName    = v.itemName,
+                    itemRarity  = v.itemRarity,
+                    itemTexture = v.itemTexture,
+                    itemLink    = v.itemLink,
+                    bossNum     = v.bossNum,
+                    looter      = v.looter,
+                    rollType    = v.rollType,
+                    rollValue   = v.rollValue,
+                    time        = v.time,                -- numerico per sort
+                    timeFmt     = date("%H:%M", v.time), -- stringa per UI
+                }
+            end
+            return t
         end,
 
         rowName        = function(n, it) return n .. "ItemBtn" .. it.id end,
         rowTmpl        = "KRTLoggerLootButton",
 
-        drawRow        = function(btn, v)
-            _G[btn .. "Name"]:SetText("|c" .. itemColors[v.itemRarity + 1] .. v.itemName .. "|r")
-            _G[btn .. "Source"]:SetText(addon.Logger.Boss:GetName(v.bossNum, addon.Logger.selectedRaid))
+        drawRow        = (function()
+            local ROW_H
+            local parts = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" }
+            return function(btn, v, sc, w, CacheParts, row)
+                if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
+                local ui = CacheParts(row, btn, parts)
 
-            local wt = _G[btn .. "Winner"]
-            local r, g, b = addon:GetClassColor(addon:GetPlayerClass(v.looter))
-            wt:SetText(v.looter); wt:SetVertexColor(r, g, b)
+                ui.Name:SetText("|c" .. itemColors[v.itemRarity + 1] .. v.itemName .. "|r")
+                ui.Source:SetText(addon.Logger.Boss:GetName(v.bossNum, addon.Logger.selectedRaid))
 
-            _G[btn .. "Type"]:SetText(lootTypesColored[v.rollType] or lootTypesColored[4])
-            _G[btn .. "Roll"]:SetText(v.rollValue or 0)
-            _G[btn .. "Time"]:SetText(date("%H:%M", v.time))
-            _G[btn .. "ItemIconTexture"]:SetTexture(v.itemTexture)
-        end,
+                local r, g, b = addon:GetClassColor(addon:GetPlayerClass(v.looter))
+                ui.Winner:SetText(v.looter); ui.Winner:SetVertexColor(r, g, b)
+
+                ui.Type:SetText(lootTypesColored[v.rollType] or lootTypesColored[4])
+                ui.Roll:SetText(v.rollValue or 0)
+                ui.Time:SetText(v.timeFmt)
+                ui.ItemIconTexture:SetTexture(v.itemTexture)
+
+                return ROW_H
+            end
+        end)(),
 
         highlightId    = function() return addon.Logger.selectedItem end,
 
@@ -5470,7 +5633,8 @@ do
         if isEdit and bossData then
             bossData.name, bossData.date, bossData.difficulty = name, time(killDate), difficulty
         else
-            tinsert(KRT_Raids[rID].bossKills, { name = name, date = time(killDate), difficulty = difficulty, players = {} })
+            tinsert(KRT_Raids[rID].bossKills,
+                { name = name, date = time(killDate), difficulty = difficulty, players = {} })
         end
 
         self:Hide()
@@ -5533,9 +5697,11 @@ do
         end
 
         local bossKill = KRT_Raids[rID].bossKills[bID]
-        for _, n in ipairs(bossKill.players) do if n:lower() == name:lower() then
+        for _, n in ipairs(bossKill.players) do
+            if n:lower() == name:lower() then
                 addon:PrintError(L.ErrAttendeesPlayerExists); return
-            end end
+            end
+        end
 
         for _, p in ipairs(KRT_Raids[rID].players) do
             if name:lower() == p.name:lower() then
