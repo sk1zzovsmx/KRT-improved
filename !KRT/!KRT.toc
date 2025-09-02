@@ -16,7 +16,6 @@
 
 # Libraries:
 Libs\LibStub.lua
-Libs\CallbackHandler-1.0.lua
 Libs\LibBossIDs-1.0.lua
 Libs\LibDeformat-3.0.lua
 
