@@ -1,0 +1,130 @@
+------------------------------------------------------------------------
+r20 | Humbedooh | 2010-10-01 06:41:17 -0500 (Fri, 01 Oct 2010) | 1 line
+Changed paths:
+   M /trunk/LibXML-1.0.lua
+
+Removed parsing of <! [...] > fields for the time being as they were causing corruption.
+------------------------------------------------------------------------
+r19 | Humbedooh | 2010-09-27 17:14:06 -0500 (Mon, 27 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/LibXML-1.0.lua
+
+Added support for a:b in-line arguments.
+------------------------------------------------------------------------
+r18 | Humbedooh | 2010-09-25 23:15:43 -0500 (Sat, 25 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/LibXML-1.0.toc
+
+Typo fix
+------------------------------------------------------------------------
+r17 | Humbedooh | 2010-09-25 22:21:53 -0500 (Sat, 25 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/LibXML-1.0.lua
+
+Classes starting with "!" are now treated as short-form elements by default. This eliminates the need to discard comments.
+------------------------------------------------------------------------
+r16 | Humbedooh | 2010-09-25 18:38:25 -0500 (Sat, 25 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/LibXML-1.0.lua
+
+Added a check to bypass <!-- --> tags but retain <!class > elements.
+------------------------------------------------------------------------
+r15 | Humbedooh | 2010-09-25 16:47:29 -0500 (Sat, 25 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/LibXML-1.0.lua
+
+Optimizationatoring the code.
+------------------------------------------------------------------------
+r14 | Humbedooh | 2010-09-25 16:06:48 -0500 (Sat, 25 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/.pkgmeta
+   M /trunk/LibXML-1.0.toc
+
+Updated TOC and pkgmeta
+------------------------------------------------------------------------
+r13 | Humbedooh | 2010-09-25 15:19:41 -0500 (Sat, 25 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/.docmeta
+
+Work, damnit!
+------------------------------------------------------------------------
+r12 | Humbedooh | 2010-09-25 15:09:06 -0500 (Sat, 25 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/LibXML-1.0.lua
+
+Flying baby cows!
+------------------------------------------------------------------------
+r11 | Humbedooh | 2010-09-25 14:54:11 -0500 (Sat, 25 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/LibXML-1.0.lua
+
+Moar tries!
+------------------------------------------------------------------------
+r10 | Humbedooh | 2010-09-25 14:47:59 -0500 (Sat, 25 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/LibXML-1.0.lua
+
+Updated docs
+------------------------------------------------------------------------
+r9 | Humbedooh | 2010-09-25 13:48:37 -0500 (Sat, 25 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/LibXML-1.0.lua
+
+Updated documentation
+------------------------------------------------------------------------
+r8 | Humbedooh | 2010-09-25 13:33:40 -0500 (Sat, 25 Sep 2010) | 1 line
+Changed paths:
+   A /trunk/.docmeta
+   M /trunk/LibXML-1.0.lua
+
+Added docmeta stuff.
+------------------------------------------------------------------------
+r7 | Humbedooh | 2010-09-25 13:16:02 -0500 (Sat, 25 Sep 2010) | 2 lines
+Changed paths:
+   M /trunk/LibXML-1.0.lua
+
+- Changed import syntax to: struct, error_msg = LibXML:Import(data, [loose]);
+- Added line numbers to error messages for easier debugging.
+------------------------------------------------------------------------
+r6 | Humbedooh | 2010-09-24 23:18:54 -0500 (Fri, 24 Sep 2010) | 2 lines
+Changed paths:
+   M /trunk/LibXML-1.0.lua
+
+Tidying up.
+Fixed a small bug with a stack error call referring to a non-existent key.
+------------------------------------------------------------------------
+r5 | Humbedooh | 2010-09-24 21:36:51 -0500 (Fri, 24 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/LibXML-1.0.toc
+
+Updated TOC
+------------------------------------------------------------------------
+r4 | Humbedooh | 2010-09-24 17:44:20 -0500 (Fri, 24 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/LibXML-1.0.toc
+
+Updated TOC since it was obviously wrong.
+------------------------------------------------------------------------
+r3 | Humbedooh | 2010-09-24 10:59:59 -0500 (Fri, 24 Sep 2010) | 1 line
+Changed paths:
+   M /trunk/.pkgmeta
+   M /trunk/LibXML-1.0.toc
+
+Changed .pkgmeta to only fetch LibStub.lua
+------------------------------------------------------------------------
+r2 | Humbedooh | 2010-09-24 10:50:20 -0500 (Fri, 24 Sep 2010) | 1 line
+Changed paths:
+   A /trunk/.pkgmeta
+   A /trunk/LibXML-1.0.lua
+   A /trunk/LibXML-1.0.toc
+
+Initial commit
+------------------------------------------------------------------------
+r1 | root | 2010-09-24 09:41:23 -0500 (Fri, 24 Sep 2010) | 1 line
+Changed paths:
+   A /branches
+   A /tags
+   A /trunk
+
+"libxml-1-0/mainline: Initial Import"
+------------------------------------------------------------------------
