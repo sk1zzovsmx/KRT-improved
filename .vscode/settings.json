@@ -62,6 +62,7 @@
         "START",
         "GROUP",
         "UIDropDownMenu_GetText",
-        "Raid"
+        "Raid",
+        "DEFAULT_CHAT_FRAME"
     ]
 }
