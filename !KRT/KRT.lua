@@ -258,7 +258,7 @@ do
         for i, v in ipairs(callbacks[e]) do
             local ok, err = pcall(v, e, ...)
             if not ok then
-                addon:PrintError(L.StrCbErrExec:format(tostring(v), tostring(e), err))
+                addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
             end
         end
     end
@@ -493,18 +493,18 @@ do
         if current then
             if current.zone == instanceName then
                 if current.size == 10 and (instanceDiff % 2 == 0) then
-                    addon:Print(L.StrNewRaidSessionChange)
+                    addon:info(L.StrNewRaidSessionChange)
                     Raid:Create(instanceName, 25)
                 elseif current.size == 25 and (instanceDiff % 2 ~= 0) then
-                    addon:Print(L.StrNewRaidSessionChange)
+                    addon:info(L.StrNewRaidSessionChange)
                     Raid:Create(instanceName, 10)
                 end
             end
         elseif (instanceDiff % 2 == 0) then
-            addon:Print(L.StrNewRaidSessionChange)
+            addon:info(L.StrNewRaidSessionChange)
             Raid:Create(instanceName, 25)
         elseif (instanceDiff % 2 ~= 0) then
-            addon:Print(L.StrNewRaidSessionChange)
+            addon:info(L.StrNewRaidSessionChange)
             Raid:Create(instanceName, 10)
         end
     end
@@ -668,7 +668,7 @@ do
 
         -- Prevent setting a negative count
         if value < 0 then
-            addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
+            addon:error(L.ErrPlayerCountBelowZero:format(name))
             return
         end
 
@@ -684,7 +684,7 @@ do
 
     function Raid:IncrementPlayerCount(name, raidNum)
         if Raid:GetPlayerID(name, raidNum) == 0 then
-            addon:PrintError(L.ErrCannotFindPlayer:format(name))
+            addon:error(L.ErrCannotFindPlayer:format(name))
             return
         end
 
@@ -694,13 +694,13 @@ do
 
     function Raid:DecrementPlayerCount(name, raidNum)
         if Raid:GetPlayerID(name, raidNum) == 0 then
-            addon:PrintError(L.ErrCannotFindPlayer:format(name))
+            addon:error(L.ErrCannotFindPlayer:format(name))
             return
         end
 
         local c = Raid:GetPlayerCount(name, raidNum)
         if c <= 0 then
-            addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
+            addon:error(L.ErrPlayerCountBelowZero:format(name))
             return
         end
         Raid:SetPlayerCount(name, c - 1, raidNum)
@@ -733,13 +733,12 @@ do
     -- Returns the RGB color values for a given class name.
     --
     do
-        local colors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
         function addon:GetClassColor(name)
             name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
-            if not colors[name] then
+            local c = Compat and Compat.GetClassColorObj(name)
+            if not c then
                 return 1, 1, 1
             end
-            local c = colors[name]
             return c.r, c.g, c.b
         end
     end
@@ -1061,56 +1060,30 @@ end
 ---============================================================================
 do
     -- Output strings:
-    local output          = "|cfff58cba%s|r: %s"
+    local output          = "%s: %s"
     local chatPrefix      = "Kader Raid Tools"
     local chatPrefixShort = "KRT"
+    local prefixHex       = Compat and Compat.RGBToHex(245/255, 140/255, 186/255)
 
     --
     -- Prepares the final output string with a prefix.
     --
     local function PreparePrint(text, prefix)
         prefix = prefix or chatPrefixShort
+        if prefixHex and Compat and Compat.WrapTextInColorCode then
+            prefix = Compat.WrapTextInColorCode(prefix, prefixHex)
+        end
         return format(output, prefix, tostring(text))
     end
 
     --
-    -- Prints a default message to the chat frame.
+    -- Prints a message to the chat frame.
     --
     function addon:Print(text, prefix)
         local msg = PreparePrint(text, prefix)
-        return Utils.print(msg)
-    end
-
-    --
-    -- Prints a green success message.
-    --
-    function addon:PrintSuccess(text, prefix)
-        local msg = PreparePrint(text, prefix)
-        return Utils.print_green(msg)
-    end
-
-    --
-    -- Prints a red error message.
-    --
-    function addon:PrintError(text, prefix)
-        local msg = PreparePrint(text, prefix)
-        return Utils.print_red(msg)
-    end
-
-    --
-    -- Prints an orange warning message.
-    --
-    function addon:PrintWarning(text, prefix)
-        local msg = PreparePrint(text, prefix)
-        return Utils.print_orange(msg)
-    end
-
-    --
-    -- Prints a blue info message.
-    --
-    function addon:PrintInfo(text, prefix)
-        local msg = PreparePrint(text, prefix)
-        return Utils.print_blue(msg)
+        if DEFAULT_CHAT_FRAME then
+            DEFAULT_CHAT_FRAME:AddMessage(msg)
+        end
     end
 
     --
@@ -1427,7 +1400,7 @@ do
 
         if playerRollTracker[itemId] >= allowed then
             addon:Debug("DEBUG", "Roll blocked for %s (max %d rolls reached for itemId=%d)", name, allowed, itemId)
-            addon:Print(L.ChatOnlyRollOnce)
+            addon:info(L.ChatOnlyRollOnce)
             return
         end
 
@@ -1473,7 +1446,7 @@ do
 
             local itemId = self:GetCurrentRollItemID()
             if not itemId or lootCount == 0 then
-                addon:PrintError("Item ID missing or loot table not ready – roll will be ignored.")
+                addon:error("Item ID missing or loot table not ready – roll will be ignored.")
                 addon:Debug("DEBUG", "Roll ignored: missing itemId or lootCount = 0")
                 return
             end
@@ -2599,7 +2572,7 @@ do
             end
         end
         if itemIndex == nil then
-            addon:PrintError(L.ErrCannotFindItem:format(itemLink))
+            addon:error(L.ErrCannotFindItem:format(itemLink))
             return false
         end
 
@@ -2637,7 +2610,7 @@ do
                 return true
             end
         end
-        addon:PrintError(L.ErrCannotFindPlayer:format(playerName))
+        addon:error(L.ErrCannotFindPlayer:format(playerName))
         return false
     end
 
@@ -2698,7 +2671,7 @@ do
         elseif CheckInteractDistance(playerName, 2) == 1 then
             -- Player is in range for trade
             if itemInfo.isStack and not addon.options.ignoreStacks then
-                addon:PrintWarning(L.ErrItemStack:format(itemLink))
+                addon:warn(L.ErrItemStack:format(itemLink))
                 return false
             end
             ClearCursor()
@@ -2706,7 +2679,7 @@ do
             if CursorHasItem() then
                 InitiateTrade(playerName)
                 if addon.options.screenReminder and not screenshotWarn then
-                    addon:PrintWarning(L.ErrScreenReminder)
+                    addon:warn(L.ErrScreenReminder)
                     screenshotWarn = true
                 end
             end
@@ -2933,7 +2906,7 @@ do
         wipe(reservesByItemID)
         self:RefreshWindow()
         self:CloseWindow()
-        addon:Print(L.StrReserveListCleared)
+        addon:info(L.StrReserveListCleared)
     end
 
     function Reserves:HasData()
@@ -2946,7 +2919,7 @@ do
 
     function Reserves:ShowWindow()
         if not reserveListFrame then
-            addon:PrintError("Reserve List frame not available.")
+            addon:error("Reserve List frame not available.")
             return
         end
         addon:Debug("DEBUG", "Showing reserve list window.")
@@ -2962,7 +2935,7 @@ do
         addon:Debug("DEBUG", "Opening import reserves box.")
         local frame = _G["KRTImportWindow"]
         if not frame then
-            addon:PrintError("KRTImportWindow not found.")
+            addon:error("KRTImportWindow not found.")
             return
         end
         frame:Show()
@@ -3193,7 +3166,7 @@ do
                 end
             end
         end
-        addon:Print(count > 0 and ("Requested info for " .. count .. " missing items.") or
+        addon:info(count > 0 and ("Requested info for " .. count .. " missing items.") or
             "All item infos are available.")
         addon:Debug("DEBUG", "Total missing items requested: %d", count)
     end
@@ -3520,7 +3493,7 @@ do
         for k, v in pairs(defaultOptions) do
             KRT_Options[k] = v
         end
-        addon:PrintSuccess("Default options have been restored.")
+        addon:info("Default options have been restored.")
     end
 
     --
@@ -3849,7 +3822,7 @@ do
             wName = (isEdit and wID > 0) and wID or (#KRT_Warnings + 1)
         end
         if wContent == "" then
-            addon:PrintError(L.StrWarningsError)
+            addon:error(L.StrWarningsError)
             return
         end
         if isEdit and wID > 0 and KRT_Warnings[wID] ~= nil then
@@ -4158,7 +4131,7 @@ do
         local found
         found, name = addon.Raid:CheckPlayer(name)
         if not found then
-            addon:PrintError(format((name == "" and L.ErrChangesNoPlayer or L.ErrCannotFindPlayer), name))
+            addon:error(format((name == "" and L.ErrChangesNoPlayer or L.ErrCannotFindPlayer), name))
             return
         end
         changesTable[name] = (spec == "") and nil or spec
@@ -4293,7 +4266,7 @@ do
     -- Send spam message:
     function Spammer:Spam()
         if strlen(finalOutput) > 255 then
-            addon:PrintError(L.StrSpammerErrLength)
+            addon:error(L.StrSpammerErrLength)
             ticking = false
             return
         end
@@ -4971,10 +4944,10 @@ do
         local sel = addon.Logger.selectedRaid
         if not (btn and sel and KRT_Raids[sel]) then return end
         if KRT_Raids[sel].size ~= addon:GetRaidSize() then
-            addon:PrintError(L.ErrCannotSetCurrentRaidSize); return
+            addon:error(L.ErrCannotSetCurrentRaidSize); return
         end
         if addon.Raid:Expired(sel) then
-            addon:PrintError(L.ErrCannotSetCurrentRaidReset); return
+            addon:error(L.ErrCannotSetCurrentRaidReset); return
         end
         KRT_CurrentRaid = sel
     end
@@ -4984,7 +4957,7 @@ do
             local sel = addon.Logger.selectedRaid
             if not (sel and KRT_Raids[sel]) then return end
             if KRT_CurrentRaid and KRT_CurrentRaid == sel then
-                addon:PrintError(L.ErrCannotDeleteRaid); return
+                addon:error(L.ErrCannotDeleteRaid); return
             end
             tremove(KRT_Raids, sel)
             if KRT_CurrentRaid and KRT_CurrentRaid > sel then KRT_CurrentRaid = KRT_CurrentRaid - 1 end
@@ -5480,12 +5453,12 @@ do
 
         name        = (name == "") and "_TrashMob_" or name
         if name ~= "_TrashMob_" and (diff ~= "h" and diff ~= "n") then
-            addon:PrintError(L.ErrBossDifficulty); return
+            addon:error(L.ErrBossDifficulty); return
         end
 
         local h, m = bTime:match("(%d+):(%d+)"); h, m = tonumber(h), tonumber(m)
         if not (h and m) then
-            addon:PrintError(L.ErrBossTime); return
+            addon:error(L.ErrBossTime); return
         end
 
         local difficulty = (KRT_Raids[rID].size == 10) and 1 or 2
@@ -5552,24 +5525,24 @@ do
     function Box:Save()
         local name = _G[frameName .. "Name"]:GetText():trim()
         if name == "" then
-            addon:PrintError(L.ErrAttendeesInvalidName); return
+            addon:error(L.ErrAttendeesInvalidName); return
         end
 
         local rID, bID = addon.Logger.selectedRaid, addon.Logger.selectedBoss
         if not (rID and bID and KRT_Raids[rID]) then
-            addon:PrintError(L.ErrAttendeesInvalidRaidBoss); return
+            addon:error(L.ErrAttendeesInvalidRaidBoss); return
         end
 
         local bossKill = KRT_Raids[rID].bossKills[bID]
         for _, n in ipairs(bossKill.players) do
             if n:lower() == name:lower() then
-                addon:PrintError(L.ErrAttendeesPlayerExists); return
+                addon:error(L.ErrAttendeesPlayerExists); return
             end
         end
 
         for _, p in ipairs(KRT_Raids[rID].players) do
             if name:lower() == p.name:lower() then
-                addon:PrintSuccess(L.StrAttendeesAddSuccess)
+                addon:info(L.StrAttendeesAddSuccess)
                 tinsert(bossKill.players, p.name)
                 self:Toggle()
                 addon.Logger.BossAttendees:Fetch()
@@ -5577,7 +5550,7 @@ do
             end
         end
 
-        addon:PrintError(L.ErrAttendeesInvalidName)
+        addon:error(L.ErrAttendeesInvalidName)
     end
 end
 
@@ -5661,7 +5634,7 @@ do
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.Warnings:Toggle()
             elseif cmd2 == "help" then
-                addon:Print(format(L.StrCmdCommands, "krt rw"), "KRT")
+                addon:info(format(L.StrCmdCommands, "krt rw"), "KRT")
                 print(helpString:format("toggle", L.StrCmdToggle))
                 print(helpString:format("[ID]", L.StrCmdWarningAnnounce))
             else
@@ -5677,7 +5650,7 @@ do
             elseif cmd2 == "announce" or cmd2 == "spam" then
                 addon.Changes:Announce()
             else
-                addon:Print(format(L.StrCmdCommands, "krt ms"), "KRT")
+                addon:info(format(L.StrCmdCommands, "krt ms"), "KRT")
                 print(helpString:format("toggle", L.StrCmdToggle))
                 print(helpString:format("demand", L.StrCmdChangesDemand))
                 print(helpString:format("announce", L.StrCmdChangesAnnounce))
@@ -5702,7 +5675,7 @@ do
             elseif cmd2 == "import" then
                 addon.Reserves:ShowImportBox()
             else
-                addon:Print(format(L.StrCmdCommands, "krt res"), "KRT")
+                addon:info(format(L.StrCmdCommands, "krt res"), "KRT")
                 print(helpString:format("toggle", L.StrCmdToggle))
                 print(helpString:format("import", L.StrCmdReservesImport))
             end
@@ -5716,7 +5689,7 @@ do
             elseif cmd2 == "stop" then
                 addon.Spammer:Stop()
             else
-                addon:Print(format(L.StrCmdCommands, "krt pug"), "KRT")
+                addon:info(format(L.StrCmdCommands, "krt pug"), "KRT")
                 print(helpString:format("toggle", L.StrCmdToggle))
                 print(helpString:format("start", L.StrCmdLFMStart))
                 print(helpString:format("stop", L.StrCmdLFMStop))
@@ -5724,7 +5697,7 @@ do
 
             -- ==== Help fallback ====
         else
-            addon:Print(format(L.StrCmdCommands, "krt"), "KRT")
+            addon:info(format(L.StrCmdCommands, "krt"), "KRT")
             print(helpString:format("config", L.StrCmdConfig))
             print(helpString:format("lfm", L.StrCmdGrouper))
             print(helpString:format("ach", L.StrCmdAchiev))

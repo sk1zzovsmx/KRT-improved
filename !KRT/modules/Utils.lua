@@ -94,11 +94,6 @@ function Utils.isString(str)
 	return (str and strlen(str) > 0)
 end
 
--- RBG to Hex:
-function Utils.rgb2hex(r, g, b)
-        return format("%02x%02x%02x", round(r * 255), round(g * 255), round(b * 255))
-end
-
 -- Enable/Disable Frame:
 function Utils.enableDisable(frame, cond)
 	if frame == nil then
@@ -278,90 +273,6 @@ function Utils.sec2clock(seconds)
 	mins  = format("%02.f", floor(sec / 60 - (hours * 60)))
 	secs  = format("%02.f", floor(sec - hours * 3600 - mins * 60))
 	return hours .. ":" .. mins .. ":" .. secs
-end
-
--- Messages functions:
-do
-	local CHAT_FRAME = DEFAULT_CHAT_FRAME
-	function Utils._print(opt, ...)
-		if not CHAT_FRAME then return end
-		local msg, num = "", select("#", ...)
-		for i = 1, num do
-			local m
-			local v = select(i, ...)
-			if type(v) == "boolean" then
-				m = Utils.bool2str(v)
-			elseif type(v) == "table" then
-				m = "<table>"
-			elseif type(v) == "function" then
-				m = "<function>"
-			elseif v == nil then
-				m = "<nil>"
-			else
-				m = v
-			end
-			msg = msg .. " " .. m
-		end
-		if opt.str then
-			return msg
-		elseif opt.r ~= nil then
-			CHAT_FRAME:AddMessage(msg, opt.r, opt.g, opt.b)
-		else
-			CHAT_FRAME:AddMessage(msg)
-		end
-	end
-
-	function Utils.print(...)
-		local opt = {}
-		return Utils._print(opt, ...)
-	end
-
-	function Utils.print_str(...)
-		local opt = {}
-		opt.str = true
-		return Utils._print(opt, ...)
-	end
-
-	function Utils.print_color(r, g, b, ...)
-		local opt = { r = r, g = g, b = b }
-		return print(opt, ...)
-	end
-
-	function Utils.print_gold(...)
-		return Utils.print_color(1.00, 0.82, 0.00, ...)
-	end
-
-	function Utils.print_gray(...)
-		return Utils.print_color(0.50, 0.50, 0.50, ...)
-	end
-
-	function Utils.print_orange(...)
-		return Utils.print_color(1.00, 0.49, 0.24, ...)
-	end
-
-	function Utils.print_red(...)
-		return Utils.print_color(1.00, 0.12, 0.12, ...)
-	end
-
-	function Utils.print_yellow(...)
-		return Utils.print_color(1.00, 1.00, 0.00, ...)
-	end
-
-	function Utils.print_white(...)
-		return Utils.print_color(1.00, 1.00, 1.00, ...)
-	end
-
-	function Utils.print_green(...)
-		return Utils.print_color(0.12, 1.00, 0.12, ...)
-	end
-
-	function Utils.print_blue(...)
-		return Utils.print_color(0.00, 0.44, 0.87, ...)
-	end
-
-	function Utils.print_purple(...)
-		return Utils.print_color(0.64, 0.21, 0.93, ...)
-	end
 end
 
 -- Sends an addOn message to the appropriate channel:
