@@ -201,8 +201,6 @@ local titleString                       = "|cfff58cbaK|r|caaf49141RT|r : %s"
 -- Cached Functions & Libraries
 ---============================================================================
 
--- Local function placeholders
-local TriggerEvent
 local LoadOptions
 
 -- Cached WoW API & Lua Functions
@@ -215,54 +213,6 @@ local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 
 local deformat                          = addon.Deformat
 local BossIDs                           = addon.BossIDs
-
----============================================================================
--- Core Functions
----============================================================================
-
---
--- Returns the name of the main addon frame.
---
-function addon:GetFrameName()
-    local name
-    if UIMaster ~= nil then
-        name = UIMaster:GetName()
-    end
-    return name
-end
----============================================================================
--- Callback System
--- A simple system for registering and triggering custom events.
----============================================================================
-do
-    -- Table of registered callbacks:
-    local callbacks = {}
-
-    --
-    -- Registers a new callback function for an event.
-    --
-    function addon:RegisterCallback(e, func)
-        if not e or type(func) ~= "function" then
-            error(L.StrCbErrUsage)
-        end
-        callbacks[e] = callbacks[e] or {}
-        tinsert(callbacks[e], func)
-        return #callbacks
-    end
-
-    --
-    -- Triggers a registered event, calling all associated functions.
-    --
-    function TriggerEvent(e, ...)
-        if not callbacks[e] then return end
-        for i, v in ipairs(callbacks[e]) do
-            local ok, err = pcall(v, e, ...)
-            if not ok then
-                addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
-            end
-        end
-    end
-end
 
 ---============================================================================
 -- Event System
@@ -462,7 +412,7 @@ do
 
         tinsert(KRT_Raids, raidInfo)
         KRT_CurrentRaid = #KRT_Raids
-        TriggerEvent("RaidCreate", KRT_CurrentRaid)
+        Utils.TriggerEvent("RaidCreate", KRT_CurrentRaid)
         Utils.schedule(3, addon.UpdateRaidRoster)
     end
 
@@ -1360,7 +1310,7 @@ do
                 itemRollTracker[itemId][name])
         end
 
-        TriggerEvent("AddRoll", name, roll)
+        Utils.TriggerEvent("AddRoll", name, roll)
         SortRolls()
 
         -- Auto-select winner if none is manually selected
@@ -1532,7 +1482,7 @@ do
     -- Clears all roll-related state and UI elements.
     --
     function addon:ClearRolls(rec)
-        frameName = frameName or self:GetFrameName()
+        frameName = frameName or Utils.GetFrameName()
         if not frameName then return end
         rollsTable, rerolled, itemRollTracker = {}, {}, {}
         playerRollTracker, rolled, warned, rollsCount = {}, false, false, 0
@@ -1613,7 +1563,7 @@ do
     -- Rebuilds the roll list UI and marks the top roller or selected winner.
     --
     function addon:FetchRolls()
-        local frameName = addon:GetFrameName()
+        local frameName = Utils.GetFrameName()
         addon:Debug("DEBUG", "FetchRolls called; frameName: %s", frameName)
         local scrollFrame = _G[frameName .. "ScrollFrame"]
         local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
@@ -1782,7 +1732,7 @@ do
         lootTable[lootCount].itemColor   = itemColors[itemRarity + 1]
         lootTable[lootCount].itemLink    = itemLink
         lootTable[lootCount].itemTexture = itemTexture
-        TriggerEvent("AddItem", itemLink)
+        Utils.TriggerEvent("AddItem", itemLink)
     end
 
     --
@@ -1799,7 +1749,7 @@ do
     --
     function addon:SetItem(i)
         if i.itemName and i.itemLink and i.itemTexture and i.itemColor then
-            frameName = frameName or self:GetFrameName()
+            frameName = frameName or Utils.GetFrameName()
             if frameName == nil then return end
 
             local currentItemLink = _G[frameName .. "Name"]
@@ -1812,7 +1762,7 @@ do
                 currentItemBtn.tooltip_item = i.itemLink
                 self:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
             end
-            TriggerEvent("SetItem", i.itemLink)
+            Utils.TriggerEvent("SetItem", i.itemLink)
         end
     end
 
@@ -1832,7 +1782,7 @@ do
     function addon:ClearLoot()
         lootTable = twipe(lootTable)
         lootCount = 0
-        frameName = frameName or self:GetFrameName()
+        frameName = frameName or Utils.GetFrameName()
         _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
         _G[frameName .. "ItemBtn"]:SetNormalTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
         if frameName == UIMaster:GetName() then
@@ -1947,6 +1897,7 @@ do
     function Master:OnLoad(frame)
         if not frame then return end
         UIMaster = frame
+        addon.UIMaster = frame
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
         frame:SetScript("OnUpdate", UpdateUIFrame)
@@ -2712,7 +2663,7 @@ do
     end
 
     -- Register some callbacks:
-    addon:RegisterCallback("SetItem", function(f, itemLink)
+    Utils.RegisterCallback("SetItem", function(f, itemLink)
         local oldItem = GetItemLink()
         if oldItem ~= itemLink then
             announced = false
@@ -3561,7 +3512,7 @@ do
             _G[frameName .. "countdownDurationText"]:SetText(value)
         end
         name = strsub(name, strlen(frameName) + 1)
-        TriggerEvent("Config" .. name, value)
+        Utils.TriggerEvent("Config" .. name, value)
         KRT_Options[name] = value
     end
 
@@ -3994,7 +3945,7 @@ do
         end
     end
 
-    addon:RegisterCallback("RaidLeave", function(e, name)
+    Utils.RegisterCallback("RaidLeave", function(e, name)
         Changes:Delete(name)
         CancelChanges()
     end)
@@ -4543,7 +4494,7 @@ do
     -- toggle campo selezionato + evento
     local function selectAndTrigger(ns, field, id, event)
         ns[field] = (id ~= ns[field]) and id or nil
-        TriggerEvent(event, id)
+        Utils.TriggerEvent(event, id)
         return ns[field]
     end
 
@@ -4762,7 +4713,7 @@ do
     -- selettori (toggle + evento)
     local function sel(field, id, ev)
         addon.Logger[field] = (id ~= addon.Logger[field]) and id or nil
-        TriggerEvent(ev, id)
+        Utils.TriggerEvent(ev, id)
     end
     function Logger:SelectRaid(btn) if btn then sel("selectedRaid", btn:GetID(), "LoggerSelectRaid") end end
 
@@ -4856,7 +4807,7 @@ do
         }
     end
 
-    addon:RegisterCallback("LoggerSelectRaid", function()
+    Utils.RegisterCallback("LoggerSelectRaid", function()
         addon.Logger.selectedBoss, addon.Logger.selectedPlayer, addon.Logger.selectedItem = nil, nil, nil
     end)
 end
@@ -4975,7 +4926,7 @@ do
         (controller._makeConfirmPopup)("KRTLOGGER_DELETE_RAID", L.StrConfirmDeleteRaid, DeleteRaid)
     end
 
-    addon:RegisterCallback("RaidCreate", function(_, num)
+    Utils.RegisterCallback("RaidCreate", function(_, num)
         addon.Logger.selectedRaid = tonumber(num)
         controller:Dirty()
     end)
@@ -5084,7 +5035,7 @@ do
         return name
     end
 
-    addon:RegisterCallback("LoggerSelectRaid", function() controller:Dirty() end)
+    Utils.RegisterCallback("LoggerSelectRaid", function() controller:Dirty() end)
 end
 
 -- ============================================================================
@@ -5158,8 +5109,8 @@ do
     end
 
     local function Reset() controller:Dirty() end
-    addon:RegisterCallback("LoggerSelectRaid", Reset)
-    addon:RegisterCallback("LoggerSelectBoss", Reset)
+    Utils.RegisterCallback("LoggerSelectRaid", Reset)
+    Utils.RegisterCallback("LoggerSelectBoss", Reset)
 end
 
 -- ============================================================================
@@ -5252,7 +5203,7 @@ do
         (controller._makeConfirmPopup)("KRTLOGGER_DELETE_RAIDATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendee)
     end
 
-    addon:RegisterCallback("LoggerSelectRaid", function() controller:Dirty() end)
+    Utils.RegisterCallback("LoggerSelectRaid", function() controller:Dirty() end)
 end
 
 -- ============================================================================
@@ -5399,9 +5350,9 @@ do
     end
 
     local function Reset() controller:Dirty() end
-    addon:RegisterCallback("LoggerSelectRaid", Reset)
-    addon:RegisterCallback("LoggerSelectBoss", Reset)
-    addon:RegisterCallback("LoggerSelectPlayer", Reset)
+    Utils.RegisterCallback("LoggerSelectRaid", Reset)
+    Utils.RegisterCallback("LoggerSelectBoss", Reset)
+    Utils.RegisterCallback("LoggerSelectPlayer", Reset)
 end
 
 -- ============================================================================
@@ -5475,7 +5426,7 @@ do
         end
 
         self:Hide()
-        TriggerEvent("LoggerSelectRaid")
+        Utils.TriggerEvent("LoggerSelectRaid")
     end
 
     function Box:CancelAddEdit()

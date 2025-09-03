@@ -2,6 +2,7 @@ local addonName, addon = ...
 addon.Utils = {}
 
 local Utils = addon.Utils
+local L = addon.L
 local type, ipairs, pairs = type, ipairs, pairs
 local floor, random, round = math.floor, math.random, math.round
 local setmetatable, getmetatable = setmetatable, getmetatable
@@ -12,6 +13,43 @@ local strsub, strlen = string.sub, string.len
 local lower, upper = string.lower, string.upper
 local select = select
 local GetLocale = GetLocale
+
+-- ============================================================================
+-- Callback utilities
+-- ============================================================================
+
+local callbacks = {}
+
+function Utils.RegisterCallback(e, func)
+        if not e or type(func) ~= "function" then
+                error(L.StrCbErrUsage)
+        end
+        callbacks[e] = callbacks[e] or {}
+        tinsert(callbacks[e], func)
+        return #callbacks
+end
+
+function Utils.TriggerEvent(e, ...)
+        if not callbacks[e] then return end
+        for i, v in ipairs(callbacks[e]) do
+                local ok, err = pcall(v, e, ...)
+                if not ok then
+                        addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
+                end
+        end
+end
+
+-- ============================================================================
+-- Frame helpers
+-- ============================================================================
+
+function Utils.GetFrameName()
+        local name
+        if addon.UIMaster ~= nil then
+                name = addon.UIMaster:GetName()
+        end
+        return name
+end
 
 -- Shuffle a table:
 _G.table.shuffle = function(t)
