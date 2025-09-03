@@ -114,15 +114,36 @@ end
 
 -- Uppercase first:
 _G.string.ucfirst = function(str)
-	str = lower(str)
-	return gsub(str, "%a", upper, 1)
+        str = lower(str)
+        return gsub(str, "%a", upper, 1)
+end
+
+-- ============================================================================
+-- Color utilities
+-- ============================================================================
+
+function Utils.RGBToHex(r, g, b)
+        if r and g and b and r <= 1 and g <= 1 and b <= 1 then
+                r, g, b = r * 255, g * 255, b * 255
+        end
+        if Compat and Compat.RGBToHex then
+                return Compat.RGBToHex(r, g, b)
+        end
+        return format("%02x%02x%02x", r, g, b)
+end
+
+function Utils.WrapTextInColorCode(text, colorHexString)
+        if Compat and Compat.WrapTextInColorCode then
+                return Compat.WrapTextInColorCode(text, colorHexString)
+        end
+        return ("|c%s%s|r"):format(colorHexString, text)
 end
 
 -- Determines if a given string is a number
 function Utils.isNumber(str)
-	local valid = false
-	if str then
-		valid = find(str, "^(%d+%.?%d*)$")
+        local valid = false
+        if str then
+                valid = find(str, "^(%d+%.?%d*)$")
 	end
 	return valid
 end
