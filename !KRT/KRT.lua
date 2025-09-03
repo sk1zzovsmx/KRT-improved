@@ -147,14 +147,14 @@ local lootTypesText                     = {
 
 -- Roll Type Colored Display Text
 local lootTypesColored                  = {
-    GREEN_FONT_COLOR_CODE .. L.BtnMS .. FONT_COLOR_CODE_CLOSE,
-    LIGHTYELLOW_FONT_COLOR_CODE .. L.BtnOS .. FONT_COLOR_CODE_CLOSE,
-    "|cffa335ee" .. L.BtnSR .. FONT_COLOR_CODE_CLOSE,
-    NORMAL_FONT_COLOR_CODE .. L.BtnFree .. FONT_COLOR_CODE_CLOSE,
-    ORANGE_FONT_COLOR_CODE .. L.BtnBank .. FONT_COLOR_CODE_CLOSE,
-    RED_FONT_COLOR_CODE .. L.BtnDisenchant .. FONT_COLOR_CODE_CLOSE,
-    HIGHLIGHT_FONT_COLOR_CODE .. L.BtnHold .. FONT_COLOR_CODE_CLOSE,
-    GREEN_FONT_COLOR_CODE .. "DKP" .. FONT_COLOR_CODE_CLOSE,
+    Utils.WrapTextInColorCode(L.BtnMS, GREEN_FONT_COLOR_CODE:sub(3)),
+    Utils.WrapTextInColorCode(L.BtnOS, LIGHTYELLOW_FONT_COLOR_CODE:sub(3)),
+    Utils.WrapTextInColorCode(L.BtnSR, "ffa335ee"),
+    Utils.WrapTextInColorCode(L.BtnFree, NORMAL_FONT_COLOR_CODE:sub(3)),
+    Utils.WrapTextInColorCode(L.BtnBank, ORANGE_FONT_COLOR_CODE:sub(3)),
+    Utils.WrapTextInColorCode(L.BtnDisenchant, RED_FONT_COLOR_CODE:sub(3)),
+    Utils.WrapTextInColorCode(L.BtnHold, HIGHLIGHT_FONT_COLOR_CODE:sub(3)),
+    Utils.WrapTextInColorCode("DKP", GREEN_FONT_COLOR_CODE:sub(3)),
 }
 
 -- Item Quality Colors
@@ -1013,15 +1013,15 @@ do
     local output          = "%s: %s"
     local chatPrefix      = "Kader Raid Tools"
     local chatPrefixShort = "KRT"
-    local prefixHex       = Compat and Compat.RGBToHex(245/255, 140/255, 186/255)
+    local prefixHex       = Utils.RGBToHex(245/255, 140/255, 186/255)
 
     --
     -- Prepares the final output string with a prefix.
     --
     local function PreparePrint(text, prefix)
         prefix = prefix or chatPrefixShort
-        if prefixHex and Compat and Compat.WrapTextInColorCode then
-            prefix = Compat.WrapTextInColorCode(prefix, prefixHex)
+        if prefixHex then
+            prefix = Utils.WrapTextInColorCode(prefix, prefixHex)
         end
         return format(output, prefix, tostring(text))
     end
@@ -1753,7 +1753,7 @@ do
             if frameName == nil then return end
 
             local currentItemLink = _G[frameName .. "Name"]
-            currentItemLink:SetText("|c" .. i.itemColor .. i.itemName .. "|r")
+            currentItemLink:SetText(Utils.WrapTextInColorCode(i.itemName, i.itemColor))
 
             local currentItemBtn = _G[frameName .. "ItemBtn"]
             currentItemBtn:SetNormalTexture(i.itemTexture)
@@ -5278,7 +5278,7 @@ do
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
                 local ui = CacheParts(row, btn, parts)
 
-                ui.Name:SetText("|c" .. itemColors[v.itemRarity + 1] .. v.itemName .. "|r")
+                ui.Name:SetText(Utils.WrapTextInColorCode(v.itemName, itemColors[v.itemRarity + 1]))
                 ui.Source:SetText(addon.Logger.Boss:GetName(v.bossNum, addon.Logger.selectedRaid))
 
                 local r, g, b = addon:GetClassColor(addon:GetPlayerClass(v.looter))
