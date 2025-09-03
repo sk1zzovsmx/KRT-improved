@@ -58,6 +58,22 @@ if addon.Logger and not addon.__LoggerEmbedded then
     addon.__LoggerEmbedded = true
 end
 
+function addon:Debug(level, fmt, ...)
+    if not self.Logger then return end
+    local lv = type(level) == "string" and level:upper()
+    if     lv == "ERROR" and self.error then
+        return self:error(fmt, ...)
+    elseif lv == "WARN"  and self.warn  then
+        return self:warn(fmt, ...)
+    elseif lv == "DEBUG" and self.debug then
+        return self:debug(fmt, ...)
+    else
+        if self.info then
+            return self:info(fmt, ...)
+        end
+    end
+end
+
 -- SavedVariables for log level (fallback INFO)
 KRT_Debug       = KRT_Debug or {}
 do
@@ -214,199 +230,6 @@ function addon:GetFrameName()
     end
     return name
 end
-
---
--- Sends a message to the addon's debugger module.
--- @param level The debug level (e.g., "INFO", "ERROR").
--- @param msg The message string, supports format placeholders.
--- @param ... Values for the format placeholders.
---
-
---Returns debug function
-function addon:Debug(level, msg, ...)
-    if self.Debugger then
-        self.Debugger:Add(level, msg, ...)
-    end
-end
-
----============================================================================
--- Debugger Module
--- Handles the creation and management of the debug window.
----============================================================================
-do
-    addon.Debugger         = {}
-    local Debugger         = addon.Debugger
-
-    -- Local references
-    local frameName, frame, scrollFrame
-    local isDebuggerOpen   = false
-    local buffer           = {} -- Holds messages if the frame isn't ready
-
-    local logLevelPriority = { DEBUG = 1, INFO = 2, WARN = 3, ERROR = 4 }
-    local logLevelNames    = { [1] = "DEBUG", [2] = "INFO", [3] = "WARN", [4] = "ERROR" }
-    local minLevel         = "DEBUG" -- Default log level
-    local MAX_DEBUG_LOGS   = 500     -- <--- Limite massimo log, modifica qui
-
-    --
-    -- Called when the debugger frame is loaded.
-    --
-    function Debugger:OnLoad(self)
-        frame = self
-        frameName = frame:GetName()
-        scrollFrame = _G[frameName .. "ScrollFrame"]
-        frame:SetMovable(true)
-        frame:EnableMouse(true)
-        frame:RegisterForDrag("LeftButton")
-        frame:SetScript("OnDragStart", frame.StartMoving)
-        frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-
-        if scrollFrame then
-            print("[Debugger] scrollFrame found:", scrollFrame:GetName())
-        else
-            print("[Debugger] ERROR: scrollFrame is nil!")
-        end
-
-        -- Restore saved position if available
-        if KRT_Debug and KRT_Debug.Pos and KRT_Debug.Pos.point then
-            local p = KRT_Debug.Pos
-            frame:ClearAllPoints()
-            frame:SetPoint(p.point, p.relativeTo or UIParent, p.relativePoint, p.xOfs, p.yOfs)
-        end
-    end
-
-    --
-    -- Shows the debugger window.
-    --
-    function Debugger:Show()
-        if not frame then return end
-        frame:Show()
-
-        if not isDebuggerOpen then
-            isDebuggerOpen = true
-            self:Add("DEBUG", "Debugger window opened.")
-            self:AddBufferedMessages()
-        end
-    end
-
-    --
-    -- Hides the debugger window.
-    --
-    function Debugger:Hide()
-        if frame then
-            frame:Hide()
-            isDebuggerOpen = false
-        end
-    end
-
-    --
-    -- Clears all messages from the debug output.
-    --
-    function Debugger:Clear()
-        if scrollFrame then
-            scrollFrame:Clear()
-        end
-        buffer = {}
-    end
-
-    --
-    -- Sets the minimum log level to display.
-    --
-    function Debugger:SetMinLevel(level)
-        if type(level) == "number" and logLevelNames[level] then
-            minLevel = logLevelNames[level]
-            self:Add("INFO", "Log level set to [%s]", minLevel)
-        elseif type(level) == "string" then
-            level = string.upper(level)
-            if logLevelPriority[level] then
-                minLevel = level
-                self:Add("INFO", "Log level set to [%s]", minLevel)
-            else
-                self:Add("ERROR", "Invalid log level: %s", level)
-            end
-        else
-            self:Add("ERROR", "Invalid log level type.")
-        end
-    end
-
-    --
-    -- Returns the current minimum log level.
-    --
-    function Debugger:GetMinLevel()
-        return minLevel
-    end
-
-    --
-    -- Adds a message to the debug log.
-    --
-    function Debugger:Add(level, msg, ...)
-        -- Allow calling with Add("message") which defaults to DEBUG level.
-        if not msg then
-            msg = level
-            level = "DEBUG"
-        end
-
-        if logLevelPriority[level] < logLevelPriority[minLevel] then return end
-
-        if select('#', ...) > 0 then
-            local safeArgs = {}
-            for i = 1, select('#', ...) do
-                local v = select(i, ...)
-                table.insert(safeArgs, type(v) == "string" and v or tostring(v))
-            end
-            msg = string.format(msg, unpack(safeArgs))
-        end
-        local line = string.format("[%s][%s] %s", date("%H:%M:%S"), level, msg)
-
-        -- If the frame isn't ready, buffer the message.
-        if not scrollFrame then
-            tinsert(buffer, line)
-            while #buffer > MAX_DEBUG_LOGS do
-                table.remove(buffer, 1)
-            end
-            return
-        end
-
-        -- Set color based on level
-        local r, g, b = 1, 1, 1 -- Default white
-        if level == "ERROR" then
-            r, g, b = 1, 0.2, 0.2
-        elseif level == "WARN" then
-            r, g, b = 1, 0.8, 0
-        elseif level == "INFO" then
-            r, g, b = 0.6, 0.8, 1
-        elseif level == "DEBUG" then
-            r, g, b = 0.8, 0.8, 0.8
-        end
-
-        scrollFrame:AddMessage(line, r, g, b)
-
-        -- Truncate persistent log table if it exists
-        if KRT_Debug and KRT_Debug.Debugs then
-            table.insert(KRT_Debug.Debugs, line)
-            while #KRT_Debug.Debugs > MAX_DEBUG_LOGS do
-                table.remove(KRT_Debug.Debugs, 1)
-            end
-        end
-    end
-
-    --
-    -- Adds any buffered messages to the scroll frame once it's available.
-    --
-    function Debugger:AddBufferedMessages()
-        for _, msg in ipairs(buffer) do
-            scrollFrame:AddMessage(msg)
-        end
-        buffer = {}
-    end
-
-    --
-    -- Returns true if the debugger window is visible.
-    --
-    function Debugger:IsShown()
-        return frame and frame:IsShown()
-    end
-end
-
 ---============================================================================
 -- Callback System
 -- A simple system for registering and triggering custom events.
@@ -5785,36 +5608,36 @@ do
 
         local cmd1, cmd2, cmd3 = strsplit(" ", cmd, 3)
 
-        -- ==== Debugger ====
+        -- ==== Debug ====
         if Utils.checkEntry(cmdDebug, cmd1) then
             local subCmd = cmd2 and cmd2:lower()
 
-            local actions = {
-                clear  = function() addon.Debugger:Clear() end,
-                show   = function() addon.Debugger:Show() end,
-                hide   = function() addon.Debugger:Hide() end,
-                toggle = function()
-                    if addon.Debugger:IsShown() then
-                        addon.Debugger:Hide()
-                        addon.Debugger:Clear()
-                    else
-                        addon.Debugger:Show()
-                    end
-                end,
-            }
-
-            if not subCmd or subCmd == "" then
-                actions.toggle()
-            elseif subCmd == "level" or subCmd == "lvl" then
+            if not subCmd or subCmd == "" or subCmd == "level" or subCmd == "lvl" then
                 if not cmd3 then
-                    addon.Debugger:Add("INFO", "Current log level: %s", addon.Debugger:GetMinLevel())
+                    local lvl = addon.GetLogLevel and addon:GetLogLevel()
+                    local name
+                    for k, v in pairs(addon.logLevels or {}) do
+                        if v == lvl then
+                            name = k
+                            break
+                        end
+                    end
+                    addon:info("Current log level: %s", name or tostring(lvl))
                 else
-                    addon.Debugger:SetMinLevel(tonumber(cmd3) or cmd3)
+                    local lv = tonumber(cmd3)
+                    if not lv and addon.logLevels then
+                        lv = addon.logLevels[cmd3:upper()]
+                    end
+                    if lv then
+                        addon:SetLogLevel(lv)
+                        KRT_Debug.level = lv
+                        addon:info("Log level set to [%s]", cmd3)
+                    else
+                        addon:warn("Unknown log level: %s", cmd3)
+                    end
                 end
-            elseif actions[subCmd] then
-                actions[subCmd]()
             else
-                addon.Debugger:Add("WARN", "Unknown debug command: %s", subCmd)
+                addon:warn("Unknown debug command: %s", subCmd)
             end
 
             -- ==== Achievement Link ====
