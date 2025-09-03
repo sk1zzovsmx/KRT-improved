@@ -1,8 +1,10 @@
 local addonName, addon = ...
-addon.Utils = {}
+addon.Utils = addon.Utils or {}
 
-local Utils = addon.Utils
-local L = addon.L
+local Utils   = addon.Utils
+local L       = addon.L
+local Compat  = addon.Compat
+
 local type, ipairs, pairs = type, ipairs, pairs
 local floor, random, round = math.floor, math.random, math.round
 local setmetatable, getmetatable = setmetatable, getmetatable
@@ -11,7 +13,7 @@ local find, match = string.find, string.match
 local format, gsub = string.format, string.gsub
 local strsub, strlen = string.sub, string.len
 local lower, upper = string.lower, string.upper
-local select = select
+local select, unpack = select, unpack
 local GetLocale = GetLocale
 
 -- ============================================================================
@@ -139,6 +141,15 @@ function Utils.WrapTextInColorCode(text, colorHexString)
         return ("|c%s%s|r"):format(colorHexString, text)
 end
 
+function Utils.GetClassColor(name)
+        name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
+        local c = Compat and Compat.GetClassColorObj and Compat.GetClassColorObj(name)
+        if not c then
+                return 1, 1, 1
+        end
+        return c.r, c.g, c.b
+end
+
 -- Determines if a given string is a number
 function Utils.isNumber(str)
         local valid = false
@@ -177,13 +188,19 @@ end
 
 -- Conditional Show/Hide Frame:
 function Utils.showHide(frame, cond)
-	if frame == nil then
-		return
-	elseif cond and not frame:IsShown() then
-		frame:Show()
-	elseif not cond and frame:IsShown() then
-		frame:Hide()
-	end
+        if frame == nil then
+                return
+        elseif cond and not frame:IsShown() then
+                frame:Show()
+        elseif not cond and frame:IsShown() then
+                frame:Hide()
+        end
+end
+
+function Utils.CreatePool(frameType, parent, template, resetter)
+        if Compat and Compat.CreateFramePool then
+                return Compat.CreateFramePool(frameType, parent, template, resetter)
+        end
 end
 
 -- Lock/Unlock Highlight:
@@ -217,42 +234,40 @@ end
 -- Tasks Manager --
 -------------------
 do
-	-- Table of scheduled tasks:
-	local tasks = {}
+local scheduled = {}
 
-	-- Schedule a task:
-	function Utils.schedule(sec, func, ...)
-		local task = {}
-		task.time = time() + sec
-		task.func = func
-		for i = 1, select("#", ...) do
-			task[i] = select(i, ...)
-		end
-		tasks[#tasks + 1] = task
-		tinsert(tasks, task)
-	end
+function Utils.schedule(sec, func, ...)
+if type(func) ~= "function" then return end
+local args = { ... }
+if addon.After then
+local handle = addon.After(sec, function() func(unpack(args)) end)
+scheduled[func] = handle
+return handle
+else
+func(unpack(args))
+end
+end
 
-	-- Unschedule a task:
-	function Utils.unschedule(func)
-		for i, v in pairs(tasks) do
-			if func == v.func then
-				tremove(tasks, i)
-				break
-			end
-		end
-	end
+function Utils.unschedule(func)
+local handle = scheduled[func]
+if handle and addon.CancelTimer then
+addon.CancelTimer(handle, true)
+end
+scheduled[func] = nil
+end
 
-	-- Run all scheduled tasks:
-	function Utils.run()
-		local now = time()
-		for i = 1, #tasks do
-			local task = tasks[i]
-			if task and type(task.func) == "function" and task.time <= now then
-				task.func(unpack(task))
-				tremove(tasks, i) -- Only once!
-			end
-		end
-	end
+function Utils.run()
+end
+
+function Utils.periodicTimer(sec, func, ...)
+if type(func) ~= "function" then return end
+local args = { ... }
+local function wrapper()
+func(unpack(args))
+Utils.schedule(sec, wrapper)
+end
+return Utils.schedule(sec, wrapper)
+end
 end
 
 -- Periodic frame update:
