@@ -16,7 +16,6 @@ _G["KRT"]                               = addon
 -- These variables are persisted across sessions for the addon.
 ---============================================================================
 
-KRT_Debug                               = KRT_Debug or {}
 KRT_Options                             = KRT_Options or {}
 KRT_Raids                               = KRT_Raids or {}
 KRT_Players                             = KRT_Players or {}
@@ -28,6 +27,49 @@ KRT_LastBoss                            = KRT_LastBoss or nil
 KRT_NextReset                           = KRT_NextReset or 0
 KRT_SavedReserves                       = KRT_SavedReserves or {}
 KRT_PlayerCounts                        = KRT_PlayerCounts or {}
+
+---============================================================================
+-- External Libraries / Bootstrap
+---============================================================================
+local LibStub = LibStub
+
+-- Resolve libraries (safe)
+local Compat   = LibStub and LibStub("LibCompat-1.0", true)
+local Logger   = LibStub and LibStub("LibLogger-1.0", true)
+local Deformat = LibStub and LibStub("LibDeformat-3.0", true)   -- already used elsewhere
+local BossIDs  = LibStub and LibStub("LibBossIDs-1.0", true)    -- already used elsewhere
+local LibXML   = LibStub and LibStub("LibXML-1.0", true)        -- optional runtime XML
+-- LibMath extends directly math if present; no action here.
+
+-- Expose handles on addon (without overwriting if already present)
+addon.Compat   = addon.Compat   or Compat
+addon.Logger   = addon.Logger   or Logger
+addon.Deformat = addon.Deformat or Deformat
+addon.BossIDs  = addon.BossIDs  or BossIDs
+addon.LibXML   = addon.LibXML   or LibXML
+
+-- Embed compat and logger only if available and not already embedded
+if addon.Compat and not addon.__CompatEmbedded then
+    addon.Compat:Embed(addon)
+    addon.__CompatEmbedded = true
+end
+if addon.Logger and not addon.__LoggerEmbedded then
+    addon.Logger:Embed(addon)
+    addon.__LoggerEmbedded = true
+end
+
+-- SavedVariables for log level (fallback INFO)
+KRT_Debug       = KRT_Debug or {}
+do
+    local INFO = (addon.Logger and addon.Logger.logLevels and addon.Logger.logLevels.INFO) or 2
+    KRT_Debug.level = KRT_Debug.level or INFO
+    if addon.SetLogLevel then
+        addon:SetLogLevel(KRT_Debug.level)
+    end
+    if addon.SetPerformanceMode then
+        addon:SetPerformanceMode(true)
+    end
+end
 
 ---============================================================================
 -- Core Addon Frames & Locals
@@ -155,9 +197,8 @@ local format, match, find, strlen       = string.format, string.match, string.fi
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 
--- External Libraries
-local deformat                          = LibStub("LibDeformat-3.0")
-local BossIDs                           = LibStub("LibBossIDs-1.0")
+local deformat                          = addon.Deformat
+local BossIDs                           = addon.BossIDs
 
 ---============================================================================
 -- Core Functions
