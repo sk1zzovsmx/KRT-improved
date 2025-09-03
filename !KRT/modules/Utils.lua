@@ -3,7 +3,7 @@ addon.Utils = {}
 
 local Utils = addon.Utils
 local type, ipairs, pairs = type, ipairs, pairs
-local floor, random = math.floor, math.random
+local floor, random, round = math.floor, math.random, math.round
 local setmetatable, getmetatable = setmetatable, getmetatable
 local tinsert, tremove, twipe = table.insert, table.remove, table.wipe
 local find, match = string.find, string.match
@@ -94,28 +94,9 @@ function Utils.isString(str)
 	return (str and strlen(str) > 0)
 end
 
--- Math Clamp
-_G.math.clamp = function(val, min, max)
-	if val and val <= min then
-		return min
-	elseif val and val >= max then
-		return max
-	end
-	return val
-end
-
--- math.round
-_G.math.round = function(num, idp)
-	if idp and idp > 0 then
-		local mult = 10 ^ idp
-		return floor(num * mult + 0.5) / mult
-	end
-	return floor(num + 0.5)
-end
-
 -- RBG to Hex:
 function Utils.rgb2hex(r, g, b)
-	return format("%02x%02x%02x", r * 255, g * 255, b * 255)
+        return format("%02x%02x%02x", round(r * 255), round(g * 255), round(b * 255))
 end
 
 -- Enable/Disable Frame:
