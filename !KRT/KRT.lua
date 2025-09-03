@@ -269,7 +269,6 @@ do
     -- Register initial events and scripts
     addon:RegisterEvents("ADDON_LOADED")
     mainFrame:SetScript("OnEvent", HandleEvent)
-    mainFrame:SetScript("OnUpdate", Utils.run)
 end
 
 ---============================================================================
@@ -682,15 +681,8 @@ do
     --
     -- Returns the RGB color values for a given class name.
     --
-    do
-        function addon:GetClassColor(name)
-            name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
-            local c = Compat and Compat.GetClassColorObj(name)
-            if not c then
-                return 1, 1, 1
-            end
-            return c.r, c.g, c.b
-        end
+    function addon:GetClassColor(name)
+        return Utils.GetClassColor(name)
     end
 
     --
