@@ -265,8 +265,6 @@ do
     local inRaid             = false
     local numRaid            = 0
     local GetLootMethod      = GetLootMethod
-    local GetNumPartyMembers = GetNumPartyMembers
-    local GetNumRaidMembers  = GetNumRaidMembers
     local GetRaidRosterInfo  = GetRaidRosterInfo
 
     --------------------------------------------------------------------------
@@ -278,7 +276,8 @@ do
     --
     function addon:UpdateRaidRoster()
         if not KRT_CurrentRaid then return end
-        numRaid = addon:GetNumGroupMembers()
+        local _, _, count = addon:GetGroupTypeAndCount()
+        numRaid = count
         if numRaid == 0 then
             Raid:End()
             return
@@ -356,8 +355,8 @@ do
         if KRT_CurrentRaid then
             self:End()
         end
-        numRaid = addon:GetNumGroupMembers()
-        if numRaid == 0 then return end
+        local groupType, _, numRaid = addon:GetGroupTypeAndCount()
+        if groupType ~= "raid" or numRaid == 0 then return end
 
         local realm = GetRealmName() or UNKNOWN
         KRT_Players[realm] = KRT_Players[realm] or {}
@@ -457,7 +456,8 @@ do
     --
     function Raid:FirstCheck()
         Utils.unschedule(addon.Raid.FirstCheck)
-        if addon:GetNumGroupMembers() == 0 then return end
+        local _, _, count = addon:GetGroupTypeAndCount()
+        if count == 0 then return end
 
         if KRT_CurrentRaid and Raid:CheckPlayer(unitName, KRT_CurrentRaid) then
             Utils.schedule(2, addon.UpdateRaidRoster)
@@ -897,10 +897,11 @@ do
         local originalName = name
         name = name or unitName or UnitName("player")
         if next(players) == nil then
-            if GetNumRaidMembers() > 0 then
-                numRaid = GetNumRaidMembers()
+            local groupType, _, count = self:GetGroupTypeAndCount()
+            if groupType == "raid" and count > 0 then
+                numRaid = count
                 for i = 1, numRaid do
-                    local pname, prank, _, _, _, _, _, _, _, _, _ = GetRaidRosterInfo(i)
+                    local pname, prank = GetRaidRosterInfo(i)
                     if pname == name then
                         rank = prank
                         break
@@ -952,22 +953,6 @@ do
     --------------------------------------------------------------------------
     -- Raid & Loot Status Checks
     --------------------------------------------------------------------------
-
-    --
-    -- Checks if the player is in a party.
-    --
-    function addon:IsInParty()
-        local inParty = (GetNumPartyMembers() > 0) and (GetNumRaidMembers() == 0)
-        return inParty
-    end
-
-    --
-    -- Checks if the player is in a raid.
-    --
-    function addon:IsInRaid()
-        local raidStatus = (inRaid == true or GetNumRaidMembers() > 0)
-        return raidStatus
-    end
 
     --
     -- Checks if the group is using the Master Looter system.
@@ -1058,8 +1043,8 @@ do
                     end
                 end
 
-                -- Switch to party mode if we're in a party:
-            elseif self:IsInParty() then
+                -- Switch to party mode if we're in a group:
+            elseif self:IsInGroup() then
                 channel = "PARTY"
 
                 -- Switch to alone mode
@@ -2678,7 +2663,11 @@ do
     -- Return sorted array of player names currently in the raid.
     local function GetCurrentRaidPlayers()
         wipe(raidPlayers)
-        for i = 1, GetNumRaidMembers() do
+        local groupType, _, count = addon:GetGroupTypeAndCount()
+        if groupType ~= "raid" then
+            return raidPlayers
+        end
+        for i = 1, count do
             local name = GetRaidRosterInfo(i)
             if name and name ~= "" then
                 raidPlayers[#raidPlayers + 1] = name
