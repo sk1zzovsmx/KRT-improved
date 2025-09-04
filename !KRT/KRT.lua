@@ -39,6 +39,7 @@ local Logger   = LibStub and LibStub("LibLogger-1.0", true)
 local Deformat = LibStub and LibStub("LibDeformat-3.0", true)   -- already used elsewhere
 local BossIDs  = LibStub and LibStub("LibBossIDs-1.0", true)    -- already used elsewhere
 local LibXML   = LibStub and LibStub("LibXML-1.0", true)        -- optional runtime XML
+local CallbackHandler = LibStub and LibStub("CallbackHandler-1.0", true)
 -- LibMath extends directly math if present; no action here.
 
 -- Expose handles on addon (without overwriting if already present)
@@ -47,6 +48,7 @@ addon.Logger   = addon.Logger   or Logger
 addon.Deformat = addon.Deformat or Deformat
 addon.BossIDs  = addon.BossIDs  or BossIDs
 addon.LibXML   = addon.LibXML   or LibXML
+addon.CallbackHandler = addon.CallbackHandler or CallbackHandler
 
 -- Embed compat and logger only if available and not already embedded
 if addon.Compat and not addon.__CompatEmbedded then
@@ -217,56 +219,39 @@ local BossIDs                           = addon.BossIDs
 -- Manages WoW API event registration for the addon.
 ---============================================================================
 do
-    -- Table of registered events:
-    local events = {}
-
-    --
-    -- Handles all registered WoW API events.
-    --
-    local function HandleEvent(self, e, ...)
-        if e == "ADDON_LOADED" then
-            LoadOptions()
-        end
-        if not events[e] then return end
-        for i, v in ipairs(events[e]) do
-            if type(v[e]) == "function" then
-                v[e](v, ...)
+    local CB = addon.CallbackHandler
+    if CB then
+        local function OnUsed(_, _, e) mainFrame:RegisterEvent(e) end
+        local function OnUnused(_, _, e) mainFrame:UnregisterEvent(e) end
+        local events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents", OnUsed, OnUnused)
+        mainFrame:SetScript("OnEvent", function(_, e, ...)
+            if e == "ADDON_LOADED" then
+                LoadOptions()
             end
-        end
-    end
-
-    --
-    -- Registers one or more WoW API events for a given object (usually a module).
-    --
-    function addon:RegisterEvents(...)
-        for i = 1, select("#", ...) do
-            local e = select(i, ...)
-            events[e] = events[e] or {}
-            tinsert(events[e], self)
+            events:Fire(e, ...)
+        end)
+        addon:RegisterEvent("ADDON_LOADED")
+    else
+        mainFrame:SetScript("OnEvent", function(_, e, ...)
+            if e == "ADDON_LOADED" then
+                LoadOptions()
+            end
+            local func = addon[e]
+            if type(func) == "function" then
+                func(addon, ...)
+            end
+        end)
+        mainFrame:RegisterEvent("ADDON_LOADED")
+        function addon:RegisterEvent(e)
             mainFrame:RegisterEvent(e)
         end
-    end
-
-    --
-    -- Unregisters all events for a given object.
-    --
-    function addon:UnregisterEvents()
-        for e, v in pairs(events) do
-            for i = #v, 1, -1 do
-                if v[i] == self then
-                    tremove(v, i)
-                end
-            end
-            if #v == 0 then
-                events[e] = nil
-                mainFrame:UnregisterEvent(e)
-            end
+        function addon:UnregisterEvent(e)
+            mainFrame:UnregisterEvent(e)
+        end
+        function addon:UnregisterAllEvents()
+            mainFrame:UnregisterAllEvents()
         end
     end
-
-    -- Register initial events and scripts
-    addon:RegisterEvents("ADDON_LOADED")
-    mainFrame:SetScript("OnEvent", HandleEvent)
 end
 
 ---============================================================================
@@ -5670,24 +5655,22 @@ end
 --
 function addon:ADDON_LOADED(name)
     if name ~= addonName then return end
-    mainFrame:UnregisterEvent("ADDON_LOADED")
+    self:UnregisterEvent("ADDON_LOADED")
     LoadOptions()
-    self:RegisterEvents(
-        "CHAT_MSG_ADDON",
-        "CHAT_MSG_SYSTEM",
-        "CHAT_MSG_LOOT",
-        "CHAT_MSG_MONSTER_YELL",
-        "RAID_ROSTER_UPDATE",
-        "PLAYER_ENTERING_WORLD",
-        "COMBAT_LOG_EVENT_UNFILTERED",
-        "RAID_INSTANCE_WELCOME",
-        -- Master Looter Events
-        "ITEM_LOCKED",
-        "LOOT_CLOSED",
-        "LOOT_OPENED",
-        "LOOT_SLOT_CLEARED",
-        "TRADE_ACCEPT_UPDATE"
-    )
+    self:RegisterEvent("CHAT_MSG_ADDON")
+    self:RegisterEvent("CHAT_MSG_SYSTEM")
+    self:RegisterEvent("CHAT_MSG_LOOT")
+    self:RegisterEvent("CHAT_MSG_MONSTER_YELL")
+    self:RegisterEvent("RAID_ROSTER_UPDATE")
+    self:RegisterEvent("PLAYER_ENTERING_WORLD")
+    self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    self:RegisterEvent("RAID_INSTANCE_WELCOME")
+    -- Master Looter Events
+    self:RegisterEvent("ITEM_LOCKED")
+    self:RegisterEvent("LOOT_CLOSED")
+    self:RegisterEvent("LOOT_OPENED")
+    self:RegisterEvent("LOOT_SLOT_CLEARED")
+    self:RegisterEvent("TRADE_ACCEPT_UPDATE")
     self:RAID_ROSTER_UPDATE()
 end
 
