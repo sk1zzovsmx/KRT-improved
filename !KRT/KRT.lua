@@ -285,19 +285,16 @@ do
 
         local realm = GetRealmName() or UNKNOWN
         KRT_Players[realm] = KRT_Players[realm] or {}
-        local players = {}
+        local raid = KRT_Raids[KRT_CurrentRaid]
+        raid.playersByName = raid.playersByName or {}
+        local playersByName = raid.playersByName
         for i = 1, numRaid do
             local name, rank, subgroup, level, classL, class, _, online = GetRaidRosterInfo(i)
             if name then
-                tinsert(players, name)
-                inRaid = false
-                for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
-                    if v.name == name and v.leave == nil then
-                        inRaid = true
-                    end
-                end
+                local player = playersByName[name]
                 local unitID = "raid" .. tostring(i)
                 local raceL, race = UnitRace(unitID)
+                inRaid = player and player.leave == nil
                 if not inRaid then
                     local toRaid = {
                         name     = name,
@@ -309,7 +306,10 @@ do
                         count    = 0, -- <--- Inizializza count!
                     }
                     Raid:AddPlayer(toRaid)
+                    player = toRaid
                 end
+
+                player.seen = true
 
                 if not KRT_Players[realm][name] then
                     KRT_Players[realm][name] = {
@@ -326,17 +326,11 @@ do
         end
 
         -- Mark players who have left
-        for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
-            local found = nil
-            for _, p in ipairs(players) do
-                if v.name == p then
-                    found = true
-                    break
-                end
-            end
-            if not found and v.leave == nil then
+        for name, v in pairs(playersByName) do
+            if not v.seen and v.leave == nil then
                 v.leave = Utils.GetCurrentTime()
             end
+            v.seen = nil
         end
         Utils.unschedule(addon.UpdateRaidRoster)
     end
@@ -356,14 +350,15 @@ do
         local currentTime = Utils.GetCurrentTime()
 
         local raidInfo = {
-            realm     = realm,
-            zone      = zoneName,
-            size      = raidSize,
-            players   = {},
-            bossKills = {},
-            loot      = {},
-            startTime = currentTime,
-            changes   = {},
+            realm         = realm,
+            zone          = zoneName,
+            size          = raidSize,
+            players       = {},
+            playersByName = {},
+            bossKills     = {},
+            loot          = {},
+            startTime     = currentTime,
+            changes       = {},
         }
 
         for i = 1, numRaid do
@@ -371,7 +366,7 @@ do
             if name then
                 local unitID = "raid" .. tostring(i)
                 local raceL, race = UnitRace(unitID)
-                tinsert(raidInfo.players, {
+                local p = {
                     name     = name,
                     rank     = rank,
                     subgroup = subgroup,
@@ -379,7 +374,9 @@ do
                     join     = Utils.GetCurrentTime(),
                     leave    = nil,
                     count    = 0, -- Initialize loot count
-                })
+                }
+                tinsert(raidInfo.players, p)
+                raidInfo.playersByName[name] = p
                 KRT_Players[realm][name] = {
                     name   = name,
                     level  = level,
@@ -466,20 +463,24 @@ do
     function Raid:AddPlayer(t, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
         if not raidNum or not t or not t.name then return end
+        local raid = KRT_Raids[raidNum]
+        raid.playersByName = raid.playersByName or {}
         local players = Raid:GetPlayers(raidNum)
         local found = false
         for i, p in ipairs(players) do
             if t.name == p.name then
                 -- Preserve count if present
                 t.count = t.count or p.count or 0
-                KRT_Raids[raidNum].players[i] = t
+                raid.players[i] = t
+                raid.playersByName[t.name] = t
                 found = true
                 break
             end
         end
         if not found then
             t.count = t.count or 0
-            tinsert(KRT_Raids[raidNum].players, t)
+            tinsert(raid.players, t)
+            raid.playersByName[t.name] = t
         end
     end
 
