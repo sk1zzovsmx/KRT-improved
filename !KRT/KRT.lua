@@ -210,6 +210,7 @@ local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
 local format, match, find, strlen       = string.format, string.match, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
+local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
 
 local deformat                          = addon.Deformat
 local BossIDs                           = addon.BossIDs
