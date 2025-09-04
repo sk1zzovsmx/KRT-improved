@@ -98,14 +98,12 @@
 				</Scripts>
 			</ScrollingMessageFrame>
 		</Frames>
-		<Scripts>
-			<OnDragStart>self:StartMoving()</OnDragStart>
-			<OnDragStop>self:StopMovingOrSizing()</OnDragStop>
-			<OnLoad>KRT.Debugger:OnLoad(self)</OnLoad>
-		</Scripts>
-		<Anchors>
-			<Anchor point="CENTER" />
-		</Anchors>
+                <Scripts>
+                        <OnLoad>KRT.Debugger:OnLoad(self)</OnLoad>
+                </Scripts>
+                <Anchors>
+                        <Anchor point="CENTER" />
+                </Anchors>
 		<!-- Title Text -->
 		<Layers>
 			<Layer level="ARTWORK">

@@ -1011,6 +1011,9 @@ do
         if DEFAULT_CHAT_FRAME then
             DEFAULT_CHAT_FRAME:AddMessage(msg)
         end
+        if addon.Debugger and addon.Debugger.Add then
+            addon.Debugger:Add(msg)
+        end
     end
 
     --
@@ -1053,6 +1056,99 @@ do
             end
         end
         Utils.chat(tostring(text), channel)
+    end
+end
+
+---============================================================================
+-- Debugger Window
+---============================================================================
+do
+    addon.Debugger = addon.Debugger or {}
+    local Debugger = addon.Debugger
+
+    local frame, frameName, scrollFrame
+    local buffer = {}
+    local MAX_DEBUG_LOGS = 500
+
+    function Debugger:OnLoad(f)
+        frame = f
+        frameName = frame:GetName()
+        scrollFrame = _G[frameName .. "ScrollFrame"]
+        frame:SetMovable(true)
+        frame:EnableMouse(true)
+        frame:RegisterForDrag("LeftButton")
+        frame:SetScript("OnDragStart", frame.StartMoving)
+        frame:SetScript("OnDragStop", function(self)
+            self:StopMovingOrSizing()
+            local p, rt, rp, x, y = self:GetPoint()
+            KRT_Debug.Pos = {
+                point = p,
+                relativeTo = rt and rt:GetName() or nil,
+                relativePoint = rp,
+                xOfs = x,
+                yOfs = y,
+            }
+        end)
+        if KRT_Debug and KRT_Debug.Pos and KRT_Debug.Pos.point then
+            local p = KRT_Debug.Pos
+            frame:ClearAllPoints()
+            frame:SetPoint(p.point, p.relativeTo and _G[p.relativeTo] or UIParent,
+                p.relativePoint, p.xOfs, p.yOfs)
+        end
+        Debugger:AddBufferedMessages()
+    end
+
+    function Debugger:Show()
+        if frame then frame:Show() end
+    end
+
+    function Debugger:Hide()
+        if frame then frame:Hide() end
+    end
+
+    function Debugger:IsShown()
+        return frame and frame:IsShown()
+    end
+
+    function Debugger:Clear()
+        if scrollFrame then scrollFrame:Clear() end
+        buffer = {}
+    end
+
+    local function color(msg)
+        if msg:find("ERROR") then
+            return 1, 0.2, 0.2
+        elseif msg:find("WARN") then
+            return 1, 0.8, 0
+        elseif msg:find("INFO") then
+            return 0.6, 0.8, 1
+        elseif msg:find("DEBUG") then
+            return 0.8, 0.8, 0.8
+        end
+        return 1, 1, 1
+    end
+
+    function Debugger:Add(msg)
+        if not msg then return end
+        local line = format("[%s] %s", date("%H:%M:%S"), msg)
+        if not scrollFrame then
+            table.insert(buffer, line)
+            while #buffer > MAX_DEBUG_LOGS do table.remove(buffer, 1) end
+            return
+        end
+        local r, g, b = color(msg)
+        scrollFrame:AddMessage(line, r, g, b)
+        KRT_Debug.Debugs = KRT_Debug.Debugs or {}
+        table.insert(KRT_Debug.Debugs, line)
+        while #KRT_Debug.Debugs > MAX_DEBUG_LOGS do table.remove(KRT_Debug.Debugs, 1) end
+    end
+
+    function Debugger:AddBufferedMessages()
+        if not scrollFrame then return end
+        for _, msg in ipairs(buffer) do
+            scrollFrame:AddMessage(msg)
+        end
+        buffer = {}
     end
 end
 
