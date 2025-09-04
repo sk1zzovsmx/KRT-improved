@@ -102,7 +102,6 @@ local deformat                          = LibStub("LibDeformat-3.0")
 local LibCompat                         = LibStub("LibCompat-1.0")
 local AceBucket                         = LibStub("AceBucket-3.0")
 AceBucket:Embed(addon)
-addon.Compat                           = LibCompat
 
 -- Returns the used frame's name:
 function addon:GetFrameName()
@@ -353,7 +352,8 @@ do
 
 	-- Register some events and frame-related functions:
         addon:RegisterEvent("ADDON_LOADED")
-        mainFrame:SetScript("OnEvent", HandleEvent)
+	mainFrame:SetScript("OnEvent", HandleEvent)
+	mainFrame:SetScript("OnUpdate", Utils.run)
 end
 
 -- ==================== Raid Helpers ==================== --
@@ -669,10 +669,18 @@ do
 		return size
 	end
 
-        -- Return class color by name:
-        function addon:GetClassColor(name)
-                return Utils.GetClassColor(name)
-        end
+	-- Return class color by name:
+	do
+		local colors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS
+		function addon:GetClassColor(name)
+			name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
+			if not colors[name] then
+				return 1, 1, 1
+			end
+			local c = colors[name]
+			return c.r, c.g, c.b
+		end
+	end
 
 	-- Checks if a raid is expired
 	function Raid:Expired(rID)
