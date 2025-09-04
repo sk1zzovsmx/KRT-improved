@@ -203,8 +203,6 @@ local titleString                       = "|cfff58cbaK|r|caaf49141RT|r : %s"
 
 local LoadOptions
 
--- Cached WoW API & Lua Functions
-local SendChatMessage                   = SendChatMessage
 local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, table.wipe
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
 local format, match, find, strlen       = string.format, string.match, string.find, string.len
@@ -1067,7 +1065,7 @@ do
                 channel = "SAY" -- Fallback for solo
             end
         end
-        SendChatMessage(tostring(text), channel)
+        Utils.chat(tostring(text), channel)
     end
 end
 
@@ -2180,7 +2178,7 @@ do
     --
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
-        if Utils.periodic(self, frameName, updateInterval, elapsed) then
+        if Utils.throttle(self, frameName, updateInterval, elapsed) then
             itemCount = _G[frameName .. "ItemCount"]:GetNumber()
             if itemInfo.count and itemInfo.count ~= itemCount then
                 if itemInfo.count < itemCount then
@@ -2953,7 +2951,7 @@ do
     function UpdateUIFrame(self, elapsed)
         addon:Debug("DEBUG", "UpdateUIFrame called with elapsed time: %.2f", elapsed)
         LocalizeUIFrame()
-        if Utils.periodic(self, frameName, updateInterval, elapsed) then
+        if Utils.throttle(self, frameName, updateInterval, elapsed) then
             addon:Debug("DEBUG", "Periodic check passed for %s", frameName)
             local clearButton = _G[frameName .. "ClearButton"]
             if clearButton then
@@ -3542,7 +3540,7 @@ do
     --
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
-        if Utils.periodic(self, frameName, updateInterval, elapsed) then
+        if Utils.throttle(self, frameName, updateInterval, elapsed) then
             _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)
             _G[frameName .. "useRaidWarning"]:SetChecked(addon.options.useRaidWarning == true)
             _G[frameName .. "announceOnWin"]:SetChecked(addon.options.announceOnWin == true)
@@ -3727,7 +3725,7 @@ do
     -- OnUpdate frame:
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
-        if Utils.periodic(self, frameName, updateInterval, elapsed) then
+        if Utils.throttle(self, frameName, updateInterval, elapsed) then
             if fetched == false then FetchWarnings() end
             if #KRT_Warnings > 0 then
                 for i = 1, #KRT_Warnings do
@@ -4002,7 +4000,7 @@ do
     -- OnUpdate frame:
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
-        if Utils.periodic(self, frameName, updateInterval, elapsed) then
+        if Utils.throttle(self, frameName, updateInterval, elapsed) then
             if not fetched then
                 InitChangesTable()
                 FetchChanges()
@@ -4214,14 +4212,14 @@ do
             return
         end
         if #channels <= 0 then
-            SendChatMessage(tostring(finalOutput), "YELL")
+            Utils.chat(tostring(finalOutput), "YELL")
             return
         end
         for i, c in ipairs(channels) do
             if c == "Guild" or c == "Yell" then
-                SendChatMessage(tostring(finalOutput), upper(c))
+                Utils.chat(tostring(finalOutput), upper(c))
             else
-                SendChatMessage(tostring(finalOutput), "CHANNEL", nil, c)
+                Utils.chat(tostring(finalOutput), "CHANNEL", nil, c)
             end
         end
     end
@@ -4288,7 +4286,7 @@ do
     -- OnUpdate frame:
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
-        if Utils.periodic(self, frameName, updateInterval, elapsed) then
+        if Utils.throttle(self, frameName, updateInterval, elapsed) then
             if not loaded then
                 for k, v in pairs(KRT_Spammer) do
                     if k == "Channels" then
@@ -4570,7 +4568,7 @@ do
                 self.localized = true
             end
 
-            if not Utils.periodic(frame, self.frameName .. (cfg.keyName or ""), cfg.updateInterval, elapsed) then
+            if not Utils.throttle(frame, self.frameName .. (cfg.keyName or ""), cfg.updateInterval, elapsed) then
                 return
             end
 
@@ -4683,7 +4681,7 @@ do
                 _G[frameName .. "Title"]:SetText(string.format(titleString, L.StrLootHistory))
                 localized = true
             end
-            if Utils.periodic(self, frameName, updateInterval, elapsed) and Logger.selectedRaid == nil then
+            if Utils.throttle(self, frameName, updateInterval, elapsed) and Logger.selectedRaid == nil then
                 Logger.selectedRaid = KRT_CurrentRaid
             end
         end)
@@ -5436,7 +5434,7 @@ do
             addon:SetTooltip(_G[frameName .. "Time"], L.StrBossTimeHelp, "ANCHOR_RIGHT")
             localized = true
         end
-        if Utils.periodic(frame, frameName, updateInterval, elapsed) then
+        if Utils.throttle(frame, frameName, updateInterval, elapsed) then
             Utils.setText(_G[frameName .. "Title"], L.StrEditBoss, L.StrAddBoss, isEdit)
         end
     end

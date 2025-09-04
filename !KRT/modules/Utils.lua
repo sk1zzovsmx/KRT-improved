@@ -234,49 +234,58 @@ end
 -- Tasks Manager --
 -------------------
 do
-local scheduled = {}
+    local scheduled = {}
 
-function Utils.schedule(sec, func, ...)
-if type(func) ~= "function" then return end
-local args = { ... }
-if addon.After then
-local handle = addon.After(sec, function() func(unpack(args)) end)
-scheduled[func] = handle
-return handle
-else
-func(unpack(args))
-end
+    function Utils.schedule(sec, func, ...)
+        if type(func) ~= "function" then return end
+        local args = { ... }
+        if addon.After then
+            local handle
+            handle = addon.After(sec, function()
+                scheduled[func] = nil
+                func(unpack(args))
+            end)
+            scheduled[func] = handle
+            return handle
+        else
+            func(unpack(args))
+        end
+    end
+
+    function Utils.periodic(sec, func, ...)
+        if type(func) ~= "function" then return end
+        local args = { ... }
+        local function wrapper()
+            func(unpack(args))
+            if addon.After then
+                scheduled[func] = addon.After(sec, wrapper)
+            end
+        end
+        return Utils.schedule(sec, wrapper)
+    end
+
+    function Utils.unschedule(func)
+        local handle = scheduled[func]
+        if handle and handle.Cancel then
+            handle:Cancel()
+        elseif handle and addon.CancelTimer then
+            addon.CancelTimer(handle, true)
+        end
+        scheduled[func] = nil
+    end
+
+    function Utils.run(func, ...)
+        return Utils.schedule(0, func, ...)
+    end
 end
 
-function Utils.unschedule(func)
-local handle = scheduled[func]
-if handle and addon.CancelTimer then
-addon.CancelTimer(handle, true)
-end
-scheduled[func] = nil
-end
-
-function Utils.run()
-end
-
-function Utils.periodicTimer(sec, func, ...)
-if type(func) ~= "function" then return end
-local args = { ... }
-local function wrapper()
-func(unpack(args))
-Utils.schedule(sec, wrapper)
-end
-return Utils.schedule(sec, wrapper)
-end
-end
-
--- Periodic frame update:
-function Utils.periodic(frame, name, period, elapsed)
-	local t = frame[name] or 0
-	t = t + elapsed
-	if t > period then
-		frame[name] = 0
-		return true
+-- Throttle frame OnUpdate:
+function Utils.throttle(frame, name, period, elapsed)
+        local t = frame[name] or 0
+        t = t + elapsed
+        if t > period then
+                frame[name] = 0
+                return true
 	end
 	frame[name] = t
 	return false
@@ -351,14 +360,19 @@ end
 
 -- Sends an addOn message to the appropriate channel:
 function Utils.sync(prefix, msg)
-	local zone = select(2, IsInInstance())
-	if zone == "pvp" or zone == "arena" then
-		SendAddonMessage(prefix, msg, "BATTLEGROUND")
-	elseif GetRealNumRaidMembers() > 0 then
-		SendAddonMessage(prefix, msg, "RAID")
-	elseif GetRealNumPartyMembers() > 0 then
-		SendAddonMessage(prefix, msg, "PARTY")
-	end
+        local zone = select(2, IsInInstance())
+        if zone == "pvp" or zone == "arena" then
+                SendAddonMessage(prefix, msg, "BATTLEGROUND")
+        elseif GetRealNumRaidMembers() > 0 then
+                SendAddonMessage(prefix, msg, "RAID")
+        elseif GetRealNumPartyMembers() > 0 then
+                SendAddonMessage(prefix, msg, "PARTY")
+        end
+end
+
+function Utils.chat(msg, channel, language, target)
+        if not msg then return end
+        SendChatMessage(tostring(msg), channel, language, target)
 end
 
 -- Send a whisper to a player by his/her character name or BNet ID
