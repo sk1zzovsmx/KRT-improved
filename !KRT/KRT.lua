@@ -33,8 +33,8 @@ KRT_PlayerCounts                        = KRT_PlayerCounts or {}
 ---============================================================================
 local LibStub = LibStub
 
--- Resolve libraries (safe)
-local Compat   = LibStub and LibStub("LibCompat-1.0", true)
+-- Resolve libraries
+local Compat   = LibStub("LibCompat-1.0")
 local Logger   = LibStub and LibStub("LibLogger-1.0", true)
 local Deformat = LibStub and LibStub("LibDeformat-3.0", true)   -- already used elsewhere
 local BossIDs  = LibStub and LibStub("LibBossIDs-1.0", true)    -- already used elsewhere
@@ -50,8 +50,8 @@ addon.BossIDs  = addon.BossIDs  or BossIDs
 addon.LibXML   = addon.LibXML   or LibXML
 addon.CallbackHandler = addon.CallbackHandler or CallbackHandler
 
--- Embed compat and logger only if available and not already embedded
-if addon.Compat and not addon.__CompatEmbedded then
+-- Embed compat and logger only if not already embedded
+if not addon.__CompatEmbedded then
     addon.Compat:Embed(addon)
     addon.__CompatEmbedded = true
 end
@@ -211,18 +211,7 @@ local format, match, find, strlen       = string.format, string.match, string.fi
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
-local IsInRaid, IsInGroup, GetNumGroupMembers, GetNumSubgroupMembers =
-    IsInRaid, IsInGroup, GetNumGroupMembers, GetNumSubgroupMembers
-
-local function GetGroupTypeAndCount()
-    if IsInRaid() then
-        return "raid", GetNumGroupMembers()
-    elseif IsInGroup() then
-        return "party", GetNumSubgroupMembers()
-    else
-        return nil, 0
-    end
-end
+local GetGroupTypeAndCount = addon.GetGroupTypeAndCount
 
 local deformat                          = addon.Deformat
 local BossIDs                           = addon.BossIDs
@@ -288,7 +277,7 @@ do
     --
     function addon:UpdateRaidRoster()
         if not KRT_CurrentRaid then return end
-        local _, count = GetGroupTypeAndCount()
+        local _, _, count = GetGroupTypeAndCount()
         numRaid = count
         if numRaid == 0 then
             Raid:End()
@@ -367,7 +356,7 @@ do
         if KRT_CurrentRaid then
             self:End()
         end
-        local groupType, numRaid = GetGroupTypeAndCount()
+        local groupType, _, numRaid = GetGroupTypeAndCount()
         if groupType ~= "raid" or numRaid == 0 then return end
 
         local realm = GetRealmName() or UNKNOWN
@@ -468,7 +457,7 @@ do
     --
     function Raid:FirstCheck()
         Utils.unschedule(addon.Raid.FirstCheck)
-        local _, count = GetGroupTypeAndCount()
+        local _, _, count = GetGroupTypeAndCount()
         if count == 0 then return end
 
         if KRT_CurrentRaid and Raid:CheckPlayer(unitName, KRT_CurrentRaid) then
@@ -909,7 +898,7 @@ do
         local originalName = name
         name = name or unitName or UnitName("player")
         if next(players) == nil then
-            local groupType, count = GetGroupTypeAndCount()
+            local groupType, _, count = GetGroupTypeAndCount()
             if groupType == "raid" and count > 0 then
                 numRaid = count
                 for i = 1, numRaid do
@@ -2675,7 +2664,7 @@ do
     -- Return sorted array of player names currently in the raid.
     local function GetCurrentRaidPlayers()
         wipe(raidPlayers)
-        local groupType, count = GetGroupTypeAndCount()
+        local groupType, _, count = GetGroupTypeAndCount()
         if groupType ~= "raid" then
             return raidPlayers
         end
