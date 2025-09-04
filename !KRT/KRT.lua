@@ -278,7 +278,7 @@ do
     --
     function addon:UpdateRaidRoster()
         if not KRT_CurrentRaid then return end
-        numRaid = GetNumRaidMembers()
+        numRaid = addon:GetNumGroupMembers()
         if numRaid == 0 then
             Raid:End()
             return
@@ -289,12 +289,25 @@ do
         local raid = KRT_Raids[KRT_CurrentRaid]
         raid.playersByName = raid.playersByName or {}
         local playersByName = raid.playersByName
-        for i = 1, numRaid do
-            local name, rank, subgroup, level, classL, class, _, online = GetRaidRosterInfo(i)
+        for unit in addon:UnitIterator() do
+            local name = UnitName(unit)
             if name then
+                local index = UnitInRaid(unit)
+                local rank, subgroup
+                if index then
+                    _, rank, subgroup = GetRaidRosterInfo(index)
+                end
+                if addon.UnitIsGroupLeader and addon.UnitIsGroupLeader(unit) then
+                    rank = 2
+                elseif addon.UnitIsGroupAssistant and addon.UnitIsGroupAssistant(unit) then
+                    rank = 1
+                end
+                rank = rank or 0
+                subgroup = subgroup or 1
+                local level = UnitLevel(unit)
+                local classL, class = UnitClass(unit)
                 local player = playersByName[name]
-                local unitID = "raid" .. tostring(i)
-                local raceL, race = UnitRace(unitID)
+                local raceL, race = UnitRace(unit)
                 inRaid = player and player.leave == nil
                 if not inRaid then
                     local toRaid = {
@@ -320,7 +333,7 @@ do
                         raceL  = raceL,
                         class  = class or "UNKNOWN",
                         classL = classL,
-                        sex    = UnitSex(unitID)
+                        sex    = UnitSex(unit),
                     }
                 end
             end
@@ -343,7 +356,7 @@ do
         if KRT_CurrentRaid then
             self:End()
         end
-        numRaid = GetNumRaidMembers()
+        numRaid = addon:GetNumGroupMembers()
         if numRaid == 0 then return end
 
         local realm = GetRealmName() or UNKNOWN
@@ -444,7 +457,7 @@ do
     --
     function Raid:FirstCheck()
         Utils.unschedule(addon.Raid.FirstCheck)
-        if GetNumRaidMembers() == 0 then return end
+        if addon:GetNumGroupMembers() == 0 then return end
 
         if KRT_CurrentRaid and Raid:CheckPlayer(unitName, KRT_CurrentRaid) then
             Utils.schedule(2, addon.UpdateRaidRoster)
@@ -500,10 +513,12 @@ do
             instanceDiff = instanceDiff + (2 * dynDiff)
         end
         local players = {}
-        for i = 1, GetNumRaidMembers() do
-            local name, _, _, _, _, _, _, online = GetRaidRosterInfo(i)
-            if online == 1 then -- track only online players:
-                tinsert(players, name)
+        for unit in addon:UnitIterator() do
+            if UnitIsConnected(unit) then -- track only online players
+                local name = UnitName(unit)
+                if name then
+                    tinsert(players, name)
+                end
             end
         end
         local currentTime = Utils.GetCurrentTime()
