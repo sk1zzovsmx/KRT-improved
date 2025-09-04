@@ -2663,7 +2663,8 @@ end
 
 -- ==================== Loot Counter (Reworked: Style & Logic) ==================== --
 do
-    local rows = {}
+    local rows, raidPlayers = {}, {}
+    local wipe = wipe or table.wipe
     local countsFrame, scrollChild
 
     -- Helper to ensure frames exist
@@ -2674,18 +2675,18 @@ do
 
     -- Return sorted array of player names currently in the raid.
     local function GetCurrentRaidPlayers()
-        local players = {}
+        wipe(raidPlayers)
         for i = 1, GetNumRaidMembers() do
             local name = GetRaidRosterInfo(i)
             if name and name ~= "" then
-                table.insert(players, name)
+                raidPlayers[#raidPlayers + 1] = name
                 if KRT_PlayerCounts[name] == nil then
                     KRT_PlayerCounts[name] = 0
                 end
             end
         end
-        table.sort(players)
-        return players
+        table.sort(raidPlayers)
+        return raidPlayers
     end
 
     -- Show or hide the loot counter frame.
@@ -2709,6 +2710,7 @@ do
         local players = GetCurrentRaidPlayers()
         local numPlayers = #players
         local rowHeight = 25
+        local counts = KRT_PlayerCounts
 
         scrollChild:SetHeight(numPlayers * rowHeight)
 
@@ -2740,16 +2742,16 @@ do
                 row.plus:SetScript("OnClick", function(self)
                     local n = row._playerName
                     if n then
-                        KRT_PlayerCounts[n] = (KRT_PlayerCounts[n] or 0) + 1
-                        addon:UpdateCountsFrame()
+                        counts[n] = (counts[n] or 0) + 1
+                        row.count:SetText(tostring(counts[n]))
                     end
                 end)
                 row.minus:SetScript("OnClick", function(self)
                     local n = row._playerName
                     if n then
-                        local c = (KRT_PlayerCounts[n] or 0) - 1
-                        KRT_PlayerCounts[n] = c > 0 and c or 0
-                        addon:UpdateCountsFrame()
+                        local c = (counts[n] or 0) - 1
+                        counts[n] = c > 0 and c or 0
+                        row.count:SetText(tostring(counts[n]))
                     end
                 end)
 
@@ -2761,7 +2763,7 @@ do
 
             row._playerName = name
             row.name:SetText(name)
-            row.count:SetText(tostring(KRT_PlayerCounts[name] or 0))
+            row.count:SetText(tostring(counts[name] or 0))
             row:Show()
         end
 
