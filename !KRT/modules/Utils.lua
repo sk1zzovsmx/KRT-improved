@@ -11,7 +11,6 @@ local format, gsub = string.format, string.gsub
 local strsub, strlen = string.sub, string.len
 local lower, upper = string.lower, string.upper
 local select = select
-local unpack = unpack
 local GetLocale = GetLocale
 
 -- Shuffle a table:
@@ -116,27 +115,7 @@ end
 
 -- RBG to Hex:
 function Utils.rgb2hex(r, g, b)
-        return format("%02x%02x%02x", r * 255, g * 255, b * 255)
-end
-
--- Class color helpers
-do
-        local fallback = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS or {}
-        function Utils.GetClassColor(class)
-                class = class and upper(class)
-                local compat = addon.Compat
-                if compat and compat.GetClassColor then
-                        local r, g, b = compat:GetClassColor(class)
-                        if r and g and b then
-                                return r, g, b
-                        end
-                end
-                local c = fallback[class]
-                if c then
-                        return c.r, c.g, c.b
-                end
-                return 1, 1, 1
-        end
+	return format("%02x%02x%02x", r * 255, g * 255, b * 255)
 end
 
 -- Enable/Disable Frame:
@@ -203,38 +182,42 @@ end
 -- Tasks Manager --
 -------------------
 do
-        -- Table of scheduled timers:
-        local scheduled = {}
+	-- Table of scheduled tasks:
+	local tasks = {}
 
-        -- Schedule a task and keep the timer handle so it can be cancelled later
-        function Utils.schedule(sec, func, ...)
-                if type(func) ~= "function" then return end
-                local handle
-                if addon.NewTimer then
-                        handle = addon:NewTimer(sec, func, ...)
-                elseif C_Timer and C_Timer.NewTimer then
-                        local args = { ... }
-                        handle = C_Timer.NewTimer(sec, function() func(unpack(args)) end)
-                elseif addon.After then
-                        local args = { ... }
-                        handle = addon.After(sec, function() func(unpack(args)) end)
-                end
-                scheduled[func] = handle
-                return handle
-        end
+	-- Schedule a task:
+	function Utils.schedule(sec, func, ...)
+		local task = {}
+		task.time = time() + sec
+		task.func = func
+		for i = 1, select("#", ...) do
+			task[i] = select(i, ...)
+		end
+		tasks[#tasks+1] = task
+		tinsert(tasks, task)
+	end
 
-        -- Unschedule a task using the stored handle
-        function Utils.unschedule(func)
-                local handle = scheduled[func]
-                if handle then
-                        if addon.CancelTimer then
-                                addon.CancelTimer(handle)
-                        elseif handle.Cancel then
-                                handle:Cancel()
-                        end
-                        scheduled[func] = nil
-                end
-        end
+	-- Unschedule a task:
+	function Utils.unschedule(func)
+		for i, v in pairs(tasks) do
+			if func == v.func then
+				tremove(tasks, i)
+				break
+			end
+		end
+	end
+
+	-- Run all scheduled tasks:
+	function Utils.run()
+		local now = time()
+		for i = 1, #tasks do
+			local task = tasks[i]
+			if task and type(task.func) == "function" and task.time <= now then
+				task.func(unpack(task))
+				tremove(tasks, i) -- Only once!
+			end
+		end
+	end
 end
 
 -- Periodic frame update:
