@@ -276,6 +276,8 @@ L.MsgChatThrottleSet              = "Chat throttle set to %s sec"
 L.MsgLFMPeriodSet                 = "LFM period set to %s sec"
 L.MsgMinimapPosSet                = "Minimap button angle set to %s"
 
+L.LFM_TEMPLATE                   = "[KRT] LFM: {raid} {roles} {time}"
+
 -- ==================== Raid & Loot Locales ==================== --
 L.ItemValues                      = {
 	[1] = "Poor",

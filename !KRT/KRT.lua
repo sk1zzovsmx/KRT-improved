@@ -4452,6 +4452,50 @@ do
     end)
 end
 
+-- Lightweight LFM scheduler
+do
+    local U = addon.Utils
+    local S = addon.Spammer
+    local running
+
+    local function Send(msg)
+        if U.Throttle("lfm_msg", _G.KRT_Options.chatThrottle or 2.0) then
+            SendChatMessage(msg, IsInRaid() and "RAID" or "GUILD")
+        end
+    end
+
+    local function Tick()
+        if not running then return end
+        local msg = addon.L.LFM_TEMPLATE or "[KRT] LFM: {raid} {roles} {time}"
+        local raidName = GetRealZoneText() or "Raid"
+        local text = msg:gsub("{raid}", raidName):gsub("{roles}", "T/H/D"):gsub("{time}", date("%H:%M"))
+        Send(text)
+        U.Schedule(_G.KRT_Options.lfmPeriod or 45, Tick)
+    end
+
+    function S:Init() end
+
+    function S:Start()
+        if running then return end
+        running = true
+        Tick()
+        addon:Log("LFM started")
+    end
+
+    function S:Stop()
+        running = false
+        addon:Log("LFM stopped")
+    end
+
+    function S:Toggle()
+        if running then
+            S:Stop()
+        else
+            S:Start()
+        end
+    end
+end
+
 -- ==================== Tooltips ==================== --
 do
     local colors = HIGHLIGHT_FONT_COLOR
