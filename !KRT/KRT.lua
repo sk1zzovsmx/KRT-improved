@@ -2653,12 +2653,25 @@ end
 do
     local rows, raidPlayers = {}, {}
     local wipe = wipe or table.wipe
-    local countsFrame, scrollChild
+    local countsFrame, scrollChild, needsUpdate = nil, nil, false
+
+    local function RequestCountsUpdate()
+        needsUpdate = true
+    end
 
     -- Helper to ensure frames exist
     local function EnsureFrames()
         countsFrame = countsFrame or _G["KRTLootCounterFrame"]
         scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
+        if countsFrame and not countsFrame._krtCounterHook then
+            countsFrame:SetScript("OnUpdate", function(self, elapsed)
+                if needsUpdate and Utils.throttle(self, "LootCounter", 0.1, elapsed) then
+                    needsUpdate = false
+                    addon:UpdateCountsFrame()
+                end
+            end)
+            countsFrame._krtCounterHook = true
+        end
     end
 
     -- Return sorted array of player names currently in the raid.
@@ -2688,7 +2701,7 @@ do
             if countsFrame:IsShown() then
                 countsFrame:Hide()
             else
-                addon:UpdateCountsFrame() -- Always refresh before showing
+                RequestCountsUpdate()
                 countsFrame:Show()
             end
         end
@@ -2731,19 +2744,19 @@ do
                 row.minus:SetText("-")
                 row.minus:SetPoint("LEFT", row.plus, "RIGHT", 2, 0)
 
-                row.plus:SetScript("OnClick", function(self)
+                row.plus:SetScript("OnClick", function()
                     local n = row._playerName
                     if n then
                         counts[n] = (counts[n] or 0) + 1
-                        row.count:SetText(tostring(counts[n]))
+                        RequestCountsUpdate()
                     end
                 end)
-                row.minus:SetScript("OnClick", function(self)
+                row.minus:SetScript("OnClick", function()
                     local n = row._playerName
                     if n then
                         local c = (counts[n] or 0) - 1
                         counts[n] = c > 0 and c or 0
-                        row.count:SetText(tostring(counts[n]))
+                        RequestCountsUpdate()
                     end
                 end)
 
@@ -4510,7 +4523,7 @@ do
     -- Controller liste con pooling righe e highlight differito
     function MakeListController(cfg)
         -- cfg: keyName, updateInterval, localize(frameName), getData()->array
-        --      rowName(frameName,item)->"PrefixBtn"..id, rowTmpl, drawRow(btnName,item,scrollChild,scrollW)
+        --      rowName(frameName,item,index)->"PrefixBtn"..index, rowTmpl, drawRow(btnName,item,scrollChild,scrollW)
         --      highlightId()->id|nil, postUpdate(frameName)
         --      sorters = { key = function(a,b,asc) return cond end, ... }
         local self = {
@@ -4608,7 +4621,7 @@ do
             local count = #self.data
             for i = 1, count do
                 local it      = self.data[i]
-                local btnName = cfg.rowName(n, it)
+                local btnName = cfg.rowName(n, it, i)
                 local row     = self._rows[i]
 
                 if not row or row:GetName() ~= btnName then
@@ -4834,7 +4847,7 @@ do
             return t
         end,
 
-        rowName        = function(n, it) return n .. "RaidBtn" .. it.id end,
+        rowName        = function(n, it, i) return n .. "RaidBtn" .. i end,
         rowTmpl        = "KRTLoggerRaidButton",
 
         -- Altezza riga costante (cache dal template alla 1a chiamata)
@@ -4950,7 +4963,7 @@ do
             return t
         end,
 
-        rowName        = function(n, it) return n .. "BossBtn" .. it.id end,
+        rowName        = function(n, it, i) return n .. "BossBtn" .. i end,
         rowTmpl        = "KRTLoggerBossButton",
 
         drawRow        = (function()
@@ -5040,7 +5053,7 @@ do
             return addon.Raid:GetPlayers(addon.Logger.selectedRaid, addon.Logger.selectedBoss) or {}
         end,
 
-        rowName        = function(n, it) return n .. "PlayerBtn" .. it.id end,
+        rowName        = function(n, it, i) return n .. "PlayerBtn" .. i end,
         rowTmpl        = "KRTLoggerBossAttendeeButton",
 
         drawRow        = (function()
@@ -5135,7 +5148,7 @@ do
             return t
         end,
 
-        rowName        = function(n, it) return n .. "PlayerBtn" .. it.id end,
+        rowName        = function(n, it, i) return n .. "PlayerBtn" .. i end,
         rowTmpl        = "KRTLoggerRaidAttendeeButton",
 
         drawRow        = (function()
@@ -5252,7 +5265,7 @@ do
             return t
         end,
 
-        rowName        = function(n, it) return n .. "ItemBtn" .. it.id end,
+        rowName        = function(n, it, i) return n .. "ItemBtn" .. i end,
         rowTmpl        = "KRTLoggerLootButton",
 
         drawRow        = (function()
