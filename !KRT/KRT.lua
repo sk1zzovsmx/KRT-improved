@@ -82,7 +82,11 @@ do
     local INFO = (addon.Logger and addon.Logger.logLevels and addon.Logger.logLevels.INFO) or 2
     KRT_Debug.level = KRT_Debug.level or INFO
     if addon.SetLogLevel then
-        addon:SetLogLevel(KRT_Debug.level)
+        local lv = KRT_Debug.level
+        if KRT_Options and KRT_Options.debug and addon.Logger and addon.Logger.logLevels then
+            lv = addon.Logger.logLevels.DEBUG or lv
+        end
+        addon:SetLogLevel(lv)
     end
     if addon.SetPerformanceMode then
         addon:SetPerformanceMode(true)
@@ -1070,6 +1074,8 @@ do
 
     -- Cached math functions
     local abs, sqrt = math.abs, math.sqrt
+    local cos, sin = math.cos, math.sin
+    local rad, atan2, deg = math.rad, math.atan2, math.deg
 
     --
     -- Initializes and opens the right-click menu for the minimap button.
@@ -1183,9 +1189,20 @@ do
     --
     -- OnLoad handler for the minimap button.
     --
+    function MinimapBtn:SetPos(angle)
+        angle = angle % 360
+        addon.options.minimapPos = angle
+        local r = rad(angle)
+        KRT_MINIMAP_GUI:ClearAllPoints()
+        KRT_MINIMAP_GUI:SetPoint("CENTER", cos(r) * 80, sin(r) * 80)
+    end
+
     function MinimapBtn:OnLoad(btn)
         if not btn then return end
+        addon.options = addon.options or KRT_Options or {}
         KRT_MINIMAP_GUI:SetUserPlaced(true)
+        self:SetPos(addon.options.minimapPos or 325)
+        if not addon.options.minimapButton then KRT_MINIMAP_GUI:Hide() end
         KRT_MINIMAP_GUI:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         KRT_MINIMAP_GUI:SetScript("OnMouseDown", function(self, button)
             if IsAltKeyDown() then
@@ -1198,6 +1215,9 @@ do
         end)
         KRT_MINIMAP_GUI:SetScript("OnMouseUp", function(self)
             self:SetScript("OnUpdate", nil)
+            local mx, my = Minimap:GetCenter()
+            local bx, by = self:GetCenter()
+            MinimapBtn:SetPos(deg(atan2(by - my, bx - mx)))
         end)
         KRT_MINIMAP_GUI:SetScript("OnClick", function(self, button, down)
             -- Ignore clicks if Shift or Alt keys are held:
@@ -3429,6 +3449,10 @@ do
         ignoreStacks           = false,
         showTooltips           = true,
         minimapButton          = true,
+        minimapPos             = 325,
+        debug                  = false,
+        chatThrottle           = 2,
+        lfmPeriod              = 45,
         countdownSimpleRaidMsg = false,
         countdownDuration      = 5,
         countdownRollsBlock    = true,
@@ -3454,6 +3478,12 @@ do
         -- Ensure dependent options are consistent
         if not addon.options.useRaidWarning then
             addon.options.countdownSimpleRaidMsg = false
+        end
+
+        if addon.options.debug and addon.SetLogLevel and addon.Logger and addon.Logger.logLevels then
+            addon:SetLogLevel(addon.Logger.logLevels.DEBUG)
+        elseif addon.SetLogLevel then
+            addon:SetLogLevel(KRT_Debug.level)
         end
     end
 
@@ -4120,7 +4150,7 @@ do
     local loaded = false
 
     local name, tankClass, healerClass, meleeClass, rangedClass
-    local duration = 60
+    local duration = (KRT_Options and KRT_Options.lfmPeriod) or 60
     local tank = 0
     local healer = 0
     local melee = 0
@@ -4191,8 +4221,8 @@ do
                 ticking = false
             else
                 tickStart = GetTime()
-                duration = tonumber(duration)
-                tickPos = (duration >= 1 and duration or 60) + 1
+                duration = tonumber(duration) or addon.options.lfmPeriod
+                tickPos = (duration >= 1 and duration or addon.options.lfmPeriod) + 1
                 ticking = true
                 -- Spammer:Spam()
             end
@@ -4219,14 +4249,14 @@ do
             return
         end
         if #channels <= 0 then
-            Utils.chat(tostring(finalOutput), "YELL")
+            Utils.chat(tostring(finalOutput), "YELL", nil, nil, true)
             return
         end
         for i, c in ipairs(channels) do
             if c == "Guild" or c == "Yell" then
-                Utils.chat(tostring(finalOutput), upper(c))
+                Utils.chat(tostring(finalOutput), upper(c), nil, nil, true)
             else
-                Utils.chat(tostring(finalOutput), "CHANNEL", nil, c)
+                Utils.chat(tostring(finalOutput), "CHANNEL", nil, c, true)
             end
         end
     end
@@ -4295,6 +4325,7 @@ do
         LocalizeUIFrame()
         if Utils.throttle(self, frameName, updateInterval, elapsed) then
             if not loaded then
+                KRT_Spammer.Duration = KRT_Spammer.Duration or addon.options.lfmPeriod
                 for k, v in pairs(KRT_Spammer) do
                     if k == "Channels" then
                         for i, c in ipairs(v) do
@@ -4371,7 +4402,7 @@ do
                 -- Set set duration:
                 duration = _G[frameName .. "Duration"]:GetText()
                 if duration == "" then
-                    duration = 60
+                    duration = addon.options.lfmPeriod
                     _G[frameName .. "Duration"]:SetText(duration)
                 end
                 finalOutput = temp
@@ -5539,6 +5570,8 @@ do
     local cmdDebug    = { "debug", "dbg", "debugger" }
     local cmdLoot     = { "loot", "ml", "master" }
     local cmdReserves = { "res", "reserves", "reserve" }
+    local cmdChat     = { "chat", "throttle", "chatthrottle" }
+    local cmdMinimap  = { "minimap", "mm" }
 
     local helpString  = "|caaf49141%s|r: %s"
 
@@ -5556,7 +5589,7 @@ do
         if Utils.checkEntry(cmdDebug, cmd1) then
             local subCmd = cmd2 and cmd2:lower()
 
-            if not subCmd or subCmd == "" or subCmd == "level" or subCmd == "lvl" then
+            if subCmd == "level" or subCmd == "lvl" then
                 if not cmd3 then
                     local lvl = addon.GetLogLevel and addon:GetLogLevel()
                     local name
@@ -5581,7 +5614,54 @@ do
                     end
                 end
             else
-                addon:warn("Unknown debug command: %s", subCmd)
+                if subCmd == "on" then
+                    addon.options.debug = true
+                elseif subCmd == "off" then
+                    addon.options.debug = false
+                else
+                    addon.options.debug = not addon.options.debug
+                end
+                if addon.options.debug and addon.Logger and addon.Logger.logLevels then
+                    addon:SetLogLevel(addon.Logger.logLevels.DEBUG)
+                    addon:info(L.MsgDebugOn)
+                else
+                    addon:SetLogLevel(KRT_Debug.level)
+                    addon:info(L.MsgDebugOff)
+                end
+            end
+
+            -- ==== Chat Throttle ====
+        elseif Utils.checkEntry(cmdChat, cmd1) then
+            local val = tonumber(cmd2)
+            if val then
+                addon.options.chatThrottle = val
+                addon:info(L.MsgChatThrottleSet, val)
+            else
+                addon:info(L.MsgChatThrottleSet, addon.options.chatThrottle)
+            end
+
+            -- ==== Minimap ====
+        elseif Utils.checkEntry(cmdMinimap, cmd1) then
+            local sub = cmd2 and cmd2:lower()
+            if sub == "on" then
+                addon.options.minimapButton = true
+                if KRT_MINIMAP_GUI then KRT_MINIMAP_GUI:Show() end
+            elseif sub == "off" then
+                addon.options.minimapButton = false
+                if KRT_MINIMAP_GUI then KRT_MINIMAP_GUI:Hide() end
+            elseif sub == "pos" and cmd3 then
+                local angle = tonumber(cmd3)
+                if angle then
+                    addon.Minimap:SetPos(angle)
+                    addon:info(L.MsgMinimapPosSet, angle)
+                end
+            elseif sub == "pos" then
+                addon:info(L.MsgMinimapPosSet, addon.options.minimapPos)
+            else
+                addon:info(format(L.StrCmdCommands, "krt minimap"), "KRT")
+                print(helpString:format("on", L.StrCmdToggle))
+                print(helpString:format("off", L.StrCmdToggle))
+                print(helpString:format("pos <deg>", L.StrCmdMinimapPos))
             end
 
             -- ==== Achievement Link ====
@@ -5659,11 +5739,22 @@ do
                 addon.Spammer:Start()
             elseif cmd2 == "stop" then
                 addon.Spammer:Stop()
+            elseif cmd2 == "period" then
+                if cmd3 then
+                    local v = tonumber(cmd3)
+                    if v then
+                        addon.options.lfmPeriod = v
+                        addon:info(L.MsgLFMPeriodSet, v)
+                    end
+                else
+                    addon:info(L.MsgLFMPeriodSet, addon.options.lfmPeriod)
+                end
             else
                 addon:info(format(L.StrCmdCommands, "krt pug"), "KRT")
                 print(helpString:format("toggle", L.StrCmdToggle))
                 print(helpString:format("start", L.StrCmdLFMStart))
                 print(helpString:format("stop", L.StrCmdLFMStop))
+                print(helpString:format("period", L.StrCmdLFMPeriod))
             end
 
             -- ==== Help fallback ====
