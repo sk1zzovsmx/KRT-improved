@@ -16,6 +16,66 @@ local lower, upper = string.lower, string.upper
 local select, unpack = select, unpack
 local GetLocale = GetLocale
 
+-- Lightweight pooling and timers
+local GetTime = GetTime
+local CreateFrame = CreateFrame
+
+-- Table pool (no table.new in 3.3.5a)
+local TPOOL = setmetatable({}, { __mode = "k" })
+
+function Utils.AcquireTable()
+        for t in pairs(TPOOL) do
+                TPOOL[t] = nil
+                twipe(t)
+                return t
+        end
+        return {}
+end
+
+function Utils.ReleaseTable(t)
+        if t then
+                twipe(t)
+                TPOOL[t] = true
+        end
+end
+
+-- Lightweight throttle (keyed)
+local last = {}
+function Utils.Throttle(key, sec)
+        local now = GetTime()
+        sec = sec or 1
+        if not last[key] or (now - last[key]) >= sec then
+                last[key] = now
+                return true
+        end
+end
+
+-- Tiny scheduler (no C_Timer in 3.3.5)
+local Queue, Driver = {}, CreateFrame("Frame")
+Driver:SetScript("OnUpdate", function(_, _)
+        local now = GetTime()
+        for i = #Queue, 1, -1 do
+                local q = Queue[i]
+                if q.t <= now then
+                        table.remove(Queue, i)
+                        local ok, err = pcall(q.f)
+                        if not ok and addon.LogErr then
+                                addon:LogErr("Scheduler: %s", tostring(err))
+                        end
+                end
+        end
+end)
+
+function Utils.Schedule(delay, func)
+        if type(func) ~= "function" then return end
+        Queue[#Queue + 1] = { t = GetTime() + (delay or 0), f = func }
+end
+
+-- Color helper (common usage)
+function Utils.ColorText(text, r, g, b)
+        return ("|cff%02x%02x%02x%s|r"):format((r or 1) * 255, (g or 0.82) * 255, (b or 0) * 255, text)
+end
+
 -- ============================================================================
 -- Callback utilities
 -- ============================================================================
