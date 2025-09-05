@@ -1199,6 +1199,7 @@ do
 
     function MinimapBtn:OnLoad(btn)
         if not btn then return end
+        addon.options = addon.options or KRT_Options or {}
         KRT_MINIMAP_GUI:SetUserPlaced(true)
         self:SetPos(addon.options.minimapPos or 325)
         if not addon.options.minimapButton then KRT_MINIMAP_GUI:Hide() end
