@@ -267,6 +267,14 @@ L.StrCmdLFMStop                   = "stops LFM spam"
 L.StrCmdChangesDemand             = "ask raid members to whisper you their ms changes"
 L.StrCmdChangesAnnounce           = "spam ms changes to raid channel"
 L.StrCmdReserves                  = "access reserve list related commands"
+L.StrCmdLFMPeriod                 = "set LFM spam period"
+L.StrCmdMinimapPos                = "set minimap button angle"
+
+L.MsgDebugOn                      = "Debug mode enabled"
+L.MsgDebugOff                     = "Debug mode disabled"
+L.MsgChatThrottleSet              = "Chat throttle set to %s sec"
+L.MsgLFMPeriodSet                 = "LFM period set to %s sec"
+L.MsgMinimapPosSet                = "Minimap button angle set to %s"
 
 -- ==================== Raid & Loot Locales ==================== --
 L.ItemValues                      = {
