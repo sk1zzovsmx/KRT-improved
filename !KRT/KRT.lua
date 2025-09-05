@@ -2664,8 +2664,8 @@ do
         countsFrame = countsFrame or _G["KRTLootCounterFrame"]
         scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         if countsFrame and not countsFrame._krtCounterHook then
-            countsFrame:SetScript("OnUpdate", function(self, elapsed)
-                if needsUpdate and Utils.throttle(self, "LootCounter", 0.1, elapsed) then
+            countsFrame:SetScript("OnUpdate", function()
+                if needsUpdate and Utils.Throttle("LootCounter", 0.1) then
                     needsUpdate = false
                     addon:UpdateCountsFrame()
                 end
@@ -4580,9 +4580,7 @@ do
             end
 
             if not self.fetched then
-                wipe(self.data)
-                local src = cfg.getData() or {}
-                for i = 1, #src do self.data[i] = src[i] end
+                if cfg.getData then cfg.getData(self.data) end
                 self:Fetch()
             end
 
@@ -4833,18 +4831,22 @@ do
         end,
 
         -- Preformat date una volta sola
-        getData        = function()
-            local t = {}
-            for i, r in ipairs(KRT_Raids) do
-                t[#t + 1] = {
-                    id      = i,
-                    zone    = r.zone,
-                    size    = r.size,
-                    date    = r.startTime,                         -- numerico per sort
-                    dateFmt = date("%d/%m/%Y %H:%M", r.startTime), -- stringa per UI
-                }
+        getData        = function(out)
+            local count = #KRT_Raids
+            for i = 1, count do
+                local r = KRT_Raids[i]
+                local it = out[i] or Utils.AcquireTable()
+                it.id      = i
+                it.zone    = r.zone
+                it.size    = r.size
+                it.date    = r.startTime
+                it.dateFmt = date("%d/%m/%Y %H:%M", r.startTime)
+                out[i] = it
             end
-            return t
+            for i = count + 1, #out do
+                Utils.ReleaseTable(out[i])
+                out[i] = nil
+            end
         end,
 
         rowName        = function(n, it, i) return n .. "RaidBtn" .. i end,
@@ -4946,21 +4948,23 @@ do
         end,
 
         -- Copia e preformat time (senza toccare i campi usati per sort)
-        getData        = function()
+        getData        = function(out)
             local src = addon.Raid:GetBosses(addon.Logger.selectedRaid) or {}
-            local t = {}
             for i = 1, #src do
                 local b = src[i]
-                t[i] = {
-                    id      = b.id,
-                    name    = b.name,
-                    time    = b.time,                -- numerico per sort
-                    mode    = b.mode,
-                    timeFmt = date("%H:%M", b.time), -- stringa UI
-                }
+                local it = out[i] or Utils.AcquireTable()
+                it.id      = b.id
+                it.name    = b.name
+                it.time    = b.time
+                it.mode    = b.mode
+                it.timeFmt = date("%H:%M", b.time)
+                out[i] = it
             end
-            table.sort(t, function(a, b) return a.id > b.id end)
-            return t
+            for i = #src + 1, #out do
+                Utils.ReleaseTable(out[i])
+                out[i] = nil
+            end
+            table.sort(out, function(a, b) return a.id > b.id end)
         end,
 
         rowName        = function(n, it, i) return n .. "BossBtn" .. i end,
@@ -5048,9 +5052,24 @@ do
 
         localize       = function(n) _G[n .. "Title"]:SetText(L.StrBossAttendees) end,
 
-        getData        = function()
-            if not addon.Logger.selectedBoss then return {} end
-            return addon.Raid:GetPlayers(addon.Logger.selectedRaid, addon.Logger.selectedBoss) or {}
+        getData        = function(out)
+            if not addon.Logger.selectedBoss then
+                for i = #out, 1, -1 do Utils.ReleaseTable(out[i]); out[i] = nil end
+                return
+            end
+            local src = addon.Raid:GetPlayers(addon.Logger.selectedRaid, addon.Logger.selectedBoss) or {}
+            for i = 1, #src do
+                local p = src[i]
+                local it = out[i] or Utils.AcquireTable()
+                it.id    = p.id
+                it.name  = p.name
+                it.class = p.class
+                out[i] = it
+            end
+            for i = #src + 1, #out do
+                Utils.ReleaseTable(out[i])
+                out[i] = nil
+            end
         end,
 
         rowName        = function(n, it, i) return n .. "PlayerBtn" .. i end,
@@ -5130,22 +5149,24 @@ do
         end,
 
         -- Preformat join/leave per la UI
-        getData        = function()
+        getData        = function(out)
             local src = addon.Raid:GetPlayers(addon.Logger.selectedRaid) or {}
-            local t = {}
             for i = 1, #src do
                 local p = src[i]
-                t[i] = {
-                    id       = p.id,
-                    name     = p.name,
-                    class    = p.class,
-                    join     = p.join,                -- numerico per sort
-                    leave    = p.leave,               -- numerico/nil per sort
-                    joinFmt  = date("%H:%M", p.join), -- stringa UI
-                    leaveFmt = p.leave and date("%H:%M", p.leave) or "",
-                }
+                local it = out[i] or Utils.AcquireTable()
+                it.id       = p.id
+                it.name     = p.name
+                it.class    = p.class
+                it.join     = p.join
+                it.leave    = p.leave
+                it.joinFmt  = date("%H:%M", p.join)
+                it.leaveFmt = p.leave and date("%H:%M", p.leave) or ""
+                out[i] = it
             end
-            return t
+            for i = #src + 1, #out do
+                Utils.ReleaseTable(out[i])
+                out[i] = nil
+            end
         end,
 
         rowName        = function(n, it, i) return n .. "PlayerBtn" .. i end,
@@ -5233,7 +5254,7 @@ do
         end,
 
         -- Preformat time per la UI (mantieni i campi numerici per sort/logica)
-        getData        = function()
+        getData        = function(out)
             raidLoot = addon.Raid:GetLoot(addon.Logger.selectedRaid) or {}
 
             local pID = addon.Logger.selectedPlayer
@@ -5244,25 +5265,27 @@ do
                 data = addon.Raid:GetLoot(addon.Logger.selectedRaid, addon.Logger.selectedBoss) or {}
             end
 
-            local t = {}
             for i = 1, #data do
                 local v = data[i]
-                t[i] = {
-                    id          = v.id,
-                    itemId      = v.itemId,
-                    itemName    = v.itemName,
-                    itemRarity  = v.itemRarity,
-                    itemTexture = v.itemTexture,
-                    itemLink    = v.itemLink,
-                    bossNum     = v.bossNum,
-                    looter      = v.looter,
-                    rollType    = v.rollType,
-                    rollValue   = v.rollValue,
-                    time        = v.time,                -- numerico per sort
-                    timeFmt     = date("%H:%M", v.time), -- stringa per UI
-                }
+                local it = out[i] or Utils.AcquireTable()
+                it.id          = v.id
+                it.itemId      = v.itemId
+                it.itemName    = v.itemName
+                it.itemRarity  = v.itemRarity
+                it.itemTexture = v.itemTexture
+                it.itemLink    = v.itemLink
+                it.bossNum     = v.bossNum
+                it.looter      = v.looter
+                it.rollType    = v.rollType
+                it.rollValue   = v.rollValue
+                it.time        = v.time
+                it.timeFmt     = date("%H:%M", v.time)
+                out[i] = it
             end
-            return t
+            for i = #data + 1, #out do
+                Utils.ReleaseTable(out[i])
+                out[i] = nil
+            end
         end,
 
         rowName        = function(n, it, i) return n .. "ItemBtn" .. i end,
