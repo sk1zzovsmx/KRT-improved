@@ -98,6 +98,8 @@ local pcall                             = pcall
 local format, match, find, strlen       = string.format, string.match, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
+local LibStub                          = _G.LibStub
+assert(LibStub, "LibStub library missing. Ensure Libs/LibStub.lua loads first.")
 local deformat                          = LibStub("LibDeformat-3.0")
 
 -- Returns the used frame's name:
