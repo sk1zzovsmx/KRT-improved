@@ -31,10 +31,10 @@ KRT_PlayerCounts                        = KRT_PlayerCounts or {}
 ---============================================================================
 -- External Libraries / Bootstrap
 ---============================================================================
-local LibStub = LibStub
+local LibStub = _G.LibStub
 
 -- Resolve libraries
-local Compat   = LibStub("LibCompat-1.0")
+local Compat   = LibStub and LibStub("LibCompat-1.0")
 local Logger   = LibStub and LibStub("LibLogger-1.0", true)
 local Deformat = LibStub and LibStub("LibDeformat-3.0", true)   -- already used elsewhere
 local BossIDs  = LibStub and LibStub("LibBossIDs-1.0", true)    -- already used elsewhere
@@ -50,8 +50,7 @@ addon.BossIDs  = addon.BossIDs  or BossIDs
 addon.LibXML   = addon.LibXML   or LibXML
 addon.CallbackHandler = addon.CallbackHandler or CallbackHandler
 
--- Embed compat and logger only if not already embedded
-if not addon.__CompatEmbedded then
+if addon.Compat and not addon.__CompatEmbedded then
     addon.Compat:Embed(addon)
     addon.__CompatEmbedded = true
 end
