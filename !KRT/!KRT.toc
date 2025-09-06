@@ -15,7 +15,7 @@
 ## X-Localizations: Kader (frFR)
 
 # Libraries:
-Libs\\libs.xml
+Libs\libs.xml
 
 # Localization (moved to the top for 'L' to be available):
 Localization\localization.en.lua
