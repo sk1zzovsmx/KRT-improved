@@ -1,4 +1,4 @@
--- modules/bossList.lua
+-- Modules/bossList.lua
 -- This file will be loaded after KRT.lua, so KRT should be defined.
 local KRT = _G["KRT"]
 
