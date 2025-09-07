@@ -308,6 +308,8 @@ do
 
     function Utils.schedule(sec, func, ...)
         if type(func) ~= "function" then return end
+        local delay = sec or 0
+        if delay <= 0 then delay = 0.01 end
         local args = { ... }
         local function call()
             scheduled[func] = nil
@@ -315,9 +317,9 @@ do
         end
         local handle
         if addon.After then
-            handle = addon.After(sec or 0, call)
+            handle = addon.After(delay, call)
         else
-            handle = Utils.Schedule(sec or 0, call)
+            handle = Utils.Schedule(delay, call)
         end
         scheduled[func] = handle
         return handle
@@ -326,17 +328,19 @@ do
 
     function Utils.periodic(sec, func, ...)
         if type(func) ~= "function" then return end
+        local delay = sec or 0
+        if delay <= 0 then delay = 0.01 end
         local args, alive = { ... }, true
         local function tick()
             if not alive then return end
             func(unpack(args))
             if addon.After then
-                addon.After(sec, tick)
+                addon.After(delay, tick)
             else
-                Utils.Schedule(sec, tick)
+                Utils.Schedule(delay, tick)
             end
         end
-        Utils.schedule(sec, tick)
+        Utils.schedule(delay, tick)
         return function() alive = false end
     end
 
