@@ -26,7 +26,7 @@ local GetTime = GetTime
 -- Table pool (no table.new in 3.3.5a)
 local TPOOL = setmetatable({}, { __mode = "k" })
 
-function Utils.AcquireTable()
+function Utils.acquireTable()
         for t in pairs(TPOOL) do
                 TPOOL[t] = nil
                 twipe(t)
@@ -35,7 +35,7 @@ function Utils.AcquireTable()
         return {}
 end
 
-function Utils.ReleaseTable(t)
+function Utils.releaseTable(t)
         if t then
                 twipe(t)
                 TPOOL[t] = true
@@ -43,7 +43,7 @@ function Utils.ReleaseTable(t)
 end
 -- Lightweight throttle (keyed)
 local last = {}
-function Utils.Throttle(key, sec)
+function Utils.throttleKey(key, sec)
         local now = GetTime()
         sec = sec or 1
         if not last[key] or (now - last[key]) >= sec then
@@ -52,9 +52,8 @@ function Utils.Throttle(key, sec)
         end
 end
 
-
 -- Color helper (common usage)
-function Utils.ColorText(text, r, g, b)
+function Utils.colorText(text, r, g, b)
         return ("|cff%02x%02x%02x%s|r"):format((r or 1) * 255, (g or 0.82) * 255, (b or 0) * 255, text)
 end
 
@@ -64,7 +63,7 @@ end
 
 local callbacks = {}
 
-function Utils.RegisterCallback(e, func)
+function Utils.registerCallback(e, func)
         if not e or type(func) ~= "function" then
                 error(L.StrCbErrUsage)
         end
@@ -73,7 +72,7 @@ function Utils.RegisterCallback(e, func)
         return #callbacks
 end
 
-function Utils.TriggerEvent(e, ...)
+function Utils.triggerEvent(e, ...)
         if not callbacks[e] then return end
         for i, v in ipairs(callbacks[e]) do
                 local ok, err = pcall(v, e, ...)
@@ -87,7 +86,7 @@ end
 -- Frame helpers
 -- ============================================================================
 
-function Utils.GetFrameName()
+function Utils.getFrameName()
         local name
         if addon.UIMaster ~= nil then
                 name = addon.UIMaster:GetName()
@@ -166,7 +165,7 @@ end
 -- Color utilities
 -- ============================================================================
 
-function Utils.RGBToHex(r, g, b)
+function Utils.rgbToHex(r, g, b)
         if r and g and b and r <= 1 and g <= 1 and b <= 1 then
                 r, g, b = r * 255, g * 255, b * 255
         end
@@ -176,14 +175,14 @@ function Utils.RGBToHex(r, g, b)
         return format("%02x%02x%02x", r, g, b)
 end
 
-function Utils.WrapTextInColorCode(text, colorHexString)
+function Utils.wrapTextInColorCode(text, colorHexString)
         if Compat and Compat.WrapTextInColorCode then
                 return Compat.WrapTextInColorCode(text, colorHexString)
         end
         return ("|c%s%s|r"):format(colorHexString, text)
 end
 
-function Utils.GetClassColor(name)
+function Utils.getClassColor(name)
         name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
         local c = Compat and Compat.GetClassColorObj and Compat.GetClassColorObj(name)
         if not c then
@@ -239,7 +238,7 @@ function Utils.showHide(frame, cond)
         end
 end
 
-function Utils.CreatePool(frameType, parent, template, resetter)
+function Utils.createPool(frameType, parent, template, resetter)
         if Compat and Compat.CreateFramePool then
                 return Compat.CreateFramePool(frameType, parent, template, resetter)
         end
@@ -452,13 +451,13 @@ function Utils.getSecondsAsString(t)
 end
 
 -- Determines if the player is in a raid instance
-function Utils.IsRaidInstance()
+function Utils.isRaidInstance()
 	local inInstance, instanceType = IsInInstance()
 	return ((inInstance) and (instanceType == "raid"))
 end
 
 -- Returns the raid difficulty:
-function Utils.GetDifficulty()
+function Utils.getDifficulty()
 	local difficulty = nil
 	local inInstance, instanceType = IsInInstance()
 	if inInstance and instanceType == "raid" then
@@ -468,7 +467,7 @@ function Utils.GetDifficulty()
 end
 
 -- Returns the NPCID or nil:
-function Utils.GetNPCID(GUID)
+function Utils.getNpcId(GUID)
 	local first3 = tonumber("0x" .. strsub(GUID, 3, 5))
 	local unitType = bit.band(first3, 0x007)
 	if ((unitType == 0x003) or (unitType == 0x005)) then
@@ -478,7 +477,7 @@ function Utils.GetNPCID(GUID)
 end
 
 -- Returns the current time:
-function Utils.GetCurrentTime(server)
+function Utils.getCurrentTime(server)
 	server = server or true
 	local t = time()
 	if server == true then
@@ -490,7 +489,7 @@ function Utils.GetCurrentTime(server)
 end
 
 -- Returns the server offset:
-function Utils.GetServerOffset()
+function Utils.getServerOffset()
 	local sH, sM = GetGameTime()
 	local lH, lM = tonumber(date("%H")), tonumber(date("%M"))
         local sT = sH + sM / 60
