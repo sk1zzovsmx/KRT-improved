@@ -71,24 +71,26 @@ local CallbackHandler  = addon.CallbackHandler
 
 function addon:Debug(level, fmt, ...)
     if not self.Logger then return end
-    local msg = fmt
-    if select("#", ...) > 0 then
-        msg = string.format(fmt, ...)
-    end
     local lv = type(level) == "string" and level:upper()
+    local fn
     if     lv == "ERROR" and self.error then
-        self:error(msg)
-    elseif lv == "WARN"  and self.warn  then
-        self:warn(msg)
+        fn = self.error
+    elseif lv == "WARN"  and self.warn then
+        fn = self.warn
     elseif lv == "DEBUG" and self.debug then
-        self:debug(msg)
+        fn = self.debug
     else
-        if self.info then
-            self:info(msg)
-        end
+        fn = self.info
     end
-    if self.Debugger and self.Debugger.AddMessage then
-        self.Debugger:AddMessage(msg)
+    if fn then
+        fn(self, fmt, ...)
+    end
+    if self.Debugger and self.Debugger.AddMessage and self.logLevels and self.logLevel then
+        local lvl = self.logLevels[lv] or self.logLevels.INFO
+        if lvl <= self.logLevel then
+            local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
+            self.Debugger:AddMessage(msg)
+        end
     end
 end
 
