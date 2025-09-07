@@ -267,8 +267,7 @@ local format, match, find, strlen       = string.format, string.match, string.fi
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
-local GetGroupTypeAndCount = assert(Compat and Compat.GetGroupTypeAndCount, "LibCompat-1.0 required")
-addon.GetGroupTypeAndCount = GetGroupTypeAndCount
+local IsInRaid, GetNumRaidMembers, GetNumPartyMembers = IsInRaid, GetNumRaidMembers, GetNumPartyMembers
 
 local deformat                          = addon.Deformat
 local BossIDs                           = addon.BossIDs
@@ -334,7 +333,7 @@ do
     --
     function addon:UpdateRaidRoster()
         if not KRT_CurrentRaid then return end
-        local _, _, count = GetGroupTypeAndCount()
+        local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
         numRaid = count
         if numRaid == 0 then
             Raid:End()
@@ -413,8 +412,9 @@ do
         if KRT_CurrentRaid then
             self:End()
         end
-        local groupType, _, numRaid = GetGroupTypeAndCount()
-        if groupType ~= "raid" or numRaid == 0 then return end
+        if not IsInRaid() then return end
+        local numRaid = GetNumRaidMembers()
+        if numRaid == 0 then return end
 
         local realm = GetRealmName() or UNKNOWN
         KRT_Players[realm] = KRT_Players[realm] or {}
@@ -514,7 +514,7 @@ do
     --
     function Raid:FirstCheck()
         Utils.unschedule(addon.Raid.FirstCheck)
-        local _, _, count = GetGroupTypeAndCount()
+        local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
         if count == 0 then return end
 
         if KRT_CurrentRaid and Raid:CheckPlayer(unitName, KRT_CurrentRaid) then
@@ -955,9 +955,8 @@ do
         local originalName = name
         name = name or unitName or UnitName("player")
         if next(players) == nil then
-            local groupType, _, count = GetGroupTypeAndCount()
-            if groupType == "raid" and count > 0 then
-                numRaid = count
+            if IsInRaid() then
+                numRaid = GetNumRaidMembers()
                 for i = 1, numRaid do
                     local pname, prank = GetRaidRosterInfo(i)
                     if pname == name then
@@ -2750,10 +2749,10 @@ do
     -- Return sorted array of player names currently in the raid.
     local function GetCurrentRaidPlayers()
         wipe(raidPlayers)
-        local groupType, _, count = GetGroupTypeAndCount()
-        if groupType ~= "raid" then
+        if not IsInRaid() then
             return raidPlayers
         end
+        local count = GetNumRaidMembers()
         for i = 1, count do
             local name = GetRaidRosterInfo(i)
             if name and name ~= "" then
