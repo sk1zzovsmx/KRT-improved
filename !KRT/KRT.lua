@@ -4187,11 +4187,18 @@ do
     local length = 0
     local channels = {}
 
-    local ticking = false
-    local paused = false
-    local tickStart, tickPos = 0, 0
+    local ticker, remaining
 
-    local ceil = math.ceil
+    local function startTicker()
+        ticker = addon.NewTicker(1, function()
+            remaining = (remaining or 0) - 1
+            _G[frameName .. "Tick"]:SetText(remaining > 0 and remaining or "")
+            if remaining <= 0 then
+                Spammer:Spam()
+                remaining = duration
+            end
+        end)
+    end
 
     -- OnLoad frame:
     function Spammer:OnLoad(frame)
@@ -4234,7 +4241,6 @@ do
             value = (value == "") and nil or value
             KRT_Spammer[target] = value
             box:ClearFocus()
-            if ticking and paused then paused = false end
         end
         loaded = false
     end
@@ -4242,37 +4248,37 @@ do
     -- Start spamming:
     function Spammer:Start()
         if strlen(finalOutput) > 3 and strlen(finalOutput) <= 255 then
-            if paused then
-                paused = false
-            elseif ticking then
-                ticking = false
-            else
-                tickStart = GetTime()
-                duration = tonumber(duration) or addon.options.lfmPeriod
-                tickPos = (duration >= 1 and duration or addon.options.lfmPeriod) + 1
-                ticking = true
-                -- Spammer:Spam()
-            end
+            if ticker then ticker:Cancel() end
+            duration = tonumber(duration) or addon.options.lfmPeriod
+            remaining = duration
+            startTicker()
         end
     end
 
     -- Stop spamming:
     function Spammer:Stop()
-        _G[frameName .. "Tick"]:SetText(duration or 0)
-        ticking = false
-        paused = false
+        if ticker then
+            ticker:Cancel()
+            ticker = nil
+        end
+        remaining = nil
+        _G[frameName .. "Tick"]:SetText("")
     end
 
     -- Pausing spammer
     function Spammer:Pause()
-        paused = true
+        if ticker then
+            ticker:Cancel()
+            ticker = nil
+        elseif remaining and remaining > 0 then
+            startTicker()
+        end
     end
 
     -- Send spam message:
     function Spammer:Spam()
         if strlen(finalOutput) > 255 then
             addon:error(L.StrSpammerErrLength)
-            ticking = false
             return
         end
         if #channels <= 0 then
@@ -4433,27 +4439,14 @@ do
                     _G[frameName .. "Duration"]:SetText(duration)
                 end
                 finalOutput = temp
-                Utils.setText(_G[frameName .. "StartBtn"], (paused and L.BtnResume or L.BtnStop), START, ticking == true)
+                Utils.setText(_G[frameName .. "StartBtn"], L.BtnStop, START, ticker ~= nil)
                 Utils.enableDisable(_G[frameName .. "StartBtn"], (strlen(finalOutput) > 3 and strlen(finalOutput) <= 255))
             end
 
-            if ticking then
-                if not paused then
-                    local count = ceil(duration - GetTime() + tickStart)
-                    local i = tickPos - 1
-                    while i >= count do
-                        _G[frameName .. "Tick"]:SetText(i)
-                        i = i - 1
-                    end
-                    tickPos = count
-                    if tickPos < 0 then tickPos = 0 end
-                    if tickPos == 0 then
-                        _G[frameName .. "Tick"]:SetText("")
-                        Spammer:Spam()
-                        ticking = false
-                        Spammer:Start()
-                    end
-                end
+            if remaining and remaining > 0 then
+                _G[frameName .. "Tick"]:SetText(remaining)
+            else
+                _G[frameName .. "Tick"]:SetText("")
             end
         end
     end
