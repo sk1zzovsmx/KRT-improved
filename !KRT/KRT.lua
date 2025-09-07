@@ -4157,13 +4157,11 @@ do
     addon.Spammer = {}
     local Spammer = addon.Spammer
 
-    local spamFrame = CreateFrame("Frame")
     local frameName
 
     local LocalizeUIFrame
     local localized = false
 
-    local UpdateUIFrame
     local updateInterval = 0.05
 
     local FindAchievement
@@ -4193,7 +4191,6 @@ do
         UISpammer = frame
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
-        frame:SetScript("OnUpdate", UpdateUIFrame)
     end
 
     -- Toggle frame visibility:
@@ -4341,113 +4338,109 @@ do
         localized = true
     end
 
-    -- OnUpdate frame:
-    function UpdateUIFrame(self, elapsed)
+    -- Periodic ticker callback
+    function Spammer:Tick()
+        if not UISpammer then return end
         LocalizeUIFrame()
-        if Utils.throttle(self, frameName, updateInterval, elapsed) then
-            if not loaded then
-                KRT_Spammer.Duration = KRT_Spammer.Duration or addon.options.lfmPeriod
-                for k, v in pairs(KRT_Spammer) do
-                    if k == "Channels" then
-                        for i, c in ipairs(v) do
-                            _G[frameName .. "Chat" .. c]:SetChecked()
-                        end
-                    elseif _G[frameName .. k] then
-                        _G[frameName .. k]:SetText(v)
+        if not loaded then
+            KRT_Spammer.Duration = KRT_Spammer.Duration or addon.options.lfmPeriod
+            for k, v in pairs(KRT_Spammer) do
+                if k == "Channels" then
+                    for i, c in ipairs(v) do
+                        _G[frameName .. "Chat" .. c]:SetChecked()
                     end
+                elseif _G[frameName .. k] then
+                    _G[frameName .. k]:SetText(v)
                 end
-                loaded = true
+            end
+            loaded = true
+        end
+
+        if UISpammer:IsShown() then
+            channels    = KRT_Spammer.Channels or {}
+            name        = _G[frameName .. "Name"]:GetText():trim()
+            tank        = tonumber(_G[frameName .. "Tank"]:GetText()) or 0
+            tankClass   = _G[frameName .. "TankClass"]:GetText():trim()
+            healer      = tonumber(_G[frameName .. "Healer"]:GetText()) or 0
+            healerClass = _G[frameName .. "HealerClass"]:GetText():trim()
+            melee       = tonumber(_G[frameName .. "Melee"]:GetText()) or 0
+            meleeClass  = _G[frameName .. "MeleeClass"]:GetText():trim()
+            ranged      = tonumber(_G[frameName .. "Ranged"]:GetText()) or 0
+            rangedClass = _G[frameName .. "RangedClass"]:GetText():trim()
+            message     = _G[frameName .. "Message"]:GetText():trim()
+
+            local temp  = output
+            if string.trim(name) ~= "" then temp = temp .. " " .. name end
+            if tank > 0 or healer > 0 or melee > 0 or ranged > 0 then
+                temp = temp .. " - Need"
+                if tank > 0 then
+                    temp = temp .. ", " .. tank .. " Tank"
+                    if tankClass ~= "" then temp = temp .. " (" .. tankClass .. ")" end
+                end
+                if healer > 0 then
+                    temp = temp .. ", " .. healer .. " Healer"
+                    if healerClass ~= "" then temp = temp .. " (" .. healerClass .. ")" end
+                end
+                if melee > 0 then
+                    temp = temp .. ", " .. melee .. " Melee"
+                    if meleeClass ~= "" then temp = temp .. " (" .. meleeClass .. ")" end
+                end
+                if ranged > 0 then
+                    temp = temp .. ", " .. ranged .. " Ranged"
+                    if rangedClass ~= "" then temp = temp .. " (" .. rangedClass .. ")" end
+                end
+            end
+            if message ~= "" then
+                temp = temp .. " - " .. FindAchievement(message)
             end
 
-            -- We build the message only if the frame is shown
-            if UISpammer:IsShown() then
-                channels    = KRT_Spammer.Channels or {}
-                name        = _G[frameName .. "Name"]:GetText():trim()
-                tank        = tonumber(_G[frameName .. "Tank"]:GetText()) or 0
-                tankClass   = _G[frameName .. "TankClass"]:GetText():trim()
-                healer      = tonumber(_G[frameName .. "Healer"]:GetText()) or 0
-                healerClass = _G[frameName .. "HealerClass"]:GetText():trim()
-                melee       = tonumber(_G[frameName .. "Melee"]:GetText()) or 0
-                meleeClass  = _G[frameName .. "MeleeClass"]:GetText():trim()
-                ranged      = tonumber(_G[frameName .. "Ranged"]:GetText()) or 0
-                rangedClass = _G[frameName .. "RangedClass"]:GetText():trim()
-                message     = _G[frameName .. "Message"]:GetText():trim()
+            if temp ~= "LFM" then
+                local total = tank + healer + melee + ranged
+                local max = name:find("25") and 25 or 10
+                temp = temp .. " (" .. max - (total or 0) .. "/" .. max .. ")"
 
-                local temp  = output
-                if string.trim(name) ~= "" then temp = temp .. " " .. name end
-                if tank > 0 or healer > 0 or melee > 0 or ranged > 0 then
-                    temp = temp .. " - Need"
-                    if tank > 0 then
-                        temp = temp .. ", " .. tank .. " Tank"
-                        if tankClass ~= "" then temp = temp .. " (" .. tankClass .. ")" end
-                    end
-                    if healer > 0 then
-                        temp = temp .. ", " .. healer .. " Healer"
-                        if healerClass ~= "" then temp = temp .. " (" .. healerClass .. ")" end
-                    end
-                    if melee > 0 then
-                        temp = temp .. ", " .. melee .. " Melee"
-                        if meleeClass ~= "" then temp = temp .. " (" .. meleeClass .. ")" end
-                    end
-                    if ranged > 0 then
-                        temp = temp .. ", " .. ranged .. " Ranged"
-                        if rangedClass ~= "" then temp = temp .. " (" .. rangedClass .. ")" end
-                    end
-                end
-                if message ~= "" then
-                    temp = temp .. " - " .. FindAchievement(message)
-                end
+                _G[frameName .. "Output"]:SetText(temp)
+                length = strlen(temp)
+                _G[frameName .. "Length"]:SetText(length .. "/255")
 
-                if temp ~= "LFM" then
-                    local total = tank + healer + melee + ranged
-                    local max = name:find("25") and 25 or 10
-                    temp = temp .. " (" .. max - (total or 0) .. "/" .. max .. ")"
-
-                    _G[frameName .. "Output"]:SetText(temp)
-                    length = strlen(temp)
-                    _G[frameName .. "Length"]:SetText(length .. "/255")
-
-                    if length <= 0 then
-                        _G[frameName .. "Length"]:SetTextColor(0.5, 0.5, 0.5)
-                    elseif length <= 255 then
-                        _G[frameName .. "Length"]:SetTextColor(0.0, 1.0, 0.0)
-                        _G[frameName .. "Message"]:SetMaxLetters(255)
-                    else
-                        _G[frameName .. "Message"]:SetMaxLetters(strlen(message) - 1)
-                        _G[frameName .. "Length"]:SetTextColor(1.0, 0.0, 0.0)
-                    end
+                if length <= 0 then
+                    _G[frameName .. "Length"]:SetTextColor(0.5, 0.5, 0.5)
+                elseif length <= 255 then
+                    _G[frameName .. "Length"]:SetTextColor(0.0, 1.0, 0.0)
+                    _G[frameName .. "Message"]:SetMaxLetters(255)
                 else
-                    _G[frameName .. "Output"]:SetText(temp)
+                    _G[frameName .. "Message"]:SetMaxLetters(strlen(message) - 1)
+                    _G[frameName .. "Length"]:SetTextColor(1.0, 0.0, 0.0)
                 end
-
-                -- Set set duration:
-                duration = _G[frameName .. "Duration"]:GetText()
-                if duration == "" then
-                    duration = addon.options.lfmPeriod
-                    _G[frameName .. "Duration"]:SetText(duration)
-                end
-                finalOutput = temp
-                Utils.setText(_G[frameName .. "StartBtn"], (paused and L.BtnResume or L.BtnStop), START, ticking == true)
-                Utils.enableDisable(_G[frameName .. "StartBtn"], (strlen(finalOutput) > 3 and strlen(finalOutput) <= 255))
+            else
+                _G[frameName .. "Output"]:SetText(temp)
             end
 
-            if ticking then
-                if not paused then
-                    local count = ceil(duration - GetTime() + tickStart)
-                    local i = tickPos - 1
-                    while i >= count do
-                        _G[frameName .. "Tick"]:SetText(i)
-                        i = i - 1
-                    end
-                    tickPos = count
-                    if tickPos < 0 then tickPos = 0 end
-                    if tickPos == 0 then
-                        _G[frameName .. "Tick"]:SetText("")
-                        Spammer:Spam()
-                        ticking = false
-                        Spammer:Start()
-                    end
-                end
+            -- Set set duration:
+            duration = _G[frameName .. "Duration"]:GetText()
+            if duration == "" then
+                duration = addon.options.lfmPeriod
+                _G[frameName .. "Duration"]:SetText(duration)
+            end
+            finalOutput = temp
+            Utils.setText(_G[frameName .. "StartBtn"], (paused and L.BtnResume or L.BtnStop), START, ticking == true)
+            Utils.enableDisable(_G[frameName .. "StartBtn"], (strlen(finalOutput) > 3 and strlen(finalOutput) <= 255))
+        end
+
+        if ticking and not paused then
+            local count = ceil(duration - GetTime() + tickStart)
+            local i = tickPos - 1
+            while i >= count do
+                _G[frameName .. "Tick"]:SetText(i)
+                i = i - 1
+            end
+            tickPos = count
+            if tickPos < 0 then tickPos = 0 end
+            if tickPos == 0 then
+                _G[frameName .. "Tick"]:SetText("")
+                Spammer:Spam()
+                ticking = false
+                Spammer:Start()
             end
         end
     end
@@ -4467,10 +4460,8 @@ do
         return out
     end
 
-    -- To spam even if the frame is closed:
-    spamFrame:SetScript("OnUpdate", function(self, elapsed)
-        if UISpammer then UpdateUIFrame(UISpammer, elapsed) end
-    end)
+    -- Periodic ticker
+    Utils.periodic(updateInterval, function() Spammer:Tick() end)
 end
 
 -- Lightweight LFM scheduler
