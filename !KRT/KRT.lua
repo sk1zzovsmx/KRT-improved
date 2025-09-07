@@ -72,15 +72,24 @@ local CallbackHandler  = addon.CallbackHandler
 function addon:Debug(level, fmt, ...)
     if not self.Logger then return end
     local lv = type(level) == "string" and level:upper()
+    local fn
     if     lv == "ERROR" and self.error then
-        return self:error(fmt, ...)
-    elseif lv == "WARN"  and self.warn  then
-        return self:warn(fmt, ...)
+        fn = self.error
+    elseif lv == "WARN"  and self.warn then
+        fn = self.warn
     elseif lv == "DEBUG" and self.debug then
-        return self:debug(fmt, ...)
+        fn = self.debug
     else
-        if self.info then
-            return self:info(fmt, ...)
+        fn = self.info
+    end
+    if fn then
+        fn(self, fmt, ...)
+    end
+    if self.Debugger and self.Debugger.AddMessage and self.logLevels and self.logLevel then
+        local lvl = self.logLevels[lv] or self.logLevels.INFO
+        if lvl <= self.logLevel then
+            local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
+            self.Debugger:AddMessage(msg)
         end
     end
 end
@@ -99,6 +108,40 @@ do
     end
     if addon.SetPerformanceMode then
         addon:SetPerformanceMode(true)
+    end
+end
+
+---============================================================================
+-- Debugger Module
+---============================================================================
+do
+    addon.Debugger = {}
+    local Debugger = addon.Debugger
+
+    local debugFrame, msgFrame
+
+    function Debugger:OnLoad(frame)
+        if not frame then return end
+        debugFrame = frame
+        msgFrame = _G[frame:GetName() .. "ScrollFrame"]
+    end
+
+    function Debugger:AddMessage(msg, r, g, b)
+        if not msgFrame then return end
+        msgFrame:AddMessage(tostring(msg), r or 1, g or 1, b or 1)
+    end
+
+    function Debugger:Clear()
+        if msgFrame then msgFrame:Clear() end
+    end
+
+    function Debugger:Toggle()
+        if not debugFrame then return end
+        if debugFrame:IsShown() then
+            debugFrame:Hide()
+        else
+            debugFrame:Show()
+        end
     end
 end
 
