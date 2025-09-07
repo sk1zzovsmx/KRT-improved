@@ -331,23 +331,30 @@ do
             if not alive then return end
             func(unpack(args))
             if addon.After then
-                addon.After(sec, tick)
+                scheduled[tick] = addon.After(sec, tick)
             else
-                Utils.Schedule(sec, tick)
+                scheduled[tick] = Utils.Schedule(sec, tick)
             end
         end
-        Utils.schedule(sec, tick)
-        return function() alive = false end
+        scheduled[tick] = Utils.schedule(sec, tick)
+        return function()
+            alive = false
+            Utils.unschedule(tick)
+        end
     end
 
     function Utils.unschedule(func)
-        local handle = scheduled[func]
+        local handle = scheduled[func] or func
         if handle and handle.Cancel then
             handle:Cancel()
         elseif handle and addon.CancelTimer then
             addon.CancelTimer(handle, true)
         end
-        scheduled[func] = nil
+        for f, h in pairs(scheduled) do
+            if h == handle or f == func then
+                scheduled[f] = nil
+            end
+        end
     end
 
     function Utils.run(func, ...)
