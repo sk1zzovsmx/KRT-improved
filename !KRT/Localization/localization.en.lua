@@ -15,7 +15,7 @@ addon.L                           = setmetatable(addon.L, {
 local L                           = addon.L -- Make a local reference for convenience within this file
 
 -- ==================== Callbacks ==================== --
-L.StrCbErrUsage                   = "Usage: KRT:RegisterCallback(event, callbacks)"
+L.StrCbErrUsage                   = "Usage: KRT:registerCallback(event, callbacks)"
 L.StrCbErrExec                    = "Error while executing callback %s for event %s: %s"
 
 -- ==================== General Buttons ==================== --
