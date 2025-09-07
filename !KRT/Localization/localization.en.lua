@@ -171,7 +171,7 @@ L.StrSpammerMessageHelp2          = "You can use |cffffd700{ID}|r to include ach
 L.StrSpammerMessageHelp3          =
 "You can find the achievement |cffffd700ID|r using the command: \n|cffffd700/krt ach [link]|r."
 
--- ==================== Logger Frame ==================== --
+-- ==================== History Frame ==================== --
 L.StrDate                         = "Date"
 L.StrSize                         = "Size"
 L.StrTime                         = "Time"
@@ -235,7 +235,7 @@ L.ErrAttendeesInvalidRaidBoss     = "Invalid raid or boss ID."
 L.ErrAttendeesPlayerExists        = "This player is already on the boss attendees list."
 L.StrAttendeesAddSuccess          = "Player successfully added to the boss attendees."
 
--- ==================== Logger: EditBox Frame ==================== --
+-- ==================== History: EditBox Frame ==================== --
 L.StrAddEntry                     = "Add Entry"
 L.StrEditEntry                    = "Edit Entry"
 L.StrDateEditBox                  = "Day/Month/Year"
@@ -248,7 +248,7 @@ L.ErrEditBoxInvalidDay            = "Invalid Day: Please enter a valid day."
 L.ErrEditBoxInvalidHour           = "Invalid Hour: Please enter a valid hour."
 L.ErrEditBoxInvalidMinute         = "Invalid Minute: Please enter a valid minute."
 
--- ==================== Logger: Export Frame ==================== --
+-- ==================== History: Export Frame ==================== --
 L.StrExportBoxTitle               = "Export Loot History"
 L.StrExportFormat                 = "Please enter the export format:"
 L.StrExportBoxHelp                = "Copy the data below and paste it to an external location to save it:"
@@ -261,7 +261,7 @@ L.StrCmdGrouper                   = "access LFM Spam related commands"
 L.StrCmdAchiev                    = "look for achievement ID to use for LFM"
 L.StrCmdChanges                   = "access ms changes related commands"
 L.StrCmdWarnings                  = "access warnings related commands"
-L.StrCmdLog                       = "access loot history related commands"
+L.StrCmdHistory                   = "access loot history related commands"
 L.StrCmdLFMStart                  = "starts LFM spam"
 L.StrCmdLFMStop                   = "stops LFM spam"
 L.StrCmdChangesDemand             = "ask raid members to whisper you their ms changes"
