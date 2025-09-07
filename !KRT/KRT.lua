@@ -4583,47 +4583,48 @@ end
 -- ============================================================================
 -- Helper locali per liste History (ottimizzato)
 -- ============================================================================
-do
-    -- Local alias
-    local _G          = _G
-    local CreateFrame = CreateFrame
-    local wipe        = table.wipe
-    local math_max    = math.max
+local MakeListController
 
-    -- toggle campo selezionato + evento
-    local function selectAndTrigger(ns, field, id, event)
-        ns[field] = (id ~= ns[field]) and id or nil
-        Utils.triggerEvent(event, id)
-        return ns[field]
+-- Local alias
+local _G          = _G
+local CreateFrame = CreateFrame
+local wipe        = table.wipe
+local math_max    = math.max
+
+-- toggle campo selezionato + evento
+local function selectAndTrigger(ns, field, id, event)
+    ns[field] = (id ~= ns[field]) and id or nil
+    Utils.triggerEvent(event, id)
+    return ns[field]
+end
+
+-- popup di conferma compatto
+local function makeConfirmPopup(key, text, onAccept, cancels)
+    StaticPopupDialogs[key] = {
+        text         = text,
+        button1      = L.BtnOK,
+        button2      = CANCEL,
+        OnAccept     = onAccept,
+        cancels      = cancels or key,
+        timeout      = 0,
+        whileDead    = 1,
+        hideOnEscape = 1,
+    }
+end
+
+-- cache dei child più usati per ridurre _G[...] ripetuti
+local function CacheParts(row, name, parts)
+    if row._p then return row._p end
+    local p = {}
+    for i = 1, #parts do
+        p[parts[i]] = _G[name .. parts[i]]
     end
+    row._p = p
+    return p
+end
 
-    -- popup di conferma compatto
-    local function makeConfirmPopup(key, text, onAccept, cancels)
-        StaticPopupDialogs[key] = {
-            text         = text,
-            button1      = L.BtnOK,
-            button2      = CANCEL,
-            OnAccept     = onAccept,
-            cancels      = cancels or key,
-            timeout      = 0,
-            whileDead    = 1,
-            hideOnEscape = 1,
-        }
-    end
-
-    -- cache dei child più usati per ridurre _G[...] ripetuti
-    local function CacheParts(row, name, parts)
-        if row._p then return row._p end
-        local p = {}
-        for i = 1, #parts do
-            p[parts[i]] = _G[name .. parts[i]]
-        end
-        row._p = p
-        return p
-    end
-
-    -- Controller liste con pooling righe e highlight differito
-    function MakeListController(cfg)
+-- Controller liste con pooling righe e highlight differito
+local function MakeListController(cfg)
         -- cfg: keyName, updateInterval, localize(frameName), getData()->array
         --      rowName(frameName,item,index)->"PrefixBtn"..index, rowTmpl, drawRow(btnName,item,scrollChild,scrollW)
         --      highlightId()->id|nil, postUpdate(frameName)
@@ -4765,7 +4766,6 @@ do
 
         return self
     end
-end
 
 -- ============================================================================
 -- Loot History Frame (Main)
@@ -4916,7 +4916,7 @@ do
     addon.History.Raids = addon.History.Raids or {}
     local Raids = addon.History.Raids
 
-    local controller = MakeListController({
+    local controller = MakeListController{
         keyName        = "RaidsList",
         updateInterval = 0.075,
 
@@ -4984,7 +4984,7 @@ do
             zone = function(a, b, asc) return asc and (a.zone < b.zone) or (a.zone > b.zone) end,
             size = function(a, b, asc) return asc and (a.size < b.size) or (a.size > b.size) end,
         },
-    })
+    }
 
     function Raids:OnLoad(frame) controller:OnLoad(frame) end
 
@@ -5040,7 +5040,7 @@ do
     addon.History.Boss = addon.History.Boss or {}
     local Boss = addon.History.Boss
 
-    local controller = MakeListController({
+    local controller = MakeListController{
         keyName        = "BossList",
         updateInterval = 0.075,
 
@@ -5102,7 +5102,7 @@ do
             time = function(a, b, asc) return asc and (a.time < b.time) or (a.time > b.time) end,
             mode = function(a, b, asc) return asc and (a.mode < b.mode) or (a.mode > b.mode) end,
         },
-    })
+    }
 
     function Boss:OnLoad(frame) controller:OnLoad(frame) end
 
@@ -5148,7 +5148,7 @@ do
     addon.History.BossAttendees = addon.History.BossAttendees or {}
     local M = addon.History.BossAttendees
 
-    local controller = MakeListController({
+    local controller = MakeListController{
         keyName        = "BossAttendees",
         updateInterval = 0.075,
 
@@ -5202,7 +5202,7 @@ do
         sorters        = {
             name = function(a, b, asc) return asc and (a.name < b.name) or (a.name > b.name) end,
         },
-    })
+    }
 
     function M:OnLoad(frame) controller:OnLoad(frame) end
 
@@ -5238,7 +5238,7 @@ do
     addon.History.RaidAttendees = addon.History.RaidAttendees or {}
     local M = addon.History.RaidAttendees
 
-    local controller = MakeListController({
+    local controller = MakeListController{
         keyName        = "RaidAttendees",
         updateInterval = 0.075,
 
@@ -5299,7 +5299,7 @@ do
                 return asc and (A < B) or (A > B)
             end,
         },
-    })
+    }
 
     function M:OnLoad(frame) controller:OnLoad(frame) end
 
@@ -5335,7 +5335,7 @@ do
 
     local raidLoot = {} -- cache per tooltip OnEnter (lista completa del raid)
 
-    local controller = MakeListController({
+    local controller = MakeListController{
         keyName        = "LootList",
         updateInterval = 0.075,
 
@@ -5431,7 +5431,7 @@ do
             end,
             time   = function(a, b, asc) return asc and (a.time < b.time) or (a.time > b.time) end,
         },
-    })
+    }
 
     function Loot:OnLoad(frame) controller:OnLoad(frame) end
 
