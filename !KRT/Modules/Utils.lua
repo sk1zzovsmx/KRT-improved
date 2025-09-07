@@ -407,15 +407,14 @@ end
 
 -- Convert seconds to readable clock string:
 function Utils.sec2clock(seconds)
-	local sec = tonumber(seconds)
-	if sec <= 0 then
-		return "00:00:00"
-	end
-	local hours, mins, secs
-	hours = format("%02.f", floor(sec / 3600))
-	mins  = format("%02.f", floor(sec / 60 - (hours * 60)))
-	secs  = format("%02.f", floor(sec - hours * 3600 - mins * 60))
-	return hours .. ":" .. mins .. ":" .. secs
+        local sec = tonumber(seconds)
+        if sec <= 0 then
+                return "00:00:00"
+        end
+        local h = floor(sec, 3600)
+        local m = floor(sec - h, 60)
+        local s = floor(sec - h - m)
+        return format("%02d:%02d:%02d", h / 3600, m / 60, s)
 end
 
 -- Sends an addOn message to the appropriate channel:
@@ -467,16 +466,7 @@ function Utils.getUTCTimestamp()
 end
 
 function Utils.getSecondsAsString(t)
-	local str = "00:00:00"
-	local sec
-	if t > 0 then
-		local hrs = floor(t / 3600)
-		sec = t - (hrs * 3600)
-		local min = floor(sec / 60)
-		sec = sec - (min * 60)
-		str = format("%02d:%02d:%02d", hrs, min, sec)
-	end
-	return str
+        return Utils.sec2clock(t)
 end
 
 -- Determines if the player is in a raid instance
@@ -521,9 +511,9 @@ end
 function Utils.GetServerOffset()
 	local sH, sM = GetGameTime()
 	local lH, lM = tonumber(date("%H")), tonumber(date("%M"))
-	local sT = sH + sM / 60
-	local lT = lH + lM / 60
-	local offset = floor((sT - lT) * 2 + 0.5) / 2
+        local sT = sH + sM / 60
+        local lT = lH + lM / 60
+        local offset = round(sT - lT, 0.5)
 	if offset >= 12 then
 		offset = offset - 24
 	elseif offset < -12 then
