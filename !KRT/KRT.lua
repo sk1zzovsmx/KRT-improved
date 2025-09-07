@@ -36,7 +36,6 @@ addon.Compat          = addon.Compat          or (LibStub and LibStub("LibCompat
 addon.Logger          = addon.Logger          or (LibStub and LibStub("LibLogger-1.0", true))
 addon.Deformat        = addon.Deformat        or (LibStub and LibStub("LibDeformat-3.0", true))
 addon.BossIDs         = addon.BossIDs         or (LibStub and LibStub("LibBossIDs-1.0", true))
-addon.LibXML          = addon.LibXML          or (LibStub and LibStub("LibXML-1.0", true))
 addon.CallbackHandler = addon.CallbackHandler or (LibStub and LibStub("CallbackHandler-1.0", true))
 
 if addon.Compat and addon.Compat.Embed then
