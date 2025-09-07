@@ -33,31 +33,41 @@ KRT_PlayerCounts                        = KRT_PlayerCounts or {}
 ---============================================================================
 local LibStub = _G.LibStub
 
--- Resolve libraries
-local Compat   = LibStub and LibStub("LibCompat-1.0")
-local Logger   = LibStub and LibStub("LibLogger-1.0", true)
-local Deformat = LibStub and LibStub("LibDeformat-3.0", true)   -- already used elsewhere
-local BossIDs  = LibStub and LibStub("LibBossIDs-1.0", true)    -- already used elsewhere
-local LibXML   = LibStub and LibStub("LibXML-1.0", true)        -- optional runtime XML
-local CallbackHandler = LibStub and LibStub("CallbackHandler-1.0", true)
--- LibMath extends directly math if present; no action here.
-
--- Expose handles on addon (without overwriting if already present)
-addon.Compat   = addon.Compat   or Compat
-addon.Logger   = addon.Logger   or Logger
-addon.Deformat = addon.Deformat or Deformat
-addon.BossIDs  = addon.BossIDs  or BossIDs
-addon.LibXML   = addon.LibXML   or LibXML
-addon.CallbackHandler = addon.CallbackHandler or CallbackHandler
-
-if addon.Compat and not addon.__CompatEmbedded then
-    addon.Compat:Embed(addon)
-    addon.__CompatEmbedded = true
+-- Library bootstrap ------------------------------------------------------
+local function GetLib(name, silent)
+    return LibStub and LibStub(name, silent)
 end
-if addon.Logger and not addon.__LoggerEmbedded then
-    addon.Logger:Embed(addon)
-    addon.__LoggerEmbedded = true
+
+local function TryEmbed(lib, target)
+    if lib and lib.Embed then
+        lib:Embed(target)
+    end
 end
+
+local LIBS = {
+    ["LibCompat-1.0"]       = { field = "Compat",          embed = true  },
+    ["LibLogger-1.0"]       = { field = "Logger",          embed = true  },
+    ["LibDeformat-3.0"]     = { field = "Deformat",        embed = false },
+    ["LibBossIDs-1.0"]      = { field = "BossIDs",         embed = false },
+    ["LibXML-1.0"]          = { field = "LibXML",          embed = false },
+    ["CallbackHandler-1.0"] = { field = "CallbackHandler", embed = false },
+    -- LibMath extends math by itself.
+}
+
+for major, conf in pairs(LIBS) do
+    local lib = GetLib(major, true)
+    addon[conf.field] = addon[conf.field] or lib
+    if conf.embed then
+        TryEmbed(lib, addon)
+    end
+end
+
+local Compat           = addon.Compat
+local Logger           = addon.Logger
+local Deformat         = addon.Deformat
+local BossIDs          = addon.BossIDs
+local LibXML           = addon.LibXML
+local CallbackHandler  = addon.CallbackHandler
 
 function addon:Debug(level, fmt, ...)
     if not self.Logger then return end
