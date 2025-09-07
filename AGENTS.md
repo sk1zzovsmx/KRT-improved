@@ -20,6 +20,7 @@ No Ace3 GUI; UI is XML + Lua only. Vendored libs via **LibStub**.
   `KRT_LastBoss, KRT_NextReset, KRT_SavedReserves, KRT_PlayerCounts, KRT_Debug`.
 - **Branching model:** work **only** on `dev`. `main` is release‑only. Maintainers handle merges/bumping.
 - **Backward compatibility:** avoid breaking SV keys and existing CLI without a note in **18) Change log**.
+- **Structure:** keep addon monolithic; integrate features within `!KRT/` instead of split addons.
 
 > If you need to change a hard constraint, edit this section and add a note in **18) Change log**.
 
@@ -35,7 +36,7 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 
 ---
 
-## 4) Repo layout
+## 4) Repo layout (monolithic)
 ```
 !KRT/
   !KRT.toc                 # metadata (Interface 30300, SavedVariables, links)
@@ -79,7 +80,7 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 
 ## 6) User‑visible commands
 - **`/krt`**, **`/kraidtools`** — main entry. Subcommands (see localized help):
-  - `config` (options), `warnings`, `log`, `reserves`, `changes`, `grouper`, `achiev`, `lfm start|stop`
+  - `config` (options), `warnings`, `log`, `reserves`, `changes`, `ach`, `lfm start|stop`
 
 *Guideline:* Keep CLI surface stable; document new subcommands via help output and localization.
 
@@ -193,3 +194,4 @@ https://github.com/gakeez/agents_md_collection/blob/main/examples/lua-programmin
 
 ## 18) Change log (edit by hand)
 - _2025‑09‑05_: Initial lightweight version; removed binding “recipes”. Added `dev`‑only branching policy.
+- _2025-09-07_: Clarified monolithic structure and updated CLI command list.
