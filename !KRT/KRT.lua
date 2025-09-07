@@ -32,35 +32,30 @@ KRT_PlayerCounts                        = KRT_PlayerCounts or {}
 -- External Libraries / Bootstrap
 ---============================================================================
 local LibStub = _G.LibStub
-addon.Compat          = addon.Compat          or (LibStub and LibStub("LibCompat-1.0", true))
-addon.Logger          = addon.Logger          or (LibStub and LibStub("LibLogger-1.0", true))
-addon.Deformat        = addon.Deformat        or (LibStub and LibStub("LibDeformat-3.0", true))
-addon.BossIDs         = addon.BossIDs         or (LibStub and LibStub("LibBossIDs-1.0", true))
-addon.CallbackHandler = addon.CallbackHandler or (LibStub and LibStub("CallbackHandler-1.0", true))
+if LibStub then
+    local libs = {
+        Compat          = "LibCompat-1.0",
+        Logger          = "LibLogger-1.0",
+        Deformat        = "LibDeformat-3.0",
+        BossIDs         = "LibBossIDs-1.0",
+        CallbackHandler = "CallbackHandler-1.0",
+    }
+    for field, name in pairs(libs) do
+        addon[field] = addon[field] or LibStub(name, true)
+    end
+end
 
-if addon.Compat and addon.Compat.Embed then
-    addon.Compat:Embed(addon)
-end
-if addon.Logger and addon.Logger.Embed then
-    addon.Logger:Embed(addon)
-end
+if addon.Compat and addon.Compat.Embed then addon.Compat:Embed(addon) end
+if addon.Logger and addon.Logger.Embed then addon.Logger:Embed(addon) end
 
 function addon:Debug(level, fmt, ...)
     if not self.Logger then return end
     local lv = type(level) == "string" and level:upper()
-    local fn
-    if     lv == "ERROR" and self.error then
-        fn = self.error
-    elseif lv == "WARN"  and self.warn then
-        fn = self.warn
-    elseif lv == "DEBUG" and self.debug then
-        fn = self.debug
-    else
-        fn = self.info
-    end
-    if fn then
-        fn(self, fmt, ...)
-    end
+    local fn = (lv == "ERROR" and self.error)
+              or (lv == "WARN" and self.warn)
+              or (lv == "DEBUG" and self.debug)
+              or self.info
+    if fn then fn(self, fmt, ...) end
     if self.Debugger and self.Debugger.AddMessage and self.logLevels and self.logLevel then
         local lvl = self.logLevels[lv] or self.logLevels.INFO
         if lvl <= self.logLevel then
@@ -71,7 +66,7 @@ function addon:Debug(level, fmt, ...)
 end
 
 -- SavedVariables for log level (fallback INFO)
-KRT_Debug       = KRT_Debug or {}
+KRT_Debug = KRT_Debug or {}
 do
     local INFO = (addon.Logger and addon.Logger.logLevels and addon.Logger.logLevels.INFO) or 2
     KRT_Debug.level = KRT_Debug.level or INFO
@@ -91,8 +86,8 @@ end
 -- Debugger Module
 ---============================================================================
 do
-    addon.Debugger = {}
-    local Debugger = addon.Debugger
+    local Debugger = {}
+    addon.Debugger = Debugger
 
     local debugFrame, msgFrame
 
@@ -103,8 +98,9 @@ do
     end
 
     function Debugger:AddMessage(msg, r, g, b)
-        if not msgFrame then return end
-        msgFrame:AddMessage(tostring(msg), r or 1, g or 1, b or 1)
+        if msgFrame then
+            msgFrame:AddMessage(tostring(msg), r or 1, g or 1, b or 1)
+        end
     end
 
     function Debugger:Clear()
