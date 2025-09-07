@@ -32,34 +32,19 @@ KRT_PlayerCounts                        = KRT_PlayerCounts or {}
 -- External Libraries / Bootstrap
 ---============================================================================
 local LibStub = _G.LibStub
+addon.Compat          = addon.Compat          or (LibStub and LibStub("LibCompat-1.0", true))
+addon.Logger          = addon.Logger          or (LibStub and LibStub("LibLogger-1.0", true))
+addon.Deformat        = addon.Deformat        or (LibStub and LibStub("LibDeformat-3.0", true))
+addon.BossIDs         = addon.BossIDs         or (LibStub and LibStub("LibBossIDs-1.0", true))
+addon.LibXML          = addon.LibXML          or (LibStub and LibStub("LibXML-1.0", true))
+addon.CallbackHandler = addon.CallbackHandler or (LibStub and LibStub("CallbackHandler-1.0", true))
 
--- Library bootstrap ------------------------------------------------------
-local function GetLib(name, silent)
-    return LibStub and LibStub(name, silent)
+if addon.Compat and addon.Compat.Embed then
+    addon.Compat:Embed(addon)
 end
-
-local function TryEmbed(lib, target)
-    if lib and lib.Embed then
-        lib:Embed(target)
-    end
+if addon.Logger and addon.Logger.Embed then
+    addon.Logger:Embed(addon)
 end
-
-addon.Compat          = addon.Compat          or GetLib("LibCompat-1.0", true)
-addon.Logger          = addon.Logger          or GetLib("LibLogger-1.0", true)
-addon.Deformat        = addon.Deformat        or GetLib("LibDeformat-3.0", true)
-addon.BossIDs         = addon.BossIDs         or GetLib("LibBossIDs-1.0", true)
-addon.LibXML          = addon.LibXML          or GetLib("LibXML-1.0", true)
-addon.CallbackHandler = addon.CallbackHandler or GetLib("CallbackHandler-1.0", true)
-
-TryEmbed(addon.Compat, addon)
-TryEmbed(addon.Logger, addon)
-
-local Compat           = addon.Compat
-local Logger           = addon.Logger
-local BossIDs          = addon.BossIDs
-local LibXML           = addon.LibXML
-local CallbackHandler  = addon.CallbackHandler
-local deformat         = addon.Deformat
 
 function addon:Debug(level, fmt, ...)
     if not self.Logger then return end
@@ -260,8 +245,6 @@ local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower,
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
 local IsInRaid, GetNumRaidMembers, GetNumPartyMembers = IsInRaid, GetNumRaidMembers, GetNumPartyMembers
-
--- deformat and BossIDs localized near bootstrap
 
 ---============================================================================
 -- Event System
@@ -587,27 +570,27 @@ do
     --
     function Raid:AddLoot(msg, rollType, rollValue)
         -- Master Loot
-        local player, itemLink, itemCount = deformat(msg, LOOT_ITEM_MULTIPLE)
+        local player, itemLink, itemCount = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
         if not player then
             itemCount = 1
-            player, itemLink = deformat(msg, LOOT_ITEM)
+            player, itemLink = addon.Deformat(msg, LOOT_ITEM)
         end
         if not player then
             player = unitName
-            itemLink, itemCount = deformat(msg, msg, LOOT_ITEM_SELF_MULTIPLE)
+            itemLink, itemCount = addon.Deformat(msg, msg, LOOT_ITEM_SELF_MULTIPLE)
         end
         if not itemLink then
             itemCount = 1
-            itemLink = deformat(msg, LOOT_ITEM_SELF)
+            itemLink = addon.Deformat(msg, LOOT_ITEM_SELF)
         end
 
         -- Other Loot Rolls
         if not player or not itemLink then
             itemCount = 1
-            player, itemLink = deformat(msg, LOOT_ROLL_YOU_WON)
+            player, itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
             if not itemLink then
                 player = unitName
-                itemLink = deformat(msg, LOOT_ROLL_YOU_WON)
+                itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
             end
         end
         if not itemLink then return end
@@ -1422,7 +1405,7 @@ do
     --
     function addon:CHAT_MSG_SYSTEM(msg)
         if not msg or not record then return end
-        local player, roll, min, max = deformat(msg, RANDOM_ROLL_RESULT)
+        local player, roll, min, max = addon.Deformat(msg, RANDOM_ROLL_RESULT)
         if player and roll and min == 1 and max == 100 then
             addon:Debug("DEBUG", "Detected roll message: %s rolled %d (range %d-%d)", player, roll, min, max)
 
@@ -1893,7 +1876,7 @@ do
         local num = tip:NumLines()
         for i = num, 1, -1 do
             local t = _G["KRT_FakeTooltipTextLeft" .. i]:GetText()
-            if deformat(t, BIND_TRADE_TIME_REMAINING) ~= nil then
+            if addon.Deformat(t, BIND_TRADE_TIME_REMAINING) ~= nil then
                 return false
             elseif t == ITEM_SOULBOUND then
                 return true
@@ -4788,7 +4771,7 @@ end
 -- ============================================================================
 do
     addon.Logger = addon.Logger or {}
-    Logger = addon.Logger
+    local Logger = addon.Logger
 
     local frameName, localized, updateInterval = nil, false, 0.05
 
@@ -5950,7 +5933,7 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
     if not KRT_CurrentRaid then return end
     if event == "UNIT_DIED" then
         local npcID = Utils.GetNPCID(destGUID)
-        if BossIDs.BossIDs[npcID] then
+        if addon.BossIDs.BossIDs[npcID] then
             self.Raid:AddBoss(destName)
         end
     end
