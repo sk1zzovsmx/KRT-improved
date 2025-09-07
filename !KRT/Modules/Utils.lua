@@ -275,34 +275,69 @@ end
 -- Tasks Manager --
 -------------------
 do
+    local queue, driver = {}, nil
     local scheduled = {}
+
+    local function step(_, elapsed)
+        for i = #queue, 1, -1 do
+            local job = queue[i]
+            job.t = job.t - elapsed
+            if job.t <= 0 or job.cancelled then
+                tremove(queue, i)
+                if not job.cancelled then
+                    job.func()
+                end
+            end
+        end
+        if #queue == 0 and driver then
+            driver:SetScript("OnUpdate", nil)
+        end
+    end
+
+    function Utils.Schedule(sec, func)
+        if type(func) ~= "function" then return end
+        driver = driver or CreateFrame("Frame")
+        local job = { t = sec or 0, func = func }
+        function job:Cancel()
+            self.cancelled = true
+        end
+        tinsert(queue, job)
+        driver:SetScript("OnUpdate", step)
+        return job
+    end
 
     function Utils.schedule(sec, func, ...)
         if type(func) ~= "function" then return end
         local args = { ... }
-        if addon.After then
-            local handle
-            handle = addon.After(sec, function()
-                scheduled[func] = nil
-                func(unpack(args))
-            end)
-            scheduled[func] = handle
-            return handle
-        else
+        local function call()
+            scheduled[func] = nil
             func(unpack(args))
         end
+        local handle
+        if addon.After then
+            handle = addon.After(sec or 0, call)
+        else
+            handle = Utils.Schedule(sec or 0, call)
+        end
+        scheduled[func] = handle
+        return handle
     end
+    Utils.scheduleDelay = Utils.schedule
 
     function Utils.periodic(sec, func, ...)
         if type(func) ~= "function" then return end
-        local args = { ... }
-        local function wrapper()
+        local args, alive = { ... }, true
+        local function tick()
+            if not alive then return end
             func(unpack(args))
             if addon.After then
-                scheduled[func] = addon.After(sec, wrapper)
+                addon.After(sec, tick)
+            else
+                Utils.Schedule(sec, tick)
             end
         end
-        return Utils.schedule(sec, wrapper)
+        Utils.schedule(sec, tick)
+        return function() alive = false end
     end
 
     function Utils.unschedule(func)
