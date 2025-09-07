@@ -71,17 +71,24 @@ local CallbackHandler  = addon.CallbackHandler
 
 function addon:Debug(level, fmt, ...)
     if not self.Logger then return end
+    local msg = fmt
+    if select("#", ...) > 0 then
+        msg = string.format(fmt, ...)
+    end
     local lv = type(level) == "string" and level:upper()
     if     lv == "ERROR" and self.error then
-        return self:error(fmt, ...)
+        self:error(msg)
     elseif lv == "WARN"  and self.warn  then
-        return self:warn(fmt, ...)
+        self:warn(msg)
     elseif lv == "DEBUG" and self.debug then
-        return self:debug(fmt, ...)
+        self:debug(msg)
     else
         if self.info then
-            return self:info(fmt, ...)
+            self:info(msg)
         end
+    end
+    if self.Debugger and self.Debugger.AddMessage then
+        self.Debugger:AddMessage(msg)
     end
 end
 
@@ -99,6 +106,40 @@ do
     end
     if addon.SetPerformanceMode then
         addon:SetPerformanceMode(true)
+    end
+end
+
+---============================================================================
+-- Debugger Module
+---============================================================================
+do
+    addon.Debugger = {}
+    local Debugger = addon.Debugger
+
+    local debugFrame, msgFrame
+
+    function Debugger:OnLoad(frame)
+        if not frame then return end
+        debugFrame = frame
+        msgFrame = _G[frame:GetName() .. "ScrollFrame"]
+    end
+
+    function Debugger:AddMessage(msg, r, g, b)
+        if not msgFrame then return end
+        msgFrame:AddMessage(tostring(msg), r or 1, g or 1, b or 1)
+    end
+
+    function Debugger:Clear()
+        if msgFrame then msgFrame:Clear() end
+    end
+
+    function Debugger:Toggle()
+        if not debugFrame then return end
+        if debugFrame:IsShown() then
+            debugFrame:Hide()
+        else
+            debugFrame:Show()
+        end
     end
 end
 
