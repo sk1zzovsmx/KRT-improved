@@ -6,5 +6,4 @@
     <Include file="LibCompat-1.0/lib.xml"/>
     <Include file="LibLogger-1.0/LibLogger-1.0/lib.xml"/>
     <Script file="LibMath/LibMath.lua"/>
-    <Script file="LibXML-1.0/LibXML-1.0.lua"/>
 </Ui>
