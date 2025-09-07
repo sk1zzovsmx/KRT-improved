@@ -231,8 +231,6 @@ local titleString                       = "|cfff58cbaK|r|caaf49141RT|r : %s"
 -- Cached Functions & Libraries
 ---============================================================================
 
-local LoadOptions
-
 local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, table.wipe
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
 local format, match, find, strlen       = string.format, string.match, string.find, string.len
@@ -253,7 +251,7 @@ do
         local events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents", OnUsed, OnUnused)
         mainFrame:SetScript("OnEvent", function(_, e, ...)
             if e == "ADDON_LOADED" then
-                LoadOptions()
+                addon.LoadOptions()
             end
             events:Fire(e, ...)
         end)
@@ -261,7 +259,7 @@ do
     else
         mainFrame:SetScript("OnEvent", function(_, e, ...)
             if e == "ADDON_LOADED" then
-                LoadOptions()
+                addon.LoadOptions()
             end
             local func = addon[e]
             if type(func) == "function" then
@@ -3492,7 +3490,7 @@ do
     --
     -- Loads addon options from saved variables, filling in defaults.
     --
-    function LoadOptions()
+    local function LoadOptions()
         addon.options = KRT_Options
         Utils.fillTable(addon.options, defaultOptions)
 
@@ -3507,6 +3505,7 @@ do
             addon:SetLogLevel(KRT_Debug.level)
         end
     end
+    addon.LoadOptions = LoadOptions
 
     --
     -- Public method to reset options to default.
@@ -5855,7 +5854,7 @@ end
 function addon:ADDON_LOADED(name)
     if name ~= addonName then return end
     self:UnregisterEvent("ADDON_LOADED")
-    LoadOptions()
+    addon.LoadOptions()
     self:RegisterEvent("CHAT_MSG_ADDON")
     self:RegisterEvent("CHAT_MSG_SYSTEM")
     self:RegisterEvent("CHAT_MSG_LOOT")
