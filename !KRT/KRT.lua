@@ -3876,7 +3876,7 @@ do
     local updateInterval = 0.1
 
     local changesTable = {}
-    local FetchChanges, SaveChanges, CancelChanges
+    local FetchChanges, SaveChanges, CancelChanges, InitChangesTable
     local fetched = false
     local selectedID, tempSelectedID
     local isAdd = false
@@ -4090,7 +4090,7 @@ do
     end
 
     -- Initialize changes table:
-    function InitChangesTable()
+    local function InitChangesTable()
         addon:Debug("DEBUG", "Initializing changes table.")
         changesTable = KRT_CurrentRaid and KRT_Raids[KRT_CurrentRaid].changes or {}
     end
