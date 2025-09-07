@@ -44,30 +44,22 @@ local function TryEmbed(lib, target)
     end
 end
 
-local LIBS = {
-    ["LibCompat-1.0"]       = { field = "Compat",          embed = true  },
-    ["LibLogger-1.0"]       = { field = "Logger",          embed = true  },
-    ["LibDeformat-3.0"]     = { field = "Deformat",        embed = false },
-    ["LibBossIDs-1.0"]      = { field = "BossIDs",         embed = false },
-    ["LibXML-1.0"]          = { field = "LibXML",          embed = false },
-    ["CallbackHandler-1.0"] = { field = "CallbackHandler", embed = false },
-    -- LibMath extends math by itself.
-}
+addon.Compat          = addon.Compat          or GetLib("LibCompat-1.0", true)
+addon.Logger          = addon.Logger          or GetLib("LibLogger-1.0", true)
+addon.Deformat        = addon.Deformat        or GetLib("LibDeformat-3.0", true)
+addon.BossIDs         = addon.BossIDs         or GetLib("LibBossIDs-1.0", true)
+addon.LibXML          = addon.LibXML          or GetLib("LibXML-1.0", true)
+addon.CallbackHandler = addon.CallbackHandler or GetLib("CallbackHandler-1.0", true)
 
-for major, conf in pairs(LIBS) do
-    local lib = GetLib(major, true)
-    addon[conf.field] = addon[conf.field] or lib
-    if conf.embed then
-        TryEmbed(lib, addon)
-    end
-end
+TryEmbed(addon.Compat, addon)
+TryEmbed(addon.Logger, addon)
 
 local Compat           = addon.Compat
 local Logger           = addon.Logger
-local Deformat         = addon.Deformat
 local BossIDs          = addon.BossIDs
 local LibXML           = addon.LibXML
 local CallbackHandler  = addon.CallbackHandler
+local deformat         = addon.Deformat
 
 function addon:Debug(level, fmt, ...)
     if not self.Logger then return end
@@ -270,8 +262,7 @@ local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
 local GetGroupTypeAndCount = assert(Compat and Compat.GetGroupTypeAndCount, "LibCompat-1.0 required")
 addon.GetGroupTypeAndCount = GetGroupTypeAndCount
 
-local deformat                          = addon.Deformat
-local BossIDs                           = addon.BossIDs
+-- deformat and BossIDs localized near bootstrap
 
 ---============================================================================
 -- Event System
@@ -4798,7 +4789,7 @@ end
 -- ============================================================================
 do
     addon.Logger = addon.Logger or {}
-    local Logger = addon.Logger
+    Logger = addon.Logger
 
     local frameName, localized, updateInterval = nil, false, 0.05
 
