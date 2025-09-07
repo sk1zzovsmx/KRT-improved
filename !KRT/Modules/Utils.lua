@@ -294,7 +294,7 @@ do
         end
     end
 
-    function Utils.Schedule(sec, func)
+    function Utils.scheduleFrame(sec, func)
         if type(func) ~= "function" then return end
         driver = driver or CreateFrame("Frame")
         local job = { t = sec or 0, func = func }
@@ -317,7 +317,7 @@ do
         if addon.After then
             handle = addon.After(sec or 0, call)
         else
-            handle = Utils.Schedule(sec or 0, call)
+            handle = Utils.scheduleFrame(sec or 0, call)
         end
         scheduled[func] = handle
         return handle
@@ -333,7 +333,7 @@ do
             if addon.After then
                 addon.After(sec, tick)
             else
-                Utils.Schedule(sec, tick)
+                Utils.scheduleFrame(sec, tick)
             end
         end
         Utils.schedule(sec, tick)
@@ -404,25 +404,25 @@ function Utils.isEmpty(t)
 end
 
 -- Boolean <> String conversion:
-function Utils.bool2str(bool)
-	return bool and "true" or "false"
+function Utils.boolToStr(bool)
+        return bool and "true" or "false"
 end
 
-function Utils.str2bool(str)
-	return (str ~= "false")
+function Utils.strToBool(str)
+        return (str ~= "false")
 end
 
 -- Number <> Boolean conversion:
-function Utils.bool2num(bool)
-	return bool and 1 or 0
+function Utils.boolToNum(bool)
+        return bool and 1 or 0
 end
 
-function Utils.num2bool(num)
-	return (num ~= 0)
+function Utils.numToBool(num)
+        return (num ~= 0)
 end
 
 -- Convert seconds to readable clock string:
-function Utils.sec2clock(seconds)
+function Utils.secToClock(seconds)
         local sec = tonumber(seconds)
         if sec <= 0 then
                 return "00:00:00"
@@ -476,13 +476,13 @@ end
 -- local BNSendWhisper = Utils.whisper --
 
 -- Returns the current UTC date and time in seconds:
-function Utils.getUTCTimestamp()
+function Utils.getUtcTimestamp()
 	local utcDateTime = date("!*t")
 	return time(utcDateTime)
 end
 
 function Utils.getSecondsAsString(t)
-        return Utils.sec2clock(t)
+        return Utils.secToClock(t)
 end
 
 -- Determines if the player is in a raid instance
