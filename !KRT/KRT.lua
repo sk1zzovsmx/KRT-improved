@@ -177,14 +177,14 @@ local lootTypesText                     = {
 
 -- Roll Type Colored Display Text
 local lootTypesColored                  = {
-    Utils.WrapTextInColorCode(L.BtnMS, GREEN_FONT_COLOR_CODE:sub(3)),
-    Utils.WrapTextInColorCode(L.BtnOS, LIGHTYELLOW_FONT_COLOR_CODE:sub(3)),
-    Utils.WrapTextInColorCode(L.BtnSR, "ffa335ee"),
-    Utils.WrapTextInColorCode(L.BtnFree, NORMAL_FONT_COLOR_CODE:sub(3)),
-    Utils.WrapTextInColorCode(L.BtnBank, ORANGE_FONT_COLOR_CODE:sub(3)),
-    Utils.WrapTextInColorCode(L.BtnDisenchant, RED_FONT_COLOR_CODE:sub(3)),
-    Utils.WrapTextInColorCode(L.BtnHold, HIGHLIGHT_FONT_COLOR_CODE:sub(3)),
-    Utils.WrapTextInColorCode("DKP", GREEN_FONT_COLOR_CODE:sub(3)),
+    Utils.wrapTextInColorCode(L.BtnMS, GREEN_FONT_COLOR_CODE:sub(3)),
+    Utils.wrapTextInColorCode(L.BtnOS, LIGHTYELLOW_FONT_COLOR_CODE:sub(3)),
+    Utils.wrapTextInColorCode(L.BtnSR, "ffa335ee"),
+    Utils.wrapTextInColorCode(L.BtnFree, NORMAL_FONT_COLOR_CODE:sub(3)),
+    Utils.wrapTextInColorCode(L.BtnBank, ORANGE_FONT_COLOR_CODE:sub(3)),
+    Utils.wrapTextInColorCode(L.BtnDisenchant, RED_FONT_COLOR_CODE:sub(3)),
+    Utils.wrapTextInColorCode(L.BtnHold, HIGHLIGHT_FONT_COLOR_CODE:sub(3)),
+    Utils.wrapTextInColorCode("DKP", GREEN_FONT_COLOR_CODE:sub(3)),
 }
 
 -- Item Quality Colors
@@ -244,28 +244,24 @@ local IsInRaid, GetNumRaidMembers, GetNumPartyMembers = IsInRaid, GetNumRaidMemb
 -- Manages WoW API event registration for the addon.
 ---============================================================================
 do
-    local CB = addon.CallbackHandler
-    if CB then
-        local function OnUsed(_, _, e) mainFrame:RegisterEvent(e) end
-        local function OnUnused(_, _, e) mainFrame:UnregisterEvent(e) end
-        local events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents", OnUsed, OnUnused)
-        mainFrame:SetScript("OnEvent", function(_, e, ...)
-            if e == "ADDON_LOADED" then
-                addon.LoadOptions()
-            end
+    local events
+
+    local function OnEvent(_, e, ...)
+        if e == "ADDON_LOADED" then
+            LoadOptions()
+        end
+        if events then
             events:Fire(e, ...)
-        end)
-        addon:RegisterEvent("ADDON_LOADED")
-    else
-        mainFrame:SetScript("OnEvent", function(_, e, ...)
-            if e == "ADDON_LOADED" then
-                addon.LoadOptions()
-            end
+        else
             local func = addon[e]
             if type(func) == "function" then
                 func(addon, ...)
             end
-        end)
+        end
+    end
+
+    local function InitEventFallback()
+        mainFrame:SetScript("OnEvent", OnEvent)
         mainFrame:RegisterEvent("ADDON_LOADED")
         function addon:RegisterEvent(e)
             mainFrame:RegisterEvent(e)
@@ -277,6 +273,17 @@ do
             mainFrame:UnregisterAllEvents()
         end
     end
+
+    local CB = addon.CallbackHandler
+    if CB then
+        local function OnUsed(_, _, e) mainFrame:RegisterEvent(e) end
+        local function OnUnused(_, _, e) mainFrame:UnregisterEvent(e) end
+        events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents", OnUsed, OnUnused)
+        mainFrame:SetScript("OnEvent", OnEvent)
+        addon:RegisterEvent("ADDON_LOADED")
+    end
+
+    if not CB then InitEventFallback() end
 end
 
 ---============================================================================
@@ -338,7 +345,7 @@ do
                         rank     = rank,
                         subgroup = subgroup,
                         class    = class or "UNKNOWN",
-                        join     = Utils.GetCurrentTime(),
+                        join     = Utils.getCurrentTime(),
                         leave    = nil,
                         count    = 0, -- <--- Inizializza count!
                     }
@@ -365,7 +372,7 @@ do
         -- Mark players who have left
         for name, v in pairs(playersByName) do
             if not v.seen and v.leave == nil then
-                v.leave = Utils.GetCurrentTime()
+                v.leave = Utils.getCurrentTime()
             end
             v.seen = nil
         end
@@ -385,7 +392,7 @@ do
 
         local realm = GetRealmName() or UNKNOWN
         KRT_Players[realm] = KRT_Players[realm] or {}
-        local currentTime = Utils.GetCurrentTime()
+        local currentTime = Utils.getCurrentTime()
 
         local raidInfo = {
             realm         = realm,
@@ -409,7 +416,7 @@ do
                     rank     = rank,
                     subgroup = subgroup,
                     class    = class or "UNKNOWN",
-                    join     = Utils.GetCurrentTime(),
+                    join     = Utils.getCurrentTime(),
                     leave    = nil,
                     count    = 0, -- Initialize loot count
                 }
@@ -429,7 +436,7 @@ do
 
         tinsert(KRT_Raids, raidInfo)
         KRT_CurrentRaid = #KRT_Raids
-        Utils.TriggerEvent("RaidCreate", KRT_CurrentRaid)
+        Utils.triggerEvent("RaidCreate", KRT_CurrentRaid)
         Utils.schedule(3, addon.UpdateRaidRoster)
     end
 
@@ -439,7 +446,7 @@ do
     function Raid:End()
         if not KRT_CurrentRaid then return end
         Utils.unschedule(addon.Raid.UpdateRaidRoster)
-        local currentTime = Utils.GetCurrentTime()
+        local currentTime = Utils.getCurrentTime()
         for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
             if not v.leave then v.leave = currentTime end
         end
@@ -546,7 +553,7 @@ do
                 end
             end
         end
-        local currentTime = Utils.GetCurrentTime()
+        local currentTime = Utils.getCurrentTime()
         local killInfo = {
             name       = bossName,
             difficulty = instanceDiff,
@@ -617,7 +624,7 @@ do
             rollType    = rollType,
             rollValue   = rollValue,
             bossNum     = KRT_LastBoss,
-            time        = Utils.GetCurrentTime(),
+            time        = Utils.getCurrentTime(),
         }
         tinsert(KRT_Raids[KRT_CurrentRaid].loot, lootInfo)
     end
@@ -707,7 +714,7 @@ do
     -- Returns the RGB color values for a given class name.
     --
     function addon:GetClassColor(name)
-        return Utils.GetClassColor(name)
+        return Utils.getClassColor(name)
     end
 
     --
@@ -719,7 +726,7 @@ do
             return true
         end
 
-        local currentTime = Utils.GetCurrentTime()
+        local currentTime = Utils.getCurrentTime()
         local startTime = KRT_Raids[rID].startTime
         local validDuration = (currentTime + KRT_NextReset) - startTime
 
@@ -1014,7 +1021,7 @@ do
     local output          = "%s: %s"
     local chatPrefix      = "Kader Raid Tools"
     local chatPrefixShort = "KRT"
-    local prefixHex       = Utils.RGBToHex(245/255, 140/255, 186/255)
+    local prefixHex       = Utils.rgbToHex(245/255, 140/255, 186/255)
 
     --
     -- Prepares the final output string with a prefix.
@@ -1022,7 +1029,7 @@ do
     local function PreparePrint(text, prefix)
         prefix = prefix or chatPrefixShort
         if prefixHex then
-            prefix = Utils.WrapTextInColorCode(prefix, prefixHex)
+            prefix = Utils.wrapTextInColorCode(prefix, prefixHex)
         end
         return format(output, prefix, tostring(text))
     end
@@ -1327,7 +1334,7 @@ do
                 itemRollTracker[itemId][name])
         end
 
-        Utils.TriggerEvent("AddRoll", name, roll)
+        Utils.triggerEvent("AddRoll", name, roll)
         SortRolls()
 
         -- Auto-select winner if none is manually selected
@@ -1499,7 +1506,7 @@ do
     -- Clears all roll-related state and UI elements.
     --
     function addon:ClearRolls(rec)
-        frameName = frameName or Utils.GetFrameName()
+        frameName = frameName or Utils.getFrameName()
         if not frameName then return end
         rollsTable, rerolled, itemRollTracker = {}, {}, {}
         playerRollTracker, rolled, warned, rollsCount = {}, false, false, 0
@@ -1580,7 +1587,7 @@ do
     -- Rebuilds the roll list UI and marks the top roller or selected winner.
     --
     function addon:FetchRolls()
-        local frameName = Utils.GetFrameName()
+        local frameName = Utils.getFrameName()
         addon:Debug("DEBUG", "FetchRolls called; frameName: %s", frameName)
         local scrollFrame = _G[frameName .. "ScrollFrame"]
         local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
@@ -1749,7 +1756,7 @@ do
         lootTable[lootCount].itemColor   = itemColors[itemRarity + 1]
         lootTable[lootCount].itemLink    = itemLink
         lootTable[lootCount].itemTexture = itemTexture
-        Utils.TriggerEvent("AddItem", itemLink)
+        Utils.triggerEvent("AddItem", itemLink)
     end
 
     --
@@ -1766,11 +1773,11 @@ do
     --
     function addon:SetItem(i)
         if i.itemName and i.itemLink and i.itemTexture and i.itemColor then
-            frameName = frameName or Utils.GetFrameName()
+            frameName = frameName or Utils.getFrameName()
             if frameName == nil then return end
 
             local currentItemLink = _G[frameName .. "Name"]
-            currentItemLink:SetText(Utils.WrapTextInColorCode(i.itemName, i.itemColor))
+            currentItemLink:SetText(Utils.wrapTextInColorCode(i.itemName, i.itemColor))
 
             local currentItemBtn = _G[frameName .. "ItemBtn"]
             currentItemBtn:SetNormalTexture(i.itemTexture)
@@ -1779,7 +1786,7 @@ do
                 currentItemBtn.tooltip_item = i.itemLink
                 self:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
             end
-            Utils.TriggerEvent("SetItem", i.itemLink)
+            Utils.triggerEvent("SetItem", i.itemLink)
         end
     end
 
@@ -1799,7 +1806,7 @@ do
     function addon:ClearLoot()
         lootTable = twipe(lootTable)
         lootCount = 0
-        frameName = frameName or Utils.GetFrameName()
+        frameName = frameName or Utils.getFrameName()
         _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
         _G[frameName .. "ItemBtn"]:SetNormalTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
         if frameName == UIMaster:GetName() then
@@ -2680,7 +2687,7 @@ do
     end
 
     -- Register some callbacks:
-    Utils.RegisterCallback("SetItem", function(f, itemLink)
+    Utils.registerCallback("SetItem", function(f, itemLink)
         local oldItem = GetItemLink()
         if oldItem ~= itemLink then
             announced = false
@@ -2704,7 +2711,7 @@ do
         scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         if countsFrame and not countsFrame._krtCounterHook then
             countsFrame:SetScript("OnUpdate", function()
-                if needsUpdate and Utils.Throttle("LootCounter", 0.1) then
+                if needsUpdate and Utils.throttleKey("LootCounter", 0.1) then
                     needsUpdate = false
                     addon:UpdateCountsFrame()
                 end
@@ -3559,7 +3566,7 @@ do
             _G[frameName .. "countdownDurationText"]:SetText(value)
         end
         name = strsub(name, strlen(frameName) + 1)
-        Utils.TriggerEvent("Config" .. name, value)
+        Utils.triggerEvent("Config" .. name, value)
         KRT_Options[name] = value
     end
 
@@ -3992,7 +3999,7 @@ do
         end
     end
 
-    Utils.RegisterCallback("RaidLeave", function(e, name)
+    Utils.registerCallback("RaidLeave", function(e, name)
         Changes:Delete(name)
         CancelChanges()
     end)
@@ -4479,7 +4486,7 @@ do
     local running
 
     local function Send(msg)
-        if U.Throttle("lfm_msg", _G.KRT_Options.chatThrottle or 2.0) then
+        if U.throttleKey("lfm_msg", _G.KRT_Options.chatThrottle or 2.0) then
             SendChatMessage(msg, IsInRaid() and "RAID" or "GUILD")
         end
     end
@@ -4490,7 +4497,7 @@ do
         local raidName = GetRealZoneText() or "Raid"
         local text = msg:gsub("{raid}", raidName):gsub("{roles}", "T/H/D"):gsub("{time}", date("%H:%M"))
         Send(text)
-        U.Schedule(_G.KRT_Options.lfmPeriod or 45, Tick)
+        U.scheduleDelay(_G.KRT_Options.lfmPeriod or 45, Tick)
     end
 
     function S:Init() end
@@ -4586,7 +4593,7 @@ do
     -- toggle campo selezionato + evento
     local function selectAndTrigger(ns, field, id, event)
         ns[field] = (id ~= ns[field]) and id or nil
-        Utils.TriggerEvent(event, id)
+        Utils.triggerEvent(event, id)
         return ns[field]
     end
 
@@ -4803,7 +4810,7 @@ do
     -- selettori (toggle + evento)
     local function sel(field, id, ev)
         addon.History[field] = (id ~= addon.History[field]) and id or nil
-        Utils.TriggerEvent(ev, id)
+        Utils.triggerEvent(ev, id)
     end
     function History:SelectRaid(btn) if btn then sel("selectedRaid", btn:GetID(), "HistorySelectRaid") end end
 
@@ -4897,7 +4904,7 @@ do
         }
     end
 
-    Utils.RegisterCallback("HistorySelectRaid", function()
+    Utils.registerCallback("HistorySelectRaid", function()
         addon.History.selectedBoss, addon.History.selectedPlayer, addon.History.selectedItem = nil, nil, nil
     end)
 end
@@ -4930,7 +4937,7 @@ do
             local count = #KRT_Raids
             for i = 1, count do
                 local r = KRT_Raids[i]
-                local it = out[i] or Utils.AcquireTable()
+                local it = out[i] or Utils.acquireTable()
                 it.id      = i
                 it.zone    = r.zone
                 it.size    = r.size
@@ -4939,7 +4946,7 @@ do
                 out[i] = it
             end
             for i = count + 1, #out do
-                Utils.ReleaseTable(out[i])
+                Utils.releaseTable(out[i])
                 out[i] = nil
             end
         end,
@@ -5020,7 +5027,7 @@ do
         (controller._makeConfirmPopup)("KRTHISTORY_DELETE_RAID", L.StrConfirmDeleteRaid, DeleteRaid)
     end
 
-    Utils.RegisterCallback("RaidCreate", function(_, num)
+    Utils.registerCallback("RaidCreate", function(_, num)
         addon.History.selectedRaid = tonumber(num)
         controller:Dirty()
     end)
@@ -5047,7 +5054,7 @@ do
             local src = addon.Raid:GetBosses(addon.History.selectedRaid) or {}
             for i = 1, #src do
                 local b = src[i]
-                local it = out[i] or Utils.AcquireTable()
+                local it = out[i] or Utils.acquireTable()
                 it.id      = b.id
                 it.name    = b.name
                 it.time    = b.time
@@ -5056,7 +5063,7 @@ do
                 out[i] = it
             end
             for i = #src + 1, #out do
-                Utils.ReleaseTable(out[i])
+                Utils.releaseTable(out[i])
                 out[i] = nil
             end
             table.sort(out, function(a, b) return a.id > b.id end)
@@ -5131,7 +5138,7 @@ do
         return name
     end
 
-    Utils.RegisterCallback("HistorySelectRaid", function() controller:Dirty() end)
+    Utils.registerCallback("HistorySelectRaid", function() controller:Dirty() end)
 end
 
 -- ============================================================================
@@ -5149,20 +5156,20 @@ do
 
         getData        = function(out)
             if not addon.History.selectedBoss then
-                for i = #out, 1, -1 do Utils.ReleaseTable(out[i]); out[i] = nil end
+                for i = #out, 1, -1 do Utils.releaseTable(out[i]); out[i] = nil end
                 return
             end
             local src = addon.Raid:GetPlayers(addon.History.selectedRaid, addon.History.selectedBoss) or {}
             for i = 1, #src do
                 local p = src[i]
-                local it = out[i] or Utils.AcquireTable()
+                local it = out[i] or Utils.acquireTable()
                 it.id    = p.id
                 it.name  = p.name
                 it.class = p.class
                 out[i] = it
             end
             for i = #src + 1, #out do
-                Utils.ReleaseTable(out[i])
+                Utils.releaseTable(out[i])
                 out[i] = nil
             end
         end,
@@ -5220,8 +5227,8 @@ do
     end
 
     local function Reset() controller:Dirty() end
-    Utils.RegisterCallback("HistorySelectRaid", Reset)
-    Utils.RegisterCallback("HistorySelectBoss", Reset)
+    Utils.registerCallback("HistorySelectRaid", Reset)
+    Utils.registerCallback("HistorySelectBoss", Reset)
 end
 
 -- ============================================================================
@@ -5248,7 +5255,7 @@ do
             local src = addon.Raid:GetPlayers(addon.History.selectedRaid) or {}
             for i = 1, #src do
                 local p = src[i]
-                local it = out[i] or Utils.AcquireTable()
+                local it = out[i] or Utils.acquireTable()
                 it.id       = p.id
                 it.name     = p.name
                 it.class    = p.class
@@ -5259,7 +5266,7 @@ do
                 out[i] = it
             end
             for i = #src + 1, #out do
-                Utils.ReleaseTable(out[i])
+                Utils.releaseTable(out[i])
                 out[i] = nil
             end
         end,
@@ -5316,7 +5323,7 @@ do
         (controller._makeConfirmPopup)("KRTHISTORY_DELETE_RAIDATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendee)
     end
 
-    Utils.RegisterCallback("HistorySelectRaid", function() controller:Dirty() end)
+    Utils.registerCallback("HistorySelectRaid", function() controller:Dirty() end)
 end
 
 -- ============================================================================
@@ -5362,7 +5369,7 @@ do
 
             for i = 1, #data do
                 local v = data[i]
-                local it = out[i] or Utils.AcquireTable()
+                local it = out[i] or Utils.acquireTable()
                 it.id          = v.id
                 it.itemId      = v.itemId
                 it.itemName    = v.itemName
@@ -5378,7 +5385,7 @@ do
                 out[i] = it
             end
             for i = #data + 1, #out do
-                Utils.ReleaseTable(out[i])
+                Utils.releaseTable(out[i])
                 out[i] = nil
             end
         end,
@@ -5393,7 +5400,7 @@ do
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
                 local ui = CacheParts(row, btn, parts)
 
-                ui.Name:SetText(Utils.WrapTextInColorCode(v.itemName, itemColors[v.itemRarity + 1]))
+                ui.Name:SetText(Utils.wrapTextInColorCode(v.itemName, itemColors[v.itemRarity + 1]))
                 ui.Source:SetText(addon.History.Boss:GetName(v.bossNum, addon.History.selectedRaid))
 
                 local r, g, b = addon:GetClassColor(addon:GetPlayerClass(v.looter))
@@ -5465,9 +5472,9 @@ do
     end
 
     local function Reset() controller:Dirty() end
-    Utils.RegisterCallback("HistorySelectRaid", Reset)
-    Utils.RegisterCallback("HistorySelectBoss", Reset)
-    Utils.RegisterCallback("HistorySelectPlayer", Reset)
+    Utils.registerCallback("HistorySelectRaid", Reset)
+    Utils.registerCallback("HistorySelectBoss", Reset)
+    Utils.registerCallback("HistorySelectPlayer", Reset)
 end
 
 -- ============================================================================
@@ -5541,7 +5548,7 @@ do
         end
 
         self:Hide()
-        Utils.TriggerEvent("HistorySelectRaid")
+        Utils.triggerEvent("HistorySelectRaid")
     end
 
     function Box:CancelAddEdit()
@@ -5926,7 +5933,7 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
     local _, event, _, _, _, destGUID, destName = ...
     if not KRT_CurrentRaid then return end
     if event == "UNIT_DIED" then
-        local npcID = Utils.GetNPCID(destGUID)
+        local npcID = Utils.getNpcId(destGUID)
         if addon.BossIDs.BossIDs[npcID] then
             self.Raid:AddBoss(destName)
         end
