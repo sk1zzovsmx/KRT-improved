@@ -6,7 +6,12 @@ local L       = addon.L
 local Compat  = addon.Compat
 
 local type, ipairs, pairs = type, ipairs, pairs
-local floor, random, round = math.floor, math.random, math.round
+local floor, random = math.floor, math.random
+
+local function round(number, significance)
+	return floor((number / (significance or 1)) + 0.5) * (significance or 1)
+end
+
 local setmetatable, getmetatable = setmetatable, getmetatable
 local tinsert, tremove, twipe = table.insert, table.remove, table.wipe
 local find, match = string.find, string.match
