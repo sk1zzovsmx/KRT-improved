@@ -11,7 +11,6 @@ local floor, random = math.floor, math.random
 local function round(number, significance)
 	return floor((number / (significance or 1)) + 0.5) * (significance or 1)
 end
-
 local setmetatable, getmetatable = setmetatable, getmetatable
 local tinsert, tremove, twipe = table.insert, table.remove, table.wipe
 local find, match = string.find, string.match
@@ -21,9 +20,8 @@ local lower, upper = string.lower, string.upper
 local select, unpack = select, unpack
 local GetLocale = GetLocale
 
--- Lightweight pooling and timers
+-- Lightweight pooling
 local GetTime = GetTime
-local CreateFrame = CreateFrame
 
 -- Table pool (no table.new in 3.3.5a)
 local TPOOL = setmetatable({}, { __mode = "k" })
@@ -43,7 +41,6 @@ function Utils.releaseTable(t)
                 TPOOL[t] = true
         end
 end
-
 -- Lightweight throttle (keyed)
 local last = {}
 function Utils.throttleKey(key, sec)
@@ -53,27 +50,6 @@ function Utils.throttleKey(key, sec)
                 last[key] = now
                 return true
         end
-end
-
--- Tiny scheduler (no C_Timer in 3.3.5)
-local Queue, Driver = {}, CreateFrame("Frame")
-Driver:SetScript("OnUpdate", function(_, _)
-        local now = GetTime()
-        for i = #Queue, 1, -1 do
-                local q = Queue[i]
-                if q.t <= now then
-                        table.remove(Queue, i)
-                        local ok, err = pcall(q.f)
-                        if not ok and addon.LogErr then
-                                addon:LogErr("Scheduler: %s", tostring(err))
-                        end
-                end
-        end
-end)
-
-function Utils.scheduleDelay(delay, func)
-        if type(func) ~= "function" then return end
-        Queue[#Queue + 1] = { t = GetTime() + (delay or 0), f = func }
 end
 
 -- Color helper (common usage)

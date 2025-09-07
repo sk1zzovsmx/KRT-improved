@@ -246,28 +246,24 @@ local IsInRaid, GetNumRaidMembers, GetNumPartyMembers = IsInRaid, GetNumRaidMemb
 -- Manages WoW API event registration for the addon.
 ---============================================================================
 do
-    local CB = addon.CallbackHandler
-    if CB then
-        local function OnUsed(_, _, e) mainFrame:RegisterEvent(e) end
-        local function OnUnused(_, _, e) mainFrame:UnregisterEvent(e) end
-        local events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents", OnUsed, OnUnused)
-        mainFrame:SetScript("OnEvent", function(_, e, ...)
-            if e == "ADDON_LOADED" then
-                LoadOptions()
-            end
+    local events
+
+    local function OnEvent(_, e, ...)
+        if e == "ADDON_LOADED" then
+            LoadOptions()
+        end
+        if events then
             events:Fire(e, ...)
-        end)
-        addon:RegisterEvent("ADDON_LOADED")
-    else
-        mainFrame:SetScript("OnEvent", function(_, e, ...)
-            if e == "ADDON_LOADED" then
-                LoadOptions()
-            end
+        else
             local func = addon[e]
             if type(func) == "function" then
                 func(addon, ...)
             end
-        end)
+        end
+    end
+
+    local function InitEventFallback()
+        mainFrame:SetScript("OnEvent", OnEvent)
         mainFrame:RegisterEvent("ADDON_LOADED")
         function addon:RegisterEvent(e)
             mainFrame:RegisterEvent(e)
@@ -279,6 +275,17 @@ do
             mainFrame:UnregisterAllEvents()
         end
     end
+
+    local CB = addon.CallbackHandler
+    if CB then
+        local function OnUsed(_, _, e) mainFrame:RegisterEvent(e) end
+        local function OnUnused(_, _, e) mainFrame:UnregisterEvent(e) end
+        events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents", OnUsed, OnUnused)
+        mainFrame:SetScript("OnEvent", OnEvent)
+        addon:RegisterEvent("ADDON_LOADED")
+    end
+
+    if not CB then InitEventFallback() end
 end
 
 ---============================================================================
