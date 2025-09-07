@@ -224,7 +224,8 @@ local format, match, find, strlen       = string.format, string.match, string.fi
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
-local GetGroupTypeAndCount = addon.GetGroupTypeAndCount
+local GetGroupTypeAndCount = assert(Compat and Compat.GetGroupTypeAndCount, "LibCompat-1.0 required")
+addon.GetGroupTypeAndCount = GetGroupTypeAndCount
 
 local deformat                          = addon.Deformat
 local BossIDs                           = addon.BossIDs
