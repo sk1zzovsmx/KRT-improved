@@ -4157,14 +4157,13 @@ do
     addon.Spammer = {}
     local Spammer = addon.Spammer
 
-    local spamFrame = CreateFrame("Frame")
     local frameName
 
     local LocalizeUIFrame
     local localized = false
 
     local UpdateUIFrame
-    local updateInterval = 0.05
+    local updateInterval = 0.2
 
     local FindAchievement
 
@@ -4183,9 +4182,7 @@ do
 
     local ticking = false
     local paused = false
-    local tickStart, tickPos = 0, 0
-
-    local ceil = math.ceil
+    local tickPos = 0
 
     -- OnLoad frame:
     function Spammer:OnLoad(frame)
@@ -4239,14 +4236,14 @@ do
             if paused then
                 paused = false
             elseif ticking then
-                ticking = false
+                return Spammer:Stop()
             else
-                tickStart = GetTime()
                 duration = tonumber(duration) or addon.options.lfmPeriod
-                tickPos = (duration >= 1 and duration or addon.options.lfmPeriod) + 1
+                tickPos = duration
+                _G[frameName .. "Tick"]:SetText(tickPos)
                 ticking = true
-                -- Spammer:Spam()
             end
+            Utils.schedule(1, Spammer.Tick)
         end
     end
 
@@ -4255,11 +4252,13 @@ do
         _G[frameName .. "Tick"]:SetText(duration or 0)
         ticking = false
         paused = false
+        Utils.unschedule(Spammer.Tick)
     end
 
     -- Pausing spammer
     function Spammer:Pause()
         paused = true
+        Utils.unschedule(Spammer.Tick)
     end
 
     -- Send spam message:
@@ -4420,35 +4419,31 @@ do
                     _G[frameName .. "Output"]:SetText(temp)
                 end
 
-                -- Set set duration:
-                duration = _G[frameName .. "Duration"]:GetText()
-                if duration == "" then
+                -- Set duration:
+                duration = tonumber(_G[frameName .. "Duration"]:GetText())
+                if not duration or duration <= 0 then
                     duration = addon.options.lfmPeriod
                     _G[frameName .. "Duration"]:SetText(duration)
                 end
                 finalOutput = temp
-                Utils.setText(_G[frameName .. "StartBtn"], (paused and L.BtnResume or L.BtnStop), START, ticking == true)
-                Utils.enableDisable(_G[frameName .. "StartBtn"], (strlen(finalOutput) > 3 and strlen(finalOutput) <= 255))
+                Utils.setText(_G[frameName .. "StartBtn"],
+                    (paused and L.BtnResume or L.BtnStop), START, ticking == true)
+                Utils.enableDisable(_G[frameName .. "StartBtn"],
+                    (strlen(finalOutput) > 3 and strlen(finalOutput) <= 255))
             end
+        end
+    end
 
-            if ticking then
-                if not paused then
-                    local count = ceil(duration - GetTime() + tickStart)
-                    local i = tickPos - 1
-                    while i >= count do
-                        _G[frameName .. "Tick"]:SetText(i)
-                        i = i - 1
-                    end
-                    tickPos = count
-                    if tickPos < 0 then tickPos = 0 end
-                    if tickPos == 0 then
-                        _G[frameName .. "Tick"]:SetText("")
-                        Spammer:Spam()
-                        ticking = false
-                        Spammer:Start()
-                    end
-                end
-            end
+    function Spammer:Tick()
+        if not ticking or paused then return end
+        tickPos = tickPos - 1
+        if tickPos <= 0 then
+            Spammer:Spam()
+            tickPos = duration
+        end
+        _G[frameName .. "Tick"]:SetText(tickPos > 0 and tickPos or "")
+        if ticking and not paused then
+            Utils.schedule(1, Spammer.Tick)
         end
     end
 
@@ -4467,10 +4462,6 @@ do
         return out
     end
 
-    -- To spam even if the frame is closed:
-    spamFrame:SetScript("OnUpdate", function(self, elapsed)
-        if UISpammer then UpdateUIFrame(UISpammer, elapsed) end
-    end)
 end
 
 -- Lightweight LFM scheduler
