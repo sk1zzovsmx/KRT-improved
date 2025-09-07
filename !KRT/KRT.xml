@@ -2380,14 +2380,14 @@
 	<!-- ====== End of Loot Bans Frame ====== -->
 
 	<!-- ====== Start of History Loot ====== -->
-	<Frame name="KRTLoggerFrameTemplate" parent="KRTLogger" virtual="true">
+	<Frame name="KRTHistoryFrameTemplate" parent="KRTHistory" virtual="true">
 		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" tile="true">
 			<TileSize val="16" />
 			<BackgroundInsets left="3" right="3" top="45" bottom="30" />
 		</Backdrop>
 	</Frame>
 	<!-- Table header template -->
-	<Button name="KRTLoggerTableHeader" virtual="true">
+	<Button name="KRTHistoryTableHeader" virtual="true">
 		<Size>
 			<AbsDimension x="10" y="19" />
 		</Size>
@@ -2453,7 +2453,7 @@
 		</HighlightTexture>
 	</Button>
 	<!-- Buttons Template -->
-	<Button name="KRTLoggerRaidButton" virtual="true">
+	<Button name="KRTHistoryRaidButton" virtual="true">
 		<Size>
 			<AbsDimension y="20" />
 		</Size>
@@ -2556,10 +2556,10 @@
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
 		<Scripts>
-			<OnClick>KRT.Logger:SelectRaid(self, button)</OnClick>
+			<OnClick>KRT.History:SelectRaid(self, button)</OnClick>
 		</Scripts>
 	</Button>
-	<Button name="KRTLoggerBossButton" virtual="true">
+	<Button name="KRTHistoryBossButton" virtual="true">
 		<Size>
 			<AbsDimension y="20" />
 		</Size>
@@ -2662,10 +2662,10 @@
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
 		<Scripts>
-			<OnClick>KRT.Logger:SelectBoss(self, button)</OnClick>
+			<OnClick>KRT.History:SelectBoss(self, button)</OnClick>
 		</Scripts>
 	</Button>
-	<Button name="KRTLoggerBossAttendeeButton" virtual="true">
+	<Button name="KRTHistoryBossAttendeeButton" virtual="true">
 		<Size>
 			<AbsDimension y="20" />
 		</Size>
@@ -2730,10 +2730,10 @@
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
 		<Scripts>
-			<OnClick>KRT.Logger:SelectBossPlayer(self, button)</OnClick>
+			<OnClick>KRT.History:SelectBossPlayer(self, button)</OnClick>
 		</Scripts>
 	</Button>
-	<Button name="KRTLoggerRaidAttendeeButton" virtual="true">
+	<Button name="KRTHistoryRaidAttendeeButton" virtual="true">
 		<Size>
 			<AbsDimension y="20" />
 		</Size>
@@ -2823,10 +2823,10 @@
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
 		<Scripts>
-			<OnClick>KRT.Logger:SelectPlayer(self, button)</OnClick>
+			<OnClick>KRT.History:SelectPlayer(self, button)</OnClick>
 		</Scripts>
 	</Button>
-	<Button name="KRTLoggerLootButton" virtual="true">
+	<Button name="KRTHistoryLootButton" virtual="true">
 		<Size>
 			<AbsDimension y="26" />
 		</Size>
@@ -2977,7 +2977,7 @@
 					</Anchors>
 				</NormalTexture>
 				<Scripts>
-					<OnEnter>KRT.Logger.Loot:OnEnter(self)</OnEnter>
+					<OnEnter>KRT.History.Loot:OnEnter(self)</OnEnter>
 					<OnLeave>GameTooltip:Hide()</OnLeave>
 				</Scripts>
 			</Button>
@@ -2991,17 +2991,17 @@
 		</HighlightTexture>
 		<Scripts>
 			<OnLoad>self:RegisterForClicks("AnyUp")</OnLoad>
-			<OnClick>KRT.Logger:SelectItem(self, button)</OnClick>
+			<OnClick>KRT.History:SelectItem(self, button)</OnClick>
 		</Scripts>
 	</Button>
-	<!-- The Frame: Logger -->
-	<Frame name="KRTLogger" inherits="KRTFrameTemplate">
+      <!-- The Frame: History -->
+      <Frame name="KRTHistory" inherits="KRTFrameTemplate">
 		<Size>
 			<AbsDimension x="830" y="488" />
 		</Size>
 		<Frames>
 
-			<Frame name="$parentRaids" inherits="KRTLoggerFrameTemplate">
+			<Frame name="$parentRaids" inherits="KRTHistoryFrameTemplate">
 				<Size>
 					<AbsDimension x="330" y="195" />
 				</Size>
@@ -3047,7 +3047,7 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Raids:SetCurrent(self, button)</OnClick>
+							<OnClick>KRT.History.Raids:SetCurrent(self, button)</OnClick>
 						</Scripts>
 					</Button>
 					<Button name="$parentExportBtn" inherits="KRTButtonTemplate" text="Export">
@@ -3074,11 +3074,11 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Raids:Delete(self, button)</OnClick>
+							<OnClick>KRT.History.Raids:Delete(self, button)</OnClick>
 						</Scripts>
 					</Button>
 					<!-- Table Headers -->
-					<Button name="$parentHeaderNum" inherits="KRTLoggerTableHeader" text="#">
+					<Button name="$parentHeaderNum" inherits="KRTHistoryTableHeader" text="#">
 						<Size>
 							<AbsDimension x="40" y="20" />
 						</Size>
@@ -3090,10 +3090,10 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Raids:Sort("id")</OnClick>
+							<OnClick>KRT.History.Raids:Sort("id")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderDate" inherits="KRTLoggerTableHeader" text="Date">
+					<Button name="$parentHeaderDate" inherits="KRTHistoryTableHeader" text="Date">
 						<Size>
 							<AbsDimension x="100" y="20" />
 						</Size>
@@ -3106,10 +3106,10 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Raids:Sort("date")</OnClick>
+							<OnClick>KRT.History.Raids:Sort("date")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderZone" inherits="KRTLoggerTableHeader" text="ZONE">
+					<Button name="$parentHeaderZone" inherits="KRTHistoryTableHeader" text="ZONE">
 						<Size>
 							<AbsDimension x="123" y="20" />
 						</Size>
@@ -3122,10 +3122,10 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Raids:Sort("zone")</OnClick>
+							<OnClick>KRT.History.Raids:Sort("zone")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderSize" inherits="KRTLoggerTableHeader" text="Size">
+					<Button name="$parentHeaderSize" inherits="KRTHistoryTableHeader" text="Size">
 						<Size>
 							<AbsDimension x="45" y="20" />
 						</Size>
@@ -3138,7 +3138,7 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Raids:Sort("size")</OnClick>
+							<OnClick>KRT.History.Raids:Sort("size")</OnClick>
 						</Scripts>
 					</Button>
 					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
@@ -3158,11 +3158,11 @@
 				</Frames>
 
 				<Scripts>
-					<OnLoad>KRT.Logger.Raids:OnLoad(self)</OnLoad>
+					<OnLoad>KRT.History.Raids:OnLoad(self)</OnLoad>
 				</Scripts>
 			</Frame>
 
-			<Frame name="$parentBosses" inherits="KRTLoggerFrameTemplate">
+			<Frame name="$parentBosses" inherits="KRTHistoryFrameTemplate">
 				<Size>
 					<AbsDimension x="315" y="195" />
 				</Size>
@@ -3208,7 +3208,7 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Boss:Add(self, button)</OnClick>
+							<OnClick>KRT.History.Boss:Add(self, button)</OnClick>
 						</Scripts>
 					</Button>
 					<Button name="$parentEditBtn" inherits="KRTButtonTemplate" text="Edit">
@@ -3223,7 +3223,7 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Boss:Edit(self, button)</OnClick>
+							<OnClick>KRT.History.Boss:Edit(self, button)</OnClick>
 						</Scripts>
 					</Button>
 					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate" text="DELETE">
@@ -3238,11 +3238,11 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Boss:Delete(self, button)</OnClick>
+							<OnClick>KRT.History.Boss:Delete(self, button)</OnClick>
 						</Scripts>
 					</Button>
 					<!-- Table Headers -->
-					<Button name="$parentHeaderNum" inherits="KRTLoggerTableHeader" text="#">
+					<Button name="$parentHeaderNum" inherits="KRTHistoryTableHeader" text="#">
 						<Size>
 							<AbsDimension x="35" y="20" />
 						</Size>
@@ -3254,10 +3254,10 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Boss:Sort("id")</OnClick>
+							<OnClick>KRT.History.Boss:Sort("id")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderName" inherits="KRTLoggerTableHeader" text="NAME">
+					<Button name="$parentHeaderName" inherits="KRTHistoryTableHeader" text="NAME">
 						<Size>
 							<AbsDimension x="148" y="20" />
 						</Size>
@@ -3270,10 +3270,10 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Boss:Sort("name")</OnClick>
+							<OnClick>KRT.History.Boss:Sort("name")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderTime" inherits="KRTLoggerTableHeader" text="Time">
+					<Button name="$parentHeaderTime" inherits="KRTHistoryTableHeader" text="Time">
 						<Size>
 							<AbsDimension x="45" y="20" />
 						</Size>
@@ -3286,10 +3286,10 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Boss:Sort("time")</OnClick>
+							<OnClick>KRT.History.Boss:Sort("time")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderMode" inherits="KRTLoggerTableHeader" text="MODE">
+					<Button name="$parentHeaderMode" inherits="KRTHistoryTableHeader" text="MODE">
 						<Size>
 							<AbsDimension x="65" y="20" />
 						</Size>
@@ -3302,7 +3302,7 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Boss:Sort("mode")</OnClick>
+							<OnClick>KRT.History.Boss:Sort("mode")</OnClick>
 						</Scripts>
 					</Button>
 					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
@@ -3321,11 +3321,11 @@
 					</ScrollFrame>
 				</Frames>
 				<Scripts>
-					<OnLoad>KRT.Logger.Boss:OnLoad(self)</OnLoad>
+					<OnLoad>KRT.History.Boss:OnLoad(self)</OnLoad>
 				</Scripts>
 			</Frame>
 
-			<Frame name="$parentBossAttendees" inherits="KRTLoggerFrameTemplate">
+			<Frame name="$parentBossAttendees" inherits="KRTHistoryFrameTemplate">
 				<Size>
 					<AbsDimension x="140" y="192" />
 				</Size>
@@ -3371,7 +3371,7 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.BossAttendees:Add(self, button)</OnClick>
+							<OnClick>KRT.History.BossAttendees:Add(self, button)</OnClick>
 						</Scripts>
 					</Button>
 					<Button name="$parentRemoveBtn" inherits="KRTButtonTemplate" text="DELETE">
@@ -3386,11 +3386,11 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.BossAttendees:Delete(self, button)</OnClick>
+							<OnClick>KRT.History.BossAttendees:Delete(self, button)</OnClick>
 						</Scripts>
 					</Button>
 					<!-- Table Headers -->
-					<Button name="$parentHeaderName" inherits="KRTLoggerTableHeader" text="NAME">
+					<Button name="$parentHeaderName" inherits="KRTHistoryTableHeader" text="NAME">
 						<Size>
 							<AbsDimension x="118" y="20" />
 						</Size>
@@ -3402,7 +3402,7 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.BossAttendees:Sort("name")</OnClick>
+							<OnClick>KRT.History.BossAttendees:Sort("name")</OnClick>
 						</Scripts>
 					</Button>
 					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
@@ -3421,11 +3421,11 @@
 					</ScrollFrame>
 				</Frames>
 				<Scripts>
-					<OnLoad>KRT.Logger.BossAttendees:OnLoad(self)</OnLoad>
+					<OnLoad>KRT.History.BossAttendees:OnLoad(self)</OnLoad>
 				</Scripts>
 			</Frame>
 
-			<Frame name="$parentRaidAttendees" inherits="KRTLoggerFrameTemplate">
+			<Frame name="$parentRaidAttendees" inherits="KRTHistoryFrameTemplate">
 				<Size>
 					<AbsDimension x="215" y="235" />
 				</Size>
@@ -3471,7 +3471,7 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.RaidAttendees:Add(self, button)</OnClick>
+							<OnClick>KRT.History.RaidAttendees:Add(self, button)</OnClick>
 						</Scripts>
 					</Button>
 					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate" text="DELETE">
@@ -3486,11 +3486,11 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.RaidAttendees:Delete(self, button)</OnClick>
+							<OnClick>KRT.History.RaidAttendees:Delete(self, button)</OnClick>
 						</Scripts>
 					</Button>
 					<!-- Table Headers -->
-					<Button name="$parentHeaderName" inherits="KRTLoggerTableHeader" text="NAME">
+					<Button name="$parentHeaderName" inherits="KRTHistoryTableHeader" text="NAME">
 						<Size>
 							<AbsDimension x="85" y="20" />
 						</Size>
@@ -3502,10 +3502,10 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.RaidAttendees:Sort("name")</OnClick>
+							<OnClick>KRT.History.RaidAttendees:Sort("name")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderJoin" inherits="KRTLoggerTableHeader" text="Join">
+					<Button name="$parentHeaderJoin" inherits="KRTHistoryTableHeader" text="Join">
 						<Size>
 							<AbsDimension x="55" y="20" />
 						</Size>
@@ -3518,10 +3518,10 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.RaidAttendees:Sort("join")</OnClick>
+							<OnClick>KRT.History.RaidAttendees:Sort("join")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderLeave" inherits="KRTLoggerTableHeader" text="Leave">
+					<Button name="$parentHeaderLeave" inherits="KRTHistoryTableHeader" text="Leave">
 						<Size>
 							<AbsDimension x="55" y="20" />
 						</Size>
@@ -3534,7 +3534,7 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.RaidAttendees:Sort("leave")</OnClick>
+							<OnClick>KRT.History.RaidAttendees:Sort("leave")</OnClick>
 						</Scripts>
 					</Button>
 					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
@@ -3553,11 +3553,11 @@
 					</ScrollFrame>
 				</Frames>
 				<Scripts>
-					<OnLoad>KRT.Logger.RaidAttendees:OnLoad(self)</OnLoad>
+					<OnLoad>KRT.History.RaidAttendees:OnLoad(self)</OnLoad>
 				</Scripts>
 			</Frame>
 
-			<Frame name="$parentLoot" inherits="KRTLoggerFrameTemplate">
+			<Frame name="$parentLoot" inherits="KRTHistoryFrameTemplate">
 				<Size>
 					<AbsDimension x="578" y="235" />
 				</Size>
@@ -3652,12 +3652,12 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Loot:Delete(self, button)</OnClick>
+							<OnClick>KRT.History.Loot:Delete(self, button)</OnClick>
 						</Scripts>
 					</Button>
 
 					<!-- Table Headers -->
-					<Button name="$parentHeaderItem" inherits="KRTLoggerTableHeader" text="Item">
+					<Button name="$parentHeaderItem" inherits="KRTHistoryTableHeader" text="Item">
 						<Size>
 							<AbsDimension x="190" y="20" />
 						</Size>
@@ -3669,10 +3669,10 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Loot:Sort("id")</OnClick>
+							<OnClick>KRT.History.Loot:Sort("id")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderSource" inherits="KRTLoggerTableHeader" text="Source">
+					<Button name="$parentHeaderSource" inherits="KRTHistoryTableHeader" text="Source">
 						<Size>
 							<AbsDimension x="135" y="20" />
 						</Size>
@@ -3685,10 +3685,10 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Loot:Sort("source")</OnClick>
+							<OnClick>KRT.History.Loot:Sort("source")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderWinner" inherits="KRTLoggerTableHeader" text="Winner">
+					<Button name="$parentHeaderWinner" inherits="KRTHistoryTableHeader" text="Winner">
 						<Size>
 							<AbsDimension x="90" y="20" />
 						</Size>
@@ -3701,10 +3701,10 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Loot:Sort("winner")</OnClick>
+							<OnClick>KRT.History.Loot:Sort("winner")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderType" inherits="KRTLoggerTableHeader" text="TYPE">
+					<Button name="$parentHeaderType" inherits="KRTHistoryTableHeader" text="TYPE">
 						<Size>
 							<AbsDimension x="50" y="20" />
 						</Size>
@@ -3717,10 +3717,10 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Loot:Sort("type")</OnClick>
+							<OnClick>KRT.History.Loot:Sort("type")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderRoll" inherits="KRTLoggerTableHeader" text="Roll">
+					<Button name="$parentHeaderRoll" inherits="KRTHistoryTableHeader" text="Roll">
 						<Size>
 							<AbsDimension x="45" y="20" />
 						</Size>
@@ -3733,10 +3733,10 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Loot:Sort("roll")</OnClick>
+							<OnClick>KRT.History.Loot:Sort("roll")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderTime" inherits="KRTLoggerTableHeader" text="Time">
+					<Button name="$parentHeaderTime" inherits="KRTHistoryTableHeader" text="Time">
 						<Size>
 							<AbsDimension x="45" y="20" />
 						</Size>
@@ -3749,7 +3749,7 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.Loot:Sort("time")</OnClick>
+							<OnClick>KRT.History.Loot:Sort("time")</OnClick>
 						</Scripts>
 					</Button>
 					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
@@ -3768,13 +3768,13 @@
 					</ScrollFrame>
 				</Frames>
 				<Scripts>
-					<OnLoad>KRT.Logger.Loot:OnLoad(self)</OnLoad>
+					<OnLoad>KRT.History.Loot:OnLoad(self)</OnLoad>
 				</Scripts>
 			</Frame>
 
 			<!-- Add/Edit Boss: -->
-			<Frame name="KRTLoggerBossBox" inherits="KRTSimpleFrameTemplate" frameStrata="HIGH"
-				parent="KRTLogger">
+			<Frame name="KRTHistoryBossBox" inherits="KRTSimpleFrameTemplate" frameStrata="HIGH"
+				parent="KRTHistory">
 				<Size>
 					<AbsDimension x="185" y="145" />
 				</Size>
@@ -3790,13 +3790,13 @@
 					<Layer level="BACKGROUND">
 						<Texture file="Interface\DialogFrame\UI-DialogBox-Background-Dark">
 							<Anchors>
-								<Anchor point="TOPLEFT" relativeTo="KRTLogger"
+								<Anchor point="TOPLEFT" relativeTo="KRTHistory"
 									relativePoint="TOPLEFT">
 									<Offset>
 										<AbsDimension x="10" y="-32" />
 									</Offset>
 								</Anchor>
-								<Anchor point="BOTTOMRIGHT" relativeTo="KRTLogger"
+								<Anchor point="BOTTOMRIGHT" relativeTo="KRTHistory"
 									relativePoint="BOTTOMRIGHT">
 									<Offset>
 										<AbsDimension x="-10" y="10" />
@@ -3855,7 +3855,7 @@
 							<Anchor point="RIGHT" x="-10" />
 						</Anchors>
 						<Scripts>
-							<OnEnterPressed>KRT.Logger.BossBox:Save()</OnEnterPressed>
+							<OnEnterPressed>KRT.History.BossBox:Save()</OnEnterPressed>
 						</Scripts>
 					</EditBox>
 					<EditBox name="$parentDifficulty" inherits="KRTEditBoxTemplate" letters="1">
@@ -3865,7 +3865,7 @@
 							<Anchor point="RIGHT" x="-100" />
 						</Anchors>
 						<Scripts>
-							<OnEnterPressed>KRT.Logger.BossBox:Save()</OnEnterPressed>
+							<OnEnterPressed>KRT.History.BossBox:Save()</OnEnterPressed>
 						</Scripts>
 					</EditBox>
 					<EditBox name="$parentTime" inherits="KRTEditBoxTemplate">
@@ -3875,7 +3875,7 @@
 							<Anchor point="RIGHT" x="-10" />
 						</Anchors>
 						<Scripts>
-							<OnEnterPressed>KRT.Logger.BossBox:Save()</OnEnterPressed>
+							<OnEnterPressed>KRT.History.BossBox:Save()</OnEnterPressed>
 						</Scripts>
 					</EditBox>
 					<Button name="$parentSaveBtn" inherits="KRTButtonTemplate" text="SAVE">
@@ -3890,7 +3890,7 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.BossBox:Save()</OnClick>
+							<OnClick>KRT.History.BossBox:Save()</OnClick>
 						</Scripts>
 					</Button>
 					<Button inherits="KRTButtonTemplate" text="CANCEL">
@@ -3910,7 +3910,7 @@
 					</Button>
 				</Frames>
 				<Scripts>
-					<OnLoad>KRT.Logger.BossBox:OnLoad(self)</OnLoad>
+					<OnLoad>KRT.History.BossBox:OnLoad(self)</OnLoad>
 					<OnDragStart>self:GetParent():StartMoving()</OnDragStart>
 					<OnDragStop>self:GetParent():StopMovingOrSizing()</OnDragStop>
 				</Scripts>
@@ -3919,7 +3919,7 @@
 
 			<!-- Add/Edit Boss Attendee: -->
 			<Frame name="$parentPlayerBox" inherits="KRTSimpleFrameTemplate" frameStrata="HIGH"
-				hidden="true" parent="KRTLogger">
+				hidden="true" parent="KRTHistory">
 				<Size>
 					<AbsDimension x="185" y="100" />
 				</Size>
@@ -3934,13 +3934,13 @@
 					<Layer level="BACKGROUND">
 						<Texture file="Interface\DialogFrame\UI-DialogBox-Background-Dark">
 							<Anchors>
-								<Anchor point="TOPLEFT" relativeTo="KRTLogger"
+								<Anchor point="TOPLEFT" relativeTo="KRTHistory"
 									relativePoint="TOPLEFT">
 									<Offset>
 										<AbsDimension x="10" y="-32" />
 									</Offset>
 								</Anchor>
-								<Anchor point="BOTTOMRIGHT" relativeTo="KRTLogger"
+								<Anchor point="BOTTOMRIGHT" relativeTo="KRTHistory"
 									relativePoint="BOTTOMRIGHT">
 									<Offset>
 										<AbsDimension x="-10" y="10" />
@@ -3991,7 +3991,7 @@
 							</Anchor>
 						</Anchors>
 						<Scripts>
-							<OnClick>KRT.Logger.AttendeesBox:Save()</OnClick>
+							<OnClick>KRT.History.AttendeesBox:Save()</OnClick>
 						</Scripts>
 					</Button>
 					<Button inherits="KRTButtonTemplate" text="CANCEL">
@@ -4011,14 +4011,14 @@
 					</Button>
 				</Frames>
 				<Scripts>
-					<OnLoad>KRT.Logger.AttendeesBox:OnLoad(self)</OnLoad>
+					<OnLoad>KRT.History.AttendeesBox:OnLoad(self)</OnLoad>
 					<OnDragStart>self:GetParent():StartMoving()</OnDragStart>
 					<OnDragStop>self:GetParent():StopMovingOrSizing()</OnDragStop>
 				</Scripts>
 			</Frame>
 		</Frames>
 		<Scripts>
-			<OnLoad>KRT.Logger:OnLoad(self)</OnLoad>
+			<OnLoad>KRT.History:OnLoad(self)</OnLoad>
 		</Scripts>
 	</Frame>
 	<!-- ====== End of History Loot ====== -->
