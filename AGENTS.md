@@ -48,7 +48,6 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
     # localization.it.lua  # optional future mirror
   Modules/                 # NOTE: directory name is Uppercase
     Utils.lua              # utility functions (table ops, color, formatting, etc.)
-    bossList.lua           # boss id/name lists
     ignoredItems.lua       # item filter list
   Libs/                    # vendored libraries (LibStub–based)
     libs.xml
