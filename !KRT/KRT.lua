@@ -250,7 +250,8 @@ local format, match, find, strlen       = string.format, string.match, string.fi
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
-local IsInRaid, GetNumRaidMembers, GetNumPartyMembers = IsInRaid, GetNumRaidMembers, GetNumPartyMembers
+local IsInRaid, GetNumRaidMembers, GetNumPartyMembers =
+    addon.IsInRaid or IsInRaid, GetNumRaidMembers, GetNumPartyMembers
 
 ---============================================================================
 -- Event System
