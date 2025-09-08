@@ -516,7 +516,10 @@ do
     -- Performs an initial raid check on player login.
     --
     function module:FirstCheck()
-        Utils.unschedule(addon.Raid.FirstCheck)
+        if module.firstCheckHandle then
+            Utils.unschedule(module.firstCheckHandle)
+            module.firstCheckHandle = nil
+        end
         local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
         if count == 0 then return end
 
@@ -6131,7 +6134,8 @@ end
 --
 function addon:PLAYER_ENTERING_WORLD()
     mainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
-    Utils.schedule(3, self.Raid.FirstCheck)
+    local module = self.Raid
+    module.firstCheckHandle = Utils.schedule(3, module.FirstCheck, module)
 end
 
 --
