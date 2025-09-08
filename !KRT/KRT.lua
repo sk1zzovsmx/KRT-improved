@@ -4812,13 +4812,33 @@ do
         addon.History[field] = (id ~= addon.History[field]) and id or nil
         Utils.triggerEvent(ev, id)
     end
-    function History:SelectRaid(btn) if btn then sel("selectedRaid", btn:GetID(), "HistorySelectRaid") end end
+    -- select a raid and notify listeners
+    function History:SelectRaid(btn)
+        if btn then
+            sel("selectedRaid", btn:GetID(), "HistorySelectRaid")
+        end
+    end
 
-    function History:SelectBoss(btn) if btn then sel("selectedBoss", btn:GetID(), "HistorySelectBoss") end end
+    -- select a boss and notify listeners
+    function History:SelectBoss(btn)
+        if btn then
+            sel("selectedBoss", btn:GetID(), "HistorySelectBoss")
+        end
+    end
 
-    function History:SelectBossPlayer(btn) if btn then sel("selectedBossPlayer", btn:GetID(), "HistorySelectBossPlayer") end end
+    -- select a player within a boss kill
+    function History:SelectBossPlayer(btn)
+        if btn then
+            sel("selectedBossPlayer", btn:GetID(), "HistorySelectBossPlayer")
+        end
+    end
 
-    function History:SelectPlayer(btn) if btn then sel("selectedPlayer", btn:GetID(), "HistorySelectPlayer") end end
+    -- select a player and notify listeners
+    function History:SelectPlayer(btn)
+        if btn then
+            sel("selectedPlayer", btn:GetID(), "HistorySelectPlayer")
+        end
+    end
 
     do -- Item: sinistro seleziona, destro menu
         local function openItemMenu()
@@ -5204,13 +5224,25 @@ do
         },
     }
 
-    function M:OnLoad(frame) controller:OnLoad(frame) end
+    -- initialize the attendees controller
+    function M:OnLoad(frame)
+        controller:OnLoad(frame)
+    end
 
-    function M:Fetch() controller:Fetch() end
+    -- fetch attendees data
+    function M:Fetch()
+        controller:Fetch()
+    end
 
-    function M:Sort(t) controller:Sort(t) end
+    -- sort attendees list
+    function M:Sort(t)
+        controller:Sort(t)
+    end
 
-    function M:Add() addon.History.AttendeesBox:Toggle() end
+    -- toggle add attendee dialog
+    function M:Add()
+        addon.History.AttendeesBox:Toggle()
+    end
 
     do
         local function DeleteAttendee()
@@ -5221,7 +5253,12 @@ do
             Utils.removeEntry(raid.bossKills[bID].players, name)
             controller:Dirty()
         end
-        function M:Delete() if addon.History.selectedBossPlayer then StaticPopup_Show("KRTHISTORY_DELETE_ATTENDEE") end end
+        -- ask for confirmation before deleting an attendee
+        function M:Delete()
+            if addon.History.selectedBossPlayer then
+                StaticPopup_Show("KRTHISTORY_DELETE_ATTENDEE")
+            end
+        end
 
         (controller._makeConfirmPopup)("KRTHISTORY_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendee)
     end
