@@ -261,7 +261,7 @@ do
 
     local function OnEvent(_, e, ...)
         if e == "ADDON_LOADED" then
-            LoadOptions()
+            addon.LoadOptions()
         end
         if events then
             events:Fire(e, ...)
@@ -2766,10 +2766,12 @@ end
 
 -- ==================== Loot Counter (Reworked: Style & Logic) ==================== --
 do
+    local module = addon.Master
+
     local rows, raidPlayers = {}, {}
     local wipe = wipe or table.wipe
     local countsFrame, scrollChild, needsUpdate = nil, nil, false
-
+    
     local function RequestCountsUpdate()
         needsUpdate = true
     end
