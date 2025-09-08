@@ -5519,7 +5519,7 @@ end
 -- ============================================================================
 do
     addon.History.Loot = addon.History.Loot or {}
-    local Loot = addon.History.Loot
+    local module = addon.History.Loot
 
     local raidLoot = {} -- cache per tooltip OnEnter (lista completa del raid)
 
