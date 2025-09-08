@@ -57,9 +57,7 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
     LibCompat-1.0/
     LibDeformat-3.0/
     LibLogger-1.0/
-    LibMath/
     LibStub/
-    LibXML-1.0/
 ```
 
 ---
@@ -71,8 +69,6 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 - **LibLogger‑1.0** lightweight logger (can embed onto addon)
 - **LibDeformat‑3.0** pattern‑based deformatting (parsing chat/loot lines)
 - **LibBossIDs‑1.0** boss id/name lookup
-- **LibXML‑1.0** optional runtime XML helpers
-- **LibMath** tiny math helpers
 
 *Guideline:* Embed via `LibStub("Name", true)`; treat missing libs gracefully; never hard‑require Ace3.
 
@@ -89,6 +85,7 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 ## 7) Module map (in `KRT.lua` unless stated)
 - `addon.Raid`          — raid state, roster helpers
 - `addon.Loot`          — loot events, history, export string
+- `addon.History`       — loot history
 - `addon.Rolls`         — roll tracking (MS/OS/SR/Free/Bank/DE/Hold), sorting, winner logic
 - `addon.Reserves`      — SR model (per‑item reserve counts), CSV import/export
 - `addon.Warnings`      — announcements (RW/RAID/PARTY), templates & throttling
@@ -185,6 +182,56 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 Lua code skeletons in‑repo: If a templates folder exists (e.g., `TemplatesLua/`), treat it as optional, non‑binding
 starting points (module skeleton, event listener, CLI sub‑command, logger usage). Prefer existing KRT patterns.
 
+Skeleton:
+
+-- =======================================================
+--  Module <ModuleName>
+--  Note: use a `do ... end` block to encapsulate the scope
+-- =======================================================
+do
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
+    -- `addon` is the main namespace (exposed in KRT.lua)
+    addon.ModuleName = addon.ModuleName or {}
+
+    -------------------------------------------------------
+    -- 2. Local aliases for performance
+    -------------------------------------------------------
+    local module = addon.ModuleName  -- quick access to the module table
+    local L = addon.L               -- localization table (if strings are needed)
+
+    -------------------------------------------------------
+    -- 3. Internal state (non-exposed local variables)
+    -------------------------------------------------------
+    local someState
+
+    -------------------------------------------------------
+    -- 4. “Private” (local) functions
+    -------------------------------------------------------
+    local function helper(arg)
+        -- internal logic
+    end
+
+    -------------------------------------------------------
+    -- 5. Public module functions
+    -------------------------------------------------------
+    function module:Init(...)
+        -- module initialization
+    end
+
+    function module:DoSomething(arg1, arg2)
+        helper(arg1)
+        -- other operations
+    end
+
+    -------------------------------------------------------
+    -- 6. Optional hooks/events
+    -------------------------------------------------------
+    -- example: register an event if the module requires it
+    -- frame:RegisterEvent("SOME_EVENT")
+end
+
 External guide: Lua Programming Development Guide — Agents.md examples collection.
 https://github.com/gakeez/agents_md_collection/blob/main/examples/lua-programming-development.md
 
@@ -195,4 +242,5 @@ https://github.com/gakeez/agents_md_collection/blob/main/examples/lua-programmin
 ## 18) Change log (edit by hand)
 - _2025‑09‑05_: Initial lightweight version; removed binding “recipes”. Added `dev`‑only branching policy.
 - _2025-09-07_: Clarified monolithic structure and updated CLI command list.
-- _2025-09-10_: Renamed Logger module to History to avoid conflict with debugging logger.
+- _2025-09-08_: Renamed Logger module to History to avoid conflict with debugging logger.
+- _2025-09-09_: Integrate new template. Removed unused Libs.
