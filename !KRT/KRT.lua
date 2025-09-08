@@ -6105,6 +6105,48 @@ function addon:CHAT_MSG_LOOT(msg)
 end
 
 --
+-- CHAT_MSG_SYSTEM: Forwards roll messages to the Rolls module.
+--
+function addon:CHAT_MSG_SYSTEM(msg)
+    addon.Rolls:CHAT_MSG_SYSTEM(msg)
+end
+
+--
+-- ITEM_LOCKED: Forwards item lock events to the Master module.
+--
+function addon:ITEM_LOCKED(...)
+    addon.Master:ITEM_LOCKED(...)
+end
+
+--
+-- LOOT_OPENED: Forwards loot window opening to the Master module.
+--
+function addon:LOOT_OPENED(...)
+    addon.Master:LOOT_OPENED(...)
+end
+
+--
+-- LOOT_CLOSED: Forwards loot window closing to the Master module.
+--
+function addon:LOOT_CLOSED(...)
+    addon.Master:LOOT_CLOSED(...)
+end
+
+--
+-- LOOT_SLOT_CLEARED: Forwards cleared loot slots to the Master module.
+--
+function addon:LOOT_SLOT_CLEARED(...)
+    addon.Master:LOOT_SLOT_CLEARED(...)
+end
+
+--
+-- TRADE_ACCEPT_UPDATE: Forwards trade acceptance updates to the Master module.
+--
+function addon:TRADE_ACCEPT_UPDATE(...)
+    addon.Master:TRADE_ACCEPT_UPDATE(...)
+end
+
+--
 -- CHAT_MSG_MONSTER_YELL: Logs a boss kill based on specific boss yells.
 --
 function addon:CHAT_MSG_MONSTER_YELL(...)
