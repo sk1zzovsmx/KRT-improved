@@ -250,8 +250,7 @@ local format, match, find, strlen       = string.format, string.match, string.fi
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
-local IsInRaid, GetNumRaidMembers, GetNumPartyMembers =
-    addon.IsInRaid or IsInRaid, GetNumRaidMembers, GetNumPartyMembers
+local GetNumRaidMembers, GetNumPartyMembers = GetNumRaidMembers, GetNumPartyMembers
 
 ---============================================================================
 -- Event System
@@ -337,7 +336,7 @@ do
     --
     function module:UpdateRaidRoster()
         if not KRT_CurrentRaid then return end
-        local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
+        local count = addon:IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
         numRaid = count
         if numRaid == 0 then
             module:End()
@@ -416,7 +415,7 @@ do
         if KRT_CurrentRaid then
             self:End()
         end
-        if not IsInRaid() then return end
+        if not addon:IsInRaid() then return end
         local numRaid = GetNumRaidMembers()
         if numRaid == 0 then return end
 
@@ -521,7 +520,7 @@ do
             Utils.unschedule(module.firstCheckHandle)
             module.firstCheckHandle = nil
         end
-        local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
+        local count = addon:IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
         if count == 0 then return end
 
         if KRT_CurrentRaid and module:CheckPlayer(unitName, KRT_CurrentRaid) then
@@ -735,7 +734,7 @@ do
     --
     function module:GetRaidSize()
         local size = 0
-        if self:IsInRaid() then
+        if addon:IsInRaid() then
             local diff = GetRaidDifficulty()
             size = (diff == 1 or diff == 3) and 10 or 25
         end
@@ -961,7 +960,7 @@ do
         local originalName = name
         name = name or unitName or UnitName("player")
         if next(players) == nil then
-            if IsInRaid() then
+            if addon:IsInRaid() then
                 numRaid = GetNumRaidMembers()
                 for i = 1, numRaid do
                     local pname, prank = GetRaidRosterInfo(i)
@@ -2798,7 +2797,7 @@ do
     -- Return sorted array of player names currently in the raid.
     local function GetCurrentRaidPlayers()
         wipe(raidPlayers)
-        if not IsInRaid() then
+        if not addon:IsInRaid() then
             return raidPlayers
         end
         local count = GetNumRaidMembers()
@@ -4644,7 +4643,7 @@ do
 
     local function Send(msg)
         if U.throttleKey("lfm_msg", _G.KRT_Options.chatThrottle or 2.0) then
-            SendChatMessage(msg, IsInRaid() and "RAID" or "GUILD")
+            SendChatMessage(msg, addon:IsInRaid() and "RAID" or "GUILD")
         end
     end
 
