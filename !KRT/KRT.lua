@@ -91,7 +91,6 @@ do
     -------------------------------------------------------
     addon.Debugger = addon.Debugger or {}
     local module = addon.Debugger
-    local Debugger = module
 
     -------------------------------------------------------
     -- Internal state
@@ -101,23 +100,23 @@ do
     -------------------------------------------------------
     -- Public methods
     -------------------------------------------------------
-    function Debugger:OnLoad(frame)
+    function module:OnLoad(frame)
         if not frame then return end
         debugFrame = frame
         msgFrame = _G[frame:GetName() .. "ScrollFrame"]
     end
 
-    function Debugger:AddMessage(msg, r, g, b)
+    function module:AddMessage(msg, r, g, b)
         if msgFrame then
             msgFrame:AddMessage(tostring(msg), r or 1, g or 1, b or 1)
         end
     end
 
-    function Debugger:Clear()
+    function module:Clear()
         if msgFrame then msgFrame:Clear() end
     end
 
-    function Debugger:Toggle()
+    function module:Toggle()
         if not debugFrame then return end
         if debugFrame:IsShown() then
             debugFrame:Hide()
@@ -307,7 +306,6 @@ do
     addon.Raid = addon.Raid or {}
     local module = addon.Raid
     local L = addon.L
-    local Raid = module
 
     -------------------------------------------------------
     -- Internal state
@@ -337,7 +335,7 @@ do
         local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
         numRaid = count
         if numRaid == 0 then
-            Raid:End()
+            module:End()
             return
         end
 
@@ -376,7 +374,7 @@ do
                         leave    = nil,
                         count    = 0, -- <--- Inizializza count!
                     }
-                    Raid:AddPlayer(toRaid)
+                    module:AddPlayer(toRaid)
                     player = toRaid
                 end
 
@@ -409,7 +407,7 @@ do
     --
     -- Creates a new raid log entry.
     --
-    function Raid:Create(zoneName, raidSize)
+    function module:Create(zoneName, raidSize)
         if KRT_CurrentRaid then
             self:End()
         end
@@ -470,7 +468,7 @@ do
     --
     -- Ends the current raid log entry, marking end time.
     --
-    function Raid:End()
+    function module:End()
         if not KRT_CurrentRaid then return end
         Utils.unschedule(addon.Raid.UpdateRaidRoster)
         local currentTime = Utils.getCurrentTime()
@@ -485,9 +483,9 @@ do
     --
     -- Checks the current raid status and creates a new session if needed.
     --
-    function Raid:Check(instanceName, instanceDiff)
+    function module:Check(instanceName, instanceDiff)
         if not KRT_CurrentRaid then
-            Raid:Create(instanceName, (instanceDiff % 2 == 0 and 25 or 10))
+            module:Create(instanceName, (instanceDiff % 2 == 0 and 25 or 10))
         end
 
         local current = KRT_Raids[KRT_CurrentRaid]
@@ -495,37 +493,37 @@ do
             if current.zone == instanceName then
                 if current.size == 10 and (instanceDiff % 2 == 0) then
                     addon:info(L.StrNewRaidSessionChange)
-                    Raid:Create(instanceName, 25)
+                    module:Create(instanceName, 25)
                 elseif current.size == 25 and (instanceDiff % 2 ~= 0) then
                     addon:info(L.StrNewRaidSessionChange)
-                    Raid:Create(instanceName, 10)
+                    module:Create(instanceName, 10)
                 end
             end
         elseif (instanceDiff % 2 == 0) then
             addon:info(L.StrNewRaidSessionChange)
-            Raid:Create(instanceName, 25)
+            module:Create(instanceName, 25)
         elseif (instanceDiff % 2 ~= 0) then
             addon:info(L.StrNewRaidSessionChange)
-            Raid:Create(instanceName, 10)
+            module:Create(instanceName, 10)
         end
     end
 
     --
     -- Performs an initial raid check on player login.
     --
-    function Raid:FirstCheck()
+    function module:FirstCheck()
         Utils.unschedule(addon.Raid.FirstCheck)
         local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
         if count == 0 then return end
 
-        if KRT_CurrentRaid and Raid:CheckPlayer(unitName, KRT_CurrentRaid) then
+        if KRT_CurrentRaid and module:CheckPlayer(unitName, KRT_CurrentRaid) then
             Utils.schedule(2, addon.UpdateRaidRoster)
             return
         end
 
         local instanceName, instanceType, instanceDiff = GetInstanceInfo()
         if instanceType == "raid" then
-            Raid:Check(instanceName, instanceDiff)
+            module:Check(instanceName, instanceDiff)
             return
         end
     end
@@ -533,12 +531,12 @@ do
     --
     -- Adds a player to the raid log.
     --
-    function Raid:AddPlayer(t, raidNum)
+    function module:AddPlayer(t, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
         if not raidNum or not t or not t.name then return end
         local raid = KRT_Raids[raidNum]
         raid.playersByName = raid.playersByName or {}
-        local players = Raid:GetPlayers(raidNum)
+        local players = module:GetPlayers(raidNum)
         local found = false
         for i, p in ipairs(players) do
             if t.name == p.name then
@@ -560,7 +558,7 @@ do
     --
     -- Adds a boss kill to the active raid log.
     --
-    function Raid:AddBoss(bossName, manDiff, raidNum)
+    function module:AddBoss(bossName, manDiff, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
         if not raidNum or not bossName then return end
 
@@ -595,7 +593,7 @@ do
     --
     -- Adds a loot item to the active raid log.
     --
-    function Raid:AddLoot(msg, rollType, rollValue)
+    function module:AddLoot(msg, rollType, rollValue)
         -- Master Loot
         local player, itemLink, itemCount = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
         if not player then
@@ -660,9 +658,9 @@ do
     -- Player Count API
     --------------------------------------------------------------------------
 
-    function Raid:GetPlayerCount(name, raidNum)
+    function module:GetPlayerCount(name, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
-        local players = Raid:GetPlayers(raidNum)
+        local players = module:GetPlayers(raidNum)
         for i, p in ipairs(players) do
             if p.name == name then
                 return p.count or 0
@@ -671,7 +669,7 @@ do
         return 0
     end
 
-    function Raid:SetPlayerCount(name, value, raidNum)
+    function module:SetPlayerCount(name, value, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
 
         -- Prevent setting a negative count
@@ -690,28 +688,28 @@ do
         end
     end
 
-    function Raid:IncrementPlayerCount(name, raidNum)
-        if Raid:GetPlayerID(name, raidNum) == 0 then
+    function module:IncrementPlayerCount(name, raidNum)
+        if module:GetPlayerID(name, raidNum) == 0 then
             addon:error(L.ErrCannotFindPlayer:format(name))
             return
         end
 
-        local c = Raid:GetPlayerCount(name, raidNum)
-        Raid:SetPlayerCount(name, c + 1, raidNum)
+        local c = module:GetPlayerCount(name, raidNum)
+        module:SetPlayerCount(name, c + 1, raidNum)
     end
 
-    function Raid:DecrementPlayerCount(name, raidNum)
-        if Raid:GetPlayerID(name, raidNum) == 0 then
+    function module:DecrementPlayerCount(name, raidNum)
+        if module:GetPlayerID(name, raidNum) == 0 then
             addon:error(L.ErrCannotFindPlayer:format(name))
             return
         end
 
-        local c = Raid:GetPlayerCount(name, raidNum)
+        local c = module:GetPlayerCount(name, raidNum)
         if c <= 0 then
             addon:error(L.ErrPlayerCountBelowZero:format(name))
             return
         end
-        Raid:SetPlayerCount(name, c - 1, raidNum)
+        module:SetPlayerCount(name, c - 1, raidNum)
     end
 
     --------------------------------------------------------------------------
@@ -747,7 +745,7 @@ do
     --
     -- Checks if a raid log is expired (older than the weekly reset).
     --
-    function Raid:Expired(rID)
+    function module:Expired(rID)
         rID = rID or KRT_CurrentRaid
         if not rID or not KRT_Raids[rID] then
             return true
@@ -764,7 +762,7 @@ do
     --
     -- Retrieves all loot for a given raid and optional boss number.
     --
-    function Raid:GetLoot(raidNum, bossNum)
+    function module:GetLoot(raidNum, bossNum)
         local items = {}
         raidNum = raidNum or KRT_CurrentRaid
         bossNum = bossNum or 0
@@ -798,7 +796,7 @@ do
     --
     -- Retrieves the position of a specific loot item within the raid's loot table.
     --
-    function Raid:GetLootID(itemID, raidNum, holderName)
+    function module:GetLootID(itemID, raidNum, holderName)
         local pos = 0
         local loot = self:GetLoot(raidNum)
         holderName = holderName or unitName
@@ -815,7 +813,7 @@ do
     --
     -- Retrieves all boss kills for a given raid.
     --
-    function Raid:GetBosses(raidNum)
+    function module:GetBosses(raidNum)
         local bosses = {}
         raidNum = raidNum or KRT_CurrentRaid
         if raidNum and KRT_Raids[raidNum] then
@@ -847,7 +845,7 @@ do
     --
     -- Returns players from the raid log. Can be filtered by boss kill.
     --
-    function Raid:GetPlayers(raidNum, bossNum)
+    function module:GetPlayers(raidNum, bossNum)
         raidNum = raidNum or KRT_CurrentRaid
         local players = {}
         if raidNum and KRT_Raids[raidNum] then
@@ -873,9 +871,9 @@ do
     --
     -- Checks if a player is in the raid log.
     --
-    function Raid:CheckPlayer(name, raidNum)
+    function module:CheckPlayer(name, raidNum)
         local found = false
-        local players = Raid:GetPlayers(raidNum)
+        local players = module:GetPlayers(raidNum)
         local originalName = name
         if players ~= nil then
             name = ucfirst(name:trim())
@@ -896,7 +894,7 @@ do
     --
     -- Returns the player's internal ID from the raid log.
     --
-    function Raid:GetPlayerID(name, raidNum)
+    function module:GetPlayerID(name, raidNum)
         local id = 0
         raidNum = raidNum or KRT_CurrentRaid
         if raidNum and KRT_Raids[raidNum] then
@@ -915,7 +913,7 @@ do
     --
     -- Gets a player's name by their internal ID.
     --
-    function Raid:GetPlayerName(id, raidNum)
+    function module:GetPlayerName(id, raidNum)
         local name
         raidNum = raidNum or addon.History.selectedRaid or KRT_CurrentRaid
         if raidNum and KRT_Raids[raidNum] then
@@ -932,11 +930,11 @@ do
     --
     -- Returns a table of items looted by the selected player.
     --
-    function Raid:GetPlayerLoot(name, raidNum, bossNum)
+    function module:GetPlayerLoot(name, raidNum, bossNum)
         local items = {}
-        local loot = Raid:GetLoot(raidNum, bossNum)
+        local loot = module:GetLoot(raidNum, bossNum)
         local originalName = name
-        name = (type(name) == "number") and Raid:GetPlayerName(name) or name
+        name = (type(name) == "number") and module:GetPlayerName(name) or name
         for k, v in ipairs(loot) do
             if v.looter == name then
                 local info = v
@@ -951,7 +949,7 @@ do
     -- Gets a player's rank.
     --
     function addon:GetPlayerRank(name, raidNum)
-        local players = Raid:GetPlayers(raidNum)
+        local players = module:GetPlayers(raidNum)
         local rank = 0
         local originalName = name
         name = name or unitName or UnitName("player")
@@ -994,7 +992,7 @@ do
     -- Gets a player's unit ID (e.g., "raid1").
     --
     function addon:GetUnitID(name)
-        local players = Raid:GetPlayers()
+        local players = module:GetPlayers()
         local id = "none"
         local resolvedName = name
         if players then
@@ -1033,7 +1031,7 @@ do
     -- Clears all raid target icons.
     --
     function addon:ClearRaidIcons()
-        local players = Raid:GetPlayers()
+        local players = module:GetPlayers()
         for i, p in ipairs(players) do
             SetRaidTarget("raid" .. tostring(i), 0)
         end
@@ -1328,7 +1326,6 @@ do
     addon.Rolls = addon.Rolls or {}
     local module = addon.Rolls
     local L = addon.L
-    local Rolls = module
     local frameName
 
     -------------------------------------------------------
@@ -1729,7 +1726,6 @@ do
     addon.Loot = addon.Loot or {}
     local module = addon.Loot
     local L = addon.L
-    local Loot = module
     local frameName
 
     -------------------------------------------------------
@@ -1949,7 +1945,6 @@ do
     addon.Master = addon.Master or {}
     local module = addon.Master
     local L = addon.L
-    local Master = module
     local frameName
 
     -------------------------------------------------------
@@ -1985,7 +1980,7 @@ do
     -------------------------------------------------------
 
     -- OnLoad frame:
-    function Master:OnLoad(frame)
+    function module:OnLoad(frame)
         if not frame then return end
         UIMaster = frame
         addon.UIMaster = frame
@@ -2000,14 +1995,14 @@ do
     --
     -- Toggles the visibility of the Master Looter frame.
     --
-    function Master:Toggle()
+    function module:Toggle()
         Utils.toggle(UIMaster)
     end
 
     --
     -- Hides the Master Looter frame.
     --
-    function Master:Hide()
+    function module:Hide()
         if UIMaster and UIMaster:IsShown() then
             UIMaster:Hide()
         end
@@ -2016,7 +2011,7 @@ do
     --
     -- Button: Select/Remove Item
     --
-    function Master:BtnSelectItem(btn)
+    function module:BtnSelectItem(btn)
         if btn == nil or lootCount <= 0 then return end
         if fromInventory == true then
             addon:ClearLoot()
@@ -2033,7 +2028,7 @@ do
     --
     -- Button: Spam Loot Links or Do Ready Check
     --
-    function Master:BtnSpamLoot(btn)
+    function module:BtnSpamLoot(btn)
         if btn == nil or lootCount <= 0 then return end
         if fromInventory == true then
             addon:Announce(L.ChatReadyCheck)
@@ -2052,14 +2047,14 @@ do
     --
     -- Button: Open Reserves List
     --
-    function Master:BtnOpenReserves(btn)
+    function module:BtnOpenReserves(btn)
         addon.Reserves:ShowWindow()
     end
 
     --
     -- Button: Import Reserves
     --
-    function Master:BtnImportReserves(btn)
+    function module:BtnImportReserves(btn)
         addon.Reserves:ShowImportBox()
     end
 
@@ -2096,19 +2091,19 @@ do
         end
     end
 
-    function Master:BtnMS(btn)
+    function module:BtnMS(btn)
         return AnnounceRoll(1, "ChatRollMS")
     end
 
-    function Master:BtnOS(btn)
+    function module:BtnOS(btn)
         return AnnounceRoll(2, "ChatRollOS")
     end
 
-    function Master:BtnSR(btn)
+    function module:BtnSR(btn)
         return AnnounceRoll(3, "ChatRollSR")
     end
 
-    function Master:BtnFree(btn)
+    function module:BtnFree(btn)
         return AnnounceRoll(4, "ChatRollFree")
     end
 
@@ -2116,7 +2111,7 @@ do
     -- Button: Starts or stops the roll countdown.
     --
 
-    function Master:BtnCountdown(btn)
+    function module:BtnCountdown(btn)
         if countdownRun then
             addon:RecordRolls(false)
             countdownRun = false
@@ -2132,7 +2127,7 @@ do
     --
     -- Button: Clear Rolls
     --
-    function Master:BtnClear(btn)
+    function module:BtnClear(btn)
         announced = false
         return addon:ClearRolls()
     end
@@ -2140,7 +2135,7 @@ do
     --
     -- Button: Award/Trade
     --
-    function Master:BtnAward(btn)
+    function module:BtnAward(btn)
         if lootCount <= 0 or rollsCount <= 0 then
             addon:Debug("DEBUG", "Cannot award, lootCount=%d, rollsCount=%d", lootCount or 0, rollsCount or 0)
             return
@@ -2157,7 +2152,7 @@ do
     --
     -- Button: Hold item
     --
-    function Master:BtnHold(btn)
+    function module:BtnHold(btn)
         if lootCount <= 0 or holder == nil then return end
         countdownRun = false
         local itemLink = GetItemLink()
@@ -2172,7 +2167,7 @@ do
     --
     -- Button: Bank item
     --
-    function Master:BtnBank(btn)
+    function module:BtnBank(btn)
         if lootCount <= 0 or banker == nil then return end
         countdownRun = false
         local itemLink = GetItemLink()
@@ -2187,7 +2182,7 @@ do
     --
     -- Button: Disenchant item
     --
-    function Master:BtnDisenchant(btn)
+    function module:BtnDisenchant(btn)
         if lootCount <= 0 or disenchanter == nil then return end
         countdownRun = false
         local itemLink = GetItemLink()
@@ -2202,7 +2197,7 @@ do
     --
     -- Selects a winner from the roll list.
     --
-    function Master:SelectWinner(btn)
+    function module:SelectWinner(btn)
         if not btn then return end
         local btnName = btn:GetName()
         local player = _G[btnName .. "Name"]:GetText()
@@ -2222,7 +2217,7 @@ do
     --
     -- Selects an item from the item selection frame.
     --
-    function Master:BtnSelectedItem(btn)
+    function module:BtnSelectedItem(btn)
         if not btn then return end
         local index = btn:GetID()
         if index ~= nil then
@@ -2359,7 +2354,7 @@ do
                 info.hasArrow     = false
                 info.notCheckable = 1
                 info.text         = key
-                info.func         = Master.OnClickDropDown
+                info.func         = module.OnClickDropDown
                 info.arg1         = UIDROPDOWNMENU_OPEN_MENU
                 info.arg2         = key
                 UIDropDownMenu_AddButton(info, UIDROPDOWNMENU_MENU_LEVEL)
@@ -2400,7 +2395,7 @@ do
     --
     -- OnClick handler for dropdown menu items.
     --
-    function Master:OnClickDropDown(owner, value)
+    function module:OnClickDropDown(owner, value)
         if not KRT_CurrentRaid then return end
         UIDropDownMenu_SetText(owner, value)
         UIDropDownMenu_SetSelectedValue(owner, value)
@@ -2928,7 +2923,6 @@ do
     addon.Reserves = addon.Reserves or {}
     local module = addon.Reserves
     local L = addon.L
-    local Reserves = module
 
     -------------------------------------------------------
     -- Internal state
@@ -2962,13 +2956,13 @@ do
     -- Saved Data Management
     --------------------------------------------------------------------------
 
-    function Reserves:Save()
+    function module:Save()
         addon:Debug("DEBUG", "Saving reserves data. Entries: %d", Utils.tableLen(reservesData))
         KRT_SavedReserves = table.deepCopy(reservesData)
         KRT_SavedReserves.reservesByItemID = table.deepCopy(reservesByItemID)
     end
 
-    function Reserves:Load()
+    function module:Load()
         addon:Debug("DEBUG", "Loading reserves. Data exists: %s", tostring(KRT_SavedReserves ~= nil))
         if KRT_SavedReserves then
             reservesData = table.deepCopy(KRT_SavedReserves)
@@ -2979,7 +2973,7 @@ do
         end
     end
 
-    function Reserves:ResetSaved()
+    function module:ResetSaved()
         addon:Debug("DEBUG", "Resetting saved reserves data.")
         KRT_SavedReserves = nil
         wipe(reservesData)
@@ -2989,7 +2983,7 @@ do
         addon:info(L.StrReserveListCleared)
     end
 
-    function Reserves:HasData()
+    function module:HasData()
         return next(reservesData) ~= nil
     end
 
@@ -2997,7 +2991,7 @@ do
     -- UI Window Management
     --------------------------------------------------------------------------
 
-    function Reserves:ShowWindow()
+    function module:ShowWindow()
         if not reserveListFrame then
             addon:error("Reserve List frame not available.")
             return
@@ -3006,12 +3000,12 @@ do
         reserveListFrame:Show()
     end
 
-    function Reserves:CloseWindow()
+    function module:CloseWindow()
         addon:Debug("DEBUG", "Closing reserve list window.")
         if reserveListFrame then reserveListFrame:Hide() end
     end
 
-    function Reserves:ShowImportBox()
+    function module:ShowImportBox()
         addon:Debug("DEBUG", "Opening import reserves box.")
         local frame = _G["KRTImportWindow"]
         if not frame then
@@ -3025,7 +3019,7 @@ do
         _G[frame:GetName() .. "Title"]:SetText(format(titleString, L.StrImportReservesTitle))
     end
 
-    function Reserves:OnLoad(frame)
+    function module:OnLoad(frame)
         addon:Debug("DEBUG", "Reserves frame loaded.")
         reserveListFrame = frame
         frameName = frame:GetName()
@@ -3094,14 +3088,14 @@ do
             addon:Debug("DEBUG", "Periodic check passed for %s", frameName)
             local clearButton = _G[frameName .. "ClearButton"]
             if clearButton then
-                local hasData = Reserves:HasData()
+                local hasData = module:HasData()
                 Utils.enableDisable(clearButton, hasData)
                 addon:Debug("DEBUG", "ClearButton %s (HasData: %s)", hasData and "enabled" or "disabled", hasData)
             end
 
             local queryButton = _G[frameName .. "QueryButton"]
             if queryButton then
-                local hasData = Reserves:HasData()
+                local hasData = module:HasData()
                 Utils.enableDisable(queryButton, hasData)
                 addon:Debug("DEBUG", "QueryButton %s (HasData: %s)", hasData and "enabled" or "disabled", hasData)
             end
@@ -3112,7 +3106,7 @@ do
     -- Reserve Data Handling
     --------------------------------------------------------------------------
 
-    function Reserves:GetReserve(playerName)
+    function module:GetReserve(playerName)
         local player = playerName:lower():trim()
         local reserve = reservesData[player]
 
@@ -3127,13 +3121,13 @@ do
     end
 
     -- Get all reserves:
-    function Reserves:GetAllReserves()
+    function module:GetAllReserves()
         addon:Debug("DEBUG", "Fetching all reserves. Total players with reserves: %d", Utils.tableLen(reservesData))
         return reservesData
     end
 
     -- Parse imported text
-    function Reserves:ParseCSV(csv)
+    function module:ParseCSV(csv)
         addon:Debug("DEBUG", "Starting to parse CSV data.")
         wipe(reservesData)
         wipe(reservesByItemID)
@@ -3214,7 +3208,7 @@ do
     -- Item Info Querying
     --------------------------------------------------------------------------
 
-    function Reserves:QueryItemInfo(itemId)
+    function module:QueryItemInfo(itemId)
         if not itemId then return end
         addon:Debug("DEBUG", "Querying info for itemId: %d", itemId)
         local name, link, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
@@ -3232,7 +3226,7 @@ do
     end
 
     -- Query all missing items for reserves
-    function Reserves:QueryMissingItems()
+    function module:QueryMissingItems()
         local count = 0
         addon:Debug("DEBUG", "Querying missing items in reserves.")
         for _, player in pairs(reservesData) do
@@ -3252,7 +3246,7 @@ do
     end
 
     -- Update reserve item data
-    function Reserves:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
+    function module:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
         addon:Debug("DEBUG", "Updating reserve item data for itemId: %d", itemId)
         for _, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
@@ -3298,7 +3292,7 @@ do
     end
 
     -- Get reserve count for a specific item for a player
-    function Reserves:GetReserveCountForItem(itemId, playerName)
+    function module:GetReserveCountForItem(itemId, playerName)
         local normalized = playerName and playerName:lower()
         local entry = reservesData[normalized]
         if not entry then return 0 end
@@ -3318,7 +3312,7 @@ do
     -- UI Display
     --------------------------------------------------------------------------
 
-    function Reserves:RefreshWindow()
+    function module:RefreshWindow()
         addon:Debug("DEBUG", "Refreshing reserve window.")
         if not reserveListFrame or not scrollChild then return end
 
@@ -3402,7 +3396,7 @@ do
                     collapsedBossGroups[source] = not collapsedBossGroups[source]
                     addon:Debug("DEBUG", "Toggling collapse state for source: %s to %s", source,
                         tostring(collapsedBossGroups[source]))
-                    Reserves:RefreshWindow()
+                    module:RefreshWindow()
                 end)
 
                 tinsert(reserveItemRows, headerBtn)
@@ -3412,7 +3406,7 @@ do
             -- Log for rows that are added
             if not collapsedBossGroups[source] then
                 addon:Debug("DEBUG", "Adding row for itemId: %d, source: %s", entry.itemId, source)
-                local row = Reserves:CreateReserveRow(scrollChild, entry, yOffset, index)
+                local row = module:CreateReserveRow(scrollChild, entry, yOffset, index)
                 tinsert(reserveItemRows, row)
                 yOffset = yOffset + rowHeight
             end
@@ -3424,7 +3418,7 @@ do
     end
 
     -- Create a new row for displaying a reserve
-    function Reserves:CreateReserveRow(parent, info, yOffset, index)
+    function module:CreateReserveRow(parent, info, yOffset, index)
         addon:Debug("DEBUG", "Creating reserve row for itemId: %d", info.itemId)
         local row = CreateFrame("Frame", nil, parent)
         row:SetSize(320, 34)
@@ -3498,7 +3492,7 @@ do
     -- SR Announcement Formatting
     --------------------------------------------------------------------------
 
-    function Reserves:GetPlayersForItem(itemId)
+    function module:GetPlayersForItem(itemId)
         addon:Debug("DEBUG", "Getting players for itemId: %d", itemId)
         local players = {}
         -- Loop through each player and their reserves
@@ -3518,7 +3512,7 @@ do
         return players
     end
 
-    function Reserves:FormatReservedPlayersLine(itemId)
+    function module:FormatReservedPlayersLine(itemId)
         addon:Debug("DEBUG", "Formatting reserved players line for itemId: %d", itemId)
         local list = self:GetPlayersForItem(itemId)
         -- Log the list of players found for the item
@@ -3537,7 +3531,6 @@ do
     addon.Config = addon.Config or {}
     local module = addon.Config
     local L = addon.L
-    local Config = module
     local frameName
 
     -------------------------------------------------------
@@ -3615,14 +3608,14 @@ do
     --
     -- Public method to reset options to default.
     --
-    function Config:Default()
+    function module:Default()
         return LoadDefaultOptions()
     end
 
     --
     -- OnLoad handler for the configuration frame.
     --
-    function Config:OnLoad(frame)
+    function module:OnLoad(frame)
         if not frame then return end
         UIConfig = frame
         frameName = frame:GetName()
@@ -3633,14 +3626,14 @@ do
     --
     -- Toggles the visibility of the configuration frame.
     --
-    function Config:Toggle()
+    function module:Toggle()
         Utils.toggle(UIConfig)
     end
 
     --
     -- Hides the configuration frame.
     --
-    function Config:Hide()
+    function module:Hide()
         if UIConfig and UIConfig:IsShown() then
             UIConfig:Hide()
         end
@@ -3649,7 +3642,7 @@ do
     --
     -- OnClick handler for option controls.
     --
-    function Config:OnClick(btn)
+    function module:OnClick(btn)
         if not btn then return end
         frameName = frameName or btn:GetParent():GetName()
         local value, name = nil, btn:GetName()
@@ -3748,7 +3741,6 @@ do
     addon.Warnings = addon.Warnings or {}
     local module = addon.Warnings
     local L = addon.L
-    local Warnings = module
     local frameName
 
     -------------------------------------------------------
@@ -3778,7 +3770,7 @@ do
     local isEdit = false
 
     -- OnLoad frame:
-    function Warnings:OnLoad(frame)
+    function module:OnLoad(frame)
         if not frame then return end
         UIWarnings = frame
         frameName = frame:GetName()
@@ -3787,24 +3779,24 @@ do
     end
 
     -- Externally update frame:
-    function Warnings:Update()
+    function module:Update()
         return FetchWarnings()
     end
 
     -- Toggle frame visibility:
-    function Warnings:Toggle()
+    function module:Toggle()
         Utils.toggle(UIWarnings)
     end
 
     -- Hide frame:
-    function Warnings:Hide()
+    function module:Hide()
         if UIWarnings and UIWarnings:IsShown() then
             UIWarnings:Hide()
         end
     end
 
     -- Warning selection:
-    function Warnings:Select(btn)
+    function module:Select(btn)
         if btn == nil or isEdit == true then return end
         local bName = btn:GetName()
         local wID = tonumber(_G[bName .. "ID"]:GetText())
@@ -3818,7 +3810,7 @@ do
     end
 
     -- Edit/Save warning:
-    function Warnings:Edit()
+    function module:Edit()
         local wName, wContent
         if selectedID ~= nil then
             local w = KRT_Warnings[selectedID]
@@ -3840,7 +3832,7 @@ do
     end
 
     -- Delete Warning:
-    function Warnings:Delete(btn)
+    function module:Delete(btn)
         if btn == nil or selectedID == nil then return end
         local oldWarnings = {}
         for i, w in ipairs(KRT_Warnings) do
@@ -3863,7 +3855,7 @@ do
     end
 
     -- Announce Warning:
-    function Warnings:Announce(wID)
+    function module:Announce(wID)
         if KRT_Warnings == nil then return end
         if wID == nil then
             wID = (selectedID ~= nil) and selectedID or tempSelectedID
@@ -3874,7 +3866,7 @@ do
     end
 
     -- Cancel editing/adding:
-    function Warnings:Cancel()
+    function module:Cancel()
         _G[frameName .. "Name"]:SetText("")
         _G[frameName .. "Name"]:ClearFocus()
         _G[frameName .. "Content"]:SetText("")
@@ -3893,10 +3885,10 @@ do
             _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelp)
         end
         _G[frameName .. "Title"]:SetText(format(titleString, RAID_WARNING))
-        _G[frameName .. "Name"]:SetScript("OnEscapePressed", Warnings.Cancel)
-        _G[frameName .. "Content"]:SetScript("OnEscapePressed", Warnings.Cancel)
-        _G[frameName .. "Name"]:SetScript("OnEnterPressed", Warnings.Edit)
-        _G[frameName .. "Content"]:SetScript("OnEnterPressed", Warnings.Edit)
+        _G[frameName .. "Name"]:SetScript("OnEscapePressed", module.Cancel)
+        _G[frameName .. "Content"]:SetScript("OnEscapePressed", module.Cancel)
+        _G[frameName .. "Name"]:SetScript("OnEnterPressed", module.Edit)
+        _G[frameName .. "Content"]:SetScript("OnEnterPressed", module.Edit)
         localized = true
     end
 
@@ -3955,11 +3947,11 @@ do
         _G[frameName .. "Name"]:ClearFocus()
         _G[frameName .. "Content"]:SetText("")
         _G[frameName .. "Content"]:ClearFocus()
-        Warnings:Cancel()
-        Warnings:Update()
+        module:Cancel()
+        module:Update()
     end
 
-    -- Fetch Warnings:
+    -- Fetch module:
     function FetchWarnings()
         local scrollFrame = _G[frameName .. "ScrollFrame"]
         local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
@@ -3991,7 +3983,6 @@ do
     addon.Changes = addon.Changes or {}
     local module = addon.Changes
     local L = addon.L
-    local Changes = module
     local frameName
 
     -------------------------------------------------------
@@ -4019,7 +4010,7 @@ do
     -------------------------------------------------------
 
     -- OnLoad frame:
-    function Changes:OnLoad(frame)
+    function module:OnLoad(frame)
         if not frame then return end
         UIChanges = frame
         frameName = frame:GetName()
@@ -4028,21 +4019,21 @@ do
     end
 
     -- Toggle frame visibility:
-    function Changes:Toggle()
+    function module:Toggle()
         CancelChanges()
         Utils.toggle(UIChanges)
     end
 
     -- Hide frame:
-    function Changes:Hide()
+    function module:Hide()
         if UIChanges and UIChanges:IsShown() then
             CancelChanges()
             UIChanges:Hide()
         end
     end
 
-    -- Clear Changes:
-    function Changes:Clear()
+    -- Clear module:
+    function module:Clear()
         if not KRT_CurrentRaid or changesTable == nil then return end
         for n, p in pairs(changesTable) do
             changesTable[n] = nil
@@ -4055,7 +4046,7 @@ do
     end
 
     -- Selecting Player:
-    function Changes:Select(btn)
+    function module:Select(btn)
         -- No selection.
         if not btn then return end
         local btnName = btn:GetName()
@@ -4086,7 +4077,7 @@ do
     end
 
     -- Add / Delete:
-    function Changes:Add(btn)
+    function module:Add(btn)
         if not KRT_CurrentRaid or not btn then return end
         if not selectedID then
             btn:Hide()
@@ -4104,7 +4095,7 @@ do
     end
 
     -- Edit / Save
-    function Changes:Edit()
+    function module:Edit()
         if not KRT_CurrentRaid then return end
         if not selectedID or isEdit then
             local name = _G[frameName .. "Name"]:GetText()
@@ -4121,7 +4112,7 @@ do
     end
 
     -- Remove player's change:
-    function Changes:Delete(name)
+    function module:Delete(name)
         if not KRT_CurrentRaid or not name then return end
         KRT_Raids[KRT_CurrentRaid].changes[name] = nil
         if _G[frameName .. "PlayerBtn" .. name] then
@@ -4130,18 +4121,18 @@ do
     end
 
     Utils.registerCallback("RaidLeave", function(e, name)
-        Changes:Delete(name)
+        module:Delete(name)
         CancelChanges()
     end)
 
-    -- Ask For Changes:
-    function Changes:Demand()
+    -- Ask For module:
+    function module:Demand()
         if not KRT_CurrentRaid then return end
         addon:Announce(L.StrChangesDemand)
     end
 
-    -- Spam Changes:
-    function Changes:Announce()
+    -- Spam module:
+    function module:Announce()
         if not KRT_CurrentRaid then return end
         -- In case of a reload/relog and the frame wasn't loaded
         if not fetched or #changesTable == 0 then
@@ -4184,8 +4175,8 @@ do
             _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
         end
         _G[frameName .. "Title"]:SetText(format(titleString, L.StrChanges))
-        _G[frameName .. "Name"]:SetScript("OnEnterPressed", Changes.Edit)
-        _G[frameName .. "Spec"]:SetScript("OnEnterPressed", Changes.Edit)
+        _G[frameName .. "Name"]:SetScript("OnEnterPressed", module.Edit)
+        _G[frameName .. "Spec"]:SetScript("OnEnterPressed", module.Edit)
         _G[frameName .. "Name"]:SetScript("OnEscapePressed", CancelChanges)
         _G[frameName .. "Spec"]:SetScript("OnEscapePressed", CancelChanges)
         localized = true
@@ -4231,7 +4222,7 @@ do
         changesTable = KRT_CurrentRaid and KRT_Raids[KRT_CurrentRaid].changes or {}
     end
 
-    -- Fetch All Changes:
+    -- Fetch All module:
     function FetchChanges()
         addon:Debug("DEBUG", "Fetching all changes.")
         if not KRT_CurrentRaid then return end
@@ -4257,7 +4248,7 @@ do
         fetched = true
     end
 
-    -- Save Changes:
+    -- Save module:
     function SaveChanges(name, spec)
         if not KRT_CurrentRaid or not name then return end
         name = ucfirst(name:trim())
@@ -4296,7 +4287,6 @@ do
     addon.Spammer = addon.Spammer or {}
     local module = addon.Spammer
     local L = addon.L
-    local Spammer = module
 
     -------------------------------------------------------
     -- Internal state
@@ -4340,7 +4330,7 @@ do
     local ceil = math.ceil
 
     -- OnLoad frame:
-    function Spammer:OnLoad(frame)
+    function module:OnLoad(frame)
         if not frame then return end
         UISpammer = frame
         frameName = frame:GetName()
@@ -4349,19 +4339,19 @@ do
     end
 
     -- Toggle frame visibility:
-    function Spammer:Toggle()
+    function module:Toggle()
         Utils.toggle(UISpammer)
     end
 
     -- Hide frame:
-    function Spammer:Hide()
+    function module:Hide()
         if UISpammer and UISpammer:IsShown() then
             UISpammer:Hide()
         end
     end
 
     -- Save edit box:-
-    function Spammer:Save(box)
+    function module:Save(box)
         if not box then return end
         local boxName = box:GetName()
         local target = gsub(boxName, frameName, "")
@@ -4386,7 +4376,7 @@ do
     end
 
     -- Start spamming:
-    function Spammer:Start()
+    function module:Start()
         if strlen(finalOutput) > 3 and strlen(finalOutput) <= 255 then
             if paused then
                 paused = false
@@ -4397,25 +4387,25 @@ do
                 duration = tonumber(duration) or addon.options.lfmPeriod
                 tickPos = (duration >= 1 and duration or addon.options.lfmPeriod) + 1
                 ticking = true
-                -- Spammer:Spam()
+                -- module:Spam()
             end
         end
     end
 
     -- Stop spamming:
-    function Spammer:Stop()
+    function module:Stop()
         _G[frameName .. "Tick"]:SetText(duration or 0)
         ticking = false
         paused = false
     end
 
     -- Pausing spammer
-    function Spammer:Pause()
+    function module:Pause()
         paused = true
     end
 
     -- Send spam message:
-    function Spammer:Spam()
+    function module:Spam()
         if strlen(finalOutput) > 255 then
             addon:error(L.StrSpammerErrLength)
             ticking = false
@@ -4435,7 +4425,7 @@ do
     end
 
     -- Tab move between edit boxes:
-    function Spammer:Tab(a, b)
+    function module:Tab(a, b)
         local target
         if IsShiftKeyDown() and _G[frameName .. b] ~= nil then
             target = _G[frameName .. b]
@@ -4446,14 +4436,14 @@ do
     end
 
     -- Clears Data
-    function Spammer:Clear()
+    function module:Clear()
         for k, _ in pairs(KRT_Spammer) do
             if k ~= "Channels" and k ~= "Duration" then
                 KRT_Spammer[k] = nil
             end
         end
         message, output, finalOutput = nil, "LFM", ""
-        Spammer:Stop()
+        module:Stop()
         _G[frameName .. "Name"]:SetText("")
         _G[frameName .. "Tank"]:SetText("")
         _G[frameName .. "TankClass"]:SetText("")
@@ -4476,7 +4466,7 @@ do
             _G[frameName .. "PreviewStr"]:SetText(L.StrSpammerPreviewStr)
         end
         _G[frameName .. "Title"]:SetText(format(titleString, L.StrSpammer))
-        _G[frameName .. "StartBtn"]:SetScript("OnClick", Spammer.Start)
+        _G[frameName .. "StartBtn"]:SetScript("OnClick", module.Start)
 
         local durationBox = _G[frameName .. "Duration"]
         durationBox.tooltip_title = AUCTION_DURATION
@@ -4595,9 +4585,9 @@ do
                     if tickPos < 0 then tickPos = 0 end
                     if tickPos == 0 then
                         _G[frameName .. "Tick"]:SetText("")
-                        Spammer:Spam()
+                        module:Spam()
                         ticking = false
-                        Spammer:Start()
+                        module:Start()
                     end
                 end
             end
@@ -4923,15 +4913,14 @@ do
     addon.History = addon.History or {}
     local module = addon.History
     local L = addon.L
-    local History = module
 
     -------------------------------------------------------
     -- Internal state
     -------------------------------------------------------
     local frameName, localized, updateInterval = nil, false, 0.05
 
-    History.selectedRaid, History.selectedBoss = nil, nil
-    History.selectedPlayer, History.selectedBossPlayer, History.selectedItem = nil, nil, nil
+    module.selectedRaid, module.selectedBoss = nil, nil
+    module.selectedPlayer, module.selectedBossPlayer, module.selectedItem = nil, nil, nil
 
     -------------------------------------------------------
     -- Private helpers
@@ -4941,7 +4930,7 @@ do
     -- Public methods
     -------------------------------------------------------
 
-    function History:OnLoad(frame)
+    function module:OnLoad(frame)
         if not frame then return end
         UIHistory, frameName = frame, frame:GetName() -- UIHistory globale per XML
         frame:RegisterForDrag("LeftButton")
@@ -4950,21 +4939,21 @@ do
                 _G[frameName .. "Title"]:SetText(string.format(titleString, L.StrLootHistory))
                 localized = true
             end
-            if Utils.throttle(self, frameName, updateInterval, elapsed) and History.selectedRaid == nil then
-                History.selectedRaid = KRT_CurrentRaid
+            if Utils.throttle(self, frameName, updateInterval, elapsed) and module.selectedRaid == nil then
+                module.selectedRaid = KRT_CurrentRaid
             end
         end)
         frame:SetScript("OnHide", function()
-            History.selectedRaid, History.selectedBoss, History.selectedPlayer, History.selectedItem =
+            module.selectedRaid, module.selectedBoss, module.selectedPlayer, module.selectedItem =
                 KRT_CurrentRaid, nil, nil, nil
         end)
     end
 
-    function History:Toggle() Utils.toggle(UIHistory) end
+    function module:Toggle() Utils.toggle(UIHistory) end
 
-    function History:Hide()
+    function module:Hide()
         if not UIHistory then return end
-        History.selectedRaid, History.selectedBoss, History.selectedPlayer, History.selectedItem =
+        module.selectedRaid, module.selectedBoss, module.selectedPlayer, module.selectedItem =
             KRT_CurrentRaid, nil, nil, nil
         Utils.showHide(UIHistory, false)
     end
@@ -4975,28 +4964,28 @@ do
         Utils.triggerEvent(ev, id)
     end
     -- select a raid and notify listeners
-    function History:SelectRaid(btn)
+    function module:SelectRaid(btn)
         if btn then
             sel("selectedRaid", btn:GetID(), "HistorySelectRaid")
         end
     end
 
     -- select a boss and notify listeners
-    function History:SelectBoss(btn)
+    function module:SelectBoss(btn)
         if btn then
             sel("selectedBoss", btn:GetID(), "HistorySelectBoss")
         end
     end
 
     -- select a player within a boss kill
-    function History:SelectBossPlayer(btn)
+    function module:SelectBossPlayer(btn)
         if btn then
             sel("selectedBossPlayer", btn:GetID(), "HistorySelectBossPlayer")
         end
     end
 
     -- select a player and notify listeners
-    function History:SelectPlayer(btn)
+    function module:SelectPlayer(btn)
         if btn then
             sel("selectedPlayer", btn:GetID(), "HistorySelectPlayer")
         end
@@ -5013,7 +5002,7 @@ do
                 { text = L.StrEditItemRollValue, func = function() StaticPopup_Show("KRTHISTORY_ITEM_EDIT_VALUE") end },
             }, f, "cursor", 0, 0, "MENU")
         end
-        function History:SelectItem(btn, button)
+        function module:SelectItem(btn, button)
             if not btn then return end
             if button == "LeftButton" then
                 sel("selectedItem", btn:GetID(), "HistorySelectItem")
@@ -5092,7 +5081,7 @@ do
 end
 
 -- ============================================================================
--- History: Raids List
+-- module: Raids List
 -- ============================================================================
 do
     addon.History.Raids = addon.History.Raids or {}
@@ -5216,7 +5205,7 @@ do
 end
 
 -- ============================================================================
--- History: Boss List
+-- module: Boss List
 -- ============================================================================
 do
     addon.History.Boss = addon.History.Boss or {}
@@ -5324,7 +5313,7 @@ do
 end
 
 -- ============================================================================
--- History: Boss Attendees List
+-- module: Boss Attendees List
 -- ============================================================================
 do
     addon.History.BossAttendees = addon.History.BossAttendees or {}
@@ -5431,7 +5420,7 @@ do
 end
 
 -- ============================================================================
--- History: Raid Attendees List
+-- module: Raid Attendees List
 -- ============================================================================
 do
     addon.History.RaidAttendees = addon.History.RaidAttendees or {}
@@ -5526,7 +5515,7 @@ do
 end
 
 -- ============================================================================
--- History: Loot List
+-- module: Loot List
 -- ============================================================================
 do
     addon.History.Loot = addon.History.Loot or {}
@@ -5632,13 +5621,13 @@ do
         },
     }
 
-    function Loot:OnLoad(frame) controller:OnLoad(frame) end
+    function module:OnLoad(frame) controller:OnLoad(frame) end
 
-    function Loot:Fetch() controller:Fetch() end
+    function module:Fetch() controller:Fetch() end
 
-    function Loot:Sort(t) controller:Sort(t) end
+    function module:Sort(t) controller:Sort(t) end
 
-    function Loot:OnEnter(btn)
+    function module:OnEnter(btn)
         if not btn then return end
         local id = btn:GetParent():GetID()
         if not raidLoot[id] then return end
@@ -5655,7 +5644,7 @@ do
                 controller:Dirty()
             end
         end
-        function Loot:Delete() if addon.History.selectedItem then StaticPopup_Show("KRTHISTORY_DELETE_ITEM") end end
+        function module:Delete() if addon.History.selectedItem then StaticPopup_Show("KRTHISTORY_DELETE_ITEM") end end
 
         (controller._makeConfirmPopup)("KRTHISTORY_DELETE_ITEM", L.StrConfirmDeleteItem, DeleteItem)
     end
@@ -5677,7 +5666,7 @@ do
 end
 
 -- ============================================================================
--- History: Add/Edit Boss Popup
+-- module: Add/Edit Boss Popup
 -- ============================================================================
 do
     addon.History.BossBox = addon.History.BossBox or {}
@@ -5772,7 +5761,7 @@ do
 end
 
 -- ============================================================================
--- History: Add Attendee Popup
+-- module: Add Attendee Popup
 -- ============================================================================
 do
     addon.History.AttendeesBox = addon.History.AttendeesBox or {}
