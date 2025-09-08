@@ -37,20 +37,17 @@ KRT_PlayerCounts                        = KRT_PlayerCounts or {}
 ---============================================================================
 local LibStub = _G.LibStub
 if LibStub then
-    local libs = {
-        Compat          = "LibCompat-1.0",
-        Logger          = "LibLogger-1.0",
-        Deformat        = "LibDeformat-3.0",
-        BossIDs         = "LibBossIDs-1.0",
-        CallbackHandler = "CallbackHandler-1.0",
-    }
-    for field, name in pairs(libs) do
-        addon[field] = addon[field] or LibStub(name, true)
-    end
+    addon.Compat = addon.Compat or LibStub("LibCompat-1.0", true)
+    addon.Logger = addon.Logger or LibStub("LibLogger-1.0", true)
+    addon.Deformat = addon.Deformat or LibStub("LibDeformat-3.0", true)
+    addon.BossIDs = addon.BossIDs or LibStub("LibBossIDs-1.0", true)
+    addon.CallbackHandler = addon.CallbackHandler or LibStub("CallbackHandler-1.0", true)
+
+    if addon.Compat and addon.Compat.Embed then addon.Compat:Embed(addon) end
+    if addon.Logger and addon.Logger.Embed then addon.Logger:Embed(addon) end
 end
 
-if addon.Compat and addon.Compat.Embed then addon.Compat:Embed(addon) end
-if addon.Logger and addon.Logger.Embed then addon.Logger:Embed(addon) end
+local IsInRaid = addon.IsInRaid
 
 function addon:Debug(level, fmt, ...)
     if not self.Logger then return end
@@ -734,7 +731,7 @@ do
     --
     function module:GetRaidSize()
         local size = 0
-        if addon:IsInRaid() then
+        if IsInRaid() then
             local diff = GetRaidDifficulty()
             size = (diff == 1 or diff == 3) and 10 or 25
         end
@@ -1082,7 +1079,7 @@ do
         local originalChannel = channel
         if not channel then
             -- Switch to raid channel if we're in a raid:
-            if self:IsInRaid() then
+            if IsInRaid() then
                 -- Check for countdown messages
                 local countdownTicPattern = L.ChatCountdownTic:gsub("%%d", "%%d+")
                 local isCountdownMessage = text:find(countdownTicPattern) or text:find(L.ChatCountdownEnd)
