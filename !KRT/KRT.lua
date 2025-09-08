@@ -8,6 +8,10 @@ local addonName, addon                  = ...
 local L                                 = addon.L
 local Utils                             = addon.Utils
 
+local ITEM_LINK_PATTERN =
+    "|?c?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?" ..
+    "(%-?%d*):?(%-?%d*):?(%d*)|?h?%[?([^%[%]]*)%]?|?h?|?r?"
+
 local _G                                = _G
 _G["KRT"]                               = addon
 
@@ -621,8 +625,7 @@ do
         if not itemLink then return end
         local _, _, itemString = string.find(itemLink, "^|c%x+|H(.+)|h%[.*%]")
         local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
-        local _, _, _, _, itemId = string.find(itemLink,
-            "|?c?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?(%-?%d*):?(%-?%d*):?(%d*)|?h?%[?([^%[%]]*)%]?|?h?|?r?")
+        local _, _, _, _, itemId = string.find(itemLink, ITEM_LINK_PATTERN)
         itemId = tonumber(itemId)
 
         -- We don't proceed if lower than threshold or ignored.
@@ -1512,8 +1515,8 @@ do
 
         itemRollTracker[itemId] = itemRollTracker[itemId] or {}
         local used = itemRollTracker[itemId][name] or 0
-        local allowed = (currentRollType == rollTypes.RESERVED and addon.Reserves:GetReserveCountForItem(itemId, name) > 0)
-            and addon.Reserves:GetReserveCountForItem(itemId, name) or 1
+        local reserve = addon.Reserves:GetReserveCountForItem(itemId, name)
+        local allowed = (currentRollType == rollTypes.RESERVED and reserve > 0) and reserve or 1
         local result = used >= allowed
         addon:Debug("DEBUG", "DidRoll: name=%s, itemId=%d, used=%d, allowed=%d, result=%s", name, itemId, used, allowed,
             tostring(result))
@@ -1779,8 +1782,8 @@ do
     -- Adds an item to the loot table.
     --
     function module:AddItem(itemLink)
-        local itemName, _, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture =
-            GetItemInfo(itemLink)
+        local itemName, _, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType,
+            itemStackCount, itemEquipLoc, itemTexture = GetItemInfo(itemLink)
 
         if not itemName or not itemRarity then
             GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
@@ -2302,7 +2305,11 @@ do
                         if i % 10 == 0 then
                             addon:Announce(L.ChatCountdownTic:format(i))
                         end
-                    elseif ((i > 0 and i < 10 and i % 7 == 0) or (i > 0 and i >= 5 and i % 5 == 0) or (i > 0 and i <= 3)) then
+                    elseif (
+                        (i > 0 and i < 10 and i % 7 == 0) or
+                        (i > 0 and i >= 5 and i % 5 == 0) or
+                        (i > 0 and i <= 3)
+                    ) then
                         addon:Announce(L.ChatCountdownTic:format(i))
                     end
                     i = i - 1
@@ -4569,8 +4576,16 @@ do
                     _G[frameName .. "Duration"]:SetText(duration)
                 end
                 finalOutput = temp
-                Utils.setText(_G[frameName .. "StartBtn"], (paused and L.BtnResume or L.BtnStop), START, ticking == true)
-                Utils.enableDisable(_G[frameName .. "StartBtn"], (strlen(finalOutput) > 3 and strlen(finalOutput) <= 255))
+                Utils.setText(
+                    _G[frameName .. "StartBtn"],
+                    (paused and L.BtnResume or L.BtnStop),
+                    START,
+                    ticking == true
+                )
+                Utils.enableDisable(
+                    _G[frameName .. "StartBtn"],
+                    (strlen(finalOutput) > 3 and strlen(finalOutput) <= 255)
+                )
             end
 
             if ticking then
@@ -4997,9 +5012,24 @@ do
             local f = _G.KRTHistoryItemMenuFrame or
                 CreateFrame("Frame", "KRTHistoryItemMenuFrame", UIParent, "UIDropDownMenuTemplate")
             EasyMenu({
-                { text = L.StrEditItemLooter,    func = function() StaticPopup_Show("KRTHISTORY_ITEM_EDIT_WINNER") end },
-                { text = L.StrEditItemRollType,  func = function() StaticPopup_Show("KRTHISTORY_ITEM_EDIT_ROLL") end },
-                { text = L.StrEditItemRollValue, func = function() StaticPopup_Show("KRTHISTORY_ITEM_EDIT_VALUE") end },
+                {
+                    text = L.StrEditItemLooter,
+                    func = function()
+                        StaticPopup_Show("KRTHISTORY_ITEM_EDIT_WINNER")
+                    end
+                },
+                {
+                    text = L.StrEditItemRollType,
+                    func = function()
+                        StaticPopup_Show("KRTHISTORY_ITEM_EDIT_ROLL")
+                    end
+                },
+                {
+                    text = L.StrEditItemRollValue,
+                    func = function()
+                        StaticPopup_Show("KRTHISTORY_ITEM_EDIT_VALUE")
+                    end
+                },
             }, f, "cursor", 0, 0, "MENU")
         end
         function module:SelectItem(btn, button)
@@ -5144,8 +5174,9 @@ do
 
         postUpdate     = function(n)
             local sel = addon.History.selectedRaid
-            Utils.enableDisable(_G[n .. "CurrentBtn"],
-                (sel and sel ~= KRT_CurrentRaid and not addon.Raid:Expired(sel) and addon.Raid:GetRaidSize() == KRT_Raids[sel].size))
+            local canSetCurrent = sel and sel ~= KRT_CurrentRaid and not addon.Raid:Expired(sel) and
+                addon.Raid:GetRaidSize() == KRT_Raids[sel].size
+            Utils.enableDisable(_G[n .. "CurrentBtn"], canSetCurrent)
             Utils.enableDisable(_G[n .. "DeleteBtn"], (sel ~= KRT_CurrentRaid))
         end,
 
@@ -5397,7 +5428,9 @@ do
 
     do
         local function DeleteAttendee()
-            local rID, bID, pID = addon.History.selectedRaid, addon.History.selectedBoss, addon.History.selectedBossPlayer
+            local rID = addon.History.selectedRaid
+            local bID = addon.History.selectedBoss
+            local pID = addon.History.selectedBossPlayer
             if not (rID and bID and pID) then return end
             local raid = KRT_Raids[rID]; if not (raid and raid.bossKills[bID]) then return end
             local name = addon.Raid:GetPlayerName(pID, rID)
@@ -5506,7 +5539,11 @@ do
             for i = #raid.loot, 1, -1 do if raid.loot[i].looter == name then tremove(raid.loot, i) end end
             controller:Dirty()
         end
-        function M:Delete() if addon.History.selectedPlayer then StaticPopup_Show("KRTHISTORY_DELETE_RAIDATTENDEE") end end
+        function M:Delete()
+            if addon.History.selectedPlayer then
+                StaticPopup_Show("KRTHISTORY_DELETE_RAIDATTENDEE")
+            end
+        end
 
         (controller._makeConfirmPopup)("KRTHISTORY_DELETE_RAIDATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendee)
     end
