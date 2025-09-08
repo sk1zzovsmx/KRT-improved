@@ -86,11 +86,21 @@ end
 -- Debugger Module
 ---============================================================================
 do
-    local Debugger = {}
-    addon.Debugger = Debugger
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
+    addon.Debugger = addon.Debugger or {}
+    local module = addon.Debugger
+    local Debugger = module
 
+    -------------------------------------------------------
+    -- Internal state
+    -------------------------------------------------------
     local debugFrame, msgFrame
 
+    -------------------------------------------------------
+    -- Public methods
+    -------------------------------------------------------
     function Debugger:OnLoad(frame)
         if not frame then return end
         debugFrame = frame
@@ -291,12 +301,29 @@ end
 -- Manages raid state, roster, boss kills, and loot logging.
 ---============================================================================
 do
-    addon.Raid               = {}
-    local Raid               = addon.Raid
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
+    addon.Raid = addon.Raid or {}
+    local module = addon.Raid
+    local L = addon.L
+    local Raid = module
+
+    -------------------------------------------------------
+    -- Internal state
+    -------------------------------------------------------
     local inRaid             = false
     local numRaid            = 0
     local GetLootMethod      = GetLootMethod
     local GetRaidRosterInfo  = GetRaidRosterInfo
+
+    -------------------------------------------------------
+    -- Private helpers
+    -------------------------------------------------------
+
+    -------------------------------------------------------
+    -- Public methods
+    -------------------------------------------------------
 
     --------------------------------------------------------------------------
     -- History Functions
@@ -1011,6 +1038,9 @@ do
             SetRaidTarget("raid" .. tostring(i), 0)
         end
     end
+    -------------------------------------------------------
+    -- Event hooks
+    -------------------------------------------------------
 end
 
 ---============================================================================
@@ -1091,10 +1121,16 @@ end
 -- Minimap Button Module
 ---============================================================================
 do
-    addon.Minimap = {}
-    local MinimapBtn = addon.Minimap
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
+    addon.Minimap = addon.Minimap or {}
+    local module = addon.Minimap
+    local L = addon.L
 
-    -- Local variables
+    -------------------------------------------------------
+    -- 3. Internal state (non-exposed local variables)
+    -------------------------------------------------------
     local addonMenu
     local dragMode
 
@@ -1103,9 +1139,10 @@ do
     local cos, sin = math.cos, math.sin
     local rad, atan2, deg = math.rad, math.atan2, math.deg
 
-    --
+    -------------------------------------------------------
+    -- Private helpers
+    -------------------------------------------------------
     -- Initializes and opens the right-click menu for the minimap button.
-    --
     local function OpenMenu()
         local info = {}
         addonMenu = addonMenu or CreateFrame("Frame", "KRTMenu", UIParent, "UIDropDownMenuTemplate")
@@ -1188,9 +1225,7 @@ do
         ToggleDropDownMenu(1, nil, addonMenu, KRT_MINIMAP_GUI, 0, 0)
     end
 
-    --
     -- Moves the minimap button while dragging.
-    --
     local function moveButton(self)
         local centerX, centerY = Minimap:GetCenter()
         local x, y = GetCursorPosition()
@@ -1212,10 +1247,10 @@ do
         end
     end
 
-    --
-    -- OnLoad handler for the minimap button.
-    --
-    function MinimapBtn:SetPos(angle)
+    -------------------------------------------------------
+    -- Public methods
+    -------------------------------------------------------
+    function module:SetPos(angle)
         angle = angle % 360
         addon.options.minimapPos = angle
         local r = rad(angle)
@@ -1223,7 +1258,7 @@ do
         KRT_MINIMAP_GUI:SetPoint("CENTER", cos(r) * 80, sin(r) * 80)
     end
 
-    function MinimapBtn:OnLoad(btn)
+    function module:OnLoad(btn)
         if not btn then return end
         addon.options = addon.options or KRT_Options or {}
         KRT_MINIMAP_GUI:SetUserPlaced(true)
@@ -1243,7 +1278,7 @@ do
             self:SetScript("OnUpdate", nil)
             local mx, my = Minimap:GetCenter()
             local bx, by = self:GetCenter()
-            MinimapBtn:SetPos(deg(atan2(by - my, bx - mx)))
+            module:SetPos(deg(atan2(by - my, bx - mx)))
         end)
         KRT_MINIMAP_GUI:SetScript("OnClick", function(self, button, down)
             -- Ignore clicks if Shift or Alt keys are held:
@@ -1268,9 +1303,7 @@ do
         end)
     end
 
-    --
     -- Toggles the visibility of the minimap button.
-    --
     function addon:ToggleMinimapButton()
         self.options.minimapButton = not self.options.minimapButton
         if self.options.minimapButton then
@@ -1280,12 +1313,15 @@ do
         end
     end
 
-    --
     -- Hides the minimap button.
-    --
     function addon:HideMinimapButton()
         return KRT_MINIMAP_GUI:Hide()
     end
+
+    -------------------------------------------------------
+    -- Event hooks
+    -------------------------------------------------------
+    -- (none)
 end
 
 ---============================================================================
@@ -1293,18 +1329,26 @@ end
 -- Manages roll tracking, sorting, and winner determination.
 ---============================================================================
 do
-    addon.Rolls = {}
-    local Rolls = addon.Rolls
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
+    addon.Rolls = addon.Rolls or {}
+    local module = addon.Rolls
+    local L = addon.L
+    local Rolls = module
     local frameName
 
-    -- Roll state variables
+    -------------------------------------------------------
+    -- Internal state
+    -------------------------------------------------------
     local record, canRoll, warned = false, true, false
     local playerRollTracker, rollsTable, rerolled, itemRollTracker = {}, {}, {}, {}
     local selectedPlayer = nil
 
-    --
+    -------------------------------------------------------
+    -- Private helpers
+    -------------------------------------------------------
     -- Sorts the rollsTable either ascending or descending.
-    --
     local function SortRolls()
         if rollsTable ~= nil then
             table.sort(rollsTable, function(a, b)
@@ -1318,9 +1362,7 @@ do
         end
     end
 
-    --
     -- Adds a player's roll to the tracking tables.
-    --
     local function AddRoll(name, roll, itemId)
         roll = tonumber(roll)
         rollsCount = rollsCount + 1
@@ -1357,9 +1399,10 @@ do
         addon:FetchRolls()
     end
 
-    --
+    -------------------------------------------------------
+    -- Public methods
+    -------------------------------------------------------
     -- Initiates a /roll 1-100 for the player.
-    --
     function addon:Roll(btn)
         local itemId = self:GetCurrentRollItemID()
         if not itemId then return end
@@ -1383,9 +1426,7 @@ do
         playerRollTracker[itemId] = playerRollTracker[itemId] + 1
     end
 
-    --
     -- Returns the current roll session state.
-    --
     function addon:RollStatus()
         addon:Debug("DEBUG", "RollStatus queried: type=%s, record=%s, canRoll=%s, rolled=%s", tostring(currentRollType),
             tostring(record), tostring(canRoll), tostring(rolled))
@@ -1681,6 +1722,11 @@ do
         end
         addon:Debug("DEBUG", "FetchRolls completed. Total entries: %d", rollsCount)
     end
+
+    -------------------------------------------------------
+    -- Event hooks
+    -------------------------------------------------------
+    -- (none)
 end
 
 ---============================================================================
@@ -1688,12 +1734,28 @@ end
 -- Manages the loot window items (fetching from loot/inventory).
 ---============================================================================
 do
-    addon.Loot = {}
-    local Loot = addon.Loot
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
+    addon.Loot = addon.Loot or {}
+    local module = addon.Loot
+    local L = addon.L
+    local Loot = module
     local frameName
 
+    -------------------------------------------------------
+    -- Internal state
+    -------------------------------------------------------
     local lootTable = {}
     local currentItemIndex = 0
+
+    -------------------------------------------------------
+    -- Private helpers
+    -------------------------------------------------------
+
+    -------------------------------------------------------
+    -- Public methods
+    -------------------------------------------------------
 
     --
     -- Fetches items from the currently open loot window.
@@ -1886,16 +1948,27 @@ do
         tip:Hide()
         return false
     end
+    -------------------------------------------------------
+    -- Event hooks
+    -------------------------------------------------------
 end
 
 ---============================================================================
 -- Master Looter Frame Module
 ---============================================================================
 do
-    addon.Master = {}
-    local Master = addon.Master
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
+    addon.Master = addon.Master or {}
+    local module = addon.Master
+    local L = addon.L
+    local Master = module
     local frameName
 
+    -------------------------------------------------------
+    -- Internal state
+    -------------------------------------------------------
     local LocalizeUIFrame
     local localized = false
 
@@ -1916,6 +1989,14 @@ do
     local screenshotWarn = false
 
     local announced = false
+
+    -------------------------------------------------------
+    -- Private helpers
+    -------------------------------------------------------
+
+    -------------------------------------------------------
+    -- Public methods
+    -------------------------------------------------------
 
     -- OnLoad frame:
     function Master:OnLoad(frame)
@@ -2825,6 +2906,9 @@ do
     end
 
     -- Add a button to the master loot frame to open the loot counter UI
+    -------------------------------------------------------
+    -- Event hooks
+    -------------------------------------------------------
     local function SetupMasterLootFrameHooks()
         local f = _G["KRTMasterLootFrame"]
         if f and not f.KRT_LootCounterBtn then
@@ -2852,9 +2936,17 @@ end
 -- Manages item reserves, import, and display.
 ---============================================================================
 do
-    addon.Reserves = {}
-    local Reserves = addon.Reserves
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
+    addon.Reserves = addon.Reserves or {}
+    local module = addon.Reserves
+    local L = addon.L
+    local Reserves = module
 
+    -------------------------------------------------------
+    -- Internal state
+    -------------------------------------------------------
     -- UI Elements
     local frameName
     local reserveListFrame, scrollFrame, scrollChild
@@ -2867,6 +2959,14 @@ do
     local reservesByItemID = {}
     local pendingItemInfo = {}
     local collapsedBossGroups = {}
+
+    -------------------------------------------------------
+    -- Private helpers
+    -------------------------------------------------------
+
+    -------------------------------------------------------
+    -- Public methods
+    -------------------------------------------------------
 
     -- Local functions
     local LocalizeUIFrame
@@ -3439,26 +3539,41 @@ do
         addon:Debug("DEBUG", "Players for itemId %d: %s", itemId, table.concat(list, ", "))
         return #list > 0 and table.concat(list, ", ") or ""
     end
+    -------------------------------------------------------
+    -- Event hooks
+    -------------------------------------------------------
 end
 
 ---============================================================================
 -- Configuration Frame Module
 ---============================================================================
 do
-    addon.Config = {}
-    local Config = addon.Config
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
+    addon.Config = addon.Config or {}
+    local module = addon.Config
+    local L = addon.L
+    local Config = module
     local frameName
 
-    -- State variables
+    -------------------------------------------------------
+    -- Internal state
+    -------------------------------------------------------
     local localized = false
 
-    -- Frame update:
+    -- Frame update
     local UpdateUIFrame
     local updateInterval = 0.1
 
-    -- Local functions
+    -------------------------------------------------------
+    -- Private helpers
+    -------------------------------------------------------
     local LocalizeUIFrame
-    local UpdateUIFrame
+
+    -------------------------------------------------------
+    -- Public methods
+    -------------------------------------------------------
 
     --
     -- Default options for the addon.
@@ -3639,15 +3754,26 @@ do
             end
         end
     end
+    -------------------------------------------------------
+    -- Event hooks
+    -------------------------------------------------------
 end
 
 -- ==================== Warnings Frame ==================== --
 
 do
-    addon.Warnings = {}
-    local Warnings = addon.Warnings
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
+    addon.Warnings = addon.Warnings or {}
+    local module = addon.Warnings
+    local L = addon.L
+    local Warnings = module
     local frameName
 
+    -------------------------------------------------------
+    -- Internal state
+    -------------------------------------------------------
     local LocalizeUIFrame
     local localized = false
 
@@ -3656,6 +3782,14 @@ do
 
     local FetchWarnings
     local fetched = false
+
+    -------------------------------------------------------
+    -- Private helpers
+    -------------------------------------------------------
+
+    -------------------------------------------------------
+    -- Public methods
+    -------------------------------------------------------
 
     local selectedID, tempSelectedID
 
@@ -3866,15 +4000,26 @@ do
         end
         fetched = true
     end
+    -------------------------------------------------------
+    -- Event hooks
+    -------------------------------------------------------
 end
 
 -- ==================== MS Changes Frame ==================== --
 
 do
-    addon.Changes = {}
-    local Changes = addon.Changes
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
+    addon.Changes = addon.Changes or {}
+    local module = addon.Changes
+    local L = addon.L
+    local Changes = module
     local frameName
 
+    -------------------------------------------------------
+    -- Internal state
+    -------------------------------------------------------
     local LocalizeUIFrame
     local localized = false
 
@@ -3887,6 +4032,14 @@ do
     local selectedID, tempSelectedID
     local isAdd = false
     local isEdit = false
+
+    -------------------------------------------------------
+    -- Private helpers
+    -------------------------------------------------------
+
+    -------------------------------------------------------
+    -- Public methods
+    -------------------------------------------------------
 
     -- OnLoad frame:
     function Changes:OnLoad(frame)
@@ -4155,14 +4308,25 @@ do
         _G[frameName .. "Spec"]:SetText("")
         _G[frameName .. "Spec"]:ClearFocus()
     end
+    -------------------------------------------------------
+    -- Event hooks
+    -------------------------------------------------------
 end
 
 -- ==================== LFM Spam Frame ==================== --
 
 do
-    addon.Spammer = {}
-    local Spammer = addon.Spammer
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
+    addon.Spammer = addon.Spammer or {}
+    local module = addon.Spammer
+    local L = addon.L
+    local Spammer = module
 
+    -------------------------------------------------------
+    -- Internal state
+    -------------------------------------------------------
     local spamFrame = CreateFrame("Frame")
     local frameName
 
@@ -4171,6 +4335,14 @@ do
 
     local UpdateUIFrame
     local updateInterval = 0.05
+
+    -------------------------------------------------------
+    -- Private helpers
+    -------------------------------------------------------
+
+    -------------------------------------------------------
+    -- Public methods
+    -------------------------------------------------------
 
     local FindAchievement
 
@@ -4477,6 +4649,9 @@ do
     spamFrame:SetScript("OnUpdate", function(self, elapsed)
         if UISpammer then UpdateUIFrame(UISpammer, elapsed) end
     end)
+    -------------------------------------------------------
+    -- Event hooks
+    -------------------------------------------------------
 end
 
 -- Lightweight LFM scheduler
@@ -4771,13 +4946,29 @@ local function MakeListController(cfg)
 -- Loot History Frame (Main)
 -- ============================================================================
 do
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
     addon.History = addon.History or {}
-    local History = addon.History
+    local module = addon.History
+    local L = addon.L
+    local History = module
 
+    -------------------------------------------------------
+    -- Internal state
+    -------------------------------------------------------
     local frameName, localized, updateInterval = nil, false, 0.05
 
     History.selectedRaid, History.selectedBoss = nil, nil
     History.selectedPlayer, History.selectedBossPlayer, History.selectedItem = nil, nil, nil
+
+    -------------------------------------------------------
+    -- Private helpers
+    -------------------------------------------------------
+
+    -------------------------------------------------------
+    -- Public methods
+    -------------------------------------------------------
 
     function History:OnLoad(frame)
         if not frame then return end
@@ -5662,6 +5853,9 @@ do
 
         addon:error(L.ErrAttendeesInvalidName)
     end
+    -------------------------------------------------------
+    -- Event hooks
+    -------------------------------------------------------
 end
 
 ---============================================================================
