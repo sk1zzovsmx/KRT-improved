@@ -5,6 +5,30 @@ local Utils   = addon.Utils
 local L       = addon.L
 local Compat  = addon.Compat
 
+-- Embed LibCompat mixins onto Utils for convenience
+if Compat and Compat.Embed then
+       Compat:Embed(Utils) -- Utils.After, Utils.UnitIterator, Utils.Table, etc.
+end
+
+-- Back-compat/lightweight aliases
+Utils.getNpcId = Utils.GetCreatureId -- use LibCompat's creature id extractor
+
+-- Uniform color helper
+function Utils.colorText(text, r, g, b)
+       return Utils.WrapTextInColorCode(text, "ff" .. Utils.RGBPercToHex(r or 1, g or 0.82, b or 0))
+end
+
+-- Practical helper aliases
+function Utils.after(sec, fn) return Utils.After(sec, fn) end
+
+-- Group/pet iteration in one call
+function Utils.forEachGroupUnit(cb, includePets)
+       local iter, state, index = Utils.UnitIterator(not includePets and true or nil)
+       for unit, owner in iter, state, index do
+               cb(unit, owner)
+       end
+end
+
 local type, ipairs, pairs = type, ipairs, pairs
 local floor, random = math.floor, math.random
 
@@ -50,11 +74,6 @@ function Utils.throttleKey(key, sec)
                 last[key] = now
                 return true
         end
-end
-
--- Color helper (common usage)
-function Utils.colorText(text, r, g, b)
-        return ("|cff%02x%02x%02x%s|r"):format((r or 1) * 255, (g or 0.82) * 255, (b or 0) * 255, text)
 end
 
 -- ============================================================================
@@ -173,13 +192,6 @@ function Utils.rgbToHex(r, g, b)
                 return Compat.RGBToHex(r, g, b)
         end
         return format("%02x%02x%02x", r, g, b)
-end
-
-function Utils.wrapTextInColorCode(text, colorHexString)
-        if Compat and Compat.WrapTextInColorCode then
-                return Compat.WrapTextInColorCode(text, colorHexString)
-        end
-        return ("|c%s%s|r"):format(colorHexString, text)
 end
 
 function Utils.getClassColor(name)
@@ -506,16 +518,6 @@ function Utils.getDifficulty()
 		difficulty = GetRaidDifficulty()
 	end
 	return difficulty
-end
-
--- Returns the NPCID or nil:
-function Utils.getNpcId(GUID)
-	local first3 = tonumber("0x" .. strsub(GUID, 3, 5))
-	local unitType = bit.band(first3, 0x007)
-	if ((unitType == 0x003) or (unitType == 0x005)) then
-		return tonumber("0x" .. strsub(GUID, 9, 12))
-	end
-	return nil
 end
 
 -- Returns the current time:
