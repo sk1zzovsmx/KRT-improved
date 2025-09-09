@@ -68,6 +68,8 @@ local After         = addon.After
 local NewTicker     = addon.NewTicker
 local CancelTimer   = addon.CancelTimer
 local tLength       = addon.tLength
+local UnitIsGroupLeader = addon.UnitIsGroupLeader
+local UnitIsGroupAssistant = addon.UnitIsGroupAssistant
 
 function addon:Debug(level, fmt, ...)
     if not self.Logger then return end
@@ -374,9 +376,9 @@ do
                 if index then
                     _, rank, subgroup = GetRaidRosterInfo(index)
                 end
-                if addon.UnitIsGroupLeader and addon.UnitIsGroupLeader(unit) then
+                if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
                     rank = 2
-                elseif addon.UnitIsGroupAssistant and addon.UnitIsGroupAssistant(unit) then
+                elseif UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
                     rank = 1
                 end
                 rank = rank or 0
@@ -464,9 +466,9 @@ do
                 if index then
                     _, rank, subgroup, level, classL, class = GetRaidRosterInfo(index)
                 end
-                if addon.UnitIsGroupLeader and addon.UnitIsGroupLeader(unit) then
+                if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
                     rank = 2
-                elseif addon.UnitIsGroupAssistant and addon.UnitIsGroupAssistant(unit) then
+                elseif UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
                     rank = 1
                 end
                 rank = rank or 0
@@ -1001,9 +1003,9 @@ do
                 for unit in UnitIterator(true) do
                     local pname = UnitName(unit)
                     if pname == name then
-                        if addon.UnitIsGroupLeader and addon.UnitIsGroupLeader(unit) then
+                        if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
                             rank = 2
-                        elseif addon.UnitIsGroupAssistant and addon.UnitIsGroupAssistant(unit) then
+                        elseif UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
                             rank = 1
                         end
                         break
@@ -1132,13 +1134,19 @@ do
                     if addon.options.countdownSimpleRaidMsg then
                         channel = "RAID" -- Force RAID if countdownSimpleRaidMsg is true
                         -- Use RAID_WARNING if leader/officer AND useRaidWarning is true
-                    elseif addon.options.useRaidWarning and (IsRaidLeader() or IsRaidOfficer()) then
+                    elseif addon.options.useRaidWarning and (
+                        (UnitIsGroupLeader and UnitIsGroupLeader("player")) or
+                        (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
+                    ) then
                         channel = "RAID_WARNING"
                     else
                         channel = "RAID" -- Fallback
                     end
                 else
-                    if addon.options.useRaidWarning and (IsRaidLeader() or IsRaidOfficer()) then
+                    if addon.options.useRaidWarning and (
+                        (UnitIsGroupLeader and UnitIsGroupLeader("player")) or
+                        (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
+                    ) then
                         channel = "RAID_WARNING"
                     else
                         channel = "RAID" -- Fallback
