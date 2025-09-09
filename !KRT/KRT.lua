@@ -53,11 +53,13 @@ end
 
 -- Alias locali (safe e veloci)
 local IsInRaid      = addon.IsInRaid
+local IsInGroup     = addon.IsInGroup
 local UnitIterator  = addon.UnitIterator
 local After         = addon.After
 local NewTicker     = addon.NewTicker
 local CancelTimer   = addon.CancelTimer
 local GetCreatureId = addon.GetCreatureId
+local tLength       = addon.tLength
 
 function addon:Debug(level, fmt, ...)
     if not self.Logger then return end
@@ -261,7 +263,6 @@ local format, match, find, strlen       = string.format, string.match, string.fi
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
-local GetNumRaidMembers, GetNumPartyMembers = GetNumRaidMembers, GetNumPartyMembers
 
 ---============================================================================
 -- Event System
@@ -349,9 +350,8 @@ do
         if not KRT_CurrentRaid then return end
         CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
-        local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
-        numRaid = count
-        if numRaid == 0 then
+        if not IsInGroup() then
+            numRaid = 0
             module:End()
             return
         end
@@ -411,6 +411,12 @@ do
             end
         end
 
+        numRaid = tLength(playersByName)
+        if numRaid == 0 then
+            module:End()
+            return
+        end
+
         -- Mark players who have left
         for name, v in pairs(playersByName) do
             if not v.seen and v.leave == nil then
@@ -428,8 +434,6 @@ do
             self:End()
         end
         if not IsInRaid() then return end
-        local numRaid = GetNumRaidMembers()
-        if numRaid == 0 then return end
 
         local realm = GetRealmName() or UNKNOWN
         KRT_Players[realm] = KRT_Players[realm] or {}
@@ -447,11 +451,25 @@ do
             changes       = {},
         }
 
-        for i = 1, numRaid do
-            local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
+        for unit in UnitIterator(true) do
+            local name = UnitName(unit)
             if name then
-                local unitID = "raid" .. tostring(i)
-                local raceL, race = UnitRace(unitID)
+                local index = UnitInRaid(unit)
+                local rank, subgroup, level, classL, class
+                if index then
+                    _, rank, subgroup, level, classL, class = GetRaidRosterInfo(index)
+                end
+                if addon.UnitIsGroupLeader and addon.UnitIsGroupLeader(unit) then
+                    rank = 2
+                elseif addon.UnitIsGroupAssistant and addon.UnitIsGroupAssistant(unit) then
+                    rank = 1
+                end
+                rank = rank or 0
+                subgroup = subgroup or 1
+                level = level or UnitLevel(unit)
+                classL = classL or select(1, UnitClass(unit))
+                class  = class  or select(2, UnitClass(unit))
+                local raceL, race = UnitRace(unit)
                 local p = {
                     name     = name,
                     rank     = rank,
@@ -470,7 +488,7 @@ do
                     raceL  = raceL,
                     class  = class or "UNKNOWN",
                     classL = classL,
-                    sex    = UnitSex(unitID),
+                    sex    = UnitSex(unit),
                 }
             end
         end
@@ -534,8 +552,7 @@ do
             CancelTimer(module.firstCheckHandle, true)
             module.firstCheckHandle = nil
         end
-        local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
-        if count == 0 then return end
+        if not IsInGroup() then return end
 
         if KRT_CurrentRaid and module:CheckPlayer(unitName, KRT_CurrentRaid) then
             CancelTimer(module.updateRosterHandle, true)
@@ -974,13 +991,16 @@ do
         local rank = 0
         local originalName = name
         name = name or unitName or UnitName("player")
-        if next(players) == nil then
-            if IsInRaid() then
-                numRaid = GetNumRaidMembers()
-                for i = 1, numRaid do
-                    local pname, prank = GetRaidRosterInfo(i)
+        if tLength(players) == 0 then
+            if IsInGroup() then
+                for unit in UnitIterator(true) do
+                    local pname = UnitName(unit)
                     if pname == name then
-                        rank = prank
+                        if addon.UnitIsGroupLeader and addon.UnitIsGroupLeader(unit) then
+                            rank = 2
+                        elseif addon.UnitIsGroupAssistant and addon.UnitIsGroupAssistant(unit) then
+                            rank = 1
+                        end
                         break
                     end
                 end
@@ -2839,12 +2859,11 @@ do
     -- Return sorted array of player names currently in the raid.
     local function GetCurrentRaidPlayers()
         wipe(raidPlayers)
-        if not IsInRaid() then
+        if not IsInGroup() then
             return raidPlayers
         end
-        local count = GetNumRaidMembers()
-        for i = 1, count do
-            local name = GetRaidRosterInfo(i)
+        for unit in UnitIterator(true) do
+            local name = UnitName(unit)
             if name and name ~= "" then
                 raidPlayers[#raidPlayers + 1] = name
                 if KRT_PlayerCounts[name] == nil then
