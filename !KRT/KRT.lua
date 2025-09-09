@@ -1381,7 +1381,7 @@ do
     -------------------------------------------------------
     -- Internal state
     -------------------------------------------------------
-    local record, canRoll, warned = false, true, false
+    local record, canRoll, warned, rolled = false, true, false, false
     local playerRollTracker, rollsTable, rerolled, itemRollTracker = {}, {}, {}, {}
     local selectedPlayer = nil
 
