@@ -58,7 +58,6 @@ local UnitIterator  = addon.UnitIterator
 local After         = addon.After
 local NewTicker     = addon.NewTicker
 local CancelTimer   = addon.CancelTimer
-local GetCreatureId = addon.GetCreatureId
 local tLength       = addon.tLength
 
 function addon:Debug(level, fmt, ...)
@@ -6271,12 +6270,14 @@ end
 -- COMBAT_LOG_EVENT_UNFILTERED: Logs a boss kill when a boss unit dies.
 --
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
-    local _, event, _, _, _, destGUID, destName = ...
+    local _, event, _, _, _, destGUID = ...
     if not KRT_CurrentRaid then return end
     if event == "UNIT_DIED" then
-        local npcID = Utils.getNpcId(destGUID)
-        if addon.BossIDs.BossIDs[npcID] then
-            self.Raid:AddBoss(destName)
+        if addon.GetUnitIdFromGUID(destGUID, "player") then return end
+        local npcId = addon.GetCreatureId(destGUID)
+        local boss = addon.BossIDs:GetBossName(npcId)
+        if boss then
+            self.Raid:AddBoss(boss)
         end
     end
 end
