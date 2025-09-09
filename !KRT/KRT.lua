@@ -2432,8 +2432,9 @@ do
             dropDownData[i] = twipe(dropDownData[i])
         end
         dropDownGroupData = twipe(dropDownGroupData)
-        for p = 1, GetRealNumRaidMembers() do
-            local name, _, subgroup = GetRaidRosterInfo(p)
+        for unit in UnitIterator() do
+            local name = UnitName(unit)
+            local subgroup = select(2, GetRaidRosterInfo(UnitInRaid(unit)))
             if name then
                 dropDownData[subgroup][name] = name
                 dropDownGroupData[subgroup] = true
