@@ -153,6 +153,7 @@ local unitName                          = UnitName("player")
 local trader, winner
 local holder, banker, disenchanter
 local lootOpened                        = false
+local lootCloseTimer
 local currentRollType                   = 4
 local currentRollItem                   = 0
 local fromInventory                     = false
@@ -2571,11 +2572,18 @@ do
     --
     function module:LOOT_CLOSED()
         if addon.Raid:IsMasterLooter() then
-            lootOpened = false
-            UIMaster:Hide()
-            addon.Loot:ClearLoot()
-            addon.Rolls:ClearRolls()
-            addon.Rolls:RecordRolls(false)
+            if lootCloseTimer then
+                Utils.CancelTimer(lootCloseTimer)
+                lootCloseTimer = nil
+            end
+            lootCloseTimer = Utils.after(0.1, function()
+                lootCloseTimer = nil
+                lootOpened = false
+                UIMaster:Hide()
+                addon.Loot:ClearLoot()
+                addon.Rolls:ClearRolls()
+                addon.Rolls:RecordRolls(false)
+            end)
         end
     end
 
