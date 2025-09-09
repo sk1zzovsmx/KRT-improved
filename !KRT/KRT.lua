@@ -2670,7 +2670,7 @@ do
             return false
         end
 
-        for p = 1, 40 do
+        for p = 1, addon.Raid:GetNumRaid() do
             if GetMasterLootCandidate(p) == playerName then
                 GiveMasterLoot(itemIndex, p)
                 local output, whisper
