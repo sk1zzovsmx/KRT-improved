@@ -790,16 +790,20 @@ do
     --
     function module:Expired(rID)
         rID = rID or KRT_CurrentRaid
-        if not rID or not KRT_Raids[rID] then
+        local raid = rID and KRT_Raids[rID]
+        if not raid then
             return true
         end
 
+        local startTime = raid.startTime
         local currentTime = Utils.getCurrentTime()
-        local startTime = KRT_Raids[rID].startTime
-        local validDuration = (currentTime + KRT_NextReset) - startTime
+        local week = 604800 -- 7 days in seconds
 
-        local isExpired = validDuration >= 604800 -- 7 days in seconds
-        return isExpired
+        if KRT_NextReset and KRT_NextReset > currentTime then
+            return startTime < (KRT_NextReset - week)
+        end
+
+        return currentTime >= startTime + week
     end
 
     --
