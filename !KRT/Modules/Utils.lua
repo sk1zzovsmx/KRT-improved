@@ -10,11 +10,6 @@ if Compat and Compat.Embed then
        Compat:Embed(Utils) -- Utils.After, Utils.UnitIterator, Utils.Table, etc.
 end
 
--- Uniform color helper
-function Utils.colorText(text, r, g, b)
-       return Utils.WrapTextInColorCode(text, "ff" .. Utils.RGBPercToHex(r or 1, g or 0.82, b or 0))
-end
-
 -- Practical helper aliases
 function Utils.after(sec, fn) return Utils.After(sec, fn) end
 
@@ -171,7 +166,7 @@ function Utils.rgbToHex(r, g, b)
         return format("%02x%02x%02x", r, g, b)
 end
 
-function Utils.getClassColor(name)
+function addon.GetClassColor(name)
         name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
         local c = Compat and Compat.GetClassColorObj and Compat.GetClassColorObj(name)
         if not c then
