@@ -2612,10 +2612,10 @@ do
     function module:LOOT_CLOSED()
         if addon.Raid:IsMasterLooter() then
             if lootCloseTimer then
-                Utils.CancelTimer(lootCloseTimer)
+                CancelTimer(lootCloseTimer)
                 lootCloseTimer = nil
             end
-            lootCloseTimer = Utils.after(0.1, function()
+            lootCloseTimer = After(0.1, function()
                 lootCloseTimer = nil
                 lootOpened = false
                 UIMaster:Hide()
