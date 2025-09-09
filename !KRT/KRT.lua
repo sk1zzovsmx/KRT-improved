@@ -335,6 +335,7 @@ do
     local numRaid            = 0
     local GetLootMethod      = GetLootMethod
     local GetRaidRosterInfo  = GetRaidRosterInfo
+    local UnitIsUnit         = UnitIsUnit
 
     -------------------------------------------------------
     -- Private helpers
@@ -1068,9 +1069,21 @@ do
     -- Checks if the player is the Master Looter.
     --
     function module:IsMasterLooter()
-        local method, partyID = GetLootMethod()
-        local isML = (partyID and partyID == 0)
-        return isML
+        local method, partyMaster, raidMaster = GetLootMethod()
+        if method ~= "master" then
+            return false
+        end
+        if partyMaster then
+            if partyMaster == 0 or UnitIsUnit("party" .. tostring(partyMaster), "player") then
+                return true
+            end
+        end
+        if raidMaster then
+            if raidMaster == 0 or UnitIsUnit("raid" .. tostring(raidMaster), "player") then
+                return true
+            end
+        end
+        return false
     end
 
     --
