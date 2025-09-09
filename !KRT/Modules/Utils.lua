@@ -10,6 +10,12 @@ if Compat and Compat.Embed then
        Compat:Embed(Utils) -- Utils.After, Utils.UnitIterator, Utils.Table, etc.
 end
 
+-- LibCompat aliases
+Utils.tCopy     = Compat and Compat.tCopy
+Utils.tLength   = Compat and Compat.tLength
+Utils.tContains = (Compat and Compat.tContains) or tContains
+Utils.tIndexOf  = Compat and Compat.tIndexOf
+
 -- Practical helper aliases
 function Utils.after(sec, fn) return Utils.After(sec, fn) end
 
@@ -36,6 +42,7 @@ local lower, upper = string.lower, string.upper
 local select, unpack = select, unpack
 local GetLocale = GetLocale
 local GetTime = GetTime
+local tContains = tContains
 
 -- Lightweight throttle (keyed)
 local last = {}
@@ -93,32 +100,6 @@ _G.table.shuffle = function(t)
 		t[n], t[k] = t[k], t[n]
 		n = n - 1
 	end
-end
-
--- Fills a table (t1) with missing values from another (t2):
-function Utils.fillTable(t1, t2)
-	for i, v in pairs(t2) do
-		if t1[i] == nil then
-			t1[i] = v
-		elseif type(v) == "table" then
-			Utils.fillTable(v, t2[i])
-		end
-	end
-end
-
--- DeepCopy:
-_G.table.deepCopy = function(t)
-	if type(t) ~= "table" then return t end
-	local mt = getmetatable(t)
-	local res = {}
-	for k, v in pairs(t) do
-		if type(v) == "table" then
-			v = _G.table.deepCopy(v)
-		end
-		res[k] = v
-	end
-	setmetatable(res, mt)
-	return res
 end
 
 -- Reverse table:
@@ -267,42 +248,6 @@ function Utils.throttle(frame, name, period, elapsed)
 	end
 	frame[name] = t
 	return false
-end
-
--- Check entry in a table:
-function Utils.checkEntry(t, val)
-	for i, v in ipairs(t) do
-		if v == val then
-			return true
-		end
-	end
-	return false
-end
-
--- Remove all val occurrences from a table:
-function Utils.removeEntry(t, val)
-	local removed = false
-	for i = #t, 1, -1 do
-		if t[i] == val then
-			tremove(t, i)
-			removed = true
-		end
-	end
-	return removed
-end
-
--- Returns the "real" table's length:
-function Utils.tableLen(t)
-	local len = 0
-	for _, _ in pairs(t) do
-		len = len + 1
-	end
-	return len
-end
-
--- Checks if a table is empty
-function Utils.isEmpty(t)
-	return (Utils.tableLen(t) == 0)
 end
 
 -- Boolean <> String conversion:

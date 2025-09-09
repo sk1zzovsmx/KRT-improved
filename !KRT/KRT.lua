@@ -904,7 +904,7 @@ do
             if bossNum and KRT_Raids[raidNum].bossKills[bossNum] then
                 local _players = {}
                 for i, p in ipairs(players) do
-                    if Utils.checkEntry(KRT_Raids[raidNum]["bossKills"][bossNum]["players"], p.name) then
+                    if addon.tContains(KRT_Raids[raidNum]["bossKills"][bossNum]["players"], p.name) then
                         tinsert(_players, p)
                     end
                 end
@@ -1519,7 +1519,7 @@ do
             local used = itemRollTracker[itemId][player] or 0
 
             if used >= allowed then
-                if not Utils.checkEntry(rerolled, player) then
+                if not addon.tContains(rerolled, player) then
                     Utils.whisper(player, L.ChatOnlyRollOnce)
                     tinsert(rerolled, player)
                     addon:Debug("DEBUG", "Roll denied: %s exceeded allowed rolls for item %d", player, itemId)
@@ -3039,16 +3039,16 @@ do
     --------------------------------------------------------------------------
 
     function module:Save()
-        addon:Debug("DEBUG", "Saving reserves data. Entries: %d", Utils.tableLen(reservesData))
-        KRT_SavedReserves = table.deepCopy(reservesData)
-        KRT_SavedReserves.reservesByItemID = table.deepCopy(reservesByItemID)
+        addon:Debug("DEBUG", "Saving reserves data. Entries: %d", addon.tLength(reservesData))
+        KRT_SavedReserves = addon.tCopy({}, reservesData)
+        KRT_SavedReserves.reservesByItemID = addon.tCopy({}, reservesByItemID)
     end
 
     function module:Load()
         addon:Debug("DEBUG", "Loading reserves. Data exists: %s", tostring(KRT_SavedReserves ~= nil))
         if KRT_SavedReserves then
-            reservesData = table.deepCopy(KRT_SavedReserves)
-            reservesByItemID = table.deepCopy(KRT_SavedReserves.reservesByItemID or {})
+            reservesData = addon.tCopy({}, KRT_SavedReserves)
+            reservesByItemID = addon.tCopy({}, KRT_SavedReserves.reservesByItemID or {})
         else
             reservesData = {}
             reservesByItemID = {}
@@ -3204,7 +3204,7 @@ do
 
     -- Get all reserves:
     function module:GetAllReserves()
-        addon:Debug("DEBUG", "Fetching all reserves. Total players with reserves: %d", Utils.tableLen(reservesData))
+        addon:Debug("DEBUG", "Fetching all reserves. Total players with reserves: %d", addon.tLength(reservesData))
         return reservesData
     end
 
@@ -3281,7 +3281,7 @@ do
             end
         end
         -- Log when the CSV parsing is completed
-        addon:Debug("DEBUG", "Finished parsing CSV data. Total reserves processed: %d", Utils.tableLen(reservesData))
+        addon:Debug("DEBUG", "Finished parsing CSV data. Total reserves processed: %d", addon.tLength(reservesData))
         self:RefreshWindow()
         self:Save()
     end
@@ -3661,9 +3661,8 @@ do
     -- Loads the default options into the settings table.
     --
     local function LoadDefaultOptions()
-        for k, v in pairs(defaultOptions) do
-            KRT_Options[k] = v
-        end
+        KRT_Options = addon.tCopy({}, defaultOptions)
+        addon.options = KRT_Options
         addon:info("Default options have been restored.")
     end
 
@@ -3671,8 +3670,9 @@ do
     -- Loads addon options from saved variables, filling in defaults.
     --
     local function LoadOptions()
-        addon.options = KRT_Options
-        Utils.fillTable(addon.options, defaultOptions)
+        addon.options = addon.tCopy({}, defaultOptions)
+        addon.tCopy(addon.options, KRT_Options)
+        KRT_Options = addon.options
 
         -- Ensure dependent options are consistent
         if not addon.options.useRaidWarning then
@@ -4221,7 +4221,7 @@ do
             InitChangesTable()
             FetchChanges()
         end
-        local count = Utils.tableLen(changesTable)
+        local count = addon.tLength(changesTable)
         local msg
         if count == 0 then
             if tempSelectedID then
@@ -4272,7 +4272,7 @@ do
                 InitChangesTable()
                 FetchChanges()
             end
-            local count = Utils.tableLen(changesTable)
+            local count = addon.tLength(changesTable)
             if count > 0 then
                 for n, s in pairs(changesTable) do
                     if selectedID == n and _G[frameName .. "PlayerBtn" .. n] then
@@ -4446,11 +4446,15 @@ do
             KRT_Spammer.Channels = KRT_Spammer.Channels or {}
             local channel = gsub(target, "Chat", "")
             local checked = (box:GetChecked() == 1)
-            local existed = Utils.checkEntry(KRT_Spammer.Channels, channel)
+            local existed = addon.tContains(KRT_Spammer.Channels, channel)
             if checked and not existed then
                 tinsert(KRT_Spammer.Channels, channel)
             elseif not checked and existed then
-                Utils.removeEntry(KRT_Spammer.Channels, channel)
+                local i = addon.tIndexOf(KRT_Spammer.Channels, channel)
+                while i do
+                    tremove(KRT_Spammer.Channels, i)
+                    i = addon.tIndexOf(KRT_Spammer.Channels, channel)
+                end
             end
         else
             local value = box:GetText():trim()
@@ -5511,7 +5515,12 @@ do
             if not (rID and bID and pID) then return end
             local raid = KRT_Raids[rID]; if not (raid and raid.bossKills[bID]) then return end
             local name = addon.Raid:GetPlayerName(pID, rID)
-            Utils.removeEntry(raid.bossKills[bID].players, name)
+            local list = raid.bossKills[bID].players
+            local i = addon.tIndexOf(list, name)
+            while i do
+                tremove(list, i)
+                i = addon.tIndexOf(list, name)
+            end
             controller:Dirty()
         end
         -- ask for confirmation before deleting an attendee
@@ -5612,7 +5621,13 @@ do
             local raid = KRT_Raids[rID]; if not (raid and raid.players[pID]) then return end
             local name = raid.players[pID].name
             tremove(raid.players, pID)
-            for _, boss in ipairs(raid.bossKills) do Utils.removeEntry(boss.players, name) end
+            for _, boss in ipairs(raid.bossKills) do
+                local i = addon.tIndexOf(boss.players, name)
+                while i do
+                    tremove(boss.players, i)
+                    i = addon.tIndexOf(boss.players, name)
+                end
+            end
             for i = #raid.loot, 1, -1 do if raid.loot[i].looter == name then tremove(raid.loot, i) end end
             controller:Dirty()
         end
@@ -5962,7 +5977,7 @@ do
         local cmd1, cmd2, cmd3 = strsplit(" ", cmd, 3)
 
         -- ==== Debug ====
-        if Utils.checkEntry(cmdDebug, cmd1) then
+        if addon.tContains(cmdDebug, cmd1) then
             local subCmd = cmd2 and cmd2:lower()
 
             if subCmd == "level" or subCmd == "lvl" then
@@ -6007,7 +6022,7 @@ do
             end
 
             -- ==== Chat Throttle ====
-        elseif Utils.checkEntry(cmdChat, cmd1) then
+        elseif addon.tContains(cmdChat, cmd1) then
             local val = tonumber(cmd2)
             if val then
                 addon.options.chatThrottle = val
@@ -6017,7 +6032,7 @@ do
             end
 
             -- ==== Minimap ====
-        elseif Utils.checkEntry(cmdMinimap, cmd1) then
+        elseif addon.tContains(cmdMinimap, cmd1) then
             local sub = cmd2 and cmd2:lower()
             if sub == "on" then
                 addon.options.minimapButton = true
@@ -6041,7 +6056,7 @@ do
             end
 
             -- ==== Achievement Link ====
-        elseif Utils.checkEntry(cmdAchiev, cmd1) and find(cmd, "achievement:%d*:") then
+        elseif addon.tContains(cmdAchiev, cmd1) and find(cmd, "achievement:%d*:") then
             local from, to = string.find(cmd, "achievement%:%d*%:")
             local id = string.sub(cmd, from + 12, to - 1)
             from, to = string.find(cmd, "%|cffffff00%|Hachievement%:.*%]%|h%|r")
@@ -6049,7 +6064,7 @@ do
             printHelp("KRT", name .. " - ID#" .. id)
 
             -- ==== Config ====
-        elseif Utils.checkEntry(cmdConfig, cmd1) then
+        elseif addon.tContains(cmdConfig, cmd1) then
             if cmd2 == "reset" then
                 addon.Config:Default()
             else
@@ -6057,7 +6072,7 @@ do
             end
 
             -- ==== Warnings ====
-        elseif Utils.checkEntry(cmdWarnings, cmd1) then
+        elseif addon.tContains(cmdWarnings, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.Warnings:Toggle()
             elseif cmd2 == "help" then
@@ -6069,7 +6084,7 @@ do
             end
 
             -- ==== MS Changes ====
-        elseif Utils.checkEntry(cmdChanges, cmd1) then
+        elseif addon.tContains(cmdChanges, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.Changes:Toggle()
             elseif cmd2 == "demand" or cmd2 == "ask" then
@@ -6084,19 +6099,19 @@ do
             end
 
             -- ==== Loot History ====
-        elseif Utils.checkEntry(cmdHistory, cmd1) then
+        elseif addon.tContains(cmdHistory, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.History:Toggle()
             end
 
             -- ==== Master Looter ====
-        elseif Utils.checkEntry(cmdLoot, cmd1) then
+        elseif addon.tContains(cmdLoot, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.Master:Toggle()
             end
 
             -- ==== Reserves ====
-        elseif Utils.checkEntry(cmdReserves, cmd1) then
+        elseif addon.tContains(cmdReserves, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.Reserves:ShowWindow()
             elseif cmd2 == "import" then
@@ -6108,7 +6123,7 @@ do
             end
 
             -- ==== LFM (Spammer) ====
-        elseif Utils.checkEntry(cmdLFM, cmd1) then
+        elseif addon.tContains(cmdLFM, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" or cmd2 == "show" then
                 addon.Spammer:Toggle()
             elseif cmd2 == "start" then
