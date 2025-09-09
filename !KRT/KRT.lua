@@ -1397,8 +1397,13 @@ do
                 end
                 return a.roll > b.roll
             end)
-            winner = rollsTable[1].name
-            addon:Debug("DEBUG", "Sorted rolls; current winner: %s with roll: %d", winner, rollsTable[1].roll)
+            if rollsTable[1] then
+                winner = rollsTable[1].name
+                addon:Debug("DEBUG", "Sorted rolls; current winner: %s with roll: %d", winner, rollsTable[1].roll)
+            else
+                winner = nil
+                addon:Debug("DEBUG", "Sorted rolls; no winner")
+            end
         end
     end
 
@@ -1574,6 +1579,10 @@ do
     -- Returns the highest roll value from the current winner.
     --
     function module:HighestRoll()
+        if not winner then
+            addon:Debug("DEBUG", "HighestRoll: no winner")
+            return 0
+        end
         for i = 1, rollsCount do
             if rollsTable[i].name == winner then
                 addon:Debug("DEBUG", "HighestRoll: %s rolled %d", winner, rollsTable[i].roll)
