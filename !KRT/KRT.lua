@@ -358,6 +358,9 @@ do
         if not IsInGroup() then
             numRaid = 0
             module:End()
+            if addon.Master and addon.Master.PrepareDropDowns then
+                addon.Master:PrepareDropDowns()
+            end
             return
         end
 
@@ -428,6 +431,9 @@ do
                 v.leave = Utils.getCurrentTime()
             end
             v.seen = nil
+        end
+        if addon.Master and addon.Master.PrepareDropDowns then
+            addon.Master:PrepareDropDowns()
         end
     end
 
@@ -2446,6 +2452,7 @@ do
             end
         end
     end
+    module.PrepareDropDowns = PrepareDropDowns
 
     --
     -- OnClick handler for dropdown menu items.
