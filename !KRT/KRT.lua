@@ -5156,7 +5156,7 @@ do
             local count = #KRT_Raids
             for i = 1, count do
                 local r = KRT_Raids[i]
-                local it = out[i] or Utils.acquireTable()
+                local it = out[i] or Utils.Table.get("history-raids")
                 it.id      = i
                 it.zone    = r.zone
                 it.size    = r.size
@@ -5165,7 +5165,7 @@ do
                 out[i] = it
             end
             for i = count + 1, #out do
-                Utils.releaseTable(out[i])
+                Utils.Table.free(out[i])
                 out[i] = nil
             end
         end,
@@ -5274,7 +5274,7 @@ do
             local src = addon.Raid:GetBosses(addon.History.selectedRaid) or {}
             for i = 1, #src do
                 local b = src[i]
-                local it = out[i] or Utils.acquireTable()
+                local it = out[i] or Utils.Table.get("history-bosses")
                 it.id      = b.id
                 it.name    = b.name
                 it.time    = b.time
@@ -5283,7 +5283,7 @@ do
                 out[i] = it
             end
             for i = #src + 1, #out do
-                Utils.releaseTable(out[i])
+                Utils.Table.free(out[i])
                 out[i] = nil
             end
             table.sort(out, function(a, b) return a.id > b.id end)
@@ -5376,20 +5376,20 @@ do
 
         getData        = function(out)
             if not addon.History.selectedBoss then
-                for i = #out, 1, -1 do Utils.releaseTable(out[i]); out[i] = nil end
+                for i = #out, 1, -1 do Utils.Table.free(out[i]); out[i] = nil end
                 return
             end
             local src = addon.Raid:GetPlayers(addon.History.selectedRaid, addon.History.selectedBoss) or {}
             for i = 1, #src do
                 local p = src[i]
-                local it = out[i] or Utils.acquireTable()
+                local it = out[i] or Utils.Table.get("history-boss-attendees")
                 it.id    = p.id
                 it.name  = p.name
                 it.class = p.class
                 out[i] = it
             end
             for i = #src + 1, #out do
-                Utils.releaseTable(out[i])
+                Utils.Table.free(out[i])
                 out[i] = nil
             end
         end,
@@ -5494,7 +5494,7 @@ do
             local src = addon.Raid:GetPlayers(addon.History.selectedRaid) or {}
             for i = 1, #src do
                 local p = src[i]
-                local it = out[i] or Utils.acquireTable()
+                local it = out[i] or Utils.Table.get("history-raid-attendees")
                 it.id       = p.id
                 it.name     = p.name
                 it.class    = p.class
@@ -5505,7 +5505,7 @@ do
                 out[i] = it
             end
             for i = #src + 1, #out do
-                Utils.releaseTable(out[i])
+                Utils.Table.free(out[i])
                 out[i] = nil
             end
         end,
@@ -5612,7 +5612,7 @@ do
 
             for i = 1, #data do
                 local v = data[i]
-                local it = out[i] or Utils.acquireTable()
+                local it = out[i] or Utils.Table.get("history-loot")
                 it.id          = v.id
                 it.itemId      = v.itemId
                 it.itemName    = v.itemName
@@ -5628,7 +5628,7 @@ do
                 out[i] = it
             end
             for i = #data + 1, #out do
-                Utils.releaseTable(out[i])
+                Utils.Table.free(out[i])
                 out[i] = nil
             end
         end,

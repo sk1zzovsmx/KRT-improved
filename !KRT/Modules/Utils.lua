@@ -36,35 +36,15 @@ local function round(number, significance)
 	return floor((number / (significance or 1)) + 0.5) * (significance or 1)
 end
 local setmetatable, getmetatable = setmetatable, getmetatable
-local tinsert, tremove, twipe = table.insert, table.remove, table.wipe
+local tinsert, tremove = table.insert, table.remove
 local find, match = string.find, string.match
 local format, gsub = string.format, string.gsub
 local strsub, strlen = string.sub, string.len
 local lower, upper = string.lower, string.upper
 local select, unpack = select, unpack
 local GetLocale = GetLocale
-
--- Lightweight pooling
 local GetTime = GetTime
 
--- Table pool (no table.new in 3.3.5a)
-local TPOOL = setmetatable({}, { __mode = "k" })
-
-function Utils.acquireTable()
-        for t in pairs(TPOOL) do
-                TPOOL[t] = nil
-                twipe(t)
-                return t
-        end
-        return {}
-end
-
-function Utils.releaseTable(t)
-        if t then
-                twipe(t)
-                TPOOL[t] = true
-        end
-end
 -- Lightweight throttle (keyed)
 local last = {}
 function Utils.throttleKey(key, sec)
