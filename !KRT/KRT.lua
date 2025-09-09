@@ -37,17 +37,25 @@ KRT_PlayerCounts                        = KRT_PlayerCounts or {}
 ---============================================================================
 local LibStub = _G.LibStub
 if LibStub then
-    addon.Compat = addon.Compat or LibStub("LibCompat-1.0", true)
-    addon.Logger = addon.Logger or LibStub("LibLogger-1.0", true)
-    addon.Deformat = addon.Deformat or LibStub("LibDeformat-3.0", true)
-    addon.BossIDs = addon.BossIDs or LibStub("LibBossIDs-1.0", true)
-    addon.CallbackHandler = addon.CallbackHandler or LibStub("CallbackHandler-1.0", true)
+    addon.Compat   = LibStub("LibCompat-1.0",   true)
+    addon.BossIDs  = LibStub("LibBossIDs-1.0",  true)
+    addon.Logger   = LibStub("LibLogger-1.0",   true)
+    addon.Deformat = LibStub("LibDeformat-3.0", true)
+    addon.CallbackHandler = LibStub("CallbackHandler-1.0", true)
 
-    if addon.Compat and addon.Compat.Embed then addon.Compat:Embed(addon) end
-    if addon.Logger and addon.Logger.Embed then addon.Logger:Embed(addon) end
+    if addon.Compat and addon.Compat.Embed then
+        addon.Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
+    end
+    if addon.Logger and addon.Logger.Embed then
+        addon.Logger:Embed(addon)
+    end
 end
 
-local IsInRaid = addon.IsInRaid
+-- Alias locali (safe e veloci)
+local IsInRaid      = addon.IsInRaid
+local UnitIterator  = addon.UnitIterator
+local After         = addon.After
+local GetCreatureId = addon.GetCreatureId
 
 function addon:Debug(level, fmt, ...)
     if not self.Logger then return end
@@ -333,7 +341,7 @@ do
     --
     function module:UpdateRaidRoster()
         if not KRT_CurrentRaid then return end
-        local count = addon:IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
+        local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
         numRaid = count
         if numRaid == 0 then
             module:End()
@@ -345,7 +353,7 @@ do
         local raid = KRT_Raids[KRT_CurrentRaid]
         raid.playersByName = raid.playersByName or {}
         local playersByName = raid.playersByName
-        for unit in addon:UnitIterator() do
+        for unit in UnitIterator(true) do
             local name = UnitName(unit)
             if name then
                 local index = UnitInRaid(unit)
@@ -412,7 +420,7 @@ do
         if KRT_CurrentRaid then
             self:End()
         end
-        if not addon:IsInRaid() then return end
+        if not IsInRaid() then return end
         local numRaid = GetNumRaidMembers()
         if numRaid == 0 then return end
 
@@ -517,7 +525,7 @@ do
             Utils.unschedule(module.firstCheckHandle)
             module.firstCheckHandle = nil
         end
-        local count = addon:IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
+        local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
         if count == 0 then return end
 
         if KRT_CurrentRaid and module:CheckPlayer(unitName, KRT_CurrentRaid) then
@@ -574,7 +582,7 @@ do
             instanceDiff = instanceDiff + (2 * dynDiff)
         end
         local players = {}
-        for unit in addon:UnitIterator() do
+        for unit in UnitIterator(true) do
             if UnitIsConnected(unit) then -- track only online players
                 local name = UnitName(unit)
                 if name then
@@ -957,7 +965,7 @@ do
         local originalName = name
         name = name or unitName or UnitName("player")
         if next(players) == nil then
-            if addon:IsInRaid() then
+            if IsInRaid() then
                 numRaid = GetNumRaidMembers()
                 for i = 1, numRaid do
                     local pname, prank = GetRaidRosterInfo(i)
@@ -2794,7 +2802,7 @@ do
     -- Return sorted array of player names currently in the raid.
     local function GetCurrentRaidPlayers()
         wipe(raidPlayers)
-        if not addon:IsInRaid() then
+        if not IsInRaid() then
             return raidPlayers
         end
         local count = GetNumRaidMembers()
@@ -4640,7 +4648,7 @@ do
 
     local function Send(msg)
         if U.throttleKey("lfm_msg", _G.KRT_Options.chatThrottle or 2.0) then
-            SendChatMessage(msg, addon:IsInRaid() and "RAID" or "GUILD")
+            SendChatMessage(msg, IsInRaid() and "RAID" or "GUILD")
         end
     end
 
