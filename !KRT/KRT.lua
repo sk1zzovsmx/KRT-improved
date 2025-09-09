@@ -1731,7 +1731,7 @@ do
             local nameStr, rollStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"], _G[btnName .. "Star"]
 
             if nameStr and nameStr.SetVertexColor then
-                local _, class = UnitClass(name)
+                local class = addon.Raid:GetPlayerClass(name)
                 class = class and class:upper() or "UNKNOWN"
                 if isSR and self:IsReserved(itemId, name) then
                     nameStr:SetVertexColor(0.4, 0.6, 1.0)
