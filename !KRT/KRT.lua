@@ -51,6 +51,15 @@ if LibStub then
     end
 end
 
+do
+    local _WrapTextInColorCode = addon.WrapTextInColorCode
+    if _WrapTextInColorCode then
+        function addon:WrapTextInColorCode(text, colorHex)
+            return _WrapTextInColorCode(text, colorHex)
+        end
+    end
+end
+
 -- Alias locali (safe e veloci)
 local IsInRaid      = addon.IsInRaid
 local IsInGroup     = addon.IsInGroup
@@ -199,14 +208,14 @@ local lootTypesText                     = {
 
 -- Roll Type Colored Display Text
 local lootTypesColored                  = {
-    Utils.wrapTextInColorCode(L.BtnMS, GREEN_FONT_COLOR_CODE:sub(3)),
-    Utils.wrapTextInColorCode(L.BtnOS, LIGHTYELLOW_FONT_COLOR_CODE:sub(3)),
-    Utils.wrapTextInColorCode(L.BtnSR, "ffa335ee"),
-    Utils.wrapTextInColorCode(L.BtnFree, NORMAL_FONT_COLOR_CODE:sub(3)),
-    Utils.wrapTextInColorCode(L.BtnBank, ORANGE_FONT_COLOR_CODE:sub(3)),
-    Utils.wrapTextInColorCode(L.BtnDisenchant, RED_FONT_COLOR_CODE:sub(3)),
-    Utils.wrapTextInColorCode(L.BtnHold, HIGHLIGHT_FONT_COLOR_CODE:sub(3)),
-    Utils.wrapTextInColorCode("DKP", GREEN_FONT_COLOR_CODE:sub(3)),
+    addon:WrapTextInColorCode(L.BtnMS, GREEN_FONT_COLOR_CODE:sub(3)),
+    addon:WrapTextInColorCode(L.BtnOS, LIGHTYELLOW_FONT_COLOR_CODE:sub(3)),
+    addon:WrapTextInColorCode(L.BtnSR, "ffa335ee"),
+    addon:WrapTextInColorCode(L.BtnFree, NORMAL_FONT_COLOR_CODE:sub(3)),
+    addon:WrapTextInColorCode(L.BtnBank, ORANGE_FONT_COLOR_CODE:sub(3)),
+    addon:WrapTextInColorCode(L.BtnDisenchant, RED_FONT_COLOR_CODE:sub(3)),
+    addon:WrapTextInColorCode(L.BtnHold, HIGHLIGHT_FONT_COLOR_CODE:sub(3)),
+    addon:WrapTextInColorCode("DKP", GREEN_FONT_COLOR_CODE:sub(3)),
 }
 
 -- Item Quality Colors
@@ -248,8 +257,8 @@ local RAID_TARGET_MARKERS               = {
 
 local K_COLOR                           = "fff58cba"
 local RT_COLOR                          = "aaf49141"
-local titleString                       = Utils.wrapTextInColorCode("K", K_COLOR)
-                                        .. Utils.wrapTextInColorCode("RT", RT_COLOR)
+local titleString                       = addon:WrapTextInColorCode("K", K_COLOR)
+                                        .. addon:WrapTextInColorCode("RT", RT_COLOR)
                                         .. " : %s"
 
 ---============================================================================
@@ -776,7 +785,7 @@ do
     -- Returns the RGB color values for a given class name.
     --
     function module:GetClassColor(name)
-        return Utils.getClassColor(name)
+        return addon.GetClassColor(name)
     end
 
     --
@@ -1094,7 +1103,7 @@ do
     local function PreparePrint(text, prefix)
         prefix = prefix or chatPrefixShort
         if prefixHex then
-            prefix = Utils.wrapTextInColorCode(prefix, prefixHex)
+            prefix = addon:WrapTextInColorCode(prefix, prefixHex)
         end
         return format(output, prefix, tostring(text))
     end
@@ -1327,9 +1336,9 @@ do
         KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
             GameTooltip_SetDefaultAnchor(GameTooltip, self)
             GameTooltip:SetText(
-                Utils.wrapTextInColorCode("Kader", K_COLOR)
+                addon:WrapTextInColorCode("Kader", K_COLOR)
                 .. " "
-                .. Utils.wrapTextInColorCode("Raid Tools", "aad4af37")
+                .. addon:WrapTextInColorCode("Raid Tools", "aad4af37")
             )
             GameTooltip:AddLine(L.StrMinimapLClick, 1, 1, 1)
             GameTooltip:AddLine(L.StrMinimapRClick, 1, 1, 1)
@@ -1868,7 +1877,7 @@ do
             if frameName == nil then return end
 
             local currentItemLink = _G[frameName .. "Name"]
-            currentItemLink:SetText(Utils.wrapTextInColorCode(i.itemName, i.itemColor))
+            currentItemLink:SetText(addon:WrapTextInColorCode(i.itemName, i.itemColor))
 
             local currentItemBtn = _G[frameName .. "ItemBtn"]
             currentItemBtn:SetNormalTexture(i.itemTexture)
@@ -5693,7 +5702,7 @@ do
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
                 local ui = CacheParts(row, btn, parts)
 
-                ui.Name:SetText(Utils.wrapTextInColorCode(v.itemName, itemColors[v.itemRarity + 1]))
+                ui.Name:SetText(addon:WrapTextInColorCode(v.itemName, itemColors[v.itemRarity + 1]))
                 ui.Source:SetText(addon.History.Boss:GetName(v.bossNum, addon.History.selectedRaid))
 
                 local r, g, b = addon.Raid:GetClassColor(addon.Raid:GetPlayerClass(v.looter))
@@ -5939,7 +5948,7 @@ do
 
     local helpString  = "%s: %s"
     local function printHelp(cmd, desc)
-        print(helpString:format(Utils.wrapTextInColorCode(cmd, RT_COLOR), desc))
+        print(helpString:format(addon:WrapTextInColorCode(cmd, RT_COLOR), desc))
     end
 
     local function HandleSlashCmd(cmd)
