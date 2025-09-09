@@ -18,6 +18,8 @@ README.md           export-ignore
 *.xml           text
 *.toc           text
 
+\!KRT/Libs/**   -text
+
 # Fonts
 *.ttf           binary
 
