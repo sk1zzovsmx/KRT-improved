@@ -1613,22 +1613,23 @@ do
     -- Clears all roll-related state and UI elements.
     --
     function module:ClearRolls(rec)
-        frameName = frameName or Utils.getFrameName()
-        if not frameName then return end
+        local frameName = Utils.getFrameName()
         rollsTable, rerolled, itemRollTracker = {}, {}, {}
         playerRollTracker, rolled, warned, rollsCount = {}, false, false, 0
         selectedPlayer = nil
         if rec == false then record = false end
 
-        local i = 1
-        local btn = _G[frameName .. "PlayerBtn" .. i]
-        while btn do
-            btn:Hide()
-            i = i + 1
-            btn = _G[frameName .. "PlayerBtn" .. i]
-        end
+        if frameName then
+            local i = 1
+            local btn = _G[frameName .. "PlayerBtn" .. i]
+            while btn do
+                btn:Hide()
+                i = i + 1
+                btn = _G[frameName .. "PlayerBtn" .. i]
+            end
 
-        addon.Raid:ClearRaidIcons()
+            addon.Raid:ClearRaidIcons()
+        end
     end
 
     --
