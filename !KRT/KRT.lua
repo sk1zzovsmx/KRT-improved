@@ -150,13 +150,10 @@ end
 ---============================================================================
 -- Core Addon Frames & Locals
 ---============================================================================
-
+ 
 -- Addon UI Frames
 local mainFrame                         = CreateFrame("Frame")
-local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings
-local UIHistory, UIHistoryItemBox
--- local UIHistoryBossBox, UIHistoryPlayerBox
-local _
+local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings, UIHistory, UIHistoryItemBox
 
 -- Local Variables
 local unitName                          = UnitName("player")
