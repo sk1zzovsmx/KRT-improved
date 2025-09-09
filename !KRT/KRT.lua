@@ -243,8 +243,11 @@ local RAID_TARGET_MARKERS               = {
     "{skull}"
 }
 
--- Shared Frame Title String
-local titleString                       = "|cfff58cbaK|r|caaf49141RT|r : %s"
+local K_COLOR                           = "fff58cba"
+local RT_COLOR                          = "aaf49141"
+local titleString                       = Utils.wrapTextInColorCode("K", K_COLOR)
+                                        .. Utils.wrapTextInColorCode("RT", RT_COLOR)
+                                        .. " : %s"
 
 ---============================================================================
 -- Cached Functions & Libraries
@@ -1298,7 +1301,11 @@ do
         end)
         KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
             GameTooltip_SetDefaultAnchor(GameTooltip, self)
-            GameTooltip:SetText("|cfff58cbaKader|r |caad4af37Raid Tools|r")
+            GameTooltip:SetText(
+                Utils.wrapTextInColorCode("Kader", K_COLOR)
+                .. " "
+                .. Utils.wrapTextInColorCode("Raid Tools", "aad4af37")
+            )
             GameTooltip:AddLine(L.StrMinimapLClick, 1, 1, 1)
             GameTooltip:AddLine(L.StrMinimapRClick, 1, 1, 1)
             GameTooltip:AddLine(L.StrMinimapSClick, 1, 1, 1)
@@ -5887,7 +5894,10 @@ do
     local cmdChat     = { "chat", "throttle", "chatthrottle" }
     local cmdMinimap  = { "minimap", "mm" }
 
-    local helpString  = "|caaf49141%s|r: %s"
+    local helpString  = "%s: %s"
+    local function printHelp(cmd, desc)
+        print(helpString:format(Utils.wrapTextInColorCode(cmd, RT_COLOR), desc))
+    end
 
     local function HandleSlashCmd(cmd)
         if not cmd or cmd == "" then return end
@@ -5973,9 +5983,9 @@ do
                 addon:info(L.MsgMinimapPosSet, addon.options.minimapPos)
             else
                 addon:info(format(L.StrCmdCommands, "krt minimap"), "KRT")
-                print(helpString:format("on", L.StrCmdToggle))
-                print(helpString:format("off", L.StrCmdToggle))
-                print(helpString:format("pos <deg>", L.StrCmdMinimapPos))
+                printHelp("on", L.StrCmdToggle)
+                printHelp("off", L.StrCmdToggle)
+                printHelp("pos <deg>", L.StrCmdMinimapPos)
             end
 
             -- ==== Achievement Link ====
@@ -5984,7 +5994,7 @@ do
             local id = string.sub(cmd, from + 12, to - 1)
             from, to = string.find(cmd, "%|cffffff00%|Hachievement%:.*%]%|h%|r")
             local name = string.sub(cmd, from, to)
-            print(helpString:format("KRT", name .. " - ID#" .. id))
+            printHelp("KRT", name .. " - ID#" .. id)
 
             -- ==== Config ====
         elseif Utils.checkEntry(cmdConfig, cmd1) then
@@ -6000,8 +6010,8 @@ do
                 addon.Warnings:Toggle()
             elseif cmd2 == "help" then
                 addon:info(format(L.StrCmdCommands, "krt rw"), "KRT")
-                print(helpString:format("toggle", L.StrCmdToggle))
-                print(helpString:format("[ID]", L.StrCmdWarningAnnounce))
+                printHelp("toggle", L.StrCmdToggle)
+                printHelp("[ID]", L.StrCmdWarningAnnounce)
             else
                 addon.Warnings:Announce(tonumber(cmd2))
             end
@@ -6016,9 +6026,9 @@ do
                 addon.Changes:Announce()
             else
                 addon:info(format(L.StrCmdCommands, "krt ms"), "KRT")
-                print(helpString:format("toggle", L.StrCmdToggle))
-                print(helpString:format("demand", L.StrCmdChangesDemand))
-                print(helpString:format("announce", L.StrCmdChangesAnnounce))
+                printHelp("toggle", L.StrCmdToggle)
+                printHelp("demand", L.StrCmdChangesDemand)
+                printHelp("announce", L.StrCmdChangesAnnounce)
             end
 
             -- ==== Loot History ====
@@ -6041,8 +6051,8 @@ do
                 addon.Reserves:ShowImportBox()
             else
                 addon:info(format(L.StrCmdCommands, "krt res"), "KRT")
-                print(helpString:format("toggle", L.StrCmdToggle))
-                print(helpString:format("import", L.StrCmdReservesImport))
+                printHelp("toggle", L.StrCmdToggle)
+                printHelp("import", L.StrCmdReservesImport)
             end
 
             -- ==== LFM (Spammer) ====
@@ -6065,22 +6075,22 @@ do
                 end
             else
                 addon:info(format(L.StrCmdCommands, "krt pug"), "KRT")
-                print(helpString:format("toggle", L.StrCmdToggle))
-                print(helpString:format("start", L.StrCmdLFMStart))
-                print(helpString:format("stop", L.StrCmdLFMStop))
-                print(helpString:format("period", L.StrCmdLFMPeriod))
+                printHelp("toggle", L.StrCmdToggle)
+                printHelp("start", L.StrCmdLFMStart)
+                printHelp("stop", L.StrCmdLFMStop)
+                printHelp("period", L.StrCmdLFMPeriod)
             end
 
             -- ==== Help fallback ====
         else
             addon:info(format(L.StrCmdCommands, "krt"), "KRT")
-            print(helpString:format("config", L.StrCmdConfig))
-            print(helpString:format("lfm", L.StrCmdGrouper))
-            print(helpString:format("ach", L.StrCmdAchiev))
-            print(helpString:format("changes", L.StrCmdChanges))
-            print(helpString:format("warnings", L.StrCmdWarnings))
-            print(helpString:format("history", L.StrCmdHistory))
-            print(helpString:format("reserves", L.StrCmdReserves))
+            printHelp("config", L.StrCmdConfig)
+            printHelp("lfm", L.StrCmdGrouper)
+            printHelp("ach", L.StrCmdAchiev)
+            printHelp("changes", L.StrCmdChanges)
+            printHelp("warnings", L.StrCmdWarnings)
+            printHelp("history", L.StrCmdHistory)
+            printHelp("reserves", L.StrCmdReserves)
         end
     end
 
