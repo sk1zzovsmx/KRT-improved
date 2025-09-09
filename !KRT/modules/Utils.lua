@@ -14,13 +14,13 @@ local select = select
 local GetLocale = GetLocale
 
 -- Shuffle a table:
-_G.table.shuffle = function(t)
-	local n = #t
-	while n > 2 do
-		local k = random(1, n)
-		t[n], t[k] = t[k], t[n]
-		n = n - 1
-	end
+function Utils.shuffle(t)
+        local n = #t
+        while n > 2 do
+                local k = random(1, n)
+                t[n], t[k] = t[k], t[n]
+                n = n - 1
+        end
 end
 
 -- Fills a table (t1) with missing values from another (t2):
@@ -35,13 +35,13 @@ function Utils.fillTable(t1, t2)
 end
 
 -- DeepCopy:
-_G.table.deepCopy = function(t)
-	if type(t) ~= "table" then return t end
+function Utils.deepCopy(t)
+        if type(t) ~= "table" then return t end
     local mt = getmetatable(t)
     local res = {}
     for k, v in pairs(t) do
         if type(v) == "table" then
-            v = _G.table.deepCopy(v)
+            v = Utils.deepCopy(v)
         end
         res[k] = v
     end
@@ -50,34 +50,34 @@ _G.table.deepCopy = function(t)
 end
 
 -- Reverse table:
-_G.table.reverse = function(t, count)
-	local i, j = 1, #t
-	while i < j do
-		t[i], t[j] = t[j], t[i]
-		i = i + 1
-		j = j - 1
-	end
+function Utils.reverse(t, count)
+        local i, j = 1, #t
+        while i < j do
+                t[i], t[j] = t[j], t[i]
+                i = i + 1
+                j = j - 1
+        end
 end
 
 -- Trim a string:
-_G.string.trim = function(str)
-	return gsub(str, "^%s*(.-)%s*$", "%1")
+function Utils.trim(str)
+        return gsub(str, "^%s*(.-)%s*$", "%1")
 end
 
 -- String starts with:
-_G.string.startsWith = function(str, piece)
-	return strsub(str, 1, strlen(piece)) == piece
+function Utils.startsWith(str, piece)
+        return strsub(str, 1, strlen(piece)) == piece
 end
 
 -- String ends with:
-_G.string.endsWith = function(str, piece)
-	return #str >= #piece and find(str, #str - #piece + 1, true) and true or false
+function Utils.endsWith(str, piece)
+        return #str >= #piece and find(str, #str - #piece + 1, true) and true or false
 end
 
 -- Uppercase first:
-_G.string.ucfirst = function(str)
-	str = lower(str)
-	return gsub(str, "%a", upper, 1)
+function Utils.ucfirst(str)
+        str = lower(str)
+        return gsub(str, "%a", upper, 1)
 end
 
 -- Determines if a given string is a number
@@ -95,22 +95,22 @@ function Utils.isString(str)
 end
 
 -- Math Clamp
-_G.math.clamp = function(val, min, max)
-	if val and val <= min then
-		return min
-	elseif val and val >= max then
-		return max
-	end
-	return val
+function Utils.clamp(val, min, max)
+        if val and val <= min then
+                return min
+        elseif val and val >= max then
+                return max
+        end
+        return val
 end
 
 -- math.round
-_G.math.round = function(num, idp)
-	if idp and idp > 0 then
-		local mult = 10^idp
-		return floor(num * mult + 0.5) / mult
-	end
-	return floor(num + 0.5)
+function Utils.round(num, idp)
+        if idp and idp > 0 then
+                local mult = 10^idp
+                return floor(num * mult + 0.5) / mult
+        end
+        return floor(num + 0.5)
 end
 
 -- RBG to Hex:

@@ -97,7 +97,7 @@ local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
 local pcall                             = pcall
 local format, match, find, strlen       = string.format, string.match, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
-local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
+local tostring, tonumber, ucfirst       = tostring, tonumber, Utils.ucfirst
 local deformat                          = LibStub("LibDeformat-3.0")
 
 -- Returns the used frame's name:
@@ -795,12 +795,12 @@ do
 		local players = Raid:GetPlayers(raidNum)
 		local originalName = name
 		if players ~= nil then
-			name = ucfirst(name:trim())
+                       name = ucfirst(Utils.trim(name))
 			for i, p in ipairs(players) do
 				if name == p.name then
 					found = true
 					break
-				elseif strlen(name) >= 5 and p.name:startsWith(name) then
+                               elseif strlen(name) >= 5 and Utils.startsWith(p.name, name) then
 					name = p.name
 					found = true
 					break
@@ -1964,7 +1964,7 @@ do
 				addon:Announce(format(L.ChatPlayerRolled, player, roll))
 				return
 			end
-			winner = player:trim()
+                       winner = Utils.trim(player)
 			addon:FetchRolls()
 			Utils.sync("KRT-RollWinner", player)
 		end
@@ -2493,16 +2493,16 @@ do
 	-- Saved Data
 	----------------------------------------------------------------
 	function Reserves:Save()
-		addon:Debug("DEBUG", "Saving reserves data. Entries: %d", Utils.tableLen(reservesData))
-		KRT_SavedReserves = table.deepCopy(reservesData)
-		KRT_SavedReserves.reservesByItemID = table.deepCopy(reservesByItemID)
+               addon:Debug("DEBUG", "Saving reserves data. Entries: %d", Utils.tableLen(reservesData))
+               KRT_SavedReserves = Utils.deepCopy(reservesData)
+               KRT_SavedReserves.reservesByItemID = Utils.deepCopy(reservesByItemID)
 	end
 
 	function Reserves:Load()
-		addon:Debug("DEBUG", "Loading reserves. Data exists: %s", tostring(KRT_SavedReserves ~= nil))
-		if KRT_SavedReserves then
-			reservesData = table.deepCopy(KRT_SavedReserves)
-			reservesByItemID = table.deepCopy(KRT_SavedReserves.reservesByItemID or {})
+               addon:Debug("DEBUG", "Loading reserves. Data exists: %s", tostring(KRT_SavedReserves ~= nil))
+               if KRT_SavedReserves then
+                       reservesData = Utils.deepCopy(KRT_SavedReserves)
+                       reservesByItemID = Utils.deepCopy(KRT_SavedReserves.reservesByItemID or {})
 		else
 			reservesData = {}
 			reservesByItemID = {}
@@ -2642,7 +2642,7 @@ do
 	----------------------------------------------------------------
 	-- Get specific reserve for a player:
 	function Reserves:GetReserve(playerName)
-		local player = playerName:lower():trim()
+               local player = Utils.trim(playerName:lower())
 		local reserve = reservesData[player]
 
 		-- Log when the function is called and show the reserve for the player
@@ -2669,7 +2669,7 @@ do
 
 		local function cleanCSVField(field)
 			if not field then return nil end
-			return field:gsub('^"(.-)"$', '%1'):trim()
+                       return Utils.trim(field:gsub('^"(.-)"$', '%1'))
 		end
 
 		local firstLine = true
@@ -2690,8 +2690,8 @@ do
 				plus                                                            = cleanCSVField(plus)
 
 				local itemId                                                    = tonumber(itemIdStr)
-				local normalized                                                = playerName and
-					playerName:lower():trim()
+                               local normalized                                                = playerName and
+                                       Utils.trim(playerName:lower())
 
 				if normalized and itemId then
 					-- Log the player being processed
@@ -3399,8 +3399,8 @@ do
 	-- Saving a Warning:
 	function SaveWarning(wContent, wName, wID)
 		wID = wID and tonumber(wID) or 0
-		wName = tostring(wName):trim()
-		wContent = tostring(wContent):trim()
+               wName = Utils.trim(tostring(wName))
+               wContent = Utils.trim(tostring(wContent))
 		if wName == "" then
 			wName = (isEdit and wID > 0) and wID or (#KRT_Warnings + 1)
 		end
@@ -3708,8 +3708,8 @@ do
 	-- Save Changes:
 	function SaveChanges(name, spec)
 		if not KRT_CurrentRaid or not name then return end
-		name = ucfirst(name:trim())
-		spec = ucfirst(spec:trim())
+               name = ucfirst(Utils.trim(name))
+               spec = ucfirst(Utils.trim(spec))
 		-- Is the player in the raid?
 		local found
 		found, name = addon.Raid:CheckPlayer(name)
@@ -3808,7 +3808,7 @@ do
 				Utils.removeEntry(KRT_Spammer.Channels, channel)
 			end
 		else
-			local value = box:GetText():trim()
+                       local value = Utils.trim(box:GetText())
 			value = (value == "") and nil or value
 			KRT_Spammer[target] = value
 			box:ClearFocus()
@@ -3945,19 +3945,19 @@ do
 			-- We build the message only if the frame is shown
 			if UISpammer:IsShown() then
 				channels    = KRT_Spammer.Channels or {}
-				name        = _G[frameName .. "Name"]:GetText():trim()
+                               name        = Utils.trim(_G[frameName .. "Name"]:GetText())
 				tank        = tonumber(_G[frameName .. "Tank"]:GetText()) or 0
-				tankClass   = _G[frameName .. "TankClass"]:GetText():trim()
+                               tankClass   = Utils.trim(_G[frameName .. "TankClass"]:GetText())
 				healer      = tonumber(_G[frameName .. "Healer"]:GetText()) or 0
-				healerClass = _G[frameName .. "HealerClass"]:GetText():trim()
+                               healerClass = Utils.trim(_G[frameName .. "HealerClass"]:GetText())
 				melee       = tonumber(_G[frameName .. "Melee"]:GetText()) or 0
-				meleeClass  = _G[frameName .. "MeleeClass"]:GetText():trim()
+                               meleeClass  = Utils.trim(_G[frameName .. "MeleeClass"]:GetText())
 				ranged      = tonumber(_G[frameName .. "Ranged"]:GetText()) or 0
-				rangedClass = _G[frameName .. "RangedClass"]:GetText():trim()
-				message     = _G[frameName .. "Message"]:GetText():trim()
+                               rangedClass = Utils.trim(_G[frameName .. "RangedClass"]:GetText())
+                               message     = Utils.trim(_G[frameName .. "Message"]:GetText())
 
-				local temp  = output
-				if string.trim(name) ~= "" then temp = temp .. " " .. name end
+                               local temp  = output
+                               if Utils.trim(name) ~= "" then temp = temp .. " " .. name end
 				if tank > 0 or healer > 0 or melee > 0 or ranged > 0 then
 					temp = temp .. " - Need"
 					if tank > 0 then
@@ -4035,8 +4035,8 @@ do
 		end
 	end
 
-	function FindAchievement(inp)
-		local out = inp:trim()
+       function FindAchievement(inp)
+               local out = Utils.trim(inp)
 		if out and out ~= "" and find(out, "%{%d*%}") then
 			local b, e = find(out, "%{%d*%}")
 			local id = strsub(out, b + 1, e - 1)
@@ -4288,7 +4288,7 @@ do
 				self.itemId = nil
 			end,
 			OnAccept     = function(self)
-				local name = self.editBox:GetText():trim()
+                               local name = Utils.trim(self.editBox:GetText())
 
 				if name ~= "" and self.raidId and KRT_Raids[self.raidId] then
 					for i, player in ipairs(KRT_Raids[self.raidId].players) do
@@ -5474,9 +5474,9 @@ do
 	function BossBox:Save()
 		selectedRaid = addon.Logger.selectedRaid
 		if not selectedRaid then return end
-		local name = _G[frameName .. "Name"]:GetText():trim()
-		local diff = _G[frameName .. "Difficulty"]:GetText():trim()
-		local bTime = _G[frameName .. "Time"]:GetText():trim()
+               local name = Utils.trim(_G[frameName .. "Name"]:GetText())
+               local diff = Utils.trim(_G[frameName .. "Difficulty"]:GetText())
+               local bTime = Utils.trim(_G[frameName .. "Time"]:GetText())
 		-- Check the name:
 		name = (name == "") and "_TrashMob_" or name
 		-- Check the difficulty:
@@ -5619,9 +5619,9 @@ do
 	end
 
 	function AttendeesBox:Save()
-		local name = _G[frameName .. "Name"]:GetText()
-		-- invalid name provided.
-		if name:trim() == "" then
+               local name = _G[frameName .. "Name"]:GetText()
+               -- invalid name provided.
+               if Utils.trim(name) == "" then
 			addon:PrintError(L.ErrAttendeesInvalidName)
 			return
 		end
