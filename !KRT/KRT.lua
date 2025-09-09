@@ -1317,9 +1317,14 @@ do
         end)
         KRT_MINIMAP_GUI:SetScript("OnMouseUp", function(self)
             self:SetScript("OnUpdate", nil)
+            if dragMode == "free" then
+                dragMode = nil
+                return
+            end
             local mx, my = Minimap:GetCenter()
             local bx, by = self:GetCenter()
             module:SetPos(deg(atan2(by - my, bx - mx)))
+            dragMode = nil
         end)
         KRT_MINIMAP_GUI:SetScript("OnClick", function(self, button, down)
             -- Ignore clicks if Shift or Alt keys are held:
