@@ -55,6 +55,8 @@ end
 local IsInRaid      = addon.IsInRaid
 local UnitIterator  = addon.UnitIterator
 local After         = addon.After
+local NewTicker     = addon.NewTicker
+local CancelTimer   = addon.CancelTimer
 local GetCreatureId = addon.GetCreatureId
 
 function addon:Debug(level, fmt, ...)
@@ -345,6 +347,8 @@ do
     --
     function module:UpdateRaidRoster()
         if not KRT_CurrentRaid then return end
+        CancelTimer(module.updateRosterHandle, true)
+        module.updateRosterHandle = nil
         local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
         numRaid = count
         if numRaid == 0 then
@@ -414,7 +418,6 @@ do
             end
             v.seen = nil
         end
-        Utils.unschedule(module.UpdateRaidRoster)
     end
 
     --
@@ -475,7 +478,8 @@ do
         tinsert(KRT_Raids, raidInfo)
         KRT_CurrentRaid = #KRT_Raids
         Utils.triggerEvent("RaidCreate", KRT_CurrentRaid)
-        Utils.schedule(3, module.UpdateRaidRoster)
+        CancelTimer(module.updateRosterHandle, true)
+        module.updateRosterHandle = After(3, function() module:UpdateRaidRoster() end)
     end
 
     --
@@ -483,7 +487,8 @@ do
     --
     function module:End()
         if not KRT_CurrentRaid then return end
-        Utils.unschedule(module.UpdateRaidRoster)
+        CancelTimer(module.updateRosterHandle, true)
+        module.updateRosterHandle = nil
         local currentTime = Utils.getCurrentTime()
         for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
             if not v.leave then v.leave = currentTime end
@@ -526,14 +531,15 @@ do
     --
     function module:FirstCheck()
         if module.firstCheckHandle then
-            Utils.unschedule(module.firstCheckHandle)
+            CancelTimer(module.firstCheckHandle, true)
             module.firstCheckHandle = nil
         end
         local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
         if count == 0 then return end
 
         if KRT_CurrentRaid and module:CheckPlayer(unitName, KRT_CurrentRaid) then
-            Utils.schedule(2, module.UpdateRaidRoster)
+            CancelTimer(module.updateRosterHandle, true)
+            module.updateRosterHandle = After(2, function() module:UpdateRaidRoster() end)
             return
         end
 
@@ -2793,10 +2799,30 @@ do
 
     local rows, raidPlayers = {}, {}
     local wipe = wipe or table.wipe
-    local countsFrame, scrollChild, needsUpdate = nil, nil, false
-    
+    local countsFrame, scrollChild, needsUpdate, countsTicker = nil, nil, false, nil
+
     local function RequestCountsUpdate()
         needsUpdate = true
+    end
+
+    local function TickCounts()
+        if needsUpdate then
+            needsUpdate = false
+            addon.Master:UpdateCountsFrame()
+        end
+    end
+
+    local function StartCountsTicker()
+        if not countsTicker then
+            countsTicker = NewTicker(0.1, TickCounts)
+        end
+    end
+
+    local function StopCountsTicker()
+        if countsTicker then
+            CancelTimer(countsTicker, true)
+            countsTicker = nil
+        end
     end
 
     -- Helper to ensure frames exist
@@ -2804,12 +2830,8 @@ do
         countsFrame = countsFrame or _G["KRTLootCounterFrame"]
         scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         if countsFrame and not countsFrame._krtCounterHook then
-            countsFrame:SetScript("OnUpdate", function()
-                if needsUpdate and Utils.throttleKey("LootCounter", 0.1) then
-                    needsUpdate = false
-                    addon.Master:UpdateCountsFrame()
-                end
-            end)
+            countsFrame:SetScript("OnShow", StartCountsTicker)
+            countsFrame:SetScript("OnHide", StopCountsTicker)
             countsFrame._krtCounterHook = true
         end
     end
@@ -4323,7 +4345,6 @@ do
     -------------------------------------------------------
     -- Internal state
     -------------------------------------------------------
-    local spamFrame = CreateFrame("Frame")
     local frameName
 
     local LocalizeUIFrame
@@ -4331,6 +4352,7 @@ do
 
     local UpdateUIFrame
     local updateInterval = 0.05
+    local updateTicker
 
     -------------------------------------------------------
     -- Private helpers
@@ -4367,7 +4389,12 @@ do
         UISpammer = frame
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
-        frame:SetScript("OnUpdate", UpdateUIFrame)
+        if updateTicker then
+            CancelTimer(updateTicker, true)
+        end
+        updateTicker = NewTicker(updateInterval, function()
+            if UISpammer then UpdateUIFrame(UISpammer, updateInterval) end
+        end)
     end
 
     -- Toggle frame visibility:
@@ -4649,17 +4676,13 @@ do
         return out
     end
 
-    -- To spam even if the frame is closed:
-    spamFrame:SetScript("OnUpdate", function(self, elapsed)
-        if UISpammer then UpdateUIFrame(UISpammer, elapsed) end
-    end)
 end
 
 -- Lightweight LFM scheduler
 do
     local U = addon.Utils
     local S = addon.Spammer
-    local running
+    local ticker
 
     local function Send(msg)
         if U.throttleKey("lfm_msg", _G.KRT_Options.chatThrottle or 2.0) then
@@ -4668,30 +4691,31 @@ do
     end
 
     local function Tick()
-        if not running then return end
         local msg = addon.L.LFM_TEMPLATE or "[KRT] LFM: {raid} {roles} {time}"
         local raidName = GetRealZoneText() or "Raid"
         local text = msg:gsub("{raid}", raidName):gsub("{roles}", "T/H/D"):gsub("{time}", date("%H:%M"))
         Send(text)
-        U.scheduleDelay(_G.KRT_Options.lfmPeriod or 45, Tick)
     end
 
     function S:Init() end
 
     function S:Start()
-        if running then return end
-        running = true
+        if ticker then return end
         Tick()
+        ticker = NewTicker(_G.KRT_Options.lfmPeriod or 45, Tick)
         addon.History.Loot:Log("LFM started")
     end
 
     function S:Stop()
-        running = false
+        if ticker then
+            CancelTimer(ticker, true)
+            ticker = nil
+        end
         addon.History.Loot:Log("LFM stopped")
     end
 
     function S:Toggle()
-        if running then
+        if ticker then
             S:Stop()
         else
             S:Start()
@@ -6146,7 +6170,7 @@ function addon:RAID_INSTANCE_WELCOME(...)
     local instanceName, instanceType, instanceDiff = GetInstanceInfo()
     _, KRT_NextReset = ...
     if L.RaidZones[instanceName] ~= nil then
-        Utils.schedule(3, function()
+        After(3, function()
             addon.Raid:Check(instanceName, instanceDiff)
         end)
     end
@@ -6158,7 +6182,8 @@ end
 function addon:PLAYER_ENTERING_WORLD()
     mainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
     local module = self.Raid
-    module.firstCheckHandle = Utils.schedule(3, module.FirstCheck, module)
+    CancelTimer(module.firstCheckHandle, true)
+    module.firstCheckHandle = After(3, function() module:FirstCheck() end)
 end
 
 --
