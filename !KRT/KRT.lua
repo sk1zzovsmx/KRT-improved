@@ -1038,15 +1038,14 @@ do
     -- Gets a player's unit ID (e.g., "raid1").
     --
     function module:GetUnitID(name)
-        local players = module:GetPlayers()
         local id = "none"
-        local resolvedName = name
-        if players then
-            for i, p in ipairs(players) do
-                if p.name == name then
-                    id = "raid" .. tostring(i)
-                    break
-                end
+        if not IsInGroup() or not name then
+            return id
+        end
+        for unit in UnitIterator(true) do
+            if UnitName(unit) == name then
+                id = unit
+                break
             end
         end
         return id
