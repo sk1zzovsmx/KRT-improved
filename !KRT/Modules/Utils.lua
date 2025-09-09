@@ -10,9 +10,6 @@ if Compat and Compat.Embed then
        Compat:Embed(Utils) -- Utils.After, Utils.UnitIterator, Utils.Table, etc.
 end
 
--- Back-compat/lightweight aliases
-Utils.getNpcId = Utils.GetCreatureId -- use LibCompat's creature id extractor
-
 -- Uniform color helper
 function Utils.colorText(text, r, g, b)
        return Utils.WrapTextInColorCode(text, "ff" .. Utils.RGBPercToHex(r or 1, g or 0.82, b or 0))
