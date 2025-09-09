@@ -1599,6 +1599,7 @@ do
     -- Returns the highest roll value from the current winner.
     --
     function module:HighestRoll()
+        if not winner or rollsCount == 0 then return 0 end
         for i = 1, rollsCount do
             if rollsTable[i].name == winner then
                 addon:Debug("DEBUG", "HighestRoll: %s rolled %d", winner, rollsTable[i].roll)
