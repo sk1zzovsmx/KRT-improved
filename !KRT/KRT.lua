@@ -1690,6 +1690,9 @@ do
                         starTarget = name
                     end
                 end
+                if isSR and not starTarget then
+                    starTarget = winner
+                end
                 addon:Debug("DEBUG", "Top SR roll by: %s", tostring(starTarget))
             else
                 starTarget = winner
