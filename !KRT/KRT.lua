@@ -37,17 +37,25 @@ KRT_PlayerCounts                        = KRT_PlayerCounts or {}
 ---============================================================================
 local LibStub = _G.LibStub
 if LibStub then
-    addon.Compat = addon.Compat or LibStub("LibCompat-1.0", true)
-    addon.Logger = addon.Logger or LibStub("LibLogger-1.0", true)
-    addon.Deformat = addon.Deformat or LibStub("LibDeformat-3.0", true)
-    addon.BossIDs = addon.BossIDs or LibStub("LibBossIDs-1.0", true)
-    addon.CallbackHandler = addon.CallbackHandler or LibStub("CallbackHandler-1.0", true)
+    addon.Compat   = LibStub("LibCompat-1.0",   true)
+    addon.BossIDs  = LibStub("LibBossIDs-1.0",  true)
+    addon.Logger   = LibStub("LibLogger-1.0",   true)
+    addon.Deformat = LibStub("LibDeformat-3.0", true)
+    addon.CallbackHandler = LibStub("CallbackHandler-1.0", true)
 
-    if addon.Compat and addon.Compat.Embed then addon.Compat:Embed(addon) end
-    if addon.Logger and addon.Logger.Embed then addon.Logger:Embed(addon) end
+    if addon.Compat and addon.Compat.Embed then
+        addon.Compat:Embed(addon) -- <— mixin: After, UnitIterator, GetCreatureId, ecc.
+    end
+    if addon.Logger and addon.Logger.Embed then
+        addon.Logger:Embed(addon)
+    end
 end
 
-local IsInRaid = addon.IsInRaid
+-- Alias locali (safe e veloci)
+local IsInRaid      = addon.IsInRaid
+local UnitIterator  = addon.UnitIterator
+local After         = addon.After
+local GetCreatureId = addon.GetCreatureId
 
 function addon:Debug(level, fmt, ...)
     if not self.Logger then return end
@@ -333,7 +341,7 @@ do
     --
     function module:UpdateRaidRoster()
         if not KRT_CurrentRaid then return end
-        local count = addon:IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
+        local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
         numRaid = count
         if numRaid == 0 then
             module:End()
@@ -345,7 +353,7 @@ do
         local raid = KRT_Raids[KRT_CurrentRaid]
         raid.playersByName = raid.playersByName or {}
         local playersByName = raid.playersByName
-        for unit in addon:UnitIterator() do
+        for unit in UnitIterator(true) do
             local name = UnitName(unit)
             if name then
                 local index = UnitInRaid(unit)
@@ -574,7 +582,7 @@ do
             instanceDiff = instanceDiff + (2 * dynDiff)
         end
         local players = {}
-        for unit in addon:UnitIterator() do
+        for unit in UnitIterator(true) do
             if UnitIsConnected(unit) then -- track only online players
                 local name = UnitName(unit)
                 if name then
