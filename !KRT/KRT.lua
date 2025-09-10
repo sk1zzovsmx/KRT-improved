@@ -781,12 +781,10 @@ do
     -- Returns raid size: 10 or 25.
     --
     function module:GetRaidSize()
-        local size = 0
-        if IsInRaid() then
-            local diff = GetRaidDifficulty()
-            size = (diff == 1 or diff == 3) and 10 or 25
-        end
-        return size
+        if not IsInRaid() then return 0 end
+        local diff = GetRaidDifficulty and GetRaidDifficulty() or (GetRaidDifficultyID and GetRaidDifficultyID())
+        if not diff then return (GetNumGroupMembers() > 10) and 25 or 10 end
+        return (diff == 1 or diff == 3) and 10 or 25
     end
 
     --
