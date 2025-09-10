@@ -297,23 +297,14 @@ function Utils.chat(msg, channel, language, target, bypass)
 	SendChatMessage(tostring(msg), channel, language, target)
 end
 
--- Send a whisper to a player by his/her character name or BNet ID
+-- Send a whisper to a player by his/her character name
 -- Returns true if the message was sent, nil otherwise
 function Utils.whisper(target, msg)
-	if type(target) == "number" then
-		-- Make sure to never send BNet whispers to ourselves.
-		if not BNIsSelf(target) then
-			BNSendWhisper(target, msg)
-			return true
-		end
-	elseif type(target) == "string" then
-		-- Unlike above, it is sometimes useful to whisper ourselves.
-		SendChatMessage(msg, "WHISPER", nil, target)
-		return true
-	end
+        if type(target) == "string" and msg then
+                SendChatMessage(msg, "WHISPER", nil, target)
+                return true
+        end
 end
-
--- local BNSendWhisper = Utils.whisper --
 
 -- Returns the current UTC date and time in seconds:
 function Utils.getUTCTimestamp()
