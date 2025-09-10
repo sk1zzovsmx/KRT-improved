@@ -26,6 +26,7 @@ Templates.xml
 # Utilities & Core Files:
 Modules\Utils.lua
 Modules\C.lua
+RefactorHelpers.lua
 KRT.lua
 KRT.xml
 
