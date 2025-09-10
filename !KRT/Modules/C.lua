@@ -17,7 +17,6 @@ C.rollTypes = {
     BANK       = 5,
     DISENCHANT = 6,
     HOLD       = 7,
-    DKP        = 8,
 }
 
 -- Roll Type Display Text
@@ -40,7 +39,6 @@ C.lootTypesColored = {
     "|cffff7f00" .. L.BtnBank .. "|r",
     "|cffff2020" .. L.BtnDisenchant .. "|r",
     "|cffffffff" .. L.BtnHold .. "|r",
-    "|cff20ff20DKP|r",
 }
 
 -- Item Quality Colors
