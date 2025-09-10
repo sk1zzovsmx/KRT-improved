@@ -2060,6 +2060,7 @@ do
 
     local countdownRun = false
     local countdownStart, countdownPos = 0, 0
+    local ceil = math.ceil
 
     local AssignItem, TradeItem
     local screenshotWarn = false
