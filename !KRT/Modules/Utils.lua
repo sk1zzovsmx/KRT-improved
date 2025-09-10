@@ -3,12 +3,16 @@ addon.Utils            = addon.Utils or {}
 
 local Utils            = addon.Utils
 local L                = addon.L
-local Compat           = addon.Compat or (LibStub and LibStub("LibCompat-1.0"))
-Compat:Embed(Utils)
-Utils.tCopy     = Compat.tCopy
-Utils.tLength   = Compat.tLength
-Utils.tContains = Compat.tContains
-Utils.tIndexOf  = Compat.tIndexOf
+local LibStub          = _G.LibStub
+local Compat           = addon.Compat or (LibStub and LibStub("LibCompat-1.0", true))
+if Compat then
+        addon.Compat = Compat
+        Compat:Embed(Utils)
+        Utils.tCopy     = Compat.tCopy
+        Utils.tLength   = Compat.tLength
+        Utils.tContains = Compat.tContains
+        Utils.tIndexOf  = Compat.tIndexOf
+end
 
 -- Practical helper aliases
 function Utils.after(sec, fn) return Utils.After(sec, fn) end
