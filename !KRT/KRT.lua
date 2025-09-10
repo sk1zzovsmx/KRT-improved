@@ -2809,28 +2809,31 @@ do
             addon.Loot:ClearLoot()
             addon.Rolls:ClearRolls(false)
             addon.Raid:ClearRaidIcons()
-        elseif CheckInteractDistance(playerName, 2) == 1 then
-            -- Player is in range for trade
-            if itemInfo.isStack and not addon.options.ignoreStacks then
-                addon:warn(L.ErrItemStack:format(itemLink))
-                return false
-            end
-            ClearCursor()
-            PickupContainerItem(itemInfo.bagID, itemInfo.slotID)
-            if CursorHasItem() then
-                InitiateTrade(playerName)
-                if addon.options.screenReminder and not screenshotWarn then
-                    addon:warn(L.ErrScreenReminder)
-                    screenshotWarn = true
+        else
+            local unit = addon.Raid:GetUnitID(playerName)
+            if unit ~= "none" and CheckInteractDistance(unit, 2) == 1 then
+                -- Player is in range for trade
+                if itemInfo.isStack and not addon.options.ignoreStacks then
+                    addon:warn(L.ErrItemStack:format(itemLink))
+                    return false
                 end
+                ClearCursor()
+                PickupContainerItem(itemInfo.bagID, itemInfo.slotID)
+                if CursorHasItem() then
+                    InitiateTrade(playerName)
+                    if addon.options.screenReminder and not screenshotWarn then
+                        addon:warn(L.ErrScreenReminder)
+                        screenshotWarn = true
+                    end
+                end
+                -- Cannot trade the player?
+            elseif unit ~= "none" then
+                -- Player is out of range
+                addon.Raid:ClearRaidIcons()
+                SetRaidTarget(trader, 1)
+                SetRaidTarget(winner, 4)
+                output = L.ChatTrade:format(playerName, itemLink)
             end
-            -- Cannot trade the player?
-        elseif addon.Raid:GetUnitID(playerName) ~= "none" then
-            -- Player is out of range
-            addon.Raid:ClearRaidIcons()
-            SetRaidTarget(trader, 1)
-            SetRaidTarget(winner, 4)
-            output = L.ChatTrade:format(playerName, itemLink)
         end
 
         if not announced then
