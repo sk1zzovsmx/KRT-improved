@@ -49,15 +49,6 @@ if addon.Logger and addon.Logger.Embed then
     addon.Logger:Embed(addon)
 end
 
-do
-    local _WrapTextInColorCode = addon.WrapTextInColorCode
-    if _WrapTextInColorCode then
-        function addon:WrapTextInColorCode(text, colorHex)
-            return _WrapTextInColorCode(text, colorHex)
-        end
-    end
-end
-
 -- Alias locali (safe e veloci)
 local IsInRaid             = addon.IsInRaid
 local IsInGroup            = addon.IsInGroup
@@ -1111,7 +1102,7 @@ do
     local output          = "%s: %s"
     local chatPrefix      = "Kader Raid Tools"
     local chatPrefixShort = "KRT"
-    local prefixHex       = Utils.rgbToHex(245 / 255, 140 / 255, 186 / 255)
+    local prefixHex       = "ff" .. Utils.rgbToHex(245 / 255, 140 / 255, 186 / 255)
 
     --
     -- Prepares the final output string with a prefix.
