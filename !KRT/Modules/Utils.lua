@@ -8,11 +8,12 @@ local LibStub          = _G.LibStub
 -- Library helper: caches LibStub lookups
 function addon:GetLib(name, silent)
         self.libs = self.libs or {}
-        local lib = self.libs[name]
-        if not lib and LibStub then
-                lib = LibStub(name, silent)
-                self.libs[name] = lib
+        local cached = self.libs[name]
+        if cached ~= nil then
+                return cached or nil
         end
+        local lib = LibStub and LibStub(name, silent)
+        self.libs[name] = lib or false
         return lib
 end
 
