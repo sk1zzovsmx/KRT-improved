@@ -205,14 +205,14 @@ local lootTypesText                     = {
 
 -- Roll Type Colored Display Text
 local lootTypesColored                  = {
-    addon:WrapTextInColorCode(L.BtnMS, GREEN_FONT_COLOR_CODE:sub(3)),
-    addon:WrapTextInColorCode(L.BtnOS, LIGHTYELLOW_FONT_COLOR_CODE:sub(3)),
+    addon:WrapTextInColorCode(L.BtnMS, "ff" .. GREEN_FONT_COLOR_CODE:sub(5)),
+    addon:WrapTextInColorCode(L.BtnOS, "ff" .. LIGHTYELLOW_FONT_COLOR_CODE:sub(5)),
     addon:WrapTextInColorCode(L.BtnSR, "ffa335ee"),
-    addon:WrapTextInColorCode(L.BtnFree, NORMAL_FONT_COLOR_CODE:sub(3)),
-    addon:WrapTextInColorCode(L.BtnBank, ORANGE_FONT_COLOR_CODE:sub(3)),
-    addon:WrapTextInColorCode(L.BtnDisenchant, RED_FONT_COLOR_CODE:sub(3)),
-    addon:WrapTextInColorCode(L.BtnHold, HIGHLIGHT_FONT_COLOR_CODE:sub(3)),
-    addon:WrapTextInColorCode("DKP", GREEN_FONT_COLOR_CODE:sub(3)),
+    addon:WrapTextInColorCode(L.BtnFree, "ff" .. NORMAL_FONT_COLOR_CODE:sub(5)),
+    addon:WrapTextInColorCode(L.BtnBank, "ff" .. ORANGE_FONT_COLOR_CODE:sub(5)),
+    addon:WrapTextInColorCode(L.BtnDisenchant, "ff" .. RED_FONT_COLOR_CODE:sub(5)),
+    addon:WrapTextInColorCode(L.BtnHold, "ff" .. HIGHLIGHT_FONT_COLOR_CODE:sub(5)),
+    addon:WrapTextInColorCode("DKP", "ff" .. GREEN_FONT_COLOR_CODE:sub(5)),
 }
 
 -- Item Quality Colors
