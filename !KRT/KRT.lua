@@ -667,11 +667,8 @@ do
         -- Other Loot Rolls
         if not player or not itemLink then
             itemCount = 1
-            player, itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
-            if not itemLink then
-                player = unitName
-                itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
-            end
+            itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
+            player = unitName
         end
         if not itemLink then return end
         local _, _, itemString = string.find(itemLink, "^|c%x+|H(.+)|h%[.*%]")
