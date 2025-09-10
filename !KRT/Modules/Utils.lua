@@ -3,6 +3,8 @@ addon.Utils            = addon.Utils or {}
 
 local Utils            = addon.Utils
 local L                = addon.L
+local LibStub          = _G.LibStub
+
 local Compat           = addon.Compat or (LibStub and LibStub("LibCompat-1.0"))
 Compat:Embed(Utils)
 Utils.tCopy     = Compat.tCopy
