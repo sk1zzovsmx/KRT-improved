@@ -4,17 +4,11 @@ addon.Utils = addon.Utils or {}
 local Utils   = addon.Utils
 local L       = addon.L
 local Compat  = addon.Compat
-
--- Embed LibCompat mixins onto Utils for convenience
-if Compat and Compat.Embed then
-       Compat:Embed(Utils) -- Utils.After, Utils.UnitIterator, Utils.Table, etc.
-end
-
--- LibCompat aliases
-Utils.tCopy     = Compat and Compat.tCopy
-Utils.tLength   = Compat and Compat.tLength
-Utils.tContains = (Compat and Compat.tContains) or tContains
-Utils.tIndexOf  = Compat and Compat.tIndexOf
+Compat:Embed(Utils)
+Utils.tCopy     = Compat.tCopy
+Utils.tLength   = Compat.tLength
+Utils.tContains = Compat.tContains
+Utils.tIndexOf  = Compat.tIndexOf
 
 -- Practical helper aliases
 function Utils.after(sec, fn) return Utils.After(sec, fn) end
@@ -42,7 +36,6 @@ local lower, upper = string.lower, string.upper
 local select, unpack = select, unpack
 local GetLocale = GetLocale
 local GetTime = GetTime
-local tContains = tContains
 
 -- Lightweight throttle (keyed)
 local last = {}
@@ -141,15 +134,12 @@ function Utils.rgbToHex(r, g, b)
         if r and g and b and r <= 1 and g <= 1 and b <= 1 then
                 r, g, b = r * 255, g * 255, b * 255
         end
-        if Compat and Compat.RGBToHex then
-                return Compat.RGBToHex(r, g, b)
-        end
-        return format("%02x%02x%02x", r, g, b)
+        return Compat.RGBToHex(r, g, b)
 end
 
 function addon.GetClassColor(name)
         name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
-        local c = Compat and Compat.GetClassColorObj and Compat.GetClassColorObj(name)
+        local c = Compat.GetClassColorObj(name)
         if not c then
                 return 1, 1, 1
         end
@@ -204,9 +194,7 @@ function Utils.showHide(frame, cond)
 end
 
 function Utils.createPool(frameType, parent, template, resetter)
-        if Compat and Compat.CreateFramePool then
-                return Compat.CreateFramePool(frameType, parent, template, resetter)
-        end
+        return Compat.CreateFramePool(frameType, parent, template, resetter)
 end
 
 -- Lock/Unlock Highlight:
