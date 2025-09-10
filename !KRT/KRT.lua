@@ -2866,7 +2866,7 @@ do
     local module = addon.Master
 
     local rows, raidPlayers = {}, {}
-    local wipe = wipe or table.wipe
+    local twipe = twipe
     local countsFrame, scrollChild, needsUpdate, countsTicker = nil, nil, false, nil
 
     local function RequestCountsUpdate()
@@ -2906,7 +2906,7 @@ do
 
     -- Return sorted array of player names currently in the raid.
     local function GetCurrentRaidPlayers()
-        wipe(raidPlayers)
+        twipe(raidPlayers)
         if not IsInGroup() then
             return raidPlayers
         end
@@ -4906,10 +4906,10 @@ local function MakeListController(cfg)
         localized  = false,
         data       = {},
         _asc       = false,
-        _rows      = {},       -- pool ordinato per indice
-        _rowByName = {},       -- cache name->frame
-        _lastHL    = nil,      -- ultimo id evidenziato
-        _active    = true,     -- aggiorna solo se visibile
+        _rows      = {},   -- pool ordinato per indice
+        _rowByName = {},   -- cache name->frame
+        _lastHL    = nil,  -- ultimo id evidenziato
+        _active    = true, -- aggiorna solo se visibile
         _lastWidth = nil,
     }
 
