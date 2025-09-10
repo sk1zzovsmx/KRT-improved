@@ -4,7 +4,19 @@ addon.Utils            = addon.Utils or {}
 local Utils            = addon.Utils
 local L                = addon.L
 local LibStub          = _G.LibStub
-local Compat           = addon.Compat or (LibStub and LibStub("LibCompat-1.0", true))
+
+-- Library helper: caches LibStub lookups
+function addon:GetLib(name, silent)
+        self.libs = self.libs or {}
+        local lib = self.libs[name]
+        if not lib and LibStub then
+                lib = LibStub(name, silent)
+                self.libs[name] = lib
+        end
+        return lib
+end
+
+local Compat = addon:GetLib("LibCompat-1.0", true)
 if Compat then
         addon.Compat = Compat
         Compat:Embed(Utils)
