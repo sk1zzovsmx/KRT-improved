@@ -4,11 +4,6 @@ addon.C               = addon.C or {}
 local C               = addon.C
 local L               = addon.L
 
-local Compat          = addon:GetLib("LibCompat-1.0", true)
-if Compat and Compat.Embed then
-    Compat:Embed(addon)
-end
-
 C.ITEM_LINK_PATTERN =
     "|?c?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?" ..
     "(%-?%d*):?(%-?%d*):?(%d*)|?h?%[?([^%[%]]*)%]?|?h?|?r?"
@@ -38,14 +33,14 @@ C.lootTypesText = {
 
 -- Roll Type Colored Display Text
 C.lootTypesColored = {
-    addon:WrapTextInColorCode(L.BtnMS, "ff" .. GREEN_FONT_COLOR_CODE:sub(5)),
-    addon:WrapTextInColorCode(L.BtnOS, "ff" .. LIGHTYELLOW_FONT_COLOR_CODE:sub(5)),
-    addon:WrapTextInColorCode(L.BtnSR, "ffa335ee"),
-    addon:WrapTextInColorCode(L.BtnFree, "ff" .. NORMAL_FONT_COLOR_CODE:sub(5)),
-    addon:WrapTextInColorCode(L.BtnBank, "ff" .. ORANGE_FONT_COLOR_CODE:sub(5)),
-    addon:WrapTextInColorCode(L.BtnDisenchant, "ff" .. RED_FONT_COLOR_CODE:sub(5)),
-    addon:WrapTextInColorCode(L.BtnHold, "ff" .. HIGHLIGHT_FONT_COLOR_CODE:sub(5)),
-    addon:WrapTextInColorCode("DKP", "ff" .. GREEN_FONT_COLOR_CODE:sub(5)),
+    "|cff20ff20" .. L.BtnMS .. "|r",
+    "|cffffff9f" .. L.BtnOS .. "|r",
+    "|cffa335ee" .. L.BtnSR .. "|r",
+    "|cffffd200" .. L.BtnFree .. "|r",
+    "|cffff7f00" .. L.BtnBank .. "|r",
+    "|cffff2020" .. L.BtnDisenchant .. "|r",
+    "|cffffffff" .. L.BtnHold .. "|r",
+    "|cff20ff20DKP|r",
 }
 
 -- Item Quality Colors
@@ -87,7 +82,5 @@ C.RAID_TARGET_MARKERS = {
 
 C.K_COLOR  = "fff58cba"
 C.RT_COLOR = "aaf49141"
-C.titleString = addon:WrapTextInColorCode("K", C.K_COLOR)
-    .. addon:WrapTextInColorCode("RT", C.RT_COLOR)
-    .. " : %s"
+C.titleString = "|c" .. C.K_COLOR .. "K|r|c" .. C.RT_COLOR .. "RT|r : %s"
 
