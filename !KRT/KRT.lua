@@ -4496,6 +4496,8 @@ do
         if find(target, "Chat") then
             KRT_Spammer.Channels = KRT_Spammer.Channels or {}
             local channel = gsub(target, "Chat", "")
+            local id = tonumber(channel) or select(1, GetChannelName(channel))
+            channel = (id and id > 0) and id or channel
             local checked = (box:GetChecked() == 1)
             local existed = addon.tContains(KRT_Spammer.Channels, channel)
             if checked and not existed then
@@ -4558,10 +4560,10 @@ do
             return
         end
         for i, c in ipairs(channels) do
-            if c == "Guild" or c == "Yell" then
-                Utils.chat(tostring(finalOutput), upper(c), nil, nil, true)
-            else
+            if type(c) == "number" then
                 Utils.chat(tostring(finalOutput), "CHANNEL", nil, c, true)
+            else
+                Utils.chat(tostring(finalOutput), upper(c), nil, nil, true)
             end
         end
     end
@@ -4634,7 +4636,10 @@ do
                 for k, v in pairs(KRT_Spammer) do
                     if k == "Channels" then
                         for i, c in ipairs(v) do
-                            _G[frameName .. "Chat" .. c]:SetChecked()
+                            local id = tonumber(c) or select(1, GetChannelName(c))
+                            id = (id and id > 0) and id or c
+                            v[i] = id
+                            _G[frameName .. "Chat" .. id]:SetChecked()
                         end
                     elseif _G[frameName .. k] then
                         _G[frameName .. k]:SetText(v)
