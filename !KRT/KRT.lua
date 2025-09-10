@@ -7,10 +7,16 @@
 local addonName, addon  = ...
 local L                 = addon.L
 local Utils             = addon.Utils
-
-local ITEM_LINK_PATTERN =
-    "|?c?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?" ..
-    "(%-?%d*):?(%-?%d*):?(%d*)|?h?%[?([^%[%]]*)%]?|?h?|?r?"
+local C                 = addon.C
+local ITEM_LINK_PATTERN = C.ITEM_LINK_PATTERN
+local rollTypes         = C.rollTypes
+local lootTypesText     = C.lootTypesText
+local lootTypesColored  = C.lootTypesColored
+local itemColors        = C.itemColors
+local RAID_TARGET_MARKERS = C.RAID_TARGET_MARKERS
+local K_COLOR           = C.K_COLOR
+local RT_COLOR          = C.RT_COLOR
+local titleString       = C.titleString
 
 local _G                = _G
 _G["KRT"]               = addon
@@ -166,88 +172,6 @@ local itemTraded                        = 0
 -- Function placeholders for loot helpers
 local ItemExists, ItemIsSoulbound, GetItem
 local GetItemIndex, GetItemName, GetItemLink, GetItemTexture
-
----============================================================================
--- Constants & Static Data
----============================================================================
-
--- Roll Types Enum
-local rollTypes                         = {
-    MAINSPEC   = 1,
-    OFFSPEC    = 2,
-    RESERVED   = 3,
-    FREE       = 4,
-    BANK       = 5,
-    DISENCHANT = 6,
-    HOLD       = 7,
-    DKP        = 8
-}
-
--- Roll Type Display Text
-local lootTypesText                     = {
-    L.BtnMS,
-    L.BtnOS,
-    L.BtnSR,
-    L.BtnFree,
-    L.BtnBank,
-    L.BtnDisenchant,
-    L.BtnHold
-}
-
--- Roll Type Colored Display Text
-local lootTypesColored                  = {
-    addon:WrapTextInColorCode(L.BtnMS, "ff" .. GREEN_FONT_COLOR_CODE:sub(5)),
-    addon:WrapTextInColorCode(L.BtnOS, "ff" .. LIGHTYELLOW_FONT_COLOR_CODE:sub(5)),
-    addon:WrapTextInColorCode(L.BtnSR, "ffa335ee"),
-    addon:WrapTextInColorCode(L.BtnFree, "ff" .. NORMAL_FONT_COLOR_CODE:sub(5)),
-    addon:WrapTextInColorCode(L.BtnBank, "ff" .. ORANGE_FONT_COLOR_CODE:sub(5)),
-    addon:WrapTextInColorCode(L.BtnDisenchant, "ff" .. RED_FONT_COLOR_CODE:sub(5)),
-    addon:WrapTextInColorCode(L.BtnHold, "ff" .. HIGHLIGHT_FONT_COLOR_CODE:sub(5)),
-    addon:WrapTextInColorCode("DKP", "ff" .. GREEN_FONT_COLOR_CODE:sub(5)),
-}
-
--- Item Quality Colors
-local itemColors                        = {
-    [1] = "ff9d9d9d", -- Poor
-    [2] = "ffffffff", -- Common
-    [3] = "ff1eff00", -- Uncommon
-    [4] = "ff0070dd", -- Rare
-    [5] = "ffa335ee", -- Epic
-    [6] = "ffff8000", -- Legendary
-    [7] = "ffe6cc80", -- Artifact / Heirloom
-}
-
--- Class Colors
-local CLASS_COLORS                      = {
-    ["UNKNOWN"]     = "ffffffff",
-    ["DEATHKNIGHT"] = "ffc41f3b",
-    ["DRUID"]       = "ffff7d0a",
-    ["HUNTER"]      = "ffabd473",
-    ["MAGE"]        = "ff40c7eb",
-    ["PALADIN"]     = "fff58cba",
-    ["PRIEST"]      = "ffffffff",
-    ["ROGUE"]       = "fffff569",
-    ["SHAMAN"]      = "ff0070de",
-    ["WARLOCK"]     = "ff8787ed",
-    ["WARRIOR"]     = "ffc79c6e",
-}
-
--- Raid Target Markers
-local RAID_TARGET_MARKERS               = {
-    "{circle}",
-    "{diamond}",
-    "{triangle}",
-    "{moon}",
-    "{square}",
-    "{cross}",
-    "{skull}"
-}
-
-local K_COLOR                           = "fff58cba"
-local RT_COLOR                          = "aaf49141"
-local titleString                       = addon:WrapTextInColorCode("K", K_COLOR)
-    .. addon:WrapTextInColorCode("RT", RT_COLOR)
-    .. " : %s"
 
 ---============================================================================
 -- Cached Functions & Libraries
