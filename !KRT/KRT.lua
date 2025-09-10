@@ -50,6 +50,16 @@ addon.CallbackHandler   = addon:GetLib("CallbackHandler-1.0", true)
 
 if Compat and Compat.Embed then
     Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
+    if addon.Utils then
+        addon.Utils.After       = addon.After
+        addon.Utils.NewTicker   = addon.NewTicker
+        addon.Utils.CancelTimer = addon.CancelTimer
+        addon.Utils.UnitIterator = addon.UnitIterator
+        addon.Utils.tCopy       = addon.tCopy
+        addon.Utils.tLength     = addon.tLength
+        addon.Utils.tContains   = addon.tContains
+        addon.Utils.tIndexOf    = addon.tIndexOf
+    end
 end
 if addon.Logger and addon.Logger.Embed then
     addon.Logger:Embed(addon)

@@ -16,16 +16,6 @@ function addon:GetLib(name, silent)
         return lib
 end
 
-local Compat = addon:GetLib("LibCompat-1.0", true)
-if Compat then
-        addon.Compat = Compat
-        Compat:Embed(Utils)
-        Utils.tCopy     = Compat.tCopy
-        Utils.tLength   = Compat.tLength
-        Utils.tContains = Compat.tContains
-        Utils.tIndexOf  = Compat.tIndexOf
-end
-
 -- Practical helper aliases
 function Utils.after(sec, fn) return Utils.After(sec, fn) end
 
@@ -150,12 +140,12 @@ function Utils.rgbToHex(r, g, b)
 	if r and g and b and r <= 1 and g <= 1 and b <= 1 then
 		r, g, b = r * 255, g * 255, b * 255
 	end
-	return Compat.RGBToHex(r, g, b)
+        return addon.Compat.RGBToHex(r, g, b)
 end
 
 function addon.GetClassColor(name)
 	name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
-	local c = Compat.GetClassColorObj(name)
+        local c = addon.Compat.GetClassColorObj(name)
 	if not c then
 		return 1, 1, 1
 	end
@@ -210,7 +200,7 @@ function Utils.showHide(frame, cond)
 end
 
 function Utils.createPool(frameType, parent, template, resetter)
-	return Compat.CreateFramePool(frameType, parent, template, resetter)
+        return addon.Compat.CreateFramePool(frameType, parent, template, resetter)
 end
 
 -- Lock/Unlock Highlight:
