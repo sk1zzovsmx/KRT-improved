@@ -1306,14 +1306,12 @@ do
             self:ClearAllPoints()
             self:SetPoint("CENTER", x, y)
         else
-            -- Circular drag mode
-            centerX, centerY = abs(x), abs(y)
-            centerX = (centerX / sqrt(centerX ^ 2 + centerY ^ 2)) * 80
-            centerY = (centerY / sqrt(centerX ^ 2 + centerY ^ 2)) * 80
-            centerX = x < 0 and -centerX or centerX
-            centerY = y < 0 and -centerY or centerY
+            -- Circular drag mode (snap to ring radius ~80)
+            local dist = sqrt(x * x + y * y)
+            if dist == 0 then dist = 1 end
+            local px, py = (x / dist) * 80, (y / dist) * 80
             self:ClearAllPoints()
-            self:SetPoint("CENTER", centerX, centerY)
+            self:SetPoint("CENTER", px, py)
         end
     end
 
