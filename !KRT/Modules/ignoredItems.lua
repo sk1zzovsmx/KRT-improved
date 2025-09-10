@@ -1,15 +1,15 @@
 -- Modules/ignoredItems.lua
--- This file will be loaded after KRT.lua, so KRT should be defined.
-local KRT = _G["KRT"]
+-- This file is loaded after KRT.lua, so the addon table should be defined.
+local addonName, addon = ...
 
-if not KRT then
+if not addon then
     -- This should ideally not happen if the .toc load order is correct,
     -- but it's a good defensive check.
-    error("KRT global table not found when loading ignoredItems.lua")
+    error(addonName .. " addon table not found when loading ignoredItems.lua")
 end
 
 -- Items to ignore when adding raids loot:
-KRT.ignoredItems = {
+addon.ignoredItems = {
     -- Emblems (Wrath of the Lich King)
     [40752] = true,  -- Emblem of Heroism
     [40753] = true,  -- Emblem of Valor
