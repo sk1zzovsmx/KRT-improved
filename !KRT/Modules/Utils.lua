@@ -1,9 +1,9 @@
 local addonName, addon = ...
-addon.Utils = addon.Utils or {}
+addon.Utils            = addon.Utils or {}
 
-local Utils   = addon.Utils
-local L       = addon.L
-local Compat  = addon.Compat
+local Utils            = addon.Utils
+local L                = addon.L
+local Compat           = addon.Compat or (LibStub and LibStub("LibCompat-1.0"))
 Compat:Embed(Utils)
 Utils.tCopy     = Compat.tCopy
 Utils.tLength   = Compat.tLength
@@ -15,10 +15,10 @@ function Utils.after(sec, fn) return Utils.After(sec, fn) end
 
 -- Group/pet iteration in one call
 function Utils.forEachGroupUnit(cb, includePets)
-       local iter, state, index = Utils.UnitIterator(not includePets and true or nil)
-       for unit, owner in iter, state, index do
-               cb(unit, owner)
-       end
+	local iter, state, index = Utils.UnitIterator(not includePets and true or nil)
+	for unit, owner in iter, state, index do
+		cb(unit, owner)
+	end
 end
 
 local type, ipairs, pairs = type, ipairs, pairs
@@ -40,12 +40,12 @@ local GetTime = GetTime
 -- Lightweight throttle (keyed)
 local last = {}
 function Utils.throttleKey(key, sec)
-        local now = GetTime()
-        sec = sec or 1
-        if not last[key] or (now - last[key]) >= sec then
-                last[key] = now
-                return true
-        end
+	local now = GetTime()
+	sec = sec or 1
+	if not last[key] or (now - last[key]) >= sec then
+		last[key] = now
+		return true
+	end
 end
 
 -- ============================================================================
@@ -55,22 +55,22 @@ end
 local callbacks = {}
 
 function Utils.registerCallback(e, func)
-        if not e or type(func) ~= "function" then
-                error(L.StrCbErrUsage)
-        end
-        callbacks[e] = callbacks[e] or {}
-        tinsert(callbacks[e], func)
-        return #callbacks
+	if not e or type(func) ~= "function" then
+		error(L.StrCbErrUsage)
+	end
+	callbacks[e] = callbacks[e] or {}
+	tinsert(callbacks[e], func)
+	return #callbacks
 end
 
 function Utils.triggerEvent(e, ...)
-        if not callbacks[e] then return end
-        for i, v in ipairs(callbacks[e]) do
-                local ok, err = pcall(v, e, ...)
-                if not ok then
-                        addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
-                end
-        end
+	if not callbacks[e] then return end
+	for i, v in ipairs(callbacks[e]) do
+		local ok, err = pcall(v, e, ...)
+		if not ok then
+			addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
+		end
+	end
 end
 
 -- ============================================================================
@@ -78,11 +78,11 @@ end
 -- ============================================================================
 
 function Utils.getFrameName()
-        local name
-        if addon.UIMaster ~= nil then
-                name = addon.UIMaster:GetName()
-        end
-        return name
+	local name
+	if addon.UIMaster ~= nil then
+		name = addon.UIMaster:GetName()
+	end
+	return name
 end
 
 -- Shuffle a table:
@@ -122,8 +122,8 @@ end
 
 -- Uppercase first:
 _G.string.ucfirst = function(str)
-        str = lower(str)
-        return gsub(str, "%a", upper, 1)
+	str = lower(str)
+	return gsub(str, "%a", upper, 1)
 end
 
 -- ============================================================================
@@ -131,26 +131,26 @@ end
 -- ============================================================================
 
 function Utils.rgbToHex(r, g, b)
-        if r and g and b and r <= 1 and g <= 1 and b <= 1 then
-                r, g, b = r * 255, g * 255, b * 255
-        end
-        return Compat.RGBToHex(r, g, b)
+	if r and g and b and r <= 1 and g <= 1 and b <= 1 then
+		r, g, b = r * 255, g * 255, b * 255
+	end
+	return Compat.RGBToHex(r, g, b)
 end
 
 function addon.GetClassColor(name)
-        name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
-        local c = Compat.GetClassColorObj(name)
-        if not c then
-                return 1, 1, 1
-        end
-        return c.r, c.g, c.b
+	name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
+	local c = Compat.GetClassColorObj(name)
+	if not c then
+		return 1, 1, 1
+	end
+	return c.r, c.g, c.b
 end
 
 -- Determines if a given string is a number
 function Utils.isNumber(str)
-        local valid = false
-        if str then
-                valid = find(str, "^(%d+%.?%d*)$")
+	local valid = false
+	if str then
+		valid = find(str, "^(%d+%.?%d*)$")
 	end
 	return valid
 end
@@ -184,17 +184,17 @@ end
 
 -- Conditional Show/Hide Frame:
 function Utils.showHide(frame, cond)
-        if frame == nil then
-                return
-        elseif cond and not frame:IsShown() then
-                frame:Show()
-        elseif not cond and frame:IsShown() then
-                frame:Hide()
-        end
+	if frame == nil then
+		return
+	elseif cond and not frame:IsShown() then
+		frame:Show()
+	elseif not cond and frame:IsShown() then
+		frame:Hide()
+	end
 end
 
 function Utils.createPool(frameType, parent, template, resetter)
-        return Compat.CreateFramePool(frameType, parent, template, resetter)
+	return Compat.CreateFramePool(frameType, parent, template, resetter)
 end
 
 -- Lock/Unlock Highlight:
@@ -224,15 +224,13 @@ function Utils.returnIf(cond, a, b)
 	return (cond ~= nil and cond ~= false) and a or b
 end
 
-
-
 -- Throttle frame OnUpdate:
 function Utils.throttle(frame, name, period, elapsed)
-        local t = frame[name] or 0
-        t = t + elapsed
-        if t > period then
-                frame[name] = 0
-                return true
+	local t = frame[name] or 0
+	t = t + elapsed
+	if t > period then
+		frame[name] = 0
+		return true
 	end
 	frame[name] = t
 	return false
@@ -258,38 +256,38 @@ end
 
 -- Convert seconds to readable clock string:
 function Utils.sec2clock(seconds)
-        local sec = tonumber(seconds)
-        if sec <= 0 then
-                return "00:00:00"
-        end
-        local h = floor(sec, 3600)
-        local m = floor(sec - h, 60)
-        local s = floor(sec - h - m)
-        return format("%02d:%02d:%02d", h / 3600, m / 60, s)
+	local sec = tonumber(seconds)
+	if sec <= 0 then
+		return "00:00:00"
+	end
+	local h = floor(sec, 3600)
+	local m = floor(sec - h, 60)
+	local s = floor(sec - h - m)
+	return format("%02d:%02d:%02d", h / 3600, m / 60, s)
 end
 
 -- Sends an addOn message to the appropriate channel:
 function Utils.sync(prefix, msg)
-        local zone = select(2, IsInInstance())
-        if zone == "pvp" or zone == "arena" then
-                SendAddonMessage(prefix, msg, "BATTLEGROUND")
-        elseif GetRealNumRaidMembers() > 0 then
-                SendAddonMessage(prefix, msg, "RAID")
-        elseif GetRealNumPartyMembers() > 0 then
-                SendAddonMessage(prefix, msg, "PARTY")
-        end
+	local zone = select(2, IsInInstance())
+	if zone == "pvp" or zone == "arena" then
+		SendAddonMessage(prefix, msg, "BATTLEGROUND")
+	elseif GetRealNumRaidMembers() > 0 then
+		SendAddonMessage(prefix, msg, "RAID")
+	elseif GetRealNumPartyMembers() > 0 then
+		SendAddonMessage(prefix, msg, "PARTY")
+	end
 end
 
 local lastChat = 0
 function Utils.chat(msg, channel, language, target, bypass)
-        if not msg then return end
-        if not bypass then
-                local throttle = addon.options and addon.options.chatThrottle or 0
-                local now = GetTime()
-                if throttle > 0 and (now - lastChat) < throttle then return end
-                lastChat = now
-        end
-        SendChatMessage(tostring(msg), channel, language, target)
+	if not msg then return end
+	if not bypass then
+		local throttle = addon.options and addon.options.chatThrottle or 0
+		local now = GetTime()
+		if throttle > 0 and (now - lastChat) < throttle then return end
+		lastChat = now
+	end
+	SendChatMessage(tostring(msg), channel, language, target)
 end
 
 -- Send a whisper to a player by his/her character name or BNet ID
@@ -317,7 +315,7 @@ function Utils.getUTCTimestamp()
 end
 
 function Utils.getSecondsAsString(t)
-        return Utils.sec2clock(t)
+	return Utils.sec2clock(t)
 end
 
 -- Determines if the player is in a raid instance
@@ -352,9 +350,9 @@ end
 function Utils.getServerOffset()
 	local sH, sM = GetGameTime()
 	local lH, lM = tonumber(date("%H")), tonumber(date("%M"))
-        local sT = sH + sM / 60
-        local lT = lH + lM / 60
-        local offset = round(sT - lT, 0.5)
+	local sT = sH + sM / 60
+	local lT = lH + lM / 60
+	local offset = round(sT - lT, 0.5)
 	if offset >= 12 then
 		offset = offset - 24
 	elseif offset < -12 then
