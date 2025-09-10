@@ -48,22 +48,16 @@ addon.Logger            = addon:GetLib("LibLogger-1.0", true)
 addon.Deformat          = addon:GetLib("LibDeformat-3.0", true)
 addon.CallbackHandler   = addon:GetLib("CallbackHandler-1.0", true)
 
-if Compat and Compat.Embed then
-    Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
-    if addon.Utils then
-        addon.Utils.After       = addon.After
-        addon.Utils.NewTicker   = addon.NewTicker
-        addon.Utils.CancelTimer = addon.CancelTimer
-        addon.Utils.UnitIterator = addon.UnitIterator
-        addon.Utils.tCopy       = addon.tCopy
-        addon.Utils.tLength     = addon.tLength
-        addon.Utils.tContains   = addon.tContains
-        addon.Utils.tIndexOf    = addon.tIndexOf
-    end
-end
-if addon.Logger and addon.Logger.Embed then
-    addon.Logger:Embed(addon)
-end
+Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
+addon.Utils.After       = addon.After
+addon.Utils.NewTicker   = addon.NewTicker
+addon.Utils.CancelTimer = addon.CancelTimer
+addon.Utils.UnitIterator = addon.UnitIterator
+addon.Utils.tCopy       = addon.tCopy
+addon.Utils.tLength     = addon.tLength
+addon.Utils.tContains   = addon.tContains
+addon.Utils.tIndexOf    = addon.tIndexOf
+addon.Logger:Embed(addon)
 
 -- Alias locali (safe e veloci)
 local IsInRaid             = addon.IsInRaid
@@ -77,37 +71,27 @@ local UnitIsGroupLeader    = addon.UnitIsGroupLeader
 local UnitIsGroupAssistant = addon.UnitIsGroupAssistant
 
 function addon:Debug(level, fmt, ...)
-    if not self.Logger then return end
     local lv = type(level) == "string" and level:upper()
     local fn = (lv == "ERROR" and self.error)
         or (lv == "WARN" and self.warn)
         or (lv == "DEBUG" and self.debug)
         or self.info
-    if fn then fn(self, fmt, ...) end
-    if self.Debugger and self.Debugger.AddMessage and self.logLevels and self.logLevel then
-        local lvl = self.logLevels[lv] or self.logLevels.INFO
-        if lvl <= self.logLevel then
-            local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
-            self.Debugger:AddMessage(msg)
-        end
+    fn(self, fmt, ...)
+    local lvl = self.logLevels[lv] or self.logLevels.INFO
+    if lvl <= self.logLevel then
+        local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
+        self.Debugger:AddMessage(msg)
     end
 end
 
--- SavedVariables for log level (fallback INFO)
+-- SavedVariables for log level
 KRT_Debug = KRT_Debug or {}
 do
-    local INFO = (addon.Logger and addon.Logger.logLevels and addon.Logger.logLevels.INFO) or 2
+    local INFO = addon.Logger.logLevels.INFO
     KRT_Debug.level = KRT_Debug.level or INFO
-    if addon.SetLogLevel then
-        local lv = KRT_Debug.level
-        if KRT_Options and KRT_Options.debug and addon.Logger and addon.Logger.logLevels then
-            lv = addon.Logger.logLevels.DEBUG or lv
-        end
-        addon:SetLogLevel(lv)
-    end
-    if addon.SetPerformanceMode then
-        addon:SetPerformanceMode(true)
-    end
+    local lv = KRT_Options and KRT_Options.debug and addon.Logger.logLevels.DEBUG or KRT_Debug.level
+    addon:SetLogLevel(lv)
+    addon:SetPerformanceMode(true)
 end
 
 ---============================================================================
@@ -129,23 +113,19 @@ do
     -- Public methods
     -------------------------------------------------------
     function module:OnLoad(frame)
-        if not frame then return end
         debugFrame = frame
         msgFrame = _G[frame:GetName() .. "ScrollFrame"]
     end
 
     function module:AddMessage(msg, r, g, b)
-        if msgFrame then
-            msgFrame:AddMessage(tostring(msg), r or 1, g or 1, b or 1)
-        end
+        msgFrame:AddMessage(tostring(msg), r or 1, g or 1, b or 1)
     end
 
     function module:Clear()
-        if msgFrame then msgFrame:Clear() end
+        msgFrame:Clear()
     end
 
     function module:Toggle()
-        if not debugFrame then return end
         if debugFrame:IsShown() then
             debugFrame:Hide()
         else
