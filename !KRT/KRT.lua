@@ -77,20 +77,7 @@ local UnitIsGroupLeader    = addon.UnitIsGroupLeader
 local UnitIsGroupAssistant = addon.UnitIsGroupAssistant
 
 function addon:Debug(level, fmt, ...)
-    if not self.Logger then return end
-    local lv = type(level) == "string" and level:upper()
-    local fn = (lv == "ERROR" and self.error)
-        or (lv == "WARN" and self.warn)
-        or (lv == "DEBUG" and self.debug)
-        or self.info
-    if fn then fn(self, fmt, ...) end
-    if self.Debugger and self.Debugger.AddMessage and self.logLevels and self.logLevel then
-        local lvl = self.logLevels[lv] or self.logLevels.INFO
-        if lvl <= self.logLevel then
-            local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
-            self.Debugger:AddMessage(msg)
-        end
-    end
+    if fmt then self.Logger:Log(level, string.format(fmt, ...)) end
 end
 
 -- SavedVariables for log level (fallback INFO)
@@ -5894,7 +5881,7 @@ do
 
     local helpString  = "%s: %s"
     local function printHelp(cmd, desc)
-        print(helpString:format(addon:WrapTextInColorCode(cmd, RT_COLOR), desc))
+        addon:Print(helpString:format(addon:WrapTextInColorCode(cmd, RT_COLOR), desc))
     end
 
     local function HandleSlashCmd(cmd)
