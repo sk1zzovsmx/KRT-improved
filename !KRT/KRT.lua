@@ -1756,6 +1756,7 @@ do
 
             btn:SetID(i)
             btn:Show()
+            btn.playerName = name
 
             if not btn.selectedBackground then
                 btn.selectedBackground = btn:CreateTexture("KRTSelectedHighlight", "ARTWORK")
@@ -2298,14 +2299,15 @@ do
     function module:SelectWinner(btn)
         if not btn then return end
         local btnName = btn:GetName()
-        local player = _G[btnName .. "Name"]:GetText()
-        if player ~= nil then
+        local raw = btn.playerName or _G[btnName .. "Name"]:GetText() or ""
+        local player = raw:gsub("^%s*>%s*(.-)%s*<%s*$", "%1"):trim()
+        if player ~= "" then
             if IsControlKeyDown() then
                 local roll = _G[btnName .. "Roll"]:GetText()
                 addon:Announce(format(L.ChatPlayerRolled, player, roll))
                 return
             end
-            winner = player:trim()
+            winner = player
             addon.Rolls:FetchRolls()
             Utils.sync("KRT-RollWinner", player)
         end
