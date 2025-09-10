@@ -37,15 +37,13 @@ KRT_PlayerCounts        = KRT_PlayerCounts or {}
 ---============================================================================
 local LibStub           = _G.LibStub
 if LibStub then
-    addon.Compat          = LibStub("LibCompat-1.0", true)
+    addon.Compat          = LibStub("LibCompat-1.0")
     addon.BossIDs         = LibStub("LibBossIDs-1.0", true)
     addon.Logger          = LibStub("LibLogger-1.0", true)
     addon.Deformat        = LibStub("LibDeformat-3.0", true)
     addon.CallbackHandler = LibStub("CallbackHandler-1.0", true)
 
-    if addon.Compat and addon.Compat.Embed then
-        addon.Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
-    end
+    addon.Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
     if addon.Logger and addon.Logger.Embed then
         addon.Logger:Embed(addon)
     end
