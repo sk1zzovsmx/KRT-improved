@@ -77,37 +77,30 @@ local UnitIsGroupLeader    = addon.UnitIsGroupLeader
 local UnitIsGroupAssistant = addon.UnitIsGroupAssistant
 
 function addon:Debug(level, fmt, ...)
-    if not self.Logger then return end
-    local lv = type(level) == "string" and level:upper()
+    local lv = level:upper()
     local fn = (lv == "ERROR" and self.error)
         or (lv == "WARN" and self.warn)
         or (lv == "DEBUG" and self.debug)
         or self.info
-    if fn then fn(self, fmt, ...) end
-    if self.Debugger and self.Debugger.AddMessage and self.logLevels and self.logLevel then
-        local lvl = self.logLevels[lv] or self.logLevels.INFO
-        if lvl <= self.logLevel then
-            local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
-            self.Debugger:AddMessage(msg)
-        end
+    fn(self, fmt, ...)
+    local lvl = self.logLevels[lv]
+    if lvl <= self.logLevel then
+        local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
+        self.Debugger:AddMessage(msg)
     end
 end
 
 -- SavedVariables for log level (fallback INFO)
 KRT_Debug = KRT_Debug or {}
 do
-    local INFO = (addon.Logger and addon.Logger.logLevels and addon.Logger.logLevels.INFO) or 2
+    local INFO = addon.Logger.logLevels.INFO
     KRT_Debug.level = KRT_Debug.level or INFO
-    if addon.SetLogLevel then
-        local lv = KRT_Debug.level
-        if KRT_Options and KRT_Options.debug and addon.Logger and addon.Logger.logLevels then
-            lv = addon.Logger.logLevels.DEBUG or lv
-        end
-        addon:SetLogLevel(lv)
+    local lv = KRT_Debug.level
+    if KRT_Options and KRT_Options.debug then
+        lv = addon.Logger.logLevels.DEBUG
     end
-    if addon.SetPerformanceMode then
-        addon:SetPerformanceMode(true)
-    end
+    addon:SetLogLevel(lv)
+    addon:SetPerformanceMode(true)
 end
 
 ---============================================================================
@@ -134,7 +127,7 @@ do
     end
 
     function module:AddMessage(msg, r, g, b)
-        msgFrame:AddMessage(tostring(msg), r, g, b)
+        msgFrame:AddMessage(msg, r, g, b)
     end
 
     function module:Clear()
