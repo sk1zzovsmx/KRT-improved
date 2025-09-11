@@ -175,8 +175,7 @@ local rollsCount                        = 0
 local itemCount                         = 1
 local itemTraded                        = 0
 
--- Function placeholders for loot helpers
-local ItemExists, ItemIsSoulbound, GetItem
+local ItemIsSoulbound, GetItem
 local GetItemIndex, GetItemName, GetItemLink, GetItemTexture
 
 ---============================================================================
@@ -1567,13 +1566,9 @@ do
     -- Gets the item ID of the item currently being rolled for.
     --
     function module:GetCurrentRollItemID()
-        local index = GetItemIndex and GetItemIndex() or 1
-        local item = GetItem and GetItem(index)
-        local itemLink = item and item.itemLink
-        if not itemLink then
-            addon:Debug("DEBUG", "GetCurrentRollItemID: No itemLink found at index %d", index)
-            return nil
-        end
+        local index = GetItemIndex()
+        local item = GetItem(index)
+        local itemLink = item.itemLink
         local itemId = tonumber(string.match(itemLink, "item:(%d+)"))
         addon:Debug("DEBUG", "GetCurrentRollItemID: Found itemId %d", itemId)
         return itemId
@@ -1737,7 +1732,7 @@ do
     addon.Loot = addon.Loot or {}
     local module = addon.Loot
     local L = addon.L
-    local frameName
+    local frameName = Utils.getFrameName()
 
     -------------------------------------------------------
     -- Internal state
@@ -1775,12 +1770,10 @@ do
         end
 
         currentItemIndex = 1
-        if oldItem ~= nil then
-            for t = 1, lootCount do
-                if oldItem == GetItemLink(t) then
-                    currentItemIndex = t
-                    break
-                end
+        for t = 1, lootCount do
+            if oldItem == GetItemLink(t) then
+                currentItemIndex = t
+                break
             end
         end
         self:PrepareItem()
@@ -1790,16 +1783,7 @@ do
     -- Adds an item to the loot table.
     --
     function module:AddItem(itemLink)
-        local itemName, _, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType,
-        itemStackCount, itemEquipLoc, itemTexture = GetItemInfo(itemLink)
-
-        if not itemName or not itemRarity then
-            GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
-            GameTooltip:SetHyperlink(itemLink)
-            GameTooltip:Hide()
-            addon:Debug("DEBUG", "Item info not available yet, deferring.")
-            return
-        end
+        local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
 
         if fromInventory == false then
             local lootThreshold = GetLootThreshold()
@@ -1821,41 +1805,32 @@ do
     -- Prepares the currently selected item for display.
     --
     function module:PrepareItem()
-        if ItemExists(currentItemIndex) then
-            self:SetItem(lootTable[currentItemIndex])
-        end
+        self:SetItem(lootTable[currentItemIndex])
     end
 
     --
     -- Sets the main item display in the UI.
     --
     function module:SetItem(i)
-        if i.itemName and i.itemLink and i.itemTexture and i.itemColor then
-            frameName = frameName or Utils.getFrameName()
-            if frameName == nil then return end
+        local currentItemLink = _G[frameName .. "Name"]
+        currentItemLink:SetText(addon:WrapTextInColorCode(i.itemName, i.itemColor))
 
-            local currentItemLink = _G[frameName .. "Name"]
-            currentItemLink:SetText(addon:WrapTextInColorCode(i.itemName, i.itemColor))
+        local currentItemBtn = _G[frameName .. "ItemBtn"]
+        currentItemBtn:SetNormalTexture(i.itemTexture)
 
-            local currentItemBtn = _G[frameName .. "ItemBtn"]
-            currentItemBtn:SetNormalTexture(i.itemTexture)
-
-            if self.options.showTooltips then
-                currentItemBtn.tooltip_item = i.itemLink
-                self:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
-            end
-            Utils.triggerEvent("SetItem", i.itemLink)
+        if self.options.showTooltips then
+            currentItemBtn.tooltip_item = i.itemLink
+            self:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
         end
+        Utils.triggerEvent("SetItem", i.itemLink)
     end
 
     --
     -- Selects an item from the loot list by its index.
     --
     function module:SelectItem(i)
-        if ItemExists(i) then
-            currentItemIndex = i
-            self:PrepareItem()
-        end
+        currentItemIndex = i
+        self:PrepareItem()
     end
 
     --
@@ -1864,7 +1839,6 @@ do
     function module:ClearLoot()
         lootTable = twipe(lootTable)
         lootCount = 0
-        frameName = frameName or Utils.getFrameName()
         _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
         _G[frameName .. "ItemBtn"]:SetNormalTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
         if frameName == UIMaster:GetName() then
@@ -1894,7 +1868,7 @@ do
     --
     function GetItemName(i)
         i = i or currentItemIndex
-        return lootTable[i] and lootTable[i].itemName or nil
+        return lootTable[i].itemName
     end
 
     --
@@ -1902,7 +1876,7 @@ do
     --
     function GetItemLink(i)
         i = i or currentItemIndex
-        return lootTable[i] and lootTable[i].itemLink or nil
+        return lootTable[i].itemLink
     end
 
     --
@@ -1910,15 +1884,7 @@ do
     --
     function GetItemTexture(i)
         i = i or currentItemIndex
-        return lootTable[i] and lootTable[i].itemTexture or nil
-    end
-
-    --
-    -- Checks if a loot item exists at the given index.
-    --
-    function ItemExists(i)
-        i = i or currentItemIndex
-        return (lootTable[i] ~= nil)
+        return lootTable[i].itemTexture
     end
 
     --
@@ -2342,7 +2308,7 @@ do
             Utils.enableDisable(_G[frameName .. "OSBtn"], lootCount >= 1)
             Utils.enableDisable(_G[frameName .. "SRBtn"], lootCount >= 1 and addon.Reserves:HasData())
             Utils.enableDisable(_G[frameName .. "FreeBtn"], lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "CountdownBtn"], lootCount >= 1 and ItemExists())
+            Utils.enableDisable(_G[frameName .. "CountdownBtn"], lootCount >= 1)
             Utils.enableDisable(_G[frameName .. "HoldBtn"], lootCount >= 1)
             Utils.enableDisable(_G[frameName .. "BankBtn"], lootCount >= 1)
             Utils.enableDisable(_G[frameName .. "DisenchantBtn"], lootCount >= 1)
