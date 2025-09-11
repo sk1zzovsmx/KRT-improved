@@ -1329,7 +1329,7 @@ do
     -------------------------------------------------------
     -- Internal state
     -------------------------------------------------------
-    local record, canRoll, warned, rolled = false, true, false, false
+    local record, canRoll, warned, rolled = true, true, false, false
     local playerRollTracker, rollsTable, rerolled, itemRollTracker = {}, {}, {}, {}
     local selectedPlayer = nil
 
@@ -1338,20 +1338,18 @@ do
     -------------------------------------------------------
     -- Sorts the rollsTable either ascending or descending.
     local function SortRolls()
-        if rollsTable ~= nil then
-            table.sort(rollsTable, function(a, b)
-                if addon.options.sortAscending then
-                    return a.roll < b.roll
-                end
-                return a.roll > b.roll
-            end)
-            if rollsTable[1] then
-                winner = rollsTable[1].name
-                addon:Debug("DEBUG", "Sorted rolls; current winner: %s with roll: %d", winner, rollsTable[1].roll)
-            else
-                winner = nil
-                addon:Debug("DEBUG", "Sorted rolls; no winner")
+        table.sort(rollsTable, function(a, b)
+            if addon.options.sortAscending then
+                return a.roll < b.roll
             end
+            return a.roll > b.roll
+        end)
+        if rollsTable[1] then
+            winner = rollsTable[1].name
+            addon:Debug("DEBUG", "Sorted rolls; current winner: %s with roll: %d", winner, rollsTable[1].roll)
+        else
+            winner = nil
+            addon:Debug("DEBUG", "Sorted rolls; no winner")
         end
     end
 
@@ -1362,19 +1360,17 @@ do
         rollsTable[rollsCount] = { name = name, roll = roll, itemId = itemId }
         addon:Debug("DEBUG", "AddRoll: name=%s, roll=%d, itemId=%s", tostring(name), roll, tostring(itemId))
 
-        if itemId then
-            itemRollTracker[itemId] = itemRollTracker[itemId] or {}
-            itemRollTracker[itemId][name] = (itemRollTracker[itemId][name] or 0) + 1
-            addon:Debug("DEBUG", "Updated itemRollTracker: itemId=%d, player=%s, count=%d", itemId, name,
-                itemRollTracker[itemId][name])
-        end
+        itemRollTracker[itemId] = itemRollTracker[itemId] or {}
+        itemRollTracker[itemId][name] = (itemRollTracker[itemId][name] or 0) + 1
+        addon:Debug("DEBUG", "Updated itemRollTracker: itemId=%d, player=%s, count=%d", itemId, name,
+            itemRollTracker[itemId][name])
 
         Utils.triggerEvent("AddRoll", name, roll)
         SortRolls()
 
         -- Auto-select winner if none is manually selected
         if not selectedPlayer then
-            local resolvedItemId = itemId or module:GetCurrentRollItemID()
+            local resolvedItemId = itemId
             if currentRollType == rollTypes.RESERVED then
                 local topRoll = -1
                 for _, entry in ipairs(rollsTable) do
@@ -1398,8 +1394,6 @@ do
     -- Initiates a /roll 1-100 for the player.
     function module:Roll(btn)
         local itemId = self:GetCurrentRollItemID()
-        if not itemId then return end
-
         playerRollTracker[itemId] = playerRollTracker[itemId] or 0
         local name = UnitName("player")
         local allowed = 1
@@ -1430,7 +1424,7 @@ do
     -- Enables or disables the recording of rolls.
     --
     function module:RecordRolls(bool)
-        canRoll, record = bool == true, bool == true
+        canRoll = bool
         addon:Debug("DEBUG", "RecordRolls: %s", tostring(bool))
     end
 
@@ -1438,9 +1432,8 @@ do
     -- Intercepts system messages to detect player rolls.
     --
     function module:CHAT_MSG_SYSTEM(msg)
-        if not msg or not record then return end
         local player, roll, min, max = addon.Deformat(msg, RANDOM_ROLL_RESULT)
-        if player and roll and min == 1 and max == 100 then
+        if min == 1 and max == 100 then
             addon:Debug("DEBUG", "Detected roll message: %s rolled %d (range %d-%d)", player, roll, min, max)
 
             if not canRoll then
@@ -1453,7 +1446,7 @@ do
             end
 
             local itemId = self:GetCurrentRollItemID()
-            if not itemId or lootCount == 0 then
+            if lootCount == 0 then
                 addon:error("Item ID missing or loot table not ready – roll will be ignored.")
                 addon:Debug("DEBUG", "Roll ignored: missing itemId or lootCount = 0")
                 return
@@ -1502,17 +1495,6 @@ do
     -- Checks if a player has already used all their rolls for an item.
     --
     function module:DidRoll(itemId, name)
-        if not itemId then
-            for i = 1, rollsCount do
-                if rollsTable[i].name == name then
-                    addon:Debug("DEBUG", "DidRoll: %s has rolled (no itemId specified)", name)
-                    return true
-                end
-            end
-            addon:Debug("DEBUG", "DidRoll: %s has NOT rolled (no itemId specified)", name)
-            return false
-        end
-
         itemRollTracker[itemId] = itemRollTracker[itemId] or {}
         local used = itemRollTracker[itemId][name] or 0
         local reserve = addon.Reserves:GetReserveCountForItem(itemId, name)
@@ -1548,32 +1530,25 @@ do
         rollsTable, rerolled, itemRollTracker = {}, {}, {}
         playerRollTracker, rolled, warned, rollsCount = {}, false, false, 0
         selectedPlayer = nil
-        if rec == false then record = false end
 
-        if frameName then
-            local i = 1
-            local btn = _G[frameName .. "PlayerBtn" .. i]
-            while btn do
-                btn:Hide()
-                i = i + 1
-                btn = _G[frameName .. "PlayerBtn" .. i]
-            end
-
-            addon.Raid:ClearRaidIcons()
+        local i = 1
+        local btn = _G[frameName .. "PlayerBtn" .. i]
+        while btn do
+            btn:Hide()
+            i = i + 1
+            btn = _G[frameName .. "PlayerBtn" .. i]
         end
+
+        addon.Raid:ClearRaidIcons()
     end
 
     --
     -- Gets the item ID of the item currently being rolled for.
     --
     function module:GetCurrentRollItemID()
-        local index = GetItemIndex and GetItemIndex() or 1
-        local item = GetItem and GetItem(index)
-        local itemLink = item and item.itemLink
-        if not itemLink then
-            addon:Debug("DEBUG", "GetCurrentRollItemID: No itemLink found at index %d", index)
-            return nil
-        end
+        local index = GetItemIndex()
+        local item = GetItem(index)
+        local itemLink = item.itemLink
         local itemId = tonumber(string.match(itemLink, "item:(%d+)"))
         addon:Debug("DEBUG", "GetCurrentRollItemID: Found itemId %d", itemId)
         return itemId
