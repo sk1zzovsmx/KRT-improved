@@ -282,9 +282,7 @@ do
         if not IsInGroup() then
             numRaid = 0
             module:End()
-            if addon.Master and addon.Master.PrepareDropDowns then
-                addon.Master:PrepareDropDowns()
-            end
+            addon.Master:PrepareDropDowns()
             return
         end
 
@@ -356,9 +354,7 @@ do
             end
             v.seen = nil
         end
-        if addon.Master and addon.Master.PrepareDropDowns then
-            addon.Master:PrepareDropDowns()
-        end
+        addon.Master:PrepareDropDowns()
     end
 
     --
@@ -1993,14 +1989,13 @@ do
 
     -- OnLoad frame:
     function module:OnLoad(frame)
-        if not frame then return end
         UIMaster = frame
         addon.UIMaster = frame
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
         frame:SetScript("OnUpdate", UpdateUIFrame)
         frame:SetScript("OnHide", function()
-            if selectionFrame then selectionFrame:Hide() end
+            selectionFrame:Hide()
         end)
     end
 
@@ -2015,16 +2010,13 @@ do
     -- Hides the Master Looter frame.
     --
     function module:Hide()
-        if UIMaster and UIMaster:IsShown() then
-            UIMaster:Hide()
-        end
+        UIMaster:Hide()
     end
 
     --
     -- Button: Select/Remove Item
     --
     function module:BtnSelectItem(btn)
-        if btn == nil or lootCount <= 0 then return end
         if fromInventory == true then
             addon.Loot:ClearLoot()
             addon.Rolls:ClearRolls()
@@ -2032,7 +2024,7 @@ do
             announced = false
             fromInventory = false
             if lootOpened == true then addon.Loot:FetchLoot() end
-        elseif selectionFrame then
+        else
             selectionFrame:SetShown(not selectionFrame:IsVisible())
         end
     end
@@ -2041,7 +2033,6 @@ do
     -- Button: Spam Loot Links or Do Ready Check
     --
     function module:BtnSpamLoot(btn)
-        if btn == nil or lootCount <= 0 then return end
         if fromInventory == true then
             addon:Announce(L.ChatReadyCheck)
             DoReadyCheck()
@@ -2049,9 +2040,7 @@ do
             addon:Announce(L.ChatSpamLoot, "RAID")
             for i = 1, lootCount do
                 local itemLink = GetItemLink(i)
-                if itemLink then
-                    addon:Announce(i .. ". " .. itemLink, "RAID")
-                end
+                addon:Announce(i .. ". " .. itemLink, "RAID")
             end
         end
     end
@@ -2074,33 +2063,31 @@ do
     -- Generic function to announce a roll for the current item.
     --
     local function AnnounceRoll(rollType, chatMsg)
-        if lootCount >= 1 then
-            announced = false
-            currentRollType = rollType
-            addon.Rolls:ClearRolls()
-            addon.Rolls:RecordRolls(true)
+        announced = false
+        currentRollType = rollType
+        addon.Rolls:ClearRolls()
+        addon.Rolls:RecordRolls(true)
 
-            local itemLink = GetItemLink()
-            local itemID = tonumber(string.match(itemLink or "", "item:(%d+)"))
-            local message = ""
+        local itemLink = GetItemLink()
+        local itemID = tonumber(string.match(itemLink, "item:(%d+)"))
+        local message = ""
 
-            if rollType == rollTypes.RESERVED and addon.Reserves and addon.Reserves.FormatReservedPlayersLine then
-                local srList = addon.Reserves:FormatReservedPlayersLine(itemID)
-                local suff = addon.options.sortAscending and "Low" or "High"
-                message = itemCount > 1
-                    and L[chatMsg .. "Multiple" .. suff]:format(srList, itemLink, itemCount)
-                    or L[chatMsg]:format(srList, itemLink)
-            else
-                local suff = addon.options.sortAscending and "Low" or "High"
-                message = itemCount > 1
-                    and L[chatMsg .. "Multiple" .. suff]:format(itemLink, itemCount)
-                    or L[chatMsg]:format(itemLink)
-            end
-
-            addon:Announce(message)
-            _G[frameName .. "ItemCount"]:ClearFocus()
-            currentRollItem = addon.Raid:GetLootID(itemID)
+        if rollType == rollTypes.RESERVED then
+            local srList = addon.Reserves:FormatReservedPlayersLine(itemID)
+            local suff = addon.options.sortAscending and "Low" or "High"
+            message = itemCount > 1
+                and L[chatMsg .. "Multiple" .. suff]:format(srList, itemLink, itemCount)
+                or L[chatMsg]:format(srList, itemLink)
+        else
+            local suff = addon.options.sortAscending and "Low" or "High"
+            message = itemCount > 1
+                and L[chatMsg .. "Multiple" .. suff]:format(itemLink, itemCount)
+                or L[chatMsg]:format(itemLink)
         end
+
+        addon:Announce(message)
+        _G[frameName .. "ItemCount"]:ClearFocus()
+        currentRollItem = addon.Raid:GetLootID(itemID)
     end
 
     function module:BtnMS(btn)
@@ -2148,10 +2135,6 @@ do
     -- Button: Award/Trade
     --
     function module:BtnAward(btn)
-        if lootCount <= 0 or rollsCount <= 0 then
-            addon:Debug("DEBUG", "Cannot award, lootCount=%d, rollsCount=%d", lootCount or 0, rollsCount or 0)
-            return
-        end
         countdownRun = false
         local itemLink = GetItemLink()
         _G[frameName .. "ItemCount"]:ClearFocus()
@@ -2165,10 +2148,8 @@ do
     -- Button: Hold item
     --
     function module:BtnHold(btn)
-        if lootCount <= 0 or holder == nil then return end
         countdownRun = false
         local itemLink = GetItemLink()
-        if itemLink == nil then return end
         currentRollType = rollTypes.HOLD
         if fromInventory == true then
             return TradeItem(itemLink, holder, rollTypes.HOLD, 0)
@@ -2180,10 +2161,8 @@ do
     -- Button: Bank item
     --
     function module:BtnBank(btn)
-        if lootCount <= 0 or banker == nil then return end
         countdownRun = false
         local itemLink = GetItemLink()
-        if itemLink == nil then return end
         currentRollType = rollTypes.BANK
         if fromInventory == true then
             return TradeItem(itemLink, banker, rollTypes.BANK, 0)
@@ -2195,10 +2174,8 @@ do
     -- Button: Disenchant item
     --
     function module:BtnDisenchant(btn)
-        if lootCount <= 0 or disenchanter == nil then return end
         countdownRun = false
         local itemLink = GetItemLink()
-        if itemLink == nil then return end
         currentRollType = rollTypes.DISENCHANT
         if fromInventory == true then
             return TradeItem(itemLink, disenchanter, rollTypes.DISENCHANT, 0)
@@ -2210,9 +2187,8 @@ do
     -- Selects a winner from the roll list.
     --
     function module:SelectWinner(btn)
-        if not btn then return end
         local btnName = btn:GetName()
-        local raw = btn.playerName or _G[btnName .. "Name"]:GetText() or ""
+        local raw = btn.playerName or _G[btnName .. "Name"]:GetText()
         local player = raw:gsub("^%s*>%s*(.-)%s*<%s*$", "%1"):trim()
         if player ~= "" then
             if IsControlKeyDown() then
@@ -2231,13 +2207,10 @@ do
     -- Selects an item from the item selection frame.
     --
     function module:BtnSelectedItem(btn)
-        if not btn then return end
         local index = btn:GetID()
-        if index ~= nil then
-            announced = false
-            selectionFrame:Hide()
-            addon.Loot:SelectItem(index)
-        end
+        announced = false
+        selectionFrame:Hide()
+        addon.Loot:SelectItem(index)
     end
 
     --
@@ -2434,7 +2407,7 @@ do
     -- Updates the text of the dropdowns to reflect the current selection.
     --
     function UpdateDropDowns(frame)
-        if not frame or not KRT_CurrentRaid then return end
+        if not KRT_CurrentRaid then return end
         local name = frame:GetName()
         -- Update loot holder:
         if name == dropDownFrameHolder:GetName() then
@@ -2476,10 +2449,8 @@ do
     -- Creates the item selection frame if it doesn't exist.
     --
     local function CreateSelectionFrame()
-        if selectionFrame == nil then
-            selectionFrame = CreateFrame("Frame", nil, UIMaster, "KRTSimpleFrameTemplate")
-            selectionFrame:Hide()
-        end
+        selectionFrame = selectionFrame or CreateFrame("Frame", nil, UIMaster, "KRTSimpleFrameTemplate")
+        selectionFrame:Hide()
         local index = 1
         local btnName = frameName .. "ItemSelectionBtn" .. index
         local btn = _G[btnName]
@@ -2512,9 +2483,6 @@ do
             height = height + 37
         end
         selectionFrame:SetHeight(height)
-        if lootCount <= 0 then
-            selectionFrame:Hide()
-        end
     end
 
     --------------------------------------------------------------------------
@@ -2525,9 +2493,7 @@ do
     -- ITEM_LOCKED: Triggered when an item is picked up from inventory.
     --
     function module:ITEM_LOCKED(inBag, inSlot)
-        if not inBag or not inSlot then return end
         local itemTexture, itemCount, locked, quality, _, _, itemLink = GetContainerItemInfo(inBag, inSlot)
-        if not itemLink or not itemTexture then return end
         _G[frameName .. "ItemBtn"]:SetScript("OnClick", function(self)
             if not ItemIsSoulbound(inBag, inSlot) then
                 -- Clear count:
@@ -2564,7 +2530,7 @@ do
             announced = false
             addon.Loot:FetchLoot()
             UpdateSelectionFrame()
-            if lootCount >= 1 then UIMaster:Show() end
+            UIMaster:Show()
             if not addon.History.container then
                 addon.History.source = UnitName("target")
             end
@@ -2598,11 +2564,7 @@ do
         if addon.Raid:IsMasterLooter() then
             addon.Loot:FetchLoot()
             UpdateSelectionFrame()
-            if lootCount >= 1 then
-                UIMaster:Show()
-            else
-                UIMaster:Hide()
-            end
+            UIMaster:SetShown(lootCount >= 1)
         end
     end
 
@@ -2634,10 +2596,6 @@ do
                 itemIndex = i
                 break
             end
-        end
-        if itemIndex == nil then
-            addon:error(L.ErrCannotFindItem:format(itemLink))
-            return false
         end
 
         for p = 1, addon.Raid:GetNumRaid() do
@@ -2682,7 +2640,6 @@ do
     -- Trades an item from inventory to a player.
     --
     function TradeItem(itemLink, playerName, rollType, rollValue)
-        if itemLink ~= GetItemLink() then return end
         trader = unitName
 
         -- Prepare initial output and whisper:
@@ -2823,7 +2780,7 @@ do
     local function EnsureFrames()
         countsFrame = countsFrame or _G["KRTLootCounterFrame"]
         scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
-        if countsFrame and not countsFrame._krtCounterHook then
+        if not countsFrame._krtCounterHook then
             countsFrame:SetScript("OnShow", StartCountsTicker)
             countsFrame:SetScript("OnHide", StopCountsTicker)
             countsFrame._krtCounterHook = true
@@ -2852,20 +2809,17 @@ do
     -- Show or hide the loot counter frame.
     function module:ToggleCountsFrame()
         EnsureFrames()
-        if countsFrame then
-            if countsFrame:IsShown() then
-                countsFrame:Hide()
-            else
-                RequestCountsUpdate()
-                countsFrame:Show()
-            end
+        if countsFrame:IsShown() then
+            countsFrame:Hide()
+        else
+            RequestCountsUpdate()
+            countsFrame:Show()
         end
     end
 
     -- Update the loot counter UI with current player counts.
     function module:UpdateCountsFrame()
         EnsureFrames()
-        if not countsFrame or not scrollChild then return end
 
         local players = GetCurrentRaidPlayers()
         local numPlayers = #players
@@ -2939,7 +2893,7 @@ do
     -------------------------------------------------------
     local function SetupMasterLootFrameHooks()
         local f = _G["KRTMasterLootFrame"]
-        if f and not f.KRT_LootCounterBtn then
+        if not f.KRT_LootCounterBtn then
             local btn = CreateFrame("Button", nil, f, "KRTButtonTemplate")
             btn:SetSize(100, 24)
             btn:SetText("Loot Counter")
@@ -2950,7 +2904,7 @@ do
             f.KRT_LootCounterBtn = btn
 
             f:HookScript("OnHide", function()
-                if countsFrame and countsFrame:IsShown() then
+                if countsFrame:IsShown() then
                     countsFrame:Hide()
                 end
             end)
