@@ -117,7 +117,7 @@ do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
     -------------------------------------------------------
-    addon.Debugger = addon.Debugger or {}
+    addon.Debugger = {}
     local module = addon.Debugger
 
     -------------------------------------------------------
@@ -129,23 +129,19 @@ do
     -- Public methods
     -------------------------------------------------------
     function module:OnLoad(frame)
-        if not frame then return end
         debugFrame = frame
         msgFrame = _G[frame:GetName() .. "ScrollFrame"]
     end
 
     function module:AddMessage(msg, r, g, b)
-        if msgFrame then
-            msgFrame:AddMessage(tostring(msg), r or 1, g or 1, b or 1)
-        end
+        msgFrame:AddMessage(tostring(msg), r, g, b)
     end
 
     function module:Clear()
-        if msgFrame then msgFrame:Clear() end
+        msgFrame:Clear()
     end
 
     function module:Toggle()
-        if not debugFrame then return end
         if debugFrame:IsShown() then
             debugFrame:Hide()
         else
