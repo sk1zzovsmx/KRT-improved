@@ -1059,48 +1059,7 @@ do
     -- Sends an announcement to the appropriate channel (Raid, Party, etc.).
     --
     function addon:Announce(text, channel)
-        local originalChannel = channel
-        if not channel then
-            -- Switch to raid channel if we're in a raid:
-            if IsInRaid() then
-                -- Check for countdown messages
-                local countdownTicPattern = L.ChatCountdownTic:gsub("%%d", "%%d+")
-                local isCountdownMessage = text:find(countdownTicPattern) or text:find(L.ChatCountdownEnd)
-
-                if isCountdownMessage then
-                    -- If it's a countdown message:
-                    if addon.options.countdownSimpleRaidMsg then
-                        channel = "RAID" -- Force RAID if countdownSimpleRaidMsg is true
-                        -- Use RAID_WARNING if leader/officer AND useRaidWarning is true
-                    elseif addon.options.useRaidWarning and (
-                            (UnitIsGroupLeader and UnitIsGroupLeader("player")) or
-                            (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
-                        ) then
-                        channel = "RAID_WARNING"
-                    else
-                        channel = "RAID" -- Fallback
-                    end
-                else
-                    if addon.options.useRaidWarning and (
-                            (UnitIsGroupLeader and UnitIsGroupLeader("player")) or
-                            (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
-                        ) then
-                        channel = "RAID_WARNING"
-                    else
-                        channel = "RAID" -- Fallback
-                    end
-                end
-
-                -- Switch to party mode if we're in a group:
-            elseif self:IsInGroup() then
-                channel = "PARTY"
-
-                -- Switch to alone mode
-            else
-                channel = "SAY" -- Fallback for solo
-            end
-        end
-        Utils.chat(tostring(text), channel)
+        Utils.chat(text, channel or "RAID_WARNING")
     end
 end
 
@@ -3819,7 +3778,6 @@ do
 
     -- OnLoad frame:
     function module:OnLoad(frame)
-        if not frame then return end
         UIWarnings = frame
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
@@ -3838,17 +3796,14 @@ do
 
     -- Hide frame:
     function module:Hide()
-        if UIWarnings and UIWarnings:IsShown() then
-            UIWarnings:Hide()
-        end
+        UIWarnings:Hide()
     end
 
     -- Warning selection:
     function module:Select(btn)
-        if btn == nil or isEdit == true then return end
+        if isEdit == true then return end
         local bName = btn:GetName()
         local wID = tonumber(_G[bName .. "ID"]:GetText())
-        if KRT_Warnings[wID] == nil then return end
         if IsControlKeyDown() then
             selectedID = nil
             tempSelectedID = wID
@@ -3860,12 +3815,8 @@ do
     -- Edit/Save warning:
     function module:Edit()
         local wName, wContent
-        if selectedID ~= nil then
+        if selectedID then
             local w = KRT_Warnings[selectedID]
-            if w == nil then
-                selectedID = nil
-                return
-            end
             if not isEdit and (tempName == "" and tempContent == "") then
                 _G[frameName .. "Name"]:SetText(w.name)
                 _G[frameName .. "Name"]:SetFocus()
@@ -3881,7 +3832,7 @@ do
 
     -- Delete Warning:
     function module:Delete(btn)
-        if btn == nil or selectedID == nil then return end
+        if selectedID == nil then return end
         local oldWarnings = {}
         for i, w in ipairs(KRT_Warnings) do
             _G[frameName .. "WarningBtn" .. i]:Hide()
@@ -3904,12 +3855,10 @@ do
 
     -- Announce Warning:
     function module:Announce(wID)
-        if KRT_Warnings == nil then return end
         if wID == nil then
-            wID = (selectedID ~= nil) and selectedID or tempSelectedID
+            wID = selectedID or tempSelectedID
         end
-        if wID <= 0 or KRT_Warnings[wID] == nil then return end
-        tempSelectedID = nil -- Always clear temporary selected id:
+        tempSelectedID = nil
         return addon:Announce(KRT_Warnings[wID].content)
     end
 
@@ -3945,16 +3894,14 @@ do
         LocalizeUIFrame()
         if Utils.throttle(self, frameName, updateInterval, elapsed) then
             if fetched == false then FetchWarnings() end
-            if #KRT_Warnings > 0 then
-                for i = 1, #KRT_Warnings do
-                    if selectedID == i and _G[frameName .. "WarningBtn" .. i] then
-                        _G[frameName .. "WarningBtn" .. i]:LockHighlight()
-                        _G[frameName .. "OutputName"]:SetText(KRT_Warnings[selectedID].name)
-                        _G[frameName .. "OutputContent"]:SetText(KRT_Warnings[selectedID].content)
-                        _G[frameName .. "OutputContent"]:SetTextColor(1, 1, 1)
-                    else
-                        _G[frameName .. "WarningBtn" .. i]:UnlockHighlight()
-                    end
+            for i = 1, #KRT_Warnings do
+                if selectedID == i then
+                    _G[frameName .. "WarningBtn" .. i]:LockHighlight()
+                    _G[frameName .. "OutputName"]:SetText(KRT_Warnings[selectedID].name)
+                    _G[frameName .. "OutputContent"]:SetText(KRT_Warnings[selectedID].content)
+                    _G[frameName .. "OutputContent"]:SetTextColor(1, 1, 1)
+                else
+                    _G[frameName .. "WarningBtn" .. i]:UnlockHighlight()
                 end
             end
             if selectedID == nil then
@@ -3974,9 +3921,9 @@ do
 
     -- Saving a Warning:
     function SaveWarning(wContent, wName, wID)
-        wID = wID and tonumber(wID) or 0
-        wName = tostring(wName):trim()
-        wContent = tostring(wContent):trim()
+        wID = tonumber(wID) or 0
+        wName = wName:trim()
+        wContent = wContent:trim()
         if wName == "" then
             wName = (isEdit and wID > 0) and wID or (#KRT_Warnings + 1)
         end
@@ -3984,7 +3931,7 @@ do
             addon:error(L.StrWarningsError)
             return
         end
-        if isEdit and wID > 0 and KRT_Warnings[wID] ~= nil then
+        if isEdit and wID > 0 then
             KRT_Warnings[wID].name = wName
             KRT_Warnings[wID].content = wContent
             isEdit = false
