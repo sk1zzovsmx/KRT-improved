@@ -105,9 +105,11 @@ do
         end
         addon:SetLogLevel(lv)
     end
+---============================================================================
     if addon.SetPerformanceMode then
         addon:SetPerformanceMode(true)
     end
+
 end
 
 ---============================================================================
@@ -2967,7 +2969,7 @@ do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
     -------------------------------------------------------
-    addon.Reserves = addon.Reserves or {}
+    addon.Reserves = {}
     local module = addon.Reserves
     local L = addon.L
 
@@ -3010,14 +3012,9 @@ do
     end
 
     function module:Load()
-        addon:Debug("DEBUG", "Loading reserves. Data exists: %s", tostring(KRT_SavedReserves ~= nil))
-        if KRT_SavedReserves then
-            reservesData = addon.tCopy({}, KRT_SavedReserves)
-            reservesByItemID = addon.tCopy({}, KRT_SavedReserves.reservesByItemID or {})
-        else
-            reservesData = {}
-            reservesByItemID = {}
-        end
+        addon:Debug("DEBUG", "Loading reserves.")
+        reservesData = addon.tCopy({}, KRT_SavedReserves)
+        reservesByItemID = addon.tCopy({}, KRT_SavedReserves.reservesByItemID)
     end
 
     function module:ResetSaved()
@@ -3039,30 +3036,20 @@ do
     --------------------------------------------------------------------------
 
     function module:ShowWindow()
-        if not reserveListFrame then
-            addon:error("Reserve List frame not available.")
-            return
-        end
         addon:Debug("DEBUG", "Showing reserve list window.")
         reserveListFrame:Show()
     end
 
     function module:CloseWindow()
         addon:Debug("DEBUG", "Closing reserve list window.")
-        if reserveListFrame then reserveListFrame:Hide() end
+        reserveListFrame:Hide()
     end
 
     function module:ShowImportBox()
         addon:Debug("DEBUG", "Opening import reserves box.")
         local frame = _G["KRTImportWindow"]
-        if not frame then
-            addon:error("KRTImportWindow not found.")
-            return
-        end
         frame:Show()
-        if _G["KRTImportEditBox"] then
-            _G["KRTImportEditBox"]:SetText("")
-        end
+        _G["KRTImportEditBox"]:SetText("")
         _G[frame:GetName() .. "Title"]:SetText(format(titleString, L.StrImportReservesTitle))
     end
 
@@ -3076,8 +3063,8 @@ do
         frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
         frame:SetScript("OnUpdate", UpdateUIFrame)
 
-        scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"]
-        scrollChild = scrollFrame and scrollFrame.ScrollChild or _G["KRTReserveListFrameScrollChild"]
+        scrollFrame = frame.ScrollFrame
+        scrollChild = scrollFrame.ScrollChild
 
         local buttons = {
             CloseButton = "CloseWindow",
@@ -3086,10 +3073,8 @@ do
         }
         for suff, method in pairs(buttons) do
             local btn = _G["KRTReserveListFrame" .. suff]
-            if btn and self[method] then
-                btn:SetScript("OnClick", function() self[method](self) end)
-                addon:Debug("DEBUG", "Button '%s' assigned to '%s'", suff, method)
-            end
+            btn:SetScript("OnClick", function() self[method](self) end)
+            addon:Debug("DEBUG", "Button '%s' assigned to '%s'", suff, method)
         end
 
         LocalizeUIFrame()
@@ -3116,14 +3101,8 @@ do
     --------------------------------------------------------------------------
 
     function LocalizeUIFrame()
-        if localized then
-            addon:Debug("DEBUG", "UI already localized.")
-            return
-        end
-        if frameName then
-            _G[frameName .. "Title"]:SetText(format(titleString, L.StrRaidReserves))
-            addon:Debug("DEBUG", "UI localized: %s", L.StrRaidReserves)
-        end
+        _G[frameName .. "Title"]:SetText(format(titleString, L.StrRaidReserves))
+        addon:Debug("DEBUG", "UI localized: %s", L.StrRaidReserves)
         localized = true
     end
 
@@ -3133,19 +3112,14 @@ do
         LocalizeUIFrame()
         if Utils.throttle(self, frameName, updateInterval, elapsed) then
             addon:Debug("DEBUG", "Periodic check passed for %s", frameName)
+            local hasData = module:HasData()
             local clearButton = _G[frameName .. "ClearButton"]
-            if clearButton then
-                local hasData = module:HasData()
-                Utils.enableDisable(clearButton, hasData)
-                addon:Debug("DEBUG", "ClearButton %s (HasData: %s)", hasData and "enabled" or "disabled", hasData)
-            end
+            Utils.enableDisable(clearButton, hasData)
+            addon:Debug("DEBUG", "ClearButton %s (HasData: %s)", hasData and "enabled" or "disabled", hasData)
 
             local queryButton = _G[frameName .. "QueryButton"]
-            if queryButton then
-                local hasData = module:HasData()
-                Utils.enableDisable(queryButton, hasData)
-                addon:Debug("DEBUG", "QueryButton %s (HasData: %s)", hasData and "enabled" or "disabled", hasData)
-            end
+            Utils.enableDisable(queryButton, hasData)
+            addon:Debug("DEBUG", "QueryButton %s (HasData: %s)", hasData and "enabled" or "disabled", hasData)
         end
     end
 
@@ -3156,14 +3130,7 @@ do
     function module:GetReserve(playerName)
         local player = playerName:lower():trim()
         local reserve = reservesData[player]
-
-        -- Log when the function is called and show the reserve for the player
-        if reserve then
-            addon:Debug("DEBUG", "Found reserve for player: %s, Reserve data: %s", playerName, tostring(reserve))
-        else
-            addon:Debug("DEBUG", "No reserve found for player: %s", playerName)
-        end
-
+        addon:Debug("DEBUG", "Reserve for player: %s, data: %s", playerName, tostring(reserve))
         return reserve
     end
 
@@ -3180,7 +3147,6 @@ do
         wipe(reservesByItemID)
 
         local function cleanCSVField(field)
-            if not field then return nil end
             return field:gsub('^"(.-)"$', '%1'):trim()
         end
 
@@ -3202,11 +3168,9 @@ do
                 plus                                                            = cleanCSVField(plus)
 
                 local itemId                                                    = tonumber(itemIdStr)
-                local normalized                                                = playerName and
-                    playerName:lower():trim()
+                local normalized                                                = playerName:lower():trim()
 
-                if normalized and itemId then
-                    -- Log the player being processed
+                if itemId then
                     addon:Debug("DEBUG", "Processing player: %s, Item ID: %d", playerName, itemId)
                     reservesData[normalized] = reservesData[normalized] or {
                         original = playerName,
@@ -3216,7 +3180,7 @@ do
                     local found = false
                     for _, entry in ipairs(reservesData[normalized].reserves) do
                         if entry.rawID == itemId then
-                            entry.quantity = (entry.quantity or 1) + 1
+                            entry.quantity = entry.quantity + 1
                             found = true
                             addon:Debug("DEBUG", "Updated quantity for player %s, item ID %d. New quantity: %d",
                                 playerName, itemId, entry.quantity)
@@ -3231,13 +3195,12 @@ do
                             itemName = nil,
                             itemIcon = nil,
                             quantity = 1,
-                            class    = class ~= "" and class or nil,
-                            note     = note ~= "" and note or nil,
-                            plus     = tonumber(plus) or 0,
-                            source   = source ~= "" and source or nil
+                            class    = class,
+                            note     = note,
+                            plus     = tonumber(plus),
+                            source   = source
                         }
                         tinsert(reservesData[normalized].reserves, entry)
-                        reservesByItemID[itemId] = reservesByItemID[itemId] or {}
                         tinsert(reservesByItemID[itemId], entry)
                         -- Log new reserve entry added
                         addon:Debug("DEBUG", "Added new reserve entry for player %s, item ID %d", playerName, itemId)
@@ -3256,81 +3219,50 @@ do
     --------------------------------------------------------------------------
 
     function module:QueryItemInfo(itemId)
-        if not itemId then return end
         addon:Debug("DEBUG", "Querying info for itemId: %d", itemId)
         local name, link, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
-        if name and link and tex then
-            self:UpdateReserveItemData(itemId, name, link, tex)
-            addon:Debug("DEBUG", "Successfully queried info for itemId: %d, Item Name: %s", itemId, name)
-            return true
-        else
-            GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
-            GameTooltip:SetHyperlink("item:" .. itemId)
-            GameTooltip:Hide()
-            pendingItemInfo[itemId] = true
-            addon:Debug("DEBUG", "Failed to query info for itemId: %d", itemId)
-            return false
-        end
+        self:UpdateReserveItemData(itemId, name, link, tex)
+        return true
     end
 
     -- Query all missing items for reserves
     function module:QueryMissingItems()
         local count = 0
         addon:Debug("DEBUG", "Querying missing items in reserves.")
+        local grouped = {}
         for _, player in pairs(reservesData) do
-            if type(player) == "table" and type(player.reserves) == "table" then
-                for _, r in ipairs(player.reserves) do
-                    if not r.itemLink or not r.itemIcon then
-                        if not self:QueryItemInfo(r.rawID) then
-                            count = count + 1
-                        end
-                    end
+            for _, r in ipairs(player.reserves) do
+                if self:QueryItemInfo(r.rawID) then
+                    count = count + 1
                 end
             end
         end
-        addon:info(count > 0 and ("Requested info for " .. count .. " missing items.") or
-            "All item infos are available.")
-        addon:Debug("DEBUG", "Total missing items requested: %d", count)
+        addon:info("Requested info for " .. count .. " items.")
+        addon:Debug("DEBUG", "Total items requested: %d", count)
     end
 
     -- Update reserve item data
     function module:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
         addon:Debug("DEBUG", "Updating reserve item data for itemId: %d", itemId)
         for _, player in pairs(reservesData) do
-            if type(player) == "table" and type(player.reserves) == "table" then
-                for _, r in ipairs(player.reserves or {}) do
-                    if r.rawID == itemId then
-                        r.itemName = itemName
-                        r.itemLink = itemLink
-                        r.itemIcon = itemIcon or "Interface\\Icons\\INV_Misc_QuestionMark"
-                        addon:Debug("DEBUG", "Updated reserve data for player: %s, itemId: %d", player.original, itemId)
-                    end
+            for _, r in ipairs(player.reserves) do
+                if r.rawID == itemId then
+                    r.itemName = itemName
+                    r.itemLink = itemLink
+                    r.itemIcon = itemIcon
+                    addon:Debug("DEBUG", "Updated reserve data for player: %s, itemId: %d", player.original, itemId)
                 end
             end
         end
 
         local rows = rowsByItemID[itemId]
-        if not rows then return end
         for _, row in ipairs(rows) do
-            local icon = itemIcon or "Interface\\Icons\\INV_Misc_QuestionMark"
-            row.icon:SetTexture(icon)
-
-            if row.quantityText then
-                if row.quantityText:GetText() and row.quantityText:GetText():match("^%d+x$") then
-                    row.quantityText:SetText(row.quantityText:GetText()) -- Preserve format
-                end
-            end
-
-            local tooltipText = itemLink or itemName or ("Item ID: " .. itemId)
-            row.nameText:SetText(tooltipText)
-
+            row.icon:SetTexture(itemIcon)
+            row.quantityText:SetText(row.quantityText:GetText())
+            row.nameText:SetText(itemLink)
             row.iconBtn:SetScript("OnEnter", function()
                 GameTooltip:SetOwner(row.iconBtn, "ANCHOR_RIGHT")
-                if itemLink then
-                    GameTooltip:SetHyperlink(itemLink)
-                else
-                    GameTooltip:SetText("Item ID: " .. itemId, 1, 1, 1)
-                end
+                GameTooltip:SetHyperlink(itemLink)
                 GameTooltip:Show()
             end)
             row.iconBtn:SetScript("OnLeave", function()
@@ -3341,15 +3273,14 @@ do
 
     -- Get reserve count for a specific item for a player
     function module:GetReserveCountForItem(itemId, playerName)
-        local normalized = playerName and playerName:lower()
+        local normalized = playerName:lower()
         local entry = reservesData[normalized]
-        if not entry then return 0 end
         addon:Debug("DEBUG", "Checking reserve count for itemId: %d for player: %s", itemId, playerName)
-        for _, r in ipairs(entry.reserves or {}) do
+        for _, r in ipairs(entry.reserves) do
             if r.rawID == itemId then
                 addon:Debug("DEBUG", "Found reserve for itemId: %d, player: %s, quantity: %d", itemId, playerName,
                     r.quantity)
-                return r.quantity or 1
+                return r.quantity
             end
         end
         addon:Debug("DEBUG", "No reserve found for itemId: %d, player: %s", itemId, playerName)
@@ -3362,7 +3293,6 @@ do
 
     function module:RefreshWindow()
         addon:Debug("DEBUG", "Refreshing reserve window.")
-        if not reserveListFrame or not scrollChild then return end
 
         -- Hide and clear old rows
         for _, row in ipairs(reserveItemRows) do row:Hide() end
@@ -3372,16 +3302,16 @@ do
         -- Group reserves by item source, ID, and quantity
         local grouped = {}
         for _, player in pairs(reservesData) do
-            for _, r in ipairs(player.reserves or {}) do
-                local key = (r.source or "Unknown") .. "||" .. r.rawID .. "||" .. (r.quantity or 1)
-                grouped[key] = grouped[key] or {
+            for _, r in ipairs(player.reserves) do
+                local key = r.source .. "||" .. r.rawID .. "||" .. r.quantity
+                grouped[key] = {
                     itemId = r.rawID,
-                    quantity = r.quantity or 1,
+                    quantity = r.quantity,
                     itemLink = r.itemLink,
                     itemName = r.itemName,
                     itemIcon = r.itemIcon,
-                    source = r.source or "Unknown",
-                    players = {}
+                    source = r.source,
+                    players = {},
                 }
                 tinsert(grouped[key].players, player.original)
             end
@@ -3409,9 +3339,6 @@ do
             if not seenSources[source] then
                 seenSources[source] = true
                 addon:Debug("DEBUG", "New source found: %s", source)
-                if collapsedBossGroups[source] == nil then
-                    collapsedBossGroups[source] = false
-                end
 
                 local headerBtn = CreateFrame("Button", nil, scrollChild)
                 headerBtn:SetSize(320, 28)
@@ -3487,36 +3414,26 @@ do
 
         local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         nameText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 8, -2)
-        nameText:SetText(info.itemLink or info.itemName or ("[Item " .. info.itemId .. "]"))
+        nameText:SetText(info.itemLink)
 
         local playerText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         playerText:SetPoint("TOPLEFT", nameText, "BOTTOMLEFT", 0, -2)
-        playerText:SetText(table.concat(info.players or {}, ", "))
+        playerText:SetText(table.concat(info.players, ", "))
 
         local quantityText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         quantityText:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
         quantityText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
         quantityText:SetTextColor(1, 1, 1)
 
-        if info.quantity and info.quantity > 1 then
-            quantityText:SetText(info.quantity .. "x")
-            quantityText:Show()
-        else
-            quantityText:Hide()
-        end
+        quantityText:SetText(info.quantity .. "x")
+        quantityText:Show()
 
-        icon:SetTexture(info.itemIcon or "Interface\\Icons\\INV_Misc_QuestionMark")
+        icon:SetTexture(info.itemIcon)
 
         iconBtn:SetScript("OnEnter", function()
             GameTooltip:SetOwner(iconBtn, "ANCHOR_RIGHT")
-            if info.itemLink then
-                GameTooltip:SetHyperlink(info.itemLink)
-            else
-                GameTooltip:SetText("Item ID: " .. info.itemId, 1, 1, 1)
-            end
-            if info.source then
-                GameTooltip:AddLine("Dropped by: " .. info.source, 0.8, 0.8, 0.8)
-            end
+            GameTooltip:SetHyperlink(info.itemLink)
+            GameTooltip:AddLine("Dropped by: " .. info.source, 0.8, 0.8, 0.8)
             GameTooltip:Show()
         end)
 
@@ -3530,7 +3447,6 @@ do
         row.quantityText = quantityText
 
         row:Show()
-        rowsByItemID[info.itemId] = rowsByItemID[info.itemId] or {}
         tinsert(rowsByItemID[info.itemId], row)
 
         return row
@@ -3544,10 +3460,10 @@ do
         addon:Debug("DEBUG", "Getting players for itemId: %d", itemId)
         local players = {}
         -- Loop through each player and their reserves
-        for _, player in pairs(reservesData or {}) do
-            for _, r in ipairs(player.reserves or {}) do
+        for _, player in pairs(reservesData) do
+            for _, r in ipairs(player.reserves) do
                 if r.rawID == itemId then
-                    local qty = r.quantity or 1
+                    local qty = r.quantity
                     local display = qty > 1 and ("(" .. qty .. "x)" .. player.original) or player.original
                     tinsert(players, display)
                     -- Log when a player is added for an item
@@ -3565,7 +3481,7 @@ do
         local list = self:GetPlayersForItem(itemId)
         -- Log the list of players found for the item
         addon:Debug("DEBUG", "Players for itemId %d: %s", itemId, table.concat(list, ", "))
-        return #list > 0 and table.concat(list, ", ") or ""
+        return table.concat(list, ", ")
     end
 end
 
