@@ -281,58 +281,54 @@ do
             return
         end
 
-        local realm = GetRealmName() or UNKNOWN
+        local realm = GetRealmName()
         KRT_Players[realm] = KRT_Players[realm] or {}
         local raid = KRT_Raids[KRT_CurrentRaid]
         raid.playersByName = raid.playersByName or {}
         local playersByName = raid.playersByName
         for unit in UnitIterator(true) do
             local name = UnitName(unit)
-            if name then
-                local index = UnitInRaid(unit)
-                local rank, subgroup
-                if index then
-                    _, rank, subgroup = GetRaidRosterInfo(index)
-                end
-                if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
-                    rank = 2
-                elseif UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
-                    rank = 1
-                end
-                rank = rank or 0
-                subgroup = subgroup or 1
-                local level = UnitLevel(unit)
-                local classL, class = UnitClass(unit)
-                local player = playersByName[name]
-                local raceL, race = UnitRace(unit)
-                inRaid = player and player.leave == nil
-                if not inRaid then
-                    local toRaid = {
-                        name     = name,
-                        rank     = rank,
-                        subgroup = subgroup,
-                        class    = class or "UNKNOWN",
-                        join     = Utils.getCurrentTime(),
-                        leave    = nil,
-                        count    = 0, -- <--- Inizializza count!
-                    }
-                    module:AddPlayer(toRaid)
-                    player = toRaid
-                end
+            local index = UnitInRaid(unit)
+            local rank, subgroup
+            if index then
+                _, rank, subgroup = GetRaidRosterInfo(index)
+            end
+            if UnitIsGroupLeader(unit) then
+                rank = 2
+            elseif UnitIsGroupAssistant(unit) then
+                rank = 1
+            end
+            local level = UnitLevel(unit)
+            local classL, class = UnitClass(unit)
+            local player = playersByName[name]
+            local raceL, race = UnitRace(unit)
+            inRaid = player and player.leave == nil
+            if not inRaid then
+                local toRaid = {
+                    name     = name,
+                    rank     = rank,
+                    subgroup = subgroup,
+                    class    = class,
+                    join     = Utils.getCurrentTime(),
+                    leave    = nil,
+                    count    = 0,
+                }
+                module:AddPlayer(toRaid)
+                player = toRaid
+            end
 
-                player.seen = true
+            player.seen = true
 
-                if not KRT_Players[realm][name] then
-                    KRT_Players[realm][name] = {
-                        name   = name,
-                        level  = level,
-                        race   = race,
-                        raceL  = raceL,
-                        class  = class or "UNKNOWN",
-                        classL = classL,
-                        sex    = UnitSex(unit),
-                    }
-                end
+            if not KRT_Players[realm][name] then
+                KRT_Players[realm][name] = {
+                    name   = name,
+                    level  = level,
+                    race   = race,
+                    raceL  = raceL,
+                    class  = class,
+                    classL = classL,
+                    sex    = UnitSex(unit),
+                }
             end
         end
 
@@ -363,7 +359,7 @@ do
         end
         if not IsInRaid() then return end
 
-        local realm = GetRealmName() or UNKNOWN
+        local realm = GetRealmName()
         KRT_Players[realm] = KRT_Players[realm] or {}
         local currentTime = Utils.getCurrentTime()
 
@@ -387,25 +383,20 @@ do
                 if index then
                     _, rank, subgroup, level, classL, class = GetRaidRosterInfo(index)
                 end
-                if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
+                if UnitIsGroupLeader(unit) then
                     rank = 2
-                elseif UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
+                elseif UnitIsGroupAssistant(unit) then
                     rank = 1
                 end
-                rank              = rank or 0
-                subgroup          = subgroup or 1
-                level             = level or UnitLevel(unit)
-                classL            = classL or select(1, UnitClass(unit))
-                class             = class or select(2, UnitClass(unit))
                 local raceL, race = UnitRace(unit)
-                local p           = {
+                local p = {
                     name     = name,
                     rank     = rank,
                     subgroup = subgroup,
-                    class    = class or "UNKNOWN",
+                    class    = class,
                     join     = Utils.getCurrentTime(),
                     leave    = nil,
-                    count    = 0, -- Initialize loot count
+                    count    = 0,
                 }
                 tinsert(raidInfo.players, p)
                 raidInfo.playersByName[name] = p
@@ -414,7 +405,7 @@ do
                     level  = level,
                     race   = race,
                     raceL  = raceL,
-                    class  = class or "UNKNOWN",
+                    class  = class,
                     classL = classL,
                     sex    = UnitSex(unit),
                 }
@@ -508,7 +499,7 @@ do
         for i, p in ipairs(players) do
             if t.name == p.name then
                 -- Preserve count if present
-                t.count = t.count or p.count or 0
+                t.count = t.count or p.count
                 raid.players[i] = t
                 raid.playersByName[t.name] = t
                 found = true
@@ -516,7 +507,6 @@ do
             end
         end
         if not found then
-            t.count = t.count or 0
             tinsert(raid.players, t)
             raid.playersByName[t.name] = t
         end
@@ -626,10 +616,10 @@ do
         local players = module:GetPlayers(raidNum)
         for i, p in ipairs(players) do
             if p.name == name then
-                return p.count or 0
+                return p.count
             end
         end
-        return 0
+        return
     end
 
     function module:SetPlayerCount(name, value, raidNum)
@@ -691,8 +681,7 @@ do
     --
     function module:GetRaidSize()
         if not IsInRaid() then return 0 end
-        local diff = GetRaidDifficulty and GetRaidDifficulty() or (GetRaidDifficultyID and GetRaidDifficultyID())
-        if not diff then return (GetNumGroupMembers() > 10) and 25 or 10 end
+        local diff = GetRaidDifficulty()
         return (diff == 1 or diff == 3) and 10 or 25
     end
 
@@ -730,13 +719,12 @@ do
     function module:GetLoot(raidNum, bossNum)
         local items = {}
         raidNum = raidNum or KRT_CurrentRaid
-        bossNum = bossNum or 0
         if not raidNum or not KRT_Raids[raidNum] then
             return items
         end
         local loot = KRT_Raids[raidNum].loot
         local total = 0
-        if tonumber(bossNum) <= 0 then
+        if not bossNum or tonumber(bossNum) <= 0 then
             -- Get all loot
             for k, v in ipairs(loot) do
                 local info = v
@@ -917,15 +905,15 @@ do
         local players = module:GetPlayers(raidNum)
         local rank = 0
         local originalName = name
-        name = name or unitName or UnitName("player")
+        name = name or unitName
         if tLength(players) == 0 then
             if IsInGroup() then
                 for unit in UnitIterator(true) do
                     local pname = UnitName(unit)
                     if pname == name then
-                        if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
+                        if UnitIsGroupLeader(unit) then
                             rank = 2
-                        elseif UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
+                        elseif UnitIsGroupAssistant(unit) then
                             rank = 1
                         end
                         break
@@ -935,7 +923,7 @@ do
         else
             for i, p in ipairs(players) do
                 if p.name == name then
-                    rank = p.rank or 0
+                    rank = p.rank
                     break
                 end
             end
@@ -947,13 +935,9 @@ do
     -- Gets a player's class from the saved players database.
     --
     function module:GetPlayerClass(name)
-        local class = "UNKNOWN"
-        local realm = GetRealmName() or UNKNOWN
+        local realm = GetRealmName()
         local resolvedName = name or unitName
-        if KRT_Players[realm] and KRT_Players[realm][resolvedName] then
-            class = KRT_Players[realm][resolvedName].class or "UNKNOWN"
-        end
-        return class
+        return KRT_Players[realm][resolvedName].class
     end
 
     --
