@@ -4945,7 +4945,6 @@ do
     -------------------------------------------------------
 
     function module:OnLoad(frame)
-        if not frame then return end
         UIHistory, frameName = frame, frame:GetName() -- UIHistory globale per XML
         frame:RegisterForDrag("LeftButton")
         frame:SetScript("OnUpdate", function(self, elapsed)
@@ -4966,7 +4965,6 @@ do
     function module:Toggle() Utils.toggle(UIHistory) end
 
     function module:Hide()
-        if not UIHistory then return end
         module.selectedRaid, module.selectedBoss, module.selectedPlayer, module.selectedItem =
             KRT_CurrentRaid, nil, nil, nil
         Utils.showHide(UIHistory, false)
@@ -4979,35 +4977,26 @@ do
     end
     -- select a raid and notify listeners
     function module:SelectRaid(btn)
-        if btn then
-            sel("selectedRaid", btn:GetID(), "HistorySelectRaid")
-        end
+        sel("selectedRaid", btn:GetID(), "HistorySelectRaid")
     end
 
     -- select a boss and notify listeners
     function module:SelectBoss(btn)
-        if btn then
-            sel("selectedBoss", btn:GetID(), "HistorySelectBoss")
-        end
+        sel("selectedBoss", btn:GetID(), "HistorySelectBoss")
     end
 
     -- select a player within a boss kill
     function module:SelectBossPlayer(btn)
-        if btn then
-            sel("selectedBossPlayer", btn:GetID(), "HistorySelectBossPlayer")
-        end
+        sel("selectedBossPlayer", btn:GetID(), "HistorySelectBossPlayer")
     end
 
     -- select a player and notify listeners
     function module:SelectPlayer(btn)
-        if btn then
-            sel("selectedPlayer", btn:GetID(), "HistorySelectPlayer")
-        end
+        sel("selectedPlayer", btn:GetID(), "HistorySelectPlayer")
     end
 
     do -- Item: sinistro seleziona, destro menu
         local function openItemMenu()
-            if not addon.History.selectedItem then return end
             local f = _G.KRTHistoryItemMenuFrame or
                 CreateFrame("Frame", "KRTHistoryItemMenuFrame", UIParent, "UIDropDownMenuTemplate")
             EasyMenu({
@@ -5032,7 +5021,6 @@ do
             }, f, "cursor", 0, 0, "MENU")
         end
         function module:SelectItem(btn, button)
-            if not btn then return end
             if button == "LeftButton" then
                 sel("selectedItem", btn:GetID(), "HistorySelectItem")
             elseif button == "RightButton" then
@@ -5058,14 +5046,16 @@ do
             end,
             OnAccept = function(self)
                 local name = self.editBox:GetText():trim()
-                if name ~= "" and self.raidId and KRT_Raids[self.raidId] then
-                    for _, p in ipairs(KRT_Raids[self.raidId].players) do
-                        if name:lower() == p.name:lower() then
-                            addon.History.Loot:Log(self.itemId, p.name); addon.History.Loot:Fetch(); break
-                        end
+                for _, p in ipairs(KRT_Raids[self.raidId].players) do
+                    if name:lower() == p.name:lower() then
+                        addon.History.Loot:Log(self.itemId, p.name)
+                        addon.History.Loot:Fetch()
+                        break
                     end
                 end
-                self.editBox:SetText(""); self.editBox:ClearFocus(); self:Hide()
+                self.editBox:SetText("")
+                self.editBox:ClearFocus()
+                self:Hide()
             end,
         }
         StaticPopupDialogs["KRTHISTORY_ITEM_EDIT_ROLL"] = {
@@ -5080,9 +5070,9 @@ do
             OnShow = function(self) self.itemId = addon.History.selectedItem end,
             OnHide = function(self) self.itemId = nil end,
             OnAccept = function(self)
-                local rt = self.editBox:GetNumber(); if rt > 0 and rt <= 7 then
-                    addon.History.Loot:Log(self.itemId, nil, rt); addon.History.Loot:Fetch()
-                end
+                local rt = self.editBox:GetNumber()
+                addon.History.Loot:Log(self.itemId, nil, rt)
+                addon.History.Loot:Fetch()
             end,
         }
         StaticPopupDialogs["KRTHISTORY_ITEM_EDIT_VALUE"] = {
@@ -5097,9 +5087,9 @@ do
             OnShow = function(self) self.itemId = addon.History.selectedItem end,
             OnHide = function(self) self.itemId = nil end,
             OnAccept = function(self)
-                local v = self.editBox:GetNumber(); if v ~= nil then
-                    addon.History.Loot:Log(self.itemId, nil, nil, v); addon.History.Loot:Fetch()
-                end
+                local v = self.editBox:GetNumber()
+                addon.History.Loot:Log(self.itemId, nil, nil, v)
+                addon.History.Loot:Fetch()
             end,
         }
     end
