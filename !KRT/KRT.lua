@@ -1135,7 +1135,6 @@ do
         addonMenu = addonMenu or CreateFrame("Frame", "KRTMenu", UIParent, "UIDropDownMenuTemplate")
         addonMenu.displayMode = "MENU"
         addonMenu.initialize = function(self, level)
-            if not level then return end
             wipe(info)
             if level == 1 then
                 -- Toggle master loot frame:
@@ -1225,7 +1224,6 @@ do
         else
             -- Circular drag mode (snap to ring radius ~80)
             local dist = sqrt(x * x + y * y)
-            if dist == 0 then dist = 1 end
             local px, py = (x / dist) * 80, (y / dist) * 80
             self:ClearAllPoints()
             self:SetPoint("CENTER", px, py)
@@ -1243,8 +1241,7 @@ do
         KRT_MINIMAP_GUI:SetPoint("CENTER", cos(r) * 80, sin(r) * 80)
     end
 
-    function module:OnLoad(btn)
-        if not btn then return end
+    function module:OnLoad()
         addon.options = addon.options or KRT_Options or {}
         KRT_MINIMAP_GUI:SetUserPlaced(true)
         self:SetPos(addon.options.minimapPos or 325)
