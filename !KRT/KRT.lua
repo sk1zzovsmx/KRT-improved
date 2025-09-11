@@ -4342,7 +4342,6 @@ do
     local frameName
 
     local LocalizeUIFrame
-    local localized = false
 
     local UpdateUIFrame
     local updateInterval = 0.05
@@ -4379,15 +4378,11 @@ do
 
     -- OnLoad frame:
     function module:OnLoad(frame)
-        if not frame then return end
         UISpammer = frame
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
-        if updateTicker then
-            CancelTimer(updateTicker, true)
-        end
         updateTicker = NewTicker(updateInterval, function()
-            if UISpammer then UpdateUIFrame(UISpammer, updateInterval) end
+            UpdateUIFrame(UISpammer, updateInterval)
         end)
     end
 
@@ -4398,14 +4393,11 @@ do
 
     -- Hide frame:
     function module:Hide()
-        if UISpammer and UISpammer:IsShown() then
-            UISpammer:Hide()
-        end
+        UISpammer:Hide()
     end
 
     -- Save edit box:-
     function module:Save(box)
-        if not box then return end
         local boxName = box:GetName()
         local target = gsub(boxName, frameName, "")
         if find(target, "Chat") then
@@ -4436,18 +4428,15 @@ do
 
     -- Start spamming:
     function module:Start()
-        if strlen(finalOutput) > 3 and strlen(finalOutput) <= 255 then
-            if paused then
-                paused = false
-            elseif ticking then
-                ticking = false
-            else
-                tickStart = GetTime()
-                duration = tonumber(duration) or addon.options.lfmPeriod
-                tickPos = (duration >= 1 and duration or addon.options.lfmPeriod) + 1
-                ticking = true
-                -- module:Spam()
-            end
+        if paused then
+            paused = false
+        elseif ticking then
+            ticking = false
+        else
+            tickStart = GetTime()
+            duration = tonumber(duration) or addon.options.lfmPeriod
+            tickPos = (duration >= 1 and duration or addon.options.lfmPeriod) + 1
+            ticking = true
         end
     end
 
@@ -4465,16 +4454,7 @@ do
 
     -- Send spam message:
     function module:Spam()
-        if strlen(finalOutput) > 255 then
-            addon:error(L.StrSpammerErrLength)
-            ticking = false
-            return
-        end
-        if #channels <= 0 then
-            Utils.chat(tostring(finalOutput), "YELL", nil, nil, true)
-            return
-        end
-        for i, c in ipairs(channels) do
+        for _, c in ipairs(channels) do
             if type(c) == "number" then
                 Utils.chat(tostring(finalOutput), "CHANNEL", nil, c, true)
             else
@@ -4485,13 +4465,8 @@ do
 
     -- Tab move between edit boxes:
     function module:Tab(a, b)
-        local target
-        if IsShiftKeyDown() and _G[frameName .. b] ~= nil then
-            target = _G[frameName .. b]
-        elseif _G[frameName .. a] ~= nil then
-            target = _G[frameName .. a]
-        end
-        if target then target:SetFocus() end
+        local target = IsShiftKeyDown() and _G[frameName .. b] or _G[frameName .. a]
+        target:SetFocus()
     end
 
     -- Clears Data
@@ -4517,13 +4492,10 @@ do
 
     -- Localizing ui frame:
     function LocalizeUIFrame()
-        if localized then return end
-        if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-            _G[frameName .. "CompStr"]:SetText(L.StrSpammerCompStr)
-            _G[frameName .. "NeedStr"]:SetText(L.StrSpammerNeedStr)
-            _G[frameName .. "MessageStr"]:SetText(L.StrSpammerMessageStr)
-            _G[frameName .. "PreviewStr"]:SetText(L.StrSpammerPreviewStr)
-        end
+        _G[frameName .. "CompStr"]:SetText(L.StrSpammerCompStr)
+        _G[frameName .. "NeedStr"]:SetText(L.StrSpammerNeedStr)
+        _G[frameName .. "MessageStr"]:SetText(L.StrSpammerMessageStr)
+        _G[frameName .. "PreviewStr"]:SetText(L.StrSpammerPreviewStr)
         _G[frameName .. "Title"]:SetText(format(titleString, L.StrSpammer))
         _G[frameName .. "StartBtn"]:SetScript("OnClick", module.Start)
 
@@ -4538,8 +4510,6 @@ do
             L.StrSpammerMessageHelp2,
             L.StrSpammerMessageHelp3,
         })
-
-        localized = true
     end
 
     -- OnUpdate frame:
