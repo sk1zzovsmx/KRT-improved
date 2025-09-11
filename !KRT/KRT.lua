@@ -3576,7 +3576,7 @@ do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
     -------------------------------------------------------
-    addon.Config = addon.Config or {}
+    addon.Config = {}
     local module = addon.Config
     local L = addon.L
     local frameName
@@ -3645,9 +3645,9 @@ do
             addon.options.countdownSimpleRaidMsg = false
         end
 
-        if addon.options.debug and addon.SetLogLevel and addon.Logger and addon.Logger.logLevels then
+        if addon.options.debug then
             addon:SetLogLevel(addon.Logger.logLevels.DEBUG)
-        elseif addon.SetLogLevel then
+        else
             addon:SetLogLevel(KRT_Debug.level)
         end
     end
@@ -3664,7 +3664,6 @@ do
     -- OnLoad handler for the configuration frame.
     --
     function module:OnLoad(frame)
-        if not frame then return end
         UIConfig = frame
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
@@ -3682,17 +3681,14 @@ do
     -- Hides the configuration frame.
     --
     function module:Hide()
-        if UIConfig and UIConfig:IsShown() then
-            UIConfig:Hide()
-        end
+        UIConfig:Hide()
     end
 
     --
     -- OnClick handler for option controls.
     --
     function module:OnClick(btn)
-        if not btn then return end
-        frameName = frameName or btn:GetParent():GetName()
+        frameName = btn:GetParent():GetName()
         local value, name = nil, btn:GetName()
 
         if name ~= frameName .. "countdownDuration" then
@@ -3764,17 +3760,15 @@ do
             local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
             local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
 
-            if useRaidWarningBtn and countdownSimpleRaidMsgBtn and countdownSimpleRaidMsgStr then
-                if not useRaidWarningBtn:GetChecked() then
-                    countdownSimpleRaidMsgBtn:SetChecked(addon.options.countdownSimpleRaidMsg)
-                    countdownSimpleRaidMsgBtn:Disable()
-                    countdownSimpleRaidMsgStr:SetTextColor(0.5, 0.5, 0.5)
-                else
-                    countdownSimpleRaidMsgBtn:Enable()
-                    countdownSimpleRaidMsgStr:SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g,
-                        HIGHLIGHT_FONT_COLOR.b)
-                    countdownSimpleRaidMsgBtn:SetChecked(addon.options.countdownSimpleRaidMsg)
-                end
+            if not useRaidWarningBtn:GetChecked() then
+                countdownSimpleRaidMsgBtn:SetChecked(addon.options.countdownSimpleRaidMsg)
+                countdownSimpleRaidMsgBtn:Disable()
+                countdownSimpleRaidMsgStr:SetTextColor(0.5, 0.5, 0.5)
+            else
+                countdownSimpleRaidMsgBtn:Enable()
+                countdownSimpleRaidMsgStr:SetTextColor(
+                    HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
+                countdownSimpleRaidMsgBtn:SetChecked(addon.options.countdownSimpleRaidMsg)
             end
         end
     end
