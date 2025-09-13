@@ -85,11 +85,7 @@ end
 -- ============================================================================
 
 function Utils.getFrameName()
-	local name
-	if addon.UIMaster ~= nil then
-		name = addon.UIMaster:GetName()
-	end
-	return name
+        return addon.UIMaster:GetName()
 end
 
 -- Shuffle a table:
@@ -169,35 +165,29 @@ end
 
 -- Enable/Disable Frame:
 function Utils.enableDisable(frame, cond)
-	if frame == nil then
-		return
-	elseif cond and frame:IsEnabled() == 0 then
-		frame:Enable()
-	elseif not cond and frame:IsEnabled() == 1 then
-		frame:Disable()
-	end
+        if cond and frame:IsEnabled() == 0 then
+                frame:Enable()
+        elseif not cond and frame:IsEnabled() == 1 then
+                frame:Disable()
+        end
 end
 
 -- Unconditional show/hide frame:
 function Utils.toggle(frame)
-	if frame == nil then
-		return
-	elseif frame:IsVisible() then
-		frame:Hide()
-	else
-		frame:Show()
-	end
+        if frame:IsVisible() then
+                frame:Hide()
+        else
+                frame:Show()
+        end
 end
 
 -- Conditional Show/Hide Frame:
 function Utils.showHide(frame, cond)
-	if frame == nil then
-		return
-	elseif cond and not frame:IsShown() then
-		frame:Show()
-	elseif not cond and frame:IsShown() then
-		frame:Hide()
-	end
+        if cond and not frame:IsShown() then
+                frame:Show()
+        elseif not cond and frame:IsShown() then
+                frame:Hide()
+        end
 end
 
 function Utils.createPool(frameType, parent, template, resetter)
@@ -206,29 +196,25 @@ end
 
 -- Lock/Unlock Highlight:
 function Utils.toggleHighlight(frame, cond)
-	if frame == nil then
-		return
-	elseif cond then
-		frame:LockHighlight()
-	else
-		frame:UnlockHighlight()
-	end
+        if cond then
+                frame:LockHighlight()
+        else
+                frame:UnlockHighlight()
+        end
 end
 
 -- Set frameent text with condition:
 function Utils.setText(frame, str1, str2, cond)
-	if frame == nil then
-		return
-	elseif cond then
-		frame:SetText(str1)
-	else
-		frame:SetText(str2)
-	end
+        if cond then
+                frame:SetText(str1)
+        else
+                frame:SetText(str2)
+        end
 end
 
 -- Return with IF:
 function Utils.returnIf(cond, a, b)
-	return (cond ~= nil and cond ~= false) and a or b
+        return cond and a or b
 end
 
 -- Throttle frame OnUpdate:
