@@ -1035,7 +1035,7 @@ do
         if prefixHex then
             prefix = addon:WrapTextInColorCode(prefix, prefixHex)
         end
-        return format(output, prefix, tostring(text))
+        return string.format(output, prefix, tostring(text))
     end
 
     --
@@ -1052,48 +1052,44 @@ do
     -- Sends an announcement to the appropriate channel (Raid, Party, etc.).
     --
     function addon:Announce(text, channel)
-        local originalChannel = channel
-        if not channel then
-            -- Switch to raid channel if we're in a raid:
-            if IsInRaid() then
-                -- Check for countdown messages
-                local countdownTicPattern = L.ChatCountdownTic:gsub("%%d", "%%d+")
-                local isCountdownMessage = text:find(countdownTicPattern) or text:find(L.ChatCountdownEnd)
+        local ch = channel
 
-                if isCountdownMessage then
-                    -- If it's a countdown message:
-                    if addon.options.countdownSimpleRaidMsg then
-                        channel = "RAID" -- Force RAID if countdownSimpleRaidMsg is true
-                        -- Use RAID_WARNING if leader/officer AND useRaidWarning is true
-                    elseif addon.options.useRaidWarning and (
-                            (UnitIsGroupLeader and UnitIsGroupLeader("player")) or
-                            (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
-                        ) then
-                        channel = "RAID_WARNING"
-                    else
-                        channel = "RAID" -- Fallback
-                    end
+        if not ch then
+            local isCountdown = false
+            -- Check for countdown messages
+            do
+                local ticPat = L.ChatCountdownTic:gsub("%%d", "%%d+")
+                isCountdown = (find(text, ticPat) ~= nil) or (find(text, L.ChatCountdownEnd) ~= nil)
+            end
+
+            if IsInRaid() then
+                -- If it's a countdown message:
+                if isCountdown and addon.options.countdownSimpleRaidMsg then
+                    ch = "RAID"
                 else
-                    if addon.options.useRaidWarning and (
-                            (UnitIsGroupLeader and UnitIsGroupLeader("player")) or
-                            (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
-                        ) then
-                        channel = "RAID_WARNING"
+                    -- Use RAID_WARNING if leader/officer AND useRaidWarning is true
+                    if addon.options.useRaidWarning then
+                        local isLead = (UnitIsGroupLeader and UnitIsGroupLeader("player"))
+                            or (IsRaidLeader and IsRaidLeader())
+                        local isAssist = (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
+                            or (IsRaidOfficer and IsRaidOfficer())
+                        if isLead or isAssist then
+                            ch = "RAID_WARNING"
+                        else
+                            ch = "RAID"
+                        end
                     else
-                        channel = "RAID" -- Fallback
+                        ch = "RAID"
                     end
                 end
 
-                -- Switch to party mode if we're in a group:
-            elseif self:IsInGroup() then
-                channel = "PARTY"
-
-                -- Switch to alone mode
+            elseif IsInGroup() then
+                ch = "PARTY"
             else
-                channel = "SAY" -- Fallback for solo
+                ch = "SAY"
             end
         end
-        Utils.chat(tostring(text), channel)
+        Utils.chat(tostring(text), ch)
     end
 end
 
