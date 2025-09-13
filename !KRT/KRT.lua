@@ -1352,6 +1352,7 @@ do
     local function addRoll(name, roll, itemId)
         roll = tonumber(roll)
         state.count = state.count + 1
+        rollsCount = rollsCount + 1
         state.rolls[state.count] = { name = name, roll = roll, itemId = itemId }
         addon:Debug("DEBUG", "AddRoll: name=%s roll=%d item=%s", name, roll, tostring(itemId))
 
@@ -1385,7 +1386,7 @@ do
 
     local function resetRolls(rec)
         state.rolls, state.rerolled, state.itemCounts = {}, {}, {}
-        state.playerCounts, state.count = {}, 0
+        state.playerCounts, state.count, rollsCount = {}, 0, 0
         state.selected, state.rolled, state.warned = nil, false, false
         if rec == false then state.record = false end
     end
