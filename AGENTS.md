@@ -69,7 +69,8 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 - **LibDeformat‑3.0** pattern‑based deformatting (parsing chat/loot lines)
 - **LibBossIDs‑1.0** boss id/name lookup
 
-*Guideline:* Embed via `LibStub("Name", true)`; treat missing libs gracefully; never hard‑require Ace3.
+*Guideline:* Embed via `LibStub("Name", true)`; assume libs exist.
+If missing, fall back via `LibCompat-1.0`; never hard‑require Ace3.
 
 ---
 
@@ -136,7 +137,10 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 ## 11) Security & compat
 - No external I/O or networking beyond WoW API.
 - Avoid taint: no secure frame manipulation in combat; defer via out‑of‑combat handlers.
-- Guard locale and nils; never trust `Unit*` calls to succeed; use `LibCompat-1.0` iterators.
+- Guard locale; assume Blizzard APIs and vendored libs exist.
+- Drop redundant nil-safe wrappers or alternative API fallbacks.
+- Keep nil checks only where they prevent real logic errors (e.g., `Unit*` results).
+- If an API or lib is missing, rely on `LibCompat-1.0`.
 - Respect 3.3.5 API (no modern `C_Timer`, etc.). If you need timers, use `OnUpdate` with conservative throttle.
 
 ---
@@ -244,3 +248,4 @@ https://github.com/gakeez/agents_md_collection/blob/main/examples/lua-programmin
 - _2025-09-08_: Renamed Logger module to History to avoid conflict with debugging logger.
 - _2025-09-09_: Integrate new template. Removed unused Libs.
 - _2025-09-10_: Clarified proprietary WoW API requirement.
+- _2025-09-13_: Updated nil-check and API fallback guidelines.
