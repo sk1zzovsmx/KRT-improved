@@ -1068,9 +1068,16 @@ do
                     ch = "RAID"
                 else
                     -- Use RAID_WARNING if leader/officer AND useRaidWarning is true
-                    if addon.options.useRaidWarning
-                        and (UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")) then
-                        ch = "RAID_WARNING"
+                    if addon.options.useRaidWarning then
+                        local isLead = (UnitIsGroupLeader and UnitIsGroupLeader("player"))
+                            or (IsRaidLeader and IsRaidLeader())
+                        local isAssist = (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
+                            or (IsRaidOfficer and IsRaidOfficer())
+                        if isLead or isAssist then
+                            ch = "RAID_WARNING"
+                        else
+                            ch = "RAID"
+                        end
                     else
                         ch = "RAID"
                     end
