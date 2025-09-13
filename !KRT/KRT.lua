@@ -294,9 +294,9 @@ do
                 if index then
                     _, rank, subgroup = GetRaidRosterInfo(index)
                 end
-                if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
+                if UnitIsGroupLeader(unit) then
                     rank = 2
-                elseif UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
+                elseif UnitIsGroupAssistant(unit) then
                     rank = 1
                 end
                 rank = rank or 0
@@ -387,9 +387,9 @@ do
                 if index then
                     _, rank, subgroup, level, classL, class = GetRaidRosterInfo(index)
                 end
-                if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
+                if UnitIsGroupLeader(unit) then
                     rank = 2
-                elseif UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
+                elseif UnitIsGroupAssistant(unit) then
                     rank = 1
                 end
                 rank              = rank or 0
@@ -923,9 +923,9 @@ do
                 for unit in UnitIterator(true) do
                     local pname = UnitName(unit)
                     if pname == name then
-                        if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
+                        if UnitIsGroupLeader(unit) then
                             rank = 2
-                        elseif UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
+                        elseif UnitIsGroupAssistant(unit) then
                             rank = 1
                         end
                         break
@@ -1069,10 +1069,8 @@ do
                 else
                     -- Use RAID_WARNING if leader/officer AND useRaidWarning is true
                     if addon.options.useRaidWarning then
-                        local isLead = (UnitIsGroupLeader and UnitIsGroupLeader("player"))
-                            or (IsRaidLeader and IsRaidLeader())
-                        local isAssist = (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
-                            or (IsRaidOfficer and IsRaidOfficer())
+                        local isLead = UnitIsGroupLeader("player") or IsRaidLeader()
+                        local isAssist = UnitIsGroupAssistant("player") or IsRaidOfficer()
                         if isLead or isAssist then
                             ch = "RAID_WARNING"
                         else
