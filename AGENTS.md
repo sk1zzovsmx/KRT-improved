@@ -118,6 +118,7 @@ If missing, fall back via `LibCompat-1.0`; never hard‑require Ace3.
 - XML: build widgets from `Templates.xml` and named frames in `KRT.xml`.
 - UI text via `L[...]` only; avoid hardcoded strings.
 - Do not add Ace3. Keep vendored libs minimal and updated.
+- Avoid boilerplate at runtime: keep logs concise and omit repetitive status messages.
 - Lines ≤ 120 chars; keep functions short; group related private helpers in local blocks.
 - Commit style: `feat(rolls): ...`, `fix(reserves): ...`, `ref(ui): ...`, `perf: ...`, `chore: ...`.
 
