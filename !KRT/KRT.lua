@@ -281,7 +281,10 @@ do
             return
         end
 
-        local realm = GetRealmName() or UNKNOWN
+        local realm = GetRealmName()
+        if type(realm) ~= "string" then
+            realm = ""
+        end
         KRT_Players[realm] = KRT_Players[realm] or {}
         local raid = KRT_Raids[KRT_CurrentRaid]
         raid.playersByName = raid.playersByName or {}
@@ -363,7 +366,10 @@ do
         end
         if not IsInRaid() then return end
 
-        local realm = GetRealmName() or UNKNOWN
+        local realm = GetRealmName()
+        if type(realm) ~= "string" then
+            realm = ""
+        end
         KRT_Players[realm] = KRT_Players[realm] or {}
         local currentTime = Utils.getCurrentTime()
 
@@ -948,7 +954,10 @@ do
     --
     function module:GetPlayerClass(name)
         local class = "UNKNOWN"
-        local realm = GetRealmName() or UNKNOWN
+        local realm = GetRealmName()
+        if type(realm) ~= "string" then
+            realm = ""
+        end
         local resolvedName = name or unitName
         if KRT_Players[realm] and KRT_Players[realm][resolvedName] then
             class = KRT_Players[realm][resolvedName].class or "UNKNOWN"
