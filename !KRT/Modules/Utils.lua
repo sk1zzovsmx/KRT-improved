@@ -12,7 +12,7 @@ function addon:GetLib(name, silent)
         if cached ~= nil then
                 return cached or nil
         end
-        local lib = LibStub and LibStub(name, silent)
+        local lib = LibStub(name, silent)
         self.libs[name] = lib or false
         return lib
 end
