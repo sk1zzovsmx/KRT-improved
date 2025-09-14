@@ -4698,7 +4698,7 @@ local function selectAndTrigger(ns, field, id, event)
     return ns[field]
 end
 
--- popup di conferma compatto
+-- compact confirmation popup
 local function makeConfirmPopup(key, text, onAccept, cancels)
     StaticPopupDialogs[key] = {
         text         = text,
@@ -4712,7 +4712,7 @@ local function makeConfirmPopup(key, text, onAccept, cancels)
     }
 end
 
--- cache dei child più usati per ridurre _G[...] ripetuti
+-- cache frequently used children to reduce repeated _G[...] lookups
 local function CacheParts(row, name, parts)
     if row._p then return row._p end
     local p = {}
@@ -5413,11 +5413,11 @@ do
             _G[n .. "Title"]:SetText(L.StrRaidAttendees)
             _G[n .. "HeaderJoin"]:SetText(L.StrJoin)
             _G[n .. "HeaderLeave"]:SetText(L.StrLeave)
-            -- FIXME: riattivare quando implementato
+            -- FIXME: re-enable when implemented
             _G[n .. "AddBtn"]:Disable(); _G[n .. "DeleteBtn"]:Disable()
         end,
 
-        -- Preformat join/leave per la UI
+        -- Preformat join/leave for the UI
         getData        = function(out)
             local src = addon.Raid:GetPlayers(addon.History.selectedRaid) or {}
             for i = 1, #src do
@@ -5527,12 +5527,12 @@ do
             _G[n .. "HeaderType"]:SetText(L.StrType)
             _G[n .. "HeaderRoll"]:SetText(L.StrRoll)
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
-            -- FIXME: disabilitati finché non implementati
+            -- FIXME: disabled until implemented
             _G[n .. "ExportBtn"]:Disable(); _G[n .. "ClearBtn"]:Disable(); _G[n .. "AddBtn"]:Disable(); _G
                 [n .. "EditBtn"]:Disable()
         end,
 
-        -- Preformat time per la UI (mantieni i campi numerici per sort/logica)
+        -- Preformat time for the UI (keep numeric fields for sorting/logic)
         getData        = function(out)
             raidLoot = addon.Raid:GetLoot(addon.History.selectedRaid) or {}
 

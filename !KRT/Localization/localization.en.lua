@@ -306,11 +306,11 @@ L.RaidZones                       = {
 	["The Eye of Eternity"] = "The Eye of Eternity",
 	["Vault of Archavon"] = "Vault of Archavon",
 	["Ulduar"] = "Ulduar",
-	["Onyxia's Lair"] = "Onyxia's Lair",                          -- Nota: Onyxia è presente anche in Classic
+        ["Onyxia's Lair"] = "Onyxia's Lair",                          -- Note: Onyxia is also present in Classic
 	["Trial of the Crusader"] = "Trial of the Crusader",
-	["Trial of the Grand Crusader"] = "Trial of the Grand Crusader", -- Già presente, lo mantengo
+        ["Trial of the Grand Crusader"] = "Trial of the Grand Crusader", -- Already present, keeping it
 	["Icecrown Citadel"] = "Icecrown Citadel",
-	["The Ruby Sanctum"] = "The Ruby Sanctum",                    -- Già presente, lo mantengo
+        ["The Ruby Sanctum"] = "The Ruby Sanctum",                    -- Already present, keeping it
 }
 -- The reason we are using these is because of the missing
 -- UNIT_DIED event once these bosses are dealt with.
