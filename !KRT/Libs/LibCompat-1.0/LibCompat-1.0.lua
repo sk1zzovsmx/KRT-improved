@@ -4,7 +4,7 @@
 -- @author: Kader B (https://github.com/bkader/LibCompat-1.0)
 --
 
-local MAJOR, MINOR = "LibCompat-1.0", 33
+local MAJOR, MINOR = "LibCompat-1.0", 32
 local lib, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then return end
 
@@ -491,14 +491,6 @@ do
 		end
 	end
 
-	local function GetRaidDifficulty()
-		if _G.GetRaidDifficulty then
-			return _G.GetRaidDifficulty()
-		elseif _G.GetRaidDifficultyID then
-			return _G.GetRaidDifficultyID()
-		end
-	end
-
 	local UnitIterator
 	do
 		local rmem, pmem, step, count
@@ -698,7 +690,6 @@ do
 	lib.GetNumGroupMembers = GetNumGroupMembers
 	lib.GetNumSubgroupMembers = GetNumSubgroupMembers
 	lib.GetGroupTypeAndCount = GetGroupTypeAndCount
-	lib.GetRaidDifficulty = GetRaidDifficulty
 	lib.IsGroupDead = IsGroupDead
 	lib.IsGroupInCombat = IsGroupInCombat
 	lib.GroupIterator = GroupIterator
