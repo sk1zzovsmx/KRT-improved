@@ -696,9 +696,16 @@ do
     --
     function module:GetRaidSize()
         if not IsInRaid() then return 0 end
-        local diff = GetRaidDifficulty and GetRaidDifficulty() or (GetRaidDifficultyID and GetRaidDifficultyID())
-        if not diff then return (GetNumGroupMembers() > 10) and 25 or 10 end
-        return (diff == 1 or diff == 3) and 10 or 25
+        local diff = addon.Compat and addon.Compat.GetRaidDifficulty
+            and addon.Compat.GetRaidDifficulty()
+        if diff then
+            return (diff == 1 or diff == 3) and 10 or 25
+        end
+        local members = numRaid
+        if addon.Compat and addon.Compat.GetNumGroupMembers then
+            members = addon.Compat.GetNumGroupMembers()
+        end
+        return members > 20 and 25 or 10
     end
 
     --
