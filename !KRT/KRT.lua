@@ -56,23 +56,18 @@ addon.CallbackHandler     = addon:GetLib("CallbackHandler-1.0", true)
 
 Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
 addon.Logger:Embed(addon)
-addon.Utils.After          = addon.After
-addon.Utils.NewTicker      = addon.NewTicker
-addon.Utils.CancelTimer    = addon.CancelTimer
-addon.Utils.UnitIterator   = addon.UnitIterator
-addon.Utils.tCopy          = addon.tCopy
-addon.Utils.tLength        = addon.tLength
-addon.Utils.tContains      = addon.tContains
-addon.Utils.tIndexOf       = addon.tIndexOf
+Utils.After          = addon.After
+Utils.NewTicker      = addon.NewTicker
+Utils.CancelTimer    = addon.CancelTimer
+Utils.UnitIterator   = addon.UnitIterator
+Utils.tCopy          = addon.tCopy
+Utils.tLength        = addon.tLength
+Utils.tContains      = addon.tContains
+Utils.tIndexOf       = addon.tIndexOf
 
 -- Alias locali (safe e veloci)
 local IsInRaid             = addon.IsInRaid
 local IsInGroup            = addon.IsInGroup
-local UnitIterator         = addon.UnitIterator
-local After                = addon.After
-local NewTicker            = addon.NewTicker
-local CancelTimer          = addon.CancelTimer
-local tLength              = addon.tLength
 local UnitIsGroupLeader    = addon.UnitIsGroupLeader
 local UnitIsGroupAssistant = addon.UnitIsGroupAssistant
 
@@ -275,7 +270,7 @@ do
     --
     function module:UpdateRaidRoster()
         if not KRT_CurrentRaid then return end
-        CancelTimer(module.updateRosterHandle, true)
+        Utils.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
         if not IsInGroup() then
             numRaid = 0
@@ -294,7 +289,7 @@ do
         local raid = KRT_Raids[KRT_CurrentRaid]
         raid.playersByName = raid.playersByName or {}
         local playersByName = raid.playersByName
-        for unit in UnitIterator(true) do
+        for unit in Utils.UnitIterator(true) do
             local name = UnitName(unit)
             if name then
                 local index = UnitInRaid(unit)
@@ -344,7 +339,7 @@ do
             end
         end
 
-        numRaid = tLength(playersByName)
+        numRaid = Utils.tLength(playersByName)
         if numRaid == 0 then
             module:End()
             return
@@ -390,7 +385,7 @@ do
             changes       = {},
         }
 
-        for unit in UnitIterator(true) do
+        for unit in Utils.UnitIterator(true) do
             local name = UnitName(unit)
             if name then
                 local index = UnitInRaid(unit)
@@ -435,8 +430,8 @@ do
         tinsert(KRT_Raids, raidInfo)
         KRT_CurrentRaid = #KRT_Raids
         Utils.triggerEvent("RaidCreate", KRT_CurrentRaid)
-        CancelTimer(module.updateRosterHandle, true)
-        module.updateRosterHandle = After(3, function() module:UpdateRaidRoster() end)
+        Utils.CancelTimer(module.updateRosterHandle, true)
+        module.updateRosterHandle = Utils.After(3, function() module:UpdateRaidRoster() end)
     end
 
     --
@@ -444,7 +439,7 @@ do
     --
     function module:End()
         if not KRT_CurrentRaid then return end
-        CancelTimer(module.updateRosterHandle, true)
+        Utils.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
         local currentTime = Utils.getCurrentTime()
         for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
@@ -488,14 +483,14 @@ do
     --
     function module:FirstCheck()
         if module.firstCheckHandle then
-            CancelTimer(module.firstCheckHandle, true)
+            Utils.CancelTimer(module.firstCheckHandle, true)
             module.firstCheckHandle = nil
         end
         if not IsInGroup() then return end
 
         if KRT_CurrentRaid and module:CheckPlayer(unitName, KRT_CurrentRaid) then
-            CancelTimer(module.updateRosterHandle, true)
-            module.updateRosterHandle = After(2, function() module:UpdateRaidRoster() end)
+            Utils.CancelTimer(module.updateRosterHandle, true)
+            module.updateRosterHandle = Utils.After(2, function() module:UpdateRaidRoster() end)
             return
         end
 
@@ -548,7 +543,7 @@ do
             instanceDiff = instanceDiff + (2 * dynDiff)
         end
         local players = {}
-        for unit in UnitIterator(true) do
+        for unit in Utils.UnitIterator(true) do
             if UnitIsConnected(unit) then -- track only online players
                 local name = UnitName(unit)
                 if name then
@@ -841,7 +836,7 @@ do
             if bossNum and KRT_Raids[raidNum].bossKills[bossNum] then
                 local _players = {}
                 for i, p in ipairs(players) do
-                    if addon.tContains(KRT_Raids[raidNum]["bossKills"][bossNum]["players"], p.name) then
+                    if Utils.tContains(KRT_Raids[raidNum]["bossKills"][bossNum]["players"], p.name) then
                         tinsert(_players, p)
                     end
                 end
@@ -936,9 +931,9 @@ do
         local rank = 0
         local originalName = name
         name = name or unitName or UnitName("player")
-        if tLength(players) == 0 then
+        if Utils.tLength(players) == 0 then
             if IsInGroup() then
-                for unit in UnitIterator(true) do
+                for unit in Utils.UnitIterator(true) do
                     local pname = UnitName(unit)
                     if pname == name then
                         if UnitIsGroupLeader(unit) then
@@ -985,7 +980,7 @@ do
         if not IsInGroup() or not name then
             return id
         end
-        for unit in UnitIterator(true) do
+        for unit in Utils.UnitIterator(true) do
             if UnitName(unit) == name then
                 id = unit
                 break
@@ -1487,7 +1482,7 @@ do
         tracker[itemId] = tracker[itemId] or {}
         local used = tracker[itemId][player] or 0
         if used >= allowed then
-            if not addon.tContains(state.rerolled, player) then
+            if not Utils.tContains(state.rerolled, player) then
                 Utils.whisper(player, L.ChatOnlyRollOnce)
                 tinsert(state.rerolled, player)
             end
@@ -2343,7 +2338,7 @@ do
             dropDownData[i] = twipe(dropDownData[i])
         end
         dropDownGroupData = twipe(dropDownGroupData)
-        for unit in UnitIterator() do
+        for unit in Utils.UnitIterator() do
             local name = UnitName(unit)
             local subgroup = select(2, GetRaidRosterInfo(UnitInRaid(unit)))
             if name then
@@ -2520,10 +2515,10 @@ do
     function module:LOOT_CLOSED()
         if addon.Raid:IsMasterLooter() then
             if lootCloseTimer then
-                CancelTimer(lootCloseTimer)
+                Utils.CancelTimer(lootCloseTimer)
                 lootCloseTimer = nil
             end
-            lootCloseTimer = After(0.1, function()
+            lootCloseTimer = Utils.After(0.1, function()
                 lootCloseTimer = nil
                 lootOpened = false
                 UIMaster:Hide()
@@ -2751,13 +2746,13 @@ do
 
     local function StartCountsTicker()
         if not countsTicker then
-            countsTicker = NewTicker(0.1, TickCounts)
+            countsTicker = Utils.NewTicker(0.1, TickCounts)
         end
     end
 
     local function StopCountsTicker()
         if countsTicker then
-            CancelTimer(countsTicker, true)
+            Utils.CancelTimer(countsTicker, true)
             countsTicker = nil
         end
     end
@@ -2779,7 +2774,7 @@ do
         if not IsInGroup() then
             return raidPlayers
         end
-        for unit in UnitIterator(true) do
+        for unit in Utils.UnitIterator(true) do
             local name = UnitName(unit)
             if name and name ~= "" then
                 raidPlayers[#raidPlayers + 1] = name
@@ -2947,16 +2942,16 @@ do
     --------------------------------------------------------------------------
 
     function module:Save()
-        addon:Debug("DEBUG", "Saving reserves data. Entries: %d", addon.tLength(reservesData))
-        KRT_SavedReserves = addon.tCopy({}, reservesData)
-        KRT_SavedReserves.reservesByItemID = addon.tCopy({}, reservesByItemID)
+        addon:Debug("DEBUG", "Saving reserves data. Entries: %d", Utils.tLength(reservesData))
+        KRT_SavedReserves = Utils.tCopy({}, reservesData)
+        KRT_SavedReserves.reservesByItemID = Utils.tCopy({}, reservesByItemID)
     end
 
     function module:Load()
         addon:Debug("DEBUG", "Loading reserves. Data exists: %s", tostring(KRT_SavedReserves ~= nil))
         if KRT_SavedReserves then
-            reservesData = addon.tCopy({}, KRT_SavedReserves)
-            reservesByItemID = addon.tCopy({}, KRT_SavedReserves.reservesByItemID or {})
+            reservesData = Utils.tCopy({}, KRT_SavedReserves)
+            reservesByItemID = Utils.tCopy({}, KRT_SavedReserves.reservesByItemID or {})
         else
             reservesData = {}
             reservesByItemID = {}
@@ -3112,7 +3107,7 @@ do
 
     -- Get all reserves:
     function module:GetAllReserves()
-        addon:Debug("DEBUG", "Fetching all reserves. Total players with reserves: %d", addon.tLength(reservesData))
+        addon:Debug("DEBUG", "Fetching all reserves. Total players with reserves: %d", Utils.tLength(reservesData))
         return reservesData
     end
 
@@ -3189,7 +3184,7 @@ do
             end
         end
         -- Log when the CSV parsing is completed
-        addon:Debug("DEBUG", "Finished parsing CSV data. Total reserves processed: %d", addon.tLength(reservesData))
+        addon:Debug("DEBUG", "Finished parsing CSV data. Total reserves processed: %d", Utils.tLength(reservesData))
         self:RefreshWindow()
         self:Save()
     end
@@ -3570,7 +3565,7 @@ do
     -- Loads the default options into the settings table.
     --
     local function LoadDefaultOptions()
-        KRT_Options = addon.tCopy({}, defaultOptions)
+        KRT_Options = Utils.tCopy({}, defaultOptions)
         addon.options = KRT_Options
         addon:info("Default options have been restored.")
     end
@@ -3579,8 +3574,8 @@ do
     -- Loads addon options from saved variables, filling in defaults.
     --
     local function LoadOptions()
-        addon.options = addon.tCopy({}, defaultOptions)
-        addon.tCopy(addon.options, KRT_Options)
+        addon.options = Utils.tCopy({}, defaultOptions)
+        Utils.tCopy(addon.options, KRT_Options)
         KRT_Options = addon.options
 
         -- Ensure dependent options are consistent
@@ -4130,7 +4125,7 @@ do
             InitChangesTable()
             FetchChanges()
         end
-        local count = addon.tLength(changesTable)
+        local count = Utils.tLength(changesTable)
         local msg
         if count == 0 then
             if tempSelectedID then
@@ -4181,7 +4176,7 @@ do
                 InitChangesTable()
                 FetchChanges()
             end
-            local count = addon.tLength(changesTable)
+            local count = Utils.tLength(changesTable)
             if count > 0 then
                 for n, s in pairs(changesTable) do
                     if selectedID == n and _G[frameName .. "PlayerBtn" .. n] then
@@ -4327,9 +4322,9 @@ do
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
         if updateTicker then
-            CancelTimer(updateTicker, true)
+            Utils.CancelTimer(updateTicker, true)
         end
-        updateTicker = NewTicker(updateInterval, function()
+        updateTicker = Utils.NewTicker(updateInterval, function()
             if UISpammer then UpdateUIFrame(UISpammer, updateInterval) end
         end)
     end
@@ -4357,14 +4352,14 @@ do
             local id = tonumber(channel) or select(1, GetChannelName(channel))
             channel = (id and id > 0) and id or channel
             local checked = (box:GetChecked() == 1)
-            local existed = addon.tContains(KRT_Spammer.Channels, channel)
+            local existed = Utils.tContains(KRT_Spammer.Channels, channel)
             if checked and not existed then
                 tinsert(KRT_Spammer.Channels, channel)
             elseif not checked and existed then
-                local i = addon.tIndexOf(KRT_Spammer.Channels, channel)
+                local i = Utils.tIndexOf(KRT_Spammer.Channels, channel)
                 while i do
                     tremove(KRT_Spammer.Channels, i)
-                    i = addon.tIndexOf(KRT_Spammer.Channels, channel)
+                    i = Utils.tIndexOf(KRT_Spammer.Channels, channel)
                 end
             end
         else
@@ -5339,10 +5334,10 @@ do
             local raid = KRT_Raids[rID]; if not (raid and raid.bossKills[bID]) then return end
             local name = addon.Raid:GetPlayerName(pID, rID)
             local list = raid.bossKills[bID].players
-            local i = addon.tIndexOf(list, name)
+            local i = Utils.tIndexOf(list, name)
             while i do
                 tremove(list, i)
-                i = addon.tIndexOf(list, name)
+                i = Utils.tIndexOf(list, name)
             end
             controller:Dirty()
         end
@@ -5438,10 +5433,10 @@ do
             local name = raid.players[pID].name
             tremove(raid.players, pID)
             for _, boss in ipairs(raid.bossKills) do
-                local i = addon.tIndexOf(boss.players, name)
+                local i = Utils.tIndexOf(boss.players, name)
                 while i do
                     tremove(boss.players, i)
-                    i = addon.tIndexOf(boss.players, name)
+                    i = Utils.tIndexOf(boss.players, name)
                 end
             end
             for i = #raid.loot, 1, -1 do if raid.loot[i].looter == name then tremove(raid.loot, i) end end
@@ -5821,7 +5816,7 @@ do
         local cmd1, cmd2, cmd3 = strsplit(" ", cmd, 3)
 
         -- ==== Debug ====
-        if addon.tContains(cmdDebug, cmd1) then
+        if Utils.tContains(cmdDebug, cmd1) then
             local subCmd = cmd2 and cmd2:lower()
 
             if subCmd == "level" or subCmd == "lvl" then
@@ -5866,7 +5861,7 @@ do
             end
 
             -- ==== Chat Throttle ====
-        elseif addon.tContains(cmdChat, cmd1) then
+        elseif Utils.tContains(cmdChat, cmd1) then
             local val = tonumber(cmd2)
             if val then
                 addon.options.chatThrottle = val
@@ -5876,7 +5871,7 @@ do
             end
 
             -- ==== Minimap ====
-        elseif addon.tContains(cmdMinimap, cmd1) then
+        elseif Utils.tContains(cmdMinimap, cmd1) then
             local sub = cmd2 and cmd2:lower()
             if sub == "on" then
                 addon.options.minimapButton = true
@@ -5900,7 +5895,7 @@ do
             end
 
             -- ==== Achievement Link ====
-        elseif addon.tContains(cmdAchiev, cmd1) and find(cmd, "achievement:%d*:") then
+        elseif Utils.tContains(cmdAchiev, cmd1) and find(cmd, "achievement:%d*:") then
             local from, to = string.find(cmd, "achievement%:%d*%:")
             local id = string.sub(cmd, from + 12, to - 1)
             from, to = string.find(cmd, "%|cffffff00%|Hachievement%:.*%]%|h%|r")
@@ -5908,7 +5903,7 @@ do
             printHelp("KRT", name .. " - ID#" .. id)
 
             -- ==== Config ====
-        elseif addon.tContains(cmdConfig, cmd1) then
+        elseif Utils.tContains(cmdConfig, cmd1) then
             if cmd2 == "reset" then
                 addon.Config:Default()
             else
@@ -5916,7 +5911,7 @@ do
             end
 
             -- ==== Warnings ====
-        elseif addon.tContains(cmdWarnings, cmd1) then
+        elseif Utils.tContains(cmdWarnings, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.Warnings:Toggle()
             elseif cmd2 == "help" then
@@ -5928,7 +5923,7 @@ do
             end
 
             -- ==== MS Changes ====
-        elseif addon.tContains(cmdChanges, cmd1) then
+        elseif Utils.tContains(cmdChanges, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.Changes:Toggle()
             elseif cmd2 == "demand" or cmd2 == "ask" then
@@ -5943,19 +5938,19 @@ do
             end
 
             -- ==== Loot History ====
-        elseif addon.tContains(cmdHistory, cmd1) then
+        elseif Utils.tContains(cmdHistory, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.History:Toggle()
             end
 
             -- ==== Master Looter ====
-        elseif addon.tContains(cmdLoot, cmd1) then
+        elseif Utils.tContains(cmdLoot, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.Master:Toggle()
             end
 
             -- ==== Reserves ====
-        elseif addon.tContains(cmdReserves, cmd1) then
+        elseif Utils.tContains(cmdReserves, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.Reserves:ShowWindow()
             elseif cmd2 == "import" then
@@ -5967,7 +5962,7 @@ do
             end
 
             -- ==== LFM (Spammer) ====
-        elseif addon.tContains(cmdLFM, cmd1) then
+        elseif Utils.tContains(cmdLFM, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" or cmd2 == "show" then
                 addon.Spammer:Toggle()
             elseif cmd2 == "start" then
@@ -6057,7 +6052,7 @@ function addon:RAID_INSTANCE_WELCOME(...)
     local instanceName, instanceType, instanceDiff = GetInstanceInfo()
     _, KRT_NextReset = ...
     if L.RaidZones[instanceName] ~= nil then
-        After(3, function()
+        Utils.After(3, function()
             addon.Raid:Check(instanceName, instanceDiff)
         end)
     end
@@ -6069,8 +6064,8 @@ end
 function addon:PLAYER_ENTERING_WORLD()
     mainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
     local module = self.Raid
-    CancelTimer(module.firstCheckHandle, true)
-    module.firstCheckHandle = After(3, function() module:FirstCheck() end)
+    Utils.CancelTimer(module.firstCheckHandle, true)
+    module.firstCheckHandle = Utils.After(3, function() module:FirstCheck() end)
 end
 
 --
