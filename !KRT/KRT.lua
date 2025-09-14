@@ -167,10 +167,15 @@ local lootCount                         = 0
 local rollsCount                        = 0
 local itemCount                         = 1
 local itemTraded                        = 0
+local currentItemIndex                  = 0
 
 -- Function placeholders for loot helpers
 local ItemExists, ItemIsSoulbound, GetItem
 local GetItemIndex, GetItemName, GetItemLink, GetItemTexture
+
+function GetItemIndex()
+    return currentItemIndex
+end
 
 ---============================================================================
 -- Cached Functions & Libraries
@@ -1529,7 +1534,7 @@ do
 
     -- Gets the item ID of the item currently being rolled for.
     function module:GetCurrentRollItemID()
-        local index = GetItemIndex and GetItemIndex() or 1
+        local index = GetItemIndex()
         local item = GetItem and GetItem(index)
         local itemLink = item and item.itemLink
         if not itemLink then return nil end
@@ -1672,7 +1677,6 @@ do
     -- Internal state
     -------------------------------------------------------
     local lootTable = {}
-    local currentItemIndex = 0
 
     -------------------------------------------------------
     -- Private helpers
@@ -1803,14 +1807,6 @@ do
         end
     end
 
-    --
-    -- Returns the index of the currently selected item.
-    --
-    function GetItemIndex()
-        return currentItemIndex
-    end
-
-    --
     -- Returns the table for the currently selected item.
     --
     function GetItem(i)
