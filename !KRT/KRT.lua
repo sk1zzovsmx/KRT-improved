@@ -1036,53 +1036,56 @@ end
 -- Chat Output Helpers
 ---============================================================================
 do
-    -- Output strings:
+    -------------------------------------------------------
+    -- 1. Create/retrieve the module table
+    -------------------------------------------------------
+    addon.Chat = addon.Chat or {}
+    local module = addon.Chat
+    local L = addon.L
+
+    -------------------------------------------------------
+    -- 3. Internal state (non-exposed local variables)
+    -------------------------------------------------------
     local output          = "%s: %s"
     local chatPrefix      = "Kader Raid Tools"
     local chatPrefixShort = "KRT"
     local prefixHex       = "ff" .. Utils.rgbToHex(245 / 255, 140 / 255, 186 / 255)
 
-    --
-    -- Prepares the final output string with a prefix.
-    --
+    -------------------------------------------------------
+    -- 4. “Private” (local) functions
+    -------------------------------------------------------
     local function PreparePrint(text, prefix)
         prefix = prefix or chatPrefixShort
         if prefixHex then
             prefix = addon:WrapTextInColorCode(prefix, prefixHex)
         end
-        return string.format(output, prefix, tostring(text))
+        return format(output, prefix, tostring(text))
     end
 
-    --
-    -- Prints a message to the chat frame.
-    --
-    function addon:Print(text, prefix)
+    -------------------------------------------------------
+    -- 5. Public module functions
+    -------------------------------------------------------
+    function module:Print(text, prefix)
         local msg = PreparePrint(text, prefix)
         if DEFAULT_CHAT_FRAME then
             DEFAULT_CHAT_FRAME:AddMessage(msg)
         end
     end
 
-    --
-    -- Sends an announcement to the appropriate channel (Raid, Party, etc.).
-    --
-    function addon:Announce(text, channel)
+    function module:Announce(text, channel)
         local ch = channel
 
         if not ch then
             local isCountdown = false
-            -- Check for countdown messages
             do
                 local ticPat = L.ChatCountdownTic:gsub("%%d", "%%d+")
                 isCountdown = (find(text, ticPat) ~= nil) or (find(text, L.ChatCountdownEnd) ~= nil)
             end
 
             if IsInRaid() then
-                -- If it's a countdown message:
                 if isCountdown and addon.options.countdownSimpleRaidMsg then
                     ch = "RAID"
                 else
-                    -- Use RAID_WARNING if leader/officer AND useRaidWarning is true
                     if addon.options.useRaidWarning then
                         local isLead = UnitIsGroupLeader("player") or IsRaidLeader()
                         local isAssist = UnitIsGroupAssistant("player") or IsRaidOfficer()
@@ -1102,6 +1105,17 @@ do
             end
         end
         Utils.chat(tostring(text), ch)
+    end
+
+    -------------------------------------------------------
+    -- 6. Legacy helpers
+    -------------------------------------------------------
+    function addon:Print(text, prefix)
+        module:Print(text, prefix)
+    end
+
+    function addon:Announce(text, channel)
+        module:Announce(text, channel)
     end
 end
 
