@@ -4,60 +4,60 @@
     - Handles core logic, event registration, and module initialization.
 ]]
 
-local addonName, addon  = ...
-local L                 = addon.L
-local Utils             = addon.Utils
-local C                 = addon.C
-local ITEM_LINK_PATTERN = C.ITEM_LINK_PATTERN
-local rollTypes         = C.rollTypes
-local lootTypesText     = C.lootTypesText
-local lootTypesColored  = C.lootTypesColored
-local itemColors        = C.itemColors
+local addonName, addon    = ...
+local L                   = addon.L
+local Utils               = addon.Utils
+local C                   = addon.C
+local ITEM_LINK_PATTERN   = C.ITEM_LINK_PATTERN
+local rollTypes           = C.rollTypes
+local lootTypesText       = C.lootTypesText
+local lootTypesColored    = C.lootTypesColored
+local itemColors          = C.itemColors
 local RAID_TARGET_MARKERS = C.RAID_TARGET_MARKERS
-local K_COLOR           = C.K_COLOR
-local RT_COLOR          = C.RT_COLOR
-local titleString       = C.titleString
+local K_COLOR             = C.K_COLOR
+local RT_COLOR            = C.RT_COLOR
+local titleString         = C.titleString
 
-local _G                = _G
-_G["KRT"]               = addon
+local _G                  = _G
+_G["KRT"]                 = addon
 
 ---============================================================================
 -- Saved Variables
 -- These variables are persisted across sessions for the addon.
 ---============================================================================
 
-KRT_Options             = KRT_Options or {}
-KRT_Raids               = KRT_Raids or {}
-KRT_Players             = KRT_Players or {}
-KRT_Warnings            = KRT_Warnings or {}
-KRT_ExportString        = KRT_ExportString or "$I,$N,$S,$W,$T,$R,$H:$M,$d/$m/$y"
-KRT_Spammer             = KRT_Spammer or {}
-KRT_CurrentRaid         = KRT_CurrentRaid or nil
-KRT_LastBoss            = KRT_LastBoss or nil
-KRT_NextReset           = KRT_NextReset or 0
-KRT_SavedReserves       = KRT_SavedReserves or {}
-KRT_PlayerCounts        = KRT_PlayerCounts or {}
+KRT_Options               = KRT_Options or {}
+KRT_Raids                 = KRT_Raids or {}
+KRT_Players               = KRT_Players or {}
+KRT_Warnings              = KRT_Warnings or {}
+KRT_ExportString          = KRT_ExportString or "$I,$N,$S,$W,$T,$R,$H:$M,$d/$m/$y"
+KRT_Spammer               = KRT_Spammer or {}
+KRT_CurrentRaid           = KRT_CurrentRaid or nil
+KRT_LastBoss              = KRT_LastBoss or nil
+KRT_NextReset             = KRT_NextReset or 0
+KRT_SavedReserves         = KRT_SavedReserves or {}
+KRT_PlayerCounts          = KRT_PlayerCounts or {}
 
 ---============================================================================
 -- External Libraries / Bootstrap
 ---============================================================================
-local Compat            = addon:GetLib("LibCompat-1.0")
-addon.Compat            = Compat
-addon.BossIDs           = addon:GetLib("LibBossIDs-1.0", true)
-addon.Logger            = addon:GetLib("LibLogger-1.0", true)
-addon.Deformat          = addon:GetLib("LibDeformat-3.0", true)
-addon.CallbackHandler   = addon:GetLib("CallbackHandler-1.0", true)
+local Compat              = addon:GetLib("LibCompat-1.0")
+addon.Compat              = Compat
+addon.BossIDs             = addon:GetLib("LibBossIDs-1.0", true)
+addon.Logger              = addon:GetLib("LibLogger-1.0", true)
+addon.Deformat            = addon:GetLib("LibDeformat-3.0", true)
+addon.CallbackHandler     = addon:GetLib("CallbackHandler-1.0", true)
 
 Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
 addon.Logger:Embed(addon)
-addon.Utils.After        = addon.After
-addon.Utils.NewTicker    = addon.NewTicker
-addon.Utils.CancelTimer  = addon.CancelTimer
-addon.Utils.UnitIterator = addon.UnitIterator
-addon.Utils.tCopy        = addon.tCopy
-addon.Utils.tLength      = addon.tLength
-addon.Utils.tContains    = addon.tContains
-addon.Utils.tIndexOf     = addon.tIndexOf
+addon.Utils.After          = addon.After
+addon.Utils.NewTicker      = addon.NewTicker
+addon.Utils.CancelTimer    = addon.CancelTimer
+addon.Utils.UnitIterator   = addon.UnitIterator
+addon.Utils.tCopy          = addon.tCopy
+addon.Utils.tLength        = addon.tLength
+addon.Utils.tContains      = addon.tContains
+addon.Utils.tIndexOf       = addon.tIndexOf
 
 -- Alias locali (safe e veloci)
 local IsInRaid             = addon.IsInRaid
@@ -142,26 +142,26 @@ end
 ---============================================================================
 
 -- Addon UI Frames
-local mainFrame                         = CreateFrame("Frame")
+local mainFrame        = CreateFrame("Frame")
 local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings, UIHistory, UIHistoryItemBox
 
 -- Local Variables
-local unitName                          = UnitName("player")
+local unitName         = UnitName("player")
 
 -- Rolls & Loot
 local trader, winner
 local holder, banker, disenchanter
-local lootOpened                        = false
+local lootOpened       = false
 local lootCloseTimer
-local currentRollType                   = 4
-local currentRollItem                   = 0
-local fromInventory                     = false
-local itemInfo                          = {}
-local lootCount                         = 0
-local rollsCount                        = 0
-local itemCount                         = 1
-local itemTraded                        = 0
-local currentItemIndex                  = 0
+local currentRollType  = 4
+local currentRollItem  = 0
+local fromInventory    = false
+local itemInfo         = {}
+local lootCount        = 0
+local rollsCount       = 0
+local itemCount        = 1
+local itemTraded       = 0
+local currentItemIndex = 0
 
 -- Function placeholders for loot helpers
 local ItemExists, ItemIsSoulbound, GetItem
@@ -1095,7 +1095,6 @@ do
                         ch = "RAID"
                     end
                 end
-
             elseif IsInGroup() then
                 ch = "PARTY"
             else
@@ -5031,7 +5030,7 @@ do
 end
 
 -- ============================================================================
--- module: Raids List
+-- History: Raids List
 -- ============================================================================
 do
     addon.History.Raids = addon.History.Raids or {}
@@ -5156,7 +5155,7 @@ do
 end
 
 -- ============================================================================
--- module: Boss List
+-- History: Boss List
 -- ============================================================================
 do
     addon.History.Boss = addon.History.Boss or {}
@@ -5264,7 +5263,7 @@ do
 end
 
 -- ============================================================================
--- module: Boss Attendees List
+-- History: Boss Attendees List
 -- ============================================================================
 do
     addon.History.BossAttendees = addon.History.BossAttendees or {}
@@ -5380,7 +5379,7 @@ do
 end
 
 -- ============================================================================
--- module: Raid Attendees List
+-- History: Raid Attendees List
 -- ============================================================================
 do
     addon.History.RaidAttendees = addon.History.RaidAttendees or {}
@@ -5485,7 +5484,7 @@ do
 end
 
 -- ============================================================================
--- module: Loot List
+-- History: Loot List
 -- ============================================================================
 do
     addon.History.Loot = addon.History.Loot or {}
@@ -5636,7 +5635,7 @@ do
 end
 
 -- ============================================================================
--- module: Add/Edit Boss Popup
+-- History: Add/Edit Boss Popup
 -- ============================================================================
 do
     addon.History.BossBox = addon.History.BossBox or {}
@@ -5731,7 +5730,7 @@ do
 end
 
 -- ============================================================================
--- module: Add Attendee Popup
+-- History: Add Attendee Popup
 -- ============================================================================
 do
     addon.History.AttendeesBox = addon.History.AttendeesBox or {}
