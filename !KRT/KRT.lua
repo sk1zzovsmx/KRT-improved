@@ -4,10 +4,19 @@
     - Handles core logic, event registration, and module initialization.
 ]]
 
-local addonName, addon    = ...
-local L                   = addon.L
-local Utils               = addon.Utils
-local C                   = addon.C
+local addonName, addon = ...
+local L                = addon.L
+local Utils            = addon.Utils
+local C                = addon.C
+
+local _G               = _G
+_G["KRT"]              = addon
+
+
+---============================================================================
+-- Costants
+---============================================================================
+
 local ITEM_LINK_PATTERN   = C.ITEM_LINK_PATTERN
 local rollTypes           = C.rollTypes
 local lootTypesText       = C.lootTypesText
@@ -17,9 +26,6 @@ local RAID_TARGET_MARKERS = C.RAID_TARGET_MARKERS
 local K_COLOR             = C.K_COLOR
 local RT_COLOR            = C.RT_COLOR
 local titleString         = C.titleString
-
-local _G                  = _G
-_G["KRT"]                 = addon
 
 ---============================================================================
 -- Saved Variables
@@ -1039,9 +1045,9 @@ do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
     -------------------------------------------------------
-    addon.Chat = addon.Chat or {}
-    local module = addon.Chat
-    local L = addon.L
+    addon.Chat            = addon.Chat or {}
+    local module          = addon.Chat
+    local L               = addon.L
 
     -------------------------------------------------------
     -- 3. Internal state (non-exposed local variables)
