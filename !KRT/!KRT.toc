@@ -23,9 +23,11 @@ Localization\localization.en.lua
 # Templates File:
 Templates.xml
 
-# Utilities & Core Files:
+# Utilities Files:
 Modules\Utils.lua
 Modules\C.lua
+
+# Core Files:
 KRT.lua
 KRT.xml
 
