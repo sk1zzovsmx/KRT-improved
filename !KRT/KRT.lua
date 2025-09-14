@@ -5222,11 +5222,30 @@ do
             local rID, bID = addon.History.selectedRaid, addon.History.selectedBoss
             if not (rID and bID) then return end
             local raid = KRT_Raids[rID]; if not (raid and raid.bossKills[bID]) then return end
+
+            -- Elimina loot del boss rimosso e riallinea gli indici per le successive
+            for i = #raid.loot, 1, -1 do
+                local bn = tonumber(raid.loot[i].bossNum)
+                if bn then
+                    if bn == bID then
+                        tremove(raid.loot, i)
+                    elseif bn > bID then
+                        raid.loot[i].bossNum = bn - 1
+                    end
+                end
+            end
+
+            -- Rimuovi il boss dalla lista
             tremove(raid.bossKills, bID)
-            for i = #raid.loot, 1, -1 do if raid.loot[i].bossNum == bID then tremove(raid.loot, i) end end
+
             controller:Dirty()
         end
-        function Boss:Delete() if addon.History.selectedBoss then StaticPopup_Show("KRTHISTORY_DELETE_BOSS") end end
+
+        function Boss:Delete()
+            if addon.History.selectedBoss then
+                StaticPopup_Show("KRTHISTORY_DELETE_BOSS")
+            end
+        end
 
         (controller._makeConfirmPopup)("KRTHISTORY_DELETE_BOSS", L.StrConfirmDeleteBoss, DeleteBoss)
     end
@@ -5549,13 +5568,19 @@ do
 
     function module:Sort(t) controller:Sort(t) end
 
-    function module:OnEnter(btn)
-        if not btn then return end
-        local row = btn.GetParent and btn:GetParent() or btn
-        local id  = row:GetID()
-        if not raidLoot[id] then return end
-        GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
-        GameTooltip:SetHyperlink(raidLoot[id].itemLink)
+    function module:OnEnter(widget)
+        if not widget then return end
+        -- Se l'enter arriva da una texture/fontstring, risali al bottone riga
+        local row = (widget.IsObjectType and widget:IsObjectType("Button")) and widget
+            or (widget.GetParent and widget:GetParent()) or widget
+        if not (row and row.GetID) then return end
+
+        local id   = row:GetID()
+        local item = raidLoot[id]
+        if not item then return end
+
+        GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink(item.itemLink)
     end
 
     do

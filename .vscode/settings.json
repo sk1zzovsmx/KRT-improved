@@ -68,7 +68,8 @@
         "UIParent",
         "GameTooltip",
         "Minimap",
-        "ReloadUI"
+        "ReloadUI",
+        "OKAY"
     ],
     "editor.rulers": [
         80,
