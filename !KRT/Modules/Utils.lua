@@ -3,18 +3,34 @@ addon.Utils            = addon.Utils or {}
 
 local Utils            = addon.Utils
 local L                = addon.L
-local LibStub          = _G.LibStub
+
+local LibStub
+
+local function resolveLibStub()
+	LibStub = LibStub or _G.LibStub
+	return LibStub
+end
+
+local function getLibCache(target)
+	local libs = target.libs
+	if not libs then
+		libs = {}
+		target.libs = libs
+	end
+	return libs
+end
 
 -- Library helper: caches LibStub lookups
 function addon:GetLib(name, silent)
-        self.libs = self.libs or {}
-        local cached = self.libs[name]
-        if cached ~= nil then
-                return cached or nil
-        end
-        local lib = LibStub(name, silent)
-        self.libs[name] = lib or false
-        return lib
+	local libs = getLibCache(self)
+	local cached = libs[name]
+	if cached ~= nil then
+		return cached or nil
+	end
+	local stub = resolveLibStub()
+	local lib = stub(name, silent)
+	libs[name] = lib or false
+	return lib
 end
 
 -- Practical helper aliases
