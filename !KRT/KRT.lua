@@ -275,16 +275,11 @@ do
         if not IsInGroup() then
             numRaid = 0
             module:End()
-            if addon.Master and addon.Master.PrepareDropDowns then
-                addon.Master:PrepareDropDowns()
-            end
+            addon.Master:PrepareDropDowns()
             return
         end
 
         local realm = GetRealmName()
-        if type(realm) ~= "string" then
-            realm = ""
-        end
         KRT_Players[realm] = KRT_Players[realm] or {}
         local raid = KRT_Raids[KRT_CurrentRaid]
         raid.playersByName = raid.playersByName or {}
@@ -352,9 +347,7 @@ do
             end
             v.seen = nil
         end
-        if addon.Master and addon.Master.PrepareDropDowns then
-            addon.Master:PrepareDropDowns()
-        end
+        addon.Master:PrepareDropDowns()
     end
 
     --
@@ -697,15 +690,11 @@ do
     --
     function module:GetRaidSize()
         if not IsInRaid() then return 0 end
-        local diff = addon.Compat and addon.Compat.GetRaidDifficulty
-            and addon.Compat.GetRaidDifficulty()
+        local diff = addon.GetRaidDifficulty()
         if diff then
             return (diff == 1 or diff == 3) and 10 or 25
         end
-        local members = numRaid
-        if addon.Compat and addon.Compat.GetNumGroupMembers then
-            members = addon.Compat.GetNumGroupMembers()
-        end
+        local members = addon.GetNumGroupMembers()
         return members > 20 and 25 or 10
     end
 
@@ -2022,7 +2011,7 @@ do
             local itemID = tonumber(string.match(itemLink or "", "item:(%d+)"))
             local message = ""
 
-            if rollType == rollTypes.RESERVED and addon.Reserves and addon.Reserves.FormatReservedPlayersLine then
+            if rollType == rollTypes.RESERVED then
                 local srList = addon.Reserves:FormatReservedPlayersLine(itemID)
                 local suff = addon.options.sortAscending and "Low" or "High"
                 message = itemCount > 1
@@ -3583,9 +3572,9 @@ do
             addon.options.countdownSimpleRaidMsg = false
         end
 
-        if addon.options.debug and addon.SetLogLevel and addon.Logger and addon.Logger.logLevels then
+        if addon.options.debug then
             addon:SetLogLevel(addon.Logger.logLevels.DEBUG)
-        elseif addon.SetLogLevel then
+        else
             addon:SetLogLevel(KRT_Debug.level)
         end
     end
@@ -5593,7 +5582,7 @@ do
     end
 
     function module:Log(itemID, looter, rollType, rollValue)
-        local raidID = addon.History and addon.History.selectedRaid or KRT_CurrentRaid
+        local raidID = addon.History.selectedRaid or KRT_CurrentRaid
         if not raidID or not KRT_Raids[raidID] then return end
         local it = KRT_Raids[raidID].loot[itemID]; if not it then return end
         if looter and looter ~= "" then it.looter = looter end
@@ -5851,7 +5840,7 @@ do
                 else
                     addon.options.debug = not addon.options.debug
                 end
-                if addon.options.debug and addon.Logger and addon.Logger.logLevels then
+                if addon.options.debug then
                     addon:SetLogLevel(addon.Logger.logLevels.DEBUG)
                     addon:info(L.MsgDebugOn)
                 else
@@ -6084,39 +6073,21 @@ function addon:CHAT_MSG_SYSTEM(msg)
     addon.Rolls:CHAT_MSG_SYSTEM(msg)
 end
 
---
--- ITEM_LOCKED: Forwards item lock events to the Master module.
---
-function addon:ITEM_LOCKED(...)
-    addon.Master:ITEM_LOCKED(...)
-end
-
---
--- LOOT_OPENED: Forwards loot window opening to the Master module.
---
-function addon:LOOT_OPENED(...)
-    addon.Master:LOOT_OPENED(...)
-end
-
---
--- LOOT_CLOSED: Forwards loot window closing to the Master module.
---
-function addon:LOOT_CLOSED(...)
-    addon.Master:LOOT_CLOSED(...)
-end
-
---
--- LOOT_SLOT_CLEARED: Forwards cleared loot slots to the Master module.
---
-function addon:LOOT_SLOT_CLEARED(...)
-    addon.Master:LOOT_SLOT_CLEARED(...)
-end
-
---
--- TRADE_ACCEPT_UPDATE: Forwards trade acceptance updates to the Master module.
---
-function addon:TRADE_ACCEPT_UPDATE(...)
-    addon.Master:TRADE_ACCEPT_UPDATE(...)
+-- Master looter events
+do
+    local forward = {
+        ITEM_LOCKED = "ITEM_LOCKED",
+        LOOT_OPENED = "LOOT_OPENED",
+        LOOT_CLOSED = "LOOT_CLOSED",
+        LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
+        TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
+    }
+    for e, m in pairs(forward) do
+        local method = m
+        addon[e] = function(_, ...)
+            addon.Master[method](addon.Master, ...)
+        end
+    end
 end
 
 --
