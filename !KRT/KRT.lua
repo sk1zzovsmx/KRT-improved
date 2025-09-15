@@ -6083,8 +6083,9 @@ do
         TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
     }
     for e, m in pairs(forward) do
+        local method = m
         addon[e] = function(_, ...)
-            addon.Master[m](addon.Master, ...)
+            addon.Master[method](addon.Master, ...)
         end
     end
 end
