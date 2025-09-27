@@ -142,34 +142,48 @@ end
 -- Core Addon Frames & Locals
 ---============================================================================
 
+-- Centralised addon state
+addon.State = addon.State or {}
+local coreState        = addon.State
+
+coreState.frames       = coreState.frames or {}
+local Frames           = coreState.frames
+Frames.main            = Frames.main or CreateFrame("Frame")
+
 -- Addon UI Frames
-local mainFrame        = CreateFrame("Frame")
+local mainFrame        = Frames.main
 local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings, UIHistory, UIHistoryItemBox
 
--- Local Variables
-local unitName         = UnitName("player")
+-- Player info helper
+coreState.player       = coreState.player or {}
+local function GetPlayerName()
+    local name = coreState.player.name or UnitName("player")
+    coreState.player.name = name
+    return name
+end
 
 -- Rolls & Loot
-local trader, winner
-local holder, banker, disenchanter
-local lootOpened       = false
-local lootCloseTimer
-local currentRollType  = 4
-local currentRollItem  = 0
-local fromInventory    = false
-local itemInfo         = {}
-local lootCount        = 0
-local rollsCount       = 0
-local itemCount        = 1
-local itemTraded       = 0
-local currentItemIndex = 0
+coreState.loot         = coreState.loot or {}
+local lootState        = coreState.loot
+lootState.itemInfo     = lootState.itemInfo or {}
+lootState.currentRollType  = lootState.currentRollType or 4
+lootState.currentRollItem  = lootState.currentRollItem or 0
+lootState.currentItemIndex = lootState.currentItemIndex or 0
+lootState.itemCount        = lootState.itemCount or 1
+lootState.lootCount        = lootState.lootCount or 0
+lootState.rollsCount       = lootState.rollsCount or 0
+lootState.itemTraded       = lootState.itemTraded or 0
+if lootState.opened == nil then lootState.opened = false end
+if lootState.fromInventory == nil then lootState.fromInventory = false end
+
+local itemInfo             = lootState.itemInfo
 
 -- Function placeholders for loot helpers
 local ItemExists, ItemIsSoulbound, GetItem
 local GetItemIndex, GetItemName, GetItemLink, GetItemTexture
 
 function GetItemIndex()
-    return currentItemIndex
+    return lootState.currentItemIndex
 end
 
 ---============================================================================
@@ -481,7 +495,7 @@ do
         end
         if not IsInGroup() then return end
 
-        if KRT_CurrentRaid and module:CheckPlayer(unitName, KRT_CurrentRaid) then
+        if KRT_CurrentRaid and module:CheckPlayer(GetPlayerName(), KRT_CurrentRaid) then
             Utils.CancelTimer(module.updateRosterHandle, true)
             module.updateRosterHandle = Utils.After(2, function() module:UpdateRaidRoster() end)
             return
@@ -561,27 +575,37 @@ do
     --
     function module:AddLoot(msg, rollType, rollValue)
         -- Master Loot
-        local player, itemLink, itemCount = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
+        local player, itemLink, count = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
+        local itemCount = count or 1
         if not player then
-            itemCount = 1
             player, itemLink = addon.Deformat(msg, LOOT_ITEM)
+            itemCount = 1
         end
         if not player then
-            player = unitName
-            itemLink, itemCount = addon.Deformat(msg, LOOT_ITEM_SELF_MULTIPLE)
+            local link
+            link, count = addon.Deformat(msg, LOOT_ITEM_SELF_MULTIPLE)
+            if link then
+                itemLink = link
+                itemCount = count or 1
+            end
+            player = GetPlayerName()
         end
         if not itemLink then
-            itemCount = 1
             itemLink = addon.Deformat(msg, LOOT_ITEM_SELF)
+            itemCount = 1
         end
 
         -- Other Loot Rolls
         if not player or not itemLink then
-            itemCount = 1
             itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
-            player = unitName
+            player = GetPlayerName()
+            itemCount = 1
         end
         if not itemLink then return end
+
+        itemCount = tonumber(itemCount) or 1
+        lootState.itemCount = itemCount
+
         local _, _, itemString = string.find(itemLink, "^|c%x+|H(.+)|h%[.*%]")
         local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
         local _, _, _, _, itemId = string.find(itemLink, ITEM_LINK_PATTERN)
@@ -596,7 +620,7 @@ do
             self:AddBoss("_TrashMob_")
         end
 
-        if not rollType then rollType = currentRollType end
+        if not rollType then rollType = lootState.currentRollType end
         if not rollValue then rollValue = addon.Rolls:HighestRoll() end
 
         local lootInfo = {
@@ -766,7 +790,7 @@ do
     function module:GetLootID(itemID, raidNum, holderName)
         local pos = 0
         local loot = self:GetLoot(raidNum)
-        holderName = holderName or unitName
+        holderName = holderName or GetPlayerName()
         itemID = tonumber(itemID)
         for k, v in ipairs(loot) do
             if v.itemId == itemID and v.looter == holderName then
@@ -865,7 +889,7 @@ do
         local id = 0
         raidNum = raidNum or KRT_CurrentRaid
         if raidNum and KRT_Raids[raidNum] then
-            name = name or unitName
+            name = name or GetPlayerName()
             local players = KRT_Raids[raidNum].players
             for i, p in ipairs(players) do
                 if p.name == name then
@@ -919,7 +943,7 @@ do
         local players = module:GetPlayers(raidNum)
         local rank = 0
         local originalName = name
-        name = name or unitName or UnitName("player")
+        name = name or GetPlayerName() or UnitName("player")
         if Utils.tLength(players) == 0 then
             if IsInGroup() then
                 for unit in Utils.UnitIterator(true) do
@@ -954,7 +978,7 @@ do
         if type(realm) ~= "string" then
             realm = ""
         end
-        local resolvedName = name or unitName
+        local resolvedName = name or GetPlayerName()
         if KRT_Players[realm] and KRT_Players[realm][resolvedName] then
             class = KRT_Players[realm][resolvedName].class or "UNKNOWN"
         end
@@ -1349,7 +1373,7 @@ do
     local function sortRolls()
         local rolls = state.rolls
         if #rolls == 0 then
-            winner = nil
+            lootState.winner = nil
             addon:Debug("DEBUG", "SortRolls: no entries")
             return
         end
@@ -1357,14 +1381,14 @@ do
         table.sort(rolls, function(a, b)
             return addon.options.sortAscending and a.roll < b.roll or a.roll > b.roll
         end)
-        winner = rolls[1].name
-        addon:Debug("DEBUG", "SortRolls: winner=%s roll=%d", winner, rolls[1].roll)
+        lootState.winner = rolls[1].name
+        addon:Debug("DEBUG", "SortRolls: winner=%s roll=%d", lootState.winner, rolls[1].roll)
     end
 
     local function addRoll(name, roll, itemId)
         roll = tonumber(roll)
         state.count = state.count + 1
-        rollsCount = rollsCount + 1
+        lootState.rollsCount = lootState.rollsCount + 1
         state.rolls[state.count] = { name = name, roll = roll, itemId = itemId }
         addon:Debug("DEBUG", "AddRoll: name=%s roll=%d item=%s", name, roll, tostring(itemId))
 
@@ -1379,7 +1403,7 @@ do
 
         if not state.selected then
             local targetItem = itemId or module:GetCurrentRollItemID()
-            if currentRollType == rollTypes.RESERVED then
+            if lootState.currentRollType == rollTypes.RESERVED then
                 local top, best = -1, nil
                 for _, r in ipairs(state.rolls) do
                     if module:IsReserved(targetItem, r.name) and r.roll > top then
@@ -1388,7 +1412,7 @@ do
                 end
                 state.selected = best
             else
-                state.selected = winner
+                state.selected = lootState.winner
             end
             addon:Debug("DEBUG", "Auto-selected player=%s", tostring(state.selected))
         end
@@ -1398,7 +1422,7 @@ do
 
     local function resetRolls(rec)
         state.rolls, state.rerolled, state.itemCounts = {}, {}, {}
-        state.playerCounts, state.count, rollsCount = {}, 0, 0
+        state.playerCounts, state.count, lootState.rollsCount = {}, 0, 0
         state.selected, state.rolled, state.warned = nil, false, false
         if rec == false then state.record = false end
     end
@@ -1413,7 +1437,7 @@ do
 
         local name = UnitName("player")
         local allowed = 1
-        if currentRollType == rollTypes.RESERVED then
+        if lootState.currentRollType == rollTypes.RESERVED then
             allowed = addon.Reserves:GetReserveCountForItem(itemId, name)
         end
 
@@ -1431,7 +1455,7 @@ do
 
     -- Returns the current roll session state.
     function module:RollStatus()
-        return currentRollType, state.record, state.canRoll, state.rolled
+        return lootState.currentRollType, state.record, state.canRoll, state.rolled
     end
 
     -- Enables or disables the recording of rolls.
@@ -1456,13 +1480,13 @@ do
         end
 
         local itemId = self:GetCurrentRollItemID()
-        if not itemId or lootCount == 0 then
+        if not itemId or lootState.lootCount == 0 then
             addon:error("Item ID missing or loot table not ready – roll ignored.")
             return
         end
 
         local allowed = 1
-        if currentRollType == rollTypes.RESERVED then
+        if lootState.currentRollType == rollTypes.RESERVED then
             local reserves = addon.Reserves:GetReserveCountForItem(itemId, player)
             allowed = reserves > 0 and reserves or 1
         end
@@ -1505,16 +1529,16 @@ do
         tracker[itemId] = tracker[itemId] or {}
         local used = tracker[itemId][name] or 0
         local reserve = addon.Reserves:GetReserveCountForItem(itemId, name)
-        local allowed = (currentRollType == rollTypes.RESERVED and reserve > 0) and reserve or 1
+        local allowed = (lootState.currentRollType == rollTypes.RESERVED and reserve > 0) and reserve or 1
         return used >= allowed
     end
 
     -- Returns the highest roll value from the current winner.
     function module:HighestRoll()
-        if not winner then return 0 end
+        if not lootState.winner then return 0 end
         for i = 1, state.count do
             local entry = state.rolls[i]
-            if entry.name == winner then return entry.roll end
+            if entry.name == lootState.winner then return entry.roll end
         end
         return 0
     end
@@ -1550,7 +1574,7 @@ do
         local tracker = state.itemCounts
         tracker[itemId] = tracker[itemId] or {}
         local used = tracker[itemId][name] or 0
-        local allowed = (currentRollType == rollTypes.RESERVED)
+        local allowed = (lootState.currentRollType == rollTypes.RESERVED)
             and addon.Reserves:GetReserveCountForItem(itemId, name)
             or 1
         return used < allowed
@@ -1582,7 +1606,7 @@ do
         scrollChild:SetWidth(scrollFrame:GetWidth())
 
         local itemId = self:GetCurrentRollItemID()
-        local isSR = currentRollType == rollTypes.RESERVED
+        local isSR = lootState.currentRollType == rollTypes.RESERVED
         local starTarget = state.selected
 
         if not starTarget then
@@ -1593,9 +1617,9 @@ do
                         top, best = entry.roll, entry.name
                     end
                 end
-                starTarget = best or winner
+                starTarget = best or lootState.winner
             else
-                starTarget = winner
+                starTarget = lootState.winner
             end
         end
 
@@ -1693,11 +1717,11 @@ do
     --
     function module:FetchLoot()
         local oldItem
-        if lootCount >= 1 then
-            oldItem = GetItemLink(currentItemIndex)
+        if lootState.lootCount >= 1 then
+            oldItem = GetItemLink(lootState.currentItemIndex)
         end
-        lootOpened = true
-        fromInventory = false
+        lootState.opened = true
+        lootState.fromInventory = false
         self:ClearLoot()
 
         for i = 1, GetNumLootItems() do
@@ -1709,11 +1733,11 @@ do
             end
         end
 
-        currentItemIndex = 1
+        lootState.currentItemIndex = 1
         if oldItem ~= nil then
-            for t = 1, lootCount do
+            for t = 1, lootState.lootCount do
                 if oldItem == GetItemLink(t) then
-                    currentItemIndex = t
+                    lootState.currentItemIndex = t
                     break
                 end
             end
@@ -1736,19 +1760,19 @@ do
             return
         end
 
-        if fromInventory == false then
+        if lootState.fromInventory == false then
             local lootThreshold = GetLootThreshold()
             if itemRarity < lootThreshold then return end
-            lootCount = lootCount + 1
+            lootState.lootCount = lootState.lootCount + 1
         else
-            lootCount = 1
-            currentItemIndex = 1
+            lootState.lootCount = 1
+            lootState.currentItemIndex = 1
         end
-        lootTable[lootCount]             = {}
-        lootTable[lootCount].itemName    = itemName
-        lootTable[lootCount].itemColor   = itemColors[itemRarity + 1]
-        lootTable[lootCount].itemLink    = itemLink
-        lootTable[lootCount].itemTexture = itemTexture
+        lootTable[lootState.lootCount]             = {}
+        lootTable[lootState.lootCount].itemName    = itemName
+        lootTable[lootState.lootCount].itemColor   = itemColors[itemRarity + 1]
+        lootTable[lootState.lootCount].itemLink    = itemLink
+        lootTable[lootState.lootCount].itemTexture = itemTexture
         Utils.triggerEvent("AddItem", itemLink)
     end
 
@@ -1756,8 +1780,8 @@ do
     -- Prepares the currently selected item for display.
     --
     function module:PrepareItem()
-        if ItemExists(currentItemIndex) then
-            self:SetItem(lootTable[currentItemIndex])
+        if ItemExists(lootState.currentItemIndex) then
+            self:SetItem(lootTable[lootState.currentItemIndex])
         end
     end
 
@@ -1788,7 +1812,7 @@ do
     --
     function module:SelectItem(i)
         if ItemExists(i) then
-            currentItemIndex = i
+            lootState.currentItemIndex = i
             self:PrepareItem()
         end
     end
@@ -1798,7 +1822,7 @@ do
     --
     function module:ClearLoot()
         lootTable = twipe(lootTable)
-        lootCount = 0
+        lootState.lootCount = 0
         frameName = frameName or Utils.getFrameName()
         _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
         _G[frameName .. "ItemBtn"]:SetNormalTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
@@ -1812,7 +1836,7 @@ do
     -- Returns the table for the currently selected item.
     --
     function GetItem(i)
-        i = i or currentItemIndex
+        i = i or lootState.currentItemIndex
         return lootTable[i]
     end
 
@@ -1820,7 +1844,7 @@ do
     -- Returns the name of the currently selected item.
     --
     function GetItemName(i)
-        i = i or currentItemIndex
+        i = i or lootState.currentItemIndex
         return lootTable[i] and lootTable[i].itemName or nil
     end
 
@@ -1828,7 +1852,7 @@ do
     -- Returns the link of the currently selected item.
     --
     function GetItemLink(i)
-        i = i or currentItemIndex
+        i = i or lootState.currentItemIndex
         return lootTable[i] and lootTable[i].itemLink or nil
     end
 
@@ -1836,7 +1860,7 @@ do
     -- Returns the texture of the currently selected item.
     --
     function GetItemTexture(i)
-        i = i or currentItemIndex
+        i = i or lootState.currentItemIndex
         return lootTable[i] and lootTable[i].itemTexture or nil
     end
 
@@ -1844,7 +1868,7 @@ do
     -- Checks if a loot item exists at the given index.
     --
     function ItemExists(i)
-        i = i or currentItemIndex
+        i = i or lootState.currentItemIndex
         return (lootTable[i] ~= nil)
     end
 
@@ -1951,14 +1975,14 @@ do
     -- Button: Select/Remove Item
     --
     function module:BtnSelectItem(btn)
-        if btn == nil or lootCount <= 0 then return end
-        if fromInventory == true then
+        if btn == nil or lootState.lootCount <= 0 then return end
+        if lootState.fromInventory == true then
             addon.Loot:ClearLoot()
             addon.Rolls:ClearRolls()
             addon.Rolls:RecordRolls(false)
             announced = false
-            fromInventory = false
-            if lootOpened == true then addon.Loot:FetchLoot() end
+            lootState.fromInventory = false
+            if lootState.opened == true then addon.Loot:FetchLoot() end
         elseif selectionFrame then
             selectionFrame:SetShown(not selectionFrame:IsVisible())
         end
@@ -1968,13 +1992,13 @@ do
     -- Button: Spam Loot Links or Do Ready Check
     --
     function module:BtnSpamLoot(btn)
-        if btn == nil or lootCount <= 0 then return end
-        if fromInventory == true then
+        if btn == nil or lootState.lootCount <= 0 then return end
+        if lootState.fromInventory == true then
             addon:Announce(L.ChatReadyCheck)
             DoReadyCheck()
         else
             addon:Announce(L.ChatSpamLoot, "RAID")
-            for i = 1, lootCount do
+            for i = 1, lootState.lootCount do
                 local itemLink = GetItemLink(i)
                 if itemLink then
                     addon:Announce(i .. ". " .. itemLink, "RAID")
@@ -2001,9 +2025,9 @@ do
     -- Generic function to announce a roll for the current item.
     --
     local function AnnounceRoll(rollType, chatMsg)
-        if lootCount >= 1 then
+        if lootState.lootCount >= 1 then
             announced = false
-            currentRollType = rollType
+            lootState.currentRollType = rollType
             addon.Rolls:ClearRolls()
             addon.Rolls:RecordRolls(true)
 
@@ -2014,19 +2038,19 @@ do
             if rollType == rollTypes.RESERVED then
                 local srList = addon.Reserves:FormatReservedPlayersLine(itemID)
                 local suff = addon.options.sortAscending and "Low" or "High"
-                message = itemCount > 1
-                    and L[chatMsg .. "Multiple" .. suff]:format(srList, itemLink, itemCount)
+                message = lootState.itemCount > 1
+                    and L[chatMsg .. "Multiple" .. suff]:format(srList, itemLink, lootState.itemCount)
                     or L[chatMsg]:format(srList, itemLink)
             else
                 local suff = addon.options.sortAscending and "Low" or "High"
-                message = itemCount > 1
-                    and L[chatMsg .. "Multiple" .. suff]:format(itemLink, itemCount)
+                message = lootState.itemCount > 1
+                    and L[chatMsg .. "Multiple" .. suff]:format(itemLink, lootState.itemCount)
                     or L[chatMsg]:format(itemLink)
             end
 
             addon:Announce(message)
             _G[frameName .. "ItemCount"]:ClearFocus()
-            currentRollItem = addon.Raid:GetLootID(itemID)
+            lootState.currentRollItem = addon.Raid:GetLootID(itemID)
         end
     end
 
@@ -2075,62 +2099,62 @@ do
     -- Button: Award/Trade
     --
     function module:BtnAward(btn)
-        if lootCount <= 0 or rollsCount <= 0 then
-            addon:Debug("DEBUG", "Cannot award, lootCount=%d, rollsCount=%d", lootCount or 0, rollsCount or 0)
+        if lootState.lootCount <= 0 or lootState.rollsCount <= 0 then
+            addon:Debug("DEBUG", "Cannot award, lootCount=%d, rollsCount=%d", lootState.lootCount or 0, lootState.rollsCount or 0)
             return
         end
         countdownRun = false
         local itemLink = GetItemLink()
         _G[frameName .. "ItemCount"]:ClearFocus()
-        if fromInventory == true then
-            return TradeItem(itemLink, winner, currentRollType, addon.Rolls:HighestRoll())
+        if lootState.fromInventory == true then
+            return TradeItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
         end
-        return AssignItem(itemLink, winner, currentRollType, addon.Rolls:HighestRoll())
+        return AssignItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
     end
 
     --
     -- Button: Hold item
     --
     function module:BtnHold(btn)
-        if lootCount <= 0 or holder == nil then return end
+        if lootState.lootCount <= 0 or lootState.holder == nil then return end
         countdownRun = false
         local itemLink = GetItemLink()
         if itemLink == nil then return end
-        currentRollType = rollTypes.HOLD
-        if fromInventory == true then
-            return TradeItem(itemLink, holder, rollTypes.HOLD, 0)
+        lootState.currentRollType = rollTypes.HOLD
+        if lootState.fromInventory == true then
+            return TradeItem(itemLink, lootState.holder, rollTypes.HOLD, 0)
         end
-        return AssignItem(itemLink, holder, rollTypes.HOLD, 0)
+        return AssignItem(itemLink, lootState.holder, rollTypes.HOLD, 0)
     end
 
     --
     -- Button: Bank item
     --
     function module:BtnBank(btn)
-        if lootCount <= 0 or banker == nil then return end
+        if lootState.lootCount <= 0 or lootState.banker == nil then return end
         countdownRun = false
         local itemLink = GetItemLink()
         if itemLink == nil then return end
-        currentRollType = rollTypes.BANK
-        if fromInventory == true then
-            return TradeItem(itemLink, banker, rollTypes.BANK, 0)
+        lootState.currentRollType = rollTypes.BANK
+        if lootState.fromInventory == true then
+            return TradeItem(itemLink, lootState.banker, rollTypes.BANK, 0)
         end
-        return AssignItem(itemLink, banker, rollTypes.BANK, 0)
+        return AssignItem(itemLink, lootState.banker, rollTypes.BANK, 0)
     end
 
     --
     -- Button: Disenchant item
     --
     function module:BtnDisenchant(btn)
-        if lootCount <= 0 or disenchanter == nil then return end
+        if lootState.lootCount <= 0 or lootState.disenchanter == nil then return end
         countdownRun = false
         local itemLink = GetItemLink()
         if itemLink == nil then return end
-        currentRollType = rollTypes.DISENCHANT
-        if fromInventory == true then
-            return TradeItem(itemLink, disenchanter, rollTypes.DISENCHANT, 0)
+        lootState.currentRollType = rollTypes.DISENCHANT
+        if lootState.fromInventory == true then
+            return TradeItem(itemLink, lootState.disenchanter, rollTypes.DISENCHANT, 0)
         end
-        return AssignItem(itemLink, disenchanter, rollTypes.DISENCHANT, 0)
+        return AssignItem(itemLink, lootState.disenchanter, rollTypes.DISENCHANT, 0)
     end
 
     --
@@ -2147,11 +2171,11 @@ do
                 addon:Announce(format(L.ChatPlayerRolled, player, roll))
                 return
             end
-            winner = player
+            lootState.winner = player
             addon.Rolls:FetchRolls()
             Utils.sync("KRT-RollWinner", player)
         end
-        if itemCount == 1 then announced = false end
+        if lootState.itemCount == 1 then announced = false end
     end
 
     --
@@ -2215,10 +2239,10 @@ do
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
         if Utils.throttle(self, frameName, updateInterval, elapsed) then
-            itemCount = _G[frameName .. "ItemCount"]:GetNumber()
-            if itemInfo.count and itemInfo.count ~= itemCount then
-                if itemInfo.count < itemCount then
-                    itemCount = itemInfo.count
+            lootState.itemCount = _G[frameName .. "ItemCount"]:GetNumber()
+            if itemInfo.count and itemInfo.count ~= lootState.itemCount then
+                if itemInfo.count < lootState.itemCount then
+                    lootState.itemCount = itemInfo.count
                     _G[frameName .. "ItemCount"]:SetNumber(itemInfo.count)
                 end
             end
@@ -2230,7 +2254,7 @@ do
 
             -- Button State Updates
             Utils.setText(_G[frameName .. "CountdownBtn"], L.BtnStop, L.BtnCountdown, countdownRun == true)
-            Utils.setText(_G[frameName .. "AwardBtn"], TRADE, L.BtnAward, fromInventory == true)
+            Utils.setText(_G[frameName .. "AwardBtn"], TRADE, L.BtnAward, lootState.fromInventory == true)
             -- Countdown Logic
             if countdownRun == true then
                 local tick = ceil(addon.options.countdownDuration - GetTime() + countdownStart)
@@ -2263,26 +2287,26 @@ do
             end
 
             -- Enable/Disable Buttons
-            Utils.enableDisable(_G[frameName .. "SelectItemBtn"], lootCount > 1 or (fromInventory and lootCount >= 1))
-            Utils.enableDisable(_G[frameName .. "SpamLootBtn"], lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "MSBtn"], lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "OSBtn"], lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "SRBtn"], lootCount >= 1 and addon.Reserves:HasData())
-            Utils.enableDisable(_G[frameName .. "FreeBtn"], lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "CountdownBtn"], lootCount >= 1 and ItemExists())
-            Utils.enableDisable(_G[frameName .. "HoldBtn"], lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "BankBtn"], lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "DisenchantBtn"], lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "AwardBtn"], (lootCount >= 1 and rollsCount >= 1))
+            Utils.enableDisable(_G[frameName .. "SelectItemBtn"], lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1))
+            Utils.enableDisable(_G[frameName .. "SpamLootBtn"], lootState.lootCount >= 1)
+            Utils.enableDisable(_G[frameName .. "MSBtn"], lootState.lootCount >= 1)
+            Utils.enableDisable(_G[frameName .. "OSBtn"], lootState.lootCount >= 1)
+            Utils.enableDisable(_G[frameName .. "SRBtn"], lootState.lootCount >= 1 and addon.Reserves:HasData())
+            Utils.enableDisable(_G[frameName .. "FreeBtn"], lootState.lootCount >= 1)
+            Utils.enableDisable(_G[frameName .. "CountdownBtn"], lootState.lootCount >= 1 and ItemExists())
+            Utils.enableDisable(_G[frameName .. "HoldBtn"], lootState.lootCount >= 1)
+            Utils.enableDisable(_G[frameName .. "BankBtn"], lootState.lootCount >= 1)
+            Utils.enableDisable(_G[frameName .. "DisenchantBtn"], lootState.lootCount >= 1)
+            Utils.enableDisable(_G[frameName .. "AwardBtn"], (lootState.lootCount >= 1 and lootState.rollsCount >= 1))
             Utils.enableDisable(_G[frameName .. "OpenReservesBtn"], addon.Reserves:HasData())
             Utils.enableDisable(_G[frameName .. "ImportReservesBtn"], not addon.Reserves:HasData())
 
             local rollType, record, canRoll, rolled = addon.Rolls:RollStatus()
             Utils.enableDisable(_G[frameName .. "RollBtn"], record and canRoll and rolled == false)
-            Utils.enableDisable(_G[frameName .. "ClearBtn"], rollsCount >= 1)
+            Utils.enableDisable(_G[frameName .. "ClearBtn"], lootState.rollsCount >= 1)
 
-            Utils.setText(_G[frameName .. "SelectItemBtn"], L.BtnRemoveItem, L.BtnSelectItem, fromInventory)
-            Utils.setText(_G[frameName .. "SpamLootBtn"], READY_CHECK, L.BtnSpamLoot, fromInventory)
+            Utils.setText(_G[frameName .. "SelectItemBtn"], L.BtnRemoveItem, L.BtnSelectItem, lootState.fromInventory)
+            Utils.setText(_G[frameName .. "SpamLootBtn"], READY_CHECK, L.BtnSpamLoot, lootState.fromInventory)
         end
     end
 
@@ -2349,10 +2373,13 @@ do
         local name = owner:GetName()
         if name == dropDownFrameHolder:GetName() then
             KRT_Raids[KRT_CurrentRaid].holder = value
+            lootState.holder = value
         elseif name == dropDownFrameBanker:GetName() then
             KRT_Raids[KRT_CurrentRaid].banker = value
+            lootState.banker = value
         elseif name == dropDownFrameDisenchanter:GetName() then
             KRT_Raids[KRT_CurrentRaid].disenchanter = value
+            lootState.disenchanter = value
         end
         CloseDropDownMenus()
     end
@@ -2365,36 +2392,36 @@ do
         local name = frame:GetName()
         -- Update loot holder:
         if name == dropDownFrameHolder:GetName() then
-            holder = KRT_Raids[KRT_CurrentRaid].holder
-            if holder and addon.Raid:GetUnitID(holder) == "none" then
+            lootState.holder = KRT_Raids[KRT_CurrentRaid].holder
+            if lootState.holder and addon.Raid:GetUnitID(lootState.holder) == "none" then
                 KRT_Raids[KRT_CurrentRaid].holder = nil
-                holder = nil
+                lootState.holder = nil
             end
-            if holder then
-                UIDropDownMenu_SetText(dropDownFrameHolder, holder)
-                UIDropDownMenu_SetSelectedValue(dropDownFrameHolder, holder)
+            if lootState.holder then
+                UIDropDownMenu_SetText(dropDownFrameHolder, lootState.holder)
+                UIDropDownMenu_SetSelectedValue(dropDownFrameHolder, lootState.holder)
             end
             -- Update loot banker:
         elseif name == dropDownFrameBanker:GetName() then
-            banker = KRT_Raids[KRT_CurrentRaid].banker
-            if banker and addon.Raid:GetUnitID(banker) == "none" then
+            lootState.banker = KRT_Raids[KRT_CurrentRaid].banker
+            if lootState.banker and addon.Raid:GetUnitID(lootState.banker) == "none" then
                 KRT_Raids[KRT_CurrentRaid].banker = nil
-                banker = nil
+                lootState.banker = nil
             end
-            if banker then
-                UIDropDownMenu_SetText(dropDownFrameBanker, banker)
-                UIDropDownMenu_SetSelectedValue(dropDownFrameBanker, banker)
+            if lootState.banker then
+                UIDropDownMenu_SetText(dropDownFrameBanker, lootState.banker)
+                UIDropDownMenu_SetSelectedValue(dropDownFrameBanker, lootState.banker)
             end
             -- Update loot disenchanter:
         elseif name == dropDownFrameDisenchanter:GetName() then
-            disenchanter = KRT_Raids[KRT_CurrentRaid].disenchanter
-            if disenchanter and addon.Raid:GetUnitID(disenchanter) == "none" then
+            lootState.disenchanter = KRT_Raids[KRT_CurrentRaid].disenchanter
+            if lootState.disenchanter and addon.Raid:GetUnitID(lootState.disenchanter) == "none" then
                 KRT_Raids[KRT_CurrentRaid].disenchanter = nil
-                disenchanter = nil
+                lootState.disenchanter = nil
             end
-            if disenchanter then
-                UIDropDownMenu_SetText(dropDownFrameDisenchanter, disenchanter)
-                UIDropDownMenu_SetSelectedValue(dropDownFrameDisenchanter, disenchanter)
+            if lootState.disenchanter then
+                UIDropDownMenu_SetText(dropDownFrameDisenchanter, lootState.disenchanter)
+                UIDropDownMenu_SetSelectedValue(dropDownFrameDisenchanter, lootState.disenchanter)
             end
         end
     end
@@ -2424,7 +2451,7 @@ do
     function UpdateSelectionFrame()
         CreateSelectionFrame()
         local height = 5
-        for i = 1, lootCount do
+        for i = 1, lootState.lootCount do
             local btnName = frameName .. "ItemSelectionBtn" .. i
             local btn = _G[btnName] or CreateFrame("Button", btnName, selectionFrame, "KRTItemSelectionButton")
             btn:SetID(i)
@@ -2439,7 +2466,7 @@ do
             height = height + 37
         end
         selectionFrame:SetHeight(height)
-        if lootCount <= 0 then
+        if lootState.lootCount <= 0 then
             selectionFrame:Hide()
         end
     end
@@ -2453,8 +2480,9 @@ do
     --
     function module:ITEM_LOCKED(inBag, inSlot)
         if not inBag or not inSlot then return end
-        local itemTexture, itemCount, locked, quality, _, _, itemLink = GetContainerItemInfo(inBag, inSlot)
+        local itemTexture, count, locked, quality, _, _, itemLink = GetContainerItemInfo(inBag, inSlot)
         if not itemLink or not itemTexture then return end
+        lootState.itemCount = count or lootState.itemCount or 1
         _G[frameName .. "ItemBtn"]:SetScript("OnClick", function(self)
             if not ItemIsSoulbound(inBag, inSlot) then
                 -- Clear count:
@@ -2462,7 +2490,7 @@ do
                 _G[frameName .. "ItemCount"]:ClearFocus()
                 _G[frameName .. "ItemCount"]:Hide()
 
-                fromInventory = true
+                lootState.fromInventory = true
                 addon.Loot:AddItem(itemLink)
                 addon.Loot:PrepareItem()
                 announced        = false
@@ -2470,9 +2498,9 @@ do
                 itemInfo.bagID   = inBag
                 itemInfo.slotID  = inSlot
                 itemInfo.count   = GetItemCount(itemLink)
-                itemInfo.isStack = (itemCount > 1)
+                itemInfo.isStack = (lootState.itemCount > 1)
                 if itemInfo.count >= 1 then
-                    itemCount = itemInfo.count
+                    lootState.itemCount = itemInfo.count
                     _G[frameName .. "ItemCount"]:SetText(itemInfo.count)
                     _G[frameName .. "ItemCount"]:Show()
                     _G[frameName .. "ItemCount"]:SetFocus()
@@ -2487,11 +2515,11 @@ do
     --
     function module:LOOT_OPENED()
         if addon.Raid:IsMasterLooter() then
-            lootOpened = true
+            lootState.opened = true
             announced = false
             addon.Loot:FetchLoot()
             UpdateSelectionFrame()
-            if lootCount >= 1 then UIMaster:Show() end
+            if lootState.lootCount >= 1 then UIMaster:Show() end
             if not addon.History.container then
                 addon.History.source = UnitName("target")
             end
@@ -2503,13 +2531,13 @@ do
     --
     function module:LOOT_CLOSED()
         if addon.Raid:IsMasterLooter() then
-            if lootCloseTimer then
-                Utils.CancelTimer(lootCloseTimer)
-                lootCloseTimer = nil
+            if lootState.closeTimer then
+                Utils.CancelTimer(lootState.closeTimer)
+                lootState.closeTimer = nil
             end
-            lootCloseTimer = Utils.After(0.1, function()
-                lootCloseTimer = nil
-                lootOpened = false
+            lootState.closeTimer = Utils.After(0.1, function()
+                lootState.closeTimer = nil
+                lootState.opened = false
                 UIMaster:Hide()
                 addon.Loot:ClearLoot()
                 addon.Rolls:ClearRolls()
@@ -2525,7 +2553,7 @@ do
         if addon.Raid:IsMasterLooter() then
             addon.Loot:FetchLoot()
             UpdateSelectionFrame()
-            if lootCount >= 1 then
+            if lootState.lootCount >= 1 then
                 UIMaster:Show()
             else
                 UIMaster:Hide()
@@ -2537,11 +2565,11 @@ do
     -- TRADE_ACCEPT_UPDATE: Triggered during a trade.
     --
     function module:TRADE_ACCEPT_UPDATE(tAccepted, pAccepted)
-        if itemCount == 1 and trader and winner and trader ~= winner then
+        if lootState.itemCount == 1 and lootState.trader and lootState.winner and lootState.trader ~= lootState.winner then
             if tAccepted == 1 and pAccepted == 1 then
-                addon.History.Loot:Log(currentRollItem, winner, currentRollType, addon.Rolls:HighestRoll())
-                trader = nil
-                winner = nil
+                addon.History.Loot:Log(lootState.currentRollItem, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
+                lootState.trader = nil
+                lootState.winner = nil
                 addon.Loot:ClearLoot()
                 addon.Rolls:ClearRolls()
                 addon.Rolls:RecordRolls(false)
@@ -2597,7 +2625,7 @@ do
                 if whisper then
                     Utils.whisper(playerName, whisper)
                 end
-                addon.History.Loot:Log(currentRollItem, playerName, rollType, rollValue)
+                addon.History.Loot:Log(lootState.currentRollItem, playerName, rollType, rollValue)
                 return true
             end
         end
@@ -2610,7 +2638,7 @@ do
     --
     function TradeItem(itemLink, playerName, rollType, rollValue)
         if itemLink ~= GetItemLink() then return end
-        trader = unitName
+        lootState.trader = GetPlayerName()
 
         -- Prepare initial output and whisper:
         local output, whisper
@@ -2636,15 +2664,15 @@ do
                 whisper = L.WhisperDisenchantTrade:format(itemLink)
             end
             -- Multiple winners:
-        elseif itemCount > 1 then
+        elseif lootState.itemCount > 1 then
             -- Announce multiple winners
             addon.Raid:ClearRaidIcons()
-            SetRaidTarget(trader, 1)
+            SetRaidTarget(lootState.trader, 1)
             local rolls = addon.Rolls:GetRolls()
             local winners = {}
-            for i = 1, itemCount do
+            for i = 1, lootState.itemCount do
                 if rolls[i] then
-                    if rolls[i].name == trader then
+                    if rolls[i].name == lootState.trader then
                         tinsert(winners, "{star} " .. rolls[i].name .. "(" .. rolls[i].roll .. ")")
                     else
                         SetRaidTarget(rolls[i].name, i + 1)
@@ -2652,9 +2680,9 @@ do
                     end
                 end
             end
-            output = L.ChatTradeMutiple:format(tconcat(winners, ", "), trader)
+            output = L.ChatTradeMutiple:format(tconcat(winners, ", "), lootState.trader)
             -- Trader is the winner:
-        elseif trader == winner then
+        elseif lootState.trader == lootState.winner then
             -- Trader won, clear state
             addon.Loot:ClearLoot()
             addon.Rolls:ClearRolls(false)
@@ -2680,8 +2708,8 @@ do
             elseif unit ~= "none" then
                 -- Player is out of range
                 addon.Raid:ClearRaidIcons()
-                SetRaidTarget(trader, 1)
-                if winner then SetRaidTarget(winner, 4) end
+                SetRaidTarget(lootState.trader, 1)
+                if lootState.winner then SetRaidTarget(lootState.winner, 4) end
                 output = L.ChatTrade:format(playerName, itemLink)
             end
         end
@@ -2689,7 +2717,7 @@ do
         if not announced then
             if output then addon:Announce(output) end
             if whisper then
-                if playerName == trader then
+                if playerName == lootState.trader then
                     addon.Loot:ClearLoot()
                     addon.Rolls:ClearRolls()
                     addon.Rolls:RecordRolls(false)
@@ -2697,8 +2725,8 @@ do
                     Utils.whisper(playerName, whisper)
                 end
             end
-            if rollType <= rollTypes.FREE and playerName == trader then
-                addon.History.Loot:Log(currentRollItem, trader, rollType, rollValue)
+            if rollType <= rollTypes.FREE and playerName == lootState.trader then
+                addon.History.Loot:Log(lootState.currentRollItem, lootState.trader, rollType, rollValue)
             end
             announced = true
         end
