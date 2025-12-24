@@ -161,6 +161,122 @@
 		</NormalTexture>
 	</Button>
 
+	<!-- Reserve list header template -->
+	<Button name="KRTReserveHeaderTemplate" virtual="true">
+		<Size>
+			<AbsDimension x="320" y="28" />
+		</Size>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString name="$parentLabel" inherits="GameFontNormal">
+					<Anchors>
+						<Anchor point="CENTER" />
+					</Anchors>
+					<Font font="Fonts\\FRIZQT__.TTF" height="14" flags="OUTLINE" />
+					<Color r="1" g="0.82" b="0" a="1" />
+				</FontString>
+				<Texture name="$parentLeftLine" file="Interface\\Buttons\\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="RIGHT" relativeTo="$parentLabel" relativePoint="LEFT">
+							<Offset>
+								<AbsDimension x="-6" y="0" />
+							</Offset>
+						</Anchor>
+						<Anchor point="LEFT">
+							<Offset>
+								<AbsDimension x="4" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1" a="0.3" />
+				</Texture>
+				<Texture name="$parentRightLine" file="Interface\\Buttons\\WHITE8x8">
+					<Size>
+						<AbsDimension y="1" />
+					</Size>
+					<Anchors>
+						<Anchor point="LEFT" relativeTo="$parentLabel" relativePoint="RIGHT">
+							<Offset>
+								<AbsDimension x="6" y="0" />
+							</Offset>
+						</Anchor>
+						<Anchor point="RIGHT">
+							<Offset>
+								<AbsDimension x="-4" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1" a="0.3" />
+				</Texture>
+			</Layer>
+		</Layers>
+	</Button>
+
+	<!-- Reserve list row template -->
+	<Frame name="KRTReserveRowTemplate" virtual="true">
+		<Size>
+			<AbsDimension x="320" y="34" />
+		</Size>
+		<Frames>
+			<Button name="$parentIconBtn" inherits="KRTItemButtonTemplate">
+				<Size>
+					<AbsDimension x="32" y="32" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT">
+						<Offset>
+							<AbsDimension x="0" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+		</Frames>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBackground" file="Interface\\Buttons\\WHITE8x8">
+					<Anchors>
+						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<FontString name="$parentName" inherits="KRTFontString">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentIconBtn" relativePoint="TOPRIGHT">
+							<Offset>
+								<AbsDimension x="8" y="-2" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentPlayers" inherits="GameFontHighlightSmall">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-2" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentQuantity" inherits="GameFontNormalSmall">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentIconBtn" relativePoint="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-2" y="2" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Font font="Fonts\\FRIZQT__.TTF" height="10" flags="OUTLINE" />
+					<Color r="1" g="1" b="1" a="1" />
+				</FontString>
+			</Layer>
+		</Layers>
+	</Frame>
+
 	<!-- General FontString template -->
 	<FontString name="KRTFontString" font="GameFontNormal" justifyH="LEFT" justifyV="MIDDLE"
 		virtual="true" />
