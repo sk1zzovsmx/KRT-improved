@@ -187,6 +187,26 @@ function Utils.rgbToHex(r, g, b)
 	return addon.Compat.RGBToHex(r, g, b)
 end
 
+function Utils.normalizeHexColor(color)
+	if type(color) == "string" then
+		local hex = color:gsub("^|c", ""):gsub("|r$", ""):gsub("^#", "")
+		if #hex == 6 then
+			hex = "ff" .. hex
+		end
+		return hex
+	end
+
+	if type(color) == "table" and color.GenerateHexColor then
+		local hex = color:GenerateHexColor():gsub("^#", "")
+		if #hex == 6 then
+			hex = "ff" .. hex
+		end
+		return hex
+	end
+
+	return "ffffffff"
+end
+
 function addon.GetClassColor(name)
 	name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
 	local c = addon.Compat.GetClassColorObj(name)
