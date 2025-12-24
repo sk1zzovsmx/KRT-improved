@@ -243,6 +243,9 @@ do
         events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents", OnUsed, OnUnused)
         mainFrame:SetScript("OnEvent", OnEvent)
         mainFrame:RegisterEvent("ADDON_LOADED")
+        addon:RegisterEvent("ADDON_LOADED", function(_, name)
+            addon:ADDON_LOADED(name)
+        end)
     end
 
     if not CB then InitEventFallback() end
