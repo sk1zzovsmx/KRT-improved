@@ -4743,19 +4743,6 @@ local TGet  = Utils.Table.get
 local TFree = Utils.Table.free
 
 -- compact confirmation popup (riusabile)
-local function makeConfirmPopup(key, text, onAccept, cancels)
-    StaticPopupDialogs[key] = {
-        text         = text,
-        button1      = OKAY,
-        button2      = CANCEL,
-        OnAccept     = onAccept,
-        cancels      = cancels or key,
-        timeout      = 0,
-        whileDead    = 1,
-        hideOnEscape = 1,
-    }
-end
-
 -- Controller generico per liste con pooling righe e refresh differito
 local function MakeListController(cfg)
     -- cfg:
@@ -4944,7 +4931,7 @@ local function MakeListController(cfg)
     end
 
     -- utilities esposte
-    self._makeConfirmPopup = makeConfirmPopup
+    self._makeConfirmPopup = Utils.makeConfirmPopup
 
     return self
 end
@@ -5052,26 +5039,7 @@ do
             end
         end
 
-        local function makeEditBoxPopup(key, text, onAccept, onShow)
-            StaticPopupDialogs[key] = {
-                text         = text,
-                button1      = SAVE,
-                button2      = CANCEL,
-                timeout      = 0,
-                whileDead    = 1,
-                hideOnEscape = 1,
-                hasEditBox   = 1,
-                cancels      = key,
-                OnShow       = function(self) if onShow then onShow(self) end end,
-                OnHide       = function(self)
-                    self.editBox:SetText("")
-                    self.editBox:ClearFocus()
-                end,
-                OnAccept     = function(self) onAccept(self, self.editBox:GetText()) end,
-            }
-        end
-
-        makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_WINNER", L.StrEditItemLooterHelp,
+        Utils.makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_WINNER", L.StrEditItemLooterHelp,
             function(self, text)
                 local name = (text or ""):trim():lower()
                 local raid = KRT_Raids[self.raidId]
@@ -5090,14 +5058,14 @@ do
             end
         )
 
-        makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_ROLL", L.StrEditItemRollTypeHelp,
+        Utils.makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_ROLL", L.StrEditItemRollTypeHelp,
             function(self, text)
                 addon.History.Loot:Log(self.itemId, nil, tonumber(text))
             end,
             function(self) self.itemId = addon.History.selectedItem end
         )
 
-        makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp,
+        Utils.makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp,
             function(self, text)
                 addon.History.Loot:Log(self.itemId, nil, nil, tonumber(text))
             end,
