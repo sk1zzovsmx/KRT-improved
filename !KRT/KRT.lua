@@ -5259,7 +5259,10 @@ do
         end,
 
         getData     = function(out)
-            local src = addon.Raid:GetBosses(addon.History.selectedRaid) or {}
+            local rID = addon.History.selectedRaid
+            if not rID then return end
+
+            local src = addon.Raid:GetBosses(rID) or {}
             for i = 1, #src do
                 local b    = src[i]
                 local it   = TGet("history-bosses")
@@ -5270,7 +5273,6 @@ do
                 it.timeFmt = date("%H:%M", b.time)
                 out[i]     = it
             end
-            table.sort(out, function(a, b) return a.id > b.id end)
         end,
 
         rowName     = function(n, _, i) return n .. "BossBtn" .. i end,
@@ -5384,10 +5386,11 @@ do
         end,
 
         getData     = function(out)
+            local rID = addon.History.selectedRaid
             local bID = addon.History.selectedBoss
-            if not bID then return end
+            if not (rID and bID) then return end
 
-            local src = addon.Raid:GetPlayers(addon.History.selectedRaid, bID) or {}
+            local src = addon.Raid:GetPlayers(rID, bID) or {}
             for i = 1, #src do
                 local p  = src[i]
                 local it = TGet("history-boss-attendees")
@@ -5493,7 +5496,10 @@ do
         end,
 
         getData     = function(out)
-            local src = addon.Raid:GetPlayers(addon.History.selectedRaid) or {}
+            local rID = addon.History.selectedRaid
+            if not rID then return end
+
+            local src = addon.Raid:GetPlayers(rID) or {}
             for i = 1, #src do
                 local p     = src[i]
                 local it    = TGet("history-raid-attendees")
