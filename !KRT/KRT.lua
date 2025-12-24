@@ -1283,7 +1283,11 @@ do
         addon.options = addon.options or KRT_Options or {}
         KRT_MINIMAP_GUI:SetUserPlaced(true)
         self:SetPos(addon.options.minimapPos or 325)
-        if not addon.options.minimapButton then KRT_MINIMAP_GUI:Hide() end
+        if addon.options.minimapButton == false then
+            KRT_MINIMAP_GUI:Hide()
+        else
+            KRT_MINIMAP_GUI:Show()
+        end
         KRT_MINIMAP_GUI:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         KRT_MINIMAP_GUI:SetScript("OnMouseDown", function(self, button)
             if IsAltKeyDown() then
@@ -3610,6 +3614,15 @@ do
             addon:SetLogLevel(addon.Logger.logLevels.DEBUG)
         else
             addon:SetLogLevel(KRT_Debug.level)
+        end
+
+        if KRT_MINIMAP_GUI then
+            addon.Minimap:SetPos(addon.options.minimapPos or 325)
+            if addon.options.minimapButton then
+                KRT_MINIMAP_GUI:Show()
+            else
+                KRT_MINIMAP_GUI:Hide()
+            end
         end
     end
     addon.LoadOptions = LoadOptions
