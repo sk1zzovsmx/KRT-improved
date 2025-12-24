@@ -2955,10 +2955,71 @@ do
     local reservesByItemID = {}
     local pendingItemInfo = {}
     local collapsedBossGroups = {}
+    local itemFallbackIcon = "Interface\\Icons\\INV_Misc_QuestionMark"
 
     -------------------------------------------------------
     -- Private helpers
     -------------------------------------------------------
+    local function SetupReserveRowTooltip(row)
+        if not row or not row.iconBtn then return end
+        row.iconBtn:SetScript("OnEnter", function()
+            GameTooltip:SetOwner(row.iconBtn, "ANCHOR_RIGHT")
+            if row._itemLink then
+                GameTooltip:SetHyperlink(row._itemLink)
+            else
+                GameTooltip:SetText("Item ID: " .. (row._itemId or "?"), 1, 1, 1)
+            end
+            if row._source then
+                GameTooltip:AddLine("Dropped by: " .. row._source, 0.8, 0.8, 0.8)
+            end
+            GameTooltip:Show()
+        end)
+        row.iconBtn:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+    end
+
+    local function ApplyReserveRowData(row, info, index)
+        if not row or not info then return end
+        row._itemId = info.itemId
+        row._itemLink = info.itemLink
+        row._itemName = info.itemName
+        row._source = info.source
+
+        if row.background then
+            row.background:SetVertexColor(index % 2 == 0 and 0.1 or 0, 0.1, 0.1, 0.3)
+        end
+
+        if row.iconTexture then
+            row.iconTexture:SetTexture(info.itemIcon or itemFallbackIcon)
+        end
+
+        if row.nameText then
+            row.nameText:SetText(info.itemLink or info.itemName or ("[Item " .. info.itemId .. "]"))
+        end
+
+        if row.playerText then
+            row.playerText:SetText(table.concat(info.players or {}, ", "))
+        end
+
+        if row.quantityText then
+            if info.quantity and info.quantity > 1 then
+                row.quantityText:SetText(info.quantity .. "x")
+                row.quantityText:Show()
+            else
+                row.quantityText:Hide()
+            end
+        end
+    end
+
+    local function ReserveHeaderOnClick(self)
+        local source = self and self._source
+        if not source then return end
+        collapsedBossGroups[source] = not collapsedBossGroups[source]
+        addon:Debug("DEBUG", "Toggling collapse state for source: %s to %s", source,
+            tostring(collapsedBossGroups[source]))
+        module:RefreshWindow()
+    end
 
     -------------------------------------------------------
     -- Public methods
@@ -3123,6 +3184,7 @@ do
     --------------------------------------------------------------------------
 
     function module:GetReserve(playerName)
+        if type(playerName) ~= "string" then return nil end
         local player = playerName:lower():trim()
         local reserve = reservesData[player]
 
@@ -3271,7 +3333,7 @@ do
                     if r.rawID == itemId then
                         r.itemName = itemName
                         r.itemLink = itemLink
-                        r.itemIcon = itemIcon or "Interface\\Icons\\INV_Misc_QuestionMark"
+                        r.itemIcon = itemIcon or itemFallbackIcon
                         addon:Debug("DEBUG", "Updated reserve data for player: %s, itemId: %d", player.original, itemId)
                     end
                 end
@@ -3281,30 +3343,15 @@ do
         local rows = rowsByItemID[itemId]
         if not rows then return end
         for _, row in ipairs(rows) do
-            local icon = itemIcon or "Interface\\Icons\\INV_Misc_QuestionMark"
-            row.icon:SetTexture(icon)
-
-            if row.quantityText then
-                if row.quantityText:GetText() and row.quantityText:GetText():match("^%d+x$") then
-                    row.quantityText:SetText(row.quantityText:GetText()) -- Preserve format
-                end
+            row._itemId = itemId
+            row._itemLink = itemLink
+            row._itemName = itemName
+            if row.iconTexture then
+                row.iconTexture:SetTexture(itemIcon or itemFallbackIcon)
             end
-
-            local tooltipText = itemLink or itemName or ("Item ID: " .. itemId)
-            row.nameText:SetText(tooltipText)
-
-            row.iconBtn:SetScript("OnEnter", function()
-                GameTooltip:SetOwner(row.iconBtn, "ANCHOR_RIGHT")
-                if itemLink then
-                    GameTooltip:SetHyperlink(itemLink)
-                else
-                    GameTooltip:SetText("Item ID: " .. itemId, 1, 1, 1)
-                end
-                GameTooltip:Show()
-            end)
-            row.iconBtn:SetScript("OnLeave", function()
-                GameTooltip:Hide()
-            end)
+            if row.nameText then
+                row.nameText:SetText(itemLink or itemName or ("Item ID: " .. itemId))
+            end
         end
     end
 
@@ -3369,9 +3416,11 @@ do
 
         local rowHeight, yOffset = 34, 0
         local seenSources = {}
+        local rowIndex = 0
+        local headerIndex = 0
 
         -- Create headers and reserve rows
-        for index, entry in ipairs(displayList) do
+        for _, entry in ipairs(displayList) do
             local source = entry.source
 
             -- Log for new source groups
@@ -3382,48 +3431,17 @@ do
                     collapsedBossGroups[source] = false
                 end
 
-                local headerBtn = CreateFrame("Button", nil, scrollChild)
-                headerBtn:SetSize(320, 28)
-                headerBtn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -yOffset)
-
-                local fullLabel = headerBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-                fullLabel:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
-                fullLabel:SetTextColor(1, 0.82, 0)
-                local prefix = collapsedBossGroups[source] and "|TInterface\\Buttons\\UI-PlusButton-Up:12|t " or
-                    "|TInterface\\Buttons\\UI-MinusButton-Up:12|t "
-                fullLabel:SetText(prefix .. source)
-                fullLabel:SetPoint("CENTER", headerBtn, "CENTER", 0, 0)
-
-                local leftLine = headerBtn:CreateTexture(nil, "ARTWORK")
-                leftLine:SetTexture("Interface\\Buttons\\WHITE8x8")
-                leftLine:SetVertexColor(1, 1, 1, 0.3)
-                leftLine:SetHeight(1)
-                leftLine:SetPoint("RIGHT", fullLabel, "LEFT", -6, 0)
-                leftLine:SetPoint("LEFT", headerBtn, "LEFT", 4, 0)
-
-                local rightLine = headerBtn:CreateTexture(nil, "ARTWORK")
-                rightLine:SetTexture("Interface\\Buttons\\WHITE8x8")
-                rightLine:SetVertexColor(1, 1, 1, 0.3)
-                rightLine:SetHeight(1)
-                rightLine:SetPoint("LEFT", fullLabel, "RIGHT", 6, 0)
-                rightLine:SetPoint("RIGHT", headerBtn, "RIGHT", -4, 0)
-
-                -- Click toggle
-                headerBtn:SetScript("OnClick", function()
-                    collapsedBossGroups[source] = not collapsedBossGroups[source]
-                    addon:Debug("DEBUG", "Toggling collapse state for source: %s to %s", source,
-                        tostring(collapsedBossGroups[source]))
-                    module:RefreshWindow()
-                end)
-
-                tinsert(reserveItemRows, headerBtn)
+                headerIndex = headerIndex + 1
+                local header = module:CreateReserveHeader(scrollChild, source, yOffset, headerIndex)
+                tinsert(reserveItemRows, header)
                 yOffset = yOffset + 24
             end
 
             -- Log for rows that are added
             if not collapsedBossGroups[source] then
+                rowIndex = rowIndex + 1
                 addon:Debug("DEBUG", "Adding row for itemId: %d, source: %s", entry.itemId, source)
-                local row = module:CreateReserveRow(scrollChild, entry, yOffset, index)
+                local row = module:CreateReserveRow(scrollChild, entry, yOffset, rowIndex)
                 tinsert(reserveItemRows, row)
                 yOffset = yOffset + rowHeight
             end
@@ -3434,70 +3452,46 @@ do
         scrollFrame:SetVerticalScroll(0)
     end
 
+    function module:CreateReserveHeader(parent, source, yOffset, index)
+        local headerName = frameName .. "ReserveHeader" .. index
+        local header = _G[headerName] or CreateFrame("Button", headerName, parent, "KRTReserveHeaderTemplate")
+        header:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -yOffset)
+        header._source = source
+        if not header._initialized then
+            header.label = _G[headerName .. "Label"]
+            header:SetScript("OnClick", ReserveHeaderOnClick)
+            header._initialized = true
+        end
+        if header.label then
+            local prefix = collapsedBossGroups[source] and "|TInterface\\Buttons\\UI-PlusButton-Up:12|t " or
+                "|TInterface\\Buttons\\UI-MinusButton-Up:12|t "
+            header.label:SetText(prefix .. source)
+        end
+        header:Show()
+        return header
+    end
+
     -- Create a new row for displaying a reserve
     function module:CreateReserveRow(parent, info, yOffset, index)
         addon:Debug("DEBUG", "Creating reserve row for itemId: %d", info.itemId)
-        local row = CreateFrame("Frame", nil, parent)
-        row:SetSize(320, 34)
+        local rowName = frameName .. "ReserveRow" .. index
+        local row = _G[rowName] or CreateFrame("Frame", rowName, parent, "KRTReserveRowTemplate")
         row:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -yOffset)
         row._rawID = info.itemId
-
-        local bg = row:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints(row)
-        bg:SetTexture("Interface\\Buttons\\WHITE8x8")
-        bg:SetVertexColor(index % 2 == 0 and 0.1 or 0, 0.1, 0.1, 0.3)
-
-        local icon = row:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(32, 32)
-        icon:SetPoint("LEFT", row, "LEFT", 0, 0)
-
-        local iconBtn = CreateFrame("Button", nil, row)
-        iconBtn:SetAllPoints(icon)
-
-        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 8, -2)
-        nameText:SetText(info.itemLink or info.itemName or ("[Item " .. info.itemId .. "]"))
-
-        local playerText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        playerText:SetPoint("TOPLEFT", nameText, "BOTTOMLEFT", 0, -2)
-        playerText:SetText(table.concat(info.players or {}, ", "))
-
-        local quantityText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        quantityText:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
-        quantityText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
-        quantityText:SetTextColor(1, 1, 1)
-
-        if info.quantity and info.quantity > 1 then
-            quantityText:SetText(info.quantity .. "x")
-            quantityText:Show()
-        else
-            quantityText:Hide()
+        if not row._initialized then
+            row.background = _G[rowName .. "Background"]
+            row.iconBtn = _G[rowName .. "IconBtn"]
+            row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
+            if row.iconTexture and row.iconBtn then
+                row.iconTexture:SetAllPoints(row.iconBtn)
+            end
+            row.nameText = _G[rowName .. "Name"]
+            row.playerText = _G[rowName .. "Players"]
+            row.quantityText = _G[rowName .. "Quantity"]
+            SetupReserveRowTooltip(row)
+            row._initialized = true
         end
-
-        icon:SetTexture(info.itemIcon or "Interface\\Icons\\INV_Misc_QuestionMark")
-
-        iconBtn:SetScript("OnEnter", function()
-            GameTooltip:SetOwner(iconBtn, "ANCHOR_RIGHT")
-            if info.itemLink then
-                GameTooltip:SetHyperlink(info.itemLink)
-            else
-                GameTooltip:SetText("Item ID: " .. info.itemId, 1, 1, 1)
-            end
-            if info.source then
-                GameTooltip:AddLine("Dropped by: " .. info.source, 0.8, 0.8, 0.8)
-            end
-            GameTooltip:Show()
-        end)
-
-        iconBtn:SetScript("OnLeave", function()
-            GameTooltip:Hide()
-        end)
-
-        row.icon = icon
-        row.iconBtn = iconBtn
-        row.nameText = nameText
-        row.quantityText = quantityText
-
+        ApplyReserveRowData(row, info, index)
         row:Show()
         rowsByItemID[info.itemId] = rowsByItemID[info.itemId] or {}
         tinsert(rowsByItemID[info.itemId], row)
