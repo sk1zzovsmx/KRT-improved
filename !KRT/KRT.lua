@@ -55,15 +55,17 @@ addon.Deformat            = addon:GetLib("LibDeformat-3.0", true)
 addon.CallbackHandler     = addon:GetLib("CallbackHandler-1.0", true)
 
 Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
+Utils.Table     = addon.Table
+Utils.TablePool = addon.TablePool
 addon.Logger:Embed(addon)
-Utils.After          = addon.After
-Utils.NewTicker      = addon.NewTicker
-Utils.CancelTimer    = addon.CancelTimer
-Utils.UnitIterator   = addon.UnitIterator
-Utils.tCopy          = addon.tCopy
-Utils.tLength        = addon.tLength
-Utils.tContains      = addon.tContains
-Utils.tIndexOf       = addon.tIndexOf
+Utils.After                = addon.After
+Utils.NewTicker            = addon.NewTicker
+Utils.CancelTimer          = addon.CancelTimer
+Utils.UnitIterator         = addon.UnitIterator
+Utils.tCopy                = addon.tCopy
+Utils.tLength              = addon.tLength
+Utils.tContains            = addon.tContains
+Utils.tIndexOf             = addon.tIndexOf
 
 -- Alias locali (safe e veloci)
 local IsInRaid             = addon.IsInRaid
@@ -143,19 +145,19 @@ end
 ---============================================================================
 
 -- Centralised addon state
-addon.State = addon.State or {}
-local coreState        = addon.State
+addon.State      = addon.State or {}
+local coreState  = addon.State
 
-coreState.frames       = coreState.frames or {}
-local Frames           = coreState.frames
-Frames.main            = Frames.main or CreateFrame("Frame")
+coreState.frames = coreState.frames or {}
+local Frames     = coreState.frames
+Frames.main      = Frames.main or CreateFrame("Frame")
 
 -- Addon UI Frames
-local mainFrame        = Frames.main
+local mainFrame  = Frames.main
 local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings, UIHistory, UIHistoryItemBox
 
 -- Player info helper
-coreState.player       = coreState.player or {}
+coreState.player = coreState.player or {}
 local function GetPlayerName()
     local name = coreState.player.name or UnitName("player")
     coreState.player.name = name
@@ -163,9 +165,9 @@ local function GetPlayerName()
 end
 
 -- Rolls & Loot
-coreState.loot         = coreState.loot or {}
-local lootState        = coreState.loot
-lootState.itemInfo     = lootState.itemInfo or {}
+coreState.loot             = coreState.loot or {}
+local lootState            = coreState.loot
+lootState.itemInfo         = lootState.itemInfo or {}
 lootState.currentRollType  = lootState.currentRollType or 4
 lootState.currentRollItem  = lootState.currentRollItem or 0
 lootState.currentItemIndex = lootState.currentItemIndex or 0
@@ -176,7 +178,7 @@ lootState.itemTraded       = lootState.itemTraded or 0
 if lootState.opened == nil then lootState.opened = false end
 if lootState.fromInventory == nil then lootState.fromInventory = false end
 
-local itemInfo             = lootState.itemInfo
+local itemInfo = lootState.itemInfo
 
 -- Function placeholders for loot helpers
 local ItemExists, ItemIsSoulbound, GetItem
@@ -926,11 +928,10 @@ do
         local loot = module:GetLoot(raidNum, bossNum)
         local originalName = name
         name = (type(name) == "number") and module:GetPlayerName(name) or name
-        for k, v in ipairs(loot) do
+        for _, v in ipairs(loot) do
             if v.looter == name then
-                local info = v
-                info.id = k
-                tinsert(items, info)
+                -- Keep v.id as the original index assigned by GetLoot()
+                tinsert(items, v)
             end
         end
         return items
@@ -2100,7 +2101,8 @@ do
     --
     function module:BtnAward(btn)
         if lootState.lootCount <= 0 or lootState.rollsCount <= 0 then
-            addon:Debug("DEBUG", "Cannot award, lootCount=%d, rollsCount=%d", lootState.lootCount or 0, lootState.rollsCount or 0)
+            addon:Debug("DEBUG", "Cannot award, lootCount=%d, rollsCount=%d", lootState.lootCount or 0,
+                lootState.rollsCount or 0)
             return
         end
         countdownRun = false
@@ -2287,7 +2289,8 @@ do
             end
 
             -- Enable/Disable Buttons
-            Utils.enableDisable(_G[frameName .. "SelectItemBtn"], lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1))
+            Utils.enableDisable(_G[frameName .. "SelectItemBtn"],
+                lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1))
             Utils.enableDisable(_G[frameName .. "SpamLootBtn"], lootState.lootCount >= 1)
             Utils.enableDisable(_G[frameName .. "MSBtn"], lootState.lootCount >= 1)
             Utils.enableDisable(_G[frameName .. "OSBtn"], lootState.lootCount >= 1)
@@ -2567,7 +2570,8 @@ do
     function module:TRADE_ACCEPT_UPDATE(tAccepted, pAccepted)
         if lootState.itemCount == 1 and lootState.trader and lootState.winner and lootState.trader ~= lootState.winner then
             if tAccepted == 1 and pAccepted == 1 then
-                addon.History.Loot:Log(lootState.currentRollItem, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
+                addon.History.Loot:Log(lootState.currentRollItem, lootState.winner, lootState.currentRollType,
+                    addon.Rolls:HighestRoll())
                 lootState.trader = nil
                 lootState.winner = nil
                 addon.Loot:ClearLoot()
@@ -4694,12 +4698,49 @@ end
 
 -- ============================================================================
 -- Helper e Controller liste - versione SLIM (event-driven, no polling)
+--   - no CacheParts (usa row._p via cfg._rowParts)
+--   - pooling wrappers (cfg.poolTag) + free prima del wipe
+--   - elimina wipe(out) ridondanti nei getData (controller già wipa)
+--   - tooltip loot via row._itemLink (robusto)
 -- ============================================================================
 
 local _G          = _G
 local CreateFrame = CreateFrame
-local wipe        = table.wipe
+
+local wipe        = _G.wipe or table.wipe
+local tinsert     = _G.tinsert
+local tremove     = _G.tremove
+local ipairs      = _G.ipairs
+local pairs       = _G.pairs
+local tonumber    = _G.tonumber
+local tostring    = _G.tostring
+local strsplit    = _G.strsplit
+local format      = _G.format
+local date        = _G.date
+local time        = _G.time
 local math_max    = math.max
+local strlower    = string.lower
+local strfind     = string.find
+local strsub      = string.sub
+
+-- LibCompat table pool: alias robusto (degrada se non disponibile)
+do
+    if Utils and addon and addon.Table and not Utils.Table then
+        Utils.Table = addon.Table
+    end
+    if Utils and addon and addon.TablePool and not Utils.TablePool then
+        Utils.TablePool = addon.TablePool
+    end
+    if Utils and not Utils.Table then
+        Utils.Table = {}
+        function Utils.Table.get(_) return {} end
+
+        function Utils.Table.free(_, _) end
+    end
+end
+
+local TGet  = Utils.Table.get
+local TFree = Utils.Table.free
 
 -- compact confirmation popup (riusabile)
 local function makeConfirmPopup(key, text, onAccept, cancels)
@@ -4715,17 +4756,6 @@ local function makeConfirmPopup(key, text, onAccept, cancels)
     }
 end
 
--- fallback mini-cache, se non abbiamo row._p pronto
-local function CacheParts(row, name, parts)
-    if row._p then return row._p end
-    local p = {}
-    for i = 1, #parts do
-        p[parts[i]] = _G[name .. parts[i]]
-    end
-    row._p = p
-    return p
-end
-
 -- Controller generico per liste con pooling righe e refresh differito
 local function MakeListController(cfg)
     -- cfg:
@@ -4733,11 +4763,12 @@ local function MakeListController(cfg)
     --   getData(outTbl)
     --   rowName(frameName,item,index)
     --   rowTmpl
-    --   drawRow(btnName,item,scrollChild,scrollW,CacheParts,row)->rowHeight|nil
+    --   drawRow(row,item)->rowHeight|nil
     --   highlightId()
     --   postUpdate(frameName)
     --   sorters = { key = function(a,b,asc) return cond end, ... }
-    --   _rowParts = { "ID","Name",... }   -- opzionale: cache 1-shot dei sotto-widget
+    --   _rowParts = { "ID","Name",... }   -- cache 1-shot dei sotto-widget su row._p
+    --   poolTag   = "history-..."         -- pooling wrappers via Utils.Table.get/free
 
     local self = {
         frameName  = nil,
@@ -4755,21 +4786,25 @@ local function MakeListController(cfg)
     local defer = CreateFrame("Frame")
     defer:Hide()
 
-    local function acquireRow(name, parent, tmpl)
-        local row = self._rowByName[name]
+    local function acquireRow(btnName, parent, tmpl)
+        local row = self._rowByName[btnName]
         if row then
-            row:Show(); return row
+            row:Show()
+            return row
         end
-        row = CreateFrame("Button", name, parent, tmpl)
-        self._rowByName[name] = row
-        -- cache 1-shot dei children se specificati
+
+        row = CreateFrame("Button", btnName, parent, tmpl)
+        self._rowByName[btnName] = row
+
         if cfg._rowParts and not row._p then
             local p = {}
             for i = 1, #cfg._rowParts do
-                p[cfg._rowParts[i]] = _G[name .. cfg._rowParts[i]]
+                local part = cfg._rowParts[i]
+                p[part] = _G[btnName .. part]
             end
             row._p = p
         end
+
         return row
     end
 
@@ -4797,6 +4832,11 @@ local function MakeListController(cfg)
         if cfg.postUpdate then cfg.postUpdate(self.frameName) end
     end
 
+    function self:Touch()
+        -- highlight/postUpdate only (no rebuild data)
+        defer:Show()
+    end
+
     function self:Dirty()
         self._dirty = true
         defer:Show()
@@ -4805,12 +4845,21 @@ local function MakeListController(cfg)
     defer:SetScript("OnUpdate", function(f)
         f:Hide()
         if not self._active or not self.frameName then return end
+
         if self._dirty then
+            if cfg.poolTag and TFree then
+                for i = 1, #self.data do
+                    TFree(cfg.poolTag, self.data[i])
+                end
+            end
+
             wipe(self.data)
             if cfg.getData then cfg.getData(self.data) end
+
             self:Fetch()
             self._dirty = false
         end
+
         applyHighlightAndPost()
     end)
 
@@ -4827,7 +4876,9 @@ local function MakeListController(cfg)
             self:Dirty()
         end)
 
-        frame:SetScript("OnHide", function() self._active = false end)
+        frame:SetScript("OnHide", function()
+            self._active = false
+        end)
 
         if frame:IsShown() then
             self._active = true
@@ -4847,19 +4898,18 @@ local function MakeListController(cfg)
         local sc = _G[n .. "ScrollFrameScrollChild"]
         if not (sf and sc) then return end
 
-        local scrollW = sf:GetWidth()
+        local scrollW = sf:GetWidth() or 0
         local widthChanged = (self._lastWidth ~= scrollW)
         self._lastWidth = scrollW
 
         local totalH = 0
-        sc:SetHeight(sf:GetHeight())
-
         local count = #self.data
+
         for i = 1, count do
             local it      = self.data[i]
             local btnName = cfg.rowName(n, it, i)
-            local row     = self._rows[i]
 
+            local row     = self._rows[i]
             if not row or row:GetName() ~= btnName then
                 row = acquireRow(btnName, sc, cfg.rowTmpl)
                 self._rows[i] = row
@@ -4870,7 +4920,7 @@ local function MakeListController(cfg)
             row:SetPoint("TOPLEFT", 0, -totalH)
             if widthChanged then row:SetWidth(scrollW - 20) end
 
-            local rH = cfg.drawRow(btnName, it, sc, scrollW, CacheParts, row)
+            local rH = cfg.drawRow(row, it)
             local usedH = rH or row:GetHeight() or 20
             totalH = totalH + usedH
 
@@ -4912,9 +4962,17 @@ do
     module.selectedRaid, module.selectedBoss                              = nil, nil
     module.selectedPlayer, module.selectedBossPlayer, module.selectedItem = nil, nil, nil
 
+    function module:ResetSelections()
+        module.selectedBoss       = nil
+        module.selectedPlayer     = nil
+        module.selectedBossPlayer = nil
+        module.selectedItem       = nil
+    end
+
     local function makeSelector(field, ev)
-        return function(self, btn)
-            module[field] = (btn:GetID() ~= module[field]) and btn:GetID() or nil
+        return function(_, btn)
+            local id = btn and btn.GetID and btn:GetID()
+            module[field] = (id and id ~= module[field]) and id or nil
             Utils.triggerEvent(ev, module[field])
         end
     end
@@ -4928,13 +4986,13 @@ do
             if not module.selectedRaid then
                 module.selectedRaid = KRT_CurrentRaid
             end
-            module.selectedBoss, module.selectedPlayer, module.selectedItem = nil, nil, nil
+            module:ResetSelections()
             Utils.triggerEvent("HistorySelectRaid", module.selectedRaid)
         end)
 
         frame:SetScript("OnHide", function()
             module.selectedRaid = KRT_CurrentRaid
-            module.selectedBoss, module.selectedPlayer, module.selectedItem = nil, nil, nil
+            module:ResetSelections()
         end)
     end
 
@@ -4942,21 +5000,37 @@ do
 
     function module:Hide()
         module.selectedRaid = KRT_CurrentRaid
-        module.selectedBoss, module.selectedPlayer, module.selectedItem = nil, nil, nil
+        module:ResetSelections()
         Utils.showHide(UIHistory, false)
     end
 
     -- Selectors
-    module.SelectRaid       = makeSelector("selectedRaid", "HistorySelectRaid")
-    module.SelectBoss       = makeSelector("selectedBoss", "HistorySelectBoss")
-    module.SelectBossPlayer = makeSelector("selectedBossPlayer", "HistorySelectBossPlayer")
-    module.SelectPlayer     = makeSelector("selectedPlayer", "HistorySelectPlayer")
+    module.SelectRaid = makeSelector("selectedRaid", "HistorySelectRaid")
+    module.SelectBoss = makeSelector("selectedBoss", "HistorySelectBoss")
+
+    -- Player filter: only one active at a time
+    function module:SelectBossPlayer(btn)
+        local id = btn and btn.GetID and btn:GetID()
+        module.selectedBossPlayer = (id and id ~= module.selectedBossPlayer) and id or nil
+        module.selectedPlayer = nil
+        Utils.triggerEvent("HistorySelectBossPlayer", module.selectedBossPlayer)
+        Utils.triggerEvent("HistorySelectPlayer", module.selectedPlayer)
+    end
+
+    function module:SelectPlayer(btn)
+        local id = btn and btn.GetID and btn:GetID()
+        module.selectedPlayer = (id and id ~= module.selectedPlayer) and id or nil
+        module.selectedBossPlayer = nil
+        Utils.triggerEvent("HistorySelectPlayer", module.selectedPlayer)
+        Utils.triggerEvent("HistorySelectBossPlayer", module.selectedBossPlayer)
+    end
 
     -- Item: left select, right menu
     do
         local function openItemMenu()
             local f = _G.KRTHistoryItemMenuFrame or
                 CreateFrame("Frame", "KRTHistoryItemMenuFrame", UIParent, "UIDropDownMenuTemplate")
+
             EasyMenu({
                 { text = L.StrEditItemLooter,    func = function() StaticPopup_Show("KRTHISTORY_ITEM_EDIT_WINNER") end },
                 { text = L.StrEditItemRollType,  func = function() StaticPopup_Show("KRTHISTORY_ITEM_EDIT_ROLL") end },
@@ -4965,17 +5039,19 @@ do
         end
 
         function module:SelectItem(btn, button)
-            local id = btn:GetID()
+            local id = btn and btn.GetID and btn:GetID()
+            if not id then return end
+
             if button == "LeftButton" then
                 module.selectedItem = (id ~= module.selectedItem) and id or nil
                 Utils.triggerEvent("HistorySelectItem", module.selectedItem)
             elseif button == "RightButton" then
                 module.selectedItem = id
+                Utils.triggerEvent("HistorySelectItem", module.selectedItem)
                 openItemMenu()
             end
         end
 
-        -- popup DRY
         local function makeEditBoxPopup(key, text, onAccept, onShow)
             StaticPopupDialogs[key] = {
                 text         = text,
@@ -4988,7 +5064,8 @@ do
                 cancels      = key,
                 OnShow       = function(self) if onShow then onShow(self) end end,
                 OnHide       = function(self)
-                    self.editBox:SetText(""); self.editBox:ClearFocus()
+                    self.editBox:SetText("")
+                    self.editBox:ClearFocus()
                 end,
                 OnAccept     = function(self) onAccept(self, self.editBox:GetText()) end,
             }
@@ -4997,38 +5074,39 @@ do
         makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_WINNER", L.StrEditItemLooterHelp,
             function(self, text)
                 local name = (text or ""):trim():lower()
-                for _, p in ipairs(KRT_Raids[self.raidId].players) do
+                local raid = KRT_Raids[self.raidId]
+                if not (raid and raid.players) then return end
+
+                for _, p in ipairs(raid.players) do
                     if name == p.name:lower() then
-                        module.Loot:Log(self.itemId, p.name)
-                        Utils.triggerEvent("HistorySelectRaid", module.selectedRaid)
-                        break
+                        addon.History.Loot:Log(self.itemId, p.name)
+                        return
                     end
                 end
             end,
             function(self)
-                self.raidId = module.selectedRaid; self.itemId = module.selectedItem
+                self.raidId = addon.History.selectedRaid
+                self.itemId = addon.History.selectedItem
             end
         )
 
         makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_ROLL", L.StrEditItemRollTypeHelp,
             function(self, text)
-                module.Loot:Log(self.itemId, nil, tonumber(text))
-                Utils.triggerEvent("HistorySelectRaid", module.selectedRaid)
+                addon.History.Loot:Log(self.itemId, nil, tonumber(text))
             end,
-            function(self) self.itemId = module.selectedItem end
+            function(self) self.itemId = addon.History.selectedItem end
         )
 
         makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp,
             function(self, text)
-                module.Loot:Log(self.itemId, nil, nil, tonumber(text))
-                Utils.triggerEvent("HistorySelectRaid", module.selectedRaid)
+                addon.History.Loot:Log(self.itemId, nil, nil, tonumber(text))
             end,
-            function(self) self.itemId = module.selectedItem end
+            function(self) self.itemId = addon.History.selectedItem end
         )
     end
 
     Utils.registerCallback("HistorySelectRaid", function()
-        module.selectedBoss, module.selectedPlayer, module.selectedItem = nil, nil, nil
+        module:ResetSelections()
     end)
 end
 
@@ -5042,6 +5120,7 @@ do
 
     local controller    = MakeListController {
         keyName     = "RaidsList",
+        poolTag     = "history-raids",
         _rowParts   = { "ID", "Date", "Zone", "Size" },
 
         localize    = function(n)
@@ -5055,10 +5134,9 @@ do
         end,
 
         getData     = function(out)
-            wipe(out)
             for i = 1, #KRT_Raids do
                 local r    = KRT_Raids[i]
-                local it   = Utils.Table.get("history-raids")
+                local it   = TGet("history-raids")
                 it.id      = i
                 it.zone    = r.zone
                 it.size    = r.size
@@ -5068,14 +5146,14 @@ do
             end
         end,
 
-        rowName     = function(n, it, i) return n .. "RaidBtn" .. i end,
+        rowName     = function(n, _, i) return n .. "RaidBtn" .. i end,
         rowTmpl     = "KRTHistoryRaidButton",
 
         drawRow     = (function()
             local ROW_H
-            return function(btn, it, sc, w, CacheParts, row)
+            return function(row, it)
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
-                local ui = row._p or CacheParts(row, btn, { "ID", "Date", "Zone", "Size" })
+                local ui = row._p
                 ui.ID:SetText(it.id)
                 ui.Date:SetText(it.dateFmt)
                 ui.Zone:SetText(it.zone)
@@ -5092,6 +5170,7 @@ do
                 and sel ~= KRT_CurrentRaid
                 and not addon.Raid:Expired(sel)
                 and addon.Raid:GetRaidSize() == KRT_Raids[sel].size
+
             Utils.enableDisable(_G[n .. "CurrentBtn"], canSetCurrent)
             Utils.enableDisable(_G[n .. "DeleteBtn"], (sel ~= KRT_CurrentRaid))
         end,
@@ -5113,13 +5192,17 @@ do
     function Raids:SetCurrent(btn)
         local sel = addon.History.selectedRaid
         if not (btn and sel and KRT_Raids[sel]) then return end
+
         if KRT_Raids[sel].size ~= addon.Raid:GetRaidSize() then
-            addon:error(L.ErrCannotSetCurrentRaidSize); return
+            addon:error(L.ErrCannotSetCurrentRaidSize)
+            return
         end
         if addon.Raid:Expired(sel) then
-            addon:error(L.ErrCannotSetCurrentRaidReset); return
+            addon:error(L.ErrCannotSetCurrentRaidReset)
+            return
         end
         KRT_CurrentRaid = sel
+        controller:Touch()
     end
 
     do
@@ -5127,12 +5210,15 @@ do
             local sel = addon.History.selectedRaid
             if not (sel and KRT_Raids[sel]) then return end
             if KRT_CurrentRaid and KRT_CurrentRaid == sel then
-                addon:error(L.ErrCannotDeleteRaid); return
+                addon:error(L.ErrCannotDeleteRaid)
+                return
             end
+
             tremove(KRT_Raids, sel)
-            if KRT_CurrentRaid and KRT_CurrentRaid > sel then KRT_CurrentRaid = KRT_CurrentRaid - 1 end
-            local n = controller.frameName
-            if n and _G[n .. "RaidBtn" .. sel] then _G[n .. "RaidBtn" .. sel]:Hide() end
+            if KRT_CurrentRaid and KRT_CurrentRaid > sel then
+                KRT_CurrentRaid = KRT_CurrentRaid - 1
+            end
+
             addon.History.selectedRaid = nil
             controller:Dirty()
         end
@@ -5143,13 +5229,15 @@ do
             end
         end
 
-        (controller._makeConfirmPopup)("KRTHISTORY_DELETE_RAID", L.StrConfirmDeleteRaid, DeleteRaid)
+        controller._makeConfirmPopup("KRTHISTORY_DELETE_RAID", L.StrConfirmDeleteRaid, DeleteRaid)
     end
 
     Utils.registerCallback("RaidCreate", function(_, num)
         addon.History.selectedRaid = tonumber(num)
         controller:Dirty()
     end)
+
+    Utils.registerCallback("HistorySelectRaid", function() controller:Touch() end)
 end
 
 -- ============================================================================
@@ -5162,6 +5250,7 @@ do
 
     local controller   = MakeListController {
         keyName     = "BossList",
+        poolTag     = "history-bosses",
         _rowParts   = { "ID", "Name", "Time", "Mode" },
 
         localize    = function(n)
@@ -5170,11 +5259,10 @@ do
         end,
 
         getData     = function(out)
-            wipe(out)
             local src = addon.Raid:GetBosses(addon.History.selectedRaid) or {}
             for i = 1, #src do
                 local b    = src[i]
-                local it   = Utils.Table.get("history-bosses")
+                local it   = TGet("history-bosses")
                 it.id      = b.id
                 it.name    = b.name
                 it.time    = b.time
@@ -5185,14 +5273,14 @@ do
             table.sort(out, function(a, b) return a.id > b.id end)
         end,
 
-        rowName     = function(n, it, i) return n .. "BossBtn" .. i end,
+        rowName     = function(n, _, i) return n .. "BossBtn" .. i end,
         rowTmpl     = "KRTHistoryBossButton",
 
         drawRow     = (function()
             local ROW_H
-            return function(btn, it, sc, w, CacheParts, row)
+            return function(row, it)
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
-                local ui = row._p or CacheParts(row, btn, { "ID", "Name", "Time", "Mode" })
+                local ui = row._p
                 ui.ID:SetText(it.id)
                 ui.Name:SetText(it.name)
                 ui.Time:SetText(it.timeFmt)
@@ -5233,7 +5321,8 @@ do
         local function DeleteBoss()
             local rID, bID = addon.History.selectedRaid, addon.History.selectedBoss
             if not (rID and bID) then return end
-            local raid = KRT_Raids[rID]; if not (raid and raid.bossKills[bID]) then return end
+            local raid = KRT_Raids[rID]
+            if not (raid and raid.bossKills and raid.bossKills[bID]) then return end
 
             -- Elimina loot del boss rimosso e riallinea gli indici per le successive
             for i = #raid.loot, 1, -1 do
@@ -5250,7 +5339,8 @@ do
             -- Rimuovi il boss dalla lista
             tremove(raid.bossKills, bID)
 
-            controller:Dirty()
+            addon.History.selectedBoss = nil
+            Utils.triggerEvent("HistorySelectRaid", addon.History.selectedRaid)
         end
 
         function Boss:Delete()
@@ -5259,7 +5349,7 @@ do
             end
         end
 
-        (controller._makeConfirmPopup)("KRTHISTORY_DELETE_BOSS", L.StrConfirmDeleteBoss, DeleteBoss)
+        controller._makeConfirmPopup("KRTHISTORY_DELETE_BOSS", L.StrConfirmDeleteBoss, DeleteBoss)
     end
 
     function Boss:GetName(bossNum, raidNum)
@@ -5273,6 +5363,7 @@ do
     end
 
     Utils.registerCallback("HistorySelectRaid", function() controller:Dirty() end)
+    Utils.registerCallback("HistorySelectBoss", function() controller:Touch() end)
 end
 
 -- ============================================================================
@@ -5285,6 +5376,7 @@ do
 
     local controller            = MakeListController {
         keyName     = "BossAttendees",
+        poolTag     = "history-boss-attendees",
         _rowParts   = { "Name" },
 
         localize    = function(n)
@@ -5292,12 +5384,13 @@ do
         end,
 
         getData     = function(out)
-            wipe(out)
-            if not addon.History.selectedBoss then return end
-            local src = addon.Raid:GetPlayers(addon.History.selectedRaid, addon.History.selectedBoss) or {}
+            local bID = addon.History.selectedBoss
+            if not bID then return end
+
+            local src = addon.Raid:GetPlayers(addon.History.selectedRaid, bID) or {}
             for i = 1, #src do
                 local p  = src[i]
-                local it = Utils.Table.get("history-boss-attendees")
+                local it = TGet("history-boss-attendees")
                 it.id    = p.id
                 it.name  = p.name
                 it.class = p.class
@@ -5305,14 +5398,14 @@ do
             end
         end,
 
-        rowName     = function(n, it, i) return n .. "PlayerBtn" .. i end,
+        rowName     = function(n, _, i) return n .. "PlayerBtn" .. i end,
         rowTmpl     = "KRTHistoryBossAttendeeButton",
 
         drawRow     = (function()
             local ROW_H
-            return function(btn, it, sc, w, CacheParts, row)
+            return function(row, it)
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
-                local ui = row._p or CacheParts(row, btn, { "Name" })
+                local ui = row._p
                 ui.Name:SetText(it.name)
                 local r, g, b = addon.Raid:GetClassColor(it.class)
                 ui.Name:SetVertexColor(r, g, b)
@@ -5348,7 +5441,10 @@ do
             local bID = addon.History.selectedBoss
             local pID = addon.History.selectedBossPlayer
             if not (rID and bID and pID) then return end
-            local raid = KRT_Raids[rID]; if not (raid and raid.bossKills[bID]) then return end
+
+            local raid = KRT_Raids[rID]
+            if not (raid and raid.bossKills and raid.bossKills[bID]) then return end
+
             local name = addon.Raid:GetPlayerName(pID, rID)
             local list = raid.bossKills[bID].players
             local i = Utils.tIndexOf(list, name)
@@ -5356,18 +5452,23 @@ do
                 tremove(list, i)
                 i = Utils.tIndexOf(list, name)
             end
+
+            addon.History.selectedBossPlayer = nil
             controller:Dirty()
         end
+
         function M:Delete()
-            if addon.History.selectedBossPlayer then StaticPopup_Show("KRTHISTORY_DELETE_ATTENDEE") end
+            if addon.History.selectedBossPlayer then
+                StaticPopup_Show("KRTHISTORY_DELETE_ATTENDEE")
+            end
         end
 
-        (controller._makeConfirmPopup)("KRTHISTORY_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendee)
+        controller._makeConfirmPopup("KRTHISTORY_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendee)
     end
 
-    local function Reset() controller:Dirty() end
-    Utils.registerCallback("HistorySelectRaid", Reset)
-    Utils.registerCallback("HistorySelectBoss", Reset)
+    Utils.registerCallback("HistorySelectRaid", function() controller:Dirty() end)
+    Utils.registerCallback("HistorySelectBoss", function() controller:Dirty() end)
+    Utils.registerCallback("HistorySelectBossPlayer", function() controller:Touch() end)
 end
 
 -- ============================================================================
@@ -5380,22 +5481,22 @@ do
 
     local controller            = MakeListController {
         keyName     = "RaidAttendees",
+        poolTag     = "history-raid-attendees",
         _rowParts   = { "Name", "Join", "Leave" },
 
         localize    = function(n)
             _G[n .. "Title"]:SetText(L.StrRaidAttendees)
             _G[n .. "HeaderJoin"]:SetText(L.StrJoin)
             _G[n .. "HeaderLeave"]:SetText(L.StrLeave)
-            -- non ancora implementati
-            _G[n .. "AddBtn"]:Disable(); _G[n .. "DeleteBtn"]:Disable()
+            -- Add non implementato (per ora)
+            _G[n .. "AddBtn"]:Disable()
         end,
 
         getData     = function(out)
-            wipe(out)
             local src = addon.Raid:GetPlayers(addon.History.selectedRaid) or {}
             for i = 1, #src do
                 local p     = src[i]
-                local it    = Utils.Table.get("history-raid-attendees")
+                local it    = TGet("history-raid-attendees")
                 it.id       = p.id
                 it.name     = p.name
                 it.class    = p.class
@@ -5407,16 +5508,17 @@ do
             end
         end,
 
-        rowName     = function(n, it, i) return n .. "PlayerBtn" .. i end,
+        rowName     = function(n, _, i) return n .. "PlayerBtn" .. i end,
         rowTmpl     = "KRTHistoryRaidAttendeeButton",
 
         drawRow     = (function()
             local ROW_H
-            return function(btn, it, sc, w, CacheParts, row)
+            return function(row, it)
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
-                local ui = row._p or CacheParts(row, btn, { "Name", "Join", "Leave" })
+                local ui = row._p
                 ui.Name:SetText(it.name)
-                local r, g, b = addon.Raid:GetClassColor(it.class); ui.Name:SetVertexColor(r, g, b)
+                local r, g, b = addon.Raid:GetClassColor(it.class)
+                ui.Name:SetVertexColor(r, g, b)
                 ui.Join:SetText(it.joinFmt)
                 ui.Leave:SetText(it.leaveFmt)
                 return ROW_H
@@ -5424,6 +5526,10 @@ do
         end)(),
 
         highlightId = function() return addon.History.selectedPlayer end,
+
+        postUpdate  = function(n)
+            Utils.enableDisable(_G[n .. "DeleteBtn"], addon.History.selectedPlayer ~= nil)
+        end,
 
         sorters     = {
             name  = function(a, b, asc) return asc and (a.name < b.name) or (a.name > b.name) end,
@@ -5446,9 +5552,13 @@ do
         local function DeleteAttendee()
             local rID, pID = addon.History.selectedRaid, addon.History.selectedPlayer
             if not (rID and pID) then return end
-            local raid = KRT_Raids[rID]; if not (raid and raid.players[pID]) then return end
+
+            local raid = KRT_Raids[rID]
+            if not (raid and raid.players and raid.players[pID]) then return end
+
             local name = raid.players[pID].name
             tremove(raid.players, pID)
+
             for _, boss in ipairs(raid.bossKills) do
                 local i = Utils.tIndexOf(boss.players, name)
                 while i do
@@ -5456,17 +5566,28 @@ do
                     i = Utils.tIndexOf(boss.players, name)
                 end
             end
-            for i = #raid.loot, 1, -1 do if raid.loot[i].looter == name then tremove(raid.loot, i) end end
+
+            for i = #raid.loot, 1, -1 do
+                if raid.loot[i].looter == name then
+                    tremove(raid.loot, i)
+                end
+            end
+
+            addon.History.selectedPlayer = nil
             controller:Dirty()
         end
+
         function M:Delete()
-            if addon.History.selectedPlayer then StaticPopup_Show("KRTHISTORY_DELETE_RAIDATTENDEE") end
+            if addon.History.selectedPlayer then
+                StaticPopup_Show("KRTHISTORY_DELETE_RAIDATTENDEE")
+            end
         end
 
-        (controller._makeConfirmPopup)("KRTHISTORY_DELETE_RAIDATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendee)
+        controller._makeConfirmPopup("KRTHISTORY_DELETE_RAIDATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendee)
     end
 
     Utils.registerCallback("HistorySelectRaid", function() controller:Dirty() end)
+    Utils.registerCallback("HistorySelectPlayer", function() controller:Touch() end)
 end
 
 -- ============================================================================
@@ -5477,10 +5598,9 @@ do
     local module       = addon.History.Loot
     local L            = addon.L
 
-    local raidLoot     = {} -- cache per tooltip OnEnter (lista completa del raid)
-
     local controller   = MakeListController {
         keyName     = "LootList",
+        poolTag     = "history-loot",
         _rowParts   = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
 
         localize    = function(n)
@@ -5494,57 +5614,64 @@ do
             _G[n .. "HeaderType"]:SetText(L.StrType)
             _G[n .. "HeaderRoll"]:SetText(L.StrRoll)
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
+
             -- disabilitati finché non implementati
-            _G[n .. "ExportBtn"]:Disable(); _G[n .. "ClearBtn"]:Disable(); _G[n .. "AddBtn"]:Disable()
+            _G[n .. "ExportBtn"]:Disable()
+            _G[n .. "ClearBtn"]:Disable()
+            _G[n .. "AddBtn"]:Disable()
             _G[n .. "EditBtn"]:Disable()
         end,
 
         getData     = function(out)
-            wipe(out)
-            raidLoot = addon.Raid:GetLoot(addon.History.selectedRaid) or {}
+            local rID = addon.History.selectedRaid
+            if not rID then return end
 
-            local pID = addon.History.selectedPlayer
-            local data
-            if pID then
-                data = addon.Raid:GetPlayerLoot(pID, addon.History.selectedRaid, addon.History.selectedBoss) or {}
-            else
-                data = addon.Raid:GetLoot(addon.History.selectedRaid, addon.History.selectedBoss) or {}
-            end
+            local loot  = addon.Raid:GetLoot(rID) or {}
 
-            for i = 1, #data do
-                local v        = data[i]
-                local it       = Utils.Table.get("history-loot")
-                it.id          = v.id
-                it.itemId      = v.itemId
-                it.itemName    = v.itemName
-                it.itemRarity  = v.itemRarity
-                it.itemTexture = v.itemTexture
-                it.itemLink    = v.itemLink
-                it.bossNum     = v.bossNum
-                it.looter      = v.looter
-                it.rollType    = v.rollType
-                it.rollValue   = v.rollValue
-                it.time        = v.time
-                it.timeFmt     = date("%H:%M", v.time)
-                out[i]         = it
+            local bID   = addon.History.selectedBoss
+            local pID   = addon.History.selectedBossPlayer or addon.History.selectedPlayer
+            local pName = pID and addon.Raid:GetPlayerName(pID, rID) or nil
+
+            local n     = 0
+            for i = 1, #loot do
+                local v = loot[i]
+                if (not bID or bID <= 0 or v.bossNum == bID) and (not pName or v.looter == pName) then
+                    n              = n + 1
+                    local it       = TGet("history-loot")
+                    it.id          = v.id
+                    it.itemId      = v.itemId
+                    it.itemName    = v.itemName
+                    it.itemRarity  = v.itemRarity
+                    it.itemTexture = v.itemTexture
+                    it.itemLink    = v.itemLink
+                    it.bossNum     = v.bossNum
+                    it.looter      = v.looter
+                    it.rollType    = v.rollType
+                    it.rollValue   = v.rollValue
+                    it.time        = v.time
+                    it.timeFmt     = date("%H:%M", v.time)
+                    out[n]         = it
+                end
             end
         end,
 
-        rowName     = function(n, it, i) return n .. "ItemBtn" .. i end,
+        rowName     = function(n, _, i) return n .. "ItemBtn" .. i end,
         rowTmpl     = "KRTHistoryLootButton",
 
         drawRow     = (function()
             local ROW_H
-            return function(btn, v, sc, w, CacheParts, row)
+            return function(row, v)
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
-                local ui = row._p or
-                    CacheParts(row, btn, { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" })
+                local ui = row._p
+
+                row._itemLink = v.itemLink
 
                 ui.Name:SetText(addon:WrapTextInColorCode(v.itemName, itemColors[v.itemRarity + 1]))
                 ui.Source:SetText(addon.History.Boss:GetName(v.bossNum, addon.History.selectedRaid))
 
                 local r, g, b = addon.Raid:GetClassColor(addon.Raid:GetPlayerClass(v.looter))
-                ui.Winner:SetText(v.looter); ui.Winner:SetVertexColor(r, g, b)
+                ui.Winner:SetText(v.looter)
+                ui.Winner:SetVertexColor(r, g, b)
 
                 ui.Type:SetText(lootTypesColored[v.rollType] or lootTypesColored[4])
                 ui.Roll:SetText(v.rollValue or 0)
@@ -5558,7 +5685,7 @@ do
         highlightId = function() return addon.History.selectedItem end,
 
         postUpdate  = function(n)
-            Utils.enableDisable(_G[n .. "DeleteBtn"], addon.History.selectedItem)
+            Utils.enableDisable(_G[n .. "DeleteBtn"], addon.History.selectedItem ~= nil)
         end,
 
         sorters     = {
@@ -5567,7 +5694,8 @@ do
             winner = function(a, b, asc) return asc and (a.looter < b.looter) or (a.looter > b.looter) end,
             type   = function(a, b, asc) return asc and (a.rollType < b.rollType) or (a.rollType > b.rollType) end,
             roll   = function(a, b, asc)
-                local A = a.rollValue or 0; local B = b.rollValue or 0
+                local A = a.rollValue or 0
+                local B = b.rollValue or 0
                 return asc and (A < B) or (A > B)
             end,
             time   = function(a, b, asc) return asc and (a.time < b.time) or (a.time > b.time) end,
@@ -5582,17 +5710,15 @@ do
 
     function module:OnEnter(widget)
         if not widget then return end
-        -- Se l'enter arriva da una texture/fontstring, risali al bottone riga
         local row = (widget.IsObjectType and widget:IsObjectType("Button")) and widget
             or (widget.GetParent and widget:GetParent()) or widget
         if not (row and row.GetID) then return end
 
-        local id   = row:GetID()
-        local item = raidLoot[id]
-        if not item then return end
+        local link = row._itemLink
+        if not link then return end
 
         GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-        GameTooltip:SetHyperlink(item.itemLink)
+        GameTooltip:SetHyperlink(link)
     end
 
     do
@@ -5604,18 +5730,27 @@ do
                 controller:Dirty()
             end
         end
-        function module:Delete() if addon.History.selectedItem then StaticPopup_Show("KRTHISTORY_DELETE_ITEM") end end
 
-        (controller._makeConfirmPopup)("KRTHISTORY_DELETE_ITEM", L.StrConfirmDeleteItem, DeleteItem)
+        function module:Delete()
+            if addon.History.selectedItem then
+                StaticPopup_Show("KRTHISTORY_DELETE_ITEM")
+            end
+        end
+
+        controller._makeConfirmPopup("KRTHISTORY_DELETE_ITEM", L.StrConfirmDeleteItem, DeleteItem)
     end
 
     function module:Log(itemID, looter, rollType, rollValue)
         local raidID = addon.History.selectedRaid or KRT_CurrentRaid
         if not raidID or not KRT_Raids[raidID] then return end
-        local it = KRT_Raids[raidID].loot[itemID]; if not it then return end
+
+        local it = KRT_Raids[raidID].loot[itemID]
+        if not it then return end
+
         if looter and looter ~= "" then it.looter = looter end
         if tonumber(rollType) then it.rollType = tonumber(rollType) end
         if tonumber(rollValue) then it.rollValue = tonumber(rollValue) end
+
         controller:Dirty()
     end
 
@@ -5623,6 +5758,8 @@ do
     Utils.registerCallback("HistorySelectRaid", Reset)
     Utils.registerCallback("HistorySelectBoss", Reset)
     Utils.registerCallback("HistorySelectPlayer", Reset)
+    Utils.registerCallback("HistorySelectBossPlayer", Reset)
+    Utils.registerCallback("HistorySelectItem", function() controller:Touch() end)
 end
 
 -- ============================================================================
@@ -5652,16 +5789,18 @@ do
         if f and f:IsShown() then f:Hide() end
     end
 
-    -- Compila i campi del popup partendo dai dati del boss selezionato
-    -- Campi standardizzati:
-    --   bossData.time : timestamp (number)
-    --   bossData.mode : "h" (heroic) | "n" (normal)
+    -- Campi uniformi:
+    --   bossData.time : timestamp
+    --   bossData.mode : "h" | "n"
     function Box:Fill()
         local rID, bID = addon.History.selectedRaid, addon.History.selectedBoss
         if not (rID and bID) then return end
 
-        raidData = KRT_Raids[rID]; if not raidData then return end
-        bossData = raidData.bossKills[bID]; if not bossData then return end
+        raidData = KRT_Raids[rID]
+        if not raidData then return end
+
+        bossData = raidData.bossKills[bID]
+        if not bossData then return end
 
         _G[frameName .. "Name"]:SetText(bossData.name or "")
 
@@ -5680,30 +5819,29 @@ do
         self:Toggle()
     end
 
-    -- Salva in formato uniforme:
-    --   name (string), time (timestamp), mode ("h"|"n")
     function Box:Save()
         local rID = addon.History.selectedRaid
         if not rID then return end
 
         local name  = (_G[frameName .. "Name"]:GetText() or ""):trim()
-        local modeT = string.lower((_G[frameName .. "Difficulty"]:GetText() or ""):trim())
+        local modeT = strlower((_G[frameName .. "Difficulty"]:GetText() or ""):trim())
         local bTime = (_G[frameName .. "Time"]:GetText() or ""):trim()
 
         name        = (name == "") and "_TrashMob_" or name
         if name ~= "_TrashMob_" and (modeT ~= "h" and modeT ~= "n") then
-            addon:error(L.ErrBossDifficulty); return
+            addon:error(L.ErrBossDifficulty)
+            return
         end
 
         local h, m = bTime:match("^(%d+):(%d+)$")
         h, m = tonumber(h), tonumber(m)
         if not (h and m and h >= 0 and h <= 23 and m >= 0 and m <= 59) then
-            addon:error(L.ErrBossTime); return
+            addon:error(L.ErrBossTime)
+            return
         end
 
         local _, month, day, year = CalendarGetDate()
         local killDate = { day = day, month = month, year = year, hour = h, min = m }
-
         local mode = (modeT == "h") and "h" or "n"
 
         if isEdit and bossData then
@@ -5720,7 +5858,7 @@ do
         end
 
         self:Hide()
-        Utils.triggerEvent("HistorySelectRaid")
+        Utils.triggerEvent("HistorySelectRaid", addon.History.selectedRaid)
     end
 
     function Box:CancelAddEdit()
@@ -5728,7 +5866,7 @@ do
         _G[frameName .. "Difficulty"]:SetText("")
         _G[frameName .. "Time"]:SetText("")
         isEdit, raidData, bossData = false, {}, {}
-        table.wipe(tempDate)
+        wipe(tempDate)
     end
 
     function Box:UpdateUIFrame(frame, elapsed)
@@ -5749,8 +5887,8 @@ end
 -- ============================================================================
 do
     addon.History.AttendeesBox = addon.History.AttendeesBox or {}
-    local Box = addon.History.AttendeesBox
-    local L = addon.L
+    local Box                  = addon.History.AttendeesBox
+    local L                    = addon.L
 
     local frameName
 
@@ -5759,39 +5897,46 @@ do
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
         frame:SetScript("OnShow", function()
-            local e = _G[frameName .. "Name"]; e:SetText(""); e:SetFocus()
+            local e = _G[frameName .. "Name"]
+            e:SetText("")
+            e:SetFocus()
         end)
         frame:SetScript("OnHide", function()
-            local e = _G[frameName .. "Name"]; e:SetText(""); e:ClearFocus()
+            local e = _G[frameName .. "Name"]
+            e:SetText("")
+            e:ClearFocus()
         end)
     end
 
     function Box:Toggle() Utils.toggle(_G[frameName]) end
 
     function Box:Save()
-        local name = _G[frameName .. "Name"]:GetText():trim()
+        local name = (_G[frameName .. "Name"]:GetText() or ""):trim()
         if name == "" then
-            addon:error(L.ErrAttendeesInvalidName); return
+            addon:error(L.ErrAttendeesInvalidName)
+            return
         end
 
         local rID, bID = addon.History.selectedRaid, addon.History.selectedBoss
         if not (rID and bID and KRT_Raids[rID]) then
-            addon:error(L.ErrAttendeesInvalidRaidBoss); return
+            addon:error(L.ErrAttendeesInvalidRaidBoss)
+            return
         end
 
         local bossKill = KRT_Raids[rID].bossKills[bID]
         for _, n in ipairs(bossKill.players) do
             if n:lower() == name:lower() then
-                addon:error(L.ErrAttendeesPlayerExists); return
+                addon:error(L.ErrAttendeesPlayerExists)
+                return
             end
         end
 
         for _, p in ipairs(KRT_Raids[rID].players) do
             if name:lower() == p.name:lower() then
-                addon:info(L.StrAttendeesAddSuccess)
                 tinsert(bossKill.players, p.name)
+                addon:info(L.StrAttendeesAddSuccess)
                 self:Toggle()
-                addon.History.BossAttendees:Fetch()
+                Utils.triggerEvent("HistorySelectBoss", addon.History.selectedBoss)
                 return
             end
         end
@@ -5804,7 +5949,6 @@ end
 -- Slash Commands
 ---============================================================================
 do
-    -- Valid subcommands for each feature
     local cmdAchiev   = { "ach", "achi", "achiev", "achievement" }
     local cmdLFM      = { "pug", "lfm", "group", "grouper" }
     local cmdConfig   = { "config", "conf", "options", "opt" }
@@ -5831,10 +5975,12 @@ do
         end
 
         local cmd1, cmd2, cmd3 = strsplit(" ", cmd, 3)
+        cmd1 = cmd1 and strlower(cmd1) or nil
+        cmd2 = cmd2 and strlower(cmd2) or nil
 
         -- ==== Debug ====
         if Utils.tContains(cmdDebug, cmd1) then
-            local subCmd = cmd2 and cmd2:lower()
+            local subCmd = cmd2
 
             if subCmd == "level" or subCmd == "lvl" then
                 if not cmd3 then
@@ -5850,7 +5996,7 @@ do
                 else
                     local lv = tonumber(cmd3)
                     if not lv and addon.logLevels then
-                        lv = addon.logLevels[cmd3:upper()]
+                        lv = addon.logLevels[strupper(cmd3)]
                     end
                     if lv then
                         addon:SetLogLevel(lv)
@@ -5868,6 +6014,7 @@ do
                 else
                     addon.options.debug = not addon.options.debug
                 end
+
                 if addon.options.debug then
                     addon:SetLogLevel(addon.Logger.logLevels.DEBUG)
                     addon:info(L.MsgDebugOn)
@@ -5889,7 +6036,7 @@ do
 
             -- ==== Minimap ====
         elseif Utils.tContains(cmdMinimap, cmd1) then
-            local sub = cmd2 and cmd2:lower()
+            local sub = cmd2
             if sub == "on" then
                 addon.options.minimapButton = true
                 if KRT_MINIMAP_GUI then KRT_MINIMAP_GUI:Show() end
@@ -5912,11 +6059,11 @@ do
             end
 
             -- ==== Achievement Link ====
-        elseif Utils.tContains(cmdAchiev, cmd1) and find(cmd, "achievement:%d*:") then
-            local from, to = string.find(cmd, "achievement%:%d*%:")
-            local id = string.sub(cmd, from + 12, to - 1)
-            from, to = string.find(cmd, "%|cffffff00%|Hachievement%:.*%]%|h%|r")
-            local name = string.sub(cmd, from, to)
+        elseif Utils.tContains(cmdAchiev, cmd1) and strfind(cmd, "achievement:%d*:") then
+            local from, to = strfind(cmd, "achievement%:%d*%:")
+            local id = strsub(cmd, from + 12, to - 1)
+            from, to = strfind(cmd, "%|cffffff00%|Hachievement%:.*%]%|h%|r")
+            local name = strsub(cmd, from, to)
             printHelp("KRT", name .. " - ID#" .. id)
 
             -- ==== Config ====
