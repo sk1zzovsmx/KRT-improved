@@ -3455,6 +3455,7 @@ do
     function module:CreateReserveHeader(parent, source, yOffset, index)
         local headerName = frameName .. "ReserveHeader" .. index
         local header = _G[headerName] or CreateFrame("Button", headerName, parent, "KRTReserveHeaderTemplate")
+        header:ClearAllPoints()
         header:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -yOffset)
         header._source = source
         if not header._initialized then
@@ -3476,6 +3477,7 @@ do
         addon:Debug("DEBUG", "Creating reserve row for itemId: %d", info.itemId)
         local rowName = frameName .. "ReserveRow" .. index
         local row = _G[rowName] or CreateFrame("Frame", rowName, parent, "KRTReserveRowTemplate")
+        row:ClearAllPoints()
         row:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -yOffset)
         row._rawID = info.itemId
         if not row._initialized then
