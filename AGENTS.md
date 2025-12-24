@@ -38,25 +38,31 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 
 ## 4) Repo layout (monolithic)
 ```
-!KRT/
-  !KRT.toc                 # metadata (Interface 30300, SavedVariables, links)
-  KRT.lua                  # main addon (core logic, modules & slash handlers)
-  KRT.xml                  # frames & UI logic (main, logger, reserves, master, warnings, spammer, etc.)
-  Templates.xml            # shared XML templates
-  Localization/
-    localization.en.lua    # enUS strings (L)
-    # localization.it.lua  # optional future mirror
-  Modules/                 # NOTE: directory name is Uppercase
-    Utils.lua              # utility functions (table ops, color, formatting, etc.)
-    ignoredItems.lua       # item filter list
-  Libs/                    # vendored libraries (LibStub–based)
-    libs.xml
-    CallbackHandler-1.0/
-    LibBossIDs-1.0/
-    LibCompat-1.0/
-    LibDeformat-3.0/
-    LibLogger-1.0/
-    LibStub/
+/
+  AGENTS.md                # this file (repo-wide agent guidance)
+  README.md                # project overview
+  screenshot.jpg           # reference image
+  .devcontainer/           # devcontainer config
+  .vscode/                 # editor settings
+  !KRT/                    # addon root (shipped folder)
+    !KRT.toc               # metadata (Interface 30300, SavedVariables, links)
+    KRT.lua                # main addon (core logic, modules & slash handlers)
+    KRT.xml                # frames & UI logic (main, logger, reserves, master, warnings, spammer, etc.)
+    Templates.xml          # shared XML templates
+    Localization/
+      localization.en.lua  # enUS strings (L)
+      # localization.it.lua  # optional future mirror
+    Modules/               # NOTE: directory name is Uppercase
+      Utils.lua            # utility functions (table ops, color, formatting, etc.)
+      ignoredItems.lua     # item filter list
+    Libs/                  # vendored libraries (LibStub–based)
+      libs.xml
+      CallbackHandler-1.0/
+      LibBossIDs-1.0/
+      LibCompat-1.0/
+      LibDeformat-3.0/
+      LibLogger-1.0/
+      LibStub/
 ```
 
 ---
@@ -250,3 +256,4 @@ https://github.com/gakeez/agents_md_collection/blob/main/examples/lua-programmin
 - _2025-09-09_: Integrate new template. Removed unused Libs.
 - _2025-09-10_: Clarified proprietary WoW API requirement.
 - _2025-09-13_: Updated nil-check and API fallback guidelines.
+- _2025-09-14_: Updated repo layout to reflect current folder hierarchy.
