@@ -238,11 +238,16 @@ do
 
     local CB = addon.CallbackHandler
     if CB then
+        local addonEventProxy = {}
+        function addonEventProxy:ADDON_LOADED(name)
+            addon:ADDON_LOADED(name)
+        end
         local function OnUsed(_, _, e) mainFrame:RegisterEvent(e) end
         local function OnUnused(_, _, e) mainFrame:UnregisterEvent(e) end
         events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents", OnUsed, OnUnused)
         mainFrame:SetScript("OnEvent", OnEvent)
-        addon:RegisterEvent("ADDON_LOADED")
+        mainFrame:RegisterEvent("ADDON_LOADED")
+        addon:RegisterEvent("ADDON_LOADED", addonEventProxy, "ADDON_LOADED")
     end
 
     if not CB then InitEventFallback() end
