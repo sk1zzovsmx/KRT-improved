@@ -242,7 +242,7 @@ do
         local function OnUnused(_, _, e) mainFrame:UnregisterEvent(e) end
         events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents", OnUsed, OnUnused)
         mainFrame:SetScript("OnEvent", OnEvent)
-        addon:RegisterEvent("ADDON_LOADED")
+        mainFrame:RegisterEvent("ADDON_LOADED")
     end
 
     if not CB then InitEventFallback() end
