@@ -1140,80 +1140,56 @@ do
     -- Initializes and opens the right-click menu for the minimap button.
     local function OpenMenu()
         local info = {}
+        local function AddMenuButton(level, text, func)
+            wipe(info)
+            info.text = text
+            info.notCheckable = 1
+            info.func = func
+            UIDropDownMenu_AddButton(info, level)
+        end
+
+        local function AddMenuTitle(level, text)
+            wipe(info)
+            info.isTitle = 1
+            info.text = text
+            info.notCheckable = 1
+            UIDropDownMenu_AddButton(info, level)
+        end
+
+        local function AddMenuSeparator(level)
+            wipe(info)
+            info.disabled = 1
+            info.notCheckable = 1
+            UIDropDownMenu_AddButton(info, level)
+        end
+
         addonMenu = addonMenu or CreateFrame("Frame", "KRTMenu", UIParent, "UIDropDownMenuTemplate")
         addonMenu.displayMode = "MENU"
         addonMenu.initialize = function(self, level)
-            wipe(info)
             if level == 1 then
                 -- Toggle master loot frame:
-                info.text = MASTER_LOOTER
-                info.notCheckable = 1
-                info.func = function() addon.Master:Toggle() end
-                UIDropDownMenu_AddButton(info, level)
-                wipe(info)
+                AddMenuButton(level, MASTER_LOOTER, function() addon.Master:Toggle() end)
                 -- Toggle raid warnings frame:
-                info.text = RAID_WARNING
-                info.notCheckable = 1
-                info.func = function() addon.Warnings:Toggle() end
-                UIDropDownMenu_AddButton(info, level)
-                wipe(info)
+                AddMenuButton(level, RAID_WARNING, function() addon.Warnings:Toggle() end)
                 -- Toggle loot history frame:
-                info.text = L.StrLootHistory
-                info.notCheckable = 1
-                info.func = function() addon.History:Toggle() end
-                UIDropDownMenu_AddButton(info, level)
-                wipe(info)
+                AddMenuButton(level, L.StrLootHistory, function() addon.History:Toggle() end)
                 -- Separator:
-                info.disabled = 1
-                info.notCheckable = 1
-                UIDropDownMenu_AddButton(info, level)
-                wipe(info)
+                AddMenuSeparator(level)
                 -- Clear raid icons:
-                info.text = L.StrClearIcons
-                info.notCheckable = 1
-                info.func = function() addon.Raid:ClearRaidIcons() end
-                UIDropDownMenu_AddButton(info, level)
-                wipe(info)
+                AddMenuButton(level, L.StrClearIcons, function() addon.Raid:ClearRaidIcons() end)
                 -- Separator:
-                info.disabled = 1
-                info.notCheckable = 1
-                UIDropDownMenu_AddButton(info, level)
-                wipe(info)
+                AddMenuSeparator(level)
                 -- MS changes header:
-                info.isTitle = 1
-                info.text = L.StrMSChanges
-                info.notCheckable = 1
-                UIDropDownMenu_AddButton(info, level)
-                wipe(info)
-                info.notCheckable = 1
+                AddMenuTitle(level, L.StrMSChanges)
                 -- Toggle MS Changes frame:
-                info.text = L.BtnConfigure
-                info.notCheckable = 1
-                info.func = function() addon.Changes:Toggle() end
-                UIDropDownMenu_AddButton(info, level)
-                wipe(info)
+                AddMenuButton(level, L.BtnConfigure, function() addon.Changes:Toggle() end)
                 -- Ask for MS changes:
-                info.text = L.BtnDemand
-                info.notCheckable = 1
-                info.func = function() addon.Changes:Demand() end
-                UIDropDownMenu_AddButton(info, level)
-                wipe(info)
+                AddMenuButton(level, L.BtnDemand, function() addon.Changes:Demand() end)
                 -- Spam ms changes:
-                info.text = CHAT_ANNOUNCE
-                info.notCheckable = 1
-                info.func = function() addon.Changes:Announce() end
-                UIDropDownMenu_AddButton(info, level)
-                wipe(info)
-                info.disabled = 1
-                info.notCheckable = 1
-                UIDropDownMenu_AddButton(info, level)
-                wipe(info)
+                AddMenuButton(level, CHAT_ANNOUNCE, function() addon.Changes:Announce() end)
+                AddMenuSeparator(level)
                 -- Toggle lfm spammer frame:
-                info.text = L.StrLFMSpam
-                info.notCheckable = 1
-                info.func = function() addon.Spammer:Toggle() end
-                UIDropDownMenu_AddButton(info, level)
-                wipe(info)
+                AddMenuButton(level, L.StrLFMSpam, function() addon.Spammer:Toggle() end)
             end
         end
         ToggleDropDownMenu(1, nil, addonMenu, KRT_MINIMAP_GUI, 0, 0)
@@ -1241,6 +1217,14 @@ do
     -------------------------------------------------------
     -- Public methods
     -------------------------------------------------------
+    local function SetMinimapShown(show)
+        if show then
+            KRT_MINIMAP_GUI:Show()
+        else
+            KRT_MINIMAP_GUI:Hide()
+        end
+    end
+
     function module:SetPos(angle)
         addon.options = addon.options or KRT_Options or {}
         angle = angle % 360
@@ -1254,11 +1238,7 @@ do
         addon.options = addon.options or KRT_Options or {}
         KRT_MINIMAP_GUI:SetUserPlaced(true)
         self:SetPos(addon.options.minimapPos or 325)
-        if addon.options.minimapButton == false then
-            KRT_MINIMAP_GUI:Hide()
-        else
-            KRT_MINIMAP_GUI:Show()
-        end
+        SetMinimapShown(addon.options.minimapButton ~= false)
         KRT_MINIMAP_GUI:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         KRT_MINIMAP_GUI:SetScript("OnMouseDown", function(self, button)
             if IsAltKeyDown() then
@@ -1310,11 +1290,7 @@ do
     -- Toggles the visibility of the minimap button.
     function module:ToggleMinimapButton()
         self.options.minimapButton = not self.options.minimapButton
-        if self.options.minimapButton then
-            KRT_MINIMAP_GUI:Show()
-        else
-            KRT_MINIMAP_GUI:Hide()
-        end
+        SetMinimapShown(self.options.minimapButton)
     end
 
     -- Hides the minimap button.
