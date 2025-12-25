@@ -1071,10 +1071,10 @@ do
     -------------------------------------------------------
     -- 3. Internal state (non-exposed local variables)
     -------------------------------------------------------
-    local output          = "%s: %s"
-    local chatPrefix      = "Kader Raid Tools"
-    local chatPrefixShort = "KRT"
-    local prefixHex       = "ff" .. Utils.rgbToHex(245 / 255, 140 / 255, 186 / 255)
+    local output          = C.CHAT_OUTPUT_FORMAT
+    local chatPrefix      = C.CHAT_PREFIX
+    local chatPrefixShort = C.CHAT_PREFIX_SHORT
+    local prefixHex       = C.CHAT_PREFIX_HEX
 
     -------------------------------------------------------
     -- 4. “Private” (local) functions

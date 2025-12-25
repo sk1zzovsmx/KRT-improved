@@ -82,3 +82,7 @@ C.K_COLOR  = "fff58cba"
 C.RT_COLOR = "aaf49141"
 C.titleString = "|c" .. C.K_COLOR .. "K|r|c" .. C.RT_COLOR .. "RT|r : %s"
 
+C.CHAT_OUTPUT_FORMAT = "%s: %s"
+C.CHAT_PREFIX = "Kader Raid Tools"
+C.CHAT_PREFIX_SHORT = "KRT"
+C.CHAT_PREFIX_HEX = C.K_COLOR
