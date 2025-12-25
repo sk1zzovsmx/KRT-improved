@@ -54,6 +54,47 @@ local lower, upper = string.lower, string.upper
 local select, unpack = select, unpack
 local GetLocale = GetLocale
 local GetTime = GetTime
+local GetRaidRosterInfo = GetRaidRosterInfo
+local GetRealmName = GetRealmName
+local UnitClass = UnitClass
+local UnitInRaid = UnitInRaid
+local UnitIsGroupAssistant = UnitIsGroupAssistant
+local UnitIsGroupLeader = UnitIsGroupLeader
+local UnitLevel = UnitLevel
+
+function Utils.getRealmName()
+	local realm = GetRealmName()
+	if type(realm) ~= "string" then
+		return ""
+	end
+	return realm
+end
+
+function Utils.getUnitRank(unit, fallback)
+	if UnitIsGroupLeader(unit) then
+		return 2
+	end
+	if UnitIsGroupAssistant(unit) then
+		return 1
+	end
+	return fallback or 0
+end
+
+function Utils.getRaidRosterData(unit)
+	local index = UnitInRaid(unit)
+	local rank, subgroup, level, classL, class
+	if index then
+		_, rank, subgroup, level, classL, class = GetRaidRosterInfo(index)
+	end
+	rank = Utils.getUnitRank(unit, rank)
+	subgroup = subgroup or 1
+	level = level or UnitLevel(unit)
+	if not classL or not class then
+		classL = classL or select(1, UnitClass(unit))
+		class = class or select(2, UnitClass(unit))
+	end
+	return rank, subgroup, level, classL, class
+end
 
 -- Lightweight throttle (keyed)
 local last = {}

@@ -309,7 +309,7 @@ do
             return
         end
 
-        local realm = GetRealmName()
+        local realm = Utils.getRealmName()
         KRT_Players[realm] = KRT_Players[realm] or {}
         local raid = KRT_Raids[KRT_CurrentRaid]
         raid.playersByName = raid.playersByName or {}
@@ -317,20 +317,7 @@ do
         for unit in Utils.UnitIterator(true) do
             local name = UnitName(unit)
             if name then
-                local index = UnitInRaid(unit)
-                local rank, subgroup
-                if index then
-                    _, rank, subgroup = GetRaidRosterInfo(index)
-                end
-                if UnitIsGroupLeader(unit) then
-                    rank = 2
-                elseif UnitIsGroupAssistant(unit) then
-                    rank = 1
-                end
-                rank = rank or 0
-                subgroup = subgroup or 1
-                local level = UnitLevel(unit)
-                local classL, class = UnitClass(unit)
+                local rank, subgroup, level, classL, class = Utils.getRaidRosterData(unit)
                 local player = playersByName[name]
                 local raceL, race = UnitRace(unit)
                 inRaid = player and player.leave == nil
@@ -389,10 +376,7 @@ do
         end
         if not IsInRaid() then return end
 
-        local realm = GetRealmName()
-        if type(realm) ~= "string" then
-            realm = ""
-        end
+        local realm = Utils.getRealmName()
         KRT_Players[realm] = KRT_Players[realm] or {}
         local currentTime = Utils.getCurrentTime()
 
@@ -411,21 +395,7 @@ do
         for unit in Utils.UnitIterator(true) do
             local name = UnitName(unit)
             if name then
-                local index = UnitInRaid(unit)
-                local rank, subgroup, level, classL, class
-                if index then
-                    _, rank, subgroup, level, classL, class = GetRaidRosterInfo(index)
-                end
-                if UnitIsGroupLeader(unit) then
-                    rank = 2
-                elseif UnitIsGroupAssistant(unit) then
-                    rank = 1
-                end
-                rank              = rank or 0
-                subgroup          = subgroup or 1
-                level             = level or UnitLevel(unit)
-                classL            = classL or select(1, UnitClass(unit))
-                class             = class or select(2, UnitClass(unit))
+                local rank, subgroup, level, classL, class = Utils.getRaidRosterData(unit)
                 local raceL, race = UnitRace(unit)
                 local p           = {
                     name     = name,
@@ -965,11 +935,7 @@ do
                 for unit in Utils.UnitIterator(true) do
                     local pname = UnitName(unit)
                     if pname == name then
-                        if UnitIsGroupLeader(unit) then
-                            rank = 2
-                        elseif UnitIsGroupAssistant(unit) then
-                            rank = 1
-                        end
+                        rank = Utils.getUnitRank(unit)
                         break
                     end
                 end
@@ -990,10 +956,7 @@ do
     --
     function module:GetPlayerClass(name)
         local class = "UNKNOWN"
-        local realm = GetRealmName()
-        if type(realm) ~= "string" then
-            realm = ""
-        end
+        local realm = Utils.getRealmName()
         local resolvedName = name or GetPlayerName()
         if KRT_Players[realm] and KRT_Players[realm][resolvedName] then
             class = KRT_Players[realm][resolvedName].class or "UNKNOWN"
