@@ -1080,7 +1080,7 @@ do
     local function PreparePrint(text, prefix)
         prefix = prefix or chatPrefixShort
         if prefixHex then
-            prefix = addon:WrapTextInColorCode(prefix, prefixHex)
+            prefix = addon:WrapTextInColorCode(prefix, Utils.normalizeHexColor(prefixHex))
         end
         return format(output, prefix, tostring(text))
     end
@@ -1272,6 +1272,7 @@ do
     -- Public methods
     -------------------------------------------------------
     function module:SetPos(angle)
+        addon.options = addon.options or KRT_Options or {}
         angle = angle % 360
         addon.options.minimapPos = angle
         local r = rad(angle)
@@ -1321,9 +1322,9 @@ do
         KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
             GameTooltip_SetDefaultAnchor(GameTooltip, self)
             GameTooltip:SetText(
-                addon:WrapTextInColorCode("Kader", K_COLOR)
+                addon:WrapTextInColorCode("Kader", Utils.normalizeHexColor(K_COLOR))
                 .. " "
-                .. addon:WrapTextInColorCode("Raid Tools", "aad4af37")
+                .. addon:WrapTextInColorCode("Raid Tools", Utils.normalizeHexColor("aad4af37"))
             )
             GameTooltip:AddLine(L.StrMinimapLClick, 1, 1, 1)
             GameTooltip:AddLine(L.StrMinimapRClick, 1, 1, 1)
@@ -1807,7 +1808,7 @@ do
             if frameName == nil then return end
 
             local currentItemLink = _G[frameName .. "Name"]
-            currentItemLink:SetText(addon:WrapTextInColorCode(i.itemName, i.itemColor))
+            currentItemLink:SetText(addon:WrapTextInColorCode(i.itemName, Utils.normalizeHexColor(i.itemColor)))
 
             local currentItemBtn = _G[frameName .. "ItemBtn"]
             currentItemBtn:SetNormalTexture(i.itemTexture)
@@ -3035,15 +3036,21 @@ do
 
     function module:Save()
         addon:Debug("DEBUG", "Saving reserves data. Entries: %d", Utils.tLength(reservesData))
-        KRT_SavedReserves = Utils.tCopy({}, reservesData)
-        KRT_SavedReserves.reservesByItemID = Utils.tCopy({}, reservesByItemID)
+        local saved = {}
+        Utils.tCopy(saved, reservesData)
+        KRT_SavedReserves = saved
+        local savedByItem = {}
+        Utils.tCopy(savedByItem, reservesByItemID)
+        KRT_SavedReserves.reservesByItemID = savedByItem
     end
 
     function module:Load()
         addon:Debug("DEBUG", "Loading reserves. Data exists: %s", tostring(KRT_SavedReserves ~= nil))
         if KRT_SavedReserves then
-            reservesData = Utils.tCopy({}, KRT_SavedReserves)
-            reservesByItemID = Utils.tCopy({}, KRT_SavedReserves.reservesByItemID or {})
+            reservesData = {}
+            Utils.tCopy(reservesData, KRT_SavedReserves)
+            reservesByItemID = {}
+            Utils.tCopy(reservesByItemID, KRT_SavedReserves.reservesByItemID or {})
         else
             reservesData = {}
             reservesByItemID = {}
@@ -3592,8 +3599,10 @@ do
     -- Loads the default options into the settings table.
     --
     local function LoadDefaultOptions()
-        KRT_Options = Utils.tCopy({}, defaultOptions)
-        addon.options = KRT_Options
+        local options = {}
+        Utils.tCopy(options, defaultOptions)
+        KRT_Options = options
+        addon.options = options
         addon:info("Default options have been restored.")
     end
 
@@ -3601,9 +3610,13 @@ do
     -- Loads addon options from saved variables, filling in defaults.
     --
     local function LoadOptions()
-        addon.options = Utils.tCopy({}, defaultOptions)
-        Utils.tCopy(addon.options, KRT_Options)
-        KRT_Options = addon.options
+        local options = {}
+        Utils.tCopy(options, defaultOptions)
+        if KRT_Options then
+            Utils.tCopy(options, KRT_Options)
+        end
+        KRT_Options = options
+        addon.options = options
 
         -- Ensure dependent options are consistent
         if not addon.options.useRaidWarning then
@@ -4510,6 +4523,17 @@ do
     -- OnUpdate frame:
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
+        if not addon.options then
+            if addon.LoadOptions then
+                addon.LoadOptions()
+            end
+            if not addon.options then
+                if self then
+                    self:SetScript("OnUpdate", nil)
+                end
+                return
+            end
+        end
         if Utils.throttle(self, frameName, updateInterval, elapsed) then
             if not loaded then
                 KRT_Spammer.Duration = KRT_Spammer.Duration or addon.options.lfmPeriod
@@ -5646,7 +5670,10 @@ do
 
                 row._itemLink = v.itemLink
 
-                ui.Name:SetText(addon:WrapTextInColorCode(v.itemName, itemColors[v.itemRarity + 1]))
+                ui.Name:SetText(addon:WrapTextInColorCode(
+                    v.itemName,
+                    Utils.normalizeHexColor(itemColors[v.itemRarity + 1])
+                ))
                 ui.Source:SetText(addon.History.Boss:GetName(v.bossNum, addon.History.selectedRaid))
 
                 local r, g, b = addon.Raid:GetClassColor(addon.Raid:GetPlayerClass(v.looter))
@@ -5943,7 +5970,7 @@ do
 
     local helpString  = "%s: %s"
     local function printHelp(cmd, desc)
-        print(helpString:format(addon:WrapTextInColorCode(cmd, RT_COLOR), desc))
+        print(helpString:format(addon:WrapTextInColorCode(cmd, Utils.normalizeHexColor(RT_COLOR)), desc))
     end
 
     local function HandleSlashCmd(cmd)
