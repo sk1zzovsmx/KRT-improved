@@ -222,3 +222,4 @@ If missing, fall back via `LibCompat-1.0`; never hard-require Ace3.
 - _2025-09-10_: Clarified proprietary WoW API requirement.
 - _2025-09-13_: Updated nil-check and API fallback guidelines.
 - _2025-12-24_: Added BINDING `Docs/KRT_STANDARD.md` and `TemplatesLua/` as canonical patterns for all work.
+- _2025-12-26_: Added KRT_Options schemaVersion/migrations defaults in `!KRT/KRT.lua`.
