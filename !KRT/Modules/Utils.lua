@@ -45,10 +45,6 @@ end
 
 local type, ipairs, pairs = type, ipairs, pairs
 local floor, random = math.floor, math.random
-
-local function round(number, significance)
-	return floor((number / (significance or 1)) + 0.5) * (significance or 1)
-end
 local setmetatable, getmetatable = setmetatable, getmetatable
 local tinsert, tremove = table.insert, table.remove
 local find, match = string.find, string.match
@@ -184,7 +180,7 @@ function Utils.rgbToHex(r, g, b)
 	if r and g and b and r <= 1 and g <= 1 and b <= 1 then
 		r, g, b = r * 255, g * 255, b * 255
 	end
-	return addon.Compat.RGBToHex(r, g, b)
+	return addon.RGBToHex(r, g, b)
 end
 
 function Utils.normalizeHexColor(color)
@@ -258,7 +254,7 @@ function Utils.showHide(frame, cond)
 end
 
 function Utils.createPool(frameType, parent, template, resetter)
-	return addon.Compat.CreateFramePool(frameType, parent, template, resetter)
+	return addon.CreateFramePool(frameType, parent, template, resetter)
 end
 
 -- Lock/Unlock Highlight:
@@ -403,7 +399,7 @@ function Utils.getServerOffset()
 	local lH, lM = tonumber(date("%H")), tonumber(date("%M"))
 	local sT = sH + sM / 60
 	local lT = lH + lM / 60
-	local offset = round(sT - lT, 0.5)
+	local offset = addon.Round((sT - lT) / 0.5) * 0.5
 	if offset >= 12 then
 		offset = offset - 24
 	elseif offset < -12 then
