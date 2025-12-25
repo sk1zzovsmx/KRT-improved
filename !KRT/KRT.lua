@@ -662,7 +662,9 @@ do
 
     function module:GetPlayerCount(name, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
-        local players = module:GetPlayers(raidNum)
+        local raid = raidNum and KRT_Raids[raidNum]
+        local players = raid and raid.players
+        if not players then return 0 end
         for i, p in ipairs(players) do
             if p.name == name then
                 return p.count or 0
@@ -770,30 +772,27 @@ do
     -- Retrieves all loot for a given raid and optional boss number.
     --
     function module:GetLoot(raidNum, bossNum)
-        local items = {}
         raidNum = raidNum or KRT_CurrentRaid
         bossNum = bossNum or 0
-        if not raidNum or not KRT_Raids[raidNum] then
-            return items
+        local raid = raidNum and KRT_Raids[raidNum]
+        if not raid then
+            return {}
         end
-        local loot = KRT_Raids[raidNum].loot
-        local total = 0
+        local loot = raid.loot
         if tonumber(bossNum) <= 0 then
-            -- Get all loot
             for k, v in ipairs(loot) do
-                local info = v
-                info.id = k
-                tinsert(items, info)
-                total = total + 1
+                v.id = k
             end
-        elseif KRT_Raids[raidNum].bossKills[bossNum] then
+            return loot
+        end
+
+        local items = {}
+        if raid.bossKills[bossNum] then
             -- Get loot for a specific boss
             for k, v in ipairs(loot) do
                 if v.bossNum == bossNum then
-                    local info = v
-                    info.id = k
-                    tinsert(items, info)
-                    total = total + 1
+                    v.id = k
+                    tinsert(items, v)
                 end
             end
         end
@@ -854,25 +853,26 @@ do
     --
     function module:GetPlayers(raidNum, bossNum)
         raidNum = raidNum or KRT_CurrentRaid
-        local players = {}
-        if raidNum and KRT_Raids[raidNum] then
-            for k, v in ipairs(KRT_Raids[raidNum].players) do
-                local info = v
-                v.id = k
-                tinsert(players, info)
-            end
-            -- players = KRT_Raids[raidNum].players
-            if bossNum and KRT_Raids[raidNum].bossKills[bossNum] then
-                local _players = {}
-                for i, p in ipairs(players) do
-                    if Utils.tContains(KRT_Raids[raidNum]["bossKills"][bossNum]["players"], p.name) then
-                        tinsert(_players, p)
-                    end
-                end
-                return _players
-            end
+        local raid = raidNum and KRT_Raids[raidNum]
+        if not raid then return {} end
+
+        local raidPlayers = raid.players or {}
+        for k, v in ipairs(raidPlayers) do
+            v.id = k
         end
-        return players
+
+        if bossNum and raid.bossKills[bossNum] then
+            local players = {}
+            local bossPlayers = raid.bossKills[bossNum].players
+            for i, p in ipairs(raidPlayers) do
+                if Utils.tContains(bossPlayers, p.name) then
+                    tinsert(players, p)
+                end
+            end
+            return players
+        end
+
+        return raidPlayers
     end
 
     --
@@ -955,11 +955,12 @@ do
     -- Gets a player's rank.
     --
     function module:GetPlayerRank(name, raidNum)
-        local players = module:GetPlayers(raidNum)
+        local raid = raidNum and KRT_Raids[raidNum]
+        local players = raid and raid.players or {}
         local rank = 0
         local originalName = name
         name = name or GetPlayerName() or UnitName("player")
-        if Utils.tLength(players) == 0 then
+        if #players == 0 then
             if IsInGroup() then
                 for unit in Utils.UnitIterator(true) do
                     local pname = UnitName(unit)
@@ -1405,6 +1406,11 @@ do
         addon:Debug("DEBUG", "SortRolls: winner=%s roll=%d", lootState.winner, rolls[1].roll)
     end
 
+    local function onRollButtonClick(self)
+        state.selected = self.playerName
+        module:FetchRolls()
+    end
+
     local function addRoll(name, roll, itemId)
         roll = tonumber(roll)
         state.count = state.count + 1
@@ -1694,10 +1700,10 @@ do
             Utils.showHide(star, showStar)
             if showStar then starShown = true end
 
-            btn:SetScript("OnClick", function()
-                state.selected = name
-                module:FetchRolls()
-            end)
+            if not btn.krtHasOnClick then
+                btn:SetScript("OnClick", onRollButtonClick)
+                btn.krtHasOnClick = true
+            end
 
             btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
             btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
