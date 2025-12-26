@@ -66,8 +66,13 @@ Utils.bindLogger(addon)
 -- Alias locali (safe e veloci)
 local IsInRaid             = addon.IsInRaid
 local IsInGroup            = addon.IsInGroup
+local UnitIterator         = addon.UnitIterator
 local UnitIsGroupLeader    = addon.UnitIsGroupLeader
 local UnitIsGroupAssistant = addon.UnitIsGroupAssistant
+local tLength              = addon.tLength
+local tCopy                = addon.tCopy
+local tIndexOf             = addon.tIndexOf
+local tContains            = _G.tContains
 
 -- SavedVariables for log level (fallback INFO)
 KRT_Debug = KRT_Debug or {}
@@ -279,7 +284,7 @@ do
         local raid = KRT_Raids[KRT_CurrentRaid]
         raid.playersByName = raid.playersByName or {}
         local playersByName = raid.playersByName
-        for unit in Utils.UnitIterator(true) do
+        for unit in UnitIterator(true) do
             local name = UnitName(unit)
             if name then
                 local rank, subgroup, level, classL, class = Utils.getRaidRosterData(unit)
@@ -316,7 +321,7 @@ do
             end
         end
 
-        numRaid = Utils.tLength(playersByName)
+        numRaid = tLength(playersByName)
         if numRaid == 0 then
             module:End()
             return
@@ -357,7 +362,7 @@ do
             changes       = {},
         }
 
-        for unit in Utils.UnitIterator(true) do
+        for unit in UnitIterator(true) do
             local name = UnitName(unit)
             if name then
                 local rank, subgroup, level, classL, class = Utils.getRaidRosterData(unit)
@@ -501,7 +506,7 @@ do
             instanceDiff = instanceDiff + (2 * dynDiff)
         end
         local players = {}
-        for unit in Utils.UnitIterator(true) do
+        for unit in UnitIterator(true) do
             if UnitIsConnected(unit) then -- track only online players
                 local name = UnitName(unit)
                 if name then
@@ -793,7 +798,7 @@ do
             local players = {}
             local bossPlayers = raid.bossKills[bossNum].players
             for i, p in ipairs(raidPlayers) do
-                if Utils.tContains(bossPlayers, p.name) then
+                if tContains(bossPlayers, p.name) then
                     tinsert(players, p)
                 end
             end
@@ -890,7 +895,7 @@ do
         name = name or Utils.getPlayerName() or UnitName("player")
         if #players == 0 then
             if IsInGroup() then
-                for unit in Utils.UnitIterator(true) do
+                for unit in UnitIterator(true) do
                     local pname = UnitName(unit)
                     if pname == name then
                         rank = Utils.getUnitRank(unit)
@@ -930,7 +935,7 @@ do
         if not IsInGroup() or not name then
             return id
         end
-        for unit in Utils.UnitIterator(true) do
+        for unit in UnitIterator(true) do
             if UnitName(unit) == name then
                 id = unit
                 break
@@ -1418,7 +1423,7 @@ do
         tracker[itemId] = tracker[itemId] or {}
         local used = tracker[itemId][player] or 0
         if used >= allowed then
-            if not Utils.tContains(state.rerolled, player) then
+            if not tContains(state.rerolled, player) then
                 Utils.whisper(player, L.ChatOnlyRollOnce)
                 tinsert(state.rerolled, player)
             end
@@ -2274,7 +2279,7 @@ do
             dropDownData[i] = twipe(dropDownData[i])
         end
         dropDownGroupData = twipe(dropDownGroupData)
-        for unit in Utils.UnitIterator() do
+        for unit in UnitIterator() do
             local name = UnitName(unit)
             local _, subgroup = Utils.getRaidRosterData(unit)
             if name then
@@ -2715,7 +2720,7 @@ do
         if not IsInGroup() then
             return raidPlayers
         end
-        for unit in Utils.UnitIterator(true) do
+        for unit in UnitIterator(true) do
             local name = UnitName(unit)
             if name and name ~= "" then
                 raidPlayers[#raidPlayers + 1] = name
@@ -2967,12 +2972,12 @@ do
 
     function module:Save()
         RebuildIndex()
-        addon:Debug("DEBUG", "Saving reserves data. Entries: %d", Utils.tLength(reservesData))
+        addon:Debug("DEBUG", "Saving reserves data. Entries: %d", tLength(reservesData))
         local saved = {}
-        Utils.tCopy(saved, reservesData)
+        tCopy(saved, reservesData)
         KRT_SavedReserves = saved
         local savedByItem = {}
-        Utils.tCopy(savedByItem, reservesByItemID)
+        tCopy(savedByItem, reservesByItemID)
         KRT_SavedReserves.reservesByItemID = savedByItem
     end
 
@@ -2980,7 +2985,7 @@ do
         addon:Debug("DEBUG", "Loading reserves. Data exists: %s", tostring(KRT_SavedReserves ~= nil))
         twipe(reservesData)
         if KRT_SavedReserves then
-            Utils.tCopy(reservesData, KRT_SavedReserves, "reservesByItemID")
+            tCopy(reservesData, KRT_SavedReserves, "reservesByItemID")
         end
         RebuildIndex()
     end
@@ -3130,7 +3135,7 @@ do
 
     -- Get all reserves:
     function module:GetAllReserves()
-        addon:Debug("DEBUG", "Fetching all reserves. Total players with reserves: %d", Utils.tLength(reservesData))
+        addon:Debug("DEBUG", "Fetching all reserves. Total players with reserves: %d", tLength(reservesData))
         return reservesData
     end
 
@@ -3207,7 +3212,7 @@ do
         end
 
         RebuildIndex()
-        addon:Debug("DEBUG", "Finished parsing CSV data. Total players with reserves: %d", Utils.tLength(reservesData))
+        addon:Debug("DEBUG", "Finished parsing CSV data. Total players with reserves: %d", tLength(reservesData))
         self:RefreshWindow()
         self:Save()
     end
@@ -3563,7 +3568,7 @@ do
     --
     local function LoadDefaultOptions()
         local options = {}
-        Utils.tCopy(options, defaultOptions)
+        tCopy(options, defaultOptions)
         KRT_Options = options
         addon.options = options
         addon:info("Default options have been restored.")
@@ -3574,9 +3579,9 @@ do
     --
     local function LoadOptions()
         local options = {}
-        Utils.tCopy(options, defaultOptions)
+        tCopy(options, defaultOptions)
         if KRT_Options then
-            Utils.tCopy(options, KRT_Options)
+            tCopy(options, KRT_Options)
         end
         KRT_Options = options
         addon.options = options
@@ -4126,7 +4131,7 @@ do
             InitChangesTable()
             FetchChanges()
         end
-        local count = Utils.tLength(changesTable)
+        local count = tLength(changesTable)
         local msg
         if count == 0 then
             if tempSelectedID then
@@ -4177,7 +4182,7 @@ do
                 InitChangesTable()
                 FetchChanges()
             end
-            local count = Utils.tLength(changesTable)
+            local count = tLength(changesTable)
             if count > 0 then
                 for n, s in pairs(changesTable) do
                     if selectedID == n and _G[frameName .. "PlayerBtn" .. n] then
@@ -4351,14 +4356,14 @@ do
             local id = tonumber(channel) or select(1, GetChannelName(channel))
             channel = (id and id > 0) and id or channel
             local checked = (box:GetChecked() == 1)
-            local existed = Utils.tContains(KRT_Spammer.Channels, channel)
+            local existed = tContains(KRT_Spammer.Channels, channel)
             if checked and not existed then
                 tinsert(KRT_Spammer.Channels, channel)
             elseif not checked and existed then
-                local i = Utils.tIndexOf(KRT_Spammer.Channels, channel)
+                local i = tIndexOf(KRT_Spammer.Channels, channel)
                 while i do
                     tremove(KRT_Spammer.Channels, i)
-                    i = Utils.tIndexOf(KRT_Spammer.Channels, channel)
+                    i = tIndexOf(KRT_Spammer.Channels, channel)
                 end
             end
         else
@@ -5407,10 +5412,10 @@ do
 
             local name = addon.Raid:GetPlayerName(pID, rID)
             local list = raid.bossKills[bID].players
-            local i = Utils.tIndexOf(list, name)
+            local i = tIndexOf(list, name)
             while i do
                 tremove(list, i)
-                i = Utils.tIndexOf(list, name)
+                i = tIndexOf(list, name)
             end
 
             addon.History.selectedBossPlayer = nil
@@ -5523,10 +5528,10 @@ do
             tremove(raid.players, pID)
 
             for _, boss in ipairs(raid.bossKills) do
-                local i = Utils.tIndexOf(boss.players, name)
+                local i = tIndexOf(boss.players, name)
                 while i do
                     tremove(boss.players, i)
-                    i = Utils.tIndexOf(boss.players, name)
+                    i = tIndexOf(boss.players, name)
                 end
             end
 
