@@ -5957,8 +5957,7 @@ do
     end
 
     local function splitArgs(msg)
-        msg = msg or ""
-        msg = msg:gsub("^%s+", ""):gsub("%s+$", "")
+        msg = (msg or ""):trim()
         local cmd, rest = msg:match("^(%S+)%s*(.-)$")
         return (cmd or ""):lower(), rest or ""
     end
@@ -6191,7 +6190,6 @@ end
 ---============================================================================
 
 local addonEvents = {
-    CHAT_MSG_ADDON = "CHAT_MSG_ADDON",
     CHAT_MSG_SYSTEM = "CHAT_MSG_SYSTEM",
     CHAT_MSG_LOOT = "CHAT_MSG_LOOT",
     CHAT_MSG_MONSTER_YELL = "CHAT_MSG_MONSTER_YELL",
