@@ -162,13 +162,6 @@ Frames.main      = Frames.main or CreateFrame("Frame")
 local mainFrame  = Frames.main
 local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings, UIHistory, UIHistoryItemBox
 
-local function HideFrame(frame, onHide)
-    if frame and frame:IsShown() then
-        if onHide then onHide() end
-        frame:Hide()
-    end
-end
-
 -- Player info helper
 coreState.player = coreState.player or {}
 local function GetPlayerName()
@@ -1931,7 +1924,7 @@ do
     -- Hides the Master Looter frame.
     --
     function module:Hide()
-        HideFrame(UIMaster)
+        Utils.hideFrame(UIMaster)
     end
 
     --
@@ -3674,7 +3667,7 @@ do
     -- Hides the configuration frame.
     --
     function module:Hide()
-        HideFrame(UIConfig)
+        Utils.hideFrame(UIConfig)
     end
 
     --
@@ -3828,7 +3821,7 @@ do
 
     -- Hide frame:
     function module:Hide()
-        HideFrame(UIWarnings)
+        Utils.hideFrame(UIWarnings)
     end
 
     -- Warning selection:
@@ -4062,7 +4055,7 @@ do
 
     -- Hide frame:
     function module:Hide()
-        HideFrame(UIChanges, CancelChanges)
+        Utils.hideFrame(UIChanges, CancelChanges)
     end
 
     -- Clear module:
@@ -4383,7 +4376,7 @@ do
 
     -- Hide frame:
     function module:Hide()
-        HideFrame(UISpammer)
+        Utils.hideFrame(UISpammer)
     end
 
     -- Save edit box:-
