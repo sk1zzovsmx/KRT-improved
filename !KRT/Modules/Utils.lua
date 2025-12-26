@@ -92,7 +92,8 @@ function Utils.debug(addonRef, level, fmt, ...)
 		fn(addonRef, fmt, ...)
 	end
 	local lvl = addonRef.logLevels and addonRef.logLevels[lv]
-	if not lvl or not addonRef.logLevel or not addonRef.Debugger then return end
+	if not lvl or not addonRef.logLevel then return end
+	if not addonRef.Debugger or type(addonRef.Debugger.AddMessage) ~= "function" then return end
 	if lvl <= addonRef.logLevel then
 		local msg = select("#", ...) > 0 and format(fmt, ...) or fmt
 		addonRef.Debugger:AddMessage(msg)
