@@ -1358,7 +1358,7 @@ do
         local itemId = self:GetCurrentRollItemID()
         if not itemId then return end
 
-        local name = UnitName("player")
+        local name = Utils.getPlayerName()
         local allowed = 1
         if lootState.currentRollType == rollTypes.RESERVED then
             allowed = addon.Reserves:GetReserveCountForItem(itemId, name)
@@ -2276,7 +2276,7 @@ do
         dropDownGroupData = twipe(dropDownGroupData)
         for unit in Utils.UnitIterator() do
             local name = UnitName(unit)
-            local subgroup = select(2, GetRaidRosterInfo(UnitInRaid(unit)))
+            local _, subgroup = Utils.getRaidRosterData(unit)
             if name then
                 dropDownData[subgroup][name] = name
                 dropDownGroupData[subgroup] = true
