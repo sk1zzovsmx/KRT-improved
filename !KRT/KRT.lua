@@ -1019,7 +1019,7 @@ do
     local function PreparePrint(text, prefix)
         prefix = prefix or chatPrefixShort
         if prefixHex then
-            prefix = addon:WrapTextInColorCode(prefix, Utils.normalizeHexColor(prefixHex))
+            prefix = addon.WrapTextInColorCode(prefix, Utils.normalizeHexColor(prefixHex))
         end
         return format(output, prefix, tostring(text))
     end
@@ -1241,9 +1241,9 @@ do
         KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
             GameTooltip_SetDefaultAnchor(GameTooltip, self)
             GameTooltip:SetText(
-                addon:WrapTextInColorCode("Kader", Utils.normalizeHexColor(K_COLOR))
+                addon.WrapTextInColorCode("Kader", Utils.normalizeHexColor(K_COLOR))
                 .. " "
-                .. addon:WrapTextInColorCode("Raid Tools", Utils.normalizeHexColor("aad4af37"))
+                .. addon.WrapTextInColorCode("Raid Tools", Utils.normalizeHexColor("aad4af37"))
             )
             GameTooltip:AddLine(L.StrMinimapLClick, 1, 1, 1)
             GameTooltip:AddLine(L.StrMinimapRClick, 1, 1, 1)
@@ -1728,7 +1728,10 @@ do
             if frameName == nil then return end
 
             local currentItemLink = _G[frameName .. "Name"]
-            currentItemLink:SetText(addon:WrapTextInColorCode(i.itemName, Utils.normalizeHexColor(i.itemColor)))
+            currentItemLink:SetText(addon.WrapTextInColorCode(
+                i.itemName,
+                Utils.normalizeHexColor(i.itemColor)
+            ))
 
             local currentItemBtn = _G[frameName .. "ItemBtn"]
             currentItemBtn:SetNormalTexture(i.itemTexture)
@@ -5299,7 +5302,7 @@ do
 
                 row._itemLink = v.itemLink
 
-                ui.Name:SetText(addon:WrapTextInColorCode(
+                ui.Name:SetText(addon.WrapTextInColorCode(
                     v.itemName,
                     Utils.normalizeHexColor(itemColors[v.itemRarity + 1])
                 ))
@@ -5601,7 +5604,7 @@ do
 
     local helpString = "%s: %s"
     local function printHelp(cmd, desc)
-        print(helpString:format(addon:WrapTextInColorCode(cmd, Utils.normalizeHexColor(RT_COLOR)), desc))
+        print(helpString:format(addon.WrapTextInColorCode(cmd, Utils.normalizeHexColor(RT_COLOR)), desc))
     end
 
     local function showHelp()
