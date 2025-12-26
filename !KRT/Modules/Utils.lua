@@ -1,8 +1,33 @@
-local addonName, addon = ...
-addon.Utils            = addon.Utils or {}
+local addonName, addon     = ...
+addon.Utils                = addon.Utils or {}
 
-local Utils            = addon.Utils
-local L                = addon.L
+local Utils                = addon.Utils
+local L                    = addon.L
+
+local type, ipairs, pairs  = type, ipairs, pairs
+local floor, random        = math.floor, math.random
+local setmetatable         = setmetatable
+local getmetatable         = getmetatable
+local tinsert, tremove     = table.insert, table.remove
+local find, match          = string.find, string.match
+local format, gsub         = string.format, string.gsub
+local strsub, strlen       = string.sub, string.len
+local lower, upper         = string.lower, string.upper
+local select, unpack       = select, unpack
+
+local GetLocale            = GetLocale
+local GetTime              = GetTime
+local GetRaidRosterInfo    = GetRaidRosterInfo
+local GetRealmName         = GetRealmName
+local UnitClass            = UnitClass
+local UnitInRaid           = UnitInRaid
+local UnitIsGroupAssistant = UnitIsGroupAssistant
+local UnitIsGroupLeader    = UnitIsGroupLeader
+local UnitLevel            = UnitLevel
+
+---============================================================================
+-- Library helper
+---============================================================================
 
 -- Library helper: direct LibStub lookup
 function addon:GetLib(name, silent)
@@ -10,11 +35,14 @@ function addon:GetLib(name, silent)
 	-- as a global yet; try _G.LibStub first, then rawget on _G, then fallback to
 	-- a compat implementation (addon.Compat) if present.
 	local globalEnv = _G or (getfenv and getfenv(0)) or {}
+
 	local LibStub = globalEnv.LibStub
 	if not LibStub and rawget then
 		-- rawget(globalEnv, "LibStub") could be nil; guard it
 		local ok, val = pcall(function() return rawget(globalEnv, "LibStub") end)
-		if ok and val then LibStub = val end
+		if ok and val then
+			LibStub = val
+		end
 	end
 
 	if not LibStub and addon and addon.Compat and type(addon.Compat.GetLibrary) == "function" then
@@ -32,6 +60,10 @@ function addon:GetLib(name, silent)
 	return LibStub(name, silent)
 end
 
+---============================================================================
+-- Small helpers / iteration
+---============================================================================
+
 -- Practical helper aliases
 function Utils.after(sec, fn) return Utils.After(sec, fn) end
 
@@ -43,24 +75,9 @@ function Utils.forEachGroupUnit(cb, includePets)
 	end
 end
 
-local type, ipairs, pairs = type, ipairs, pairs
-local floor, random = math.floor, math.random
-local setmetatable, getmetatable = setmetatable, getmetatable
-local tinsert, tremove = table.insert, table.remove
-local find, match = string.find, string.match
-local format, gsub = string.format, string.gsub
-local strsub, strlen = string.sub, string.len
-local lower, upper = string.lower, string.upper
-local select, unpack = select, unpack
-local GetLocale = GetLocale
-local GetTime = GetTime
-local GetRaidRosterInfo = GetRaidRosterInfo
-local GetRealmName = GetRealmName
-local UnitClass = UnitClass
-local UnitInRaid = UnitInRaid
-local UnitIsGroupAssistant = UnitIsGroupAssistant
-local UnitIsGroupLeader = UnitIsGroupLeader
-local UnitLevel = UnitLevel
+---============================================================================
+-- Roster helpers
+---============================================================================
 
 function Utils.getRealmName()
 	local realm = GetRealmName()
@@ -82,59 +99,72 @@ end
 
 function Utils.getRaidRosterData(unit)
 	local index = UnitInRaid(unit)
+
 	local rank, subgroup, level, classL, class
 	if index then
 		_, rank, subgroup, level, classL, class = GetRaidRosterInfo(index)
 	end
+
 	rank = Utils.getUnitRank(unit, rank)
 	subgroup = subgroup or 1
 	level = level or UnitLevel(unit)
+
 	if not classL or not class then
 		classL = classL or select(1, UnitClass(unit))
 		class = class or select(2, UnitClass(unit))
 	end
+
 	return rank, subgroup, level, classL, class
 end
 
+---============================================================================
+-- Lightweight throttles
+---============================================================================
+
 -- Lightweight throttle (keyed)
-local last = {}
-function Utils.throttleKey(key, sec)
-	local now = GetTime()
-	sec = sec or 1
-	if not last[key] or (now - last[key]) >= sec then
-		last[key] = now
-		return true
-	end
-end
+do
+	local last = {}
 
--- ============================================================================
--- Callback utilities
--- ============================================================================
-
-local callbacks = {}
-
-function Utils.registerCallback(e, func)
-	if not e or type(func) ~= "function" then
-		error(L.StrCbErrUsage)
-	end
-	callbacks[e] = callbacks[e] or {}
-	tinsert(callbacks[e], func)
-	return #callbacks
-end
-
-function Utils.triggerEvent(e, ...)
-	if not callbacks[e] then return end
-	for i, v in ipairs(callbacks[e]) do
-		local ok, err = pcall(v, e, ...)
-		if not ok then
-			addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
+	function Utils.throttleKey(key, sec)
+		local now = GetTime()
+		sec = sec or 1
+		if not last[key] or (now - last[key]) >= sec then
+			last[key] = now
+			return true
 		end
 	end
 end
 
--- ============================================================================
+---============================================================================
+-- Callback utilities
+---============================================================================
+
+do
+	local callbacks = {}
+
+	function Utils.registerCallback(e, func)
+		if not e or type(func) ~= "function" then
+			error(L.StrCbErrUsage)
+		end
+		callbacks[e] = callbacks[e] or {}
+		tinsert(callbacks[e], func)
+		return #callbacks
+	end
+
+	function Utils.triggerEvent(e, ...)
+		if not callbacks[e] then return end
+		for i, v in ipairs(callbacks[e]) do
+			local ok, err = pcall(v, e, ...)
+			if not ok then
+				addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
+			end
+		end
+	end
+end
+
+---============================================================================
 -- Frame helpers
--- ============================================================================
+---============================================================================
 
 function Utils.getFrameName()
 	return addon.UIMaster:GetName()
@@ -163,14 +193,24 @@ function Utils.makeEditBoxPopup(key, text, onAccept, onShow)
 		hideOnEscape = 1,
 		hasEditBox   = 1,
 		cancels      = key,
-		OnShow       = function(self) if onShow then onShow(self) end end,
+		OnShow       = function(self)
+			if onShow then
+				onShow(self)
+			end
+		end,
 		OnHide       = function(self)
 			self.editBox:SetText("")
 			self.editBox:ClearFocus()
 		end,
-		OnAccept     = function(self) onAccept(self, self.editBox:GetText()) end,
+		OnAccept     = function(self)
+			onAccept(self, self.editBox:GetText())
+		end,
 	}
 end
+
+---============================================================================
+-- Global convenience helpers (kept as-is)
+---============================================================================
 
 -- Shuffle a table:
 _G.table.shuffle = function(t)
@@ -213,9 +253,9 @@ _G.string.ucfirst = function(str)
 	return gsub(str, "%a", upper, 1)
 end
 
--- ============================================================================
+---============================================================================
 -- Color utilities
--- ============================================================================
+---============================================================================
 
 function Utils.rgbToHex(r, g, b)
 	if r and g and b and r <= 1 and g <= 1 and b <= 1 then
@@ -252,6 +292,10 @@ function addon.GetClassColor(name)
 	end
 	return c.r, c.g, c.b
 end
+
+---============================================================================
+-- Generic utilities
+---============================================================================
 
 -- Determines if a given string is a number
 function Utils.isNumber(str)
@@ -383,16 +427,19 @@ function Utils.sync(prefix, msg)
 	end
 end
 
-local lastChat = 0
-function Utils.chat(msg, channel, language, target, bypass)
-	if not msg then return end
-	if not bypass then
-		local throttle = addon.options and addon.options.chatThrottle or 0
-		local now = GetTime()
-		if throttle > 0 and (now - lastChat) < throttle then return end
-		lastChat = now
+do
+	local lastChat = 0
+
+	function Utils.chat(msg, channel, language, target, bypass)
+		if not msg then return end
+		if not bypass then
+			local throttle = addon.options and addon.options.chatThrottle or 0
+			local now = GetTime()
+			if throttle > 0 and (now - lastChat) < throttle then return end
+			lastChat = now
+		end
+		SendChatMessage(tostring(msg), channel, language, target)
 	end
-	SendChatMessage(tostring(msg), channel, language, target)
 end
 
 -- Send a whisper to a player by his/her character name
@@ -456,6 +503,10 @@ function Utils.getServerOffset()
 	end
 	return offset
 end
+
+---============================================================================
+-- Base64 encode/decode
+---============================================================================
 
 --[==[ Base64 encode/decode ]==] --
 do
