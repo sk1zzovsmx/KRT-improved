@@ -1980,6 +1980,19 @@ do
         end
     end
 
+    local function AssignToTarget(rollType, targetKey)
+        if lootState.lootCount <= 0 or not lootState[targetKey] then return end
+        countdownRun = false
+        local itemLink = GetItemLink()
+        if not itemLink then return end
+        lootState.currentRollType = rollType
+        local target = lootState[targetKey]
+        if lootState.fromInventory then
+            return TradeItem(itemLink, target, rollType, 0)
+        end
+        return AssignItem(itemLink, target, rollType, 0)
+    end
+
     function module:BtnMS(btn)
         return AnnounceRoll(1, "ChatRollMS")
     end
@@ -2043,45 +2056,21 @@ do
     -- Button: Hold item
     --
     function module:BtnHold(btn)
-        if lootState.lootCount <= 0 or lootState.holder == nil then return end
-        countdownRun = false
-        local itemLink = GetItemLink()
-        if itemLink == nil then return end
-        lootState.currentRollType = rollTypes.HOLD
-        if lootState.fromInventory == true then
-            return TradeItem(itemLink, lootState.holder, rollTypes.HOLD, 0)
-        end
-        return AssignItem(itemLink, lootState.holder, rollTypes.HOLD, 0)
+        return AssignToTarget(rollTypes.HOLD, "holder")
     end
 
     --
     -- Button: Bank item
     --
     function module:BtnBank(btn)
-        if lootState.lootCount <= 0 or lootState.banker == nil then return end
-        countdownRun = false
-        local itemLink = GetItemLink()
-        if itemLink == nil then return end
-        lootState.currentRollType = rollTypes.BANK
-        if lootState.fromInventory == true then
-            return TradeItem(itemLink, lootState.banker, rollTypes.BANK, 0)
-        end
-        return AssignItem(itemLink, lootState.banker, rollTypes.BANK, 0)
+        return AssignToTarget(rollTypes.BANK, "banker")
     end
 
     --
     -- Button: Disenchant item
     --
     function module:BtnDisenchant(btn)
-        if lootState.lootCount <= 0 or lootState.disenchanter == nil then return end
-        countdownRun = false
-        local itemLink = GetItemLink()
-        if itemLink == nil then return end
-        lootState.currentRollType = rollTypes.DISENCHANT
-        if lootState.fromInventory == true then
-            return TradeItem(itemLink, lootState.disenchanter, rollTypes.DISENCHANT, 0)
-        end
-        return AssignItem(itemLink, lootState.disenchanter, rollTypes.DISENCHANT, 0)
+        return AssignToTarget(rollTypes.DISENCHANT, "disenchanter")
     end
 
     --
@@ -4930,6 +4919,18 @@ local function MakeListController(cfg)
     return self
 end
 
+local function BindListController(module, controller)
+    module.OnLoad = function(_, frame) controller:OnLoad(frame) end
+    module.Fetch = function() controller:Fetch() end
+    module.Sort = function(_, t) controller:Sort(t) end
+end
+
+local function RegisterCallbacks(names, handler)
+    for i = 1, #names do
+        Utils.registerCallback(names[i], handler)
+    end
+end
+
 -- ============================================================================
 -- History (Main) - stato + selettori
 -- ============================================================================
@@ -5145,11 +5146,7 @@ do
         },
     }
 
-    function Raids:OnLoad(frame) controller:OnLoad(frame) end
-
-    function Raids:Fetch() controller:Fetch() end
-
-    function Raids:Sort(t) controller:Sort(t) end
+    BindListController(Raids, controller)
 
     function Raids:SetCurrent(btn)
         local sel = addon.History.selectedRaid
@@ -5271,11 +5268,7 @@ do
         },
     }
 
-    function Boss:OnLoad(frame) controller:OnLoad(frame) end
-
-    function Boss:Fetch() controller:Fetch() end
-
-    function Boss:Sort(t) controller:Sort(t) end
+    BindListController(Boss, controller)
 
     function Boss:Add() addon.History.BossBox:Toggle() end
 
@@ -5392,11 +5385,7 @@ do
         },
     }
 
-    function M:OnLoad(frame) controller:OnLoad(frame) end
-
-    function M:Fetch() controller:Fetch() end
-
-    function M:Sort(t) controller:Sort(t) end
+    BindListController(M, controller)
 
     function M:Add() addon.History.AttendeesBox:Toggle() end
 
@@ -5431,8 +5420,7 @@ do
         controller._makeConfirmPopup("KRTHISTORY_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendee)
     end
 
-    Utils.registerCallback("HistorySelectRaid", function() controller:Dirty() end)
-    Utils.registerCallback("HistorySelectBoss", function() controller:Dirty() end)
+    RegisterCallbacks({ "HistorySelectRaid", "HistorySelectBoss" }, function() controller:Dirty() end)
     Utils.registerCallback("HistorySelectBossPlayer", function() controller:Touch() end)
 end
 
@@ -5510,11 +5498,7 @@ do
         },
     }
 
-    function M:OnLoad(frame) controller:OnLoad(frame) end
-
-    function M:Fetch() controller:Fetch() end
-
-    function M:Sort(t) controller:Sort(t) end
+    BindListController(M, controller)
 
     do
         local function DeleteAttendee()
@@ -5673,11 +5657,7 @@ do
         },
     }
 
-    function module:OnLoad(frame) controller:OnLoad(frame) end
-
-    function module:Fetch() controller:Fetch() end
-
-    function module:Sort(t) controller:Sort(t) end
+    BindListController(module, controller)
 
     function module:OnEnter(widget)
         if not widget then return end
@@ -5726,10 +5706,10 @@ do
     end
 
     local function Reset() controller:Dirty() end
-    Utils.registerCallback("HistorySelectRaid", Reset)
-    Utils.registerCallback("HistorySelectBoss", Reset)
-    Utils.registerCallback("HistorySelectPlayer", Reset)
-    Utils.registerCallback("HistorySelectBossPlayer", Reset)
+    RegisterCallbacks(
+        { "HistorySelectRaid", "HistorySelectBoss", "HistorySelectPlayer", "HistorySelectBossPlayer" },
+        Reset
+    )
     Utils.registerCallback("HistorySelectItem", function() controller:Touch() end)
 end
 
