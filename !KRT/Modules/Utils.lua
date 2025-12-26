@@ -24,6 +24,9 @@ local UnitClass            = UnitClass
 local UnitInRaid           = UnitInRaid
 local UnitIsGroupAssistant = UnitIsGroupAssistant
 local UnitIsGroupLeader    = UnitIsGroupLeader
+local UnitIsPartyLeader    = UnitIsPartyLeader
+local UnitIsRaidLeader     = UnitIsRaidLeader
+local UnitIsRaidOfficer    = UnitIsRaidOfficer
 local UnitLevel            = UnitLevel
 local UnitName             = UnitName
 
@@ -171,10 +174,19 @@ function Utils.getRealmName()
 end
 
 function Utils.getUnitRank(unit, fallback)
-	if UnitIsGroupLeader(unit) then
+	if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
 		return 2
 	end
-	if UnitIsGroupAssistant(unit) then
+	if UnitIsRaidLeader and UnitIsRaidLeader(unit) then
+		return 2
+	end
+	if UnitIsPartyLeader and UnitIsPartyLeader(unit) then
+		return 2
+	end
+	if UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
+		return 1
+	end
+	if UnitIsRaidOfficer and UnitIsRaidOfficer(unit) then
 		return 1
 	end
 	return fallback or 0
