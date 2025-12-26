@@ -5959,7 +5959,7 @@ do
     local function splitArgs(msg)
         msg = (msg or ""):trim()
         local cmd, rest = msg:match("^(%S+)%s*(.-)$")
-        return (cmd or ""):lower(), rest or ""
+        return (cmd or ""):lower(), (rest or ""):trim()
     end
 
     local function registerAliases(list, fn)
