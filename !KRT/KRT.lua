@@ -3154,8 +3154,7 @@ do
         end
 
         local firstLine = true
-        for line in csv:gmatch("[^
-]+") do
+        for line in csv:gmatch("[^]+") do
             if firstLine then
                 firstLine = false
             else
