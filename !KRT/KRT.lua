@@ -10,6 +10,12 @@ addon.name             = addon.name or addonName
 local L                = addon.L
 local Utils            = addon.Utils
 local C                = addon.C
+local function TGet(tag)
+    if Utils.Table and Utils.Table.get then
+        return Utils.Table.get(tag)
+    end
+    return {}
+end
 
 local _G               = _G
 _G["KRT"]              = addon
@@ -1013,7 +1019,7 @@ do
     local function PreparePrint(text, prefix)
         prefix = prefix or chatPrefixShort
         if prefixHex then
-            prefix = addon:WrapTextInColorCode(prefix, Utils.normalizeHexColor(prefixHex))
+            prefix = addon.WrapTextInColorCode(prefix, Utils.normalizeHexColor(prefixHex))
         end
         return format(output, prefix, tostring(text))
     end
@@ -1235,9 +1241,9 @@ do
         KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
             GameTooltip_SetDefaultAnchor(GameTooltip, self)
             GameTooltip:SetText(
-                addon:WrapTextInColorCode("Kader", Utils.normalizeHexColor(K_COLOR))
+                addon.WrapTextInColorCode("Kader", Utils.normalizeHexColor(K_COLOR))
                 .. " "
-                .. addon:WrapTextInColorCode("Raid Tools", Utils.normalizeHexColor("aad4af37"))
+                .. addon.WrapTextInColorCode("Raid Tools", Utils.normalizeHexColor("aad4af37"))
             )
             GameTooltip:AddLine(L.StrMinimapLClick, 1, 1, 1)
             GameTooltip:AddLine(L.StrMinimapRClick, 1, 1, 1)
@@ -1722,7 +1728,10 @@ do
             if frameName == nil then return end
 
             local currentItemLink = _G[frameName .. "Name"]
-            currentItemLink:SetText(addon:WrapTextInColorCode(i.itemName, Utils.normalizeHexColor(i.itemColor)))
+            currentItemLink:SetText(addon.WrapTextInColorCode(
+                i.itemName,
+                Utils.normalizeHexColor(i.itemColor)
+            ))
 
             local currentItemBtn = _G[frameName .. "ItemBtn"]
             currentItemBtn:SetNormalTexture(i.itemTexture)
@@ -1844,7 +1853,7 @@ do
     local localized = false
 
     local UpdateUIFrame
-    local updateInterval = 0.05
+    local updateInterval = C.UPDATE_INTERVAL_MASTER
 
     local InitializeDropDowns, PrepareDropDowns, UpdateDropDowns
     local dropDownData, dropDownGroupData = {}, {}
@@ -2681,7 +2690,7 @@ do
 
     local function StartCountsTicker()
         if not countsTicker then
-            countsTicker = Utils.NewTicker(0.1, TickCounts)
+            countsTicker = Utils.NewTicker(C.LOOT_COUNTER_TICK_INTERVAL, TickCounts)
         end
     end
 
@@ -2742,7 +2751,7 @@ do
 
         local players = GetCurrentRaidPlayers()
         local numPlayers = #players
-        local rowHeight = 25
+        local rowHeight = C.LOOT_COUNTER_ROW_HEIGHT
         local counts = KRT_PlayerCounts
 
         scrollChild:SetHeight(numPlayers * rowHeight)
@@ -2854,12 +2863,12 @@ do
 
     -- State variables
     local localized = false
-    local updateInterval = 0.5
+    local updateInterval = C.UPDATE_INTERVAL_RESERVES
     local reservesData = {}
     local reservesByItemID = {}
     local pendingItemInfo = {}
     local collapsedBossGroups = {}
-    local itemFallbackIcon = "Interface\\Icons\\INV_Misc_QuestionMark"
+    local itemFallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
 
     -------------------------------------------------------
     -- Private helpers
@@ -3145,8 +3154,7 @@ do
         end
 
         local firstLine = true
-        for line in csv:gmatch("[^
-]+") do
+        for line in csv:gmatch("[^]+") do
             if firstLine then
                 firstLine = false
             else
@@ -3388,7 +3396,7 @@ do
             return a.quantity < b.quantity
         end)
 
-        local rowHeight, yOffset = 34, 0
+        local rowHeight, yOffset = C.RESERVES_ROW_HEIGHT, 0
         local seenSources = {}
         local rowIndex = 0
         local headerIndex = 0
@@ -3402,7 +3410,7 @@ do
                 headerIndex = headerIndex + 1
                 local header = module:CreateReserveHeader(scrollChild, source, yOffset, headerIndex)
                 reserveItemRows[#reserveItemRows + 1] = header
-                yOffset = yOffset + 24
+                yOffset = yOffset + C.RESERVE_HEADER_HEIGHT
             end
 
             if not collapsedBossGroups[source] then
@@ -3515,7 +3523,7 @@ do
 
     -- Frame update
     local UpdateUIFrame
-    local updateInterval = 0.1
+    local updateInterval = C.UPDATE_INTERVAL_CONFIG
 
     -------------------------------------------------------
     -- Private helpers
@@ -3736,7 +3744,7 @@ do
     local localized = false
 
     local UpdateUIFrame
-    local updateInterval = 0.1
+    local updateInterval = C.UPDATE_INTERVAL_WARNINGS
 
     local FetchWarnings
     local fetched = false
@@ -3976,7 +3984,7 @@ do
     local localized = false
 
     local UpdateUIFrame
-    local updateInterval = 0.1
+    local updateInterval = C.UPDATE_INTERVAL_CHANGES
 
     local changesTable = {}
     local FetchChanges, SaveChanges, CancelChanges
@@ -4278,7 +4286,7 @@ do
     local localized = false
 
     local UpdateUIFrame
-    local updateInterval = 0.05
+    local updateInterval = C.UPDATE_INTERVAL_SPAMMER
     local updateTicker
 
     -------------------------------------------------------
@@ -4288,8 +4296,6 @@ do
     -------------------------------------------------------
     -- Public methods
     -------------------------------------------------------
-
-    local FindAchievement
 
     local loaded = false
 
@@ -4541,7 +4547,7 @@ do
                     end
                 end
                 if message ~= "" then
-                    temp = temp .. " - " .. FindAchievement(message)
+                    temp = temp .. " - " .. Utils.findAchievement(message)
                 end
 
                 if temp ~= "LFM" then
@@ -4606,329 +4612,6 @@ do
         end
     end
 
-    function FindAchievement(inp)
-        local out = inp:trim()
-        if out and out ~= "" and find(out, "%{%d*%}") then
-            local b, e = find(out, "%{%d*%}")
-            local id = strsub(out, b + 1, e - 1)
-            if not id or id == "" or not GetAchievementLink(id) then
-                link = "[" .. id .. "]"
-            else
-                link = GetAchievementLink(id)
-            end
-            out = strsub(out, 0, b - 1) .. link .. strsub(out, e + 1)
-        end
-        return out
-    end
-end
-
--- ==================== Tooltips ==================== --
-do
-    local colors = HIGHLIGHT_FONT_COLOR
-
-    -- Show the tooltip:
-    local function ShowTooltip(frame)
-        -- Is the anchor manually set?
-        if not frame.tooltip_anchor then
-            GameTooltip_SetDefaultAnchor(GameTooltip, frame)
-        else
-            GameTooltip:SetOwner(frame, frame.tooltip_anchor)
-        end
-
-        -- Do we have a title?
-        if frame.tooltip_title then
-            GameTooltip:SetText(frame.tooltip_title)
-        end
-
-        -- Do We have a text?
-        if frame.tooltip_text then
-            if type(frame.tooltip_text) == "string" then
-                GameTooltip:AddLine(frame.tooltip_text, colors.r, colors.g, colors.b, true)
-            elseif type(frame.tooltip_text) == "table" then
-                for _, l in ipairs(frame.tooltip_text) do
-                    GameTooltip:AddLine(l, colors.r, colors.g, colors.b, true)
-                end
-            end
-        end
-
-        -- Do we have an item tooltip?
-        if frame.tooltip_item then
-            GameTooltip:SetHyperlink(frame.tooltip_item)
-        end
-
-        GameTooltip:Show()
-    end
-
-    -- Hides the tooltip:
-    local function HideTooltip()
-        GameTooltip:Hide()
-    end
-
-    -- Sets addon tooltips scripts:
-    function addon:SetTooltip(frame, text, anchor, title)
-        -- No frame no blame...
-        if not frame then return end
-        -- Prepare the text
-        frame.tooltip_text = text and text or frame.tooltip_text
-        frame.tooltip_anchor = anchor and anchor or frame.tooltip_anchor
-        frame.tooltip_title = title and title or frame.tooltip_title
-        -- No title or text? nothing to do...
-        if not frame.tooltip_title and not frame.tooltip_text and not frame.tooltip_item then return end
-        frame:SetScript("OnEnter", ShowTooltip)
-        frame:SetScript("OnLeave", HideTooltip)
-    end
-end
-
--- ============================================================================
--- Helper e Controller liste - versione SLIM (event-driven, no polling)
---   - no CacheParts (usa row._p via cfg._rowParts)
---   - pooling wrappers (cfg.poolTag) + free prima del wipe
---   - elimina wipe(out) ridondanti nei getData (controller già wipa)
---   - tooltip loot via row._itemLink (robusto)
--- ============================================================================
-
-local _G          = _G
-local CreateFrame = CreateFrame
-
-local wipe        = _G.wipe or table.wipe
-local tinsert     = _G.tinsert
-local tremove     = _G.tremove
-local ipairs      = _G.ipairs
-local pairs       = _G.pairs
-local tonumber    = _G.tonumber
-local tostring    = _G.tostring
-local strsplit    = _G.strsplit
-local format      = _G.format
-local date        = _G.date
-local time        = _G.time
-local math_max    = math.max
-local strlower    = string.lower
-local strfind     = string.find
-local strsub      = string.sub
-
--- LibCompat table pool: alias robusto (degrada se non disponibile)
-do
-    if Utils and addon and addon.Table and not Utils.Table then
-        Utils.Table = addon.Table
-    end
-    if Utils and addon and addon.TablePool and not Utils.TablePool then
-        Utils.TablePool = addon.TablePool
-    end
-    if Utils and not Utils.Table then
-        Utils.Table = {}
-        function Utils.Table.get(_) return {} end
-
-        function Utils.Table.free(_, _) end
-    end
-end
-
-local TGet  = Utils.Table.get
-local TFree = Utils.Table.free
-
--- compact confirmation popup (riusabile)
--- Controller generico per liste con pooling righe e refresh differito
-local function MakeListController(cfg)
-    -- cfg:
-    --   keyName, localize(frameName)
-    --   getData(outTbl)
-    --   rowName(frameName,item,index)
-    --   rowTmpl
-    --   drawRow(row,item)->rowHeight|nil
-    --   highlightId()
-    --   postUpdate(frameName)
-    --   sorters = { key = function(a,b,asc) return cond end, ... }
-    --   _rowParts = { "ID","Name",... }   -- cache 1-shot dei sotto-widget su row._p
-    --   poolTag   = "history-..."         -- pooling wrappers via Utils.Table.get/free
-
-    local self = {
-        frameName  = nil,
-        data       = {},
-        _rows      = {},
-        _rowByName = {},
-        _asc       = false,
-        _lastHL    = nil,
-        _active    = true,
-        _localized = false,
-        _lastWidth = nil,
-        _dirty     = true,
-    }
-
-    local defer = CreateFrame("Frame")
-    defer:Hide()
-
-    local function acquireRow(btnName, parent, tmpl)
-        local row = self._rowByName[btnName]
-        if row then
-            row:Show()
-            return row
-        end
-
-        row = CreateFrame("Button", btnName, parent, tmpl)
-        self._rowByName[btnName] = row
-
-        if cfg._rowParts and not row._p then
-            local p = {}
-            for i = 1, #cfg._rowParts do
-                local part = cfg._rowParts[i]
-                p[part] = _G[btnName .. part]
-            end
-            row._p = p
-        end
-
-        return row
-    end
-
-    local function hideExtraRows(fromIndex)
-        for i = fromIndex, #self._rows do
-            local r = self._rows[i]
-            if r then r:Hide() end
-        end
-    end
-
-    local function applyHighlightAndPost()
-        if cfg.highlightId then
-            local sel = cfg.highlightId()
-            if sel ~= self._lastHL then
-                self._lastHL = sel
-                for i = 1, #self.data do
-                    local it  = self.data[i]
-                    local row = self._rows[i]
-                    if row then
-                        Utils.toggleHighlight(row, sel ~= nil and it.id == sel)
-                    end
-                end
-            end
-        end
-        if cfg.postUpdate then cfg.postUpdate(self.frameName) end
-    end
-
-    function self:Touch()
-        -- highlight/postUpdate only (no rebuild data)
-        defer:Show()
-    end
-
-    function self:Dirty()
-        self._dirty = true
-        defer:Show()
-    end
-
-    defer:SetScript("OnUpdate", function(f)
-        f:Hide()
-        if not self._active or not self.frameName then return end
-
-        if self._dirty then
-            if cfg.poolTag and TFree then
-                for i = 1, #self.data do
-                    TFree(cfg.poolTag, self.data[i])
-                end
-            end
-
-            wipe(self.data)
-            if cfg.getData then cfg.getData(self.data) end
-
-            self:Fetch()
-            self._dirty = false
-        end
-
-        applyHighlightAndPost()
-    end)
-
-    function self:OnLoad(frame)
-        if not frame then return end
-        self.frameName = frame:GetName()
-
-        frame:SetScript("OnShow", function()
-            self._active = true
-            if not self._localized and cfg.localize then
-                cfg.localize(self.frameName)
-                self._localized = true
-            end
-            self:Dirty()
-        end)
-
-        frame:SetScript("OnHide", function()
-            self._active = false
-        end)
-
-        if frame:IsShown() then
-            self._active = true
-            if not self._localized and cfg.localize then
-                cfg.localize(self.frameName)
-                self._localized = true
-            end
-            self:Dirty()
-        end
-    end
-
-    function self:Fetch()
-        local n = self.frameName
-        if not n then return end
-
-        local sf = _G[n .. "ScrollFrame"]
-        local sc = _G[n .. "ScrollFrameScrollChild"]
-        if not (sf and sc) then return end
-
-        local scrollW = sf:GetWidth() or 0
-        local widthChanged = (self._lastWidth ~= scrollW)
-        self._lastWidth = scrollW
-
-        local totalH = 0
-        local count = #self.data
-
-        for i = 1, count do
-            local it      = self.data[i]
-            local btnName = cfg.rowName(n, it, i)
-
-            local row     = self._rows[i]
-            if not row or row:GetName() ~= btnName then
-                row = acquireRow(btnName, sc, cfg.rowTmpl)
-                self._rows[i] = row
-            end
-
-            row:SetID(it.id)
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", 0, -totalH)
-            if widthChanged then row:SetWidth(scrollW - 20) end
-
-            local rH = cfg.drawRow(row, it)
-            local usedH = rH or row:GetHeight() or 20
-            totalH = totalH + usedH
-
-            row:Show()
-        end
-
-        hideExtraRows(count + 1)
-        sc:SetHeight(math_max(totalH, sf:GetHeight()))
-
-        -- forza ricalcolo HL su dataset aggiornato
-        self._lastHL = nil
-    end
-
-    function self:Sort(key)
-        local cmp = cfg.sorters and cfg.sorters[key]
-        if not cmp or #self.data <= 1 then return end
-        self._asc = not self._asc
-        table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
-        self:Fetch()
-        applyHighlightAndPost()
-    end
-
-    -- utilities esposte
-    self._makeConfirmPopup = Utils.makeConfirmPopup
-
-    return self
-end
-
-local function BindListController(module, controller)
-    module.OnLoad = function(_, frame) controller:OnLoad(frame) end
-    module.Fetch = function() controller:Fetch() end
-    module.Sort = function(_, t) controller:Sort(t) end
-end
-
-local function RegisterCallbacks(names, handler)
-    for i = 1, #names do
-        Utils.registerCallback(names[i], handler)
-    end
 end
 
 -- ============================================================================
@@ -5081,7 +4764,7 @@ do
     local Raids         = addon.History.Raids
     local L             = addon.L
 
-    local controller    = MakeListController {
+    local controller    = Utils.makeListController {
         keyName     = "RaidsList",
         poolTag     = "history-raids",
         _rowParts   = { "ID", "Date", "Zone", "Size" },
@@ -5146,7 +4829,7 @@ do
         },
     }
 
-    BindListController(Raids, controller)
+    Utils.bindListController(Raids, controller)
 
     function Raids:SetCurrent(btn)
         local sel = addon.History.selectedRaid
@@ -5207,7 +4890,7 @@ do
     local Boss         = addon.History.Boss
     local L            = addon.L
 
-    local controller   = MakeListController {
+    local controller   = Utils.makeListController {
         keyName     = "BossList",
         poolTag     = "history-bosses",
         _rowParts   = { "ID", "Name", "Time", "Mode" },
@@ -5268,7 +4951,7 @@ do
         },
     }
 
-    BindListController(Boss, controller)
+    Utils.bindListController(Boss, controller)
 
     function Boss:Add() addon.History.BossBox:Toggle() end
 
@@ -5331,7 +5014,7 @@ do
     local M                     = addon.History.BossAttendees
     local L                     = addon.L
 
-    local controller            = MakeListController {
+    local controller            = Utils.makeListController {
         keyName     = "BossAttendees",
         poolTag     = "history-boss-attendees",
         _rowParts   = { "Name" },
@@ -5385,7 +5068,7 @@ do
         },
     }
 
-    BindListController(M, controller)
+    Utils.bindListController(M, controller)
 
     function M:Add() addon.History.AttendeesBox:Toggle() end
 
@@ -5420,7 +5103,7 @@ do
         controller._makeConfirmPopup("KRTHISTORY_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendee)
     end
 
-    RegisterCallbacks({ "HistorySelectRaid", "HistorySelectBoss" }, function() controller:Dirty() end)
+    Utils.registerCallbacks({ "HistorySelectRaid", "HistorySelectBoss" }, function() controller:Dirty() end)
     Utils.registerCallback("HistorySelectBossPlayer", function() controller:Touch() end)
 end
 
@@ -5432,7 +5115,7 @@ do
     local M                     = addon.History.RaidAttendees
     local L                     = addon.L
 
-    local controller            = MakeListController {
+    local controller            = Utils.makeListController {
         keyName     = "RaidAttendees",
         poolTag     = "history-raid-attendees",
         _rowParts   = { "Name", "Join", "Leave" },
@@ -5498,7 +5181,7 @@ do
         },
     }
 
-    BindListController(M, controller)
+    Utils.bindListController(M, controller)
 
     do
         local function DeleteAttendee()
@@ -5550,7 +5233,7 @@ do
     local module       = addon.History.Loot
     local L            = addon.L
 
-    local controller   = MakeListController {
+    local controller   = Utils.makeListController {
         keyName     = "LootList",
         poolTag     = "history-loot",
         _rowParts   = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
@@ -5618,7 +5301,7 @@ do
 
                 row._itemLink = v.itemLink
 
-                ui.Name:SetText(addon:WrapTextInColorCode(
+                ui.Name:SetText(addon.WrapTextInColorCode(
                     v.itemName,
                     Utils.normalizeHexColor(itemColors[v.itemRarity + 1])
                 ))
@@ -5657,7 +5340,7 @@ do
         },
     }
 
-    BindListController(module, controller)
+    Utils.bindListController(module, controller)
 
     function module:OnEnter(widget)
         if not widget then return end
@@ -5706,7 +5389,7 @@ do
     end
 
     local function Reset() controller:Dirty() end
-    RegisterCallbacks(
+    Utils.registerCallbacks(
         { "HistorySelectRaid", "HistorySelectBoss", "HistorySelectPlayer", "HistorySelectBossPlayer" },
         Reset
     )
@@ -5723,7 +5406,7 @@ do
 
     local frameName, localized, isEdit = nil, false, false
     local raidData, bossData, tempDate = {}, {}, {}
-    local updateInterval               = 0.1
+    local updateInterval               = C.UPDATE_INTERVAL_HISTORY
 
     function Box:OnLoad(frame)
         if not frame then return end
@@ -5920,7 +5603,7 @@ do
 
     local helpString = "%s: %s"
     local function printHelp(cmd, desc)
-        print(helpString:format(addon:WrapTextInColorCode(cmd, Utils.normalizeHexColor(RT_COLOR)), desc))
+        print(helpString:format(addon.WrapTextInColorCode(cmd, Utils.normalizeHexColor(RT_COLOR)), desc))
     end
 
     local function showHelp()
