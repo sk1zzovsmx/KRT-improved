@@ -285,6 +285,14 @@ function Utils.toggle(frame)
 	end
 end
 
+-- Hide frame with optional onHide callback:
+function Utils.hideFrame(frame, onHide)
+	if frame and frame:IsShown() then
+		if onHide then onHide() end
+		frame:Hide()
+	end
+end
+
 -- Conditional Show/Hide Frame:
 function Utils.showHide(frame, cond)
 	if cond and not frame:IsShown() then
