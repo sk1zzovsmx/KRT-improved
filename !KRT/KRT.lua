@@ -59,37 +59,15 @@ addon.Deformat            = addon:GetLib("LibDeformat-3.0", true)
 addon.CallbackHandler     = addon:GetLib("CallbackHandler-1.0", true)
 
 Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
-Utils.Table     = addon.Table
-Utils.TablePool = addon.TablePool
 addon.Logger:Embed(addon)
-Utils.After                = addon.After
-Utils.NewTicker            = addon.NewTicker
-Utils.CancelTimer          = addon.CancelTimer
-Utils.UnitIterator         = addon.UnitIterator
-Utils.tCopy                = addon.tCopy
-Utils.tLength              = addon.tLength
-Utils.tContains            = addon.tContains
-Utils.tIndexOf             = addon.tIndexOf
+Utils.bindCompat(addon)
+Utils.bindLogger(addon)
 
 -- Alias locali (safe e veloci)
 local IsInRaid             = addon.IsInRaid
 local IsInGroup            = addon.IsInGroup
 local UnitIsGroupLeader    = addon.UnitIsGroupLeader
 local UnitIsGroupAssistant = addon.UnitIsGroupAssistant
-
-function addon:Debug(level, fmt, ...)
-    local lv = level:upper()
-    local fn = (lv == "ERROR" and self.error)
-        or (lv == "WARN" and self.warn)
-        or (lv == "DEBUG" and self.debug)
-        or self.info
-    fn(self, fmt, ...)
-    local lvl = self.logLevels[lv]
-    if lvl <= self.logLevel then
-        local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
-        self.Debugger:AddMessage(msg)
-    end
-end
 
 -- SavedVariables for log level (fallback INFO)
 KRT_Debug = KRT_Debug or {}
@@ -164,12 +142,6 @@ local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings, UIHistory, UIHistory
 
 -- Player info helper
 coreState.player = coreState.player or {}
-local function GetPlayerName()
-    local name = coreState.player.name or UnitName("player")
-    coreState.player.name = name
-    return name
-end
-
 -- Rolls & Loot
 coreState.loot             = coreState.loot or {}
 local lootState            = coreState.loot
@@ -474,7 +446,7 @@ do
         end
         if not IsInGroup() then return end
 
-        if KRT_CurrentRaid and module:CheckPlayer(GetPlayerName(), KRT_CurrentRaid) then
+        if KRT_CurrentRaid and module:CheckPlayer(Utils.getPlayerName(), KRT_CurrentRaid) then
             Utils.CancelTimer(module.updateRosterHandle, true)
             module.updateRosterHandle = Utils.After(2, function() module:UpdateRaidRoster() end)
             return
@@ -567,7 +539,7 @@ do
                 itemLink = link
                 itemCount = count or 1
             end
-            player = GetPlayerName()
+            player = Utils.getPlayerName()
         end
         if not itemLink then
             itemLink = addon.Deformat(msg, LOOT_ITEM_SELF)
@@ -577,7 +549,7 @@ do
         -- Other Loot Rolls
         if not player or not itemLink then
             itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
-            player = GetPlayerName()
+            player = Utils.getPlayerName()
             itemCount = 1
         end
         if not itemLink then return end
@@ -768,7 +740,7 @@ do
     function module:GetLootID(itemID, raidNum, holderName)
         local pos = 0
         local loot = self:GetLoot(raidNum)
-        holderName = holderName or GetPlayerName()
+        holderName = holderName or Utils.getPlayerName()
         itemID = tonumber(itemID)
         for k, v in ipairs(loot) do
             if v.itemId == itemID and v.looter == holderName then
@@ -868,7 +840,7 @@ do
         local id = 0
         raidNum = raidNum or KRT_CurrentRaid
         if raidNum and KRT_Raids[raidNum] then
-            name = name or GetPlayerName()
+            name = name or Utils.getPlayerName()
             local players = KRT_Raids[raidNum].players
             for i, p in ipairs(players) do
                 if p.name == name then
@@ -922,7 +894,7 @@ do
         local players = raid and raid.players or {}
         local rank = 0
         local originalName = name
-        name = name or GetPlayerName() or UnitName("player")
+        name = name or Utils.getPlayerName() or UnitName("player")
         if #players == 0 then
             if IsInGroup() then
                 for unit in Utils.UnitIterator(true) do
@@ -950,7 +922,7 @@ do
     function module:GetPlayerClass(name)
         local class = "UNKNOWN"
         local realm = Utils.getRealmName()
-        local resolvedName = name or GetPlayerName()
+        local resolvedName = name or Utils.getPlayerName()
         if KRT_Players[realm] and KRT_Players[realm][resolvedName] then
             class = KRT_Players[realm][resolvedName].class or "UNKNOWN"
         end
@@ -2597,7 +2569,7 @@ do
     --
     function TradeItem(itemLink, playerName, rollType, rollValue)
         if itemLink ~= GetItemLink() then return end
-        lootState.trader = GetPlayerName()
+        lootState.trader = Utils.getPlayerName()
 
         -- Prepare initial output and whisper:
         local output, whisper
@@ -3621,11 +3593,7 @@ do
             addon.options.countdownSimpleRaidMsg = false
         end
 
-        if addon.options.debug then
-            addon:SetLogLevel(addon.Logger.logLevels.DEBUG)
-        else
-            addon:SetLogLevel(KRT_Debug.level)
-        end
+        Utils.applyDebugSetting(addon.options.debug)
 
         if KRT_MINIMAP_GUI then
             addon.Minimap:SetPos(addon.options.minimapPos or 325)
@@ -5954,224 +5922,263 @@ end
 -- Slash Commands
 ---============================================================================
 do
-    local cmdAchiev   = { "ach", "achi", "achiev", "achievement" }
-    local cmdLFM      = { "pug", "lfm", "group", "grouper" }
-    local cmdConfig   = { "config", "conf", "options", "opt" }
-    local cmdChanges  = { "ms", "changes", "mschanges" }
-    local cmdWarnings = { "warning", "warnings", "warn", "rw" }
-    local cmdHistory  = { "history", "log", "logger" }
-    local cmdDebug    = { "debug", "dbg", "debugger" }
-    local cmdLoot     = { "loot", "ml", "master" }
-    local cmdReserves = { "res", "reserves", "reserve" }
-    local cmdChat     = { "chat", "throttle", "chatthrottle" }
-    local cmdMinimap  = { "minimap", "mm" }
+    addon.Slash = addon.Slash or {}
+    local Slash = addon.Slash
+    local L = addon.L
 
-    local helpString  = "%s: %s"
+    Slash.sub = Slash.sub or {}
+
+    local cmdAchiev = { "ach", "achi", "achiev", "achievement" }
+    local cmdLFM = { "pug", "lfm", "group", "grouper" }
+    local cmdConfig = { "config", "conf", "options", "opt" }
+    local cmdChanges = { "ms", "changes", "mschanges" }
+    local cmdWarnings = { "warning", "warnings", "warn", "rw" }
+    local cmdHistory = { "history", "log", "logger" }
+    local cmdDebug = { "debug", "dbg", "debugger" }
+    local cmdLoot = { "loot", "ml", "master" }
+    local cmdReserves = { "res", "reserves", "reserve" }
+    local cmdChat = { "chat", "throttle", "chatthrottle" }
+    local cmdMinimap = { "minimap", "mm" }
+
+    local helpString = "%s: %s"
     local function printHelp(cmd, desc)
         print(helpString:format(addon:WrapTextInColorCode(cmd, Utils.normalizeHexColor(RT_COLOR)), desc))
     end
 
-    local function HandleSlashCmd(cmd)
-        if not cmd or cmd == "" then return end
+    local function showHelp()
+        addon:info(format(L.StrCmdCommands, "krt"), "KRT")
+        printHelp("config", L.StrCmdConfig)
+        printHelp("lfm", L.StrCmdGrouper)
+        printHelp("ach", L.StrCmdAchiev)
+        printHelp("changes", L.StrCmdChanges)
+        printHelp("warnings", L.StrCmdWarnings)
+        printHelp("history", L.StrCmdHistory)
+        printHelp("reserves", L.StrCmdReserves)
+    end
 
+    local function splitArgs(msg)
+        msg = msg or ""
+        msg = msg:gsub("^%s+", ""):gsub("%s+$", "")
+        local cmd, rest = msg:match("^(%S+)%s*(.-)$")
+        return (cmd or ""):lower(), rest or ""
+    end
+
+    local function registerAliases(list, fn)
+        for _, cmd in ipairs(list) do
+            Slash.sub[cmd] = fn
+        end
+    end
+
+    function Slash:Register(cmd, fn)
+        self.sub[cmd] = fn
+    end
+
+    function Slash:Handle(msg)
+        if not msg or msg == "" then return end
+        local cmd, rest = splitArgs(msg)
         if cmd == "show" or cmd == "toggle" then
             addon.Master:Toggle()
             return
         end
-
-        local cmd1, cmd2, cmd3 = strsplit(" ", cmd, 3)
-        cmd1 = cmd1 and strlower(cmd1) or nil
-        cmd2 = cmd2 and strlower(cmd2) or nil
-
-        -- ==== Debug ====
-        if Utils.tContains(cmdDebug, cmd1) then
-            local subCmd = cmd2
-
-            if subCmd == "level" or subCmd == "lvl" then
-                if not cmd3 then
-                    local lvl = addon.GetLogLevel and addon:GetLogLevel()
-                    local name
-                    for k, v in pairs(addon.logLevels or {}) do
-                        if v == lvl then
-                            name = k
-                            break
-                        end
-                    end
-                    addon:info("Current log level: %s", name or tostring(lvl))
-                else
-                    local lv = tonumber(cmd3)
-                    if not lv and addon.logLevels then
-                        lv = addon.logLevels[strupper(cmd3)]
-                    end
-                    if lv then
-                        addon:SetLogLevel(lv)
-                        KRT_Debug.level = lv
-                        addon:info("Log level set to [%s]", cmd3)
-                    else
-                        addon:warn("Unknown log level: %s", cmd3)
-                    end
-                end
-            else
-                if subCmd == "on" then
-                    addon.options.debug = true
-                elseif subCmd == "off" then
-                    addon.options.debug = false
-                else
-                    addon.options.debug = not addon.options.debug
-                end
-
-                if addon.options.debug then
-                    addon:SetLogLevel(addon.Logger.logLevels.DEBUG)
-                    addon:info(L.MsgDebugOn)
-                else
-                    addon:SetLogLevel(KRT_Debug.level)
-                    addon:info(L.MsgDebugOff)
-                end
-            end
-
-            -- ==== Chat Throttle ====
-        elseif Utils.tContains(cmdChat, cmd1) then
-            local val = tonumber(cmd2)
-            if val then
-                addon.options.chatThrottle = val
-                addon:info(L.MsgChatThrottleSet, val)
-            else
-                addon:info(L.MsgChatThrottleSet, addon.options.chatThrottle)
-            end
-
-            -- ==== Minimap ====
-        elseif Utils.tContains(cmdMinimap, cmd1) then
-            local sub = cmd2
-            if sub == "on" then
-                addon.options.minimapButton = true
-                if KRT_MINIMAP_GUI then KRT_MINIMAP_GUI:Show() end
-            elseif sub == "off" then
-                addon.options.minimapButton = false
-                if KRT_MINIMAP_GUI then KRT_MINIMAP_GUI:Hide() end
-            elseif sub == "pos" and cmd3 then
-                local angle = tonumber(cmd3)
-                if angle then
-                    addon.Minimap:SetPos(angle)
-                    addon:info(L.MsgMinimapPosSet, angle)
-                end
-            elseif sub == "pos" then
-                addon:info(L.MsgMinimapPosSet, addon.options.minimapPos)
-            else
-                addon:info(format(L.StrCmdCommands, "krt minimap"), "KRT")
-                printHelp("on", L.StrCmdToggle)
-                printHelp("off", L.StrCmdToggle)
-                printHelp("pos <deg>", L.StrCmdMinimapPos)
-            end
-
-            -- ==== Achievement Link ====
-        elseif Utils.tContains(cmdAchiev, cmd1) and strfind(cmd, "achievement:%d*:") then
-            local from, to = strfind(cmd, "achievement%:%d*%:")
-            local id = strsub(cmd, from + 12, to - 1)
-            from, to = strfind(cmd, "%|cffffff00%|Hachievement%:.*%]%|h%|r")
-            local name = strsub(cmd, from, to)
-            printHelp("KRT", name .. " - ID#" .. id)
-
-            -- ==== Config ====
-        elseif Utils.tContains(cmdConfig, cmd1) then
-            if cmd2 == "reset" then
-                addon.Config:Default()
-            else
-                addon.Config:Toggle()
-            end
-
-            -- ==== Warnings ====
-        elseif Utils.tContains(cmdWarnings, cmd1) then
-            if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
-                addon.Warnings:Toggle()
-            elseif cmd2 == "help" then
-                addon:info(format(L.StrCmdCommands, "krt rw"), "KRT")
-                printHelp("toggle", L.StrCmdToggle)
-                printHelp("[ID]", L.StrCmdWarningAnnounce)
-            else
-                addon.Warnings:Announce(tonumber(cmd2))
-            end
-
-            -- ==== MS Changes ====
-        elseif Utils.tContains(cmdChanges, cmd1) then
-            if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
-                addon.Changes:Toggle()
-            elseif cmd2 == "demand" or cmd2 == "ask" then
-                addon.Changes:Demand()
-            elseif cmd2 == "announce" or cmd2 == "spam" then
-                addon.Changes:Announce()
-            else
-                addon:info(format(L.StrCmdCommands, "krt ms"), "KRT")
-                printHelp("toggle", L.StrCmdToggle)
-                printHelp("demand", L.StrCmdChangesDemand)
-                printHelp("announce", L.StrCmdChangesAnnounce)
-            end
-
-            -- ==== Loot History ====
-        elseif Utils.tContains(cmdHistory, cmd1) then
-            if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
-                addon.History:Toggle()
-            end
-
-            -- ==== Master Looter ====
-        elseif Utils.tContains(cmdLoot, cmd1) then
-            if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
-                addon.Master:Toggle()
-            end
-
-            -- ==== Reserves ====
-        elseif Utils.tContains(cmdReserves, cmd1) then
-            if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
-                addon.Reserves:ShowWindow()
-            elseif cmd2 == "import" then
-                addon.Reserves:ShowImportBox()
-            else
-                addon:info(format(L.StrCmdCommands, "krt res"), "KRT")
-                printHelp("toggle", L.StrCmdToggle)
-                printHelp("import", L.StrCmdReservesImport)
-            end
-
-            -- ==== LFM (Spammer) ====
-        elseif Utils.tContains(cmdLFM, cmd1) then
-            if not cmd2 or cmd2 == "" or cmd2 == "toggle" or cmd2 == "show" then
-                addon.Spammer:Toggle()
-            elseif cmd2 == "start" then
-                addon.Spammer:Start()
-            elseif cmd2 == "stop" then
-                addon.Spammer:Stop()
-            elseif cmd2 == "period" then
-                if cmd3 then
-                    local v = tonumber(cmd3)
-                    if v then
-                        addon.options.lfmPeriod = v
-                        addon:info(L.MsgLFMPeriodSet, v)
-                    end
-                else
-                    addon:info(L.MsgLFMPeriodSet, addon.options.lfmPeriod)
-                end
-            else
-                addon:info(format(L.StrCmdCommands, "krt pug"), "KRT")
-                printHelp("toggle", L.StrCmdToggle)
-                printHelp("start", L.StrCmdLFMStart)
-                printHelp("stop", L.StrCmdLFMStop)
-                printHelp("period", L.StrCmdLFMPeriod)
-            end
-
-            -- ==== Help fallback ====
-        else
-            addon:info(format(L.StrCmdCommands, "krt"), "KRT")
-            printHelp("config", L.StrCmdConfig)
-            printHelp("lfm", L.StrCmdGrouper)
-            printHelp("ach", L.StrCmdAchiev)
-            printHelp("changes", L.StrCmdChanges)
-            printHelp("warnings", L.StrCmdWarnings)
-            printHelp("history", L.StrCmdHistory)
-            printHelp("reserves", L.StrCmdReserves)
+        local fn = self.sub[cmd]
+        if fn then
+            return fn(rest, cmd, msg)
         end
+        showHelp()
     end
+
+    registerAliases(cmdDebug, function(rest)
+        local subCmd, arg = splitArgs(rest)
+        if subCmd == "" then subCmd = nil end
+
+        if subCmd == "level" or subCmd == "lvl" then
+            if not arg or arg == "" then
+                local lvl = addon.GetLogLevel and addon:GetLogLevel()
+                local name
+                for k, v in pairs(addon.logLevels or {}) do
+                    if v == lvl then
+                        name = k
+                        break
+                    end
+                end
+                addon:info("Current log level: %s", name or tostring(lvl))
+                return
+            end
+
+            local lv = tonumber(arg)
+            if not lv and addon.logLevels then
+                lv = addon.logLevels[upper(arg)]
+            end
+            if lv then
+                addon:SetLogLevel(lv)
+                KRT_Debug.level = lv
+                addon:info("Log level set to [%s]", arg)
+            else
+                addon:warn("Unknown log level: %s", arg)
+            end
+            return
+        end
+
+        if subCmd == "on" then
+            Utils.applyDebugSetting(true)
+        elseif subCmd == "off" then
+            Utils.applyDebugSetting(false)
+        else
+            Utils.applyDebugSetting(not addon.options.debug)
+        end
+
+        if addon.options.debug then
+            addon:info(L.MsgDebugOn)
+        else
+            addon:info(L.MsgDebugOff)
+        end
+    end)
+
+    registerAliases(cmdChat, function(rest)
+        local val = tonumber(rest)
+        if val then
+            addon.options.chatThrottle = val
+            addon:info(L.MsgChatThrottleSet, val)
+        else
+            addon:info(L.MsgChatThrottleSet, addon.options.chatThrottle)
+        end
+    end)
+
+    registerAliases(cmdMinimap, function(rest)
+        local sub, arg = splitArgs(rest)
+        if sub == "on" then
+            addon.options.minimapButton = true
+            if KRT_MINIMAP_GUI then KRT_MINIMAP_GUI:Show() end
+        elseif sub == "off" then
+            addon.options.minimapButton = false
+            if KRT_MINIMAP_GUI then KRT_MINIMAP_GUI:Hide() end
+        elseif sub == "pos" and arg ~= "" then
+            local angle = tonumber(arg)
+            if angle then
+                addon.Minimap:SetPos(angle)
+                addon:info(L.MsgMinimapPosSet, angle)
+            end
+        elseif sub == "pos" then
+            addon:info(L.MsgMinimapPosSet, addon.options.minimapPos)
+        else
+            addon:info(format(L.StrCmdCommands, "krt minimap"), "KRT")
+            printHelp("on", L.StrCmdToggle)
+            printHelp("off", L.StrCmdToggle)
+            printHelp("pos <deg>", L.StrCmdMinimapPos)
+        end
+    end)
+
+    registerAliases(cmdAchiev, function(_, _, raw)
+        if not raw or not raw:find("achievement:%d*:") then
+            addon:info(format(L.StrCmdCommands, "krt ach"), "KRT")
+            return
+        end
+
+        local from, to = raw:find("achievement%:%d*%:")
+        if not (from and to) then return end
+        local id = raw:sub(from + 12, to - 1)
+        from, to = raw:find("%|cffffff00%|Hachievement%:.*%]%|h%|r")
+        local name = (from and to) and raw:sub(from, to) or ""
+        printHelp("KRT", name .. " - ID#" .. id)
+    end)
+
+    registerAliases(cmdConfig, function(rest)
+        local sub = splitArgs(rest)
+        if sub == "reset" then
+            addon.Config:Default()
+        else
+            addon.Config:Toggle()
+        end
+    end)
+
+    registerAliases(cmdWarnings, function(rest)
+        local sub = splitArgs(rest)
+        if not sub or sub == "" or sub == "toggle" then
+            addon.Warnings:Toggle()
+        elseif sub == "help" then
+            addon:info(format(L.StrCmdCommands, "krt rw"), "KRT")
+            printHelp("toggle", L.StrCmdToggle)
+            printHelp("[ID]", L.StrCmdWarningAnnounce)
+        else
+            addon.Warnings:Announce(tonumber(sub))
+        end
+    end)
+
+    registerAliases(cmdChanges, function(rest)
+        local sub = splitArgs(rest)
+        if not sub or sub == "" or sub == "toggle" then
+            addon.Changes:Toggle()
+        elseif sub == "demand" or sub == "ask" then
+            addon.Changes:Demand()
+        elseif sub == "announce" or sub == "spam" then
+            addon.Changes:Announce()
+        else
+            addon:info(format(L.StrCmdCommands, "krt ms"), "KRT")
+            printHelp("toggle", L.StrCmdToggle)
+            printHelp("demand", L.StrCmdChangesDemand)
+            printHelp("announce", L.StrCmdChangesAnnounce)
+        end
+    end)
+
+    registerAliases(cmdHistory, function(rest)
+        local sub = splitArgs(rest)
+        if not sub or sub == "" or sub == "toggle" then
+            addon.History:Toggle()
+        end
+    end)
+
+    registerAliases(cmdLoot, function(rest)
+        local sub = splitArgs(rest)
+        if not sub or sub == "" or sub == "toggle" then
+            addon.Master:Toggle()
+        end
+    end)
+
+    registerAliases(cmdReserves, function(rest)
+        local sub = splitArgs(rest)
+        if not sub or sub == "" or sub == "toggle" then
+            addon.Reserves:ShowWindow()
+        elseif sub == "import" then
+            addon.Reserves:ShowImportBox()
+        else
+            addon:info(format(L.StrCmdCommands, "krt res"), "KRT")
+            printHelp("toggle", L.StrCmdToggle)
+            printHelp("import", L.StrCmdReservesImport)
+        end
+    end)
+
+    registerAliases(cmdLFM, function(rest)
+        local sub, arg = splitArgs(rest)
+        if not sub or sub == "" or sub == "toggle" or sub == "show" then
+            addon.Spammer:Toggle()
+        elseif sub == "start" then
+            addon.Spammer:Start()
+        elseif sub == "stop" then
+            addon.Spammer:Stop()
+        elseif sub == "period" then
+            if arg and arg ~= "" then
+                local v = tonumber(arg)
+                if v then
+                    addon.options.lfmPeriod = v
+                    addon:info(L.MsgLFMPeriodSet, v)
+                end
+            else
+                addon:info(L.MsgLFMPeriodSet, addon.options.lfmPeriod)
+            end
+        else
+            addon:info(format(L.StrCmdCommands, "krt pug"), "KRT")
+            printHelp("toggle", L.StrCmdToggle)
+            printHelp("start", L.StrCmdLFMStart)
+            printHelp("stop", L.StrCmdLFMStop)
+            printHelp("period", L.StrCmdLFMPeriod)
+        end
+    end)
 
     -- Register slash commands
     SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
-    SlashCmdList["KRT"] = HandleSlashCmd
+    SlashCmdList["KRT"] = function(msg)
+        Slash:Handle(msg)
+    end
 
     SLASH_KRTCOUNTS1 = "/krtcounts"
     SlashCmdList["KRTCOUNTS"] = function()
@@ -6183,6 +6190,22 @@ end
 -- Main Event Handlers
 ---============================================================================
 
+local addonEvents = {
+    CHAT_MSG_ADDON = "CHAT_MSG_ADDON",
+    CHAT_MSG_SYSTEM = "CHAT_MSG_SYSTEM",
+    CHAT_MSG_LOOT = "CHAT_MSG_LOOT",
+    CHAT_MSG_MONSTER_YELL = "CHAT_MSG_MONSTER_YELL",
+    RAID_ROSTER_UPDATE = "RAID_ROSTER_UPDATE",
+    PLAYER_ENTERING_WORLD = "PLAYER_ENTERING_WORLD",
+    COMBAT_LOG_EVENT_UNFILTERED = "COMBAT_LOG_EVENT_UNFILTERED",
+    RAID_INSTANCE_WELCOME = "RAID_INSTANCE_WELCOME",
+    ITEM_LOCKED = "ITEM_LOCKED",
+    LOOT_CLOSED = "LOOT_CLOSED",
+    LOOT_OPENED = "LOOT_OPENED",
+    LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
+    TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
+}
+
 --
 -- ADDON_LOADED: Initializes the addon after loading.
 --
@@ -6190,20 +6213,12 @@ function addon:ADDON_LOADED(name)
     if name ~= addonName then return end
     self:UnregisterEvent("ADDON_LOADED")
     addon.LoadOptions()
-    self:RegisterEvent("CHAT_MSG_ADDON")
-    self:RegisterEvent("CHAT_MSG_SYSTEM")
-    self:RegisterEvent("CHAT_MSG_LOOT")
-    self:RegisterEvent("CHAT_MSG_MONSTER_YELL")
-    self:RegisterEvent("RAID_ROSTER_UPDATE")
-    self:RegisterEvent("PLAYER_ENTERING_WORLD")
-    self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-    self:RegisterEvent("RAID_INSTANCE_WELCOME")
-    -- Master Looter Events
-    self:RegisterEvent("ITEM_LOCKED")
-    self:RegisterEvent("LOOT_CLOSED")
-    self:RegisterEvent("LOOT_OPENED")
-    self:RegisterEvent("LOOT_SLOT_CLEARED")
-    self:RegisterEvent("TRADE_ACCEPT_UPDATE")
+    for event, handler in pairs(addonEvents) do
+        local method = handler
+        self:RegisterEvent(event, function(...)
+            self[method](self, ...)
+        end)
+    end
     self:RAID_ROSTER_UPDATE()
 end
 

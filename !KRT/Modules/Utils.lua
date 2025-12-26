@@ -24,6 +24,7 @@ local UnitInRaid           = UnitInRaid
 local UnitIsGroupAssistant = UnitIsGroupAssistant
 local UnitIsGroupLeader    = UnitIsGroupLeader
 local UnitLevel            = UnitLevel
+local UnitName             = UnitName
 
 ---============================================================================
 -- Library helper
@@ -58,6 +59,71 @@ function addon:GetLib(name, silent)
 	end
 
 	return LibStub(name, silent)
+end
+
+---============================================================================
+-- Addon binding helpers
+---============================================================================
+
+function Utils.bindCompat(addonRef)
+	addonRef = addonRef or addon
+	if not addonRef then return end
+	Utils.Table = addonRef.Table
+	Utils.TablePool = addonRef.TablePool
+	Utils.After = addonRef.After
+	Utils.NewTicker = addonRef.NewTicker
+	Utils.CancelTimer = addonRef.CancelTimer
+	Utils.UnitIterator = addonRef.UnitIterator
+	Utils.tCopy = addonRef.tCopy
+	Utils.tLength = addonRef.tLength
+	Utils.tContains = addonRef.tContains
+	Utils.tIndexOf = addonRef.tIndexOf
+end
+
+function Utils.debug(addonRef, level, fmt, ...)
+	addonRef = addonRef or addon
+	if not addonRef then return end
+	local lv = tostring(level or "INFO"):upper()
+	local fn = (lv == "ERROR" and addonRef.error)
+		or (lv == "WARN" and addonRef.warn)
+		or (lv == "DEBUG" and addonRef.debug)
+		or addonRef.info
+	if fn then
+		fn(addonRef, fmt, ...)
+	end
+	local lvl = addonRef.logLevels and addonRef.logLevels[lv]
+	if not lvl or not addonRef.logLevel or not addonRef.Debugger then return end
+	if lvl <= addonRef.logLevel then
+		local msg = select("#", ...) > 0 and format(fmt, ...) or fmt
+		addonRef.Debugger:AddMessage(msg)
+	end
+end
+
+function Utils.bindLogger(addonRef)
+	addonRef = addonRef or addon
+	if not addonRef then return end
+	addonRef.Debug = function(self, level, fmt, ...)
+		return Utils.debug(self, level, fmt, ...)
+	end
+end
+
+function Utils.applyDebugSetting(enabled)
+	if addon and addon.options then
+		addon.options.debug = enabled and true or false
+	end
+	local levels = addon and addon.Logger and addon.Logger.logLevels or {}
+	local level = enabled and levels.DEBUG or (KRT_Debug and KRT_Debug.level)
+	if addon and addon.SetLogLevel and level then
+		addon:SetLogLevel(level)
+	end
+end
+
+function Utils.getPlayerName()
+	addon.State = addon.State or {}
+	addon.State.player = addon.State.player or {}
+	local name = addon.State.player.name or UnitName("player")
+	addon.State.player.name = name
+	return name
 end
 
 ---============================================================================
