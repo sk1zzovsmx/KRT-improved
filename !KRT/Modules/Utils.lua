@@ -19,6 +19,7 @@ local GetLocale            = GetLocale
 local GetTime              = GetTime
 local GetRaidRosterInfo    = GetRaidRosterInfo
 local GetRealmName         = GetRealmName
+local GetAchievementLink   = GetAchievementLink
 local UnitClass            = UnitClass
 local UnitInRaid           = UnitInRaid
 local UnitIsGroupAssistant = UnitIsGroupAssistant
@@ -140,6 +141,21 @@ function Utils.forEachGroupUnit(cb, includePets)
 	for unit, owner in iter, state, index do
 		cb(unit, owner)
 	end
+end
+
+---============================================================================
+-- String helpers
+---============================================================================
+
+function Utils.findAchievement(inp)
+	local out = inp and inp:trim() or ""
+	if out ~= "" and find(out, "%{%d*%}") then
+		local b, e = find(out, "%{%d*%}")
+		local id = strsub(out, b + 1, e - 1)
+		local link = (id and id ~= "" and GetAchievementLink(id)) or ("[" .. id .. "]")
+		out = strsub(out, 1, b - 1) .. link .. strsub(out, e + 1)
+	end
+	return out
 end
 
 ---============================================================================
@@ -273,6 +289,56 @@ function Utils.makeEditBoxPopup(key, text, onAccept, onShow)
 			onAccept(self, self.editBox:GetText())
 		end,
 	}
+end
+
+---============================================================================
+-- Tooltip helpers
+---============================================================================
+
+do
+	local colors = HIGHLIGHT_FONT_COLOR
+
+	local function showTooltip(frame)
+		if not frame.tooltip_anchor then
+			GameTooltip_SetDefaultAnchor(GameTooltip, frame)
+		else
+			GameTooltip:SetOwner(frame, frame.tooltip_anchor)
+		end
+
+		if frame.tooltip_title then
+			GameTooltip:SetText(frame.tooltip_title)
+		end
+
+		if frame.tooltip_text then
+			if type(frame.tooltip_text) == "string" then
+				GameTooltip:AddLine(frame.tooltip_text, colors.r, colors.g, colors.b, true)
+			elseif type(frame.tooltip_text) == "table" then
+				for _, line in ipairs(frame.tooltip_text) do
+					GameTooltip:AddLine(line, colors.r, colors.g, colors.b, true)
+				end
+			end
+		end
+
+		if frame.tooltip_item then
+			GameTooltip:SetHyperlink(frame.tooltip_item)
+		end
+
+		GameTooltip:Show()
+	end
+
+	local function hideTooltip()
+		GameTooltip:Hide()
+	end
+
+	function addon:SetTooltip(frame, text, anchor, title)
+		if not frame then return end
+		frame.tooltip_text = text and text or frame.tooltip_text
+		frame.tooltip_anchor = anchor and anchor or frame.tooltip_anchor
+		frame.tooltip_title = title and title or frame.tooltip_title
+		if not frame.tooltip_title and not frame.tooltip_text and not frame.tooltip_item then return end
+		frame:SetScript("OnEnter", showTooltip)
+		frame:SetScript("OnLeave", hideTooltip)
+	end
 end
 
 ---============================================================================
@@ -569,6 +635,228 @@ function Utils.getServerOffset()
 		offset = offset + 24
 	end
 	return offset
+end
+
+---============================================================================
+-- List controller helpers
+---============================================================================
+
+do
+	local _G          = _G
+	local CreateFrame = CreateFrame
+
+	local wipe        = _G.wipe or table.wipe
+	local tinsert     = _G.tinsert
+	local ipairs      = _G.ipairs
+	local pairs       = _G.pairs
+	local format      = _G.format
+	local date        = _G.date
+	local math_max    = math.max
+
+	if Utils and addon and addon.Table and not Utils.Table then
+		Utils.Table = addon.Table
+	end
+	if Utils and addon and addon.TablePool and not Utils.TablePool then
+		Utils.TablePool = addon.TablePool
+	end
+	if Utils and not Utils.Table then
+		Utils.Table = {}
+		function Utils.Table.get(_) return {} end
+
+		function Utils.Table.free(_, _) end
+	end
+
+	local TGet  = Utils.Table.get
+	local TFree = Utils.Table.free
+
+	function Utils.makeListController(cfg)
+		local self = {
+			frameName  = nil,
+			data       = {},
+			_rows      = {},
+			_rowByName = {},
+			_asc       = false,
+			_lastHL    = nil,
+			_active    = true,
+			_localized = false,
+			_lastWidth = nil,
+			_dirty     = true,
+		}
+
+		local defer = CreateFrame("Frame")
+		defer:Hide()
+
+		local function acquireRow(btnName, parent, tmpl)
+			local row = self._rowByName[btnName]
+			if row then
+				row:Show()
+				return row
+			end
+
+			row = CreateFrame("Button", btnName, parent, tmpl)
+			self._rowByName[btnName] = row
+
+			if cfg._rowParts and not row._p then
+				local p = {}
+				for i = 1, #cfg._rowParts do
+					local part = cfg._rowParts[i]
+					p[part] = _G[btnName .. part]
+				end
+				row._p = p
+			end
+
+			return row
+		end
+
+		local function hideExtraRows(fromIndex)
+			for i = fromIndex, #self._rows do
+				local r = self._rows[i]
+				if r then r:Hide() end
+			end
+		end
+
+		local function applyHighlightAndPost()
+			if cfg.highlightId then
+				local sel = cfg.highlightId()
+				if sel ~= self._lastHL then
+					self._lastHL = sel
+					for i = 1, #self.data do
+						local it  = self.data[i]
+						local row = self._rows[i]
+						if row then
+							Utils.toggleHighlight(row, sel ~= nil and it.id == sel)
+						end
+					end
+				end
+			end
+			if cfg.postUpdate then cfg.postUpdate(self.frameName) end
+		end
+
+		function self:Touch()
+			defer:Show()
+		end
+
+		function self:Dirty()
+			self._dirty = true
+			defer:Show()
+		end
+
+		defer:SetScript("OnUpdate", function(f)
+			f:Hide()
+			if not self._active or not self.frameName then return end
+
+			if self._dirty then
+				if cfg.poolTag and TFree then
+					for i = 1, #self.data do
+						TFree(cfg.poolTag, self.data[i])
+					end
+				end
+
+				wipe(self.data)
+				if cfg.getData then cfg.getData(self.data) end
+
+				self:Fetch()
+				self._dirty = false
+			end
+
+			applyHighlightAndPost()
+		end)
+
+		function self:OnLoad(frame)
+			if not frame then return end
+			self.frameName = frame:GetName()
+
+			frame:SetScript("OnShow", function()
+				self._active = true
+				if not self._localized and cfg.localize then
+					cfg.localize(self.frameName)
+					self._localized = true
+				end
+				self:Dirty()
+			end)
+
+			frame:SetScript("OnHide", function()
+				self._active = false
+			end)
+
+			if frame:IsShown() then
+				self._active = true
+				if not self._localized and cfg.localize then
+					cfg.localize(self.frameName)
+					self._localized = true
+				end
+				self:Dirty()
+			end
+		end
+
+		function self:Fetch()
+			local n = self.frameName
+			if not n then return end
+
+			local sf = _G[n .. "ScrollFrame"]
+			local sc = _G[n .. "ScrollFrameScrollChild"]
+			if not (sf and sc) then return end
+
+			local scrollW = sf:GetWidth() or 0
+			local widthChanged = (self._lastWidth ~= scrollW)
+			self._lastWidth = scrollW
+
+			local totalH = 0
+			local count = #self.data
+
+			for i = 1, count do
+				local it      = self.data[i]
+				local btnName = cfg.rowName(n, it, i)
+
+				local row     = self._rows[i]
+				if not row or row:GetName() ~= btnName then
+					row = acquireRow(btnName, sc, cfg.rowTmpl)
+					self._rows[i] = row
+				end
+
+				row:SetID(it.id)
+				row:ClearAllPoints()
+				row:SetPoint("TOPLEFT", 0, -totalH)
+				if widthChanged then row:SetWidth(scrollW - 20) end
+
+				local rH = cfg.drawRow(row, it)
+				local usedH = rH or row:GetHeight() or 20
+				totalH = totalH + usedH
+
+				row:Show()
+			end
+
+			hideExtraRows(count + 1)
+			sc:SetHeight(math_max(totalH, sf:GetHeight()))
+
+			self._lastHL = nil
+		end
+
+		function self:Sort(key)
+			local cmp = cfg.sorters and cfg.sorters[key]
+			if not cmp or #self.data <= 1 then return end
+			self._asc = not self._asc
+			table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
+			self:Fetch()
+			applyHighlightAndPost()
+		end
+
+		self._makeConfirmPopup = Utils.makeConfirmPopup
+
+		return self
+	end
+
+	function Utils.bindListController(module, controller)
+		module.OnLoad = function(_, frame) controller:OnLoad(frame) end
+		module.Fetch = function() controller:Fetch() end
+		module.Sort = function(_, t) controller:Sort(t) end
+	end
+
+	function Utils.registerCallbacks(names, handler)
+		for i = 1, #names do
+			Utils.registerCallback(names[i], handler)
+		end
+	end
 end
 
 ---============================================================================
