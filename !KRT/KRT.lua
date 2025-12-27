@@ -2062,6 +2062,10 @@ do
                 lootState.rollsCount or 0)
             return
         end
+        if not lootState.winner then
+            addon:warn(L.ErrNoWinnerSelected)
+            return
+        end
         countdownRun = false
         local itemLink = GetItemLink()
         _G[frameName .. "ItemCount"]:ClearFocus()
