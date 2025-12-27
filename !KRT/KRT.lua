@@ -2715,9 +2715,10 @@ do
         countsFrame = countsFrame or _G["KRTLootCounterFrame"]
         scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         if countsFrame and not countsFrame._krtCounterHook then
-            if countsFrame.Title then
-                countsFrame.Title:SetText(format(titleString, L.StrLootCounter))
-                countsFrame.Title:Show()
+            local title = _G["KRTLootCounterFrameTitle"]
+            if title then
+                title:SetText(format(titleString, L.StrLootCounter))
+                title:Show()
             end
             countsFrame:SetScript("OnShow", StartCountsTicker)
             countsFrame:SetScript("OnHide", StopCountsTicker)
