@@ -2935,7 +2935,7 @@ do
         end
 
         if row.iconTexture then
-            local icon = info.itemIcon or itemFallbackIcon
+            local icon = info.itemIcon or (info.itemId and GetItemIcon(info.itemId)) or itemFallbackIcon
             row.iconTexture:SetTexture(icon)
             row.iconTexture:SetAllPoints(row.iconBtn)
             row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -2952,6 +2952,7 @@ do
         end
         if row.sourceText then
             row.sourceText:SetText("")
+            row.sourceText:Hide()
         end
 
         if row.quantityText then
@@ -3337,6 +3338,10 @@ do
             end
             if row.nameText then
                 row.nameText:SetText(itemLink or itemName or ("Item ID: " .. itemId))
+            end
+            if row.sourceText then
+                row.sourceText:SetText("")
+                row.sourceText:Hide()
             end
         end
     end
