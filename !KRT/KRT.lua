@@ -114,6 +114,15 @@ do
     function module:OnLoad(frame)
         debugFrame = frame
         msgFrame = _G[frame:GetName() .. "ScrollFrame"]
+        frame:SetScript("OnDragStart", frame.StartMoving)
+        frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+    end
+
+    function module:OnScrollLoad(frame)
+        if not frame then return end
+        frame:SetJustifyH("LEFT")
+        frame:SetFading(false)
+        frame:SetMaxLines(500)
     end
 
     function module:AddMessage(msg, r, g, b)
@@ -3032,6 +3041,23 @@ do
             _G["KRTImportEditBox"]:SetText("")
         end
         _G[frame:GetName() .. "Title"]:SetText(format(titleString, L.StrImportReservesTitle))
+    end
+
+    function module:CloseImportWindow()
+        local frame = _G["KRTImportWindow"]
+        if frame then
+            frame:Hide()
+        end
+    end
+
+    function module:ImportFromEditBox()
+        local editBox = _G["KRTImportEditBox"]
+        if not editBox then return end
+        local csv = editBox:GetText()
+        if csv and csv ~= "" then
+            self:ParseCSV(csv)
+        end
+        self:CloseImportWindow()
     end
 
     function module:OnLoad(frame)

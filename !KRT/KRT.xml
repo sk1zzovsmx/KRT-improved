@@ -90,17 +90,11 @@
 				</Anchors>
 				<FontString inherits="GameFontHighlightSmall" />
 				<Scripts>
-					<OnLoad>
-						self:SetJustifyH("LEFT")
-						self:SetFading(false)
-						self:SetMaxLines(500)
-					</OnLoad>
+					<OnLoad>KRT.Debugger:OnScrollLoad(self)</OnLoad>
 				</Scripts>
 			</ScrollingMessageFrame>
 		</Frames>
 		<Scripts>
-			<OnDragStart>self:StartMoving()</OnDragStart>
-			<OnDragStop>self:StopMovingOrSizing()</OnDragStop>
 			<OnLoad>KRT.Debugger:OnLoad(self)</OnLoad>
 		</Scripts>
 		<Anchors>
@@ -2393,12 +2387,6 @@
 			<OnLoad>
 				KRT.Reserves:OnLoad(self)
 			</OnLoad>
-			<OnDragStart>
-				self:StartMoving()
-			</OnDragStart>
-			<OnDragStop>
-				self:StopMovingOrSizing()
-			</OnDragStop>
 		</Scripts>
 	</Frame>
 	<!-- ====== End Reserve List Window ====== -->
@@ -2462,13 +2450,7 @@
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnClick>
-						local csv = KRTImportEditBox:GetText()
-						if csv and csv ~= "" then
-						KRT.Reserves:ParseCSV(csv)
-						KRTImportWindow:Hide()
-						end
-					</OnClick>
+					<OnClick>KRT.Reserves:ImportFromEditBox()</OnClick>
 				</Scripts>
 			</Button>
 
@@ -2485,7 +2467,7 @@
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnClick>KRTImportWindow:Hide()</OnClick>
+					<OnClick>KRT.Reserves:CloseImportWindow()</OnClick>
 				</Scripts>
 			</Button>
 		</Frames>
