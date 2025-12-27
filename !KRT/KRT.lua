@@ -2945,6 +2945,9 @@ do
         if row.playerText then
             row.playerText:SetText(info.playersText or (info.players and tconcat(info.players, ", ")) or "")
         end
+        if row.sourceText then
+            row.sourceText:SetText(info.source or "")
+        end
 
         if row.quantityText then
             if info.quantity and info.quantity > 1 then
@@ -3485,11 +3488,12 @@ do
             row.iconBtn = _G[rowName .. "IconBtn"]
             row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
             if row.iconTexture and row.iconBtn then
-                row.iconTexture:SetAllPoints(row.iconBtn)
-            end
-            row.nameText = _G[rowName .. "Name"]
-            row.playerText = _G[rowName .. "Players"]
-            row.quantityText = _G[rowName .. "Quantity"]
+            row.iconTexture:SetAllPoints(row.iconBtn)
+        end
+        row.nameText = _G[rowName .. "Name"]
+        row.sourceText = _G[rowName .. "Source"]
+        row.playerText = _G[rowName .. "Players"]
+        row.quantityText = _G[rowName .. "Quantity"]
             SetupReserveRowTooltip(row)
             row._initialized = true
         end
