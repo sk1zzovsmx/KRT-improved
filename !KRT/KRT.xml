@@ -2070,18 +2070,22 @@
 	<!-- ====== End of Master Loot Frame ====== -->
 
 	<!-- ====== Start of Loot Counter Frame ====== -->
-	<Frame name="KRTLootCounterFrame" inherits="KRTFrameTemplate" hidden="true">
+	<Frame name="KRTLootCounterFrame" inherits="KRTFrameTemplate" hidden="true" enableMouse="true"
+		registerForDrag="LeftButton">
 		<Size>
-			<AbsDimension x="210" y="300" />
+			<AbsDimension x="260" y="360" />
 		</Size>
 		<Anchors>
 			<Anchor point="CENTER" />
 		</Anchors>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString name="$parentTitle" inherits="GameFontNormal" text="Loot Counter">
+				<FontString name="$parentCounterTitle" inherits="GameFontNormal" text="Loot Counter">
+					<Size>
+						<AbsDimension x="200" y="0" />
+					</Size>
 					<Anchors>
-						<Anchor point="TOP" x="0" y="-15" />
+						<Anchor point="TOP" x="0" y="-14" />
 					</Anchors>
 				</FontString>
 			</Layer>
