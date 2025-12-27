@@ -2044,7 +2044,7 @@
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnClick>KRT:ToggleCountsFrame()</OnClick>
+					<OnClick>KRT.Master:ToggleCountsFrame()</OnClick>
 				</Scripts>
 			</Button>
 		</Frames>
@@ -2089,7 +2089,7 @@
 			</ScrollFrame>
 		</Frames>
 		<Scripts>
-			<OnShow>KRT:UpdateCountsFrame()</OnShow>
+			<OnShow>KRT.Master:UpdateCountsFrame()</OnShow>
 		</Scripts>
 	</Frame>
 	<!-- ====== End of Loot Counter Frame ====== -->
