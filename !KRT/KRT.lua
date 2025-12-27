@@ -2898,16 +2898,103 @@ do
     local updateInterval = C.UPDATE_INTERVAL_RESERVES
     local reservesData = {}
     local reservesByItemID = {}
+    local reservesDisplayList = {}
+    local reservesDirty = false
     local pendingItemInfo = {}
     local collapsedBossGroups = {}
     local itemFallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
+    local grouped = {}
 
     -------------------------------------------------------
     -- Private helpers
     -------------------------------------------------------
 
+    local function UpdateDisplayEntryForItem(itemId)
+        if not itemId then return end
+        reservesDirty = true
+
+        local groupedBySource = {}
+        local list = reservesByItemID[itemId]
+        if type(list) == "table" then
+            for i = 1, #list do
+                local r = list[i]
+                if type(r) == "table" then
+                    local source = r.source or "Unknown"
+                    local qty = r.quantity or 1
+                    local bySource = groupedBySource[source]
+                    if not bySource then
+                        bySource = {}
+                        groupedBySource[source] = bySource
+                        if collapsedBossGroups[source] == nil then
+                            collapsedBossGroups[source] = false
+                        end
+                    end
+                    local data = bySource[qty]
+                    if not data then
+                        data = {
+                            itemId = itemId,
+                            quantity = qty,
+                            itemLink = r.itemLink,
+                            itemName = r.itemName,
+                            itemIcon = r.itemIcon,
+                            source = source,
+                            players = {},
+                        }
+                        bySource[qty] = data
+                    end
+                    data.players[#data.players + 1] = r.player or "?"
+                end
+            end
+        end
+
+        local existing = {}
+        local remaining = {}
+        for i = 1, #reservesDisplayList do
+            local data = reservesDisplayList[i]
+            if data and data.itemId == itemId then
+                existing[#existing + 1] = data
+            else
+                remaining[#remaining + 1] = data
+            end
+        end
+
+        local reused = 0
+        for source, byQty in pairs(groupedBySource) do
+            for _, data in pairs(byQty) do
+                reused = reused + 1
+                local target = existing[reused]
+                if target then
+                    target.itemId = itemId
+                    target.quantity = data.quantity
+                    target.itemLink = data.itemLink
+                    target.itemName = data.itemName
+                    target.itemIcon = data.itemIcon
+                    target.source = source
+                    target.players = target.players or {}
+                    twipe(target.players)
+                    for i = 1, #data.players do
+                        target.players[i] = data.players[i]
+                    end
+                    target.playersText = tconcat(target.players, ", ")
+                    target.players = nil
+                    remaining[#remaining + 1] = target
+                else
+                    data.playersText = tconcat(data.players, ", ")
+                    data.players = nil
+                    remaining[#remaining + 1] = data
+                end
+            end
+        end
+
+        twipe(reservesDisplayList)
+        for i = 1, #remaining do
+            reservesDisplayList[i] = remaining[i]
+        end
+    end
+
     local function RebuildIndex()
         twipe(reservesByItemID)
+        reservesDirty = true
         for _, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
                 local playerName = player.original or "?"
@@ -2925,6 +3012,61 @@ do
                 end
             end
         end
+
+        twipe(reservesDisplayList)
+        twipe(grouped)
+        for itemId, list in pairs(reservesByItemID) do
+            if type(list) == "table" then
+                for i = 1, #list do
+                    local r = list[i]
+                    if type(r) == "table" then
+                        local source = r.source or "Unknown"
+                        local qty = r.quantity or 1
+
+                        local bySource = grouped[source]
+                        if not bySource then
+                            bySource = {}
+                            grouped[source] = bySource
+                            if collapsedBossGroups[source] == nil then
+                                collapsedBossGroups[source] = false
+                            end
+                        end
+
+                        local byItem = bySource[itemId]
+                        if not byItem then
+                            byItem = {}
+                            bySource[itemId] = byItem
+                        end
+
+                        local data = byItem[qty]
+                        if not data then
+                            data = {
+                                itemId = itemId,
+                                quantity = qty,
+                                itemLink = r.itemLink,
+                                itemName = r.itemName,
+                                itemIcon = r.itemIcon,
+                                source = source,
+                                players = {},
+                            }
+                            byItem[qty] = data
+                        end
+
+                        data.players[#data.players + 1] = r.player or "?"
+                    end
+                end
+            end
+        end
+
+        for _, byItem in pairs(grouped) do
+            for _, byQty in pairs(byItem) do
+                for _, data in pairs(byQty) do
+                    data.playersText = tconcat(data.players, ", ")
+                    data.players = nil
+                    reservesDisplayList[#reservesDisplayList + 1] = data
+                end
+            end
+        end
     end
 
     local function SetupReserveRowTooltip(row)
@@ -2932,12 +3074,12 @@ do
         row.iconBtn:SetScript("OnEnter", function()
             GameTooltip:SetOwner(row.iconBtn, "ANCHOR_RIGHT")
             if row._itemLink then
-                GameTooltip:SetHyperlink(row._itemLink)
-            else
-                GameTooltip:SetText("Item ID: " .. (row._itemId or "?"), 1, 1, 1)
+                GameTooltip:SetHyperlink(row._tooltipTitle)
+            elseif row._tooltipTitle then
+                GameTooltip:SetText(row._tooltipTitle, 1, 1, 1)
             end
-            if row._source then
-                GameTooltip:AddLine("Dropped by: " .. row._source, 0.8, 0.8, 0.8)
+            if row._tooltipSource then
+                GameTooltip:AddLine(row._tooltipSource, 0.8, 0.8, 0.8)
             end
             GameTooltip:Show()
         end)
@@ -2952,13 +3094,26 @@ do
         row._itemLink = info.itemLink
         row._itemName = info.itemName
         row._source = info.source
+        row._tooltipTitle = info.itemLink or info.itemName or ("Item ID: " .. (info.itemId or "?"))
+        row._tooltipSource = info.source and ("Dropped by: " .. info.source) or nil
 
         if row.background then
             row.background:SetVertexColor(index % 2 == 0 and 0.1 or 0, 0.1, 0.1, 0.3)
         end
 
         if row.iconTexture then
-            row.iconTexture:SetTexture(info.itemIcon or itemFallbackIcon)
+            local icon = info.itemIcon
+            if not icon and info.itemId then
+                local fetchedIcon = GetItemIcon(info.itemId)
+                if type(fetchedIcon) == "string" and fetchedIcon ~= "" then
+                    info.itemIcon = fetchedIcon
+                    icon = fetchedIcon
+                end
+            end
+            icon = icon or itemFallbackIcon
+            if type(icon) ~= "string" or icon == "" then icon = itemFallbackIcon end
+            row.iconTexture:SetTexture(icon)
+            row.iconTexture:Show()
         end
 
         if row.nameText then
@@ -2966,12 +3121,8 @@ do
         end
 
         if row.playerText then
-            row.playerText:SetText(info.playersText or (info.players and tconcat(info.players, ", ")) or "")
+            row.playerText:SetText(info.playersText or "")
         end
-        if row.sourceText then
-            row.sourceText:SetText(info.source or "")
-        end
-
         if row.quantityText then
             if info.quantity and info.quantity > 1 then
                 row.quantityText:SetText(info.quantity .. "x")
@@ -3028,6 +3179,8 @@ do
         KRT_SavedReserves = nil
         twipe(reservesData)
         twipe(reservesByItemID)
+        twipe(reservesDisplayList)
+        reservesDirty = true
         self:RefreshWindow()
         self:CloseWindow()
         addon:info(L.StrReserveListCleared)
@@ -3199,6 +3352,7 @@ do
         addon:Debug("DEBUG", "Starting to parse CSV data.")
         twipe(reservesData)
         twipe(reservesByItemID)
+        reservesDirty = true
 
         local function cleanCSVField(field)
             if not field then return nil end
@@ -3312,6 +3466,7 @@ do
     function module:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
         if not itemId then return end
         local icon = itemIcon or itemFallbackIcon
+        reservesDirty = true
 
         local list = reservesByItemID[itemId]
         if type(list) == "table" then
@@ -3339,6 +3494,8 @@ do
             end
         end
 
+        UpdateDisplayEntryForItem(itemId)
+
         local rows = rowsByItemID[itemId]
         if not rows then return end
         for i = 1, #rows do
@@ -3346,8 +3503,12 @@ do
             row._itemId = itemId
             row._itemLink = itemLink
             row._itemName = itemName
+            row._tooltipTitle = itemLink or itemName or ("Item ID: " .. itemId)
+            row._tooltipSource = row._source and ("Dropped by: " .. row._source) or nil
             if row.iconTexture then
+                if type(icon) ~= "string" or icon == "" then icon = itemFallbackIcon end
                 row.iconTexture:SetTexture(icon)
+                row.iconTexture:Show()
             end
             if row.nameText then
                 row.nameText:SetText(itemLink or itemName or ("Item ID: " .. itemId))
@@ -3386,75 +3547,22 @@ do
         twipe(reserveItemRows)
         twipe(rowsByItemID)
 
-        -- Group reserves by source, itemId, quantity
-        local grouped = {}
-        for itemId, list in pairs(reservesByItemID) do
-            if type(list) == "table" then
-                for i = 1, #list do
-                    local r = list[i]
-                    if type(r) == "table" then
-                        local source = r.source or "Unknown"
-                        local qty = r.quantity or 1
-
-                        local bySource = grouped[source]
-                        if not bySource then
-                            bySource = {}
-                            grouped[source] = bySource
-                            if collapsedBossGroups[source] == nil then
-                                collapsedBossGroups[source] = false
-                            end
-                        end
-
-                        local byItem = bySource[itemId]
-                        if not byItem then
-                            byItem = {}
-                            bySource[itemId] = byItem
-                        end
-
-                        local data = byItem[qty]
-                        if not data then
-                            data = {
-                                itemId = itemId,
-                                quantity = qty,
-                                itemLink = r.itemLink,
-                                itemName = r.itemName,
-                                itemIcon = r.itemIcon,
-                                source = source,
-                                players = {},
-                            }
-                            byItem[qty] = data
-                        end
-
-                        data.players[#data.players + 1] = r.player or "?"
-                    end
-                end
-            end
+        if reservesDirty then
+            table.sort(reservesDisplayList, function(a, b)
+                if a.source ~= b.source then return a.source < b.source end
+                if a.itemId ~= b.itemId then return a.itemId < b.itemId end
+                return a.quantity < b.quantity
+            end)
+            reservesDirty = false
         end
-
-        -- Flatten for sorting / display
-        local displayList = {}
-        for _, byItem in pairs(grouped) do
-            for _, byQty in pairs(byItem) do
-                for _, data in pairs(byQty) do
-                    data.playersText = tconcat(data.players, ", ")
-                    displayList[#displayList + 1] = data
-                end
-            end
-        end
-
-        table.sort(displayList, function(a, b)
-            if a.source ~= b.source then return a.source < b.source end
-            if a.itemId ~= b.itemId then return a.itemId < b.itemId end
-            return a.quantity < b.quantity
-        end)
 
         local rowHeight, yOffset = C.RESERVES_ROW_HEIGHT, 0
         local seenSources = {}
         local rowIndex = 0
         local headerIndex = 0
 
-        for i = 1, #displayList do
-            local entry = displayList[i]
+        for i = 1, #reservesDisplayList do
+            local entry = reservesDisplayList[i]
             local source = entry.source
 
             if not seenSources[source] then
@@ -3499,6 +3607,20 @@ do
         return header
     end
 
+    local function SetupReserveIcon(row)
+        if not row or not row.iconTexture or not row.iconBtn then return end
+        row.iconTexture:ClearAllPoints()
+        row.iconTexture:SetPoint("TOPLEFT", row.iconBtn, "TOPLEFT", 2, -2)
+        row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
+        row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        row.iconTexture:SetDrawLayer("ARTWORK")
+        row.iconBtn:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2")
+        local normal = row.iconBtn:GetNormalTexture()
+        if normal then
+            normal:SetAllPoints(row.iconBtn)
+        end
+    end
+
     -- Create a new row for displaying a reserve
     function module:CreateReserveRow(parent, info, yOffset, index)
         local rowName = frameName .. "ReserveRow" .. index
@@ -3510,14 +3632,16 @@ do
             row.background = _G[rowName .. "Background"]
             row.iconBtn = _G[rowName .. "IconBtn"]
             row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
-            if row.iconTexture and row.iconBtn then
-            row.iconTexture:SetAllPoints(row.iconBtn)
-        end
-        row.nameText = _G[rowName .. "Name"]
-        row.sourceText = _G[rowName .. "Source"]
-        row.playerText = _G[rowName .. "Players"]
-        row.quantityText = _G[rowName .. "Quantity"]
+            SetupReserveIcon(row)
+            row.nameText = _G[rowName .. "Name"]
+            row.sourceText = _G[rowName .. "Source"]
+            row.playerText = _G[rowName .. "Players"]
+            row.quantityText = _G[rowName .. "Quantity"]
             SetupReserveRowTooltip(row)
+            if row.sourceText then
+                row.sourceText:SetText("")
+                row.sourceText:Hide()
+            end
             row._initialized = true
         end
         ApplyReserveRowData(row, info, index)
@@ -5353,12 +5477,21 @@ do
                 local ui = row._p
 
                 row._itemLink = v.itemLink
-
-                ui.Name:SetText(addon.WrapTextInColorCode(
-                    v.itemName,
-                    Utils.normalizeHexColor(itemColors[v.itemRarity + 1])
-                ))
-                ui.Source:SetText(addon.History.Boss:GetName(v.bossNum, addon.History.selectedRaid))
+                local nameText = v.itemLink or v.itemName or ("[Item " .. (v.itemId or "?") .. "]")
+                if v.itemLink then
+                    ui.Name:SetText(nameText)
+                else
+                    ui.Name:SetText(addon.WrapTextInColorCode(
+                        nameText,
+                        Utils.normalizeHexColor(itemColors[(v.itemRarity or 1) + 1])
+                    ))
+                end
+                local selectedBoss = addon.History.selectedBoss
+                if selectedBoss and v.bossNum == selectedBoss then
+                    ui.Source:SetText("")
+                else
+                    ui.Source:SetText(addon.History.Boss:GetName(v.bossNum, addon.History.selectedRaid))
+                end
 
                 local r, g, b = addon.GetClassColor(addon.Raid:GetPlayerClass(v.looter))
                 ui.Winner:SetText(v.looter)
@@ -5367,7 +5500,14 @@ do
                 ui.Type:SetText(lootTypesColored[v.rollType] or lootTypesColored[4])
                 ui.Roll:SetText(v.rollValue or 0)
                 ui.Time:SetText(v.timeFmt)
-                ui.ItemIconTexture:SetTexture(v.itemTexture)
+                local icon = v.itemTexture
+                if not icon and v.itemId then
+                    icon = GetItemIcon(v.itemId)
+                end
+                if not icon then
+                    icon = C.RESERVES_ITEM_FALLBACK_ICON
+                end
+                ui.ItemIconTexture:SetTexture(icon)
 
                 return ROW_H
             end
