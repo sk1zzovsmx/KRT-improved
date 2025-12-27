@@ -2938,11 +2938,6 @@ do
             local icon = info.itemIcon or (info.itemId and GetItemIcon(info.itemId)) or itemFallbackIcon
             if type(icon) ~= "string" or icon == "" then icon = itemFallbackIcon end
             row.iconTexture:SetTexture(icon)
-            row.iconTexture:ClearAllPoints()
-            row.iconTexture:SetPoint("TOPLEFT", row.iconBtn, "TOPLEFT", 2, -2)
-            row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
-            row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-            row.iconTexture:SetDrawLayer("ARTWORK")
             row.iconTexture:Show()
         end
 
@@ -3335,11 +3330,6 @@ do
             if row.iconTexture then
                 if type(icon) ~= "string" or icon == "" then icon = itemFallbackIcon end
                 row.iconTexture:SetTexture(icon)
-                row.iconTexture:ClearAllPoints()
-                row.iconTexture:SetPoint("TOPLEFT", row.iconBtn, "TOPLEFT", 2, -2)
-                row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
-                row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-                row.iconTexture:SetDrawLayer("ARTWORK")
                 row.iconTexture:Show()
             end
             if row.nameText then
@@ -3496,6 +3486,20 @@ do
         return header
     end
 
+    local function SetupReserveIcon(row)
+        if not row or not row.iconTexture or not row.iconBtn then return end
+        row.iconTexture:ClearAllPoints()
+        row.iconTexture:SetPoint("TOPLEFT", row.iconBtn, "TOPLEFT", 2, -2)
+        row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
+        row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        row.iconTexture:SetDrawLayer("ARTWORK")
+        row.iconBtn:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2")
+        local normal = row.iconBtn:GetNormalTexture()
+        if normal then
+            normal:SetAllPoints(row.iconBtn)
+        end
+    end
+
     -- Create a new row for displaying a reserve
     function module:CreateReserveRow(parent, info, yOffset, index)
         local rowName = frameName .. "ReserveRow" .. index
@@ -3507,20 +3511,7 @@ do
             row.background = _G[rowName .. "Background"]
             row.iconBtn = _G[rowName .. "IconBtn"]
             row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
-            if row.iconTexture and row.iconBtn then
-                row.iconTexture:ClearAllPoints()
-                row.iconTexture:SetPoint("TOPLEFT", row.iconBtn, "TOPLEFT", 2, -2)
-                row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
-                row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-                row.iconTexture:SetDrawLayer("ARTWORK")
-            end
-            if row.iconBtn then
-                row.iconBtn:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2")
-                local normal = row.iconBtn:GetNormalTexture()
-                if normal then
-                    normal:SetAllPoints(row.iconBtn)
-                end
-            end
+            SetupReserveIcon(row)
             row.nameText = _G[rowName .. "Name"]
             row.sourceText = _G[rowName .. "Source"]
             row.playerText = _G[rowName .. "Players"]
