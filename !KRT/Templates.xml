@@ -13,16 +13,11 @@
 		</Anchors>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString inherits="GameFontNormalSmall" name="$parentTitle" justifyH="CENTER" text="">
+				<FontString inherits="GameFontNormalSmall" name="$parentTitle" justifyH="LEFT" text="">
 					<Anchors>
 						<Anchor point="LEFT" relativeTo="$parentTitleBG" relativePoint="LEFT">
 							<Offset>
 								<AbsDimension x="5" y="1" />
-							</Offset>
-						</Anchor>
-						<Anchor point="RIGHT" relativeTo="$parentTitleBG" relativePoint="RIGHT">
-							<Offset>
-								<AbsDimension x="-5" y="1" />
 							</Offset>
 						</Anchor>
 					</Anchors>
