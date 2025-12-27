@@ -8,11 +8,7 @@
 			<AbsDimension x="230" y="385" />
 		</Size>
 		<Anchors>
-			<Anchor point="CENTER">
-				<Offset>
-					<AbsDimension x="0" y="0" />
-				</Offset>
-			</Anchor>
+			<Anchor point="CENTER" />
 		</Anchors>
 		<Layers>
 			<Layer level="ARTWORK">
@@ -41,11 +37,7 @@
 			<AbsDimension x="230" y="385" />
 		</Size>
 		<Anchors>
-			<Anchor point="CENTER">
-				<Offset>
-					<AbsDimension x="0" y="0" />
-				</Offset>
-			</Anchor>
+			<Anchor point="CENTER" />
 		</Anchors>
 		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background-Dark"
 			edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
@@ -152,11 +144,7 @@
 				<AbsDimension x="30" y="30" />
 			</Size>
 			<Anchors>
-				<Anchor point="CENTER">
-					<Offset>
-						<AbsDimension x="0" y="0" />
-					</Offset>
-				</Anchor>
+				<Anchor point="CENTER" />
 			</Anchors>
 		</NormalTexture>
 	</Button>
@@ -175,10 +163,6 @@
 	<ScrollFrame name="KRTScrollFrameTemplate" inherits="UIPanelScrollFrameTemplate" virtual="true">
 		<ScrollChild>
 			<Frame name="$parentScrollChild" setAllPoints="$parent">
-				<Anchors>
-					<Anchor point="TOPLEFT" />
-					<Anchor point="BOTTOMRIGHT" />
-				</Anchors>
 			</Frame>
 		</ScrollChild>
 	</ScrollFrame>
@@ -297,8 +281,8 @@
 		</Layers>
 		<HighlightTexture>
 			<Anchors>
-				<Anchor point="TOPLEFT" relativePoint="TOPLEFT" />
-				<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMRIGHT" />
+				<Anchor point="TOPLEFT" />
+				<Anchor point="BOTTOMRIGHT" />
 			</Anchors>
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
