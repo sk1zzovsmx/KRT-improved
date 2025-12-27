@@ -43,6 +43,8 @@ L.StrSpamBans                     = "Spam Bans"
 L.StrClearIcons                   = "Clear Raid Icons"
 
 -- ==================== Loot Master Frame ==================== --
+L.BtnLootCounter                 = "Loot Counter"
+L.BtnRaidList                    = "Raid List"
 L.BtnSelectItem                   = "Select Item"
 L.BtnRemoveItem                   = "Remove Item"
 L.BtnSpamLoot                     = "Spam Loot"

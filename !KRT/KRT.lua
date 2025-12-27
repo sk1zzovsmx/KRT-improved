@@ -2148,6 +2148,7 @@ do
             _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
             _G[frameName .. "RollsHeaderRoll"]:SetText(L.StrRoll)
             _G[frameName .. "OpenReservesBtn"]:SetText(L.BtnOpenReserves)
+            _G[frameName .. "RaidListBtn"]:SetText(L.BtnRaidList)
             _G[frameName .. "ImportReservesBtn"]:SetText(L.BtnImportReserves)
         end
         _G[frameName .. "Title"]:SetText(format(titleString, MASTER_LOOTER))
@@ -2838,7 +2839,7 @@ do
         if f and not f.KRT_LootCounterBtn then
             local btn = CreateFrame("Button", nil, f, "KRTButtonTemplate")
             btn:SetSize(100, 24)
-            btn:SetText("Loot Counter")
+            btn:SetText(L.BtnLootCounter)
             btn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -20, -20)
             btn:SetScript("OnClick", function()
                 addon.Master:ToggleCountsFrame()
