@@ -302,8 +302,5 @@
 			</Anchors>
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
-		<Scripts>
-			<OnClick>KRT.Master:SelectWinner(self, button)</OnClick>
-		</Scripts>
 	</Button>
 </Ui>
