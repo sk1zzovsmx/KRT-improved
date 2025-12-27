@@ -2179,11 +2179,18 @@ do
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
         if Utils.throttle(self, frameName, updateInterval, elapsed) then
-            lootState.itemCount = _G[frameName .. "ItemCount"]:GetNumber()
-            if itemInfo.count and itemInfo.count ~= lootState.itemCount then
-                if itemInfo.count < lootState.itemCount then
-                    lootState.itemCount = itemInfo.count
-                    _G[frameName .. "ItemCount"]:SetNumber(itemInfo.count)
+            local itemCountBox = _G[frameName .. "ItemCount"]
+            if itemCountBox and itemCountBox:IsVisible() then
+                local rawCount = itemCountBox:GetText()
+                local count = tonumber(rawCount)
+                if count and count > 0 then
+                    lootState.itemCount = count
+                    if itemInfo.count and itemInfo.count ~= lootState.itemCount then
+                        if itemInfo.count < lootState.itemCount then
+                            lootState.itemCount = itemInfo.count
+                            itemCountBox:SetNumber(itemInfo.count)
+                        end
+                    end
                 end
             end
 
