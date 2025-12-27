@@ -2956,11 +2956,6 @@ do
         if row.playerText then
             row.playerText:SetText(info.playersText or (info.players and tconcat(info.players, ", ")) or "")
         end
-        if row.sourceText then
-            row.sourceText:SetText("")
-            row.sourceText:Hide()
-        end
-
         if row.quantityText then
             if info.quantity and info.quantity > 1 then
                 row.quantityText:SetText(info.quantity .. "x")
@@ -3343,10 +3338,6 @@ do
             if row.nameText then
                 row.nameText:SetText(itemLink or itemName or ("Item ID: " .. itemId))
             end
-            if row.sourceText then
-                row.sourceText:SetText("")
-                row.sourceText:Hide()
-            end
         end
     end
 
@@ -3525,6 +3516,10 @@ do
             row.playerText = _G[rowName .. "Players"]
             row.quantityText = _G[rowName .. "Quantity"]
             SetupReserveRowTooltip(row)
+            if row.sourceText then
+                row.sourceText:SetText("")
+                row.sourceText:Hide()
+            end
             row._initialized = true
         end
         ApplyReserveRowData(row, info, index)
