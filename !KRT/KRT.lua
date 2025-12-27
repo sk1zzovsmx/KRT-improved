@@ -2938,7 +2938,9 @@ do
             local icon = info.itemIcon or (info.itemId and GetItemIcon(info.itemId)) or itemFallbackIcon
             if type(icon) ~= "string" or icon == "" then icon = itemFallbackIcon end
             row.iconTexture:SetTexture(icon)
-            row.iconTexture:SetAllPoints(row.iconBtn)
+            row.iconTexture:ClearAllPoints()
+            row.iconTexture:SetPoint("TOPLEFT", row.iconBtn, "TOPLEFT", 2, -2)
+            row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
             row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
             row.iconTexture:SetDrawLayer("ARTWORK")
             row.iconTexture:Show()
@@ -3333,7 +3335,9 @@ do
             if row.iconTexture then
                 if type(icon) ~= "string" or icon == "" then icon = itemFallbackIcon end
                 row.iconTexture:SetTexture(icon)
-                row.iconTexture:SetAllPoints(row.iconBtn)
+                row.iconTexture:ClearAllPoints()
+                row.iconTexture:SetPoint("TOPLEFT", row.iconBtn, "TOPLEFT", 2, -2)
+                row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
                 row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
                 row.iconTexture:SetDrawLayer("ARTWORK")
                 row.iconTexture:Show()
@@ -3504,7 +3508,9 @@ do
             row.iconBtn = _G[rowName .. "IconBtn"]
             row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
             if row.iconTexture and row.iconBtn then
-                row.iconTexture:SetAllPoints(row.iconBtn)
+                row.iconTexture:ClearAllPoints()
+                row.iconTexture:SetPoint("TOPLEFT", row.iconBtn, "TOPLEFT", 2, -2)
+                row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
                 row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
                 row.iconTexture:SetDrawLayer("ARTWORK")
             end
