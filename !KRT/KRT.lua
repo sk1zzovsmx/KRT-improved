@@ -4096,6 +4096,7 @@ do
 
     local FetchWarnings
     local fetched = false
+    local warningsDirty = false
 
     -------------------------------------------------------
     -- Private helpers
@@ -4106,6 +4107,8 @@ do
     -------------------------------------------------------
 
     local selectedID, tempSelectedID
+    local lastSelectedID = false
+    local lastEditBtnMode
 
     local tempName, tempContent
     local SaveWarning
@@ -4117,12 +4120,16 @@ do
         UIWarnings = frame
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
+        frame:HookScript("OnShow", function()
+            warningsDirty = true
+            lastSelectedID = false
+        end)
         frame:SetScript("OnUpdate", UpdateUIFrame)
     end
 
     -- Externally update frame:
     function module:Update()
-        return FetchWarnings()
+        warningsDirty = true
     end
 
     -- Toggle frame visibility:
@@ -4191,7 +4198,7 @@ do
         elseif selectedID > count then
             selectedID = selectedID - 1
         end
-        FetchWarnings()
+        warningsDirty = true
     end
 
     -- Announce Warning:
@@ -4232,35 +4239,47 @@ do
         localized = true
     end
 
+    local function UpdateSelectionUI()
+        if lastSelectedID and _G[frameName .. "WarningBtn" .. lastSelectedID] then
+            _G[frameName .. "WarningBtn" .. lastSelectedID]:UnlockHighlight()
+        end
+        if selectedID and KRT_Warnings[selectedID] then
+            local btn = _G[frameName .. "WarningBtn" .. selectedID]
+            if btn then
+                btn:LockHighlight()
+            end
+            _G[frameName .. "OutputName"]:SetText(KRT_Warnings[selectedID].name)
+            _G[frameName .. "OutputContent"]:SetText(KRT_Warnings[selectedID].content)
+            _G[frameName .. "OutputContent"]:SetTextColor(1, 1, 1)
+        else
+            _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelp)
+            _G[frameName .. "OutputContent"]:SetText(L.StrWarningsHelp)
+            _G[frameName .. "OutputContent"]:SetTextColor(0.5, 0.5, 0.5)
+        end
+        lastSelectedID = selectedID
+    end
+
     -- OnUpdate frame:
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
         if Utils.throttle(self, frameName, updateInterval, elapsed) then
-            if fetched == false then FetchWarnings() end
-            if #KRT_Warnings > 0 then
-                for i = 1, #KRT_Warnings do
-                    if selectedID == i and _G[frameName .. "WarningBtn" .. i] then
-                        _G[frameName .. "WarningBtn" .. i]:LockHighlight()
-                        _G[frameName .. "OutputName"]:SetText(KRT_Warnings[selectedID].name)
-                        _G[frameName .. "OutputContent"]:SetText(KRT_Warnings[selectedID].content)
-                        _G[frameName .. "OutputContent"]:SetTextColor(1, 1, 1)
-                    else
-                        _G[frameName .. "WarningBtn" .. i]:UnlockHighlight()
-                    end
-                end
+            if warningsDirty or not fetched then
+                FetchWarnings()
+                warningsDirty = false
             end
-            if selectedID == nil then
-                _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelp)
-                _G[frameName .. "OutputContent"]:SetText(L.StrWarningsHelp)
-                _G[frameName .. "OutputContent"]:SetTextColor(0.5, 0.5, 0.5)
+            if selectedID ~= lastSelectedID then
+                UpdateSelectionUI()
             end
             tempName    = _G[frameName .. "Name"]:GetText()
             tempContent = _G[frameName .. "Content"]:GetText()
             Utils.enableDisable(_G[frameName .. "EditBtn"], (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
             Utils.enableDisable(_G[frameName .. "DeleteBtn"], selectedID ~= nil)
             Utils.enableDisable(_G[frameName .. "AnnounceBtn"], selectedID ~= nil)
-            Utils.setText(_G[frameName .. "EditBtn"], SAVE, L.BtnEdit,
-                (tempName ~= "" or tempContent ~= "") or selectedID == nil)
+            local editBtnMode = (tempName ~= "" or tempContent ~= "") or selectedID == nil
+            if editBtnMode ~= lastEditBtnMode then
+                Utils.setText(_G[frameName .. "EditBtn"], SAVE, L.BtnEdit, editBtnMode)
+                lastEditBtnMode = editBtnMode
+            end
         end
     end
 
@@ -4311,6 +4330,7 @@ do
             totalHeight = totalHeight + btn:GetHeight()
         end
         fetched = true
+        lastSelectedID = false
     end
 end
 
@@ -4337,7 +4357,11 @@ do
     local changesTable = {}
     local FetchChanges, SaveChanges, CancelChanges
     local fetched = false
+    local changesDirty = false
     local selectedID, tempSelectedID
+    local lastSelectedID = false
+    local lastEditBtnMode
+    local lastAddBtnMode
     local isAdd = false
     local isEdit = false
 
@@ -4355,6 +4379,10 @@ do
         UIChanges = frame
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
+        frame:HookScript("OnShow", function()
+            changesDirty = true
+            lastSelectedID = false
+        end)
         frame:SetScript("OnUpdate", UpdateUIFrame)
     end
 
@@ -4380,6 +4408,7 @@ do
         end
         CancelChanges()
         fetched = false
+        changesDirty = true
     end
 
     -- Selecting Player:
@@ -4399,6 +4428,7 @@ do
                 _G[frameName .. "PlayerBtn" .. name]:Hide()
             end
             fetched = false
+            changesDirty = true
             return
         end
         -- Quick announce?
@@ -4428,6 +4458,7 @@ do
             end
             CancelChanges()
             fetched = false
+            changesDirty = true
         end
     end
 
@@ -4455,6 +4486,7 @@ do
         if _G[frameName .. "PlayerBtn" .. name] then
             _G[frameName .. "PlayerBtn" .. name]:Hide()
         end
+        changesDirty = true
     end
 
     Utils.registerCallback("RaidLeave", function(e, name)
@@ -4474,7 +4506,6 @@ do
         -- In case of a reload/relog and the frame wasn't loaded
         if not fetched or #changesTable == 0 then
             InitChangesTable()
-            FetchChanges()
         end
         local count = tLength(changesTable)
         local msg
@@ -4523,28 +4554,39 @@ do
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
         if Utils.throttle(self, frameName, updateInterval, elapsed) then
-            if not fetched then
+            if changesDirty or not fetched then
                 InitChangesTable()
                 FetchChanges()
+                changesDirty = false
             end
             local count = tLength(changesTable)
             if count > 0 then
-                for n, s in pairs(changesTable) do
-                    if selectedID == n and _G[frameName .. "PlayerBtn" .. n] then
-                        _G[frameName .. "PlayerBtn" .. n]:LockHighlight()
-                    elseif _G[frameName .. "PlayerBtn" .. n] ~= nil then
-                        _G[frameName .. "PlayerBtn" .. n]:UnlockHighlight()
-                    end
-                end
             else
                 tempSelectedID = nil
                 selectedID = nil
             end
+            if selectedID ~= lastSelectedID then
+                if lastSelectedID and _G[frameName .. "PlayerBtn" .. lastSelectedID] then
+                    _G[frameName .. "PlayerBtn" .. lastSelectedID]:UnlockHighlight()
+                end
+                if selectedID and _G[frameName .. "PlayerBtn" .. selectedID] then
+                    _G[frameName .. "PlayerBtn" .. selectedID]:LockHighlight()
+                end
+                lastSelectedID = selectedID
+            end
             Utils.showHide(_G[frameName .. "Name"], (isEdit or isAdd))
             Utils.showHide(_G[frameName .. "Spec"], (isEdit or isAdd))
             Utils.enableDisable(_G[frameName .. "EditBtn"], (selectedID or isEdit or isAdd))
-            Utils.setText(_G[frameName .. "EditBtn"], SAVE, L.BtnEdit, isAdd or (selectedID and isEdit))
-            Utils.setText(_G[frameName .. "AddBtn"], ADD, DELETE, (not selectedID and not isEdit and not isAdd))
+            local editBtnMode = isAdd or (selectedID and isEdit)
+            if editBtnMode ~= lastEditBtnMode then
+                Utils.setText(_G[frameName .. "EditBtn"], SAVE, L.BtnEdit, editBtnMode)
+                lastEditBtnMode = editBtnMode
+            end
+            local addBtnMode = (not selectedID and not isEdit and not isAdd)
+            if addBtnMode ~= lastAddBtnMode then
+                Utils.setText(_G[frameName .. "AddBtn"], ADD, DELETE, addBtnMode)
+                lastAddBtnMode = addBtnMode
+            end
             Utils.showHide(_G[frameName .. "AddBtn"], (not isEdit and not isAdd))
             Utils.enableDisable(_G[frameName .. "ClearBtn"], count > 0)
             Utils.enableDisable(_G[frameName .. "AnnounceBtn"], count > 0)
@@ -4583,6 +4625,7 @@ do
             totalHeight = totalHeight + btn:GetHeight()
         end
         fetched = true
+        lastSelectedID = false
     end
 
     -- Save module:
@@ -4600,6 +4643,7 @@ do
         changesTable[name] = (spec == "") and nil or spec
         CancelChanges()
         fetched = false
+        changesDirty = true
     end
 
     -- Cancel all actions:
