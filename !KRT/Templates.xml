@@ -135,7 +135,7 @@
 			<AbsDimension x="30" y="30" />
 		</Size>
 		<Layers>
-			<Layer level="BORDER">
+			<Layer level="ARTWORK">
 				<Texture name="$parentIconTexture">
 					<Size>
 						<AbsDimension x="30" y="30" />

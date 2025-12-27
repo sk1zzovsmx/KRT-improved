@@ -2936,6 +2936,7 @@ do
 
         if row.iconTexture then
             local icon = info.itemIcon or (info.itemId and GetItemIcon(info.itemId)) or itemFallbackIcon
+            if type(icon) ~= "string" or icon == "" then icon = itemFallbackIcon end
             row.iconTexture:SetTexture(icon)
             row.iconTexture:SetAllPoints(row.iconBtn)
             row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -3330,6 +3331,7 @@ do
             row._itemLink = itemLink
             row._itemName = itemName
             if row.iconTexture then
+                if type(icon) ~= "string" or icon == "" then icon = itemFallbackIcon end
                 row.iconTexture:SetTexture(icon)
                 row.iconTexture:SetAllPoints(row.iconBtn)
                 row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
