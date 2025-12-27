@@ -2875,6 +2875,7 @@ do
     local updateInterval = C.UPDATE_INTERVAL_RESERVES
     local reservesData = {}
     local reservesByItemID = {}
+    local reservesDisplayList = {}
     local pendingItemInfo = {}
     local collapsedBossGroups = {}
     local itemFallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
@@ -2899,6 +2900,60 @@ do
                         end
                         list[#list + 1] = r
                     end
+                end
+            end
+        end
+
+        twipe(reservesDisplayList)
+        local grouped = {}
+        for itemId, list in pairs(reservesByItemID) do
+            if type(list) == "table" then
+                for i = 1, #list do
+                    local r = list[i]
+                    if type(r) == "table" then
+                        local source = r.source or "Unknown"
+                        local qty = r.quantity or 1
+
+                        local bySource = grouped[source]
+                        if not bySource then
+                            bySource = {}
+                            grouped[source] = bySource
+                            if collapsedBossGroups[source] == nil then
+                                collapsedBossGroups[source] = false
+                            end
+                        end
+
+                        local byItem = bySource[itemId]
+                        if not byItem then
+                            byItem = {}
+                            bySource[itemId] = byItem
+                        end
+
+                        local data = byItem[qty]
+                        if not data then
+                            data = {
+                                itemId = itemId,
+                                quantity = qty,
+                                itemLink = r.itemLink,
+                                itemName = r.itemName,
+                                itemIcon = r.itemIcon,
+                                source = source,
+                                players = {},
+                            }
+                            byItem[qty] = data
+                        end
+
+                        data.players[#data.players + 1] = r.player or "?"
+                    end
+                end
+            end
+        end
+
+        for _, byItem in pairs(grouped) do
+            for _, byQty in pairs(byItem) do
+                for _, data in pairs(byQty) do
+                    data.playersText = tconcat(data.players, ", ")
+                    reservesDisplayList[#reservesDisplayList + 1] = data
                 end
             end
         end
@@ -2954,7 +3009,7 @@ do
         end
 
         if row.playerText then
-            row.playerText:SetText(info.playersText or (info.players and tconcat(info.players, ", ")) or "")
+            row.playerText:SetText(info.playersText or "")
         end
         if row.quantityText then
             if info.quantity and info.quantity > 1 then
@@ -3012,6 +3067,7 @@ do
         KRT_SavedReserves = nil
         twipe(reservesData)
         twipe(reservesByItemID)
+        twipe(reservesDisplayList)
         self:RefreshWindow()
         self:CloseWindow()
         addon:info(L.StrReserveListCleared)
@@ -3323,6 +3379,15 @@ do
             end
         end
 
+        for i = 1, #reservesDisplayList do
+            local data = reservesDisplayList[i]
+            if data and data.itemId == itemId then
+                data.itemName = itemName
+                data.itemLink = itemLink
+                data.itemIcon = icon
+            end
+        end
+
         local rows = rowsByItemID[itemId]
         if not rows then return end
         for i = 1, #rows do
@@ -3372,63 +3437,7 @@ do
         twipe(reserveItemRows)
         twipe(rowsByItemID)
 
-        -- Group reserves by source, itemId, quantity
-        local grouped = {}
-        for itemId, list in pairs(reservesByItemID) do
-            if type(list) == "table" then
-                for i = 1, #list do
-                    local r = list[i]
-                    if type(r) == "table" then
-                        local source = r.source or "Unknown"
-                        local qty = r.quantity or 1
-
-                        local bySource = grouped[source]
-                        if not bySource then
-                            bySource = {}
-                            grouped[source] = bySource
-                            if collapsedBossGroups[source] == nil then
-                                collapsedBossGroups[source] = false
-                            end
-                        end
-
-                        local byItem = bySource[itemId]
-                        if not byItem then
-                            byItem = {}
-                            bySource[itemId] = byItem
-                        end
-
-                        local data = byItem[qty]
-                        if not data then
-                            data = {
-                                itemId = itemId,
-                                quantity = qty,
-                                itemLink = r.itemLink,
-                                itemName = r.itemName,
-                                itemIcon = r.itemIcon,
-                                source = source,
-                                players = {},
-                            }
-                            byItem[qty] = data
-                        end
-
-                        data.players[#data.players + 1] = r.player or "?"
-                    end
-                end
-            end
-        end
-
-        -- Flatten for sorting / display
-        local displayList = {}
-        for _, byItem in pairs(grouped) do
-            for _, byQty in pairs(byItem) do
-                for _, data in pairs(byQty) do
-                    data.playersText = tconcat(data.players, ", ")
-                    displayList[#displayList + 1] = data
-                end
-            end
-        end
-
-        table.sort(displayList, function(a, b)
+        table.sort(reservesDisplayList, function(a, b)
             if a.source ~= b.source then return a.source < b.source end
             if a.itemId ~= b.itemId then return a.itemId < b.itemId end
             return a.quantity < b.quantity
@@ -3439,8 +3448,8 @@ do
         local rowIndex = 0
         local headerIndex = 0
 
-        for i = 1, #displayList do
-            local entry = displayList[i]
+        for i = 1, #reservesDisplayList do
+            local entry = reservesDisplayList[i]
             local source = entry.source
 
             if not seenSources[source] then
