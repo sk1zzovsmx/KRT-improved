@@ -3047,12 +3047,12 @@ do
         row.iconBtn:SetScript("OnEnter", function()
             GameTooltip:SetOwner(row.iconBtn, "ANCHOR_RIGHT")
             if row._itemLink then
-                GameTooltip:SetHyperlink(row._itemLink)
-            else
-                GameTooltip:SetText("Item ID: " .. (row._itemId or "?"), 1, 1, 1)
+                GameTooltip:SetHyperlink(row._tooltipTitle)
+            elseif row._tooltipTitle then
+                GameTooltip:SetText(row._tooltipTitle, 1, 1, 1)
             end
-            if row._source then
-                GameTooltip:AddLine("Dropped by: " .. row._source, 0.8, 0.8, 0.8)
+            if row._tooltipSource then
+                GameTooltip:AddLine(row._tooltipSource, 0.8, 0.8, 0.8)
             end
             GameTooltip:Show()
         end)
@@ -3067,6 +3067,8 @@ do
         row._itemLink = info.itemLink
         row._itemName = info.itemName
         row._source = info.source
+        row._tooltipTitle = info.itemLink or info.itemName or ("Item ID: " .. (info.itemId or "?"))
+        row._tooltipSource = info.source and ("Dropped by: " .. info.source) or nil
 
         if row.background then
             row.background:SetVertexColor(index % 2 == 0 and 0.1 or 0, 0.1, 0.1, 0.3)
@@ -3474,6 +3476,8 @@ do
             row._itemId = itemId
             row._itemLink = itemLink
             row._itemName = itemName
+            row._tooltipTitle = itemLink or itemName or ("Item ID: " .. itemId)
+            row._tooltipSource = row._source and ("Dropped by: " .. row._source) or nil
             if row.iconTexture then
                 if type(icon) ~= "string" or icon == "" then icon = itemFallbackIcon end
                 row.iconTexture:SetTexture(icon)
