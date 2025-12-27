@@ -196,19 +196,39 @@
 			</Layer>
 			<Layer level="OVERLAY">
 				<FontString name="$parentName" inherits="KRTFontString">
+					<Size>
+						<AbsDimension x="185" y="0" />
+					</Size>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentIconBtn" relativePoint="TOPRIGHT">
 							<Offset>
 								<AbsDimension x="8" y="-2" />
 							</Offset>
 						</Anchor>
+						<Anchor point="RIGHT" relativeTo="$parentPlayers" relativePoint="LEFT">
+							<Offset>
+								<AbsDimension x="-6" y="0" />
+							</Offset>
+						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentPlayers" inherits="GameFontHighlightSmall">
+				<FontString name="$parentSource" inherits="GameFontHighlightSmall">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-2" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentPlayers" inherits="GameFontHighlightSmall" justifyH="RIGHT">
+					<Size>
+						<AbsDimension x="100" y="0" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPRIGHT" relativeTo="$parent" relativePoint="TOPRIGHT">
+							<Offset>
+								<AbsDimension x="-6" y="-2" />
 							</Offset>
 						</Anchor>
 					</Anchors>
