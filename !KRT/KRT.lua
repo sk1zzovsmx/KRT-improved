@@ -4680,7 +4680,7 @@ do
     function module:OnLoad(frame)
         UIHistory, frameName = frame, frame:GetName()
         frame:RegisterForDrag("LeftButton")
-        _G[frameName .. "Title"]:SetText(L.StrLootHistory)
+        _G[frameName .. "Title"]:SetText(format(titleString, L.StrLootHistory))
 
         frame:SetScript("OnShow", function()
             if not module.selectedRaid then
