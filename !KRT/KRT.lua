@@ -2876,6 +2876,7 @@ do
     local reservesData = {}
     local reservesByItemID = {}
     local reservesDisplayList = {}
+    local reservesDirty = false
     local pendingItemInfo = {}
     local collapsedBossGroups = {}
     local itemFallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
@@ -2886,6 +2887,7 @@ do
 
     local function UpdateDisplayEntryForItem(itemId)
         if not itemId then return end
+        reservesDirty = true
 
         local groupedBySource = {}
         local list = reservesByItemID[itemId]
@@ -2965,6 +2967,7 @@ do
 
     local function RebuildIndex()
         twipe(reservesByItemID)
+        reservesDirty = true
         for _, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
                 local playerName = player.original or "?"
@@ -3147,6 +3150,7 @@ do
         twipe(reservesData)
         twipe(reservesByItemID)
         twipe(reservesDisplayList)
+        reservesDirty = true
         self:RefreshWindow()
         self:CloseWindow()
         addon:info(L.StrReserveListCleared)
@@ -3318,6 +3322,7 @@ do
         addon:Debug("DEBUG", "Starting to parse CSV data.")
         twipe(reservesData)
         twipe(reservesByItemID)
+        reservesDirty = true
 
         local function cleanCSVField(field)
             if not field then return nil end
@@ -3431,6 +3436,7 @@ do
     function module:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
         if not itemId then return end
         local icon = itemIcon or itemFallbackIcon
+        reservesDirty = true
 
         local list = reservesByItemID[itemId]
         if type(list) == "table" then
@@ -3509,11 +3515,14 @@ do
         twipe(reserveItemRows)
         twipe(rowsByItemID)
 
-        table.sort(reservesDisplayList, function(a, b)
-            if a.source ~= b.source then return a.source < b.source end
-            if a.itemId ~= b.itemId then return a.itemId < b.itemId end
-            return a.quantity < b.quantity
-        end)
+        if reservesDirty then
+            table.sort(reservesDisplayList, function(a, b)
+                if a.source ~= b.source then return a.source < b.source end
+                if a.itemId ~= b.itemId then return a.itemId < b.itemId end
+                return a.quantity < b.quantity
+            end)
+            reservesDirty = false
+        end
 
         local rowHeight, yOffset = C.RESERVES_ROW_HEIGHT, 0
         local seenSources = {}
