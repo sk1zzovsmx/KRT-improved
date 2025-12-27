@@ -2934,8 +2934,12 @@ do
             row.background:SetVertexColor(index % 2 == 0 and 0.1 or 0, 0.1, 0.1, 0.3)
         end
 
+        local iconTexture = info.itemIcon or itemFallbackIcon
         if row.iconTexture then
-            row.iconTexture:SetTexture(info.itemIcon or itemFallbackIcon)
+            row.iconTexture:SetTexture(iconTexture)
+        end
+        if row.iconBtn then
+            row.iconBtn:SetNormalTexture(iconTexture)
         end
 
         if row.nameText then
@@ -2945,7 +2949,6 @@ do
         if row.playerText then
             row.playerText:SetText(info.playersText or (info.players and tconcat(info.players, ", ")) or "")
         end
-
         if row.quantityText then
             if info.quantity and info.quantity > 1 then
                 row.quantityText:SetText(info.quantity .. "x")
@@ -3322,6 +3325,9 @@ do
             row._itemName = itemName
             if row.iconTexture then
                 row.iconTexture:SetTexture(icon)
+            end
+            if row.iconBtn then
+                row.iconBtn:SetNormalTexture(icon)
             end
             if row.nameText then
                 row.nameText:SetText(itemLink or itemName or ("Item ID: " .. itemId))

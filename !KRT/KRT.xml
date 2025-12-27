@@ -202,13 +202,21 @@
 								<AbsDimension x="8" y="-2" />
 							</Offset>
 						</Anchor>
+						<Anchor point="RIGHT" relativeTo="$parent" relativePoint="RIGHT">
+							<Offset>
+								<AbsDimension x="-110" y="0" />
+							</Offset>
+						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentPlayers" inherits="GameFontHighlightSmall">
+				<FontString name="$parentPlayers" inherits="GameFontHighlightSmall" justifyH="RIGHT">
+					<Size>
+						<AbsDimension x="100" y="0" />
+					</Size>
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPRIGHT" relativeTo="$parent" relativePoint="TOPRIGHT">
 							<Offset>
-								<AbsDimension x="0" y="-2" />
+								<AbsDimension x="-6" y="-2" />
 							</Offset>
 						</Anchor>
 					</Anchors>
