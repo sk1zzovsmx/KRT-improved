@@ -2884,6 +2884,85 @@ do
     -- Private helpers
     -------------------------------------------------------
 
+    local function UpdateDisplayEntryForItem(itemId)
+        if not itemId then return end
+
+        local groupedBySource = {}
+        local list = reservesByItemID[itemId]
+        if type(list) == "table" then
+            for i = 1, #list do
+                local r = list[i]
+                if type(r) == "table" then
+                    local source = r.source or "Unknown"
+                    local qty = r.quantity or 1
+                    local bySource = groupedBySource[source]
+                    if not bySource then
+                        bySource = {}
+                        groupedBySource[source] = bySource
+                        if collapsedBossGroups[source] == nil then
+                            collapsedBossGroups[source] = false
+                        end
+                    end
+                    local data = bySource[qty]
+                    if not data then
+                        data = {
+                            itemId = itemId,
+                            quantity = qty,
+                            itemLink = r.itemLink,
+                            itemName = r.itemName,
+                            itemIcon = r.itemIcon,
+                            source = source,
+                            players = {},
+                        }
+                        bySource[qty] = data
+                    end
+                    data.players[#data.players + 1] = r.player or "?"
+                end
+            end
+        end
+
+        local existing = {}
+        local remaining = {}
+        for i = 1, #reservesDisplayList do
+            local data = reservesDisplayList[i]
+            if data and data.itemId == itemId then
+                existing[#existing + 1] = data
+            else
+                remaining[#remaining + 1] = data
+            end
+        end
+
+        local reused = 0
+        for source, byQty in pairs(groupedBySource) do
+            for _, data in pairs(byQty) do
+                reused = reused + 1
+                local target = existing[reused]
+                if target then
+                    target.itemId = itemId
+                    target.quantity = data.quantity
+                    target.itemLink = data.itemLink
+                    target.itemName = data.itemName
+                    target.itemIcon = data.itemIcon
+                    target.source = source
+                    twipe(target.players)
+                    for i = 1, #data.players do
+                        target.players[i] = data.players[i]
+                    end
+                    target.playersText = tconcat(target.players, ", ")
+                    remaining[#remaining + 1] = target
+                else
+                    data.playersText = tconcat(data.players, ", ")
+                    remaining[#remaining + 1] = data
+                end
+            end
+        end
+
+        twipe(reservesDisplayList)
+        for i = 1, #remaining do
+            reservesDisplayList[i] = remaining[i]
+        end
+    end
+
     local function RebuildIndex()
         twipe(reservesByItemID)
         for _, player in pairs(reservesData) do
@@ -3379,14 +3458,7 @@ do
             end
         end
 
-        for i = 1, #reservesDisplayList do
-            local data = reservesDisplayList[i]
-            if data and data.itemId == itemId then
-                data.itemName = itemName
-                data.itemLink = itemLink
-                data.itemIcon = icon
-            end
-        end
+        UpdateDisplayEntryForItem(itemId)
 
         local rows = rowsByItemID[itemId]
         if not rows then return end
