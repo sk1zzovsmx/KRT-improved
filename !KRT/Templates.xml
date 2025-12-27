@@ -3,7 +3,8 @@
 
 	<!-- Default Frames Template -->
 	<Frame name="KRTFrameTemplate" inherits="UIPanelDialogTemplate" parent="UIParent" movable="true"
-		frameStrata="MEDIUM" toplevel="true" hidden="true" clampedToScreen="true" virtual="true">
+		enableMouse="true" frameStrata="MEDIUM" toplevel="true" hidden="true" clampedToScreen="true"
+		virtual="true">
 		<Size>
 			<AbsDimension x="230" y="385" />
 		</Size>
@@ -12,8 +13,7 @@
 		</Anchors>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString inherits="GameFontNormalSmall" name="$parentTitle"
-					text="|cff69ccf0Kader|r Raid Tools">
+				<FontString inherits="GameFontNormalSmall" name="$parentTitle" justifyH="LEFT" text="">
 					<Anchors>
 						<Anchor point="LEFT" relativeTo="$parentTitleBG" relativePoint="LEFT">
 							<Offset>
@@ -25,6 +25,7 @@
 			</Layer>
 		</Layers>
 		<Scripts>
+			<OnLoad>self:RegisterForDrag("LeftButton")</OnLoad>
 			<OnDragStart>self:StartMoving()</OnDragStart>
 			<OnDragStop>self:StopMovingOrSizing()</OnDragStop>
 		</Scripts>

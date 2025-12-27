@@ -2715,8 +2715,10 @@ do
         countsFrame = countsFrame or _G["KRTLootCounterFrame"]
         scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         if countsFrame and not countsFrame._krtCounterHook then
-            if countsFrame.Title then
-                countsFrame.Title:Hide()
+            local title = _G["KRTLootCounterFrameTitle"]
+            if title then
+                title:SetText(format(titleString, L.StrLootCounter))
+                title:Show()
             end
             countsFrame:SetScript("OnShow", StartCountsTicker)
             countsFrame:SetScript("OnHide", StopCountsTicker)
@@ -4678,7 +4680,7 @@ do
     function module:OnLoad(frame)
         UIHistory, frameName = frame, frame:GetName()
         frame:RegisterForDrag("LeftButton")
-        _G[frameName .. "Title"]:SetText(L.StrLootHistory)
+        _G[frameName .. "Title"]:SetText(format(titleString, L.StrLootHistory))
 
         frame:SetScript("OnShow", function()
             if not module.selectedRaid then

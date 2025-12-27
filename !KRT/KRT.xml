@@ -2079,16 +2079,7 @@
 			<Anchor point="CENTER" />
 		</Anchors>
 		<Layers>
-			<Layer level="ARTWORK">
-				<FontString name="$parentCounterTitle" inherits="GameFontNormal" text="Loot Counter">
-					<Size>
-						<AbsDimension x="200" y="0" />
-					</Size>
-					<Anchors>
-						<Anchor point="TOP" x="0" y="-14" />
-					</Anchors>
-				</FontString>
-			</Layer>
+			<Layer level="ARTWORK" />
 		</Layers>
 		<Frames>
 			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
