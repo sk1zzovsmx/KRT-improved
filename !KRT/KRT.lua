@@ -2934,20 +2934,13 @@ do
             row.background:SetVertexColor(index % 2 == 0 and 0.1 or 0, 0.1, 0.1, 0.3)
         end
 
-        if row.iconBtn then
+        if row.iconTexture then
             local icon = info.itemIcon or (info.itemId and GetItemIcon(info.itemId)) or itemFallbackIcon
-            row.iconBtn:SetNormalTexture(icon)
-            local texture = row.iconBtn:GetNormalTexture()
-            if texture then
-                texture:SetAllPoints(row.iconBtn)
-                texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-                texture:SetDrawLayer("ARTWORK")
-                texture:Show()
-            end
-            if row.iconTexture then
-                row.iconTexture:SetTexture(nil)
-                row.iconTexture:Hide()
-            end
+            row.iconTexture:SetTexture(icon)
+            row.iconTexture:SetAllPoints(row.iconBtn)
+            row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            row.iconTexture:SetDrawLayer("ARTWORK")
+            row.iconTexture:Show()
         end
 
         if row.nameText then
@@ -3336,19 +3329,12 @@ do
             row._itemId = itemId
             row._itemLink = itemLink
             row._itemName = itemName
-            if row.iconBtn then
-                row.iconBtn:SetNormalTexture(icon)
-                local texture = row.iconBtn:GetNormalTexture()
-                if texture then
-                    texture:SetAllPoints(row.iconBtn)
-                    texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-                    texture:SetDrawLayer("ARTWORK")
-                    texture:Show()
-                end
-                if row.iconTexture then
-                    row.iconTexture:SetTexture(nil)
-                    row.iconTexture:Hide()
-                end
+            if row.iconTexture then
+                row.iconTexture:SetTexture(icon)
+                row.iconTexture:SetAllPoints(row.iconBtn)
+                row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                row.iconTexture:SetDrawLayer("ARTWORK")
+                row.iconTexture:Show()
             end
             if row.nameText then
                 row.nameText:SetText(itemLink or itemName or ("Item ID: " .. itemId))
@@ -3515,13 +3501,10 @@ do
             row.background = _G[rowName .. "Background"]
             row.iconBtn = _G[rowName .. "IconBtn"]
             row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
-            if row.iconBtn then
-                local texture = row.iconBtn:GetNormalTexture()
-                if texture then
-                    texture:SetAllPoints(row.iconBtn)
-                    texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-                    texture:SetDrawLayer("ARTWORK")
-                end
+            if row.iconTexture and row.iconBtn then
+                row.iconTexture:SetAllPoints(row.iconBtn)
+                row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                row.iconTexture:SetDrawLayer("ARTWORK")
             end
             row.nameText = _G[rowName .. "Name"]
             row.sourceText = _G[rowName .. "Source"]

@@ -136,7 +136,14 @@
 		</Size>
 		<Layers>
 			<Layer level="BORDER">
-				<Texture name="$parentIconTexture" />
+				<Texture name="$parentIconTexture">
+					<Size>
+						<AbsDimension x="30" y="30" />
+					</Size>
+					<Anchors>
+						<Anchor point="CENTER" />
+					</Anchors>
+				</Texture>
 			</Layer>
 		</Layers>
 		<NormalTexture name="$parentNormalTexture" file="Interface\PaperDoll\UI-Backpack-EmptySlot">

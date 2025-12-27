@@ -200,9 +200,9 @@
 						<AbsDimension x="0" y="0" />
 					</Size>
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentIconBtn" relativePoint="TOPRIGHT">
+						<Anchor point="TOPLEFT" relativeTo="$parent" relativePoint="TOPLEFT">
 							<Offset>
-								<AbsDimension x="8" y="-2" />
+								<AbsDimension x="40" y="-2" />
 							</Offset>
 						</Anchor>
 						<Anchor point="RIGHT" relativeTo="$parentPlayers" relativePoint="LEFT">
@@ -217,9 +217,9 @@
 						<AbsDimension x="0" y="0" />
 					</Size>
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parent" relativePoint="TOPLEFT">
 							<Offset>
-								<AbsDimension x="0" y="-2" />
+								<AbsDimension x="40" y="-16" />
 							</Offset>
 						</Anchor>
 						<Anchor point="RIGHT" relativeTo="$parentPlayers" relativePoint="LEFT">
