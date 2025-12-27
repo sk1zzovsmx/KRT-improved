@@ -2880,6 +2880,7 @@ do
     local pendingItemInfo = {}
     local collapsedBossGroups = {}
     local itemFallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
+    local grouped = {}
 
     -------------------------------------------------------
     -- Private helpers
@@ -2987,7 +2988,7 @@ do
         end
 
         twipe(reservesDisplayList)
-        local grouped = {}
+        twipe(grouped)
         for itemId, list in pairs(reservesByItemID) do
             if type(list) == "table" then
                 for i = 1, #list do
