@@ -2947,14 +2947,17 @@ do
                     target.itemName = data.itemName
                     target.itemIcon = data.itemIcon
                     target.source = source
+                    target.players = target.players or {}
                     twipe(target.players)
                     for i = 1, #data.players do
                         target.players[i] = data.players[i]
                     end
                     target.playersText = tconcat(target.players, ", ")
+                    target.players = nil
                     remaining[#remaining + 1] = target
                 else
                     data.playersText = tconcat(data.players, ", ")
+                    data.players = nil
                     remaining[#remaining + 1] = data
                 end
             end
@@ -3036,6 +3039,7 @@ do
             for _, byQty in pairs(byItem) do
                 for _, data in pairs(byQty) do
                     data.playersText = tconcat(data.players, ", ")
+                    data.players = nil
                     reservesDisplayList[#reservesDisplayList + 1] = data
                 end
             end
