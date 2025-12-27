@@ -264,6 +264,7 @@ do
     -------------------------------------------------------
     local inRaid            = false
     local numRaid           = 0
+    local rosterVersion     = 0
     local GetLootMethod     = GetLootMethod
     local GetRaidRosterInfo = GetRaidRosterInfo
     local UnitIsUnit        = UnitIsUnit
@@ -284,6 +285,7 @@ do
     -- Updates the current raid roster, adding new players and marking those who left.
     --
     function module:UpdateRaidRoster()
+        rosterVersion = rosterVersion + 1
         if not KRT_CurrentRaid then return end
         Utils.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
@@ -350,6 +352,10 @@ do
             v.seen = nil
         end
         addon.Master:PrepareDropDowns()
+    end
+
+    function module:GetRosterVersion()
+        return rosterVersion
     end
 
     --
@@ -1872,6 +1878,19 @@ do
 
     local selectionFrame, UpdateSelectionFrame
 
+    local lastUIState = {
+        buttons = {},
+        texts = {},
+        rollStatus = {},
+    }
+    local dirtyFlags = {
+        itemCount = true,
+        dropdowns = true,
+        winner = true,
+        rolls = true,
+        buttons = true,
+    }
+
     local countdownRun = false
     local countdownStart, countdownPos = 0, 0
     local ceil = math.ceil
@@ -1880,10 +1899,84 @@ do
     local screenshotWarn = false
 
     local announced = false
+    local cachedRosterVersion
+    local candidateCache = {
+        itemLink = nil,
+        indexByName = {},
+    }
 
     -------------------------------------------------------
     -- Private helpers
     -------------------------------------------------------
+    local function UpdateMasterButtonsIfChanged(state)
+        local buttons = lastUIState.buttons
+        local texts = lastUIState.texts
+
+        local function UpdateEnabled(key, frame, enabled)
+            if buttons[key] ~= enabled then
+                Utils.enableDisable(frame, enabled)
+                buttons[key] = enabled
+            end
+        end
+
+        local function UpdateText(key, frame, text)
+            if texts[key] ~= text then
+                frame:SetText(text)
+                texts[key] = text
+            end
+        end
+
+        UpdateText("countdown", _G[frameName .. "CountdownBtn"], state.countdownText)
+        UpdateText("award", _G[frameName .. "AwardBtn"], state.awardText)
+        UpdateText("selectItem", _G[frameName .. "SelectItemBtn"], state.selectItemText)
+        UpdateText("spamLoot", _G[frameName .. "SpamLootBtn"], state.spamLootText)
+
+        UpdateEnabled("selectItem", _G[frameName .. "SelectItemBtn"], state.canSelectItem)
+        UpdateEnabled("spamLoot", _G[frameName .. "SpamLootBtn"], state.canSpamLoot)
+        UpdateEnabled("ms", _G[frameName .. "MSBtn"], state.canStartRolls)
+        UpdateEnabled("os", _G[frameName .. "OSBtn"], state.canStartRolls)
+        UpdateEnabled("sr", _G[frameName .. "SRBtn"], state.canStartSR)
+        UpdateEnabled("free", _G[frameName .. "FreeBtn"], state.canStartRolls)
+        UpdateEnabled("countdown", _G[frameName .. "CountdownBtn"], state.canCountdown)
+        UpdateEnabled("hold", _G[frameName .. "HoldBtn"], state.canHold)
+        UpdateEnabled("bank", _G[frameName .. "BankBtn"], state.canBank)
+        UpdateEnabled("disenchant", _G[frameName .. "DisenchantBtn"], state.canDisenchant)
+        UpdateEnabled("award", _G[frameName .. "AwardBtn"], state.canAward)
+        UpdateEnabled("openReserves", _G[frameName .. "OpenReservesBtn"], state.canOpenReserves)
+        UpdateEnabled("importReserves", _G[frameName .. "ImportReservesBtn"], state.canImportReserves)
+        UpdateEnabled("roll", _G[frameName .. "RollBtn"], state.canRoll)
+        UpdateEnabled("clear", _G[frameName .. "ClearBtn"], state.canClear)
+    end
+
+    local function RefreshDropDowns(force)
+        if not dropDownsInitialized then return end
+        if not force and not dropDownDirty then return end
+        UpdateDropDowns(dropDownFrameHolder)
+        UpdateDropDowns(dropDownFrameBanker)
+        UpdateDropDowns(dropDownFrameDisenchanter)
+        dropDownDirty = false
+        dirtyFlags.dropdowns = false
+    end
+
+    local function HookDropDownOpen(frame)
+        if not frame then return end
+        local button = _G[frame:GetName() .. "Button"]
+        if button and not button._krtDropDownHook then
+            button:HookScript("OnClick", function() RefreshDropDowns(true) end)
+            button._krtDropDownHook = true
+        end
+    end
+
+    local function BuildCandidateCache(itemLink)
+        candidateCache.itemLink = itemLink
+        twipe(candidateCache.indexByName)
+        for p = 1, addon.Raid:GetNumRaid() do
+            local candidate = GetMasterLootCandidate(p)
+            if candidate and candidate ~= "" then
+                candidateCache.indexByName[candidate] = p
+            end
+        end
+    end
 
     -------------------------------------------------------
     -- Public methods
@@ -2159,6 +2252,7 @@ do
         _G[frameName .. "Title"]:SetText(format(titleString, MASTER_LOOTER))
         _G[frameName .. "ItemCount"]:SetScript("OnTextChanged", function(self)
             announced = false
+            dirtyFlags.itemCount = true
         end)
         if next(dropDownData) == nil then
             for i = 1, 8 do dropDownData[i] = {} end
@@ -2170,6 +2264,11 @@ do
         UIDropDownMenu_Initialize(dropDownFrameHolder, InitializeDropDowns)
         UIDropDownMenu_Initialize(dropDownFrameBanker, InitializeDropDowns)
         UIDropDownMenu_Initialize(dropDownFrameDisenchanter, InitializeDropDowns)
+        dropDownsInitialized = true
+        HookDropDownOpen(dropDownFrameHolder)
+        HookDropDownOpen(dropDownFrameBanker)
+        HookDropDownOpen(dropDownFrameDisenchanter)
+        RefreshDropDowns(true)
         localized = true
     end
 
@@ -2182,29 +2281,30 @@ do
             local itemCountBox = _G[frameName .. "ItemCount"]
             if itemCountBox and itemCountBox:IsVisible() then
                 local rawCount = itemCountBox:GetText()
-                local count = tonumber(rawCount)
-                if count and count > 0 then
-                    lootState.itemCount = count
-                    if itemInfo.count and itemInfo.count ~= lootState.itemCount then
-                        if itemInfo.count < lootState.itemCount then
-                            lootState.itemCount = itemInfo.count
-                            itemCountBox:SetNumber(itemInfo.count)
+                if rawCount ~= lastUIState.itemCountText then
+                    lastUIState.itemCountText = rawCount
+                    dirtyFlags.itemCount = true
+                end
+                if dirtyFlags.itemCount then
+                    local count = tonumber(rawCount)
+                    if count and count > 0 then
+                        lootState.itemCount = count
+                        if itemInfo.count and itemInfo.count ~= lootState.itemCount then
+                            if itemInfo.count < lootState.itemCount then
+                                lootState.itemCount = itemInfo.count
+                                itemCountBox:SetNumber(itemInfo.count)
+                                lastUIState.itemCountText = tostring(itemInfo.count)
+                            end
                         end
                     end
+                    dirtyFlags.itemCount = false
                 end
             end
 
-            -- Dropdown Updates
             if dropDownDirty then
-                UpdateDropDowns(dropDownFrameHolder)
-                UpdateDropDowns(dropDownFrameBanker)
-                UpdateDropDowns(dropDownFrameDisenchanter)
-                dropDownDirty = false
+                dirtyFlags.dropdowns = true
             end
 
-            -- Button State Updates
-            Utils.setText(_G[frameName .. "CountdownBtn"], L.BtnStop, L.BtnCountdown, countdownRun == true)
-            Utils.setText(_G[frameName .. "AwardBtn"], TRADE, L.BtnAward, lootState.fromInventory == true)
             -- Countdown Logic
             if countdownRun == true then
                 local tick = ceil(addon.options.countdownDuration - GetTime() + countdownStart)
@@ -2236,28 +2336,85 @@ do
                 end
             end
 
-            -- Enable/Disable Buttons
-            Utils.enableDisable(_G[frameName .. "SelectItemBtn"],
-                lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1))
-            Utils.enableDisable(_G[frameName .. "SpamLootBtn"], lootState.lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "MSBtn"], lootState.lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "OSBtn"], lootState.lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "SRBtn"], lootState.lootCount >= 1 and addon.Reserves:HasData())
-            Utils.enableDisable(_G[frameName .. "FreeBtn"], lootState.lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "CountdownBtn"], lootState.lootCount >= 1 and ItemExists())
-            Utils.enableDisable(_G[frameName .. "HoldBtn"], lootState.lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "BankBtn"], lootState.lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "DisenchantBtn"], lootState.lootCount >= 1)
-            Utils.enableDisable(_G[frameName .. "AwardBtn"], (lootState.lootCount >= 1 and lootState.rollsCount >= 1))
-            Utils.enableDisable(_G[frameName .. "OpenReservesBtn"], addon.Reserves:HasData())
-            Utils.enableDisable(_G[frameName .. "ImportReservesBtn"], not addon.Reserves:HasData())
-
             local rollType, record, canRoll, rolled = addon.Rolls:RollStatus()
-            Utils.enableDisable(_G[frameName .. "RollBtn"], record and canRoll and rolled == false)
-            Utils.enableDisable(_G[frameName .. "ClearBtn"], lootState.rollsCount >= 1)
+            local rollStatus = lastUIState.rollStatus
+            if rollStatus.record ~= record
+                or rollStatus.canRoll ~= canRoll
+                or rollStatus.rolled ~= rolled
+                or rollStatus.rollType ~= rollType then
+                rollStatus.record = record
+                rollStatus.canRoll = canRoll
+                rollStatus.rolled = rolled
+                rollStatus.rollType = rollType
+                dirtyFlags.rolls = true
+                dirtyFlags.buttons = true
+            end
 
-            Utils.setText(_G[frameName .. "SelectItemBtn"], L.BtnRemoveItem, L.BtnSelectItem, lootState.fromInventory)
-            Utils.setText(_G[frameName .. "SpamLootBtn"], READY_CHECK, L.BtnSpamLoot, lootState.fromInventory)
+            if lastUIState.rollsCount ~= lootState.rollsCount then
+                lastUIState.rollsCount = lootState.rollsCount
+                dirtyFlags.rolls = true
+                dirtyFlags.buttons = true
+            end
+
+            if lastUIState.winner ~= lootState.winner then
+                lastUIState.winner = lootState.winner
+                dirtyFlags.winner = true
+                dirtyFlags.buttons = true
+            end
+
+            if lastUIState.lootCount ~= lootState.lootCount then
+                lastUIState.lootCount = lootState.lootCount
+                dirtyFlags.buttons = true
+            end
+
+            if lastUIState.fromInventory ~= lootState.fromInventory then
+                lastUIState.fromInventory = lootState.fromInventory
+                dirtyFlags.buttons = true
+            end
+
+            local hasReserves = addon.Reserves:HasData()
+            if lastUIState.hasReserves ~= hasReserves then
+                lastUIState.hasReserves = hasReserves
+                dirtyFlags.buttons = true
+            end
+
+            local hasItem = ItemExists()
+            if lastUIState.hasItem ~= hasItem then
+                lastUIState.hasItem = hasItem
+                dirtyFlags.buttons = true
+            end
+
+            if lastUIState.countdownRun ~= countdownRun then
+                lastUIState.countdownRun = countdownRun
+                dirtyFlags.buttons = true
+            end
+
+            if dirtyFlags.buttons then
+                UpdateMasterButtonsIfChanged({
+                    countdownText = countdownRun and L.BtnStop or L.BtnCountdown,
+                    awardText = lootState.fromInventory and TRADE or L.BtnAward,
+                    selectItemText = lootState.fromInventory and L.BtnRemoveItem or L.BtnSelectItem,
+                    spamLootText = lootState.fromInventory and READY_CHECK or L.BtnSpamLoot,
+                    canSelectItem = lootState.lootCount > 1
+                        or (lootState.fromInventory and lootState.lootCount >= 1),
+                    canSpamLoot = lootState.lootCount >= 1,
+                    canStartRolls = lootState.lootCount >= 1,
+                    canStartSR = lootState.lootCount >= 1 and hasReserves,
+                    canCountdown = lootState.lootCount >= 1 and hasItem,
+                    canHold = lootState.lootCount >= 1,
+                    canBank = lootState.lootCount >= 1,
+                    canDisenchant = lootState.lootCount >= 1,
+                    canAward = lootState.lootCount >= 1 and lootState.rollsCount >= 1,
+                    canOpenReserves = hasReserves,
+                    canImportReserves = not hasReserves,
+                    canRoll = record and canRoll and rolled == false,
+                    canClear = lootState.rollsCount >= 1,
+                })
+                dirtyFlags.buttons = false
+            end
+
+            dirtyFlags.rolls = false
+            dirtyFlags.winner = false
         end
     end
 
@@ -2298,7 +2455,13 @@ do
     -- Prepares the data for the dropdowns by fetching the raid roster.
     --
     function PrepareDropDowns()
+        local rosterVersion = addon.Raid.GetRosterVersion and addon.Raid:GetRosterVersion() or nil
+        if rosterVersion and cachedRosterVersion == rosterVersion then
+            return
+        end
+        cachedRosterVersion = rosterVersion
         dropDownDirty = true
+        dirtyFlags.dropdowns = true
         for i = 1, 8 do
             dropDownData[i] = twipe(dropDownData[i])
         end
@@ -2311,6 +2474,7 @@ do
                 dropDownGroupData[subgroup] = true
             end
         end
+        RefreshDropDowns(true)
     end
 
     module.PrepareDropDowns = PrepareDropDowns
@@ -2334,6 +2498,7 @@ do
             lootState.disenchanter = value
         end
         dropDownDirty = true
+        dirtyFlags.dropdowns = true
         CloseDropDownMenus()
     end
 
@@ -2549,39 +2714,45 @@ do
             return false
         end
 
-        for p = 1, addon.Raid:GetNumRaid() do
-            if GetMasterLootCandidate(p) == playerName then
-                GiveMasterLoot(itemIndex, p)
-                local output, whisper
-                if rollType <= 4 and addon.options.announceOnWin then
-                    output = L.ChatAward:format(playerName, itemLink)
-                elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
-                    output = L.ChatHold:format(playerName, itemLink)
-                    if addon.options.lootWhispers then
-                        whisper = L.WhisperHoldAssign:format(itemLink)
-                    end
-                elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
-                    output = L.ChatBank:format(playerName, itemLink)
-                    if addon.options.lootWhispers then
-                        whisper = L.WhisperBankAssign:format(itemLink)
-                    end
-                elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
-                    output = L.ChatDisenchant:format(itemLink, playerName)
-                    if addon.options.lootWhispers then
-                        whisper = L.WhisperDisenchantAssign:format(itemLink)
-                    end
+        if candidateCache.itemLink ~= itemLink then
+            BuildCandidateCache(itemLink)
+        end
+        local candidateIndex = candidateCache.indexByName[playerName]
+        if not candidateIndex then
+            BuildCandidateCache(itemLink)
+            candidateIndex = candidateCache.indexByName[playerName]
+        end
+        if candidateIndex then
+            GiveMasterLoot(itemIndex, candidateIndex)
+            local output, whisper
+            if rollType <= 4 and addon.options.announceOnWin then
+                output = L.ChatAward:format(playerName, itemLink)
+            elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
+                output = L.ChatHold:format(playerName, itemLink)
+                if addon.options.lootWhispers then
+                    whisper = L.WhisperHoldAssign:format(itemLink)
                 end
-
-                if output and not announced then
-                    addon:Announce(output)
-                    announced = true
+            elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
+                output = L.ChatBank:format(playerName, itemLink)
+                if addon.options.lootWhispers then
+                    whisper = L.WhisperBankAssign:format(itemLink)
                 end
-                if whisper then
-                    Utils.whisper(playerName, whisper)
+            elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
+                output = L.ChatDisenchant:format(itemLink, playerName)
+                if addon.options.lootWhispers then
+                    whisper = L.WhisperDisenchantAssign:format(itemLink)
                 end
-                addon.History.Loot:Log(lootState.currentRollItem, playerName, rollType, rollValue)
-                return true
             end
+
+            if output and not announced then
+                addon:Announce(output)
+                announced = true
+            end
+            if whisper then
+                Utils.whisper(playerName, whisper)
+            end
+            addon.History.Loot:Log(lootState.currentRollItem, playerName, rollType, rollValue)
+            return true
         end
         addon:error(L.ErrCannotFindPlayer:format(playerName))
         return false
