@@ -2935,7 +2935,12 @@ do
         end
 
         if row.iconTexture then
-            row.iconTexture:SetTexture(info.itemIcon or itemFallbackIcon)
+            local icon = info.itemIcon or itemFallbackIcon
+            row.iconTexture:SetTexture(icon)
+            row.iconTexture:SetAllPoints(row.iconBtn)
+            row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            row.iconTexture:SetDrawLayer("ARTWORK")
+            row.iconTexture:Show()
         end
 
         if row.nameText then
@@ -2946,7 +2951,7 @@ do
             row.playerText:SetText(info.playersText or (info.players and tconcat(info.players, ", ")) or "")
         end
         if row.sourceText then
-            row.sourceText:SetText(info.source or "")
+            row.sourceText:SetText("")
         end
 
         if row.quantityText then
@@ -3325,6 +3330,10 @@ do
             row._itemName = itemName
             if row.iconTexture then
                 row.iconTexture:SetTexture(icon)
+                row.iconTexture:SetAllPoints(row.iconBtn)
+                row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                row.iconTexture:SetDrawLayer("ARTWORK")
+                row.iconTexture:Show()
             end
             if row.nameText then
                 row.nameText:SetText(itemLink or itemName or ("Item ID: " .. itemId))
@@ -3488,12 +3497,14 @@ do
             row.iconBtn = _G[rowName .. "IconBtn"]
             row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
             if row.iconTexture and row.iconBtn then
-            row.iconTexture:SetAllPoints(row.iconBtn)
-        end
-        row.nameText = _G[rowName .. "Name"]
-        row.sourceText = _G[rowName .. "Source"]
-        row.playerText = _G[rowName .. "Players"]
-        row.quantityText = _G[rowName .. "Quantity"]
+                row.iconTexture:SetAllPoints(row.iconBtn)
+                row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                row.iconTexture:SetDrawLayer("ARTWORK")
+            end
+            row.nameText = _G[rowName .. "Name"]
+            row.sourceText = _G[rowName .. "Source"]
+            row.playerText = _G[rowName .. "Players"]
+            row.quantityText = _G[rowName .. "Quantity"]
             SetupReserveRowTooltip(row)
             row._initialized = true
         end
@@ -5330,12 +5341,21 @@ do
                 local ui = row._p
 
                 row._itemLink = v.itemLink
-
-                ui.Name:SetText(addon.WrapTextInColorCode(
-                    v.itemName,
-                    Utils.normalizeHexColor(itemColors[v.itemRarity + 1])
-                ))
-                ui.Source:SetText(addon.History.Boss:GetName(v.bossNum, addon.History.selectedRaid))
+                local nameText = v.itemLink or v.itemName or ("[Item " .. (v.itemId or "?") .. "]")
+                if v.itemLink then
+                    ui.Name:SetText(nameText)
+                else
+                    ui.Name:SetText(addon.WrapTextInColorCode(
+                        nameText,
+                        Utils.normalizeHexColor(itemColors[(v.itemRarity or 1) + 1])
+                    ))
+                end
+                local selectedBoss = addon.History.selectedBoss
+                if selectedBoss and v.bossNum == selectedBoss then
+                    ui.Source:SetText("")
+                else
+                    ui.Source:SetText(addon.History.Boss:GetName(v.bossNum, addon.History.selectedRaid))
+                end
 
                 local r, g, b = addon.GetClassColor(addon.Raid:GetPlayerClass(v.looter))
                 ui.Winner:SetText(v.looter)
@@ -5344,7 +5364,14 @@ do
                 ui.Type:SetText(lootTypesColored[v.rollType] or lootTypesColored[4])
                 ui.Roll:SetText(v.rollValue or 0)
                 ui.Time:SetText(v.timeFmt)
-                ui.ItemIconTexture:SetTexture(v.itemTexture)
+                local icon = v.itemTexture
+                if not icon and v.itemId then
+                    icon = GetItemIcon(v.itemId)
+                end
+                if not icon then
+                    icon = C.RESERVES_ITEM_FALLBACK_ICON
+                end
+                ui.ItemIconTexture:SetTexture(icon)
 
                 return ROW_H
             end
