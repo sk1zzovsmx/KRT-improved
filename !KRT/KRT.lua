@@ -2935,7 +2935,15 @@ do
         end
 
         if row.iconTexture then
-            local icon = info.itemIcon or (info.itemId and GetItemIcon(info.itemId)) or itemFallbackIcon
+            local icon = info.itemIcon
+            if not icon and info.itemId then
+                local fetchedIcon = GetItemIcon(info.itemId)
+                if type(fetchedIcon) == "string" and fetchedIcon ~= "" then
+                    info.itemIcon = fetchedIcon
+                    icon = fetchedIcon
+                end
+            end
+            icon = icon or itemFallbackIcon
             if type(icon) ~= "string" or icon == "" then icon = itemFallbackIcon end
             row.iconTexture:SetTexture(icon)
             row.iconTexture:Show()
