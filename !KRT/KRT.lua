@@ -1868,6 +1868,7 @@ do
     local dropDownData, dropDownGroupData = {}, {}
     local dropDownFrameHolder, dropDownFrameBanker, dropDownFrameDisenchanter
     local dropDownsInitialized
+    local dropDownDirty = true
 
     local selectionFrame, UpdateSelectionFrame
 
@@ -2183,9 +2184,12 @@ do
             end
 
             -- Dropdown Updates
-            UpdateDropDowns(dropDownFrameHolder)
-            UpdateDropDowns(dropDownFrameBanker)
-            UpdateDropDowns(dropDownFrameDisenchanter)
+            if dropDownDirty then
+                UpdateDropDowns(dropDownFrameHolder)
+                UpdateDropDowns(dropDownFrameBanker)
+                UpdateDropDowns(dropDownFrameDisenchanter)
+                dropDownDirty = false
+            end
 
             -- Button State Updates
             Utils.setText(_G[frameName .. "CountdownBtn"], L.BtnStop, L.BtnCountdown, countdownRun == true)
@@ -2283,6 +2287,7 @@ do
     -- Prepares the data for the dropdowns by fetching the raid roster.
     --
     function PrepareDropDowns()
+        dropDownDirty = true
         for i = 1, 8 do
             dropDownData[i] = twipe(dropDownData[i])
         end
@@ -2317,6 +2322,7 @@ do
             KRT_Raids[KRT_CurrentRaid].disenchanter = value
             lootState.disenchanter = value
         end
+        dropDownDirty = true
         CloseDropDownMenus()
     end
 
