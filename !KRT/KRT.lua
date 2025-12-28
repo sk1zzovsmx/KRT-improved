@@ -6511,7 +6511,9 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
     local _, event, _, _, _, destGUID = ...
     if not KRT_CurrentRaid then return end
     if event == "UNIT_DIED" then
-        if addon.GetUnitIdFromGUID(destGUID, "player") then return end
+        local class, unit = addon.GetClassFromGUID(destGUID, "player")
+        if unit then return end
+        class = class or "UNKNOWN"
         local npcId = addon.GetCreatureId(destGUID)
         local boss = addon.BossIDs:GetBossName(npcId)
         if boss then
