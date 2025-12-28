@@ -1968,7 +1968,7 @@ do
     local function BuildCandidateCache(itemLink)
         candidateCache.itemLink = itemLink
         twipe(candidateCache.indexByName)
-        for p = 1, addon.Raid:GetNumRaid() do
+        for p = 1, addon.GetNumGroupMembers() do
             local candidate = GetMasterLootCandidate(p)
             if candidate and candidate ~= "" then
                 candidateCache.indexByName[candidate] = p
@@ -4801,7 +4801,7 @@ do
 
     -- Start spamming:
     function module:Start()
-        if strlen(finalOutput) > 3 and strlen(finalOutput) <= 255 then
+        if addon.WithinRange(strlen(finalOutput), 4, 255) then
             if paused then
                 paused = false
             elseif ticking then
@@ -6017,7 +6017,7 @@ do
 
         local h, m = bTime:match("^(%d+):(%d+)$")
         h, m = tonumber(h), tonumber(m)
-        if not (h and m and h >= 0 and h <= 23 and m >= 0 and m <= 59) then
+        if not (h and m and addon.WithinRange(h, 0, 23) and addon.WithinRange(m, 0, 59)) then
             addon:error(L.ErrBossTime)
             return
         end
