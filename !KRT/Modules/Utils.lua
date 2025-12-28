@@ -174,19 +174,13 @@ function Utils.getRealmName()
 end
 
 function Utils.getUnitRank(unit, fallback)
-	if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
+	local groupLeader = (addon and addon.UnitIsGroupLeader) or UnitIsGroupLeader
+	local groupAssistant = (addon and addon.UnitIsGroupAssistant) or UnitIsGroupAssistant
+
+	if groupLeader and groupLeader(unit) then
 		return 2
 	end
-	if UnitIsRaidLeader and UnitIsRaidLeader(unit) then
-		return 2
-	end
-	if UnitIsPartyLeader and UnitIsPartyLeader(unit) then
-		return 2
-	end
-	if UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
-		return 1
-	end
-	if UnitIsRaidOfficer and UnitIsRaidOfficer(unit) then
+	if groupAssistant and groupAssistant(unit) then
 		return 1
 	end
 	return fallback or 0

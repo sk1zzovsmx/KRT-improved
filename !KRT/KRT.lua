@@ -692,12 +692,12 @@ do
     -- Returns raid size: 10 or 25.
     --
     function module:GetRaidSize()
-        if not IsInRaid() then return 0 end
+        local _, _, members = addon.GetGroupTypeAndCount()
+        if members == 0 then return 0 end
         local diff = addon.GetRaidDifficulty()
         if diff then
             return (diff == 1 or diff == 3) and 10 or 25
         end
-        local members = addon.GetNumGroupMembers()
         return members > 20 and 25 or 10
     end
 
@@ -1064,9 +1064,7 @@ do
                     ch = "RAID"
                 else
                     if addon.options.useRaidWarning then
-                        local isLead = UnitIsGroupLeader("player") or IsRaidLeader()
-                        local isAssist = UnitIsGroupAssistant("player") or IsRaidOfficer()
-                        if isLead or isAssist then
+                        if UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") then
                             ch = "RAID_WARNING"
                         else
                             ch = "RAID"
