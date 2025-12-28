@@ -301,7 +301,7 @@ do
         local raid = KRT_Raids[KRT_CurrentRaid]
         raid.playersByName = raid.playersByName or {}
         local playersByName = raid.playersByName
-        for unit in UnitIterator(true) do
+        addon.GroupIterator(function(unit, owner)
             local name = UnitName(unit)
             if name then
                 local rank, subgroup, level, classL, class = Utils.getRaidRosterData(unit)
@@ -336,7 +336,7 @@ do
                     }
                 end
             end
-        end
+        end, true)
 
         numRaid = tLength(playersByName)
         if numRaid == 0 then
@@ -383,7 +383,7 @@ do
             changes       = {},
         }
 
-        for unit in UnitIterator(true) do
+        addon.GroupIterator(function(unit, owner)
             local name = UnitName(unit)
             if name then
                 local rank, subgroup, level, classL, class = Utils.getRaidRosterData(unit)
@@ -409,7 +409,7 @@ do
                     sex    = UnitSex(unit),
                 }
             end
-        end
+        end, true)
 
         tinsert(KRT_Raids, raidInfo)
         KRT_CurrentRaid = #KRT_Raids
@@ -527,14 +527,14 @@ do
             instanceDiff = instanceDiff + (2 * dynDiff)
         end
         local players = {}
-        for unit in UnitIterator(true) do
+        addon.GroupIterator(function(unit, owner)
             if UnitIsConnected(unit) then -- track only online players
                 local name = UnitName(unit)
                 if name then
                     tinsert(players, name)
                 end
             end
-        end
+        end, true)
         local currentTime = Utils.getCurrentTime()
         local killInfo = {
             name       = bossName,
@@ -2466,14 +2466,14 @@ do
             dropDownData[i] = twipe(dropDownData[i])
         end
         dropDownGroupData = twipe(dropDownGroupData)
-        for unit in UnitIterator() do
+        addon.GroupIterator(function(unit, owner)
             local name = UnitName(unit)
             local _, subgroup = Utils.getRaidRosterData(unit)
             if name then
                 dropDownData[subgroup][name] = name
                 dropDownGroupData[subgroup] = true
             end
-        end
+        end)
         RefreshDropDowns(true)
     end
 
@@ -2921,7 +2921,7 @@ do
         if not IsInGroup() then
             return raidPlayers
         end
-        for unit in UnitIterator(true) do
+        addon.GroupIterator(function(unit, owner)
             local name = UnitName(unit)
             if name and name ~= "" then
                 raidPlayers[#raidPlayers + 1] = name
@@ -2929,7 +2929,7 @@ do
                     KRT_PlayerCounts[name] = 0
                 end
             end
-        end
+        end, true)
         table.sort(raidPlayers)
         return raidPlayers
     end
