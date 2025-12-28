@@ -183,18 +183,6 @@ function Utils.getUnitRank(unit, fallback)
 	if groupAssistant and groupAssistant(unit) then
 		return 1
 	end
-
-	if not (addon and addon.UnitIsGroupLeader) then
-		if UnitIsRaidLeader and UnitIsRaidLeader(unit) then
-			return 2
-		end
-		if UnitIsPartyLeader and UnitIsPartyLeader(unit) then
-			return 2
-		end
-		if UnitIsRaidOfficer and UnitIsRaidOfficer(unit) then
-			return 1
-		end
-	end
 	return fallback or 0
 end
 
