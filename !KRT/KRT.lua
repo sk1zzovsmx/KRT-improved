@@ -917,8 +917,9 @@ do
         if #players == 0 then
             if IsInGroup() then
                 for unit in UnitIterator(true) do
-                    local pname = UnitName(unit)
-                    if pname == name then
+                    local fullname = addon.UnitFullName(unit)
+                    local shortname = UnitName(unit)
+                    if fullname == name or shortname == name then
                         rank = Utils.getUnitRank(unit)
                         break
                     end
@@ -957,7 +958,9 @@ do
             return id
         end
         for unit in UnitIterator(true) do
-            if UnitName(unit) == name then
+            local fullname = addon.UnitFullName(unit)
+            local shortname = UnitName(unit)
+            if fullname == name or shortname == name then
                 id = unit
                 break
             end
