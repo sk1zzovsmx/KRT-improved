@@ -1059,21 +1059,17 @@ do
                 isCountdown = (find(text, ticPat) ~= nil) or (find(text, L.ChatCountdownEnd) ~= nil)
             end
 
-            if IsInRaid() then
+            local groupType = addon.GetGroupTypeAndCount()
+            if groupType == "raid" then
                 if isCountdown and addon.options.countdownSimpleRaidMsg then
                     ch = "RAID"
+                elseif addon.options.useRaidWarning
+                    and (UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")) then
+                    ch = "RAID_WARNING"
                 else
-                    if addon.options.useRaidWarning then
-                        if UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") then
-                            ch = "RAID_WARNING"
-                        else
-                            ch = "RAID"
-                        end
-                    else
-                        ch = "RAID"
-                    end
+                    ch = "RAID"
                 end
-            elseif IsInGroup() then
+            elseif groupType == "party" then
                 ch = "PARTY"
             else
                 ch = "SAY"
@@ -1890,8 +1886,8 @@ do
     }
 
     local countdownRun = false
-    local countdownStart, countdownPos = 0, 0
-    local ceil = math.ceil
+    local countdownTicker
+    local countdownEndTimer
 
     local AssignItem, TradeItem
     local screenshotWarn = false
@@ -1906,6 +1902,55 @@ do
     -------------------------------------------------------
     -- Private helpers
     -------------------------------------------------------
+    local function StopCountdown()
+        Utils.CancelTimer(countdownTicker, true)
+        Utils.CancelTimer(countdownEndTimer, true)
+        countdownTicker = nil
+        countdownEndTimer = nil
+        countdownRun = false
+    end
+
+    local function ShouldAnnounceCountdownTick(remaining, duration)
+        if remaining >= duration then
+            return true
+        end
+        if remaining >= 10 then
+            return (remaining % 10 == 0)
+        end
+        if remaining > 0 and remaining < 10 and remaining % 7 == 0 then
+            return true
+        end
+        if remaining > 0 and remaining >= 5 and remaining % 5 == 0 then
+            return true
+        end
+        return remaining > 0 and remaining <= 3
+    end
+
+    local function StartCountdown()
+        StopCountdown()
+        countdownRun = true
+        local duration = addon.options.countdownDuration or 0
+        local remaining = duration
+        if ShouldAnnounceCountdownTick(remaining, duration) then
+            addon:Announce(L.ChatCountdownTic:format(remaining))
+        end
+        countdownTicker = Utils.NewTicker(1, function()
+            remaining = remaining - 1
+            if remaining > 0 then
+                if ShouldAnnounceCountdownTick(remaining, duration) then
+                    addon:Announce(L.ChatCountdownTic:format(remaining))
+                end
+            end
+        end, duration)
+        countdownEndTimer = Utils.After(duration, function()
+            if not countdownRun then return end
+            StopCountdown()
+            addon:Announce(L.ChatCountdownEnd)
+            if addon.options.countdownRollsBlock then
+                addon.Rolls:RecordRolls(false)
+            end
+        end)
+    end
     local function UpdateMasterButtonsIfChanged(state)
         local buttons = lastUIState.buttons
         local texts = lastUIState.texts
@@ -2126,13 +2171,11 @@ do
     function module:BtnCountdown(btn)
         if countdownRun then
             addon.Rolls:RecordRolls(false)
-            countdownRun = false
+            StopCountdown()
         else
             addon.Rolls:RecordRolls(true)
             announced = false
-            countdownRun = true
-            countdownStart = GetTime()
-            countdownPos = addon.options.countdownDuration + 1
+            StartCountdown()
         end
     end
 
@@ -2301,37 +2344,6 @@ do
 
             if dropDownDirty then
                 dirtyFlags.dropdowns = true
-            end
-
-            -- Countdown Logic
-            if countdownRun == true then
-                local tick = ceil(addon.options.countdownDuration - GetTime() + countdownStart)
-                local i = countdownPos - 1
-                while i >= tick do
-                    if i >= addon.options.countdownDuration then
-                        addon:Announce(L.ChatCountdownTic:format(i))
-                    elseif i >= 10 then
-                        if i % 10 == 0 then
-                            addon:Announce(L.ChatCountdownTic:format(i))
-                        end
-                    elseif (
-                            (i > 0 and i < 10 and i % 7 == 0) or
-                            (i > 0 and i >= 5 and i % 5 == 0) or
-                            (i > 0 and i <= 3)
-                        ) then
-                        addon:Announce(L.ChatCountdownTic:format(i))
-                    end
-                    i = i - 1
-                end
-                countdownPos = tick
-                if countdownPos == 0 then
-                    countdownRun = false
-                    countdownPos = 0
-                    addon:Announce(L.ChatCountdownEnd)
-                    if addon.options.countdownRollsBlock then
-                        addon.Rolls:RecordRolls(false)
-                    end
-                end
             end
 
             local rollType, record, canRoll, rolled = addon.Rolls:RollStatus()
@@ -4715,9 +4727,9 @@ do
 
     local ticking = false
     local paused = false
-    local tickStart, tickPos = 0, 0
-
-    local ceil = math.ceil
+    local spamTimer
+    local countdownTicker
+    local countdownRemaining = 0
     local lastState = {
         name = nil,
         tank = 0,
@@ -4735,7 +4747,8 @@ do
     local StartTicker
     local StopTicker
     local RenderPreview
-    local UpdateSpamTimer
+    local StartSpamCycle
+    local StopSpamCycle
     local UpdateControls
     local BuildOutput
 
@@ -4804,14 +4817,14 @@ do
         if addon.WithinRange(strlen(finalOutput), 4, 255) then
             if paused then
                 paused = false
+                StartSpamCycle()
             elseif ticking then
                 ticking = false
+                StopSpamCycle()
             else
-                tickStart = GetTime()
-                duration = tonumber(duration) or addon.options.lfmPeriod
-                tickPos = (duration >= 1 and duration or addon.options.lfmPeriod) + 1
                 ticking = true
                 StartTicker()
+                StartSpamCycle()
                 -- module:Spam()
             end
         end
@@ -4819,9 +4832,9 @@ do
 
     -- Stop spamming:
     function module:Stop()
-        _G[frameName .. "Tick"]:SetText(duration or 0)
         ticking = false
         paused = false
+        StopSpamCycle()
         if UISpammer and not UISpammer:IsShown() then
             StopTicker()
         end
@@ -4830,6 +4843,7 @@ do
     -- Pausing spammer
     function module:Pause()
         paused = true
+        StopSpamCycle()
     end
 
     -- Send spam message:
@@ -4920,6 +4934,43 @@ do
         })
 
         localized = true
+    end
+
+    local function UpdateTickDisplay()
+        if countdownRemaining > 0 then
+            _G[frameName .. "Tick"]:SetText(countdownRemaining)
+        else
+            _G[frameName .. "Tick"]:SetText("")
+        end
+    end
+
+    function StopSpamCycle()
+        Utils.CancelTimer(countdownTicker, true)
+        Utils.CancelTimer(spamTimer, true)
+        countdownTicker = nil
+        spamTimer = nil
+        countdownRemaining = 0
+        UpdateTickDisplay()
+    end
+
+    function StartSpamCycle()
+        StopSpamCycle()
+        duration = tonumber(duration) or addon.options.lfmPeriod
+        countdownRemaining = duration
+        UpdateTickDisplay()
+        countdownTicker = Utils.NewTicker(1, function()
+            countdownRemaining = countdownRemaining - 1
+            if countdownRemaining < 0 then
+                countdownRemaining = 0
+            end
+            UpdateTickDisplay()
+        end, duration)
+        spamTimer = Utils.After(duration, function()
+            if not ticking or paused then return end
+            UpdateTickDisplay()
+            module:Spam()
+            StartSpamCycle()
+        end)
     end
 
     function StartTicker()
@@ -5086,24 +5137,6 @@ do
         UpdateControls()
     end
 
-    function UpdateSpamTimer()
-        if not ticking or paused then return end
-        local count = ceil(duration - GetTime() + tickStart)
-        local i = tickPos - 1
-        while i >= count do
-            _G[frameName .. "Tick"]:SetText(i)
-            i = i - 1
-        end
-        tickPos = count
-        if tickPos < 0 then tickPos = 0 end
-        if tickPos == 0 then
-            _G[frameName .. "Tick"]:SetText("")
-            module:Spam()
-            ticking = false
-            module:Start()
-        end
-    end
-
     -- OnUpdate frame:
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
@@ -5140,7 +5173,6 @@ do
                 loaded = true
             end
             RenderPreview()
-            UpdateSpamTimer()
         end
     end
 
