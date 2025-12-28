@@ -10,11 +10,19 @@ addon.name             = addon.name or addonName
 local L                = addon.L
 local Utils            = addon.Utils
 local C                = addon.C
+local wipe             = _G.wipe or table.wipe
 local function TGet(tag)
-    if Utils.Table and Utils.Table.get then
-        return Utils.Table.get(tag)
+    local Table = addon.Table
+    if Table and Table.get then
+        return wipe(Table.get(tag))
     end
     return {}
+end
+local function TFree(tag, obj)
+    local Table = addon.Table
+    if Table and Table.free then
+        Table.free(tag, obj)
+    end
 end
 
 local _G               = _G
@@ -774,17 +782,16 @@ do
     -- Retrieves all boss kills for a given raid.
     --
     function module:GetBosses(raidNum)
-        local bosses = {}
+        local bosses = TGet("history-bosses-src")
         raidNum = raidNum or KRT_CurrentRaid
         if raidNum and KRT_Raids[raidNum] then
             local kills = KRT_Raids[raidNum].bossKills
             for i, b in ipairs(kills) do
-                local info = {
-                    id = i,
-                    difficulty = b.difficulty,
-                    time = b.date,
-                    hash = b.hash or "0",
-                }
+                local info = TGet("history-bosses-src-item")
+                info.id = i
+                info.difficulty = b.difficulty
+                info.time = b.date
+                info.hash = b.hash or "0"
                 if b.name == "_TrashMob_" then
                     info.name = L.StrTrashMob
                     info.mode = ""
@@ -816,7 +823,7 @@ do
         end
 
         if bossNum and raid.bossKills[bossNum] then
-            local players = {}
+            local players = TGet("history-boss-attendees-src")
             local bossPlayers = raid.bossKills[bossNum].players
             for i, p in ipairs(raidPlayers) do
                 if tContains(bossPlayers, p.name) then
@@ -5449,6 +5456,10 @@ do
                 it.timeFmt = date("%H:%M", b.time)
                 out[i]     = it
             end
+            for i = 1, #src do
+                TFree("history-bosses-src-item", src[i])
+            end
+            TFree("history-bosses-src", src)
         end,
 
         rowName     = function(n, _, i) return n .. "BossBtn" .. i end,
@@ -5571,6 +5582,7 @@ do
                 it.class = p.class
                 out[i]   = it
             end
+            TFree("history-boss-attendees-src", src)
         end,
 
         rowName     = function(n, _, i) return n .. "PlayerBtn" .. i end,
