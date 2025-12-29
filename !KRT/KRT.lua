@@ -3095,7 +3095,6 @@ do
     local reservesDirty = false
     local pendingItemInfo = {}
     local collapsedBossGroups = {}
-    local itemFallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
     local grouped = {}
 
     -------------------------------------------------------
@@ -3330,10 +3329,12 @@ do
                     icon = fetchedIcon
                 end
             end
-            icon = icon or itemFallbackIcon
-            if type(icon) ~= "string" or icon == "" then icon = itemFallbackIcon end
-            row.iconTexture:SetTexture(icon)
-            row.iconTexture:Show()
+            if type(icon) == "string" and icon ~= "" then
+                row.iconTexture:SetTexture(icon)
+                row.iconTexture:Show()
+            else
+                row.iconTexture:Hide()
+            end
         end
 
         if row.nameText then
@@ -3685,7 +3686,7 @@ do
     -- Update reserve item data
     function module:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
         if not itemId then return end
-        local icon = itemIcon or itemFallbackIcon
+        local icon = itemIcon
         reservesDirty = true
 
         local list = reservesByItemID[itemId]
@@ -3726,9 +3727,12 @@ do
             row._tooltipTitle = itemLink or itemName or ("Item ID: " .. itemId)
             row._tooltipSource = row._source and ("Dropped by: " .. row._source) or nil
             if row.iconTexture then
-                if type(icon) ~= "string" or icon == "" then icon = itemFallbackIcon end
-                row.iconTexture:SetTexture(icon)
-                row.iconTexture:Show()
+                if type(icon) == "string" and icon ~= "" then
+                    row.iconTexture:SetTexture(icon)
+                    row.iconTexture:Show()
+                else
+                    row.iconTexture:Hide()
+                end
             end
             if row.nameText then
                 row.nameText:SetText(itemLink or itemName or ("Item ID: " .. itemId))
@@ -3847,10 +3851,14 @@ do
             row.background = _G[rowName .. "Background"]
             row.iconBtn = _G[rowName .. "IconBtn"]
             row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
+            row.textBlock = _G[rowName .. "TextBlock"]
             SetupReserveIcon(row)
-            row.nameText = _G[rowName .. "Name"]
-            row.sourceText = _G[rowName .. "Source"]
-            row.playerText = _G[rowName .. "Players"]
+            if row.textBlock and row.iconBtn then
+                row.textBlock:SetFrameLevel(row.iconBtn:GetFrameLevel() + 1)
+            end
+            row.nameText = _G[rowName .. "TextBlockName"]
+            row.sourceText = _G[rowName .. "TextBlockSource"]
+            row.playerText = _G[rowName .. "TextBlockPlayers"]
             row.quantityText = _G[rowName .. "Quantity"]
             SetupReserveRowTooltip(row)
             if row.sourceText then

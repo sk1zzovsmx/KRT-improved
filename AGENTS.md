@@ -231,3 +231,4 @@ TemplatesLua/
 - _2025-09-22_: Expanded vendored library guidance into explicit bullet rules.
 - _2025-09-23_: Reset Master Loot ItemCount on item change/award and refresh counts for loot sources.
 - _2025-09-24_: Centered reserve list row alignment and auto-queried missing item icons on open.
+- _2025-09-25_: Reserve list rows now place text to the right of icons and hide icons until item data loads.
