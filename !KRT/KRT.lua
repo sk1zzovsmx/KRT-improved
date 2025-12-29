@@ -3652,18 +3652,24 @@ do
         if not itemId then return end
         addon:debug("Reserves: query item info itemId=%d.", itemId)
         local name, link, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
-        if name and link and tex then
-            self:UpdateReserveItemData(itemId, name, link, tex)
-            addon:debug("Reserves: item info ready itemId=%d name=%s.", itemId, name)
-            return true
-        else
-            GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
-            GameTooltip:SetHyperlink("item:" .. itemId)
-            GameTooltip:Hide()
-            pendingItemInfo[itemId] = true
-            addon:debug("Reserves: item info pending itemId=%d.", itemId)
-            return false
+        if name and link then
+            local icon = tex
+            if type(icon) ~= "string" or icon == "" then
+                icon = GetItemIcon(itemId)
+            end
+            self:UpdateReserveItemData(itemId, name, link, icon)
+            if type(icon) == "string" and icon ~= "" then
+                addon:debug("Reserves: item info ready itemId=%d name=%s.", itemId, name)
+                return true
+            end
         end
+
+        GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+        GameTooltip:SetHyperlink("item:" .. itemId)
+        GameTooltip:Hide()
+        pendingItemInfo[itemId] = true
+        addon:debug("Reserves: item info pending itemId=%d.", itemId)
+        return false
     end
 
     -- Query all missing items for reserves
