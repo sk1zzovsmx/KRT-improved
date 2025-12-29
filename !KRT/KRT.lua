@@ -518,7 +518,7 @@ do
         local _, _, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
         if manDiff then
             instanceDiff = (KRT_Raids[raidNum].size == 10) and 1 or 2
-            if lower(manDiff) == "h" then instanceDiff = instanceDiff + 2 end
+            if Utils.normalizeLower(manDiff, true) == "h" then instanceDiff = instanceDiff + 2 end
         elseif isDyn then
             instanceDiff = instanceDiff + (2 * dynDiff)
         end
@@ -2216,7 +2216,7 @@ do
         if not btn then return end
         local btnName = btn:GetName()
         local raw = btn.playerName or _G[btnName .. "Name"]:GetText() or ""
-        local player = raw:gsub("^%s*>%s*(.-)%s*<%s*$", "%1"):trim()
+        local player = Utils.trimText(raw:gsub("^%s*>%s*(.-)%s*<%s*$", "%1"))
         if player ~= "" then
             if IsControlKeyDown() then
                 local roll = _G[btnName .. "Roll"]:GetText()
@@ -3507,7 +3507,7 @@ do
 
         local function cleanCSVField(field)
             if not field then return nil end
-            return field:gsub('^"(.-)"$', '%1'):trim()
+            return Utils.trimText(field:gsub('^"(.-)"$', '%1'), true)
         end
 
         local firstLine = true
@@ -3672,7 +3672,7 @@ do
 
     -- Get reserve count for a specific item for a player
     function module:GetReserveCountForItem(itemId, playerName)
-        local normalized = playerName and playerName:lower()
+        local normalized = Utils.normalizeLower(playerName, true)
         local entry = reservesData[normalized]
         if not entry then return 0 end
         addon:debug("Reserves: check count itemId=%d player=%s.", itemId, playerName)
@@ -5263,7 +5263,7 @@ do
                 if not (raid and raid.players) then return end
 
                 for _, p in ipairs(raid.players) do
-                    if name == p.name:lower() then
+                    if name == Utils.normalizeLower(p.name) then
                         addon.History.Loot:Log(self.itemId, p.name)
                         return
                     end
@@ -6101,7 +6101,8 @@ do
 
     function Box:Save()
         local name = Utils.trimText(_G[frameName .. "Name"]:GetText())
-        if name == "" then
+        local normalizedName = Utils.normalizeLower(name)
+        if normalizedName == "" then
             addon:error(L.ErrAttendeesInvalidName)
             return
         end
@@ -6114,14 +6115,14 @@ do
 
         local bossKill = KRT_Raids[rID].bossKills[bID]
         for _, n in ipairs(bossKill.players) do
-            if n:lower() == name:lower() then
+            if Utils.normalizeLower(n) == normalizedName then
                 addon:error(L.ErrAttendeesPlayerExists)
                 return
             end
         end
 
         for _, p in ipairs(KRT_Raids[rID].players) do
-            if name:lower() == p.name:lower() then
+            if normalizedName == Utils.normalizeLower(p.name) then
                 tinsert(bossKill.players, p.name)
                 addon:info(L.StrAttendeesAddSuccess)
                 self:Toggle()
