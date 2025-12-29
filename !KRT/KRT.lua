@@ -3418,9 +3418,6 @@ do
         end
         addon:debug("Reserves: show list window.")
         reserveListFrame:Show()
-        if self:HasData() then
-            self:QueryMissingItems(true)
-        end
     end
 
     function module:CloseWindow()
