@@ -19,7 +19,6 @@ end
 
 local _G               = _G
 _G["KRT"]              = addon
-local LibStub          = _G.LibStub
 
 
 ---============================================================================
@@ -58,12 +57,12 @@ KRT_PlayerCounts          = KRT_PlayerCounts or {}
 ---============================================================================
 -- External Libraries / Bootstrap
 ---============================================================================
-local Compat              = LibStub("LibCompat-1.0")
+local Compat              = addon:GetLib("LibCompat-1.0")
 addon.Compat              = Compat
-addon.BossIDs             = LibStub("LibBossIDs-1.0", true)
-addon.Logger              = LibStub("LibLogger-1.0", true)
-addon.Deformat            = LibStub("LibDeformat-3.0", true)
-addon.CallbackHandler     = LibStub("CallbackHandler-1.0", true)
+addon.BossIDs             = addon:GetLib("LibBossIDs-1.0")
+addon.Logger              = addon:GetLib("LibLogger-1.0")
+addon.Deformat            = addon:GetLib("LibDeformat-3.0")
+addon.CallbackHandler     = addon:GetLib("CallbackHandler-1.0")
 
 Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
 addon.Logger:Embed(addon)
