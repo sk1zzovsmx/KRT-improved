@@ -3495,6 +3495,9 @@ do
                     end
                     addon:debug("Reserves: update item data %s.", link)
                     self:UpdateReserveItemData(itemId, name, link, icon)
+                    if reserveListFrame and reserveListFrame:IsShown() then
+                        self:RefreshWindow()
+                    end
                     if type(icon) == "string" and icon ~= "" then
                         pendingItemInfo[itemId] = nil
                     else
@@ -3652,7 +3655,7 @@ do
         if not itemId then return end
         addon:debug("Reserves: query item info itemId=%d.", itemId)
         local name, link, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
-        if name and link then
+        if name then
             local icon = tex
             if type(icon) ~= "string" or icon == "" then
                 icon = GetItemIcon(itemId)
@@ -3675,6 +3678,7 @@ do
     -- Query all missing items for reserves
     function module:QueryMissingItems(silent)
         local count = 0
+        local updated = false
         addon:debug("Reserves: query missing items.")
         for _, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
@@ -3682,10 +3686,15 @@ do
                     if not r.itemLink or not r.itemIcon then
                         if not self:QueryItemInfo(r.rawID) then
                             count = count + 1
+                        else
+                            updated = true
                         end
                     end
                 end
             end
+        end
+        if updated and reserveListFrame and reserveListFrame:IsShown() then
+            self:RefreshWindow()
         end
         if not silent then
             if count > 0 then
