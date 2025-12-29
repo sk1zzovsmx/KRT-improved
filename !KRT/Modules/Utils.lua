@@ -15,6 +15,7 @@ local strsub, strlen       = string.sub, string.len
 local lower, upper         = string.lower, string.upper
 local ucfirst             = _G.string and _G.string.ucfirst
 local select, unpack       = select, unpack
+local LibStub              = LibStub
 
 local GetLocale            = GetLocale
 local GetTime              = GetTime
@@ -34,6 +35,16 @@ local UnitName             = UnitName
 ---============================================================================
 -- Addon binding helpers
 ---============================================================================
+
+function addon:GetLib(name)
+	if not LibStub then
+		error("LibStub missing while loading " .. tostring(name))
+	end
+	if not name or name == "" then
+		error("GetLib requires a library name")
+	end
+	return LibStub(name)
+end
 
 function Utils.applyDebugSetting(enabled)
 	if addon and addon.options then
