@@ -32,86 +32,8 @@ local UnitLevel            = UnitLevel
 local UnitName             = UnitName
 
 ---============================================================================
--- Library helper
----============================================================================
-
--- Library helper: direct LibStub lookup
-function addon:GetLib(name, silent)
-	-- Try common places for LibStub. In some load orders LibStub may not be available
-	-- as a global yet; try _G.LibStub first, then rawget on _G, then fallback to
-	-- a compat implementation (addon.Compat) if present.
-	local globalEnv = _G or (getfenv and getfenv(0)) or {}
-
-	local LibStub = globalEnv.LibStub
-	if not LibStub and rawget then
-		-- rawget(globalEnv, "LibStub") could be nil; guard it
-		local ok, val = pcall(function() return rawget(globalEnv, "LibStub") end)
-		if ok and val then
-			LibStub = val
-		end
-	end
-
-	if not LibStub and addon and addon.Compat and type(addon.Compat.GetLibrary) == "function" then
-		-- LibCompat exposes a GetLibrary-like accessor; try it as a best-effort fallback
-		return addon.Compat:GetLibrary(name, silent)
-	end
-
-	if not LibStub then
-		if not silent then
-			error(("LibStub not found when requesting %q"):format(tostring(name)), 2)
-		end
-		return nil
-	end
-
-	return LibStub(name, silent)
-end
-
----============================================================================
 -- Addon binding helpers
 ---============================================================================
-
-function Utils.bindCompat(addonRef)
-	addonRef = addonRef or addon
-	if not addonRef then return end
-	Utils.Table = addonRef.Table
-	Utils.TablePool = addonRef.TablePool
-	Utils.After = addonRef.After
-	Utils.NewTicker = addonRef.NewTicker
-	Utils.CancelTimer = addonRef.CancelTimer
-	Utils.UnitIterator = addonRef.UnitIterator
-	Utils.tCopy = addonRef.tCopy
-	Utils.tLength = addonRef.tLength
-	Utils.tContains = addonRef.tContains
-	Utils.tIndexOf = addonRef.tIndexOf
-end
-
-function Utils.debug(addonRef, level, fmt, ...)
-	addonRef = addonRef or addon
-	if not addonRef then return end
-	local lv = tostring(level or "INFO"):upper()
-	local fn = (lv == "ERROR" and addonRef.error)
-		or (lv == "WARN" and addonRef.warn)
-		or (lv == "DEBUG" and addonRef.debug)
-		or addonRef.info
-	if fn then
-		fn(addonRef, fmt, ...)
-	end
-	local lvl = addonRef.logLevels and addonRef.logLevels[lv]
-	if not lvl or not addonRef.logLevel then return end
-	if not addonRef.Debugger or type(addonRef.Debugger.AddMessage) ~= "function" then return end
-	if lvl <= addonRef.logLevel then
-		local msg = select("#", ...) > 0 and format(fmt, ...) or fmt
-		addonRef.Debugger:AddMessage(msg)
-	end
-end
-
-function Utils.bindLogger(addonRef)
-	addonRef = addonRef or addon
-	if not addonRef then return end
-	addonRef.Debug = function(self, level, fmt, ...)
-		return Utils.debug(self, level, fmt, ...)
-	end
-end
 
 function Utils.applyDebugSetting(enabled)
 	if addon and addon.options then
@@ -136,12 +58,9 @@ end
 -- Small helpers / iteration
 ---============================================================================
 
--- Practical helper aliases
-function Utils.after(sec, fn) return Utils.After(sec, fn) end
-
 -- Group/pet iteration in one call
 function Utils.forEachGroupUnit(cb, includePets)
-	local iter, state, index = Utils.UnitIterator(not includePets and true or nil)
+	local iter, state, index = addon.UnitIterator(not includePets and true or nil)
 	for unit, owner in iter, state, index do
 		cb(unit, owner)
 	end
@@ -694,21 +613,12 @@ do
 	local date        = _G.date
 	local math_max    = math.max
 
-	if Utils and addon and addon.Table and not Utils.Table then
-		Utils.Table = addon.Table
-	end
-	if Utils and addon and addon.TablePool and not Utils.TablePool then
-		Utils.TablePool = addon.TablePool
-	end
 	if Utils and not Utils.Table then
 		Utils.Table = {}
 		function Utils.Table.get(_) return {} end
 
 		function Utils.Table.free(_, _) end
 	end
-
-	local TGet  = Utils.Table.get
-	local TFree = Utils.Table.free
 
 	function Utils.makeListController(cfg)
 		local self = {
@@ -787,9 +697,10 @@ do
 			if not self._active or not self.frameName then return end
 
 			if self._dirty then
-				if cfg.poolTag and TFree then
+				local tableFree = (addon.Table and addon.Table.free) or (Utils.Table and Utils.Table.free)
+				if cfg.poolTag and tableFree then
 					for i = 1, #self.data do
-						TFree(cfg.poolTag, self.data[i])
+						tableFree(cfg.poolTag, self.data[i])
 					end
 				end
 
