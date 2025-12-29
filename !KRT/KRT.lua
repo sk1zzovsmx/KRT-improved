@@ -6078,7 +6078,7 @@ do
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
         frame:SetScript("OnShow", function()
-            Utils.setEditBoxValue(_G[frameName .. "Name"], "", true)
+            Utils.resetEditBox(_G[frameName .. "Name"])
         end)
         frame:SetScript("OnHide", function()
             Utils.resetEditBox(_G[frameName .. "Name"])
