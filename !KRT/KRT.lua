@@ -3418,9 +3418,6 @@ do
         end
         addon:debug("Reserves: show list window.")
         reserveListFrame:Show()
-        if self:HasData() then
-            self:QueryMissingItems(true)
-        end
     end
 
     function module:CloseWindow()
@@ -3502,6 +3499,8 @@ do
                         pendingItemInfo[itemId] = nil
                     else
                         addon:debug("Reserves: icon still pending itemId=%d.", itemId)
+                        pendingItemInfo[itemId] = true
+                        self:QueryItemInfo(itemId)
                     end
                 else
                     addon:debug("Reserves: item info missing itemId=%d.", itemId)
@@ -3849,7 +3848,7 @@ do
         row.iconTexture:SetPoint("TOPLEFT", row.iconBtn, "TOPLEFT", 2, -2)
         row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
         row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        row.iconTexture:SetDrawLayer("ARTWORK")
+        row.iconTexture:SetDrawLayer("OVERLAY")
     end
 
     -- Create a new row for displaying a reserve
