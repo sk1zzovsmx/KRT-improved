@@ -136,7 +136,7 @@
 		<AbsDimension x="32" y="32" />
 	</Size>
 		<Layers>
-			<Layer level="ARTWORK">
+			<Layer level="OVERLAY">
 				<Texture name="$parentIconTexture">
 					<Size>
 						<AbsDimension x="32" y="32" />
@@ -147,7 +147,7 @@
 				</Texture>
 			</Layer>
 		</Layers>
-	<NormalTexture name="$parentNormalTexture" file="Interface\PaperDoll\UI-Backpack-EmptySlot">
+	<NormalTexture name="$parentNormalTexture" file="Interface\\Icons\\INV_Misc_QuestionMark">
 		<Size>
 			<AbsDimension x="32" y="32" />
 		</Size>
