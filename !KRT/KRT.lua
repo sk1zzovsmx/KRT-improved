@@ -3370,9 +3370,7 @@ do
             return
         end
         frame:Show()
-        if _G["KRTImportEditBox"] then
-            _G["KRTImportEditBox"]:SetText("")
-        end
+        Utils.resetEditBox(_G["KRTImportEditBox"])
         Utils.setFrameTitle(frame, L.StrImportReservesTitle)
     end
 
