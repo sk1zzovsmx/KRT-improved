@@ -5309,7 +5309,7 @@ do
         _rowParts   = { "ID", "Date", "Zone", "Size" },
 
         localize    = function(n)
-            _G[n .. "Title"]:SetText(L.StrRaidsList)
+            Utils.setFrameTitle(n, L.StrRaidsList)
             _G[n .. "HeaderDate"]:SetText(L.StrDate)
             _G[n .. "HeaderSize"]:SetText(L.StrSize)
             _G[n .. "CurrentBtn"]:SetText(L.StrSetCurrent)
@@ -5435,7 +5435,7 @@ do
         _rowParts   = { "ID", "Name", "Time", "Mode" },
 
         localize    = function(n)
-            _G[n .. "Title"]:SetText(L.StrBosses)
+            Utils.setFrameTitle(n, L.StrBosses)
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
         end,
 
@@ -5559,7 +5559,7 @@ do
         _rowParts   = { "Name" },
 
         localize    = function(n)
-            _G[n .. "Title"]:SetText(L.StrBossAttendees)
+            Utils.setFrameTitle(n, L.StrBossAttendees)
         end,
 
         getData     = function(out)
@@ -5660,7 +5660,7 @@ do
         _rowParts   = { "Name", "Join", "Leave" },
 
         localize    = function(n)
-            _G[n .. "Title"]:SetText(L.StrRaidAttendees)
+            Utils.setFrameTitle(n, L.StrRaidAttendees)
             _G[n .. "HeaderJoin"]:SetText(L.StrJoin)
             _G[n .. "HeaderLeave"]:SetText(L.StrLeave)
             -- Add non implementato (per ora)
@@ -5778,7 +5778,7 @@ do
         _rowParts   = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
 
         localize    = function(n)
-            _G[n .. "Title"]:SetText(L.StrRaidLoot)
+            Utils.setFrameTitle(n, L.StrRaidLoot)
             _G[n .. "ExportBtn"]:SetText(L.BtnExport)
             _G[n .. "ClearBtn"]:SetText(L.BtnClear)
             _G[n .. "EditBtn"]:SetText(L.BtnEdit)
