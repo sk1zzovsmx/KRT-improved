@@ -3077,6 +3077,7 @@ do
     addon.Reserves = addon.Reserves or {}
     local module = addon.Reserves
     local L = addon.L
+    local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
 
     -------------------------------------------------------
     -- Internal state
@@ -3329,12 +3330,11 @@ do
                     icon = fetchedIcon
                 end
             end
-            if type(icon) == "string" and icon ~= "" then
-                row.iconTexture:SetTexture(icon)
-                row.iconTexture:Show()
-            else
-                row.iconTexture:Hide()
+            if type(icon) ~= "string" or icon == "" then
+                icon = fallbackIcon
             end
+            row.iconTexture:SetTexture(icon)
+            row.iconTexture:Show()
         end
 
         if row.nameText then
@@ -3727,12 +3727,12 @@ do
             row._tooltipTitle = itemLink or itemName or ("Item ID: " .. itemId)
             row._tooltipSource = row._source and ("Dropped by: " .. row._source) or nil
             if row.iconTexture then
-                if type(icon) == "string" and icon ~= "" then
-                    row.iconTexture:SetTexture(icon)
-                    row.iconTexture:Show()
-                else
-                    row.iconTexture:Hide()
+                local resolvedIcon = icon
+                if type(resolvedIcon) ~= "string" or resolvedIcon == "" then
+                    resolvedIcon = fallbackIcon
                 end
+                row.iconTexture:SetTexture(resolvedIcon)
+                row.iconTexture:Show()
             end
             if row.nameText then
                 row.nameText:SetText(itemLink or itemName or ("Item ID: " .. itemId))
