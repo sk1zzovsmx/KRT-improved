@@ -184,6 +184,23 @@
 					</Anchor>
 				</Anchors>
 			</Button>
+			<Frame name="$parentTextBlock">
+				<Size>
+					<AbsDimension x="0" y="28" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parent" relativePoint="LEFT">
+						<Offset>
+							<AbsDimension x="40" y="0" />
+						</Offset>
+					</Anchor>
+					<Anchor point="RIGHT" relativeTo="$parent" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="-6" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Frame>
 		</Frames>
 		<Layers>
 			<Layer level="BACKGROUND">
@@ -200,14 +217,14 @@
 						<AbsDimension x="0" y="0" />
 					</Size>
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parent" relativePoint="TOPLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentTextBlock" relativePoint="TOPLEFT">
 							<Offset>
-								<AbsDimension x="40" y="-2" />
+								<AbsDimension x="0" y="0" />
 							</Offset>
 						</Anchor>
-						<Anchor point="RIGHT" relativeTo="$parent" relativePoint="RIGHT">
+						<Anchor point="RIGHT" relativeTo="$parentTextBlock" relativePoint="RIGHT">
 							<Offset>
-								<AbsDimension x="-6" y="0" />
+								<AbsDimension x="0" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
@@ -236,9 +253,9 @@
 								<AbsDimension x="0" y="-2" />
 							</Offset>
 						</Anchor>
-						<Anchor point="RIGHT" relativeTo="$parent" relativePoint="RIGHT">
+						<Anchor point="RIGHT" relativeTo="$parentTextBlock" relativePoint="RIGHT">
 							<Offset>
-								<AbsDimension x="-6" y="0" />
+								<AbsDimension x="0" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
