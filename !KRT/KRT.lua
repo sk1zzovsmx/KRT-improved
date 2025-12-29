@@ -3416,6 +3416,9 @@ do
         end
         addon:debug("Reserves: show list window.")
         reserveListFrame:Show()
+        if self:HasData() then
+            self:QueryMissingItems(true)
+        end
     end
 
     function module:CloseWindow()
@@ -3655,7 +3658,7 @@ do
     end
 
     -- Query all missing items for reserves
-    function module:QueryMissingItems()
+    function module:QueryMissingItems(silent)
         local count = 0
         addon:debug("Reserves: query missing items.")
         for _, player in pairs(reservesData) do
@@ -3669,10 +3672,12 @@ do
                 end
             end
         end
-        if count > 0 then
-            addon:info(L.MsgReserveItemsRequested, count)
-        else
-            addon:info(L.MsgReserveItemsReady)
+        if not silent then
+            if count > 0 then
+                addon:info(L.MsgReserveItemsRequested, count)
+            else
+                addon:info(L.MsgReserveItemsReady)
+            end
         end
         addon:debug("Reserves: missing items requested=%d.", count)
     end
