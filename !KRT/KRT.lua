@@ -4217,10 +4217,8 @@ do
 
     -- Cancel editing/adding:
     function module:Cancel()
-        _G[frameName .. "Name"]:SetText("")
-        _G[frameName .. "Name"]:ClearFocus()
-        _G[frameName .. "Content"]:SetText("")
-        _G[frameName .. "Content"]:ClearFocus()
+        Utils.resetEditBox(_G[frameName .. "Name"])
+        Utils.resetEditBox(_G[frameName .. "Content"])
         selectedID = nil
         tempSelectedID = nil
         isEdit = false
@@ -4305,10 +4303,6 @@ do
         else
             tinsert(KRT_Warnings, { name = wName, content = wContent })
         end
-        _G[frameName .. "Name"]:SetText("")
-        _G[frameName .. "Name"]:ClearFocus()
-        _G[frameName .. "Content"]:SetText("")
-        _G[frameName .. "Content"]:ClearFocus()
         module:Cancel()
         module:Update()
     end
@@ -4655,10 +4649,8 @@ do
         isEdit = false
         selectedID = nil
         tempSelectedID = nil
-        _G[frameName .. "Name"]:SetText("")
-        _G[frameName .. "Name"]:ClearFocus()
-        _G[frameName .. "Spec"]:SetText("")
-        _G[frameName .. "Spec"]:ClearFocus()
+        Utils.resetEditBox(_G[frameName .. "Name"])
+        Utils.resetEditBox(_G[frameName .. "Spec"])
     end
 end
 
@@ -4872,16 +4864,16 @@ do
         lastState.message = nil
         lastState.duration = nil
         module:Stop()
-        _G[frameName .. "Name"]:SetText("")
-        _G[frameName .. "Tank"]:SetText("")
-        _G[frameName .. "TankClass"]:SetText("")
-        _G[frameName .. "Healer"]:SetText("")
-        _G[frameName .. "HealerClass"]:SetText("")
-        _G[frameName .. "Melee"]:SetText("")
-        _G[frameName .. "MeleeClass"]:SetText("")
-        _G[frameName .. "Ranged"]:SetText("")
-        _G[frameName .. "RangedClass"]:SetText("")
-        _G[frameName .. "Message"]:SetText("")
+        Utils.resetEditBox(_G[frameName .. "Name"])
+        Utils.resetEditBox(_G[frameName .. "Tank"])
+        Utils.resetEditBox(_G[frameName .. "TankClass"])
+        Utils.resetEditBox(_G[frameName .. "Healer"])
+        Utils.resetEditBox(_G[frameName .. "HealerClass"])
+        Utils.resetEditBox(_G[frameName .. "Melee"])
+        Utils.resetEditBox(_G[frameName .. "MeleeClass"])
+        Utils.resetEditBox(_G[frameName .. "Ranged"])
+        Utils.resetEditBox(_G[frameName .. "RangedClass"])
+        Utils.resetEditBox(_G[frameName .. "Message"])
     end
 
     -- Localizing ui frame:
@@ -6051,9 +6043,9 @@ do
     end
 
     function Box:CancelAddEdit()
-        _G[frameName .. "Name"]:SetText("")
-        _G[frameName .. "Difficulty"]:SetText("")
-        _G[frameName .. "Time"]:SetText("")
+        Utils.resetEditBox(_G[frameName .. "Name"])
+        Utils.resetEditBox(_G[frameName .. "Difficulty"])
+        Utils.resetEditBox(_G[frameName .. "Time"])
         isEdit, raidData, bossData = false, {}, {}
         wipe(tempDate)
     end
@@ -6086,14 +6078,10 @@ do
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
         frame:SetScript("OnShow", function()
-            local e = _G[frameName .. "Name"]
-            e:SetText("")
-            e:SetFocus()
+            Utils.setEditBoxValue(_G[frameName .. "Name"], "", true)
         end)
         frame:SetScript("OnHide", function()
-            local e = _G[frameName .. "Name"]
-            e:SetText("")
-            e:ClearFocus()
+            Utils.resetEditBox(_G[frameName .. "Name"])
         end)
     end
 
