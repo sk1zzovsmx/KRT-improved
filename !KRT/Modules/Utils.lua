@@ -268,6 +268,47 @@ function Utils.makeEditBoxPopup(key, text, onAccept, onShow)
 	}
 end
 
+function Utils.setFrameTitle(frameOrName, titleText, titleFormat)
+	local frameName = frameOrName
+	if type(frameOrName) ~= "string" then
+		frameName = frameOrName and frameOrName.GetName and frameOrName:GetName() or nil
+	end
+	if not frameName then return end
+	local titleFrame = _G[frameName .. "Title"]
+	if not titleFrame then return end
+	local fmt = titleFormat or (addon.C and addon.C.titleString) or "%s"
+	titleFrame:SetText(format(fmt, titleText))
+end
+
+function Utils.resetEditBox(editBox, hide)
+	if not editBox then return end
+	editBox:SetText("")
+	editBox:ClearFocus()
+	if hide then
+		editBox:Hide()
+	end
+end
+
+function Utils.setEditBoxValue(editBox, value, focus)
+	if not editBox then return end
+	editBox:SetText(value)
+	editBox:Show()
+	if focus then
+		editBox:SetFocus()
+	end
+end
+
+function Utils.setShown(frame, show)
+	if not frame then return end
+	if show then
+		if not frame:IsShown() then
+			frame:Show()
+		end
+	elseif frame:IsShown() then
+		frame:Hide()
+	end
+end
+
 ---============================================================================
 -- Tooltip helpers
 ---============================================================================

@@ -33,7 +33,6 @@ local itemColors          = C.itemColors
 local RAID_TARGET_MARKERS = C.RAID_TARGET_MARKERS
 local K_COLOR             = C.K_COLOR
 local RT_COLOR            = C.RT_COLOR
-local titleString         = C.titleString
 
 ---============================================================================
 -- Saved Variables
@@ -1182,11 +1181,7 @@ do
     -- Public methods
     -------------------------------------------------------
     local function SetMinimapShown(show)
-        if show then
-            KRT_MINIMAP_GUI:Show()
-        else
-            KRT_MINIMAP_GUI:Hide()
-        end
+        Utils.setShown(KRT_MINIMAP_GUI, show)
     end
 
     function module:SetPos(angle)
@@ -1259,7 +1254,7 @@ do
 
     -- Hides the minimap button.
     function module:HideMinimapButton()
-        return KRT_MINIMAP_GUI:Hide()
+        return Utils.setShown(KRT_MINIMAP_GUI, false)
     end
 end
 
@@ -1759,9 +1754,7 @@ do
         _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
         _G[frameName .. "ItemBtn"]:SetNormalTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
         if frameName == UIMaster:GetName() then
-            _G[frameName .. "ItemCount"]:SetText("")
-            _G[frameName .. "ItemCount"]:ClearFocus()
-            _G[frameName .. "ItemCount"]:Hide()
+            Utils.resetEditBox(_G[frameName .. "ItemCount"], true)
         end
     end
 
@@ -2276,7 +2269,7 @@ do
             _G[frameName .. "RaidListBtn"]:SetText(L.BtnRaidList)
             _G[frameName .. "ImportReservesBtn"]:SetText(L.BtnImportReserves)
         end
-        _G[frameName .. "Title"]:SetText(format(titleString, MASTER_LOOTER))
+        Utils.setFrameTitle(frameName, MASTER_LOOTER)
         _G[frameName .. "ItemCount"]:SetScript("OnTextChanged", function(self)
             announced = false
             dirtyFlags.itemCount = true
@@ -2600,9 +2593,7 @@ do
         _G[frameName .. "ItemBtn"]:SetScript("OnClick", function(self)
             if not ItemIsSoulbound(inBag, inSlot) then
                 -- Clear count:
-                _G[frameName .. "ItemCount"]:SetText("")
-                _G[frameName .. "ItemCount"]:ClearFocus()
-                _G[frameName .. "ItemCount"]:Hide()
+                Utils.resetEditBox(_G[frameName .. "ItemCount"], true)
 
                 lootState.fromInventory = true
                 addon.Loot:AddItem(itemLink)
@@ -2615,9 +2606,7 @@ do
                 itemInfo.isStack = (lootState.itemCount > 1)
                 if itemInfo.count >= 1 then
                     lootState.itemCount = itemInfo.count
-                    _G[frameName .. "ItemCount"]:SetText(itemInfo.count)
-                    _G[frameName .. "ItemCount"]:Show()
-                    _G[frameName .. "ItemCount"]:SetFocus()
+                    Utils.setEditBoxValue(_G[frameName .. "ItemCount"], itemInfo.count, true)
                 end
             end
             ClearCursor()
@@ -2901,10 +2890,8 @@ do
         scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         if countsFrame and not countsFrame._krtCounterHook then
             local title = _G["KRTLootCounterFrameTitle"]
-            if title then
-                title:SetText(format(titleString, L.StrLootCounter))
-                title:Show()
-            end
+            Utils.setFrameTitle("KRTLootCounterFrame", L.StrLootCounter)
+            if title then title:Show() end
             countsFrame:SetScript("OnShow", StartCountsTicker)
             countsFrame:SetScript("OnHide", StopCountsTicker)
             countsFrame._krtCounterHook = true
@@ -3386,7 +3373,7 @@ do
         if _G["KRTImportEditBox"] then
             _G["KRTImportEditBox"]:SetText("")
         end
-        _G[frame:GetName() .. "Title"]:SetText(format(titleString, L.StrImportReservesTitle))
+        Utils.setFrameTitle(frame, L.StrImportReservesTitle)
     end
 
     function module:CloseImportWindow()
@@ -3461,7 +3448,7 @@ do
             return
         end
         if frameName then
-            _G[frameName .. "Title"]:SetText(format(titleString, L.StrRaidReserves))
+            Utils.setFrameTitle(frameName, L.StrRaidReserves)
             addon:debug("UI localized: %s", L.StrRaidReserves)
         end
         localized = true
@@ -3940,9 +3927,9 @@ do
         if KRT_MINIMAP_GUI then
             addon.Minimap:SetPos(addon.options.minimapPos or 325)
             if addon.options.minimapButton then
-                KRT_MINIMAP_GUI:Show()
+                Utils.setShown(KRT_MINIMAP_GUI, true)
             else
-                KRT_MINIMAP_GUI:Hide()
+                Utils.setShown(KRT_MINIMAP_GUI, false)
             end
         end
     end
@@ -4035,7 +4022,7 @@ do
             _G[frameName .. "countdownDurationStr"]:SetText(L.StrConfigCountdownDuration)
             _G[frameName .. "countdownSimpleRaidMsgStr"]:SetText(L.StrConfigCountdownSimpleRaidMsg)
         end
-        _G[frameName .. "Title"]:SetText(format(titleString, SETTINGS))
+        Utils.setFrameTitle(frameName, SETTINGS)
         _G[frameName .. "AboutStr"]:SetText(L.StrConfigAbout)
         _G[frameName .. "DefaultsBtn"]:SetScript("OnClick", LoadDefaultOptions)
         localized = true
@@ -4246,7 +4233,7 @@ do
             _G[frameName .. "EditBtn"]:SetText(SAVE)
             _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelp)
         end
-        _G[frameName .. "Title"]:SetText(format(titleString, RAID_WARNING))
+        Utils.setFrameTitle(frameName, RAID_WARNING)
         _G[frameName .. "Name"]:SetScript("OnEscapePressed", module.Cancel)
         _G[frameName .. "Content"]:SetScript("OnEscapePressed", module.Cancel)
         _G[frameName .. "Name"]:SetScript("OnEnterPressed", module.Edit)
@@ -4557,7 +4544,7 @@ do
             _G[frameName .. "DemandBtn"]:SetText(L.BtnDemand)
             _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
         end
-        _G[frameName .. "Title"]:SetText(format(titleString, L.StrChanges))
+        Utils.setFrameTitle(frameName, L.StrChanges)
         _G[frameName .. "Name"]:SetScript("OnEnterPressed", module.Edit)
         _G[frameName .. "Spec"]:SetScript("OnEnterPressed", module.Edit)
         _G[frameName .. "Name"]:SetScript("OnEscapePressed", CancelChanges)
@@ -4905,7 +4892,7 @@ do
             _G[frameName .. "MessageStr"]:SetText(L.StrSpammerMessageStr)
             _G[frameName .. "PreviewStr"]:SetText(L.StrSpammerPreviewStr)
         end
-        _G[frameName .. "Title"]:SetText(format(titleString, L.StrSpammer))
+        Utils.setFrameTitle(frameName, L.StrSpammer)
         _G[frameName .. "StartBtn"]:SetScript("OnClick", module.Start)
 
         local durationBox = _G[frameName .. "Duration"]
@@ -5196,7 +5183,7 @@ do
     function module:OnLoad(frame)
         UIHistory, frameName = frame, frame:GetName()
         frame:RegisterForDrag("LeftButton")
-        _G[frameName .. "Title"]:SetText(format(titleString, L.StrLootHistory))
+        Utils.setFrameTitle(frameName, L.StrLootHistory)
 
         frame:SetScript("OnShow", function()
             if not module.selectedRaid then
@@ -6269,10 +6256,10 @@ do
         local sub, arg = Utils.splitArgs(rest)
         if sub == "on" then
             addon.options.minimapButton = true
-            if KRT_MINIMAP_GUI then KRT_MINIMAP_GUI:Show() end
+            Utils.setShown(KRT_MINIMAP_GUI, true)
         elseif sub == "off" then
             addon.options.minimapButton = false
-            if KRT_MINIMAP_GUI then KRT_MINIMAP_GUI:Hide() end
+            Utils.setShown(KRT_MINIMAP_GUI, false)
         elseif sub == "pos" and arg ~= "" then
             local angle = tonumber(arg)
             if angle then
