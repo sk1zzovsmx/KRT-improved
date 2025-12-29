@@ -115,6 +115,23 @@ function Utils.findAchievement(inp)
 	return out
 end
 
+function Utils.formatChatMessage(text, prefix, outputFormat, prefixHex)
+	local msgPrefix = prefix or ""
+	if prefixHex then
+		msgPrefix = addon.WrapTextInColorCode(msgPrefix, Utils.normalizeHexColor(prefixHex))
+	end
+	return format(outputFormat or "%s%s", msgPrefix, tostring(text))
+end
+
+function Utils.splitArgs(msg)
+	msg = Utils.trimText(msg)
+	if msg == "" then
+		return "", ""
+	end
+	local cmd, rest = msg:match("^(%S+)%s*(.-)$")
+	return Utils.normalizeLower(cmd), Utils.trimText(rest)
+end
+
 ---============================================================================
 -- Roster helpers
 ---============================================================================

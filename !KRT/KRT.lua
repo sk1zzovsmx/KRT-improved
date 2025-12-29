@@ -1026,21 +1026,10 @@ do
     local prefixHex       = C.CHAT_PREFIX_HEX
 
     -------------------------------------------------------
-    -- 4. “Private” (local) functions
-    -------------------------------------------------------
-    local function PreparePrint(text, prefix)
-        prefix = prefix or chatPrefixShort
-        if prefixHex then
-            prefix = addon.WrapTextInColorCode(prefix, Utils.normalizeHexColor(prefixHex))
-        end
-        return format(output, prefix, tostring(text))
-    end
-
-    -------------------------------------------------------
     -- 5. Public module functions
     -------------------------------------------------------
     function module:Print(text, prefix)
-        local msg = PreparePrint(text, prefix)
+        local msg = Utils.formatChatMessage(text, prefix or chatPrefixShort, output, prefixHex)
         if DEFAULT_CHAT_FRAME then
             DEFAULT_CHAT_FRAME:AddMessage(msg)
         end
@@ -6195,12 +6184,6 @@ do
         printHelp("reserves", L.StrCmdReserves)
     end
 
-    local function splitArgs(msg)
-        msg = Utils.trimText(msg)
-        local cmd, rest = msg:match("^(%S+)%s*(.-)$")
-        return Utils.normalizeLower(cmd), Utils.trimText(rest)
-    end
-
     local function registerAliases(list, fn)
         for _, cmd in ipairs(list) do
             Slash.sub[cmd] = fn
@@ -6213,7 +6196,7 @@ do
 
     function Slash:Handle(msg)
         if not msg or msg == "" then return end
-        local cmd, rest = splitArgs(msg)
+        local cmd, rest = Utils.splitArgs(msg)
         if cmd == "show" or cmd == "toggle" then
             addon.Master:Toggle()
             return
@@ -6226,7 +6209,7 @@ do
     end
 
     registerAliases(cmdDebug, function(rest)
-        local subCmd, arg = splitArgs(rest)
+        local subCmd, arg = Utils.splitArgs(rest)
         if subCmd == "" then subCmd = nil end
 
         if subCmd == "level" or subCmd == "lvl" then
@@ -6283,7 +6266,7 @@ do
     end)
 
     registerAliases(cmdMinimap, function(rest)
-        local sub, arg = splitArgs(rest)
+        local sub, arg = Utils.splitArgs(rest)
         if sub == "on" then
             addon.options.minimapButton = true
             if KRT_MINIMAP_GUI then KRT_MINIMAP_GUI:Show() end
@@ -6321,7 +6304,7 @@ do
     end)
 
     registerAliases(cmdConfig, function(rest)
-        local sub = splitArgs(rest)
+        local sub = Utils.splitArgs(rest)
         if sub == "reset" then
             addon.Config:Default()
         else
@@ -6330,7 +6313,7 @@ do
     end)
 
     registerAliases(cmdWarnings, function(rest)
-        local sub = splitArgs(rest)
+        local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             addon.Warnings:Toggle()
         elseif sub == "help" then
@@ -6343,7 +6326,7 @@ do
     end)
 
     registerAliases(cmdChanges, function(rest)
-        local sub = splitArgs(rest)
+        local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             addon.Changes:Toggle()
         elseif sub == "demand" or sub == "ask" then
@@ -6359,21 +6342,21 @@ do
     end)
 
     registerAliases(cmdHistory, function(rest)
-        local sub = splitArgs(rest)
+        local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             addon.History:Toggle()
         end
     end)
 
     registerAliases(cmdLoot, function(rest)
-        local sub = splitArgs(rest)
+        local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             addon.Master:Toggle()
         end
     end)
 
     registerAliases(cmdReserves, function(rest)
-        local sub = splitArgs(rest)
+        local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             addon.Reserves:ShowWindow()
         elseif sub == "import" then
@@ -6386,7 +6369,7 @@ do
     end)
 
     registerAliases(cmdLFM, function(rest)
-        local sub, arg = splitArgs(rest)
+        local sub, arg = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" or sub == "show" then
             addon.Spammer:Toggle()
         elseif sub == "start" then
