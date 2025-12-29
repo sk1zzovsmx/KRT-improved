@@ -3418,9 +3418,6 @@ do
         end
         addon:debug("Reserves: show list window.")
         reserveListFrame:Show()
-        if self:HasData() then
-            self:QueryMissingItems(true)
-        end
     end
 
     function module:CloseWindow()
@@ -3498,10 +3495,15 @@ do
                     end
                     addon:debug("Reserves: update item data %s.", link)
                     self:UpdateReserveItemData(itemId, name, link, icon)
+                    if reserveListFrame and reserveListFrame:IsShown() then
+                        self:RefreshWindow()
+                    end
                     if type(icon) == "string" and icon ~= "" then
                         pendingItemInfo[itemId] = nil
                     else
                         addon:debug("Reserves: icon still pending itemId=%d.", itemId)
+                        pendingItemInfo[itemId] = true
+                        self:QueryItemInfo(itemId)
                     end
                 else
                     addon:debug("Reserves: item info missing itemId=%d.", itemId)
@@ -3653,23 +3655,30 @@ do
         if not itemId then return end
         addon:debug("Reserves: query item info itemId=%d.", itemId)
         local name, link, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
-        if name and link and tex then
-            self:UpdateReserveItemData(itemId, name, link, tex)
-            addon:debug("Reserves: item info ready itemId=%d name=%s.", itemId, name)
-            return true
-        else
-            GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
-            GameTooltip:SetHyperlink("item:" .. itemId)
-            GameTooltip:Hide()
-            pendingItemInfo[itemId] = true
-            addon:debug("Reserves: item info pending itemId=%d.", itemId)
-            return false
+        if name then
+            local icon = tex
+            if type(icon) ~= "string" or icon == "" then
+                icon = GetItemIcon(itemId)
+            end
+            self:UpdateReserveItemData(itemId, name, link, icon)
+            if type(icon) == "string" and icon ~= "" then
+                addon:debug("Reserves: item info ready itemId=%d name=%s.", itemId, name)
+                return true
+            end
         end
+
+        GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+        GameTooltip:SetHyperlink("item:" .. itemId)
+        GameTooltip:Hide()
+        pendingItemInfo[itemId] = true
+        addon:debug("Reserves: item info pending itemId=%d.", itemId)
+        return false
     end
 
     -- Query all missing items for reserves
     function module:QueryMissingItems(silent)
         local count = 0
+        local updated = false
         addon:debug("Reserves: query missing items.")
         for _, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
@@ -3677,10 +3686,15 @@ do
                     if not r.itemLink or not r.itemIcon then
                         if not self:QueryItemInfo(r.rawID) then
                             count = count + 1
+                        else
+                            updated = true
                         end
                     end
                 end
             end
+        end
+        if updated and reserveListFrame and reserveListFrame:IsShown() then
+            self:RefreshWindow()
         end
         if not silent then
             if count > 0 then
@@ -3849,7 +3863,7 @@ do
         row.iconTexture:SetPoint("TOPLEFT", row.iconBtn, "TOPLEFT", 2, -2)
         row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
         row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        row.iconTexture:SetDrawLayer("ARTWORK")
+        row.iconTexture:SetDrawLayer("OVERLAY")
     end
 
     -- Create a new row for displaying a reserve
