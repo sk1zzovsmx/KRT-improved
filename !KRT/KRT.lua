@@ -2922,10 +2922,10 @@ do
         EnsureFrames()
         if countsFrame then
             if countsFrame:IsShown() then
-                countsFrame:Hide()
+                Utils.setShown(countsFrame, false)
             else
                 RequestCountsUpdate()
-                countsFrame:Show()
+                Utils.setShown(countsFrame, true)
             end
         end
     end
@@ -3019,7 +3019,7 @@ do
 
             f:HookScript("OnHide", function()
                 if countsFrame and countsFrame:IsShown() then
-                    countsFrame:Hide()
+                    Utils.setShown(countsFrame, false)
                 end
             end)
         end
@@ -5972,7 +5972,7 @@ do
 
     function Box:Hide()
         local f = _G[frameName]
-        if f and f:IsShown() then f:Hide() end
+        Utils.setShown(f, false)
     end
 
     -- Campi uniformi:
