@@ -92,7 +92,9 @@ TemplatesLua/
 - **LibBossIDs-1.0** boss id/name lookup
 
 *Guideline:* Embed via `LibStub("Name", true)`; assume libs exist.
-If missing, fall back via `LibCompat-1.0`; never hard-require Ace3.
+- Prefer vendored libraries when available.
+- Avoid duplicate helpers in `Modules/Utils.lua` or `KRT.lua` if a vendored lib already covers the need.
+- If a lib is vendored, do not add fallbacks; never hard-require Ace3.
 
 ---
 
@@ -225,3 +227,6 @@ If missing, fall back via `LibCompat-1.0`; never hard-require Ace3.
 - _2025-12-26_: Added KRT_Options schemaVersion/migrations defaults in `!KRT/KRT.lua`.
 - _2025-12-27_: Hardened debug logger guard, trimmed slash args, removed unused CHAT_MSG_ADDON entry.
 - _2025-09-20_: Enlarged Loot Counter window, centered title, and enabled dragging.
+- _2025-09-21_: Prefer vendored libs, avoid Utils/KRT duplicates, and skip fallbacks when libs are vendored.
+- _2025-09-22_: Expanded vendored library guidance into explicit bullet rules.
+- _2025-09-23_: Reset Master Loot ItemCount on item change/award and refresh counts for loot sources.
