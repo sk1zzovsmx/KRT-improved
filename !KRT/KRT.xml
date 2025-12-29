@@ -177,7 +177,7 @@
 					<AbsDimension x="32" y="32" />
 				</Size>
 				<Anchors>
-					<Anchor point="LEFT">
+					<Anchor point="LEFT" relativeTo="$parent" relativePoint="LEFT">
 						<Offset>
 							<AbsDimension x="0" y="0" />
 						</Offset>
@@ -186,12 +186,12 @@
 			</Button>
 			<Frame name="$parentTextBlock">
 				<Size>
-					<AbsDimension x="0" y="28" />
+					<AbsDimension x="0" y="32" />
 				</Size>
 				<Anchors>
-					<Anchor point="LEFT" relativeTo="$parent" relativePoint="LEFT">
+					<Anchor point="LEFT" relativeTo="$parentIconBtn" relativePoint="RIGHT">
 						<Offset>
-							<AbsDimension x="40" y="0" />
+							<AbsDimension x="8" y="0" />
 						</Offset>
 					</Anchor>
 					<Anchor point="RIGHT" relativeTo="$parent" relativePoint="RIGHT">

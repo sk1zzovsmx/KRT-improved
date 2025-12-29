@@ -230,3 +230,4 @@ TemplatesLua/
 - _2025-09-21_: Prefer vendored libs, avoid Utils/KRT duplicates, and skip fallbacks when libs are vendored.
 - _2025-09-22_: Expanded vendored library guidance into explicit bullet rules.
 - _2025-09-23_: Reset Master Loot ItemCount on item change/award and refresh counts for loot sources.
+- _2025-09-24_: Centered reserve list row alignment and auto-queried missing item icons on open.
