@@ -6065,9 +6065,9 @@ do
             addon:SetTooltip(_G[frameName .. "Time"], L.StrBossTimeHelp, "ANCHOR_RIGHT")
             localized = true
         end
-        if Utils.throttle(frame, frameName, updateInterval, elapsed) then
+        Utils.throttledUIUpdate(frame, frameName, updateInterval, elapsed, function()
             Utils.setText(_G[frameName .. "Title"], L.StrEditBoss, L.StrAddBoss, isEdit)
-        end
+        end)
     end
 end
 
