@@ -200,6 +200,58 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<FontString name="$parentName" inherits="KRTFontString">
+							<Size>
+								<AbsDimension x="0" y="0" />
+							</Size>
+							<Anchors>
+								<Anchor point="TOPLEFT">
+									<Offset>
+										<AbsDimension x="0" y="0" />
+									</Offset>
+								</Anchor>
+								<Anchor point="RIGHT">
+									<Offset>
+										<AbsDimension x="0" y="0" />
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentSource" inherits="GameFontHighlightSmall">
+							<Size>
+								<AbsDimension x="0" y="0" />
+							</Size>
+							<Anchors>
+								<Anchor point="TOPLEFT">
+									<Offset>
+										<AbsDimension x="0" y="-16" />
+									</Offset>
+								</Anchor>
+								<Anchor point="RIGHT">
+									<Offset>
+										<AbsDimension x="0" y="0" />
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+						<FontString name="$parentPlayers" inherits="GameFontHighlightSmall" justifyH="LEFT">
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT">
+									<Offset>
+										<AbsDimension x="0" y="-2" />
+									</Offset>
+								</Anchor>
+								<Anchor point="RIGHT">
+									<Offset>
+										<AbsDimension x="0" y="0" />
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
 			</Frame>
 		</Frames>
 		<Layers>
@@ -212,54 +264,6 @@
 				</Texture>
 			</Layer>
 			<Layer level="OVERLAY">
-				<FontString name="$parentName" inherits="KRTFontString">
-					<Size>
-						<AbsDimension x="0" y="0" />
-					</Size>
-					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentTextBlock" relativePoint="TOPLEFT">
-							<Offset>
-								<AbsDimension x="0" y="0" />
-							</Offset>
-						</Anchor>
-						<Anchor point="RIGHT" relativeTo="$parentTextBlock" relativePoint="RIGHT">
-							<Offset>
-								<AbsDimension x="0" y="0" />
-							</Offset>
-						</Anchor>
-					</Anchors>
-				</FontString>
-				<FontString name="$parentSource" inherits="GameFontHighlightSmall">
-					<Size>
-						<AbsDimension x="0" y="0" />
-					</Size>
-					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parent" relativePoint="TOPLEFT">
-							<Offset>
-								<AbsDimension x="40" y="-16" />
-							</Offset>
-						</Anchor>
-						<Anchor point="RIGHT" relativeTo="$parent" relativePoint="RIGHT">
-							<Offset>
-								<AbsDimension x="-6" y="0" />
-							</Offset>
-						</Anchor>
-					</Anchors>
-				</FontString>
-				<FontString name="$parentPlayers" inherits="GameFontHighlightSmall" justifyH="LEFT">
-					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT">
-							<Offset>
-								<AbsDimension x="0" y="-2" />
-							</Offset>
-						</Anchor>
-						<Anchor point="RIGHT" relativeTo="$parentTextBlock" relativePoint="RIGHT">
-							<Offset>
-								<AbsDimension x="0" y="0" />
-							</Offset>
-						</Anchor>
-					</Anchors>
-				</FontString>
 				<FontString name="$parentQuantity" inherits="GameFontNormalSmall">
 					<Anchors>
 						<Anchor point="BOTTOMRIGHT" relativeTo="$parentIconBtn" relativePoint="BOTTOMRIGHT">
