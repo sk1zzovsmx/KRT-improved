@@ -3332,6 +3332,7 @@ do
             end
             if type(icon) ~= "string" or icon == "" then
                 icon = fallbackIcon
+                info.itemIcon = icon
             end
             row.iconTexture:SetTexture(icon)
             row.iconTexture:Show()
@@ -3491,9 +3492,17 @@ do
             if pendingItemInfo[itemId] then
                 local name, link, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
                 if name then
+                    local icon = tex
+                    if type(icon) ~= "string" or icon == "" then
+                        icon = GetItemIcon(itemId)
+                    end
                     addon:debug("Reserves: update item data %s.", link)
-                    self:UpdateReserveItemData(itemId, name, link, tex)
-                    pendingItemInfo[itemId] = nil
+                    self:UpdateReserveItemData(itemId, name, link, icon)
+                    if type(icon) == "string" and icon ~= "" then
+                        pendingItemInfo[itemId] = nil
+                    else
+                        addon:debug("Reserves: icon still pending itemId=%d.", itemId)
+                    end
                 else
                     addon:debug("Reserves: item info missing itemId=%d.", itemId)
                 end
@@ -3687,6 +3696,9 @@ do
     function module:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
         if not itemId then return end
         local icon = itemIcon
+        if (type(icon) ~= "string" or icon == "") and itemName then
+            icon = fallbackIcon
+        end
         reservesDirty = true
 
         local list = reservesByItemID[itemId]
