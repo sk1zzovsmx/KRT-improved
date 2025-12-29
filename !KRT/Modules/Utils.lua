@@ -13,6 +13,7 @@ local find, match          = string.find, string.match
 local format, gsub         = string.format, string.gsub
 local strsub, strlen       = string.sub, string.len
 local lower, upper         = string.lower, string.upper
+local ucfirst             = _G.string and _G.string.ucfirst
 local select, unpack       = select, unpack
 
 local GetLocale            = GetLocale
@@ -149,6 +150,29 @@ end
 ---============================================================================
 -- String helpers
 ---============================================================================
+
+function Utils.trimText(value, allowNil)
+	if value == nil then
+		return allowNil and nil or ""
+	end
+	return tostring(value):trim()
+end
+
+function Utils.normalizeName(value, allowNil)
+	local text = Utils.trimText(value, allowNil)
+	if text == nil then
+		return nil
+	end
+	return (ucfirst and ucfirst(text)) or text
+end
+
+function Utils.normalizeLower(value, allowNil)
+	local text = Utils.trimText(value, allowNil)
+	if text == nil then
+		return nil
+	end
+	return lower(text)
+end
 
 function Utils.findAchievement(inp)
 	local out = inp and inp:trim() or ""
@@ -521,6 +545,17 @@ function Utils.throttle(frame, name, period, elapsed)
 		return true
 	end
 	frame[name] = t
+	return false
+end
+
+function Utils.throttledUIUpdate(frame, frameName, period, elapsed, fn)
+	if not frameName or type(fn) ~= "function" then
+		return false
+	end
+	if Utils.throttle(frame, frameName, period, elapsed) then
+		fn()
+		return true
+	end
 	return false
 end
 

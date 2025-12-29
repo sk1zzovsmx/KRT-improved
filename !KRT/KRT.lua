@@ -194,7 +194,7 @@ local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.conc
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
 local format, match, find, strlen       = string.format, string.match, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
-local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
+local tostring, tonumber               = tostring, tonumber
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
 
 ---============================================================================
@@ -837,7 +837,7 @@ do
         local players = module:GetPlayers(raidNum)
         local originalName = name
         if players ~= nil then
-            name = ucfirst(name:trim())
+            name = Utils.normalizeName(name)
             for i, p in ipairs(players) do
                 if name == p.name then
                     found = true
@@ -2318,7 +2318,7 @@ do
     --
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
-        if Utils.throttle(self, frameName, updateInterval, elapsed) then
+        Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             local itemCountBox = _G[frameName .. "ItemCount"]
             if itemCountBox and itemCountBox:IsVisible() then
                 local rawCount = itemCountBox:GetText()
@@ -2425,7 +2425,7 @@ do
 
             dirtyFlags.rolls = false
             dirtyFlags.winner = false
-        end
+        end)
     end
 
     --
@@ -3484,8 +3484,7 @@ do
     -- Update UI Frame:
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
-        if not frameName then return end
-        if Utils.throttle(self, frameName, updateInterval, elapsed) then
+        Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             local hasData = module:HasData()
             local clearButton = _G[frameName .. "ClearButton"]
             if clearButton then
@@ -3495,7 +3494,7 @@ do
             if queryButton then
                 Utils.enableDisable(queryButton, hasData)
             end
-        end
+        end)
     end
 
     --------------------------------------------------------------------------
@@ -3504,7 +3503,7 @@ do
 
     function module:GetReserve(playerName)
         if type(playerName) ~= "string" then return nil end
-        local player = playerName:lower():trim()
+        local player = Utils.normalizeLower(playerName)
         local reserve = reservesData[player]
 
         -- Log when the function is called and show the reserve for the player
@@ -3557,7 +3556,7 @@ do
                 plus = cleanCSVField(plus)
 
                 local itemId = tonumber(itemIdStr)
-                local normalized = playerName and playerName:lower():trim()
+                local normalized = Utils.normalizeLower(playerName, true)
 
                 if normalized and itemId then
                     reservesData[normalized] = reservesData[normalized] or {
@@ -4061,43 +4060,45 @@ do
     --
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
-        if configDirty and Utils.throttle(self, frameName, updateInterval, elapsed) then
-            _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)
-            _G[frameName .. "useRaidWarning"]:SetChecked(addon.options.useRaidWarning == true)
-            _G[frameName .. "announceOnWin"]:SetChecked(addon.options.announceOnWin == true)
-            _G[frameName .. "announceOnHold"]:SetChecked(addon.options.announceOnHold == true)
-            _G[frameName .. "announceOnBank"]:SetChecked(addon.options.announceOnBank == true)
-            _G[frameName .. "announceOnDisenchant"]:SetChecked(addon.options.announceOnDisenchant == true)
-            _G[frameName .. "lootWhispers"]:SetChecked(addon.options.lootWhispers == true)
-            _G[frameName .. "countdownRollsBlock"]:SetChecked(addon.options.countdownRollsBlock == true)
-            _G[frameName .. "screenReminder"]:SetChecked(addon.options.screenReminder == true)
-            _G[frameName .. "ignoreStacks"]:SetChecked(addon.options.ignoreStacks == true)
-            _G[frameName .. "showTooltips"]:SetChecked(addon.options.showTooltips == true)
-            _G[frameName .. "minimapButton"]:SetChecked(addon.options.minimapButton == true)
-            _G[frameName .. "countdownDuration"]:SetValue(addon.options.countdownDuration)
-            _G[frameName .. "countdownDurationText"]:SetText(addon.options.countdownDuration)
+        if configDirty then
+            Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
+                _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)
+                _G[frameName .. "useRaidWarning"]:SetChecked(addon.options.useRaidWarning == true)
+                _G[frameName .. "announceOnWin"]:SetChecked(addon.options.announceOnWin == true)
+                _G[frameName .. "announceOnHold"]:SetChecked(addon.options.announceOnHold == true)
+                _G[frameName .. "announceOnBank"]:SetChecked(addon.options.announceOnBank == true)
+                _G[frameName .. "announceOnDisenchant"]:SetChecked(addon.options.announceOnDisenchant == true)
+                _G[frameName .. "lootWhispers"]:SetChecked(addon.options.lootWhispers == true)
+                _G[frameName .. "countdownRollsBlock"]:SetChecked(addon.options.countdownRollsBlock == true)
+                _G[frameName .. "screenReminder"]:SetChecked(addon.options.screenReminder == true)
+                _G[frameName .. "ignoreStacks"]:SetChecked(addon.options.ignoreStacks == true)
+                _G[frameName .. "showTooltips"]:SetChecked(addon.options.showTooltips == true)
+                _G[frameName .. "minimapButton"]:SetChecked(addon.options.minimapButton == true)
+                _G[frameName .. "countdownDuration"]:SetValue(addon.options.countdownDuration)
+                _G[frameName .. "countdownDurationText"]:SetText(addon.options.countdownDuration)
 
-            -- Handle dependent options
-            local useRaidWarningBtn = _G[frameName .. "useRaidWarning"]
-            local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
-            local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
+                -- Handle dependent options
+                local useRaidWarningBtn = _G[frameName .. "useRaidWarning"]
+                local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
+                local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
 
-            if useRaidWarningBtn and countdownSimpleRaidMsgBtn and countdownSimpleRaidMsgStr then
-                if lastUseRaidWarning ~= addon.options.useRaidWarning then
-                    if not useRaidWarningBtn:GetChecked() then
-                        countdownSimpleRaidMsgBtn:SetChecked(addon.options.countdownSimpleRaidMsg)
-                        countdownSimpleRaidMsgBtn:Disable()
-                        countdownSimpleRaidMsgStr:SetTextColor(0.5, 0.5, 0.5)
-                    else
-                        countdownSimpleRaidMsgBtn:Enable()
-                        countdownSimpleRaidMsgStr:SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g,
-                            HIGHLIGHT_FONT_COLOR.b)
-                        countdownSimpleRaidMsgBtn:SetChecked(addon.options.countdownSimpleRaidMsg)
+                if useRaidWarningBtn and countdownSimpleRaidMsgBtn and countdownSimpleRaidMsgStr then
+                    if lastUseRaidWarning ~= addon.options.useRaidWarning then
+                        if not useRaidWarningBtn:GetChecked() then
+                            countdownSimpleRaidMsgBtn:SetChecked(addon.options.countdownSimpleRaidMsg)
+                            countdownSimpleRaidMsgBtn:Disable()
+                            countdownSimpleRaidMsgStr:SetTextColor(0.5, 0.5, 0.5)
+                        else
+                            countdownSimpleRaidMsgBtn:Enable()
+                            countdownSimpleRaidMsgStr:SetTextColor(HIGHLIGHT_FONT_COLOR.r,
+                                HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
+                            countdownSimpleRaidMsgBtn:SetChecked(addon.options.countdownSimpleRaidMsg)
+                        end
+                        lastUseRaidWarning = addon.options.useRaidWarning
                     end
-                    lastUseRaidWarning = addon.options.useRaidWarning
                 end
-            end
-            configDirty = false
+                configDirty = false
+            end)
         end
     end
 end
@@ -4290,7 +4291,7 @@ do
     -- OnUpdate frame:
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
-        if Utils.throttle(self, frameName, updateInterval, elapsed) then
+        Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             if warningsDirty or not fetched then
                 FetchWarnings()
                 warningsDirty = false
@@ -4308,14 +4309,14 @@ do
                 Utils.setText(_G[frameName .. "EditBtn"], SAVE, L.BtnEdit, editBtnMode)
                 lastEditBtnMode = editBtnMode
             end
-        end
+        end)
     end
 
     -- Saving a Warning:
     function SaveWarning(wContent, wName, wID)
         wID = wID and tonumber(wID) or 0
-        wName = tostring(wName):trim()
-        wContent = tostring(wContent):trim()
+        wName = Utils.trimText(wName)
+        wContent = Utils.trimText(wContent)
         if wName == "" then
             wName = (isEdit and wID > 0) and wID or (#KRT_Warnings + 1)
         end
@@ -4581,7 +4582,7 @@ do
     -- OnUpdate frame:
     function UpdateUIFrame(self, elapsed)
         LocalizeUIFrame()
-        if Utils.throttle(self, frameName, updateInterval, elapsed) then
+        Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             if changesDirty or not fetched then
                 InitChangesTable()
                 FetchChanges()
@@ -4620,7 +4621,7 @@ do
             Utils.enableDisable(_G[frameName .. "AnnounceBtn"], count > 0)
             Utils.enableDisable(_G[frameName .. "AddBtn"], KRT_CurrentRaid)
             Utils.enableDisable(_G[frameName .. "DemandBtn"], KRT_CurrentRaid)
-        end
+        end)
     end
 
     -- Initialize changes table:
@@ -4659,8 +4660,8 @@ do
     -- Save module:
     function SaveChanges(name, spec)
         if not KRT_CurrentRaid or not name then return end
-        name = ucfirst(name:trim())
-        spec = ucfirst(spec:trim())
+        name = Utils.normalizeName(name)
+        spec = Utils.normalizeName(spec)
         -- Is the player in the raid?
         local found
         found, name = addon.Raid:CheckPlayer(name)
@@ -4803,7 +4804,7 @@ do
                 end
             end
         else
-            local value = box:GetText():trim()
+            local value = Utils.trimText(box:GetText())
             value = (value == "") and nil or value
             KRT_Spammer[target] = value
             box:ClearFocus()
@@ -5040,7 +5041,7 @@ do
         channels = KRT_Spammer.Channels or {}
 
         local changed = false
-        local nameValue = _G[frameName .. "Name"]:GetText():trim()
+        local nameValue = Utils.trimText(_G[frameName .. "Name"]:GetText())
         if lastState.name ~= nameValue then
             lastState.name = nameValue
             changed = true
@@ -5052,7 +5053,7 @@ do
             changed = true
         end
 
-        local tankClassValue = _G[frameName .. "TankClass"]:GetText():trim()
+        local tankClassValue = Utils.trimText(_G[frameName .. "TankClass"]:GetText())
         if lastState.tankClass ~= tankClassValue then
             lastState.tankClass = tankClassValue
             changed = true
@@ -5064,7 +5065,7 @@ do
             changed = true
         end
 
-        local healerClassValue = _G[frameName .. "HealerClass"]:GetText():trim()
+        local healerClassValue = Utils.trimText(_G[frameName .. "HealerClass"]:GetText())
         if lastState.healerClass ~= healerClassValue then
             lastState.healerClass = healerClassValue
             changed = true
@@ -5076,7 +5077,7 @@ do
             changed = true
         end
 
-        local meleeClassValue = _G[frameName .. "MeleeClass"]:GetText():trim()
+        local meleeClassValue = Utils.trimText(_G[frameName .. "MeleeClass"]:GetText())
         if lastState.meleeClass ~= meleeClassValue then
             lastState.meleeClass = meleeClassValue
             changed = true
@@ -5088,13 +5089,13 @@ do
             changed = true
         end
 
-        local rangedClassValue = _G[frameName .. "RangedClass"]:GetText():trim()
+        local rangedClassValue = Utils.trimText(_G[frameName .. "RangedClass"]:GetText())
         if lastState.rangedClass ~= rangedClassValue then
             lastState.rangedClass = rangedClassValue
             changed = true
         end
 
-        local messageValue = _G[frameName .. "Message"]:GetText():trim()
+        local messageValue = Utils.trimText(_G[frameName .. "Message"]:GetText())
         if lastState.message ~= messageValue then
             lastState.message = messageValue
             changed = true
@@ -5155,7 +5156,7 @@ do
             StopTicker()
             return
         end
-        if Utils.throttle(self, frameName, updateInterval, elapsed) then
+        Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             if not loaded then
                 KRT_Spammer.Duration = KRT_Spammer.Duration or addon.options.lfmPeriod
                 for k, v in pairs(KRT_Spammer) do
@@ -5173,7 +5174,7 @@ do
                 loaded = true
             end
             RenderPreview()
-        end
+        end)
     end
 
 end
@@ -5283,7 +5284,7 @@ do
 
         Utils.makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_WINNER", L.StrEditItemLooterHelp,
             function(self, text)
-                local name = (text or ""):trim():lower()
+                local name = Utils.normalizeLower(text)
                 local raid = KRT_Raids[self.raidId]
                 if not (raid and raid.players) then return end
 
@@ -6037,9 +6038,9 @@ do
         local rID = addon.History.selectedRaid
         if not rID then return end
 
-        local name  = (_G[frameName .. "Name"]:GetText() or ""):trim()
-        local modeT = strlower((_G[frameName .. "Difficulty"]:GetText() or ""):trim())
-        local bTime = (_G[frameName .. "Time"]:GetText() or ""):trim()
+        local name = Utils.trimText(_G[frameName .. "Name"]:GetText())
+        local modeT = Utils.normalizeLower(_G[frameName .. "Difficulty"]:GetText())
+        local bTime = Utils.trimText(_G[frameName .. "Time"]:GetText())
 
         name        = (name == "") and "_TrashMob_" or name
         if name ~= "_TrashMob_" and (modeT ~= "h" and modeT ~= "n") then
@@ -6125,7 +6126,7 @@ do
     function Box:Toggle() Utils.toggle(_G[frameName]) end
 
     function Box:Save()
-        local name = (_G[frameName .. "Name"]:GetText() or ""):trim()
+        local name = Utils.trimText(_G[frameName .. "Name"]:GetText())
         if name == "" then
             addon:error(L.ErrAttendeesInvalidName)
             return
@@ -6198,9 +6199,9 @@ do
     end
 
     local function splitArgs(msg)
-        msg = (msg or ""):trim()
+        msg = Utils.trimText(msg)
         local cmd, rest = msg:match("^(%S+)%s*(.-)$")
-        return (cmd or ""):lower(), (rest or ""):trim()
+        return Utils.normalizeLower(cmd), Utils.trimText(rest)
     end
 
     local function registerAliases(list, fn)
