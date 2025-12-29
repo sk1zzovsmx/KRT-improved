@@ -169,7 +169,7 @@
 
 	<Frame name="KRTReserveRowTemplate" virtual="true">
 		<Size>
-			<AbsDimension x="320" y="34" />
+			<AbsDimension x="320" y="42" />
 		</Size>
 		<Frames>
 			<Button name="$parentIconBtn" inherits="KRTItemButtonTemplate">
@@ -205,7 +205,7 @@
 								<AbsDimension x="40" y="-2" />
 							</Offset>
 						</Anchor>
-						<Anchor point="RIGHT" relativeTo="$parentPlayers" relativePoint="LEFT">
+						<Anchor point="RIGHT" relativeTo="$parent" relativePoint="RIGHT">
 							<Offset>
 								<AbsDimension x="-6" y="0" />
 							</Offset>
@@ -222,21 +222,23 @@
 								<AbsDimension x="40" y="-16" />
 							</Offset>
 						</Anchor>
-						<Anchor point="RIGHT" relativeTo="$parentPlayers" relativePoint="LEFT">
+						<Anchor point="RIGHT" relativeTo="$parent" relativePoint="RIGHT">
 							<Offset>
 								<AbsDimension x="-6" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentPlayers" inherits="GameFontHighlightSmall" justifyH="RIGHT">
-					<Size>
-						<AbsDimension x="100" y="0" />
-					</Size>
+				<FontString name="$parentPlayers" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Anchors>
-						<Anchor point="TOPRIGHT" relativeTo="$parent" relativePoint="TOPRIGHT">
+						<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT">
 							<Offset>
-								<AbsDimension x="-6" y="-2" />
+								<AbsDimension x="0" y="-2" />
+							</Offset>
+						</Anchor>
+						<Anchor point="RIGHT" relativeTo="$parent" relativePoint="RIGHT">
+							<Offset>
+								<AbsDimension x="-6" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>

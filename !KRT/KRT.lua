@@ -3076,6 +3076,37 @@ do
     -- Private helpers
     -------------------------------------------------------
 
+    local playerTextTemp = {}
+
+    local function FormatReservePlayerName(name, count)
+        if count and count > 1 then
+            return name .. format(L.StrReserveCountSuffix, count)
+        end
+        return name
+    end
+
+    local function AddReservePlayer(data, name, count)
+        if not data.players then data.players = {} end
+        if not data.playerCounts then data.playerCounts = {} end
+        local existing = data.playerCounts[name]
+        if existing then
+            data.playerCounts[name] = existing + (count or 1)
+        else
+            data.players[#data.players + 1] = name
+            data.playerCounts[name] = count or 1
+        end
+    end
+
+    local function BuildPlayersText(players, counts)
+        if not players then return "" end
+        twipe(playerTextTemp)
+        for i = 1, #players do
+            local name = players[i]
+            playerTextTemp[#playerTextTemp + 1] = FormatReservePlayerName(name, counts and counts[name] or 1)
+        end
+        return tconcat(playerTextTemp, ", ")
+    end
+
     local function UpdateDisplayEntryForItem(itemId)
         if not itemId then return end
         reservesDirty = true
@@ -3087,7 +3118,6 @@ do
                 local r = list[i]
                 if type(r) == "table" then
                     local source = r.source or "Unknown"
-                    local qty = r.quantity or 1
                     local bySource = groupedBySource[source]
                     if not bySource then
                         bySource = {}
@@ -3096,20 +3126,20 @@ do
                             collapsedBossGroups[source] = false
                         end
                     end
-                    local data = bySource[qty]
+                    local data = bySource[itemId]
                     if not data then
                         data = {
                             itemId = itemId,
-                            quantity = qty,
                             itemLink = r.itemLink,
                             itemName = r.itemName,
                             itemIcon = r.itemIcon,
                             source = source,
                             players = {},
+                            playerCounts = {},
                         }
-                        bySource[qty] = data
+                        bySource[itemId] = data
                     end
-                    data.players[#data.players + 1] = r.player or "?"
+                    AddReservePlayer(data, r.player or "?", r.quantity or 1)
                 end
             end
         end
@@ -3132,22 +3162,27 @@ do
                 local target = existing[reused]
                 if target then
                     target.itemId = itemId
-                    target.quantity = data.quantity
                     target.itemLink = data.itemLink
                     target.itemName = data.itemName
                     target.itemIcon = data.itemIcon
                     target.source = source
                     target.players = target.players or {}
+                    target.playerCounts = target.playerCounts or {}
                     twipe(target.players)
+                    twipe(target.playerCounts)
                     for i = 1, #data.players do
-                        target.players[i] = data.players[i]
+                        local name = data.players[i]
+                        target.players[i] = name
+                        target.playerCounts[name] = data.playerCounts[name]
                     end
-                    target.playersText = tconcat(target.players, ", ")
+                    target.playersText = BuildPlayersText(target.players, target.playerCounts)
                     target.players = nil
+                    target.playerCounts = nil
                     remaining[#remaining + 1] = target
                 else
-                    data.playersText = tconcat(data.players, ", ")
+                    data.playersText = BuildPlayersText(data.players, data.playerCounts)
                     data.players = nil
+                    data.playerCounts = nil
                     remaining[#remaining + 1] = data
                 end
             end
@@ -3188,7 +3223,6 @@ do
                     local r = list[i]
                     if type(r) == "table" then
                         local source = r.source or "Unknown"
-                        local qty = r.quantity or 1
 
                         local bySource = grouped[source]
                         if not bySource then
@@ -3199,39 +3233,32 @@ do
                             end
                         end
 
-                        local byItem = bySource[itemId]
-                        if not byItem then
-                            byItem = {}
-                            bySource[itemId] = byItem
-                        end
-
-                        local data = byItem[qty]
+                        local data = bySource[itemId]
                         if not data then
                             data = {
                                 itemId = itemId,
-                                quantity = qty,
                                 itemLink = r.itemLink,
                                 itemName = r.itemName,
                                 itemIcon = r.itemIcon,
                                 source = source,
                                 players = {},
+                                playerCounts = {},
                             }
-                            byItem[qty] = data
+                            bySource[itemId] = data
                         end
 
-                        data.players[#data.players + 1] = r.player or "?"
+                        AddReservePlayer(data, r.player or "?", r.quantity or 1)
                     end
                 end
             end
         end
 
         for _, byItem in pairs(grouped) do
-            for _, byQty in pairs(byItem) do
-                for _, data in pairs(byQty) do
-                    data.playersText = tconcat(data.players, ", ")
-                    data.players = nil
-                    reservesDisplayList[#reservesDisplayList + 1] = data
-                end
+            for _, data in pairs(byItem) do
+                data.playersText = BuildPlayersText(data.players, data.playerCounts)
+                data.players = nil
+                data.playerCounts = nil
+                reservesDisplayList[#reservesDisplayList + 1] = data
             end
         end
     end
@@ -3291,12 +3318,7 @@ do
             row.playerText:SetText(info.playersText or "")
         end
         if row.quantityText then
-            if info.quantity and info.quantity > 1 then
-                row.quantityText:SetText(info.quantity .. "x")
-                row.quantityText:Show()
-            else
-                row.quantityText:Hide()
-            end
+            row.quantityText:Hide()
         end
     end
 
@@ -3717,7 +3739,7 @@ do
             table.sort(reservesDisplayList, function(a, b)
                 if a.source ~= b.source then return a.source < b.source end
                 if a.itemId ~= b.itemId then return a.itemId < b.itemId end
-                return a.quantity < b.quantity
+                return false
             end)
             reservesDirty = false
         end
@@ -3780,11 +3802,6 @@ do
         row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
         row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         row.iconTexture:SetDrawLayer("ARTWORK")
-        row.iconBtn:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2")
-        local normal = row.iconBtn:GetNormalTexture()
-        if normal then
-            normal:SetAllPoints(row.iconBtn)
-        end
     end
 
     -- Create a new row for displaying a reserve
@@ -3833,7 +3850,7 @@ do
             local qty = (type(r) == "table" and r.quantity) or 1
             qty = qty or 1
             local name = (type(r) == "table" and r.player) or "?"
-            players[#players + 1] = (qty > 1 and ("(" .. qty .. "x)" .. name)) or name
+            players[#players + 1] = FormatReservePlayerName(name, qty)
         end
         return players
     end

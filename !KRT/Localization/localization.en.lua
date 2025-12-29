@@ -141,6 +141,7 @@ L.StrReserveListCleared           = "Reserve list cleared."
 L.StrReserveListTitle             = "Reserve List"
 L.BtnClose                        = "Close"
 L.BtnClearReserves                = "Clear Reserves"
+L.StrReserveCountSuffix           = " (x%d)"
 
 -- ==================== Raid Warnings Frame ==================== --
 L.StrMessage                      = "Message"
