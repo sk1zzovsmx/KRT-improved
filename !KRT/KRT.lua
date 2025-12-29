@@ -1651,8 +1651,9 @@ do
         for i = 1, GetNumLootItems() do
             if LootSlotIsItem(i) then
                 local itemLink = GetLootSlotLink(i)
+                local _, _, count = GetLootSlotInfo(i)
                 if GetItemFamily(itemLink) ~= 64 then -- no DE mat!
-                    self:AddItem(itemLink)
+                    self:AddItem(itemLink, count)
                 end
             end
         end
@@ -1667,12 +1668,15 @@ do
             end
         end
         self:PrepareItem()
+        if addon.Master and addon.Master.ResetItemCount then
+            addon.Master:ResetItemCount()
+        end
     end
 
     --
     -- Adds an item to the loot table.
     --
-    function module:AddItem(itemLink)
+    function module:AddItem(itemLink, itemCount)
         local itemName, _, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType,
         itemStackCount, itemEquipLoc, itemTexture = GetItemInfo(itemLink)
 
@@ -1697,6 +1701,7 @@ do
         lootTable[lootState.lootCount].itemColor   = itemColors[itemRarity + 1]
         lootTable[lootState.lootCount].itemLink    = itemLink
         lootTable[lootState.lootCount].itemTexture = itemTexture
+        lootTable[lootState.lootCount].count       = itemCount or 1
         Utils.triggerEvent("AddItem", itemLink)
     end
 
@@ -1741,6 +1746,9 @@ do
         if ItemExists(i) then
             lootState.currentItemIndex = i
             self:PrepareItem()
+            if addon.Master and addon.Master.ResetItemCount then
+                addon.Master:ResetItemCount()
+            end
         end
     end
 
@@ -1787,6 +1795,18 @@ do
     function GetItemTexture(i)
         i = i or lootState.currentItemIndex
         return lootTable[i] and lootTable[i].itemTexture or nil
+    end
+
+    function module:GetCurrentItemCount()
+        if lootState.fromInventory then
+            return itemInfo.count or lootState.itemCount or 1
+        end
+        local item = GetItem()
+        local count = item and item.count
+        if count and count > 0 then
+            return count
+        end
+        return 1
     end
 
     --
@@ -1881,6 +1901,23 @@ do
     -------------------------------------------------------
     -- Private helpers
     -------------------------------------------------------
+    local function SetItemCountValue(count, focus)
+        frameName = frameName or Utils.getFrameName()
+        if not frameName or frameName ~= UIMaster:GetName() then return end
+        local itemCountBox = _G[frameName .. "ItemCount"]
+        if not itemCountBox then return end
+        count = tonumber(count) or 1
+        if count < 1 then count = 1 end
+        lootState.itemCount = count
+        Utils.setEditBoxValue(itemCountBox, count, focus)
+        lastUIState.itemCountText = tostring(count)
+        dirtyFlags.itemCount = false
+    end
+
+    function module:ResetItemCount(focus)
+        SetItemCountValue(addon.Loot:GetCurrentItemCount(), focus)
+    end
+
     local function StopCountdown()
         Utils.CancelTimer(countdownTicker, true)
         Utils.CancelTimer(countdownEndTimer, true)
@@ -2181,11 +2218,14 @@ do
         end
         countdownRun = false
         local itemLink = GetItemLink()
-        _G[frameName .. "ItemCount"]:ClearFocus()
+        local result
         if lootState.fromInventory == true then
-            return TradeItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
+            result = TradeItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
+        else
+            result = AssignItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
         end
-        return AssignItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
+        module:ResetItemCount()
+        return result
     end
 
     --
@@ -2240,6 +2280,7 @@ do
             announced = false
             selectionFrame:Hide()
             addon.Loot:SelectItem(index)
+            module:ResetItemCount()
         end
     end
 
@@ -2596,18 +2637,15 @@ do
                 Utils.resetEditBox(_G[frameName .. "ItemCount"], true)
 
                 lootState.fromInventory = true
-                addon.Loot:AddItem(itemLink)
+                addon.Loot:AddItem(itemLink, count)
                 addon.Loot:PrepareItem()
                 announced        = false
                 -- self.History:SetSource("inventory")
                 itemInfo.bagID   = inBag
                 itemInfo.slotID  = inSlot
-                itemInfo.count   = GetItemCount(itemLink)
-                itemInfo.isStack = (lootState.itemCount > 1)
-                if itemInfo.count >= 1 then
-                    lootState.itemCount = itemInfo.count
-                    Utils.setEditBoxValue(_G[frameName .. "ItemCount"], itemInfo.count, true)
-                end
+                itemInfo.count   = count or 1
+                itemInfo.isStack = (itemInfo.count > 1)
+                module:ResetItemCount(true)
             end
             ClearCursor()
         end)
@@ -2661,6 +2699,7 @@ do
             else
                 UIMaster:Hide()
             end
+            module:ResetItemCount()
         end
     end
 
