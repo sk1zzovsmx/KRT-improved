@@ -13,7 +13,9 @@ local find, match          = string.find, string.match
 local format, gsub         = string.format, string.gsub
 local strsub, strlen       = string.sub, string.len
 local lower, upper         = string.lower, string.upper
+local ucfirst             = _G.string and _G.string.ucfirst
 local select, unpack       = select, unpack
+local LibStub              = LibStub
 
 local GetLocale            = GetLocale
 local GetTime              = GetTime
@@ -31,85 +33,17 @@ local UnitLevel            = UnitLevel
 local UnitName             = UnitName
 
 ---============================================================================
--- Library helper
----============================================================================
-
--- Library helper: direct LibStub lookup
-function addon:GetLib(name, silent)
-	-- Try common places for LibStub. In some load orders LibStub may not be available
-	-- as a global yet; try _G.LibStub first, then rawget on _G, then fallback to
-	-- a compat implementation (addon.Compat) if present.
-	local globalEnv = _G or (getfenv and getfenv(0)) or {}
-
-	local LibStub = globalEnv.LibStub
-	if not LibStub and rawget then
-		-- rawget(globalEnv, "LibStub") could be nil; guard it
-		local ok, val = pcall(function() return rawget(globalEnv, "LibStub") end)
-		if ok and val then
-			LibStub = val
-		end
-	end
-
-	if not LibStub and addon and addon.Compat and type(addon.Compat.GetLibrary) == "function" then
-		-- LibCompat exposes a GetLibrary-like accessor; try it as a best-effort fallback
-		return addon.Compat:GetLibrary(name, silent)
-	end
-
-	if not LibStub then
-		if not silent then
-			error(("LibStub not found when requesting %q"):format(tostring(name)), 2)
-		end
-		return nil
-	end
-
-	return LibStub(name, silent)
-end
-
----============================================================================
 -- Addon binding helpers
 ---============================================================================
 
-function Utils.bindCompat(addonRef)
-	addonRef = addonRef or addon
-	if not addonRef then return end
-	Utils.Table = addonRef.Table
-	Utils.TablePool = addonRef.TablePool
-	Utils.After = addonRef.After
-	Utils.NewTicker = addonRef.NewTicker
-	Utils.CancelTimer = addonRef.CancelTimer
-	Utils.UnitIterator = addonRef.UnitIterator
-	Utils.tCopy = addonRef.tCopy
-	Utils.tLength = addonRef.tLength
-	Utils.tContains = addonRef.tContains
-	Utils.tIndexOf = addonRef.tIndexOf
-end
-
-function Utils.debug(addonRef, level, fmt, ...)
-	addonRef = addonRef or addon
-	if not addonRef then return end
-	local lv = tostring(level or "INFO"):upper()
-	local fn = (lv == "ERROR" and addonRef.error)
-		or (lv == "WARN" and addonRef.warn)
-		or (lv == "DEBUG" and addonRef.debug)
-		or addonRef.info
-	if fn then
-		fn(addonRef, fmt, ...)
+function addon:GetLib(name)
+	if not LibStub then
+		error("LibStub missing while loading " .. tostring(name))
 	end
-	local lvl = addonRef.logLevels and addonRef.logLevels[lv]
-	if not lvl or not addonRef.logLevel then return end
-	if not addonRef.Debugger or type(addonRef.Debugger.AddMessage) ~= "function" then return end
-	if lvl <= addonRef.logLevel then
-		local msg = select("#", ...) > 0 and format(fmt, ...) or fmt
-		addonRef.Debugger:AddMessage(msg)
+	if not name or name == "" then
+		error("GetLib requires a library name")
 	end
-end
-
-function Utils.bindLogger(addonRef)
-	addonRef = addonRef or addon
-	if not addonRef then return end
-	addonRef.Debug = function(self, level, fmt, ...)
-		return Utils.debug(self, level, fmt, ...)
-	end
+	return LibStub(name)
 end
 
 function Utils.applyDebugSetting(enabled)
@@ -135,12 +69,9 @@ end
 -- Small helpers / iteration
 ---============================================================================
 
--- Practical helper aliases
-function Utils.after(sec, fn) return Utils.After(sec, fn) end
-
 -- Group/pet iteration in one call
 function Utils.forEachGroupUnit(cb, includePets)
-	local iter, state, index = Utils.UnitIterator(not includePets and true or nil)
+	local iter, state, index = addon.UnitIterator(not includePets and true or nil)
 	for unit, owner in iter, state, index do
 		cb(unit, owner)
 	end
@@ -149,6 +80,29 @@ end
 ---============================================================================
 -- String helpers
 ---============================================================================
+
+function Utils.trimText(value, allowNil)
+	if value == nil then
+		return allowNil and nil or ""
+	end
+	return tostring(value):trim()
+end
+
+function Utils.normalizeName(value, allowNil)
+	local text = Utils.trimText(value, allowNil)
+	if text == nil then
+		return nil
+	end
+	return (ucfirst and ucfirst(text)) or text
+end
+
+function Utils.normalizeLower(value, allowNil)
+	local text = Utils.trimText(value, allowNil)
+	if text == nil then
+		return nil
+	end
+	return lower(text)
+end
 
 function Utils.findAchievement(inp)
 	local out = inp and inp:trim() or ""
@@ -159,6 +113,23 @@ function Utils.findAchievement(inp)
 		out = strsub(out, 1, b - 1) .. link .. strsub(out, e + 1)
 	end
 	return out
+end
+
+function Utils.formatChatMessage(text, prefix, outputFormat, prefixHex)
+	local msgPrefix = prefix or ""
+	if prefixHex then
+		msgPrefix = addon.WrapTextInColorCode(msgPrefix, Utils.normalizeHexColor(prefixHex))
+	end
+	return format(outputFormat or "%s%s", msgPrefix, tostring(text))
+end
+
+function Utils.splitArgs(msg)
+	msg = Utils.trimText(msg)
+	if msg == "" then
+		return "", ""
+	end
+	local cmd, rest = msg:match("^(%S+)%s*(.-)$")
+	return Utils.normalizeLower(cmd), Utils.trimText(rest)
 end
 
 ---============================================================================
@@ -524,6 +495,17 @@ function Utils.throttle(frame, name, period, elapsed)
 	return false
 end
 
+function Utils.throttledUIUpdate(frame, frameName, period, elapsed, fn)
+	if not frameName or type(fn) ~= "function" then
+		return false
+	end
+	if Utils.throttle(frame, frameName, period, elapsed) then
+		fn()
+		return true
+	end
+	return false
+end
+
 -- Boolean <> String conversion:
 function Utils.bool2str(bool)
 	return bool and "true" or "false"
@@ -659,21 +641,12 @@ do
 	local date        = _G.date
 	local math_max    = math.max
 
-	if Utils and addon and addon.Table and not Utils.Table then
-		Utils.Table = addon.Table
-	end
-	if Utils and addon and addon.TablePool and not Utils.TablePool then
-		Utils.TablePool = addon.TablePool
-	end
 	if Utils and not Utils.Table then
 		Utils.Table = {}
 		function Utils.Table.get(_) return {} end
 
 		function Utils.Table.free(_, _) end
 	end
-
-	local TGet  = Utils.Table.get
-	local TFree = Utils.Table.free
 
 	function Utils.makeListController(cfg)
 		local self = {
@@ -752,9 +725,10 @@ do
 			if not self._active or not self.frameName then return end
 
 			if self._dirty then
-				if cfg.poolTag and TFree then
+				local tableFree = (addon.Table and addon.Table.free) or (Utils.Table and Utils.Table.free)
+				if cfg.poolTag and tableFree then
 					for i = 1, #self.data do
-						TFree(cfg.poolTag, self.data[i])
+						tableFree(cfg.poolTag, self.data[i])
 					end
 				end
 
