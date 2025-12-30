@@ -203,6 +203,7 @@ do
     local function OnEvent(_, e, ...)
         if e == "ADDON_LOADED" then
             addon.LoadOptions()
+            addon.Reserves:Load()
         end
         if events then
             events:Fire(e, ...)
