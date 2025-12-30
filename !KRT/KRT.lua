@@ -3425,16 +3425,13 @@ do
         local saved = {}
         tCopy(saved, reservesData)
         KRT_SavedReserves = saved
-        local savedByItem = {}
-        tCopy(savedByItem, reservesByItemID)
-        KRT_SavedReserves.reservesByItemID = savedByItem
     end
 
     function module:Load()
         addon:debug("Reserves: load data=%s.", tostring(KRT_SavedReserves ~= nil))
         twipe(reservesData)
         if KRT_SavedReserves then
-            tCopy(reservesData, KRT_SavedReserves, "reservesByItemID")
+            tCopy(reservesData, KRT_SavedReserves)
         end
         RebuildIndex()
     end
