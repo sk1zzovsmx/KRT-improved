@@ -3728,14 +3728,17 @@ do
 
     -- Query all missing items for reserves
     function module:QueryMissingItems(silent)
+        local seen = {}
         local count = 0
         local updated = false
         addon:debug("Reserves: query missing items.")
         for _, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
                 for _, r in ipairs(player.reserves) do
-                    if not r.itemLink or not r.itemIcon then
-                        if not self:QueryItemInfo(r.rawID) then
+                    local itemId = r.rawID
+                    if itemId and not seen[itemId] and (not r.itemLink or not r.itemIcon) then
+                        seen[itemId] = true
+                        if not self:QueryItemInfo(itemId) then
                             count = count + 1
                         else
                             updated = true
