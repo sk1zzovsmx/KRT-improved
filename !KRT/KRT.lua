@@ -3690,6 +3690,7 @@ do
         local count = 0
         local updated = false
         local totalMissing = 0
+        local seenMissing = {}
         addon:debug("Reserves: query missing items.")
         pendingItemCount = 0
         pendingQueryActive = false
@@ -3698,12 +3699,15 @@ do
             if type(player) == "table" and type(player.reserves) == "table" then
                 for _, r in ipairs(player.reserves) do
                     if not r.itemLink or not r.itemIcon then
-                        totalMissing = totalMissing + 1
-                        if not self:QueryItemInfo(r.rawID) then
-                            count = count + 1
-                            pendingItemCount = pendingItemCount + 1
-                        else
-                            updated = true
+                        if not seenMissing[r.rawID] then
+                            seenMissing[r.rawID] = true
+                            totalMissing = totalMissing + 1
+                            if not self:QueryItemInfo(r.rawID) then
+                                count = count + 1
+                                pendingItemCount = pendingItemCount + 1
+                            else
+                                updated = true
+                            end
                         end
                     end
                 end
@@ -3712,6 +3716,12 @@ do
         if pendingItemCount > 0 then
             pendingQueryActive = true
             addon:info(L.MsgReserveItemsQuerying, totalMissing)
+        elseif totalMissing > 0 then
+            addon:info(L.MsgReserveItemsAllReady)
+            reservesDirty = true
+            if reserveListFrame then
+                self:RefreshWindow()
+            end
         end
         if updated and reserveListFrame and reserveListFrame:IsShown() then
             self:RefreshWindow()
