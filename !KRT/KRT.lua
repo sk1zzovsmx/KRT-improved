@@ -1306,6 +1306,7 @@ do
 
     local function onRollButtonClick(self)
         state.selected = self.playerName
+        lootState.winner = self.playerName
         module:FetchRolls()
     end
 
