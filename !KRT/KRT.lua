@@ -3464,6 +3464,7 @@ do
         end
         addon:debug("Reserves: show list window.")
         reserveListFrame:Show()
+        self:RefreshWindow()
     end
 
     function module:CloseWindow()
