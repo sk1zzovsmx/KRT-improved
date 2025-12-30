@@ -3097,6 +3097,8 @@ do
     local pendingItemInfo = {}
     local pendingItemCount = 0
     local pendingRequestActive = false
+    local pendingTimeout = 0
+    local PENDING_TIMEOUT = 30
     local collapsedBossGroups = {}
     local grouped = {}
 
@@ -3437,7 +3439,7 @@ do
         end
         addon:debug("Reserves: show list window.")
         reserveListFrame:Show()
-        if reservesDirty then
+        if reservesDirty or pendingRequestActive then
             self:RefreshWindow()
         end
     end
@@ -3515,23 +3517,22 @@ do
                     if type(icon) ~= "string" or icon == "" then
                         icon = GetItemIcon(itemId)
                     end
+                    if type(icon) ~= "string" or icon == "" then
+                        icon = fallbackIcon
+                    end
                     addon:debug("Reserves: update item data %s.", link)
                     self:UpdateReserveItemData(itemId, name, link, icon)
-                    if type(icon) == "string" and icon ~= "" then
-                        ClearPendingItem(itemId)
-                    else
-                        addon:debug("Reserves: icon still pending itemId=%d.", itemId)
-                        pendingItemInfo[itemId] = true
-                        self:QueryItemInfo(itemId)
-                    end
+                    ClearPendingItem(itemId)
                     if pendingRequestActive and pendingItemCount == 0 then
                         pendingRequestActive = false
+                        pendingTimeout = 0
                         addon:info(L.MsgReserveItemsReady)
                         reservesDirty = true
                         self:RefreshWindow()
                     end
                 else
                     addon:debug("Reserves: item info missing itemId=%d.", itemId)
+                    ClearPendingItem(itemId)
                 end
             end
         end)
@@ -3564,7 +3565,25 @@ do
             end
             local queryButton = _G[frameName .. "QueryButton"]
             if queryButton then
-                Utils.enableDisable(queryButton, hasData and pendingItemCount == 0)
+                Utils.enableDisable(queryButton, hasData and not pendingRequestActive)
+            end
+            if pendingRequestActive then
+                pendingTimeout = pendingTimeout + elapsed
+                if pendingTimeout >= PENDING_TIMEOUT then
+                    pendingRequestActive = false
+                    pendingTimeout = 0
+                    pendingItemCount = 0
+                    twipe(pendingItemInfo)
+                    addon:info(L.MsgReserveItemsTimeout)
+                    reservesDirty = true
+                    module:RefreshWindow()
+                elseif pendingItemCount == 0 then
+                    pendingRequestActive = false
+                    pendingTimeout = 0
+                    addon:info(L.MsgReserveItemsReady)
+                    reservesDirty = true
+                    module:RefreshWindow()
+                end
             end
         end)
     end
@@ -3685,12 +3704,13 @@ do
             if type(icon) ~= "string" or icon == "" then
                 icon = GetItemIcon(itemId)
             end
-            self:UpdateReserveItemData(itemId, name, link, icon)
-            if type(icon) == "string" and icon ~= "" then
-                ClearPendingItem(itemId)
-                addon:debug("Reserves: item info ready itemId=%d name=%s.", itemId, name)
-                return true
+            if type(icon) ~= "string" or icon == "" then
+                icon = fallbackIcon
             end
+            self:UpdateReserveItemData(itemId, name, link, icon)
+            ClearPendingItem(itemId)
+            addon:debug("Reserves: item info ready itemId=%d name=%s.", itemId, name)
+            return true
         end
 
         GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
@@ -3707,12 +3727,14 @@ do
         local updated = false
         pendingItemCount = 0
         pendingRequestActive = false
+        pendingTimeout = 0
         twipe(pendingItemInfo)
         addon:debug("Reserves: query missing items.")
         for _, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
                 for _, r in ipairs(player.reserves) do
                     if not r.itemLink or not r.itemIcon then
+                        TrackPendingItem(r.rawID)
                         if not self:QueryItemInfo(r.rawID) then
                             count = count + 1
                         else

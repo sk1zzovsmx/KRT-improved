@@ -285,6 +285,7 @@ L.MsgLogLevelCurrent              = "Log level: current=%s."
 L.MsgLogLevelSet                  = "Log level: set=%s."
 L.MsgReserveItemsRequested        = "Reserves: requested info for %s missing items."
 L.MsgReserveItemsReady            = "Reserves: all item infos are available."
+L.MsgReserveItemsTimeout          = "Reserves: item info timeout reached, using fallback icons."
 
 L.LFM_TEMPLATE                   = "[KRT] LFM: {raid} {roles} {time}"
 
