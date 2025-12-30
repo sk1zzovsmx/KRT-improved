@@ -3437,6 +3437,9 @@ do
         end
         addon:debug("Reserves: show list window.")
         reserveListFrame:Show()
+        if reservesDirty then
+            self:RefreshWindow()
+        end
     end
 
     function module:CloseWindow()
@@ -3524,9 +3527,8 @@ do
                     if pendingRequestActive and pendingItemCount == 0 then
                         pendingRequestActive = false
                         addon:info(L.MsgReserveItemsReady)
-                        if reserveListFrame and reserveListFrame:IsShown() then
-                            self:RefreshWindow()
-                        end
+                        reservesDirty = true
+                        self:RefreshWindow()
                     end
                 else
                     addon:debug("Reserves: item info missing itemId=%d.", itemId)
@@ -3703,6 +3705,9 @@ do
     function module:QueryMissingItems(silent)
         local count = 0
         local updated = false
+        pendingItemCount = 0
+        pendingRequestActive = false
+        twipe(pendingItemInfo)
         addon:debug("Reserves: query missing items.")
         for _, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
