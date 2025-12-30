@@ -1298,7 +1298,15 @@ do
             return
         end
 
+        local isSR = lootState.currentRollType == rollTypes.RESERVED
         table.sort(rolls, function(a, b)
+            if isSR then
+                local ar = module:IsReserved(a.itemId, a.name)
+                local br = module:IsReserved(b.itemId, b.name)
+                if ar ~= br then
+                    return ar
+                end
+            end
             return addon.options.sortAscending and a.roll < b.roll or a.roll > b.roll
         end)
         lootState.winner = rolls[1].name
