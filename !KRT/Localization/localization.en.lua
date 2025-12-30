@@ -283,8 +283,6 @@ L.MsgMinimapPosSet                = "Minimap: angle set to %s."
 L.MsgDefaultsRestored             = "Options: defaults restored."
 L.MsgLogLevelCurrent              = "Log level: current=%s."
 L.MsgLogLevelSet                  = "Log level: set=%s."
-L.MsgReserveItemsRequested        = "Reserves: requested info for %s missing items."
-L.MsgReserveItemsReady            = "Reserves: all item infos are available."
 L.MsgReserveItemsQuerying         = "Reserves: querying %s items..."
 L.MsgReserveItemsAllReady         = "Reserves: all item data obtained."
 

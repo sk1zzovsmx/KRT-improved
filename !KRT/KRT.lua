@@ -3715,9 +3715,13 @@ do
         end
         if pendingItemCount > 0 then
             pendingQueryActive = true
-            addon:info(L.MsgReserveItemsQuerying, totalMissing)
+            if not silent then
+                addon:info(L.MsgReserveItemsQuerying, totalMissing)
+            end
         elseif totalMissing > 0 then
-            addon:info(L.MsgReserveItemsAllReady)
+            if not silent then
+                addon:info(L.MsgReserveItemsAllReady)
+            end
             reservesDirty = true
             if reserveListFrame then
                 self:RefreshWindow()
@@ -3725,13 +3729,6 @@ do
         end
         if updated and reserveListFrame and reserveListFrame:IsShown() then
             self:RefreshWindow()
-        end
-        if not silent then
-            if count > 0 then
-                addon:info(L.MsgReserveItemsRequested, count)
-            else
-                addon:info(L.MsgReserveItemsReady)
-            end
         end
         addon:debug("Reserves: missing items requested=%d.", count)
     end
