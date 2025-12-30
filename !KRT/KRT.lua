@@ -6546,6 +6546,7 @@ function addon:ADDON_LOADED(name)
     if name ~= addonName then return end
     self:UnregisterEvent("ADDON_LOADED")
     addon.LoadOptions()
+    addon.Reserves:Load()
     for event, handler in pairs(addonEvents) do
         local method = handler
         self:RegisterEvent(event, function(...)
