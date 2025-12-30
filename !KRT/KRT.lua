@@ -3096,6 +3096,7 @@ do
     -- UI Elements
     local frameName
     local reserveListFrame, scrollFrame, scrollChild
+    local reserveHeaders = {}
     local reserveItemRows, rowsByItemID = {}, {}
 
     -- State variables
@@ -3849,6 +3850,12 @@ do
         twipe(reserveItemRows)
         twipe(rowsByItemID)
 
+        -- Hide and clear old headers
+        for i = 1, #reserveHeaders do
+            reserveHeaders[i]:Hide()
+        end
+        twipe(reserveHeaders)
+
         if reservesDirty then
             table.sort(reservesDisplayList, function(a, b)
                 if a.source ~= b.source then return a.source < b.source end
@@ -3871,7 +3878,7 @@ do
                 seenSources[source] = true
                 headerIndex = headerIndex + 1
                 local header = module:CreateReserveHeader(scrollChild, source, yOffset, headerIndex)
-                reserveItemRows[#reserveItemRows + 1] = header
+                reserveHeaders[#reserveHeaders + 1] = header
                 yOffset = yOffset + C.RESERVE_HEADER_HEIGHT
             end
 
