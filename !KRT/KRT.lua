@@ -203,6 +203,7 @@ do
     local function OnEvent(_, e, ...)
         if e == "ADDON_LOADED" then
             addon.LoadOptions()
+            addon.Reserves:Load()
         end
         if events then
             events:Fire(e, ...)
@@ -6546,7 +6547,6 @@ function addon:ADDON_LOADED(name)
     if name ~= addonName then return end
     self:UnregisterEvent("ADDON_LOADED")
     addon.LoadOptions()
-    addon.Reserves:Load()
     for event, handler in pairs(addonEvents) do
         local method = handler
         self:RegisterEvent(event, function(...)
