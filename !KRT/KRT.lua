@@ -3095,6 +3095,7 @@ do
     local reservesDisplayList = {}
     local reservesDirty = false
     local pendingItemInfo = {}
+    local pendingItemCount = 0
     local collapsedBossGroups = {}
     local grouped = {}
 
@@ -3103,6 +3104,42 @@ do
     -------------------------------------------------------
 
     local playerTextTemp = {}
+
+    local function MarkPendingItem(itemId, hasName, hasIcon)
+        if not itemId then return nil end
+        local pending = pendingItemInfo[itemId]
+        if not pending then
+            pending = {
+                nameReady = false,
+                iconReady = false
+            }
+            pendingItemInfo[itemId] = pending
+            pendingItemCount = pendingItemCount + 1
+            addon:debug("Reserves: track pending itemId=%d pending=%d.", itemId, pendingItemCount)
+        end
+        if hasName then
+            pending.nameReady = true
+        end
+        if hasIcon then
+            pending.iconReady = true
+        end
+        return pending
+    end
+
+    local function CompletePendingItem(itemId)
+        if not itemId or not pendingItemInfo[itemId] then return end
+        pendingItemInfo[itemId] = nil
+        if pendingItemCount > 0 then
+            pendingItemCount = pendingItemCount - 1
+        end
+        addon:debug("Reserves: item ready itemId=%d pending=%d.", itemId, pendingItemCount)
+        if pendingItemCount == 0 then
+            addon:debug("Reserves: pending item info complete.")
+            if reserveListFrame and reserveListFrame:IsShown() then
+                module:RefreshWindow()
+            end
+        end
+    end
 
     local function FormatReservePlayerName(name, count)
         if count and count > 1 then
@@ -3488,25 +3525,25 @@ do
             addon:debug("Reserves: item info received itemId=%d.", itemId)
             if pendingItemInfo[itemId] then
                 local name, link, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
-                if name then
-                    local icon = tex
-                    if type(icon) ~= "string" or icon == "" then
-                        icon = GetItemIcon(itemId)
-                    end
+                local icon = tex
+                if type(icon) ~= "string" or icon == "" then
+                    icon = GetItemIcon(itemId)
+                end
+                local hasName = type(name) == "string" and name ~= ""
+                    and type(link) == "string" and link ~= ""
+                local hasIcon = type(icon) == "string" and icon ~= ""
+                if hasName then
                     addon:debug("Reserves: update item data %s.", link)
                     self:UpdateReserveItemData(itemId, name, link, icon)
-                    if reserveListFrame and reserveListFrame:IsShown() then
-                        self:RefreshWindow()
-                    end
-                    if type(icon) == "string" and icon ~= "" then
-                        pendingItemInfo[itemId] = nil
-                    else
-                        addon:debug("Reserves: icon still pending itemId=%d.", itemId)
-                        pendingItemInfo[itemId] = true
-                        self:QueryItemInfo(itemId)
-                    end
                 else
                     addon:debug("Reserves: item info missing itemId=%d.", itemId)
+                end
+                MarkPendingItem(itemId, hasName, hasIcon)
+                if hasName and hasIcon then
+                    CompletePendingItem(itemId)
+                else
+                    addon:debug("Reserves: item info still pending itemId=%d.", itemId)
+                    self:QueryItemInfo(itemId)
                 end
             end
         end)
@@ -3655,22 +3692,26 @@ do
         if not itemId then return end
         addon:debug("Reserves: query item info itemId=%d.", itemId)
         local name, link, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
-        if name then
-            local icon = tex
-            if type(icon) ~= "string" or icon == "" then
-                icon = GetItemIcon(itemId)
-            end
+        local icon = tex
+        if type(icon) ~= "string" or icon == "" then
+            icon = GetItemIcon(itemId)
+        end
+        local hasName = type(name) == "string" and name ~= ""
+            and type(link) == "string" and link ~= ""
+        local hasIcon = type(icon) == "string" and icon ~= ""
+        if hasName then
             self:UpdateReserveItemData(itemId, name, link, icon)
-            if type(icon) == "string" and icon ~= "" then
-                addon:debug("Reserves: item info ready itemId=%d name=%s.", itemId, name)
-                return true
-            end
+        end
+        MarkPendingItem(itemId, hasName, hasIcon)
+        if hasName and hasIcon then
+            addon:debug("Reserves: item info ready itemId=%d name=%s.", itemId, name)
+            CompletePendingItem(itemId)
+            return true
         end
 
         GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
         GameTooltip:SetHyperlink("item:" .. itemId)
         GameTooltip:Hide()
-        pendingItemInfo[itemId] = true
         addon:debug("Reserves: item info pending itemId=%d.", itemId)
         return false
     end
