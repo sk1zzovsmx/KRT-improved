@@ -17,8 +17,8 @@ local function TGet(tag)
     return {}
 end
 
-local _G               = _G
-_G["KRT"]              = addon
+local _G  = _G
+_G["KRT"] = addon
 
 
 ---============================================================================
@@ -78,7 +78,7 @@ local tIndexOf             = addon.tIndexOf
 local tContains            = _G.tContains
 
 -- SavedVariables for log level (fallback INFO)
-KRT_Debug = KRT_Debug or {}
+KRT_Debug                  = KRT_Debug or {}
 do
     local INFO = addon.Logger.logLevels.INFO
     KRT_Debug.level = KRT_Debug.level or INFO
@@ -145,19 +145,19 @@ end
 ---============================================================================
 
 -- Centralised addon state
-addon.State      = addon.State or {}
-local coreState  = addon.State
+addon.State                = addon.State or {}
+local coreState            = addon.State
 
-coreState.frames = coreState.frames or {}
-local Frames     = coreState.frames
-Frames.main      = Frames.main or CreateFrame("Frame")
+coreState.frames           = coreState.frames or {}
+local Frames               = coreState.frames
+Frames.main                = Frames.main or CreateFrame("Frame")
 
 -- Addon UI Frames
-local mainFrame  = Frames.main
+local mainFrame            = Frames.main
 local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings, UIHistory, UIHistoryItemBox
 
 -- Player info helper
-coreState.player = coreState.player or {}
+coreState.player           = coreState.player or {}
 -- Rolls & Loot
 coreState.loot             = coreState.loot or {}
 local lootState            = coreState.loot
@@ -190,7 +190,7 @@ local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.conc
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
 local format, match, find, strlen       = string.format, string.match, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
-local tostring, tonumber               = tostring, tonumber
+local tostring, tonumber                = tostring, tonumber
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
 
 ---============================================================================
@@ -384,8 +384,8 @@ do
             local name = UnitName(unit)
             if name then
                 local rank, subgroup, level, classL, class = Utils.getRaidRosterData(unit)
-                local raceL, race = UnitRace(unit)
-                local p           = {
+                local raceL, race                          = UnitRace(unit)
+                local p                                    = {
                     name     = name,
                     rank     = rank,
                     subgroup = subgroup,
@@ -3117,6 +3117,43 @@ do
 
     local playerTextTemp = {}
 
+    local function splitCSV(line)
+        local out, i, len = {}, 1, #line
+        while i <= len do
+            local c = line:sub(i, i)
+            if c == '"' then
+                local j = i + 1
+                local buf = {}
+                while j <= len do
+                    local ch = line:sub(j, j)
+                    if ch == '"' then
+                        if line:sub(j + 1, j + 1) == '"' then
+                            buf[#buf + 1] = '"'
+                            j = j + 2
+                        else
+                            j = j + 1
+                            break
+                        end
+                    else
+                        buf[#buf + 1] = ch
+                        j = j + 1
+                    end
+                end
+                out[#out + 1] = table.concat(buf)
+                if line:sub(j, j) == "," then
+                    i = j + 1
+                else
+                    i = j
+                end
+            else
+                local j = line:find(",", i, true) or (len + 1)
+                out[#out + 1] = line:sub(i, j - 1)
+                i = j + 1
+            end
+        end
+        return out
+    end
+
     local function MarkPendingItem(itemId, hasName, hasIcon)
         if not itemId then return nil end
         local pending = pendingItemInfo[itemId]
@@ -3343,7 +3380,7 @@ do
         row.iconBtn:SetScript("OnEnter", function()
             GameTooltip:SetOwner(row.iconBtn, "ANCHOR_RIGHT")
             if row._itemLink then
-                GameTooltip:SetHyperlink(row._tooltipTitle)
+                GameTooltip:SetHyperlink(row._itemLink)
             elseif row._tooltipTitle then
                 GameTooltip:SetText(row._tooltipTitle, 1, 1, 1)
             end
@@ -3443,6 +3480,9 @@ do
         twipe(reservesData)
         twipe(reservesByItemID)
         twipe(reservesDisplayList)
+        twipe(collapsedBossGroups)
+        twipe(pendingItemInfo)
+        pendingItemCount = 0
         reservesDirty = true
         self:RefreshWindow()
         self:CloseWindow()
@@ -3626,11 +3666,14 @@ do
         addon:debug("Reserves: parse CSV start.")
         twipe(reservesData)
         twipe(reservesByItemID)
+        twipe(reservesDisplayList)
         reservesDirty = true
-
-        local function cleanCSVField(field)
-            if not field then return nil end
-            return Utils.trimText(field:gsub('^"(.-)"$', '%1'), true)
+        twipe(collapsedBossGroups)
+        local function clean(field)
+            if field == nil then return nil end
+            field = Utils.trimText(field, true)
+            if field == "" then return nil end
+            return field
         end
 
         local firstLine = true
@@ -3638,21 +3681,20 @@ do
             if firstLine then
                 firstLine = false
             else
-                local _, itemIdStr, source, playerName, class, spec, note, plus = line:match(
-                    '^"?(.-)"?,(.-),(.-),(.-),(.-),(.-),(.-),(.-)')
+                local cols       = splitCSV(line)
+                -- formato atteso: (1 ignored), 2 itemId, 3 source, 4 player, 5 class, 6 spec, 7 note, 8 plus
+                local itemIdStr  = clean(cols[2])
+                local source     = clean(cols[3])
+                local playerName = clean(cols[4])
+                local class      = clean(cols[5])
+                local spec       = clean(cols[6])
+                local note       = clean(cols[7])
+                local plusStr    = clean(cols[8])
 
-                itemIdStr = cleanCSVField(itemIdStr)
-                source = cleanCSVField(source)
-                playerName = cleanCSVField(playerName)
-                class = cleanCSVField(class)
-                spec = cleanCSVField(spec)
-                note = cleanCSVField(note)
-                plus = cleanCSVField(plus)
-
-                local itemId = tonumber(itemIdStr)
-                local normalized = Utils.normalizeLower(playerName, true)
-
-                if normalized and itemId then
+                local itemId     = tonumber(itemIdStr)
+                if playerName and itemId then
+                    local normalized = Utils.normalizeLower(playerName, true)
+                    local srcKey = source or nil
                     reservesData[normalized] = reservesData[normalized] or {
                         original = playerName,
                         reserves = {}
@@ -3660,9 +3702,10 @@ do
 
                     local list = reservesData[normalized].reserves
                     local found = false
+                    -- dedup per itemId + source
                     for i = 1, #list do
                         local entry = list[i]
-                        if entry and entry.rawID == itemId then
+                        if entry and entry.rawID == itemId and entry.source == srcKey then
                             entry.quantity = (entry.quantity or 1) + 1
                             found = true
                             break
@@ -3676,11 +3719,11 @@ do
                             itemName = nil,
                             itemIcon = nil,
                             quantity = 1,
-                            class = class ~= "" and class or nil,
-                            spec = spec ~= "" and spec or nil,
-                            note = note ~= "" and note or nil,
-                            plus = tonumber(plus) or 0,
-                            source = source ~= "" and source or nil,
+                            class = class,
+                            spec = spec,
+                            note = note,
+                            plus = tonumber(plusStr) or 0,
+                            source = srcKey,
                             player = playerName
                         }
                     end
@@ -4026,8 +4069,8 @@ do
     -- Default options for the addon.
     --
     local defaultOptions = {
-        schemaVersion         = 1,
-        migrations            = {},
+        schemaVersion          = 1,
+        migrations             = {},
         sortAscending          = false,
         useRaidWarning         = true,
         announceOnWin          = true,
@@ -5297,7 +5340,6 @@ do
             RenderPreview()
         end)
     end
-
 end
 
 -- ============================================================================
@@ -6159,7 +6201,7 @@ do
         local rID = addon.History.selectedRaid
         if not rID then return end
 
-        local name = Utils.trimText(_G[frameName .. "Name"]:GetText())
+        local name  = Utils.trimText(_G[frameName .. "Name"]:GetText())
         local modeT = Utils.normalizeLower(_G[frameName .. "Difficulty"]:GetText())
         local bTime = Utils.trimText(_G[frameName .. "Time"]:GetText())
 
@@ -6570,6 +6612,9 @@ function addon:ADDON_LOADED(name)
         self:RegisterEvent(event, function(...)
             self[method](self, ...)
         end)
+    end
+    if addon.Reserves and addon.Reserves.Load then
+        addon.Reserves:Load()
     end
     self:RAID_ROSTER_UPDATE()
 end
