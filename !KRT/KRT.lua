@@ -1372,7 +1372,8 @@ do
         local name = Utils.getPlayerName()
         local allowed = 1
         if lootState.currentRollType == rollTypes.RESERVED then
-            allowed = addon.Reserves:GetReserveCountForItem(itemId, name)
+            local reserve = addon.Reserves:GetReserveCountForItem(itemId, name)
+            allowed = (reserve > 0) and reserve or 1
         end
 
         state.playerCounts[itemId] = state.playerCounts[itemId] or 0
