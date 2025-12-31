@@ -1410,13 +1410,15 @@ do
         state.playerCounts[itemId] = state.playerCounts[itemId] or 0
         if state.playerCounts[itemId] >= allowed then
             addon:info(L.ChatOnlyRollOnce)
-            addon:debug("Rolls: blocked self=%s (%d/%d) itemId=%d.", name, state.playerCounts[itemId], allowed, itemId)
+            addon:debug("Rolls: blocked self=%s (%d/%d) itemId=%d.", name, state.playerCounts[itemId], allowed,
+                itemId)
             return
         end
 
         RandomRoll(1, 100)
         state.playerCounts[itemId] = state.playerCounts[itemId] + 1
-        addon:debug("Rolls: self=%s rolled for itemId=%d (%d/%d).", name, itemId, state.playerCounts[itemId], allowed)
+        addon:debug("Rolls: self=%s rolled for itemId=%d (%d/%d).", name, itemId, state.playerCounts[itemId],
+            allowed)
     end
 
     -- Returns the current roll session state.
@@ -1455,7 +1457,6 @@ do
 
         state.itemCounts[itemId] = state.itemCounts[itemId] or {}
         local used = state.itemCounts[itemId][player] or 0
-
         if used >= allowed then
             if not tContains(state.rerolled, player) then
                 Utils.whisper(player, L.ChatOnlyRollOnce)
