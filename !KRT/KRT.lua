@@ -17,8 +17,8 @@ local function TGet(tag)
     return {}
 end
 
-local _G               = _G
-_G["KRT"]              = addon
+local _G  = _G
+_G["KRT"] = addon
 
 
 ---============================================================================
@@ -78,7 +78,7 @@ local tIndexOf             = addon.tIndexOf
 local tContains            = _G.tContains
 
 -- SavedVariables for log level (fallback INFO)
-KRT_Debug = KRT_Debug or {}
+KRT_Debug                  = KRT_Debug or {}
 do
     local INFO = addon.Logger.logLevels.INFO
     KRT_Debug.level = KRT_Debug.level or INFO
@@ -145,19 +145,19 @@ end
 ---============================================================================
 
 -- Centralised addon state
-addon.State      = addon.State or {}
-local coreState  = addon.State
+addon.State                = addon.State or {}
+local coreState            = addon.State
 
-coreState.frames = coreState.frames or {}
-local Frames     = coreState.frames
-Frames.main      = Frames.main or CreateFrame("Frame")
+coreState.frames           = coreState.frames or {}
+local Frames               = coreState.frames
+Frames.main                = Frames.main or CreateFrame("Frame")
 
 -- Addon UI Frames
-local mainFrame  = Frames.main
+local mainFrame            = Frames.main
 local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings, UIHistory, UIHistoryItemBox
 
 -- Player info helper
-coreState.player = coreState.player or {}
+coreState.player           = coreState.player or {}
 -- Rolls & Loot
 coreState.loot             = coreState.loot or {}
 local lootState            = coreState.loot
@@ -190,7 +190,7 @@ local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.conc
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
 local format, match, find, strlen       = string.format, string.match, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
-local tostring, tonumber               = tostring, tonumber
+local tostring, tonumber                = tostring, tonumber
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
 
 ---============================================================================
@@ -384,8 +384,8 @@ do
             local name = UnitName(unit)
             if name then
                 local rank, subgroup, level, classL, class = Utils.getRaidRosterData(unit)
-                local raceL, race = UnitRace(unit)
-                local p           = {
+                local raceL, race                          = UnitRace(unit)
+                local p                                    = {
                     name     = name,
                     rank     = rank,
                     subgroup = subgroup,
@@ -2902,7 +2902,11 @@ do
     end)
 end
 
--- ==================== Loot Counter (Reworked: Style & Logic) ==================== --
+---============================================================================
+-- Loot Counter Module
+-- Counter and display item distribution.
+---============================================================================
+
 do
     local module = addon.Master
 
@@ -4026,8 +4030,8 @@ do
     -- Default options for the addon.
     --
     local defaultOptions = {
-        schemaVersion         = 1,
-        migrations            = {},
+        schemaVersion          = 1,
+        migrations             = {},
         sortAscending          = false,
         useRaidWarning         = true,
         announceOnWin          = true,
@@ -4232,7 +4236,9 @@ do
     end
 end
 
--- ==================== Warnings Frame ==================== --
+---============================================================================
+-- Warnings Frame Module
+---============================================================================
 
 do
     -------------------------------------------------------
@@ -4486,7 +4492,9 @@ do
     end
 end
 
--- ==================== MS Changes Frame ==================== --
+---============================================================================
+-- MS Changes Module
+---============================================================================
 
 do
     -------------------------------------------------------
@@ -4809,7 +4817,9 @@ do
     end
 end
 
--- ==================== LFM Spam Frame ==================== --
+---============================================================================
+-- LFM Spam Module
+---============================================================================
 
 do
     -------------------------------------------------------
@@ -5297,11 +5307,11 @@ do
             RenderPreview()
         end)
     end
-
 end
 
 -- ============================================================================
--- History (Main) - stato + selettori
+-- History Frame (aka Loot Logger)
+-- Shown loot history for raids
 -- ============================================================================
 do
     addon.History                                                         = addon.History or {}
@@ -5443,7 +5453,7 @@ do
 end
 
 -- ============================================================================
--- Raids List (allineata agli XML)
+-- Raids List
 -- ============================================================================
 do
     addon.History.Raids = addon.History.Raids or {}
@@ -6159,7 +6169,7 @@ do
         local rID = addon.History.selectedRaid
         if not rID then return end
 
-        local name = Utils.trimText(_G[frameName .. "Name"]:GetText())
+        local name  = Utils.trimText(_G[frameName .. "Name"]:GetText())
         local modeT = Utils.normalizeLower(_G[frameName .. "Difficulty"]:GetText())
         local bTime = Utils.trimText(_G[frameName .. "Time"]:GetText())
 
