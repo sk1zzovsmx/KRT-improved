@@ -17,8 +17,8 @@ local function TGet(tag)
     return {}
 end
 
-local _G               = _G
-_G["KRT"]              = addon
+local _G  = _G
+_G["KRT"] = addon
 
 
 ---============================================================================
@@ -78,7 +78,7 @@ local tIndexOf             = addon.tIndexOf
 local tContains            = _G.tContains
 
 -- SavedVariables for log level (fallback INFO)
-KRT_Debug = KRT_Debug or {}
+KRT_Debug                  = KRT_Debug or {}
 do
     local INFO = addon.Logger.logLevels.INFO
     KRT_Debug.level = KRT_Debug.level or INFO
@@ -145,19 +145,19 @@ end
 ---============================================================================
 
 -- Centralised addon state
-addon.State      = addon.State or {}
-local coreState  = addon.State
+addon.State                = addon.State or {}
+local coreState            = addon.State
 
-coreState.frames = coreState.frames or {}
-local Frames     = coreState.frames
-Frames.main      = Frames.main or CreateFrame("Frame")
+coreState.frames           = coreState.frames or {}
+local Frames               = coreState.frames
+Frames.main                = Frames.main or CreateFrame("Frame")
 
 -- Addon UI Frames
-local mainFrame  = Frames.main
+local mainFrame            = Frames.main
 local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings, UIHistory, UIHistoryItemBox
 
 -- Player info helper
-coreState.player = coreState.player or {}
+coreState.player           = coreState.player or {}
 -- Rolls & Loot
 coreState.loot             = coreState.loot or {}
 local lootState            = coreState.loot
@@ -190,7 +190,7 @@ local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.conc
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
 local format, match, find, strlen       = string.format, string.match, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
-local tostring, tonumber               = tostring, tonumber
+local tostring, tonumber                = tostring, tonumber
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
 
 ---============================================================================
@@ -201,10 +201,6 @@ do
     local events
 
     local function OnEvent(_, e, ...)
-        if e == "ADDON_LOADED" then
-            addon.LoadOptions()
-            addon.Reserves:Load()
-        end
         if events then
             events:Fire(e, ...)
         else
@@ -218,7 +214,7 @@ do
     local function InitEventFallback()
         mainFrame:SetScript("OnEvent", OnEvent)
         mainFrame:RegisterEvent("ADDON_LOADED")
-        function addon:RegisterEvent(e)
+        function addon:RegisterEvent(e, ...)
             mainFrame:RegisterEvent(e)
         end
 
@@ -384,8 +380,8 @@ do
             local name = UnitName(unit)
             if name then
                 local rank, subgroup, level, classL, class = Utils.getRaidRosterData(unit)
-                local raceL, race = UnitRace(unit)
-                local p           = {
+                local raceL, race                          = UnitRace(unit)
+                local p                                    = {
                     name     = name,
                     rank     = rank,
                     subgroup = subgroup,
@@ -1290,65 +1286,104 @@ do
     -------------------------------------------------------
     -- 3. Private helpers
     -------------------------------------------------------
-    local function sortRolls()
-        local rolls = state.rolls
-        if #rolls == 0 then
-            lootState.winner = nil
-            addon:debug("Rolls: sort no entries.")
-            return
+    local function GetAllowedRolls(itemId, playerName)
+        if lootState.currentRollType ~= rollTypes.RESERVED then
+            return 1
+        end
+        local reserve = addon.Reserves:GetReserveCountForItem(itemId, playerName)
+        return (reserve and reserve > 0) and reserve or 1
+    end
+
+    local function IsReservedForItem(itemId, playerName)
+        return addon.Reserves:GetReserveCountForItem(itemId, playerName) > 0
+    end
+
+    -- Sort rolls IN-PLACE according to:
+    -- - SR mode: SR first, then non-SR
+    -- - then roll order (asc/desc) based on addon.options.sortAscending
+    -- Returns the "topName" (first entry after sort) or nil.
+    local function sortRolls(itemId)
+        if state.count <= 0 then
+            return nil
         end
 
+        local sortAscending = addon.options and addon.options.sortAscending == true
         local isSR = lootState.currentRollType == rollTypes.RESERVED
-        table.sort(rolls, function(a, b)
-            if isSR then
-                local ar = module:IsReserved(a.itemId, a.name)
-                local br = module:IsReserved(b.itemId, b.name)
+
+        table.sort(state.rolls, function(a, b)
+            if isSR and itemId then
+                local ar = IsReservedForItem(itemId, a.name)
+                local br = IsReservedForItem(itemId, b.name)
                 if ar ~= br then
                     return ar
                 end
             end
-            return addon.options.sortAscending and a.roll < b.roll or a.roll > b.roll
+
+            if a.roll ~= b.roll then
+                return sortAscending and (a.roll < b.roll) or (a.roll > b.roll)
+            end
+
+            -- tie-break deterministico
+            if a.name ~= b.name then
+                return a.name < b.name
+            end
+            return false
         end)
-        lootState.winner = rolls[1].name
-        addon:debug("Rolls: sorted winner=%s roll=%d.", lootState.winner, rolls[1].roll)
+
+        local top = state.rolls[1]
+        return top and top.name or nil
     end
 
     local function onRollButtonClick(self)
+        if not self or not self.playerName then return end
         state.selected = self.playerName
         lootState.winner = self.playerName
+        addon:debug("Rolls: manual select winner=%s itemId=%s.",
+            tostring(lootState.winner), tostring(module:GetCurrentRollItemID()))
         module:FetchRolls()
     end
 
     local function addRoll(name, roll, itemId)
         roll = tonumber(roll)
+        itemId = itemId or module:GetCurrentRollItemID()
+
+        if not name or not roll or not itemId then
+            addon:debug("Rolls: addRoll skipped name=%s roll=%s itemId=%s.",
+                tostring(name), tostring(roll), tostring(itemId))
+            return
+        end
+
         state.count = state.count + 1
         lootState.rollsCount = lootState.rollsCount + 1
         state.rolls[state.count] = { name = name, roll = roll, itemId = itemId }
-        addon:debug("Rolls: add name=%s roll=%d item=%s.", name, roll, tostring(itemId))
 
-        if itemId then
-            local tracker = state.itemCounts
-            tracker[itemId] = tracker[itemId] or {}
-            tracker[itemId][name] = (tracker[itemId][name] or 0) + 1
-        end
+        -- aggiorna contatore usi per item (serve per limitare re-roll e UI SR (used/allowed))
+        state.itemCounts[itemId] = state.itemCounts[itemId] or {}
+        state.itemCounts[itemId][name] = (state.itemCounts[itemId][name] or 0) + 1
+
+        addon:debug("Rolls: add name=%s roll=%d itemId=%d used=%d allowed=%d.",
+            tostring(name), roll, itemId,
+            state.itemCounts[itemId][name], GetAllowedRolls(itemId, name))
 
         Utils.triggerEvent("AddRoll", name, roll)
-        sortRolls()
 
-        if not state.selected then
-            local targetItem = itemId or module:GetCurrentRollItemID()
-            if lootState.currentRollType == rollTypes.RESERVED then
-                local top, best = -1, nil
-                for _, r in ipairs(state.rolls) do
-                    if module:IsReserved(targetItem, r.name) and r.roll > top then
-                        top, best = r.roll, r.name
-                    end
-                end
-                state.selected = best
-            else
-                state.selected = lootState.winner
+        local topName = sortRolls(itemId)
+
+        -- winner:
+        -- - se manuale: resta manuale
+        -- - altrimenti: è il primo della lista ordinata (che in SR mette SR davanti)
+        if state.selected then
+            if topName and topName ~= state.selected then
+                addon:debug("Rolls: manual winner locked=%s (auto=%s).",
+                    tostring(state.selected), tostring(topName))
             end
-            addon:debug("Rolls: auto-selected player=%s.", tostring(state.selected))
+            lootState.winner = state.selected
+        else
+            lootState.winner = topName
+            addon:debug("Rolls: auto winner=%s (sortAscending=%s SR=%s).",
+                tostring(lootState.winner),
+                tostring(addon.options and addon.options.sortAscending == true),
+                tostring(lootState.currentRollType == rollTypes.RESERVED))
         end
 
         module:FetchRolls()
@@ -1370,22 +1405,20 @@ do
         if not itemId then return end
 
         local name = Utils.getPlayerName()
-        local allowed = 1
-        if lootState.currentRollType == rollTypes.RESERVED then
-            local reserve = addon.Reserves:GetReserveCountForItem(itemId, name)
-            allowed = (reserve > 0) and reserve or 1
-        end
+        local allowed = GetAllowedRolls(itemId, name)
 
         state.playerCounts[itemId] = state.playerCounts[itemId] or 0
         if state.playerCounts[itemId] >= allowed then
             addon:info(L.ChatOnlyRollOnce)
-            addon:debug("Rolls: blocked player=%s (%d/%d).", name, state.playerCounts[itemId], allowed)
+            addon:debug("Rolls: blocked self=%s (%d/%d) itemId=%d.", name, state.playerCounts[itemId], allowed,
+                itemId)
             return
         end
 
         RandomRoll(1, 100)
         state.playerCounts[itemId] = state.playerCounts[itemId] + 1
-        addon:debug("Rolls: player=%s item=%d.", name, itemId)
+        addon:debug("Rolls: self=%s rolled for itemId=%d (%d/%d).", name, itemId, state.playerCounts[itemId],
+            allowed)
     end
 
     -- Returns the current roll session state.
@@ -1420,25 +1453,20 @@ do
             return
         end
 
-        local allowed = 1
-        if lootState.currentRollType == rollTypes.RESERVED then
-            local reserves = addon.Reserves:GetReserveCountForItem(itemId, player)
-            allowed = reserves > 0 and reserves or 1
-        end
+        local allowed = GetAllowedRolls(itemId, player)
 
-        local tracker = state.itemCounts
-        tracker[itemId] = tracker[itemId] or {}
-        local used = tracker[itemId][player] or 0
+        state.itemCounts[itemId] = state.itemCounts[itemId] or {}
+        local used = state.itemCounts[itemId][player] or 0
         if used >= allowed then
             if not tContains(state.rerolled, player) then
                 Utils.whisper(player, L.ChatOnlyRollOnce)
                 tinsert(state.rerolled, player)
             end
-            addon:debug("Rolls: denied player=%s (%d/%d).", player, used, allowed)
+            addon:debug("Rolls: denied player=%s (%d/%d) itemId=%d.", player, used, allowed, itemId)
             return
         end
 
-        addon:debug("Rolls: accepted player=%s (%d/%d).", player, used + 1, allowed)
+        addon:debug("Rolls: accepted player=%s (%d/%d) itemId=%d.", player, used + 1, allowed, itemId)
         addRoll(player, roll, itemId)
     end
 
@@ -1456,15 +1484,13 @@ do
     function module:DidRoll(itemId, name)
         if not itemId then
             for i = 1, state.count do
-                if state.rolls[i].name == name then return true end
+                if state.rolls[i] and state.rolls[i].name == name then return true end
             end
             return false
         end
-        local tracker = state.itemCounts
-        tracker[itemId] = tracker[itemId] or {}
-        local used = tracker[itemId][name] or 0
-        local reserve = addon.Reserves:GetReserveCountForItem(itemId, name)
-        local allowed = (lootState.currentRollType == rollTypes.RESERVED and reserve > 0) and reserve or 1
+        state.itemCounts[itemId] = state.itemCounts[itemId] or {}
+        local used = state.itemCounts[itemId][name] or 0
+        local allowed = GetAllowedRolls(itemId, name)
         return used >= allowed
     end
 
@@ -1473,7 +1499,9 @@ do
         if not lootState.winner then return 0 end
         for i = 1, state.count do
             local entry = state.rolls[i]
-            if entry.name == lootState.winner then return entry.roll end
+            if entry and entry.name == lootState.winner then
+                return entry.roll or 0
+            end
         end
         return 0
     end
@@ -1499,32 +1527,26 @@ do
         local item = GetItem and GetItem(index)
         local itemLink = item and item.itemLink
         if not itemLink then return nil end
-        local itemId = tonumber(string.match(itemLink, "item:(%d+)"))
-        addon:debug("Rolls: current itemId=%s.", tostring(itemId))
-        return itemId
+        return tonumber(string.match(itemLink, "item:(%d+)"))
     end
 
     -- Validates if a player can still roll for an item.
     function module:IsValidRoll(itemId, name)
-        local tracker = state.itemCounts
-        tracker[itemId] = tracker[itemId] or {}
-        local used = tracker[itemId][name] or 0
-        local allowed = (lootState.currentRollType == rollTypes.RESERVED)
-            and addon.Reserves:GetReserveCountForItem(itemId, name)
-            or 1
+        state.itemCounts[itemId] = state.itemCounts[itemId] or {}
+        local used = state.itemCounts[itemId][name] or 0
+        local allowed = GetAllowedRolls(itemId, name)
         return used < allowed
     end
 
     -- Checks if a player has reserved the specified item.
     function module:IsReserved(itemId, name)
-        return addon.Reserves:GetReserveCountForItem(itemId, name) > 0
+        return IsReservedForItem(itemId, name)
     end
 
     -- Gets the number of reserves a player has used for an item.
     function module:GetUsedReserveCount(itemId, name)
-        local tracker = state.itemCounts
-        tracker[itemId] = tracker[itemId] or {}
-        return tracker[itemId][name] or 0
+        state.itemCounts[itemId] = state.itemCounts[itemId] or {}
+        return state.itemCounts[itemId][name] or 0
     end
 
     -- Gets the total number of reserves a player has for an item.
@@ -1537,88 +1559,94 @@ do
         local frameName = Utils.getFrameName()
         local scrollFrame = _G[frameName .. "ScrollFrame"]
         local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
+        if not scrollFrame or not scrollChild then return end
+
         scrollChild:SetHeight(scrollFrame:GetHeight())
         scrollChild:SetWidth(scrollFrame:GetWidth())
 
         local itemId = self:GetCurrentRollItemID()
         local isSR = lootState.currentRollType == rollTypes.RESERVED
-        local starTarget = state.selected
 
-        if not starTarget then
-            if isSR then
-                local top, best = -1, nil
-                for _, entry in ipairs(state.rolls) do
-                    if module:IsReserved(itemId, entry.name) and entry.roll > top then
-                        top, best = entry.roll, entry.name
-                    end
-                end
-                starTarget = best or lootState.winner
-            else
-                starTarget = lootState.winner
-            end
+        -- IMPORTANT: garantisce che la UI rispecchi SEMPRE l'opzione di sorting
+        local topName = sortRolls(itemId)
+        if not state.selected then
+            lootState.winner = topName
         end
+
+        local starTarget = state.selected or lootState.winner
 
         local starShown, totalHeight = false, 0
         for i = 1, state.count do
             local entry = state.rolls[i]
-            local name, roll = entry.name, entry.roll
-            local btnName = frameName .. "PlayerBtn" .. i
-            local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTSelectPlayerTemplate")
+            if entry then
+                local name, roll = entry.name, entry.roll
+                local btnName = frameName .. "PlayerBtn" .. i
+                local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTSelectPlayerTemplate")
 
-            btn:SetID(i)
-            btn:Show()
-            btn.playerName = name
+                btn:SetID(i)
+                btn:Show()
+                btn.playerName = name
 
-            if not btn.selectedBackground then
-                btn.selectedBackground = btn:CreateTexture("KRTSelectedHighlight", "ARTWORK")
-                btn.selectedBackground:SetAllPoints()
-                btn.selectedBackground:SetTexture(1, 0.8, 0, 0.1)
-                btn.selectedBackground:Hide()
-            end
-
-            local nameStr, rollStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"], _G[btnName .. "Star"]
-
-            if nameStr and nameStr.SetVertexColor then
-                local class = addon.Raid:GetPlayerClass(name)
-                class = class and class:upper() or "UNKNOWN"
-                if isSR and self:IsReserved(itemId, name) then
-                    nameStr:SetVertexColor(0.4, 0.6, 1.0)
-                else
-                    local r, g, b = addon.GetClassColor(class)
-                    nameStr:SetVertexColor(r, g, b)
+                if not btn.selectedBackground then
+                    btn.selectedBackground = btn:CreateTexture("KRTSelectedHighlight", "ARTWORK")
+                    btn.selectedBackground:SetAllPoints()
+                    btn.selectedBackground:SetTexture(1, 0.8, 0, 0.1)
+                    btn.selectedBackground:Hide()
                 end
+
+                local nameStr = _G[btnName .. "Name"]
+                local rollStr = _G[btnName .. "Roll"]
+                local star    = _G[btnName .. "Star"]
+
+                if nameStr and nameStr.SetVertexColor then
+                    local class = addon.Raid:GetPlayerClass(name)
+                    class = class and class:upper() or "UNKNOWN"
+                    if isSR and self:IsReserved(itemId, name) then
+                        nameStr:SetVertexColor(0.4, 0.6, 1.0) -- SR in azzurro
+                    else
+                        local r, g, b = addon.GetClassColor(class)
+                        nameStr:SetVertexColor(r, g, b)
+                    end
+                end
+
+                if state.selected == name then
+                    nameStr:SetText("> " .. name .. " <")
+                    btn.selectedBackground:Show()
+                else
+                    nameStr:SetText(name)
+                    btn.selectedBackground:Hide()
+                end
+
+                if isSR and self:IsReserved(itemId, name) then
+                    local count = self:GetAllowedReserves(itemId, name)
+                    local used = self:GetUsedReserveCount(itemId, name)
+                    rollStr:SetText(count > 1 and format("%d (%d/%d)", roll, used, count) or tostring(roll))
+                else
+                    rollStr:SetText(roll)
+                end
+
+                local showStar = (not starShown) and starTarget and (name == starTarget)
+                Utils.showHide(star, showStar)
+                if showStar then starShown = true end
+
+                if not btn.krtHasOnClick then
+                    btn:SetScript("OnClick", onRollButtonClick)
+                    btn.krtHasOnClick = true
+                end
+
+                btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
+                btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
+                totalHeight = totalHeight + btn:GetHeight()
             end
-
-            if state.selected == name then
-                nameStr:SetText("> " .. name .. " <")
-                btn.selectedBackground:Show()
-            else
-                nameStr:SetText(name)
-                btn.selectedBackground:Hide()
-            end
-
-            if isSR and self:IsReserved(itemId, name) then
-                local count = self:GetAllowedReserves(itemId, name)
-                local used = self:GetUsedReserveCount(itemId, name)
-                rollStr:SetText(count > 1 and format("%d (%d/%d)", roll, used, count) or tostring(roll))
-            else
-                rollStr:SetText(roll)
-            end
-
-            local showStar = not starShown and name == starTarget
-            Utils.showHide(star, showStar)
-            if showStar then starShown = true end
-
-            if not btn.krtHasOnClick then
-                btn:SetScript("OnClick", onRollButtonClick)
-                btn.krtHasOnClick = true
-            end
-
-            btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
-            btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
-            totalHeight = totalHeight + btn:GetHeight()
         end
     end
+
+    -- Refresh immediato lista quando cambi "sortAscending" in Config
+    Utils.registerCallback("ConfigsortAscending", function(_, value)
+        addon.options.sortAscending = value == true
+        addon:debug("Config: sortAscending=%s -> refresh rolls UI.", tostring(addon.options.sortAscending))
+        module:FetchRolls()
+    end)
 end
 
 ---============================================================================
@@ -2290,8 +2318,15 @@ do
         if index ~= nil then
             announced = false
             selectionFrame:Hide()
+
             addon.Loot:SelectItem(index)
+
+            addon.Rolls:ClearRolls()
+            addon.Rolls:RecordRolls(false)
+            lootState.winner = nil
+
             module:ResetItemCount()
+            addon:debug("Loot: selected item index=%s -> rolls cleared, recording off.", tostring(index))
         end
     end
 
@@ -3117,6 +3152,43 @@ do
 
     local playerTextTemp = {}
 
+    local function splitCSV(line)
+        local out, i, len = {}, 1, #line
+        while i <= len do
+            local c = line:sub(i, i)
+            if c == '"' then
+                local j = i + 1
+                local buf = {}
+                while j <= len do
+                    local ch = line:sub(j, j)
+                    if ch == '"' then
+                        if line:sub(j + 1, j + 1) == '"' then
+                            buf[#buf + 1] = '"'
+                            j = j + 2
+                        else
+                            j = j + 1
+                            break
+                        end
+                    else
+                        buf[#buf + 1] = ch
+                        j = j + 1
+                    end
+                end
+                out[#out + 1] = table.concat(buf)
+                if line:sub(j, j) == "," then
+                    i = j + 1
+                else
+                    i = j
+                end
+            else
+                local j = line:find(",", i, true) or (len + 1)
+                out[#out + 1] = line:sub(i, j - 1)
+                i = j + 1
+            end
+        end
+        return out
+    end
+
     local function MarkPendingItem(itemId, hasName, hasIcon)
         if not itemId then return nil end
         local pending = pendingItemInfo[itemId]
@@ -3343,7 +3415,7 @@ do
         row.iconBtn:SetScript("OnEnter", function()
             GameTooltip:SetOwner(row.iconBtn, "ANCHOR_RIGHT")
             if row._itemLink then
-                GameTooltip:SetHyperlink(row._tooltipTitle)
+                GameTooltip:SetHyperlink(row._itemLink)
             elseif row._tooltipTitle then
                 GameTooltip:SetText(row._tooltipTitle, 1, 1, 1)
             end
@@ -3443,6 +3515,9 @@ do
         twipe(reservesData)
         twipe(reservesByItemID)
         twipe(reservesDisplayList)
+        twipe(collapsedBossGroups)
+        twipe(pendingItemInfo)
+        pendingItemCount = 0
         reservesDirty = true
         self:RefreshWindow()
         self:CloseWindow()
@@ -3626,11 +3701,20 @@ do
         addon:debug("Reserves: parse CSV start.")
         twipe(reservesData)
         twipe(reservesByItemID)
+        twipe(reservesDisplayList)
         reservesDirty = true
 
-        local function cleanCSVField(field)
-            if not field then return nil end
-            return Utils.trimText(field:gsub('^"(.-)"$', '%1'), true)
+        -- reset stato UI/cache per import “pulito”
+        twipe(collapsedBossGroups)
+        twipe(pendingItemInfo)
+        pendingItemCount = 0
+        addon:debug("Reserves: ParseCSV reset done (pending=0, collapse cleared).")
+
+        local function clean(field)
+            if field == nil then return nil end
+            field = Utils.trimText(field, true)
+            if field == "" then return nil end
+            return field
         end
 
         local firstLine = true
@@ -3638,21 +3722,20 @@ do
             if firstLine then
                 firstLine = false
             else
-                local _, itemIdStr, source, playerName, class, spec, note, plus = line:match(
-                    '^"?(.-)"?,(.-),(.-),(.-),(.-),(.-),(.-),(.-)')
+                local cols       = splitCSV(line)
+                -- formato atteso: (1 ignored), 2 itemId, 3 source, 4 player, 5 class, 6 spec, 7 note, 8 plus
+                local itemIdStr  = clean(cols[2])
+                local source     = clean(cols[3])
+                local playerName = clean(cols[4])
+                local class      = clean(cols[5])
+                local spec       = clean(cols[6])
+                local note       = clean(cols[7])
+                local plusStr    = clean(cols[8])
 
-                itemIdStr = cleanCSVField(itemIdStr)
-                source = cleanCSVField(source)
-                playerName = cleanCSVField(playerName)
-                class = cleanCSVField(class)
-                spec = cleanCSVField(spec)
-                note = cleanCSVField(note)
-                plus = cleanCSVField(plus)
-
-                local itemId = tonumber(itemIdStr)
-                local normalized = Utils.normalizeLower(playerName, true)
-
-                if normalized and itemId then
+                local itemId     = tonumber(itemIdStr)
+                if playerName and itemId then
+                    local normalized = Utils.normalizeLower(playerName, true)
+                    local srcKey = source or nil
                     reservesData[normalized] = reservesData[normalized] or {
                         original = playerName,
                         reserves = {}
@@ -3660,9 +3743,10 @@ do
 
                     local list = reservesData[normalized].reserves
                     local found = false
+                    -- dedup per itemId + source
                     for i = 1, #list do
                         local entry = list[i]
-                        if entry and entry.rawID == itemId then
+                        if entry and entry.rawID == itemId and entry.source == srcKey then
                             entry.quantity = (entry.quantity or 1) + 1
                             found = true
                             break
@@ -3676,11 +3760,11 @@ do
                             itemName = nil,
                             itemIcon = nil,
                             quantity = 1,
-                            class = class ~= "" and class or nil,
-                            spec = spec ~= "" and spec or nil,
-                            note = note ~= "" and note or nil,
-                            plus = tonumber(plus) or 0,
-                            source = source ~= "" and source or nil,
+                            class = class,
+                            spec = spec,
+                            note = note,
+                            plus = tonumber(plusStr) or 0,
+                            source = srcKey,
                             player = playerName
                         }
                     end
@@ -3689,9 +3773,12 @@ do
         end
 
         RebuildIndex()
-        addon:debug("Reserves: parse CSV complete players=%d.", tLength(reservesData))
+        addon:debug("Reserves: ParseCSV indexed items=%d display=%d players=%d.",
+            tLength(reservesByItemID), #reservesDisplayList, tLength(reservesData))
+
         self:RefreshWindow()
         self:Save()
+        addon:debug("Reserves: parse CSV complete.")
     end
 
     --------------------------------------------------------------------------
@@ -3822,19 +3909,34 @@ do
 
     -- Get reserve count for a specific item for a player
     function module:GetReserveCountForItem(itemId, playerName)
+        itemId = tonumber(itemId)
+        if not itemId or type(playerName) ~= "string" then
+            addon:debug("Reserves: GetReserveCountForItem invalid itemId=%s player=%s.",
+                tostring(itemId), tostring(playerName))
+            return 0
+        end
+
         local normalized = Utils.normalizeLower(playerName, true)
         local entry = reservesData[normalized]
-        if not entry then return 0 end
-        addon:debug("Reserves: check count itemId=%d player=%s.", itemId, playerName)
-        for _, r in ipairs(entry.reserves or {}) do
-            if r.rawID == itemId then
-                addon:debug("Reserves: found itemId=%d player=%s qty=%d.", itemId, playerName,
-                    r.quantity)
-                return r.quantity or 1
+        if not entry or type(entry.reserves) ~= "table" then
+            return 0
+        end
+
+        local total, matches = 0, 0
+        for _, r in ipairs(entry.reserves) do
+            if type(r) == "table" and r.rawID == itemId then
+                matches = matches + 1
+                total = total + (tonumber(r.quantity) or 1)
             end
         end
-        addon:debug("Reserves: none itemId=%d player=%s.", itemId, playerName)
-        return 0
+
+        -- Debug solo se “interessante” (multi entry o qty > 1)
+        if matches > 1 or total > 1 then
+            addon:debug("Reserves: count itemId=%d player=%s total=%d matches=%d.",
+                itemId, playerName, total, matches)
+        end
+
+        return total
     end
 
     --------------------------------------------------------------------------
@@ -3970,15 +4072,36 @@ do
         local list = reservesByItemID[itemId]
         if type(list) ~= "table" then return {} end
 
-        local players = {}
+        local ordered = {}
+        local counts = {}
+        local rawEntries = 0
+
         for i = 1, #list do
             local r = list[i]
-            local qty = (type(r) == "table" and r.quantity) or 1
-            qty = qty or 1
-            local name = (type(r) == "table" and r.player) or "?"
-            players[#players + 1] = FormatReservePlayerName(name, qty)
+            if type(r) == "table" then
+                rawEntries = rawEntries + 1
+                local name = r.player or "?"
+                local qty = tonumber(r.quantity) or 1
+                if counts[name] == nil then
+                    ordered[#ordered + 1] = name
+                    counts[name] = 0
+                end
+                counts[name] = counts[name] + qty
+            end
         end
-        return players
+
+        -- Debug solo se stai aggregando (raw > unique)
+        if rawEntries > #ordered then
+            addon:debug("Reserves: players aggregated itemId=%s raw=%d unique=%d.",
+                tostring(itemId), rawEntries, #ordered)
+        end
+
+        local out = {}
+        for i = 1, #ordered do
+            local n = ordered[i]
+            out[#out + 1] = FormatReservePlayerName(n, counts[n] or 1)
+        end
+        return out
     end
 
     function module:FormatReservedPlayersLine(itemId)
@@ -4026,8 +4149,8 @@ do
     -- Default options for the addon.
     --
     local defaultOptions = {
-        schemaVersion         = 1,
-        migrations            = {},
+        schemaVersion          = 1,
+        migrations             = {},
         sortAscending          = false,
         useRaidWarning         = true,
         announceOnWin          = true,
@@ -6159,7 +6282,7 @@ do
         local rID = addon.History.selectedRaid
         if not rID then return end
 
-        local name = Utils.trimText(_G[frameName .. "Name"]:GetText())
+        local name  = Utils.trimText(_G[frameName .. "Name"]:GetText())
         local modeT = Utils.normalizeLower(_G[frameName .. "Difficulty"]:GetText())
         local bTime = Utils.trimText(_G[frameName .. "Time"]:GetText())
 
@@ -6570,6 +6693,9 @@ function addon:ADDON_LOADED(name)
         self:RegisterEvent(event, function(...)
             self[method](self, ...)
         end)
+    end
+    if addon.Reserves and addon.Reserves.Load then
+        addon.Reserves:Load()
     end
     self:RAID_ROSTER_UPDATE()
 end
