@@ -32,20 +32,6 @@ local UnitIsRaidOfficer    = UnitIsRaidOfficer
 local UnitLevel            = UnitLevel
 local UnitName             = UnitName
 
----============================================================================
--- Addon binding helpers
----============================================================================
-
-function addon:GetLib(name)
-	if not LibStub then
-		error("LibStub missing while loading " .. tostring(name))
-	end
-	if not name or name == "" then
-		error("GetLib requires a library name")
-	end
-	return LibStub(name)
-end
-
 function Utils.applyDebugSetting(enabled)
 	if addon and addon.options then
 		addon.options.debug = enabled and true or false
