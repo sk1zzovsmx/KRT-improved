@@ -1584,9 +1584,7 @@ do
                 if isSR and self:IsReserved(itemId, name) then
                     nameStr:SetVertexColor(0.4, 0.6, 1.0)
                 else
-                    local className = class
-                    local c = addon.Compat.GetClassColorObj(className)
-                    local r, g, b = (c and c.r or 1), (c and c.g or 1), (c and c.b or 1)
+                    local r, g, b = Utils.getClassColor(class)
                     nameStr:SetVertexColor(r, g, b)
                 end
             end
@@ -4779,9 +4777,7 @@ do
             local name = _G[btnName .. "Name"]
             name:SetText(n)
             local class = addon.Raid:GetPlayerClass(n)
-            local className = class
-            local c = addon.Compat.GetClassColorObj(className)
-            local r, g, b = (c and c.r or 1), (c and c.g or 1), (c and c.b or 1)
+            local r, g, b = Utils.getClassColor(class)
             name:SetVertexColor(r, g, b)
             _G[btnName .. "Spec"]:SetText(c)
             btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
@@ -5866,9 +5862,7 @@ do
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
                 local ui = row._p
                 ui.Name:SetText(it.name)
-                local className = it.class
-                local c = addon.Compat.GetClassColorObj(className)
-                local r, g, b = (c and c.r or 1), (c and c.g or 1), (c and c.b or 1)
+                local r, g, b = Utils.getClassColor(it.class)
                 ui.Name:SetVertexColor(r, g, b)
                 return ROW_H
             end
@@ -5976,9 +5970,7 @@ do
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
                 local ui = row._p
                 ui.Name:SetText(it.name)
-                local className = it.class
-                local c = addon.Compat.GetClassColorObj(className)
-                local r, g, b = (c and c.r or 1), (c and c.g or 1), (c and c.b or 1)
+                local r, g, b = Utils.getClassColor(it.class)
                 ui.Name:SetVertexColor(r, g, b)
                 ui.Join:SetText(it.joinFmt)
                 ui.Leave:SetText(it.leaveFmt)
@@ -6138,9 +6130,7 @@ do
                     ui.Source:SetText(addon.History.Boss:GetName(v.bossNum, addon.History.selectedRaid))
                 end
 
-                local className = addon.Raid:GetPlayerClass(v.looter)
-                local c = addon.Compat.GetClassColorObj(className)
-                local r, g, b = (c and c.r or 1), (c and c.g or 1), (c and c.b or 1)
+                local r, g, b = Utils.getClassColor(addon.Raid:GetPlayerClass(v.looter))
                 ui.Winner:SetText(v.looter)
                 ui.Winner:SetVertexColor(r, g, b)
 

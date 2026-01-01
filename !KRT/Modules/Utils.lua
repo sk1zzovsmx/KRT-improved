@@ -421,6 +421,11 @@ function Utils.normalizeHexColor(color)
 	return "ffffffff"
 end
 
+function Utils.getClassColor(className)
+	local c = addon.Compat.GetClassColorObj(className)
+	return (c and c.r or 1), (c and c.g or 1), (c and c.b or 1)
+end
+
 ---============================================================================
 -- Generic utilities
 ---============================================================================
