@@ -660,13 +660,6 @@ do
 	local date        = _G.date
 	local math_max    = math.max
 
-	if Utils and not Utils.Table then
-		Utils.Table = {}
-		function Utils.Table.get(_) return {} end
-
-		function Utils.Table.free(_, _) end
-	end
-
 	function Utils.makeListController(cfg)
 		local self = {
 			frameName  = nil,
@@ -744,7 +737,7 @@ do
 			if not self._active or not self.frameName then return end
 
 			if self._dirty then
-				local tableFree = (addon.Table and addon.Table.free) or (Utils.Table and Utils.Table.free)
+				local tableFree = addon.Table and addon.Table.free
 				if cfg.poolTag and tableFree then
 					for i = 1, #self.data do
 						tableFree(cfg.poolTag, self.data[i])
