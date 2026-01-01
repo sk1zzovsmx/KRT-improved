@@ -190,7 +190,7 @@ end
 
 local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, table.wipe
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
-local format, match, find, strlen       = string.format, string.match, string.find, string.len
+local format, find, strlen              = string.format, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber                = tostring, tonumber
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
@@ -1047,8 +1047,8 @@ do
         if not ch then
             local isCountdown = false
             do
-                local ticPat = L.ChatCountdownTic:gsub("%%d", "%%d+")
-                isCountdown = (find(text, ticPat) ~= nil) or (find(text, L.ChatCountdownEnd) ~= nil)
+                local seconds = addon.Deformat(text, L.ChatCountdownTic)
+                isCountdown = (seconds ~= nil) or (find(text, L.ChatCountdownEnd) ~= nil)
             end
 
             local groupType = addon.GetGroupTypeAndCount()
@@ -1528,7 +1528,7 @@ do
         local item = GetItem and GetItem(index)
         local itemLink = item and item.itemLink
         if not itemLink then return nil end
-        local itemId = tonumber(string.match(itemLink, "item:(%d+)"))
+        local itemId = Utils.getItemIdFromLink(itemLink)
         addon:debug("Rolls: current itemId=%s.", tostring(itemId))
         return itemId
     end
@@ -2167,7 +2167,7 @@ do
             addon.Rolls:RecordRolls(true)
 
             local itemLink = GetItemLink()
-            local itemID = tonumber(string.match(itemLink or "", "item:(%d+)"))
+            local itemID = Utils.getItemIdFromLink(itemLink)
             local message = ""
 
             if rollType == rollTypes.RESERVED then

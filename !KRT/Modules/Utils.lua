@@ -32,6 +32,8 @@ local UnitIsRaidOfficer    = UnitIsRaidOfficer
 local UnitLevel            = UnitLevel
 local UnitName             = UnitName
 
+local ITEM_LINK_FORMAT     = "|c%s|Hitem:%d:%s|h[%s]|h|r"
+
 function Utils.applyDebugSetting(enabled)
 	if addon and addon.options then
 		addon.options.debug = enabled and true or false
@@ -116,6 +118,12 @@ function Utils.splitArgs(msg)
 	end
 	local cmd, rest = msg:match("^(%S+)%s*(.-)$")
 	return Utils.normalizeLower(cmd), Utils.trimText(rest)
+end
+
+function Utils.getItemIdFromLink(itemLink)
+	if not itemLink then return nil end
+	local _, itemId = addon.Deformat(itemLink, ITEM_LINK_FORMAT)
+	return itemId
 end
 
 ---============================================================================
