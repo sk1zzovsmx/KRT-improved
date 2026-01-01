@@ -16,6 +16,11 @@ local function TGet(tag)
     end
     return {}
 end
+local function TFree(tag, tbl, noclear, func, ...)
+    if addon.Table and addon.Table.free then
+        return addon.Table.free(tag, tbl, noclear, func, ...)
+    end
+end
 
 local _G  = _G
 _G["KRT"] = addon
@@ -767,8 +772,9 @@ do
     --
     -- Retrieves all boss kills for a given raid.
     --
-    function module:GetBosses(raidNum)
-        local bosses = {}
+    function module:GetBosses(raidNum, out)
+        local bosses = out or TGet("raid-bosses")
+        if out then wipe(bosses) end
         raidNum = raidNum or KRT_CurrentRaid
         if raidNum and KRT_Raids[raidNum] then
             local kills = KRT_Raids[raidNum].bossKills
@@ -789,6 +795,8 @@ do
                 tinsert(bosses, info)
             end
         end
+        -- Caller releases via addon.Table.free("raid-bosses", bosses)
+        -- when using a pooled table.
         return bosses
     end
 
@@ -799,7 +807,7 @@ do
     --
     -- Returns players from the raid log. Can be filtered by boss kill.
     --
-    function module:GetPlayers(raidNum, bossNum)
+    function module:GetPlayers(raidNum, bossNum, out)
         raidNum = raidNum or KRT_CurrentRaid
         local raid = raidNum and KRT_Raids[raidNum]
         if not raid then return {} end
@@ -810,13 +818,16 @@ do
         end
 
         if bossNum and raid.bossKills[bossNum] then
-            local players = {}
+            local players = out or TGet("raid-boss-players")
+            if out then wipe(players) end
             local bossPlayers = raid.bossKills[bossNum].players
             for i, p in ipairs(raidPlayers) do
                 if tContains(bossPlayers, p.name) then
                     tinsert(players, p)
                 end
             end
+            -- Caller releases via addon.Table.free("raid-boss-players", players)
+            -- when using a pooled table.
             return players
         end
 
@@ -1277,16 +1288,27 @@ do
         warned       = false,
         rolled       = false,
         selected     = nil,
-        rolls        = {},
-        rerolled     = {},
-        playerCounts = {},
-        itemCounts   = {},
+        rolls        = TGet("rolls-list"),
+        rerolled     = TGet("rolls-rerolled"),
+        playerCounts = TGet("rolls-player-counts"),
+        itemCounts   = nil,
         count        = 0,
     }
+    local newItemCounts, delItemCounts = addon.TablePool and addon.TablePool("k")
+    state.itemCounts = newItemCounts and newItemCounts() or TGet("rolls-item-counts")
 
     -------------------------------------------------------
     -- 3. Private helpers
     -------------------------------------------------------
+    local function AcquireItemTracker(itemId)
+        local tracker = state.itemCounts
+        if not tracker[itemId] then
+            tracker[itemId] = newItemCounts and newItemCounts() or TGet("rolls-item-tracker")
+            -- Tracker tables are released via resetRolls() using delItemCounts(..., true).
+        end
+        return tracker[itemId]
+    end
+
     local function sortRolls()
         local rolls = state.rolls
         if #rolls == 0 then
@@ -1320,13 +1342,17 @@ do
         roll = tonumber(roll)
         state.count = state.count + 1
         lootState.rollsCount = lootState.rollsCount + 1
-        state.rolls[state.count] = { name = name, roll = roll, itemId = itemId }
+        local entry = TGet("rolls-entry")
+        entry.name = name
+        entry.roll = roll
+        entry.itemId = itemId
+        state.rolls[state.count] = entry
+        -- Roll entries are released via resetRolls().
         addon:debug("Rolls: add name=%s roll=%d item=%s.", name, roll, tostring(itemId))
 
         if itemId then
-            local tracker = state.itemCounts
-            tracker[itemId] = tracker[itemId] or {}
-            tracker[itemId][name] = (tracker[itemId][name] or 0) + 1
+            local tracker = AcquireItemTracker(itemId)
+            tracker[name] = (tracker[name] or 0) + 1
         end
 
         Utils.triggerEvent("AddRoll", name, roll)
@@ -1352,8 +1378,22 @@ do
     end
 
     local function resetRolls(rec)
-        state.rolls, state.rerolled, state.itemCounts = {}, {}, {}
-        state.playerCounts, state.count, lootState.rollsCount = {}, 0, 0
+        for i = 1, state.count do
+            TFree("rolls-entry", state.rolls[i])
+        end
+        TFree("rolls-list", state.rolls)
+        TFree("rolls-rerolled", state.rerolled)
+        TFree("rolls-player-counts", state.playerCounts)
+        if delItemCounts then
+            delItemCounts(state.itemCounts, true)
+        else
+            TFree("rolls-item-counts", state.itemCounts)
+        end
+        state.rolls = TGet("rolls-list")
+        state.rerolled = TGet("rolls-rerolled")
+        state.playerCounts = TGet("rolls-player-counts")
+        state.itemCounts = newItemCounts and newItemCounts() or TGet("rolls-item-counts")
+        state.count, lootState.rollsCount = 0, 0
         state.selected, state.rolled, state.warned = nil, false, false
         if rec == false then state.record = false end
     end
@@ -1423,9 +1463,8 @@ do
             allowed = reserves > 0 and reserves or 1
         end
 
-        local tracker = state.itemCounts
-        tracker[itemId] = tracker[itemId] or {}
-        local used = tracker[itemId][player] or 0
+        local tracker = AcquireItemTracker(itemId)
+        local used = tracker[player] or 0
         if used >= allowed then
             if not tContains(state.rerolled, player) then
                 Utils.whisper(player, L.ChatOnlyRollOnce)
@@ -1457,9 +1496,8 @@ do
             end
             return false
         end
-        local tracker = state.itemCounts
-        tracker[itemId] = tracker[itemId] or {}
-        local used = tracker[itemId][name] or 0
+        local tracker = AcquireItemTracker(itemId)
+        local used = tracker[name] or 0
         local reserve = addon.Reserves:GetReserveCountForItem(itemId, name)
         local allowed = (lootState.currentRollType == rollTypes.RESERVED and reserve > 0) and reserve or 1
         return used >= allowed
@@ -1503,9 +1541,8 @@ do
 
     -- Validates if a player can still roll for an item.
     function module:IsValidRoll(itemId, name)
-        local tracker = state.itemCounts
-        tracker[itemId] = tracker[itemId] or {}
-        local used = tracker[itemId][name] or 0
+        local tracker = AcquireItemTracker(itemId)
+        local used = tracker[name] or 0
         local allowed = (lootState.currentRollType == rollTypes.RESERVED)
             and addon.Reserves:GetReserveCountForItem(itemId, name)
             or 1
@@ -1519,9 +1556,8 @@ do
 
     -- Gets the number of reserves a player has used for an item.
     function module:GetUsedReserveCount(itemId, name)
-        local tracker = state.itemCounts
-        tracker[itemId] = tracker[itemId] or {}
-        return tracker[itemId][name] or 0
+        local tracker = AcquireItemTracker(itemId)
+        return tracker[name] or 0
     end
 
     -- Gets the total number of reserves a player has for an item.
@@ -5715,7 +5751,7 @@ do
             local rID = addon.History.selectedRaid
             if not rID then return end
 
-            local src = addon.Raid:GetBosses(rID) or {}
+            local src = addon.Raid:GetBosses(rID, TGet("raid-bosses"))
             for i = 1, #src do
                 local b    = src[i]
                 local it   = TGet("history-bosses")
@@ -5726,6 +5762,8 @@ do
                 it.timeFmt = date("%H:%M", b.time)
                 out[i]     = it
             end
+            -- src released here to avoid roster-scan churn in history refresh.
+            TFree("raid-bosses", src)
         end,
 
         rowName     = function(n, _, i) return n .. "BossBtn" .. i end,
@@ -5839,7 +5877,7 @@ do
             local bID = addon.History.selectedBoss
             if not (rID and bID) then return end
 
-            local src = addon.Raid:GetPlayers(rID, bID) or {}
+            local src = addon.Raid:GetPlayers(rID, bID, TGet("raid-boss-players"))
             for i = 1, #src do
                 local p  = src[i]
                 local it = TGet("history-boss-attendees")
@@ -5848,6 +5886,8 @@ do
                 it.class = p.class
                 out[i]   = it
             end
+            -- src released here to avoid roster-scan churn in history refresh.
+            TFree("raid-boss-players", src)
         end,
 
         rowName     = function(n, _, i) return n .. "PlayerBtn" .. i end,
