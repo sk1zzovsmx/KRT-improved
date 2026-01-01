@@ -4876,6 +4876,30 @@ do
         "RangedClass",
         "Message",
     }
+    local resetFields = {
+        "Name",
+        "Tank",
+        "TankClass",
+        "Healer",
+        "HealerClass",
+        "Melee",
+        "MeleeClass",
+        "Ranged",
+        "RangedClass",
+        "Message",
+    }
+    local previewFields = {
+        { key = "name", box = "Name" },
+        { key = "tank", box = "Tank", number = true },
+        { key = "tankClass", box = "TankClass" },
+        { key = "healer", box = "Healer", number = true },
+        { key = "healerClass", box = "HealerClass" },
+        { key = "melee", box = "Melee", number = true },
+        { key = "meleeClass", box = "MeleeClass" },
+        { key = "ranged", box = "Ranged", number = true },
+        { key = "rangedClass", box = "RangedClass" },
+        { key = "message", box = "Message" },
+    }
     local lastControls = {
         locked = nil,
         canStart = nil,
@@ -4905,6 +4929,7 @@ do
     local BuildOutput
     local UpdateTickDisplay
     local SetInputsLocked
+    local GetValidDuration
 
     -- OnLoad frame:
     function module:OnLoad(frame)
@@ -5061,16 +5086,9 @@ do
         lastState.message = nil
         lastState.duration = nil
         module:Stop()
-        Utils.resetEditBox(_G[frameName .. "Name"])
-        Utils.resetEditBox(_G[frameName .. "Tank"])
-        Utils.resetEditBox(_G[frameName .. "TankClass"])
-        Utils.resetEditBox(_G[frameName .. "Healer"])
-        Utils.resetEditBox(_G[frameName .. "HealerClass"])
-        Utils.resetEditBox(_G[frameName .. "Melee"])
-        Utils.resetEditBox(_G[frameName .. "MeleeClass"])
-        Utils.resetEditBox(_G[frameName .. "Ranged"])
-        Utils.resetEditBox(_G[frameName .. "RangedClass"])
-        Utils.resetEditBox(_G[frameName .. "Message"])
+        for _, field in ipairs(resetFields) do
+            Utils.resetEditBox(_G[frameName .. field])
+        end
         previewDirty = true
         SetInputsLocked(false)
     end
@@ -5175,12 +5193,17 @@ do
         UpdateTickDisplay()
     end
 
+    function GetValidDuration()
+        local value = tonumber(duration)
+        if not value or value <= 0 then
+            value = addon.options.lfmPeriod or 60
+        end
+        return value
+    end
+
     function StartSpamCycle(resetCountdown)
         StopSpamCycle(false)
-        duration = tonumber(duration)
-        if not duration or duration <= 0 then
-            duration = addon.options.lfmPeriod or 60
-        end
+        duration = GetValidDuration()
         if resetCountdown or countdownRemaining <= 0 then
             countdownRemaining = duration
         end
@@ -5190,10 +5213,7 @@ do
             countdownRemaining = countdownRemaining - 1
             if countdownRemaining <= 0 then
                 module:Spam()
-                duration = tonumber(duration)
-                if not duration or duration <= 0 then
-                    duration = addon.options.lfmPeriod or 60
-                end
+                duration = GetValidDuration()
                 countdownRemaining = duration
             end
             UpdateTickDisplay()
@@ -5292,64 +5312,18 @@ do
         channels = KRT_Spammer.Channels or {}
 
         local changed = false
-        local nameValue = Utils.trimText(_G[frameName .. "Name"]:GetText())
-        if lastState.name ~= nameValue then
-            lastState.name = nameValue
-            changed = true
-        end
-
-        local tankValue = tonumber(_G[frameName .. "Tank"]:GetText()) or 0
-        if lastState.tank ~= tankValue then
-            lastState.tank = tankValue
-            changed = true
-        end
-
-        local tankClassValue = Utils.trimText(_G[frameName .. "TankClass"]:GetText())
-        if lastState.tankClass ~= tankClassValue then
-            lastState.tankClass = tankClassValue
-            changed = true
-        end
-
-        local healerValue = tonumber(_G[frameName .. "Healer"]:GetText()) or 0
-        if lastState.healer ~= healerValue then
-            lastState.healer = healerValue
-            changed = true
-        end
-
-        local healerClassValue = Utils.trimText(_G[frameName .. "HealerClass"]:GetText())
-        if lastState.healerClass ~= healerClassValue then
-            lastState.healerClass = healerClassValue
-            changed = true
-        end
-
-        local meleeValue = tonumber(_G[frameName .. "Melee"]:GetText()) or 0
-        if lastState.melee ~= meleeValue then
-            lastState.melee = meleeValue
-            changed = true
-        end
-
-        local meleeClassValue = Utils.trimText(_G[frameName .. "MeleeClass"]:GetText())
-        if lastState.meleeClass ~= meleeClassValue then
-            lastState.meleeClass = meleeClassValue
-            changed = true
-        end
-
-        local rangedValue = tonumber(_G[frameName .. "Ranged"]:GetText()) or 0
-        if lastState.ranged ~= rangedValue then
-            lastState.ranged = rangedValue
-            changed = true
-        end
-
-        local rangedClassValue = Utils.trimText(_G[frameName .. "RangedClass"]:GetText())
-        if lastState.rangedClass ~= rangedClassValue then
-            lastState.rangedClass = rangedClassValue
-            changed = true
-        end
-
-        local messageValue = Utils.trimText(_G[frameName .. "Message"]:GetText())
-        if lastState.message ~= messageValue then
-            lastState.message = messageValue
-            changed = true
+        for _, field in ipairs(previewFields) do
+            local box = _G[frameName .. field.box]
+            local value
+            if field.number then
+                value = tonumber(box:GetText()) or 0
+            else
+                value = Utils.trimText(box:GetText())
+            end
+            if lastState[field.key] ~= value then
+                lastState[field.key] = value
+                changed = true
+            end
         end
 
         local durationValue = _G[frameName .. "Duration"]:GetText()
@@ -5377,6 +5351,7 @@ do
                     _G[frameName .. "Length"]:SetTextColor(0.0, 1.0, 0.0)
                     _G[frameName .. "Message"]:SetMaxLetters(255)
                 else
+                    local messageValue = lastState.message or ""
                     _G[frameName .. "Message"]:SetMaxLetters(strlen(messageValue) - 1)
                     _G[frameName .. "Length"]:SetTextColor(1.0, 0.0, 0.0)
                 end
