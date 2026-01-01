@@ -56,12 +56,12 @@ KRT_PlayerCounts          = KRT_PlayerCounts or {}
 ---============================================================================
 -- External Libraries / Bootstrap
 ---============================================================================
-local Compat              = addon:GetLib("LibCompat-1.0")
+local Compat              = LibStub("LibCompat-1.0")
 addon.Compat              = Compat
-addon.BossIDs             = addon:GetLib("LibBossIDs-1.0")
-addon.Logger              = addon:GetLib("LibLogger-1.0")
-addon.Deformat            = addon:GetLib("LibDeformat-3.0")
-addon.CallbackHandler     = addon:GetLib("CallbackHandler-1.0")
+addon.BossIDs             = LibStub("LibBossIDs-1.0")
+addon.Logger              = LibStub("LibLogger-1.0")
+addon.Deformat            = LibStub("LibDeformat-3.0")
+addon.CallbackHandler     = LibStub("CallbackHandler-1.0")
 
 Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
 addon.Logger:Embed(addon)
