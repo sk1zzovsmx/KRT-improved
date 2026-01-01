@@ -1584,7 +1584,7 @@ do
                 if isSR and self:IsReserved(itemId, name) then
                     nameStr:SetVertexColor(0.4, 0.6, 1.0)
                 else
-                    local r, g, b = addon.GetClassColor(class)
+                    local r, g, b = Utils.getClassColor(class)
                     nameStr:SetVertexColor(r, g, b)
                 end
             end
@@ -4777,7 +4777,7 @@ do
             local name = _G[btnName .. "Name"]
             name:SetText(n)
             local class = addon.Raid:GetPlayerClass(n)
-            local r, g, b = addon.GetClassColor(class)
+            local r, g, b = Utils.getClassColor(class)
             name:SetVertexColor(r, g, b)
             _G[btnName .. "Spec"]:SetText(c)
             btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
@@ -5862,7 +5862,7 @@ do
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
                 local ui = row._p
                 ui.Name:SetText(it.name)
-                local r, g, b = addon.GetClassColor(it.class)
+                local r, g, b = Utils.getClassColor(it.class)
                 ui.Name:SetVertexColor(r, g, b)
                 return ROW_H
             end
@@ -5970,7 +5970,7 @@ do
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
                 local ui = row._p
                 ui.Name:SetText(it.name)
-                local r, g, b = addon.GetClassColor(it.class)
+                local r, g, b = Utils.getClassColor(it.class)
                 ui.Name:SetVertexColor(r, g, b)
                 ui.Join:SetText(it.joinFmt)
                 ui.Leave:SetText(it.leaveFmt)
@@ -6130,7 +6130,7 @@ do
                     ui.Source:SetText(addon.History.Boss:GetName(v.bossNum, addon.History.selectedRaid))
                 end
 
-                local r, g, b = addon.GetClassColor(addon.Raid:GetPlayerClass(v.looter))
+                local r, g, b = Utils.getClassColor(addon.Raid:GetPlayerClass(v.looter))
                 ui.Winner:SetText(v.looter)
                 ui.Winner:SetVertexColor(r, g, b)
 

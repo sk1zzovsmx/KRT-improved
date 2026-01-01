@@ -421,13 +421,9 @@ function Utils.normalizeHexColor(color)
 	return "ffffffff"
 end
 
-function addon.GetClassColor(name)
-	name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
-	local c = addon.Compat.GetClassColorObj(name)
-	if not c then
-		return 1, 1, 1
-	end
-	return c.r, c.g, c.b
+function Utils.getClassColor(className)
+	local c = addon.Compat.GetClassColorObj(className)
+	return (c and c.r or 1), (c and c.g or 1), (c and c.b or 1)
 end
 
 ---============================================================================
