@@ -483,10 +483,6 @@ function Utils.showHide(frame, cond)
 	end
 end
 
-function Utils.createPool(frameType, parent, template, resetter)
-	return addon.CreateFramePool(frameType, parent, template, resetter)
-end
-
 -- Lock/Unlock Highlight:
 function Utils.toggleHighlight(frame, cond)
 	if cond then
