@@ -284,7 +284,7 @@ do
     function module:UpdateRaidRoster()
         rosterVersion = rosterVersion + 1
         if not KRT_CurrentRaid then return end
-        Utils.CancelTimer(module.updateRosterHandle, true)
+        addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
         if not IsInGroup() then
             numRaid = 0
@@ -411,7 +411,7 @@ do
         tinsert(KRT_Raids, raidInfo)
         KRT_CurrentRaid = #KRT_Raids
         Utils.triggerEvent("RaidCreate", KRT_CurrentRaid)
-        Utils.CancelTimer(module.updateRosterHandle, true)
+        addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = addon.After(3, function() module:UpdateRaidRoster() end)
     end
 
@@ -420,7 +420,7 @@ do
     --
     function module:End()
         if not KRT_CurrentRaid then return end
-        Utils.CancelTimer(module.updateRosterHandle, true)
+        addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
         local currentTime = Utils.getCurrentTime()
         for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
@@ -464,13 +464,13 @@ do
     --
     function module:FirstCheck()
         if module.firstCheckHandle then
-            Utils.CancelTimer(module.firstCheckHandle, true)
+            addon.CancelTimer(module.firstCheckHandle, true)
             module.firstCheckHandle = nil
         end
         if not IsInGroup() then return end
 
         if KRT_CurrentRaid and module:CheckPlayer(Utils.getPlayerName(), KRT_CurrentRaid) then
-            Utils.CancelTimer(module.updateRosterHandle, true)
+            addon.CancelTimer(module.updateRosterHandle, true)
             module.updateRosterHandle = addon.After(2, function() module:UpdateRaidRoster() end)
             return
         end
@@ -1930,8 +1930,8 @@ do
     end
 
     local function StopCountdown()
-        Utils.CancelTimer(countdownTicker, true)
-        Utils.CancelTimer(countdownEndTimer, true)
+        addon.CancelTimer(countdownTicker, true)
+        addon.CancelTimer(countdownEndTimer, true)
         countdownTicker = nil
         countdownEndTimer = nil
         countdownRun = false
@@ -1961,7 +1961,7 @@ do
         if ShouldAnnounceCountdownTick(remaining, duration) then
             addon:Announce(L.ChatCountdownTic:format(remaining))
         end
-        countdownTicker = Utils.NewTicker(1, function()
+        countdownTicker = addon.NewTicker(1, function()
             remaining = remaining - 1
             if remaining > 0 then
                 if ShouldAnnounceCountdownTick(remaining, duration) then
@@ -2684,7 +2684,7 @@ do
     function module:LOOT_CLOSED()
         if addon.Raid:IsMasterLooter() then
             if lootState.closeTimer then
-                Utils.CancelTimer(lootState.closeTimer)
+                addon.CancelTimer(lootState.closeTimer)
                 lootState.closeTimer = nil
             end
             lootState.closeTimer = addon.After(0.1, function()
@@ -2927,13 +2927,13 @@ do
 
     local function StartCountsTicker()
         if not countsTicker then
-            countsTicker = Utils.NewTicker(C.LOOT_COUNTER_TICK_INTERVAL, TickCounts)
+            countsTicker = addon.NewTicker(C.LOOT_COUNTER_TICK_INTERVAL, TickCounts)
         end
     end
 
     local function StopCountsTicker()
         if countsTicker then
-            Utils.CancelTimer(countsTicker, true)
+            addon.CancelTimer(countsTicker, true)
             countsTicker = nil
         end
     end
@@ -5185,7 +5185,7 @@ do
     end
 
     function StopSpamCycle(resetCountdown)
-        Utils.CancelTimer(countdownTicker, true)
+        addon.CancelTimer(countdownTicker, true)
         countdownTicker = nil
         if resetCountdown then
             countdownRemaining = 0
@@ -5208,7 +5208,7 @@ do
             countdownRemaining = duration
         end
         UpdateTickDisplay()
-        countdownTicker = Utils.NewTicker(1, function()
+        countdownTicker = addon.NewTicker(1, function()
             if not ticking or paused then return end
             countdownRemaining = countdownRemaining - 1
             if countdownRemaining <= 0 then
@@ -5223,7 +5223,7 @@ do
     function StartTicker()
         if updateTicker then return end
         local interval = tonumber(updateInterval) or 0.05
-        updateTicker = Utils.NewTicker(interval, function()
+        updateTicker = addon.NewTicker(interval, function()
             if UISpammer then
                 UpdateUIFrame(UISpammer, interval)
             end
@@ -5232,7 +5232,7 @@ do
 
     function StopTicker()
         if not updateTicker then return end
-        Utils.CancelTimer(updateTicker, true)
+        addon.CancelTimer(updateTicker, true)
         updateTicker = nil
     end
 
@@ -6718,7 +6718,7 @@ end
 function addon:PLAYER_ENTERING_WORLD()
     mainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
     local module = self.Raid
-    Utils.CancelTimer(module.firstCheckHandle, true)
+    addon.CancelTimer(module.firstCheckHandle, true)
     module.firstCheckHandle = addon.After(3, function() module:FirstCheck() end)
 end
 
