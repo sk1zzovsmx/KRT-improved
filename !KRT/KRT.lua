@@ -4863,6 +4863,25 @@ do
     local countdownRemaining = 0
     local inputsLocked = false
     local previewDirty = true
+    local inputFields = {
+        "Name",
+        "Duration",
+        "Tank",
+        "TankClass",
+        "Healer",
+        "HealerClass",
+        "Melee",
+        "MeleeClass",
+        "Ranged",
+        "RangedClass",
+        "Message",
+    }
+    local lastControls = {
+        locked = nil,
+        canStart = nil,
+        btnLabel = nil,
+        isStop = nil,
+    }
     local lastState = {
         name = nil,
         tank = 0,
@@ -5129,20 +5148,7 @@ do
         if inputsLocked == locked then return end
         inputsLocked = locked
         local alpha = locked and 0.7 or 1.0
-        local fields = {
-            "Name",
-            "Duration",
-            "Tank",
-            "TankClass",
-            "Healer",
-            "HealerClass",
-            "Melee",
-            "MeleeClass",
-            "Ranged",
-            "RangedClass",
-            "Message",
-        }
-        for _, field in ipairs(fields) do
+        for _, field in ipairs(inputFields) do
             local box = _G[frameName .. field]
             if box then
                 Utils.enableDisable(box, not locked)
@@ -5171,7 +5177,10 @@ do
 
     function StartSpamCycle(resetCountdown)
         StopSpamCycle(false)
-        duration = tonumber(duration) or addon.options.lfmPeriod
+        duration = tonumber(duration)
+        if not duration or duration <= 0 then
+            duration = addon.options.lfmPeriod or 60
+        end
         if resetCountdown or countdownRemaining <= 0 then
             countdownRemaining = duration
         end
@@ -5180,10 +5189,11 @@ do
             if not ticking or paused then return end
             countdownRemaining = countdownRemaining - 1
             if countdownRemaining <= 0 then
-                countdownRemaining = 0
-                UpdateTickDisplay()
                 module:Spam()
-                duration = tonumber(duration) or addon.options.lfmPeriod
+                duration = tonumber(duration)
+                if not duration or duration <= 0 then
+                    duration = addon.options.lfmPeriod or 60
+                end
                 countdownRemaining = duration
             end
             UpdateTickDisplay()
@@ -5252,19 +5262,28 @@ do
     end
 
     function UpdateControls()
+        local locked = ticking and not paused
+        local canStart = (strlen(finalOutput) > 3 and strlen(finalOutput) <= 255)
+        local btnLabel = paused and L.BtnResume or L.BtnStop
+        local isStop = ticking == true
+        if lastControls.locked == locked and lastControls.canStart == canStart and
+            lastControls.btnLabel == btnLabel and lastControls.isStop == isStop then
+            return
+        end
         if UISpammer then
-            SetInputsLocked(ticking and not paused)
+            SetInputsLocked(locked)
         end
         Utils.setText(
             _G[frameName .. "StartBtn"],
-            (paused and L.BtnResume or L.BtnStop),
+            btnLabel,
             START,
-            ticking == true
+            isStop
         )
-        Utils.enableDisable(
-            _G[frameName .. "StartBtn"],
-            (strlen(finalOutput) > 3 and strlen(finalOutput) <= 255)
-        )
+        Utils.enableDisable(_G[frameName .. "StartBtn"], canStart)
+        lastControls.locked = locked
+        lastControls.canStart = canStart
+        lastControls.btnLabel = btnLabel
+        lastControls.isStop = isStop
     end
 
     function RenderPreview()
