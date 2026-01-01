@@ -72,9 +72,6 @@ local IsInGroup            = addon.IsInGroup
 local UnitIterator         = addon.UnitIterator
 local UnitIsGroupLeader    = addon.UnitIsGroupLeader
 local UnitIsGroupAssistant = addon.UnitIsGroupAssistant
-local tLength              = addon.tLength
-local tCopy                = addon.tCopy
-local tIndexOf             = addon.tIndexOf
 local tContains            = _G.tContains
 
 -- SavedVariables for log level (fallback INFO)
@@ -335,7 +332,7 @@ do
             end
         end, true)
 
-        numRaid = tLength(playersByName)
+        numRaid = addon.tLength(playersByName)
         if numRaid == 0 then
             module:End()
             return
@@ -3426,9 +3423,9 @@ do
 
     function module:Save()
         RebuildIndex()
-        addon:debug("Reserves: save entries=%d.", tLength(reservesData))
+        addon:debug("Reserves: save entries=%d.", addon.tLength(reservesData))
         local saved = {}
-        tCopy(saved, reservesData)
+        addon.tCopy(saved, reservesData)
         KRT_SavedReserves = saved
     end
 
@@ -3436,7 +3433,7 @@ do
         addon:debug("Reserves: load data=%s.", tostring(KRT_SavedReserves ~= nil))
         twipe(reservesData)
         if KRT_SavedReserves then
-            tCopy(reservesData, KRT_SavedReserves)
+            addon.tCopy(reservesData, KRT_SavedReserves)
         end
         RebuildIndex()
     end
@@ -3616,7 +3613,7 @@ do
 
     -- Get all reserves:
     function module:GetAllReserves()
-        addon:debug("Reserves: fetch all players=%d.", tLength(reservesData))
+        addon:debug("Reserves: fetch all players=%d.", addon.tLength(reservesData))
         return reservesData
     end
 
@@ -3693,7 +3690,7 @@ do
         end
 
         RebuildIndex()
-        addon:debug("Reserves: parse CSV complete players=%d.", tLength(reservesData))
+        addon:debug("Reserves: parse CSV complete players=%d.", addon.tLength(reservesData))
         self:RefreshWindow()
         self:Save()
     end
@@ -4057,7 +4054,7 @@ do
     --
     local function LoadDefaultOptions()
         local options = {}
-        tCopy(options, defaultOptions)
+        addon.tCopy(options, defaultOptions)
         KRT_Options = options
         addon.options = options
         configDirty = true
@@ -4069,9 +4066,9 @@ do
     --
     local function LoadOptions()
         local options = {}
-        tCopy(options, defaultOptions)
+        addon.tCopy(options, defaultOptions)
         if KRT_Options then
-            tCopy(options, KRT_Options)
+            addon.tCopy(options, KRT_Options)
         end
         KRT_Options = options
         addon.options = options
@@ -4667,7 +4664,7 @@ do
         if not fetched or #changesTable == 0 then
             InitChangesTable()
         end
-        local count = tLength(changesTable)
+        local count = addon.tLength(changesTable)
         local msg
         if count == 0 then
             if tempSelectedID then
@@ -4719,7 +4716,7 @@ do
                 FetchChanges()
                 changesDirty = false
             end
-            local count = tLength(changesTable)
+            local count = addon.tLength(changesTable)
             if count > 0 then
             else
                 tempSelectedID = nil
@@ -4975,10 +4972,10 @@ do
             if checked and not existed then
                 tinsert(KRT_Spammer.Channels, channel)
             elseif not checked and existed then
-                local i = tIndexOf(KRT_Spammer.Channels, channel)
+                local i = addon.tIndexOf(KRT_Spammer.Channels, channel)
                 while i do
                     tremove(KRT_Spammer.Channels, i)
-                    i = tIndexOf(KRT_Spammer.Channels, channel)
+                    i = addon.tIndexOf(KRT_Spammer.Channels, channel)
                 end
             end
         else
@@ -5898,10 +5895,10 @@ do
 
             local name = addon.Raid:GetPlayerName(pID, rID)
             local list = raid.bossKills[bID].players
-            local i = tIndexOf(list, name)
+            local i = addon.tIndexOf(list, name)
             while i do
                 tremove(list, i)
-                i = tIndexOf(list, name)
+                i = addon.tIndexOf(list, name)
             end
 
             addon.History.selectedBossPlayer = nil
@@ -6009,10 +6006,10 @@ do
             tremove(raid.players, pID)
 
             for _, boss in ipairs(raid.bossKills) do
-                local i = tIndexOf(boss.players, name)
+                local i = addon.tIndexOf(boss.players, name)
                 while i do
                     tremove(boss.players, i)
-                    i = tIndexOf(boss.players, name)
+                    i = addon.tIndexOf(boss.players, name)
                 end
             end
 
