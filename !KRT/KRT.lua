@@ -5166,10 +5166,20 @@ do
         if inputsLocked == locked then return end
         inputsLocked = locked
         local alpha = locked and 0.7 or 1.0
+        local function setEditBoxState(box, enabled)
+            if not box then return end
+            if box.SetEnabled then
+                box:SetEnabled(enabled)
+            elseif enabled and box.Enable then
+                box:Enable()
+            elseif not enabled and box.Disable then
+                box:Disable()
+            end
+        end
         for _, field in ipairs(inputFields) do
             local box = _G[frameName .. field]
             if box then
-                Utils.enableDisable(box, not locked)
+                setEditBoxState(box, not locked)
                 box:SetAlpha(alpha)
                 if locked then
                     box:ClearFocus()
