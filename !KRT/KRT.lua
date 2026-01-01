@@ -1038,9 +1038,7 @@ do
     -------------------------------------------------------
     function module:Print(text, prefix)
         local msg = Utils.formatChatMessage(text, prefix or chatPrefixShort, output, prefixHex)
-        if DEFAULT_CHAT_FRAME then
-            DEFAULT_CHAT_FRAME:AddMessage(msg)
-        end
+        addon:info("%s", msg)
     end
 
     function module:Announce(text, channel)
@@ -1075,10 +1073,6 @@ do
     -------------------------------------------------------
     -- 6. Legacy helpers
     -------------------------------------------------------
-    function addon:Print(text, prefix)
-        module:Print(text, prefix)
-    end
-
     function addon:Announce(text, channel)
         module:Announce(text, channel)
     end
@@ -6467,7 +6461,7 @@ do
 
     local helpString = "%s: %s"
     local function printHelp(cmd, desc)
-        print(helpString:format(addon.WrapTextInColorCode(cmd, Utils.normalizeHexColor(RT_COLOR)), desc))
+        addon:info("%s", helpString:format(addon.WrapTextInColorCode(cmd, Utils.normalizeHexColor(RT_COLOR)), desc))
     end
 
     local function showHelp()
