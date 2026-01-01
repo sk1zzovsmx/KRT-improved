@@ -5222,9 +5222,10 @@ do
 
     function StartTicker()
         if updateTicker then return end
-        updateTicker = Utils.NewTicker(updateInterval, function()
+        local interval = tonumber(updateInterval) or 0.05
+        updateTicker = Utils.NewTicker(interval, function()
             if UISpammer then
-                UpdateUIFrame(UISpammer, updateInterval)
+                UpdateUIFrame(UISpammer, interval)
             end
         end)
     end
