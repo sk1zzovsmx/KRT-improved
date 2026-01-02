@@ -62,9 +62,10 @@ do
 	addon.CallbackHandler = addon.CallbackHandler or CallbackHandler
 	addon.Callbacks = addon.Callbacks or {}
 	addon.CallbackRegistry = addon.CallbackRegistry or CallbackHandler:New(addon.Callbacks)
+	addon.CallbackOrder = addon.CallbackOrder or {}
 
 	local callbacks = addon.Callbacks
-	local registry = addon.CallbackRegistry
+	local order = addon.CallbackOrder
 
 	function Utils.registerCallback(e, func)
 		if not e or type(func) ~= "function" then
@@ -72,6 +73,10 @@ do
 		end
 		local handle = {}
 		callbacks.RegisterCallback(handle, e, func)
+		if not order[e] then
+			order[e] = {}
+		end
+		tinsert(order[e], func)
 		return handle
 	end
 
@@ -82,7 +87,11 @@ do
 	end
 
 	function Utils.triggerEvent(e, ...)
-		registry:Fire(e, ...)
+		local handlers = order[e]
+		if not handlers or #handlers == 0 then return end
+		for i = 1, #handlers do
+			handlers[i](e, ...)
+		end
 	end
 end
 
