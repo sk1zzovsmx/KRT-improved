@@ -72,9 +72,6 @@ Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
 addon.Logger:Embed(addon)
 
 -- Alias locali (safe e veloci)
-local IsInRaid             = addon.IsInRaid
-local IsInGroup            = addon.IsInGroup
-local UnitIterator         = addon.UnitIterator
 local UnitIsGroupLeader    = addon.UnitIsGroupLeader
 local UnitIsGroupAssistant = addon.UnitIsGroupAssistant
 local tContains            = _G.tContains
@@ -288,7 +285,7 @@ do
         if not KRT_CurrentRaid then return end
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
-        if not IsInGroup() then
+        if not addon.IsInGroup() then
             numRaid = 0
             module:End()
             addon.Master:PrepareDropDowns()
@@ -364,7 +361,7 @@ do
         if KRT_CurrentRaid then
             self:End()
         end
-        if not IsInRaid() then return end
+        if not addon.IsInRaid() then return end
 
         local realm = Utils.getRealmName()
         KRT_Players[realm] = KRT_Players[realm] or {}
@@ -469,7 +466,7 @@ do
             addon.CancelTimer(module.firstCheckHandle, true)
             module.firstCheckHandle = nil
         end
-        if not IsInGroup() then return end
+        if not addon.IsInGroup() then return end
 
         if KRT_CurrentRaid and module:CheckPlayer(Utils.getPlayerName(), KRT_CurrentRaid) then
             addon.CancelTimer(module.updateRosterHandle, true)
@@ -920,8 +917,8 @@ do
         local originalName = name
         name = name or Utils.getPlayerName() or UnitName("player")
         if #players == 0 then
-            if IsInGroup() then
-                for unit in UnitIterator(true) do
+            if addon.IsInGroup() then
+                for unit in addon.UnitIterator(true) do
                     local pname = UnitName(unit)
                     if pname == name then
                         rank = Utils.getUnitRank(unit)
@@ -958,10 +955,10 @@ do
     --
     function module:GetUnitID(name)
         local id = "none"
-        if not IsInGroup() or not name then
+        if not addon.IsInGroup() or not name then
             return id
         end
-        for unit in UnitIterator(true) do
+        for unit in addon.UnitIterator(true) do
             if UnitName(unit) == name then
                 id = unit
                 break
@@ -2982,7 +2979,7 @@ do
     -- Return sorted array of player names currently in the raid.
     local function GetCurrentRaidPlayers()
         twipe(raidPlayers)
-        if not IsInGroup() then
+        if not addon.IsInGroup() then
             return raidPlayers
         end
         addon.GroupIterator(function(unit, owner)
