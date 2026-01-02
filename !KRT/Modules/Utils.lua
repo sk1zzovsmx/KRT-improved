@@ -194,23 +194,33 @@ end
 ---============================================================================
 
 do
-	local callbacks = {}
+	addon.CallbackHandler = addon.CallbackHandler or LibStub("CallbackHandler-1.0")
+	addon.Callbacks = addon.Callbacks or {}
+	addon.CallbackRegistry = addon.CallbackRegistry or addon.CallbackHandler:New(addon.Callbacks)
+	addon.CallbackOrder = addon.CallbackOrder or {}
+
+	local callbacks = addon.Callbacks
+	local callbackOrder = addon.CallbackOrder
 
 	function Utils.registerCallback(e, func)
-		if not e or type(func) ~= "function" then
+		if type(e) ~= "string" or type(func) ~= "function" then
 			error(L.StrCbErrUsage)
 		end
-		callbacks[e] = callbacks[e] or {}
-		tinsert(callbacks[e], func)
-		return #callbacks
+		local handle = {}
+		callbackOrder[e] = callbackOrder[e] or {}
+		tinsert(callbackOrder[e], func)
+		callbacks.RegisterCallback(handle, e, func)
+		return handle
 	end
 
 	function Utils.triggerEvent(e, ...)
-		if not callbacks[e] then return end
-		for i, v in ipairs(callbacks[e]) do
-			local ok, err = pcall(v, e, ...)
+		local handlers = callbackOrder[e]
+		if not handlers then return end
+		for i = 1, #handlers do
+			local handler = handlers[i]
+			local ok, err = pcall(handler, e, ...)
 			if not ok then
-				addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
+				addon:error(L.StrCbErrExec:format(tostring(handler), tostring(e), err))
 			end
 		end
 	end

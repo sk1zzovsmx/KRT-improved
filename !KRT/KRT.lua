@@ -66,7 +66,6 @@ addon.Compat              = Compat
 addon.BossIDs             = LibStub("LibBossIDs-1.0")
 addon.Logger              = LibStub("LibLogger-1.0")
 addon.Deformat            = LibStub("LibDeformat-3.0")
-addon.CallbackHandler     = LibStub("CallbackHandler-1.0")
 
 Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
 addon.Logger:Embed(addon)
