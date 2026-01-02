@@ -322,14 +322,15 @@ L.RaidZones                       = {
 	["Icecrown Citadel"] = "Icecrown Citadel",
         ["The Ruby Sanctum"] = "The Ruby Sanctum",                    -- Already present, keeping it
 }
--- Fallback boss-yell map for encounters that do not reliably fire UNIT_DIED.
+-- The reason we are using these is because of the missing
+-- UNIT_DIED event once these bosses are dealt with.
 L.BossYells                       = {
 	-- Naxxramas
 	["I grow tired of these games. Proceed, and I will banish your souls to oblivion!"] = "Four Horsemen",
 	-- Ulduar
-	["You rush headlong into the maw of madness!"] = "Iron Council",                            -- Normalmode - Stormcaller Brundir last
-	["What have you gained from my defeat? You are no less doomed, mortals!"] = "Iron Council",  -- Semi-Hardmode
-	-- ["Impossible..."] = MRT_IsInstanceUlduar("Iron Council"),  -- Hardmode - Steelbreaker last
+	["You rush headlong into the maw of madness!"] = "Iron Council",                         -- Normalmode - Stormcaller Brundir last
+	["What have you gained from my defeat? You are no less doomed, mortals!"] = "Iron Council", -- Semi-Hardmode - Runemaster Molgeim last
+	-- ["Impossible..."] = MRT_IsInstanceUlduar("Iron Council"),  -- Hardmode - Steelbreaker last  // also yelled by Lich King -> instance check necessary
 	["I... I am released from his grasp... at last."] = "Hodir",
 	["Stay your arms! I yield!"] = "Thorim",
 	["His hold on me dissipates. I can see clearly once more. Thank you, heroes."] = "Freya",
