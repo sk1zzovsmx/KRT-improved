@@ -6813,13 +6813,14 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
     if not KRT_CurrentRaid then return end
     local _, event, _, _, _, _, _, destGUID, destName = ...
     if event ~= "UNIT_DIED" then return end
-    if not destGUID or not destName then return end
+    if not destGUID then return end
     local _, unit = addon.GetClassFromGUID(destGUID, "player")
     if unit then return end
     local npcId = addon.GetCreatureId(destGUID)
     if not npcId then return end
     local bossLib = addon.BossIDs
-    local bossIds = bossLib and bossLib.BossIDs
-    if not bossIds or not bossIds[npcId] then return end
-    self.Raid:AddBoss(destName)
+    if not bossLib or not bossLib.BossIDs then return end
+    if bossLib.BossIDs[npcId] and destName then
+        self.Raid:AddBoss(destName)
+    end
 end
