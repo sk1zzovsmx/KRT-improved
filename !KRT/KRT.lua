@@ -6804,19 +6804,19 @@ function addon:CHAT_MSG_MONSTER_YELL(...)
 end
 
 --
--- COMBAT_LOG_EVENT_UNFILTERED: Logs a boss kill when a boss unit dies.
+-- COMBAT_LOG_EVENT_UNFILTERED: Logs a boss kill when a boss unit dies (LibBossIDs mobID table).
 --
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
-    local _, event, _, _, _, destGUID = ...
     if not KRT_CurrentRaid then return end
-    if event == "UNIT_DIED" then
-        local class, unit = addon.GetClassFromGUID(destGUID, "player")
-        if unit then return end
-        class = class or "UNKNOWN"
-        local npcId = addon.GetCreatureId(destGUID)
-        local boss = addon.BossIDs:GetBossName(npcId)
-        if boss then
-            self.Raid:AddBoss(boss)
-        end
-    end
+    local _, event, _, _, _, _, _, destGUID, destName = ...
+    if event ~= "UNIT_DIED" then return end
+    if not destGUID or not destName then return end
+    local _, unit = addon.GetClassFromGUID(destGUID, "player")
+    if unit then return end
+    local npcId = addon.GetCreatureId(destGUID)
+    if not npcId then return end
+    local bossLib = addon.BossIDs
+    local bossIDs = bossLib and bossLib.BossIDs
+    if not bossIDs or not bossIDs[npcId] then return end
+    self.Raid:AddBoss(destName)
 end
