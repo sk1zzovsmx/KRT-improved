@@ -26,7 +26,7 @@ Non-goals:
   - `addon = addon or {}`  (defensive, if codebase requires)
 - In each module file / do-block:
   - `addon.ModuleName = addon.ModuleName or {}`
-  - `local M = addon.ModuleName`
+  - `local module = addon.ModuleName`
   - `local L = addon.L` (only if strings are used)
 
 ### 2.2 Encapsulation
@@ -34,8 +34,8 @@ Non-goals:
 - Keep functions short; group private helpers above public API.
 
 ### 2.3 Naming
-- Public module methods: `M:Init()`, `M:Enable()`, `M:Disable()`, `M:Refresh()`
-- Event handlers: `M:OnEVENT_NAME(...)` or `M:OnLootOpened(...)`
+- Public module methods: `module:Init()`, `module:Enable()`, `module:Disable()`, `module:Refresh()`
+- Event handlers: `module:OnEVENT_NAME(...)` or `module:OnLootOpened(...)`
 - UI callbacks: `addon.UI:OnXxx(self, ...)` (UI code should be centralized)
 
 ## 3) Lifecycle (one standard entrypoint)

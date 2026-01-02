@@ -1,45 +1,53 @@
--- =======================================================
---  KRT Event Dispatcher Template
---  If you already have an event system, keep the repo one.
--- =======================================================
+--[[
+    KRT_EventDispatcher.lua
+    - KRT uses a single event frame. If CallbackHandler-1.0 is available,
+      you can optionally expose an addon:RegisterEvent(...) callback API.
+    - If you already have an event system in KRT.lua, keep the repo one.
+]]
+
 local _, addon = ...
 
-addon.Events = addon.Events or {}
-local Events = addon.Events
+do
+    local mainFrame = addon.EventFrame or CreateFrame("Frame")
+    addon.EventFrame = mainFrame
 
--- event -> array of { owner=table, method="OnX" } or { owner=table, fn=function }
-Events._map = Events._map or {}
-local map = Events._map
+    local events
 
-addon.EventFrame = addon.EventFrame or CreateFrame("Frame", "KRT_EventFrame")
-local EF = addon.EventFrame
+    local function OnEvent(_, event, ...)
+        if events then
+            events:Fire(event, ...)
+            return
+        end
 
-local function EnsureEvent(event)
-  if not map[event] then
-    map[event] = {}
-    EF:RegisterEvent(event)
-  end
+        local fn = addon[event]
+        if type(fn) == "function" then
+            fn(addon, ...)
+        end
+    end
+
+    local function InitFallback()
+        mainFrame:SetScript("OnEvent", OnEvent)
+
+        function addon:RegisterEvent(eventName)
+            mainFrame:RegisterEvent(eventName)
+        end
+
+        function addon:UnregisterEvent(eventName)
+            mainFrame:UnregisterEvent(eventName)
+        end
+
+        function addon:UnregisterAllEvents()
+            mainFrame:UnregisterAllEvents()
+        end
+    end
+
+    local CB = addon.CallbackHandler or (LibStub and LibStub("CallbackHandler-1.0", true))
+    if CB then
+        local function OnUsed(_, _, eventName) mainFrame:RegisterEvent(eventName) end
+        local function OnUnused(_, _, eventName) mainFrame:UnregisterEvent(eventName) end
+        events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents", OnUsed, OnUnused)
+        mainFrame:SetScript("OnEvent", OnEvent)
+    else
+        InitFallback()
+    end
 end
-
-function Events:Register(event, owner, methodOrFn)
-  EnsureEvent(event)
-  map[event][#map[event] + 1] = { owner = owner, h = methodOrFn }
-end
-
-local function CallHandler(entry, ...)
-  local h = entry.h
-  if type(h) == "string" then
-    local f = entry.owner and entry.owner[h]
-    if f then return f(entry.owner, ...) end
-  else
-    return h(entry.owner, ...)
-  end
-end
-
-EF:SetScript("OnEvent", function(_, event, ...)
-  local list = map[event]
-  if not list then return end
-  for i = 1, #list do
-    CallHandler(list[i], ...)
-  end
-end)

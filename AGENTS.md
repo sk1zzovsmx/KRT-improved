@@ -115,6 +115,8 @@ TemplatesLua/
 - `addon.Warnings`      — announcements (RW/RAID/PARTY), templates & throttling
 - `addon.Changes`       — main-spec change collection/announce utilities
 - `addon.Spammer`       — LFM spam helper (start/stop)
+- `addon.Master`        — master-loot helpers, master-loot UI, award/trade tracking
+- `addon.LootCounter`   — loot counter window (player item distribution counts)
 - `addon.UIMaster`      — frames for Master, History, Reserves, Changes, Warnings, Loot Counter (see `KRT.xml`)
 - `addon.Config`        — options window & persisted settings
 - `addon.Minimap`       — minimap button (toggle)
@@ -148,6 +150,32 @@ TemplatesLua/
 - Avoid boilerplate at runtime: keep logs concise and omit repetitive status messages.
 - Lines ≤ 120 chars; keep functions short; group related private helpers in local blocks.
 - Commit style: `feat(rolls): ...`, `fix(reserves): ...`, `ref(ui): ...`, `perf: ...`, `chore: ...`.
+
+---
+
+## 9.1) Canonical in-file module pattern (BINDING)
+When adding or refactoring modules inside `!KRT/KRT.lua`, use this skeleton:
+
+```lua
+do
+    addon.ModuleName = addon.ModuleName or {}
+    local module = addon.ModuleName
+    local L = addon.L
+
+    -- Internal state
+    local state = { enabled = true }
+
+    -- Private helpers (local functions) above public API
+
+    -- Public API
+    function module:Init() end
+end
+```
+
+Notes:
+- Prefer `local module = addon.X` (repo convention). Avoid mixing `M`, `self2`, etc.
+- Keep logic out of XML scripts; route into Lua module methods.
+- Keep line length ≤ 120 chars; avoid column-alignment whitespace in new code.
 
 ---
 
@@ -217,6 +245,7 @@ TemplatesLua/
 ---
 
 ## 18) Change log (edit by hand)
+- _2026-01-02_: Standardized module skeleton (use `local module`), updated TemplatesLua + Docs, and introduced `addon.LootCounter` module (kept Master aliases).
 - _2025-09-05_: Initial lightweight version; removed binding “recipes”. Added `dev`-only branching policy.
 - _2025-09-07_: Clarified monolithic structure and updated CLI command list.
 - _2025-09-08_: Renamed Logger module to History to avoid conflict with debugging logger.
