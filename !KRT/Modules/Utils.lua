@@ -48,7 +48,8 @@ end
 function Utils.getPlayerName()
 	addon.State = addon.State or {}
 	addon.State.player = addon.State.player or {}
-	local name = addon.State.player.name or UnitName("player")
+	local name = addon.State.player.name
+		or addon.UnitFullName("player")
 	addon.State.player.name = name
 	return name
 end
