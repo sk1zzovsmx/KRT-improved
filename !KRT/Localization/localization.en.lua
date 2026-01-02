@@ -16,6 +16,7 @@ local L                           = addon.L -- Make a local reference for conven
 
 -- ==================== Callbacks ==================== --
 L.StrCbErrUsage                   = "Usage: KRT:registerCallback(event, callbacks)"
+L.StrCbErrExec                    = "Error while executing callback %s for event %s: %s"
 
 -- ==================== General Buttons ==================== --
 L.BtnConfig                       = "Config"

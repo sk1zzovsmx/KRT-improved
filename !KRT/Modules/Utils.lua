@@ -90,7 +90,10 @@ do
 		local handlers = order[e]
 		if not handlers or #handlers == 0 then return end
 		for i = 1, #handlers do
-			handlers[i](e, ...)
+			local ok, err = pcall(handlers[i], e, ...)
+			if not ok then
+				addon:error(L.StrCbErrExec:format(tostring(handlers[i]), tostring(e), err))
+			end
 		end
 	end
 end
