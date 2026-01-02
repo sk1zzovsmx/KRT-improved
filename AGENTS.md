@@ -234,3 +234,4 @@ TemplatesLua/
 - _2025-09-25_: Reserve list rows now place text to the right of icons and hide icons until item data loads.
 - _2025-09-26_: Load saved SR reserves during addon initialization.
 - _2025-09-27_: SR roll button allows non-reserved players to roll once (SR priority remains).
+- _2025-09-28_: Boss kill logging uses LibBossIDs UNIT_DIED detection with boss yell fallback.

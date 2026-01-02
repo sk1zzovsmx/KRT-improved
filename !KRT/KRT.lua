@@ -6776,6 +6776,18 @@ function addon:CHAT_MSG_SYSTEM(msg)
     addon.Rolls:CHAT_MSG_SYSTEM(msg)
 end
 
+--
+-- CHAT_MSG_MONSTER_YELL: Fallback boss kill logging for encounters missing UNIT_DIED.
+--
+function addon:CHAT_MSG_MONSTER_YELL(...)
+    local text = ...
+    if not KRT_CurrentRaid then return end
+    local bossName = L.BossYells and L.BossYells[text]
+    if bossName then
+        self.Raid:AddBoss(bossName)
+    end
+end
+
 -- Master looter events
 do
     local forward = {
@@ -6794,29 +6806,25 @@ do
 end
 
 --
--- CHAT_MSG_MONSTER_YELL: Logs a boss kill based on specific boss yells.
---
-function addon:CHAT_MSG_MONSTER_YELL(...)
-    local text, boss = ...
-    if L.BossYells[text] and KRT_CurrentRaid then
-        self.Raid:AddBoss(L.BossYells[text])
-    end
-end
-
---
--- COMBAT_LOG_EVENT_UNFILTERED: Logs a boss kill when a boss unit dies.
+-- COMBAT_LOG_EVENT_UNFILTERED: Logs a boss kill via LibBossIDs, with name resolution fallback.
 --
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
-    local _, event, _, _, _, destGUID = ...
+    local _, event, _, _, _, _, _, destGUID, destName = ...
     if not KRT_CurrentRaid then return end
     if event == "UNIT_DIED" then
-        local class, unit = addon.GetClassFromGUID(destGUID, "player")
+        local _, unit = addon.GetClassFromGUID(destGUID, "player")
         if unit then return end
-        class = class or "UNKNOWN"
         local npcId = addon.GetCreatureId(destGUID)
-        local boss = addon.BossIDs:GetBossName(npcId)
-        if boss then
-            self.Raid:AddBoss(boss)
+        local bossIds = addon.BossIDs and addon.BossIDs.BossIDs
+        if npcId and bossIds and bossIds[npcId] then
+            local bossName = destName
+            if not bossName or bossName == "" or bossName == _G.UNKNOWNOBJECT or bossName == _G.UNKNOWN then
+                local bossUnit = addon.GetUnitIdFromGUID(destGUID, "boss")
+                bossName = bossUnit and UnitName(bossUnit) or bossName
+            end
+            if bossName and bossName ~= "" and bossName ~= _G.UNKNOWNOBJECT and bossName ~= _G.UNKNOWN then
+                self.Raid:AddBoss(bossName)
+            end
         end
     end
 end
