@@ -6776,18 +6776,6 @@ function addon:CHAT_MSG_SYSTEM(msg)
     addon.Rolls:CHAT_MSG_SYSTEM(msg)
 end
 
---
--- CHAT_MSG_MONSTER_YELL: Fallback boss kill logging for encounters missing UNIT_DIED.
---
-function addon:CHAT_MSG_MONSTER_YELL(...)
-    local text = ...
-    if not KRT_CurrentRaid then return end
-    local bossName = L.BossYells and L.BossYells[text]
-    if bossName then
-        self.Raid:AddBoss(bossName)
-    end
-end
-
 -- Master looter events
 do
     local forward = {
@@ -6802,6 +6790,18 @@ do
         addon[e] = function(_, ...)
             addon.Master[method](addon.Master, ...)
         end
+    end
+end
+
+--
+-- CHAT_MSG_MONSTER_YELL: Fallback boss kill logging for encounters missing UNIT_DIED.
+--
+function addon:CHAT_MSG_MONSTER_YELL(...)
+    local text = ...
+    if not KRT_CurrentRaid then return end
+    local bossName = L.BossYells and L.BossYells[text]
+    if bossName then
+        self.Raid:AddBoss(bossName)
     end
 end
 
