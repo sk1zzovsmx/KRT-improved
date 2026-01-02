@@ -54,6 +54,39 @@ function Utils.getPlayerName()
 end
 
 ---============================================================================
+-- Callback utilities
+---============================================================================
+
+do
+	local CallbackHandler = LibStub("CallbackHandler-1.0")
+	addon.CallbackHandler = addon.CallbackHandler or CallbackHandler
+	addon.Callbacks = addon.Callbacks or {}
+	addon.CallbackRegistry = addon.CallbackRegistry or CallbackHandler:New(addon.Callbacks)
+
+	local callbacks = addon.Callbacks
+	local registry = addon.CallbackRegistry
+
+	function Utils.registerCallback(e, func)
+		if not e or type(func) ~= "function" then
+			error(L.StrCbErrUsage)
+		end
+		local handle = {}
+		callbacks.RegisterCallback(handle, e, func)
+		return handle
+	end
+
+	function Utils.registerCallbacks(names, handler)
+		for i = 1, #names do
+			Utils.registerCallback(names[i], handler)
+		end
+	end
+
+	function Utils.triggerEvent(e, ...)
+		registry:Fire(e, ...)
+	end
+end
+
+---============================================================================
 -- Small helpers / iteration
 ---============================================================================
 
@@ -185,33 +218,6 @@ do
 		if not last[key] or (now - last[key]) >= sec then
 			last[key] = now
 			return true
-		end
-	end
-end
-
----============================================================================
--- Callback utilities
----============================================================================
-
-do
-	local callbacks = {}
-
-	function Utils.registerCallback(e, func)
-		if not e or type(func) ~= "function" then
-			error(L.StrCbErrUsage)
-		end
-		callbacks[e] = callbacks[e] or {}
-		tinsert(callbacks[e], func)
-		return #callbacks
-	end
-
-	function Utils.triggerEvent(e, ...)
-		if not callbacks[e] then return end
-		for i, v in ipairs(callbacks[e]) do
-			local ok, err = pcall(v, e, ...)
-			if not ok then
-				addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
-			end
 		end
 	end
 end
@@ -852,11 +858,6 @@ do
 		module.Sort = function(_, t) controller:Sort(t) end
 	end
 
-	function Utils.registerCallbacks(names, handler)
-		for i = 1, #names do
-			Utils.registerCallback(names[i], handler)
-		end
-	end
 end
 
 ---============================================================================
