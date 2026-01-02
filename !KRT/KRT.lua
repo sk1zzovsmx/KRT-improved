@@ -6807,16 +6807,22 @@ end
 -- COMBAT_LOG_EVENT_UNFILTERED: Logs a boss kill when a boss unit dies.
 --
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
-    local _, event, _, _, _, destGUID = ...
     if not KRT_CurrentRaid then return end
-    if event == "UNIT_DIED" then
-        local class, unit = addon.GetClassFromGUID(destGUID, "player")
-        if unit then return end
-        class = class or "UNKNOWN"
-        local npcId = addon.GetCreatureId(destGUID)
-        local boss = addon.BossIDs:GetBossName(npcId)
-        if boss then
-            self.Raid:AddBoss(boss)
-        end
+
+    -- 3.3.5a base params (8):
+    -- timestamp, event, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags
+    local _, subEvent, _, _, _, destGUID, destName, destFlags = ...
+    if subEvent ~= "UNIT_DIED" then return end
+    if bit.band(destFlags or 0, COMBATLOG_OBJECT_TYPE_PLAYER) ~= 0 then return end
+
+    -- LibCompat embeds GetCreatureId with the 3.3.5a GUID parsing rules.
+    local npcId = destGUID and addon.GetCreatureId(destGUID)
+    local bossLib = addon.BossIDs
+    local bossIds = bossLib and bossLib.BossIDs
+    if not (npcId and bossIds and bossIds[npcId]) then return end
+
+    local boss = destName or bossLib:GetBossName(npcId)
+    if boss then
+        self.Raid:AddBoss(boss)
     end
 end
