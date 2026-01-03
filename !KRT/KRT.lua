@@ -232,9 +232,13 @@ do
 
     local CB = addon.CallbackHandler
     if CB then
-        local function OnUsed(_, _, e) mainFrame:RegisterEvent(e) end
-        local function OnUnused(_, _, e) mainFrame:UnregisterEvent(e) end
-        events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents", OnUsed, OnUnused)
+        -- Create WoW event registry
+        events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents")
+
+        -- CallbackHandler-1.0: OnUsed/OnUnused vanno assegnati al registry, non passati a :New()
+        events.OnUsed = function(_, _, e) mainFrame:RegisterEvent(e) end
+        events.OnUnused = function(_, _, e) mainFrame:UnregisterEvent(e) end
+
         mainFrame:SetScript("OnEvent", OnEvent)
         mainFrame:RegisterEvent("ADDON_LOADED")
         addon:RegisterEvent("ADDON_LOADED", function(...) addon:ADDON_LOADED(...) end)

@@ -195,25 +195,49 @@ end
 ---============================================================================
 
 do
-	local callbacks = {}
+	local CallbackHandler = LibStub("CallbackHandler-1.0") -- vendored (hard dependency)
 
+	-- Internal callback registry (not the WoW event registry)
+	addon.InternalCallbacksTarget = addon.InternalCallbacksTarget or {}
+	addon.InternalCallbacks = addon.InternalCallbacks
+		or CallbackHandler:New(addon.InternalCallbacksTarget, "RegisterCallback", "UnregisterCallback", "UnregisterAllCallbacks")
+
+	local target = addon.InternalCallbacksTarget
+	local registry = addon.InternalCallbacks
+
+	-- Register a callback for an internal event.
+	-- Returns a handle you can use to unregister later (optional).
 	function Utils.registerCallback(e, func)
 		if not e or type(func) ~= "function" then
 			error(L.StrCbErrUsage)
 		end
-		callbacks[e] = callbacks[e] or {}
-		tinsert(callbacks[e], func)
-		return #callbacks
-	end
 
-	function Utils.triggerEvent(e, ...)
-		if not callbacks[e] then return end
-		for i, v in ipairs(callbacks[e]) do
-			local ok, err = pcall(v, e, ...)
+		-- CallbackHandler uses "self" as the uniqueness key; use a unique token per registration
+		-- to allow multiple anonymous listeners on the same event (same behavior as the old table).
+		local token = {}
+
+		-- Preserve existing signature + safety: listener receives (eventName, ...)
+		local wrapped = function(eventName, ...)
+			local ok, err = pcall(func, eventName, ...)
 			if not ok then
-				addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
+				addon:error(L.StrCbErrExec:format(tostring(func), tostring(eventName), err))
 			end
 		end
+
+		target.RegisterCallback(token, e, wrapped)
+		return { e = e, t = token }
+	end
+
+	-- Optional: unregister a previously registered callback handle.
+	-- (Non-breaking: if you never call it, nothing changes for current code.)
+	function Utils.unregisterCallback(handle)
+		if type(handle) ~= "table" or not handle.e or not handle.t then return end
+		target.UnregisterCallback(handle.t, handle.e)
+	end
+
+	-- Fire an internal event; callbacks receive (eventName, ...).
+	function Utils.triggerEvent(e, ...)
+		registry:Fire(e, ...)
 	end
 end
 
