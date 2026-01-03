@@ -5512,7 +5512,12 @@ do
     end
 
     -- Selectors
-    module.SelectRaid = makeSelector("selectedRaid", "HistorySelectRaid")
+    function module:SelectRaid(btn)
+        local id = btn and btn.GetID and btn:GetID()
+        module.selectedRaid = (id and id ~= module.selectedRaid) and id or nil
+        module:ResetSelections()
+        Utils.triggerEvent("HistorySelectRaid", module.selectedRaid)
+    end
     module.SelectBoss = makeSelector("selectedBoss", "HistorySelectBoss")
 
     -- Player filter: only one active at a time
@@ -5593,9 +5598,6 @@ do
         )
     end
 
-    Utils.registerCallback("HistorySelectRaid", function()
-        module:ResetSelections()
-    end)
 end
 
 -- ============================================================================
@@ -5824,6 +5826,7 @@ do
             tremove(raid.bossKills, bID)
 
             addon.History.selectedBoss = nil
+            addon.History:ResetSelections()
             Utils.triggerEvent("HistorySelectRaid", addon.History.selectedRaid)
         end
 
@@ -6354,6 +6357,7 @@ do
         end
 
         self:Hide()
+        addon.History:ResetSelections()
         Utils.triggerEvent("HistorySelectRaid", addon.History.selectedRaid)
     end
 
