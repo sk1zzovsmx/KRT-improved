@@ -2825,8 +2825,12 @@ do
                 addon:info("[Trade] Completed item=%s winner=%s type=%d roll=%d",
                     tostring(lootState.currentRollItem), tostring(lootState.winner),
                     tonumber(lootState.currentRollType) or -1, addon.Rolls:HighestRoll())
-                addon.History.Loot:Log(lootState.currentRollItem, lootState.winner, lootState.currentRollType,
-                    addon.Rolls:HighestRoll())
+                local ok = addon.History.Loot:Log(lootState.currentRollItem, lootState.winner,
+                    lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT")
+                if not ok then
+                    addon:error("[Trade] History log failed raidId=%s itemIndex=%s link=%s",
+                        tostring(KRT_CurrentRaid), tostring(lootState.currentRollItem), tostring(GetItemLink()))
+                end
                 lootState.trader = nil
                 lootState.winner = nil
                 addon.Loot:ClearLoot()
@@ -2896,7 +2900,11 @@ do
             if whisper then
                 Utils.whisper(playerName, whisper)
             end
-            addon.History.Loot:Log(lootState.currentRollItem, playerName, rollType, rollValue)
+            local ok = addon.History.Loot:Log(lootState.currentRollItem, playerName, rollType, rollValue, "ML_AWARD")
+            if not ok then
+                addon:error("[ML] Awarded but History failed raidId=%s itemIndex=%s link=%s",
+                    tostring(KRT_CurrentRaid), tostring(lootState.currentRollItem), tostring(itemLink))
+            end
             return true
         end
         addon:error(L.ErrCannotFindPlayer:format(playerName))
@@ -3004,7 +3012,12 @@ do
                 end
             end
             if rollType <= rollTypes.FREE and playerName == lootState.trader then
-                addon.History.Loot:Log(lootState.currentRollItem, lootState.trader, rollType, rollValue)
+                local ok = addon.History.Loot:Log(lootState.currentRollItem, lootState.trader,
+                    rollType, rollValue, "TRADE_KEEP")
+                if not ok then
+                    addon:error("[Trade] Keep logged but History failed raidId=%s itemIndex=%s link=%s",
+                        tostring(KRT_CurrentRaid), tostring(lootState.currentRollItem), tostring(itemLink))
+                end
             end
             announced = true
         end
@@ -5668,7 +5681,7 @@ do
 
                 for _, p in ipairs(raid.players) do
                     if name == Utils.normalizeLower(p.name) then
-                        addon.History.Loot:Log(self.itemId, p.name)
+                        addon.History.Loot:Log(self.itemId, p.name, nil, nil, "HISTORY_EDIT_WINNER")
                         return
                     end
                 end
@@ -5681,14 +5694,14 @@ do
 
         Utils.makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_ROLL", L.StrEditItemRollTypeHelp,
             function(self, text)
-                addon.History.Loot:Log(self.itemId, nil, tonumber(text))
+                addon.History.Loot:Log(self.itemId, nil, tonumber(text), nil, "HISTORY_EDIT_ROLLTYPE")
             end,
             function(self) self.itemId = addon.History.selectedItem end
         )
 
         Utils.makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp,
             function(self, text)
-                addon.History.Loot:Log(self.itemId, nil, nil, tonumber(text))
+                addon.History.Loot:Log(self.itemId, nil, nil, tonumber(text), "HISTORY_EDIT_ROLLVALUE")
             end,
             function(self) self.itemId = addon.History.selectedItem end
         )
@@ -6335,26 +6348,80 @@ do
         controller._makeConfirmPopup("KRTHISTORY_DELETE_ITEM", L.StrConfirmDeleteItem, DeleteItem)
     end
 
-    function module:Log(itemID, looter, rollType, rollValue)
+    function module:Log(itemID, looter, rollType, rollValue, source)
         local raidID = addon.History.selectedRaid or KRT_CurrentRaid
+        addon:trace("[History] Loot:Log attempt source=%s raidId=%s itemIndex=%s looter=%s type=%s roll=%s lastBoss=%s",
+            tostring(source), tostring(raidID), tostring(itemID), tostring(looter), tostring(rollType),
+            tostring(rollValue), tostring(KRT_LastBoss))
         if not raidID or not KRT_Raids[raidID] then
-            addon:warn("[History] Loot:Log skipped no raid raidId=%s", tostring(raidID))
-            return
+            addon:error("[History] Loot:Log FAILED no raid session raidId=%s itemIndex=%s", tostring(raidID),
+                tostring(itemID))
+            return false
         end
 
-        local it = KRT_Raids[raidID].loot[itemID]
+        local raid = KRT_Raids[raidID]
+        local lootCount = raid.loot and #raid.loot or 0
+        local it = raid.loot[itemID]
         if not it then
-            addon:warn("[History] Loot:Log skipped item missing raidId=%d itemIndex=%s", raidID, tostring(itemID))
-            return
+            addon:error("[History] Loot:Log FAILED item not found raidId=%d itemIndex=%s lootCount=%d", raidID,
+                tostring(itemID), lootCount)
+            return false
         end
 
-        if looter and looter ~= "" then it.looter = looter end
-        if tonumber(rollType) then it.rollType = tonumber(rollType) end
-        if tonumber(rollValue) then it.rollValue = tonumber(rollValue) end
+        if not looter or looter == "" then
+            addon:warn("[History] Loot:Log looter empty raidId=%d itemIndex=%s link=%s", raidID,
+                tostring(itemID), tostring(it.itemLink))
+        end
+        if rollType == nil then
+            addon:warn("[History] Loot:Log rollType nil raidId=%d itemIndex=%s looter=%s", raidID,
+                tostring(itemID), tostring(looter))
+        end
+
+        addon:debug("[History] Loot:Log BEFORE raidId=%d itemIndex=%s link=%s prevLooter=%s prevType=%s prevRoll=%s",
+            raidID, tostring(itemID), tostring(it.itemLink), tostring(it.looter), tostring(it.rollType),
+            tostring(it.rollValue))
+        if it.looter and it.looter ~= "" and looter and looter ~= "" and it.looter ~= looter then
+            addon:warn("[History] Loot overwrite raidId=%d itemIndex=%s link=%s from=%s to=%s", raidID,
+                tostring(itemID), tostring(it.itemLink), tostring(it.looter), tostring(looter))
+        end
+
+        local expectedLooter
+        local expectedRollType
+        local expectedRollValue
+        if looter and looter ~= "" then
+            it.looter = looter
+            expectedLooter = looter
+        end
+        if tonumber(rollType) then
+            it.rollType = tonumber(rollType)
+            expectedRollType = tonumber(rollType)
+        end
+        if tonumber(rollValue) then
+            it.rollValue = tonumber(rollValue)
+            expectedRollValue = tonumber(rollValue)
+        end
 
         controller:Dirty()
-        addon:trace("[History] Loot updated raidId=%d itemIndex=%d looter=%s type=%s roll=%s", raidID,
-            tonumber(itemID) or -1, tostring(looter), tostring(rollType), tostring(rollValue))
+        addon:info("[History] Loot recorded source=%s raidId=%d itemIndex=%s link=%s -> looter=%s type=%s roll=%s",
+            tostring(source), raidID, tostring(itemID), tostring(it.itemLink), tostring(it.looter),
+            tostring(it.rollType), tostring(it.rollValue))
+
+        local ok = true
+        if expectedLooter and it.looter ~= expectedLooter then ok = false end
+        if expectedRollType and it.rollType ~= expectedRollType then ok = false end
+        if expectedRollValue and it.rollValue ~= expectedRollValue then ok = false end
+        if not ok then
+            addon:error("[History] Loot:Log VERIFY FAILED raidId=%d itemIndex=%s got(looter=%s type=%s roll=%s)",
+                raidID, tostring(itemID), tostring(it.looter), tostring(it.rollType), tostring(it.rollValue))
+            return false
+        end
+
+        addon:debug("[History] Loot:Log verified raidId=%d itemIndex=%s", raidID, tostring(itemID))
+        if not KRT_LastBoss then
+            addon:info("[History] Loot recorded without boss context raidId=%d itemIndex=%s link=%s", raidID,
+                tostring(itemID), tostring(it.itemLink))
+        end
+        return true
     end
 
     local function Reset() controller:Dirty() end
