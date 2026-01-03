@@ -145,8 +145,8 @@ L.StrReserveCountSuffix           = " (x%d)"
 
 -- ==================== Raid Warnings Frame ==================== --
 L.StrMessage                      = "Message"
-L.StrWarningsHelp                 = "Tips:"
-L.StrWarningsHelp                 =
+L.StrWarningsHelpTitle            = "Tips:"
+L.StrWarningsHelpBody             =
 "- |cffffd700Left-Click|r to select a warning, click again to cancel selection.\n- |cffffd700Ctrl-Click|r for a quick raid warning.\n- When you select a warning, you can either |cffffd700Edit|r it, |cffffd700Delete|r it or |cffffd700Announce|r it using the provided buttons."
 L.StrWarningsError                =
 "Only the body of a message is required! Though, we recommend naming your warnings so you never get lost."
@@ -283,6 +283,7 @@ L.MsgMinimapPosSet                = "Minimap: angle set to %s."
 L.MsgDefaultsRestored             = "Options: defaults restored."
 L.MsgLogLevelCurrent              = "Log level: current=%s."
 L.MsgLogLevelSet                  = "Log level: set=%s."
+L.MsgLogLevelUnknown              = "Unknown log level: %s."
 L.MsgReserveItemsRequested        = "Reserves: requested info for %s missing items."
 L.MsgReserveItemsReady            = "Reserves: all item infos are available."
 
