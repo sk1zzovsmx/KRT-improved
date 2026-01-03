@@ -4528,7 +4528,7 @@ do
         if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
             _G[frameName .. "MessageStr"]:SetText(L.StrMessage)
             _G[frameName .. "EditBtn"]:SetText(SAVE)
-            _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelp)
+            _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
         end
         Utils.setFrameTitle(frameName, RAID_WARNING)
         _G[frameName .. "Name"]:SetScript("OnEscapePressed", module.Cancel)
@@ -4551,8 +4551,8 @@ do
             _G[frameName .. "OutputContent"]:SetText(KRT_Warnings[selectedID].content)
             _G[frameName .. "OutputContent"]:SetTextColor(1, 1, 1)
         else
-            _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelp)
-            _G[frameName .. "OutputContent"]:SetText(L.StrWarningsHelp)
+            _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
+            _G[frameName .. "OutputContent"]:SetText(L.StrWarningsHelpBody)
             _G[frameName .. "OutputContent"]:SetTextColor(0.5, 0.5, 0.5)
         end
         lastSelectedID = selectedID
@@ -6702,7 +6702,7 @@ do
                 KRT_Debug.level = lv
                 addon:info(L.MsgLogLevelSet, arg)
             else
-                addon:warn("Unknown log level: %s", arg)
+                addon:warn(L.MsgLogLevelUnknown, arg)
             end
             return
         end
