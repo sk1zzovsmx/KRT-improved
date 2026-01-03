@@ -244,7 +244,10 @@ do
         addon:RegisterEvent("ADDON_LOADED", function(...) addon:ADDON_LOADED(...) end)
     end
 
-    if not CB then InitEventFallback() end
+    if not CB then
+        addon:warn("[Core] CallbackHandler missing: using fallback event wiring")
+        InitEventFallback()
+    end
 end
 
 ---============================================================================
@@ -291,6 +294,7 @@ do
         module.updateRosterHandle = nil
         if not addon.IsInGroup() then
             numRaid = 0
+            addon:info("[Raid] Left group -> ending current raid session")
             module:End()
             addon.Master:PrepareDropDowns()
             return
@@ -339,6 +343,7 @@ do
         end, true)
 
         numRaid = addon.tLength(playersByName)
+        addon:debug("[Raid] RosterUpdate v=%d num=%d", rosterVersion, numRaid)
         if numRaid == 0 then
             module:End()
             return
@@ -498,6 +503,9 @@ do
         end
 
         local instanceName, instanceType, instanceDiff = GetInstanceInfo()
+        addon:debug("[Raid] FirstCheck inGroup=%s currentRaid=%s instance=%s type=%s diff=%s",
+            tostring(addon.IsInGroup()), tostring(KRT_CurrentRaid ~= nil), tostring(instanceName),
+            tostring(instanceType), tostring(instanceDiff))
         if instanceType == "raid" then
             module:Check(instanceName, instanceDiff)
             return
@@ -528,6 +536,9 @@ do
             t.count = t.count or 0
             tinsert(raid.players, t)
             raid.playersByName[t.name] = t
+            addon:trace("[Raid] Player join name=%s raidId=%d", tostring(t.name), tonumber(raidNum) or -1)
+        else
+            addon:trace("[Raid] Player refresh name=%s raidId=%d", tostring(t.name), tonumber(raidNum) or -1)
         end
     end
 
@@ -536,7 +547,10 @@ do
     --
     function module:AddBoss(bossName, manDiff, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
-        if not raidNum or not bossName then return end
+        if not raidNum or not bossName then
+            addon:warn("[Boss] AddBoss skipped raidId=%s boss=%s", tostring(raidNum), tostring(bossName))
+            return
+        end
 
         local _, _, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
         if manDiff then
@@ -566,6 +580,7 @@ do
         KRT_LastBoss = #KRT_Raids[raidNum].bossKills
         addon:info("[Boss] Logged boss=%s diff=%d raid=%d players=%d",
             tostring(bossName), tonumber(instanceDiff) or -1, tonumber(raidNum) or -1, #players)
+        addon:debug("[Boss] lastBoss=%d hash=%s", tonumber(KRT_LastBoss) or -1, tostring(killInfo.hash))
     end
 
     --
@@ -599,7 +614,10 @@ do
             player = Utils.getPlayerName()
             itemCount = 1
         end
-        if not itemLink then return end
+        if not itemLink then
+            addon:warn("[Loot] Parse failed msg=%s", tostring(msg))
+            return
+        end
 
         itemCount = tonumber(itemCount) or 1
         lootState.itemCount = itemCount
@@ -608,14 +626,22 @@ do
         local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
         local _, _, _, _, itemId = string.find(itemLink, ITEM_LINK_PATTERN)
         itemId = tonumber(itemId)
-        addon:trace("[Loot] Parsed player=%s itemId=%s count=%d", tostring(player), tostring(itemId), itemCount)
+        addon:trace("[Loot] Parsed looter=%s link=%s count=%d", tostring(player), tostring(itemLink), itemCount)
 
         -- We don't proceed if lower than threshold or ignored.
         local lootThreshold = GetLootThreshold()
-        if itemRarity and itemRarity < lootThreshold then return end
-        if itemId and addon.ignoredItems[itemId] then return end
+        if itemRarity and itemRarity < lootThreshold then
+            addon:debug("[Loot] Ignored below threshold rarity=%s thr=%d link=%s", tostring(itemRarity),
+                tonumber(lootThreshold) or -1, tostring(itemLink))
+            return
+        end
+        if itemId and addon.ignoredItems[itemId] then
+            addon:debug("[Loot] Ignored itemId=%s link=%s (ignoredItems)", tostring(itemId), tostring(itemLink))
+            return
+        end
 
         if not KRT_LastBoss then
+            addon:info("[Boss] No boss context -> creating _TrashMob_ bucket")
             self:AddBoss("_TrashMob_")
         end
 
@@ -637,6 +663,8 @@ do
             time        = Utils.getCurrentTime(),
         }
         tinsert(KRT_Raids[KRT_CurrentRaid].loot, lootInfo)
+        addon:debug("[Loot] Logged raidId=%d itemId=%s bossNum=%s looter=%s", tonumber(KRT_CurrentRaid) or -1,
+            tostring(itemId), tostring(KRT_LastBoss), tostring(player))
     end
 
     --------------------------------------------------------------------------
@@ -1705,6 +1733,8 @@ do
         if lootState.lootCount >= 1 then
             oldItem = GetItemLink(lootState.currentItemIndex)
         end
+        addon:trace("[Loot] FetchLoot numLootItems=%d oldIndex=%d", GetNumLootItems() or 0,
+            lootState.currentItemIndex or 0)
         lootState.opened = true
         lootState.fromInventory = false
         self:ClearLoot()
@@ -1732,6 +1762,8 @@ do
         if addon.Master and addon.Master.ResetItemCount then
             addon.Master:ResetItemCount()
         end
+        addon:trace("[Loot] FetchLoot done lootCount=%d currentIndex=%d", lootState.lootCount or 0,
+            lootState.currentItemIndex or 0)
     end
 
     --
@@ -1745,7 +1777,7 @@ do
             GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
             GameTooltip:SetHyperlink(itemLink)
             GameTooltip:Hide()
-            addon:debug("Loot: item info unavailable; deferring.")
+            addon:warn("[Loot] ItemInfo missing -> deferred link=%s", tostring(itemLink))
             return
         end
 
@@ -2096,6 +2128,8 @@ do
                 candidateCache.indexByName[candidate] = p
             end
         end
+        addon:debug("[ML] Candidate cache built item=%s candidates=%d", tostring(itemLink),
+            addon.tLength(candidateCache.indexByName))
     end
 
     -------------------------------------------------------
@@ -2279,6 +2313,8 @@ do
         end
         countdownRun = false
         local itemLink = GetItemLink()
+        addon:info("[ML] Award requested winner=%s type=%d roll=%d item=%s", tostring(lootState.winner),
+            tonumber(lootState.currentRollType) or -1, addon.Rolls:HighestRoll() or 0, tostring(itemLink))
         local result
         if lootState.fromInventory == true then
             result = TradeItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
@@ -2710,6 +2746,8 @@ do
                 itemInfo.count   = count or 1
                 itemInfo.isStack = (itemInfo.count > 1)
                 module:ResetItemCount(true)
+            else
+                addon:warn("[ML] Inventory item is soulbound -> cannot trade link=%s", tostring(itemLink))
             end
             ClearCursor()
         end)
@@ -2742,6 +2780,7 @@ do
         if addon.Raid:IsMasterLooter() then
             addon:trace("[ML] LOOT_CLOSED opened=%s items=%d", tostring(lootState.opened),
                 lootState.lootCount or 0)
+            addon:trace("[ML] LOOT_CLOSED -> scheduling cleanup")
             if lootState.closeTimer then
                 addon.CancelTimer(lootState.closeTimer)
                 lootState.closeTimer = nil
@@ -2769,6 +2808,7 @@ do
                 UIMaster:Show()
             else
                 UIMaster:Hide()
+                addon:info("[ML] Loot window emptied")
             end
             module:ResetItemCount()
         end
@@ -2869,8 +2909,9 @@ do
     function TradeItem(itemLink, playerName, rollType, rollValue)
         if itemLink ~= GetItemLink() then return end
         lootState.trader = Utils.getPlayerName()
-        addon:info("[Trade] Start item=%s trader=%s target=%s type=%d roll=%d", tostring(itemLink),
-            tostring(lootState.trader), tostring(playerName), tonumber(rollType) or -1, tonumber(rollValue) or 0)
+        addon:info("[Trade] TradeItem start item=%s trader=%s target=%s type=%d roll=%d count=%d",
+            tostring(itemLink), tostring(lootState.trader), tostring(playerName), tonumber(rollType) or -1,
+            tonumber(rollValue) or 0, lootState.itemCount or 1)
 
         -- Prepare initial output and whisper:
         local output, whisper
@@ -2925,6 +2966,8 @@ do
             if unit ~= "none" and CheckInteractDistance(unit, 2) == 1 then
                 -- Player is in range for trade
                 if itemInfo.isStack and not addon.options.ignoreStacks then
+                    addon:warn("[Trade] Stack trade blocked ignoreStacks=%s link=%s",
+                        tostring(addon.options.ignoreStacks), tostring(itemLink))
                     addon:warn(L.ErrItemStack:format(itemLink))
                     return false
                 end
@@ -3575,6 +3618,7 @@ do
         if not editBox then return end
         local csv = editBox:GetText()
         if csv and csv ~= "" then
+            addon:info("[SR] Import requested chars=%d", #csv)
             self:ParseCSV(csv)
         end
         self:CloseImportWindow()
@@ -3629,6 +3673,7 @@ do
                 end
                 MarkPendingItem(itemId, hasName, hasIcon)
                 if hasName and hasIcon then
+                    addon:info("[SR] Item info resolved itemId=%d link=%s", itemId, tostring(link))
                     CompletePendingItem(itemId)
                 else
                     addon:debug("Reserves: item info still pending itemId=%d.", itemId)
@@ -3763,12 +3808,15 @@ do
                             player = playerName
                         }
                     end
+                else
+                    addon:warn("[SR] ParseCSV skipped line=%s", tostring(line))
                 end
             end
         end
 
         RebuildIndex()
         addon:debug("Reserves: parse CSV complete players=%d.", addon.tLength(reservesData))
+        addon:info("[SR] Import complete players=%d", addon.tLength(reservesData))
         self:RefreshWindow()
         self:Save()
     end
@@ -3837,6 +3885,7 @@ do
             end
         end
         addon:debug("Reserves: missing items requested=%d.", count)
+        addon:debug("[SR] QueryMissingItems updated=%s pending=%d", tostring(updated), count)
     end
 
     -- Update reserve item data
@@ -6288,16 +6337,24 @@ do
 
     function module:Log(itemID, looter, rollType, rollValue)
         local raidID = addon.History.selectedRaid or KRT_CurrentRaid
-        if not raidID or not KRT_Raids[raidID] then return end
+        if not raidID or not KRT_Raids[raidID] then
+            addon:warn("[History] Loot:Log skipped no raid raidId=%s", tostring(raidID))
+            return
+        end
 
         local it = KRT_Raids[raidID].loot[itemID]
-        if not it then return end
+        if not it then
+            addon:warn("[History] Loot:Log skipped item missing raidId=%d itemIndex=%s", raidID, tostring(itemID))
+            return
+        end
 
         if looter and looter ~= "" then it.looter = looter end
         if tonumber(rollType) then it.rollType = tonumber(rollType) end
         if tonumber(rollValue) then it.rollValue = tonumber(rollValue) end
 
         controller:Dirty()
+        addon:trace("[History] Loot updated raidId=%d itemIndex=%d looter=%s type=%s roll=%s", raidID,
+            tonumber(itemID) or -1, tostring(looter), tostring(rollType), tostring(rollValue))
     end
 
     local function Reset() controller:Dirty() end
@@ -6775,6 +6832,8 @@ local addonEvents = {
 function addon:ADDON_LOADED(name)
     if name ~= addonName then return end
     self:UnregisterEvent("ADDON_LOADED")
+    addon:info("[Core] Loaded version=%s logLevel=%s perfMode=%s",
+        tostring(GetAddOnMetadata(addonName, "Version")), tostring(KRT_Debug.level), tostring(true))
     addon.LoadOptions()
     for event, handler in pairs(addonEvents) do
         local method = handler
@@ -6782,6 +6841,7 @@ function addon:ADDON_LOADED(name)
             self[method](self, ...)
         end)
     end
+    addon:debug("[Core] Events registered=%d", addon.tLength(addonEvents))
     self:RAID_ROSTER_UPDATE()
 end
 
@@ -6800,6 +6860,10 @@ function addon:RAID_INSTANCE_WELCOME(...)
     _, KRT_NextReset = ...
     addon:trace("[Raid] RAID_INSTANCE_WELCOME name=%s type=%s diff=%s nextReset=%s",
         tostring(instanceName), tostring(instanceType), tostring(instanceDiff), tostring(KRT_NextReset))
+    if instanceType == "raid" and not L.RaidZones[instanceName] then
+        addon:warn("[Raid] Unmapped raid zone: %s (diff=%s) -> no session check",
+            tostring(instanceName), tostring(instanceDiff))
+    end
     if L.RaidZones[instanceName] ~= nil then
         addon:info("[Raid] Instance recognized: %s diff=%s -> check",
             tostring(instanceName), tostring(instanceDiff))
@@ -6815,6 +6879,7 @@ end
 function addon:PLAYER_ENTERING_WORLD()
     mainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
     local module = self.Raid
+    addon:trace("[Core] PLAYER_ENTERING_WORLD -> scheduling FirstCheck")
     addon.CancelTimer(module.firstCheckHandle, true)
     module.firstCheckHandle = addon.After(3, function() module:FirstCheck() end)
 end
@@ -6823,6 +6888,7 @@ end
 -- CHAT_MSG_LOOT: Adds looted items to the raid log.
 --
 function addon:CHAT_MSG_LOOT(msg)
+    addon:trace("[Loot] CHAT_MSG_LOOT raw=%s", tostring(msg))
     if KRT_CurrentRaid then
         self.Raid:AddLoot(msg)
     end
@@ -6858,7 +6924,7 @@ end
 function addon:CHAT_MSG_MONSTER_YELL(...)
     local text, boss = ...
     if L.BossYells[text] and KRT_CurrentRaid then
-        addon:trace("[Boss] Yell matched boss=%s", tostring(L.BossYells[text]))
+        addon:trace("[Boss] Yell matched text=%s boss=%s", tostring(text), tostring(L.BossYells[text]))
         self.Raid:AddBoss(L.BossYells[text])
     end
 end
