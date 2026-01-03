@@ -263,3 +263,4 @@ Notes:
 - _2025-09-25_: Reserve list rows now place text to the right of icons and hide icons until item data loads.
 - _2025-09-26_: Load saved SR reserves during addon initialization.
 - _2025-09-27_: SR roll button allows non-reserved players to roll once (SR priority remains).
+- _2026-02-01_: Fixed CallbackHandler OnUsed/OnUnused wiring in event dispatcher and templates.

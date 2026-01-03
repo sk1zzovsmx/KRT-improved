@@ -43,9 +43,9 @@ do
 
     local CB = addon.CallbackHandler or (LibStub and LibStub("CallbackHandler-1.0", true))
     if CB then
-        local function OnUsed(_, _, eventName) mainFrame:RegisterEvent(eventName) end
-        local function OnUnused(_, _, eventName) mainFrame:UnregisterEvent(eventName) end
-        events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents", OnUsed, OnUnused)
+        events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents")
+        events.OnUsed = function(_, _, eventName) mainFrame:RegisterEvent(eventName) end
+        events.OnUnused = function(_, _, eventName) mainFrame:UnregisterEvent(eventName) end
         mainFrame:SetScript("OnEvent", OnEvent)
     else
         InitFallback()
