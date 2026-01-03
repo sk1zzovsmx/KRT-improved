@@ -413,6 +413,8 @@ do
 
         tinsert(KRT_Raids, raidInfo)
         KRT_CurrentRaid = #KRT_Raids
+        addon:info("[Raid] Created id=%d zone=%s size=%d players=%d",
+            KRT_CurrentRaid or -1, tostring(zoneName), tonumber(raidSize) or -1, #raidInfo.players)
         Utils.triggerEvent("RaidCreate", KRT_CurrentRaid)
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = addon.After(3, function() module:UpdateRaidRoster() end)
@@ -426,6 +428,13 @@ do
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
         local currentTime = Utils.getCurrentTime()
+        local raid = KRT_Raids[KRT_CurrentRaid]
+        if raid then
+            local duration = currentTime - (raid.startTime or currentTime)
+            addon:info("[Raid] Ended id=%d zone=%s size=%d bosses=%d loot=%d duration=%d",
+                KRT_CurrentRaid or -1, tostring(raid.zone), tonumber(raid.size) or -1,
+                raid.bossKills and #raid.bossKills or 0, raid.loot and #raid.loot or 0, duration)
+        end
         for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
             if not v.leave then v.leave = currentTime end
         end
@@ -438,6 +447,8 @@ do
     -- Checks the current raid status and creates a new session if needed.
     --
     function module:Check(instanceName, instanceDiff)
+        addon:debug("[Raid] Check zone=%s diff=%s current=%s",
+            tostring(instanceName), tostring(instanceDiff), tostring(KRT_CurrentRaid))
         if not KRT_CurrentRaid then
             module:Create(instanceName, (instanceDiff % 2 == 0 and 25 or 10))
         end
@@ -447,17 +458,25 @@ do
             if current.zone == instanceName then
                 if current.size == 10 and (instanceDiff % 2 == 0) then
                     addon:info(L.StrNewRaidSessionChange)
+                    addon:info("[Raid] Session change zone=%s size=%d diff=%d", tostring(instanceName), 25,
+                        tonumber(instanceDiff) or -1)
                     module:Create(instanceName, 25)
                 elseif current.size == 25 and (instanceDiff % 2 ~= 0) then
                     addon:info(L.StrNewRaidSessionChange)
+                    addon:info("[Raid] Session change zone=%s size=%d diff=%d", tostring(instanceName), 10,
+                        tonumber(instanceDiff) or -1)
                     module:Create(instanceName, 10)
                 end
             end
         elseif (instanceDiff % 2 == 0) then
             addon:info(L.StrNewRaidSessionChange)
+            addon:info("[Raid] Session create zone=%s size=%d diff=%d", tostring(instanceName), 25,
+                tonumber(instanceDiff) or -1)
             module:Create(instanceName, 25)
         elseif (instanceDiff % 2 ~= 0) then
             addon:info(L.StrNewRaidSessionChange)
+            addon:info("[Raid] Session create zone=%s size=%d diff=%d", tostring(instanceName), 10,
+                tonumber(instanceDiff) or -1)
             module:Create(instanceName, 10)
         end
     end
@@ -545,6 +564,8 @@ do
         }
         tinsert(KRT_Raids[raidNum].bossKills, killInfo)
         KRT_LastBoss = #KRT_Raids[raidNum].bossKills
+        addon:info("[Boss] Logged boss=%s diff=%d raid=%d players=%d",
+            tostring(bossName), tonumber(instanceDiff) or -1, tonumber(raidNum) or -1, #players)
     end
 
     --
@@ -587,6 +608,7 @@ do
         local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
         local _, _, _, _, itemId = string.find(itemLink, ITEM_LINK_PATTERN)
         itemId = tonumber(itemId)
+        addon:trace("[Loot] Parsed player=%s itemId=%s count=%d", tostring(player), tostring(itemId), itemCount)
 
         -- We don't proceed if lower than threshold or ignored.
         local lootThreshold = GetLootThreshold()
@@ -2669,6 +2691,9 @@ do
         if not inBag or not inSlot then return end
         local itemTexture, count, locked, quality, _, _, itemLink = GetContainerItemInfo(inBag, inSlot)
         if not itemLink or not itemTexture then return end
+        addon:trace("[ML] ITEM_LOCKED bag=%s slot=%s link=%s count=%s soulbound=%s",
+            tostring(inBag), tostring(inSlot), tostring(itemLink), tostring(count),
+            tostring(ItemIsSoulbound(inBag, inSlot)))
         lootState.itemCount = count or lootState.itemCount or 1
         _G[frameName .. "ItemBtn"]:SetScript("OnClick", function(self)
             if not ItemIsSoulbound(inBag, inSlot) then
@@ -2698,11 +2723,15 @@ do
             lootState.opened = true
             announced = false
             addon.Loot:FetchLoot()
+            addon:trace("[ML] LOOT_OPENED items=%d fromInv=%s", lootState.lootCount or 0,
+                tostring(lootState.fromInventory))
             UpdateSelectionFrame()
             if lootState.lootCount >= 1 then UIMaster:Show() end
             if not addon.History.container then
                 addon.History.source = UnitName("target")
             end
+            addon:info("[ML] Loot opened items=%d fromInv=%s target=%s", lootState.lootCount or 0,
+                tostring(lootState.fromInventory), tostring(UnitName("target")))
         end
     end
 
@@ -2711,6 +2740,8 @@ do
     --
     function module:LOOT_CLOSED()
         if addon.Raid:IsMasterLooter() then
+            addon:trace("[ML] LOOT_CLOSED opened=%s items=%d", tostring(lootState.opened),
+                lootState.lootCount or 0)
             if lootState.closeTimer then
                 addon.CancelTimer(lootState.closeTimer)
                 lootState.closeTimer = nil
@@ -2732,6 +2763,7 @@ do
     function module:LOOT_SLOT_CLEARED()
         if addon.Raid:IsMasterLooter() then
             addon.Loot:FetchLoot()
+            addon:trace("[ML] LOOT_SLOT_CLEARED items=%d", lootState.lootCount or 0)
             UpdateSelectionFrame()
             if lootState.lootCount >= 1 then
                 UIMaster:Show()
@@ -2746,8 +2778,13 @@ do
     -- TRADE_ACCEPT_UPDATE: Triggered during a trade.
     --
     function module:TRADE_ACCEPT_UPDATE(tAccepted, pAccepted)
+        addon:trace("[Trade] ACCEPT_UPDATE trader=%s winner=%s t=%s p=%s",
+            tostring(lootState.trader), tostring(lootState.winner), tostring(tAccepted), tostring(pAccepted))
         if lootState.itemCount == 1 and lootState.trader and lootState.winner and lootState.trader ~= lootState.winner then
             if tAccepted == 1 and pAccepted == 1 then
+                addon:info("[Trade] Completed item=%s winner=%s type=%d roll=%d",
+                    tostring(lootState.currentRollItem), tostring(lootState.winner),
+                    tonumber(lootState.currentRollType) or -1, addon.Rolls:HighestRoll())
                 addon.History.Loot:Log(lootState.currentRollItem, lootState.winner, lootState.currentRollType,
                     addon.Rolls:HighestRoll())
                 lootState.trader = nil
@@ -2782,11 +2819,16 @@ do
         end
         local candidateIndex = candidateCache.indexByName[playerName]
         if not candidateIndex then
+            addon:debug("[ML] Candidate cache miss item=%s player=%s -> rebuild",
+                tostring(itemLink), tostring(playerName))
             BuildCandidateCache(itemLink)
             candidateIndex = candidateCache.indexByName[playerName]
         end
         if candidateIndex then
             GiveMasterLoot(itemIndex, candidateIndex)
+            addon:info("[ML] Awarded item=%s -> %s type=%d roll=%d slot=%d cand=%d",
+                tostring(itemLink), tostring(playerName), tonumber(rollType) or -1, tonumber(rollValue) or 0,
+                tonumber(itemIndex) or -1, tonumber(candidateIndex) or -1)
             local output, whisper
             if rollType <= 4 and addon.options.announceOnWin then
                 output = L.ChatAward:format(playerName, itemLink)
@@ -2827,6 +2869,8 @@ do
     function TradeItem(itemLink, playerName, rollType, rollValue)
         if itemLink ~= GetItemLink() then return end
         lootState.trader = Utils.getPlayerName()
+        addon:info("[Trade] Start item=%s trader=%s target=%s type=%d roll=%d", tostring(itemLink),
+            tostring(lootState.trader), tostring(playerName), tonumber(rollType) or -1, tonumber(rollValue) or 0)
 
         -- Prepare initial output and whisper:
         local output, whisper
@@ -2872,6 +2916,7 @@ do
             -- Trader is the winner:
         elseif lootState.trader == lootState.winner then
             -- Trader won, clear state
+            addon:info("[Trade] Trader keeps item=%s winner=%s", tostring(itemLink), tostring(playerName))
             addon.Loot:ClearLoot()
             addon.Rolls:ClearRolls(false)
             addon.Raid:ClearRaidIcons()
@@ -2887,6 +2932,7 @@ do
                 PickupContainerItem(itemInfo.bagID, itemInfo.slotID)
                 if CursorHasItem() then
                     InitiateTrade(playerName)
+                    addon:info("[Trade] Initiated item=%s -> %s", tostring(itemLink), tostring(playerName))
                     if addon.options.screenReminder and not screenshotWarn then
                         addon:warn(L.ErrScreenReminder)
                         screenshotWarn = true
@@ -2895,6 +2941,7 @@ do
                 -- Cannot trade the player?
             elseif unit ~= "none" then
                 -- Player is out of range
+                addon:warn("[Trade] Delayed: %s out of range item=%s", tostring(playerName), tostring(itemLink))
                 addon.Raid:ClearRaidIcons()
                 SetRaidTarget(lootState.trader, 1)
                 if lootState.winner then SetRaidTarget(lootState.winner, 4) end
@@ -6751,7 +6798,11 @@ end
 function addon:RAID_INSTANCE_WELCOME(...)
     local instanceName, instanceType, instanceDiff = GetInstanceInfo()
     _, KRT_NextReset = ...
+    addon:trace("[Raid] RAID_INSTANCE_WELCOME name=%s type=%s diff=%s nextReset=%s",
+        tostring(instanceName), tostring(instanceType), tostring(instanceDiff), tostring(KRT_NextReset))
     if L.RaidZones[instanceName] ~= nil then
+        addon:info("[Raid] Instance recognized: %s diff=%s -> check",
+            tostring(instanceName), tostring(instanceDiff))
         addon.After(3, function()
             addon.Raid:Check(instanceName, instanceDiff)
         end)
@@ -6807,6 +6858,7 @@ end
 function addon:CHAT_MSG_MONSTER_YELL(...)
     local text, boss = ...
     if L.BossYells[text] and KRT_CurrentRaid then
+        addon:trace("[Boss] Yell matched boss=%s", tostring(L.BossYells[text]))
         self.Raid:AddBoss(L.BossYells[text])
     end
 end
@@ -6831,6 +6883,7 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
 
     local boss = destName or bossLib:GetBossName(npcId)
     if boss then
+        addon:trace("[Boss] UNIT_DIED matched npcId=%d boss=%s", tonumber(npcId) or -1, tostring(boss))
         self.Raid:AddBoss(boss)
     end
 end
