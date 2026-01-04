@@ -756,6 +756,21 @@ do
 			if cfg.postUpdate then cfg.postUpdate(self.frameName) end
 		end
 
+		local function refreshData()
+			if not self._dirty then return end
+
+			local tableFree = addon.Table and addon.Table.free
+			if cfg.poolTag and tableFree then
+				for i = 1, #self.data do
+					tableFree(cfg.poolTag, self.data[i])
+				end
+			end
+
+			wipe(self.data)
+			if cfg.getData then cfg.getData(self.data) end
+			self._dirty = false
+		end
+
 		function self:Touch()
 			defer:Show()
 		end
@@ -769,20 +784,8 @@ do
 			f:Hide()
 			if not self._active or not self.frameName then return end
 
-			if self._dirty then
-				local tableFree = addon.Table and addon.Table.free
-				if cfg.poolTag and tableFree then
-					for i = 1, #self.data do
-						tableFree(cfg.poolTag, self.data[i])
-					end
-				end
-
-				wipe(self.data)
-				if cfg.getData then cfg.getData(self.data) end
-
-				self:Fetch()
-				self._dirty = false
-			end
+			refreshData()
+			self:Fetch()
 
 			applyHighlightAndPost()
 		end)
@@ -815,6 +818,7 @@ do
 		end
 
 		function self:Fetch()
+			refreshData()
 			local n = self.frameName
 			if not n then return end
 
