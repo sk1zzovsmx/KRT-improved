@@ -6182,20 +6182,30 @@ do
             local raid = KRT_Raids[rID]
             if not (raid and raid.bossKills and raid.bossKills[bID]) then return end
 
+            -- Rimuovi il boss dalla lista
+            tremove(raid.bossKills, bID)
+
             -- Elimina loot del boss rimosso e riallinea gli indici per le successive
-            for i = #raid.loot, 1, -1 do
-                local bn = tonumber(raid.loot[i].bossNum)
-                if bn then
-                    if bn == bID then
-                        tremove(raid.loot, i)
-                    elseif bn > bID then
-                        raid.loot[i].bossNum = bn - 1
+            local lootRemoved = 0
+            local loot = raid.loot
+            local bossField = "bossNum" -- raid.loot field linking loot to boss id
+            if loot then
+                for i = #loot, 1, -1 do
+                    local bn = tonumber(loot[i][bossField])
+                    if bn then
+                        if bn == bID then
+                            tremove(loot, i)
+                            lootRemoved = lootRemoved + 1
+                        elseif bn > bID then
+                            loot[i][bossField] = bn - 1
+                        end
                     end
                 end
             end
 
-            -- Rimuovi il boss dalla lista
-            tremove(raid.bossKills, bID)
+            if lootRemoved > 0 and addon.hasInfo then
+                addon:info(L.LogHistoryBossLootRemoved, rID, bID, lootRemoved)
+            end
 
             addon.History.selectedBoss = nil
             addon.History:ResetSelections()
