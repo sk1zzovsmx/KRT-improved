@@ -621,51 +621,25 @@ do
     -- Adds a loot item to the active raid log.
     --
     function module:AddLoot(msg, rollType, rollValue)
-        -- Master Loot / Loot chat parsing
-        -- Supports both "...receives loot:" and "...receives item:" (pushed) variants.
+        -- Master Loot
         local player, itemLink, count = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
         local itemCount = count or 1
-
-        -- Master Looter "item pushed" (e.g. when assigning via Master Loot)
-        if (not player) and _G.LOOT_ITEM_PUSHED_MULTIPLE then
-            player, itemLink, count = addon.Deformat(msg, LOOT_ITEM_PUSHED_MULTIPLE)
-            itemCount = count or 1
-        end
-
         if not player then
             player, itemLink = addon.Deformat(msg, LOOT_ITEM)
             itemCount = 1
         end
-
-        if (not player) and _G.LOOT_ITEM_PUSHED then
-            player, itemLink = addon.Deformat(msg, LOOT_ITEM_PUSHED)
-            itemCount = 1
-        end
-
-        -- Self loot (no player name in the string)
-        if not itemLink then
+        if not player then
             local link
             link, count = addon.Deformat(msg, LOOT_ITEM_SELF_MULTIPLE)
-            if (not link) and _G.LOOT_ITEM_PUSHED_SELF_MULTIPLE then
-                link, count = addon.Deformat(msg, LOOT_ITEM_PUSHED_SELF_MULTIPLE)
-            end
             if link then
                 itemLink = link
                 itemCount = count or 1
-                player = Utils.getPlayerName()
             end
+            player = Utils.getPlayerName()
         end
-
         if not itemLink then
-            local link = addon.Deformat(msg, LOOT_ITEM_SELF)
-            if (not link) and _G.LOOT_ITEM_PUSHED_SELF then
-                link = addon.Deformat(msg, LOOT_ITEM_PUSHED_SELF)
-            end
-            if link then
-                itemLink = link
-                itemCount = 1
-                player = Utils.getPlayerName()
-            end
+            itemLink = addon.Deformat(msg, LOOT_ITEM_SELF)
+            itemCount = 1
         end
 
         -- Other Loot Rolls
@@ -723,7 +697,6 @@ do
             time        = Utils.getCurrentTime(),
         }
         tinsert(KRT_Raids[KRT_CurrentRaid].loot, lootInfo)
-        Utils.triggerEvent("RaidLootUpdate", KRT_CurrentRaid, lootInfo)
         addon:debug(L.LogLootLogged:format(tonumber(KRT_CurrentRaid) or -1, tostring(itemId),
             tostring(KRT_LastBoss), tostring(player)))
     end
@@ -6485,8 +6458,7 @@ do
 
     local function Reset() controller:Dirty() end
     Utils.registerCallbacks(
-        { "HistorySelectRaid", "HistorySelectBoss", "HistorySelectPlayer", "HistorySelectBossPlayer",
-            "RaidLootUpdate" },
+        { "HistorySelectRaid", "HistorySelectBoss", "HistorySelectPlayer", "HistorySelectBossPlayer" },
         Reset
     )
     Utils.registerCallback("HistorySelectItem", function() controller:Touch() end)
