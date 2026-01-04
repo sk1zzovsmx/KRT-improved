@@ -756,8 +756,8 @@ do
 			if cfg.postUpdate then cfg.postUpdate(self.frameName) end
 		end
 
-		local function refreshData()
-			if not self._dirty then return end
+		local function refreshData(force)
+			if not (self._dirty or force) then return end
 
 			local tableFree = addon.Table and addon.Table.free
 			if cfg.poolTag and tableFree then
@@ -818,7 +818,7 @@ do
 		end
 
 		function self:Fetch()
-			refreshData()
+			refreshData(self.data and #self.data == 0)
 			local n = self.frameName
 			if not n then return end
 
