@@ -5777,6 +5777,202 @@ do
 end
 
 -- ============================================================================
+-- History list controller helpers (History-only)
+-- ============================================================================
+local makeHistoryListController
+local bindHistoryListController
+
+do
+    local CreateFrame = CreateFrame
+    local wipe = _G.wipe or table.wipe
+    local math_max = math.max
+
+    function makeHistoryListController(cfg)
+        local self = {
+            frameName = nil,
+            data = {},
+            _rows = {},
+            _rowByName = {},
+            _asc = false,
+            _lastHL = nil,
+            _active = true,
+            _localized = false,
+            _lastWidth = nil,
+            _dirty = true,
+        }
+
+        local defer = CreateFrame("Frame")
+        defer:Hide()
+
+        local function acquireRow(btnName, parent, tmpl)
+            local row = self._rowByName[btnName]
+            if row then
+                row:Show()
+                return row
+            end
+
+            row = CreateFrame("Button", btnName, parent, tmpl)
+            self._rowByName[btnName] = row
+
+            if cfg._rowParts and not row._p then
+                local p = {}
+                for i = 1, #cfg._rowParts do
+                    local part = cfg._rowParts[i]
+                    p[part] = _G[btnName .. part]
+                end
+                row._p = p
+            end
+
+            return row
+        end
+
+        local function hideExtraRows(fromIndex)
+            for i = fromIndex, #self._rows do
+                local r = self._rows[i]
+                if r then r:Hide() end
+            end
+        end
+
+        local function applyHighlightAndPost()
+            if cfg.highlightId then
+                local sel = cfg.highlightId()
+                if sel ~= self._lastHL then
+                    self._lastHL = sel
+                    for i = 1, #self.data do
+                        local it = self.data[i]
+                        local row = self._rows[i]
+                        if row then
+                            Utils.toggleHighlight(row, sel ~= nil and it.id == sel)
+                        end
+                    end
+                end
+            end
+            if cfg.postUpdate then cfg.postUpdate(self.frameName) end
+        end
+
+        function self:Touch()
+            defer:Show()
+        end
+
+        function self:Dirty()
+            self._dirty = true
+            defer:Show()
+        end
+
+        defer:SetScript("OnUpdate", function(f)
+            f:Hide()
+            if not self._active or not self.frameName then return end
+
+            if self._dirty then
+                local tableFree = addon.Table and addon.Table.free
+                if cfg.poolTag and tableFree then
+                    for i = 1, #self.data do
+                        tableFree(cfg.poolTag, self.data[i])
+                    end
+                end
+
+                wipe(self.data)
+                if cfg.getData then cfg.getData(self.data) end
+
+                self:Fetch()
+                self._dirty = false
+            end
+
+            applyHighlightAndPost()
+        end)
+
+        function self:OnLoad(frame)
+            if not frame then return end
+            self.frameName = frame:GetName()
+
+            frame:SetScript("OnShow", function()
+                self._active = true
+                if not self._localized and cfg.localize then
+                    cfg.localize(self.frameName)
+                    self._localized = true
+                end
+                self:Dirty()
+            end)
+
+            frame:SetScript("OnHide", function()
+                self._active = false
+            end)
+
+            if frame:IsShown() then
+                self._active = true
+                if not self._localized and cfg.localize then
+                    cfg.localize(self.frameName)
+                    self._localized = true
+                end
+                self:Dirty()
+            end
+        end
+
+        function self:Fetch()
+            local n = self.frameName
+            if not n then return end
+
+            local sf = _G[n .. "ScrollFrame"]
+            local sc = _G[n .. "ScrollFrameScrollChild"]
+            if not (sf and sc) then return end
+
+            local scrollW = sf:GetWidth() or 0
+            local widthChanged = (self._lastWidth ~= scrollW)
+            self._lastWidth = scrollW
+
+            local totalH = 0
+            local count = #self.data
+
+            for i = 1, count do
+                local it = self.data[i]
+                local btnName = cfg.rowName(n, it, i)
+
+                local row = self._rows[i]
+                if not row or row:GetName() ~= btnName then
+                    row = acquireRow(btnName, sc, cfg.rowTmpl)
+                    self._rows[i] = row
+                end
+
+                row:SetID(it.id)
+                row:ClearAllPoints()
+                row:SetPoint("TOPLEFT", 0, -totalH)
+                if widthChanged then row:SetWidth(scrollW - 20) end
+
+                local rH = cfg.drawRow(row, it)
+                local usedH = rH or row:GetHeight() or 20
+                totalH = totalH + usedH
+
+                row:Show()
+            end
+
+            hideExtraRows(count + 1)
+            sc:SetHeight(math_max(totalH, sf:GetHeight()))
+
+            self._lastHL = nil
+        end
+
+        function self:Sort(key)
+            local cmp = cfg.sorters and cfg.sorters[key]
+            if not cmp or #self.data <= 1 then return end
+            self._asc = not self._asc
+            table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
+            self:Fetch()
+            applyHighlightAndPost()
+        end
+
+        self._makeConfirmPopup = Utils.makeConfirmPopup
+
+        return self
+    end
+
+    function bindHistoryListController(module, controller)
+        module.OnLoad = function(_, frame) controller:OnLoad(frame) end
+        module.Fetch = function() controller:Fetch() end
+        module.Sort = function(_, t) controller:Sort(t) end
+    end
+end
+
+-- ============================================================================
 -- Raids List
 -- ============================================================================
 do
@@ -5784,7 +5980,7 @@ do
     local Raids         = addon.History.Raids
     local L             = addon.L
 
-    local controller    = Utils.makeListController {
+    local controller    = makeHistoryListController {
         keyName     = "RaidsList",
         poolTag     = "history-raids",
         _rowParts   = { "ID", "Date", "Zone", "Size" },
@@ -5849,7 +6045,7 @@ do
         },
     }
 
-    Utils.bindListController(Raids, controller)
+    bindHistoryListController(Raids, controller)
 
     function Raids:SetCurrent(btn)
         local sel = addon.History.selectedRaid
@@ -5910,7 +6106,7 @@ do
     local Boss         = addon.History.Boss
     local L            = addon.L
 
-    local controller   = Utils.makeListController {
+    local controller   = makeHistoryListController {
         keyName     = "BossList",
         poolTag     = "history-bosses",
         _rowParts   = { "ID", "Name", "Time", "Mode" },
@@ -5973,7 +6169,7 @@ do
         },
     }
 
-    Utils.bindListController(Boss, controller)
+    bindHistoryListController(Boss, controller)
 
     function Boss:Add() addon.History.BossBox:Toggle() end
 
@@ -6037,7 +6233,7 @@ do
     local M                     = addon.History.BossAttendees
     local L                     = addon.L
 
-    local controller            = Utils.makeListController {
+    local controller            = makeHistoryListController {
         keyName     = "BossAttendees",
         poolTag     = "history-boss-attendees",
         _rowParts   = { "Name" },
@@ -6093,7 +6289,7 @@ do
         },
     }
 
-    Utils.bindListController(M, controller)
+    bindHistoryListController(M, controller)
 
     function M:Add() addon.History.AttendeesBox:Toggle() end
 
@@ -6140,7 +6336,7 @@ do
     local M                     = addon.History.RaidAttendees
     local L                     = addon.L
 
-    local controller            = Utils.makeListController {
+    local controller            = makeHistoryListController {
         keyName     = "RaidAttendees",
         poolTag     = "history-raid-attendees",
         _rowParts   = { "Name", "Join", "Leave" },
@@ -6206,7 +6402,7 @@ do
         },
     }
 
-    Utils.bindListController(M, controller)
+    bindHistoryListController(M, controller)
 
     do
         local function DeleteAttendee()
@@ -6258,7 +6454,7 @@ do
     local module       = addon.History.Loot
     local L            = addon.L
 
-    local controller   = Utils.makeListController {
+    local controller   = makeHistoryListController {
         keyName     = "LootList",
         poolTag     = "history-loot",
         _rowParts   = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
@@ -6381,7 +6577,7 @@ do
         },
     }
 
-    Utils.bindListController(module, controller)
+    bindHistoryListController(module, controller)
 
     function module:OnEnter(widget)
         if not widget then return end
