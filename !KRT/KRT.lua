@@ -193,61 +193,96 @@ local tostring, tonumber                = tostring, tonumber
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
 
 ---============================================================================
--- Event System
--- Manages WoW API event registration for the addon.
+-- Event System (WoW API events)
+-- Clean frame-based dispatcher (NO CallbackHandler here)
 ---============================================================================
 do
-    local events
+    -- listeners[event] = { obj1, obj2, ... }
+    local listeners = {}
 
-    local function OnEvent(_, e, ...)
-        if e == "ADDON_LOADED" then
-            addon.LoadOptions()
-            addon.Reserves:Load()
-        end
-        if events then
-            events:Fire(e, ...)
-        else
-            local func = addon[e]
-            if type(func) == "function" then
-                func(addon, ...)
+    local function HandleEvent(_, e, ...)
+        local list = listeners[e]
+        if not list then return end
+
+        for i = 1, #list do
+            local obj = list[i]
+            local fn = obj and obj[e]
+            if type(fn) == "function" then
+                local ok, err = pcall(fn, obj, ...)
+                if not ok then
+                    addon:error("Event handler failed event=%s err=%s", tostring(e), tostring(err))
+                end
             end
         end
     end
 
-    local function InitEventFallback()
-        mainFrame:SetScript("OnEvent", OnEvent)
-        mainFrame:RegisterEvent("ADDON_LOADED")
-        function addon:RegisterEvent(e)
-            mainFrame:RegisterEvent(e)
+    local function AddListener(obj, e)
+        if type(e) ~= "string" or e == "" then
+            error("Usage: RegisterEvent(\"EVENT_NAME\")", 3)
         end
 
-        function addon:UnregisterEvent(e)
+        local list = listeners[e]
+        if not list then
+            list = {}
+            listeners[e] = list
+            mainFrame:RegisterEvent(e)
+        else
+            for i = 1, #list do
+                if list[i] == obj then return end -- already registered
+            end
+        end
+
+        list[#list + 1] = obj
+    end
+
+    local function RemoveListener(obj, e)
+        local list = listeners[e]
+        if not list then return end
+
+        for i = #list, 1, -1 do
+            if list[i] == obj then
+                tremove(list, i)
+            end
+        end
+
+        if #list == 0 then
+            listeners[e] = nil
             mainFrame:UnregisterEvent(e)
         end
+    end
 
-        function addon:UnregisterAllEvents()
-            mainFrame:UnregisterAllEvents()
+    function addon:RegisterEvent(e)
+        AddListener(self, e)
+    end
+
+    function addon:RegisterEvents(...)
+        for i = 1, select("#", ...) do
+            AddListener(self, select(i, ...))
         end
     end
 
-    local CB = addon.CallbackHandler
-    if CB then
-        -- Create WoW event registry
-        events = CB:New(addon, "RegisterEvent", "UnregisterEvent", "UnregisterAllEvents")
-
-        -- CallbackHandler-1.0: OnUsed/OnUnused vanno assegnati al registry, non passati a :New()
-        events.OnUsed = function(_, _, e) mainFrame:RegisterEvent(e) end
-        events.OnUnused = function(_, _, e) mainFrame:UnregisterEvent(e) end
-
-        mainFrame:SetScript("OnEvent", OnEvent)
-        mainFrame:RegisterEvent("ADDON_LOADED")
-        addon:RegisterEvent("ADDON_LOADED", function(...) addon:ADDON_LOADED(...) end)
+    function addon:UnregisterEvent(e)
+        RemoveListener(self, e)
     end
 
-    if not CB then
-        addon:warn(L.LogCoreCallbackHandlerMissing)
-        InitEventFallback()
+    function addon:UnregisterEvents()
+        local keys = {}
+        for e in pairs(listeners) do
+            keys[#keys + 1] = e
+        end
+        for i = 1, #keys do
+            RemoveListener(self, keys[i])
+        end
     end
+
+    function addon:UnregisterAllEvents()
+        self:UnregisterEvents()
+    end
+
+    mainFrame:SetScript("OnEvent", HandleEvent)
+
+    -- bootstrap
+    addon:RegisterEvent("ADDON_LOADED")
 end
 
 ---============================================================================
@@ -6888,11 +6923,9 @@ function addon:ADDON_LOADED(name)
     addon:info(L.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
         tostring(KRT_Debug.level), tostring(true)))
     addon.LoadOptions()
-    for event, handler in pairs(addonEvents) do
-        local method = handler
-        self:RegisterEvent(event, function(...)
-            self[method](self, ...)
-        end)
+    addon.Reserves:Load()
+    for event in pairs(addonEvents) do
+        self:RegisterEvent(event)
     end
     addon:debug(L.LogCoreEventsRegistered:format(addon.tLength(addonEvents)))
     self:RAID_ROSTER_UPDATE()
@@ -6928,7 +6961,7 @@ end
 -- PLAYER_ENTERING_WORLD: Performs initial checks when the player logs in.
 --
 function addon:PLAYER_ENTERING_WORLD()
-    mainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
+    self:UnregisterEvent("PLAYER_ENTERING_WORLD")
     local module = self.Raid
     addon:trace(L.LogCorePlayerEnteringWorld)
     addon.CancelTimer(module.firstCheckHandle, true)
