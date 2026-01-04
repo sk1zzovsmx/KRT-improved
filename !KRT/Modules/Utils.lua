@@ -1,38 +1,79 @@
-local addonName, addon     = ...
-addon.Utils                = addon.Utils or {}
+local addonName, addon = ...
+addon.Utils = addon.Utils or {}
 
-local Utils                = addon.Utils
-local L                    = addon.L
+local Utils = addon.Utils
+local L = addon.L
 
-local type, ipairs, pairs  = type, ipairs, pairs
-local floor, random        = math.floor, math.random
-local setmetatable         = setmetatable
-local getmetatable         = getmetatable
-local tinsert, tremove     = table.insert, table.remove
-local find, match          = string.find, string.match
-local format, gsub         = string.format, string.gsub
-local strsub, strlen       = string.sub, string.len
-local lower, upper         = string.lower, string.upper
-local ucfirst             = _G.string and _G.string.ucfirst
-local select, unpack       = select, unpack
-local LibStub              = LibStub
+local type, ipairs = type, ipairs
+local floor, random = math.floor, math.random
+local find = string.find
+local format, gsub = string.format, string.gsub
+local strsub, strlen = string.sub, string.len
+local lower, upper = string.lower, string.upper
+local ucfirst = _G.string and _G.string.ucfirst
+local select = select
+local LibStub = LibStub
 
-local GetLocale            = GetLocale
-local GetTime              = GetTime
-local GetRaidRosterInfo    = GetRaidRosterInfo
-local GetRealmName         = GetRealmName
-local GetAchievementLink   = GetAchievementLink
-local UnitClass            = UnitClass
-local UnitInRaid           = UnitInRaid
+local GetTime = GetTime
+local GetRaidRosterInfo = GetRaidRosterInfo
+local GetRealmName = GetRealmName
+local GetAchievementLink = GetAchievementLink
+local UnitClass = UnitClass
+local UnitInRaid = UnitInRaid
 local UnitIsGroupAssistant = UnitIsGroupAssistant
-local UnitIsGroupLeader    = UnitIsGroupLeader
-local UnitIsPartyLeader    = UnitIsPartyLeader
-local UnitIsRaidLeader     = UnitIsRaidLeader
-local UnitIsRaidOfficer    = UnitIsRaidOfficer
-local UnitLevel            = UnitLevel
-local UnitName             = UnitName
+local UnitIsGroupLeader = UnitIsGroupLeader
+local UnitLevel = UnitLevel
 
-local ITEM_LINK_FORMAT     = "|c%s|Hitem:%d:%s|h[%s]|h|r"
+local ITEM_LINK_FORMAT = "|c%s|Hitem:%d:%s|h[%s]|h|r"
+
+---============================================================================
+-- Global convenience helpers (kept as-is)
+---============================================================================
+
+-- Shuffle a table:
+_G.table.shuffle = function(t)
+	local n = #t
+	while n > 2 do
+		local k = random(1, n)
+		t[n], t[k] = t[k], t[n]
+		n = n - 1
+	end
+end
+
+-- Reverse table:
+_G.table.reverse = function(t, count)
+	local i, j = 1, #t
+	while i < j do
+		t[i], t[j] = t[j], t[i]
+		i = i + 1
+		j = j - 1
+	end
+end
+
+-- Trim a string:
+_G.string.trim = function(str)
+	return gsub(str, "^%s*(.-)%s*$", "%1")
+end
+
+-- String starts with:
+_G.string.startsWith = function(str, piece)
+	return strsub(str, 1, strlen(piece)) == piece
+end
+
+-- String ends with:
+_G.string.endsWith = function(str, piece)
+	return #str >= #piece and find(str, #str - #piece + 1, true) and true or false
+end
+
+-- Uppercase first:
+_G.string.ucfirst = function(str)
+	str = lower(str)
+	return gsub(str, "%a", upper, 1)
+end
+
+---============================================================================
+-- Debug/state helpers
+---============================================================================
 
 function Utils.applyDebugSetting(enabled)
 	if addon and addon.options then
@@ -52,18 +93,6 @@ function Utils.getPlayerName()
 		or addon.UnitFullName("player")
 	addon.State.player.name = name
 	return name
-end
-
----============================================================================
--- Small helpers / iteration
----============================================================================
-
--- Group/pet iteration in one call
-function Utils.forEachGroupUnit(cb, includePets)
-	local iter, state, index = addon.UnitIterator(not includePets and true or nil)
-	for unit, owner in iter, state, index do
-		cb(unit, owner)
-	end
 end
 
 ---============================================================================
@@ -173,24 +202,6 @@ function Utils.getRaidRosterData(unit)
 end
 
 ---============================================================================
--- Lightweight throttles
----============================================================================
-
--- Lightweight throttle (keyed)
-do
-	local last = {}
-
-	function Utils.throttleKey(key, sec)
-		local now = GetTime()
-		sec = sec or 1
-		if not last[key] or (now - last[key]) >= sec then
-			last[key] = now
-			return true
-		end
-	end
-end
-
----============================================================================
 -- Callback utilities
 ---============================================================================
 
@@ -200,7 +211,8 @@ do
 	-- Internal callback registry (not the WoW event registry)
 	addon.InternalCallbacksTarget = addon.InternalCallbacksTarget or {}
 	addon.InternalCallbacks = addon.InternalCallbacks
-		or CallbackHandler:New(addon.InternalCallbacksTarget, "RegisterCallback", "UnregisterCallback", "UnregisterAllCallbacks")
+		or CallbackHandler:New(addon.InternalCallbacksTarget, "RegisterCallback", "UnregisterCallback",
+		"UnregisterAllCallbacks")
 
 	local target = addon.InternalCallbacksTarget
 	local registry = addon.InternalCallbacks
@@ -257,37 +269,37 @@ end
 
 function Utils.makeConfirmPopup(key, text, onAccept, cancels)
 	StaticPopupDialogs[key] = {
-		text         = text,
-		button1      = OKAY,
-		button2      = CANCEL,
-		OnAccept     = onAccept,
-		cancels      = cancels or key,
-		timeout      = 0,
-		whileDead    = 1,
+		text = text,
+		button1 = OKAY,
+		button2 = CANCEL,
+		OnAccept = onAccept,
+		cancels = cancels or key,
+		timeout = 0,
+		whileDead = 1,
 		hideOnEscape = 1,
 	}
 end
 
 function Utils.makeEditBoxPopup(key, text, onAccept, onShow)
 	StaticPopupDialogs[key] = {
-		text         = text,
-		button1      = SAVE,
-		button2      = CANCEL,
-		timeout      = 0,
-		whileDead    = 1,
+		text = text,
+		button1 = SAVE,
+		button2 = CANCEL,
+		timeout = 0,
+		whileDead = 1,
 		hideOnEscape = 1,
-		hasEditBox   = 1,
-		cancels      = key,
-		OnShow       = function(self)
+		hasEditBox = 1,
+		cancels = key,
+		OnShow = function(self)
 			if onShow then
 				onShow(self)
 			end
 		end,
-		OnHide       = function(self)
+		OnHide = function(self)
 			self.editBox:SetText("")
 			self.editBox:ClearFocus()
 		end,
-		OnAccept     = function(self)
+		OnAccept = function(self)
 			onAccept(self, self.editBox:GetText())
 		end,
 	}
@@ -385,60 +397,8 @@ do
 end
 
 ---============================================================================
--- Global convenience helpers (kept as-is)
----============================================================================
-
--- Shuffle a table:
-_G.table.shuffle = function(t)
-	local n = #t
-	while n > 2 do
-		local k = random(1, n)
-		t[n], t[k] = t[k], t[n]
-		n = n - 1
-	end
-end
-
--- Reverse table:
-_G.table.reverse = function(t, count)
-	local i, j = 1, #t
-	while i < j do
-		t[i], t[j] = t[j], t[i]
-		i = i + 1
-		j = j - 1
-	end
-end
-
--- Trim a string:
-_G.string.trim = function(str)
-	return gsub(str, "^%s*(.-)%s*$", "%1")
-end
-
--- String starts with:
-_G.string.startsWith = function(str, piece)
-	return strsub(str, 1, strlen(piece)) == piece
-end
-
--- String ends with:
-_G.string.endsWith = function(str, piece)
-	return #str >= #piece and find(str, #str - #piece + 1, true) and true or false
-end
-
--- Uppercase first:
-_G.string.ucfirst = function(str)
-	str = lower(str)
-	return gsub(str, "%a", upper, 1)
-end
-
----============================================================================
 -- Color utilities
 ---============================================================================
-
-function Utils.rgbToHex(r, g, b)
-	if r and g and b and r <= 1 and g <= 1 and b <= 1 then
-		r, g, b = r * 255, g * 255, b * 255
-	end
-	return addon.RGBToHex(r, g, b)
-end
 
 function Utils.normalizeHexColor(color)
 	if type(color) == "string" then
@@ -466,22 +426,8 @@ function Utils.getClassColor(className)
 end
 
 ---============================================================================
--- Generic utilities
+-- UI helpers
 ---============================================================================
-
--- Determines if a given string is a number
-function Utils.isNumber(str)
-	local valid = false
-	if str then
-		valid = find(str, "^(%d+%.?%d*)$")
-	end
-	return valid
-end
-
--- Determines if the given string is non-empty:
-function Utils.isString(str)
-	return (str and strlen(str) > 0)
-end
 
 -- Enable/Disable Frame:
 function Utils.enableDisable(frame, cond)
@@ -536,10 +482,9 @@ function Utils.setText(frame, str1, str2, cond)
 	end
 end
 
--- Return with IF:
-function Utils.returnIf(cond, a, b)
-	return cond and a or b
-end
+---============================================================================
+-- Throttles
+---============================================================================
 
 -- Throttle frame OnUpdate:
 function Utils.throttle(frame, name, period, elapsed)
@@ -564,23 +509,9 @@ function Utils.throttledUIUpdate(frame, frameName, period, elapsed, fn)
 	return false
 end
 
--- Boolean <> String conversion:
-function Utils.bool2str(bool)
-	return bool and "true" or "false"
-end
-
-function Utils.str2bool(str)
-	return (str ~= "false")
-end
-
--- Number <> Boolean conversion:
-function Utils.bool2num(bool)
-	return bool and 1 or 0
-end
-
-function Utils.num2bool(num)
-	return (num ~= 0)
-end
+---============================================================================
+-- Chat + comms helpers
+---============================================================================
 
 -- Convert seconds to readable clock string:
 function Utils.sec2clock(seconds)
@@ -630,15 +561,9 @@ function Utils.whisper(target, msg)
 	end
 end
 
--- Returns the current UTC date and time in seconds:
-function Utils.getUTCTimestamp()
-	local utcDateTime = date("!*t")
-	return time(utcDateTime)
-end
-
-function Utils.getSecondsAsString(t)
-	return Utils.sec2clock(t)
-end
+---============================================================================
+-- Time helpers
+---============================================================================
 
 -- Determines if the player is in a raid instance
 function Utils.isRaidInstance()
@@ -713,7 +638,7 @@ do
 
 	-- Decoding:
 	function Utils.decode(data)
-		data = gsub(data, "[^" .. b .. "=]", '')
+		data = gsub(data, "[^" .. b .. "=]", "")
 		return (gsub(data, ".", function(x)
 			if x == "=" then return "" end
 			local r, f = "", (find(b, x) - 1)
