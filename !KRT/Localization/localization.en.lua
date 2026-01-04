@@ -93,6 +93,7 @@ L.LogHistoryVerifyFailed          = "[History] Loot:Log VERIFY FAILED raidId=%d 
     .. "got(looter=%s type=%s roll=%s)"
 L.LogHistoryVerified              = "[History] Loot:Log verified raidId=%d itemIndex=%s"
 L.LogHistoryRecordedNoBossContext = "[History] Loot recorded without boss context raidId=%d itemIndex=%s link=%s"
+L.LogHistoryBossLootRemoved       = "[History] Boss delete removed loot raidId=%d bossId=%d removed=%d"
 
 -- ==================== General Buttons ==================== --
 L.BtnConfig                       = "Config"
