@@ -1990,6 +1990,8 @@ do
 
     local InitializeDropDowns, PrepareDropDowns, UpdateDropDowns
     local dropDownData, dropDownGroupData = {}, {}
+    -- Ensure subgroup tables exist even when the Master UI hasn't been opened yet.
+    for i = 1, 8 do dropDownData[i] = dropDownData[i] or {} end
     local dropDownFrameHolder, dropDownFrameBanker, dropDownFrameDisenchanter
     local dropDownsInitialized
     local dropDownDirty = true
@@ -2622,13 +2624,22 @@ do
         dropDownDirty = true
         dirtyFlags.dropdowns = true
         for i = 1, 8 do
-            dropDownData[i] = twipe(dropDownData[i])
+            local t = dropDownData[i]
+            if t then
+                twipe(t)
+            else
+                t = {}
+                dropDownData[i] = t
+            end
         end
-        dropDownGroupData = twipe(dropDownGroupData)
+        dropDownGroupData = dropDownGroupData or {}
+        twipe(dropDownGroupData)
         addon.GroupIterator(function(unit, owner)
             local name = UnitName(unit)
             local _, subgroup = Utils.getRaidRosterData(unit)
             if name then
+                subgroup = subgroup or 1
+                dropDownData[subgroup] = dropDownData[subgroup] or {}
                 dropDownData[subgroup][name] = name
                 dropDownGroupData[subgroup] = true
             end
