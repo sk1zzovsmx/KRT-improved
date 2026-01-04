@@ -757,11 +757,23 @@ do
 		end
 
 		function self:Touch()
+			if not self._active and self.frameName then
+				local frame = _G[self.frameName]
+				if frame and frame:IsShown() then
+					self._active = true
+				end
+			end
 			defer:Show()
 		end
 
 		function self:Dirty()
 			self._dirty = true
+			if not self._active and self.frameName then
+				local frame = _G[self.frameName]
+				if frame and frame:IsShown() then
+					self._active = true
+				end
+			end
 			defer:Show()
 		end
 

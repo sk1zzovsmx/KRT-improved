@@ -5899,7 +5899,7 @@ do
         controller:Dirty()
     end)
 
-    Utils.registerCallback("HistorySelectRaid", function() controller:Touch() end)
+    Utils.registerCallback("HistorySelectRaid", function() controller:Dirty() end)
 end
 
 -- ============================================================================
