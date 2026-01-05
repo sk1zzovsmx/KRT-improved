@@ -20,7 +20,7 @@ No Ace3 GUI; UI is XML + Lua only. Vendored libs via **LibStub**.
 - **Addon folder name:** `!KRT` (the leading `!` is intentional).
 - **SavedVariables (account):**
   `KRT_Options, KRT_Raids, KRT_Players, KRT_Warnings, KRT_ExportString, KRT_Spammer, KRT_CurrentRaid,`
-  `KRT_LastBoss, KRT_NextReset, KRT_SavedReserves, KRT_PlayerCounts, KRT_Debug`.
+  `KRT_LastBoss, KRT_NextReset, KRT_SavedReserves, KRT_PlayerCounts`.
 - **Branching model:** work **only** on `dev`. `main` is release-only. Maintainers handle merges/bumping.
 - **Backward compatibility:** avoid breaking SV keys and existing CLI without a note in **18) Change log**.
 - **Structure:** keep addon monolithic; integrate features within `!KRT/` instead of split addons.
@@ -265,3 +265,4 @@ Notes:
 - _2025-09-27_: SR roll button allows non-reserved players to roll once (SR priority remains).
 - _2026-02-01_: Fixed CallbackHandler OnUsed/OnUnused wiring in event dispatcher and templates.
 - _2026-02-15_: Parse pushed loot messages and refresh Loot History on new loot.
+- _2026-02-21_: Removed KRT_Debug SavedVariable (log levels are runtime-only).

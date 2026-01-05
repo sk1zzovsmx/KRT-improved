@@ -53,26 +53,22 @@ KRT_PlayerCounts          = KRT_PlayerCounts or {}
 local Compat              = LibStub("LibCompat-1.0")
 addon.Compat              = Compat
 addon.BossIDs             = LibStub("LibBossIDs-1.0")
-addon.Logger              = LibStub("LibLogger-1.0")
+addon.Debugger            = LibStub("LibLogger-1.0")
 addon.Deformat            = LibStub("LibDeformat-3.0")
 addon.CallbackHandler     = LibStub("CallbackHandler-1.0")
 
 Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
-addon.Logger:Embed(addon)
+addon.Debugger:Embed(addon)
 
 -- Alias locali (safe e veloci)
 local UnitIsGroupLeader    = addon.UnitIsGroupLeader
 local UnitIsGroupAssistant = addon.UnitIsGroupAssistant
 local tContains            = _G.tContains
 
--- SavedVariables for log level (fallback INFO)
-KRT_Debug                  = KRT_Debug or {}
 do
-    local INFO = addon.Logger.logLevels.INFO
-    KRT_Debug.level = KRT_Debug.level or INFO
-    local lv = KRT_Debug.level
+    local lv = addon.Debugger.logLevels.INFO
     if KRT_Options and KRT_Options.debug then
-        lv = addon.Logger.logLevels.DEBUG
+        lv = addon.Debugger.logLevels.DEBUG
     end
     addon:SetLogLevel(lv)
     addon:SetPerformanceMode(true)
@@ -6971,6 +6967,7 @@ do
         printHelp("changes", L.StrCmdChanges)
         printHelp("warnings", L.StrCmdWarnings)
         printHelp("history", L.StrCmdHistory)
+        printHelp("debug", L.StrCmdDebug)
         printHelp("reserves", L.StrCmdReserves)
     end
 
@@ -7002,6 +6999,11 @@ do
         local subCmd, arg = Utils.splitArgs(rest)
         if subCmd == "" then subCmd = nil end
 
+        if subCmd == "levels" then
+            addon:info(L.MsgLogLevelList)
+            return
+        end
+
         if subCmd == "level" or subCmd == "lvl" then
             if not arg or arg == "" then
                 local lvl = addon.GetLogLevel and addon:GetLogLevel()
@@ -7013,6 +7015,7 @@ do
                     end
                 end
                 addon:info(L.MsgLogLevelCurrent, name or tostring(lvl))
+                addon:info(L.MsgLogLevelList)
                 return
             end
 
@@ -7022,7 +7025,6 @@ do
             end
             if lv then
                 addon:SetLogLevel(lv)
-                KRT_Debug.level = lv
                 addon:info(L.MsgLogLevelSet, arg)
             else
                 addon:warn(L.MsgLogLevelUnknown, arg)
@@ -7222,8 +7224,9 @@ local addonEvents = {
 function addon:ADDON_LOADED(name)
     if name ~= addonName then return end
     self:UnregisterEvent("ADDON_LOADED")
+    local lvl = addon.GetLogLevel and addon:GetLogLevel()
     addon:info(L.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
-        tostring(KRT_Debug.level), tostring(true)))
+        tostring(lvl), tostring(true)))
     addon.LoadOptions()
     addon.Reserves:Load()
     for event in pairs(addonEvents) do
