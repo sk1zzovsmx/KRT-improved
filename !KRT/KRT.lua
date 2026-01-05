@@ -5638,88 +5638,88 @@ end
 -- ============================================================================
 do
     addon.History = addon.History or {}
-    local module = addon.History
+    local History = addon.History
     local L = addon.L
 
     local frameName
 
-    module.selectedRaid = nil
-    module.selectedBoss = nil
-    module.selectedPlayer = nil
-    module.selectedBossPlayer = nil
-    module.selectedItem = nil
+    History.selectedRaid = nil
+    History.selectedBoss = nil
+    History.selectedPlayer = nil
+    History.selectedBossPlayer = nil
+    History.selectedItem = nil
 
     local function clearSelections()
-        module.selectedBoss = nil
-        module.selectedPlayer = nil
-        module.selectedBossPlayer = nil
-        module.selectedItem = nil
+        History.selectedBoss = nil
+        History.selectedPlayer = nil
+        History.selectedBossPlayer = nil
+        History.selectedItem = nil
     end
 
     local function toggleSelection(field, id, eventName)
-        module[field] = (id and id ~= module[field]) and id or nil
+        History[field] = (id and id ~= History[field]) and id or nil
         if eventName then
-            Utils.triggerEvent(eventName, module[field])
+            Utils.triggerEvent(eventName, History[field])
         end
     end
 
-    function module:ResetSelections()
+    function History:ResetSelections()
         clearSelections()
     end
 
-    function module:OnLoad(frame)
+    function History:OnLoad(frame)
         UIHistory, frameName = frame, frame:GetName()
         frame:RegisterForDrag("LeftButton")
         Utils.setFrameTitle(frameName, L.StrLootHistory)
 
         frame:SetScript("OnShow", function()
-            if not module.selectedRaid then
-                module.selectedRaid = KRT_CurrentRaid
+            if not History.selectedRaid then
+                History.selectedRaid = KRT_CurrentRaid
             end
             clearSelections()
-            Utils.triggerEvent("HistorySelectRaid", module.selectedRaid)
+            Utils.triggerEvent("HistorySelectRaid", History.selectedRaid)
         end)
 
         frame:SetScript("OnHide", function()
-            module.selectedRaid = KRT_CurrentRaid
+            History.selectedRaid = KRT_CurrentRaid
             clearSelections()
         end)
     end
 
-    function module:Toggle() Utils.toggle(UIHistory) end
+    function History:Toggle() Utils.toggle(UIHistory) end
 
-    function module:Hide()
-        module.selectedRaid = KRT_CurrentRaid
+    function History:Hide()
+        History.selectedRaid = KRT_CurrentRaid
         clearSelections()
         Utils.showHide(UIHistory, false)
     end
 
     -- Selectors
-    function module:SelectRaid(btn)
+    function History:SelectRaid(btn)
         local id = btn and btn.GetID and btn:GetID()
-        module.selectedRaid = (id and id ~= module.selectedRaid) and id or nil
+        History.selectedRaid = (id and id ~= History.selectedRaid) and id or nil
         clearSelections()
-        Utils.triggerEvent("HistorySelectRaid", module.selectedRaid)
+        Utils.triggerEvent("HistorySelectRaid", History.selectedRaid)
     end
 
-    function module:SelectBoss(btn)
+    function History:SelectBoss(btn)
         local id = btn and btn.GetID and btn:GetID()
         toggleSelection("selectedBoss", id, "HistorySelectBoss")
     end
 
     -- Player filter: only one active at a time
-    function module:SelectBossPlayer(btn)
+    function History:SelectBossPlayer(btn)
         local id = btn and btn.GetID and btn:GetID()
-        module.selectedPlayer = nil
+        History.selectedPlayer = nil
         toggleSelection("selectedBossPlayer", id, "HistorySelectBossPlayer")
-        Utils.triggerEvent("HistorySelectPlayer", module.selectedPlayer)
+        Utils.triggerEvent("HistorySelectPlayer", History.selectedPlayer)
     end
 
-    function module:SelectPlayer(btn)
+    function History:SelectPlayer(btn)
         local id = btn and btn.GetID and btn:GetID()
-        module.selectedBossPlayer = nil
+        History.selectedBossPlayer = nil
         toggleSelection("selectedPlayer", id, "HistorySelectPlayer")
-        Utils.triggerEvent("HistorySelectBossPlayer", module.selectedBossPlayer)
+        Utils.triggerEvent("HistorySelectBossPlayer", History.selectedBossPlayer)
     end
 
     -- Item: left select, right menu
@@ -5735,15 +5735,15 @@ do
             }, f, "cursor", 0, 0, "MENU")
         end
 
-        function module:SelectItem(btn, button)
+        function History:SelectItem(btn, button)
             local id = btn and btn.GetID and btn:GetID()
             if not id then return end
 
             if button == "LeftButton" then
                 toggleSelection("selectedItem", id, "HistorySelectItem")
             elseif button == "RightButton" then
-                module.selectedItem = id
-                Utils.triggerEvent("HistorySelectItem", module.selectedItem)
+                History.selectedItem = id
+                Utils.triggerEvent("HistorySelectItem", History.selectedItem)
                 openItemMenu()
             end
         end
@@ -5928,7 +5928,14 @@ do
             if self._active then
                 ensureLocalized()
                 self:Dirty()
+                return
             end
+            releaseData()
+            for i = 1, #self._rows do
+                local row = self._rows[i]
+                if row then row:Hide() end
+            end
+            self._lastHL = nil
         end
 
         local function applyHighlight()
@@ -6327,7 +6334,7 @@ end
 -- ============================================================================
 do
     addon.History.BossAttendees = addon.History.BossAttendees or {}
-    local M = addon.History.BossAttendees
+    local BossAtt = addon.History.BossAttendees
     local L = addon.L
 
     local controller = makeHistoryListController {
@@ -6393,9 +6400,9 @@ do
         },
     }
 
-    bindHistoryListController(M, controller)
+    bindHistoryListController(BossAtt, controller)
 
-    function M:Add() addon.History.AttendeesBox:Toggle() end
+    function BossAtt:Add() addon.History.AttendeesBox:Toggle() end
 
     do
         local function DeleteAttendee()
@@ -6419,7 +6426,7 @@ do
             controller:Dirty()
         end
 
-        function M:Delete()
+        function BossAtt:Delete()
             if addon.History.selectedBossPlayer then
                 StaticPopup_Show("KRTHISTORY_DELETE_ATTENDEE")
             end
@@ -6437,7 +6444,7 @@ end
 -- ============================================================================
 do
     addon.History.RaidAttendees = addon.History.RaidAttendees or {}
-    local M = addon.History.RaidAttendees
+    local RaidAtt = addon.History.RaidAttendees
     local L = addon.L
 
     local controller = makeHistoryListController {
@@ -6510,7 +6517,7 @@ do
         },
     }
 
-    bindHistoryListController(M, controller)
+    bindHistoryListController(RaidAtt, controller)
 
     do
         local function DeleteAttendee()
@@ -6541,7 +6548,7 @@ do
             controller:Dirty()
         end
 
-        function M:Delete()
+        function RaidAtt:Delete()
             if addon.History.selectedPlayer then
                 StaticPopup_Show("KRTHISTORY_DELETE_RAIDATTENDEE")
             end
@@ -6559,7 +6566,7 @@ end
 -- ============================================================================
 do
     addon.History.Loot = addon.History.Loot or {}
-    local module = addon.History.Loot
+    local Loot = addon.History.Loot
     local L = addon.L
 
     local function isLootFromBoss(entry, bossId)
@@ -6700,9 +6707,9 @@ do
         },
     }
 
-    bindHistoryListController(module, controller)
+    bindHistoryListController(Loot, controller)
 
-    function module:OnEnter(widget)
+    function Loot:OnEnter(widget)
         if not widget then return end
         local row = (widget.IsObjectType and widget:IsObjectType("Button")) and widget
             or (widget.GetParent and widget:GetParent()) or widget
@@ -6725,7 +6732,7 @@ do
             end
         end
 
-        function module:Delete()
+        function Loot:Delete()
             if addon.History.selectedItem then
                 StaticPopup_Show("KRTHISTORY_DELETE_ITEM")
             end
@@ -6734,7 +6741,7 @@ do
         controller._makeConfirmPopup("KRTHISTORY_DELETE_ITEM", L.StrConfirmDeleteItem, DeleteItem)
     end
 
-    function module:Log(itemID, looter, rollType, rollValue, source)
+    function Loot:Log(itemID, looter, rollType, rollValue, source)
         local raidID = addon.History.selectedRaid or KRT_CurrentRaid
         addon:trace(L.LogHistoryLootLogAttempt:format(tostring(source), tostring(raidID), tostring(itemID),
             tostring(looter), tostring(rollType), tostring(rollValue), tostring(KRT_LastBoss)))
