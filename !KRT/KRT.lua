@@ -306,6 +306,7 @@ do
     local GetLootMethod     = GetLootMethod
     local GetRaidRosterInfo = GetRaidRosterInfo
     local UnitIsUnit        = UnitIsUnit
+    local rosterEndDelay    = 5
 
     -------------------------------------------------------
     -- Private helpers
@@ -327,11 +328,22 @@ do
         if not KRT_CurrentRaid then return end
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
+        if module.pendingEndHandle then
+            addon.CancelTimer(module.pendingEndHandle, true)
+            module.pendingEndHandle = nil
+        end
         if not addon.IsInGroup() then
-            numRaid = 0
-            addon:info(L.LogRaidLeftGroupEndSession)
-            module:End()
-            addon.Master:PrepareDropDowns()
+            module.pendingEndHandle = addon.After(rosterEndDelay, function()
+                module.pendingEndHandle = nil
+                if addon.IsInGroup() then
+                    module:UpdateRaidRoster()
+                    return
+                end
+                numRaid = 0
+                addon:info(L.LogRaidLeftGroupEndSession)
+                module:End()
+                addon.Master:PrepareDropDowns()
+            end)
             return
         end
 
@@ -465,6 +477,8 @@ do
     --
     function module:End()
         if not KRT_CurrentRaid then return end
+        addon.CancelTimer(module.pendingEndHandle, true)
+        module.pendingEndHandle = nil
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
         local currentTime = Utils.getCurrentTime()
@@ -5671,11 +5685,41 @@ do
             end
             module:ResetSelections()
             Utils.triggerEvent("HistorySelectRaid", module.selectedRaid)
+            if addon.History.Raids and addon.History.Raids.Activate then
+                addon.History.Raids:Activate()
+            end
+            if addon.History.Boss and addon.History.Boss.Activate then
+                addon.History.Boss:Activate()
+            end
+            if addon.History.BossAttendees and addon.History.BossAttendees.Activate then
+                addon.History.BossAttendees:Activate()
+            end
+            if addon.History.RaidAttendees and addon.History.RaidAttendees.Activate then
+                addon.History.RaidAttendees:Activate()
+            end
+            if addon.History.Loot and addon.History.Loot.Activate then
+                addon.History.Loot:Activate()
+            end
         end)
 
         frame:SetScript("OnHide", function()
             module.selectedRaid = KRT_CurrentRaid
             module:ResetSelections()
+            if addon.History.Raids and addon.History.Raids.Deactivate then
+                addon.History.Raids:Deactivate()
+            end
+            if addon.History.Boss and addon.History.Boss.Deactivate then
+                addon.History.Boss:Deactivate()
+            end
+            if addon.History.BossAttendees and addon.History.BossAttendees.Deactivate then
+                addon.History.BossAttendees:Deactivate()
+            end
+            if addon.History.RaidAttendees and addon.History.RaidAttendees.Deactivate then
+                addon.History.RaidAttendees:Deactivate()
+            end
+            if addon.History.Loot and addon.History.Loot.Deactivate then
+                addon.History.Loot:Deactivate()
+            end
         end)
     end
 
@@ -5944,30 +5988,34 @@ do
             applyHighlightAndPost()
         end)
 
+        function self:Activate()
+            if not self.frameName then return end
+            self._active = true
+            if not self._localized and cfg.localize then
+                cfg.localize(self.frameName)
+                self._localized = true
+            end
+            self:Dirty()
+        end
+
+        function self:Deactivate()
+            self._active = false
+        end
+
         function self:OnLoad(frame)
             if not frame then return end
             self.frameName = frame:GetName()
 
             frame:SetScript("OnShow", function()
-                self._active = true
-                if not self._localized and cfg.localize then
-                    cfg.localize(self.frameName)
-                    self._localized = true
-                end
-                self:Dirty()
+                self:Activate()
             end)
 
             frame:SetScript("OnHide", function()
-                self._active = false
+                self:Deactivate()
             end)
 
             if frame:IsShown() then
-                self._active = true
-                if not self._localized and cfg.localize then
-                    cfg.localize(self.frameName)
-                    self._localized = true
-                end
-                self:Dirty()
+                self:Activate()
             end
         end
 
@@ -5980,7 +6028,17 @@ do
             if not (sf and sc) then return end
 
             local scrollW = sf:GetWidth() or 0
-            local widthChanged = (self._lastWidth ~= scrollW)
+            if scrollW <= 0 then
+                local parent = sf:GetParent()
+                scrollW = (parent and parent:GetWidth()) or 0
+            end
+            if scrollW <= 0 then
+                scrollW = sc:GetWidth() or 0
+            end
+            if scrollW <= 0 then
+                scrollW = self._lastWidth or 0
+            end
+            local widthChanged = (scrollW > 0 and self._lastWidth ~= scrollW)
             self._lastWidth = scrollW
 
             local totalH = 0
@@ -5999,7 +6057,7 @@ do
                 row:SetID(it.id)
                 row:ClearAllPoints()
                 row:SetPoint("TOPLEFT", 0, -totalH)
-                if widthChanged then row:SetWidth(scrollW - 20) end
+                if widthChanged and scrollW > 0 then row:SetWidth(scrollW - 20) end
 
                 local rH = cfg.drawRow(row, it)
                 local usedH = rH or row:GetHeight() or 20
@@ -6032,6 +6090,8 @@ do
         module.OnLoad = function(_, frame) controller:OnLoad(frame) end
         module.Fetch = function() controller:Fetch() end
         module.Sort = function(_, t) controller:Sort(t) end
+        module.Activate = function() controller:Activate() end
+        module.Deactivate = function() controller:Deactivate() end
     end
 end
 
@@ -6161,7 +6221,7 @@ do
         controller:Dirty()
     end)
 
-    Utils.registerCallback("HistorySelectRaid", function() controller:Touch() end)
+    Utils.registerCallback("HistorySelectRaid", function() controller:Dirty() end)
 end
 
 -- ============================================================================
