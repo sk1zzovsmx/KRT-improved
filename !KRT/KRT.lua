@@ -6049,7 +6049,8 @@ do
         _rowParts   = { "ID", "Date", "Zone", "Size" },
 
         localize    = function(n)
-            Utils.setFrameTitle(n, L.StrRaidsList)
+            local title = _G[n .. "Title"]
+            if title then title:SetText(L.StrRaidsList) end
             _G[n .. "HeaderNum"]:SetText(L.StrNumber)
             _G[n .. "HeaderDate"]:SetText(L.StrDate)
             _G[n .. "HeaderZone"]:SetText(L.StrZone)
@@ -6177,7 +6178,8 @@ do
         _rowParts   = { "ID", "Name", "Time", "Mode" },
 
         localize    = function(n)
-            Utils.setFrameTitle(n, L.StrBosses)
+            local title = _G[n .. "Title"]
+            if title then title:SetText(L.StrBosses) end
             _G[n .. "HeaderNum"]:SetText(L.StrNumber)
             _G[n .. "HeaderName"]:SetText(L.StrName)
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
@@ -6317,7 +6319,8 @@ do
         _rowParts   = { "Name" },
 
         localize    = function(n)
-            Utils.setFrameTitle(n, L.StrBossAttendees)
+            local title = _G[n .. "Title"]
+            if title then title:SetText(L.StrBossAttendees) end
             _G[n .. "HeaderName"]:SetText(L.StrName)
         end,
 
@@ -6421,7 +6424,8 @@ do
         _rowParts   = { "Name", "Join", "Leave" },
 
         localize    = function(n)
-            Utils.setFrameTitle(n, L.StrRaidAttendees)
+            local title = _G[n .. "Title"]
+            if title then title:SetText(L.StrRaidAttendees) end
             _G[n .. "HeaderName"]:SetText(L.StrName)
             _G[n .. "HeaderJoin"]:SetText(L.StrJoin)
             _G[n .. "HeaderLeave"]:SetText(L.StrLeave)
@@ -6552,7 +6556,8 @@ do
         _rowParts   = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
 
         localize    = function(n)
-            Utils.setFrameTitle(n, L.StrRaidLoot)
+            local title = _G[n .. "Title"]
+            if title then title:SetText(L.StrRaidLoot) end
             _G[n .. "ExportBtn"]:SetText(L.BtnExport)
             _G[n .. "ClearBtn"]:SetText(L.BtnClear)
             _G[n .. "EditBtn"]:SetText(L.BtnEdit)
