@@ -6338,8 +6338,7 @@ do
         localize = function(n)
             local title = _G[n .. "Title"]
             if title then title:SetText(L.StrBossAttendees) end
-            _G[n .. "AddBtn"]:SetText(L.BtnAdd)
-            _G[n .. "DeleteBtn"]:SetText(L.BtnDelete)
+            _G[n .. "HeaderName"]:SetText(L.StrName)
         end,
 
         getData = function(out)
@@ -6347,19 +6346,19 @@ do
             local bID = addon.History.selectedBoss
             if not (rID and bID) then return end
 
-            local raid = KRT_Raids[rID]
-            local boss = raid and raid.bossKills and raid.bossKills[bID]
-            if not boss or not boss.players then return end
-
-            for i = 1, #boss.players do
+            local src = addon.Raid:GetPlayers(rID, bID, TGet("raid-boss-players"))
+            for i = 1, #src do
+                local p = src[i]
                 local it = TGet("history-boss-attendees")
-                it.id = i
-                it.name = boss.players[i]
+                it.id = p.id
+                it.name = p.name
+                it.class = p.class
                 out[i] = it
             end
+            TFree("raid-boss-players", src)
         end,
 
-        rowName = function(n, _, i) return n .. "BossAttendeeBtn" .. i end,
+        rowName = function(n, _, i) return n .. "PlayerBtn" .. i end,
         rowTmpl = "KRTHistoryBossAttendeeButton",
 
         drawRow = (function()
@@ -6367,7 +6366,7 @@ do
             return function(row, it)
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
                 local ui = row._p
-                local r, g, b = Utils.getClassColor(addon.Raid:GetPlayerClass(it.name))
+                local r, g, b = Utils.getClassColor(it.class)
                 ui.Name:SetText(it.name)
                 ui.Name:SetVertexColor(r, g, b)
                 return ROW_H
@@ -6377,10 +6376,10 @@ do
         highlightId = function() return addon.History.selectedBossPlayer end,
 
         postUpdate = function(n)
-            local hasBoss = addon.History.selectedBoss
-            local hasPlayer = addon.History.selectedBossPlayer
-            Utils.enableDisable(_G[n .. "AddBtn"], hasBoss ~= nil)
-            Utils.enableDisable(_G[n .. "DeleteBtn"], hasPlayer ~= nil)
+            local bSel = addon.History.selectedBoss
+            local pSel = addon.History.selectedBossPlayer
+            Utils.enableDisable(_G[n .. "AddBtn"], bSel and not pSel)
+            Utils.enableDisable(_G[n .. "RemoveBtn"], bSel and pSel)
         end,
 
         sorters = {
@@ -6397,20 +6396,30 @@ do
             local rID = addon.History.selectedRaid
             local bID = addon.History.selectedBoss
             local pID = addon.History.selectedBossPlayer
-            if not (rID and bID and pID and KRT_Raids[rID]) then return end
+            if not (rID and bID and pID) then return end
 
-            tremove(KRT_Raids[rID].bossKills[bID].players, pID)
+            local raid = KRT_Raids[rID]
+            if not (raid and raid.bossKills and raid.bossKills[bID]) then return end
+
+            local name = addon.Raid:GetPlayerName(pID, rID)
+            local list = raid.bossKills[bID].players
+            local i = addon.tIndexOf(list, name)
+            while i do
+                tremove(list, i)
+                i = addon.tIndexOf(list, name)
+            end
+
             addon.History.selectedBossPlayer = nil
             controller:Dirty()
         end
 
         function M:Delete()
             if addon.History.selectedBossPlayer then
-                StaticPopup_Show("KRTHISTORY_DELETE_BOSSATTENDEE")
+                StaticPopup_Show("KRTHISTORY_DELETE_ATTENDEE")
             end
         end
 
-        controller._makeConfirmPopup("KRTHISTORY_DELETE_BOSSATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendee)
+        controller._makeConfirmPopup("KRTHISTORY_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendee)
     end
 
     Utils.registerCallbacks({ "HistorySelectRaid", "HistorySelectBoss" }, function() controller:Dirty() end)
@@ -6428,34 +6437,37 @@ do
     local controller = makeHistoryListController {
         keyName = "RaidAttendeesList",
         poolTag = "history-raid-attendees",
-        _rowParts = { "Name", "Class" },
+        _rowParts = { "Name", "Join", "Leave" },
 
         localize = function(n)
             local title = _G[n .. "Title"]
             if title then title:SetText(L.StrRaidAttendees) end
-            _G[n .. "DeleteBtn"]:SetText(L.BtnDelete)
             _G[n .. "HeaderName"]:SetText(L.StrName)
-            _G[n .. "HeaderClass"]:SetText(L.StrClass)
+            _G[n .. "HeaderJoin"]:SetText(L.StrJoin)
+            _G[n .. "HeaderLeave"]:SetText(L.StrLeave)
+            _G[n .. "AddBtn"]:Disable()
         end,
 
         getData = function(out)
             local rID = addon.History.selectedRaid
             if not rID then return end
 
-            local raid = KRT_Raids[rID]
-            if not raid or not raid.players then return end
-
-            for i = 1, #raid.players do
-                local p = raid.players[i]
+            local src = addon.Raid:GetPlayers(rID) or {}
+            for i = 1, #src do
+                local p = src[i]
                 local it = TGet("history-raid-attendees")
-                it.id = i
+                it.id = p.id
                 it.name = p.name
                 it.class = p.class
+                it.join = p.join
+                it.leave = p.leave
+                it.joinFmt = date("%H:%M", p.join)
+                it.leaveFmt = p.leave and date("%H:%M", p.leave) or ""
                 out[i] = it
             end
         end,
 
-        rowName = function(n, _, i) return n .. "RaidAttendeeBtn" .. i end,
+        rowName = function(n, _, i) return n .. "PlayerBtn" .. i end,
         rowTmpl = "KRTHistoryRaidAttendeeButton",
 
         drawRow = (function()
@@ -6464,7 +6476,10 @@ do
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
                 local ui = row._p
                 ui.Name:SetText(it.name)
-                ui.Class:SetText(it.class)
+                local r, g, b = Utils.getClassColor(it.class)
+                ui.Name:SetVertexColor(r, g, b)
+                ui.Join:SetText(it.joinFmt)
+                ui.Leave:SetText(it.leaveFmt)
                 return ROW_H
             end
         end)(),
@@ -6477,7 +6492,12 @@ do
 
         sorters = {
             name = function(a, b, asc) return asc and (a.name < b.name) or (a.name > b.name) end,
-            class = function(a, b, asc) return asc and (a.class < b.class) or (a.class > b.class) end,
+            join = function(a, b, asc) return asc and (a.join < b.join) or (a.join > b.join) end,
+            leave = function(a, b, asc)
+                local A = a.leave or (asc and math.huge or -math.huge)
+                local B = b.leave or (asc and math.huge or -math.huge)
+                return asc and (A < B) or (A > B)
+            end,
         },
     }
 
@@ -6486,9 +6506,28 @@ do
     do
         local function DeleteAttendee()
             local rID, pID = addon.History.selectedRaid, addon.History.selectedPlayer
-            if not (rID and pID and KRT_Raids[rID]) then return end
+            if not (rID and pID) then return end
 
-            tremove(KRT_Raids[rID].players, pID)
+            local raid = KRT_Raids[rID]
+            if not (raid and raid.players and raid.players[pID]) then return end
+
+            local name = raid.players[pID].name
+            tremove(raid.players, pID)
+
+            for _, boss in ipairs(raid.bossKills) do
+                local i = addon.tIndexOf(boss.players, name)
+                while i do
+                    tremove(boss.players, i)
+                    i = addon.tIndexOf(boss.players, name)
+                end
+            end
+
+            for i = #raid.loot, 1, -1 do
+                if raid.loot[i].looter == name then
+                    tremove(raid.loot, i)
+                end
+            end
+
             addon.History.selectedPlayer = nil
             controller:Dirty()
         end
