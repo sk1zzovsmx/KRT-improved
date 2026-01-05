@@ -76,12 +76,21 @@ end
 ---============================================================================
 
 function Utils.applyDebugSetting(enabled)
-	if addon and addon.options then
-		addon.options.debug = enabled and true or false
+	local options = addon and addon.options
+	if options then
+		options.debug = enabled and true or false
 	end
-	local levels = addon and addon.Logger and addon.Logger.logLevels or {}
-	local level = enabled and levels.DEBUG or (KRT_Debug and KRT_Debug.level)
-	if addon and addon.SetLogLevel and level then
+
+	local level
+	if enabled then
+		local levels = addon and addon.Debugger and addon.Debugger.logLevels
+		level = levels and levels.DEBUG
+	else
+		local levels = addon and addon.Debugger and addon.Debugger.logLevels
+		level = levels and levels.INFO
+	end
+
+	if level and addon and addon.SetLogLevel then
 		addon:SetLogLevel(level)
 	end
 end
