@@ -7278,11 +7278,12 @@ function addon:RAID_INSTANCE_WELCOME(...)
     _, KRT_NextReset = ...
     addon:trace(L.LogRaidInstanceWelcome:format(tostring(instanceName), tostring(instanceType),
         tostring(instanceDiff), tostring(KRT_NextReset)))
-    if instanceType == "raid" and not L.RaidZones[instanceName] then
-        addon:warn(L.LogRaidUnmappedZone:format(tostring(instanceName), tostring(instanceDiff)))
-    end
-    if L.RaidZones[instanceName] ~= nil then
-        addon:info(L.LogRaidInstanceRecognized:format(tostring(instanceName), tostring(instanceDiff)))
+    if instanceType == "raid" then
+        if L.RaidZones[instanceName] then
+            addon:info(L.LogRaidInstanceRecognized:format(tostring(instanceName), tostring(instanceDiff)))
+        else
+            addon:warn(L.LogRaidUnmappedZone:format(tostring(instanceName), tostring(instanceDiff)))
+        end
         addon.After(3, function()
             addon.Raid:Check(instanceName, instanceDiff)
         end)
