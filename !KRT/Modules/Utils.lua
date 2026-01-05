@@ -280,7 +280,7 @@ function Utils.makeConfirmPopup(key, text, onAccept, cancels)
 	}
 end
 
-function Utils.makeEditBoxPopup(key, text, onAccept, onShow)
+function Utils.makeEditBoxPopup(key, text, onAccept, onShow, validate)
 	StaticPopupDialogs[key] = {
 		text = text,
 		button1 = SAVE,
@@ -300,7 +300,17 @@ function Utils.makeEditBoxPopup(key, text, onAccept, onShow)
 			self.editBox:ClearFocus()
 		end,
 		OnAccept = function(self)
-			onAccept(self, self.editBox:GetText())
+			local value = Utils.trimText(self.editBox:GetText(), true)
+			if validate then
+				local ok, cleanValue = validate(self, value)
+				if not ok then
+					return
+				end
+				if cleanValue ~= nil then
+					value = cleanValue
+				end
+			end
+			onAccept(self, value)
 		end,
 	}
 end

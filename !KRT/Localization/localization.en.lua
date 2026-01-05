@@ -297,7 +297,7 @@ L.StrConfirmDeleteItem            = "Are you sure you want to delete this item f
 L.StrEditItemLooter               = "Change winner"
 L.StrEditItemLooterHelp           = "Enter the name of the winner:"
 L.StrEditItemRollType             = "Change roll type"
-L.StrEditItemRollTypeHelp         = "1=MS, 2=OS, 3=Free, 4=Bank, 5=DE, 6=Hold"
+L.StrEditItemRollTypeHelp         = "1=MS, 2=OS, 3=SR, 4=Free, 5=Bank, 6=DE, 7=Hold"
 L.StrEditItemRollValue            = "Change roll value"
 L.StrEditItemRollValueHelp        = "Enter the value of the roll:"
 
@@ -329,6 +329,12 @@ L.ErrEditBoxInvalidMonth          = "Invalid Month: Please enter a valid month."
 L.ErrEditBoxInvalidDay            = "Invalid Day: Please enter a valid day."
 L.ErrEditBoxInvalidHour           = "Invalid Hour: Please enter a valid hour."
 L.ErrEditBoxInvalidMinute         = "Invalid Minute: Please enter a valid minute."
+L.ErrHistoryInvalidRaid           = "Invalid raid selection for History edit."
+L.ErrHistoryInvalidItem           = "Invalid loot item selection for History edit."
+L.ErrHistoryWinnerEmpty           = "Please enter a valid winner name."
+L.ErrHistoryWinnerNotFound        = "Winner not found in raid or boss attendees: %s"
+L.ErrHistoryInvalidRollType       = "Invalid roll type. Use a valid roll type number."
+L.ErrHistoryInvalidRollValue      = "Invalid roll value. Enter a non-negative number."
 
 -- ==================== History: Export Frame ==================== --
 L.StrExportBoxTitle               = "Export Loot History"
