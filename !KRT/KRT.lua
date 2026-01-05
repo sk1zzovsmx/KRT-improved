@@ -6520,12 +6520,24 @@ do
 end
 
 -- ============================================================================
--- Loot List
+-- Loot List (filters by selected boss and player)
 -- ============================================================================
 do
     addon.History.Loot = addon.History.Loot or {}
     local module       = addon.History.Loot
     local L            = addon.L
+
+    local function isLootFromBoss(entry, bossId)
+        return not bossId or bossId <= 0 or entry.bossNum == bossId
+    end
+
+    local function isLootByPlayer(entry, playerName)
+        return not playerName or entry.looter == playerName
+    end
+
+    local function passesFilters(entry, bossId, playerName)
+        return isLootFromBoss(entry, bossId) and isLootByPlayer(entry, playerName)
+    end
 
     local controller   = makeHistoryListController {
         keyName     = "LootList",
@@ -6564,7 +6576,7 @@ do
             local n     = 0
             for i = 1, #loot do
                 local v = loot[i]
-                if (not bID or bID <= 0 or v.bossNum == bID) and (not pName or v.looter == pName) then
+                if passesFilters(v, bID, pName) then
                     n              = n + 1
                     local it       = TGet("history-loot")
                     it.id          = v.id
