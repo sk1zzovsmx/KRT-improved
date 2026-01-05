@@ -5740,18 +5740,79 @@ do
             end
         end
 
-        Utils.makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_WINNER", L.StrEditItemLooterHelp,
-            function(self, text)
-                local name = Utils.normalizeLower(text)
-                local raid = KRT_Raids[self.raidId]
-                if not (raid and raid.players) then return end
-
+        local function findHistoryPlayer(normalizedName, raid, bossKill)
+            if raid and raid.players then
                 for _, p in ipairs(raid.players) do
-                    if name == Utils.normalizeLower(p.name) then
-                        addon.History.Loot:Log(self.itemId, p.name, nil, nil, "HISTORY_EDIT_WINNER")
-                        return
+                    if normalizedName == Utils.normalizeLower(p.name) then
+                        return p.name
                     end
                 end
+            end
+            if bossKill and bossKill.players then
+                for _, name in ipairs(bossKill.players) do
+                    if normalizedName == Utils.normalizeLower(name) then
+                        return name
+                    end
+                end
+            end
+        end
+
+        local function isValidRollType(rollType)
+            for _, value in pairs(rollTypes) do
+                if rollType == value then
+                    return true
+                end
+            end
+            return false
+        end
+
+        local function validateRollType(_, text)
+            local value = text and tonumber(text)
+            if not value or not isValidRollType(value) then
+                addon:error(L.ErrHistoryInvalidRollType)
+                return false
+            end
+            return true, value
+        end
+
+        local function validateRollValue(_, text)
+            local value = text and tonumber(text)
+            if not value or value < 0 then
+                addon:error(L.ErrHistoryInvalidRollValue)
+                return false
+            end
+            return true, value
+        end
+
+        Utils.makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_WINNER", L.StrEditItemLooterHelp,
+            function(self, text)
+                local rawText = Utils.trimText(text)
+                local name = Utils.normalizeLower(rawText)
+                if not name or name == "" then
+                    addon:error(L.ErrHistoryWinnerEmpty)
+                    return
+                end
+
+                local raid = KRT_Raids[self.raidId]
+                if not raid then
+                    addon:error(L.ErrHistoryInvalidRaid)
+                    return
+                end
+
+                local loot = raid.loot and raid.loot[self.itemId]
+                if not loot then
+                    addon:error(L.ErrHistoryInvalidItem)
+                    return
+                end
+
+                local bossKill = raid.bossKills and raid.bossKills[loot.bossNum]
+                local winner = findHistoryPlayer(name, raid, bossKill)
+                if not winner then
+                    addon:error(L.ErrHistoryWinnerNotFound:format(rawText))
+                    return
+                end
+
+                addon.History.Loot:Log(self.itemId, winner, nil, nil, "HISTORY_EDIT_WINNER")
             end,
             function(self)
                 self.raidId = addon.History.selectedRaid
@@ -5761,16 +5822,18 @@ do
 
         Utils.makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_ROLL", L.StrEditItemRollTypeHelp,
             function(self, text)
-                addon.History.Loot:Log(self.itemId, nil, tonumber(text), nil, "HISTORY_EDIT_ROLLTYPE")
+                addon.History.Loot:Log(self.itemId, nil, text, nil, "HISTORY_EDIT_ROLLTYPE")
             end,
-            function(self) self.itemId = addon.History.selectedItem end
+            function(self) self.itemId = addon.History.selectedItem end,
+            validateRollType
         )
 
         Utils.makeEditBoxPopup("KRTHISTORY_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp,
             function(self, text)
-                addon.History.Loot:Log(self.itemId, nil, nil, tonumber(text), "HISTORY_EDIT_ROLLVALUE")
+                addon.History.Loot:Log(self.itemId, nil, nil, text, "HISTORY_EDIT_ROLLVALUE")
             end,
-            function(self) self.itemId = addon.History.selectedItem end
+            function(self) self.itemId = addon.History.selectedItem end,
+            validateRollValue
         )
     end
 
