@@ -6378,8 +6378,14 @@ do
         postUpdate = function(n)
             local bSel = addon.History.selectedBoss
             local pSel = addon.History.selectedBossPlayer
-            Utils.enableDisable(_G[n .. "AddBtn"], bSel and not pSel)
-            Utils.enableDisable(_G[n .. "RemoveBtn"], bSel and pSel)
+            local addBtn = _G[n .. "AddBtn"]
+            local removeBtn = _G[n .. "RemoveBtn"]
+            if addBtn then
+                Utils.enableDisable(addBtn, bSel and not pSel)
+            end
+            if removeBtn then
+                Utils.enableDisable(removeBtn, bSel and pSel)
+            end
         end,
 
         sorters = {
@@ -6487,7 +6493,10 @@ do
         highlightId = function() return addon.History.selectedPlayer end,
 
         postUpdate = function(n)
-            Utils.enableDisable(_G[n .. "DeleteBtn"], addon.History.selectedPlayer ~= nil)
+            local deleteBtn = _G[n .. "DeleteBtn"]
+            if deleteBtn then
+                Utils.enableDisable(deleteBtn, addon.History.selectedPlayer ~= nil)
+            end
         end,
 
         sorters = {
