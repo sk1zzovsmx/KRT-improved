@@ -3222,7 +3222,7 @@
 						</Scripts>
 					</Button>
 					<!-- Table Headers -->
-					<Button name="$parentHeaderNum" inherits="KRTHistoryTableHeader" text="#">
+					<Button name="$parentHeaderNum" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="40" y="20" />
 						</Size>
@@ -3237,7 +3237,7 @@
 							<OnClick>KRT.History.Raids:Sort("id")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderDate" inherits="KRTHistoryTableHeader" text="Date">
+					<Button name="$parentHeaderDate" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="100" y="20" />
 						</Size>
@@ -3253,7 +3253,7 @@
 							<OnClick>KRT.History.Raids:Sort("date")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderZone" inherits="KRTHistoryTableHeader" text="ZONE">
+					<Button name="$parentHeaderZone" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="123" y="20" />
 						</Size>
@@ -3269,7 +3269,7 @@
 							<OnClick>KRT.History.Raids:Sort("zone")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderSize" inherits="KRTHistoryTableHeader" text="Size">
+					<Button name="$parentHeaderSize" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="45" y="20" />
 						</Size>
@@ -3386,7 +3386,7 @@
 						</Scripts>
 					</Button>
 					<!-- Table Headers -->
-					<Button name="$parentHeaderNum" inherits="KRTHistoryTableHeader" text="#">
+					<Button name="$parentHeaderNum" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="35" y="20" />
 						</Size>
@@ -3401,7 +3401,7 @@
 							<OnClick>KRT.History.Boss:Sort("id")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderName" inherits="KRTHistoryTableHeader" text="NAME">
+					<Button name="$parentHeaderName" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="148" y="20" />
 						</Size>
@@ -3417,7 +3417,7 @@
 							<OnClick>KRT.History.Boss:Sort("name")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderTime" inherits="KRTHistoryTableHeader" text="Time">
+					<Button name="$parentHeaderTime" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="45" y="20" />
 						</Size>
@@ -3433,7 +3433,7 @@
 							<OnClick>KRT.History.Boss:Sort("time")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderMode" inherits="KRTHistoryTableHeader" text="MODE">
+					<Button name="$parentHeaderMode" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="65" y="20" />
 						</Size>
@@ -3534,7 +3534,7 @@
 						</Scripts>
 					</Button>
 					<!-- Table Headers -->
-					<Button name="$parentHeaderName" inherits="KRTHistoryTableHeader" text="NAME">
+					<Button name="$parentHeaderName" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="118" y="20" />
 						</Size>
@@ -3634,7 +3634,7 @@
 						</Scripts>
 					</Button>
 					<!-- Table Headers -->
-					<Button name="$parentHeaderName" inherits="KRTHistoryTableHeader" text="NAME">
+					<Button name="$parentHeaderName" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="85" y="20" />
 						</Size>
@@ -3649,7 +3649,7 @@
 							<OnClick>KRT.History.RaidAttendees:Sort("name")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderJoin" inherits="KRTHistoryTableHeader" text="Join">
+					<Button name="$parentHeaderJoin" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="55" y="20" />
 						</Size>
@@ -3665,7 +3665,7 @@
 							<OnClick>KRT.History.RaidAttendees:Sort("join")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderLeave" inherits="KRTHistoryTableHeader" text="Leave">
+					<Button name="$parentHeaderLeave" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="55" y="20" />
 						</Size>
@@ -3801,7 +3801,7 @@
 					</Button>
 
 					<!-- Table Headers -->
-					<Button name="$parentHeaderItem" inherits="KRTHistoryTableHeader" text="Item">
+					<Button name="$parentHeaderItem" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="190" y="20" />
 						</Size>
@@ -3816,7 +3816,7 @@
 							<OnClick>KRT.History.Loot:Sort("id")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderSource" inherits="KRTHistoryTableHeader" text="Source">
+					<Button name="$parentHeaderSource" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="135" y="20" />
 						</Size>
@@ -3832,7 +3832,7 @@
 							<OnClick>KRT.History.Loot:Sort("source")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderWinner" inherits="KRTHistoryTableHeader" text="Winner">
+					<Button name="$parentHeaderWinner" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="90" y="20" />
 						</Size>
@@ -3848,7 +3848,7 @@
 							<OnClick>KRT.History.Loot:Sort("winner")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderType" inherits="KRTHistoryTableHeader" text="TYPE">
+					<Button name="$parentHeaderType" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="50" y="20" />
 						</Size>
@@ -3864,7 +3864,7 @@
 							<OnClick>KRT.History.Loot:Sort("type")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderRoll" inherits="KRTHistoryTableHeader" text="Roll">
+					<Button name="$parentHeaderRoll" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="45" y="20" />
 						</Size>
@@ -3880,7 +3880,7 @@
 							<OnClick>KRT.History.Loot:Sort("roll")</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentHeaderTime" inherits="KRTHistoryTableHeader" text="Time">
+					<Button name="$parentHeaderTime" inherits="KRTHistoryTableHeader">
 						<Size>
 							<AbsDimension x="45" y="20" />
 						</Size>

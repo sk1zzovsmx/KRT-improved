@@ -6050,7 +6050,9 @@ do
 
         localize    = function(n)
             Utils.setFrameTitle(n, L.StrRaidsList)
+            _G[n .. "HeaderNum"]:SetText(L.StrNumber)
             _G[n .. "HeaderDate"]:SetText(L.StrDate)
+            _G[n .. "HeaderZone"]:SetText(L.StrZone)
             _G[n .. "HeaderSize"]:SetText(L.StrSize)
             _G[n .. "CurrentBtn"]:SetText(L.StrSetCurrent)
             _G[n .. "ExportBtn"]:SetText(L.BtnExport)
@@ -6176,7 +6178,10 @@ do
 
         localize    = function(n)
             Utils.setFrameTitle(n, L.StrBosses)
+            _G[n .. "HeaderNum"]:SetText(L.StrNumber)
+            _G[n .. "HeaderName"]:SetText(L.StrName)
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
+            _G[n .. "HeaderMode"]:SetText(L.StrMode)
         end,
 
         getData     = function(out)
@@ -6313,6 +6318,7 @@ do
 
         localize    = function(n)
             Utils.setFrameTitle(n, L.StrBossAttendees)
+            _G[n .. "HeaderName"]:SetText(L.StrName)
         end,
 
         getData     = function(out)
@@ -6416,6 +6422,7 @@ do
 
         localize    = function(n)
             Utils.setFrameTitle(n, L.StrRaidAttendees)
+            _G[n .. "HeaderName"]:SetText(L.StrName)
             _G[n .. "HeaderJoin"]:SetText(L.StrJoin)
             _G[n .. "HeaderLeave"]:SetText(L.StrLeave)
             -- Add non implementato (per ora)
