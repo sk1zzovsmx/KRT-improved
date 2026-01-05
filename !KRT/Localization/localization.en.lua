@@ -254,9 +254,13 @@ L.StrSpammerMessageHelp3          =
 "You can find the achievement |cffffd700ID|r using the command: \n|cffffd700/krt ach [link]|r."
 
 -- ==================== History Frame ==================== --
+L.StrNumber                       = "#"
 L.StrDate                         = "Date"
+L.StrZone                         = "Zone"
 L.StrSize                         = "Size"
+L.StrName                         = "Name"
 L.StrTime                         = "Time"
+L.StrMode                         = "Mode"
 L.StrItem                         = "Item"
 L.StrSource                       = "Source"
 L.StrWinner                       = "Winner"
