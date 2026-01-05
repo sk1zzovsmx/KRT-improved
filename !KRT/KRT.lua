@@ -5645,18 +5645,34 @@ do
     module.selectedRaid, module.selectedBoss                              = nil, nil
     module.selectedPlayer, module.selectedBossPlayer, module.selectedItem = nil, nil, nil
 
+    local selectionFields = {
+        "selectedBoss",
+        "selectedPlayer",
+        "selectedBossPlayer",
+        "selectedItem",
+    }
+
+    local function resetSelections()
+        for i = 1, #selectionFields do
+            module[selectionFields[i]] = nil
+        end
+    end
+
+    local function setSelection(field, id, eventName)
+        module[field] = (id and id ~= module[field]) and id or nil
+        if eventName then
+            Utils.triggerEvent(eventName, module[field])
+        end
+    end
+
     function module:ResetSelections()
-        module.selectedBoss       = nil
-        module.selectedPlayer     = nil
-        module.selectedBossPlayer = nil
-        module.selectedItem       = nil
+        resetSelections()
     end
 
     local function makeSelector(field, ev)
         return function(_, btn)
             local id = btn and btn.GetID and btn:GetID()
-            module[field] = (id and id ~= module[field]) and id or nil
-            Utils.triggerEvent(ev, module[field])
+            setSelection(field, id, ev)
         end
     end
 
@@ -5669,13 +5685,13 @@ do
             if not module.selectedRaid then
                 module.selectedRaid = KRT_CurrentRaid
             end
-            module:ResetSelections()
+            resetSelections()
             Utils.triggerEvent("HistorySelectRaid", module.selectedRaid)
         end)
 
         frame:SetScript("OnHide", function()
             module.selectedRaid = KRT_CurrentRaid
-            module:ResetSelections()
+            resetSelections()
         end)
     end
 
@@ -5683,7 +5699,7 @@ do
 
     function module:Hide()
         module.selectedRaid = KRT_CurrentRaid
-        module:ResetSelections()
+        resetSelections()
         Utils.showHide(UIHistory, false)
     end
 
@@ -5691,7 +5707,7 @@ do
     function module:SelectRaid(btn)
         local id = btn and btn.GetID and btn:GetID()
         module.selectedRaid = (id and id ~= module.selectedRaid) and id or nil
-        module:ResetSelections()
+        resetSelections()
         Utils.triggerEvent("HistorySelectRaid", module.selectedRaid)
     end
     module.SelectBoss = makeSelector("selectedBoss", "HistorySelectBoss")
@@ -5699,17 +5715,15 @@ do
     -- Player filter: only one active at a time
     function module:SelectBossPlayer(btn)
         local id = btn and btn.GetID and btn:GetID()
-        module.selectedBossPlayer = (id and id ~= module.selectedBossPlayer) and id or nil
         module.selectedPlayer = nil
-        Utils.triggerEvent("HistorySelectBossPlayer", module.selectedBossPlayer)
+        setSelection("selectedBossPlayer", id, "HistorySelectBossPlayer")
         Utils.triggerEvent("HistorySelectPlayer", module.selectedPlayer)
     end
 
     function module:SelectPlayer(btn)
         local id = btn and btn.GetID and btn:GetID()
-        module.selectedPlayer = (id and id ~= module.selectedPlayer) and id or nil
         module.selectedBossPlayer = nil
-        Utils.triggerEvent("HistorySelectPlayer", module.selectedPlayer)
+        setSelection("selectedPlayer", id, "HistorySelectPlayer")
         Utils.triggerEvent("HistorySelectBossPlayer", module.selectedBossPlayer)
     end
 
@@ -5731,8 +5745,7 @@ do
             if not id then return end
 
             if button == "LeftButton" then
-                module.selectedItem = (id ~= module.selectedItem) and id or nil
-                Utils.triggerEvent("HistorySelectItem", module.selectedItem)
+                setSelection("selectedItem", id, "HistorySelectItem")
             elseif button == "RightButton" then
                 module.selectedItem = id
                 Utils.triggerEvent("HistorySelectItem", module.selectedItem)
@@ -5913,6 +5926,34 @@ do
             if cfg.postUpdate then cfg.postUpdate(self.frameName) end
         end
 
+        local function buildData()
+            local tableFree = addon.Table and addon.Table.free
+            if cfg.poolTag and tableFree then
+                for i = 1, #self.data do
+                    tableFree(cfg.poolTag, self.data[i])
+                end
+            end
+
+            wipe(self.data)
+            if cfg.getData then cfg.getData(self.data) end
+            self:Fetch()
+        end
+
+        local function ensureLocalized()
+            if not self._localized and cfg.localize then
+                cfg.localize(self.frameName)
+                self._localized = true
+            end
+        end
+
+        local function setActive(active)
+            self._active = active
+            if self._active then
+                ensureLocalized()
+                self:Dirty()
+            end
+        end
+
         function self:Touch()
             defer:Show()
         end
@@ -5927,17 +5968,7 @@ do
             if not self._active or not self.frameName then return end
 
             if self._dirty then
-                local tableFree = addon.Table and addon.Table.free
-                if cfg.poolTag and tableFree then
-                    for i = 1, #self.data do
-                        tableFree(cfg.poolTag, self.data[i])
-                    end
-                end
-
-                wipe(self.data)
-                if cfg.getData then cfg.getData(self.data) end
-
-                self:Fetch()
+                buildData()
                 self._dirty = false
             end
 
@@ -5949,25 +5980,15 @@ do
             self.frameName = frame:GetName()
 
             frame:SetScript("OnShow", function()
-                self._active = true
-                if not self._localized and cfg.localize then
-                    cfg.localize(self.frameName)
-                    self._localized = true
-                end
-                self:Dirty()
+                setActive(true)
             end)
 
             frame:SetScript("OnHide", function()
-                self._active = false
+                setActive(false)
             end)
 
             if frame:IsShown() then
-                self._active = true
-                if not self._localized and cfg.localize then
-                    cfg.localize(self.frameName)
-                    self._localized = true
-                end
-                self:Dirty()
+                setActive(true)
             end
         end
 
