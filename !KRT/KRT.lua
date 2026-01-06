@@ -1296,8 +1296,9 @@ do
 
     -- Toggles the visibility of the minimap button.
     function module:ToggleMinimapButton()
-        self.options.minimapButton = not self.options.minimapButton
-        SetMinimapShown(self.options.minimapButton)
+        addon.options = addon.options or KRT_Options or {}
+        addon.options.minimapButton = not addon.options.minimapButton
+        SetMinimapShown(addon.options.minimapButton)
     end
 
     -- Hides the minimap button.
@@ -1820,7 +1821,8 @@ do
             local currentItemBtn = _G[frameName .. "ItemBtn"]
             currentItemBtn:SetNormalTexture(i.itemTexture)
 
-            if self.options.showTooltips then
+            local options = addon.options or KRT_Options or {}
+            if options.showTooltips then
                 currentItemBtn.tooltip_item = i.itemLink
                 self:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
             end
