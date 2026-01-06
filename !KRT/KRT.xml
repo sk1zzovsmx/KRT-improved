@@ -1869,7 +1869,7 @@
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnClick>KRT:Roll(self, button)</OnClick>
+					<OnClick>KRT.Rolls:Roll(self, button)</OnClick>
 				</Scripts>
 			</Button>
 
