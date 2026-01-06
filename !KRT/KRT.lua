@@ -538,7 +538,13 @@ do
             end
         end, true)
         local currentTime = Utils.getCurrentTime()
+        local bossMode = ""
+        if bossName ~= "_TrashMob_" then
+            bossMode = ((instanceDiff == 3) or (instanceDiff == 4)) and "h" or "n"
+        end
         local killInfo = {
+            time       = currentTime,
+            mode       = bossMode,
             name       = bossName,
             difficulty = instanceDiff,
             players    = players,
@@ -547,6 +553,7 @@ do
         }
         tinsert(KRT_Raids[raidNum].bossKills, killInfo)
         KRT_LastBoss = #KRT_Raids[raidNum].bossKills
+        Utils.triggerEvent("RaidBossUpdate", raidNum, KRT_LastBoss, killInfo)
         addon:info(L.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1,
             tonumber(raidNum) or -1, #players))
         addon:debug(L.LogBossLastBossHash:format(tonumber(KRT_LastBoss) or -1, tostring(killInfo.hash)))
@@ -5641,12 +5648,20 @@ do
 
     function Logger:SelectBoss(btn)
         local id = btn and btn.GetID and btn:GetID()
+        if Logger.selectedItem ~= nil then
+            Logger.selectedItem = nil
+            Utils.triggerEvent("LoggerSelectItem", Logger.selectedItem)
+        end
         toggleSelection("selectedBoss", id, "LoggerSelectBoss")
     end
 
     -- Player filter: only one active at a time
     function Logger:SelectBossPlayer(btn)
         local id = btn and btn.GetID and btn:GetID()
+        if Logger.selectedItem ~= nil then
+            Logger.selectedItem = nil
+            Utils.triggerEvent("LoggerSelectItem", Logger.selectedItem)
+        end
         Logger.selectedPlayer = nil
         toggleSelection("selectedBossPlayer", id, "LoggerSelectBossPlayer")
         Utils.triggerEvent("LoggerSelectPlayer", Logger.selectedPlayer)
@@ -5654,6 +5669,10 @@ do
 
     function Logger:SelectPlayer(btn)
         local id = btn and btn.GetID and btn:GetID()
+        if Logger.selectedItem ~= nil then
+            Logger.selectedItem = nil
+            Utils.triggerEvent("LoggerSelectItem", Logger.selectedItem)
+        end
         Logger.selectedBossPlayer = nil
         toggleSelection("selectedPlayer", id, "LoggerSelectPlayer")
         Utils.triggerEvent("LoggerSelectBossPlayer", Logger.selectedBossPlayer)
@@ -6124,6 +6143,7 @@ do
     Utils.registerCallback("RaidCreate", function(_, num)
         addon.Logger.selectedRaid = tonumber(num)
         controller:Dirty()
+        Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid)
     end)
 
     Utils.registerCallback("LoggerSelectRaid", function() controller:Touch() end)
@@ -6138,10 +6158,12 @@ do
     local L = addon.L
 
     local function getBossModeLabel(bossData)
+        if bossData.name == "_TrashMob_" then return "" end
         local mode = bossData.mode
-        if not mode and bossData.difficulty then
+        if (not mode or mode == "") and bossData.difficulty then
             mode = (bossData.difficulty == 3 or bossData.difficulty == 4) and "h" or "n"
         end
+        if not mode or mode == "" then return "" end
         return (mode == "h") and "H" or "N"
     end
 
@@ -6260,6 +6282,11 @@ do
     end
 
     Utils.registerCallback("LoggerSelectRaid", function() controller:Dirty() end)
+    Utils.registerCallback("RaidBossUpdate", function(_, raidNum)
+        if addon.Logger.selectedRaid and tonumber(raidNum) == tonumber(addon.Logger.selectedRaid) then
+            controller:Dirty()
+        end
+    end)
     Utils.registerCallback("LoggerSelectBoss", function() controller:Touch() end)
 end
 
@@ -6463,6 +6490,10 @@ do
 
             local name = raid.players[pID].name
             tremove(raid.players, pID)
+
+            if raid.playersByName then
+                raid.playersByName[name] = nil
+            end
 
             for _, boss in ipairs(raid.bossKills) do
                 local i = addon.tIndexOf(boss.players, name)
@@ -6818,6 +6849,9 @@ do
         local bTime = Utils.trimText(_G[frameName .. "Time"]:GetText())
 
         name = (name == "") and "_TrashMob_" or name
+        if name == "_TrashMob_" then
+            modeT = ""
+        end
         if name ~= "_TrashMob_" and (modeT ~= "h" and modeT ~= "n") then
             addon:error(L.ErrBossDifficulty)
             return
@@ -6832,19 +6866,51 @@ do
 
         local _, month, day, year = CalendarGetDate()
         local killDate = { day = day, month = month, year = year, hour = h, min = m }
-        local mode = (modeT == "h") and "h" or "n"
+        local killTS = time(killDate)
+        local mode = (name == "_TrashMob_") and "" or ((modeT == "h") and "h" or "n")
 
-        if isEdit and bossData then
+        local difficulty
+        if name ~= "_TrashMob_" then
+            local raid = KRT_Raids[rID]
+            local base = (raid and raid.size == 10) and 1 or 2
+            difficulty = (mode == "h") and (base + 2) or base
+        end
+
+        local raid = KRT_Raids[rID]
+        if not (raid and raid.bossKills) then return end
+        local bID = addon.Logger.selectedBoss
+
+        if isEdit and bossData and bID then
             bossData.name = name
-            bossData.time = time(killDate)
+            bossData.time = killTS
             bossData.mode = mode
+            bossData.date = killTS
+            bossData.difficulty = difficulty
+            if not bossData.hash then
+                local prev = tostring(math.max((bID or 1) - 1, 0))
+                bossData.hash = Utils.encode(rID .. "|" .. name .. "|" .. prev)
+            end
+            if rID == KRT_CurrentRaid and KRT_LastBoss == bID then
+                KRT_LastBoss = bID
+            end
+            Utils.triggerEvent("RaidBossUpdate", rID, bID, bossData)
         else
-            tinsert(KRT_Raids[rID].bossKills, {
-                name = name,
-                time = time(killDate),
-                mode = mode,
-                players = {},
-            })
+            local prev = tostring(#raid.bossKills)
+            local newBoss = {
+                name       = name,
+                time       = killTS,
+                mode       = mode,
+                players    = {},
+                date       = killTS,
+                difficulty = difficulty,
+                hash       = Utils.encode(rID .. "|" .. name .. "|" .. prev),
+            }
+            tinsert(raid.bossKills, newBoss)
+            local newID = #raid.bossKills
+            if rID == KRT_CurrentRaid then
+                KRT_LastBoss = newID
+            end
+            Utils.triggerEvent("RaidBossUpdate", rID, newID, newBoss)
         end
 
         self:Hide()
