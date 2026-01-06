@@ -120,7 +120,7 @@ end
 -- Cached Functions & Libraries
 ---============================================================================
 
-local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, _G.wipe or table.wipe
+local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, table.wipe
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
 local format, find, strlen              = string.format, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
@@ -821,7 +821,7 @@ do
     --
     function module:GetBosses(raidNum, out)
         local bosses = out or {}
-        if out then wipe(bosses) end
+        if out then twipe(bosses) end
         raidNum = raidNum or KRT_CurrentRaid
         if raidNum and KRT_Raids[raidNum] then
             local kills = KRT_Raids[raidNum].bossKills
@@ -865,7 +865,7 @@ do
 
         if bossNum and raid.bossKills[bossNum] then
             local players = out or {}
-            if out then wipe(players) end
+            if out then twipe(players) end
             local bossPlayers = raid.bossKills[bossNum].players
             for i, p in ipairs(raidPlayers) do
                 if tContains(bossPlayers, p.name) then
@@ -1152,7 +1152,7 @@ do
     local function OpenMenu()
         local info = {}
         local function AddMenuButton(level, text, func)
-            wipe(info)
+            twipe(info)
             info.text = text
             info.notCheckable = 1
             info.func = func
@@ -1160,7 +1160,7 @@ do
         end
 
         local function AddMenuTitle(level, text)
-            wipe(info)
+            twipe(info)
             info.isTitle = 1
             info.text = text
             info.notCheckable = 1
@@ -1168,7 +1168,7 @@ do
         end
 
         local function AddMenuSeparator(level)
-            wipe(info)
+            twipe(info)
             info.disabled = 1
             info.notCheckable = 1
             UIDropDownMenu_AddButton(info, level)
@@ -4130,8 +4130,8 @@ do
         addon:debug("Reserves: format players itemId=%d.", itemId)
         local list = self:GetPlayersForItem(itemId)
         -- Log the list of players found for the item
-        addon:debug("Reserves: players itemId=%d list=%s.", itemId, table.concat(list, ", "))
-        return #list > 0 and table.concat(list, ", ") or ""
+        addon:debug("Reserves: players itemId=%d list=%s.", itemId, tconcat(list, ", "))
+        return #list > 0 and tconcat(list, ", ") or ""
     end
 end
 
@@ -5424,7 +5424,7 @@ do
         if lastState.message ~= "" then
             outBuf[#outBuf + 1] = " - " .. Utils.findAchievement(lastState.message)
         end
-        local temp = table.concat(outBuf)
+        local temp = tconcat(outBuf)
         if temp ~= "LFM" then
             local total = lastState.tank + lastState.healer + lastState.melee + lastState.ranged
             local max = name:find("25") and 25 or 10
@@ -5790,7 +5790,6 @@ local bindLoggerListController
 
 do
     local CreateFrame = CreateFrame
-    local wipe = _G.wipe or table.wipe
     local math_max = math.max
 
     function makeLoggerListController(cfg)
@@ -5838,7 +5837,7 @@ do
             for i = 1, #self.data do
                 twipe(self.data[i])
             end
-            wipe(self.data)
+            twipe(self.data)
         end
 
         local function refreshData()
@@ -6930,7 +6929,7 @@ do
         Utils.resetEditBox(_G[frameName .. "Difficulty"])
         Utils.resetEditBox(_G[frameName .. "Time"])
         isEdit, raidData, bossData = false, {}, {}
-        wipe(tempDate)
+        twipe(tempDate)
     end
 
     function Box:UpdateUIFrame(frame, elapsed)
