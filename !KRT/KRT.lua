@@ -120,7 +120,7 @@ end
 -- Cached Functions & Libraries
 ---============================================================================
 
-local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, table.wipe
+local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, _G.wipe or table.wipe
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
 local format, find, strlen              = string.format, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
@@ -1422,12 +1422,12 @@ do
         for i = 1, state.count do
             local entry = state.rolls[i]
             if entry then
-                table.wipe(entry)
+                twipe(entry)
             end
         end
-        table.wipe(state.rolls)
-        table.wipe(state.rerolled)
-        table.wipe(state.playerCounts)
+        twipe(state.rolls)
+        twipe(state.rerolled)
+        twipe(state.playerCounts)
         if delItemCounts then
             delItemCounts(state.itemCounts, true)
         end
@@ -5838,7 +5838,7 @@ do
 
         local function releaseData()
             for i = 1, #self.data do
-                table.wipe(self.data[i])
+                twipe(self.data[i])
             end
             wipe(self.data)
         end
@@ -5861,6 +5861,11 @@ do
             self._active = active
             if self._active then
                 ensureLocalized()
+                -- Reset one-shot diagnostics each time the list becomes active (OnShow).
+                self._loggedFetch = nil
+                self._loggedWidgets = nil
+                self._warnW0 = nil
+                self._missingScroll = nil
                 self:Dirty()
                 return
             end
@@ -5901,18 +5906,32 @@ do
             defer:Show()
         end
 
-        defer:SetScript("OnUpdate", function(f)
-            f:Hide()
+        local function runUpdate()
             if not self._active or not self.frameName then return end
 
             if self._dirty then
                 refreshData()
-                self:Fetch()
-                self._dirty = false
+                local okFetch = self:Fetch()
+                -- If Fetch() returns false we defer until the frame has a real size.
+                if okFetch ~= false then
+                    self._dirty = false
+                end
             end
 
             applyHighlight()
             postUpdate()
+        end
+
+        defer:SetScript("OnUpdate", function(f)
+            f:Hide()
+            local ok, err = pcall(runUpdate)
+            if not ok then
+                -- If the user has script errors disabled, this still surfaces the problem in chat.
+                if err ~= self._lastErr then
+                    self._lastErr = err
+                    addon:error(L.LogLoggerUIError:format(tostring(cfg.keyName or "?"), tostring(err)))
+                end
+            end
         end)
 
         function self:OnLoad(frame)
@@ -5920,7 +5939,25 @@ do
             self.frameName = frame:GetName()
 
             frame:SetScript("OnShow", function()
+                if not self._shownOnce then
+                    self._shownOnce = true
+                    addon:debug(L.LogLoggerUIShow:format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
+                end
                 setActive(true)
+                if not self._loggedWidgets then
+                    self._loggedWidgets = true
+                    local n = self.frameName
+                    local sf = n and _G[n .. "ScrollFrame"]
+                    local sc = n and _G[n .. "ScrollFrameScrollChild"]
+                    addon:debug(L.LogLoggerUIWidgets:format(
+                        tostring(cfg.keyName or "?"),
+                        tostring(sf), tostring(sc),
+                        sf and (sf:GetWidth() or 0) or 0,
+                        sf and (sf:GetHeight() or 0) or 0,
+                        sc and (sc:GetWidth() or 0) or 0,
+                        sc and (sc:GetHeight() or 0) or 0
+                    ))
+                end
             end)
 
             frame:SetScript("OnHide", function()
@@ -5938,11 +5975,43 @@ do
 
             local sf = _G[n .. "ScrollFrame"]
             local sc = _G[n .. "ScrollFrameScrollChild"]
-            if not (sf and sc) then return end
+            if not (sf and sc) then
+                if not self._missingScroll then
+                    self._missingScroll = true
+                    addon:warn(L.LogLoggerUIMissingWidgets:format(tostring(cfg.keyName or "?"), tostring(n)))
+                end
+                return
+            end
 
             local scrollW = sf:GetWidth() or 0
             local widthChanged = (self._lastWidth ~= scrollW)
             self._lastWidth = scrollW
+
+            -- Defer draw until the ScrollFrame has a real size (first OnShow can report 0).
+            if scrollW < 10 then
+                if not self._warnW0 then
+                    self._warnW0 = true
+                    addon:debug(L.LogLoggerUIDeferLayout:format(tostring(cfg.keyName or "?"), scrollW))
+                end
+                defer:Show()
+                return false
+            end
+            if (sc:GetWidth() or 0) < 10 then
+                sc:SetWidth(scrollW)
+            end
+
+            -- One-time diagnostics per list to help debug "empty/blank" frames.
+            if not self._loggedFetch then
+                self._loggedFetch = true
+                addon:debug(L.LogLoggerUIFetch:format(
+                    tostring(cfg.keyName or "?"),
+                    #self.data,
+                    sf:GetWidth() or 0, sf:GetHeight() or 0,
+                    sc:GetWidth() or 0, sc:GetHeight() or 0,
+                    (_G[n] and _G[n]:GetWidth() or 0),
+                    (_G[n] and _G[n]:GetHeight() or 0)
+                ))
+            end
 
             local totalH = 0
             local count = #self.data
@@ -5959,8 +6028,10 @@ do
 
                 row:SetID(it.id)
                 row:ClearAllPoints()
+                -- Stretch the row to the scrollchild width.
+                -- (Avoid relying on GetWidth() being valid on the first OnShow frame.)
                 row:SetPoint("TOPLEFT", 0, -totalH)
-                if widthChanged then row:SetWidth(scrollW - 20) end
+                row:SetPoint("TOPRIGHT", -20, -totalH)
 
                 local rH = cfg.drawRow(row, it)
                 local usedH = rH or row:GetHeight() or 20
@@ -5975,6 +6046,9 @@ do
             end
 
             sc:SetHeight(math_max(totalH, sf:GetHeight()))
+            if sf.UpdateScrollChildRect then
+                sf:UpdateScrollChildRect()
+            end
             self._lastHL = nil
         end
 
@@ -6296,7 +6370,7 @@ do
                 it.class = p.class
                 out[i] = it
             end
-            table.wipe(src)
+            twipe(src)
         end,
 
         rowName = function(n, _, i) return n .. "PlayerBtn" .. i end,
@@ -7224,9 +7298,11 @@ local addonEvents = {
 function addon:ADDON_LOADED(name)
     if name ~= addonName then return end
     self:UnregisterEvent("ADDON_LOADED")
+    addon.BUILD = addon.BUILD or "fixed4-2026-01-06"
     local lvl = addon.GetLogLevel and addon:GetLogLevel()
     addon:info(L.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
         tostring(lvl), tostring(true)))
+    addon:info(L.LogCoreBuild:format(tostring(addon.BUILD)))
     addon.LoadOptions()
     addon.Reserves:Load()
     for event in pairs(addonEvents) do

@@ -21,6 +21,7 @@ L.StrCbErrExec                    = "Error while executing callback %s for event
 -- ==================== Log Messages ==================== --
 L.LogCoreCallbackHandlerMissing   = "[Core] CallbackHandler missing: using fallback event wiring"
 L.LogCoreLoaded                   = "[Core] Loaded version=%s logLevel=%s perfMode=%s"
+L.LogCoreBuild                    = "[Core] build=%s"
 L.LogCoreEventsRegistered         = "[Core] Events registered=%d"
 L.LogCorePlayerEnteringWorld      = "[Core] PLAYER_ENTERING_WORLD -> scheduling FirstCheck"
 L.LogRaidLeftGroupEndSession      = "[Raid] Left group -> ending current raid session"
@@ -94,6 +95,14 @@ L.LogLoggerVerifyFailed          = "[Logger] Loot:Log VERIFY FAILED raidId=%d it
 L.LogLoggerVerified              = "[Logger] Loot:Log verified raidId=%d itemIndex=%s"
 L.LogLoggerRecordedNoBossContext = "[Logger] Loot recorded without boss context raidId=%d itemIndex=%s link=%s"
 L.LogLoggerBossLootRemoved       = "[Logger] Boss delete removed loot raidId=%d bossId=%d removed=%d"
+
+-- ==================== Logger UI Diagnostics ==================== --
+L.LogLoggerUIShow                 = "[LoggerUI] show %s -> %s"
+L.LogLoggerUIWidgets              = "[LoggerUI:%s] widgets sf=%s sc=%s sfW=%.1f sfH=%.1f scW=%.1f scH=%.1f"
+L.LogLoggerUIMissingWidgets       = "[LoggerUI:%s] Missing ScrollFrame widgets for %s"
+L.LogLoggerUIDeferLayout          = "[LoggerUI:%s] defer (layout not ready): sfW=%.1f"
+L.LogLoggerUIFetch                = "[LoggerUI:%s] fetch count=%d sfW=%.1f sfH=%.1f scW=%.1f scH=%.1f frameW=%.1f frameH=%.1f"
+L.LogLoggerUIError                = "[LoggerUI:%s] %s"
 
 -- ==================== General Buttons ==================== --
 L.BtnConfig                       = "Config"

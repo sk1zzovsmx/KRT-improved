@@ -170,7 +170,11 @@
 	<!-- ScrollFrame template -->
 	<ScrollFrame name="KRTScrollFrameTemplate" inherits="UIPanelScrollFrameTemplate" virtual="true">
 		<ScrollChild>
-			<Frame name="$parentScrollChild" setAllPoints="$parent">
+			<Frame name="$parentScrollChild">
+				<Anchors>
+					<Anchor point="TOPLEFT" />
+					<Anchor point="TOPRIGHT" />
+				</Anchors>
 			</Frame>
 		</ScrollChild>
 	</ScrollFrame>
