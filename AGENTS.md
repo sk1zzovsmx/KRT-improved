@@ -267,3 +267,4 @@ Notes:
 - _2026-02-15_: Parse pushed loot messages and refresh Loot Logger on new loot.
 - _2026-02-21_: Removed KRT_Debug SavedVariable (log levels are runtime-only).
 - _2026-03-01_: Renamed History module to Logger (UI, strings, and references).
+- _2026-03-08_: Refreshed Logger lists on show/raid create via LoggerRefresh to keep scrollframes in sync.

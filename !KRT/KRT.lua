@@ -5622,6 +5622,7 @@ do
             end
             clearSelections()
             Utils.triggerEvent("LoggerSelectRaid", Logger.selectedRaid)
+            Utils.triggerEvent("LoggerRefresh")
         end)
 
         frame:SetScript("OnHide", function()
@@ -5636,6 +5637,10 @@ do
         Logger.selectedRaid = KRT_CurrentRaid
         clearSelections()
         Utils.showHide(UILogger, false)
+    end
+
+    function Logger:Refresh()
+        Utils.triggerEvent("LoggerRefresh")
     end
 
     -- Selectors
@@ -6144,9 +6149,11 @@ do
         addon.Logger.selectedRaid = tonumber(num)
         controller:Dirty()
         Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid)
+        Utils.triggerEvent("LoggerRefresh")
     end)
 
     Utils.registerCallback("LoggerSelectRaid", function() controller:Touch() end)
+    Utils.registerCallback("LoggerRefresh", function() controller:Dirty() end)
 end
 
 -- ============================================================================
@@ -6288,6 +6295,7 @@ do
         end
     end)
     Utils.registerCallback("LoggerSelectBoss", function() controller:Touch() end)
+    Utils.registerCallback("LoggerRefresh", function() controller:Dirty() end)
 end
 
 -- ============================================================================
@@ -6398,6 +6406,7 @@ do
 
     Utils.registerCallbacks({ "LoggerSelectRaid", "LoggerSelectBoss" }, function() controller:Dirty() end)
     Utils.registerCallback("LoggerSelectBossPlayer", function() controller:Touch() end)
+    Utils.registerCallback("LoggerRefresh", function() controller:Dirty() end)
 end
 
 -- ============================================================================
@@ -6524,6 +6533,7 @@ do
 
     Utils.registerCallback("LoggerSelectRaid", function() controller:Dirty() end)
     Utils.registerCallback("LoggerSelectPlayer", function() controller:Touch() end)
+    Utils.registerCallback("LoggerRefresh", function() controller:Dirty() end)
 end
 
 -- ============================================================================
@@ -6781,6 +6791,7 @@ do
         Reset
     )
     Utils.registerCallback("LoggerSelectItem", function() controller:Touch() end)
+    Utils.registerCallback("LoggerRefresh", function() controller:Dirty() end)
 end
 
 -- ============================================================================
