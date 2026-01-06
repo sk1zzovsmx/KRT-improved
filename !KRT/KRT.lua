@@ -120,7 +120,7 @@ end
 -- Cached Functions & Libraries
 ---============================================================================
 
-local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, table.wipe
+local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, _G.wipe or table.wipe
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
 local format, find, strlen              = string.format, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
@@ -1422,12 +1422,12 @@ do
         for i = 1, state.count do
             local entry = state.rolls[i]
             if entry then
-                table.wipe(entry)
+                twipe(entry)
             end
         end
-        table.wipe(state.rolls)
-        table.wipe(state.rerolled)
-        table.wipe(state.playerCounts)
+        twipe(state.rolls)
+        twipe(state.rerolled)
+        twipe(state.playerCounts)
         if delItemCounts then
             delItemCounts(state.itemCounts, true)
         end
@@ -5838,7 +5838,7 @@ do
 
         local function releaseData()
             for i = 1, #self.data do
-                table.wipe(self.data[i])
+                twipe(self.data[i])
             end
             wipe(self.data)
         end
@@ -6296,7 +6296,7 @@ do
                 it.class = p.class
                 out[i] = it
             end
-            table.wipe(src)
+            twipe(src)
         end,
 
         rowName = function(n, _, i) return n .. "PlayerBtn" .. i end,
