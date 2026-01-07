@@ -221,7 +221,7 @@ do
 	addon.InternalCallbacksTarget = addon.InternalCallbacksTarget or {}
 	addon.InternalCallbacks = addon.InternalCallbacks
 		or CallbackHandler:New(addon.InternalCallbacksTarget, "RegisterCallback", "UnregisterCallback",
-		"UnregisterAllCallbacks")
+			"UnregisterAllCallbacks")
 
 	local target = addon.InternalCallbacksTarget
 	local registry = addon.InternalCallbacks

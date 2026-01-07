@@ -1,6 +1,5 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
-
 	<!-- ====== Start of Minimap Button ====== -->
 	<Button name="KRT_MINIMAP_GUI" parent="Minimap" movable="true" userPlaced="true"
 		frameStrata="MEDIUM" hidden="false">
@@ -46,7 +45,6 @@
 		</Scripts>
 	</Button>
 	<!-- ====== End of Minimap Button ====== -->
-
 	<!-- ====== Reserve List Templates ====== -->
 	<Button name="KRTReserveHeaderTemplate" virtual="true">
 		<Size>
@@ -100,7 +98,6 @@
 			</Layer>
 		</Layers>
 	</Button>
-
 	<Frame name="KRTReserveRowTemplate" virtual="true">
 		<Size>
 			<AbsDimension x="320" y="42" />
@@ -213,7 +210,6 @@
 		</Layers>
 	</Frame>
 	<!-- ====== End Reserve List Templates ====== -->
-
 	<!-- ====== Start of Config Frame ====== -->
 	<!-- CheckButton Template -->
 	<CheckButton name="KRTConfigCheckButtonTemplate" inherits="InterfaceOptionsCheckButtonTemplate"
@@ -597,7 +593,6 @@
 		</Scripts>
 	</Frame>
 	<!-- ====== End of Config Frame ====== -->
-
 	<!-- ====== Start of LFM Spam Frame ====== -->
 	<!-- EditBox Template -->
 	<EditBox name="KRTSpammerEditBox" inherits="KRTEditBoxTemplate" virtual="true">
@@ -1284,7 +1279,6 @@
 		</Scripts>
 	</Frame>
 	<!-- ====== End of LFM Spam Frame ====== -->
-
 	<!-- ====== Start of Warnings ====== -->
 	<!-- Raid Warning Button -->
 	<Button name="KRTWarningButtonTemplate" virtual="true">
@@ -1532,7 +1526,6 @@
 		</Scripts>
 	</Frame>
 	<!-- ====== End of Warnings ====== -->
-
 	<!-- ====== Start of Master Loot Frame ====== -->
 	<!-- Item Selection Frame -->
 	<Frame name="KRTItemSelectionFrame" toplevel="true" hidden="true" frameStrata="FULLSCREEN"
@@ -1666,7 +1659,6 @@
 				</FontString>
 			</Layer>
 		</Layers>
-
 		<Frames>
 			<Button name="$parentConfigBtn" inherits="KRTButtonTemplate" text="Configure">
 				<Size>
@@ -1683,7 +1675,6 @@
 					<OnClick>KRT.Config:Toggle()</OnClick>
 				</Scripts>
 			</Button>
-
 			<Button name="$parentSelectItemBtn" inherits="KRTButtonTemplate" text="Select Item">
 				<Size>
 					<AbsDimension x="105" y="25" />
@@ -1699,7 +1690,6 @@
 					<OnClick>KRT.Master:BtnSelectItem(self, button)</OnClick>
 				</Scripts>
 			</Button>
-
 			<Button name="$parentSpamLootBtn" inherits="KRTButtonTemplate" text="Spam Loot">
 				<Size>
 					<AbsDimension x="105" y="25" />
@@ -1715,7 +1705,6 @@
 					<OnClick>KRT.Master:BtnSpamLoot(self, button)</OnClick>
 				</Scripts>
 			</Button>
-
 			<Button name="$parentItemBtn" inherits="KRTItemButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentSelectItemBtn"
@@ -1726,7 +1715,6 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-
 			<EditBox name="$parentItemCount" inherits="KRTEditBoxTemplate" numeric="true"
 				letters="2" hidden="true">
 				<Size>
@@ -1744,7 +1732,6 @@
 					<OnEnterPressed>self:ClearFocus()</OnEnterPressed>
 				</Scripts>
 			</EditBox>
-
 			<Button name="$parentMSBtn" inherits="KRTButtonTemplate" text="MS">
 				<Size>
 					<AbsDimension x="28" y="25" />
@@ -1760,7 +1747,6 @@
 					<OnClick>KRT.Master:BtnMS(self, button)</OnClick>
 				</Scripts>
 			</Button>
-
 			<Button name="$parentOSBtn" inherits="KRTButtonTemplate" text="OS">
 				<Size>
 					<AbsDimension x="28" y="25" />
@@ -1776,7 +1762,6 @@
 					<OnClick>KRT.Master:BtnOS(self, button)</OnClick>
 				</Scripts>
 			</Button>
-
 			<Button name="$parentSRBtn" inherits="KRTButtonTemplate" text="SR">
 				<Size>
 					<AbsDimension x="28" y="25" />
@@ -1792,7 +1777,6 @@
 					<OnClick>KRT.Master:BtnSR(self, button)</OnClick>
 				</Scripts>
 			</Button>
-
 			<Button name="$parentFreeBtn" inherits="KRTButtonTemplate" text="Free">
 				<Size>
 					<AbsDimension x="35" y="25" />
@@ -1808,7 +1792,6 @@
 					<OnClick>KRT.Master:BtnFree(self, button)</OnClick>
 				</Scripts>
 			</Button>
-
 			<Button name="$parentCountdownBtn" inherits="KRTButtonTemplate" text="Countdown">
 				<Size>
 					<AbsDimension x="70" y="25" />
@@ -1824,7 +1807,6 @@
 					<OnClick>KRT.Master:BtnCountdown(self, button)</OnClick>
 				</Scripts>
 			</Button>
-
 			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT">
@@ -1839,7 +1821,6 @@
 					</Anchor>
 				</Anchors>
 			</ScrollFrame>
-
 			<Button name="$parentAwardBtn" inherits="KRTButtonTemplate" text="Award">
 				<Size>
 					<AbsDimension x="75" y="25" />
@@ -1856,7 +1837,6 @@
 					<OnClick>KRT.Master:BtnAward(self, button)</OnClick>
 				</Scripts>
 			</Button>
-
 			<Button name="$parentRollBtn" inherits="KRTButtonTemplate" text="Roll">
 				<Size>
 					<AbsDimension x="55" y="25" />
@@ -1872,7 +1852,6 @@
 					<OnClick>KRT.Rolls:Roll(self, button)</OnClick>
 				</Scripts>
 			</Button>
-
 			<Button name="$parentClearBtn" inherits="KRTButtonTemplate" text="Clear">
 				<Size>
 					<AbsDimension x="68" y="25" />
@@ -1888,7 +1867,6 @@
 					<OnClick>KRT.Master:BtnClear(self, button)</OnClick>
 				</Scripts>
 			</Button>
-
 			<Button name="$parentHoldBtn" inherits="KRTButtonTemplate" text="Hold">
 				<Size>
 					<AbsDimension x="75" y="25" />
@@ -1913,7 +1891,6 @@
 					</Anchor>
 				</Anchors>
 			</Frame>
-
 			<Button name="$parentBankBtn" inherits="KRTButtonTemplate" text="Bank">
 				<Size>
 					<AbsDimension x="75" y="25" />
@@ -1938,7 +1915,6 @@
 					</Anchor>
 				</Anchors>
 			</Frame>
-
 			<Button name="$parentDisenchantBtn" inherits="KRTButtonTemplate" text="DE">
 				<Size>
 					<AbsDimension x="75" y="25" />
@@ -1964,7 +1940,6 @@
 					</Anchor>
 				</Anchors>
 			</Frame>
-
 			<!-- First row: Import Reserve (left) and Open List (right) -->
 			<Button name="$parentImportReservesBtn" inherits="KRTButtonTemplate"
 				text="Import Reserve">
@@ -1983,7 +1958,6 @@
 					<OnClick>KRT.Master:BtnImportReserves(self, button)</OnClick>
 				</Scripts>
 			</Button>
-
 			<Button name="$parentOpenReservesBtn" inherits="KRTButtonTemplate" text="Open List">
 				<Size>
 					<AbsDimension x="105" y="25" />
@@ -2000,7 +1974,6 @@
 					<OnClick>KRT.Master:BtnOpenReserves(self, button)</OnClick>
 				</Scripts>
 			</Button>
-
 			<!-- Second row: Raid List, centered above the first row -->
 			<Button name="$parentRaidListBtn" inherits="KRTButtonTemplate" text="Raid List">
 				<Size>
@@ -2027,13 +2000,11 @@
 				</Scripts>
 			</Button>
 		</Frames>
-
 		<Scripts>
 			<OnLoad>KRT.Master:OnLoad(self)</OnLoad>
 		</Scripts>
 	</Frame>
 	<!-- ====== End of Master Loot Frame ====== -->
-
 	<!-- ====== Start of Loot Counter Frame ====== -->
 	<Frame name="KRTLootCounterFrame" inherits="KRTFrameTemplate" hidden="true" enableMouse="true"
 		registerForDrag="LeftButton">
@@ -2067,7 +2038,6 @@
 		</Scripts>
 	</Frame>
 	<!-- ====== End of Loot Counter Frame ====== -->
-
 	<!-- ====== Start of Changes ====== -->
 	<!-- Player Button -->
 	<Button name="KRTChangesButtonTemplate" virtual="true">
@@ -2281,7 +2251,6 @@
 		</Scripts>
 	</Frame>
 	<!-- ====== End of Changes ====== -->
-
 	<!-- ====== Reserve List Window ====== -->
 	<Frame name="KRTReserveListFrame" inherits="KRTFrameTemplate" toplevel="true" hidden="true"
 		frameStrata="MEDIUM">
@@ -2362,7 +2331,6 @@
 				</Anchors>
 			</Button>
 		</Frames>
-
 		<Scripts>
 			<OnLoad>
 				KRT.Reserves:OnLoad(self)
@@ -2370,7 +2338,6 @@
 		</Scripts>
 	</Frame>
 	<!-- ====== End Reserve List Window ====== -->
-
 	<!-- ====== Start of Reserve Import Window ====== -->
 	<Frame name="KRTImportWindow" inherits="KRTFrameTemplate" toplevel="true" hidden="true"
 		frameStrata="DIALOG">
@@ -2416,7 +2383,6 @@
 					</EditBox>
 				</ScrollChild>
 			</ScrollFrame>
-
 			<!-- Import Button -->
 			<Button name="KRTImportConfirmButton" inherits="KRTButtonTemplate" text="Import">
 				<Size>
@@ -2433,7 +2399,6 @@
 					<OnClick>KRT.Reserves:ImportFromEditBox()</OnClick>
 				</Scripts>
 			</Button>
-
 			<!-- Cancel Button -->
 			<Button name="KRTImportCancelButton" inherits="KRTButtonTemplate" text="Close">
 				<Size>
@@ -2453,10 +2418,8 @@
 		</Frames>
 	</Frame>
 	<!-- ====== End of Reserve Import Window ====== -->
-
 	<!-- ====== Start of Loot Bans Frame ====== -->
 	<!-- ====== End of Loot Bans Frame ====== -->
-
 	<!-- ====== Start of Logger Loot ====== -->
 	<Frame name="KRTLoggerFrameTemplate" parent="KRTLogger" virtual="true">
 		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" tile="true">
@@ -3072,13 +3035,12 @@
 			<OnClick>KRT.Logger:SelectItem(self, button)</OnClick>
 		</Scripts>
 	</Button>
-      <!-- The Frame: Logger -->
-      <Frame name="KRTLogger" inherits="KRTFrameTemplate">
+	<!-- The Frame: Logger -->
+	<Frame name="KRTLogger" inherits="KRTFrameTemplate">
 		<Size>
 			<AbsDimension x="830" y="488" />
 		</Size>
 		<Frames>
-
 			<Frame name="$parentRaids" inherits="KRTLoggerFrameTemplate">
 				<Size>
 					<AbsDimension x="330" y="195" />
@@ -3234,12 +3196,10 @@
 						</Anchors>
 					</ScrollFrame>
 				</Frames>
-
 				<Scripts>
 					<OnLoad>KRT.Logger.Raids:OnLoad(self)</OnLoad>
 				</Scripts>
 			</Frame>
-
 			<Frame name="$parentBosses" inherits="KRTLoggerFrameTemplate">
 				<Size>
 					<AbsDimension x="315" y="195" />
@@ -3402,7 +3362,6 @@
 					<OnLoad>KRT.Logger.Boss:OnLoad(self)</OnLoad>
 				</Scripts>
 			</Frame>
-
 			<Frame name="$parentBossAttendees" inherits="KRTLoggerFrameTemplate">
 				<Size>
 					<AbsDimension x="140" y="192" />
@@ -3502,7 +3461,6 @@
 					<OnLoad>KRT.Logger.BossAttendees:OnLoad(self)</OnLoad>
 				</Scripts>
 			</Frame>
-
 			<Frame name="$parentRaidAttendees" inherits="KRTLoggerFrameTemplate">
 				<Size>
 					<AbsDimension x="215" y="235" />
@@ -3634,7 +3592,6 @@
 					<OnLoad>KRT.Logger.RaidAttendees:OnLoad(self)</OnLoad>
 				</Scripts>
 			</Frame>
-
 			<Frame name="$parentLoot" inherits="KRTLoggerFrameTemplate">
 				<Size>
 					<AbsDimension x="578" y="235" />
@@ -3733,7 +3690,6 @@
 							<OnClick>KRT.Logger.Loot:Delete(self, button)</OnClick>
 						</Scripts>
 					</Button>
-
 					<!-- Table Headers -->
 					<Button name="$parentHeaderItem" inherits="KRTLoggerTableHeader">
 						<Size>
@@ -3849,7 +3805,6 @@
 					<OnLoad>KRT.Logger.Loot:OnLoad(self)</OnLoad>
 				</Scripts>
 			</Frame>
-
 			<!-- Add/Edit Boss: -->
 			<Frame name="KRTLoggerBossBox" inherits="KRTSimpleFrameTemplate" frameStrata="HIGH"
 				parent="KRTLogger">
@@ -3993,8 +3948,6 @@
 					<OnDragStop>self:GetParent():StopMovingOrSizing()</OnDragStop>
 				</Scripts>
 			</Frame>
-
-
 			<!-- Add/Edit Boss Attendee: -->
 			<Frame name="$parentPlayerBox" inherits="KRTSimpleFrameTemplate" frameStrata="HIGH"
 				hidden="true" parent="KRTLogger">
@@ -4100,5 +4053,4 @@
 		</Scripts>
 	</Frame>
 	<!-- ====== End of Logger Loot ====== -->
-
 </Ui>
