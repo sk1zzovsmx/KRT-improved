@@ -34,8 +34,6 @@ local RT_COLOR            = C.RT_COLOR
 ---============================================================================
 
 KRT_Options               = KRT_Options or {}
-KRT_Options.schemaVersion = KRT_Options.schemaVersion or 1
-KRT_Options.migrations    = KRT_Options.migrations or {}
 KRT_Raids                 = KRT_Raids or {}
 KRT_Players               = KRT_Players or {}
 KRT_Warnings              = KRT_Warnings or {}
@@ -4173,8 +4171,6 @@ do
     -- Default options for the addon.
     --
     local defaultOptions = {
-        schemaVersion          = 1,
-        migrations             = {},
         sortAscending          = false,
         useRaidWarning         = true,
         announceOnWin          = true,

@@ -11,17 +11,13 @@ addon.name = addon.name or addonName
 _G["KRT"] = addon
 
 ---------------------------------------------------------------------------
--- SavedVariables init (defaults + migrations)
+-- SavedVariables init (defaults)
 ---------------------------------------------------------------------------
 local function InitSavedVariables()
     KRT_Options = KRT_Options or {}
     KRT_Debug = KRT_Debug or {}
 
-    KRT_Options.schemaVersion = KRT_Options.schemaVersion or 1
-    KRT_Options.migrations = KRT_Options.migrations or {}
-
     -- ApplyDefaults(KRT_Options, defaults) -- see KRT_SVTemplate.lua
-    -- RunMigrations(KRT_Options)           -- see KRT_SVTemplate.lua
 end
 
 ---------------------------------------------------------------------------
