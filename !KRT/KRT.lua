@@ -4188,7 +4188,6 @@ do
         minimapButton          = true,
         minimapPos             = 325,
         debug                  = false,
-        chatThrottle           = 2,
         lfmPeriod              = 45,
         countdownSimpleRaidMsg = false,
         countdownDuration      = 5,
@@ -7025,7 +7024,6 @@ do
     local cmdDebug = { "debug", "dbg", "debugger" }
     local cmdLoot = { "loot", "ml", "master" }
     local cmdReserves = { "res", "reserves", "reserve" }
-    local cmdChat = { "chat", "throttle", "chatthrottle" }
     local cmdMinimap = { "minimap", "mm" }
 
     local helpString = "%s: %s"
@@ -7118,16 +7116,6 @@ do
             addon:info(L.MsgDebugOn)
         else
             addon:info(L.MsgDebugOff)
-        end
-    end)
-
-    registerAliases(cmdChat, function(rest)
-        local val = tonumber(rest)
-        if val then
-            addon.options.chatThrottle = val
-            addon:info(L.MsgChatThrottleSet, val)
-        else
-            addon:info(L.MsgChatThrottleSet, addon.options.chatThrottle)
         end
     end)
 

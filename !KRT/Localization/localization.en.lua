@@ -374,7 +374,6 @@ L.StrCmdMinimapPos                = "set minimap button angle"
 
 L.MsgDebugOn                      = "Debug: enabled."
 L.MsgDebugOff                     = "Debug: disabled."
-L.MsgChatThrottleSet              = "Chat throttle: set to %s sec."
 L.MsgLFMPeriodSet                 = "LFM period: set to %s sec."
 L.MsgMinimapPosSet                = "Minimap: angle set to %s."
 L.MsgDefaultsRestored             = "Options: defaults restored."
@@ -415,11 +414,11 @@ L.RaidZones                       = {
 	["The Eye of Eternity"] = "The Eye of Eternity",
 	["Vault of Archavon"] = "Vault of Archavon",
 	["Ulduar"] = "Ulduar",
-	["Onyxia's Lair"] = "Onyxia's Lair",                                 -- Note: Onyxia is also present in Classic
+	["Onyxia's Lair"] = "Onyxia's Lair",                          -- Note: Onyxia is also present in Classic
 	["Trial of the Crusader"] = "Trial of the Crusader",
-	["Trial of the Grand Crusader"] = "Trial of the Grand Crusader",     -- Already present, keeping it
+	["Trial of the Grand Crusader"] = "Trial of the Grand Crusader", -- Already present, keeping it
 	["Icecrown Citadel"] = "Icecrown Citadel",
-	["The Ruby Sanctum"] = "The Ruby Sanctum",                           -- Already present, keeping it
+	["The Ruby Sanctum"] = "The Ruby Sanctum",                    -- Already present, keeping it
 }
 -- The reason we are using these is because of the missing
 -- UNIT_DIED event once these bosses are dealt with.

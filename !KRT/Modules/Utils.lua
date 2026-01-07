@@ -556,19 +556,10 @@ function Utils.sync(prefix, msg)
 	end
 end
 
-do
-	local lastChat = 0
-
-	function Utils.chat(msg, channel, language, target, bypass)
-		if not msg then return end
-		if not bypass then
-			local throttle = addon.options and addon.options.chatThrottle or 0
-			local now = GetTime()
-			if throttle > 0 and (now - lastChat) < throttle then return end
-			lastChat = now
-		end
-		SendChatMessage(tostring(msg), channel, language, target)
-	end
+-- Send messages into chat
+function Utils.chat(msg, channel, language, target, bypass)
+	if not msg then return end
+	SendChatMessage(tostring(msg), channel, language, target)
 end
 
 -- Send a whisper to a player by his/her character name
