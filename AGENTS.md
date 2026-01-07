@@ -245,6 +245,7 @@ Notes:
 ---
 
 ## 18) Change log (edit by hand)
+- _2026-03-02_: Removed `/krt lfm period` command and default LFM period SV entry.
 - _2026-01-02_: Standardized module skeleton (use `local module`), updated TemplatesLua + Docs, and introduced `addon.LootCounter` module (kept Master aliases).
 - _2025-09-05_: Initial lightweight version; removed binding “recipes”. Added `dev`-only branching policy.
 - _2025-09-07_: Clarified monolithic structure and updated CLI command list.

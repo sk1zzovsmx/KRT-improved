@@ -4182,9 +4182,6 @@ do
         ignoreStacks           = false,
         showTooltips           = true,
         minimapButton          = true,
-        minimapPos             = 325,
-        debug                  = false,
-        lfmPeriod              = 45,
         countdownSimpleRaidMsg = false,
         countdownDuration      = 5,
         countdownRollsBlock    = true,
@@ -4989,7 +4986,7 @@ do
 
     local loaded = false
 
-    local duration = (KRT_Options and KRT_Options.lfmPeriod) or 60
+    local duration = 60
     local output = "LFM"
     local finalOutput = ""
     local length = 0
@@ -5227,6 +5224,11 @@ do
         for _, field in ipairs(resetFields) do
             Utils.resetEditBox(_G[frameName .. field])
         end
+        local durationBox = _G[frameName .. "Duration"]
+        if durationBox then
+            Utils.resetEditBox(durationBox)
+            durationBox:SetText(60)
+        end
         previewDirty = true
         SetInputsLocked(false)
     end
@@ -5344,7 +5346,7 @@ do
     function GetValidDuration()
         local value = tonumber(duration)
         if not value or value <= 0 then
-            value = addon.options.lfmPeriod or 60
+            value = 60
         end
         return value
     end
@@ -5477,7 +5479,7 @@ do
 
         local durationValue = _G[frameName .. "Duration"]:GetText()
         if durationValue == "" then
-            durationValue = addon.options.lfmPeriod
+            durationValue = 60
             _G[frameName .. "Duration"]:SetText(durationValue)
         end
         if lastState.duration ~= durationValue then
@@ -5533,7 +5535,7 @@ do
         end
         Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             if not loaded then
-                KRT_Spammer.Duration = KRT_Spammer.Duration or addon.options.lfmPeriod
+                KRT_Spammer.Duration = KRT_Spammer.Duration or 60
                 for k, v in pairs(KRT_Spammer) do
                     if k == "Channels" then
                         for i, c in ipairs(v) do
@@ -7219,29 +7221,18 @@ do
     end)
 
     registerAliases(cmdLFM, function(rest)
-        local sub, arg = Utils.splitArgs(rest)
+        local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" or sub == "show" then
             addon.Spammer:Toggle()
         elseif sub == "start" then
             addon.Spammer:Start()
         elseif sub == "stop" then
             addon.Spammer:Stop()
-        elseif sub == "period" then
-            if arg and arg ~= "" then
-                local v = tonumber(arg)
-                if v then
-                    addon.options.lfmPeriod = v
-                    addon:info(L.MsgLFMPeriodSet, v)
-                end
-            else
-                addon:info(L.MsgLFMPeriodSet, addon.options.lfmPeriod)
-            end
         else
             addon:info(format(L.StrCmdCommands, "krt pug"), "KRT")
             printHelp("toggle", L.StrCmdToggle)
             printHelp("start", L.StrCmdLFMStart)
             printHelp("stop", L.StrCmdLFMStop)
-            printHelp("period", L.StrCmdLFMPeriod)
         end
     end)
 
