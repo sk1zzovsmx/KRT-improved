@@ -4986,8 +4986,7 @@ do
 
     local loaded = false
 
-    local DEFAULT_PERIOD = 45
-    local duration = DEFAULT_PERIOD
+    local duration = 60
     local output = "LFM"
     local finalOutput = ""
     local length = 0
@@ -5225,12 +5224,10 @@ do
         for _, field in ipairs(resetFields) do
             Utils.resetEditBox(_G[frameName .. field])
         end
-        duration = DEFAULT_PERIOD
-        KRT_Spammer.Duration = DEFAULT_PERIOD
         local durationBox = _G[frameName .. "Duration"]
         if durationBox then
             Utils.resetEditBox(durationBox)
-            durationBox:SetText(DEFAULT_PERIOD)
+            durationBox:SetText(60)
         end
         previewDirty = true
         SetInputsLocked(false)
@@ -5349,7 +5346,7 @@ do
     function GetValidDuration()
         local value = tonumber(duration)
         if not value or value <= 0 then
-            value = DEFAULT_PERIOD
+            value = 60
         end
         return value
     end
@@ -5482,7 +5479,7 @@ do
 
         local durationValue = _G[frameName .. "Duration"]:GetText()
         if durationValue == "" then
-            durationValue = DEFAULT_PERIOD
+            durationValue = 60
             _G[frameName .. "Duration"]:SetText(durationValue)
         end
         if lastState.duration ~= durationValue then
@@ -5538,7 +5535,7 @@ do
         end
         Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             if not loaded then
-                KRT_Spammer.Duration = KRT_Spammer.Duration or DEFAULT_PERIOD
+                KRT_Spammer.Duration = KRT_Spammer.Duration or 60
                 for k, v in pairs(KRT_Spammer) do
                     if k == "Channels" then
                         for i, c in ipairs(v) do
