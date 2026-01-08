@@ -4152,7 +4152,6 @@ do
     -------------------------------------------------------
     local localized = false
     local configDirty = false
-    local lastUseRaidWarning
 
     -- Frame update
     local UpdateUIFrame
@@ -4211,11 +4210,6 @@ do
         KRT_Options = options
         addon.options = options
 
-        -- Ensure dependent options are consistent
-        if not addon.options.useRaidWarning then
-            addon.options.countdownSimpleRaidMsg = false
-        end
-
         Utils.applyDebugSetting(addon.options.debug)
         configDirty = true
 
@@ -4245,6 +4239,10 @@ do
         UIConfig = frame
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
+
+        -- Localize once (no per-tick calls)
+        LocalizeUIFrame()
+
         frame:SetScript("OnUpdate", UpdateUIFrame)
     end
 
@@ -4283,13 +4281,10 @@ do
             value = btn:GetValue()
             _G[frameName .. "countdownDurationText"]:SetText(value)
         end
+
         name = strsub(name, strlen(frameName) + 1)
         Utils.triggerEvent("Config" .. name, value)
         KRT_Options[name] = value
-
-        if name == "useRaidWarning" and not value then
-            KRT_Options.countdownSimpleRaidMsg = false
-        end
 
         configDirty = true
     end
@@ -4301,6 +4296,8 @@ do
         if localized then
             return
         end
+
+        -- frameName must be ready here (OnLoad sets it before calling)
         if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
             _G[frameName .. "sortAscendingStr"]:SetText(L.StrConfigSortAscending)
             _G[frameName .. "useRaidWarningStr"]:SetText(L.StrConfigUseRaidWarning)
@@ -4317,9 +4314,11 @@ do
             _G[frameName .. "countdownDurationStr"]:SetText(L.StrConfigCountdownDuration)
             _G[frameName .. "countdownSimpleRaidMsgStr"]:SetText(L.StrConfigCountdownSimpleRaidMsg)
         end
+
         Utils.setFrameTitle(frameName, SETTINGS)
         _G[frameName .. "AboutStr"]:SetText(L.StrConfigAbout)
         _G[frameName .. "DefaultsBtn"]:SetScript("OnClick", LoadDefaultOptions)
+
         localized = true
     end
 
@@ -4327,7 +4326,6 @@ do
     -- OnUpdate handler for the configuration frame.
     --
     function UpdateUIFrame(self, elapsed)
-        LocalizeUIFrame()
         if configDirty then
             Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
                 _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)
@@ -4342,29 +4340,34 @@ do
                 _G[frameName .. "ignoreStacks"]:SetChecked(addon.options.ignoreStacks == true)
                 _G[frameName .. "showTooltips"]:SetChecked(addon.options.showTooltips == true)
                 _G[frameName .. "minimapButton"]:SetChecked(addon.options.minimapButton == true)
+
+                -- IMPORTANT: always update checked state (even if disabled)
+                _G[frameName .. "countdownSimpleRaidMsg"]:SetChecked(addon.options.countdownSimpleRaidMsg == true)
+
                 _G[frameName .. "countdownDuration"]:SetValue(addon.options.countdownDuration)
                 _G[frameName .. "countdownDurationText"]:SetText(addon.options.countdownDuration)
 
-                -- Handle dependent options
-                local useRaidWarningBtn = _G[frameName .. "useRaidWarning"]
-                local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
-                local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
+                -- Dependency: if Use Raid Warnings is OFF, keep check state but grey out + disable.
+                do
+                    local useRaidWarning = addon.options.useRaidWarning == true
+                    local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
+                    local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
 
-                if useRaidWarningBtn and countdownSimpleRaidMsgBtn and countdownSimpleRaidMsgStr then
-                    if lastUseRaidWarning ~= addon.options.useRaidWarning then
-                        if not useRaidWarningBtn:GetChecked() then
-                            countdownSimpleRaidMsgBtn:SetChecked(addon.options.countdownSimpleRaidMsg)
+                    if countdownSimpleRaidMsgBtn and countdownSimpleRaidMsgStr then
+                        if useRaidWarning then
+                            countdownSimpleRaidMsgBtn:Enable()
+                            countdownSimpleRaidMsgStr:SetTextColor(
+                                HIGHLIGHT_FONT_COLOR.r,
+                                HIGHLIGHT_FONT_COLOR.g,
+                                HIGHLIGHT_FONT_COLOR.b
+                            )
+                        else
                             countdownSimpleRaidMsgBtn:Disable()
                             countdownSimpleRaidMsgStr:SetTextColor(0.5, 0.5, 0.5)
-                        else
-                            countdownSimpleRaidMsgBtn:Enable()
-                            countdownSimpleRaidMsgStr:SetTextColor(HIGHLIGHT_FONT_COLOR.r,
-                                HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
-                            countdownSimpleRaidMsgBtn:SetChecked(addon.options.countdownSimpleRaidMsg)
                         end
-                        lastUseRaidWarning = addon.options.useRaidWarning
                     end
                 end
+
                 configDirty = false
             end)
         end
