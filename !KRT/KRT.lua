@@ -1738,9 +1738,11 @@ do
         for i = 1, GetNumLootItems() do
             if LootSlotIsItem(i) then
                 local itemLink = GetLootSlotLink(i)
-                local _, _, count = GetLootSlotInfo(i)
-                if GetItemFamily(itemLink) ~= 64 then -- no DE mat!
-                    self:AddItem(itemLink, count)
+                if itemLink then
+                    local icon, name, quantity, quality = GetLootSlotInfo(i)
+                    if GetItemFamily(itemLink) ~= 64 then
+                        self:AddItem(itemLink, quantity, name, quality, icon)
+                    end
                 end
             end
         end
@@ -1763,22 +1765,55 @@ do
 
     --
     -- Adds an item to the loot table.
+    -- Note: in 3.3.5a GetItemInfo can be nil for uncached items; we fall back to
+    -- loot-slot data and the itemLink itself so Master Loot UI + Spam Loot keep working.
     --
-    function module:AddItem(itemLink, itemCount)
-        local itemName, _, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType,
-        itemStackCount, itemEquipLoc, itemTexture = GetItemInfo(itemLink)
+    function module:AddItem(itemLink, itemCount, nameHint, rarityHint, textureHint, colorHint)
+        local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
 
-        if not itemName or not itemRarity then
+        -- Try to warm the item cache (doesn't guarantee immediate GetItemInfo).
+        if (not itemName or not itemRarity or not itemTexture) and type(itemLink) == "string" then
             GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
             GameTooltip:SetHyperlink(itemLink)
             GameTooltip:Hide()
-            addon:warn(L.LogLootItemInfoMissing:format(tostring(itemLink)))
-            return
         end
 
+        if not itemName then
+            itemName = nameHint
+            if not itemName and type(itemLink) == "string" then
+                itemName = itemLink:match("%[(.-)%]")
+            end
+        end
+
+        if not itemRarity then
+            itemRarity = rarityHint
+        end
+
+        if not itemTexture then
+            itemTexture = textureHint
+        end
+
+        -- Prefer: explicit hint > link color > rarity color table.
+        local itemColor = colorHint
+        if not itemColor and type(itemLink) == "string" then
+            itemColor = itemLink:match("|c(%x%x%x%x%x%x%x%x)|Hitem:")
+        end
+        if not itemColor then
+            local r = tonumber(itemRarity) or 1
+            itemColor = itemColors[r + 1] or itemColors[2]
+        end
+
+        if not itemName then
+            addon:warn(L.LogLootItemInfoMissing:format(tostring(itemLink)))
+            itemName = tostring(itemLink)
+        end
+
+        itemTexture = itemTexture or C.RESERVES_ITEM_FALLBACK_ICON
+
         if lootState.fromInventory == false then
-            local lootThreshold = GetLootThreshold()
-            if itemRarity < lootThreshold then return end
+            local lootThreshold = GetLootThreshold() or 2
+            local rarity = tonumber(itemRarity) or 1
+            if rarity < lootThreshold then return end
             lootState.lootCount = lootState.lootCount + 1
         else
             lootState.lootCount = 1
@@ -1786,7 +1821,7 @@ do
         end
         lootTable[lootState.lootCount]             = {}
         lootTable[lootState.lootCount].itemName    = itemName
-        lootTable[lootState.lootCount].itemColor   = itemColors[itemRarity + 1]
+        lootTable[lootState.lootCount].itemColor   = itemColor
         lootTable[lootState.lootCount].itemLink    = itemLink
         lootTable[lootState.lootCount].itemTexture = itemTexture
         lootTable[lootState.lootCount].count       = itemCount or 1
