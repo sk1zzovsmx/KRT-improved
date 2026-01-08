@@ -253,6 +253,7 @@ L.ErrChangesNoPlayer              = "The name is required. Leaving the change em
 -- ==================== LFM Spam Frame ==================== --
 L.StrSpammer                      = "LFM Spam"
 L.StrSpammerCompStr               = "Raid Composition"
+L.StrSpammerNeedStr               = "Need"
 L.StrSpammerMessageStr            = "Message"
 L.StrSpammerPreviewStr            = "Preview"
 L.StrSpammerErrLength             = "Your LFM message is too long."

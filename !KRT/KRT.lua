@@ -4976,28 +4976,27 @@ do
     local updateInterval = C.UPDATE_INTERVAL_SPAMMER
     local updateTicker
 
-    -------------------------------------------------------
-    -- Private helpers
-    -------------------------------------------------------
+    -- Defaults / constants
+    local DEFAULT_DURATION_STR = "60"
+    local DEFAULT_DURATION_NUM = 60
+    local DEFAULT_OUTPUT = "LFM"
 
-    -------------------------------------------------------
-    -- Public methods
-    -------------------------------------------------------
-
+    -- Runtime state
     local loaded = false
 
-    local duration = 60
-    local output = "LFM"
-    local finalOutput = ""
-    local length = 0
-    local channels = {}
+    -- Duration kept as string for coherence with EditBox/SV
+    local duration = DEFAULT_DURATION_STR
+
+    local finalOutput = DEFAULT_OUTPUT
 
     local ticking = false
     local paused = false
     local countdownTicker
     local countdownRemaining = 0
+
     local inputsLocked = false
     local previewDirty = true
+
     local inputFields = {
         "Name",
         "Duration",
@@ -5011,6 +5010,7 @@ do
         "RangedClass",
         "Message",
     }
+
     local resetFields = {
         "Name",
         "Tank",
@@ -5023,6 +5023,7 @@ do
         "RangedClass",
         "Message",
     }
+
     local previewFields = {
         { key = "name",        box = "Name" },
         { key = "tank",        box = "Tank",       number = true },
@@ -5035,12 +5036,14 @@ do
         { key = "rangedClass", box = "RangedClass" },
         { key = "message",     box = "Message" },
     }
+
     local lastControls = {
         locked = nil,
         canStart = nil,
         btnLabel = nil,
         isStop = nil,
     }
+
     local lastState = {
         name = nil,
         tank = 0,
@@ -5052,9 +5055,10 @@ do
         ranged = 0,
         rangedClass = nil,
         message = nil,
-        duration = nil,
+        duration = nil, -- string
     }
 
+    -- Forward declarations
     local StartTicker
     local StopTicker
     local RenderPreview
@@ -5066,46 +5070,140 @@ do
     local SetInputsLocked
     local GetValidDuration
 
-    -- OnLoad frame:
+    -- Small helpers
+    local function ResetLastState()
+        lastState.name = nil
+        lastState.tank = 0
+        lastState.tankClass = nil
+        lastState.healer = 0
+        lastState.healerClass = nil
+        lastState.melee = 0
+        lastState.meleeClass = nil
+        lastState.ranged = 0
+        lastState.rangedClass = nil
+        lastState.message = nil
+        lastState.duration = nil
+    end
+
+    local function SetCheckbox(suffix, checked)
+        local chk = _G[frameName .. suffix]
+        if chk and chk.SetChecked then
+            chk:SetChecked(checked and true or false)
+        end
+    end
+
+    local function ResetAllChannelCheckboxes()
+        for i = 1, 8 do
+            SetCheckbox("Chat" .. i, false)
+        end
+        SetCheckbox("ChatGuild", false)
+        SetCheckbox("ChatYell", false)
+    end
+
+    -- Deterministic: sync Duration immediately from UI/SV (no waiting for preview tick)
+    local function SyncDurationNow()
+        local value
+
+        if UISpammer and UISpammer:IsShown() then
+            local box = _G[frameName .. "Duration"]
+            if box then
+                value = box:GetText()
+                if value == "" then
+                    value = DEFAULT_DURATION_STR
+                    box:SetText(value)
+                end
+                value = tostring(value)
+            end
+        end
+
+        if not value or value == "" then
+            value = (KRT_Spammer and KRT_Spammer.Duration) or DEFAULT_DURATION_STR
+            value = tostring(value)
+        end
+
+        duration = value
+        lastState.duration = value
+        KRT_Spammer.Duration = value
+    end
+
+    -- Deterministic: ensure preview/output is computed before Start/Resume
+    local function EnsureReadyForStart()
+        SyncDurationNow()
+
+        if UISpammer and UISpammer:IsShown() then
+            if previewDirty or not finalOutput or finalOutput == "" then
+                RenderPreview()
+                previewDirty = false
+            end
+        end
+    end
+
+    local function ResetLengthUI()
+        if not UISpammer then return end
+        local len = strlen(DEFAULT_OUTPUT)
+        local lenStr = len .. "/255"
+
+        local out = _G[frameName .. "Output"]
+        if out then out:SetText(DEFAULT_OUTPUT) end
+
+        local lengthText = _G[frameName .. "Length"]
+        if lengthText then
+            lengthText:SetText(lenStr)
+            lengthText:SetTextColor(0.5, 0.5, 0.5)
+        end
+
+        local msg = _G[frameName .. "Message"]
+        if msg and msg.SetMaxLetters then
+            msg:SetMaxLetters(255)
+        end
+    end
+
+    -- OnLoad frame
     function module:OnLoad(frame)
         if not frame then return end
+
         UISpammer = frame
         frameName = frame:GetName()
+
+        -- Localize once (not per tick)
+        LocalizeUIFrame()
+
         frame:RegisterForDrag("LeftButton")
-        frame:SetScript("OnShow", function()
-            StartTicker()
-        end)
-        frame:SetScript("OnHide", function()
-            if not ticking then
-                StopTicker()
-            end
-        end)
-        if UISpammer:IsShown() or ticking then
+        frame:SetScript("OnShow", StartTicker)
+        frame:SetScript("OnHide", StopTicker)
+
+        if frame:IsShown() then
             StartTicker()
         end
     end
 
-    -- Toggle frame visibility:
+    -- Toggle/Hide
     function module:Toggle()
         Utils.toggle(UISpammer)
     end
 
-    -- Hide frame:
     function module:Hide()
         Utils.hideFrame(UISpammer)
     end
 
-    -- Save edit box:
+    -- Save (EditBox / Checkbox)
     function module:Save(box)
         if not box then return end
+
         local boxName = box:GetName()
         local target = gsub(boxName, frameName, "")
+
         if find(target, "Chat") then
             KRT_Spammer.Channels = KRT_Spammer.Channels or {}
+
             local channel = gsub(target, "Chat", "")
             local id = tonumber(channel) or select(1, GetChannelName(channel))
             channel = (id and id > 0) and id or channel
-            local checked = (box:GetChecked() == 1)
+
+            -- FIX: GetChecked can be true/false or 1/0
+            local checked = box:GetChecked()
+            checked = (checked == true or checked == 1)
+
             local existed = tContains(KRT_Spammer.Channels, channel)
             if checked and not existed then
                 tinsert(KRT_Spammer.Channels, channel)
@@ -5122,12 +5220,15 @@ do
             KRT_Spammer[target] = value
             box:ClearFocus()
         end
+
         loaded = false
         previewDirty = true
     end
 
-    -- Start/Stop/Resume:
+    -- Start/Stop/Pause
     function module:Start()
+        EnsureReadyForStart()
+
         if addon.WithinRange(strlen(finalOutput), 4, 255) then
             if paused then
                 paused = false
@@ -5149,19 +5250,19 @@ do
         end
     end
 
-    -- Stop spamming:
     function module:Stop()
         ticking = false
         paused = false
         StopSpamCycle(true)
         SetInputsLocked(false)
+
         if UISpammer and not UISpammer:IsShown() then
             StopTicker()
         end
+
         UpdateControls()
     end
 
-    -- Pause spammer:
     function module:Pause()
         if not ticking or paused then return end
         paused = true
@@ -5170,18 +5271,23 @@ do
         UpdateControls()
     end
 
-    -- Send spam message:
+    -- Spam
     function module:Spam()
         if strlen(finalOutput) > 255 then
             addon:error(L.StrSpammerErrLength)
             ticking = false
             return
         end
-        if #channels <= 0 then
-            Utils.chat(tostring(finalOutput), "YELL", nil, nil, true)
+
+        local chList = KRT_Spammer.Channels or {}
+
+        -- CHANGE: fallback SAY (not YELL)
+        if #chList <= 0 then
+            Utils.chat(tostring(finalOutput), "SAY", nil, nil, true)
             return
         end
-        for i, c in ipairs(channels) do
+
+        for _, c in ipairs(chList) do
             if type(c) == "number" then
                 Utils.chat(tostring(finalOutput), "CHANNEL", nil, c, true)
             else
@@ -5190,7 +5296,7 @@ do
         end
     end
 
-    -- Tab move between edit boxes:
+    -- Tab
     function module:Tab(a, b)
         local target
         if IsShiftKeyDown() and _G[frameName .. b] ~= nil then
@@ -5201,47 +5307,52 @@ do
         if target then target:SetFocus() end
     end
 
-    -- Clears Data:
+    -- Clear
     function module:Clear()
         for k, _ in pairs(KRT_Spammer) do
-            if k ~= "Channels" and k ~= "Duration" then
+            if k ~= "Channels" then
                 KRT_Spammer[k] = nil
             end
         end
-        output, finalOutput = "LFM", ""
-        lastState.name = nil
-        lastState.tank = 0
-        lastState.tankClass = nil
-        lastState.healer = 0
-        lastState.healerClass = nil
-        lastState.melee = 0
-        lastState.meleeClass = nil
-        lastState.ranged = 0
-        lastState.rangedClass = nil
-        lastState.message = nil
-        lastState.duration = nil
+
+        finalOutput = DEFAULT_OUTPUT
+        ResetLastState()
+
         module:Stop()
+
         for _, field in ipairs(resetFields) do
             Utils.resetEditBox(_G[frameName .. field])
         end
+
         local durationBox = _G[frameName .. "Duration"]
+        KRT_Spammer.Duration = DEFAULT_DURATION_STR
+        duration = DEFAULT_DURATION_STR
+
         if durationBox then
             Utils.resetEditBox(durationBox)
-            durationBox:SetText(60)
+            durationBox:SetText(DEFAULT_DURATION_STR)
         end
+
+        loaded = false
         previewDirty = true
-        SetInputsLocked(false)
+
+        -- FIX: reset UI immediately (len/255 included)
+        ResetLengthUI()
+        UpdateControls()
     end
 
-    -- Localizing ui frame:
+    -- Localize UI
     function LocalizeUIFrame()
         if localized then return end
+
+        -- Keep your current behavior (no "point 2")
         if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
             _G[frameName .. "CompStr"]:SetText(L.StrSpammerCompStr)
             _G[frameName .. "NeedStr"]:SetText(L.StrSpammerNeedStr)
             _G[frameName .. "MessageStr"]:SetText(L.StrSpammerMessageStr)
             _G[frameName .. "PreviewStr"]:SetText(L.StrSpammerPreviewStr)
         end
+
         Utils.setFrameTitle(frameName, L.StrSpammer)
         _G[frameName .. "StartBtn"]:SetScript("OnClick", module.Start)
 
@@ -5260,40 +5371,40 @@ do
         local function setupEditBox(target)
             local box = _G[frameName .. target]
             if not box then return end
+
             box:SetScript("OnEditFocusGained", function()
                 if ticking and not paused then
                     module:Pause()
                 end
             end)
+
             box:SetScript("OnTextChanged", function(_, isUserInput)
                 if inputsLocked then return end
                 if isUserInput then
                     previewDirty = true
                 end
             end)
+
             box:SetScript("OnEnterPressed", function(self)
                 module:Save(self)
             end)
+
             box:SetScript("OnEditFocusLost", function(self)
                 module:Save(self)
             end)
         end
 
-        setupEditBox("Name")
-        setupEditBox("Duration")
-        setupEditBox("Tank")
-        setupEditBox("TankClass")
-        setupEditBox("Healer")
-        setupEditBox("HealerClass")
-        setupEditBox("Melee")
-        setupEditBox("MeleeClass")
-        setupEditBox("Ranged")
-        setupEditBox("RangedClass")
-        setupEditBox("Message")
+        for _, f in ipairs(inputFields) do
+            setupEditBox(f)
+        end
+
+        -- Initialize default UI length once
+        ResetLengthUI()
 
         localized = true
     end
 
+    -- Tick display
     function UpdateTickDisplay()
         if countdownRemaining > 0 then
             _G[frameName .. "Tick"]:SetText(countdownRemaining)
@@ -5302,10 +5413,13 @@ do
         end
     end
 
+    -- Lock/unlock inputs
     function SetInputsLocked(locked)
         if inputsLocked == locked then return end
         inputsLocked = locked
+
         local alpha = locked and 0.7 or 1.0
+
         local function setEditBoxState(box, enabled)
             if not box then return end
             if box.SetEnabled then
@@ -5316,6 +5430,7 @@ do
                 box:Disable()
             end
         end
+
         for _, field in ipairs(inputFields) do
             local box = _G[frameName .. field]
             if box then
@@ -5326,6 +5441,7 @@ do
                 end
             end
         end
+
         for i = 1, 8 do
             Utils.enableDisable(_G[frameName .. "Chat" .. i], not locked)
         end
@@ -5334,44 +5450,53 @@ do
         Utils.enableDisable(_G[frameName .. "ClearBtn"], not locked)
     end
 
+    -- Spam cycle
     function StopSpamCycle(resetCountdown)
         addon.CancelTimer(countdownTicker, true)
         countdownTicker = nil
+
         if resetCountdown then
             countdownRemaining = 0
         end
+
         UpdateTickDisplay()
     end
 
     function GetValidDuration()
         local value = tonumber(duration)
         if not value or value <= 0 then
-            value = 60
+            value = DEFAULT_DURATION_NUM
         end
         return value
     end
 
     function StartSpamCycle(resetCountdown)
         StopSpamCycle(false)
-        duration = GetValidDuration()
+
+        local d = GetValidDuration()
         if resetCountdown or countdownRemaining <= 0 then
-            countdownRemaining = duration
+            countdownRemaining = d
         end
+
         UpdateTickDisplay()
+
         countdownTicker = addon.NewTicker(1, function()
             if not ticking or paused then return end
+
             countdownRemaining = countdownRemaining - 1
             if countdownRemaining <= 0 then
                 module:Spam()
-                duration = GetValidDuration()
-                countdownRemaining = duration
+                countdownRemaining = GetValidDuration()
             end
+
             UpdateTickDisplay()
         end)
     end
 
+    -- UI ticker
     function StartTicker()
         if updateTicker then return end
+
         local interval = tonumber(updateInterval) or 0.05
         updateTicker = addon.NewTicker(interval, function()
             if UISpammer then
@@ -5386,83 +5511,93 @@ do
         updateTicker = nil
     end
 
+    -- Build output
     function BuildOutput()
-        local outBuf = { output }
+        local outBuf = { DEFAULT_OUTPUT }
+
         local name = lastState.name or ""
         if name ~= "" then
             outBuf[#outBuf + 1] = " "
             outBuf[#outBuf + 1] = name
         end
-        if lastState.tank > 0 or lastState.healer > 0 or lastState.melee > 0 or lastState.ranged > 0 then
-            outBuf[#outBuf + 1] = " - Need"
-            if lastState.tank > 0 then
-                outBuf[#outBuf + 1] = ", " .. lastState.tank .. " Tank"
-                if lastState.tankClass ~= "" then
-                    outBuf[#outBuf + 1] = " (" .. lastState.tankClass .. ")"
+
+        local needParts = {}
+        local function addNeed(n, label, class)
+            n = tonumber(n) or 0
+            if n > 0 then
+                local s = n .. " " .. label
+                if class and class ~= "" then
+                    s = s .. " (" .. class .. ")"
                 end
-            end
-            if lastState.healer > 0 then
-                outBuf[#outBuf + 1] = ", " .. lastState.healer .. " Healer"
-                if lastState.healerClass ~= "" then
-                    outBuf[#outBuf + 1] = " (" .. lastState.healerClass .. ")"
-                end
-            end
-            if lastState.melee > 0 then
-                outBuf[#outBuf + 1] = ", " .. lastState.melee .. " Melee"
-                if lastState.meleeClass ~= "" then
-                    outBuf[#outBuf + 1] = " (" .. lastState.meleeClass .. ")"
-                end
-            end
-            if lastState.ranged > 0 then
-                outBuf[#outBuf + 1] = ", " .. lastState.ranged .. " Ranged"
-                if lastState.rangedClass ~= "" then
-                    outBuf[#outBuf + 1] = " (" .. lastState.rangedClass .. ")"
-                end
+                needParts[#needParts + 1] = s
             end
         end
-        if lastState.message ~= "" then
-            outBuf[#outBuf + 1] = " - " .. Utils.findAchievement(lastState.message)
+
+        addNeed(lastState.tank, "Tank", lastState.tankClass)
+        addNeed(lastState.healer, "Healer", lastState.healerClass)
+        addNeed(lastState.melee, "Melee", lastState.meleeClass)
+        addNeed(lastState.ranged, "Ranged", lastState.rangedClass)
+
+        if #needParts > 0 then
+            outBuf[#outBuf + 1] = " - Need "
+            outBuf[#outBuf + 1] = tconcat(needParts, ", ")
         end
+
+        if lastState.message and lastState.message ~= "" then
+            outBuf[#outBuf + 1] = " - "
+            outBuf[#outBuf + 1] = Utils.findAchievement(lastState.message)
+        end
+
         local temp = tconcat(outBuf)
-        if temp ~= "LFM" then
-            local total = lastState.tank + lastState.healer + lastState.melee + lastState.ranged
-            local max = name:find("25") and 25 or 10
-            temp = temp .. " (" .. max - (total or 0) .. "/" .. max .. ")"
+
+        if temp ~= DEFAULT_OUTPUT then
+            local total =
+                (tonumber(lastState.tank) or 0) +
+                (tonumber(lastState.healer) or 0) +
+                (tonumber(lastState.melee) or 0) +
+                (tonumber(lastState.ranged) or 0)
+
+            local is25 = (name ~= "" and name:match("%f[%d]25%f[%D]")) ~= nil
+            local max = is25 and 25 or 10
+            temp = temp .. " (" .. (max - total) .. "/" .. max .. ")"
         end
+
         return temp
     end
 
+    -- Controls update
     function UpdateControls()
         local locked = ticking and not paused
         local canStart = (strlen(finalOutput) > 3 and strlen(finalOutput) <= 255)
         local btnLabel = paused and L.BtnResume or L.BtnStop
         local isStop = ticking == true
-        if lastControls.locked == locked and lastControls.canStart == canStart and
-            lastControls.btnLabel == btnLabel and lastControls.isStop == isStop then
+
+        if lastControls.locked == locked and
+            lastControls.canStart == canStart and
+            lastControls.btnLabel == btnLabel and
+            lastControls.isStop == isStop then
             return
         end
+
         if UISpammer then
             SetInputsLocked(locked)
         end
-        Utils.setText(
-            _G[frameName .. "StartBtn"],
-            btnLabel,
-            START,
-            isStop
-        )
+
+        Utils.setText(_G[frameName .. "StartBtn"], btnLabel, START, isStop)
         Utils.enableDisable(_G[frameName .. "StartBtn"], canStart)
+
         lastControls.locked = locked
         lastControls.canStart = canStart
         lastControls.btnLabel = btnLabel
         lastControls.isStop = isStop
     end
 
+    -- Preview render
     function RenderPreview()
         if not UISpammer or not UISpammer:IsShown() then return end
 
-        channels = KRT_Spammer.Channels or {}
-
         local changed = false
+
         for _, field in ipairs(previewFields) do
             local box = _G[frameName .. field.box]
             local value
@@ -5471,91 +5606,97 @@ do
             else
                 value = Utils.trimText(box:GetText())
             end
+
             if lastState[field.key] ~= value then
                 lastState[field.key] = value
                 changed = true
             end
         end
 
-        local durationValue = _G[frameName .. "Duration"]:GetText()
+        local durationBox = _G[frameName .. "Duration"]
+        local durationValue = durationBox and durationBox:GetText() or ""
         if durationValue == "" then
-            durationValue = 60
-            _G[frameName .. "Duration"]:SetText(durationValue)
+            durationValue = DEFAULT_DURATION_STR
+            if durationBox then durationBox:SetText(durationValue) end
         end
+
         if lastState.duration ~= durationValue then
             lastState.duration = durationValue
             changed = true
         end
 
         if changed then
-            local temp = BuildOutput()
-            finalOutput = temp
+            finalOutput = BuildOutput()
 
-            if temp ~= "LFM" then
-                _G[frameName .. "Output"]:SetText(temp)
-                length = strlen(temp)
-                _G[frameName .. "Length"]:SetText(length .. "/255")
+            local out = _G[frameName .. "Output"]
+            if out then out:SetText(finalOutput) end
 
-                if length <= 0 then
-                    _G[frameName .. "Length"]:SetTextColor(0.5, 0.5, 0.5)
-                elseif length <= 255 then
-                    _G[frameName .. "Length"]:SetTextColor(0.0, 1.0, 0.0)
-                    _G[frameName .. "Message"]:SetMaxLetters(255)
+            local len = strlen(finalOutput)
+            local lenText = _G[frameName .. "Length"]
+            if lenText then
+                lenText:SetText(len .. "/255")
+                if finalOutput == DEFAULT_OUTPUT then
+                    lenText:SetTextColor(0.5, 0.5, 0.5)
+                elseif len <= 255 then
+                    lenText:SetTextColor(0.0, 1.0, 0.0)
+                else
+                    lenText:SetTextColor(1.0, 0.0, 0.0)
+                end
+            end
+
+            local msg = _G[frameName .. "Message"]
+            if msg and msg.SetMaxLetters then
+                if len <= 255 then
+                    msg:SetMaxLetters(255)
                 else
                     local messageValue = lastState.message or ""
-                    _G[frameName .. "Message"]:SetMaxLetters(strlen(messageValue) - 1)
-                    _G[frameName .. "Length"]:SetTextColor(1.0, 0.0, 0.0)
+                    msg:SetMaxLetters(strlen(messageValue) - 1)
                 end
-            else
-                _G[frameName .. "Output"]:SetText(temp)
             end
         end
 
-        duration = lastState.duration
+        duration = lastState.duration or DEFAULT_DURATION_STR
+        KRT_Spammer.Duration = duration
+
         UpdateControls()
     end
 
-    -- OnUpdate frame:
+    -- UI update tick
     function UpdateUIFrame(self, elapsed)
-        LocalizeUIFrame()
-        if not addon.options then
-            if addon.LoadOptions then
-                addon.LoadOptions()
-            end
-            if not addon.options then
-                if self then
-                    self:SetScript("OnUpdate", nil)
-                end
-                return
-            end
-        end
-        if not (UISpammer and (UISpammer:IsShown() or ticking)) then
+        if not (UISpammer and UISpammer:IsShown()) then
             StopTicker()
             return
         end
+
         Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             if not loaded then
-                KRT_Spammer.Duration = KRT_Spammer.Duration or 60
+                KRT_Spammer.Duration = KRT_Spammer.Duration or DEFAULT_DURATION_STR
+
+                ResetAllChannelCheckboxes()
+
                 for k, v in pairs(KRT_Spammer) do
                     if k == "Channels" then
                         for i, c in ipairs(v) do
                             local id = tonumber(c) or select(1, GetChannelName(c))
                             id = (id and id > 0) and id or c
                             v[i] = id
-                            _G[frameName .. "Chat" .. id]:SetChecked()
+                            SetCheckbox("Chat" .. id, true)
                         end
                     elseif _G[frameName .. k] then
                         _G[frameName .. k]:SetText(v)
                     end
                 end
+
                 loaded = true
                 previewDirty = true
             end
+
             if ticking and not paused then
                 UpdateControls()
                 UpdateTickDisplay()
                 return
             end
+
             if previewDirty then
                 RenderPreview()
                 previewDirty = false
