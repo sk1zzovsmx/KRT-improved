@@ -555,25 +555,15 @@ do
     --
     function module:AddLoot(msg, rollType, rollValue)
         -- Master Loot / Loot chat parsing
-        -- Supports both "...receives loot:" and "...receives item:" (pushed) variants.
+        -- Supports both "...receives loot:" and "...receives item:" variants.
         local player, itemLink, count = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
         local itemCount = count or 1
-
-        -- Master Looter "item pushed" (e.g. when assigning via Master Loot)
-        if (not player) and _G.LOOT_ITEM_PUSHED_MULTIPLE then
-            player, itemLink, count = addon.Deformat(msg, LOOT_ITEM_PUSHED_MULTIPLE)
-            itemCount = count or 1
-        end
 
         if not player then
             player, itemLink = addon.Deformat(msg, LOOT_ITEM)
             itemCount = 1
         end
 
-        if (not player) and _G.LOOT_ITEM_PUSHED then
-            player, itemLink = addon.Deformat(msg, LOOT_ITEM_PUSHED)
-            itemCount = 1
-        end
 
         -- Self loot (no player name in the string)
         if not itemLink then
@@ -637,9 +627,39 @@ do
             addon:info(L.LogBossNoContextTrash)
             self:AddBoss("_TrashMob_")
         end
+        -- Award source detection:
+        -- 1) If we have a pendingAward staged by this addon (AssignItem/TradeItem), consume it.
+        -- 2) Otherwise, if THIS client is the master looter (Master Loot method), treat it as MANUAL
+        --    (loot-window dropdown assignment or direct click-to-self).
+        -- 3) Otherwise, fall back to the current roll type.
+        if not rollType then
+            local p = lootState.pendingAward
+            if p
+                and p.itemLink == itemLink
+                and p.looter == player
+                and (GetTime() - (p.ts or 0)) <= 5
+            then
+                rollType               = p.rollType
+                rollValue              = p.rollValue
+                lootState.pendingAward = nil
+            elseif self:IsMasterLooter() and not lootState.fromInventory then
+                rollType  = rollTypes.MANUAL
+                rollValue = 0
 
-        if not rollType then rollType = lootState.currentRollType end
-        if not rollValue then rollValue = addon.Rolls:HighestRoll() end
+                -- Debug-only marker: helps verify why this loot was tagged as MANUAL.
+                -- Only runs for Master Looter clients (by condition above).
+                addon:debug(
+                    "Loot: tagged MANUAL (no matching pending award) item=%s -> %s (lastRollType=%s, pending=%s).",
+                    tostring(itemLink), tostring(player), tostring(lootState.currentRollType),
+                    p and (tostring(p.itemLink) .. " -> " .. tostring(p.looter)) or "nil")
+            else
+                rollType = lootState.currentRollType
+            end
+        end
+
+        if not rollValue then
+            rollValue = addon.Rolls:HighestRoll() or 0
+        end
 
         local lootInfo = {
             itemId      = itemId,
@@ -1825,7 +1845,6 @@ do
         lootTable[lootState.lootCount].itemLink    = itemLink
         lootTable[lootState.lootCount].itemTexture = itemTexture
         lootTable[lootState.lootCount].count       = itemCount or 1
-        Utils.triggerEvent("AddItem", itemLink)
     end
 
     --
@@ -1857,7 +1876,7 @@ do
             local options = addon.options or KRT_Options or {}
             if options.showTooltips then
                 currentItemBtn.tooltip_item = i.itemLink
-                self:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
+                addon:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
             end
             Utils.triggerEvent("SetItem", i.itemLink)
         end
@@ -2209,7 +2228,7 @@ do
             lootState.fromInventory = false
             if lootState.opened == true then addon.Loot:FetchLoot() end
         elseif selectionFrame then
-            selectionFrame:SetShown(not selectionFrame:IsVisible())
+            Utils.toggle(selectionFrame)
         end
     end
 
@@ -2828,6 +2847,7 @@ do
             lootState.closeTimer = addon.After(0.1, function()
                 lootState.closeTimer = nil
                 lootState.opened = false
+                lootState.pendingAward = nil
                 UIMaster:Hide()
                 addon.Loot:ClearLoot()
                 addon.Rolls:ClearRolls()
@@ -2865,11 +2885,16 @@ do
                 addon:info(L.LogTradeCompleted:format(tostring(lootState.currentRollItem),
                     tostring(lootState.winner), tonumber(lootState.currentRollType) or -1,
                     addon.Rolls:HighestRoll()))
-                local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.winner,
-                    lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT")
-                if not ok then
-                    addon:error(L.LogTradeLoggerLogFailed:format(tostring(KRT_CurrentRaid),
-                        tostring(lootState.currentRollItem), tostring(GetItemLink())))
+                if lootState.currentRollItem and lootState.currentRollItem > 0 then
+                    local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.winner,
+                        lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT")
+
+                    if not ok then
+                        addon:error(L.LogTradeLoggerLogFailed:format(tostring(KRT_CurrentRaid),
+                            tostring(lootState.currentRollItem), tostring(GetItemLink())))
+                    end
+                else
+                    addon:warn("Trade: currentRollItem missing; cannot update loot entry.")
                 end
                 lootState.trader = nil
                 lootState.winner = nil
@@ -2908,12 +2933,21 @@ do
             candidateIndex = candidateCache.indexByName[playerName]
         end
         if candidateIndex then
+            -- Mark this award as addon-driven so AddLoot() won't classify it as MANUAL
+            lootState.pendingAward = {
+                itemLink  = itemLink,
+                looter    = playerName,
+                rollType  = rollType,
+                rollValue = rollValue,
+                ts        = GetTime(),
+            }
             GiveMasterLoot(itemIndex, candidateIndex)
             addon:info(L.LogMLAwarded:format(tostring(itemLink), tostring(playerName),
                 tonumber(rollType) or -1, tonumber(rollValue) or 0, tonumber(itemIndex) or -1,
                 tonumber(candidateIndex) or -1))
             local output, whisper
-            if rollType <= 4 and addon.options.announceOnWin then
+            if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE
+                and addon.options.announceOnWin then
                 output = L.ChatAward:format(playerName, itemLink)
             elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
                 output = L.ChatHold:format(playerName, itemLink)
@@ -2939,10 +2973,12 @@ do
             if whisper then
                 Utils.whisper(playerName, whisper)
             end
-            local ok = addon.Logger.Loot:Log(lootState.currentRollItem, playerName, rollType, rollValue, "ML_AWARD")
-            if not ok then
-                addon:error(L.LogMLAwardLoggerFailed:format(tostring(KRT_CurrentRaid),
-                    tostring(lootState.currentRollItem), tostring(itemLink)))
+            if lootState.currentRollItem and lootState.currentRollItem > 0 then
+                local ok = addon.Logger.Loot:Log(lootState.currentRollItem, playerName, rollType, rollValue, "ML_AWARD")
+                if not ok then
+                    addon:error(L.LogMLAwardLoggerFailed:format(tostring(KRT_CurrentRaid),
+                        tostring(lootState.currentRollItem), tostring(itemLink)))
+                end
             end
             return true
         end
@@ -2963,7 +2999,8 @@ do
         -- Prepare initial output and whisper:
         local output, whisper
         local keep = true
-        if rollType <= 4 and addon.options.announceOnWin then
+        if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE
+            and addon.options.announceOnWin then
             output = L.ChatAward:format(playerName, itemLink)
             keep = false
         elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
@@ -3050,7 +3087,8 @@ do
                     Utils.whisper(playerName, whisper)
                 end
             end
-            if rollType <= rollTypes.FREE and playerName == lootState.trader then
+            if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE
+                and playerName == lootState.trader then
                 local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.trader,
                     rollType, rollValue, "TRADE_KEEP")
                 if not ok then
@@ -6814,7 +6852,7 @@ do
                     it.itemLink = v.itemLink
                     it.bossNum = v.bossNum
                     it.looter = v.looter
-                    it.rollType = v.rollType
+                    it.rollType = tonumber(v.rollType) or 0
                     it.rollValue = v.rollValue
                     it.time = v.time
                     it.timeFmt = date("%H:%M", v.time)
@@ -6854,7 +6892,9 @@ do
                 ui.Winner:SetText(v.looter)
                 ui.Winner:SetVertexColor(r, g, b)
 
-                ui.Type:SetText(lootTypesColored[v.rollType] or lootTypesColored[4])
+                local rt = tonumber(v.rollType) or 0
+                v.rollType = rt
+                ui.Type:SetText(lootTypesColored[rt] or lootTypesColored[4])
                 ui.Roll:SetText(v.rollValue or 0)
                 ui.Time:SetText(v.timeFmt)
 

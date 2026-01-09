@@ -10,6 +10,7 @@ C.ITEM_LINK_PATTERN           =
 
 -- Roll Types Enum
 C.rollTypes                   = {
+    MANUAL     = 0,
     MAINSPEC   = 1,
     OFFSPEC    = 2,
     RESERVED   = 3,
@@ -21,24 +22,26 @@ C.rollTypes                   = {
 
 -- Roll Type Display Text
 C.lootTypesText               = {
-    L.BtnMS,
-    L.BtnOS,
-    L.BtnSR,
-    L.BtnFree,
-    L.BtnBank,
-    L.BtnDisenchant,
-    L.BtnHold,
+    [0] = L.BtnManual,
+    [1] = L.BtnMS,
+    [2] = L.BtnOS,
+    [3] = L.BtnSR,
+    [4] = L.BtnFree,
+    [5] = L.BtnBank,
+    [6] = L.BtnDisenchant,
+    [7] = L.BtnHold,
 }
 
 -- Roll Type Colored Display Text
 C.lootTypesColored            = {
-    "|cff20ff20" .. L.BtnMS .. "|r",
-    "|cffffff9f" .. L.BtnOS .. "|r",
-    "|cffa335ee" .. L.BtnSR .. "|r",
-    "|cffffd200" .. L.BtnFree .. "|r",
-    "|cffff7f00" .. L.BtnBank .. "|r",
-    "|cffff2020" .. L.BtnDisenchant .. "|r",
-    "|cffffffff" .. L.BtnHold .. "|r",
+    [0] = "|cffc0c0c0" .. L.BtnManual .. "|r",
+    [1] = "|cff20ff20" .. L.BtnMS .. "|r",
+    [2] = "|cffffff9f" .. L.BtnOS .. "|r",
+    [3] = "|cffa335ee" .. L.BtnSR .. "|r",
+    [4] = "|cffffd200" .. L.BtnFree .. "|r",
+    [5] = "|cffff7f00" .. L.BtnBank .. "|r",
+    [6] = "|cffff2020" .. L.BtnDisenchant .. "|r",
+    [7] = "|cffffffff" .. L.BtnHold .. "|r",
 }
 
 -- Item Quality Colors
