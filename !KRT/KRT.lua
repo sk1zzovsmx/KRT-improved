@@ -1673,14 +1673,14 @@ do
 
             local nameStr, rollStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"], _G[btnName .. "Star"]
 
-            if nameStr and nameStr.SetVertexColor then
+            if nameStr and nameStr.SetTextColor then
                 local class = addon.Raid:GetPlayerClass(name)
                 class = class and class:upper() or "UNKNOWN"
                 if isSR and self:IsReserved(itemId, name) then
-                    nameStr:SetVertexColor(0.4, 0.6, 1.0)
+                    nameStr:SetTextColor(0.4, 0.6, 1.0)
                 else
                     local r, g, b = Utils.getClassColor(class)
-                    nameStr:SetVertexColor(r, g, b)
+                    nameStr:SetTextColor(r, g, b)
                 end
             end
 
@@ -4989,7 +4989,7 @@ do
             name:SetText(n)
             local class = addon.Raid:GetPlayerClass(n)
             local r, g, b = Utils.getClassColor(class)
-            name:SetVertexColor(r, g, b)
+            name:SetTextColor(r, g, b)
             _G[btnName .. "Spec"]:SetText(c)
             btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
             btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
@@ -6597,7 +6597,7 @@ do
                 local ui = row._p
                 local r, g, b = Utils.getClassColor(it.class)
                 ui.Name:SetText(it.name)
-                ui.Name:SetVertexColor(r, g, b)
+                ui.Name:SetTextColor(r, g, b)
                 return ROW_H
             end
         end)(),
@@ -6712,7 +6712,7 @@ do
                 local ui = row._p
                 ui.Name:SetText(it.name)
                 local r, g, b = Utils.getClassColor(it.class)
-                ui.Name:SetVertexColor(r, g, b)
+                ui.Name:SetTextColor(r, g, b)
                 ui.Join:SetText(it.joinFmt)
                 ui.Leave:SetText(it.leaveFmt)
                 return ROW_H
@@ -6890,7 +6890,7 @@ do
 
                 local r, g, b = Utils.getClassColor(addon.Raid:GetPlayerClass(v.looter))
                 ui.Winner:SetText(v.looter)
-                ui.Winner:SetVertexColor(r, g, b)
+                ui.Winner:SetTextColor(r, g, b)
 
                 local rt = tonumber(v.rollType) or 0
                 v.rollType = rt
