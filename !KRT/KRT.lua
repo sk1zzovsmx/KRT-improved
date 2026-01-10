@@ -243,6 +243,30 @@ do
     -------------------------------------------------------
     -- Private helpers
     -------------------------------------------------------
+    local function debugRosterClass(unit, name, classL, class)
+        if not (KRT_Options and KRT_Options.debug) then return end
+        if not unit or not name then return end
+
+        local index = UnitInRaid(unit)
+        local rName, rRank, rSub, rLevel, rClassL, rClass
+        if index then
+            rName, rRank, rSub, rLevel, rClassL, rClass = GetRaidRosterInfo(index)
+        end
+        local uClassL, uClass = UnitClass(unit)
+
+        addon:debug(
+            "RosterTrace: unit=%s name=%s idx=%s class=%s/%s roster=%s/%s uc=%s/%s.",
+            tostring(unit),
+            tostring(name),
+            tostring(index),
+            tostring(class),
+            tostring(classL),
+            tostring(rClass),
+            tostring(rClassL),
+            tostring(uClass),
+            tostring(uClassL)
+        )
+    end
 
     -------------------------------------------------------
     -- Public methods
@@ -277,6 +301,7 @@ do
             local name = UnitName(unit)
             if name then
                 local rank, subgroup, level, classL, class = Utils.getRaidRosterData(unit)
+                debugRosterClass(unit, name, classL, class)
                 local player = playersByName[name]
                 local raceL, race = UnitRace(unit)
                 inRaid = player and player.leave == nil
@@ -360,6 +385,7 @@ do
             local name = UnitName(unit)
             if name then
                 local rank, subgroup, level, classL, class = Utils.getRaidRosterData(unit)
+                debugRosterClass(unit, name, classL, class)
                 local raceL, race                          = UnitRace(unit)
                 local p                                    = {
                     name     = name,
