@@ -2256,6 +2256,14 @@ do
             addon.tLength(candidateCache.indexByName)))
     end
 
+    local function ResetTradeState()
+        lootState.trader = nil
+        lootState.winner = nil
+        screenshotWarn = false
+    end
+
+
+
     -------------------------------------------------------
     -- Public methods
     -------------------------------------------------------
@@ -2989,6 +2997,20 @@ do
     end
 
     --
+    -- TRADE_CLOSED: trade window closed (completed or canceled)
+    --
+    function module:TRADE_CLOSED()
+        ResetTradeState("TRADE_CLOSED")
+    end
+
+    --
+    -- TRADE_REQUEST_CANCEL: trade request canceled before opening
+    --
+    function module:TRADE_REQUEST_CANCEL()
+        ResetTradeState("TRADE_REQUEST_CANCEL")
+    end
+
+    --
     -- Assigns an item from the loot window to a player.
     --
     function AssignItem(itemLink, playerName, rollType, rollValue)
@@ -3073,18 +3095,24 @@ do
     --
     function TradeItem(itemLink, playerName, rollType, rollValue)
         if itemLink ~= GetItemLink() then return end
+        local isAwardRoll = (rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE)
+
+        ResetTradeState("TRADE_START")
+
         lootState.trader = Utils.getPlayerName()
+        lootState.winner = isAwardRoll and playerName or nil
+
         addon:info(L.LogTradeStart:format(tostring(itemLink), tostring(lootState.trader),
             tostring(playerName), tonumber(rollType) or -1, tonumber(rollValue) or 0,
             lootState.itemCount or 1))
 
+
         -- Prepare initial output and whisper:
         local output, whisper
-        local keep = true
-        if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE
-            and addon.options.announceOnWin then
+        local keep = not isAwardRoll
+
+        if isAwardRoll and addon.options.announceOnWin then
             output = L.ChatAward:format(playerName, itemLink)
-            keep = false
         elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
             output = L.ChatNoneRolledHold:format(itemLink, playerName)
         elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
@@ -3153,7 +3181,7 @@ do
                 addon:warn(L.LogTradeDelayedOutOfRange:format(tostring(playerName), tostring(itemLink)))
                 addon.Raid:ClearRaidIcons()
                 SetRaidTarget(lootState.trader, 1)
-                if lootState.winner then SetRaidTarget(lootState.winner, 4) end
+                if isAwardRoll then SetRaidTarget(playerName, 4) end
                 output = L.ChatTrade:format(playerName, itemLink)
             end
         end
@@ -7566,6 +7594,8 @@ local addonEvents = {
     LOOT_OPENED = "LOOT_OPENED",
     LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
     TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
+    TRADE_REQUEST_CANCEL = "TRADE_REQUEST_CANCEL",
+    TRADE_CLOSED = "TRADE_CLOSED",
 }
 
 -- Master looter events
@@ -7576,6 +7606,8 @@ do
         LOOT_CLOSED = "LOOT_CLOSED",
         LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
         TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
+        TRADE_REQUEST_CANCEL = "TRADE_REQUEST_CANCEL",
+        TRADE_CLOSED = "TRADE_CLOSED",
     }
     for e, m in pairs(forward) do
         local method = m
