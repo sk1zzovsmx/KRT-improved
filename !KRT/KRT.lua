@@ -1375,6 +1375,9 @@ do
         warned       = false,
         rolled       = false,
         selected     = nil,
+        selectedAuto = false,
+        lastSortAsc  = nil,
+        lastSortType = nil,
         rolls        = {},
         rerolled     = {},
         playerCounts = {},
@@ -1398,6 +1401,28 @@ do
         return tracker[itemId]
     end
 
+    local function PickBestReserved(itemId)
+        if not itemId then return nil end
+        local bestName, bestRoll = nil, nil
+        local wantLow = addon.options.sortAscending == true
+        for _, entry in ipairs(state.rolls) do
+            if module:IsReserved(itemId, entry.name) then
+                if not bestName then
+                    bestName, bestRoll = entry.name, entry.roll
+                elseif wantLow then
+                    if entry.roll < bestRoll then
+                        bestName, bestRoll = entry.name, entry.roll
+                    end
+                else
+                    if entry.roll > bestRoll then
+                        bestName, bestRoll = entry.name, entry.roll
+                    end
+                end
+            end
+        end
+        return bestName, bestRoll
+    end
+
     local function sortRolls()
         local rolls = state.rolls
         if #rolls == 0 then
@@ -1418,11 +1443,14 @@ do
             return addon.options.sortAscending and a.roll < b.roll or a.roll > b.roll
         end)
         lootState.winner = rolls[1].name
+        state.lastSortAsc = addon.options.sortAscending == true
+        state.lastSortType = lootState.currentRollType
         addon:debug("Rolls: sorted winner=%s roll=%d.", lootState.winner, rolls[1].roll)
     end
 
     local function onRollButtonClick(self)
         state.selected = self.playerName
+        state.selectedAuto = false
         lootState.winner = self.playerName
         module:FetchRolls()
     end
@@ -1450,16 +1478,15 @@ do
         if not state.selected then
             local targetItem = itemId or module:GetCurrentRollItemID()
             if lootState.currentRollType == rollTypes.RESERVED then
-                local top, best = -1, nil
-                for _, r in ipairs(state.rolls) do
-                    if module:IsReserved(targetItem, r.name) and r.roll > top then
-                        top, best = r.roll, r.name
-                    end
+                local bestName, bestRoll = PickBestReserved(targetItem)
+                state.selected = bestName
+                if bestName then
+                    addon:debug("Rolls: auto-selected SR player=%s roll=%d.", bestName, bestRoll or -1)
                 end
-                state.selected = best
             else
                 state.selected = lootState.winner
             end
+            state.selectedAuto = true
             addon:debug("Rolls: auto-selected player=%s.", tostring(state.selected))
         end
 
@@ -1485,7 +1512,9 @@ do
         state.itemCounts = newItemCounts and newItemCounts()
             or {}
         state.count, lootState.rollsCount = 0, 0
-        state.selected, state.rolled, state.warned = nil, false, false
+        state.selected, state.selectedAuto = nil, false
+        state.rolled, state.warned = false, false
+        state.lastSortAsc, state.lastSortType = nil, nil
         if rec == false then state.record = false end
     end
 
@@ -1666,17 +1695,31 @@ do
 
         local itemId = self:GetCurrentRollItemID()
         local isSR = lootState.currentRollType == rollTypes.RESERVED
+
+        -- Keep the UI list order consistent with the current sort option.
+        -- (If the option is changed mid-session, we need to re-sort before rebuilding rows.)
+        local wantAsc = addon.options.sortAscending == true
+        if state.lastSortAsc ~= wantAsc or state.lastSortType ~= lootState.currentRollType then
+            sortRolls()
+
+            -- If the current selection was auto-picked, re-pick it using the new sort rule.
+            if state.selectedAuto or not state.selected then
+                if isSR then
+                    local bestName = PickBestReserved(itemId)
+                    state.selected = bestName
+                else
+                    state.selected = lootState.winner
+                end
+                state.selectedAuto = true
+            end
+        end
+
         local starTarget = state.selected
 
         if not starTarget then
             if isSR then
-                local top, best = -1, nil
-                for _, entry in ipairs(state.rolls) do
-                    if module:IsReserved(itemId, entry.name) and entry.roll > top then
-                        top, best = entry.roll, entry.name
-                    end
-                end
-                starTarget = best or lootState.winner
+                local bestName = PickBestReserved(itemId)
+                starTarget = bestName or lootState.winner
             else
                 starTarget = lootState.winner
             end
