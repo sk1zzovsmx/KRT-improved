@@ -260,7 +260,8 @@ do
         if not KRT_CurrentRaid then return end
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
-        if not addon.IsInGroup() then
+
+        if not addon.IsInRaid() then
             numRaid = 0
             addon:info(L.LogRaidLeftGroupEndSession)
             module:End()
@@ -268,67 +269,78 @@ do
             return
         end
 
+        local raid = KRT_Raids[KRT_CurrentRaid]
+        if not raid then return end
+
         local realm = Utils.getRealmName()
         KRT_Players[realm] = KRT_Players[realm] or {}
-        local raid = KRT_Raids[KRT_CurrentRaid]
+
         raid.playersByName = raid.playersByName or {}
         local playersByName = raid.playersByName
-        addon.GroupIterator(function(unit, owner)
-            local name = UnitName(unit)
-            if name then
-                local rank, subgroup, level, classL, class = Utils.getRaidRosterData(unit)
-                local player = playersByName[name]
-                local raceL, race = UnitRace(unit)
-                inRaid = player and player.leave == nil
-                if not inRaid then
-                    local toRaid = {
-                        name     = name,
-                        rank     = rank,
-                        subgroup = subgroup,
-                        class    = class or "UNKNOWN",
-                        join     = Utils.getCurrentTime(),
-                        leave    = nil,
-                        count    = 0, -- <--- Inizializza count!
-                    }
-                    module:AddPlayer(toRaid)
-                    player = toRaid
-                end
 
-                player.seen = true
+        local n = GetNumRaidMembers()
 
-                if not KRT_Players[realm][name] then
-                    KRT_Players[realm][name] = {
-                        name   = name,
-                        level  = level,
-                        race   = race,
-                        raceL  = raceL,
-                        class  = class or "UNKNOWN",
-                        classL = classL,
-                        sex    = UnitSex(unit),
-                    }
-                end
-            end
-        end, true)
+        -- Keep internal state consistent immediately
+        numRaid = n
 
-        numRaid = addon.tLength(playersByName)
-        addon:debug(L.LogRaidRosterUpdate:format(rosterVersion, numRaid))
-        if numRaid == 0 then
+        if n == 0 then
             module:End()
             return
         end
 
-        -- Mark players who have left
-        for name, v in pairs(playersByName) do
-            if not v.seen and v.leave == nil then
-                v.leave = Utils.getCurrentTime()
-            end
-            v.seen = nil
-        end
-        addon.Master:PrepareDropDowns()
-    end
+        local seen = {}
 
-    function module:GetRosterVersion()
-        return rosterVersion
+        for i = 1, n do
+            local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
+            if name then
+                local unitID = "raid" .. tostring(i)
+                local raceL, race = UnitRace(unitID)
+
+                local player = playersByName[name]
+                local active = player and player.leave == nil
+
+                if not active then
+                    local toRaid = {
+                        name     = name,
+                        rank     = rank or 0,
+                        subgroup = subgroup or 1,
+                        class    = class or "UNKNOWN",
+                        join     = Utils.getCurrentTime(),
+                        leave    = nil,
+                        count    = (player and player.count) or 0,
+                    }
+                    module:AddPlayer(toRaid)
+                    player = toRaid
+                else
+                    player.rank     = rank or player.rank or 0
+                    player.subgroup = subgroup or player.subgroup or 1
+                    player.class    = class or player.class or "UNKNOWN"
+                end
+
+                seen[name] = true
+
+                -- IMPORTANT: overwrite always
+                KRT_Players[realm][name] = {
+                    name   = name,
+                    level  = level or 0,
+                    race   = race,
+                    raceL  = raceL,
+                    class  = class or "UNKNOWN",
+                    classL = classL,
+                    sex    = UnitSex(unitID) or 0,
+                }
+            end
+        end
+
+        -- Mark leavers
+        for pname, p in pairs(playersByName) do
+            if p.leave == nil and not seen[pname] then
+                p.leave = Utils.getCurrentTime()
+            end
+        end
+
+        addon:debug(L.LogRaidRosterUpdate:format(rosterVersion, n))
+        addon.Master:PrepareDropDowns()
     end
 
     --
@@ -339,6 +351,11 @@ do
             self:End()
         end
         if not addon.IsInRaid() then return end
+
+        local num = GetNumRaidMembers()
+        if num == 0 then return end
+
+        numRaid = num
 
         local realm = Utils.getRealmName()
         KRT_Players[realm] = KRT_Players[realm] or {}
@@ -356,41 +373,53 @@ do
             changes       = {},
         }
 
-        addon.GroupIterator(function(unit, owner)
-            local name = UnitName(unit)
+        for i = 1, num do
+            local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
             if name then
-                local rank, subgroup, level, classL, class = Utils.getRaidRosterData(unit)
-                local raceL, race                          = UnitRace(unit)
-                local p                                    = {
+                local unitID = "raid" .. tostring(i)
+                local raceL, race = UnitRace(unitID)
+
+                local p = {
                     name     = name,
-                    rank     = rank,
-                    subgroup = subgroup,
+                    rank     = rank or 0,
+                    subgroup = subgroup or 1,
                     class    = class or "UNKNOWN",
                     join     = Utils.getCurrentTime(),
                     leave    = nil,
-                    count    = 0, -- Initialize loot count
+                    count    = 0,
                 }
+
                 tinsert(raidInfo.players, p)
                 raidInfo.playersByName[name] = p
+
+                -- Overwrite always
                 KRT_Players[realm][name] = {
                     name   = name,
-                    level  = level,
+                    level  = level or 0,
                     race   = race,
                     raceL  = raceL,
                     class  = class or "UNKNOWN",
                     classL = classL,
-                    sex    = UnitSex(unit),
+                    sex    = UnitSex(unitID) or 0,
                 }
             end
-        end, true)
+        end
 
         tinsert(KRT_Raids, raidInfo)
         KRT_CurrentRaid = #KRT_Raids
-        addon:info(L.LogRaidCreated:format(KRT_CurrentRaid or -1, tostring(zoneName),
-            tonumber(raidSize) or -1, #raidInfo.players))
+
+        addon:info(L.LogRaidCreated:format(
+            KRT_CurrentRaid or -1,
+            tostring(zoneName),
+            tonumber(raidSize) or -1,
+            #raidInfo.players
+        ))
+
         Utils.triggerEvent("RaidCreate", KRT_CurrentRaid)
+
+        -- One clean refresh shortly after
         addon.CancelTimer(module.updateRosterHandle, true)
-        module.updateRosterHandle = addon.After(3, function() module:UpdateRaidRoster() end)
+        module.updateRosterHandle = addon.After(2, function() module:UpdateRaidRoster() end)
     end
 
     --
@@ -527,14 +556,14 @@ do
             instanceDiff = instanceDiff + (2 * dynDiff)
         end
         local players = {}
-        addon.GroupIterator(function(unit, owner)
-            if UnitIsConnected(unit) then -- track only online players
+        for unit, owner in addon.UnitIterator(true) do
+            if UnitIsConnected(unit) then
                 local name = UnitName(unit)
                 if name then
                     tinsert(players, name)
                 end
             end
-        end, true)
+        end
         local currentTime = Utils.getCurrentTime()
         local killInfo = {
             name       = bossName,
@@ -2641,6 +2670,7 @@ do
         cachedRosterVersion = rosterVersion
         dropDownDirty = true
         dirtyFlags.dropdowns = true
+
         for i = 1, 8 do
             local t = dropDownData[i]
             if t then
@@ -2650,18 +2680,27 @@ do
                 dropDownData[i] = t
             end
         end
+
         dropDownGroupData = dropDownGroupData or {}
         twipe(dropDownGroupData)
-        addon.GroupIterator(function(unit, owner)
+
+        for unit, owner in addon.UnitIterator(true) do
             local name = UnitName(unit)
-            local _, subgroup = Utils.getRaidRosterData(unit)
-            if name then
-                subgroup = subgroup or 1
+            if name and name ~= "" then
+                local subgroup = 1
+
+                -- Se siamo in raid, ricava il subgroup reale
+                local idx = tonumber(unit:match("^raid(%d+)$"))
+                if idx then
+                    subgroup = (select(3, GetRaidRosterInfo(idx))) or 1
+                end
+
                 dropDownData[subgroup] = dropDownData[subgroup] or {}
                 dropDownData[subgroup][name] = name
                 dropDownGroupData[subgroup] = true
             end
-        end)
+        end
+
         RefreshDropDowns(true)
     end
 
@@ -3166,7 +3205,7 @@ do
         if not addon.IsInGroup() then
             return raidPlayers
         end
-        addon.GroupIterator(function(unit, owner)
+        for unit, owner in addon.UnitIterator(true) do
             local name = UnitName(unit)
             if name and name ~= "" then
                 raidPlayers[#raidPlayers + 1] = name
@@ -3174,7 +3213,7 @@ do
                     KRT_PlayerCounts[name] = 0
                 end
             end
-        end, true)
+        end
         table.sort(raidPlayers)
         return raidPlayers
     end

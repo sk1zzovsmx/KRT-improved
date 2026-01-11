@@ -15,14 +15,10 @@ local select = select
 local LibStub = LibStub
 
 local GetTime = GetTime
-local GetRaidRosterInfo = GetRaidRosterInfo
 local GetRealmName = GetRealmName
 local GetAchievementLink = GetAchievementLink
-local UnitClass = UnitClass
-local UnitInRaid = UnitInRaid
 local UnitIsGroupAssistant = UnitIsGroupAssistant
 local UnitIsGroupLeader = UnitIsGroupLeader
-local UnitLevel = UnitLevel
 
 local ITEM_LINK_FORMAT = "|c%s|Hitem:%d:%s|h[%s]|h|r"
 
@@ -188,26 +184,6 @@ function Utils.getUnitRank(unit, fallback)
 		return 1
 	end
 	return fallback or 0
-end
-
-function Utils.getRaidRosterData(unit)
-	local index = UnitInRaid(unit)
-
-	local rank, subgroup, level, classL, class
-	if index then
-		_, rank, subgroup, level, classL, class = GetRaidRosterInfo(index)
-	end
-
-	rank = Utils.getUnitRank(unit, rank)
-	subgroup = subgroup or 1
-	level = level or UnitLevel(unit)
-
-	if not classL or not class then
-		classL = classL or select(1, UnitClass(unit))
-		class = class or select(2, UnitClass(unit))
-	end
-
-	return rank, subgroup, level, classL, class
 end
 
 ---============================================================================
