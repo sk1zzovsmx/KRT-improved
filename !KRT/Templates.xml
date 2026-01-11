@@ -1,6 +1,5 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
-
 	<!-- Default Frames Template -->
 	<Frame name="KRTFrameTemplate" inherits="UIPanelDialogTemplate" parent="UIParent" movable="true"
 		enableMouse="true" frameStrata="MEDIUM" toplevel="true" hidden="true" clampedToScreen="true"
@@ -30,7 +29,6 @@
 			<OnDragStop>self:StopMovingOrSizing()</OnDragStop>
 		</Scripts>
 	</Frame>
-
 	<!-- Simple almost border-less frame template -->
 	<Frame name="KRTSimpleFrameTemplate" parent="UIParent" movable="true" enableMouse="true"
 		hidden="true" clampedToScreen="true" virtual="true">
@@ -57,7 +55,6 @@
 			<OnDragStop>self:StopMovingOrSizing()</OnDragStop>
 		</Scripts>
 	</Frame>
-
 	<!-- Default buttons template -->
 	<Button name="KRTButtonTemplate" virtual="true">
 		<Size>
@@ -129,12 +126,11 @@
 			<OnLoad>self:RegisterForClicks("AnyUp")</OnLoad>
 		</Scripts>
 	</Button>
-
 	<!-- Item icon button template -->
 	<Button name="KRTItemButtonTemplate" virtual="true">
-	<Size>
-		<AbsDimension x="32" y="32" />
-	</Size>
+		<Size>
+			<AbsDimension x="32" y="32" />
+		</Size>
 		<Layers>
 			<Layer level="OVERLAY">
 				<Texture name="$parentIconTexture">
@@ -147,34 +143,34 @@
 				</Texture>
 			</Layer>
 		</Layers>
-	<NormalTexture name="$parentNormalTexture" file="Interface\PaperDoll\UI-Backpack-EmptySlot">
-		<Size>
-			<AbsDimension x="32" y="32" />
-		</Size>
-		<Anchors>
-			<Anchor point="CENTER" />
-		</Anchors>
-	</NormalTexture>
+		<NormalTexture name="$parentNormalTexture" file="Interface\PaperDoll\UI-Backpack-EmptySlot">
+			<Size>
+				<AbsDimension x="32" y="32" />
+			</Size>
+			<Anchors>
+				<Anchor point="CENTER" />
+			</Anchors>
+		</NormalTexture>
 	</Button>
-
 	<!-- General FontString template -->
 	<FontString name="KRTFontString" font="GameFontNormal" justifyH="LEFT" justifyV="MIDDLE"
 		virtual="true" />
-
 	<!-- Gray FontString template -->
 	<FontString name="KRTFontStringGray" inherits="GameFontNormalSmall" justifyH="LEFT"
 		justifyV="MIDDLE" virtual="true">
 		<Color r="0.5" g="0.5" b="0.5" a="1" />
 	</FontString>
-
 	<!-- ScrollFrame template -->
 	<ScrollFrame name="KRTScrollFrameTemplate" inherits="UIPanelScrollFrameTemplate" virtual="true">
 		<ScrollChild>
-			<Frame name="$parentScrollChild" setAllPoints="$parent">
+			<Frame name="$parentScrollChild">
+				<Anchors>
+					<Anchor point="TOPLEFT" />
+					<Anchor point="TOPRIGHT" />
+				</Anchors>
 			</Frame>
 		</ScrollChild>
 	</ScrollFrame>
-
 	<!-- EditBox Template -->
 	<EditBox name="KRTEditBoxTemplate" inherits="InputBoxTemplate" autoFocus="false" virtual="true">
 		<FontString inherits="GameFontHighlight" />
@@ -182,7 +178,6 @@
 			<OnEscapePressed>self:ClearFocus()</OnEscapePressed>
 		</Scripts>
 	</EditBox>
-
 	<!-- Simple Border-less EdtiBox Template -->
 	<EditBox name="KRTEditBoxSimpleTemplate" font="GameFontHighlightSmall" autoFocus="false"
 		virtual="true">
@@ -211,7 +206,6 @@
 			<OnEscapePressed>self:ClearFocus()</OnEscapePressed>
 		</Scripts>
 	</EditBox>
-
 	<!-- Player Selection Button -->
 	<Button name="KRTSelectPlayerTemplate" virtual="true">
 		<Size>

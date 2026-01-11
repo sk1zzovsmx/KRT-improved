@@ -20,7 +20,7 @@ No Ace3 GUI; UI is XML + Lua only. Vendored libs via **LibStub**.
 - **Addon folder name:** `!KRT` (the leading `!` is intentional).
 - **SavedVariables (account):**
   `KRT_Options, KRT_Raids, KRT_Players, KRT_Warnings, KRT_ExportString, KRT_Spammer, KRT_CurrentRaid,`
-  `KRT_LastBoss, KRT_NextReset, KRT_SavedReserves, KRT_PlayerCounts, KRT_Debug`.
+  `KRT_LastBoss, KRT_NextReset, KRT_SavedReserves, KRT_PlayerCounts`.
 - **Branching model:** work **only** on `dev`. `main` is release-only. Maintainers handle merges/bumping.
 - **Backward compatibility:** avoid breaking SV keys and existing CLI without a note in **18) Change log**.
 - **Structure:** keep addon monolithic; integrate features within `!KRT/` instead of split addons.
@@ -109,7 +109,7 @@ TemplatesLua/
 ## 7) Module map (in `KRT.lua` unless stated)
 - `addon.Raid`          — raid state, roster helpers
 - `addon.Loot`          — loot events, history, export string
-- `addon.History`       — loot history
+- `addon.Logger`        — loot history
 - `addon.Rolls`         — roll tracking (MS/OS/SR/Free/Bank/DE/Hold), sorting, winner logic
 - `addon.Reserves`      — SR model (per-item reserve counts), CSV import/export
 - `addon.Warnings`      — announcements (RW/RAID/PARTY), templates & throttling
@@ -117,7 +117,7 @@ TemplatesLua/
 - `addon.Spammer`       — LFM spam helper (start/stop)
 - `addon.Master`        — master-loot helpers, master-loot UI, award/trade tracking
 - `addon.LootCounter`   — loot counter window (player item distribution counts)
-- `addon.UIMaster`      — frames for Master, History, Reserves, Changes, Warnings, Loot Counter (see `KRT.xml`)
+- `addon.UIMaster`      — frames for Master, Logger, Reserves, Changes, Warnings, Loot Counter (see `KRT.xml`)
 - `addon.Config`        — options window & persisted settings
 - `addon.Minimap`       — minimap button (toggle)
 - `Modules/Utils.lua`   — helpers (tables/strings/colors, `WrapTextInColorCode`, etc.)
@@ -134,7 +134,7 @@ TemplatesLua/
   - `Docs/KRT_STANDARD.md` (BINDING)
   - relevant templates in `TemplatesLua/` (BINDING)
 - Developer helpers:
-  - History window **KRTHistory** (`KRT.xml`); LibLogger API is embedded onto `addon`.
+  - Logger window **KRTLogger** (`KRT.xml`); LibLogger API is embedded onto `addon`.
   - Event hooks live in `KRT.lua` (search `RegisterEvents(...)`).
   - Useful in-game tools: `/etrace`, `/dump`, and `/krt log`.
 
@@ -183,7 +183,7 @@ Notes:
 - **Load:** no errors on login; `/krt` opens.
 - **Raid events:** roll tracking works for MS/OS/SR; winners resolved deterministically.
 - **Reserves:** CSV import/export round-trips; per-item caps apply; SR logic respected on roll gating.
-- **History:** entries append correctly; filtering maintains order.
+- **Logger:** entries append correctly; filtering maintains order.
 - **Warnings/Spammer:** throttle behavior; correct channels (RW/RAID/PARTY/WHISPER) and locale.
 - **Persistency:** SavedVariables update; reload preserves settings/state.
 - **Performance:** no GC spikes in combat; no taint; zero spam in chat/combatlog.
@@ -217,7 +217,7 @@ Notes:
 ---
 
 ## 14) Backlog (non-binding, safe tasks)
-- Reduce UI churn in Loot History/Counter via row pools and batched updates.
+- Reduce UI churn in Loot Logger/Counter via row pools and batched updates.
 - Encapsulate recurring UI elements into small Lua factories (dropdowns, button rows, tooltips).
 - Declarative builders for options to cut XML duplication.
 - Improve SR CSV UX (empty-state, error surfaces, success toast).
@@ -245,6 +245,7 @@ Notes:
 ---
 
 ## 18) Change log (edit by hand)
+- _2026-03-02_: Removed `/krt lfm period` command and default LFM period SV entry.
 - _2026-01-02_: Standardized module skeleton (use `local module`), updated TemplatesLua + Docs, and introduced `addon.LootCounter` module (kept Master aliases).
 - _2025-09-05_: Initial lightweight version; removed binding “recipes”. Added `dev`-only branching policy.
 - _2025-09-07_: Clarified monolithic structure and updated CLI command list.
@@ -253,7 +254,7 @@ Notes:
 - _2025-09-10_: Clarified proprietary WoW API requirement.
 - _2025-09-13_: Updated nil-check and API fallback guidelines.
 - _2025-12-24_: Added BINDING `Docs/KRT_STANDARD.md` and `TemplatesLua/` as canonical patterns for all work.
-- _2025-12-26_: Added KRT_Options schemaVersion/migrations defaults in `!KRT/KRT.lua`.
+- _2026-01-07_: Simplified SavedVariables: removed unused versioning/audit keys.
 - _2025-12-27_: Hardened debug logger guard, trimmed slash args, removed unused CHAT_MSG_ADDON entry.
 - _2025-09-20_: Enlarged Loot Counter window, centered title, and enabled dragging.
 - _2025-09-21_: Prefer vendored libs, avoid Utils/KRT duplicates, and skip fallbacks when libs are vendored.
@@ -264,4 +265,6 @@ Notes:
 - _2025-09-26_: Load saved SR reserves during addon initialization.
 - _2025-09-27_: SR roll button allows non-reserved players to roll once (SR priority remains).
 - _2026-02-01_: Fixed CallbackHandler OnUsed/OnUnused wiring in event dispatcher and templates.
-- _2026-02-15_: Parse pushed loot messages and refresh Loot History on new loot.
+- _2026-02-15_: Parse pushed loot messages and refresh Loot Logger on new loot.
+- _2026-02-21_: Removed KRT_Debug SavedVariable (log levels are runtime-only).
+- _2026-03-01_: Renamed History module to Logger (UI, strings, and references).

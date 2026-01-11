@@ -60,11 +60,9 @@ See: `TemplatesLua/KRT_EventDispatcher.lua`
 ## 5) SavedVariables (SV) standard
 ### 5.1 Principles
 - Never rename/remove SV keys silently.
-- Use a **schema version** and migrations for structural changes.
+- Prefer additive SV changes (new keys with safe defaults). If you must change structure, write explicit upgrade code.
 
 ### 5.2 Standard fields
-- `KRT_Options.schemaVersion` (number)
-- `KRT_Options.migrations` (optional table for audit)
 - Defaulting:
   - create missing tables
   - fill missing keys with defaults

@@ -15,14 +15,10 @@ local select = select
 local LibStub = LibStub
 
 local GetTime = GetTime
-local GetRaidRosterInfo = GetRaidRosterInfo
 local GetRealmName = GetRealmName
 local GetAchievementLink = GetAchievementLink
-local UnitClass = UnitClass
-local UnitInRaid = UnitInRaid
 local UnitIsGroupAssistant = UnitIsGroupAssistant
 local UnitIsGroupLeader = UnitIsGroupLeader
-local UnitLevel = UnitLevel
 
 local ITEM_LINK_FORMAT = "|c%s|Hitem:%d:%s|h[%s]|h|r"
 
@@ -76,12 +72,21 @@ end
 ---============================================================================
 
 function Utils.applyDebugSetting(enabled)
-	if addon and addon.options then
-		addon.options.debug = enabled and true or false
+	local options = addon and addon.options
+	if options then
+		options.debug = enabled and true or false
 	end
-	local levels = addon and addon.Logger and addon.Logger.logLevels or {}
-	local level = enabled and levels.DEBUG or (KRT_Debug and KRT_Debug.level)
-	if addon and addon.SetLogLevel and level then
+
+	local level
+	if enabled then
+		local levels = addon and addon.Debugger and addon.Debugger.logLevels
+		level = levels and levels.DEBUG
+	else
+		local levels = addon and addon.Debugger and addon.Debugger.logLevels
+		level = levels and levels.INFO
+	end
+
+	if level and addon and addon.SetLogLevel then
 		addon:SetLogLevel(level)
 	end
 end
@@ -181,26 +186,6 @@ function Utils.getUnitRank(unit, fallback)
 	return fallback or 0
 end
 
-function Utils.getRaidRosterData(unit)
-	local index = UnitInRaid(unit)
-
-	local rank, subgroup, level, classL, class
-	if index then
-		_, rank, subgroup, level, classL, class = GetRaidRosterInfo(index)
-	end
-
-	rank = Utils.getUnitRank(unit, rank)
-	subgroup = subgroup or 1
-	level = level or UnitLevel(unit)
-
-	if not classL or not class then
-		classL = classL or select(1, UnitClass(unit))
-		class = class or select(2, UnitClass(unit))
-	end
-
-	return rank, subgroup, level, classL, class
-end
-
 ---============================================================================
 -- Callback utilities
 ---============================================================================
@@ -212,7 +197,7 @@ do
 	addon.InternalCallbacksTarget = addon.InternalCallbacksTarget or {}
 	addon.InternalCallbacks = addon.InternalCallbacks
 		or CallbackHandler:New(addon.InternalCallbacksTarget, "RegisterCallback", "UnregisterCallback",
-		"UnregisterAllCallbacks")
+			"UnregisterAllCallbacks")
 
 	local target = addon.InternalCallbacksTarget
 	local registry = addon.InternalCallbacks
@@ -547,19 +532,10 @@ function Utils.sync(prefix, msg)
 	end
 end
 
-do
-	local lastChat = 0
-
-	function Utils.chat(msg, channel, language, target, bypass)
-		if not msg then return end
-		if not bypass then
-			local throttle = addon.options and addon.options.chatThrottle or 0
-			local now = GetTime()
-			if throttle > 0 and (now - lastChat) < throttle then return end
-			lastChat = now
-		end
-		SendChatMessage(tostring(msg), channel, language, target)
-	end
+-- Send messages into chat
+function Utils.chat(msg, channel, language, target, bypass)
+	if not msg then return end
+	SendChatMessage(tostring(msg), channel, language, target)
 end
 
 -- Send a whisper to a player by his/her character name

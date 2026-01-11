@@ -69,7 +69,20 @@
         "GameTooltip",
         "Minimap",
         "ReloadUI",
-        "OKAY"
+        "OKAY",
+        "COMBATLOG_OBJECT_TYPE_PLAYER",
+        "LOOT_ITEM_PUSHED_MULTIPLE",
+        "LOOT_ITEM_PUSHED",
+        "LOOT_ITEM_PUSHED_SELF_MULTIPLE",
+        "LOOT_ITEM_PUSHED_SELF",
+        "CLASS_SORT_ORDER",
+        "MAX_BOSS_FRAMES",
+        "MAX_TALENT_TABS",
+        "UKNOWNBEING",
+        "UNKNOWNOBJECT",
+        "SECOND_NUMBER_CAP",
+        "FIRST_NUMBER_CAP",
+        "LOCALIZED_CLASS_NAMES_MALE"
     ],
     "editor.rulers": [
         80,
