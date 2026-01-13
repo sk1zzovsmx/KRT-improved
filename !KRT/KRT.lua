@@ -101,6 +101,7 @@ lootState.itemCount        = lootState.itemCount or 1
 lootState.lootCount        = lootState.lootCount or 0
 lootState.rollsCount       = lootState.rollsCount or 0
 lootState.itemTraded       = lootState.itemTraded or 0
+lootState.rollStarted      = lootState.rollStarted or false
 if lootState.opened == nil then lootState.opened = false end
 if lootState.fromInventory == nil then lootState.fromInventory = false end
 
@@ -1544,6 +1545,8 @@ do
 
         lootState.winner = nil
         lootState.rollWinner = nil
+        lootState.itemTraded = 0
+        lootState.rollStarted = false
 
         if rec == false then state.record = false end
     end
@@ -2316,6 +2319,19 @@ do
         screenshotWarn = false
     end
 
+    local function RegisterAwardedItem()
+        local targetCount = tonumber(lootState.itemCount) or 1
+        if targetCount < 1 then targetCount = 1 end
+        lootState.itemTraded = (lootState.itemTraded or 0) + 1
+        if lootState.itemTraded >= targetCount then
+            lootState.itemTraded = 0
+            addon.Rolls:ClearRolls()
+            addon.Rolls:RecordRolls(false)
+            return true
+        end
+        return false
+    end
+
 
 
     -------------------------------------------------------
@@ -2408,6 +2424,8 @@ do
             lootState.currentRollType = rollType
             addon.Rolls:ClearRolls()
             addon.Rolls:RecordRolls(true)
+            lootState.rollStarted = true
+            lootState.itemTraded = 0
 
             local itemLink = GetItemLink()
             local itemID = Utils.getItemIdFromLink(itemLink)
@@ -2469,6 +2487,8 @@ do
             addon.Rolls:RecordRolls(false)
             StopCountdown()
             addon.Rolls:FetchRolls()
+        elseif not lootState.rollStarted then
+            return
         else
             addon.Rolls:RecordRolls(true)
             announced = false
@@ -2510,6 +2530,9 @@ do
             result = TradeItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
         else
             result = AssignItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
+            if result then
+                RegisterAwardedItem()
+            end
         end
         module:ResetItemCount()
         return result
@@ -2701,6 +2724,16 @@ do
                 dirtyFlags.buttons = true
             end
 
+            local itemId
+            if hasItem then
+                itemId = Utils.getItemIdFromLink(GetItemLink())
+            end
+            local hasItemReserves = itemId and addon.Reserves:HasItemReserves(itemId) or false
+            if lastUIState.hasItemReserves ~= hasItemReserves then
+                lastUIState.hasItemReserves = hasItemReserves
+                dirtyFlags.buttons = true
+            end
+
             if lastUIState.countdownRun ~= countdownRun then
                 lastUIState.countdownRun = countdownRun
                 dirtyFlags.buttons = true
@@ -2716,8 +2749,9 @@ do
                         or (lootState.fromInventory and lootState.lootCount >= 1),
                     canSpamLoot = lootState.lootCount >= 1,
                     canStartRolls = lootState.lootCount >= 1,
-                    canStartSR = lootState.lootCount >= 1 and hasReserves,
-                    canCountdown = lootState.lootCount >= 1 and hasItem,
+                    canStartSR = lootState.lootCount >= 1 and hasItemReserves,
+                    canCountdown = lootState.lootCount >= 1 and hasItem
+                        and (lootState.rollStarted or countdownRun),
                     canHold = lootState.lootCount >= 1,
                     canBank = lootState.lootCount >= 1,
                     canDisenchant = lootState.lootCount >= 1,
@@ -3028,7 +3062,7 @@ do
     function module:TRADE_ACCEPT_UPDATE(tAccepted, pAccepted)
         addon:trace(L.LogTradeAcceptUpdate:format(tostring(lootState.trader), tostring(lootState.winner),
             tostring(tAccepted), tostring(pAccepted)))
-        if lootState.itemCount == 1 and lootState.trader and lootState.winner and lootState.trader ~= lootState.winner then
+        if lootState.trader and lootState.winner and lootState.trader ~= lootState.winner then
             if tAccepted == 1 and pAccepted == 1 then
                 addon:info(L.LogTradeCompleted:format(tostring(lootState.currentRollItem),
                     tostring(lootState.winner), tonumber(lootState.currentRollType) or -1,
@@ -3044,11 +3078,12 @@ do
                 else
                     addon:warn("Trade: currentRollItem missing; cannot update loot entry.")
                 end
-                lootState.trader = nil
-                lootState.winner = nil
-                addon.Loot:ClearLoot()
-                addon.Rolls:ClearRolls()
-                addon.Rolls:RecordRolls(false)
+                local done = RegisterAwardedItem()
+                ResetTradeState()
+                if done then
+                    addon.Loot:ClearLoot()
+                    addon.Raid:ClearRaidIcons()
+                end
                 screenshotWarn = false
             end
         end
@@ -3211,9 +3246,11 @@ do
         elseif lootState.trader == lootState.winner then
             -- Trader won, clear state
             addon:info(L.LogTradeTraderKeeps:format(tostring(itemLink), tostring(playerName)))
-            addon.Loot:ClearLoot()
-            addon.Rolls:ClearRolls(false)
-            addon.Raid:ClearRaidIcons()
+            local done = RegisterAwardedItem()
+            if done then
+                addon.Loot:ClearLoot()
+                addon.Raid:ClearRaidIcons()
+            end
         else
             local unit = addon.Raid:GetUnitID(playerName)
             if unit ~= "none" and CheckInteractDistance(unit, 2) == 1 then
@@ -3831,6 +3868,12 @@ do
 
     function module:HasData()
         return next(reservesData) ~= nil
+    end
+
+    function module:HasItemReserves(itemId)
+        if not itemId then return false end
+        local list = reservesByItemID[itemId]
+        return type(list) == "table" and #list > 0
     end
 
     --------------------------------------------------------------------------

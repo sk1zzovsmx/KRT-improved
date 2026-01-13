@@ -224,6 +224,7 @@ Notes:
 ---
 
 ## 18) Change log (edit by hand)
+- _2026-03-06_: Master Looter buttons: countdown gated by roll start, SR gated by reserved item, reset rolls on awards.
 - _2026-03-05_: Removed Docs/KRT_STANDARD.md and Docs/WoW_Addons.pdf references and files.
 - _2026-03-05_: Removed TemplatesLua directory references from AGENTS and deleted TemplatesLua.
 - _2026-03-02_: Removed `/krt lfm period` command and default LFM period SV entry.
