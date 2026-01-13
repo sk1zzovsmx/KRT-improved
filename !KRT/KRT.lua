@@ -101,6 +101,7 @@ lootState.itemCount        = lootState.itemCount or 1
 lootState.lootCount        = lootState.lootCount or 0
 lootState.rollsCount       = lootState.rollsCount or 0
 lootState.itemTraded       = lootState.itemTraded or 0
+lootState.rollStarted      = lootState.rollStarted or false
 if lootState.opened == nil then lootState.opened = false end
 if lootState.fromInventory == nil then lootState.fromInventory = false end
 
@@ -1544,6 +1545,8 @@ do
 
         lootState.winner = nil
         lootState.rollWinner = nil
+        lootState.itemTraded = 0
+        lootState.rollStarted = false
 
         if rec == false then state.record = false end
     end
@@ -1571,6 +1574,7 @@ do
         end
 
         RandomRoll(1, 100)
+        state.rolled = true
         state.playerCounts[itemId] = state.playerCounts[itemId] + 1
         addon:debug("Rolls: player=%s item=%d.", name, itemId)
     end
@@ -2249,6 +2253,18 @@ do
             end
         end
 
+        local function UpdateItemState(enabled)
+            local itemBtn = _G[frameName .. "ItemBtn"]
+            if itemBtn and buttons.itemBtn ~= enabled then
+                Utils.enableDisable(itemBtn, enabled)
+                local texture = itemBtn:GetNormalTexture()
+                if texture and texture.SetDesaturated then
+                    texture:SetDesaturated(not enabled)
+                end
+                buttons.itemBtn = enabled
+            end
+        end
+
         local function UpdateText(key, frame, text)
             if texts[key] ~= text then
                 frame:SetText(text)
@@ -2276,6 +2292,7 @@ do
         UpdateEnabled("importReserves", _G[frameName .. "ImportReservesBtn"], state.canImportReserves)
         UpdateEnabled("roll", _G[frameName .. "RollBtn"], state.canRoll)
         UpdateEnabled("clear", _G[frameName .. "ClearBtn"], state.canClear)
+        UpdateItemState(state.canChangeItem)
     end
 
     local function RefreshDropDowns(force)
@@ -2316,6 +2333,21 @@ do
         screenshotWarn = false
     end
 
+    local function RegisterAwardedItem(count)
+        local targetCount = tonumber(lootState.itemCount) or 1
+        if targetCount < 1 then targetCount = 1 end
+        local increment = tonumber(count) or 1
+        if increment < 1 then increment = 1 end
+        lootState.itemTraded = (lootState.itemTraded or 0) + increment
+        if lootState.itemTraded >= targetCount then
+            lootState.itemTraded = 0
+            addon.Rolls:ClearRolls()
+            addon.Rolls:RecordRolls(false)
+            return true
+        end
+        return false
+    end
+
 
 
     -------------------------------------------------------
@@ -2354,6 +2386,7 @@ do
     --
     function module:BtnSelectItem(btn)
         if btn == nil or lootState.lootCount <= 0 then return end
+        if countdownRun then return end
         if lootState.fromInventory == true then
             addon.Loot:ClearLoot()
             addon.Rolls:ClearRolls()
@@ -2408,6 +2441,8 @@ do
             lootState.currentRollType = rollType
             addon.Rolls:ClearRolls()
             addon.Rolls:RecordRolls(true)
+            lootState.rollStarted = true
+            lootState.itemTraded = 0
 
             local itemLink = GetItemLink()
             local itemID = Utils.getItemIdFromLink(itemLink)
@@ -2469,6 +2504,8 @@ do
             addon.Rolls:RecordRolls(false)
             StopCountdown()
             addon.Rolls:FetchRolls()
+        elseif not lootState.rollStarted then
+            return
         else
             addon.Rolls:RecordRolls(true)
             announced = false
@@ -2510,6 +2547,9 @@ do
             result = TradeItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
         else
             result = AssignItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
+            if result then
+                RegisterAwardedItem()
+            end
         end
         module:ResetItemCount()
         return result
@@ -2620,6 +2660,53 @@ do
         localized = true
     end
 
+    local function UpdateItemCountFromBox(itemCountBox)
+        if not itemCountBox or not itemCountBox:IsVisible() then return end
+        local rawCount = itemCountBox:GetText()
+        if rawCount ~= lastUIState.itemCountText then
+            lastUIState.itemCountText = rawCount
+            dirtyFlags.itemCount = true
+        end
+        if dirtyFlags.itemCount then
+            local count = tonumber(rawCount)
+            if count and count > 0 then
+                lootState.itemCount = count
+                if itemInfo.count and itemInfo.count ~= lootState.itemCount then
+                    if itemInfo.count < lootState.itemCount then
+                        lootState.itemCount = itemInfo.count
+                        itemCountBox:SetNumber(itemInfo.count)
+                        lastUIState.itemCountText = tostring(itemInfo.count)
+                    end
+                end
+            end
+            dirtyFlags.itemCount = false
+        end
+    end
+
+    local function UpdateRollStatusState()
+        local rollType, record, canRoll, rolled = addon.Rolls:RollStatus()
+        local rollStatus = lastUIState.rollStatus
+        if rollStatus.record ~= record
+            or rollStatus.canRoll ~= canRoll
+            or rollStatus.rolled ~= rolled
+            or rollStatus.rollType ~= rollType then
+            rollStatus.record = record
+            rollStatus.canRoll = canRoll
+            rollStatus.rolled = rolled
+            rollStatus.rollType = rollType
+            dirtyFlags.rolls = true
+            dirtyFlags.buttons = true
+        end
+        return record, canRoll, rolled
+    end
+
+    local function FlagButtonsOnChange(key, value)
+        if lastUIState[key] ~= value then
+            lastUIState[key] = value
+            dirtyFlags.buttons = true
+        end
+    end
+
     --
     -- OnUpdate handler for the frame, updates UI elements periodically.
     --
@@ -2627,46 +2714,13 @@ do
         LocalizeUIFrame()
         Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             local itemCountBox = _G[frameName .. "ItemCount"]
-            if itemCountBox and itemCountBox:IsVisible() then
-                local rawCount = itemCountBox:GetText()
-                if rawCount ~= lastUIState.itemCountText then
-                    lastUIState.itemCountText = rawCount
-                    dirtyFlags.itemCount = true
-                end
-                if dirtyFlags.itemCount then
-                    local count = tonumber(rawCount)
-                    if count and count > 0 then
-                        lootState.itemCount = count
-                        if itemInfo.count and itemInfo.count ~= lootState.itemCount then
-                            if itemInfo.count < lootState.itemCount then
-                                lootState.itemCount = itemInfo.count
-                                itemCountBox:SetNumber(itemInfo.count)
-                                lastUIState.itemCountText = tostring(itemInfo.count)
-                            end
-                        end
-                    end
-                    dirtyFlags.itemCount = false
-                end
-            end
+            UpdateItemCountFromBox(itemCountBox)
 
             if dropDownDirty then
                 dirtyFlags.dropdowns = true
             end
 
-            local rollType, record, canRoll, rolled = addon.Rolls:RollStatus()
-            local rollStatus = lastUIState.rollStatus
-            if rollStatus.record ~= record
-                or rollStatus.canRoll ~= canRoll
-                or rollStatus.rolled ~= rolled
-                or rollStatus.rollType ~= rollType then
-                rollStatus.record = record
-                rollStatus.canRoll = canRoll
-                rollStatus.rolled = rolled
-                rollStatus.rollType = rollType
-                dirtyFlags.rolls = true
-                dirtyFlags.buttons = true
-            end
-
+            local record, canRoll, rolled = UpdateRollStatusState()
             if lastUIState.rollsCount ~= lootState.rollsCount then
                 lastUIState.rollsCount = lootState.rollsCount
                 dirtyFlags.rolls = true
@@ -2679,32 +2733,25 @@ do
                 dirtyFlags.buttons = true
             end
 
-            if lastUIState.lootCount ~= lootState.lootCount then
-                lastUIState.lootCount = lootState.lootCount
-                dirtyFlags.buttons = true
-            end
-
-            if lastUIState.fromInventory ~= lootState.fromInventory then
-                lastUIState.fromInventory = lootState.fromInventory
-                dirtyFlags.buttons = true
-            end
+            FlagButtonsOnChange("lootCount", lootState.lootCount)
+            FlagButtonsOnChange("fromInventory", lootState.fromInventory)
+            FlagButtonsOnChange("holder", lootState.holder)
+            FlagButtonsOnChange("banker", lootState.banker)
+            FlagButtonsOnChange("disenchanter", lootState.disenchanter)
 
             local hasReserves = addon.Reserves:HasData()
-            if lastUIState.hasReserves ~= hasReserves then
-                lastUIState.hasReserves = hasReserves
-                dirtyFlags.buttons = true
-            end
+            FlagButtonsOnChange("hasReserves", hasReserves)
 
             local hasItem = ItemExists()
-            if lastUIState.hasItem ~= hasItem then
-                lastUIState.hasItem = hasItem
-                dirtyFlags.buttons = true
-            end
+            FlagButtonsOnChange("hasItem", hasItem)
 
-            if lastUIState.countdownRun ~= countdownRun then
-                lastUIState.countdownRun = countdownRun
-                dirtyFlags.buttons = true
+            local itemId
+            if hasItem then
+                itemId = Utils.getItemIdFromLink(GetItemLink())
             end
+            local hasItemReserves = itemId and addon.Reserves:HasItemReserves(itemId) or false
+            FlagButtonsOnChange("hasItemReserves", hasItemReserves)
+            FlagButtonsOnChange("countdownRun", countdownRun)
 
             if dirtyFlags.buttons then
                 UpdateMasterButtonsIfChanged({
@@ -2712,19 +2759,21 @@ do
                     awardText = lootState.fromInventory and TRADE or L.BtnAward,
                     selectItemText = lootState.fromInventory and L.BtnRemoveItem or L.BtnSelectItem,
                     spamLootText = lootState.fromInventory and READY_CHECK or L.BtnSpamLoot,
-                    canSelectItem = lootState.lootCount > 1
-                        or (lootState.fromInventory and lootState.lootCount >= 1),
+                    canSelectItem = (lootState.lootCount > 1
+                        or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRun,
+                    canChangeItem = hasItem and not countdownRun,
                     canSpamLoot = lootState.lootCount >= 1,
                     canStartRolls = lootState.lootCount >= 1,
-                    canStartSR = lootState.lootCount >= 1 and hasReserves,
-                    canCountdown = lootState.lootCount >= 1 and hasItem,
-                    canHold = lootState.lootCount >= 1,
-                    canBank = lootState.lootCount >= 1,
-                    canDisenchant = lootState.lootCount >= 1,
-                    canAward = lootState.lootCount >= 1 and lootState.rollsCount >= 1,
+                    canStartSR = lootState.lootCount >= 1 and hasItemReserves,
+                    canCountdown = lootState.lootCount >= 1 and hasItem
+                        and (lootState.rollStarted or countdownRun),
+                    canHold = lootState.lootCount >= 1 and lootState.holder,
+                    canBank = lootState.lootCount >= 1 and lootState.banker,
+                    canDisenchant = lootState.lootCount >= 1 and lootState.disenchanter,
+                    canAward = lootState.lootCount >= 1 and lootState.rollsCount >= 1 and not countdownRun,
                     canOpenReserves = hasReserves,
                     canImportReserves = not hasReserves,
-                    canRoll = record and canRoll and rolled == false,
+                    canRoll = record and canRoll and rolled == false and countdownRun,
                     canClear = lootState.rollsCount >= 1,
                 })
                 dirtyFlags.buttons = false
@@ -2835,6 +2884,7 @@ do
         end
         dropDownDirty = true
         dirtyFlags.dropdowns = true
+        dirtyFlags.buttons = true
         CloseDropDownMenus()
     end
 
@@ -2854,6 +2904,7 @@ do
             if lootState.holder then
                 UIDropDownMenu_SetText(dropDownFrameHolder, lootState.holder)
                 UIDropDownMenu_SetSelectedValue(dropDownFrameHolder, lootState.holder)
+                dirtyFlags.buttons = true
             end
             -- Update loot banker:
         elseif name == dropDownFrameBanker:GetName() then
@@ -2865,6 +2916,7 @@ do
             if lootState.banker then
                 UIDropDownMenu_SetText(dropDownFrameBanker, lootState.banker)
                 UIDropDownMenu_SetSelectedValue(dropDownFrameBanker, lootState.banker)
+                dirtyFlags.buttons = true
             end
             -- Update loot disenchanter:
         elseif name == dropDownFrameDisenchanter:GetName() then
@@ -2876,6 +2928,7 @@ do
             if lootState.disenchanter then
                 UIDropDownMenu_SetText(dropDownFrameDisenchanter, lootState.disenchanter)
                 UIDropDownMenu_SetSelectedValue(dropDownFrameDisenchanter, lootState.disenchanter)
+                dirtyFlags.buttons = true
             end
         end
     end
@@ -2940,6 +2993,9 @@ do
             tostring(count), tostring(ItemIsSoulbound(inBag, inSlot))))
         lootState.itemCount = count or lootState.itemCount or 1
         _G[frameName .. "ItemBtn"]:SetScript("OnClick", function(self)
+            if countdownRun then
+                return
+            end
             if not ItemIsSoulbound(inBag, inSlot) then
                 -- Clear count:
                 Utils.resetEditBox(_G[frameName .. "ItemCount"], true)
@@ -3028,7 +3084,7 @@ do
     function module:TRADE_ACCEPT_UPDATE(tAccepted, pAccepted)
         addon:trace(L.LogTradeAcceptUpdate:format(tostring(lootState.trader), tostring(lootState.winner),
             tostring(tAccepted), tostring(pAccepted)))
-        if lootState.itemCount == 1 and lootState.trader and lootState.winner and lootState.trader ~= lootState.winner then
+        if lootState.trader and lootState.winner and lootState.trader ~= lootState.winner then
             if tAccepted == 1 and pAccepted == 1 then
                 addon:info(L.LogTradeCompleted:format(tostring(lootState.currentRollItem),
                     tostring(lootState.winner), tonumber(lootState.currentRollType) or -1,
@@ -3044,11 +3100,12 @@ do
                 else
                     addon:warn("Trade: currentRollItem missing; cannot update loot entry.")
                 end
-                lootState.trader = nil
-                lootState.winner = nil
-                addon.Loot:ClearLoot()
-                addon.Rolls:ClearRolls()
-                addon.Rolls:RecordRolls(false)
+                local done = RegisterAwardedItem()
+                ResetTradeState()
+                if done then
+                    addon.Loot:ClearLoot()
+                    addon.Raid:ClearRaidIcons()
+                end
                 screenshotWarn = false
             end
         end
@@ -3211,9 +3268,11 @@ do
         elseif lootState.trader == lootState.winner then
             -- Trader won, clear state
             addon:info(L.LogTradeTraderKeeps:format(tostring(itemLink), tostring(playerName)))
-            addon.Loot:ClearLoot()
-            addon.Rolls:ClearRolls(false)
-            addon.Raid:ClearRaidIcons()
+            local done = RegisterAwardedItem(lootState.itemCount)
+            if done then
+                addon.Loot:ClearLoot()
+                addon.Raid:ClearRaidIcons()
+            end
         else
             local unit = addon.Raid:GetUnitID(playerName)
             if unit ~= "none" and CheckInteractDistance(unit, 2) == 1 then
@@ -3831,6 +3890,12 @@ do
 
     function module:HasData()
         return next(reservesData) ~= nil
+    end
+
+    function module:HasItemReserves(itemId)
+        if not itemId then return false end
+        local list = reservesByItemID[itemId]
+        return type(list) == "table" and #list > 0
     end
 
     --------------------------------------------------------------------------
