@@ -2252,6 +2252,18 @@ do
             end
         end
 
+        local function UpdateItemState(enabled)
+            local itemBtn = _G[frameName .. "ItemBtn"]
+            if itemBtn and buttons.itemBtn ~= enabled then
+                Utils.enableDisable(itemBtn, enabled)
+                local texture = itemBtn:GetNormalTexture()
+                if texture and texture.SetDesaturated then
+                    texture:SetDesaturated(not enabled)
+                end
+                buttons.itemBtn = enabled
+            end
+        end
+
         local function UpdateText(key, frame, text)
             if texts[key] ~= text then
                 frame:SetText(text)
@@ -2279,6 +2291,7 @@ do
         UpdateEnabled("importReserves", _G[frameName .. "ImportReservesBtn"], state.canImportReserves)
         UpdateEnabled("roll", _G[frameName .. "RollBtn"], state.canRoll)
         UpdateEnabled("clear", _G[frameName .. "ClearBtn"], state.canClear)
+        UpdateItemState(state.canChangeItem)
     end
 
     local function RefreshDropDowns(force)
@@ -2370,6 +2383,7 @@ do
     --
     function module:BtnSelectItem(btn)
         if btn == nil or lootState.lootCount <= 0 then return end
+        if countdownRun then return end
         if lootState.fromInventory == true then
             addon.Loot:ClearLoot()
             addon.Rolls:ClearRolls()
@@ -2745,8 +2759,9 @@ do
                     awardText = lootState.fromInventory and TRADE or L.BtnAward,
                     selectItemText = lootState.fromInventory and L.BtnRemoveItem or L.BtnSelectItem,
                     spamLootText = lootState.fromInventory and READY_CHECK or L.BtnSpamLoot,
-                    canSelectItem = lootState.lootCount > 1
-                        or (lootState.fromInventory and lootState.lootCount >= 1),
+                    canSelectItem = (lootState.lootCount > 1
+                        or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRun,
+                    canChangeItem = hasItem and not countdownRun,
                     canSpamLoot = lootState.lootCount >= 1,
                     canStartRolls = lootState.lootCount >= 1,
                     canStartSR = lootState.lootCount >= 1 and hasItemReserves,
@@ -2974,6 +2989,9 @@ do
             tostring(count), tostring(ItemIsSoulbound(inBag, inSlot))))
         lootState.itemCount = count or lootState.itemCount or 1
         _G[frameName .. "ItemBtn"]:SetScript("OnClick", function(self)
+            if countdownRun then
+                return
+            end
             if not ItemIsSoulbound(inBag, inSlot) then
                 -- Clear count:
                 Utils.resetEditBox(_G[frameName .. "ItemCount"], true)
