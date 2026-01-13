@@ -2885,6 +2885,7 @@ do
         end
         dropDownDirty = true
         dirtyFlags.dropdowns = true
+        dirtyFlags.buttons = true
         CloseDropDownMenus()
     end
 
@@ -2904,6 +2905,7 @@ do
             if lootState.holder then
                 UIDropDownMenu_SetText(dropDownFrameHolder, lootState.holder)
                 UIDropDownMenu_SetSelectedValue(dropDownFrameHolder, lootState.holder)
+                dirtyFlags.buttons = true
             end
             -- Update loot banker:
         elseif name == dropDownFrameBanker:GetName() then
@@ -2915,6 +2917,7 @@ do
             if lootState.banker then
                 UIDropDownMenu_SetText(dropDownFrameBanker, lootState.banker)
                 UIDropDownMenu_SetSelectedValue(dropDownFrameBanker, lootState.banker)
+                dirtyFlags.buttons = true
             end
             -- Update loot disenchanter:
         elseif name == dropDownFrameDisenchanter:GetName() then
@@ -2926,6 +2929,7 @@ do
             if lootState.disenchanter then
                 UIDropDownMenu_SetText(dropDownFrameDisenchanter, lootState.disenchanter)
                 UIDropDownMenu_SetSelectedValue(dropDownFrameDisenchanter, lootState.disenchanter)
+                dirtyFlags.buttons = true
             end
         end
     end
