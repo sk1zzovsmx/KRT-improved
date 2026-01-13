@@ -1574,6 +1574,7 @@ do
         end
 
         RandomRoll(1, 100)
+        state.rolled = true
         state.playerCounts[itemId] = state.playerCounts[itemId] + 1
         addon:debug("Rolls: player=%s item=%d.", name, itemId)
     end
@@ -2767,10 +2768,10 @@ do
                     canStartSR = lootState.lootCount >= 1 and hasItemReserves,
                     canCountdown = lootState.lootCount >= 1 and hasItem
                         and (lootState.rollStarted or countdownRun),
-                    canHold = lootState.lootCount >= 1,
-                    canBank = lootState.lootCount >= 1,
-                    canDisenchant = lootState.lootCount >= 1,
-                    canAward = lootState.lootCount >= 1 and lootState.rollsCount >= 1,
+                    canHold = lootState.lootCount >= 1 and lootState.holder,
+                    canBank = lootState.lootCount >= 1 and lootState.banker,
+                    canDisenchant = lootState.lootCount >= 1 and lootState.disenchanter,
+                    canAward = lootState.lootCount >= 1 and lootState.rollsCount >= 1 and not countdownRun,
                     canOpenReserves = hasReserves,
                     canImportReserves = not hasReserves,
                     canRoll = record and canRoll and rolled == false and countdownRun,
