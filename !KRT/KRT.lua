@@ -244,6 +244,11 @@ do
     -------------------------------------------------------
     -- Private helpers
     -------------------------------------------------------
+    local function isPlayerInRaidZone(playerZone, raidZone)
+        if not playerZone or playerZone == "" then return false end
+        if not raidZone or raidZone == "" then return false end
+        return playerZone == raidZone
+    end
 
     -------------------------------------------------------
     -- Public methods
@@ -291,11 +296,14 @@ do
 
         local seen = {}
 
+        local raidZone = raid.zone
+
         for i = 1, n do
-            local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
+            local name, rank, subgroup, level, classL, class, zone = GetRaidRosterInfo(i)
             if name then
                 local unitID = "raid" .. tostring(i)
                 local raceL, race = UnitRace(unitID)
+                local inRaidZone = isPlayerInRaidZone(zone, raidZone)
 
                 local player = playersByName[name]
                 local active = player and player.leave == nil
@@ -306,7 +314,7 @@ do
                         rank     = rank or 0,
                         subgroup = subgroup or 1,
                         class    = class or "UNKNOWN",
-                        join     = Utils.getCurrentTime(),
+                        join     = inRaidZone and Utils.getCurrentTime() or nil,
                         leave    = nil,
                         count    = (player and player.count) or 0,
                     }
@@ -316,6 +324,9 @@ do
                     player.rank     = rank or player.rank or 0
                     player.subgroup = subgroup or player.subgroup or 1
                     player.class    = class or player.class or "UNKNOWN"
+                    if not player.join and inRaidZone then
+                        player.join = Utils.getCurrentTime()
+                    end
                 end
 
                 seen[name] = true
@@ -375,17 +386,18 @@ do
         }
 
         for i = 1, num do
-            local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
+            local name, rank, subgroup, level, classL, class, zone = GetRaidRosterInfo(i)
             if name then
                 local unitID = "raid" .. tostring(i)
                 local raceL, race = UnitRace(unitID)
+                local inRaidZone = isPlayerInRaidZone(zone, zoneName)
 
                 local p = {
                     name     = name,
                     rank     = rank or 0,
                     subgroup = subgroup or 1,
                     class    = class or "UNKNOWN",
-                    join     = Utils.getCurrentTime(),
+                    join     = inRaidZone and currentTime or nil,
                     leave    = nil,
                     count    = 0,
                 }
@@ -6926,7 +6938,7 @@ do
                 it.class = p.class
                 it.join = p.join
                 it.leave = p.leave
-                it.joinFmt = date("%H:%M", p.join)
+                it.joinFmt = p.join and date("%H:%M", p.join) or ""
                 it.leaveFmt = p.leave and date("%H:%M", p.leave) or ""
                 out[i] = it
             end
@@ -6960,7 +6972,11 @@ do
 
         sorters = {
             name = function(a, b, asc) return asc and (a.name < b.name) or (a.name > b.name) end,
-            join = function(a, b, asc) return asc and (a.join < b.join) or (a.join > b.join) end,
+            join = function(a, b, asc)
+                local A = a.join or (asc and math.huge or -math.huge)
+                local B = b.join or (asc and math.huge or -math.huge)
+                return asc and (A < B) or (A > B)
+            end,
             leave = function(a, b, asc)
                 local A = a.leave or (asc and math.huge or -math.huge)
                 local B = b.leave or (asc and math.huge or -math.huge)

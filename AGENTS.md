@@ -332,3 +332,4 @@ Throttle high-frequency sources (roster updates, combat log, UI refresh loops).
 - 2026-02-15_: Parse pushed loot messages and refresh Loot Logger on new loot.
 - 2026-02-21_: Removed KRT_Debug SavedVariable (log levels are runtime-only).
 - 2026-03-01_: Renamed History module to Logger (UI, strings, and references).
+- 2026-03-08_: Track raid attendee join times only when players enter the raid instance.
