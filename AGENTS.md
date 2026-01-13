@@ -30,13 +30,8 @@ No Ace3 GUI; UI is XML + Lua only. Vendored libs via **LibStub**.
 ---
 
 ## 2.1) Development standard (BINDING)
-All work on KRT must follow the standard patterns in:
-- `Docs/KRT_STANDARD.md` (the canonical “how we build KRT” rules)
-- `TemplatesLua/` (canonical templates for modules/events/SV/UI/slash/throttle)
-
 Rules:
-- New modules/features must start from `TemplatesLua/*` patterns or the closest existing in-repo equivalent.
-- If `KRT_STANDARD.md` conflicts with existing KRT code, prefer existing KRT code, then update the standard doc.
+- Prefer existing KRT code patterns when in doubt.
 - Any public surface change (SV keys / CLI / UI behavior) must be noted in **18) Change log**.
 
 ---
@@ -73,12 +68,6 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
     LibLogger-1.0/
     LibStub/
 
-Docs/
-  KRT_STANDARD.md           # BINDING: addon-wide patterns/standards
-  WoW_Addons.pdf            # optional: API reference (if kept in repo)
-
-TemplatesLua/
-  KRT_*Template.lua         # BINDING: canonical templates (dev-only, not shipped)
 ```
 
 ---
@@ -130,9 +119,6 @@ TemplatesLua/
 ## 8) Development setup (local)
 - No build step. Copy `!KRT/` into `<WoW>/Interface/AddOns/` and `/reload`.
 - Use a 3.3.5a client. Verify **Interface** matches 30300.
-- Start every change by reading:
-  - `Docs/KRT_STANDARD.md` (BINDING)
-  - relevant templates in `TemplatesLua/` (BINDING)
 - Developer helpers:
   - Logger window **KRTLogger** (`KRT.xml`); LibLogger API is embedded onto `addon`.
   - Event hooks live in `KRT.lua` (search `RegisterEvents(...)`).
@@ -212,7 +198,7 @@ Notes:
 - Ship the folder **named exactly** `!KRT` with `!KRT.toc` at root.
 - Keep `.toc` metadata updated (`Version`, `X-Date`, links).
 - Exclude debug logs from releases.
-- Do not ship `Docs/` or `TemplatesLua/` in release archives.
+- Do not ship `Docs/` in release archives.
 
 ---
 
@@ -226,7 +212,7 @@ Notes:
 ---
 
 ## 15) Do / Don’t
-**Do:** follow `Docs/KRT_STANDARD.md`; start from `TemplatesLua/`; keep changes small & testable; log via `LibLogger`.
+**Do:** keep changes small & testable; log via `LibLogger`.
 **Don’t:** introduce Ace3, block UI with long loops, break `/krt` CLI stability, or change SV keys silently.
 
 ---
@@ -237,14 +223,9 @@ Notes:
 
 ---
 
-## 17) Templates & references (BINDING for new work)
-- Canonical patterns live in `Docs/KRT_STANDARD.md` and `TemplatesLua/`.
-- Use the templates as starting points, then adapt to match existing KRT code.
-- Optional API reference: `Docs/WoW_Addons.pdf` (if present). Prefer in-repo patterns first.
-
----
-
 ## 18) Change log (edit by hand)
+- _2026-03-05_: Removed Docs/KRT_STANDARD.md and Docs/WoW_Addons.pdf references and files.
+- _2026-03-05_: Removed TemplatesLua directory references from AGENTS and deleted TemplatesLua.
 - _2026-03-02_: Removed `/krt lfm period` command and default LFM period SV entry.
 - _2026-01-02_: Standardized module skeleton (use `local module`), updated TemplatesLua + Docs, and introduced `addon.LootCounter` module (kept Master aliases).
 - _2025-09-05_: Initial lightweight version; removed binding “recipes”. Added `dev`-only branching policy.
