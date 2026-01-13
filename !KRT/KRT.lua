@@ -2333,10 +2333,12 @@ do
         screenshotWarn = false
     end
 
-    local function RegisterAwardedItem()
+    local function RegisterAwardedItem(count)
         local targetCount = tonumber(lootState.itemCount) or 1
         if targetCount < 1 then targetCount = 1 end
-        lootState.itemTraded = (lootState.itemTraded or 0) + 1
+        local increment = tonumber(count) or 1
+        if increment < 1 then increment = 1 end
+        lootState.itemTraded = (lootState.itemTraded or 0) + increment
         if lootState.itemTraded >= targetCount then
             lootState.itemTraded = 0
             addon.Rolls:ClearRolls()
@@ -3266,7 +3268,7 @@ do
         elseif lootState.trader == lootState.winner then
             -- Trader won, clear state
             addon:info(L.LogTradeTraderKeeps:format(tostring(itemLink), tostring(playerName)))
-            local done = RegisterAwardedItem()
+            local done = RegisterAwardedItem(lootState.itemCount)
             if done then
                 addon.Loot:ClearLoot()
                 addon.Raid:ClearRaidIcons()

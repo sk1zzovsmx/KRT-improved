@@ -224,6 +224,7 @@ Notes:
 ---
 
 ## 18) Change log (edit by hand)
+- _2026-03-07_: Clear rolls when self-awarding stacked inventory items (multi-count trade keep path).
 - _2026-03-06_: Master Looter buttons: countdown gates item selection, roll start, SR gated by reserved item, roll/award gating, reset rolls on awards; selection now enables Hold/Bank/DE buttons.
 - _2026-03-05_: Removed Docs/KRT_STANDARD.md and Docs/WoW_Addons.pdf references and files.
 - _2026-03-05_: Removed TemplatesLua directory references from AGENTS and deleted TemplatesLua.
