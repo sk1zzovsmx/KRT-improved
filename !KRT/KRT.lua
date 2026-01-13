@@ -787,10 +787,12 @@ do
     function module:GetRaidSize()
         local _, _, members = addon.GetGroupTypeAndCount()
         if members == 0 then return 0 end
-        local diff = addon.GetRaidDifficulty()
+
+        local diff = addon.Utils.getDifficulty()
         if diff then
             return (diff == 1 or diff == 3) and 10 or 25
         end
+
         return members > 20 and 25 or 10
     end
 
@@ -1385,8 +1387,7 @@ do
         count        = 0,
     }
     local newItemCounts, delItemCounts = addon.TablePool and addon.TablePool("k")
-    state.itemCounts = newItemCounts and newItemCounts()
-        or {}
+    state.itemCounts = newItemCounts and newItemCounts() or {}
 
     -------------------------------------------------------
     -- 3. Private helpers
@@ -1394,9 +1395,8 @@ do
     local function AcquireItemTracker(itemId)
         local tracker = state.itemCounts
         if not tracker[itemId] then
-            tracker[itemId] = newItemCounts and newItemCounts()
-                or {}
-            -- Tracker tables are released via resetRolls() using delItemCounts(..., true).
+            tracker[itemId] = newItemCounts and newItemCounts() or {}
+            -- Tracker tables are released via resetRolls() using delItemCounts(..., true)
         end
         return tracker[itemId]
     end
@@ -1405,6 +1405,7 @@ do
         if not itemId then return nil end
         local bestName, bestRoll = nil, nil
         local wantLow = addon.options.sortAscending == true
+
         for _, entry in ipairs(state.rolls) do
             if module:IsReserved(itemId, entry.name) then
                 if not bestName then
@@ -1420,76 +1421,100 @@ do
                 end
             end
         end
+
         return bestName, bestRoll
     end
 
-    local function sortRolls()
+    -- Returns the "real" winner for UI (top roll, with SR priority if active).
+    local function GetEffectiveWinner(itemId)
+        if lootState.currentRollType == rollTypes.RESERVED then
+            return PickBestReserved(itemId) or lootState.winner
+        end
+        return lootState.winner
+    end
+
+    -- Sorts rolls table + updates lootState.winner (top entry after sort).
+    local function sortRolls(itemId)
         local rolls = state.rolls
         if #rolls == 0 then
             lootState.winner = nil
+            lootState.rollWinner = nil
             addon:debug("Rolls: sort no entries.")
             return
         end
 
-        local isSR = lootState.currentRollType == rollTypes.RESERVED
+        local isSR    = (lootState.currentRollType == rollTypes.RESERVED)
+        local wantLow = (addon.options.sortAscending == true)
+
         table.sort(rolls, function(a, b)
-            if isSR then
-                local ar = module:IsReserved(a.itemId, a.name)
-                local br = module:IsReserved(b.itemId, b.name)
+            -- SR: reserved first (session itemId)
+            if isSR and itemId then
+                local ar = module:IsReserved(itemId, a.name)
+                local br = module:IsReserved(itemId, b.name)
                 if ar ~= br then
-                    return ar
+                    return ar -- true first
                 end
             end
-            return addon.options.sortAscending and a.roll < b.roll or a.roll > b.roll
+
+            if a.roll ~= b.roll then
+                return wantLow and (a.roll < b.roll) or (a.roll > b.roll)
+            end
+
+            -- tie-breaker stabile
+            return tostring(a.name) < tostring(b.name)
         end)
-        lootState.winner = rolls[1].name
-        state.lastSortAsc = addon.options.sortAscending == true
+
+        -- ⭐ top roll (segue SEMPRE Asc/Desc)
+        lootState.rollWinner = rolls[1].name
+
+        -- award target segue top roll solo se non è manuale
+        if state.canRoll or state.selectedAuto or (lootState.winner == nil) then
+            lootState.winner = lootState.rollWinner
+            state.selectedAuto = true
+        end
+
+        state.lastSortAsc  = wantLow
         state.lastSortType = lootState.currentRollType
-        addon:debug("Rolls: sorted winner=%s roll=%d.", lootState.winner, rolls[1].roll)
     end
 
     local function onRollButtonClick(self)
-        state.selected = self.playerName
+        -- ✅ Selezione SOLO a countdown finito
+        if state.canRoll then
+            return
+        end
+
+        local name = self.playerName
+        if not name or name == "" then return end
+
+        -- ✅ award target = selezione manuale
+        lootState.winner = name
+        state.selected = name
         state.selectedAuto = false
-        lootState.winner = self.playerName
+
         module:FetchRolls()
+        Utils.sync("KRT-RollWinner", name)
     end
 
     local function addRoll(name, roll, itemId)
         roll = tonumber(roll)
         state.count = state.count + 1
         lootState.rollsCount = lootState.rollsCount + 1
+
         local entry = {}
         entry.name = name
         entry.roll = roll
         entry.itemId = itemId
         state.rolls[state.count] = entry
         -- Roll entries are released via resetRolls().
-        addon:debug("Rolls: add name=%s roll=%d item=%s.", name, roll, tostring(itemId))
 
+        addon:debug("Rolls: add name=%s roll=%d item=%s.", name, roll, tostring(itemId))
         if itemId then
             local tracker = AcquireItemTracker(itemId)
             tracker[name] = (tracker[name] or 0) + 1
         end
 
         Utils.triggerEvent("AddRoll", name, roll)
-        sortRolls()
-
-        if not state.selected then
-            local targetItem = itemId or module:GetCurrentRollItemID()
-            if lootState.currentRollType == rollTypes.RESERVED then
-                local bestName, bestRoll = PickBestReserved(targetItem)
-                state.selected = bestName
-                if bestName then
-                    addon:debug("Rolls: auto-selected SR player=%s roll=%d.", bestName, bestRoll or -1)
-                end
-            else
-                state.selected = lootState.winner
-            end
-            state.selectedAuto = true
-            addon:debug("Rolls: auto-selected player=%s.", tostring(state.selected))
-        end
-
+        sortRolls(itemId)
         module:FetchRolls()
     end
 
@@ -1506,15 +1531,20 @@ do
         if delItemCounts then
             delItemCounts(state.itemCounts, true)
         end
+
         state.rolls = {}
         state.rerolled = {}
         state.playerCounts = {}
-        state.itemCounts = newItemCounts and newItemCounts()
-            or {}
+        state.itemCounts = newItemCounts and newItemCounts() or {}
+
         state.count, lootState.rollsCount = 0, 0
         state.selected, state.selectedAuto = nil, false
         state.rolled, state.warned = false, false
         state.lastSortAsc, state.lastSortType = nil, nil
+
+        lootState.winner = nil
+        lootState.rollWinner = nil
+
         if rec == false then state.record = false end
     end
 
@@ -1552,7 +1582,22 @@ do
 
     -- Enables or disables the recording of rolls.
     function module:RecordRolls(bool)
-        state.canRoll, state.record = bool == true, bool == true
+        local on      = (bool == true)
+        state.canRoll = on
+        state.record  = on
+
+        if on then
+            state.warned = false
+
+            -- reset SOLO se stiamo iniziando una sessione “pulita”
+            if state.count == 0 then
+                state.selected = nil
+                state.selectedAuto = true
+                lootState.winner = nil
+                lootState.rollWinner = nil
+            end
+        end
+
         addon:debug("Rolls: record=%s.", tostring(bool))
     end
 
@@ -1696,26 +1741,15 @@ do
         local itemId = self:GetCurrentRollItemID()
         local isSR = lootState.currentRollType == rollTypes.RESERVED
 
-        -- Keep the UI list order consistent with the current sort option.
-        -- (If the option is changed mid-session, we need to re-sort before rebuilding rows.)
         local wantAsc = addon.options.sortAscending == true
         if state.lastSortAsc ~= wantAsc or state.lastSortType ~= lootState.currentRollType then
-            sortRolls()
-
-            -- If the current selection was auto-picked, re-pick it using the new sort rule.
-            if state.selectedAuto or not state.selected then
-                if isSR then
-                    local bestName = PickBestReserved(itemId)
-                    state.selected = bestName
-                else
-                    state.selected = lootState.winner
-                end
-                state.selectedAuto = true
-            end
+            sortRolls(itemId)
         end
 
-        local starTarget = state.selected
+        -- top roll
+        local starTarget = lootState.rollWinner
 
+        -- fallback (se per qualche motivo non è ancora valorizzato)
         if not starTarget then
             if isSR then
                 local bestName = PickBestReserved(itemId)
@@ -1724,6 +1758,12 @@ do
                 starTarget = lootState.winner
             end
         end
+
+        local selectionAllowed = (state.canRoll == false)
+        local pickName = selectionAllowed and lootState.winner or nil
+
+        -- highlight: durante CD = top roll; post-CD = pick (se esiste) altrimenti top roll
+        local highlightTarget = selectionAllowed and (pickName or starTarget) or starTarget
 
         local starShown, totalHeight = false, 0
         for i = 1, state.count do
@@ -1735,6 +1775,9 @@ do
             btn:SetID(i)
             btn:Show()
             btn.playerName = name
+
+            -- click solo post-CD
+            btn:EnableMouse(selectionAllowed)
 
             if not btn.selectedBackground then
                 btn.selectedBackground = btn:CreateTexture("KRTSelectedHighlight", "ARTWORK")
@@ -1756,11 +1799,16 @@ do
                 end
             end
 
-            if state.selected == name then
+            -- > < SOLO se manuale (cioè: post-CD e selectedAuto=false)
+            if selectionAllowed and (state.selectedAuto == false) and pickName and pickName == name then
                 nameStr:SetText("> " .. name .. " <")
-                btn.selectedBackground:Show()
             else
                 nameStr:SetText(name)
+            end
+
+            if highlightTarget and highlightTarget == name then
+                btn.selectedBackground:Show()
+            else
                 btn.selectedBackground:Hide()
             end
 
@@ -1772,7 +1820,8 @@ do
                 rollStr:SetText(roll)
             end
 
-            local showStar = not starShown and name == starTarget
+            -- ⭐ STAR sempre top roll (rollWinner)
+            local showStar = (not starShown) and (starTarget ~= nil) and (name == starTarget)
             Utils.showHide(star, showStar)
             if showStar then starShown = true end
 
@@ -1786,6 +1835,10 @@ do
             totalHeight = totalHeight + btn:GetHeight()
         end
     end
+
+    Utils.registerCallback("ConfigsortAscending", function(_, value)
+        addon.Rolls:FetchRolls()
+    end)
 end
 
 ---============================================================================
@@ -2179,9 +2232,10 @@ do
             if not countdownRun then return end
             StopCountdown()
             addon:Announce(L.ChatCountdownEnd)
-            if addon.options.countdownRollsBlock then
-                addon.Rolls:RecordRolls(false)
-            end
+
+            -- ✅ a 0: stop roll (abilita selezione in Rolls) + refresh UI
+            addon.Rolls:RecordRolls(false)
+            addon.Rolls:FetchRolls()
         end)
     end
     local function UpdateMasterButtonsIfChanged(state)
@@ -2410,11 +2464,11 @@ do
     --
     -- Button: Starts or stops the roll countdown.
     --
-
     function module:BtnCountdown(btn)
         if countdownRun then
             addon.Rolls:RecordRolls(false)
             StopCountdown()
+            addon.Rolls:FetchRolls()
         else
             addon.Rolls:RecordRolls(true)
             announced = false
@@ -2434,6 +2488,10 @@ do
     -- Button: Award/Trade
     --
     function module:BtnAward(btn)
+        if countdownRun then
+            addon:warn("Countdown ancora attivo: attendi la fine (0) prima di assegnare.")
+            return
+        end
         if lootState.lootCount <= 0 or lootState.rollsCount <= 0 then
             addon:debug("Award: blocked lootCount=%d rollsCount=%d.", lootState.lootCount or 0,
                 lootState.rollsCount or 0)
@@ -2977,7 +3035,7 @@ do
                     addon.Rolls:HighestRoll()))
                 if lootState.currentRollItem and lootState.currentRollItem > 0 then
                     local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.winner,
-                        lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT")
+                        lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT", KRT_CurrentRaid)
 
                     if not ok then
                         addon:error(L.LogTradeLoggerLogFailed:format(tostring(KRT_CurrentRaid),
@@ -3078,7 +3136,8 @@ do
                 Utils.whisper(playerName, whisper)
             end
             if lootState.currentRollItem and lootState.currentRollItem > 0 then
-                local ok = addon.Logger.Loot:Log(lootState.currentRollItem, playerName, rollType, rollValue, "ML_AWARD")
+                local ok = addon.Logger.Loot:Log(lootState.currentRollItem, playerName, rollType, rollValue, "ML_AWARD",
+                    KRT_CurrentRaid)
                 if not ok then
                     addon:error(L.LogMLAwardLoggerFailed:format(tostring(KRT_CurrentRaid),
                         tostring(lootState.currentRollItem), tostring(itemLink)))
@@ -3199,8 +3258,8 @@ do
             end
             if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE
                 and playerName == lootState.trader then
-                local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.trader,
-                    rollType, rollValue, "TRADE_KEEP")
+                local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.trader, rollType, rollValue,
+                    "TRADE_KEEP", KRT_CurrentRaid)
                 if not ok then
                     addon:error(L.LogTradeKeepLoggerFailed:format(tostring(KRT_CurrentRaid),
                         tostring(lootState.currentRollItem), tostring(itemLink)))
@@ -3224,7 +3283,6 @@ end
 -- Loot Counter Module
 -- Counter and display item distribution.
 ---============================================================================
-
 do
     local module = addon.Master
 
@@ -4560,7 +4618,6 @@ end
 ---============================================================================
 -- Warnings Frame Module
 ---============================================================================
-
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -4816,7 +4873,6 @@ end
 ---============================================================================
 -- MS Changes Module
 ---============================================================================
-
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -5141,7 +5197,6 @@ end
 ---============================================================================
 -- LFM Spam Module
 ---============================================================================
-
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -7075,8 +7130,20 @@ do
         controller._makeConfirmPopup("KRTLOGGER_DELETE_ITEM", L.StrConfirmDeleteItem, DeleteItem)
     end
 
-    function Loot:Log(itemID, looter, rollType, rollValue, source)
-        local raidID = addon.Logger.selectedRaid or KRT_CurrentRaid
+    function Loot:Log(itemID, looter, rollType, rollValue, source, raidIDOverride)
+        local raidID
+        if raidIDOverride then
+            raidID = raidIDOverride
+        else
+            -- If the Logger window is open and browsing an old raid, selectedRaid may differ from KRT_CurrentRaid.
+            -- Runtime sources must always write into the CURRENT raid session, while Logger UI edits target selectedRaid.
+            local isLoggerSource = (type(source) == "string") and (source:find("^LOGGER_") ~= nil)
+            if isLoggerSource then
+                raidID = addon.Logger.selectedRaid or KRT_CurrentRaid
+            else
+                raidID = KRT_CurrentRaid or addon.Logger.selectedRaid
+            end
+        end
         addon:trace(L.LogLoggerLootLogAttempt:format(tostring(source), tostring(raidID), tostring(itemID),
             tostring(looter), tostring(rollType), tostring(rollValue), tostring(KRT_LastBoss)))
         if not raidID or not KRT_Raids[raidID] then
