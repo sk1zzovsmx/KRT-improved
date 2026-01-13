@@ -2658,6 +2658,53 @@ do
         localized = true
     end
 
+    local function SyncItemCountBox(itemCountBox)
+        if not itemCountBox or not itemCountBox:IsVisible() then return end
+        local rawCount = itemCountBox:GetText()
+        if rawCount ~= lastUIState.itemCountText then
+            lastUIState.itemCountText = rawCount
+            dirtyFlags.itemCount = true
+        end
+        if dirtyFlags.itemCount then
+            local count = tonumber(rawCount)
+            if count and count > 0 then
+                lootState.itemCount = count
+                if itemInfo.count and itemInfo.count ~= lootState.itemCount then
+                    if itemInfo.count < lootState.itemCount then
+                        lootState.itemCount = itemInfo.count
+                        itemCountBox:SetNumber(itemInfo.count)
+                        lastUIState.itemCountText = tostring(itemInfo.count)
+                    end
+                end
+            end
+            dirtyFlags.itemCount = false
+        end
+    end
+
+    local function UpdateRollStatusState()
+        local rollType, record, canRoll, rolled = addon.Rolls:RollStatus()
+        local rollStatus = lastUIState.rollStatus
+        if rollStatus.record ~= record
+            or rollStatus.canRoll ~= canRoll
+            or rollStatus.rolled ~= rolled
+            or rollStatus.rollType ~= rollType then
+            rollStatus.record = record
+            rollStatus.canRoll = canRoll
+            rollStatus.rolled = rolled
+            rollStatus.rollType = rollType
+            dirtyFlags.rolls = true
+            dirtyFlags.buttons = true
+        end
+        return record, canRoll, rolled
+    end
+
+    local function MarkButtonsDirtyIfChanged(key, value)
+        if lastUIState[key] ~= value then
+            lastUIState[key] = value
+            dirtyFlags.buttons = true
+        end
+    end
+
     --
     -- OnUpdate handler for the frame, updates UI elements periodically.
     --
@@ -2665,46 +2712,13 @@ do
         LocalizeUIFrame()
         Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             local itemCountBox = _G[frameName .. "ItemCount"]
-            if itemCountBox and itemCountBox:IsVisible() then
-                local rawCount = itemCountBox:GetText()
-                if rawCount ~= lastUIState.itemCountText then
-                    lastUIState.itemCountText = rawCount
-                    dirtyFlags.itemCount = true
-                end
-                if dirtyFlags.itemCount then
-                    local count = tonumber(rawCount)
-                    if count and count > 0 then
-                        lootState.itemCount = count
-                        if itemInfo.count and itemInfo.count ~= lootState.itemCount then
-                            if itemInfo.count < lootState.itemCount then
-                                lootState.itemCount = itemInfo.count
-                                itemCountBox:SetNumber(itemInfo.count)
-                                lastUIState.itemCountText = tostring(itemInfo.count)
-                            end
-                        end
-                    end
-                    dirtyFlags.itemCount = false
-                end
-            end
+            SyncItemCountBox(itemCountBox)
 
             if dropDownDirty then
                 dirtyFlags.dropdowns = true
             end
 
-            local rollType, record, canRoll, rolled = addon.Rolls:RollStatus()
-            local rollStatus = lastUIState.rollStatus
-            if rollStatus.record ~= record
-                or rollStatus.canRoll ~= canRoll
-                or rollStatus.rolled ~= rolled
-                or rollStatus.rollType ~= rollType then
-                rollStatus.record = record
-                rollStatus.canRoll = canRoll
-                rollStatus.rolled = rolled
-                rollStatus.rollType = rollType
-                dirtyFlags.rolls = true
-                dirtyFlags.buttons = true
-            end
-
+            local record, canRoll, rolled = UpdateRollStatusState()
             if lastUIState.rollsCount ~= lootState.rollsCount then
                 lastUIState.rollsCount = lootState.rollsCount
                 dirtyFlags.rolls = true
@@ -2717,42 +2731,22 @@ do
                 dirtyFlags.buttons = true
             end
 
-            if lastUIState.lootCount ~= lootState.lootCount then
-                lastUIState.lootCount = lootState.lootCount
-                dirtyFlags.buttons = true
-            end
-
-            if lastUIState.fromInventory ~= lootState.fromInventory then
-                lastUIState.fromInventory = lootState.fromInventory
-                dirtyFlags.buttons = true
-            end
+            MarkButtonsDirtyIfChanged("lootCount", lootState.lootCount)
+            MarkButtonsDirtyIfChanged("fromInventory", lootState.fromInventory)
 
             local hasReserves = addon.Reserves:HasData()
-            if lastUIState.hasReserves ~= hasReserves then
-                lastUIState.hasReserves = hasReserves
-                dirtyFlags.buttons = true
-            end
+            MarkButtonsDirtyIfChanged("hasReserves", hasReserves)
 
             local hasItem = ItemExists()
-            if lastUIState.hasItem ~= hasItem then
-                lastUIState.hasItem = hasItem
-                dirtyFlags.buttons = true
-            end
+            MarkButtonsDirtyIfChanged("hasItem", hasItem)
 
             local itemId
             if hasItem then
                 itemId = Utils.getItemIdFromLink(GetItemLink())
             end
             local hasItemReserves = itemId and addon.Reserves:HasItemReserves(itemId) or false
-            if lastUIState.hasItemReserves ~= hasItemReserves then
-                lastUIState.hasItemReserves = hasItemReserves
-                dirtyFlags.buttons = true
-            end
-
-            if lastUIState.countdownRun ~= countdownRun then
-                lastUIState.countdownRun = countdownRun
-                dirtyFlags.buttons = true
-            end
+            MarkButtonsDirtyIfChanged("hasItemReserves", hasItemReserves)
+            MarkButtonsDirtyIfChanged("countdownRun", countdownRun)
 
             if dirtyFlags.buttons then
                 UpdateMasterButtonsIfChanged({
