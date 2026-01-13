@@ -2758,7 +2758,7 @@ do
                     canAward = lootState.lootCount >= 1 and lootState.rollsCount >= 1,
                     canOpenReserves = hasReserves,
                     canImportReserves = not hasReserves,
-                    canRoll = record and canRoll and rolled == false,
+                    canRoll = record and canRoll and rolled == false and countdownRun,
                     canClear = lootState.rollsCount >= 1,
                 })
                 dirtyFlags.buttons = false
