@@ -2733,6 +2733,9 @@ do
 
             MarkButtonsDirtyIfChanged("lootCount", lootState.lootCount)
             MarkButtonsDirtyIfChanged("fromInventory", lootState.fromInventory)
+            MarkButtonsDirtyIfChanged("holder", lootState.holder)
+            MarkButtonsDirtyIfChanged("banker", lootState.banker)
+            MarkButtonsDirtyIfChanged("disenchanter", lootState.disenchanter)
 
             local hasReserves = addon.Reserves:HasData()
             MarkButtonsDirtyIfChanged("hasReserves", hasReserves)
