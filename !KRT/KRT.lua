@@ -2658,7 +2658,7 @@ do
         localized = true
     end
 
-    local function SyncItemCountBox(itemCountBox)
+    local function UpdateItemCountFromBox(itemCountBox)
         if not itemCountBox or not itemCountBox:IsVisible() then return end
         local rawCount = itemCountBox:GetText()
         if rawCount ~= lastUIState.itemCountText then
@@ -2698,7 +2698,7 @@ do
         return record, canRoll, rolled
     end
 
-    local function MarkButtonsDirtyIfChanged(key, value)
+    local function FlagButtonsOnChange(key, value)
         if lastUIState[key] ~= value then
             lastUIState[key] = value
             dirtyFlags.buttons = true
@@ -2712,7 +2712,7 @@ do
         LocalizeUIFrame()
         Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             local itemCountBox = _G[frameName .. "ItemCount"]
-            SyncItemCountBox(itemCountBox)
+            UpdateItemCountFromBox(itemCountBox)
 
             if dropDownDirty then
                 dirtyFlags.dropdowns = true
@@ -2731,25 +2731,25 @@ do
                 dirtyFlags.buttons = true
             end
 
-            MarkButtonsDirtyIfChanged("lootCount", lootState.lootCount)
-            MarkButtonsDirtyIfChanged("fromInventory", lootState.fromInventory)
-            MarkButtonsDirtyIfChanged("holder", lootState.holder)
-            MarkButtonsDirtyIfChanged("banker", lootState.banker)
-            MarkButtonsDirtyIfChanged("disenchanter", lootState.disenchanter)
+            FlagButtonsOnChange("lootCount", lootState.lootCount)
+            FlagButtonsOnChange("fromInventory", lootState.fromInventory)
+            FlagButtonsOnChange("holder", lootState.holder)
+            FlagButtonsOnChange("banker", lootState.banker)
+            FlagButtonsOnChange("disenchanter", lootState.disenchanter)
 
             local hasReserves = addon.Reserves:HasData()
-            MarkButtonsDirtyIfChanged("hasReserves", hasReserves)
+            FlagButtonsOnChange("hasReserves", hasReserves)
 
             local hasItem = ItemExists()
-            MarkButtonsDirtyIfChanged("hasItem", hasItem)
+            FlagButtonsOnChange("hasItem", hasItem)
 
             local itemId
             if hasItem then
                 itemId = Utils.getItemIdFromLink(GetItemLink())
             end
             local hasItemReserves = itemId and addon.Reserves:HasItemReserves(itemId) or false
-            MarkButtonsDirtyIfChanged("hasItemReserves", hasItemReserves)
-            MarkButtonsDirtyIfChanged("countdownRun", countdownRun)
+            FlagButtonsOnChange("hasItemReserves", hasItemReserves)
+            FlagButtonsOnChange("countdownRun", countdownRun)
 
             if dirtyFlags.buttons then
                 UpdateMasterButtonsIfChanged({
