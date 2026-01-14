@@ -372,6 +372,8 @@ do
             loot          = {},
             nextBossNid   = 1,
             nextLootNid   = 1,
+            bossIndexByNid = {},
+            lootIndexByNid = {},
             startTime     = currentTime,
             changes       = {},
         }
@@ -448,20 +450,58 @@ do
         KRT_LastBoss = nil
     end
 
-    local function ensureRaidSchema(raidNum)
+    local function rebuildBossIndex(raid)
+        raid.bossIndexByNid = raid.bossIndexByNid or {}
+        twipe(raid.bossIndexByNid)
+        for i = 1, #raid.bossKills do
+            local boss = raid.bossKills[i]
+            local nid = boss and tonumber(boss.bossNid)
+            if not nid then
+                return false
+            end
+            boss.bossNid = nid
+            raid.bossIndexByNid[nid] = i
+        end
+        return true
+    end
+
+    local function rebuildLootIndex(raid)
+        raid.lootIndexByNid = raid.lootIndexByNid or {}
+        twipe(raid.lootIndexByNid)
+        for i = 1, #raid.loot do
+            local entry = raid.loot[i]
+            local nid = entry and tonumber(entry.lootNid)
+            if not nid then
+                return false
+            end
+            entry.lootNid = nid
+            raid.lootIndexByNid[nid] = i
+        end
+        return true
+    end
+
+    local function ensureRaid(raidNum)
         local raid = raidNum and KRT_Raids[raidNum]
         if not raid then return nil end
 
-        local function toNumber(value)
-            if value == nil then return nil end
-            return tonumber(value)
-        end
-
         raid.players = raid.players or {}
+        raid.playersByName = raid.playersByName or {}
         raid.bossKills = raid.bossKills or {}
         raid.loot = raid.loot or {}
 
-        raid.playersByName = raid.playersByName or {}
+        raid.nextBossNid = tonumber(raid.nextBossNid) or 1
+        raid.nextLootNid = tonumber(raid.nextLootNid) or 1
+
+        if not rebuildBossIndex(raid) then
+            addon:error(L.ErrRaidSchemaMissingBossNid:format(tostring(raidNum)))
+            return nil
+        end
+        if not rebuildLootIndex(raid) then
+            addon:error(L.ErrRaidSchemaMissingLootNid:format(tostring(raidNum)))
+            return nil
+        end
+
+        twipe(raid.playersByName)
         for i = 1, #raid.players do
             local player = raid.players[i]
             if player and player.name then
@@ -469,59 +509,11 @@ do
             end
         end
 
-        local maxBossNid = 0
-        for i = 1, #raid.bossKills do
-            local boss = raid.bossKills[i]
-            if boss and boss.bossNid then
-                local nid = toNumber(boss.bossNid) or i
-                boss.bossNid = nid
-                if nid > maxBossNid then
-                    maxBossNid = nid
-                end
-            end
-            if boss and not boss.bossNid then
-                boss.bossNid = i
-                if i > maxBossNid then
-                    maxBossNid = i
-                end
-            end
-            if boss and not boss.time and boss.date then
-                boss.time = boss.date
-            end
-            if boss and not boss.mode and boss.difficulty then
-                boss.mode = (boss.difficulty == 3 or boss.difficulty == 4) and "h" or "n"
-            end
-        end
-
-        local maxLootNid = 0
-        for i = 1, #raid.loot do
-            local entry = raid.loot[i]
-            if entry then
-                local lootNid = toNumber(entry.lootNid) or i
-                entry.lootNid = lootNid
-                if lootNid > maxLootNid then
-                    maxLootNid = lootNid
-                end
-
-                entry.time = toNumber(entry.time) or toNumber(entry.date) or 0
-
-                local bossNid = toNumber(entry.bossNid) or 0
-                entry.bossNid = bossNid
-                if bossNid == 0 and entry.bossNum then
-                    local boss = raid.bossKills[toNumber(entry.bossNum) or 0]
-                    entry.bossNid = (boss and boss.bossNid) or 0
-                end
-            end
-        end
-
-        raid.nextBossNid = toNumber(raid.nextBossNid) or (maxBossNid + 1)
-        raid.nextLootNid = toNumber(raid.nextLootNid) or (maxLootNid + 1)
-
         return raid
     end
 
     function module:EnsureRaidSchema(raidNum)
-        return ensureRaidSchema(raidNum)
+        return ensureRaid(raidNum)
     end
 
     --
@@ -627,7 +619,7 @@ do
             return
         end
 
-        local raid = ensureRaidSchema(raidNum)
+        local raid = ensureRaid(raidNum)
         if not raid then return end
 
         local _, _, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
@@ -661,6 +653,7 @@ do
             hash     = Utils.encode(raidNum .. "|" .. bossName .. "|" .. (KRT_LastBoss or "0"))
         }
         tinsert(raid.bossKills, killInfo)
+        raid.bossIndexByNid[bossNid] = #raid.bossKills
         KRT_LastBoss = bossNid
         addon:info(L.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1,
             tonumber(raidNum) or -1, #players))
@@ -778,7 +771,7 @@ do
             rollValue = addon.Rolls:HighestRoll() or 0
         end
 
-        local raid = ensureRaidSchema(KRT_CurrentRaid)
+        local raid = ensureRaid(KRT_CurrentRaid)
         if not raid then return end
 
         local lootNid = raid.nextLootNid or 1
@@ -799,6 +792,7 @@ do
             time        = Utils.getCurrentTime(),
         }
         tinsert(raid.loot, lootInfo)
+        raid.lootIndexByNid[lootNid] = #raid.loot
         Utils.triggerEvent("RaidLootUpdate", KRT_CurrentRaid, lootInfo)
         addon:debug(L.LogLootLogged:format(tonumber(KRT_CurrentRaid) or -1, tostring(itemId),
             tostring(KRT_LastBoss), tostring(player)))
@@ -917,15 +911,12 @@ do
     function module:GetLoot(raidNum, bossNid)
         raidNum = raidNum or KRT_CurrentRaid
         bossNid = bossNid or 0
-        local raid = ensureRaidSchema(raidNum)
+        local raid = ensureRaid(raidNum)
         if not raid then
             return {}
         end
         local loot = raid.loot
         if tonumber(bossNid) <= 0 then
-            for k, v in ipairs(loot) do
-                v.id = v.lootNid or k
-            end
             return loot
         end
 
@@ -933,7 +924,6 @@ do
         -- Get loot for a specific boss
         for k, v in ipairs(loot) do
             if v.bossNid == bossNid then
-                v.id = v.lootNid or k
                 tinsert(items, v)
             end
         end
@@ -964,13 +954,13 @@ do
         local bosses = out or {}
         if out then twipe(bosses) end
         raidNum = raidNum or KRT_CurrentRaid
-        local raid = ensureRaidSchema(raidNum)
+        local raid = ensureRaid(raidNum)
         if raid then
             local kills = raid.bossKills
             for i = 1, #kills do
                 local b = kills[i]
                 local info = {
-                    id = b.bossNid or i,
+                    id = b.bossNid,
                     time = b.time or b.date,
                     hash = b.hash or "0",
                 }
@@ -1001,7 +991,7 @@ do
     --
     function module:GetPlayers(raidNum, bossNid, out)
         raidNum = raidNum or KRT_CurrentRaid
-        local raid = ensureRaidSchema(raidNum)
+        local raid = ensureRaid(raidNum)
         if not raid then return {} end
 
         local raidPlayers = raid.players or {}
@@ -1100,7 +1090,6 @@ do
         name = (type(name) == "number") and module:GetPlayerName(name) or name
         for _, v in ipairs(loot) do
             if v.looter == name then
-                -- Keep v.id as the original index assigned by GetLoot()
                 tinsert(items, v)
             end
         end
@@ -6163,46 +6152,16 @@ do
         return addon.Raid:EnsureRaidSchema(raidId)
     end
 
-    local function buildBossIndexByNid(raid)
-        local map = {}
-        for i = 1, #raid.bossKills do
-            local boss = raid.bossKills[i]
-            if boss and boss.bossNid then
-                local nid = tonumber(boss.bossNid)
-                if nid then
-                    map[nid] = i
-                end
-            end
-        end
-        return map
-    end
-
-    local function buildLootIndexByNid(raid)
-        local map = {}
-        for i = 1, #raid.loot do
-            local entry = raid.loot[i]
-            if entry and entry.lootNid then
-                local nid = tonumber(entry.lootNid)
-                if nid then
-                    map[nid] = i
-                end
-            end
-        end
-        return map
-    end
-
     function DB:GetBossIndexByNid(raidId, bossNid)
         local raid = ensureRaid(raidId)
         if not raid then return nil end
-        local map = buildBossIndexByNid(raid)
-        return map[bossNid]
+        return raid.bossIndexByNid and raid.bossIndexByNid[bossNid] or nil
     end
 
     function DB:GetLootIndexByNid(raidId, lootNid)
         local raid = ensureRaid(raidId)
         if not raid then return nil end
-        local map = buildLootIndexByNid(raid)
-        return map[lootNid]
+        return raid.lootIndexByNid and raid.lootIndexByNid[lootNid] or nil
     end
 
     function DB:GetBossNameByNid(raidId, bossNid)
@@ -6234,6 +6193,7 @@ do
         if KRT_CurrentRaid == raidId and KRT_LastBoss == bossNid then
             KRT_LastBoss = nil
         end
+        addon.Raid:EnsureRaidSchema(raidId)
 
         return true, removedLoot
     end
@@ -6244,6 +6204,7 @@ do
         local idx = self:GetLootIndexByNid(raidId, lootNid)
         if not idx then return false end
         tremove(raid.loot, idx)
+        addon.Raid:EnsureRaidSchema(raidId)
         return true
     end
 
@@ -7557,6 +7518,8 @@ do
             local nid = raid.nextBossNid
             raid.nextBossNid = nid + 1
             tinsert(raid.bossKills, { bossNid = nid, name = name, time = bossTime, mode = mode, players = {} })
+            raid.bossIndexByNid = raid.bossIndexByNid or {}
+            raid.bossIndexByNid[nid] = #raid.bossKills
         end
 
         self:Hide()

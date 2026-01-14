@@ -350,6 +350,8 @@ L.ErrLoggerWinnerEmpty            = "Please enter a valid winner name."
 L.ErrLoggerWinnerNotFound         = "Winner not found in raid or boss attendees: %s"
 L.ErrLoggerInvalidRollType        = "Invalid roll type. Use a valid roll type number."
 L.ErrLoggerInvalidRollValue       = "Invalid roll value. Enter a non-negative number."
+L.ErrRaidSchemaMissingBossNid     = "Raid schema invalid: missing bossNid (raid=%s)."
+L.ErrRaidSchemaMissingLootNid     = "Raid schema invalid: missing lootNid (raid=%s)."
 
 -- ==================== Logger: Export Frame ==================== --
 L.StrExportBoxTitle               = "Export Loot Logger"
