@@ -7757,6 +7757,9 @@ local addonEvents = {
     CHAT_MSG_LOOT = "CHAT_MSG_LOOT",
     CHAT_MSG_MONSTER_YELL = "CHAT_MSG_MONSTER_YELL",
     RAID_ROSTER_UPDATE = "RAID_ROSTER_UPDATE",
+    ZONE_CHANGED = "ZONE_CHANGED",
+    ZONE_CHANGED_INDOORS = "ZONE_CHANGED_INDOORS",
+    ZONE_CHANGED_NEW_AREA = "ZONE_CHANGED_NEW_AREA",
     PLAYER_ENTERING_WORLD = "PLAYER_ENTERING_WORLD",
     COMBAT_LOG_EVENT_UNFILTERED = "COMBAT_LOG_EVENT_UNFILTERED",
     RAID_INSTANCE_WELCOME = "RAID_INSTANCE_WELCOME",
@@ -7843,6 +7846,24 @@ function addon:PLAYER_ENTERING_WORLD()
     addon:trace(L.LogCorePlayerEnteringWorld)
     addon.CancelTimer(module.firstCheckHandle, true)
     module.firstCheckHandle = addon.After(3, function() module:FirstCheck() end)
+end
+
+--
+-- ZONE_CHANGED*: Refresh roster when the player transitions zones.
+--
+function addon:ZONE_CHANGED()
+    if not KRT_CurrentRaid or not addon.IsInRaid() then return end
+    addon.Raid:UpdateRaidRoster()
+end
+
+function addon:ZONE_CHANGED_INDOORS()
+    if not KRT_CurrentRaid or not addon.IsInRaid() then return end
+    addon.Raid:UpdateRaidRoster()
+end
+
+function addon:ZONE_CHANGED_NEW_AREA()
+    if not KRT_CurrentRaid or not addon.IsInRaid() then return end
+    addon.Raid:UpdateRaidRoster()
 end
 
 --
