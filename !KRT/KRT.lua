@@ -452,6 +452,11 @@ do
         local raid = raidNum and KRT_Raids[raidNum]
         if not raid then return nil end
 
+        local function toNumber(value)
+            if value == nil then return nil end
+            return tonumber(value)
+        end
+
         raid.players = raid.players or {}
         raid.bossKills = raid.bossKills or {}
         raid.loot = raid.loot or {}
@@ -459,13 +464,15 @@ do
         local maxBossNid = 0
         for i = 1, #raid.bossKills do
             local boss = raid.bossKills[i]
+            if boss and boss.bossNid then
+                local nid = toNumber(boss.bossNid) or i
+                boss.bossNid = nid
+                if nid > maxBossNid then
+                    maxBossNid = nid
+                end
+            end
             if boss and not boss.bossNid then
                 boss.bossNid = i
-            end
-            if boss and boss.bossNid then
-                if boss.bossNid > maxBossNid then
-                    maxBossNid = boss.bossNid
-                end
             end
             if boss and not boss.time and boss.date then
                 boss.time = boss.date
@@ -478,20 +485,24 @@ do
         local maxLootNid = 0
         for i = 1, #raid.loot do
             local entry = raid.loot[i]
-            if entry and not entry.lootNid then
-                entry.lootNid = i
-            end
-            if entry and not entry.bossNid and entry.bossNum then
-                local boss = raid.bossKills[entry.bossNum]
-                entry.bossNid = (boss and boss.bossNid) or 0
-            end
-            if entry and entry.lootNid and entry.lootNid > maxLootNid then
-                maxLootNid = entry.lootNid
+            if entry then
+                local lootNid = toNumber(entry.lootNid) or i
+                entry.lootNid = lootNid
+                if lootNid > maxLootNid then
+                    maxLootNid = lootNid
+                end
+
+                local bossNid = toNumber(entry.bossNid) or 0
+                entry.bossNid = bossNid
+                if bossNid == 0 and entry.bossNum then
+                    local boss = raid.bossKills[toNumber(entry.bossNum) or 0]
+                    entry.bossNid = (boss and boss.bossNid) or 0
+                end
             end
         end
 
-        raid.nextBossNid = tonumber(raid.nextBossNid) or (maxBossNid + 1)
-        raid.nextLootNid = tonumber(raid.nextLootNid) or (maxLootNid + 1)
+        raid.nextBossNid = toNumber(raid.nextBossNid) or (maxBossNid + 1)
+        raid.nextLootNid = toNumber(raid.nextLootNid) or (maxLootNid + 1)
 
         return raid
     end
@@ -6144,7 +6155,10 @@ do
         for i = 1, #raid.bossKills do
             local boss = raid.bossKills[i]
             if boss and boss.bossNid then
-                map[boss.bossNid] = i
+                local nid = tonumber(boss.bossNid)
+                if nid then
+                    map[nid] = i
+                end
             end
         end
         return map
@@ -6155,7 +6169,10 @@ do
         for i = 1, #raid.loot do
             local entry = raid.loot[i]
             if entry and entry.lootNid then
-                map[entry.lootNid] = i
+                local nid = tonumber(entry.lootNid)
+                if nid then
+                    map[nid] = i
+                end
             end
         end
         return map
@@ -7305,8 +7322,12 @@ do
             if isLoggerSource then
                 raidID = addon.Logger.selectedRaid or KRT_CurrentRaid
             else
-                raidID = KRT_CurrentRaid or addon.Logger.selectedRaid
+                raidID = KRT_CurrentRaid
             end
+        end
+        if not raidID then
+            addon:error("Loot: runtime source with no current raid (source=%s).", tostring(source))
+            return false
         end
         addon:trace(L.LogLoggerLootLogAttempt:format(
             tostring(source),
@@ -7497,7 +7518,11 @@ do
             return
         end
 
-        local _, month, day, year = CalendarGetDate()
+        local a, b, c, d = CalendarGetDate()
+        local month, day, year = a, b, c
+        if d then
+            month, day, year = b, c, d
+        end
         local bossTime = time({ day = day, month = month, year = year, hour = h, min = m })
         local mode = (modeT == "h") and "h" or "n"
 
