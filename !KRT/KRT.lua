@@ -461,6 +461,14 @@ do
         raid.bossKills = raid.bossKills or {}
         raid.loot = raid.loot or {}
 
+        raid.playersByName = raid.playersByName or {}
+        for i = 1, #raid.players do
+            local player = raid.players[i]
+            if player and player.name then
+                raid.playersByName[player.name] = player
+            end
+        end
+
         local maxBossNid = 0
         for i = 1, #raid.bossKills do
             local boss = raid.bossKills[i]
@@ -473,6 +481,9 @@ do
             end
             if boss and not boss.bossNid then
                 boss.bossNid = i
+                if i > maxBossNid then
+                    maxBossNid = i
+                end
             end
             if boss and not boss.time and boss.date then
                 boss.time = boss.date
@@ -491,6 +502,8 @@ do
                 if lootNid > maxLootNid then
                     maxLootNid = lootNid
                 end
+
+                entry.time = toNumber(entry.time) or toNumber(entry.date) or 0
 
                 local bossNid = toNumber(entry.bossNid) or 0
                 entry.bossNid = bossNid
@@ -6762,7 +6775,10 @@ do
     local Utils = addon.Utils
 
     local function modeLabel(boss)
-        return (boss and boss.mode == "h") and "H" or "N"
+        if not boss or boss.name == "_TrashMob_" or not boss.mode or boss.mode == "" then
+            return ""
+        end
+        return (boss.mode == "h") and "H" or "N"
     end
 
     local controller = makeLoggerListController {
@@ -7525,6 +7541,9 @@ do
         end
         local bossTime = time({ day = day, month = month, year = year, hour = h, min = m })
         local mode = (modeT == "h") and "h" or "n"
+        if name == "_TrashMob_" then
+            mode = ""
+        end
 
         if isEdit and bossNidEditing then
             local idx = addon.Logger.DB:GetBossIndexByNid(rID, bossNidEditing)
