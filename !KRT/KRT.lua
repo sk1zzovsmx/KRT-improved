@@ -456,7 +456,6 @@ do
         raid.bossKills = raid.bossKills or {}
         raid.loot = raid.loot or {}
 
-        local bossIndexByNid = {}
         local maxBossNid = 0
         for i = 1, #raid.bossKills do
             local boss = raid.bossKills[i]
@@ -464,7 +463,6 @@ do
                 boss.bossNid = i
             end
             if boss and boss.bossNid then
-                bossIndexByNid[boss.bossNid] = i
                 if boss.bossNid > maxBossNid then
                     maxBossNid = boss.bossNid
                 end
@@ -484,7 +482,8 @@ do
                 entry.lootNid = i
             end
             if entry and not entry.bossNid and entry.bossNum then
-                entry.bossNid = bossIndexByNid[entry.bossNum] or 0
+                local boss = raid.bossKills[entry.bossNum]
+                entry.bossNid = (boss and boss.bossNid) or 0
             end
             if entry and entry.lootNid and entry.lootNid > maxLootNid then
                 maxLootNid = entry.lootNid
@@ -493,13 +492,6 @@ do
 
         raid.nextBossNid = tonumber(raid.nextBossNid) or (maxBossNid + 1)
         raid.nextLootNid = tonumber(raid.nextLootNid) or (maxLootNid + 1)
-
-        if raidNum == KRT_CurrentRaid and KRT_LastBoss and raid.bossKills[KRT_LastBoss] then
-            local current = raid.bossKills[KRT_LastBoss]
-            if current and current.bossNid then
-                KRT_LastBoss = current.bossNid
-            end
-        end
 
         return raid
     end
@@ -7071,6 +7063,9 @@ do
 
             local name = raid.players[pID].name
             tremove(raid.players, pID)
+            if raid.playersByName then
+                raid.playersByName[name] = nil
+            end
 
             for i = 1, #raid.bossKills do
                 local boss = raid.bossKills[i]
