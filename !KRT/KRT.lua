@@ -250,6 +250,25 @@ do
         return playerZone == raidZone
     end
 
+    local function shouldCheckMissingJoins(playersByName)
+        for _, player in pairs(playersByName or {}) do
+            if player.leave == nil and not player.join then
+                return true
+            end
+        end
+        return false
+    end
+
+    local function scheduleRosterRefresh()
+        if module.updateRosterHandle then return end
+        module.updateRosterHandle = addon.After(5, function()
+            module.updateRosterHandle = nil
+            if KRT_CurrentRaid then
+                module:UpdateRaidRoster()
+            end
+        end)
+    end
+
     -------------------------------------------------------
     -- Public methods
     -------------------------------------------------------
@@ -349,6 +368,10 @@ do
             if p.leave == nil and not seen[pname] then
                 p.leave = Utils.getCurrentTime()
             end
+        end
+
+        if shouldCheckMissingJoins(playersByName) then
+            scheduleRosterRefresh()
         end
 
         addon:debug(L.LogRaidRosterUpdate:format(rosterVersion, n))
