@@ -375,6 +375,7 @@ do
         end
 
         addon:debug(L.LogRaidRosterUpdate:format(rosterVersion, n))
+        Utils.triggerEvent("LoggerRaidRosterUpdate", KRT_CurrentRaid)
         addon.Master:PrepareDropDowns()
     end
 
@@ -6923,6 +6924,11 @@ do
     end
 
     Utils.registerCallbacks({ "LoggerSelectRaid", "LoggerSelectBoss" }, function() controller:Dirty() end)
+    Utils.registerCallback("LoggerRaidRosterUpdate", function(raidId)
+        if raidId and raidId == addon.Logger.selectedRaid then
+            controller:Dirty()
+        end
+    end)
     Utils.registerCallback("LoggerSelectBossPlayer", function() controller:Touch() end)
 end
 
