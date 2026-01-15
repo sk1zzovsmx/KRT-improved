@@ -82,7 +82,8 @@
         "UNKNOWNOBJECT",
         "SECOND_NUMBER_CAP",
         "FIRST_NUMBER_CAP",
-        "LOCALIZED_CLASS_NAMES_MALE"
+        "LOCALIZED_CLASS_NAMES_MALE",
+        "CalendarFrame_SetSelectedDay"
     ],
     "editor.rulers": [
         80,

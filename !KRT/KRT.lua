@@ -29,8 +29,7 @@ local K_COLOR             = C.K_COLOR
 local RT_COLOR            = C.RT_COLOR
 
 ---============================================================================
--- Saved Variables
--- These variables are persisted across sessions for the addon.
+-- Saved Variables (and static tables)
 ---============================================================================
 
 KRT_Options               = KRT_Options or {}
@@ -40,10 +39,13 @@ KRT_Warnings              = KRT_Warnings or {}
 KRT_ExportString          = KRT_ExportString or "$I,$N,$S,$W,$T,$R,$H:$M,$d/$m/$y"
 KRT_Spammer               = KRT_Spammer or {}
 KRT_CurrentRaid           = KRT_CurrentRaid or nil
-KRT_LastBoss              = KRT_LastBoss or nil
-KRT_NextReset             = KRT_NextReset or 0
-KRT_SavedReserves         = KRT_SavedReserves or {}
-KRT_PlayerCounts          = KRT_PlayerCounts or {}
+KRT_NextReset             = KRT_NextReset or nil
+
+-- Logger schema versioning (NO retro-compat: wipe on mismatch)
+KRT_DataVersion           = tonumber(KRT_DataVersion) or 0
+
+-- Stable boss pointer for runtime loot association (bossNid, not array index)
+KRT_LastBossNid           = tonumber(KRT_LastBossNid) or nil
 
 ---============================================================================
 -- External Libraries / Bootstrap
@@ -222,43 +224,270 @@ end
 ---============================================================================
 -- Raid Helpers Module
 -- Manages raid state, roster, boss kills, and loot logging.
+--
+-- Schema v2 (NO retro-compat):
+-- raid.nextBossNid / raid.nextLootNid are monotonic; IDs are never recycled.
+-- loot.bossNid points to bossKills[*].bossNid, or 0 for "unassociated".
 ---============================================================================
 do
-    -------------------------------------------------------
-    -- 1. Create/retrieve the module table
-    -------------------------------------------------------
-    addon.Raid              = addon.Raid or {}
-    local module            = addon.Raid
-    local L                 = addon.L
+    addon.Raid = addon.Raid or {}
+    local module = addon.Raid
+    local L = addon.L
+    local Utils = addon.Utils
 
-    -------------------------------------------------------
-    -- Internal state
-    -------------------------------------------------------
-    local inRaid            = false
-    local numRaid           = 0
-    local rosterVersion     = 0
-    local GetLootMethod     = GetLootMethod
-    local GetRaidRosterInfo = GetRaidRosterInfo
-    local UnitIsUnit        = UnitIsUnit
+    local numRaid = 0
+    local rosterVersion = 0
 
-    -------------------------------------------------------
-    -- Private helpers
-    -------------------------------------------------------
-
-    -------------------------------------------------------
-    -- Public methods
-    -------------------------------------------------------
-
-    --------------------------------------------------------------------------
-    -- Logger Functions
-    --------------------------------------------------------------------------
-
-    --
-    -- Updates the current raid roster, adding new players and marking those who left.
-    --
-    function module:UpdateRaidRoster()
+    local function bumpRosterVersion()
         rosterVersion = rosterVersion + 1
-        if not KRT_CurrentRaid then return end
+    end
+
+    function module:GetRosterVersion()
+        return rosterVersion
+    end
+
+    function module:GetNumRaid()
+        return numRaid
+    end
+
+    local function getRaid(raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        return raidNum and KRT_Raids[raidNum] or nil
+    end
+
+    local function ensureRaidSchema(raid)
+        if not raid then return end
+        raid.schemaVersion = 2
+        raid.nextBossNid = tonumber(raid.nextBossNid) or 1
+        raid.nextLootNid = tonumber(raid.nextLootNid) or 1
+        raid.trashBossNid = tonumber(raid.trashBossNid) or nil
+        raid.players = raid.players or {}
+        raid.bossKills = raid.bossKills or {}
+        raid.loot = raid.loot or {}
+    end
+
+    local function findPlayerIndexByName(raid, name)
+        if not (raid and raid.players and name) then return nil end
+        for i = 1, #raid.players do
+            if raid.players[i].name == name then
+                return i
+            end
+        end
+        return nil
+    end
+
+    local function findBossIndexByNid(raid, bossNid)
+        if not (raid and raid.bossKills and bossNid) then return nil end
+        bossNid = tonumber(bossNid)
+        if not bossNid then return nil end
+        for i = 1, #raid.bossKills do
+            if tonumber(raid.bossKills[i].bossNid) == bossNid then
+                return i
+            end
+        end
+        return nil
+    end
+
+    local function findLootIndexByNid(raid, lootNid)
+        if not (raid and raid.loot and lootNid) then return nil end
+        lootNid = tonumber(lootNid)
+        if not lootNid then return nil end
+        for i = 1, #raid.loot do
+            if tonumber(raid.loot[i].lootNid) == lootNid then
+                return i
+            end
+        end
+        return nil
+    end
+
+    -- Public helpers for Logger/UI
+    function module:GetBossByNid(raidNum, bossNid)
+        local raid = getRaid(raidNum)
+        if not raid then return nil end
+        ensureRaidSchema(raid)
+        local idx = findBossIndexByNid(raid, bossNid)
+        return idx and raid.bossKills[idx] or nil, idx
+    end
+
+    function module:GetLootByNid(raidNum, lootNid)
+        local raid = getRaid(raidNum)
+        if not raid then return nil end
+        ensureRaidSchema(raid)
+        local idx = findLootIndexByNid(raid, lootNid)
+        return idx and raid.loot[idx] or nil, idx
+    end
+
+    function module:DeleteLootByNid(raidNum, lootNid)
+        local raid = getRaid(raidNum)
+        if not raid then return false end
+        ensureRaidSchema(raid)
+        local idx = findLootIndexByNid(raid, lootNid)
+        if not idx then return false end
+        tremove(raid.loot, idx)
+        return true
+    end
+
+    -- Purge: delete loot rows for removed boss
+    -- Detach: set loot.bossNid = 0 (unassociated)
+    function module:DeleteBossByNid(raidNum, bossNid, mode)
+        local raid = getRaid(raidNum)
+        if not raid then return false end
+        ensureRaidSchema(raid)
+
+        local idx = findBossIndexByNid(raid, bossNid)
+        if not idx then return false end
+
+        local removedBossNid = tonumber(raid.bossKills[idx].bossNid) or 0
+        tremove(raid.bossKills, idx)
+
+        if raid.trashBossNid and tonumber(raid.trashBossNid) == removedBossNid then
+            raid.trashBossNid = nil
+        end
+
+        local lootRemoved = 0
+        mode = mode or "purge"
+
+        if mode == "purge" then
+            for i = #raid.loot, 1, -1 do
+                if tonumber(raid.loot[i].bossNid) == removedBossNid then
+                    tremove(raid.loot, i)
+                    lootRemoved = lootRemoved + 1
+                end
+            end
+        else -- detach
+            for i = 1, #raid.loot do
+                if tonumber(raid.loot[i].bossNid) == removedBossNid then
+                    raid.loot[i].bossNid = 0
+                    lootRemoved = lootRemoved + 1
+                end
+            end
+        end
+
+        return true, lootRemoved, removedBossNid
+    end
+
+    --------------------------------------------------------------------------
+    -- Raid lifecycle
+    --------------------------------------------------------------------------
+
+    function module:Create(instanceName, instanceDiff)
+        local currentTime = Utils.getCurrentTime()
+        local diff = instanceDiff or Utils.getDifficulty() or 1
+        local size = (diff == 1 or diff == 3) and 10 or 25
+        local mode = (diff == 3 or diff == 4) and "h" or "n"
+
+        KRT_CurrentRaid = (tonumber(KRT_CurrentRaid) or 0) + 1
+        numRaid = GetNumGroupMembers() or 0
+
+        local raid = {
+            schemaVersion = 2,
+            startTime = currentTime,
+            endTime = nil,
+            zone = tostring(instanceName or ""),
+            size = size,
+            difficulty = diff, -- keep numeric for diagnostics
+            mode = mode,
+
+            nextBossNid = 1,
+            nextLootNid = 1,
+            trashBossNid = nil,
+
+            players = {},
+            bossKills = {},
+            loot = {},
+
+            holder = nil,
+            banker = nil,
+            disenchanter = nil,
+        }
+
+        KRT_Raids[KRT_CurrentRaid] = raid
+        KRT_LastBossNid = nil
+
+        addon:info(L.LogRaidCreated:format(tostring(KRT_CurrentRaid), tostring(raid.zone), tostring(raid.size),
+            tostring(numRaid)))
+        Utils.triggerEvent("RaidCreated", KRT_CurrentRaid)
+        return KRT_CurrentRaid
+    end
+
+    function module:End()
+        if not KRT_CurrentRaid or not KRT_Raids[KRT_CurrentRaid] then
+            KRT_CurrentRaid = nil
+            KRT_LastBossNid = nil
+            return
+        end
+
+        local raid = KRT_Raids[KRT_CurrentRaid]
+        ensureRaidSchema(raid)
+        raid.endTime = Utils.getCurrentTime()
+
+        addon:info(L.LogRaidEnded:format(tostring(KRT_CurrentRaid), tostring(raid.zone)))
+        Utils.triggerEvent("RaidEnded", KRT_CurrentRaid)
+
+        KRT_CurrentRaid = nil
+        KRT_LastBossNid = nil
+    end
+
+    function module:Expired(rID)
+        rID = rID or KRT_CurrentRaid
+        local raid = rID and KRT_Raids[rID]
+        if not raid then return true end
+
+        local startTime = tonumber(raid.startTime) or 0
+        local currentTime = Utils.getCurrentTime()
+        local week = 604800
+
+        if KRT_NextReset and KRT_NextReset > currentTime then
+            return startTime < (KRT_NextReset - week)
+        end
+
+        return currentTime >= startTime + week
+    end
+
+    function module:Check(instanceName, instanceDiff)
+        if not addon.IsInRaid() then
+            return
+        end
+
+        local zone = tostring(instanceName or "")
+        local diff = instanceDiff or Utils.getDifficulty() or 1
+        local size = (diff == 1 or diff == 3) and 10 or 25
+
+        if not KRT_CurrentRaid or not KRT_Raids[KRT_CurrentRaid] then
+            self:Create(zone, diff)
+            return
+        end
+
+        local raid = KRT_Raids[KRT_CurrentRaid]
+        ensureRaidSchema(raid)
+
+        -- New raid if weekly reset passed or zone/size changed
+        if self:Expired(KRT_CurrentRaid) or raid.zone ~= zone or tonumber(raid.size) ~= size then
+            addon:warn(L.LogRaidExpiredOrMismatch:format(tostring(raid.zone), tostring(zone), tostring(raid.size),
+                tostring(size)))
+            self:Create(zone, diff)
+            return
+        end
+
+        -- Otherwise refresh roster soon
+        addon.After(1, function() self:UpdateRaidRoster() end)
+    end
+
+    function module:FirstCheck()
+        local instanceName, instanceType, instanceDiff = GetInstanceInfo()
+        if instanceType == "raid" and L.RaidZones[instanceName] ~= nil then
+            addon:trace(L.LogRaidFirstCheck:format(tostring(instanceName), tostring(instanceDiff)))
+            self:Check(instanceName, instanceDiff)
+        end
+    end
+
+    --------------------------------------------------------------------------
+    -- Roster tracking
+    --------------------------------------------------------------------------
+
+    function module:UpdateRaidRoster()
+        bumpRosterVersion()
+
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
 
@@ -270,521 +499,199 @@ do
             return
         end
 
+        numRaid = GetNumGroupMembers() or 0
+        if not KRT_CurrentRaid then return end
+
         local raid = KRT_Raids[KRT_CurrentRaid]
         if not raid then return end
+        ensureRaidSchema(raid)
 
-        local realm = Utils.getRealmName()
-        KRT_Players[realm] = KRT_Players[realm] or {}
-
-        raid.playersByName = raid.playersByName or {}
-        local playersByName = raid.playersByName
-
-        local n = GetNumRaidMembers()
-
-        -- Keep internal state consistent immediately
-        numRaid = n
-
-        if n == 0 then
-            module:End()
-            return
-        end
-
+        local now = Utils.getCurrentTime()
         local seen = {}
 
-        for i = 1, n do
-            local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
-            if name then
-                local unitID = "raid" .. tostring(i)
-                local raceL, race = UnitRace(unitID)
-
-                local player = playersByName[name]
-                local active = player and player.leave == nil
-
-                if not active then
-                    local toRaid = {
-                        name     = name,
-                        rank     = rank or 0,
-                        subgroup = subgroup or 1,
-                        class    = class or "UNKNOWN",
-                        join     = Utils.getCurrentTime(),
-                        leave    = nil,
-                        count    = (player and player.count) or 0,
-                    }
-                    module:AddPlayer(toRaid)
-                    player = toRaid
-                else
-                    player.rank     = rank or player.rank or 0
-                    player.subgroup = subgroup or player.subgroup or 1
-                    player.class    = class or player.class or "UNKNOWN"
-                end
+        for unit in addon.UnitIterator(true) do
+            local name = UnitName(unit)
+            if name and name ~= "" then
+                local class = select(2, UnitClass(unit)) or "UNKNOWN"
+                local rank = Utils.getUnitRank(unit) or 0
 
                 seen[name] = true
-
-                -- IMPORTANT: overwrite always
-                KRT_Players[realm][name] = {
-                    name   = name,
-                    level  = level or 0,
-                    race   = race,
-                    raceL  = raceL,
-                    class  = class or "UNKNOWN",
-                    classL = classL,
-                    sex    = UnitSex(unitID) or 0,
-                }
-            end
-        end
-
-        -- Mark leavers
-        for pname, p in pairs(playersByName) do
-            if p.leave == nil and not seen[pname] then
-                p.leave = Utils.getCurrentTime()
-            end
-        end
-
-        addon:debug(L.LogRaidRosterUpdate:format(rosterVersion, n))
-        addon.Master:PrepareDropDowns()
-    end
-
-    --
-    -- Creates a new raid log entry.
-    --
-    function module:Create(zoneName, raidSize)
-        if KRT_CurrentRaid then
-            self:End()
-        end
-        if not addon.IsInRaid() then return end
-
-        local num = GetNumRaidMembers()
-        if num == 0 then return end
-
-        numRaid = num
-
-        local realm = Utils.getRealmName()
-        KRT_Players[realm] = KRT_Players[realm] or {}
-        local currentTime = Utils.getCurrentTime()
-
-        local raidInfo = {
-            realm         = realm,
-            zone          = zoneName,
-            size          = raidSize,
-            players       = {},
-            playersByName = {},
-            bossKills     = {},
-            loot          = {},
-            startTime     = currentTime,
-            changes       = {},
-        }
-
-        for i = 1, num do
-            local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
-            if name then
-                local unitID = "raid" .. tostring(i)
-                local raceL, race = UnitRace(unitID)
-
-                local p = {
-                    name     = name,
-                    rank     = rank or 0,
-                    subgroup = subgroup or 1,
-                    class    = class or "UNKNOWN",
-                    join     = Utils.getCurrentTime(),
-                    leave    = nil,
-                    count    = 0,
-                }
-
-                tinsert(raidInfo.players, p)
-                raidInfo.playersByName[name] = p
-
-                -- Overwrite always
-                KRT_Players[realm][name] = {
-                    name   = name,
-                    level  = level or 0,
-                    race   = race,
-                    raceL  = raceL,
-                    class  = class or "UNKNOWN",
-                    classL = classL,
-                    sex    = UnitSex(unitID) or 0,
-                }
-            end
-        end
-
-        tinsert(KRT_Raids, raidInfo)
-        KRT_CurrentRaid = #KRT_Raids
-
-        addon:info(L.LogRaidCreated:format(
-            KRT_CurrentRaid or -1,
-            tostring(zoneName),
-            tonumber(raidSize) or -1,
-            #raidInfo.players
-        ))
-
-        Utils.triggerEvent("RaidCreate", KRT_CurrentRaid)
-
-        -- One clean refresh shortly after
-        addon.CancelTimer(module.updateRosterHandle, true)
-        module.updateRosterHandle = addon.After(2, function() module:UpdateRaidRoster() end)
-    end
-
-    --
-    -- Ends the current raid log entry, marking end time.
-    --
-    function module:End()
-        if not KRT_CurrentRaid then return end
-        addon.CancelTimer(module.updateRosterHandle, true)
-        module.updateRosterHandle = nil
-        local currentTime = Utils.getCurrentTime()
-        local raid = KRT_Raids[KRT_CurrentRaid]
-        if raid then
-            local duration = currentTime - (raid.startTime or currentTime)
-            addon:info(L.LogRaidEnded:format(KRT_CurrentRaid or -1, tostring(raid.zone),
-                tonumber(raid.size) or -1, raid.bossKills and #raid.bossKills or 0,
-                raid.loot and #raid.loot or 0, duration))
-        end
-        for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
-            if not v.leave then v.leave = currentTime end
-        end
-        KRT_Raids[KRT_CurrentRaid].endTime = currentTime
-        KRT_CurrentRaid = nil
-        KRT_LastBoss = nil
-    end
-
-    --
-    -- Checks the current raid status and creates a new session if needed.
-    --
-    function module:Check(instanceName, instanceDiff)
-        addon:debug(L.LogRaidCheck:format(tostring(instanceName), tostring(instanceDiff),
-            tostring(KRT_CurrentRaid)))
-        if not KRT_CurrentRaid then
-            module:Create(instanceName, (instanceDiff % 2 == 0 and 25 or 10))
-        end
-
-        local current = KRT_Raids[KRT_CurrentRaid]
-        if current then
-            if current.zone == instanceName then
-                if current.size == 10 and (instanceDiff % 2 == 0) then
-                    addon:info(L.StrNewRaidSessionChange)
-                    addon:info(L.LogRaidSessionChange:format(tostring(instanceName), 25,
-                        tonumber(instanceDiff) or -1))
-                    module:Create(instanceName, 25)
-                elseif current.size == 25 and (instanceDiff % 2 ~= 0) then
-                    addon:info(L.StrNewRaidSessionChange)
-                    addon:info(L.LogRaidSessionChange:format(tostring(instanceName), 10,
-                        tonumber(instanceDiff) or -1))
-                    module:Create(instanceName, 10)
+                local idx = findPlayerIndexByName(raid, name)
+                if idx then
+                    local p = raid.players[idx]
+                    p.class = class
+                    p.rank = rank
+                    p.leave = nil
+                else
+                    tinsert(raid.players, {
+                        name = name,
+                        class = class,
+                        rank = rank,
+                        join = now,
+                        leave = nil,
+                    })
                 end
             end
-        elseif (instanceDiff % 2 == 0) then
-            addon:info(L.StrNewRaidSessionChange)
-            addon:info(L.LogRaidSessionCreate:format(tostring(instanceName), 25,
-                tonumber(instanceDiff) or -1))
-            module:Create(instanceName, 25)
-        elseif (instanceDiff % 2 ~= 0) then
-            addon:info(L.StrNewRaidSessionChange)
-            addon:info(L.LogRaidSessionCreate:format(tostring(instanceName), 10,
-                tonumber(instanceDiff) or -1))
-            module:Create(instanceName, 10)
-        end
-    end
-
-    --
-    -- Performs an initial raid check on player login.
-    --
-    function module:FirstCheck()
-        if module.firstCheckHandle then
-            addon.CancelTimer(module.firstCheckHandle, true)
-            module.firstCheckHandle = nil
-        end
-        if not addon.IsInGroup() then return end
-
-        if KRT_CurrentRaid and module:CheckPlayer(Utils.getPlayerName(), KRT_CurrentRaid) then
-            addon.CancelTimer(module.updateRosterHandle, true)
-            module.updateRosterHandle = addon.After(2, function() module:UpdateRaidRoster() end)
-            return
         end
 
-        local instanceName, instanceType, instanceDiff = GetInstanceInfo()
-        addon:debug(L.LogRaidFirstCheck:format(tostring(addon.IsInGroup()), tostring(KRT_CurrentRaid ~= nil),
-            tostring(instanceName), tostring(instanceType), tostring(instanceDiff)))
-        if instanceType == "raid" then
-            module:Check(instanceName, instanceDiff)
-            return
-        end
-    end
-
-    --
-    -- Adds a player to the raid log.
-    --
-    function module:AddPlayer(t, raidNum)
-        raidNum = raidNum or KRT_CurrentRaid
-        if not raidNum or not t or not t.name then return end
-        local raid = KRT_Raids[raidNum]
-        raid.playersByName = raid.playersByName or {}
-        local players = module:GetPlayers(raidNum)
-        local found = false
-        for i, p in ipairs(players) do
-            if t.name == p.name then
-                -- Preserve count if present
-                t.count = t.count or p.count or 0
-                raid.players[i] = t
-                raid.playersByName[t.name] = t
-                found = true
-                break
+        for i = 1, #raid.players do
+            local p = raid.players[i]
+            if p and p.name and not seen[p.name] and not p.leave then
+                p.leave = now
             end
         end
-        if not found then
-            t.count = t.count or 0
-            tinsert(raid.players, t)
-            raid.playersByName[t.name] = t
-            addon:trace(L.LogRaidPlayerJoin:format(tostring(t.name), tonumber(raidNum) or -1))
-        else
-            addon:trace(L.LogRaidPlayerRefresh:format(tostring(t.name), tonumber(raidNum) or -1))
-        end
+
+        Utils.triggerEvent("RaidRosterUpdate", KRT_CurrentRaid)
     end
 
-    --
-    -- Adds a boss kill to the active raid log.
-    --
-    function module:AddBoss(bossName, manDiff, raidNum)
-        raidNum = raidNum or KRT_CurrentRaid
-        if not raidNum or not bossName then
-            addon:warn(L.LogBossAddSkipped:format(tostring(raidNum), tostring(bossName)))
-            return
-        end
+    --------------------------------------------------------------------------
+    -- Boss logging (stable bossNid)
+    --------------------------------------------------------------------------
 
-        local _, _, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
-        if manDiff then
-            instanceDiff = (KRT_Raids[raidNum].size == 10) and 1 or 2
-            if Utils.normalizeLower(manDiff, true) == "h" then instanceDiff = instanceDiff + 2 end
-        elseif isDyn then
-            instanceDiff = instanceDiff + (2 * dynDiff)
-        end
+    local function allocBossNid(raid)
+        local nid = tonumber(raid.nextBossNid) or 1
+        raid.nextBossNid = nid + 1
+        return nid
+    end
+
+    local function allocLootNid(raid)
+        local nid = tonumber(raid.nextLootNid) or 1
+        raid.nextLootNid = nid + 1
+        return nid
+    end
+
+    local function buildBossPlayers()
         local players = {}
-        for unit, owner in addon.UnitIterator(true) do
-            if UnitIsConnected(unit) then
-                local name = UnitName(unit)
-                if name then
-                    tinsert(players, name)
-                end
+        for unit in addon.UnitIterator(true) do
+            local name = UnitName(unit)
+            if name and name ~= "" then
+                tinsert(players, name)
             end
         end
-        local currentTime = Utils.getCurrentTime()
-        local killInfo = {
-            name       = bossName,
-            difficulty = instanceDiff,
-            players    = players,
-            date       = currentTime,
-            hash       = Utils.encode(raidNum .. "|" .. bossName .. "|" .. (KRT_LastBoss or "0"))
-        }
-        tinsert(KRT_Raids[raidNum].bossKills, killInfo)
-        KRT_LastBoss = #KRT_Raids[raidNum].bossKills
-        addon:info(L.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1,
-            tonumber(raidNum) or -1, #players))
-        addon:debug(L.LogBossLastBossHash:format(tonumber(KRT_LastBoss) or -1, tostring(killInfo.hash)))
+        return players
     end
 
-    --
-    -- Adds a loot item to the active raid log.
-    --
-    function module:AddLoot(msg, rollType, rollValue)
-        -- Master Loot / Loot chat parsing
-        -- Supports both "...receives loot:" and "...receives item:" variants.
-        local player, itemLink, count = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
-        local itemCount = count or 1
-
-        if not player then
-            player, itemLink = addon.Deformat(msg, LOOT_ITEM)
-            itemCount = 1
-        end
-
-
-        -- Self loot (no player name in the string)
-        if not itemLink then
-            local link
-            link, count = addon.Deformat(msg, LOOT_ITEM_SELF_MULTIPLE)
-            if (not link) and _G.LOOT_ITEM_PUSHED_SELF_MULTIPLE then
-                link, count = addon.Deformat(msg, LOOT_ITEM_PUSHED_SELF_MULTIPLE)
-            end
-            if link then
-                itemLink = link
-                itemCount = count or 1
-                player = Utils.getPlayerName()
-            end
-        end
-
-        if not itemLink then
-            local link = addon.Deformat(msg, LOOT_ITEM_SELF)
-            if (not link) and _G.LOOT_ITEM_PUSHED_SELF then
-                link = addon.Deformat(msg, LOOT_ITEM_PUSHED_SELF)
-            end
-            if link then
-                itemLink = link
-                itemCount = 1
-                player = Utils.getPlayerName()
-            end
-        end
-
-        -- Other Loot Rolls
-        if not player or not itemLink then
-            itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
-            player = Utils.getPlayerName()
-            itemCount = 1
-        end
-        if not itemLink then
-            addon:warn(L.LogLootParseFailed:format(tostring(msg)))
-            return
-        end
-
-        itemCount = tonumber(itemCount) or 1
-        lootState.itemCount = itemCount
-
-        local _, _, itemString = string.find(itemLink, "^|c%x+|H(.+)|h%[.*%]")
-        local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
-        local _, _, _, _, itemId = string.find(itemLink, ITEM_LINK_PATTERN)
-        itemId = tonumber(itemId)
-        addon:trace(L.LogLootParsed:format(tostring(player), tostring(itemLink), itemCount))
-
-        -- We don't proceed if lower than threshold or ignored.
-        local lootThreshold = GetLootThreshold()
-        if itemRarity and itemRarity < lootThreshold then
-            addon:debug(L.LogLootIgnoredBelowThreshold:format(tostring(itemRarity),
-                tonumber(lootThreshold) or -1, tostring(itemLink)))
-            return
-        end
-        if itemId and addon.ignoredItems[itemId] then
-            addon:debug(L.LogLootIgnoredItemId:format(tostring(itemId), tostring(itemLink)))
-            return
-        end
-
-        if not KRT_LastBoss then
-            addon:info(L.LogBossNoContextTrash)
-            self:AddBoss("_TrashMob_")
-        end
-        -- Award source detection:
-        -- 1) If we have a pendingAward staged by this addon (AssignItem/TradeItem), consume it.
-        -- 2) Otherwise, if THIS client is the master looter (Master Loot method), treat it as MANUAL
-        --    (loot-window dropdown assignment or direct click-to-self).
-        -- 3) Otherwise, fall back to the current roll type.
-        if not rollType then
-            local p = lootState.pendingAward
-            if p
-                and p.itemLink == itemLink
-                and p.looter == player
-                and (GetTime() - (p.ts or 0)) <= 5
-            then
-                rollType               = p.rollType
-                rollValue              = p.rollValue
-                lootState.pendingAward = nil
-            elseif self:IsMasterLooter() and not lootState.fromInventory then
-                rollType  = rollTypes.MANUAL
-                rollValue = 0
-
-                -- Debug-only marker: helps verify why this loot was tagged as MANUAL.
-                -- Only runs for Master Looter clients (by condition above).
-                addon:debug(
-                    "Loot: tagged MANUAL (no matching pending award) item=%s -> %s (lastRollType=%s, pending=%s).",
-                    tostring(itemLink), tostring(player), tostring(lootState.currentRollType),
-                    p and (tostring(p.itemLink) .. " -> " .. tostring(p.looter)) or "nil")
-            else
-                rollType = lootState.currentRollType
-            end
-        end
-
-        if not rollValue then
-            rollValue = addon.Rolls:HighestRoll() or 0
-        end
-
-        local lootInfo = {
-            itemId      = itemId,
-            itemName    = itemName,
-            itemString  = itemString,
-            itemLink    = itemLink,
-            itemRarity  = itemRarity,
-            itemTexture = itemTexture,
-            itemCount   = itemCount,
-            looter      = player,
-            rollType    = rollType,
-            rollValue   = rollValue,
-            bossNum     = KRT_LastBoss,
-            time        = Utils.getCurrentTime(),
-        }
-        tinsert(KRT_Raids[KRT_CurrentRaid].loot, lootInfo)
-        Utils.triggerEvent("RaidLootUpdate", KRT_CurrentRaid, lootInfo)
-        addon:debug(L.LogLootLogged:format(tonumber(KRT_CurrentRaid) or -1, tostring(itemId),
-            tostring(KRT_LastBoss), tostring(player)))
-    end
-
-    --------------------------------------------------------------------------
-    -- Player Count API
-    --------------------------------------------------------------------------
-
-    function module:GetPlayerCount(name, raidNum)
+    function module:AddBoss(bossName, manualMode, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
         local raid = raidNum and KRT_Raids[raidNum]
-        local players = raid and raid.players
-        if not players then return 0 end
-        for i, p in ipairs(players) do
-            if p.name == name then
-                return p.count or 0
-            end
+        if not raid then return end
+        ensureRaidSchema(raid)
+
+        local currentTime = Utils.getCurrentTime()
+        local diff = Utils.getDifficulty() or raid.difficulty or 1
+        local mode = manualMode or ((diff == 3 or diff == 4) and "h" or "n")
+
+        if bossName == "_TrashMob_" then
+            mode = ""
         end
-        return 0
+
+        local bossNid = allocBossNid(raid)
+        local killInfo = {
+            bossNid = bossNid,
+            name = tostring(bossName or ""),
+            time = currentTime,
+            mode = mode,
+            players = buildBossPlayers(),
+        }
+
+        tinsert(raid.bossKills, killInfo)
+
+        -- Update runtime "last boss" pointer only when affecting current raid
+        if raidNum == KRT_CurrentRaid then
+            KRT_LastBossNid = bossNid
+        end
+
+        addon:info(L.LogBossRecorded:format(tostring(bossName), tostring(raidNum), tostring(bossNid)))
+        Utils.triggerEvent("BossAdded", raidNum, bossNid)
+
+        return bossNid
     end
 
-    function module:SetPlayerCount(name, value, raidNum)
+    local function ensureTrashBoss(raidNum)
+        local raid = raidNum and KRT_Raids[raidNum]
+        if not raid then return nil end
+        ensureRaidSchema(raid)
+
+        local tb = raid.trashBossNid and tonumber(raid.trashBossNid) or nil
+        if tb then
+            local boss = module:GetBossByNid(raidNum, tb)
+            if boss then
+                return tb
+            end
+        end
+
+        local nid = module:AddBoss("_TrashMob_", "", raidNum)
+        raid.trashBossNid = nid
+        return nid
+    end
+
+    --------------------------------------------------------------------------
+    -- Loot logging (stable lootNid + bossNid)
+    --------------------------------------------------------------------------
+
+    function module:AddLoot(msg, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
+        local raid = raidNum and KRT_Raids[raidNum]
+        if not raid then return end
+        ensureRaidSchema(raid)
 
-        -- Prevent setting a negative count
-        if value < 0 then
-            addon:error(L.ErrPlayerCountBelowZero:format(name))
-            return
-        end
+        local itemLink, player = addon.GetLootMsgInfo(msg)
+        if not itemLink or not player then return end
 
-        local players = KRT_Raids[raidNum] and KRT_Raids[raidNum].players
-        if not players then return end
-        for i, p in ipairs(players) do
-            if p.name == name then
-                p.count = value
-                return
+        local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture, _, itemClassID = GetItemInfo(itemLink)
+        local itemId = tonumber(itemLink:match("item:(%d+)")) or tonumber(addon.GetItemID and addon:GetItemID(itemLink)) or
+            0
+
+        if itemId <= 0 then return end
+        if itemClassID == 3 or itemClassID == 8 then return end -- gems + misc (keep your existing filter intent)
+
+        -- Boss association
+        local bossNid = tonumber(KRT_LastBossNid) or 0
+        if bossNid == 0 then
+            bossNid = ensureTrashBoss(raidNum) or 0
+            if raidNum == KRT_CurrentRaid then
+                KRT_LastBossNid = bossNid ~= 0 and bossNid or nil
             end
-        end
-    end
-
-    function module:IncrementPlayerCount(name, raidNum)
-        if module:GetPlayerID(name, raidNum) == 0 then
-            addon:error(L.ErrCannotFindPlayer:format(name))
-            return
+            addon:warn(L.LogLootNoBossContext:format(tostring(itemName), tostring(itemId), tostring(bossNid)))
         end
 
-        local c = module:GetPlayerCount(name, raidNum)
-        module:SetPlayerCount(name, c + 1, raidNum)
-    end
+        local rollType = (lootState and lootState.currentRollType) or 0
+        local rollValue = (lootState and lootState.highestRoll) or 0
 
-    function module:DecrementPlayerCount(name, raidNum)
-        if module:GetPlayerID(name, raidNum) == 0 then
-            addon:error(L.ErrCannotFindPlayer:format(name))
-            return
+        if lootState and lootState.pendingAward and lootState.pendingAward.itemLink == itemLink and lootState.pendingAward.winner == player then
+            rollType = lootState.pendingAward.rollType or rollType
+            rollValue = lootState.pendingAward.rollValue or rollValue
         end
 
-        local c = module:GetPlayerCount(name, raidNum)
-        if c <= 0 then
-            addon:error(L.ErrPlayerCountBelowZero:format(name))
-            return
-        end
-        module:SetPlayerCount(name, c - 1, raidNum)
+        local lootNid = allocLootNid(raid)
+        local lootInfo = {
+            lootNid = lootNid,
+            bossNid = bossNid,
+
+            itemId = itemId,
+            itemName = itemName or "",
+            itemLink = itemLink,
+            itemRarity = itemRarity or 0,
+            itemTexture = itemTexture or "",
+
+            looter = player,
+            rollType = rollType,
+            rollValue = rollValue,
+            time = Utils.getCurrentTime(),
+        }
+
+        tinsert(raid.loot, lootInfo)
+
+        addon:info(L.LogLootLogged:format(tostring(itemName), tostring(itemId), tostring(player)))
+        Utils.triggerEvent("LootAdded", raidNum, lootNid)
+
+        return lootNid
     end
 
     --------------------------------------------------------------------------
-    -- Raid Functions
+    -- Queries (Logger + other modules)
     --------------------------------------------------------------------------
 
-    --
-    -- Returns the number of members in the raid.
-    --
-    function module:GetNumRaid()
-        return numRaid
-    end
-
-    --
-    -- Returns raid size: 10 or 25.
-    --
     function module:GetRaidSize()
         local _, _, members = addon.GetGroupTypeAndCount()
         if members == 0 then return 0 end
@@ -797,148 +704,114 @@ do
         return members > 20 and 25 or 10
     end
 
-    --
-    -- Checks if a raid log is expired (older than the weekly reset).
-    --
-    function module:Expired(rID)
-        rID = rID or KRT_CurrentRaid
-        local raid = rID and KRT_Raids[rID]
-        if not raid then
-            return true
-        end
+    function module:GetLoot(raidNum, bossNid)
+        local raid = getRaid(raidNum)
+        if not raid then return {} end
+        ensureRaidSchema(raid)
 
-        local startTime = raid.startTime
-        local currentTime = Utils.getCurrentTime()
-        local week = 604800 -- 7 days in seconds
+        local out = {}
+        bossNid = tonumber(bossNid) or 0
 
-        if KRT_NextReset and KRT_NextReset > currentTime then
-            return startTime < (KRT_NextReset - week)
-        end
-
-        return currentTime >= startTime + week
-    end
-
-    --
-    -- Retrieves all loot for a given raid and optional boss number.
-    --
-    function module:GetLoot(raidNum, bossNum)
-        raidNum = raidNum or KRT_CurrentRaid
-        bossNum = bossNum or 0
-        local raid = raidNum and KRT_Raids[raidNum]
-        if not raid then
-            return {}
-        end
-        local loot = raid.loot
-        if tonumber(bossNum) <= 0 then
-            for k, v in ipairs(loot) do
-                v.id = k
+        if bossNid <= 0 then
+            for i = 1, #raid.loot do
+                local v = raid.loot[i]
+                v.id = tonumber(v.lootNid) or i
+                out[#out + 1] = v
             end
-            return loot
+            return out
         end
 
-        local items = {}
-        if raid.bossKills[bossNum] then
-            -- Get loot for a specific boss
-            for k, v in ipairs(loot) do
-                if v.bossNum == bossNum then
-                    v.id = k
-                    tinsert(items, v)
-                end
+        for i = 1, #raid.loot do
+            local v = raid.loot[i]
+            if tonumber(v.bossNid) == bossNid then
+                v.id = tonumber(v.lootNid) or i
+                out[#out + 1] = v
             end
         end
-        return items
+
+        return out
     end
 
-    --
-    -- Retrieves the position of a specific loot item within the raid's loot table.
-    --
+    -- Stable lookup for “current roll item” usage: returns lootNid (not array index)
     function module:GetLootID(itemID, raidNum, holderName)
-        local pos = 0
-        local loot = self:GetLoot(raidNum)
+        local raid = getRaid(raidNum)
+        if not raid then return 0 end
+        ensureRaidSchema(raid)
+
         holderName = holderName or Utils.getPlayerName()
         itemID = tonumber(itemID)
-        for k, v in ipairs(loot) do
-            if v.itemId == itemID and v.looter == holderName then
-                pos = k
-                break
+        if not itemID then return 0 end
+
+        -- pick the most recent match
+        for i = #raid.loot, 1, -1 do
+            local v = raid.loot[i]
+            if v and tonumber(v.itemId) == itemID and v.looter == holderName then
+                return tonumber(v.lootNid) or 0
             end
         end
-        return pos
+        return 0
     end
 
-    --
-    -- Retrieves all boss kills for a given raid.
-    --
     function module:GetBosses(raidNum, out)
         local bosses = out or {}
         if out then twipe(bosses) end
-        raidNum = raidNum or KRT_CurrentRaid
-        if raidNum and KRT_Raids[raidNum] then
-            local kills = KRT_Raids[raidNum].bossKills
-            for i, b in ipairs(kills) do
-                local info = {
-                    id = i,
-                    difficulty = b.difficulty,
-                    time = b.date,
-                    hash = b.hash or "0",
-                }
-                if b.name == "_TrashMob_" then
-                    info.name = L.StrTrashMob
-                    info.mode = ""
-                else
-                    info.name = b.name
-                    info.mode = (b.difficulty == 3 or b.difficulty == 4) and PLAYER_DIFFICULTY2 or PLAYER_DIFFICULTY1
-                end
-                tinsert(bosses, info)
-            end
+
+        local raid = getRaid(raidNum)
+        if not raid then return bosses end
+        ensureRaidSchema(raid)
+
+        for i = 1, #raid.bossKills do
+            local b = raid.bossKills[i]
+            local info = {
+                id = tonumber(b.bossNid) or i,
+                bossNid = tonumber(b.bossNid) or i,
+                time = tonumber(b.time) or 0,
+                mode = b.mode or "",
+                name = (b.name == "_TrashMob_") and L.StrTrashMob or (b.name or ""),
+            }
+            tinsert(bosses, info)
         end
-        -- Caller releases when using a pooled table.
+
         return bosses
     end
 
-    --------------------------------------------------------------------------
-    -- Player Functions
-    --------------------------------------------------------------------------
-
-    --
-    -- Returns players from the raid log. Can be filtered by boss kill.
-    --
-    function module:GetPlayers(raidNum, bossNum, out)
-        raidNum = raidNum or KRT_CurrentRaid
-        local raid = raidNum and KRT_Raids[raidNum]
+    function module:GetPlayers(raidNum, bossNid, out)
+        local raid = getRaid(raidNum)
         if not raid then return {} end
+        ensureRaidSchema(raid)
 
         local raidPlayers = raid.players or {}
-        for k, v in ipairs(raidPlayers) do
-            v.id = k
+        for i = 1, #raidPlayers do
+            raidPlayers[i].id = i
         end
 
-        if bossNum and raid.bossKills[bossNum] then
-            local players = out or {}
-            if out then twipe(players) end
-            local bossPlayers = raid.bossKills[bossNum].players
-            for i, p in ipairs(raidPlayers) do
-                if tContains(bossPlayers, p.name) then
-                    tinsert(players, p)
+        bossNid = tonumber(bossNid)
+        if bossNid and bossNid > 0 then
+            local boss = module:GetBossByNid(raidNum, bossNid)
+            if not boss then return {} end
+            local filtered = out or {}
+            if out then twipe(filtered) end
+
+            local bossPlayers = boss.players or {}
+            for i = 1, #raidPlayers do
+                local p = raidPlayers[i]
+                if p and tContains(bossPlayers, p.name) then
+                    tinsert(filtered, p)
                 end
             end
-            -- Caller releases when using a pooled table.
-            return players
+            return filtered
         end
 
         return raidPlayers
     end
 
-    --
-    -- Checks if a player is in the raid log.
-    --
     function module:CheckPlayer(name, raidNum)
         local found = false
         local players = module:GetPlayers(raidNum)
-        local originalName = name
         if players ~= nil then
             name = Utils.normalizeName(name)
-            for i, p in ipairs(players) do
+            for i = 1, #players do
+                local p = players[i]
                 if name == p.name then
                     found = true
                     break
@@ -952,68 +825,44 @@ do
         return found, name
     end
 
-    --
-    -- Returns the player's internal ID from the raid log.
-    --
     function module:GetPlayerID(name, raidNum)
-        local id = 0
-        raidNum = raidNum or KRT_CurrentRaid
-        if raidNum and KRT_Raids[raidNum] then
-            name = name or Utils.getPlayerName()
-            local players = KRT_Raids[raidNum].players
-            for i, p in ipairs(players) do
-                if p.name == name then
-                    id = i
-                    break
-                end
-            end
-        end
-        return id
+        local raid = getRaid(raidNum)
+        if not raid then return 0 end
+        ensureRaidSchema(raid)
+
+        name = name or Utils.getPlayerName()
+        local idx = findPlayerIndexByName(raid, name)
+        return idx or 0
     end
 
-    --
-    -- Gets a player's name by their internal ID.
-    --
     function module:GetPlayerName(id, raidNum)
-        local name
-        raidNum = raidNum or addon.Logger.selectedRaid or KRT_CurrentRaid
-        if raidNum and KRT_Raids[raidNum] then
-            for k, p in ipairs(KRT_Raids[raidNum].players) do
-                if k == id then
-                    name = p.name
-                    break
-                end
-            end
-        end
-        return name
+        local raid = getRaid(raidNum or addon.Logger.selectedRaid or KRT_CurrentRaid)
+        if not raid then return nil end
+        ensureRaidSchema(raid)
+
+        id = tonumber(id)
+        local p = id and raid.players and raid.players[id]
+        return p and p.name or nil
     end
 
-    --
-    -- Returns a table of items looted by the selected player.
-    --
-    function module:GetPlayerLoot(name, raidNum, bossNum)
+    function module:GetPlayerLoot(name, raidNum, bossNid)
         local items = {}
-        local loot = module:GetLoot(raidNum, bossNum)
-        local originalName = name
-        name = (type(name) == "number") and module:GetPlayerName(name) or name
-        for _, v in ipairs(loot) do
-            if v.looter == name then
-                -- Keep v.id as the original index assigned by GetLoot()
-                tinsert(items, v)
+        local loot = module:GetLoot(raidNum, bossNid)
+        name = (type(name) == "number") and module:GetPlayerName(name, raidNum) or name
+        for i = 1, #loot do
+            if loot[i].looter == name then
+                tinsert(items, loot[i])
             end
         end
         return items
     end
 
-    --
-    -- Gets a player's rank.
-    --
     function module:GetPlayerRank(name, raidNum)
-        local raid = raidNum and KRT_Raids[raidNum]
+        local raid = getRaid(raidNum)
         local players = raid and raid.players or {}
         local rank = 0
-        local originalName = name
         name = name or Utils.getPlayerName() or UnitName("player")
+
         if #players == 0 then
             if addon.IsInGroup() then
                 for unit in addon.UnitIterator(true) do
@@ -1025,19 +874,17 @@ do
                 end
             end
         else
-            for i, p in ipairs(players) do
-                if p.name == name then
-                    rank = p.rank or 0
+            for i = 1, #players do
+                if players[i].name == name then
+                    rank = players[i].rank or 0
                     break
                 end
             end
         end
+
         return rank
     end
 
-    --
-    -- Gets a player's class from the saved players database.
-    --
     function module:GetPlayerClass(name)
         local class = "UNKNOWN"
         local realm = Utils.getRealmName()
@@ -1048,9 +895,6 @@ do
         return class
     end
 
-    --
-    -- Gets a player's unit ID (e.g., "raid1").
-    --
     function module:GetUnitID(name)
         local id = "none"
         if not addon.IsInGroup() or not name then
@@ -1065,49 +909,33 @@ do
         return id
     end
 
-    --------------------------------------------------------------------------
-    -- Raid & Loot Status Checks
-    --------------------------------------------------------------------------
-
-    --
-    -- Checks if the group is using the Master Looter system.
-    --
     function module:IsMasterLoot()
         local method = select(1, GetLootMethod())
         return (method == "master")
     end
 
-    --
-    -- Checks if the player is the Master Looter.
-    --
     function module:IsMasterLooter()
         local method, partyMaster, raidMaster = GetLootMethod()
         if method ~= "master" then
             return false
         end
-        if partyMaster then
-            if partyMaster == 0 or UnitIsUnit("party" .. tostring(partyMaster), "player") then
-                return true
-            end
+        if partyMaster and (partyMaster == 0 or UnitIsUnit("party" .. tostring(partyMaster), "player")) then
+            return true
         end
-        if raidMaster then
-            if raidMaster == 0 or UnitIsUnit("raid" .. tostring(raidMaster), "player") then
-                return true
-            end
+        if raidMaster and (raidMaster == 0 or UnitIsUnit("raid" .. tostring(raidMaster), "player")) then
+            return true
         end
         return false
     end
 
-    --
-    -- Clears all raid target icons.
-    --
     function module:ClearRaidIcons()
         local players = module:GetPlayers()
-        for i, p in ipairs(players) do
+        for i = 1, #players do
             SetRaidTarget("raid" .. tostring(i), 0)
         end
     end
 end
+
 
 ---============================================================================
 -- Chat Output Helpers
@@ -6026,10 +5854,10 @@ do
     local frameName
 
     Logger.selectedRaid = nil
-    Logger.selectedBoss = nil
+    Logger.selectedBoss = nil -- bossNid (stable)
     Logger.selectedPlayer = nil
     Logger.selectedBossPlayer = nil
-    Logger.selectedItem = nil
+    Logger.selectedItem = nil -- lootNid (stable)
 
     local function clearSelections()
         Logger.selectedBoss = nil
@@ -6189,40 +6017,40 @@ do
                     return
                 end
 
-                local loot = raid.loot and raid.loot[self.itemId]
+                local loot = addon.Raid:GetLootByNid(self.raidId, self.lootNid)
                 if not loot then
                     addon:error(L.ErrLoggerInvalidItem)
                     return
                 end
 
-                local bossKill = raid.bossKills and raid.bossKills[loot.bossNum]
+                local bossKill = loot.bossNid and addon.Raid:GetBossByNid(self.raidId, loot.bossNid) or nil
                 local winner = findLoggerPlayer(name, raid, bossKill)
                 if not winner then
                     addon:error(L.ErrLoggerWinnerNotFound:format(rawText))
                     return
                 end
 
-                addon.Logger.Loot:Log(self.itemId, winner, nil, nil, "LOGGER_EDIT_WINNER")
+                addon.Logger.Loot:Log(self.lootNid, winner, nil, nil, "LOGGER_EDIT_WINNER")
             end,
             function(self)
                 self.raidId = addon.Logger.selectedRaid
-                self.itemId = addon.Logger.selectedItem
+                self.lootNid = addon.Logger.selectedItem
             end
         )
 
         Utils.makeEditBoxPopup("KRTLOGGER_ITEM_EDIT_ROLL", L.StrEditItemRollTypeHelp,
             function(self, text)
-                addon.Logger.Loot:Log(self.itemId, nil, text, nil, "LOGGER_EDIT_ROLLTYPE")
+                addon.Logger.Loot:Log(self.lootNid, nil, text, nil, "LOGGER_EDIT_ROLLTYPE")
             end,
-            function(self) self.itemId = addon.Logger.selectedItem end,
+            function(self) self.lootNid = addon.Logger.selectedItem end,
             validateRollType
         )
 
         Utils.makeEditBoxPopup("KRTLOGGER_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp,
             function(self, text)
-                addon.Logger.Loot:Log(self.itemId, nil, nil, text, "LOGGER_EDIT_ROLLVALUE")
+                addon.Logger.Loot:Log(self.lootNid, nil, nil, text, "LOGGER_EDIT_ROLLVALUE")
             end,
-            function(self) self.itemId = addon.Logger.selectedItem end,
+            function(self) self.lootNid = addon.Logger.selectedItem end,
             validateRollValue
         )
     end
@@ -6689,11 +6517,11 @@ do
             for i = 1, #raid.bossKills do
                 local boss = raid.bossKills[i]
                 local it = {}
-                it.id = i
-                it.name = boss.name
+                it.id = tonumber(boss.bossNid) or i -- stable ID
+                it.name = (boss.name == "_TrashMob_") and L.StrTrashMob or (boss.name or "")
                 it.time = boss.time or boss.date
                 it.timeFmt = date("%H:%M", it.time or time())
-                it.mode = getBossModeLabel(boss)
+                it.mode = (boss.name == "_TrashMob_") and "" or getBossModeLabel(boss)
                 out[i] = it
             end
         end,
@@ -6740,21 +6568,15 @@ do
 
     do
         local function DeleteBoss()
-            local rID, bID = addon.Logger.selectedRaid, addon.Logger.selectedBoss
-            if not (rID and bID and KRT_Raids[rID]) then return end
+            local rID, bossNid = addon.Logger.selectedRaid, addon.Logger.selectedBoss
+            if not (rID and bossNid and KRT_Raids[rID]) then return end
 
-            local lootRemoved = 0
-            local raid = KRT_Raids[rID]
-            local loot = raid.loot or {}
-            for i = #loot, 1, -1 do
-                if loot[i].bossNum == bID then
-                    tremove(loot, i)
-                    lootRemoved = lootRemoved + 1
-                end
+            local mode = addon.options.loggerBossDeleteMode or "purge"
+            local ok, lootAffected, removedBossNid = addon.Raid:DeleteBossByNid(rID, bossNid, mode)
+            if ok then
+                addon:info("Logger boss deleted: raid=%s bossNid=%s mode=%s lootAffected=%s",
+                    tostring(rID), tostring(removedBossNid), tostring(mode), tostring(lootAffected))
             end
-
-            tremove(raid.bossKills, bID)
-            addon:info(L.LogLoggerBossLootRemoved, rID, bID, lootRemoved)
 
             addon.Logger.selectedBoss = nil
             addon.Logger:ResetSelections()
@@ -6770,11 +6592,12 @@ do
         controller._makeConfirmPopup("KRTLOGGER_DELETE_BOSS", L.StrConfirmDeleteBoss, DeleteBoss)
     end
 
-    function Boss:GetName(bossId, raidId)
+    function Boss:GetName(bossNid, raidId)
         local rID = raidId or addon.Logger.selectedRaid
-        if not rID or not bossId or not KRT_Raids[rID] then return "" end
-        local boss = KRT_Raids[rID].bossKills[bossId]
-        return boss and boss.name or ""
+        if not rID or not bossNid or not KRT_Raids[rID] then return "" end
+        local boss = addon.Raid:GetBossByNid(rID, bossNid)
+        if not boss then return "" end
+        return (boss.name == "_TrashMob_") and L.StrTrashMob or (boss.name or "")
     end
 
     Utils.registerCallback("LoggerSelectRaid", function() controller:Dirty() end)
@@ -6802,10 +6625,10 @@ do
 
         getData = function(out)
             local rID = addon.Logger.selectedRaid
-            local bID = addon.Logger.selectedBoss
-            if not (rID and bID) then return end
+            local bossNid = addon.Logger.selectedBoss
+            if not (rID and bossNid) then return end
 
-            local src = addon.Raid:GetPlayers(rID, bID, {})
+            local src = addon.Raid:GetPlayers(rID, bossNid, {})
             for i = 1, #src do
                 local p = src[i]
                 local it = {}
@@ -6859,15 +6682,15 @@ do
     do
         local function DeleteAttendee()
             local rID = addon.Logger.selectedRaid
-            local bID = addon.Logger.selectedBoss
+            local bossNid = addon.Logger.selectedBoss
             local pID = addon.Logger.selectedBossPlayer
-            if not (rID and bID and pID) then return end
+            if not (rID and bossNid and pID) then return end
 
-            local raid = KRT_Raids[rID]
-            if not (raid and raid.bossKills and raid.bossKills[bID]) then return end
+            local boss = addon.Raid:GetBossByNid(rID, bossNid)
+            if not boss then return end
 
             local name = addon.Raid:GetPlayerName(pID, rID)
-            local list = raid.bossKills[bID].players
+            local list = boss.players or {}
             local i = addon.tIndexOf(list, name)
             while i do
                 tremove(list, i)
@@ -7014,23 +6837,50 @@ do
 end
 
 -- ============================================================================
--- Loot List (filters by selected boss and player)
+-- Loot List (filters by selected boss and player) + CSV Export
 -- ============================================================================
 do
     addon.Logger.Loot = addon.Logger.Loot or {}
     local Loot = addon.Logger.Loot
     local L = addon.L
+    local Utils = addon.Utils
 
-    local function isLootFromBoss(entry, bossId)
-        return not bossId or bossId <= 0 or entry.bossNum == bossId
+    local function isLootFromBoss(entry, bossNid)
+        return not bossNid or bossNid <= 0 or tonumber(entry.bossNid) == tonumber(bossNid)
     end
 
     local function isLootByPlayer(entry, playerName)
         return not playerName or entry.looter == playerName
     end
 
-    local function passesFilters(entry, bossId, playerName)
-        return isLootFromBoss(entry, bossId) and isLootByPlayer(entry, playerName)
+    local function passesFilters(entry, bossNid, playerName)
+        return isLootFromBoss(entry, bossNid) and isLootByPlayer(entry, playerName)
+    end
+
+    local function csvEscape(v)
+        if v == nil then return "" end
+        v = tostring(v)
+        v = v:gsub("\r\n", "\n"):gsub("\r", "\n")
+        if v:find('[,"\n]') then
+            v = '"' .. v:gsub('"', '""') .. '"'
+        end
+        return v
+    end
+
+    local function tsFmt(ts)
+        ts = tonumber(ts)
+        return ts and ts > 0 and date("%Y-%m-%d %H:%M:%S", ts) or ""
+    end
+
+    local function buildBossMap(raid)
+        local map = {}
+        if not raid or not raid.bossKills then return map end
+        for i = 1, #raid.bossKills do
+            local b = raid.bossKills[i]
+            local nid = tonumber(b.bossNid)
+            if nid then map[nid] = b end
+        end
+        return map
     end
 
     local controller = makeLoggerListController {
@@ -7041,9 +6891,17 @@ do
         localize = function(n)
             local title = _G[n .. "Title"]
             if title then title:SetText(L.StrRaidLoot) end
-            _G[n .. "ExportBtn"]:SetText(L.BtnExport)
-            _G[n .. "ClearBtn"]:SetText(L.BtnClear)
-            _G[n .. "EditBtn"]:SetText(L.BtnEdit)
+
+            local exportBtn = _G[n .. "ExportBtn"]
+            local clearBtn  = _G[n .. "ClearBtn"]
+            local editBtn   = _G[n .. "EditBtn"]
+            local delBtn    = _G[n .. "DeleteBtn"]
+
+            exportBtn:SetText(L.BtnExport)
+            clearBtn:SetText(L.BtnClear)
+            editBtn:SetText(L.BtnEdit)
+            if delBtn then delBtn:SetText(L.BtnDelete) end
+
             _G[n .. "HeaderItem"]:SetText(L.StrItem)
             _G[n .. "HeaderSource"]:SetText(L.StrSource)
             _G[n .. "HeaderWinner"]:SetText(L.StrWinner)
@@ -7051,42 +6909,37 @@ do
             _G[n .. "HeaderRoll"]:SetText(L.StrRoll)
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
 
-            -- disabilitati finché non implementati
-            _G[n .. "ExportBtn"]:Disable()
-            _G[n .. "ClearBtn"]:Disable()
-            _G[n .. "AddBtn"]:Disable()
-            _G[n .. "EditBtn"]:Disable()
+            -- Wire Export click here (XML has no OnClick)
+            exportBtn:SetScript("OnClick", function() Loot:ExportCSV() end)
         end,
 
         getData = function(out)
             local rID = addon.Logger.selectedRaid
-            if not rID then return end
+            if not rID or not KRT_Raids[rID] then return end
 
-            local loot = addon.Raid:GetLoot(rID) or {}
+            local bossNid = addon.Logger.selectedBoss
+            local playerId = addon.Logger.selectedPlayer or addon.Logger.selectedBossPlayer
+            local playerName = playerId and addon.Raid:GetPlayerName(playerId, rID) or nil
 
-            local bID = addon.Logger.selectedBoss
-            local pID = addon.Logger.selectedBossPlayer or addon.Logger.selectedPlayer
-            local pName = pID and addon.Raid:GetPlayerName(pID, rID) or nil
+            local loot = addon.Raid:GetLoot(rID, 0)
+            local idx = 0
 
-            local n = 0
             for i = 1, #loot do
                 local v = loot[i]
-                if passesFilters(v, bID, pName) then
-                    n = n + 1
+                if passesFilters(v, bossNid, playerName) then
+                    idx = idx + 1
                     local it = {}
-                    it.id = v.id
-                    it.itemId = v.itemId
-                    it.itemName = v.itemName
-                    it.itemRarity = v.itemRarity
-                    it.itemTexture = v.itemTexture
-                    it.itemLink = v.itemLink
-                    it.bossNum = v.bossNum
-                    it.looter = v.looter
-                    it.rollType = tonumber(v.rollType) or 0
-                    it.rollValue = v.rollValue
-                    it.time = v.time
-                    it.timeFmt = date("%H:%M", v.time)
-                    out[n] = it
+                    it.id = tonumber(v.lootNid) or v.id or i
+                    it.name = v.itemName or ""
+                    it.link = v.itemLink
+                    it.source = addon.Logger.Boss:GetName(v.bossNid, rID)
+                    it.winner = v.looter or ""
+                    it.type = (rollTypeNames and rollTypeNames[v.rollType]) or tostring(v.rollType or 0)
+                    it.roll = tostring(v.rollValue or 0)
+                    it.time = v.time or 0
+                    it.timeFmt = (v.time and date("%H:%M", v.time)) or ""
+                    it.icon = v.itemTexture
+                    out[idx] = it
                 end
             end
         end,
@@ -7096,47 +6949,18 @@ do
 
         drawRow = (function()
             local ROW_H
-            return function(row, v)
+            return function(row, it)
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
                 local ui = row._p
-
-                row._itemLink = v.itemLink
-                local nameText = v.itemLink or v.itemName or ("[Item " .. (v.itemId or "?") .. "]")
-                if v.itemLink then
-                    ui.Name:SetText(nameText)
-                else
-                    ui.Name:SetText(addon.WrapTextInColorCode(
-                        nameText,
-                        Utils.normalizeHexColor(itemColors[(v.itemRarity or 1) + 1])
-                    ))
+                ui.Name:SetText(it.link or it.name)
+                ui.Source:SetText(it.source)
+                ui.Winner:SetText(it.winner)
+                ui.Type:SetText(it.type)
+                ui.Roll:SetText(it.roll)
+                ui.Time:SetText(it.timeFmt)
+                if ui.ItemIconTexture and it.icon then
+                    ui.ItemIconTexture:SetTexture(it.icon)
                 end
-
-                local selectedBoss = addon.Logger.selectedBoss
-                if selectedBoss and v.bossNum == selectedBoss then
-                    ui.Source:SetText("")
-                else
-                    ui.Source:SetText(addon.Logger.Boss:GetName(v.bossNum, addon.Logger.selectedRaid))
-                end
-
-                local r, g, b = Utils.getClassColor(addon.Raid:GetPlayerClass(v.looter))
-                ui.Winner:SetText(v.looter)
-                ui.Winner:SetVertexColor(r, g, b)
-
-                local rt = tonumber(v.rollType) or 0
-                v.rollType = rt
-                ui.Type:SetText(lootTypesColored[rt] or lootTypesColored[4])
-                ui.Roll:SetText(v.rollValue or 0)
-                ui.Time:SetText(v.timeFmt)
-
-                local icon = v.itemTexture
-                if not icon and v.itemId then
-                    icon = GetItemIcon(v.itemId)
-                end
-                if not icon then
-                    icon = C.RESERVES_ITEM_FALLBACK_ICON
-                end
-                ui.ItemIconTexture:SetTexture(icon)
-
                 return ROW_H
             end
         end)(),
@@ -7144,18 +6968,27 @@ do
         highlightId = function() return addon.Logger.selectedItem end,
 
         postUpdate = function(n)
-            Utils.enableDisable(_G[n .. "DeleteBtn"], addon.Logger.selectedItem ~= nil)
+            local hasRaid = addon.Logger.selectedRaid
+            local hasItem = addon.Logger.selectedItem
+
+            Utils.enableDisable(_G[n .. "ExportBtn"], hasRaid ~= nil)
+            Utils.enableDisable(_G[n .. "ClearBtn"], hasRaid ~= nil)
+            Utils.enableDisable(_G[n .. "EditBtn"], hasItem ~= nil)
+
+            local delBtn = _G[n .. "DeleteBtn"]
+            if delBtn then
+                Utils.enableDisable(delBtn, hasItem ~= nil)
+            end
         end,
 
         sorters = {
-            id = function(a, b, asc) return asc and (a.itemId < b.itemId) or (a.itemId > b.itemId) end,
-            source = function(a, b, asc) return asc and (a.bossNum < b.bossNum) or (a.bossNum > b.bossNum) end,
-            winner = function(a, b, asc) return asc and (a.looter < b.looter) or (a.looter > b.looter) end,
-            type = function(a, b, asc) return asc and (a.rollType < b.rollType) or (a.rollType > b.rollType) end,
+            name = function(a, b, asc) return asc and (a.name < b.name) or (a.name > b.name) end,
+            source = function(a, b, asc) return asc and (a.source < b.source) or (a.source > b.source) end,
+            winner = function(a, b, asc) return asc and (a.winner < b.winner) or (a.winner > b.winner) end,
+            type = function(a, b, asc) return asc and (a.type < b.type) or (a.type > b.type) end,
             roll = function(a, b, asc)
-                local A = a.rollValue or 0
-                local B = b.rollValue or 0
-                return asc and (A < B) or (A > B)
+                local av, bv = tonumber(a.roll) or 0, tonumber(b.roll) or 0
+                return asc and (av < bv) or (av > bv)
             end,
             time = function(a, b, asc) return asc and (a.time < b.time) or (a.time > b.time) end,
         },
@@ -7163,296 +6996,640 @@ do
 
     bindLoggerListController(Loot, controller)
 
-    function Loot:OnEnter(widget)
-        if not widget then return end
-        local row = (widget.IsObjectType and widget:IsObjectType("Button")) and widget
-            or (widget.GetParent and widget:GetParent()) or widget
-        if not (row and row.GetID) then return end
-
-        local link = row._itemLink
-        if not link then return end
-
-        GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-        GameTooltip:SetHyperlink(link)
+    function Loot:Clear()
+        local rID = addon.Logger.selectedRaid
+        if not rID or not KRT_Raids[rID] then return end
+        KRT_Raids[rID].loot = {}
+        addon.Logger.selectedItem = nil
+        controller:Dirty()
     end
 
-    do
-        local function DeleteItem()
-            local rID, iID = addon.Logger.selectedRaid, addon.Logger.selectedItem
-            if rID and KRT_Raids[rID] and iID then
-                tremove(KRT_Raids[rID].loot, iID)
-                addon.Logger.selectedItem = nil
-                controller:Dirty()
+    function Loot:Delete()
+        if addon.Logger.selectedItem then
+            StaticPopup_Show("KRTLOGGER_DELETE_ITEM")
+        end
+    end
+
+    controller._makeConfirmPopup("KRTLOGGER_DELETE_ITEM", L.StrConfirmDeleteItem, function()
+        local rID = addon.Logger.selectedRaid
+        local lootNid = addon.Logger.selectedItem
+        if not (rID and lootNid) then return end
+        addon.Raid:DeleteLootByNid(rID, lootNid)
+        addon.Logger.selectedItem = nil
+        controller:Dirty()
+    end)
+
+    -- Export CSV of CURRENT VIEW (respects selected boss/player filters)
+    function Loot:ExportCSV()
+        local rID = addon.Logger.selectedRaid
+        if not rID or not KRT_Raids[rID] then
+            addon:warn("Export CSV: no raid selected.")
+            return
+        end
+
+        local raid = KRT_Raids[rID]
+        local bossMap = buildBossMap(raid)
+
+        local bossNid = addon.Logger.selectedBoss
+        local playerId = addon.Logger.selectedPlayer or addon.Logger.selectedBossPlayer
+        local playerName = playerId and addon.Raid:GetPlayerName(playerId, rID) or nil
+
+        local rows = {}
+        local header = table.concat({
+            "raidId", "raidZone", "raidSize", "raidMode", "raidStart", "raidStartFmt", "raidEnd", "raidEndFmt",
+            "bossNid", "bossName", "bossTime", "bossTimeFmt",
+            "lootNid", "lootTime", "lootTimeFmt",
+            "itemId", "itemName", "itemLink", "itemRarity",
+            "winner", "rollType", "rollValue"
+        }, ",")
+
+        rows[#rows + 1] = header
+
+        for i = 1, #(raid.loot or {}) do
+            local v = raid.loot[i]
+            if v and passesFilters(v, bossNid, playerName) then
+                local bnid = tonumber(v.bossNid) or 0
+                local b = (bnid > 0) and bossMap[bnid] or nil
+                local bName = ""
+                if b then
+                    bName = (b.name == "_TrashMob_") and (L.StrTrashMob or "Trash") or (b.name or "")
+                elseif bnid == 0 then
+                    bName = "Unassociated"
+                end
+
+                local line = table.concat({
+                    csvEscape(rID),
+                    csvEscape(raid.zone or ""),
+                    csvEscape(raid.size or ""),
+                    csvEscape(raid.mode or ""),
+                    csvEscape(raid.startTime or ""),
+                    csvEscape(tsFmt(raid.startTime)),
+                    csvEscape(raid.endTime or ""),
+                    csvEscape(tsFmt(raid.endTime)),
+                    csvEscape(bnid),
+                    csvEscape(bName),
+                    csvEscape(b and b.time or ""),
+                    csvEscape(tsFmt(b and b.time)),
+                    csvEscape(v.lootNid or ""),
+                    csvEscape(v.time or ""),
+                    csvEscape(tsFmt(v.time)),
+                    csvEscape(v.itemId or ""),
+                    csvEscape(v.itemName or ""),
+                    csvEscape(v.itemLink or ""),
+                    csvEscape(v.itemRarity or ""),
+                    csvEscape(v.looter or ""),
+                    csvEscape(v.rollType or 0),
+                    csvEscape(v.rollValue or 0),
+                }, ",")
+
+                rows[#rows + 1] = line
             end
         end
 
-        function Loot:Delete()
-            if addon.Logger.selectedItem then
-                StaticPopup_Show("KRTLOGGER_DELETE_ITEM")
-            end
-        end
-
-        controller._makeConfirmPopup("KRTLOGGER_DELETE_ITEM", L.StrConfirmDeleteItem, DeleteItem)
+        local csv = table.concat(rows, "\n")
+        addon.Logger:ShowTextWindow(("Loot CSV Export (Raid %s)"):format(tostring(rID)), csv)
     end
 
-    function Loot:Log(itemID, looter, rollType, rollValue, source, raidIDOverride)
+    -- Central logging entry (runtime + logger edits)
+    -- itemID here is lootNid (stable), not array index.
+    function Loot:Log(itemID, winner, rollType, rollValue, source, raidIDOverride)
+        local isLoggerSource = source and source:find("^LOGGER_") ~= nil
+
         local raidID
         if raidIDOverride then
             raidID = raidIDOverride
+        elseif isLoggerSource then
+            raidID = addon.Logger.selectedRaid
         else
-            -- If the Logger window is open and browsing an old raid, selectedRaid may differ from KRT_CurrentRaid.
-            -- Runtime sources must always write into the CURRENT raid session, while Logger UI edits target selectedRaid.
-            local isLoggerSource = (type(source) == "string") and (source:find("^LOGGER_") ~= nil)
-            if isLoggerSource then
-                raidID = addon.Logger.selectedRaid or KRT_CurrentRaid
-            else
-                raidID = KRT_CurrentRaid or addon.Logger.selectedRaid
+            raidID = KRT_CurrentRaid or addon.Logger.selectedRaid
+        end
+
+        if not raidID or not KRT_Raids[raidID] then
+            addon:warn(L.LogLoggerNoRaidSelected)
+            return
+        end
+
+        itemID = tonumber(itemID)
+        if not itemID or itemID <= 0 then
+            addon:warn(L.LogLoggerInvalidItemId)
+            return
+        end
+
+        local loot = addon.Raid:GetLootByNid(raidID, itemID)
+        if not loot then
+            addon:warn(L.LogLoggerInvalidItemId)
+            return
+        end
+
+        local hasChange = false
+
+        if winner ~= nil then
+            loot.looter = tostring(winner)
+            hasChange = true
+        end
+
+        if rollType ~= nil then
+            local rt = tonumber(rollType)
+            if rt then
+                loot.rollType = rt
+                hasChange = true
             end
         end
-        addon:trace(L.LogLoggerLootLogAttempt:format(tostring(source), tostring(raidID), tostring(itemID),
-            tostring(looter), tostring(rollType), tostring(rollValue), tostring(KRT_LastBoss)))
-        if not raidID or not KRT_Raids[raidID] then
-            addon:error(L.LogLoggerNoRaidSession:format(tostring(raidID), tostring(itemID)))
-            return false
+
+        if rollValue ~= nil then
+            local rv = tonumber(rollValue)
+            if rv and rv >= 0 then
+                loot.rollValue = rv
+                hasChange = true
+            end
         end
 
-        local raid = KRT_Raids[raidID]
-        local lootCount = raid.loot and #raid.loot or 0
-        local it = raid.loot[itemID]
-        if not it then
-            addon:error(L.LogLoggerItemNotFound:format(raidID, tostring(itemID), lootCount))
-            return false
+        if hasChange then
+            addon:info(L.LogLoggerLootEdited:format(tostring(raidID), tostring(itemID), tostring(source or "?")))
+            controller:Dirty()
         end
-
-        if not looter or looter == "" then
-            addon:warn(L.LogLoggerLooterEmpty:format(raidID, tostring(itemID), tostring(it.itemLink)))
-        end
-        if rollType == nil then
-            addon:warn(L.LogLoggerRollTypeNil:format(raidID, tostring(itemID), tostring(looter)))
-        end
-
-        addon:debug(L.LogLoggerLootBefore:format(raidID, tostring(itemID), tostring(it.itemLink),
-            tostring(it.looter), tostring(it.rollType), tostring(it.rollValue)))
-        if it.looter and it.looter ~= "" and looter and looter ~= "" and it.looter ~= looter then
-            addon:warn(L.LogLoggerLootOverwrite:format(raidID, tostring(itemID), tostring(it.itemLink),
-                tostring(it.looter), tostring(looter)))
-        end
-
-        local expectedLooter
-        local expectedRollType
-        local expectedRollValue
-        if looter and looter ~= "" then
-            it.looter = looter
-            expectedLooter = looter
-        end
-        if tonumber(rollType) then
-            it.rollType = tonumber(rollType)
-            expectedRollType = tonumber(rollType)
-        end
-        if tonumber(rollValue) then
-            it.rollValue = tonumber(rollValue)
-            expectedRollValue = tonumber(rollValue)
-        end
-
-        controller:Dirty()
-        addon:info(L.LogLoggerLootRecorded:format(tostring(source), raidID, tostring(itemID),
-            tostring(it.itemLink), tostring(it.looter), tostring(it.rollType), tostring(it.rollValue)))
-
-        local ok = true
-        if expectedLooter and it.looter ~= expectedLooter then ok = false end
-        if expectedRollType and it.rollType ~= expectedRollType then ok = false end
-        if expectedRollValue and it.rollValue ~= expectedRollValue then ok = false end
-        if not ok then
-            addon:error(L.LogLoggerVerifyFailed:format(raidID, tostring(itemID), tostring(it.looter),
-                tostring(it.rollType), tostring(it.rollValue)))
-            return false
-        end
-
-        addon:debug(L.LogLoggerVerified:format(raidID, tostring(itemID)))
-        if not KRT_LastBoss then
-            addon:info(L.LogLoggerRecordedNoBossContext:format(raidID, tostring(itemID), tostring(it.itemLink)))
-        end
-        return true
     end
 
-    local function Reset() controller:Dirty() end
-    Utils.registerCallbacks(
-        { "LoggerSelectRaid", "LoggerSelectBoss", "LoggerSelectPlayer", "LoggerSelectBossPlayer",
-            "RaidLootUpdate" },
-        Reset
-    )
+    Utils.registerCallbacks({ "LoggerSelectRaid", "LoggerSelectBoss", "LoggerSelectPlayer", "LoggerSelectBossPlayer" },
+        function() controller:Dirty() end)
     Utils.registerCallback("LoggerSelectItem", function() controller:Touch() end)
 end
 
 -- ============================================================================
--- Logger: Add/Edit Boss Popup  (Patch #1 — uniforma a time/mode)
+-- Loot List (filters by selected boss and player) + CSV Export
+-- ============================================================================
+do
+    addon.Logger.Loot = addon.Logger.Loot or {}
+    local Loot = addon.Logger.Loot
+    local L = addon.L
+    local Utils = addon.Utils
+
+    local function isLootFromBoss(entry, bossNid)
+        return not bossNid or bossNid <= 0 or tonumber(entry.bossNid) == tonumber(bossNid)
+    end
+
+    local function isLootByPlayer(entry, playerName)
+        return not playerName or entry.looter == playerName
+    end
+
+    local function passesFilters(entry, bossNid, playerName)
+        return isLootFromBoss(entry, bossNid) and isLootByPlayer(entry, playerName)
+    end
+
+    local function csvEscape(v)
+        if v == nil then return "" end
+        v = tostring(v)
+        v = v:gsub("\r\n", "\n"):gsub("\r", "\n")
+        if v:find('[,"\n]') then
+            v = '"' .. v:gsub('"', '""') .. '"'
+        end
+        return v
+    end
+
+    local function tsFmt(ts)
+        ts = tonumber(ts)
+        return ts and ts > 0 and date("%Y-%m-%d %H:%M:%S", ts) or ""
+    end
+
+    local function buildBossMap(raid)
+        local map = {}
+        if not raid or not raid.bossKills then return map end
+        for i = 1, #raid.bossKills do
+            local b = raid.bossKills[i]
+            local nid = tonumber(b.bossNid)
+            if nid then map[nid] = b end
+        end
+        return map
+    end
+
+    local controller = makeLoggerListController {
+        keyName = "LootList",
+        poolTag = "logger-loot",
+        _rowParts = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
+
+        localize = function(n)
+            local title = _G[n .. "Title"]
+            if title then title:SetText(L.StrRaidLoot) end
+
+            local exportBtn = _G[n .. "ExportBtn"]
+            local clearBtn  = _G[n .. "ClearBtn"]
+            local editBtn   = _G[n .. "EditBtn"]
+            local delBtn    = _G[n .. "DeleteBtn"]
+
+            exportBtn:SetText(L.BtnExport)
+            clearBtn:SetText(L.BtnClear)
+            editBtn:SetText(L.BtnEdit)
+            if delBtn then delBtn:SetText(L.BtnDelete) end
+
+            _G[n .. "HeaderItem"]:SetText(L.StrItem)
+            _G[n .. "HeaderSource"]:SetText(L.StrSource)
+            _G[n .. "HeaderWinner"]:SetText(L.StrWinner)
+            _G[n .. "HeaderType"]:SetText(L.StrType)
+            _G[n .. "HeaderRoll"]:SetText(L.StrRoll)
+            _G[n .. "HeaderTime"]:SetText(L.StrTime)
+
+            -- Wire Export click here (XML has no OnClick)
+            exportBtn:SetScript("OnClick", function() Loot:ExportCSV() end)
+        end,
+
+        getData = function(out)
+            local rID = addon.Logger.selectedRaid
+            if not rID or not KRT_Raids[rID] then return end
+
+            local bossNid = addon.Logger.selectedBoss
+            local playerId = addon.Logger.selectedPlayer or addon.Logger.selectedBossPlayer
+            local playerName = playerId and addon.Raid:GetPlayerName(playerId, rID) or nil
+
+            local loot = addon.Raid:GetLoot(rID, 0)
+            local idx = 0
+
+            for i = 1, #loot do
+                local v = loot[i]
+                if passesFilters(v, bossNid, playerName) then
+                    idx = idx + 1
+                    local it = {}
+                    it.id = tonumber(v.lootNid) or v.id or i
+                    it.name = v.itemName or ""
+                    it.link = v.itemLink
+                    it.source = addon.Logger.Boss:GetName(v.bossNid, rID)
+                    it.winner = v.looter or ""
+                    it.type = (rollTypeNames and rollTypeNames[v.rollType]) or tostring(v.rollType or 0)
+                    it.roll = tostring(v.rollValue or 0)
+                    it.time = v.time or 0
+                    it.timeFmt = (v.time and date("%H:%M", v.time)) or ""
+                    it.icon = v.itemTexture
+                    out[idx] = it
+                end
+            end
+        end,
+
+        rowName = function(n, _, i) return n .. "ItemBtn" .. i end,
+        rowTmpl = "KRTLoggerLootButton",
+
+        drawRow = (function()
+            local ROW_H
+            return function(row, it)
+                if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
+                local ui = row._p
+                ui.Name:SetText(it.link or it.name)
+                ui.Source:SetText(it.source)
+                ui.Winner:SetText(it.winner)
+                ui.Type:SetText(it.type)
+                ui.Roll:SetText(it.roll)
+                ui.Time:SetText(it.timeFmt)
+                if ui.ItemIconTexture and it.icon then
+                    ui.ItemIconTexture:SetTexture(it.icon)
+                end
+                return ROW_H
+            end
+        end)(),
+
+        highlightId = function() return addon.Logger.selectedItem end,
+
+        postUpdate = function(n)
+            local hasRaid = addon.Logger.selectedRaid
+            local hasItem = addon.Logger.selectedItem
+
+            Utils.enableDisable(_G[n .. "ExportBtn"], hasRaid ~= nil)
+            Utils.enableDisable(_G[n .. "ClearBtn"], hasRaid ~= nil)
+            Utils.enableDisable(_G[n .. "EditBtn"], hasItem ~= nil)
+
+            local delBtn = _G[n .. "DeleteBtn"]
+            if delBtn then
+                Utils.enableDisable(delBtn, hasItem ~= nil)
+            end
+        end,
+
+        sorters = {
+            name = function(a, b, asc) return asc and (a.name < b.name) or (a.name > b.name) end,
+            source = function(a, b, asc) return asc and (a.source < b.source) or (a.source > b.source) end,
+            winner = function(a, b, asc) return asc and (a.winner < b.winner) or (a.winner > b.winner) end,
+            type = function(a, b, asc) return asc and (a.type < b.type) or (a.type > b.type) end,
+            roll = function(a, b, asc)
+                local av, bv = tonumber(a.roll) or 0, tonumber(b.roll) or 0
+                return asc and (av < bv) or (av > bv)
+            end,
+            time = function(a, b, asc) return asc and (a.time < b.time) or (a.time > b.time) end,
+        },
+    }
+
+    bindLoggerListController(Loot, controller)
+
+    function Loot:Clear()
+        local rID = addon.Logger.selectedRaid
+        if not rID or not KRT_Raids[rID] then return end
+        KRT_Raids[rID].loot = {}
+        addon.Logger.selectedItem = nil
+        controller:Dirty()
+    end
+
+    function Loot:Delete()
+        if addon.Logger.selectedItem then
+            StaticPopup_Show("KRTLOGGER_DELETE_ITEM")
+        end
+    end
+
+    controller._makeConfirmPopup("KRTLOGGER_DELETE_ITEM", L.StrConfirmDeleteItem, function()
+        local rID = addon.Logger.selectedRaid
+        local lootNid = addon.Logger.selectedItem
+        if not (rID and lootNid) then return end
+        addon.Raid:DeleteLootByNid(rID, lootNid)
+        addon.Logger.selectedItem = nil
+        controller:Dirty()
+    end)
+
+    -- Export CSV of CURRENT VIEW (respects selected boss/player filters)
+    function Loot:ExportCSV()
+        local rID = addon.Logger.selectedRaid
+        if not rID or not KRT_Raids[rID] then
+            addon:warn("Export CSV: no raid selected.")
+            return
+        end
+
+        local raid = KRT_Raids[rID]
+        local bossMap = buildBossMap(raid)
+
+        local bossNid = addon.Logger.selectedBoss
+        local playerId = addon.Logger.selectedPlayer or addon.Logger.selectedBossPlayer
+        local playerName = playerId and addon.Raid:GetPlayerName(playerId, rID) or nil
+
+        local rows = {}
+        local header = table.concat({
+            "raidId", "raidZone", "raidSize", "raidMode", "raidStart", "raidStartFmt", "raidEnd", "raidEndFmt",
+            "bossNid", "bossName", "bossTime", "bossTimeFmt",
+            "lootNid", "lootTime", "lootTimeFmt",
+            "itemId", "itemName", "itemLink", "itemRarity",
+            "winner", "rollType", "rollValue"
+        }, ",")
+
+        rows[#rows + 1] = header
+
+        for i = 1, #(raid.loot or {}) do
+            local v = raid.loot[i]
+            if v and passesFilters(v, bossNid, playerName) then
+                local bnid = tonumber(v.bossNid) or 0
+                local b = (bnid > 0) and bossMap[bnid] or nil
+                local bName = ""
+                if b then
+                    bName = (b.name == "_TrashMob_") and (L.StrTrashMob or "Trash") or (b.name or "")
+                elseif bnid == 0 then
+                    bName = "Unassociated"
+                end
+
+                local line = table.concat({
+                    csvEscape(rID),
+                    csvEscape(raid.zone or ""),
+                    csvEscape(raid.size or ""),
+                    csvEscape(raid.mode or ""),
+                    csvEscape(raid.startTime or ""),
+                    csvEscape(tsFmt(raid.startTime)),
+                    csvEscape(raid.endTime or ""),
+                    csvEscape(tsFmt(raid.endTime)),
+                    csvEscape(bnid),
+                    csvEscape(bName),
+                    csvEscape(b and b.time or ""),
+                    csvEscape(tsFmt(b and b.time)),
+                    csvEscape(v.lootNid or ""),
+                    csvEscape(v.time or ""),
+                    csvEscape(tsFmt(v.time)),
+                    csvEscape(v.itemId or ""),
+                    csvEscape(v.itemName or ""),
+                    csvEscape(v.itemLink or ""),
+                    csvEscape(v.itemRarity or ""),
+                    csvEscape(v.looter or ""),
+                    csvEscape(v.rollType or 0),
+                    csvEscape(v.rollValue or 0),
+                }, ",")
+
+                rows[#rows + 1] = line
+            end
+        end
+
+        local csv = table.concat(rows, "\n")
+        addon.Logger:ShowTextWindow(("Loot CSV Export (Raid %s)"):format(tostring(rID)), csv)
+    end
+
+    -- Central logging entry (runtime + logger edits)
+    -- itemID here is lootNid (stable), not array index.
+    function Loot:Log(itemID, winner, rollType, rollValue, source, raidIDOverride)
+        local isLoggerSource = source and source:find("^LOGGER_") ~= nil
+
+        local raidID
+        if raidIDOverride then
+            raidID = raidIDOverride
+        elseif isLoggerSource then
+            raidID = addon.Logger.selectedRaid
+        else
+            raidID = KRT_CurrentRaid or addon.Logger.selectedRaid
+        end
+
+        if not raidID or not KRT_Raids[raidID] then
+            addon:warn(L.LogLoggerNoRaidSelected)
+            return
+        end
+
+        itemID = tonumber(itemID)
+        if not itemID or itemID <= 0 then
+            addon:warn(L.LogLoggerInvalidItemId)
+            return
+        end
+
+        local loot = addon.Raid:GetLootByNid(raidID, itemID)
+        if not loot then
+            addon:warn(L.LogLoggerInvalidItemId)
+            return
+        end
+
+        local hasChange = false
+
+        if winner ~= nil then
+            loot.looter = tostring(winner)
+            hasChange = true
+        end
+
+        if rollType ~= nil then
+            local rt = tonumber(rollType)
+            if rt then
+                loot.rollType = rt
+                hasChange = true
+            end
+        end
+
+        if rollValue ~= nil then
+            local rv = tonumber(rollValue)
+            if rv and rv >= 0 then
+                loot.rollValue = rv
+                hasChange = true
+            end
+        end
+
+        if hasChange then
+            addon:info(L.LogLoggerLootEdited:format(tostring(raidID), tostring(itemID), tostring(source or "?")))
+            controller:Dirty()
+        end
+    end
+
+    Utils.registerCallbacks({ "LoggerSelectRaid", "LoggerSelectBoss", "LoggerSelectPlayer", "LoggerSelectBossPlayer" },
+        function() controller:Dirty() end)
+    Utils.registerCallback("LoggerSelectItem", function() controller:Touch() end)
+end
+
+-- ============================================================================
+-- BossBox popup (Add/Edit boss entries in Logger)
 -- ============================================================================
 do
     addon.Logger.BossBox = addon.Logger.BossBox or {}
-    local Box = addon.Logger.BossBox
+    local BossBox = addon.Logger.BossBox
     local L = addon.L
 
-    local frameName, localized, isEdit = nil, false, false
-    local raidData, bossData, tempDate = {}, {}, {}
-    local updateInterval = C.UPDATE_INTERVAL_LOGGER
+    local function getName() return "KRTLoggerBossEditFrame" end
 
-    function Box:OnLoad(frame)
+    function BossBox:Toggle()
+        local frame = _G[getName()]
         if not frame then return end
-        frameName = frame:GetName()
-        frame:RegisterForDrag("LeftButton")
-        frame:SetScript("OnUpdate", function(_, elapsed) self:UpdateUIFrame(_, elapsed) end)
-        frame:SetScript("OnHide", function() self:CancelAddEdit() end)
+        Utils.toggle(frame)
     end
 
-    function Box:Toggle() Utils.toggle(_G[frameName]) end
+    function BossBox:Fill()
+        local frame = _G[getName()]
+        if not frame then return end
 
-    function Box:Hide()
-        local f = _G[frameName]
-        Utils.setShown(f, false)
-    end
-
-    -- Campi uniformi:
-    --   bossData.time : timestamp
-    --   bossData.mode : "h" | "n"
-    function Box:Fill()
-        local rID, bID = addon.Logger.selectedRaid, addon.Logger.selectedBoss
-        if not (rID and bID) then return end
-
-        raidData = KRT_Raids[rID]
-        if not raidData then return end
-
-        bossData = raidData.bossKills[bID]
-        if not bossData then return end
-
-        _G[frameName .. "Name"]:SetText(bossData.name or "")
-
-        local bossTime = bossData.time or bossData.date or time()
-        local d = date("*t", bossTime)
-        tempDate = { day = d.day, month = d.month, year = d.year, hour = d.hour, min = d.min }
-        _G[frameName .. "Time"]:SetText(("%02d:%02d"):format(tempDate.hour, tempDate.min))
-
-        local mode = bossData.mode
-        if not mode and bossData.difficulty then
-            mode = (bossData.difficulty == 3 or bossData.difficulty == 4) and "h" or "n"
-        end
-        _G[frameName .. "Difficulty"]:SetText((mode == "h") and "h" or "n")
-
-        isEdit = true
-        self:Toggle()
-    end
-
-    function Box:Save()
         local rID = addon.Logger.selectedRaid
-        if not rID then return end
+        local bossNid = addon.Logger.selectedBoss
+        if not (rID and bossNid) then return end
 
-        local name = Utils.trimText(_G[frameName .. "Name"]:GetText())
-        local modeT = Utils.normalizeLower(_G[frameName .. "Difficulty"]:GetText())
-        local bTime = Utils.trimText(_G[frameName .. "Time"]:GetText())
+        local boss = addon.Raid:GetBossByNid(rID, bossNid)
+        if not boss then return end
 
-        name = (name == "") and "_TrashMob_" or name
-        if name ~= "_TrashMob_" and (modeT ~= "h" and modeT ~= "n") then
-            addon:error(L.ErrBossDifficulty)
+        frame.isEdit = true
+        frame.bossNid = bossNid
+
+        _G[getName() .. "TitleText"]:SetText(L.StrBossEdit)
+        _G[getName() .. "NameEditBox"]:SetText(boss.name or "")
+        _G[getName() .. "ModeDropDownText"]:SetText((boss.mode == "h") and "H" or "N")
+
+        local d = date("*t", boss.time or time())
+        CalendarSetAbsMonth(d.month, d.year)
+        CalendarSetMonth(d.month)
+        CalendarSetYear(d.year)
+        CalendarFrame_SetSelectedDay(d.day)
+        _G[getName() .. "TimeEditBox"]:SetText(date("%H:%M", boss.time or time()))
+
+        Utils.showHide(frame, true)
+    end
+
+    function BossBox:Save()
+        local frame = _G[getName()]
+        if not frame then return end
+
+        local rID = addon.Logger.selectedRaid
+        if not rID or not KRT_Raids[rID] then return end
+
+        local raid = KRT_Raids[rID]
+        raid.nextBossNid = tonumber(raid.nextBossNid) or 1
+
+        local bossName = Utils.trimText(_G[getName() .. "NameEditBox"]:GetText() or "")
+        if bossName == "" then
+            addon:error(L.ErrLoggerInvalidBossName)
             return
         end
 
-        local h, m = bTime:match("^(%d+):(%d+)$")
-        h, m = tonumber(h), tonumber(m)
-        if not (h and m and addon.WithinRange(h, 0, 23) and addon.WithinRange(m, 0, 59)) then
-            addon:error(L.ErrBossTime)
-            return
-        end
+        local modeText = _G[getName() .. "ModeDropDownText"]:GetText()
+        local bossMode = (modeText == "H") and "h" or "n"
 
-        local _, month, day, year = CalendarGetDate()
-        local killDate = { day = day, month = month, year = year, hour = h, min = m }
-        local mode = (modeT == "h") and "h" or "n"
+        local d = date("*t", time())
+        local _, month, year = CalendarGetDate()
+        d.year, d.month, d.day = year, month, CalendarFrame_GetSelectedDay() or d.day
 
-        if isEdit and bossData then
-            bossData.name = name
-            bossData.time = time(killDate)
-            bossData.mode = mode
+        local hh, mm = Utils.parseTime(_G[getName() .. "TimeEditBox"]:GetText())
+        d.hour, d.min, d.sec = hh or d.hour, mm or d.min, 0
+        local bossTime = time(d)
+
+        if frame.isEdit and frame.bossNid then
+            local boss = addon.Raid:GetBossByNid(rID, frame.bossNid)
+            if not boss then
+                addon:error(L.ErrLoggerInvalidBoss)
+                return
+            end
+            boss.name = bossName
+            boss.mode = bossMode
+            boss.time = bossTime
         else
-            tinsert(KRT_Raids[rID].bossKills, {
-                name = name,
-                time = time(killDate),
-                mode = mode,
+            local bossNid = raid.nextBossNid
+            raid.nextBossNid = bossNid + 1
+            tinsert(raid.bossKills, {
+                bossNid = bossNid,
+                name = bossName,
+                mode = bossMode,
+                time = bossTime,
                 players = {},
             })
         end
 
-        self:Hide()
+        frame.isEdit = false
+        frame.bossNid = nil
+
+        addon.Logger.selectedBoss = nil
         addon.Logger:ResetSelections()
         Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid)
+
+        self:Toggle()
     end
 
-    function Box:CancelAddEdit()
-        Utils.resetEditBox(_G[frameName .. "Name"])
-        Utils.resetEditBox(_G[frameName .. "Difficulty"])
-        Utils.resetEditBox(_G[frameName .. "Time"])
-        isEdit, raidData, bossData = false, {}, {}
-        twipe(tempDate)
-    end
-
-    function Box:UpdateUIFrame(frame, elapsed)
-        if not localized then
-            addon:SetTooltip(_G[frameName .. "Name"], L.StrBossNameHelp, "ANCHOR_LEFT")
-            addon:SetTooltip(_G[frameName .. "Difficulty"], L.StrBossDifficultyHelp, "ANCHOR_LEFT")
-            addon:SetTooltip(_G[frameName .. "Time"], L.StrBossTimeHelp, "ANCHOR_RIGHT")
-            localized = true
+    function BossBox:Cancel()
+        local frame = _G[getName()]
+        if frame then
+            frame.isEdit = false
+            frame.bossNid = nil
         end
-        Utils.throttledUIUpdate(frame, frameName, updateInterval, elapsed, function()
-            Utils.setText(_G[frameName .. "Title"], L.StrEditBoss, L.StrAddBoss, isEdit)
-        end)
+        self:Toggle()
     end
 end
 
 -- ============================================================================
--- Logger: Add Attendee Popup
+-- AttendeesBox popup (Add boss attendees by name from raid roster)
 -- ============================================================================
 do
     addon.Logger.AttendeesBox = addon.Logger.AttendeesBox or {}
-    local Box = addon.Logger.AttendeesBox
+    local AttBox = addon.Logger.AttendeesBox
     local L = addon.L
 
-    local frameName
+    local function getName() return "KRTLoggerAttendeesEditFrame" end
 
-    function Box:OnLoad(frame)
+    function AttBox:Toggle()
+        local frame = _G[getName()]
         if not frame then return end
-        frameName = frame:GetName()
-        frame:RegisterForDrag("LeftButton")
-        frame:SetScript("OnShow", function()
-            Utils.resetEditBox(_G[frameName .. "Name"])
-        end)
-        frame:SetScript("OnHide", function()
-            Utils.resetEditBox(_G[frameName .. "Name"])
-        end)
+        Utils.toggle(frame)
     end
 
-    function Box:Toggle() Utils.toggle(_G[frameName]) end
+    function AttBox:Save()
+        local frame = _G[getName()]
+        if not frame then return end
 
-    function Box:Save()
-        local name = Utils.trimText(_G[frameName .. "Name"]:GetText())
+        local rID = addon.Logger.selectedRaid
+        local bossNid = addon.Logger.selectedBoss
+        if not (rID and bossNid and KRT_Raids[rID]) then return end
+
+        local bossKill = addon.Raid:GetBossByNid(rID, bossNid)
+        if not bossKill then return end
+
+        local name = Utils.trimText(_G[getName() .. "NameEditBox"]:GetText() or "")
         local normalizedName = Utils.normalizeLower(name)
-        if normalizedName == "" then
+        if not normalizedName or normalizedName == "" then
             addon:error(L.ErrAttendeesInvalidName)
             return
         end
 
-        local rID, bID = addon.Logger.selectedRaid, addon.Logger.selectedBoss
-        if not (rID and bID and KRT_Raids[rID]) then
-            addon:error(L.ErrAttendeesInvalidRaidBoss)
-            return
-        end
-
-        local bossKill = KRT_Raids[rID].bossKills[bID]
-        for _, n in ipairs(bossKill.players) do
+        for _, n in ipairs(bossKill.players or {}) do
             if Utils.normalizeLower(n) == normalizedName then
                 addon:error(L.ErrAttendeesPlayerExists)
                 return
             end
         end
 
-        for _, p in ipairs(KRT_Raids[rID].players) do
+        for _, p in ipairs(KRT_Raids[rID].players or {}) do
             if normalizedName == Utils.normalizeLower(p.name) then
+                bossKill.players = bossKill.players or {}
                 tinsert(bossKill.players, p.name)
                 addon:info(L.StrAttendeesAddSuccess)
                 self:Toggle()
@@ -7464,6 +7641,106 @@ do
         addon:error(L.ErrAttendeesInvalidName)
     end
 end
+
+-- ============================================================================
+-- Logger Export Window Helpers (reuses KRTImportWindow safely)
+-- ============================================================================
+do
+    local Logger = addon.Logger
+    local Utils = addon.Utils
+
+    local function getImportWindow()
+        local frame = _G["KRTImportWindow"]
+        local edit = _G["KRTImportEditBox"]
+        local confirm = _G["KRTImportConfirmButton"]
+        local cancel = _G["KRTImportCancelButton"]
+        return frame, edit, confirm, cancel
+    end
+
+    local function restoreImportWindow(frame)
+        if not frame or not frame._krtTextMode then return end
+
+        local _, _, confirm, cancel = getImportWindow()
+
+        if confirm then
+            if frame._krtPrevConfirmOnClick then
+                confirm:SetScript("OnClick", frame._krtPrevConfirmOnClick)
+            end
+            if frame._krtPrevConfirmText then
+                confirm:SetText(frame._krtPrevConfirmText)
+            end
+            confirm:Enable()
+        end
+
+        if cancel then
+            if frame._krtPrevCancelOnClick then
+                cancel:SetScript("OnClick", frame._krtPrevCancelOnClick)
+            end
+            if frame._krtPrevCancelText then
+                cancel:SetText(frame._krtPrevCancelText)
+            end
+            cancel:Enable()
+        end
+
+        frame._krtTextMode = nil
+    end
+
+    -- Show a generic copy-friendly text window using KRTImportWindow.
+    -- Safely overrides confirm/cancel handlers and restores them on hide.
+    function Logger:ShowTextWindow(title, text)
+        local frame, edit, confirm, cancel = getImportWindow()
+        if not frame or not edit then
+            addon:error("KRTImportWindow/KRTImportEditBox not found (cannot export).")
+            return
+        end
+
+        if not frame._krtHooked then
+            frame._krtHooked = true
+            frame:HookScript("OnHide", function() restoreImportWindow(frame) end)
+        end
+
+        -- Save original handlers/text once per open (export mode)
+        frame._krtTextMode = true
+        if confirm then
+            frame._krtPrevConfirmOnClick = confirm:GetScript("OnClick")
+            frame._krtPrevConfirmText = confirm:GetText()
+        end
+        if cancel then
+            frame._krtPrevCancelOnClick = cancel:GetScript("OnClick")
+            frame._krtPrevCancelText = cancel:GetText()
+        end
+
+        Utils.setFrameTitle(frame, title or "Export")
+        edit:SetText(text or "")
+        edit:SetCursorPosition(0)
+
+        -- Confirm becomes "Select All" (highlight for Ctrl+C)
+        if confirm then
+            confirm:SetText("Select All")
+            confirm:SetScript("OnClick", function()
+                edit:SetFocus()
+                edit:HighlightText()
+            end)
+            confirm:Enable()
+        end
+
+        -- Cancel becomes "Close"
+        if cancel then
+            cancel:SetText("Close")
+            cancel:SetScript("OnClick", function()
+                frame:Hide()
+            end)
+            cancel:Enable()
+        end
+
+        frame:Show()
+
+        -- Auto highlight on show for convenience
+        edit:SetFocus()
+        edit:HighlightText()
+    end
+end
+
 ---============================================================================
 -- Slash Commands
 ---============================================================================
@@ -7655,11 +7932,32 @@ do
     end)
 
     registerAliases(cmdLogger, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub, arg = Utils.splitArgs(rest)
+
         if not sub or sub == "" or sub == "toggle" then
             addon.Logger:Toggle()
+            return
+        end
+
+        -- /krt logger bossdel [purge|detach]
+        if sub == "bossdel" or sub == "bossdelete" then
+            if not arg or arg == "" then
+                addon:info("Logger boss deletion mode: %s (use: /krt logger bossdel purge|detach)",
+                    tostring(addon.options.loggerBossDeleteMode))
+                return
+            end
+            arg = Utils.normalizeLower(arg)
+            if arg ~= "purge" and arg ~= "detach" then
+                addon:warn("Invalid mode: %s (use: purge|detach)", tostring(arg))
+                return
+            end
+            addon.options.loggerBossDeleteMode = arg
+            KRT_Options.loggerBossDeleteMode = arg
+            addon:info("Logger boss deletion mode set to: %s", arg)
+            return
         end
     end)
+
 
     registerAliases(cmdLoot, function(rest)
         local sub = Utils.splitArgs(rest)
@@ -7755,17 +8053,33 @@ end
 function addon:ADDON_LOADED(name)
     if name ~= addonName then return end
     self:UnregisterEvent("ADDON_LOADED")
-    addon.BUILD = addon.BUILD or "fixed4-2026-01-06"
+
+    -- ============================
+    -- Logger schema (NO retro-compat)
+    -- ============================
+    local LOGGER_SCHEMA_VERSION = 2
+    KRT_DataVersion = tonumber(KRT_DataVersion) or 0
+    if KRT_DataVersion ~= LOGGER_SCHEMA_VERSION then
+        KRT_Raids = {}
+        KRT_CurrentRaid = nil
+        KRT_LastBossNid = nil
+        KRT_DataVersion = LOGGER_SCHEMA_VERSION
+        addon:warn("Logger data reset: schema changed (no backward compatibility).")
+    end
+
+    addon.BUILD = addon.BUILD or "logger-schema2"
     local lvl = addon.GetLogLevel and addon:GetLogLevel()
-    addon:info(L.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
-        tostring(lvl), tostring(true)))
+    addon:info(L.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")), tostring(lvl), tostring(true)))
     addon:info(L.LogCoreBuild:format(tostring(addon.BUILD)))
+
     addon.LoadOptions()
     addon.Reserves:Load()
+
     for event in pairs(addonEvents) do
         self:RegisterEvent(event)
     end
     addon:debug(L.LogCoreEventsRegistered:format(addon.tLength(addonEvents)))
+
     self:RAID_ROSTER_UPDATE()
 end
 
