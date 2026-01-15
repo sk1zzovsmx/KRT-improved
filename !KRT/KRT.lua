@@ -6057,6 +6057,117 @@ do
 end
 
 -- ============================================================================
+-- Logger Export Module
+-- Centralizes CSV export logic for Logger (Loot export: ALL raid loot only)
+-- ============================================================================
+do
+    addon.Logger.Export = addon.Logger.Export or {}
+    local Export = addon.Logger.Export
+    local L = addon.L
+    local Utils = addon.Utils
+
+    local function csvEscape(v)
+        if v == nil then return "" end
+        v = tostring(v)
+        v = v:gsub("\r\n", "\n"):gsub("\r", "\n")
+        if v:find('[,"\n]') then
+            v = '"' .. v:gsub('"', '""') .. '"'
+        end
+        return v
+    end
+
+    local function tsFmt(ts)
+        ts = tonumber(ts)
+        return ts and ts > 0 and date("%Y-%m-%d %H:%M:%S", ts) or ""
+    end
+
+    local function buildBossMap(raid)
+        local map = {}
+        if not raid or not raid.bossKills then return map end
+        for i = 1, #raid.bossKills do
+            local b = raid.bossKills[i]
+            local nid = tonumber(b.bossNid)
+            if nid then map[nid] = b end
+        end
+        return map
+    end
+
+    local function buildLootCSV_All(raidId, raid)
+        local bossMap = buildBossMap(raid)
+
+        local rows = {}
+        rows[#rows + 1] = table.concat({
+            "raidId", "raidZone", "raidSize", "raidMode", "raidStart", "raidStartFmt", "raidEnd", "raidEndFmt",
+            "bossNid", "bossName", "bossTime", "bossTimeFmt",
+            "lootNid", "lootTime", "lootTimeFmt",
+            "itemId", "itemName", "itemLink", "itemRarity",
+            "winner", "rollType", "rollValue"
+        }, ",")
+
+        local lootList = raid.loot or {}
+        for i = 1, #lootList do
+            local v = lootList[i]
+            if v then
+                local bnid = tonumber(v.bossNid) or 0
+                local b = (bnid > 0) and bossMap[bnid] or nil
+
+                local bName = ""
+                if b then
+                    bName = (b.name == "_TrashMob_") and (L.StrTrashMob or "Trash") or (b.name or "")
+                elseif bnid == 0 then
+                    bName = "Unassociated"
+                end
+
+                rows[#rows + 1] = table.concat({
+                    csvEscape(raidId),
+                    csvEscape(raid.zone or ""),
+                    csvEscape(raid.size or ""),
+                    csvEscape(raid.mode or ""),
+                    csvEscape(raid.startTime or ""),
+                    csvEscape(tsFmt(raid.startTime)),
+                    csvEscape(raid.endTime or ""),
+                    csvEscape(tsFmt(raid.endTime)),
+
+                    csvEscape(bnid),
+                    csvEscape(bName),
+                    csvEscape(b and b.time or ""),
+                    csvEscape(tsFmt(b and b.time)),
+
+                    csvEscape(v.lootNid or ""),
+                    csvEscape(v.time or ""),
+                    csvEscape(tsFmt(v.time)),
+
+                    csvEscape(v.itemId or ""),
+                    csvEscape(v.itemName or ""),
+                    csvEscape(v.itemLink or ""),
+                    csvEscape(v.itemRarity or ""),
+
+                    csvEscape(v.looter or ""),
+                    csvEscape(v.rollType or 0),
+                    csvEscape(v.rollValue or 0),
+                }, ",")
+            end
+        end
+
+        return table.concat(rows, "\n")
+    end
+
+    -- Public: single action export (ALL loot in selected raid)
+    function Export:ExportLootCSV_All()
+        local rID = addon.Logger.selectedRaid
+        if not rID or not KRT_Raids[rID] then
+            addon:warn("Export CSV: no raid selected.")
+            return
+        end
+
+        local raid = KRT_Raids[rID]
+        local csv = buildLootCSV_All(rID, raid)
+        addon.Logger:ShowTextWindow(("Loot CSV Export (All) - Raid %s"):format(tostring(rID)), csv)
+    end
+end
+
+
+-- ============================================================================
 -- Logger list controller helpers (Logger-only)
 -- ============================================================================
 local makeLoggerListController
@@ -6836,8 +6947,7 @@ do
     Utils.registerCallback("LoggerSelectPlayer", function() controller:Touch() end)
 end
 
--- ============================================================================
--- Loot List (filters by selected boss and player) + CSV Export
+-- Loot List (filters by selected boss and player)
 -- ============================================================================
 do
     addon.Logger.Loot = addon.Logger.Loot or {}
@@ -6855,32 +6965,6 @@ do
 
     local function passesFilters(entry, bossNid, playerName)
         return isLootFromBoss(entry, bossNid) and isLootByPlayer(entry, playerName)
-    end
-
-    local function csvEscape(v)
-        if v == nil then return "" end
-        v = tostring(v)
-        v = v:gsub("\r\n", "\n"):gsub("\r", "\n")
-        if v:find('[,"\n]') then
-            v = '"' .. v:gsub('"', '""') .. '"'
-        end
-        return v
-    end
-
-    local function tsFmt(ts)
-        ts = tonumber(ts)
-        return ts and ts > 0 and date("%Y-%m-%d %H:%M:%S", ts) or ""
-    end
-
-    local function buildBossMap(raid)
-        local map = {}
-        if not raid or not raid.bossKills then return map end
-        for i = 1, #raid.bossKills do
-            local b = raid.bossKills[i]
-            local nid = tonumber(b.bossNid)
-            if nid then map[nid] = b end
-        end
-        return map
     end
 
     local controller = makeLoggerListController {
@@ -6909,8 +6993,18 @@ do
             _G[n .. "HeaderRoll"]:SetText(L.StrRoll)
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
 
-            -- Wire Export click here (XML has no OnClick)
-            exportBtn:SetScript("OnClick", function() Loot:ExportCSV() end)
+            -- Export wiring delegated to addon.Logger.Export
+            if exportBtn.RegisterForClicks then
+                exportBtn:RegisterForClicks("LeftButtonUp")
+            end
+
+            exportBtn:SetScript("OnClick", function()
+                if addon.Logger.Export and addon.Logger.Export.ExportLootCSV_All then
+                    addon.Logger.Export:ExportLootCSV_All()
+                else
+                    addon:warn("Logger.Export module not loaded (cannot export).")
+                end
+            end)
         end,
 
         getData = function(out)
@@ -7018,396 +7112,6 @@ do
         addon.Logger.selectedItem = nil
         controller:Dirty()
     end)
-
-    -- Export CSV of CURRENT VIEW (respects selected boss/player filters)
-    function Loot:ExportCSV()
-        local rID = addon.Logger.selectedRaid
-        if not rID or not KRT_Raids[rID] then
-            addon:warn("Export CSV: no raid selected.")
-            return
-        end
-
-        local raid = KRT_Raids[rID]
-        local bossMap = buildBossMap(raid)
-
-        local bossNid = addon.Logger.selectedBoss
-        local playerId = addon.Logger.selectedPlayer or addon.Logger.selectedBossPlayer
-        local playerName = playerId and addon.Raid:GetPlayerName(playerId, rID) or nil
-
-        local rows = {}
-        local header = table.concat({
-            "raidId", "raidZone", "raidSize", "raidMode", "raidStart", "raidStartFmt", "raidEnd", "raidEndFmt",
-            "bossNid", "bossName", "bossTime", "bossTimeFmt",
-            "lootNid", "lootTime", "lootTimeFmt",
-            "itemId", "itemName", "itemLink", "itemRarity",
-            "winner", "rollType", "rollValue"
-        }, ",")
-
-        rows[#rows + 1] = header
-
-        for i = 1, #(raid.loot or {}) do
-            local v = raid.loot[i]
-            if v and passesFilters(v, bossNid, playerName) then
-                local bnid = tonumber(v.bossNid) or 0
-                local b = (bnid > 0) and bossMap[bnid] or nil
-                local bName = ""
-                if b then
-                    bName = (b.name == "_TrashMob_") and (L.StrTrashMob or "Trash") or (b.name or "")
-                elseif bnid == 0 then
-                    bName = "Unassociated"
-                end
-
-                local line = table.concat({
-                    csvEscape(rID),
-                    csvEscape(raid.zone or ""),
-                    csvEscape(raid.size or ""),
-                    csvEscape(raid.mode or ""),
-                    csvEscape(raid.startTime or ""),
-                    csvEscape(tsFmt(raid.startTime)),
-                    csvEscape(raid.endTime or ""),
-                    csvEscape(tsFmt(raid.endTime)),
-                    csvEscape(bnid),
-                    csvEscape(bName),
-                    csvEscape(b and b.time or ""),
-                    csvEscape(tsFmt(b and b.time)),
-                    csvEscape(v.lootNid or ""),
-                    csvEscape(v.time or ""),
-                    csvEscape(tsFmt(v.time)),
-                    csvEscape(v.itemId or ""),
-                    csvEscape(v.itemName or ""),
-                    csvEscape(v.itemLink or ""),
-                    csvEscape(v.itemRarity or ""),
-                    csvEscape(v.looter or ""),
-                    csvEscape(v.rollType or 0),
-                    csvEscape(v.rollValue or 0),
-                }, ",")
-
-                rows[#rows + 1] = line
-            end
-        end
-
-        local csv = table.concat(rows, "\n")
-        addon.Logger:ShowTextWindow(("Loot CSV Export (Raid %s)"):format(tostring(rID)), csv)
-    end
-
-    -- Central logging entry (runtime + logger edits)
-    -- itemID here is lootNid (stable), not array index.
-    function Loot:Log(itemID, winner, rollType, rollValue, source, raidIDOverride)
-        local isLoggerSource = source and source:find("^LOGGER_") ~= nil
-
-        local raidID
-        if raidIDOverride then
-            raidID = raidIDOverride
-        elseif isLoggerSource then
-            raidID = addon.Logger.selectedRaid
-        else
-            raidID = KRT_CurrentRaid or addon.Logger.selectedRaid
-        end
-
-        if not raidID or not KRT_Raids[raidID] then
-            addon:warn(L.LogLoggerNoRaidSelected)
-            return
-        end
-
-        itemID = tonumber(itemID)
-        if not itemID or itemID <= 0 then
-            addon:warn(L.LogLoggerInvalidItemId)
-            return
-        end
-
-        local loot = addon.Raid:GetLootByNid(raidID, itemID)
-        if not loot then
-            addon:warn(L.LogLoggerInvalidItemId)
-            return
-        end
-
-        local hasChange = false
-
-        if winner ~= nil then
-            loot.looter = tostring(winner)
-            hasChange = true
-        end
-
-        if rollType ~= nil then
-            local rt = tonumber(rollType)
-            if rt then
-                loot.rollType = rt
-                hasChange = true
-            end
-        end
-
-        if rollValue ~= nil then
-            local rv = tonumber(rollValue)
-            if rv and rv >= 0 then
-                loot.rollValue = rv
-                hasChange = true
-            end
-        end
-
-        if hasChange then
-            addon:info(L.LogLoggerLootEdited:format(tostring(raidID), tostring(itemID), tostring(source or "?")))
-            controller:Dirty()
-        end
-    end
-
-    Utils.registerCallbacks({ "LoggerSelectRaid", "LoggerSelectBoss", "LoggerSelectPlayer", "LoggerSelectBossPlayer" },
-        function() controller:Dirty() end)
-    Utils.registerCallback("LoggerSelectItem", function() controller:Touch() end)
-end
-
--- ============================================================================
--- Loot List (filters by selected boss and player) + CSV Export
--- ============================================================================
-do
-    addon.Logger.Loot = addon.Logger.Loot or {}
-    local Loot = addon.Logger.Loot
-    local L = addon.L
-    local Utils = addon.Utils
-
-    local function isLootFromBoss(entry, bossNid)
-        return not bossNid or bossNid <= 0 or tonumber(entry.bossNid) == tonumber(bossNid)
-    end
-
-    local function isLootByPlayer(entry, playerName)
-        return not playerName or entry.looter == playerName
-    end
-
-    local function passesFilters(entry, bossNid, playerName)
-        return isLootFromBoss(entry, bossNid) and isLootByPlayer(entry, playerName)
-    end
-
-    local function csvEscape(v)
-        if v == nil then return "" end
-        v = tostring(v)
-        v = v:gsub("\r\n", "\n"):gsub("\r", "\n")
-        if v:find('[,"\n]') then
-            v = '"' .. v:gsub('"', '""') .. '"'
-        end
-        return v
-    end
-
-    local function tsFmt(ts)
-        ts = tonumber(ts)
-        return ts and ts > 0 and date("%Y-%m-%d %H:%M:%S", ts) or ""
-    end
-
-    local function buildBossMap(raid)
-        local map = {}
-        if not raid or not raid.bossKills then return map end
-        for i = 1, #raid.bossKills do
-            local b = raid.bossKills[i]
-            local nid = tonumber(b.bossNid)
-            if nid then map[nid] = b end
-        end
-        return map
-    end
-
-    local controller = makeLoggerListController {
-        keyName = "LootList",
-        poolTag = "logger-loot",
-        _rowParts = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
-
-        localize = function(n)
-            local title = _G[n .. "Title"]
-            if title then title:SetText(L.StrRaidLoot) end
-
-            local exportBtn = _G[n .. "ExportBtn"]
-            local clearBtn  = _G[n .. "ClearBtn"]
-            local editBtn   = _G[n .. "EditBtn"]
-            local delBtn    = _G[n .. "DeleteBtn"]
-
-            exportBtn:SetText(L.BtnExport)
-            clearBtn:SetText(L.BtnClear)
-            editBtn:SetText(L.BtnEdit)
-            if delBtn then delBtn:SetText(L.BtnDelete) end
-
-            _G[n .. "HeaderItem"]:SetText(L.StrItem)
-            _G[n .. "HeaderSource"]:SetText(L.StrSource)
-            _G[n .. "HeaderWinner"]:SetText(L.StrWinner)
-            _G[n .. "HeaderType"]:SetText(L.StrType)
-            _G[n .. "HeaderRoll"]:SetText(L.StrRoll)
-            _G[n .. "HeaderTime"]:SetText(L.StrTime)
-
-            -- Wire Export click here (XML has no OnClick)
-            exportBtn:SetScript("OnClick", function() Loot:ExportCSV() end)
-        end,
-
-        getData = function(out)
-            local rID = addon.Logger.selectedRaid
-            if not rID or not KRT_Raids[rID] then return end
-
-            local bossNid = addon.Logger.selectedBoss
-            local playerId = addon.Logger.selectedPlayer or addon.Logger.selectedBossPlayer
-            local playerName = playerId and addon.Raid:GetPlayerName(playerId, rID) or nil
-
-            local loot = addon.Raid:GetLoot(rID, 0)
-            local idx = 0
-
-            for i = 1, #loot do
-                local v = loot[i]
-                if passesFilters(v, bossNid, playerName) then
-                    idx = idx + 1
-                    local it = {}
-                    it.id = tonumber(v.lootNid) or v.id or i
-                    it.name = v.itemName or ""
-                    it.link = v.itemLink
-                    it.source = addon.Logger.Boss:GetName(v.bossNid, rID)
-                    it.winner = v.looter or ""
-                    it.type = (rollTypeNames and rollTypeNames[v.rollType]) or tostring(v.rollType or 0)
-                    it.roll = tostring(v.rollValue or 0)
-                    it.time = v.time or 0
-                    it.timeFmt = (v.time and date("%H:%M", v.time)) or ""
-                    it.icon = v.itemTexture
-                    out[idx] = it
-                end
-            end
-        end,
-
-        rowName = function(n, _, i) return n .. "ItemBtn" .. i end,
-        rowTmpl = "KRTLoggerLootButton",
-
-        drawRow = (function()
-            local ROW_H
-            return function(row, it)
-                if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
-                local ui = row._p
-                ui.Name:SetText(it.link or it.name)
-                ui.Source:SetText(it.source)
-                ui.Winner:SetText(it.winner)
-                ui.Type:SetText(it.type)
-                ui.Roll:SetText(it.roll)
-                ui.Time:SetText(it.timeFmt)
-                if ui.ItemIconTexture and it.icon then
-                    ui.ItemIconTexture:SetTexture(it.icon)
-                end
-                return ROW_H
-            end
-        end)(),
-
-        highlightId = function() return addon.Logger.selectedItem end,
-
-        postUpdate = function(n)
-            local hasRaid = addon.Logger.selectedRaid
-            local hasItem = addon.Logger.selectedItem
-
-            Utils.enableDisable(_G[n .. "ExportBtn"], hasRaid ~= nil)
-            Utils.enableDisable(_G[n .. "ClearBtn"], hasRaid ~= nil)
-            Utils.enableDisable(_G[n .. "EditBtn"], hasItem ~= nil)
-
-            local delBtn = _G[n .. "DeleteBtn"]
-            if delBtn then
-                Utils.enableDisable(delBtn, hasItem ~= nil)
-            end
-        end,
-
-        sorters = {
-            name = function(a, b, asc) return asc and (a.name < b.name) or (a.name > b.name) end,
-            source = function(a, b, asc) return asc and (a.source < b.source) or (a.source > b.source) end,
-            winner = function(a, b, asc) return asc and (a.winner < b.winner) or (a.winner > b.winner) end,
-            type = function(a, b, asc) return asc and (a.type < b.type) or (a.type > b.type) end,
-            roll = function(a, b, asc)
-                local av, bv = tonumber(a.roll) or 0, tonumber(b.roll) or 0
-                return asc and (av < bv) or (av > bv)
-            end,
-            time = function(a, b, asc) return asc and (a.time < b.time) or (a.time > b.time) end,
-        },
-    }
-
-    bindLoggerListController(Loot, controller)
-
-    function Loot:Clear()
-        local rID = addon.Logger.selectedRaid
-        if not rID or not KRT_Raids[rID] then return end
-        KRT_Raids[rID].loot = {}
-        addon.Logger.selectedItem = nil
-        controller:Dirty()
-    end
-
-    function Loot:Delete()
-        if addon.Logger.selectedItem then
-            StaticPopup_Show("KRTLOGGER_DELETE_ITEM")
-        end
-    end
-
-    controller._makeConfirmPopup("KRTLOGGER_DELETE_ITEM", L.StrConfirmDeleteItem, function()
-        local rID = addon.Logger.selectedRaid
-        local lootNid = addon.Logger.selectedItem
-        if not (rID and lootNid) then return end
-        addon.Raid:DeleteLootByNid(rID, lootNid)
-        addon.Logger.selectedItem = nil
-        controller:Dirty()
-    end)
-
-    -- Export CSV of CURRENT VIEW (respects selected boss/player filters)
-    function Loot:ExportCSV()
-        local rID = addon.Logger.selectedRaid
-        if not rID or not KRT_Raids[rID] then
-            addon:warn("Export CSV: no raid selected.")
-            return
-        end
-
-        local raid = KRT_Raids[rID]
-        local bossMap = buildBossMap(raid)
-
-        local bossNid = addon.Logger.selectedBoss
-        local playerId = addon.Logger.selectedPlayer or addon.Logger.selectedBossPlayer
-        local playerName = playerId and addon.Raid:GetPlayerName(playerId, rID) or nil
-
-        local rows = {}
-        local header = table.concat({
-            "raidId", "raidZone", "raidSize", "raidMode", "raidStart", "raidStartFmt", "raidEnd", "raidEndFmt",
-            "bossNid", "bossName", "bossTime", "bossTimeFmt",
-            "lootNid", "lootTime", "lootTimeFmt",
-            "itemId", "itemName", "itemLink", "itemRarity",
-            "winner", "rollType", "rollValue"
-        }, ",")
-
-        rows[#rows + 1] = header
-
-        for i = 1, #(raid.loot or {}) do
-            local v = raid.loot[i]
-            if v and passesFilters(v, bossNid, playerName) then
-                local bnid = tonumber(v.bossNid) or 0
-                local b = (bnid > 0) and bossMap[bnid] or nil
-                local bName = ""
-                if b then
-                    bName = (b.name == "_TrashMob_") and (L.StrTrashMob or "Trash") or (b.name or "")
-                elseif bnid == 0 then
-                    bName = "Unassociated"
-                end
-
-                local line = table.concat({
-                    csvEscape(rID),
-                    csvEscape(raid.zone or ""),
-                    csvEscape(raid.size or ""),
-                    csvEscape(raid.mode or ""),
-                    csvEscape(raid.startTime or ""),
-                    csvEscape(tsFmt(raid.startTime)),
-                    csvEscape(raid.endTime or ""),
-                    csvEscape(tsFmt(raid.endTime)),
-                    csvEscape(bnid),
-                    csvEscape(bName),
-                    csvEscape(b and b.time or ""),
-                    csvEscape(tsFmt(b and b.time)),
-                    csvEscape(v.lootNid or ""),
-                    csvEscape(v.time or ""),
-                    csvEscape(tsFmt(v.time)),
-                    csvEscape(v.itemId or ""),
-                    csvEscape(v.itemName or ""),
-                    csvEscape(v.itemLink or ""),
-                    csvEscape(v.itemRarity or ""),
-                    csvEscape(v.looter or ""),
-                    csvEscape(v.rollType or 0),
-                    csvEscape(v.rollValue or 0),
-                }, ",")
-
-                rows[#rows + 1] = line
-            end
-        end
-
-        local csv = table.concat(rows, "\n")
-        addon.Logger:ShowTextWindow(("Loot CSV Export (Raid %s)"):format(tostring(rID)), csv)
-    end
 
     -- Central logging entry (runtime + logger edits)
     -- itemID here is lootNid (stable), not array index.
