@@ -377,7 +377,7 @@ do
         local mode = (diff == 3 or diff == 4) and "h" or "n"
 
         KRT_CurrentRaid = (tonumber(KRT_CurrentRaid) or 0) + 1
-        numRaid = GetNumGroupMembers() or 0
+        numRaid = addon.GetNumGroupMembers() or 0
 
         local raid = {
             schemaVersion = 2,
@@ -476,7 +476,8 @@ do
     function module:FirstCheck()
         local instanceName, instanceType, instanceDiff = GetInstanceInfo()
         if instanceType == "raid" and L.RaidZones[instanceName] ~= nil then
-            addon:trace(L.LogRaidFirstCheck:format(tostring(instanceName), tostring(instanceDiff)))
+            addon:trace(L.LogRaidFirstCheck:format(tostring(addon.IsInRaid()), tostring(KRT_CurrentRaid),
+                tostring(instanceName), tostring(instanceType), tostring(instanceDiff)))
             self:Check(instanceName, instanceDiff)
         end
     end
@@ -499,7 +500,7 @@ do
             return
         end
 
-        numRaid = GetNumGroupMembers() or 0
+        numRaid = addon.GetNumGroupMembers() or 0
         if not KRT_CurrentRaid then return end
 
         local raid = KRT_Raids[KRT_CurrentRaid]
