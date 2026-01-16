@@ -2322,7 +2322,6 @@ do
 
             addon:Announce(message)
             _G[frameName .. "ItemCount"]:ClearFocus()
-            lootState.currentRollItem = addon.Raid:GetLootID(itemID)
         end
     end
 
