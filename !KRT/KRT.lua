@@ -727,7 +727,7 @@ do
             return -- nothing to log; avoid crash
         end
 
-        local itemName, _, itemRarity, _, _, itemType, itemSubType, _, _, itemTexture = GetItemInfo(itemLink)
+        local itemName, _, itemRarity, _, _, itemType, _, _, _, itemTexture = GetItemInfo(itemLink)
         local itemId = tonumber(itemLink:match("item:(%d+)")) or tonumber(addon.GetItemID and addon:GetItemID(itemLink)) or
             0
 
