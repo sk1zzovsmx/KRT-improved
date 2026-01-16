@@ -570,11 +570,13 @@ do
 
         postUpdate = function(n)
             local sel = addon.Logger.selectedRaid
-            local raidSize = addon.Raid:GetRaidSize()
+            local groupType = addon.GetGroupTypeAndCount()
+            local isRaid = groupType == "raid"
+            local raidSize = isRaid and addon.Raid:GetRaidSize() or 0
             local canSetCurrent = sel
                 and sel ~= KRT_CurrentRaid
                 and not addon.Raid:Expired(sel)
-                and (raidSize == 0 or raidSize == KRT_Raids[sel].size)
+                and (not isRaid or raidSize == KRT_Raids[sel].size)
 
             Utils.enableDisable(_G[n .. "CurrentBtn"], canSetCurrent)
             Utils.enableDisable(_G[n .. "DeleteBtn"], (sel ~= KRT_CurrentRaid))
@@ -594,8 +596,10 @@ do
         local sel = addon.Logger.selectedRaid
         if not (btn and sel and KRT_Raids[sel]) then return end
 
-        local raidSize = addon.Raid:GetRaidSize()
-        if raidSize ~= 0 and KRT_Raids[sel].size ~= raidSize then
+        local groupType = addon.GetGroupTypeAndCount()
+        local isRaid = groupType == "raid"
+        local raidSize = isRaid and addon.Raid:GetRaidSize() or 0
+        if isRaid and KRT_Raids[sel].size ~= raidSize then
             addon:error(L.ErrCannotSetCurrentRaidSize)
             return
         end
