@@ -27,13 +27,28 @@ Localization\localization.en.lua
 # Templates File:
 Templates.xml
 
-# Utilities Files:
+# Core/Utilities Files:
+Modules\Core.lua
 Modules\Utils.lua
 Modules\C.lua
 
-# Core Files:
+# Bootstrap:
 KRT.lua
-KRT.xml
 
 # Modules
+Modules\Raid.lua
+Modules\Chat.lua
+Modules\Minimap.lua
+Modules\Rolls.lua
+Modules\Loot.lua
+Modules\Master.lua
+Modules\Reserves.lua
+Modules\Config.lua
+Modules\Warnings.lua
+Modules\Changes.lua
+Modules\Spammer.lua
+Modules\Logger.lua
+Modules\Slash.lua
+
+KRT.xml
 Modules\ignoredItems.lua
