@@ -308,30 +308,37 @@ do
             itemLink = msg:match("|Hitem:[%-:%d]+|h%[[^%]]+%]|h") -- fallback
         end
 
+        local function getLinkedItem(value)
+            if value and value:find("|Hitem:") then
+                return value
+            end
+            return nil
+        end
+
         local player
         if addon.Deformat then
             local item = addon.Deformat(msg, LOOT_ITEM_SELF)
             if item then
                 player = UnitName("player")
-                return itemLink or item, player
+                return itemLink or getLinkedItem(item), player
             end
 
             local itemMultiple = addon.Deformat(msg, LOOT_ITEM_SELF_MULTIPLE)
             if itemMultiple then
                 player = UnitName("player")
-                return itemLink or itemMultiple, player
+                return itemLink or getLinkedItem(itemMultiple), player
             end
 
             local who, otherItem = addon.Deformat(msg, LOOT_ITEM)
             if who and otherItem then
                 player = who
-                return itemLink or otherItem, player
+                return itemLink or getLinkedItem(otherItem), player
             end
 
             local whoMultiple, otherItemMultiple = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
             if whoMultiple and otherItemMultiple then
                 player = whoMultiple
-                return itemLink or otherItemMultiple, player
+                return itemLink or getLinkedItem(otherItemMultiple), player
             end
         end
 
