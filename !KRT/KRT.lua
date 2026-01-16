@@ -300,6 +300,34 @@ do
         return nil
     end
 
+    -- Parse loot chat message and return itemLink, playerName
+    function addon.GetLootMsgInfo(msg)
+        if not msg then return nil, nil end
+        -- pattern for full item link in 3.3.5a
+        local itemLink = msg:match("|c%x+|Hitem:%d+:%S+|h%[[^%]]+%]|h|r")
+        if not itemLink then
+            itemLink = msg:match("|Hitem:%d+:%S+|h%[[^%]]+%]|h") -- fallback
+        end
+
+        local player
+        -- check for "X receives loot"
+        local name = msg:match("^([^%s]+) receives loot")
+        if name then
+            if name == "You" then
+                player = UnitName("player")
+            else
+                player = name
+            end
+        else
+            -- check for "You receive loot"
+            if msg:find("You receive loot") then
+                player = UnitName("player")
+            end
+        end
+
+        return itemLink, player
+    end
+
     -- Public helpers for Logger/UI
     function module:GetBossByNid(raidNum, bossNid)
         local raid = getRaid(raidNum)
@@ -637,7 +665,9 @@ do
         ensureRaidSchema(raid)
 
         local itemLink, player = addon.GetLootMsgInfo(msg)
-        if not itemLink or not player then return end
+        if not itemLink or not player then
+            return -- nothing to log; avoid crash
+        end
 
         local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture, _, itemClassID = GetItemInfo(itemLink)
         local itemId = tonumber(itemLink:match("item:(%d+)")) or tonumber(addon.GetItemID and addon:GetItemID(itemLink)) or
