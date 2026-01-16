@@ -302,6 +302,7 @@ Throttle high-frequency sources (roster updates, combat log, UI refresh loops).
 ---
 
 ## 17) Change log (edit manually)
+- 2026-03-09: Logger "Set Current" now allows switching raids while not in a raid group.
 - 2026-03-08_: Split KRT.lua into module files and added Modules/Core.lua with updated toc load order.
 - 2026-01-13: Standardized repository language to English (AGENTS + codebase rules).
 - 2026-01-13: Reaffirmed **KRT.lua monolithic** policy and in-file module skeleton.
