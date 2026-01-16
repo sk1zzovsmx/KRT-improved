@@ -44,6 +44,7 @@ KRT_LastBoss              = KRT_LastBoss or nil
 KRT_NextReset             = KRT_NextReset or 0
 KRT_SavedReserves         = KRT_SavedReserves or {}
 KRT_PlayerCounts          = KRT_PlayerCounts or {}
+addon.options             = KRT_Options
 
 ---============================================================================
 -- External Libraries / Bootstrap
@@ -1283,19 +1284,19 @@ do
     end
 
     function module:SetPos(angle)
-        addon.options = addon.options or KRT_Options or {}
+        local options = addon.options
         angle = angle % 360
-        addon.options.minimapPos = angle
+        options.minimapPos = angle
         local r = rad(angle)
         KRT_MINIMAP_GUI:ClearAllPoints()
         KRT_MINIMAP_GUI:SetPoint("CENTER", cos(r) * 80, sin(r) * 80)
     end
 
     function module:OnLoad()
-        addon.options = addon.options or KRT_Options or {}
+        local options = addon.options
         KRT_MINIMAP_GUI:SetUserPlaced(true)
-        self:SetPos(addon.options.minimapPos or 325)
-        SetMinimapShown(addon.options.minimapButton ~= false)
+        self:SetPos(options.minimapPos or 325)
+        SetMinimapShown(options.minimapButton ~= false)
         KRT_MINIMAP_GUI:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         KRT_MINIMAP_GUI:SetScript("OnMouseDown", function(self, button)
             if IsAltKeyDown() then
@@ -1346,9 +1347,9 @@ do
 
     -- Toggles the visibility of the minimap button.
     function module:ToggleMinimapButton()
-        addon.options = addon.options or KRT_Options or {}
-        addon.options.minimapButton = not addon.options.minimapButton
-        SetMinimapShown(addon.options.minimapButton)
+        local options = addon.options
+        options.minimapButton = not options.minimapButton
+        SetMinimapShown(options.minimapButton)
     end
 
     -- Hides the minimap button.
@@ -2002,7 +2003,7 @@ do
             local currentItemBtn = _G[frameName .. "ItemBtn"]
             currentItemBtn:SetNormalTexture(i.itemTexture)
 
-            local options = addon.options or KRT_Options or {}
+            local options = addon.options
             if options.showTooltips then
                 currentItemBtn.tooltip_item = i.itemLink
                 addon:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
@@ -4467,6 +4468,18 @@ do
     -- Private helpers
     -------------------------------------------------------
     local LocalizeUIFrame
+    local function MergeDefaults(target, defaults)
+        for key, value in pairs(defaults) do
+            if type(value) == "table" then
+                if type(target[key]) ~= "table" then
+                    target[key] = {}
+                end
+                MergeDefaults(target[key], value)
+            elseif target[key] == nil then
+                target[key] = value
+            end
+        end
+    end
 
     -------------------------------------------------------
     -- Public methods
@@ -4496,9 +4509,12 @@ do
     -- Loads the default options into the settings table.
     --
     local function LoadDefaultOptions()
-        local options = {}
+        if type(KRT_Options) ~= "table" then
+            KRT_Options = {}
+        end
+        local options = KRT_Options
+        twipe(options)
         addon.tCopy(options, defaultOptions)
-        KRT_Options = options
         addon.options = options
         configDirty = true
         addon:info(L.MsgDefaultsRestored)
@@ -4508,13 +4524,11 @@ do
     -- Loads addon options from saved variables, filling in defaults.
     --
     local function LoadOptions()
-        local options = {}
-        addon.tCopy(options, defaultOptions)
-        if KRT_Options then
-            addon.tCopy(options, KRT_Options)
+        if type(KRT_Options) ~= "table" then
+            KRT_Options = {}
         end
-        KRT_Options = options
-        addon.options = options
+        MergeDefaults(KRT_Options, defaultOptions)
+        addon.options = KRT_Options
 
         Utils.applyDebugSetting(addon.options.debug)
         configDirty = true
