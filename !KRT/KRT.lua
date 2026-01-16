@@ -300,19 +300,19 @@ do
         return nil
     end
 
+    local function getLinkedItem(value)
+        if value and value:find("|Hitem:") then
+            return value
+        end
+        return nil
+    end
+
     -- Parse loot chat message and return itemLink, playerName
     function addon.GetLootMsgInfo(msg)
         if not msg then return nil, nil end
         local itemLink = msg:match("|c%x+|Hitem:[%-:%d]+|h%[[^%]]+%]|h|r")
         if not itemLink then
             itemLink = msg:match("|Hitem:[%-:%d]+|h%[[^%]]+%]|h") -- fallback
-        end
-
-        local function getLinkedItem(value)
-            if value and value:find("|Hitem:") then
-                return value
-            end
-            return nil
         end
 
         local player
