@@ -2919,7 +2919,7 @@ do
                     tostring(lootState.winner), tonumber(lootState.currentRollType) or -1,
                     addon.Rolls:HighestRoll()))
                 if lootState.currentRollItem and lootState.currentRollItem > 0 then
-                    local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.winner,
+                    local ok = addon.Logger.Log:UpdateLoot(lootState.currentRollItem, lootState.winner,
                         lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT", KRT_CurrentRaid)
 
                     if not ok then
@@ -3022,7 +3022,8 @@ do
                 Utils.whisper(playerName, whisper)
             end
             if lootState.currentRollItem and lootState.currentRollItem > 0 then
-                local ok = addon.Logger.Loot:Log(lootState.currentRollItem, playerName, rollType, rollValue, "ML_AWARD",
+                local ok = addon.Logger.Log:UpdateLoot(lootState.currentRollItem, playerName, rollType, rollValue,
+                    "ML_AWARD",
                     KRT_CurrentRaid)
                 if not ok then
                     addon:error(L.LogMLAwardLoggerFailed:format(tostring(KRT_CurrentRaid),
@@ -3146,7 +3147,7 @@ do
             end
             if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE
                 and playerName == lootState.trader then
-                local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.trader, rollType, rollValue,
+                local ok = addon.Logger.Log:UpdateLoot(lootState.currentRollItem, lootState.trader, rollType, rollValue,
                     "TRADE_KEEP", KRT_CurrentRaid)
                 if not ok then
                     addon:error(L.LogTradeKeepLoggerFailed:format(tostring(KRT_CurrentRaid),
@@ -5851,6 +5852,7 @@ do
     addon.Logger = addon.Logger or {}
     local Logger = addon.Logger
     local L = addon.L
+    local Utils = addon.Utils
 
     local frameName
 
@@ -5933,8 +5935,10 @@ do
         Utils.triggerEvent("LoggerSelectBossPlayer", Logger.selectedBossPlayer)
     end
 
-    -- Item: left select, right menu
+    -- Item: left select, right menu + edit popups (uses Logger.Log:UpdateLoot)
     do
+        local Utils = addon.Utils
+
         local function openItemMenu()
             local f = _G.KRTLoggerItemMenuFrame
                 or CreateFrame("Frame", "KRTLoggerItemMenuFrame", UIParent, "UIDropDownMenuTemplate")
@@ -6031,7 +6035,11 @@ do
                     return
                 end
 
-                addon.Logger.Loot:Log(self.lootNid, winner, nil, nil, "LOGGER_EDIT_WINNER")
+                if addon.Logger.Log and addon.Logger.Log.UpdateLoot then
+                    addon.Logger.Log:UpdateLoot(self.lootNid, winner, nil, nil, "LOGGER_EDIT_WINNER", self.raidId)
+                else
+                    addon:error("Logger.Log module not loaded (cannot edit loot).")
+                end
             end,
             function(self)
                 self.raidId = addon.Logger.selectedRaid
@@ -6041,19 +6049,110 @@ do
 
         Utils.makeEditBoxPopup("KRTLOGGER_ITEM_EDIT_ROLL", L.StrEditItemRollTypeHelp,
             function(self, text)
-                addon.Logger.Loot:Log(self.lootNid, nil, text, nil, "LOGGER_EDIT_ROLLTYPE")
+                if addon.Logger.Log and addon.Logger.Log.UpdateLoot then
+                    addon.Logger.Log:UpdateLoot(self.lootNid, nil, text, nil, "LOGGER_EDIT_ROLLTYPE", self.raidId)
+                else
+                    addon:error("Logger.Log module not loaded (cannot edit loot).")
+                end
             end,
-            function(self) self.lootNid = addon.Logger.selectedItem end,
+            function(self)
+                self.raidId = addon.Logger.selectedRaid
+                self.lootNid = addon.Logger.selectedItem
+            end,
             validateRollType
         )
 
         Utils.makeEditBoxPopup("KRTLOGGER_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp,
             function(self, text)
-                addon.Logger.Loot:Log(self.lootNid, nil, nil, text, "LOGGER_EDIT_ROLLVALUE")
+                if addon.Logger.Log and addon.Logger.Log.UpdateLoot then
+                    addon.Logger.Log:UpdateLoot(self.lootNid, nil, nil, text, "LOGGER_EDIT_ROLLVALUE", self.raidId)
+                else
+                    addon:error("Logger.Log module not loaded (cannot edit loot).")
+                end
             end,
-            function(self) self.lootNid = addon.Logger.selectedItem end,
+            function(self)
+                self.raidId = addon.Logger.selectedRaid
+                self.lootNid = addon.Logger.selectedItem
+            end,
             validateRollValue
         )
+    end
+end
+
+-- ============================================================================
+-- Logger Domain Module (data mutations)
+-- Central logging/edit entry (lootNid stable)
+-- ============================================================================
+do
+    addon.Logger.Log = addon.Logger.Log or {}
+    local Log = addon.Logger.Log
+    local L = addon.L
+    local Utils = addon.Utils
+
+    -- UpdateLoot edits an existing loot entry by lootNid (stable).
+    -- winner/rollType/rollValue are optional; nil means "no change".
+    -- source is diagnostic (e.g. "LOGGER_EDIT_WINNER", "ML_AWARD", etc.)
+    -- raidIDOverride (optional) forces the raid id; otherwise runtime sources go to KRT_CurrentRaid.
+    function Log:UpdateLoot(lootNid, winner, rollType, rollValue, source, raidIDOverride)
+        local isLoggerSource = source and source:find("^LOGGER_") ~= nil
+
+        local raidID
+        if raidIDOverride then
+            raidID = raidIDOverride
+        elseif isLoggerSource then
+            raidID = addon.Logger.selectedRaid
+        else
+            raidID = KRT_CurrentRaid or addon.Logger.selectedRaid
+        end
+
+        if not raidID or not KRT_Raids[raidID] then
+            addon:warn(L.LogLoggerNoRaidSelected)
+            return false
+        end
+
+        lootNid = tonumber(lootNid)
+        if not lootNid or lootNid <= 0 then
+            addon:warn(L.LogLoggerInvalidItemId)
+            return false
+        end
+
+        local loot = addon.Raid:GetLootByNid(raidID, lootNid)
+        if not loot then
+            addon:warn(L.LogLoggerInvalidItemId)
+            return false
+        end
+
+        local hasChange = false
+
+        if winner ~= nil then
+            loot.looter = tostring(winner)
+            hasChange = true
+        end
+
+        if rollType ~= nil then
+            local rt = tonumber(rollType)
+            if rt then
+                loot.rollType = rt
+                hasChange = true
+            end
+        end
+
+        if rollValue ~= nil then
+            local rv = tonumber(rollValue)
+            if rv and rv >= 0 then
+                loot.rollValue = rv
+                hasChange = true
+            end
+        end
+
+        if hasChange then
+            addon:info(L.LogLoggerLootEdited:format(tostring(raidID), tostring(lootNid), tostring(source or "?")))
+            if addon.Logger.selectedRaid == raidID then
+                Utils.triggerEvent("LoggerSelectRaid", raidID)
+            end
+        end
+
+        return true
     end
 end
 
@@ -6762,7 +6861,7 @@ do
                 local ui = row._p
                 local r, g, b = Utils.getClassColor(it.class)
                 ui.Name:SetText(it.name)
-                ui.Name:SetVertexColor(r, g, b)
+                ui.Name:SetTextColor(r, g, b)
                 return ROW_H
             end
         end)(),
@@ -6877,7 +6976,7 @@ do
                 local ui = row._p
                 ui.Name:SetText(it.name)
                 local r, g, b = Utils.getClassColor(it.class)
-                ui.Name:SetVertexColor(r, g, b)
+                ui.Name:SetTextColor(r, g, b)
                 ui.Join:SetText(it.joinFmt)
                 ui.Leave:SetText(it.leaveFmt)
                 return ROW_H
@@ -6948,6 +7047,7 @@ do
     Utils.registerCallback("LoggerSelectPlayer", function() controller:Touch() end)
 end
 
+-- ============================================================================
 -- Loot List (filters by selected boss and player)
 -- ============================================================================
 do
@@ -7029,11 +7129,25 @@ do
                     it.link = v.itemLink
                     it.source = addon.Logger.Boss:GetName(v.bossNid, rID)
                     it.winner = v.looter or ""
-                    it.type = (rollTypeNames and rollTypeNames[v.rollType]) or tostring(v.rollType or 0)
                     it.roll = tostring(v.rollValue or 0)
                     it.time = v.time or 0
                     it.timeFmt = (v.time and date("%H:%M", v.time)) or ""
                     it.icon = v.itemTexture
+
+                    -- Item rarity color (fallback to white)
+                    it.rarity = tonumber(v.itemRarity) or 1
+                    do
+                        local r, g, b = GetItemQualityColor(it.rarity)
+                        it.r, it.g, it.b = r or 1, g or 1, b or 1
+                    end
+
+                    -- rollTypes colored text
+                    local rt = tonumber(v.rollType) or 0
+                    it.rollType = rt
+                    it.type = (lootTypesColored and (lootTypesColored[rt] or lootTypesColored[4]))
+                        or (lootTypesText and lootTypesText[rt])
+                        or tostring(rt)
+
                     out[idx] = it
                 end
             end
@@ -7047,15 +7161,25 @@ do
             return function(row, it)
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
                 local ui = row._p
+
                 ui.Name:SetText(it.link or it.name)
+
+                -- Apply rarity coloring (works for plain names; safe even if link already contains color codes)
+                if it.r and it.g and it.b then
+                    ui.Name:SetTextColor(it.r, it.g, it.b)
+                else
+                    ui.Name:SetTextColor(1, 1, 1)
+                end
                 ui.Source:SetText(it.source)
                 ui.Winner:SetText(it.winner)
-                ui.Type:SetText(it.type)
+                ui.Type:SetText(it.type) -- <=== QUI torna colorato
                 ui.Roll:SetText(it.roll)
                 ui.Time:SetText(it.timeFmt)
+
                 if ui.ItemIconTexture and it.icon then
                     ui.ItemIconTexture:SetTexture(it.icon)
                 end
+
                 return ROW_H
             end
         end)(),
@@ -7080,11 +7204,18 @@ do
             name = function(a, b, asc) return asc and (a.name < b.name) or (a.name > b.name) end,
             source = function(a, b, asc) return asc and (a.source < b.source) or (a.source > b.source) end,
             winner = function(a, b, asc) return asc and (a.winner < b.winner) or (a.winner > b.winner) end,
-            type = function(a, b, asc) return asc and (a.type < b.type) or (a.type > b.type) end,
+
+            -- Importante: ordina per NUMERO (non per stringa colorata)
+            type = function(a, b, asc)
+                local av, bv = tonumber(a.rollType) or 0, tonumber(b.rollType) or 0
+                return asc and (av < bv) or (av > bv)
+            end,
+
             roll = function(a, b, asc)
                 local av, bv = tonumber(a.roll) or 0, tonumber(b.roll) or 0
                 return asc and (av < bv) or (av > bv)
             end,
+
             time = function(a, b, asc) return asc and (a.time < b.time) or (a.time > b.time) end,
         },
     }
@@ -7113,66 +7244,6 @@ do
         addon.Logger.selectedItem = nil
         controller:Dirty()
     end)
-
-    -- Central logging entry (runtime + logger edits)
-    -- itemID here is lootNid (stable), not array index.
-    function Loot:Log(itemID, winner, rollType, rollValue, source, raidIDOverride)
-        local isLoggerSource = source and source:find("^LOGGER_") ~= nil
-
-        local raidID
-        if raidIDOverride then
-            raidID = raidIDOverride
-        elseif isLoggerSource then
-            raidID = addon.Logger.selectedRaid
-        else
-            raidID = KRT_CurrentRaid or addon.Logger.selectedRaid
-        end
-
-        if not raidID or not KRT_Raids[raidID] then
-            addon:warn(L.LogLoggerNoRaidSelected)
-            return
-        end
-
-        itemID = tonumber(itemID)
-        if not itemID or itemID <= 0 then
-            addon:warn(L.LogLoggerInvalidItemId)
-            return
-        end
-
-        local loot = addon.Raid:GetLootByNid(raidID, itemID)
-        if not loot then
-            addon:warn(L.LogLoggerInvalidItemId)
-            return
-        end
-
-        local hasChange = false
-
-        if winner ~= nil then
-            loot.looter = tostring(winner)
-            hasChange = true
-        end
-
-        if rollType ~= nil then
-            local rt = tonumber(rollType)
-            if rt then
-                loot.rollType = rt
-                hasChange = true
-            end
-        end
-
-        if rollValue ~= nil then
-            local rv = tonumber(rollValue)
-            if rv and rv >= 0 then
-                loot.rollValue = rv
-                hasChange = true
-            end
-        end
-
-        if hasChange then
-            addon:info(L.LogLoggerLootEdited:format(tostring(raidID), tostring(itemID), tostring(source or "?")))
-            controller:Dirty()
-        end
-    end
 
     Utils.registerCallbacks({ "LoggerSelectRaid", "LoggerSelectBoss", "LoggerSelectPlayer", "LoggerSelectBossPlayer" },
         function() controller:Dirty() end)
