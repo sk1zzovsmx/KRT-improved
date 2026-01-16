@@ -303,21 +303,41 @@ do
     -- Parse loot chat message and return itemLink, playerName
     function addon.GetLootMsgInfo(msg)
         if not msg then return nil, nil end
-        -- pattern for full item link in 3.3.5a
         local itemLink = msg:match("|c%x+|Hitem:[%-:%d]+|h%[[^%]]+%]|h|r")
         if not itemLink then
             itemLink = msg:match("|Hitem:[%-:%d]+|h%[[^%]]+%]|h") -- fallback
         end
 
         local player
-        -- check for "X receives loot: ..."
+        if addon.Deformat then
+            local item = addon.Deformat(msg, LOOT_ITEM_SELF)
+            if item then
+                player = UnitName("player")
+                return itemLink or item, player
+            end
+
+            local itemMultiple = addon.Deformat(msg, LOOT_ITEM_SELF_MULTIPLE)
+            if itemMultiple then
+                player = UnitName("player")
+                return itemLink or itemMultiple, player
+            end
+
+            local who, otherItem = addon.Deformat(msg, LOOT_ITEM)
+            if who and otherItem then
+                player = who
+                return itemLink or otherItem, player
+            end
+
+            local whoMultiple, otherItemMultiple = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
+            if whoMultiple and otherItemMultiple then
+                player = whoMultiple
+                return itemLink or otherItemMultiple, player
+            end
+        end
+
         local name = msg:match("^([^%s]+) receives loot:")
         if name then
-            if name == "You" then
-                player = UnitName("player")
-            else
-                player = name
-            end
+            player = (name == "You") and UnitName("player") or name
         elseif msg:find("^You receive loot:") then
             player = UnitName("player")
         end
@@ -693,7 +713,9 @@ do
             0
 
         if itemId <= 0 then return end
-        if itemType == "Gem" or itemType == "Miscellaneous" then return end -- gems + misc (keep filter intent)
+        if itemType == ITEM_CLASS_GEM or itemType == ITEM_CLASS_MISCELLANEOUS then
+            return -- gems + misc (keep filter intent)
+        end
 
         -- Boss association
         local bossNid = tonumber(KRT_LastBossNid) or 0
