@@ -477,6 +477,41 @@ function Utils.setText(frame, str1, str2, cond)
 	end
 end
 
+function Utils.setChecked(frame, checked)
+	if frame and frame.SetChecked then
+		frame:SetChecked(checked == true)
+	end
+end
+
+function Utils.setCheckedByName(frameName, suffix, checked)
+	if not frameName or not suffix then return end
+	Utils.setChecked(_G[frameName .. suffix], checked)
+end
+
+function Utils.setTextByName(frameName, suffix, text)
+	if not frameName or not suffix then return end
+	local frame = _G[frameName .. suffix]
+	if frame and frame.SetText then
+		frame:SetText(text)
+	end
+end
+
+function Utils.setTextColor(frame, r, g, b)
+	if frame and frame.SetTextColor then
+		frame:SetTextColor(r, g, b)
+	end
+end
+
+function Utils.setTextColorByEnabled(frame, enabled, enabledColor, disabledColor)
+	local on = enabledColor or HIGHLIGHT_FONT_COLOR
+	local off = disabledColor or { r = 0.5, g = 0.5, b = 0.5 }
+	local color = enabled and on or off
+	local r = color.r or color[1] or 1
+	local g = color.g or color[2] or 1
+	local b = color.b or color[3] or 1
+	Utils.setTextColor(frame, r, g, b)
+end
+
 ---============================================================================
 -- Throttles
 ---============================================================================

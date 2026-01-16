@@ -4619,24 +4619,24 @@ do
 
         -- frameName must be ready here (OnLoad sets it before calling)
         if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-            _G[frameName .. "sortAscendingStr"]:SetText(L.StrConfigSortAscending)
-            _G[frameName .. "useRaidWarningStr"]:SetText(L.StrConfigUseRaidWarning)
-            _G[frameName .. "announceOnWinStr"]:SetText(L.StrConfigAnnounceOnWin)
-            _G[frameName .. "announceOnHoldStr"]:SetText(L.StrConfigAnnounceOnHold)
-            _G[frameName .. "announceOnBankStr"]:SetText(L.StrConfigAnnounceOnBank)
-            _G[frameName .. "announceOnDisenchantStr"]:SetText(L.StrConfigAnnounceOnDisenchant)
-            _G[frameName .. "lootWhispersStr"]:SetText(L.StrConfigLootWhisper)
-            _G[frameName .. "countdownRollsBlockStr"]:SetText(L.StrConfigCountdownRollsBlock)
-            _G[frameName .. "screenReminderStr"]:SetText(L.StrConfigScreenReminder)
-            _G[frameName .. "ignoreStacksStr"]:SetText(L.StrConfigIgnoreStacks)
-            _G[frameName .. "showTooltipsStr"]:SetText(L.StrConfigShowTooltips)
-            _G[frameName .. "minimapButtonStr"]:SetText(L.StrConfigMinimapButton)
-            _G[frameName .. "countdownDurationStr"]:SetText(L.StrConfigCountdownDuration)
-            _G[frameName .. "countdownSimpleRaidMsgStr"]:SetText(L.StrConfigCountdownSimpleRaidMsg)
+            Utils.setTextByName(frameName, "sortAscendingStr", L.StrConfigSortAscending)
+            Utils.setTextByName(frameName, "useRaidWarningStr", L.StrConfigUseRaidWarning)
+            Utils.setTextByName(frameName, "announceOnWinStr", L.StrConfigAnnounceOnWin)
+            Utils.setTextByName(frameName, "announceOnHoldStr", L.StrConfigAnnounceOnHold)
+            Utils.setTextByName(frameName, "announceOnBankStr", L.StrConfigAnnounceOnBank)
+            Utils.setTextByName(frameName, "announceOnDisenchantStr", L.StrConfigAnnounceOnDisenchant)
+            Utils.setTextByName(frameName, "lootWhispersStr", L.StrConfigLootWhisper)
+            Utils.setTextByName(frameName, "countdownRollsBlockStr", L.StrConfigCountdownRollsBlock)
+            Utils.setTextByName(frameName, "screenReminderStr", L.StrConfigScreenReminder)
+            Utils.setTextByName(frameName, "ignoreStacksStr", L.StrConfigIgnoreStacks)
+            Utils.setTextByName(frameName, "showTooltipsStr", L.StrConfigShowTooltips)
+            Utils.setTextByName(frameName, "minimapButtonStr", L.StrConfigMinimapButton)
+            Utils.setTextByName(frameName, "countdownDurationStr", L.StrConfigCountdownDuration)
+            Utils.setTextByName(frameName, "countdownSimpleRaidMsgStr", L.StrConfigCountdownSimpleRaidMsg)
         end
 
         Utils.setFrameTitle(frameName, SETTINGS)
-        _G[frameName .. "AboutStr"]:SetText(L.StrConfigAbout)
+        Utils.setTextByName(frameName, "AboutStr", L.StrConfigAbout)
         _G[frameName .. "DefaultsBtn"]:SetScript("OnClick", LoadDefaultOptions)
 
         localized = true
@@ -4648,24 +4648,24 @@ do
     function UpdateUIFrame(self, elapsed)
         if configDirty then
             Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
-                _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)
-                _G[frameName .. "useRaidWarning"]:SetChecked(addon.options.useRaidWarning == true)
-                _G[frameName .. "announceOnWin"]:SetChecked(addon.options.announceOnWin == true)
-                _G[frameName .. "announceOnHold"]:SetChecked(addon.options.announceOnHold == true)
-                _G[frameName .. "announceOnBank"]:SetChecked(addon.options.announceOnBank == true)
-                _G[frameName .. "announceOnDisenchant"]:SetChecked(addon.options.announceOnDisenchant == true)
-                _G[frameName .. "lootWhispers"]:SetChecked(addon.options.lootWhispers == true)
-                _G[frameName .. "countdownRollsBlock"]:SetChecked(addon.options.countdownRollsBlock == true)
-                _G[frameName .. "screenReminder"]:SetChecked(addon.options.screenReminder == true)
-                _G[frameName .. "ignoreStacks"]:SetChecked(addon.options.ignoreStacks == true)
-                _G[frameName .. "showTooltips"]:SetChecked(addon.options.showTooltips == true)
-                _G[frameName .. "minimapButton"]:SetChecked(addon.options.minimapButton == true)
+                Utils.setCheckedByName(frameName, "sortAscending", addon.options.sortAscending)
+                Utils.setCheckedByName(frameName, "useRaidWarning", addon.options.useRaidWarning)
+                Utils.setCheckedByName(frameName, "announceOnWin", addon.options.announceOnWin)
+                Utils.setCheckedByName(frameName, "announceOnHold", addon.options.announceOnHold)
+                Utils.setCheckedByName(frameName, "announceOnBank", addon.options.announceOnBank)
+                Utils.setCheckedByName(frameName, "announceOnDisenchant", addon.options.announceOnDisenchant)
+                Utils.setCheckedByName(frameName, "lootWhispers", addon.options.lootWhispers)
+                Utils.setCheckedByName(frameName, "countdownRollsBlock", addon.options.countdownRollsBlock)
+                Utils.setCheckedByName(frameName, "screenReminder", addon.options.screenReminder)
+                Utils.setCheckedByName(frameName, "ignoreStacks", addon.options.ignoreStacks)
+                Utils.setCheckedByName(frameName, "showTooltips", addon.options.showTooltips)
+                Utils.setCheckedByName(frameName, "minimapButton", addon.options.minimapButton)
 
                 -- IMPORTANT: always update checked state (even if disabled)
-                _G[frameName .. "countdownSimpleRaidMsg"]:SetChecked(addon.options.countdownSimpleRaidMsg == true)
+                Utils.setCheckedByName(frameName, "countdownSimpleRaidMsg", addon.options.countdownSimpleRaidMsg)
 
                 _G[frameName .. "countdownDuration"]:SetValue(addon.options.countdownDuration)
-                _G[frameName .. "countdownDurationText"]:SetText(addon.options.countdownDuration)
+                Utils.setTextByName(frameName, "countdownDurationText", addon.options.countdownDuration)
 
                 -- Dependency: if Use Raid Warnings is OFF, keep check state but grey out + disable.
                 do
@@ -4674,17 +4674,8 @@ do
                     local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
 
                     if countdownSimpleRaidMsgBtn and countdownSimpleRaidMsgStr then
-                        if useRaidWarning then
-                            countdownSimpleRaidMsgBtn:Enable()
-                            countdownSimpleRaidMsgStr:SetTextColor(
-                                HIGHLIGHT_FONT_COLOR.r,
-                                HIGHLIGHT_FONT_COLOR.g,
-                                HIGHLIGHT_FONT_COLOR.b
-                            )
-                        else
-                            countdownSimpleRaidMsgBtn:Disable()
-                            countdownSimpleRaidMsgStr:SetTextColor(0.5, 0.5, 0.5)
-                        end
+                        Utils.enableDisable(countdownSimpleRaidMsgBtn, useRaidWarning)
+                        Utils.setTextColorByEnabled(countdownSimpleRaidMsgStr, useRaidWarning)
                     end
                 end
 
@@ -4846,9 +4837,9 @@ do
     function LocalizeUIFrame()
         if localized then return end
         if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-            _G[frameName .. "MessageStr"]:SetText(L.StrMessage)
-            _G[frameName .. "EditBtn"]:SetText(SAVE)
-            _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
+            Utils.setTextByName(frameName, "MessageStr", L.StrMessage)
+            Utils.setTextByName(frameName, "EditBtn", SAVE)
+            Utils.setTextByName(frameName, "OutputName", L.StrWarningsHelpTitle)
         end
         Utils.setFrameTitle(frameName, RAID_WARNING)
         _G[frameName .. "Name"]:SetScript("OnEscapePressed", module.Cancel)
@@ -4867,13 +4858,13 @@ do
             if btn then
                 btn:LockHighlight()
             end
-            _G[frameName .. "OutputName"]:SetText(KRT_Warnings[selectedID].name)
-            _G[frameName .. "OutputContent"]:SetText(KRT_Warnings[selectedID].content)
-            _G[frameName .. "OutputContent"]:SetTextColor(1, 1, 1)
+            Utils.setTextByName(frameName, "OutputName", KRT_Warnings[selectedID].name)
+            Utils.setTextByName(frameName, "OutputContent", KRT_Warnings[selectedID].content)
+            Utils.setTextColor(_G[frameName .. "OutputContent"], 1, 1, 1)
         else
-            _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
-            _G[frameName .. "OutputContent"]:SetText(L.StrWarningsHelpBody)
-            _G[frameName .. "OutputContent"]:SetTextColor(0.5, 0.5, 0.5)
+            Utils.setTextByName(frameName, "OutputName", L.StrWarningsHelpTitle)
+            Utils.setTextByName(frameName, "OutputContent", L.StrWarningsHelpBody)
+            Utils.setTextColor(_G[frameName .. "OutputContent"], 0.5, 0.5, 0.5)
         end
         lastSelectedID = selectedID
     end
@@ -5405,19 +5396,12 @@ do
         lastState.duration = nil
     end
 
-    local function SetCheckbox(suffix, checked)
-        local chk = _G[frameName .. suffix]
-        if chk and chk.SetChecked then
-            chk:SetChecked(checked and true or false)
-        end
-    end
-
     local function ResetAllChannelCheckboxes()
         for i = 1, 8 do
-            SetCheckbox("Chat" .. i, false)
+            Utils.setCheckedByName(frameName, "Chat" .. i, false)
         end
-        SetCheckbox("ChatGuild", false)
-        SetCheckbox("ChatYell", false)
+        Utils.setCheckedByName(frameName, "ChatGuild", false)
+        Utils.setCheckedByName(frameName, "ChatYell", false)
     end
 
     -- Deterministic: sync Duration immediately from UI/SV (no waiting for preview tick)
@@ -5469,7 +5453,7 @@ do
         local lengthText = _G[frameName .. "Length"]
         if lengthText then
             lengthText:SetText(lenStr)
-            lengthText:SetTextColor(0.5, 0.5, 0.5)
+            Utils.setTextColor(lengthText, 0.5, 0.5, 0.5)
         end
 
         local msg = _G[frameName .. "Message"]
@@ -5956,11 +5940,11 @@ do
             if lenText then
                 lenText:SetText(len .. "/255")
                 if finalOutput == DEFAULT_OUTPUT then
-                    lenText:SetTextColor(0.5, 0.5, 0.5)
+                    Utils.setTextColor(lenText, 0.5, 0.5, 0.5)
                 elseif len <= 255 then
-                    lenText:SetTextColor(0.0, 1.0, 0.0)
+                    Utils.setTextColor(lenText, 0.0, 1.0, 0.0)
                 else
-                    lenText:SetTextColor(1.0, 0.0, 0.0)
+                    Utils.setTextColor(lenText, 1.0, 0.0, 0.0)
                 end
             end
 
