@@ -320,25 +320,37 @@ do
             local item = addon.Deformat(msg, LOOT_ITEM_SELF)
             if item then
                 player = UnitName("player")
-                return itemLink or getLinkedItem(item), player
+                local linkedItem = itemLink or getLinkedItem(item)
+                if linkedItem then
+                    return linkedItem, player
+                end
             end
 
             local itemMultiple = addon.Deformat(msg, LOOT_ITEM_SELF_MULTIPLE)
             if itemMultiple then
                 player = UnitName("player")
-                return itemLink or getLinkedItem(itemMultiple), player
+                local linkedItem = itemLink or getLinkedItem(itemMultiple)
+                if linkedItem then
+                    return linkedItem, player
+                end
             end
 
             local who, otherItem = addon.Deformat(msg, LOOT_ITEM)
             if who and otherItem then
                 player = who
-                return itemLink or getLinkedItem(otherItem), player
+                local linkedItem = itemLink or getLinkedItem(otherItem)
+                if linkedItem then
+                    return linkedItem, player
+                end
             end
 
             local whoMultiple, otherItemMultiple = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
             if whoMultiple and otherItemMultiple then
                 player = whoMultiple
-                return itemLink or getLinkedItem(otherItemMultiple), player
+                local linkedItem = itemLink or getLinkedItem(otherItemMultiple)
+                if linkedItem then
+                    return linkedItem, player
+                end
             end
         end
 
