@@ -304,25 +304,22 @@ do
     function addon.GetLootMsgInfo(msg)
         if not msg then return nil, nil end
         -- pattern for full item link in 3.3.5a
-        local itemLink = msg:match("|c%x+|Hitem:%d+:%S+|h%[[^%]]+%]|h|r")
+        local itemLink = msg:match("|c%x+|Hitem:[%-:%d]+|h%[[^%]]+%]|h|r")
         if not itemLink then
-            itemLink = msg:match("|Hitem:%d+:%S+|h%[[^%]]+%]|h") -- fallback
+            itemLink = msg:match("|Hitem:[%-:%d]+|h%[[^%]]+%]|h") -- fallback
         end
 
         local player
-        -- check for "X receives loot"
-        local name = msg:match("^([^%s]+) receives loot")
+        -- check for "X receives loot: ..."
+        local name = msg:match("^([^%s]+) receives loot:")
         if name then
             if name == "You" then
                 player = UnitName("player")
             else
                 player = name
             end
-        else
-            -- check for "You receive loot"
-            if msg:find("You receive loot") then
-                player = UnitName("player")
-            end
+        elseif msg:find("^You receive loot:") then
+            player = UnitName("player")
         end
 
         return itemLink, player
@@ -654,6 +651,28 @@ do
         return nid
     end
 
+    local function getItemMatchKey(itemLink)
+        if not itemLink then return nil end
+        local itemString = itemLink:match("item:[%-:%d]+")
+        if itemString and itemString ~= "" then
+            return itemString
+        end
+        local itemId = itemLink:match("item:(%d+)")
+        return itemId and ("item:" .. itemId) or nil
+    end
+
+    local function isSameItemLink(a, b)
+        if not a or not b then return false end
+        local keyA = getItemMatchKey(a)
+        local keyB = getItemMatchKey(b)
+        if keyA and keyB then
+            return keyA == keyB
+        end
+        local idA = tonumber(a:match("item:(%d+)"))
+        local idB = tonumber(b:match("item:(%d+)"))
+        return idA and idB and idA == idB
+    end
+
     --------------------------------------------------------------------------
     -- Loot logging (stable lootNid + bossNid)
     --------------------------------------------------------------------------
@@ -669,12 +688,12 @@ do
             return -- nothing to log; avoid crash
         end
 
-        local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture, _, itemClassID = GetItemInfo(itemLink)
+        local itemName, _, itemRarity, _, _, itemType, itemSubType, _, _, itemTexture = GetItemInfo(itemLink)
         local itemId = tonumber(itemLink:match("item:(%d+)")) or tonumber(addon.GetItemID and addon:GetItemID(itemLink)) or
             0
 
         if itemId <= 0 then return end
-        if itemClassID == 3 or itemClassID == 8 then return end -- gems + misc (keep your existing filter intent)
+        if itemType == "Gem" or itemType == "Miscellaneous" then return end -- gems + misc (keep filter intent)
 
         -- Boss association
         local bossNid = tonumber(KRT_LastBossNid) or 0
@@ -687,11 +706,19 @@ do
         end
 
         local rollType = (lootState and lootState.currentRollType) or 0
-        local rollValue = (lootState and lootState.highestRoll) or 0
-
-        if lootState and lootState.pendingAward and lootState.pendingAward.itemLink == itemLink and lootState.pendingAward.winner == player then
-            rollType = lootState.pendingAward.rollType or rollType
-            rollValue = lootState.pendingAward.rollValue or rollValue
+        local rollValue = 0
+        local pendingAward = lootState and lootState.pendingAward or nil
+        if pendingAward then
+            local now = GetTime()
+            local isFresh = pendingAward.ts and (now - pendingAward.ts) <= 8
+            if isFresh and isSameItemLink(pendingAward.itemLink, itemLink)
+                and pendingAward.winner == player then
+                rollType = pendingAward.rollType or rollType
+                rollValue = pendingAward.rollValue or rollValue
+                lootState.pendingAward = nil
+            elseif pendingAward.ts and (now - pendingAward.ts) > 8 then
+                lootState.pendingAward = nil
+            end
         end
 
         local lootNid = allocLootNid(raid)
@@ -2298,6 +2325,9 @@ do
         if lootState.lootCount >= 1 then
             announced = false
             lootState.currentRollType = rollType
+            if not lootState.fromInventory then
+                lootState.currentRollItem = 0
+            end
             addon.Rolls:ClearRolls()
             addon.Rolls:RecordRolls(true)
             lootState.rollStarted = true
@@ -3013,7 +3043,7 @@ do
             -- Mark this award as addon-driven so AddLoot() won't classify it as MANUAL
             lootState.pendingAward = {
                 itemLink  = itemLink,
-                looter    = playerName,
+                winner    = playerName,
                 rollType  = rollType,
                 rollValue = rollValue,
                 ts        = GetTime(),
