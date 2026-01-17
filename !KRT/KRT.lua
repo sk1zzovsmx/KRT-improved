@@ -71,7 +71,6 @@ do
         lv = addon.Debugger.logLevels.DEBUG
     end
     addon:SetLogLevel(lv)
-    addon:SetPerformanceMode(true)
 end
 
 ---============================================================================
