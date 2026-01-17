@@ -126,21 +126,11 @@ local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower,
 local tostring, tonumber                = tostring, tonumber
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
 
-local function BuildPendingAwardKey(itemLink, looter)
-    return tostring(itemLink) .. "\001" .. tostring(looter)
-end
-
 local function QueuePendingAward(itemLink, looter, rollType, rollValue)
     if not itemLink or not looter then
         return
     end
-    local key = BuildPendingAwardKey(itemLink, looter)
-    local list = lootState.pendingAwards[key]
-    if not list then
-        list = {}
-        lootState.pendingAwards[key] = list
-    end
-    list[#list + 1] = {
+    lootState.pendingAwards[#lootState.pendingAwards + 1] = {
         itemLink  = itemLink,
         looter    = looter,
         rollType  = rollType,
@@ -150,32 +140,25 @@ local function QueuePendingAward(itemLink, looter, rollType, rollValue)
 end
 
 local function ConsumePendingAward(itemLink, looter, maxAge)
-    local key = BuildPendingAwardKey(itemLink, looter)
-    local list = lootState.pendingAwards[key]
-    if not list then
-        return nil
-    end
     local now = GetTime()
-    for i = 1, #list do
-        local p = list[i]
-        if p and (now - (p.ts or 0)) <= maxAge then
-            tremove(list, i)
-            if #list == 0 then
-                lootState.pendingAwards[key] = nil
+    local found = nil
+    for i = 1, #lootState.pendingAwards do
+        local p = lootState.pendingAwards[i]
+        if p and p.itemLink == itemLink and p.looter == looter then
+            if (now - (p.ts or 0)) <= maxAge then
+                found = p
+                tremove(lootState.pendingAwards, i)
             end
-            return p
+            break
         end
     end
-    for i = #list, 1, -1 do
-        local p = list[i]
+    for i = #lootState.pendingAwards, 1, -1 do
+        local p = lootState.pendingAwards[i]
         if not p or (now - (p.ts or 0)) > maxAge then
-            tremove(list, i)
+            tremove(lootState.pendingAwards, i)
         end
     end
-    if #list == 0 then
-        lootState.pendingAwards[key] = nil
-    end
-    return nil
+    return found
 end
 
 ---============================================================================
