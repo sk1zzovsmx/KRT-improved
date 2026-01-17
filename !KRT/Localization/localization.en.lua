@@ -287,8 +287,13 @@ L.StrRaidCurrentTitle             = "Duplicate Notice"
 L.StrRaidsCurrentHelp             =
 "Sometimes you may notice duplicate raid creation. If that happends, make sure to simply set the selected one as current and delete all similar ones above it."
 L.ErrCannotDeleteRaid             = "Cannot delete the current raid."
-L.ErrCannotSetCurrentRaidSize     = "Cannot set a raid with a different difficulty as current raid."
+L.ErrCannotSetCurrentRaidSize     = "Cannot set a raid with a different size as current raid."
+L.ErrCannotSetCurrentRaidDifficulty = "Cannot set a raid with a different difficulty as current raid."
 L.ErrCannotSetCurrentRaidReset    = "Cannot set an expired raid as current raid."
+L.ErrCannotSetCurrentNotInRaid      = "You must be in a raid group to set the current raid."
+L.ErrCannotSetCurrentNotInInstance   = "You must be inside a raid instance to set the current raid."
+L.ErrCannotSetCurrentZoneMismatch   = "Cannot set a raid from a different zone as current raid."
+L.LogRaidSetCurrent                 = "Current raid set to #%d (%s, %d-player)."
 L.StrNewRaidSessionChange         = "Raid session: zone or size changed; starting a new raid."
 
 -- Boss List:

@@ -362,10 +362,16 @@ do
         KRT_Players[realm] = KRT_Players[realm] or {}
         local currentTime = Utils.getCurrentTime()
 
+        local _, _, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
+        if isDyn then
+            instanceDiff = instanceDiff + (2 * dynDiff)
+        end
+
         local raidInfo = {
             realm         = realm,
             zone          = zoneName,
             size          = raidSize,
+            difficulty    = tonumber(instanceDiff) or nil,
             players       = {},
             playersByName = {},
             bossKills     = {},
@@ -6550,6 +6556,9 @@ do
                 it.id = i
                 it.zone = r.zone
                 it.size = r.size
+                it.difficulty = tonumber(r.difficulty)
+                local mode = it.difficulty and ((it.difficulty == 3 or it.difficulty == 4) and "H" or "N") or "?"
+                it.sizeLabel = tostring(it.size or "") .. mode
                 it.date = r.startTime
                 it.dateFmt = date("%d/%m/%Y %H:%M", r.startTime)
                 out[i] = it
@@ -6567,7 +6576,7 @@ do
                 ui.ID:SetText(it.id)
                 ui.Date:SetText(it.dateFmt)
                 ui.Zone:SetText(it.zone)
-                ui.Size:SetText(it.size)
+                ui.Size:SetText(it.sizeLabel or it.size)
                 return ROW_H
             end
         end)(),
@@ -6576,10 +6585,31 @@ do
 
         postUpdate = function(n)
             local sel = addon.Logger.selectedRaid
-            local canSetCurrent = sel
-                and sel ~= KRT_CurrentRaid
-                and not addon.Raid:Expired(sel)
-                and addon.Raid:GetRaidSize() == KRT_Raids[sel].size
+            local raid = sel and KRT_Raids[sel] or nil
+
+            local canSetCurrent = false
+            if sel and raid and sel ~= KRT_CurrentRaid then
+                -- This button is intended to resolve duplicate raid creation while actively raiding.
+                if not addon.IsInRaid() then
+                    canSetCurrent = false
+                elseif addon.Raid:Expired(sel) then
+                    canSetCurrent = false
+                else
+                    local instanceName, instanceType, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
+                    if isDyn then
+                        instanceDiff = instanceDiff + (2 * dynDiff)
+                    end
+                    if instanceType == "raid" then
+                        local raidSize = tonumber(raid.size)
+                        local groupSize = addon.Raid:GetRaidSize()
+                        local zoneOk = (not raid.zone) or (raid.zone == instanceName)
+                        local raidDiff = tonumber(raid.difficulty)
+                        local curDiff = tonumber(instanceDiff)
+                        local diffOk = raidDiff and curDiff and (raidDiff == curDiff)
+                        canSetCurrent = zoneOk and raidSize and (raidSize == groupSize) and diffOk
+                    end
+                end
+            end
 
             Utils.enableDisable(_G[n .. "CurrentBtn"], canSetCurrent)
             Utils.enableDisable(_G[n .. "DeleteBtn"], (sel ~= KRT_CurrentRaid))
@@ -6596,18 +6626,57 @@ do
     bindLoggerListController(Raids, controller)
 
     function Raids:SetCurrent(btn)
-        local sel = addon.Logger.selectedRaid
-        if not (btn and sel and KRT_Raids[sel]) then return end
+        if not btn then return end
 
-        if KRT_Raids[sel].size ~= addon.Raid:GetRaidSize() then
+        local sel = addon.Logger.selectedRaid
+        local raid = sel and KRT_Raids[sel] or nil
+        if not (sel and raid) then return end
+
+        -- This is meant to fix duplicate raid creation while actively raiding.
+        if not addon.IsInRaid() then
+            addon:error(L.ErrCannotSetCurrentNotInRaid)
+            return
+        end
+
+        local instanceName, instanceType, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
+        if isDyn then
+            instanceDiff = instanceDiff + (2 * dynDiff)
+        end
+        if instanceType ~= "raid" then
+            addon:error(L.ErrCannotSetCurrentNotInInstance)
+            return
+        end
+        if raid.zone and raid.zone ~= instanceName then
+            addon:error(L.ErrCannotSetCurrentZoneMismatch)
+            return
+        end
+
+        local raidDiff = tonumber(raid.difficulty)
+        local curDiff = tonumber(instanceDiff)
+        if not (raidDiff and curDiff and raidDiff == curDiff) then
+            addon:error(L.ErrCannotSetCurrentRaidDifficulty)
+            return
+        end
+
+        local raidSize = tonumber(raid.size)
+        local groupSize = addon.Raid:GetRaidSize()
+        if not raidSize or raidSize ~= groupSize then
             addon:error(L.ErrCannotSetCurrentRaidSize)
             return
         end
+
         if addon.Raid:Expired(sel) then
             addon:error(L.ErrCannotSetCurrentRaidReset)
             return
         end
+
         KRT_CurrentRaid = sel
+        KRT_LastBoss = nil
+
+        -- Sync roster/dropdowns immediately so subsequent logging targets the selected raid.
+        addon.Raid:UpdateRaidRoster()
+
+        addon:info(L.LogRaidSetCurrent:format(sel, tostring(raid.zone), raidSize))
         controller:Touch()
     end
 
