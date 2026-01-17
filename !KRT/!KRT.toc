@@ -3,7 +3,7 @@
 ## Notes: |cfff58cbaKader|r|caaf49141RaidTools|r makes the raid leader's life easier.
 ## Author: Kader (|cff808080bkader#5341|r)
 ## DefaultState: enabled
-## SavedVariables: KRT_Options, KRT_Raids, KRT_Players, KRT_Warnings, KRT_ExportString, KRT_Spammer, KRT_CurrentRaid, KRT_LastBoss, KRT_NextReset, KRT_SavedReserves, KRT_PlayerCounts, KRT_Debug
+## SavedVariables: KRT_Options, KRT_Raids, KRT_Players, KRT_Warnings, KRT_ExportString, KRT_Spammer, KRT_CurrentRaid, KRT_LastBoss, KRT_NextReset, KRT_SavedReserves, KRT_PlayerCounts
 ## Version: 0.5.6b
 ## X-Date: 2022-06-03 @ 11:10 PM |cff808080UTC|r
 ## X-Category: Raid, Inventory

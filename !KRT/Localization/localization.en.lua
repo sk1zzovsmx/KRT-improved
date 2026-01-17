@@ -21,6 +21,7 @@ L.StrCbErrExec                    = "Error while executing callback %s for event
 -- ==================== Log Messages ==================== --
 L.LogCoreCallbackHandlerMissing   = "[Core] CallbackHandler missing: using fallback event wiring"
 L.LogCoreLoaded                   = "[Core] Loaded version=%s logLevel=%s perfMode=%s"
+L.LogCoreBuild                    = "[Core] build=%s"
 L.LogCoreEventsRegistered         = "[Core] Events registered=%d"
 L.LogCorePlayerEnteringWorld      = "[Core] PLAYER_ENTERING_WORLD -> scheduling FirstCheck"
 L.LogRaidLeftGroupEndSession      = "[Raid] Left group -> ending current raid session"
@@ -63,11 +64,11 @@ L.LogMLLootSlotCleared            = "[ML] LOOT_SLOT_CLEARED items=%d"
 L.LogMLLootWindowEmptied          = "[ML] Loot window emptied"
 L.LogMLCandidateCacheMiss         = "[ML] Candidate cache miss item=%s player=%s -> rebuild"
 L.LogMLAwarded                    = "[ML] Awarded item=%s -> %s type=%d roll=%d slot=%d cand=%d"
-L.LogMLAwardHistoryFailed         = "[ML] Awarded but History failed raidId=%s itemIndex=%s link=%s"
+L.LogMLAwardLoggerFailed          = "[ML] Awarded but Logger failed raidId=%s itemIndex=%s link=%s"
 L.LogTradeAcceptUpdate            = "[Trade] ACCEPT_UPDATE trader=%s winner=%s t=%s p=%s"
 L.LogTradeCompleted               = "[Trade] Completed item=%s winner=%s type=%d roll=%d"
-L.LogTradeHistoryLogFailed        = "[Trade] History log failed raidId=%s itemIndex=%s link=%s"
-L.LogTradeKeepHistoryFailed       = "[Trade] Keep logged but History failed raidId=%s itemIndex=%s link=%s"
+L.LogTradeLoggerLogFailed         = "[Trade] Logger log failed raidId=%s itemIndex=%s link=%s"
+L.LogTradeKeepLoggerFailed        = "[Trade] Keep logged but Logger failed raidId=%s itemIndex=%s link=%s"
 L.LogTradeStart                   = "[Trade] TradeItem start item=%s trader=%s target=%s type=%d roll=%d count=%d"
 L.LogTradeTraderKeeps             = "[Trade] Trader keeps item=%s winner=%s"
 L.LogTradeStackBlocked            = "[Trade] Stack trade blocked ignoreStacks=%s link=%s"
@@ -78,22 +79,30 @@ L.LogSRItemInfoResolved           = "[SR] Item info resolved itemId=%d link=%s"
 L.LogSRParseSkippedLine           = "[SR] ParseCSV skipped line=%s"
 L.LogSRImportComplete             = "[SR] Import complete players=%d"
 L.LogSRQueryMissingItems          = "[SR] QueryMissingItems updated=%s pending=%d"
-L.LogHistoryLootLogAttempt        = "[History] Loot:Log attempt source=%s raidId=%s itemIndex=%s "
-    .. "looter=%s type=%s roll=%s lastBoss=%s"
-L.LogHistoryNoRaidSession         = "[History] Loot:Log FAILED no raid session raidId=%s itemIndex=%s"
-L.LogHistoryItemNotFound          = "[History] Loot:Log FAILED item not found raidId=%d itemIndex=%s lootCount=%d"
-L.LogHistoryLooterEmpty           = "[History] Loot:Log looter empty raidId=%d itemIndex=%s link=%s"
-L.LogHistoryRollTypeNil           = "[History] Loot:Log rollType nil raidId=%d itemIndex=%s looter=%s"
-L.LogHistoryLootBefore            = "[History] Loot:Log BEFORE raidId=%d itemIndex=%s link=%s "
-    .. "prevLooter=%s prevType=%s prevRoll=%s"
-L.LogHistoryLootOverwrite         = "[History] Loot overwrite raidId=%d itemIndex=%s link=%s from=%s to=%s"
-L.LogHistoryLootRecorded          = "[History] Loot recorded source=%s raidId=%d itemIndex=%s link=%s -> "
-    .. "looter=%s type=%s roll=%s"
-L.LogHistoryVerifyFailed          = "[History] Loot:Log VERIFY FAILED raidId=%d itemIndex=%s "
-    .. "got(looter=%s type=%s roll=%s)"
-L.LogHistoryVerified              = "[History] Loot:Log verified raidId=%d itemIndex=%s"
-L.LogHistoryRecordedNoBossContext = "[History] Loot recorded without boss context raidId=%d itemIndex=%s link=%s"
-L.LogHistoryBossLootRemoved       = "[History] Boss delete removed loot raidId=%d bossId=%d removed=%d"
+L.LogLoggerLootLogAttempt         = "[Logger] Loot:Log attempt source=%s raidId=%s itemIndex=%s "
+	.. "looter=%s type=%s roll=%s lastBoss=%s"
+L.LogLoggerNoRaidSession          = "[Logger] Loot:Log FAILED no raid session raidId=%s itemIndex=%s"
+L.LogLoggerItemNotFound           = "[Logger] Loot:Log FAILED item not found raidId=%d itemIndex=%s lootCount=%d"
+L.LogLoggerLooterEmpty            = "[Logger] Loot:Log looter empty raidId=%d itemIndex=%s link=%s"
+L.LogLoggerRollTypeNil            = "[Logger] Loot:Log rollType nil raidId=%d itemIndex=%s looter=%s"
+L.LogLoggerLootBefore             = "[Logger] Loot:Log BEFORE raidId=%d itemIndex=%s link=%s "
+	.. "prevLooter=%s prevType=%s prevRoll=%s"
+L.LogLoggerLootOverwrite          = "[Logger] Loot overwrite raidId=%d itemIndex=%s link=%s from=%s to=%s"
+L.LogLoggerLootRecorded           = "[Logger] Loot recorded source=%s raidId=%d itemIndex=%s link=%s -> "
+	.. "looter=%s type=%s roll=%s"
+L.LogLoggerVerifyFailed           = "[Logger] Loot:Log VERIFY FAILED raidId=%d itemIndex=%s "
+	.. "got(looter=%s type=%s roll=%s)"
+L.LogLoggerVerified               = "[Logger] Loot:Log verified raidId=%d itemIndex=%s"
+L.LogLoggerRecordedNoBossContext  = "[Logger] Loot recorded without boss context raidId=%d itemIndex=%s link=%s"
+L.LogLoggerBossLootRemoved        = "[Logger] Boss delete removed loot raidId=%d bossId=%d removed=%d"
+
+-- ==================== Logger UI Diagnostics ==================== --
+L.LogLoggerUIShow                 = "[LoggerUI] show %s -> %s"
+L.LogLoggerUIWidgets              = "[LoggerUI:%s] widgets sf=%s sc=%s sfW=%.1f sfH=%.1f scW=%.1f scH=%.1f"
+L.LogLoggerUIMissingWidgets       = "[LoggerUI:%s] Missing ScrollFrame widgets for %s"
+L.LogLoggerUIDeferLayout          = "[LoggerUI:%s] defer (layout not ready): sfW=%.1f"
+L.LogLoggerUIFetch                = "[LoggerUI:%s] fetch count=%d sfW=%.1f sfH=%.1f scW=%.1f scH=%.1f frameW=%.1f frameH=%.1f"
+L.LogLoggerUIError                = "[LoggerUI:%s] %s"
 
 -- ==================== General Buttons ==================== --
 L.BtnConfig                       = "Config"
@@ -110,7 +119,7 @@ L.StrMinimapLClick                = "|cffffd700Left-Click|r to access menu"
 L.StrMinimapRClick                = "|cffffd700Right-Click|r to access settings"
 L.StrMinimapSClick                = "|cffffd700Shift+Click|r to move"
 L.StrMinimapAClick                = "|cffffd700Alt+Click|r for free drag and drop"
-L.StrLootHistory                  = "Loot History"
+L.StrLootLogger                   = "Loot Logger"
 L.StrLootCounter                  = "Loot Counter"
 L.StrRaidWarnings                 = "Raid Warnings"
 L.StrLFMSpam                      = "LFM Spam"
@@ -120,11 +129,12 @@ L.StrSpamBans                     = "Spam Bans"
 L.StrClearIcons                   = "Clear Raid Icons"
 
 -- ==================== Loot Master Frame ==================== --
-L.BtnLootCounter                 = "Loot Counter"
-L.BtnRaidList                    = "Raid List"
+L.BtnLootCounter                  = "Loot Counter"
+L.BtnRaidList                     = "Raid List"
 L.BtnSelectItem                   = "Select Item"
 L.BtnRemoveItem                   = "Remove Item"
 L.BtnSpamLoot                     = "Spam Loot"
+L.BtnManual                       = "Manual"
 L.BtnMS                           = "MS"
 L.BtnOS                           = "OS"
 L.BtnSR                           = "SR"
@@ -244,6 +254,7 @@ L.ErrChangesNoPlayer              = "The name is required. Leaving the change em
 -- ==================== LFM Spam Frame ==================== --
 L.StrSpammer                      = "LFM Spam"
 L.StrSpammerCompStr               = "Raid Composition"
+L.StrSpammerNeedStr               = "Need"
 L.StrSpammerMessageStr            = "Message"
 L.StrSpammerPreviewStr            = "Preview"
 L.StrSpammerErrLength             = "Your LFM message is too long."
@@ -253,7 +264,7 @@ L.StrSpammerMessageHelp2          = "You can use |cffffd700{ID}|r to include ach
 L.StrSpammerMessageHelp3          =
 "You can find the achievement |cffffd700ID|r using the command: \n|cffffd700/krt ach [link]|r."
 
--- ==================== History Frame ==================== --
+-- ==================== Logger Frame ==================== --
 L.StrNumber                       = "#"
 L.StrDate                         = "Date"
 L.StrZone                         = "Zone"
@@ -276,8 +287,13 @@ L.StrRaidCurrentTitle             = "Duplicate Notice"
 L.StrRaidsCurrentHelp             =
 "Sometimes you may notice duplicate raid creation. If that happends, make sure to simply set the selected one as current and delete all similar ones above it."
 L.ErrCannotDeleteRaid             = "Cannot delete the current raid."
-L.ErrCannotSetCurrentRaidSize     = "Cannot set a raid with a different difficulty as current raid."
+L.ErrCannotSetCurrentRaidSize     = "Cannot set a raid with a different size as current raid."
+L.ErrCannotSetCurrentRaidDifficulty = "Cannot set a raid with a different difficulty as current raid."
 L.ErrCannotSetCurrentRaidReset    = "Cannot set an expired raid as current raid."
+L.ErrCannotSetCurrentNotInRaid      = "You must be in a raid group to set the current raid."
+L.ErrCannotSetCurrentNotInInstance   = "You must be inside a raid instance to set the current raid."
+L.ErrCannotSetCurrentZoneMismatch   = "Cannot set a raid from a different zone as current raid."
+L.LogRaidSetCurrent                 = "Current raid set to #%d (%s, %d-player)."
 L.StrNewRaidSessionChange         = "Raid session: zone or size changed; starting a new raid."
 
 -- Boss List:
@@ -321,7 +337,7 @@ L.ErrAttendeesInvalidRaidBoss     = "Invalid raid or boss ID."
 L.ErrAttendeesPlayerExists        = "This player is already on the boss attendees list."
 L.StrAttendeesAddSuccess          = "Attendees: player added."
 
--- ==================== History: EditBox Frame ==================== --
+-- ==================== Logger: EditBox Frame ==================== --
 L.StrAddEntry                     = "Add Entry"
 L.StrEditEntry                    = "Edit Entry"
 L.StrDateEditBox                  = "Day/Month/Year"
@@ -333,15 +349,15 @@ L.ErrEditBoxInvalidMonth          = "Invalid Month: Please enter a valid month."
 L.ErrEditBoxInvalidDay            = "Invalid Day: Please enter a valid day."
 L.ErrEditBoxInvalidHour           = "Invalid Hour: Please enter a valid hour."
 L.ErrEditBoxInvalidMinute         = "Invalid Minute: Please enter a valid minute."
-L.ErrHistoryInvalidRaid           = "Invalid raid selection for History edit."
-L.ErrHistoryInvalidItem           = "Invalid loot item selection for History edit."
-L.ErrHistoryWinnerEmpty           = "Please enter a valid winner name."
-L.ErrHistoryWinnerNotFound        = "Winner not found in raid or boss attendees: %s"
-L.ErrHistoryInvalidRollType       = "Invalid roll type. Use a valid roll type number."
-L.ErrHistoryInvalidRollValue      = "Invalid roll value. Enter a non-negative number."
+L.ErrLoggerInvalidRaid            = "Invalid raid selection for Logger edit."
+L.ErrLoggerInvalidItem            = "Invalid loot item selection for Logger edit."
+L.ErrLoggerWinnerEmpty            = "Please enter a valid winner name."
+L.ErrLoggerWinnerNotFound         = "Winner not found in raid or boss attendees: %s"
+L.ErrLoggerInvalidRollType        = "Invalid roll type. Use a valid roll type number."
+L.ErrLoggerInvalidRollValue       = "Invalid roll value. Enter a non-negative number."
 
--- ==================== History: Export Frame ==================== --
-L.StrExportBoxTitle               = "Export Loot History"
+-- ==================== Logger: Export Frame ==================== --
+L.StrExportBoxTitle               = "Export Loot Logger"
 L.StrExportFormat                 = "Please enter the export format:"
 L.StrExportBoxHelp                = "Copy the data below and paste it to an external location to save it:"
 
@@ -353,7 +369,8 @@ L.StrCmdGrouper                   = "access LFM Spam related commands"
 L.StrCmdAchiev                    = "look for achievement ID to use for LFM"
 L.StrCmdChanges                   = "access ms changes related commands"
 L.StrCmdWarnings                  = "access warnings related commands"
-L.StrCmdHistory                   = "access loot history related commands"
+L.StrCmdLogger                    = "access loot logger related commands"
+L.StrCmdDebug                     = "toggle debugger or set level: debug on|off|level <name|num>"
 L.StrCmdLFMStart                  = "starts LFM spam"
 L.StrCmdLFMStop                   = "stops LFM spam"
 L.StrCmdChangesDemand             = "ask raid members to whisper you their ms changes"
@@ -364,17 +381,17 @@ L.StrCmdMinimapPos                = "set minimap button angle"
 
 L.MsgDebugOn                      = "Debug: enabled."
 L.MsgDebugOff                     = "Debug: disabled."
-L.MsgChatThrottleSet              = "Chat throttle: set to %s sec."
 L.MsgLFMPeriodSet                 = "LFM period: set to %s sec."
 L.MsgMinimapPosSet                = "Minimap: angle set to %s."
 L.MsgDefaultsRestored             = "Options: defaults restored."
 L.MsgLogLevelCurrent              = "Log level: current=%s."
 L.MsgLogLevelSet                  = "Log level: set=%s."
 L.MsgLogLevelUnknown              = "Unknown log level: %s."
+L.MsgLogLevelList                 = "Log levels: error, warn, info, debug, trace, spam (or 1-6)."
 L.MsgReserveItemsRequested        = "Reserves: requested info for %s missing items."
 L.MsgReserveItemsReady            = "Reserves: all item infos are available."
 
-L.LFM_TEMPLATE                   = "[KRT] LFM: {raid} {roles} {time}"
+L.LFM_TEMPLATE                    = "[KRT] LFM: {raid} {roles} {time}"
 
 -- ==================== Raid & Loot Locales ==================== --
 L.ItemValues                      = {
@@ -404,11 +421,11 @@ L.RaidZones                       = {
 	["The Eye of Eternity"] = "The Eye of Eternity",
 	["Vault of Archavon"] = "Vault of Archavon",
 	["Ulduar"] = "Ulduar",
-        ["Onyxia's Lair"] = "Onyxia's Lair",                          -- Note: Onyxia is also present in Classic
+	["Onyxia's Lair"] = "Onyxia's Lair",                          -- Note: Onyxia is also present in Classic
 	["Trial of the Crusader"] = "Trial of the Crusader",
-        ["Trial of the Grand Crusader"] = "Trial of the Grand Crusader", -- Already present, keeping it
+	["Trial of the Grand Crusader"] = "Trial of the Grand Crusader", -- Already present, keeping it
 	["Icecrown Citadel"] = "Icecrown Citadel",
-        ["The Ruby Sanctum"] = "The Ruby Sanctum",                    -- Already present, keeping it
+	["The Ruby Sanctum"] = "The Ruby Sanctum",                    -- Already present, keeping it
 }
 -- The reason we are using these is because of the missing
 -- UNIT_DIED event once these bosses are dealt with.

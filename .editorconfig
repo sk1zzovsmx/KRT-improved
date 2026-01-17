@@ -11,9 +11,11 @@ max_line_length = 120
 indent_style = tab
 tab_width = 4
 
-[*/Libs/**.{lua,xml,toc}]
+# Librerie vendorizzate: evita di “ripulire” whitespace
+[Libs/**]
 trim_trailing_whitespace = false
-insert_final_newline = none
+# (opzionale) se vuoi evitare anche newline aggiunte:
+# insert_final_newline = false
 
 [*.{md,yml,gitattributes,gitignore}]
 indent_style = space
