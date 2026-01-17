@@ -17,10 +17,7 @@ local C                = addon.C
 local _G               = _G
 _G["KRT"]              = addon
 
-
----============================================================================
--- Constants
----============================================================================
+-- ===== Constants =====
 
 local ITEM_LINK_PATTERN   = C.ITEM_LINK_PATTERN
 local rollTypes           = C.rollTypes
@@ -31,10 +28,8 @@ local RAID_TARGET_MARKERS = C.RAID_TARGET_MARKERS
 local K_COLOR             = C.K_COLOR
 local RT_COLOR            = C.RT_COLOR
 
--- Saved Variables
+-- ===== Saved Variables =====
 -- These variables are persisted across sessions for the addon.
----============================================================================
-
 KRT_Options               = KRT_Options or {}
 KRT_Raids                 = KRT_Raids or {}
 KRT_Players               = KRT_Players or {}
@@ -47,9 +42,7 @@ KRT_NextReset             = KRT_NextReset or 0
 KRT_SavedReserves         = KRT_SavedReserves or {}
 KRT_PlayerCounts          = KRT_PlayerCounts or {}
 
----============================================================================
--- External Libraries / Bootstrap
----============================================================================
+-- ===== External Libraries / Bootstrap =====
 local Compat              = LibStub("LibCompat-1.0")
 addon.Compat              = Compat
 addon.BossIDs             = LibStub("LibBossIDs-1.0")
@@ -73,9 +66,7 @@ do
     addon:SetLogLevel(lv)
 end
 
----============================================================================
--- Core Addon Frames & Locals
----============================================================================
+-- ===== Core Addon Frames & Locals =====
 
 -- Centralised addon state
 addon.State                = addon.State or {}
@@ -117,9 +108,7 @@ function GetItemIndex()
     return lootState.currentItemIndex
 end
 
----============================================================================
--- Cached Functions & Libraries
----============================================================================
+-- ===== Cached Functions & Libraries =====
 
 local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, table.wipe
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
@@ -127,11 +116,7 @@ local format, find, strlen              = string.format, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber                = tostring, tonumber
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
-
----============================================================================
--- Event System (WoW API events)
--- Clean frame-based dispatcher (NO CallbackHandler here)
----============================================================================
+-- ===== Event System (WoW API events; clean frame-based dispatcher, no CallbackHandler here) =====
 do
     -- listeners[event] = { obj1, obj2, ... }
     local listeners = {}
@@ -221,40 +206,17 @@ do
     addon:RegisterEvent("ADDON_LOADED")
 end
 
----============================================================================
--- Raid Helpers Module
--- Manages raid state, roster, boss kills, and loot logging.
----============================================================================
+-- ===== Raid Helpers Module: Manages raid state, roster, boss kills, and loot logging =====
 do
-    -------------------------------------------------------
-    -- 1. Create/retrieve the module table
-    -------------------------------------------------------
     addon.Raid              = addon.Raid or {}
     local module            = addon.Raid
     local L                 = addon.L
-
-    -------------------------------------------------------
-    -- Internal state
-    -------------------------------------------------------
     local inRaid            = false
     local numRaid           = 0
     local rosterVersion     = 0
     local GetLootMethod     = GetLootMethod
     local GetRaidRosterInfo = GetRaidRosterInfo
     local UnitIsUnit        = UnitIsUnit
-
-    -------------------------------------------------------
-    -- Private helpers
-    -------------------------------------------------------
-
-    -------------------------------------------------------
-    -- Public methods
-    -------------------------------------------------------
-
-    --------------------------------------------------------------------------
-    -- Logger Functions
-    --------------------------------------------------------------------------
-
     --
     -- Updates the current raid roster, adding new players and marking those who left.
     --
@@ -606,7 +568,6 @@ do
             itemCount = 1
         end
 
-
         -- Self loot (no player name in the string)
         if not itemLink then
             local link
@@ -710,10 +671,7 @@ do
         addon:debug(E.LogLootLogged:format(tonumber(KRT_CurrentRaid) or -1, tostring(itemId),
             tostring(KRT_LastBoss), tostring(player)))
     end
-
-    --------------------------------------------------------------------------
     -- Player Count API
-    --------------------------------------------------------------------------
 
     function module:GetPlayerCount(name, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
@@ -770,10 +728,7 @@ do
         end
         module:SetPlayerCount(name, c - 1, raidNum)
     end
-
-    --------------------------------------------------------------------------
     -- Raid Functions
-    --------------------------------------------------------------------------
 
     --
     -- Returns the number of members in the raid.
@@ -895,10 +850,7 @@ do
         -- Caller releases when using a pooled table.
         return bosses
     end
-
-    --------------------------------------------------------------------------
     -- Player Functions
-    --------------------------------------------------------------------------
 
     --
     -- Returns players from the raid log. Can be filtered by boss kill.
@@ -1064,10 +1016,7 @@ do
         end
         return id
     end
-
-    --------------------------------------------------------------------------
     -- Raid & Loot Status Checks
-    --------------------------------------------------------------------------
 
     --
     -- Checks if the group is using the Master Looter system.
@@ -1109,28 +1058,16 @@ do
     end
 end
 
----============================================================================
--- Chat Output Helpers
----============================================================================
+-- ===== Chat Output Helpers =====
 do
-    -------------------------------------------------------
-    -- 1. Create/retrieve the module table
-    -------------------------------------------------------
     addon.Chat            = addon.Chat or {}
     local module          = addon.Chat
     local L               = addon.L
-
-    -------------------------------------------------------
-    -- 3. Internal state (non-exposed local variables)
-    -------------------------------------------------------
     local output          = C.CHAT_OUTPUT_FORMAT
     local chatPrefix      = C.CHAT_PREFIX
     local chatPrefixShort = C.CHAT_PREFIX_SHORT
     local prefixHex       = C.CHAT_PREFIX_HEX
-
-    -------------------------------------------------------
     -- 5. Public module functions
-    -------------------------------------------------------
     function module:Print(text, prefix)
         local msg = Utils.formatChatMessage(text, prefix or chatPrefixShort, output, prefixHex)
         addon:info("%s", msg)
@@ -1164,29 +1101,17 @@ do
         end
         Utils.chat(tostring(text), ch)
     end
-
-    -------------------------------------------------------
     -- 6. Legacy helpers
-    -------------------------------------------------------
     function addon:Announce(text, channel)
         module:Announce(text, channel)
     end
 end
 
----============================================================================
--- Minimap Button Module
----============================================================================
+-- ===== Minimap Button Module =====
 do
-    -------------------------------------------------------
-    -- 1. Create/retrieve the module table
-    -------------------------------------------------------
     addon.Minimap = addon.Minimap or {}
     local module = addon.Minimap
     local L = addon.L
-
-    -------------------------------------------------------
-    -- 3. Internal state (non-exposed local variables)
-    -------------------------------------------------------
     local addonMenu
     local dragMode
 
@@ -1194,10 +1119,6 @@ do
     local abs, sqrt = math.abs, math.sqrt
     local cos, sin = math.cos, math.sin
     local rad, atan2, deg = math.rad, math.atan2, math.deg
-
-    -------------------------------------------------------
-    -- Private helpers
-    -------------------------------------------------------
     -- Initializes and opens the right-click menu for the minimap button.
     local function OpenMenu()
         local info = {}
@@ -1274,10 +1195,6 @@ do
             self:SetPoint("CENTER", px, py)
         end
     end
-
-    -------------------------------------------------------
-    -- Public methods
-    -------------------------------------------------------
     local function SetMinimapShown(show)
         Utils.setShown(KRT_MINIMAP_GUI, show)
     end
@@ -1357,21 +1274,11 @@ do
     end
 end
 
----============================================================================
--- Rolls Helpers Module
--- Manages roll tracking, sorting, and winner determination.
----============================================================================
+-- ===== Rolls Helpers Module: Manages roll tracking, sorting, and winner determination =====
 do
-    -------------------------------------------------------
-    -- 1. Create/retrieve the module table
-    -------------------------------------------------------
     addon.Rolls = addon.Rolls or {}
     local module = addon.Rolls
     local L = addon.L
-
-    -------------------------------------------------------
-    -- 2. Internal state
-    -------------------------------------------------------
     local state = {
         record       = false,
         canRoll      = true,
@@ -1389,10 +1296,6 @@ do
     }
     local newItemCounts, delItemCounts = addon.TablePool and addon.TablePool("k")
     state.itemCounts = newItemCounts and newItemCounts() or {}
-
-    -------------------------------------------------------
-    -- 3. Private helpers
-    -------------------------------------------------------
     local function AcquireItemTracker(itemId)
         local tracker = state.itemCounts
         if not tracker[itemId] then
@@ -1550,10 +1453,6 @@ do
 
         if rec == false then state.record = false end
     end
-
-    -------------------------------------------------------
-    -- 4. Public methods
-    -------------------------------------------------------
     -- Initiates a /roll 1-100 for the player.
     function module:Roll(btn)
         local itemId = self:GetCurrentRollItemID()
@@ -1846,34 +1745,17 @@ do
     end)
 end
 
----============================================================================
--- Loot Helpers Module
--- Manages the loot window items (fetching from loot/inventory).
----============================================================================
+-- ===== Loot Helpers Module: Manages the loot window items (fetching from loot/inventory) =====
 do
-    -------------------------------------------------------
-    -- 1. Create/retrieve the module table
-    -------------------------------------------------------
     addon.Loot = addon.Loot or {}
     local module = addon.Loot
     local L = addon.L
     local frameName
-
-    -------------------------------------------------------
-    -- Internal state
-    -------------------------------------------------------
     local lootTable = {}
-
-    -------------------------------------------------------
-    -- Private helpers
-    -------------------------------------------------------
     local function BuildPendingAwardKey(itemLink, looter)
         return tostring(itemLink) .. "\001" .. tostring(looter)
     end
-
-    -------------------------------------------------------
     -- Pending award helpers (shared with Master/Raid flows)
-    -------------------------------------------------------
     function module:QueuePendingAward(itemLink, looter, rollType, rollValue)
         if not itemLink or not looter then
             return
@@ -1921,11 +1803,6 @@ do
         end
         return nil
     end
-
-    -------------------------------------------------------
-    -- Public methods
-    -------------------------------------------------------
-
     --
     -- Fetches items from the currently open loot window.
     --
@@ -2169,21 +2046,12 @@ do
     end
 end
 
----============================================================================
--- Master Looter Frame Module
----============================================================================
+-- ===== Master Looter Frame Module =====
 do
-    -------------------------------------------------------
-    -- 1. Create/retrieve the module table
-    -------------------------------------------------------
     addon.Master = addon.Master or {}
     local module = addon.Master
     local L = addon.L
     local frameName
-
-    -------------------------------------------------------
-    -- Internal state
-    -------------------------------------------------------
     local LocalizeUIFrame
     local localized = false
 
@@ -2226,10 +2094,6 @@ do
         itemLink = nil,
         indexByName = {},
     }
-
-    -------------------------------------------------------
-    -- Private helpers
-    -------------------------------------------------------
     local function SetItemCountValue(count, focus)
         frameName = frameName or Utils.getFrameName()
         if not frameName or frameName ~= UIMaster:GetName() then return end
@@ -2403,13 +2267,6 @@ do
         end
         return false
     end
-
-
-
-    -------------------------------------------------------
-    -- Public methods
-    -------------------------------------------------------
-
     -- OnLoad frame:
     function module:OnLoad(frame)
         if not frame then return end
@@ -3033,10 +2890,7 @@ do
             selectionFrame:Hide()
         end
     end
-
-    --------------------------------------------------------------------------
     -- Event Handlers & Callbacks
-    --------------------------------------------------------------------------
 
     --
     -- ITEM_LOCKED: Triggered when an item is picked up from inventory.
@@ -3271,7 +3125,6 @@ do
             tostring(playerName), tonumber(rollType) or -1, tonumber(rollValue) or 0,
             lootState.itemCount or 1))
 
-
         -- Prepare initial output and whisper:
         local output, whisper
         local keep = not isAwardRoll
@@ -3387,10 +3240,7 @@ do
     end)
 end
 
----============================================================================
--- Loot Counter Module
--- Counter and display item distribution.
----============================================================================
+-- ===== Loot Counter Module: Counter and display item distribution =====
 do
     local module = addon.Master
 
@@ -3541,9 +3391,7 @@ do
     end
 
     -- Add a button to the master loot frame to open the loot counter UI
-    -------------------------------------------------------
     -- Event hooks
-    -------------------------------------------------------
     local function SetupMasterLootFrameHooks()
         local f = _G["KRTMasterLootFrame"]
         if f and not f.KRT_LootCounterBtn then
@@ -3566,22 +3414,12 @@ do
     hooksecurefunc(addon.Master, "OnLoad", SetupMasterLootFrameHooks)
 end
 
----============================================================================
--- Reserves Module
--- Manages item reserves, import, and display.
----============================================================================
+-- ===== Reserves Module: Manages item reserves, import, and display =====
 do
-    -------------------------------------------------------
-    -- 1. Create/retrieve the module table
-    -------------------------------------------------------
     addon.Reserves = addon.Reserves or {}
     local module = addon.Reserves
     local L = addon.L
     local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
-
-    -------------------------------------------------------
-    -- Internal state
-    -------------------------------------------------------
     -- UI Elements
     local frameName
     local reserveListFrame, scrollFrame, scrollChild
@@ -3599,11 +3437,6 @@ do
     local pendingItemCount = 0
     local collapsedBossGroups = {}
     local grouped = {}
-
-    -------------------------------------------------------
-    -- Private helpers
-    -------------------------------------------------------
-
     local playerTextTemp = {}
 
     local function MarkPendingItem(itemId, hasName, hasIcon)
@@ -3896,18 +3729,10 @@ do
             tostring(collapsedBossGroups[source]))
         module:RefreshWindow()
     end
-
-    -------------------------------------------------------
-    -- Public methods
-    -------------------------------------------------------
-
     -- Local functions
     local LocalizeUIFrame
     local UpdateUIFrame
-
-    --------------------------------------------------------------------------
     -- Saved Data Management
-    --------------------------------------------------------------------------
 
     function module:Save()
         RebuildIndex()
@@ -3947,10 +3772,7 @@ do
         local list = reservesByItemID[itemId]
         return type(list) == "table" and #list > 0
     end
-
-    --------------------------------------------------------------------------
     -- UI Window Management
-    --------------------------------------------------------------------------
 
     function module:ShowWindow()
         if not reserveListFrame then
@@ -4055,10 +3877,7 @@ do
             end
         end)
     end
-
-    --------------------------------------------------------------------------
     -- Localization and UI Update
-    --------------------------------------------------------------------------
 
     function LocalizeUIFrame()
         if localized then
@@ -4087,10 +3906,7 @@ do
             end
         end)
     end
-
-    --------------------------------------------------------------------------
     -- Reserve Data Handling
-    --------------------------------------------------------------------------
 
     function module:GetReserve(playerName)
         if type(playerName) ~= "string" then return nil end
@@ -4193,10 +4009,7 @@ do
         self:RefreshWindow()
         self:Save()
     end
-
-    --------------------------------------------------------------------------
     -- Item Info Querying
-    --------------------------------------------------------------------------
 
     function module:QueryItemInfo(itemId)
         if not itemId then return end
@@ -4337,10 +4150,7 @@ do
         addon:debug("Reserves: none itemId=%d player=%s.", itemId, playerName)
         return 0
     end
-
-    --------------------------------------------------------------------------
     -- UI Display
-    --------------------------------------------------------------------------
 
     function module:RefreshWindow()
         if not reserveListFrame or not scrollChild then return end
@@ -4461,10 +4271,7 @@ do
 
         return row
     end
-
-    --------------------------------------------------------------------------
     -- SR Announcement Formatting
-    --------------------------------------------------------------------------
 
     function module:GetPlayersForItem(itemId)
         if not itemId then return {} end
@@ -4491,37 +4298,19 @@ do
     end
 end
 
----============================================================================
--- Configuration Frame Module
----============================================================================
+-- ===== Configuration Frame Module =====
 do
-    -------------------------------------------------------
-    -- 1. Create/retrieve the module table
-    -------------------------------------------------------
     addon.Config = addon.Config or {}
     local module = addon.Config
     local L = addon.L
     local frameName
-
-    -------------------------------------------------------
-    -- Internal state
-    -------------------------------------------------------
     local localized = false
     local configDirty = false
 
     -- Frame update
     local UpdateUIFrame
     local updateInterval = C.UPDATE_INTERVAL_CONFIG
-
-    -------------------------------------------------------
-    -- Private helpers
-    -------------------------------------------------------
     local LocalizeUIFrame
-
-    -------------------------------------------------------
-    -- Public methods
-    -------------------------------------------------------
-
     --
     -- Default options for the addon.
     --
@@ -4739,21 +4528,12 @@ do
     end
 end
 
----============================================================================
--- Warnings Frame Module
----============================================================================
+-- ===== Warnings Frame Module =====
 do
-    -------------------------------------------------------
-    -- 1. Create/retrieve the module table
-    -------------------------------------------------------
     addon.Warnings = addon.Warnings or {}
     local module = addon.Warnings
     local L = addon.L
     local frameName
-
-    -------------------------------------------------------
-    -- Internal state
-    -------------------------------------------------------
     local LocalizeUIFrame
     local localized = false
 
@@ -4763,15 +4543,6 @@ do
     local FetchWarnings
     local fetched = false
     local warningsDirty = false
-
-    -------------------------------------------------------
-    -- Private helpers
-    -------------------------------------------------------
-
-    -------------------------------------------------------
-    -- Public methods
-    -------------------------------------------------------
-
     local selectedID, tempSelectedID
     local lastSelectedID = false
     local lastEditBtnMode
@@ -4994,21 +4765,12 @@ do
     end
 end
 
----============================================================================
--- MS Changes Module
----============================================================================
+-- ===== MS Changes Module =====
 do
-    -------------------------------------------------------
-    -- 1. Create/retrieve the module table
-    -------------------------------------------------------
     addon.Changes = addon.Changes or {}
     local module = addon.Changes
     local L = addon.L
     local frameName
-
-    -------------------------------------------------------
-    -- Internal state
-    -------------------------------------------------------
     local LocalizeUIFrame
     local localized = false
 
@@ -5025,15 +4787,6 @@ do
     local lastAddBtnMode
     local isAdd = false
     local isEdit = false
-
-    -------------------------------------------------------
-    -- Private helpers
-    -------------------------------------------------------
-
-    -------------------------------------------------------
-    -- Public methods
-    -------------------------------------------------------
-
     -- OnLoad frame:
     function module:OnLoad(frame)
         if not frame then return end
@@ -5318,20 +5071,11 @@ do
     end
 end
 
----============================================================================
--- LFM Spam Module
----============================================================================
+-- ===== LFM Spam Module =====
 do
-    -------------------------------------------------------
-    -- 1. Create/retrieve the module table
-    -------------------------------------------------------
     addon.Spammer = addon.Spammer or {}
     local module = addon.Spammer
     local L = addon.L
-
-    -------------------------------------------------------
-    -- Internal state
-    -------------------------------------------------------
     local frameName
 
     local LocalizeUIFrame
@@ -7562,9 +7306,7 @@ do
         addon:error(L.ErrAttendeesInvalidName)
     end
 end
----============================================================================
--- Slash Commands
----============================================================================
+-- ===== Slash Commands =====
 do
     addon.Slash = addon.Slash or {}
     local Slash = addon.Slash
@@ -7807,9 +7549,7 @@ do
     end
 end
 
----============================================================================
--- Main Event Handlers
----============================================================================
+-- ===== Main Event Handlers =====
 
 local addonEvents = {
     CHAT_MSG_SYSTEM = "CHAT_MSG_SYSTEM",

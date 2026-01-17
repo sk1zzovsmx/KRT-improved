@@ -21,9 +21,7 @@ local UnitIsGroupLeader = UnitIsGroupLeader
 
 local ITEM_LINK_FORMAT = "|c%s|Hitem:%d:%s|h[%s]|h|r"
 
----============================================================================
--- Global convenience helpers (kept as-is)
----============================================================================
+-- ===== Global convenience helpers (kept as-is) =====
 
 -- Shuffle a table:
 _G.table.shuffle = function(t)
@@ -69,10 +67,7 @@ _G.string.endsWith = function(str, piece)
     return strsub(str, -lenPiece) == piece
 end
 
-
----============================================================================
--- Debug/state helpers
----============================================================================
+-- ===== Debug/state helpers =====
 
 function Utils.applyDebugSetting(enabled)
 	local options = addon and addon.options
@@ -103,9 +98,7 @@ function Utils.getPlayerName()
 	return name
 end
 
----============================================================================
--- String helpers
----============================================================================
+-- ===== String helpers =====
 
 function Utils.ucfirst(value)
 	if type(value) ~= "string" then
@@ -172,9 +165,7 @@ function Utils.getItemIdFromLink(itemLink)
 	return itemId
 end
 
----============================================================================
--- UI helpers
----============================================================================
+-- ===== UI helpers =====
 
 --
 -- createRowDrawer(fn)
@@ -201,9 +192,7 @@ function Utils.createRowDrawer(fn)
     end
 end
 
----============================================================================
--- Roster helpers
----============================================================================
+-- ===== Roster helpers =====
 
 function Utils.getRealmName()
 	local realm = GetRealmName()
@@ -226,9 +215,7 @@ function Utils.getUnitRank(unit, fallback)
 	return fallback or 0
 end
 
----============================================================================
--- Callback utilities
----============================================================================
+-- ===== Callback utilities =====
 
 do
 	local CallbackHandler = LibStub("CallbackHandler-1.0") -- vendored (hard dependency)
@@ -284,9 +271,7 @@ do
 	end
 end
 
----============================================================================
--- Frame helpers
----============================================================================
+-- ===== Frame helpers =====
 
 function Utils.getFrameName()
 	return addon.UIMaster:GetName()
@@ -381,9 +366,7 @@ function Utils.setShown(frame, show)
 	end
 end
 
----============================================================================
--- Tooltip helpers
----============================================================================
+-- ===== Tooltip helpers =====
 
 do
 	local colors = HIGHLIGHT_FONT_COLOR
@@ -431,9 +414,7 @@ do
 	end
 end
 
----============================================================================
--- Color utilities
----============================================================================
+-- ===== Color utilities =====
 
 function Utils.normalizeHexColor(color)
 	if type(color) == "string" then
@@ -460,9 +441,7 @@ function Utils.getClassColor(className)
 	return (r or 1), (g or 1), (b or 1)
 end
 
----============================================================================
--- UI helpers
----============================================================================
+-- ===== UI helpers =====
 
 -- Enable/Disable Frame:
 function Utils.enableDisable(frame, cond)
@@ -517,9 +496,7 @@ function Utils.setText(frame, str1, str2, cond)
 	end
 end
 
----============================================================================
--- Throttles
----============================================================================
+-- ===== Throttles =====
 
 -- Throttle frame OnUpdate:
 function Utils.throttle(frame, name, period, elapsed)
@@ -544,9 +521,7 @@ function Utils.throttledUIUpdate(frame, frameName, period, elapsed, fn)
 	return false
 end
 
----============================================================================
--- Chat + comms helpers
----============================================================================
+-- ===== Chat + comms helpers =====
 
 -- Convert seconds to readable clock string:
 function Utils.sec2clock(seconds)
@@ -590,9 +565,7 @@ function Utils.whisper(target, msg)
 	end
 end
 
----============================================================================
--- Time helpers
----============================================================================
+-- ===== Time helpers =====
 
 -- Determines if the player is in a raid instance
 function Utils.isRaidInstance()
@@ -637,9 +610,7 @@ function Utils.getServerOffset()
 	return offset
 end
 
----============================================================================
--- Base64 encode/decode
----============================================================================
+-- ===== Base64 encode/decode =====
 
 --[==[ Base64 encode/decode ]==] --
 do
