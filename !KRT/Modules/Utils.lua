@@ -10,7 +10,6 @@ local find = string.find
 local format, gsub = string.format, string.gsub
 local strsub, strlen = string.sub, string.len
 local lower, upper = string.lower, string.upper
-local ucfirst = _G.string and _G.string.ucfirst
 local select = select
 local LibStub = LibStub
 
@@ -70,11 +69,6 @@ _G.string.endsWith = function(str, piece)
     return strsub(str, -lenPiece) == piece
 end
 
--- Uppercase first:
-_G.string.ucfirst = function(str)
-	str = lower(str)
-	return gsub(str, "%a", upper, 1)
-end
 
 ---============================================================================
 -- Debug/state helpers
@@ -113,6 +107,14 @@ end
 -- String helpers
 ---============================================================================
 
+function Utils.ucfirst(value)
+	if type(value) ~= "string" then
+		value = tostring(value or "")
+	end
+	value = lower(value)
+	return gsub(value, "%a", upper, 1)
+end
+
 function Utils.trimText(value, allowNil)
 	if value == nil then
 		return allowNil and nil or ""
@@ -125,7 +127,7 @@ function Utils.normalizeName(value, allowNil)
 	if text == nil then
 		return nil
 	end
-	return (ucfirst and ucfirst(text)) or text
+	return Utils.ucfirst(text)
 end
 
 function Utils.normalizeLower(value, allowNil)
