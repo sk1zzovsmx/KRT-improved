@@ -6,7 +6,6 @@ local E = addon.E
 -- ==================== Log Messages ==================== --
 E.LogCoreCallbackHandlerMissing   = "[Core] CallbackHandler missing: using fallback event wiring"
 E.LogCoreLoaded                   = "[Core] Loaded version=%s logLevel=%s perfMode=%s"
-E.LogCoreBuild                    = "[Core] build=%s"
 E.LogCoreEventsRegistered         = "[Core] Events registered=%d"
 E.LogCorePlayerEnteringWorld      = "[Core] PLAYER_ENTERING_WORLD -> scheduling FirstCheck"
 E.LogRaidLeftGroupEndSession      = "[Raid] Left group -> ending current raid session"
