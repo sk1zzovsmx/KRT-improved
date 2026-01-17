@@ -28,7 +28,6 @@ local RAID_TARGET_MARKERS = C.RAID_TARGET_MARKERS
 local K_COLOR             = C.K_COLOR
 local RT_COLOR            = C.RT_COLOR
 
----============================================================================
 -- Saved Variables
 -- These variables are persisted across sessions for the addon.
 ---============================================================================
@@ -259,8 +258,8 @@ do
     function module:UpdateRaidRoster()
         rosterVersion = rosterVersion + 1
         if not KRT_CurrentRaid then return end
-        addon.CancelTimer(module.updateRosterHandle, true)
-        module.updateRosterHandle = nil
+        -- Cancel any pending roster update timer and clear the handle
+        module.updateRosterHandle = Utils.cancelTimer(module.updateRosterHandle)
 
         if not addon.IsInRaid() then
             numRaid = 0
@@ -424,8 +423,8 @@ do
 
         Utils.triggerEvent("RaidCreate", KRT_CurrentRaid)
 
-        -- One clean refresh shortly after
-        addon.CancelTimer(module.updateRosterHandle, true)
+        -- One clean refresh shortly after: cancel existing timer then start a new one
+        module.updateRosterHandle = Utils.cancelTimer(module.updateRosterHandle)
         module.updateRosterHandle = addon.After(2, function() module:UpdateRaidRoster() end)
     end
 
@@ -434,8 +433,8 @@ do
     --
     function module:End()
         if not KRT_CurrentRaid then return end
-        addon.CancelTimer(module.updateRosterHandle, true)
-        module.updateRosterHandle = nil
+        -- Stop any pending roster update when ending the raid
+        module.updateRosterHandle = Utils.cancelTimer(module.updateRosterHandle)
         local currentTime = Utils.getCurrentTime()
         local raid = KRT_Raids[KRT_CurrentRaid]
         if raid then
@@ -494,14 +493,13 @@ do
     -- Performs an initial raid check on player login.
     --
     function module:FirstCheck()
-        if module.firstCheckHandle then
-            addon.CancelTimer(module.firstCheckHandle, true)
-            module.firstCheckHandle = nil
-        end
+        -- Cancel any pending first-check timer before starting a new one
+        module.firstCheckHandle = Utils.cancelTimer(module.firstCheckHandle)
         if not addon.IsInGroup() then return end
 
         if KRT_CurrentRaid and module:CheckPlayer(Utils.getPlayerName(), KRT_CurrentRaid) then
-            addon.CancelTimer(module.updateRosterHandle, true)
+            -- Restart the roster update timer: cancel the old one and schedule a new one
+            module.updateRosterHandle = Utils.cancelTimer(module.updateRosterHandle)
             module.updateRosterHandle = addon.After(2, function() module:UpdateRaidRoster() end)
             return
         end
@@ -1467,14 +1465,14 @@ do
                 return wantLow and (a.roll < b.roll) or (a.roll > b.roll)
             end
 
-            -- tie-breaker stabile
+            -- stable tie-breaker
             return tostring(a.name) < tostring(b.name)
         end)
 
-        -- ⭐ top roll (segue SEMPRE Asc/Desc)
+        -- * top roll (always follows ascending/descending sort order)
         lootState.rollWinner = rolls[1].name
 
-        -- award target segue top roll solo se non è manuale
+        -- Award target follows the top roll only when not manually selected
         if state.canRoll or state.selectedAuto or (lootState.winner == nil) then
             lootState.winner = lootState.rollWinner
             state.selectedAuto = true
@@ -1485,7 +1483,7 @@ do
     end
 
     local function onRollButtonClick(self)
-        -- ✅ Selezione SOLO a countdown finito
+        -- Selection allowed only after the countdown has finished
         if state.canRoll then
             return
         end
@@ -1493,7 +1491,7 @@ do
         local name = self.playerName
         if not name or name == "" then return end
 
-        -- ✅ award target = selezione manuale
+        -- Award target is determined by manual selection
         lootState.winner = name
         state.selected = name
         state.selectedAuto = false
@@ -1599,7 +1597,7 @@ do
         if on then
             state.warned = false
 
-            -- reset SOLO se stiamo iniziando una sessione “pulita”
+            -- Reset only if we are starting a clean session
             if state.count == 0 then
                 state.selected = nil
                 state.selectedAuto = true
@@ -1628,7 +1626,7 @@ do
 
         local itemId = self:GetCurrentRollItemID()
         if not itemId or lootState.lootCount == 0 then
-            addon:error("Item ID missing or loot table not ready – roll ignored.")
+            addon:error("Item ID missing or loot table not ready - roll ignored.")
             return
         end
 
@@ -1759,7 +1757,7 @@ do
         -- top roll
         local starTarget = lootState.rollWinner
 
-        -- fallback (se per qualche motivo non è ancora valorizzato)
+        -- fallback (if for some reason it has not been set yet)
         if not starTarget then
             if isSR then
                 local bestName = PickBestReserved(itemId)
@@ -1786,7 +1784,7 @@ do
             btn:Show()
             btn.playerName = name
 
-            -- click solo post-CD
+            -- enable click only after the countdown has finished
             btn:EnableMouse(selectionAllowed)
 
             if not btn.selectedBackground then
@@ -1809,7 +1807,8 @@ do
                 end
             end
 
-            -- > < SOLO se manuale (cioè: post-CD e selectedAuto=false)
+            -- Surround the name with > < only when manually selected
+            -- (i.e., after the countdown and when selectedAuto is false)
             if selectionAllowed and (state.selectedAuto == false) and pickName and pickName == name then
                 nameStr:SetText("> " .. name .. " <")
             else
@@ -1830,7 +1829,7 @@ do
                 rollStr:SetText(roll)
             end
 
-            -- ⭐ STAR sempre top roll (rollWinner)
+            -- Star always marks the top roll (rollWinner)
             local showStar = (not starShown) and (starTarget ~= nil) and (name == starTarget)
             Utils.showHide(star, showStar)
             if showStar then starShown = true end
@@ -2199,10 +2198,9 @@ do
     end
 
     local function StopCountdown()
-        addon.CancelTimer(countdownTicker, true)
-        addon.CancelTimer(countdownEndTimer, true)
-        countdownTicker = nil
-        countdownEndTimer = nil
+        -- Cancel active countdown timers and clear their handles
+        countdownTicker = Utils.cancelTimer(countdownTicker)
+        countdownEndTimer = Utils.cancelTimer(countdownEndTimer)
         countdownRun = false
     end
 
@@ -2243,7 +2241,7 @@ do
             StopCountdown()
             addon:Announce(L.ChatCountdownEnd)
 
-            -- ✅ a 0: stop roll (abilita selezione in Rolls) + refresh UI
+            -- At zero: stop roll (enables selection in rolls) and refresh the UI
             addon.Rolls:RecordRolls(false)
             addon.Rolls:FetchRolls()
         end)
@@ -3050,10 +3048,8 @@ do
         if addon.Raid:IsMasterLooter() then
             addon:trace(L.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
             addon:trace(L.LogMLLootClosedCleanup)
-            if lootState.closeTimer then
-                addon.CancelTimer(lootState.closeTimer)
-                lootState.closeTimer = nil
-            end
+            -- Cancel any scheduled close timer and schedule a new one
+            lootState.closeTimer = Utils.cancelTimer(lootState.closeTimer)
             lootState.closeTimer = addon.After(0.1, function()
                 lootState.closeTimer = nil
                 lootState.opened = false
@@ -3373,10 +3369,8 @@ do
     end
 
     local function StopCountsTicker()
-        if countsTicker then
-            addon.CancelTimer(countsTicker, true)
-            countsTicker = nil
-        end
+        -- Stop and clear the counts update ticker
+        countsTicker = Utils.cancelTimer(countsTicker)
     end
 
     -- Helper to ensure frames exist
@@ -4499,11 +4493,21 @@ do
     }
 
     --
+    -- Creates a fresh options table seeded with defaults.
+    -- Returns a new table populated with the values in defaultOptions. This helper
+    -- avoids duplication between LoadDefaultOptions and LoadOptions when
+    -- constructing the base options table.
+    local function NewOptions()
+        local options = {}
+        addon.tCopy(options, defaultOptions)
+        return options
+    end
+
+    --
     -- Loads the default options into the settings table.
     --
     local function LoadDefaultOptions()
-        local options = {}
-        addon.tCopy(options, defaultOptions)
+        local options = NewOptions()
         KRT_Options = options
         addon.options = options
         configDirty = true
@@ -4514,8 +4518,7 @@ do
     -- Loads addon options from saved variables, filling in defaults.
     --
     local function LoadOptions()
-        local options = {}
-        addon.tCopy(options, defaultOptions)
+        local options = NewOptions()
         if KRT_Options then
             addon.tCopy(options, KRT_Options)
         end
@@ -5764,8 +5767,8 @@ do
 
     -- Spam cycle
     function StopSpamCycle(resetCountdown)
-        addon.CancelTimer(countdownTicker, true)
-        countdownTicker = nil
+        -- Stop and clear the spam ticker
+        countdownTicker = Utils.cancelTimer(countdownTicker)
 
         if resetCountdown then
             countdownRemaining = 0
@@ -5819,8 +5822,8 @@ do
 
     function StopTicker()
         if not updateTicker then return end
-        addon.CancelTimer(updateTicker, true)
-        updateTicker = nil
+        -- Stop and clear the UI update ticker
+        updateTicker = Utils.cancelTimer(updateTicker)
     end
 
     -- Build output
@@ -6568,18 +6571,13 @@ do
         rowName = function(n, _, i) return n .. "RaidBtn" .. i end,
         rowTmpl = "KRTLoggerRaidButton",
 
-        drawRow = (function()
-            local ROW_H
-            return function(row, it)
-                if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
-                local ui = row._p
-                ui.ID:SetText(it.id)
-                ui.Date:SetText(it.dateFmt)
-                ui.Zone:SetText(it.zone)
-                ui.Size:SetText(it.sizeLabel or it.size)
-                return ROW_H
-            end
-        end)(),
+        drawRow = Utils.createRowDrawer(function(row, it)
+            local ui = row._p
+            ui.ID:SetText(it.id)
+            ui.Date:SetText(it.dateFmt)
+            ui.Zone:SetText(it.zone)
+            ui.Size:SetText(it.sizeLabel or it.size)
+        end),
 
         highlightId = function() return addon.Logger.selectedRaid end,
 
@@ -6770,18 +6768,13 @@ do
         rowName = function(n, _, i) return n .. "BossBtn" .. i end,
         rowTmpl = "KRTLoggerBossButton",
 
-        drawRow = (function()
-            local ROW_H
-            return function(row, it)
-                if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
-                local ui = row._p
-                ui.ID:SetText(it.id)
-                ui.Name:SetText(it.name)
-                ui.Time:SetText(it.timeFmt)
-                ui.Mode:SetText(it.mode)
-                return ROW_H
-            end
-        end)(),
+        drawRow = Utils.createRowDrawer(function(row, it)
+            local ui = row._p
+            ui.ID:SetText(it.id)
+            ui.Name:SetText(it.name)
+            ui.Time:SetText(it.timeFmt)
+            ui.Mode:SetText(it.mode)
+        end),
 
         highlightId = function() return addon.Logger.selectedBoss end,
 
@@ -6889,17 +6882,12 @@ do
         rowName = function(n, _, i) return n .. "PlayerBtn" .. i end,
         rowTmpl = "KRTLoggerBossAttendeeButton",
 
-        drawRow = (function()
-            local ROW_H
-            return function(row, it)
-                if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
-                local ui = row._p
-                local r, g, b = Utils.getClassColor(it.class)
-                ui.Name:SetText(it.name)
-                ui.Name:SetVertexColor(r, g, b)
-                return ROW_H
-            end
-        end)(),
+        drawRow = Utils.createRowDrawer(function(row, it)
+            local ui = row._p
+            local r, g, b = Utils.getClassColor(it.class)
+            ui.Name:SetText(it.name)
+            ui.Name:SetVertexColor(r, g, b)
+        end),
 
         highlightId = function() return addon.Logger.selectedBossPlayer end,
 
@@ -7004,19 +6992,14 @@ do
         rowName = function(n, _, i) return n .. "PlayerBtn" .. i end,
         rowTmpl = "KRTLoggerRaidAttendeeButton",
 
-        drawRow = (function()
-            local ROW_H
-            return function(row, it)
-                if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
-                local ui = row._p
-                ui.Name:SetText(it.name)
-                local r, g, b = Utils.getClassColor(it.class)
-                ui.Name:SetVertexColor(r, g, b)
-                ui.Join:SetText(it.joinFmt)
-                ui.Leave:SetText(it.leaveFmt)
-                return ROW_H
-            end
-        end)(),
+        drawRow = Utils.createRowDrawer(function(row, it)
+            local ui = row._p
+            ui.Name:SetText(it.name)
+            local r, g, b = Utils.getClassColor(it.class)
+            ui.Name:SetVertexColor(r, g, b)
+            ui.Join:SetText(it.joinFmt)
+            ui.Leave:SetText(it.leaveFmt)
+        end),
 
         highlightId = function() return addon.Logger.selectedPlayer end,
 
@@ -7120,7 +7103,7 @@ do
             _G[n .. "HeaderRoll"]:SetText(L.StrRoll)
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
 
-            -- disabilitati finché non implementati
+            -- Disabled until implemented
             _G[n .. "ExportBtn"]:Disable()
             _G[n .. "ClearBtn"]:Disable()
             _G[n .. "AddBtn"]:Disable()
@@ -7163,52 +7146,46 @@ do
         rowName = function(n, _, i) return n .. "ItemBtn" .. i end,
         rowTmpl = "KRTLoggerLootButton",
 
-        drawRow = (function()
-            local ROW_H
-            return function(row, v)
-                if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
-                local ui = row._p
-
-                row._itemLink = v.itemLink
-                local nameText = v.itemLink or v.itemName or ("[Item " .. (v.itemId or "?") .. "]")
-                if v.itemLink then
-                    ui.Name:SetText(nameText)
-                else
-                    ui.Name:SetText(addon.WrapTextInColorCode(
-                        nameText,
-                        Utils.normalizeHexColor(itemColors[(v.itemRarity or 1) + 1])
-                    ))
-                end
-
-                local selectedBoss = addon.Logger.selectedBoss
-                if selectedBoss and v.bossNum == selectedBoss then
-                    ui.Source:SetText("")
-                else
-                    ui.Source:SetText(addon.Logger.Boss:GetName(v.bossNum, addon.Logger.selectedRaid))
-                end
-
-                local r, g, b = Utils.getClassColor(addon.Raid:GetPlayerClass(v.looter))
-                ui.Winner:SetText(v.looter)
-                ui.Winner:SetVertexColor(r, g, b)
-
-                local rt = tonumber(v.rollType) or 0
-                v.rollType = rt
-                ui.Type:SetText(lootTypesColored[rt] or lootTypesColored[4])
-                ui.Roll:SetText(v.rollValue or 0)
-                ui.Time:SetText(v.timeFmt)
-
-                local icon = v.itemTexture
-                if not icon and v.itemId then
-                    icon = GetItemIcon(v.itemId)
-                end
-                if not icon then
-                    icon = C.RESERVES_ITEM_FALLBACK_ICON
-                end
-                ui.ItemIconTexture:SetTexture(icon)
-
-                return ROW_H
+        drawRow = Utils.createRowDrawer(function(row, it)
+            local ui = row._p
+            -- Preserve the original item link on the row for tooltips.
+            row._itemLink = it.itemLink
+            local nameText = it.itemLink or it.itemName or ("[Item " .. (it.itemId or "?") .. "]")
+            if it.itemLink then
+                ui.Name:SetText(nameText)
+            else
+                ui.Name:SetText(addon.WrapTextInColorCode(
+                    nameText,
+                    Utils.normalizeHexColor(itemColors[(it.itemRarity or 1) + 1])
+                ))
             end
-        end)(),
+
+            local selectedBoss = addon.Logger.selectedBoss
+            if selectedBoss and it.bossNum == selectedBoss then
+                ui.Source:SetText("")
+            else
+                ui.Source:SetText(addon.Logger.Boss:GetName(it.bossNum, addon.Logger.selectedRaid))
+            end
+
+            local r, g, b = Utils.getClassColor(addon.Raid:GetPlayerClass(it.looter))
+            ui.Winner:SetText(it.looter)
+            ui.Winner:SetVertexColor(r, g, b)
+
+            local rt = tonumber(it.rollType) or 0
+            it.rollType = rt
+            ui.Type:SetText(lootTypesColored[rt] or lootTypesColored[4])
+            ui.Roll:SetText(it.rollValue or 0)
+            ui.Time:SetText(it.timeFmt)
+
+            local icon = it.itemTexture
+            if not icon and it.itemId then
+                icon = GetItemIcon(it.itemId)
+            end
+            if not icon then
+                icon = C.RESERVES_ITEM_FALLBACK_ICON
+            end
+            ui.ItemIconTexture:SetTexture(icon)
+        end),
 
         highlightId = function() return addon.Logger.selectedItem end,
 
@@ -7354,7 +7331,7 @@ do
 end
 
 -- ============================================================================
--- Logger: Add/Edit Boss Popup  (Patch #1 — uniforma a time/mode)
+-- Logger: Add/Edit Boss Popup  (Patch #1 - normalize to time/mode)
 -- ============================================================================
 do
     addon.Logger.BossBox = addon.Logger.BossBox or {}
@@ -7871,7 +7848,8 @@ function addon:PLAYER_ENTERING_WORLD()
     self:UnregisterEvent("PLAYER_ENTERING_WORLD")
     local module = self.Raid
     addon:trace(L.LogCorePlayerEnteringWorld)
-    addon.CancelTimer(module.firstCheckHandle, true)
+    -- Restart the first-check timer on login
+    module.firstCheckHandle = Utils.cancelTimer(module.firstCheckHandle)
     module.firstCheckHandle = addon.After(3, function() module:FirstCheck() end)
 end
 
