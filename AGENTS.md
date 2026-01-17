@@ -302,6 +302,7 @@ Throttle high-frequency sources (roster updates, combat log, UI refresh loops).
 ---
 
 ## 17) Change log (edit manually)
+- 2026-03-08: Split log localization strings into Localization/ErrorLog.en.lua.
 - 2026-01-13: Standardized repository language to English (AGENTS + codebase rules).
 - 2026-01-13: Reaffirmed **KRT.lua monolithic** policy and in-file module skeleton.
 - 2026-01-13: Codified Lua 5.1 style rules (globals, formatting, naming, errors/returns, iteration).

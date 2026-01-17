@@ -7,7 +7,10 @@
 local addonName, addon = ...
 addon                  = addon or {}
 addon.name             = addon.name or addonName
+addon.L                = addon.L or {}
+addon.E                = addon.E or {}
 local L                = addon.L
+local E                = addon.E
 local Utils            = addon.Utils
 local C                = addon.C
 
@@ -265,7 +268,7 @@ do
 
         if not addon.IsInRaid() then
             numRaid = 0
-            addon:info(L.LogRaidLeftGroupEndSession)
+            addon:info(E.LogRaidLeftGroupEndSession)
             module:End()
             addon.Master:PrepareDropDowns()
             return
@@ -341,7 +344,7 @@ do
             end
         end
 
-        addon:debug(L.LogRaidRosterUpdate:format(rosterVersion, n))
+        addon:debug(E.LogRaidRosterUpdate:format(rosterVersion, n))
         addon.Master:PrepareDropDowns()
     end
 
@@ -416,7 +419,7 @@ do
         tinsert(KRT_Raids, raidInfo)
         KRT_CurrentRaid = #KRT_Raids
 
-        addon:info(L.LogRaidCreated:format(
+        addon:info(E.LogRaidCreated:format(
             KRT_CurrentRaid or -1,
             tostring(zoneName),
             tonumber(raidSize) or -1,
@@ -443,7 +446,7 @@ do
         local raid = KRT_Raids[KRT_CurrentRaid]
         if raid then
             local duration = currentTime - (raid.startTime or currentTime)
-            addon:info(L.LogRaidEnded:format(KRT_CurrentRaid or -1, tostring(raid.zone),
+            addon:info(E.LogRaidEnded:format(KRT_CurrentRaid or -1, tostring(raid.zone),
                 tonumber(raid.size) or -1, raid.bossKills and #raid.bossKills or 0,
                 raid.loot and #raid.loot or 0, duration))
         end
@@ -459,7 +462,7 @@ do
     -- Checks the current raid status and creates a new session if needed.
     --
     function module:Check(instanceName, instanceDiff)
-        addon:debug(L.LogRaidCheck:format(tostring(instanceName), tostring(instanceDiff),
+        addon:debug(E.LogRaidCheck:format(tostring(instanceName), tostring(instanceDiff),
             tostring(KRT_CurrentRaid)))
         if not KRT_CurrentRaid then
             module:Create(instanceName, (instanceDiff % 2 == 0 and 25 or 10))
@@ -470,24 +473,24 @@ do
             if current.zone == instanceName then
                 if current.size == 10 and (instanceDiff % 2 == 0) then
                     addon:info(L.StrNewRaidSessionChange)
-                    addon:info(L.LogRaidSessionChange:format(tostring(instanceName), 25,
+                    addon:info(E.LogRaidSessionChange:format(tostring(instanceName), 25,
                         tonumber(instanceDiff) or -1))
                     module:Create(instanceName, 25)
                 elseif current.size == 25 and (instanceDiff % 2 ~= 0) then
                     addon:info(L.StrNewRaidSessionChange)
-                    addon:info(L.LogRaidSessionChange:format(tostring(instanceName), 10,
+                    addon:info(E.LogRaidSessionChange:format(tostring(instanceName), 10,
                         tonumber(instanceDiff) or -1))
                     module:Create(instanceName, 10)
                 end
             end
         elseif (instanceDiff % 2 == 0) then
             addon:info(L.StrNewRaidSessionChange)
-            addon:info(L.LogRaidSessionCreate:format(tostring(instanceName), 25,
+            addon:info(E.LogRaidSessionCreate:format(tostring(instanceName), 25,
                 tonumber(instanceDiff) or -1))
             module:Create(instanceName, 25)
         elseif (instanceDiff % 2 ~= 0) then
             addon:info(L.StrNewRaidSessionChange)
-            addon:info(L.LogRaidSessionCreate:format(tostring(instanceName), 10,
+            addon:info(E.LogRaidSessionCreate:format(tostring(instanceName), 10,
                 tonumber(instanceDiff) or -1))
             module:Create(instanceName, 10)
         end
@@ -511,7 +514,7 @@ do
         end
 
         local instanceName, instanceType, instanceDiff = GetInstanceInfo()
-        addon:debug(L.LogRaidFirstCheck:format(tostring(addon.IsInGroup()), tostring(KRT_CurrentRaid ~= nil),
+        addon:debug(E.LogRaidFirstCheck:format(tostring(addon.IsInGroup()), tostring(KRT_CurrentRaid ~= nil),
             tostring(instanceName), tostring(instanceType), tostring(instanceDiff)))
         if instanceType == "raid" then
             module:Check(instanceName, instanceDiff)
@@ -543,9 +546,9 @@ do
             t.count = t.count or 0
             tinsert(raid.players, t)
             raid.playersByName[t.name] = t
-            addon:trace(L.LogRaidPlayerJoin:format(tostring(t.name), tonumber(raidNum) or -1))
+            addon:trace(E.LogRaidPlayerJoin:format(tostring(t.name), tonumber(raidNum) or -1))
         else
-            addon:trace(L.LogRaidPlayerRefresh:format(tostring(t.name), tonumber(raidNum) or -1))
+            addon:trace(E.LogRaidPlayerRefresh:format(tostring(t.name), tonumber(raidNum) or -1))
         end
     end
 
@@ -555,7 +558,7 @@ do
     function module:AddBoss(bossName, manDiff, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
         if not raidNum or not bossName then
-            addon:warn(L.LogBossAddSkipped:format(tostring(raidNum), tostring(bossName)))
+            addon:warn(E.LogBossAddSkipped:format(tostring(raidNum), tostring(bossName)))
             return
         end
 
@@ -585,9 +588,9 @@ do
         }
         tinsert(KRT_Raids[raidNum].bossKills, killInfo)
         KRT_LastBoss = #KRT_Raids[raidNum].bossKills
-        addon:info(L.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1,
+        addon:info(E.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1,
             tonumber(raidNum) or -1, #players))
-        addon:debug(L.LogBossLastBossHash:format(tonumber(KRT_LastBoss) or -1, tostring(killInfo.hash)))
+        addon:debug(E.LogBossLastBossHash:format(tonumber(KRT_LastBoss) or -1, tostring(killInfo.hash)))
     end
 
     --
@@ -632,7 +635,7 @@ do
             itemCount = 1
         end
         if not itemLink then
-            addon:warn(L.LogLootParseFailed:format(tostring(msg)))
+            addon:warn(E.LogLootParseFailed:format(tostring(msg)))
             return
         end
 
@@ -643,22 +646,22 @@ do
         local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
         local _, _, _, _, itemId = string.find(itemLink, ITEM_LINK_PATTERN)
         itemId = tonumber(itemId)
-        addon:trace(L.LogLootParsed:format(tostring(player), tostring(itemLink), itemCount))
+        addon:trace(E.LogLootParsed:format(tostring(player), tostring(itemLink), itemCount))
 
         -- We don't proceed if lower than threshold or ignored.
         local lootThreshold = GetLootThreshold()
         if itemRarity and itemRarity < lootThreshold then
-            addon:debug(L.LogLootIgnoredBelowThreshold:format(tostring(itemRarity),
+            addon:debug(E.LogLootIgnoredBelowThreshold:format(tostring(itemRarity),
                 tonumber(lootThreshold) or -1, tostring(itemLink)))
             return
         end
         if itemId and addon.ignoredItems[itemId] then
-            addon:debug(L.LogLootIgnoredItemId:format(tostring(itemId), tostring(itemLink)))
+            addon:debug(E.LogLootIgnoredItemId:format(tostring(itemId), tostring(itemLink)))
             return
         end
 
         if not KRT_LastBoss then
-            addon:info(L.LogBossNoContextTrash)
+            addon:info(E.LogBossNoContextTrash)
             self:AddBoss("_TrashMob_")
         end
         -- Award source detection:
@@ -705,7 +708,7 @@ do
         }
         tinsert(KRT_Raids[KRT_CurrentRaid].loot, lootInfo)
         Utils.triggerEvent("RaidLootUpdate", KRT_CurrentRaid, lootInfo)
-        addon:debug(L.LogLootLogged:format(tonumber(KRT_CurrentRaid) or -1, tostring(itemId),
+        addon:debug(E.LogLootLogged:format(tonumber(KRT_CurrentRaid) or -1, tostring(itemId),
             tostring(KRT_LastBoss), tostring(player)))
     end
 
@@ -1932,7 +1935,7 @@ do
         if lootState.lootCount >= 1 then
             oldItem = GetItemLink(lootState.currentItemIndex)
         end
-        addon:trace(L.LogLootFetchStart:format(GetNumLootItems() or 0, lootState.currentItemIndex or 0))
+        addon:trace(E.LogLootFetchStart:format(GetNumLootItems() or 0, lootState.currentItemIndex or 0))
         lootState.opened = true
         lootState.fromInventory = false
         self:ClearLoot()
@@ -1962,7 +1965,7 @@ do
         if addon.Master and addon.Master.ResetItemCount then
             addon.Master:ResetItemCount()
         end
-        addon:trace(L.LogLootFetchDone:format(lootState.lootCount or 0, lootState.currentItemIndex or 0))
+        addon:trace(E.LogLootFetchDone:format(lootState.lootCount or 0, lootState.currentItemIndex or 0))
     end
 
     --
@@ -2006,7 +2009,7 @@ do
         end
 
         if not itemName then
-            addon:warn(L.LogLootItemInfoMissing:format(tostring(itemLink)))
+            addon:warn(E.LogLootItemInfoMissing:format(tostring(itemLink)))
             itemName = tostring(itemLink)
         end
 
@@ -2377,7 +2380,7 @@ do
                 candidateCache.indexByName[candidate] = p
             end
         end
-        addon:debug(L.LogMLCandidateCacheBuilt:format(tostring(itemLink),
+        addon:debug(E.LogMLCandidateCacheBuilt:format(tostring(itemLink),
             addon.tLength(candidateCache.indexByName)))
     end
 
@@ -2594,7 +2597,7 @@ do
         end
         countdownRun = false
         local itemLink = GetItemLink()
-        addon:info(L.LogMLAwardRequested:format(tostring(lootState.winner),
+        addon:info(E.LogMLAwardRequested:format(tostring(lootState.winner),
             tonumber(lootState.currentRollType) or -1, addon.Rolls:HighestRoll() or 0, tostring(itemLink)))
         local result
         if lootState.fromInventory == true then
@@ -3043,7 +3046,7 @@ do
         if not inBag or not inSlot then return end
         local itemTexture, count, locked, quality, _, _, itemLink = GetContainerItemInfo(inBag, inSlot)
         if not itemLink or not itemTexture then return end
-        addon:trace(L.LogMLItemLocked:format(tostring(inBag), tostring(inSlot), tostring(itemLink),
+        addon:trace(E.LogMLItemLocked:format(tostring(inBag), tostring(inSlot), tostring(itemLink),
             tostring(count), tostring(ItemIsSoulbound(inBag, inSlot))))
         lootState.itemCount = count or lootState.itemCount or 1
         _G[frameName .. "ItemBtn"]:SetScript("OnClick", function(self)
@@ -3065,7 +3068,7 @@ do
                 itemInfo.isStack = (itemInfo.count > 1)
                 module:ResetItemCount(true)
             else
-                addon:warn(L.LogMLInventorySoulbound:format(tostring(itemLink)))
+                addon:warn(E.LogMLInventorySoulbound:format(tostring(itemLink)))
             end
             ClearCursor()
         end)
@@ -3079,14 +3082,14 @@ do
             lootState.opened = true
             announced = false
             addon.Loot:FetchLoot()
-            addon:trace(L.LogMLLootOpenedTrace:format(lootState.lootCount or 0,
+            addon:trace(E.LogMLLootOpenedTrace:format(lootState.lootCount or 0,
                 tostring(lootState.fromInventory)))
             UpdateSelectionFrame()
             if lootState.lootCount >= 1 then UIMaster:Show() end
             if not addon.Logger.container then
                 addon.Logger.source = UnitName("target")
             end
-            addon:info(L.LogMLLootOpenedInfo:format(lootState.lootCount or 0,
+            addon:info(E.LogMLLootOpenedInfo:format(lootState.lootCount or 0,
                 tostring(lootState.fromInventory), tostring(UnitName("target"))))
         end
     end
@@ -3096,8 +3099,8 @@ do
     --
     function module:LOOT_CLOSED()
         if addon.Raid:IsMasterLooter() then
-            addon:trace(L.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
-            addon:trace(L.LogMLLootClosedCleanup)
+            addon:trace(E.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
+            addon:trace(E.LogMLLootClosedCleanup)
             -- Cancel any scheduled close timer and schedule a new one
             addon.CancelTimer(lootState.closeTimer)
             lootState.closeTimer = nil
@@ -3119,13 +3122,13 @@ do
     function module:LOOT_SLOT_CLEARED()
         if addon.Raid:IsMasterLooter() then
             addon.Loot:FetchLoot()
-            addon:trace(L.LogMLLootSlotCleared:format(lootState.lootCount or 0))
+            addon:trace(E.LogMLLootSlotCleared:format(lootState.lootCount or 0))
             UpdateSelectionFrame()
             if lootState.lootCount >= 1 then
                 UIMaster:Show()
             else
                 UIMaster:Hide()
-                addon:info(L.LogMLLootWindowEmptied)
+                addon:info(E.LogMLLootWindowEmptied)
             end
             module:ResetItemCount()
         end
@@ -3135,11 +3138,11 @@ do
     -- TRADE_ACCEPT_UPDATE: Triggered during a trade.
     --
     function module:TRADE_ACCEPT_UPDATE(tAccepted, pAccepted)
-        addon:trace(L.LogTradeAcceptUpdate:format(tostring(lootState.trader), tostring(lootState.winner),
+        addon:trace(E.LogTradeAcceptUpdate:format(tostring(lootState.trader), tostring(lootState.winner),
             tostring(tAccepted), tostring(pAccepted)))
         if lootState.trader and lootState.winner and lootState.trader ~= lootState.winner then
             if tAccepted == 1 and pAccepted == 1 then
-                addon:info(L.LogTradeCompleted:format(tostring(lootState.currentRollItem),
+                addon:info(E.LogTradeCompleted:format(tostring(lootState.currentRollItem),
                     tostring(lootState.winner), tonumber(lootState.currentRollType) or -1,
                     addon.Rolls:HighestRoll()))
                 if lootState.currentRollItem and lootState.currentRollItem > 0 then
@@ -3147,7 +3150,7 @@ do
                         lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT", KRT_CurrentRaid)
 
                     if not ok then
-                        addon:error(L.LogTradeLoggerLogFailed:format(tostring(KRT_CurrentRaid),
+                        addon:error(E.LogTradeLoggerLogFailed:format(tostring(KRT_CurrentRaid),
                             tostring(lootState.currentRollItem), tostring(GetItemLink())))
                     end
                 else
@@ -3200,7 +3203,7 @@ do
         end
         local candidateIndex = candidateCache.indexByName[playerName]
         if not candidateIndex then
-            addon:debug(L.LogMLCandidateCacheMiss:format(tostring(itemLink), tostring(playerName)))
+            addon:debug(E.LogMLCandidateCacheMiss:format(tostring(itemLink), tostring(playerName)))
             BuildCandidateCache(itemLink)
             candidateIndex = candidateCache.indexByName[playerName]
         end
@@ -3208,7 +3211,7 @@ do
             -- Mark this award as addon-driven so AddLoot() won't classify it as MANUAL
             addon.Loot:QueuePendingAward(itemLink, playerName, rollType, rollValue)
             GiveMasterLoot(itemIndex, candidateIndex)
-            addon:info(L.LogMLAwarded:format(tostring(itemLink), tostring(playerName),
+            addon:info(E.LogMLAwarded:format(tostring(itemLink), tostring(playerName),
                 tonumber(rollType) or -1, tonumber(rollValue) or 0, tonumber(itemIndex) or -1,
                 tonumber(candidateIndex) or -1))
             local output, whisper
@@ -3243,7 +3246,7 @@ do
                 local ok = addon.Logger.Loot:Log(lootState.currentRollItem, playerName, rollType, rollValue, "ML_AWARD",
                     KRT_CurrentRaid)
                 if not ok then
-                    addon:error(L.LogMLAwardLoggerFailed:format(tostring(KRT_CurrentRaid),
+                    addon:error(E.LogMLAwardLoggerFailed:format(tostring(KRT_CurrentRaid),
                         tostring(lootState.currentRollItem), tostring(itemLink)))
                 end
             end
@@ -3265,7 +3268,7 @@ do
         lootState.trader = Utils.getPlayerName()
         lootState.winner = isAwardRoll and playerName or nil
 
-        addon:info(L.LogTradeStart:format(tostring(itemLink), tostring(lootState.trader),
+        addon:info(E.LogTradeStart:format(tostring(itemLink), tostring(lootState.trader),
             tostring(playerName), tonumber(rollType) or -1, tonumber(rollValue) or 0,
             lootState.itemCount or 1))
 
@@ -3314,7 +3317,7 @@ do
             -- Trader is the winner:
         elseif lootState.trader == lootState.winner then
             -- Trader won, clear state
-            addon:info(L.LogTradeTraderKeeps:format(tostring(itemLink), tostring(playerName)))
+            addon:info(E.LogTradeTraderKeeps:format(tostring(itemLink), tostring(playerName)))
             local done = RegisterAwardedItem(lootState.itemCount)
             if done then
                 addon.Loot:ClearLoot()
@@ -3325,7 +3328,7 @@ do
             if unit ~= "none" and CheckInteractDistance(unit, 2) == 1 then
                 -- Player is in range for trade
                 if itemInfo.isStack and not addon.options.ignoreStacks then
-                    addon:warn(L.LogTradeStackBlocked:format(tostring(addon.options.ignoreStacks),
+                    addon:warn(E.LogTradeStackBlocked:format(tostring(addon.options.ignoreStacks),
                         tostring(itemLink)))
                     addon:warn(L.ErrItemStack:format(itemLink))
                     return false
@@ -3334,7 +3337,7 @@ do
                 PickupContainerItem(itemInfo.bagID, itemInfo.slotID)
                 if CursorHasItem() then
                     InitiateTrade(playerName)
-                    addon:info(L.LogTradeInitiated:format(tostring(itemLink), tostring(playerName)))
+                    addon:info(E.LogTradeInitiated:format(tostring(itemLink), tostring(playerName)))
                     if addon.options.screenReminder and not screenshotWarn then
                         addon:warn(L.ErrScreenReminder)
                         screenshotWarn = true
@@ -3343,7 +3346,7 @@ do
                 -- Cannot trade the player?
             elseif unit ~= "none" then
                 -- Player is out of range
-                addon:warn(L.LogTradeDelayedOutOfRange:format(tostring(playerName), tostring(itemLink)))
+                addon:warn(E.LogTradeDelayedOutOfRange:format(tostring(playerName), tostring(itemLink)))
                 addon.Raid:ClearRaidIcons()
                 SetRaidTarget(lootState.trader, 1)
                 if isAwardRoll then SetRaidTarget(playerName, 4) end
@@ -3367,7 +3370,7 @@ do
                 local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.trader, rollType, rollValue,
                     "TRADE_KEEP", KRT_CurrentRaid)
                 if not ok then
-                    addon:error(L.LogTradeKeepLoggerFailed:format(tostring(KRT_CurrentRaid),
+                    addon:error(E.LogTradeKeepLoggerFailed:format(tostring(KRT_CurrentRaid),
                         tostring(lootState.currentRollItem), tostring(itemLink)))
                 end
             end
@@ -3989,7 +3992,7 @@ do
         if not editBox then return end
         local csv = editBox:GetText()
         if csv and csv ~= "" then
-            addon:info(L.LogSRImportRequested:format(#csv))
+            addon:info(E.LogSRImportRequested:format(#csv))
             self:ParseCSV(csv)
         end
         self:CloseImportWindow()
@@ -4044,7 +4047,7 @@ do
                 end
                 MarkPendingItem(itemId, hasName, hasIcon)
                 if hasName and hasIcon then
-                    addon:info(L.LogSRItemInfoResolved:format(itemId, tostring(link)))
+                    addon:info(E.LogSRItemInfoResolved:format(itemId, tostring(link)))
                     CompletePendingItem(itemId)
                 else
                     addon:debug("Reserves: item info still pending itemId=%d.", itemId)
@@ -4180,14 +4183,14 @@ do
                         }
                     end
                 else
-                    addon:warn(L.LogSRParseSkippedLine:format(tostring(line)))
+                    addon:warn(E.LogSRParseSkippedLine:format(tostring(line)))
                 end
             end
         end
 
         RebuildIndex()
         addon:debug("Reserves: parse CSV complete players=%d.", addon.tLength(reservesData))
-        addon:info(L.LogSRImportComplete:format(addon.tLength(reservesData)))
+        addon:info(E.LogSRImportComplete:format(addon.tLength(reservesData)))
         self:RefreshWindow()
         self:Save()
     end
@@ -4256,7 +4259,7 @@ do
             end
         end
         addon:debug("Reserves: missing items requested=%d.", count)
-        addon:debug(L.LogSRQueryMissingItems:format(tostring(updated), count))
+        addon:debug(E.LogSRQueryMissingItems:format(tostring(updated), count))
     end
 
     -- Update reserve item data
@@ -6866,7 +6869,7 @@ do
             end
 
             tremove(raid.bossKills, bID)
-            addon:info(L.LogLoggerBossLootRemoved, rID, bID, lootRemoved)
+            addon:info(E.LogLoggerBossLootRemoved, rID, bID, lootRemoved)
 
             addon.Logger.selectedBoss = nil
             addon.Logger:ResetSelections()
@@ -7305,10 +7308,10 @@ do
                 raidID = KRT_CurrentRaid or addon.Logger.selectedRaid
             end
         end
-        addon:trace(L.LogLoggerLootLogAttempt:format(tostring(source), tostring(raidID), tostring(itemID),
+        addon:trace(E.LogLoggerLootLogAttempt:format(tostring(source), tostring(raidID), tostring(itemID),
             tostring(looter), tostring(rollType), tostring(rollValue), tostring(KRT_LastBoss)))
         if not raidID or not KRT_Raids[raidID] then
-            addon:error(L.LogLoggerNoRaidSession:format(tostring(raidID), tostring(itemID)))
+            addon:error(E.LogLoggerNoRaidSession:format(tostring(raidID), tostring(itemID)))
             return false
         end
 
@@ -7316,21 +7319,21 @@ do
         local lootCount = raid.loot and #raid.loot or 0
         local it = raid.loot[itemID]
         if not it then
-            addon:error(L.LogLoggerItemNotFound:format(raidID, tostring(itemID), lootCount))
+            addon:error(E.LogLoggerItemNotFound:format(raidID, tostring(itemID), lootCount))
             return false
         end
 
         if not looter or looter == "" then
-            addon:warn(L.LogLoggerLooterEmpty:format(raidID, tostring(itemID), tostring(it.itemLink)))
+            addon:warn(E.LogLoggerLooterEmpty:format(raidID, tostring(itemID), tostring(it.itemLink)))
         end
         if rollType == nil then
-            addon:warn(L.LogLoggerRollTypeNil:format(raidID, tostring(itemID), tostring(looter)))
+            addon:warn(E.LogLoggerRollTypeNil:format(raidID, tostring(itemID), tostring(looter)))
         end
 
-        addon:debug(L.LogLoggerLootBefore:format(raidID, tostring(itemID), tostring(it.itemLink),
+        addon:debug(E.LogLoggerLootBefore:format(raidID, tostring(itemID), tostring(it.itemLink),
             tostring(it.looter), tostring(it.rollType), tostring(it.rollValue)))
         if it.looter and it.looter ~= "" and looter and looter ~= "" and it.looter ~= looter then
-            addon:warn(L.LogLoggerLootOverwrite:format(raidID, tostring(itemID), tostring(it.itemLink),
+            addon:warn(E.LogLoggerLootOverwrite:format(raidID, tostring(itemID), tostring(it.itemLink),
                 tostring(it.looter), tostring(looter)))
         end
 
@@ -7351,7 +7354,7 @@ do
         end
 
         controller:Dirty()
-        addon:info(L.LogLoggerLootRecorded:format(tostring(source), raidID, tostring(itemID),
+        addon:info(E.LogLoggerLootRecorded:format(tostring(source), raidID, tostring(itemID),
             tostring(it.itemLink), tostring(it.looter), tostring(it.rollType), tostring(it.rollValue)))
 
         local ok = true
@@ -7359,14 +7362,14 @@ do
         if expectedRollType and it.rollType ~= expectedRollType then ok = false end
         if expectedRollValue and it.rollValue ~= expectedRollValue then ok = false end
         if not ok then
-            addon:error(L.LogLoggerVerifyFailed:format(raidID, tostring(itemID), tostring(it.looter),
+            addon:error(E.LogLoggerVerifyFailed:format(raidID, tostring(itemID), tostring(it.looter),
                 tostring(it.rollType), tostring(it.rollValue)))
             return false
         end
 
-        addon:debug(L.LogLoggerVerified:format(raidID, tostring(itemID)))
+        addon:debug(E.LogLoggerVerified:format(raidID, tostring(itemID)))
         if not KRT_LastBoss then
-            addon:info(L.LogLoggerRecordedNoBossContext:format(raidID, tostring(itemID), tostring(it.itemLink)))
+            addon:info(E.LogLoggerRecordedNoBossContext:format(raidID, tostring(itemID), tostring(it.itemLink)))
         end
         return true
     end
@@ -7853,15 +7856,15 @@ function addon:ADDON_LOADED(name)
     self:UnregisterEvent("ADDON_LOADED")
     addon.BUILD = addon.BUILD or "fixed4-2026-01-06"
     local lvl = addon.GetLogLevel and addon:GetLogLevel()
-    addon:info(L.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
+    addon:info(E.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
         tostring(lvl), tostring(true)))
-    addon:info(L.LogCoreBuild:format(tostring(addon.BUILD)))
+    addon:info(E.LogCoreBuild:format(tostring(addon.BUILD)))
     addon.LoadOptions()
     addon.Reserves:Load()
     for event in pairs(addonEvents) do
         self:RegisterEvent(event)
     end
-    addon:debug(L.LogCoreEventsRegistered:format(addon.tLength(addonEvents)))
+    addon:debug(E.LogCoreEventsRegistered:format(addon.tLength(addonEvents)))
     self:RAID_ROSTER_UPDATE()
 end
 
@@ -7878,13 +7881,13 @@ end
 function addon:RAID_INSTANCE_WELCOME(...)
     local instanceName, instanceType, instanceDiff = GetInstanceInfo()
     _, KRT_NextReset = ...
-    addon:trace(L.LogRaidInstanceWelcome:format(tostring(instanceName), tostring(instanceType),
+    addon:trace(E.LogRaidInstanceWelcome:format(tostring(instanceName), tostring(instanceType),
         tostring(instanceDiff), tostring(KRT_NextReset)))
     if instanceType == "raid" and not L.RaidZones[instanceName] then
-        addon:warn(L.LogRaidUnmappedZone:format(tostring(instanceName), tostring(instanceDiff)))
+        addon:warn(E.LogRaidUnmappedZone:format(tostring(instanceName), tostring(instanceDiff)))
     end
     if L.RaidZones[instanceName] ~= nil then
-        addon:info(L.LogRaidInstanceRecognized:format(tostring(instanceName), tostring(instanceDiff)))
+        addon:info(E.LogRaidInstanceRecognized:format(tostring(instanceName), tostring(instanceDiff)))
         addon.After(3, function()
             addon.Raid:Check(instanceName, instanceDiff)
         end)
@@ -7897,7 +7900,7 @@ end
 function addon:PLAYER_ENTERING_WORLD()
     self:UnregisterEvent("PLAYER_ENTERING_WORLD")
     local module = self.Raid
-    addon:trace(L.LogCorePlayerEnteringWorld)
+    addon:trace(E.LogCorePlayerEnteringWorld)
     -- Restart the first-check timer on login
     addon.CancelTimer(module.firstCheckHandle, true)
     module.firstCheckHandle = nil
@@ -7908,7 +7911,7 @@ end
 -- CHAT_MSG_LOOT: Adds looted items to the raid log.
 --
 function addon:CHAT_MSG_LOOT(msg)
-    addon:trace(L.LogLootChatMsgLootRaw:format(tostring(msg)))
+    addon:trace(E.LogLootChatMsgLootRaw:format(tostring(msg)))
     if KRT_CurrentRaid then
         self.Raid:AddLoot(msg)
     end
@@ -7927,7 +7930,7 @@ end
 function addon:CHAT_MSG_MONSTER_YELL(...)
     local text, boss = ...
     if L.BossYells[text] and KRT_CurrentRaid then
-        addon:trace(L.LogBossYellMatched:format(tostring(text), tostring(L.BossYells[text])))
+        addon:trace(E.LogBossYellMatched:format(tostring(text), tostring(L.BossYells[text])))
         self.Raid:AddBoss(L.BossYells[text])
     end
 end
@@ -7952,7 +7955,7 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
 
     local boss = destName or bossLib:GetBossName(npcId)
     if boss then
-        addon:trace(L.LogBossUnitDiedMatched:format(tonumber(npcId) or -1, tostring(boss)))
+        addon:trace(E.LogBossUnitDiedMatched:format(tonumber(npcId) or -1, tostring(boss)))
         self.Raid:AddBoss(boss)
     end
 end
