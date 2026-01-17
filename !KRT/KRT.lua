@@ -7854,11 +7854,9 @@ end
 function addon:ADDON_LOADED(name)
     if name ~= addonName then return end
     self:UnregisterEvent("ADDON_LOADED")
-    addon.BUILD = addon.BUILD or "fixed4-2026-01-06"
     local lvl = addon.GetLogLevel and addon:GetLogLevel()
     addon:info(E.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
         tostring(lvl), tostring(true)))
-    addon:info(E.LogCoreBuild:format(tostring(addon.BUILD)))
     addon.LoadOptions()
     addon.Reserves:Load()
     for event in pairs(addonEvents) do
