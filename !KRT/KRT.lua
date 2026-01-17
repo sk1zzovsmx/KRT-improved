@@ -599,8 +599,22 @@ do
         local itemCount = count or 1
 
         if not player then
+            if _G.LOOT_ITEM_PUSHED_MULTIPLE then
+                player, itemLink, count = addon.Deformat(msg, LOOT_ITEM_PUSHED_MULTIPLE)
+                itemCount = count or 1
+            end
+        end
+
+        if not player then
             player, itemLink = addon.Deformat(msg, LOOT_ITEM)
             itemCount = 1
+        end
+
+        if not player then
+            if _G.LOOT_ITEM_PUSHED then
+                player, itemLink = addon.Deformat(msg, LOOT_ITEM_PUSHED)
+                itemCount = 1
+            end
         end
 
 
