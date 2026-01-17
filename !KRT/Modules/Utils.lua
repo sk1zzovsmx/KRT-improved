@@ -171,6 +171,35 @@ function Utils.getItemIdFromLink(itemLink)
 end
 
 ---============================================================================
+-- UI helpers
+---============================================================================
+
+--
+-- createRowDrawer(fn)
+--
+-- Wraps a row drawing function with logic to cache and return the row height.
+-- Each invocation of this helper returns a new closure with its own cached
+-- height. The supplied callback should perform any per-row UI updates but
+-- MUST NOT return a value; the wrapper will return the cached height on
+-- each call.
+--
+-- Example:
+--   drawRow = Utils.createRowDrawer(function(row, it)
+--       local ui = row._p
+--       ui.ID:SetText(it.id)
+--   end)
+function Utils.createRowDrawer(fn)
+    local rowHeight
+    return function(row, it)
+        if not rowHeight then
+            rowHeight = (row and row:GetHeight()) or 20
+        end
+        fn(row, it)
+        return rowHeight
+    end
+end
+
+---============================================================================
 -- Roster helpers
 ---============================================================================
 
