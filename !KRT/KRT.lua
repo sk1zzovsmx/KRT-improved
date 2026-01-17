@@ -7,6 +7,7 @@
 local addonName, addon = ...
 addon                  = addon or {}
 addon.name             = addon.name or addonName
+addon.L                = addon.L or {}
 local L                = addon.L
 local Utils            = addon.Utils
 local C                = addon.C
