@@ -103,6 +103,7 @@ lootState.itemTraded       = lootState.itemTraded or 0
 lootState.rollStarted      = lootState.rollStarted or false
 if lootState.opened == nil then lootState.opened = false end
 if lootState.fromInventory == nil then lootState.fromInventory = false end
+lootState.pendingAwards    = lootState.pendingAwards or {}
 
 local itemInfo = lootState.itemInfo
 
@@ -124,6 +125,58 @@ local format, find, strlen              = string.format, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber                = tostring, tonumber
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
+
+local function BuildPendingAwardKey(itemLink, looter)
+    return tostring(itemLink) .. "\001" .. tostring(looter)
+end
+
+local function QueuePendingAward(itemLink, looter, rollType, rollValue)
+    if not itemLink or not looter then
+        return
+    end
+    local key = BuildPendingAwardKey(itemLink, looter)
+    local list = lootState.pendingAwards[key]
+    if not list then
+        list = {}
+        lootState.pendingAwards[key] = list
+    end
+    list[#list + 1] = {
+        itemLink  = itemLink,
+        looter    = looter,
+        rollType  = rollType,
+        rollValue = rollValue,
+        ts        = GetTime(),
+    }
+end
+
+local function ConsumePendingAward(itemLink, looter, maxAge)
+    local key = BuildPendingAwardKey(itemLink, looter)
+    local list = lootState.pendingAwards[key]
+    if not list then
+        return nil
+    end
+    local now = GetTime()
+    for i = 1, #list do
+        local p = list[i]
+        if p and (now - (p.ts or 0)) <= maxAge then
+            tremove(list, i)
+            if #list == 0 then
+                lootState.pendingAwards[key] = nil
+            end
+            return p
+        end
+    end
+    for i = #list, 1, -1 do
+        local p = list[i]
+        if not p or (now - (p.ts or 0)) > maxAge then
+            tremove(list, i)
+        end
+    end
+    if #list == 0 then
+        lootState.pendingAwards[key] = nil
+    end
+    return nil
+end
 
 ---============================================================================
 -- Event System (WoW API events)
@@ -661,20 +714,15 @@ do
             self:AddBoss("_TrashMob_")
         end
         -- Award source detection:
-        -- 1) If we have a pendingAward staged by this addon (AssignItem/TradeItem), consume it.
+        -- 1) If we have a pending award staged by this addon (AssignItem/TradeItem), consume it.
         -- 2) Otherwise, if THIS client is the master looter (Master Loot method), treat it as MANUAL
         --    (loot-window dropdown assignment or direct click-to-self).
         -- 3) Otherwise, fall back to the current roll type.
         if not rollType then
-            local p = lootState.pendingAward
-            if p
-                and p.itemLink == itemLink
-                and p.looter == player
-                and (GetTime() - (p.ts or 0)) <= 5
-            then
-                rollType               = p.rollType
-                rollValue              = p.rollValue
-                lootState.pendingAward = nil
+            local p = ConsumePendingAward(itemLink, player, 5)
+            if p then
+                rollType = p.rollType
+                rollValue = p.rollValue
             elseif self:IsMasterLooter() and not lootState.fromInventory then
                 rollType  = rollTypes.MANUAL
                 rollValue = 0
@@ -682,9 +730,8 @@ do
                 -- Debug-only marker: helps verify why this loot was tagged as MANUAL.
                 -- Only runs for Master Looter clients (by condition above).
                 addon:debug(
-                    "Loot: tagged MANUAL (no matching pending award) item=%s -> %s (lastRollType=%s, pending=%s).",
-                    tostring(itemLink), tostring(player), tostring(lootState.currentRollType),
-                    p and (tostring(p.itemLink) .. " -> " .. tostring(p.looter)) or "nil")
+                    "Loot: tagged MANUAL (no matching pending award) item=%s -> %s (lastRollType=%s).",
+                    tostring(itemLink), tostring(player), tostring(lootState.currentRollType))
             else
                 rollType = lootState.currentRollType
             end
@@ -3055,7 +3102,7 @@ do
             lootState.closeTimer = addon.After(0.1, function()
                 lootState.closeTimer = nil
                 lootState.opened = false
-                lootState.pendingAward = nil
+                lootState.pendingAwards = {}
                 UIMaster:Hide()
                 addon.Loot:ClearLoot()
                 addon.Rolls:ClearRolls()
@@ -3157,13 +3204,7 @@ do
         end
         if candidateIndex then
             -- Mark this award as addon-driven so AddLoot() won't classify it as MANUAL
-            lootState.pendingAward = {
-                itemLink  = itemLink,
-                looter    = playerName,
-                rollType  = rollType,
-                rollValue = rollValue,
-                ts        = GetTime(),
-            }
+            QueuePendingAward(itemLink, playerName, rollType, rollValue)
             GiveMasterLoot(itemIndex, candidateIndex)
             addon:info(L.LogMLAwarded:format(tostring(itemLink), tostring(playerName),
                 tonumber(rollType) or -1, tonumber(rollValue) or 0, tonumber(itemIndex) or -1,
