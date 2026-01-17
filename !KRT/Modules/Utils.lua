@@ -58,7 +58,16 @@ end
 
 -- String ends with:
 _G.string.endsWith = function(str, piece)
-	return #str >= #piece and find(str, #str - #piece + 1, true) and true or false
+    -- Check whether a string ends with the provided piece. Fails gracefully if inputs are not strings.
+    if type(str) ~= "string" or type(piece) ~= "string" then
+        return false
+    end
+    local lenPiece = strlen(piece)
+    -- If the main string is shorter than the piece, it cannot end with it.
+    if #str < lenPiece then
+        return false
+    end
+    return strsub(str, -lenPiece) == piece
 end
 
 -- Uppercase first:
@@ -459,7 +468,7 @@ function Utils.showHide(frame, cond)
 	end
 end
 
--- Lock/Unlock Highlight:
+-- Lock or unlock highlight:
 function Utils.toggleHighlight(frame, cond)
 	if cond then
 		frame:LockHighlight()
@@ -468,7 +477,7 @@ function Utils.toggleHighlight(frame, cond)
 	end
 end
 
--- Set frameent text with condition:
+-- Set frame text based on condition:
 function Utils.setText(frame, str1, str2, cond)
 	if cond then
 		frame:SetText(str1)
@@ -510,14 +519,17 @@ end
 
 -- Convert seconds to readable clock string:
 function Utils.sec2clock(seconds)
-	local sec = tonumber(seconds)
-	if sec <= 0 then
-		return "00:00:00"
-	end
-	local h = floor(sec, 3600)
-	local m = floor(sec - h, 60)
-	local s = floor(sec - h - m)
-	return format("%02d:%02d:%02d", h / 3600, m / 60, s)
+    local sec = tonumber(seconds)
+    if sec <= 0 then
+        return "00:00:00"
+    end
+    -- Compute hours, minutes and seconds properly based on total seconds.
+    -- Use the cached floor function to avoid extra allocations in hot paths.
+    local total = floor(sec)
+    local hours = floor(total / 3600)
+    local minutes = floor((total % 3600) / 60)
+    local secondsPart = floor(total % 60)
+    return format("%02d:%02d:%02d", hours, minutes, secondsPart)
 end
 
 -- Sends an addOn message to the appropriate channel:
