@@ -16,7 +16,7 @@ _G["KRT"]              = addon
 
 
 ---============================================================================
--- Costants
+-- Constants
 ---============================================================================
 
 local ITEM_LINK_PATTERN   = C.ITEM_LINK_PATTERN
@@ -58,7 +58,7 @@ addon.CallbackHandler     = LibStub("CallbackHandler-1.0")
 Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
 addon.Debugger:Embed(addon)
 
--- Alias locali (safe e veloci)
+-- Local aliases (safe and fast)
 local UnitIsGroupLeader    = addon.UnitIsGroupLeader
 local UnitIsGroupAssistant = addon.UnitIsGroupAssistant
 local tContains            = _G.tContains
