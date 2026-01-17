@@ -126,41 +126,6 @@ local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower,
 local tostring, tonumber                = tostring, tonumber
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
 
-local function QueuePendingAward(itemLink, looter, rollType, rollValue)
-    if not itemLink or not looter then
-        return
-    end
-    lootState.pendingAwards[#lootState.pendingAwards + 1] = {
-        itemLink  = itemLink,
-        looter    = looter,
-        rollType  = rollType,
-        rollValue = rollValue,
-        ts        = GetTime(),
-    }
-end
-
-local function ConsumePendingAward(itemLink, looter, maxAge)
-    local now = GetTime()
-    local found = nil
-    for i = 1, #lootState.pendingAwards do
-        local p = lootState.pendingAwards[i]
-        if p and p.itemLink == itemLink and p.looter == looter then
-            if (now - (p.ts or 0)) <= maxAge then
-                found = p
-                tremove(lootState.pendingAwards, i)
-            end
-            break
-        end
-    end
-    for i = #lootState.pendingAwards, 1, -1 do
-        local p = lootState.pendingAwards[i]
-        if not p or (now - (p.ts or 0)) > maxAge then
-            tremove(lootState.pendingAwards, i)
-        end
-    end
-    return found
-end
-
 ---============================================================================
 -- Event System (WoW API events)
 -- Clean frame-based dispatcher (NO CallbackHandler here)
@@ -702,7 +667,7 @@ do
         --    (loot-window dropdown assignment or direct click-to-self).
         -- 3) Otherwise, fall back to the current roll type.
         if not rollType then
-            local p = ConsumePendingAward(itemLink, player, 5)
+            local p = addon.Loot:ConsumePendingAward(itemLink, player, 5)
             if p then
                 rollType = p.rollType
                 rollValue = p.rollValue
@@ -1900,6 +1865,60 @@ do
     -------------------------------------------------------
     -- Private helpers
     -------------------------------------------------------
+    local function BuildPendingAwardKey(itemLink, looter)
+        return tostring(itemLink) .. "\001" .. tostring(looter)
+    end
+
+    -------------------------------------------------------
+    -- Pending award helpers (shared with Master/Raid flows)
+    -------------------------------------------------------
+    function module:QueuePendingAward(itemLink, looter, rollType, rollValue)
+        if not itemLink or not looter then
+            return
+        end
+        local key = BuildPendingAwardKey(itemLink, looter)
+        local list = lootState.pendingAwards[key]
+        if not list then
+            list = {}
+            lootState.pendingAwards[key] = list
+        end
+        list[#list + 1] = {
+            itemLink  = itemLink,
+            looter    = looter,
+            rollType  = rollType,
+            rollValue = rollValue,
+            ts        = GetTime(),
+        }
+    end
+
+    function module:ConsumePendingAward(itemLink, looter, maxAge)
+        local key = BuildPendingAwardKey(itemLink, looter)
+        local list = lootState.pendingAwards[key]
+        if not list then
+            return nil
+        end
+        local now = GetTime()
+        for i = 1, #list do
+            local p = list[i]
+            if p and (now - (p.ts or 0)) <= maxAge then
+                tremove(list, i)
+                if #list == 0 then
+                    lootState.pendingAwards[key] = nil
+                end
+                return p
+            end
+        end
+        for i = #list, 1, -1 do
+            local p = list[i]
+            if not p or (now - (p.ts or 0)) > maxAge then
+                tremove(list, i)
+            end
+        end
+        if #list == 0 then
+            lootState.pendingAwards[key] = nil
+        end
+        return nil
+    end
 
     -------------------------------------------------------
     -- Public methods
@@ -3187,7 +3206,7 @@ do
         end
         if candidateIndex then
             -- Mark this award as addon-driven so AddLoot() won't classify it as MANUAL
-            QueuePendingAward(itemLink, playerName, rollType, rollValue)
+            addon.Loot:QueuePendingAward(itemLink, playerName, rollType, rollValue)
             GiveMasterLoot(itemIndex, candidateIndex)
             addon:info(L.LogMLAwarded:format(tostring(itemLink), tostring(playerName),
                 tonumber(rollType) or -1, tonumber(rollValue) or 0, tonumber(itemIndex) or -1,
