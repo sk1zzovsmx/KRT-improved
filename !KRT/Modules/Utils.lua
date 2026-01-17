@@ -199,22 +199,6 @@ function Utils.createRowDrawer(fn)
     end
 end
 
---
--- cancelTimer(handle)
---
--- Cancels a LibCompat timer and returns nil. This helper centralises the
--- common pattern of calling addon.CancelTimer(handle, true) followed by
--- setting the handle to nil. Use it as:
---   handle = Utils.cancelTimer(handle)
--- The extra 'silent' argument passed to CancelTimer is always true to
--- suppress potential errors if the timer is already cancelled.
-function Utils.cancelTimer(handle)
-    if handle then
-        addon.CancelTimer(handle, true)
-    end
-    return nil
-end
-
 ---============================================================================
 -- Roster helpers
 ---============================================================================

@@ -259,7 +259,8 @@ do
         rosterVersion = rosterVersion + 1
         if not KRT_CurrentRaid then return end
         -- Cancel any pending roster update timer and clear the handle
-        module.updateRosterHandle = Utils.cancelTimer(module.updateRosterHandle)
+        addon.CancelTimer(module.updateRosterHandle, true)
+        module.updateRosterHandle = nil
 
         if not addon.IsInRaid() then
             numRaid = 0
@@ -424,7 +425,8 @@ do
         Utils.triggerEvent("RaidCreate", KRT_CurrentRaid)
 
         -- One clean refresh shortly after: cancel existing timer then start a new one
-        module.updateRosterHandle = Utils.cancelTimer(module.updateRosterHandle)
+        addon.CancelTimer(module.updateRosterHandle, true)
+        module.updateRosterHandle = nil
         module.updateRosterHandle = addon.After(2, function() module:UpdateRaidRoster() end)
     end
 
@@ -434,7 +436,8 @@ do
     function module:End()
         if not KRT_CurrentRaid then return end
         -- Stop any pending roster update when ending the raid
-        module.updateRosterHandle = Utils.cancelTimer(module.updateRosterHandle)
+        addon.CancelTimer(module.updateRosterHandle, true)
+        module.updateRosterHandle = nil
         local currentTime = Utils.getCurrentTime()
         local raid = KRT_Raids[KRT_CurrentRaid]
         if raid then
@@ -494,12 +497,14 @@ do
     --
     function module:FirstCheck()
         -- Cancel any pending first-check timer before starting a new one
-        module.firstCheckHandle = Utils.cancelTimer(module.firstCheckHandle)
+        addon.CancelTimer(module.firstCheckHandle, true)
+        module.firstCheckHandle = nil
         if not addon.IsInGroup() then return end
 
         if KRT_CurrentRaid and module:CheckPlayer(Utils.getPlayerName(), KRT_CurrentRaid) then
             -- Restart the roster update timer: cancel the old one and schedule a new one
-            module.updateRosterHandle = Utils.cancelTimer(module.updateRosterHandle)
+            addon.CancelTimer(module.updateRosterHandle, true)
+            module.updateRosterHandle = nil
             module.updateRosterHandle = addon.After(2, function() module:UpdateRaidRoster() end)
             return
         end
@@ -2199,8 +2204,10 @@ do
 
     local function StopCountdown()
         -- Cancel active countdown timers and clear their handles
-        countdownTicker = Utils.cancelTimer(countdownTicker)
-        countdownEndTimer = Utils.cancelTimer(countdownEndTimer)
+        addon.CancelTimer(countdownTicker, true)
+        addon.CancelTimer(countdownEndTimer, true)
+        countdownTicker = nil
+        countdownEndTimer = nil
         countdownRun = false
     end
 
@@ -3049,7 +3056,8 @@ do
             addon:trace(L.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
             addon:trace(L.LogMLLootClosedCleanup)
             -- Cancel any scheduled close timer and schedule a new one
-            lootState.closeTimer = Utils.cancelTimer(lootState.closeTimer)
+            addon.CancelTimer(lootState.closeTimer)
+            lootState.closeTimer = nil
             lootState.closeTimer = addon.After(0.1, function()
                 lootState.closeTimer = nil
                 lootState.opened = false
@@ -3370,7 +3378,10 @@ do
 
     local function StopCountsTicker()
         -- Stop and clear the counts update ticker
-        countsTicker = Utils.cancelTimer(countsTicker)
+        if countsTicker then
+            addon.CancelTimer(countsTicker, true)
+            countsTicker = nil
+        end
     end
 
     -- Helper to ensure frames exist
@@ -5768,7 +5779,8 @@ do
     -- Spam cycle
     function StopSpamCycle(resetCountdown)
         -- Stop and clear the spam ticker
-        countdownTicker = Utils.cancelTimer(countdownTicker)
+        addon.CancelTimer(countdownTicker, true)
+        countdownTicker = nil
 
         if resetCountdown then
             countdownRemaining = 0
@@ -5823,7 +5835,8 @@ do
     function StopTicker()
         if not updateTicker then return end
         -- Stop and clear the UI update ticker
-        updateTicker = Utils.cancelTimer(updateTicker)
+        addon.CancelTimer(updateTicker, true)
+        updateTicker = nil
     end
 
     -- Build output
@@ -7849,7 +7862,8 @@ function addon:PLAYER_ENTERING_WORLD()
     local module = self.Raid
     addon:trace(L.LogCorePlayerEnteringWorld)
     -- Restart the first-check timer on login
-    module.firstCheckHandle = Utils.cancelTimer(module.firstCheckHandle)
+    addon.CancelTimer(module.firstCheckHandle, true)
+    module.firstCheckHandle = nil
     module.firstCheckHandle = addon.After(3, function() module:FirstCheck() end)
 end
 
