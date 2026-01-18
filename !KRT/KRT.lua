@@ -7694,9 +7694,7 @@ do
     end
 end
 
---
 -- ADDON_LOADED: Initializes the addon after loading.
---
 function addon:ADDON_LOADED(name)
     if name ~= addonName then return end
     self:UnregisterEvent("ADDON_LOADED")
@@ -7712,16 +7710,12 @@ function addon:ADDON_LOADED(name)
     self:RAID_ROSTER_UPDATE()
 end
 
---
 -- RAID_ROSTER_UPDATE: Updates the raid roster when it changes.
---
 function addon:RAID_ROSTER_UPDATE()
     addon.Raid:UpdateRaidRoster()
 end
 
---
 -- RAID_INSTANCE_WELCOME: Triggered when entering a raid instance.
---
 function addon:RAID_INSTANCE_WELCOME(...)
     local instanceName, instanceType, instanceDiff = GetInstanceInfo()
     _, KRT_NextReset = ...
