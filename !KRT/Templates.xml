@@ -247,7 +247,7 @@
 			<Layer level="ARTWORK">
 				<FontString name="$parentRoll" inherits="GameFontNormalSmall" justifyH="RIGHT" text="0">
 					<Size>
-						<AbsDimension x="30" />
+						<AbsDimension x="29" />
 					</Size>
 					<Anchors>
 						<Anchor point="RIGHT">
@@ -258,14 +258,14 @@
 					</Anchors>
 					<Color r="1" g="1" b="1" a="1" />
 				</FontString>
-				<FontString name="$parentSRCounter" inherits="GameFontNormalSmall" justifyH="RIGHT" text="">
+				<FontString name="$parentCounter" inherits="GameFontNormalSmall" justifyH="RIGHT" text="">
 					<Size>
-						<AbsDimension x="38" />
+						<AbsDimension x="30" />
 					</Size>
 					<Anchors>
 						<Anchor point="RIGHT" relativeTo="$parentRoll" relativePoint="LEFT">
 							<Offset>
-								<AbsDimension x="-4" y="0" />
+								<AbsDimension x="-1" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
@@ -278,7 +278,7 @@
 								<AbsDimension x="20" y="0" />
 							</Offset>
 						</Anchor>
-						<Anchor point="RIGHT" relativeTo="$parentSRCounter" relativePoint="LEFT">
+						<Anchor point="RIGHT" relativeTo="$parentCounter" relativePoint="LEFT">
 							<Offset>
 								<AbsDimension x="-4" y="0" />
 							</Offset>

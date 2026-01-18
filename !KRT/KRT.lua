@@ -1728,7 +1728,7 @@ do
                 btn.selectedBackground:Hide()
             end
 
-            local nameStr, rollStr, counterStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"], _G[btnName .. "SRCounter"], _G[btnName .. "Star"]
+            local nameStr, rollStr, counterStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"], _G[btnName .. "Counter"], _G[btnName .. "Star"]
 
             if nameStr and nameStr.SetVertexColor then
                 local class = addon.Raid:GetPlayerClass(name)
