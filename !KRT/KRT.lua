@@ -1669,7 +1669,10 @@ do
                 btn.selectedBackground:Hide()
             end
 
-            local nameStr, rollStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"], _G[btnName .. "Star"]
+            local nameStr = _G[btnName .. "Name"]
+            local rollStr = _G[btnName .. "Roll"]
+            local srCountStr = _G[btnName .. "SRCount"]
+            local star = _G[btnName .. "Star"]
 
             if nameStr and nameStr.SetVertexColor then
                 local class = addon.Raid:GetPlayerClass(name)
@@ -1696,12 +1699,13 @@ do
                 btn.selectedBackground:Hide()
             end
 
+            rollStr:SetText(roll)
             if isSR and self:IsReserved(itemId, name) then
                 local count = self:GetAllowedReserves(itemId, name)
                 local used = self:GetUsedReserveCount(itemId, name)
-                rollStr:SetText(count > 1 and format("%d (%d/%d)", roll, used, count) or tostring(roll))
+                srCountStr:SetText(count > 0 and format("(%d/%d)", used, count) or "")
             else
-                rollStr:SetText(roll)
+                srCountStr:SetText("")
             end
 
             -- Star always marks the top roll (rollWinner)
@@ -2493,6 +2497,7 @@ do
             _G[frameName .. "RaidListBtn"]:SetText(L.BtnRaidList)
             _G[frameName .. "ImportReservesBtn"]:SetText(L.BtnImportReserves)
         end
+        _G[frameName .. "RollsHeaderSR"]:SetText(L.StrSRRollCounter)
         Utils.setFrameTitle(frameName, MASTER_LOOTER)
         _G[frameName .. "ItemCount"]:SetScript("OnTextChanged", function(self)
             announced = false
