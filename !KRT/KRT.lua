@@ -1553,11 +1553,30 @@ do
     -- Returns the highest roll value from the current winner.
     function module:HighestRoll()
         if not lootState.winner then return 0 end
+
+        local winner = lootState.winner
+        local wantLow = (addon.options.sortAscending == true)
+        local best = nil
+
+        -- Prefer rolls tied to the current session item when available.
+        local sessionItemId = self:GetCurrentRollItemID()
+
         for i = 1, state.count do
             local entry = state.rolls[i]
-            if entry.name == lootState.winner then return entry.roll end
+            if entry and entry.name == winner then
+                if (not sessionItemId) or (not entry.itemId) or (entry.itemId == sessionItemId) then
+                    if best == nil then
+                        best = entry.roll
+                    elseif wantLow then
+                        if entry.roll < best then best = entry.roll end
+                    else
+                        if entry.roll > best then best = entry.roll end
+                    end
+                end
+            end
         end
-        return 0
+
+        return best or 0
     end
 
     -- Clears all roll-related state and UI elements.
@@ -1628,10 +1647,51 @@ do
             sortRolls(itemId)
         end
 
-        -- top roll
-        local starTarget = lootState.rollWinner
+        -- Build a compact display list: one row per player.
+        -- If the player rolled multiple times (multi-reserve), keep only the best roll according to sort order.
+        local wantLow = wantAsc
+        local bestByName = {}
+        local display = {}
+        for i = 1, state.count do
+            local entry = state.rolls[i]
+            if entry then
+                local name, roll = entry.name, entry.roll
+                local best = bestByName[name]
+                if not best then
+                    best = { name = name, roll = roll }
+                    bestByName[name] = best
+                    display[#display + 1] = best
+                else
+                    if wantLow then
+                        if roll < best.roll then best.roll = roll end
+                    else
+                        if roll > best.roll then best.roll = roll end
+                    end
+                end
+            end
+        end
 
-        -- fallback (if for some reason it has not been set yet)
+        table.sort(display, function(a, b)
+            -- SR: reserved first (session itemId)
+            if isSR and itemId then
+                local ar = module:IsReserved(itemId, a.name)
+                local br = module:IsReserved(itemId, b.name)
+                if ar ~= br then
+                    return ar
+                end
+            end
+
+            if a.roll ~= b.roll then
+                return wantLow and (a.roll < b.roll) or (a.roll > b.roll)
+            end
+
+            return tostring(a.name) < tostring(b.name)
+        end)
+
+        -- Top roll for UI star (compact list).
+        local starTarget = display[1] and display[1].name or lootState.rollWinner
+
+        -- Fallback (if for some reason it has not been set yet)
         if not starTarget then
             if isSR then
                 local bestName = PickBestReserved(itemId)
@@ -1648,8 +1708,8 @@ do
         local highlightTarget = selectionAllowed and (pickName or starTarget) or starTarget
 
         local starShown, totalHeight = false, 0
-        for i = 1, state.count do
-            local entry = state.rolls[i]
+        for i = 1, #display do
+            local entry = display[i]
             local name, roll = entry.name, entry.roll
             local btnName = frameName .. "PlayerBtn" .. i
             local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTSelectPlayerTemplate")
@@ -1668,12 +1728,12 @@ do
                 btn.selectedBackground:Hide()
             end
 
-            local nameStr, rollStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"], _G[btnName .. "Star"]
+            local nameStr, rollStr, counterStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"], _G[btnName .. "SRCounter"], _G[btnName .. "Star"]
 
             if nameStr and nameStr.SetVertexColor then
                 local class = addon.Raid:GetPlayerClass(name)
                 class = class and class:upper() or "UNKNOWN"
-                if isSR and self:IsReserved(itemId, name) then
+                if isSR and itemId and self:IsReserved(itemId, name) then
                     nameStr:SetVertexColor(0.4, 0.6, 1.0)
                 else
                     local r, g, b = Utils.getClassColor(class)
@@ -1695,15 +1755,27 @@ do
                 btn.selectedBackground:Hide()
             end
 
-            if isSR and self:IsReserved(itemId, name) then
-                local count = self:GetAllowedReserves(itemId, name)
-                local used = self:GetUsedReserveCount(itemId, name)
-                rollStr:SetText(count > 1 and format("%d (%d/%d)", roll, used, count) or tostring(roll))
-            else
-                rollStr:SetText(roll)
+            -- Roll value always in its own column
+            if rollStr then
+                rollStr:SetText(tostring(roll))
             end
 
-            -- Star always marks the top roll (rollWinner)
+            -- SR roll counter: show only (used/allowed) on the single compact row
+            if counterStr then
+                if isSR and itemId and self:IsReserved(itemId, name) then
+                    local allowed = self:GetAllowedReserves(itemId, name)
+                    if allowed and allowed > 1 then
+                        local used = self:GetUsedReserveCount(itemId, name)
+                        counterStr:SetText(format("(%d/%d)", used or 0, allowed))
+                    else
+                        counterStr:SetText("")
+                    end
+                else
+                    counterStr:SetText("")
+                end
+            end
+
+            -- Star always marks the top roll (compact list)
             local showStar = (not starShown) and (starTarget ~= nil) and (name == starTarget)
             Utils.showHide(star, showStar)
             if showStar then starShown = true end
@@ -1716,6 +1788,15 @@ do
             btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
             btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
             totalHeight = totalHeight + btn:GetHeight()
+        end
+
+        -- Hide leftover buttons from previous renders.
+        local j = #display + 1
+        local btn = _G[frameName .. "PlayerBtn" .. j]
+        while btn do
+            btn:Hide()
+            j = j + 1
+            btn = _G[frameName .. "PlayerBtn" .. j]
         end
     end
 
