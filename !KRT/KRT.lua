@@ -116,7 +116,6 @@ local format, find, strlen              = string.format, string.find, string.len
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber                = tostring, tonumber
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
-
 -- =========== Event System (WoW API events)  =========== --
 -- Clean frame-based dispatcher (NO CallbackHandler here)
 do
@@ -396,7 +395,7 @@ do
         -- One clean refresh shortly after: cancel existing timer then start a new one
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
-        module.updateRosterHandle = addon.After(2, function() module:UpdateRaidRoster() end)
+        module.updateRosterHandle = addon.NewTimer(2, function() module:UpdateRaidRoster() end)
     end
 
     -- Ends the current raid log entry, marking end time.
@@ -468,7 +467,7 @@ do
             -- Restart the roster update timer: cancel the old one and schedule a new one
             addon.CancelTimer(module.updateRosterHandle, true)
             module.updateRosterHandle = nil
-            module.updateRosterHandle = addon.After(2, function() module:UpdateRaidRoster() end)
+            module.updateRosterHandle = addon.NewTimer(2, function() module:UpdateRaidRoster() end)
             return
         end
 
@@ -2122,7 +2121,7 @@ do
                 end
             end
         end, duration)
-        countdownEndTimer = addon.After(duration, function()
+        countdownEndTimer = addon.NewTimer(duration, function()
             if not countdownRun then return end
             StopCountdown()
             addon:Announce(L.ChatCountdownEnd)
@@ -2879,9 +2878,11 @@ do
             addon:trace(E.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
             addon:trace(E.LogMLLootClosedCleanup)
             -- Cancel any scheduled close timer and schedule a new one
-            addon.CancelTimer(lootState.closeTimer)
-            lootState.closeTimer = nil
-            lootState.closeTimer = addon.After(0.1, function()
+            if lootState.closeTimer then
+                addon.CancelTimer(lootState.closeTimer)
+                lootState.closeTimer = nil
+            end
+            lootState.closeTimer = addon.NewTimer(0.1, function()
                 lootState.closeTimer = nil
                 lootState.opened = false
                 lootState.pendingAwards = {}
@@ -7544,7 +7545,7 @@ function addon:PLAYER_ENTERING_WORLD()
     -- Restart the first-check timer on login
     addon.CancelTimer(module.firstCheckHandle, true)
     module.firstCheckHandle = nil
-    module.firstCheckHandle = addon.After(3, function() module:FirstCheck() end)
+    module.firstCheckHandle = addon.NewTimer(3, function() module:FirstCheck() end)
 end
 
 -- CHAT_MSG_LOOT: Adds looted items to the raid log.
