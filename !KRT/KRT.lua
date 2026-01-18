@@ -18,9 +18,7 @@ local _G               = _G
 _G["KRT"]              = addon
 
 
----============================================================================
--- Constants
----============================================================================
+-- =========== Constants  =========== --
 
 local ITEM_LINK_PATTERN   = C.ITEM_LINK_PATTERN
 local rollTypes           = C.rollTypes
@@ -31,9 +29,8 @@ local RAID_TARGET_MARKERS = C.RAID_TARGET_MARKERS
 local K_COLOR             = C.K_COLOR
 local RT_COLOR            = C.RT_COLOR
 
--- Saved Variables
+-- =========== Saved Variables  =========== --
 -- These variables are persisted across sessions for the addon.
----============================================================================
 
 KRT_Options               = KRT_Options or {}
 KRT_Raids                 = KRT_Raids or {}
@@ -47,9 +44,7 @@ KRT_NextReset             = KRT_NextReset or 0
 KRT_SavedReserves         = KRT_SavedReserves or {}
 KRT_PlayerCounts          = KRT_PlayerCounts or {}
 
----============================================================================
--- External Libraries / Bootstrap
----============================================================================
+-- =========== External Libraries / Bootstrap  =========== --
 local Compat              = LibStub("LibCompat-1.0")
 addon.Compat              = Compat
 addon.BossIDs             = LibStub("LibBossIDs-1.0")
@@ -73,9 +68,7 @@ do
     addon:SetLogLevel(lv)
 end
 
----============================================================================
--- Core Addon Frames & Locals
----============================================================================
+-- =========== Core Addon Frames & Locals  =========== --
 
 -- Centralised addon state
 addon.State                = addon.State or {}
@@ -117,9 +110,7 @@ function GetItemIndex()
     return lootState.currentItemIndex
 end
 
----============================================================================
--- Cached Functions & Libraries
----============================================================================
+-- =========== Cached Functions & Libraries  =========== --
 
 local tinsert, tremove, tconcat, twipe  = table.insert, table.remove, table.concat, table.wipe
 local pairs, ipairs, type, select, next = pairs, ipairs, type, select, next
@@ -128,10 +119,8 @@ local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower,
 local tostring, tonumber                = tostring, tonumber
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
 
----============================================================================
--- Event System (WoW API events)
+-- =========== Event System (WoW API events)  =========== --
 -- Clean frame-based dispatcher (NO CallbackHandler here)
----============================================================================
 do
     -- listeners[event] = { obj1, obj2, ... }
     local listeners = {}
@@ -221,10 +210,8 @@ do
     addon:RegisterEvent("ADDON_LOADED")
 end
 
----============================================================================
--- Raid Helpers Module
+-- =========== Raid Helpers Module  =========== --
 -- Manages raid state, roster, boss kills, and loot logging.
----============================================================================
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -1109,9 +1096,7 @@ do
     end
 end
 
----============================================================================
--- Chat Output Helpers
----============================================================================
+-- =========== Chat Output Helpers  =========== --
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -1173,9 +1158,7 @@ do
     end
 end
 
----============================================================================
--- Minimap Button Module
----============================================================================
+-- =========== Minimap Button Module  =========== --
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -1357,10 +1340,8 @@ do
     end
 end
 
----============================================================================
--- Rolls Helpers Module
+-- =========== Rolls Helpers Module  =========== --
 -- Manages roll tracking, sorting, and winner determination.
----============================================================================
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -1846,10 +1827,8 @@ do
     end)
 end
 
----============================================================================
--- Loot Helpers Module
+-- =========== Loot Helpers Module  =========== --
 -- Manages the loot window items (fetching from loot/inventory).
----============================================================================
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -2169,9 +2148,7 @@ do
     end
 end
 
----============================================================================
--- Master Looter Frame Module
----============================================================================
+-- =========== Master Looter Frame Module  =========== --
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -3387,10 +3364,8 @@ do
     end)
 end
 
----============================================================================
--- Loot Counter Module
+-- =========== Loot Counter Module  =========== --
 -- Counter and display item distribution.
----============================================================================
 do
     local module = addon.Master
 
@@ -3566,10 +3541,8 @@ do
     hooksecurefunc(addon.Master, "OnLoad", SetupMasterLootFrameHooks)
 end
 
----============================================================================
--- Reserves Module
+-- =========== Reserves Module  =========== --
 -- Manages item reserves, import, and display.
----============================================================================
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -4491,9 +4464,7 @@ do
     end
 end
 
----============================================================================
--- Configuration Frame Module
----============================================================================
+-- =========== Configuration Frame Module  =========== --
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -4739,9 +4710,7 @@ do
     end
 end
 
----============================================================================
--- Warnings Frame Module
----============================================================================
+-- =========== Warnings Frame Module  =========== --
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -4994,9 +4963,7 @@ do
     end
 end
 
----============================================================================
--- MS Changes Module
----============================================================================
+-- =========== MS Changes Module  =========== --
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -5318,9 +5285,7 @@ do
     end
 end
 
----============================================================================
--- LFM Spam Module
----============================================================================
+-- =========== LFM Spam Module  =========== --
 do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
@@ -7562,9 +7527,7 @@ do
         addon:error(L.ErrAttendeesInvalidName)
     end
 end
----============================================================================
--- Slash Commands
----============================================================================
+-- =========== Slash Commands  =========== --
 do
     addon.Slash = addon.Slash or {}
     local Slash = addon.Slash
@@ -7807,9 +7770,7 @@ do
     end
 end
 
----============================================================================
--- Main Event Handlers
----============================================================================
+-- =========== Main Event Handlers  =========== --
 
 local addonEvents = {
     CHAT_MSG_SYSTEM = "CHAT_MSG_SYSTEM",
