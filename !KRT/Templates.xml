@@ -247,7 +247,7 @@
 			<Layer level="ARTWORK">
 				<FontString name="$parentRoll" inherits="GameFontNormalSmall" justifyH="RIGHT" text="0">
 					<Size>
-						<AbsDimension x="29" />
+						<AbsDimension x="22" />
 					</Size>
 					<Anchors>
 						<Anchor point="RIGHT">
@@ -265,13 +265,13 @@
 					<Anchors>
 						<Anchor point="RIGHT" relativeTo="$parentRoll" relativePoint="LEFT">
 							<Offset>
-								<AbsDimension x="-1" y="0" />
+								<AbsDimension x="0" y="0" /> <!-- was -1 -->
 							</Offset>
 						</Anchor>
 					</Anchors>
 					<Color r="1" g="1" b="1" a="1" />
 				</FontString>
-				<FontString name="$parentName" inherits="GameFontNormalSmall" justifyH="LEFT" text="PLAYER">
+				<FontString name="$parentName" inherits="GameFontNormal" justifyH="LEFT" text="PLAYER">
 					<Anchors>
 						<Anchor point="LEFT">
 							<Offset>

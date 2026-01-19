@@ -2212,6 +2212,7 @@ do
             addon.Rolls:FetchRolls()
         end)
     end
+
     local function UpdateMasterButtonsIfChanged(state)
         local buttons = lastUIState.buttons
         local texts = lastUIState.texts
@@ -2317,8 +2318,6 @@ do
         end
         return false
     end
-
-
 
     -- ----- Public methods ----- --
 
@@ -3117,7 +3116,6 @@ do
         addon:info(E.LogTradeStart:format(tostring(itemLink), tostring(lootState.trader),
             tostring(playerName), tonumber(rollType) or -1, tonumber(rollValue) or 0,
             lootState.itemCount or 1))
-
 
         -- Prepare initial output and whisper:
         local output, whisper
