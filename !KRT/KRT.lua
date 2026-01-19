@@ -3439,17 +3439,29 @@ do
 
     local playerTextTemp = {}
 
-    local function MarkPendingItem(itemId, hasName, hasIcon)
+    local function MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
         if not itemId then return nil end
         local pending = pendingItemInfo[itemId]
         if not pending then
             pending = {
                 nameReady = false,
-                iconReady = false
+                iconReady = false,
+                name = nil,
+                link = nil,
+                icon = nil,
             }
             pendingItemInfo[itemId] = pending
             pendingItemCount = pendingItemCount + 1
             addon:debug("Reserves: track pending itemId=%d pending=%d.", itemId, pendingItemCount)
+        end
+        if type(name) == "string" and name ~= "" then
+            pending.name = name
+        end
+        if type(link) == "string" and link ~= "" then
+            pending.link = link
+        end
+        if type(icon) == "string" and icon ~= "" then
+            pending.icon = icon
         end
         if hasName then
             pending.nameReady = true
@@ -3458,6 +3470,11 @@ do
             pending.iconReady = true
         end
         return pending
+    end
+
+    local function GetPendingItemInfo(pending)
+        if not pending then return nil end
+        return pending.name, pending.link, pending.icon
     end
 
     local function CompletePendingItem(itemId)
@@ -3856,29 +3873,51 @@ do
         refreshFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
         refreshFrame:SetScript("OnEvent", function(_, _, itemId)
             addon:debug("Reserves: item info received itemId=%d.", itemId)
-            if pendingItemInfo[itemId] then
-                local name, link, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
-                local icon = tex
-                if type(icon) ~= "string" or icon == "" then
-                    icon = GetItemIcon(itemId)
+            local pending = pendingItemInfo[itemId]
+            if not pending then return end
+
+            local name, link, icon = GetPendingItemInfo(pending)
+            local hasName = type(name) == "string" and name ~= ""
+                and type(link) == "string" and link ~= ""
+            local hasIcon = type(icon) == "string" and icon ~= ""
+
+            if not hasName then
+                local fetchedName, fetchedLink, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
+                if type(fetchedName) == "string" and fetchedName ~= "" then
+                    name = fetchedName
                 end
-                local hasName = type(name) == "string" and name ~= ""
-                    and type(link) == "string" and link ~= ""
-                local hasIcon = type(icon) == "string" and icon ~= ""
-                if hasName then
-                    addon:debug("Reserves: update item data %s.", link)
-                    self:UpdateReserveItemData(itemId, name, link, icon)
-                else
-                    addon:debug("Reserves: item info missing itemId=%d.", itemId)
+                if type(fetchedLink) == "string" and fetchedLink ~= "" then
+                    link = fetchedLink
                 end
-                MarkPendingItem(itemId, hasName, hasIcon)
-                if hasName and hasIcon then
-                    addon:info(E.LogSRItemInfoResolved:format(itemId, tostring(link)))
-                    CompletePendingItem(itemId)
-                else
-                    addon:debug("Reserves: item info still pending itemId=%d.", itemId)
-                    self:QueryItemInfo(itemId)
+                if type(tex) == "string" and tex ~= "" then
+                    icon = icon or tex
                 end
+            end
+
+            if not hasIcon then
+                local fetchedIcon = GetItemIcon(itemId)
+                if type(fetchedIcon) == "string" and fetchedIcon ~= "" then
+                    icon = fetchedIcon
+                end
+            end
+
+            hasName = type(name) == "string" and name ~= ""
+                and type(link) == "string" and link ~= ""
+            hasIcon = type(icon) == "string" and icon ~= ""
+
+            if hasName then
+                addon:debug("Reserves: update item data %s.", link)
+                self:UpdateReserveItemData(itemId, name, link, icon)
+            else
+                addon:debug("Reserves: item info missing itemId=%d.", itemId)
+            end
+            MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
+            if hasName and hasIcon then
+                addon:info(E.LogSRItemInfoResolved:format(itemId, tostring(link)))
+                CompletePendingItem(itemId)
+            else
+                addon:debug("Reserves: item info still pending itemId=%d.", itemId)
+                self:QueryItemInfo(itemId)
             end
         end)
     end
@@ -4022,18 +4061,39 @@ do
     function module:QueryItemInfo(itemId)
         if not itemId then return end
         addon:debug("Reserves: query item info itemId=%d.", itemId)
-        local name, link, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
-        local icon = tex
-        if type(icon) ~= "string" or icon == "" then
-            icon = GetItemIcon(itemId)
-        end
+        local pending = pendingItemInfo[itemId]
+        local name, link, icon = GetPendingItemInfo(pending)
         local hasName = type(name) == "string" and name ~= ""
             and type(link) == "string" and link ~= ""
         local hasIcon = type(icon) == "string" and icon ~= ""
+
+        if not hasName then
+            local fetchedName, fetchedLink, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
+            if type(fetchedName) == "string" and fetchedName ~= "" then
+                name = fetchedName
+            end
+            if type(fetchedLink) == "string" and fetchedLink ~= "" then
+                link = fetchedLink
+            end
+            if type(tex) == "string" and tex ~= "" then
+                icon = icon or tex
+            end
+        end
+
+        if not hasIcon then
+            local fetchedIcon = GetItemIcon(itemId)
+            if type(fetchedIcon) == "string" and fetchedIcon ~= "" then
+                icon = fetchedIcon
+            end
+        end
+
+        hasName = type(name) == "string" and name ~= ""
+            and type(link) == "string" and link ~= ""
+        hasIcon = type(icon) == "string" and icon ~= ""
         if hasName then
             self:UpdateReserveItemData(itemId, name, link, icon)
         end
-        MarkPendingItem(itemId, hasName, hasIcon)
+        MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
         if hasName and hasIcon then
             addon:debug("Reserves: item info ready itemId=%d name=%s.", itemId, name)
             CompletePendingItem(itemId)
