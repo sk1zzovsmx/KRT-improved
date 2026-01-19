@@ -131,7 +131,7 @@ do
             if type(fn) == "function" then
                 local ok, err = pcall(fn, obj, ...)
                 if not ok then
-                    addon:error("Event handler failed event=%s err=%s", tostring(e), tostring(err))
+                    addon:error(E.LogCoreEventHandlerFailed:format(tostring(e), tostring(err)))
                 end
             end
         end
@@ -1319,7 +1319,7 @@ do
         if #rolls == 0 then
             lootState.winner = nil
             lootState.rollWinner = nil
-            addon:debug("Rolls: sort no entries.")
+            addon:debug(E.LogRollsSortNoEntries)
             return
         end
 
@@ -1387,7 +1387,7 @@ do
         state.rolls[state.count] = entry
         -- Roll entries are released via resetRolls().
 
-        addon:debug("Rolls: add name=%s roll=%d item=%s.", name, roll, tostring(itemId))
+        addon:debug(E.LogRollsAddEntry:format(name, roll, tostring(itemId)))
         if itemId then
             local tracker = AcquireItemTracker(itemId)
             tracker[name] = (tracker[name] or 0) + 1
@@ -1446,14 +1446,14 @@ do
         state.playerCounts[itemId] = state.playerCounts[itemId] or 0
         if state.playerCounts[itemId] >= allowed then
             addon:info(L.ChatOnlyRollOnce)
-            addon:debug("Rolls: blocked player=%s (%d/%d).", name, state.playerCounts[itemId], allowed)
+            addon:debug(E.LogRollsBlockedPlayer:format(name, state.playerCounts[itemId], allowed))
             return
         end
 
         RandomRoll(1, 100)
         state.rolled = true
         state.playerCounts[itemId] = state.playerCounts[itemId] + 1
-        addon:debug("Rolls: player=%s item=%d.", name, itemId)
+        addon:debug(E.LogRollsPlayerRolled:format(name, itemId))
     end
 
     -- Returns the current roll session state.
@@ -1479,7 +1479,7 @@ do
             end
         end
 
-        addon:debug("Rolls: record=%s.", tostring(bool))
+        addon:debug(E.LogRollsRecordState:format(tostring(bool)))
     end
 
     -- Intercepts system messages to detect player rolls.
@@ -1493,13 +1493,13 @@ do
                 addon:Announce(L.ChatCountdownBlock)
                 state.warned = true
             end
-            addon:debug("Rolls: blocked countdown active.")
+            addon:debug(E.LogRollsCountdownBlocked)
             return
         end
 
         local itemId = self:GetCurrentRollItemID()
         if not itemId or lootState.lootCount == 0 then
-            addon:error("Item ID missing or loot table not ready - roll ignored.")
+            addon:error(E.LogRollsMissingItem)
             return
         end
 
@@ -1516,11 +1516,11 @@ do
                 Utils.whisper(player, L.ChatOnlyRollOnce)
                 tinsert(state.rerolled, player)
             end
-            addon:debug("Rolls: denied player=%s (%d/%d).", player, used, allowed)
+            addon:debug(E.LogRollsDeniedPlayer:format(player, used, allowed))
             return
         end
 
-        addon:debug("Rolls: accepted player=%s (%d/%d).", player, used + 1, allowed)
+        addon:debug(E.LogRollsAcceptedPlayer:format(player, used + 1, allowed))
         addRoll(player, roll, itemId)
     end
 
@@ -1600,7 +1600,7 @@ do
         local itemLink = item and item.itemLink
         if not itemLink then return nil end
         local itemId = Utils.getItemIdFromLink(itemLink)
-        addon:debug("Rolls: current itemId=%s.", tostring(itemId))
+        addon:debug(E.LogRollsCurrentItemId:format(tostring(itemId)))
         return itemId
     end
 
@@ -2473,12 +2473,11 @@ do
     -- Button: Award/Trade
     function module:BtnAward(btn)
         if countdownRun then
-            addon:warn("Countdown ancora attivo: attendi la fine (0) prima di assegnare.")
+            addon:warn(E.LogMLCountdownActive)
             return
         end
         if lootState.lootCount <= 0 or lootState.rollsCount <= 0 then
-            addon:debug("Award: blocked lootCount=%d rollsCount=%d.", lootState.lootCount or 0,
-                lootState.rollsCount or 0)
+            addon:debug(E.LogMLAwardBlocked:format(lootState.lootCount or 0, lootState.rollsCount or 0))
             return
         end
         if not lootState.winner then
@@ -3007,7 +3006,7 @@ do
                             tostring(lootState.currentRollItem), tostring(GetItemLink())))
                     end
                 else
-                    addon:warn("Trade: currentRollItem missing; cannot update loot entry.")
+                    addon:warn(E.LogTradeCurrentRollItemMissing)
                 end
                 local done = RegisterAwardedItem()
                 ResetTradeState()
@@ -3451,7 +3450,7 @@ do
             }
             pendingItemInfo[itemId] = pending
             pendingItemCount = pendingItemCount + 1
-            addon:debug("Reserves: track pending itemId=%d pending=%d.", itemId, pendingItemCount)
+            addon:debug(E.LogReservesTrackPending:format(itemId, pendingItemCount))
         end
         if type(name) == "string" and name ~= "" then
             pending.name = name
@@ -3482,9 +3481,9 @@ do
         if pendingItemCount > 0 then
             pendingItemCount = pendingItemCount - 1
         end
-        addon:debug("Reserves: item ready itemId=%d pending=%d.", itemId, pendingItemCount)
+        addon:debug(E.LogReservesItemReady:format(itemId, pendingItemCount))
         if pendingItemCount == 0 then
-            addon:debug("Reserves: pending item info complete.")
+            addon:debug(E.LogReservesPendingComplete)
             if reserveListFrame and reserveListFrame:IsShown() then
                 module:RefreshWindow()
             end
@@ -3741,8 +3740,7 @@ do
         local source = self and self._source
         if not source then return end
         collapsedBossGroups[source] = not collapsedBossGroups[source]
-        addon:debug("Reserves: toggle collapse source=%s state=%s.", source,
-            tostring(collapsedBossGroups[source]))
+        addon:debug(E.LogReservesToggleCollapse:format(source, tostring(collapsedBossGroups[source])))
         module:RefreshWindow()
     end
 
@@ -3756,14 +3754,14 @@ do
 
     function module:Save()
         RebuildIndex()
-        addon:debug("Reserves: save entries=%d.", addon.tLength(reservesData))
+        addon:debug(E.LogReservesSaveEntries:format(addon.tLength(reservesData)))
         local saved = {}
         addon.tCopy(saved, reservesData)
         KRT_SavedReserves = saved
     end
 
     function module:Load()
-        addon:debug("Reserves: load data=%s.", tostring(KRT_SavedReserves ~= nil))
+        addon:debug(E.LogReservesLoadData:format(tostring(KRT_SavedReserves ~= nil)))
         twipe(reservesData)
         if KRT_SavedReserves then
             addon.tCopy(reservesData, KRT_SavedReserves)
@@ -3772,7 +3770,7 @@ do
     end
 
     function module:ResetSaved()
-        addon:debug("Reserves: reset saved data.")
+        addon:debug(E.LogReservesResetSaved)
         KRT_SavedReserves = nil
         twipe(reservesData)
         twipe(reservesByItemID)
@@ -3797,24 +3795,24 @@ do
 
     function module:ShowWindow()
         if not reserveListFrame then
-            addon:error("Reserve List frame not available.")
+            addon:error(E.LogReservesFrameMissing)
             return
         end
-        addon:debug("Reserves: show list window.")
+        addon:debug(E.LogReservesShowWindow)
         reserveListFrame:Show()
         self:RefreshWindow()
     end
 
     function module:CloseWindow()
-        addon:debug("Reserves: hide list window.")
+        addon:debug(E.LogReservesHideWindow)
         if reserveListFrame then reserveListFrame:Hide() end
     end
 
     function module:ShowImportBox()
-        addon:debug("Reserves: open import window.")
+        addon:debug(E.LogReservesOpenImportWindow)
         local frame = _G["KRTImportWindow"]
         if not frame then
-            addon:error("KRTImportWindow not found.")
+            addon:error(E.LogReservesImportWindowMissing)
             return
         end
         frame:Show()
@@ -3841,7 +3839,7 @@ do
     end
 
     function module:OnLoad(frame)
-        addon:debug("Reserves: frame loaded.")
+        addon:debug(E.LogReservesFrameLoaded)
         reserveListFrame = frame
         frameName = frame:GetName()
 
@@ -3862,7 +3860,7 @@ do
             local btn = _G["KRTReserveListFrame" .. suff]
             if btn and self[method] then
                 btn:SetScript("OnClick", function() self[method](self) end)
-                addon:debug("Reserves: bind button=%s action=%s.", suff, method)
+                addon:debug(E.LogReservesBindButton:format(suff, method))
             end
         end
 
@@ -3871,7 +3869,7 @@ do
         local refreshFrame = CreateFrame("Frame")
         refreshFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
         refreshFrame:SetScript("OnEvent", function(_, _, itemId)
-            addon:debug("Reserves: item info received itemId=%d.", itemId)
+            addon:debug(E.LogReservesItemInfoReceived:format(itemId))
             local pending = pendingItemInfo[itemId]
             if not pending then return end
 
@@ -3905,17 +3903,17 @@ do
             hasIcon = type(icon) == "string" and icon ~= ""
 
             if hasName then
-                addon:debug("Reserves: update item data %s.", link)
+                addon:debug(E.LogReservesUpdateItemData:format(link))
                 self:UpdateReserveItemData(itemId, name, link, icon)
             else
-                addon:debug("Reserves: item info missing itemId=%d.", itemId)
+                addon:debug(E.LogReservesItemInfoMissing:format(itemId))
             end
             MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
             if hasName and hasIcon then
                 addon:info(E.LogSRItemInfoResolved:format(itemId, tostring(link)))
                 CompletePendingItem(itemId)
             else
-                addon:debug("Reserves: item info still pending itemId=%d.", itemId)
+                addon:debug(E.LogReservesItemInfoPending:format(itemId))
                 self:QueryItemInfo(itemId)
             end
         end)
@@ -3925,12 +3923,12 @@ do
 
     function LocalizeUIFrame()
         if localized then
-            addon:debug("Reserves: UI already localized.")
+            addon:debug(E.LogReservesUIAlreadyLocalized)
             return
         end
         if frameName then
             Utils.setFrameTitle(frameName, L.StrRaidReserves)
-            addon:debug("Reserves: UI localized %s.", L.StrRaidReserves)
+            addon:debug(E.LogReservesUILocalized:format(L.StrRaidReserves))
         end
         localized = true
     end
@@ -3960,9 +3958,9 @@ do
 
         -- Log when the function is called and show the reserve for the player
         if reserve then
-            addon:debug("Reserves: player found %s data=%s.", playerName, tostring(reserve))
+            addon:debug(E.LogReservesPlayerFound:format(playerName, tostring(reserve)))
         else
-            addon:debug("Reserves: player not found %s.", playerName)
+            addon:debug(E.LogReservesPlayerNotFound:format(playerName))
         end
 
         return reserve
@@ -3970,18 +3968,18 @@ do
 
     -- Get all reserves:
     function module:GetAllReserves()
-        addon:debug("Reserves: fetch all players=%d.", addon.tLength(reservesData))
+        addon:debug(E.LogReservesFetchAll:format(addon.tLength(reservesData)))
         return reservesData
     end
 
     -- Parse imported text
     function module:ParseCSV(csv)
         if type(csv) ~= "string" or not csv:match("%S") then
-            addon:error("Import failed: empty or invalid data.")
+            addon:error(E.LogReservesImportFailedEmpty)
             return
         end
 
-        addon:debug("Reserves: parse CSV start.")
+        addon:debug(E.LogReservesParseStart)
         twipe(reservesData)
         twipe(reservesByItemID)
         reservesDirty = true
@@ -4049,7 +4047,7 @@ do
         end
 
         RebuildIndex()
-        addon:debug("Reserves: parse CSV complete players=%d.", addon.tLength(reservesData))
+        addon:debug(E.LogReservesParseComplete:format(addon.tLength(reservesData)))
         addon:info(E.LogSRImportComplete:format(addon.tLength(reservesData)))
         self:RefreshWindow()
         self:Save()
@@ -4059,7 +4057,7 @@ do
 
     function module:QueryItemInfo(itemId)
         if not itemId then return end
-        addon:debug("Reserves: query item info itemId=%d.", itemId)
+        addon:debug(E.LogReservesQueryItemInfo:format(itemId))
         local pending = pendingItemInfo[itemId]
         local name, link, icon = GetPendingItemInfo(pending)
         local hasName = type(name) == "string" and name ~= ""
@@ -4094,7 +4092,7 @@ do
         end
         MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
         if hasName and hasIcon then
-            addon:debug("Reserves: item info ready itemId=%d name=%s.", itemId, name)
+            addon:debug(E.LogReservesItemInfoReady:format(itemId, name))
             CompletePendingItem(itemId)
             return true
         end
@@ -4102,7 +4100,7 @@ do
         GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
         GameTooltip:SetHyperlink("item:" .. itemId)
         GameTooltip:Hide()
-        addon:debug("Reserves: item info pending itemId=%d.", itemId)
+        addon:debug(E.LogReservesItemInfoPendingQuery:format(itemId))
         return false
     end
 
@@ -4111,7 +4109,7 @@ do
         local seen = {}
         local count = 0
         local updated = false
-        addon:debug("Reserves: query missing items.")
+        addon:debug(E.LogReservesQueryMissingItems)
         for _, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
                 for _, r in ipairs(player.reserves) do
@@ -4137,7 +4135,7 @@ do
                 addon:info(L.MsgReserveItemsReady)
             end
         end
-        addon:debug("Reserves: missing items requested=%d.", count)
+        addon:debug(E.LogReservesMissingItems:format(count))
         addon:debug(E.LogSRQueryMissingItems:format(tostring(updated), count))
     end
 
@@ -4206,15 +4204,14 @@ do
         local normalized = Utils.normalizeLower(playerName, true)
         local entry = reservesData[normalized]
         if not entry then return 0 end
-        addon:debug("Reserves: check count itemId=%d player=%s.", itemId, playerName)
+        addon:debug(E.LogReservesCheckCount:format(itemId, playerName))
         for _, r in ipairs(entry.reserves or {}) do
             if r.rawID == itemId then
-                addon:debug("Reserves: found itemId=%d player=%s qty=%d.", itemId, playerName,
-                    r.quantity)
+                addon:debug(E.LogReservesFoundCount:format(itemId, playerName, r.quantity))
                 return r.quantity or 1
             end
         end
-        addon:debug("Reserves: none itemId=%d player=%s.", itemId, playerName)
+        addon:debug(E.LogReservesNoCount:format(itemId, playerName))
         return 0
     end
 
@@ -4359,10 +4356,10 @@ do
     end
 
     function module:FormatReservedPlayersLine(itemId)
-        addon:debug("Reserves: format players itemId=%d.", itemId)
+        addon:debug(E.LogReservesFormatPlayers:format(itemId))
         local list = self:GetPlayersForItem(itemId)
         -- Log the list of players found for the item
-        addon:debug("Reserves: players itemId=%d list=%s.", itemId, tconcat(list, ", "))
+        addon:debug(E.LogReservesPlayersList:format(itemId, tconcat(list, ", ")))
         return #list > 0 and tconcat(list, ", ") or ""
     end
 end
@@ -5078,13 +5075,13 @@ do
 
     -- Initialize changes table:
     function InitChangesTable()
-        addon:debug("Changes: init table.")
+        addon:debug(E.LogChangesInitTable)
         changesTable = KRT_CurrentRaid and KRT_Raids[KRT_CurrentRaid].changes or {}
     end
 
     -- Fetch All module:
     function FetchChanges()
-        addon:debug("Changes: fetch all.")
+        addon:debug(E.LogChangesFetchAll)
         if not KRT_CurrentRaid then return end
         local scrollFrame = _G[frameName .. "ScrollFrame"]
         local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
