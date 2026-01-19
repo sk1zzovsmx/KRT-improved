@@ -20,7 +20,6 @@ _G["KRT"]              = addon
 
 local ITEM_LINK_PATTERN   = C.ITEM_LINK_PATTERN
 local rollTypes           = C.rollTypes
-local lootTypesText       = C.lootTypesText
 local lootTypesColored    = C.lootTypesColored
 local itemColors          = C.itemColors
 local RAID_TARGET_MARKERS = C.RAID_TARGET_MARKERS
