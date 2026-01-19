@@ -2328,6 +2328,7 @@ do
         addon.UIMaster = frame
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
+        LocalizeUIFrame()
         frame:SetScript("OnUpdate", UpdateUIFrame)
         frame:SetScript("OnHide", function()
             if selectionFrame then selectionFrame:Hide() end
@@ -2644,7 +2645,6 @@ do
 
     -- OnUpdate handler for the frame, updates UI elements periodically.
     function UpdateUIFrame(self, elapsed)
-        LocalizeUIFrame()
         Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             local itemCountBox = _G[frameName .. "ItemCount"]
             UpdateItemCountFromBox(itemCountBox)
