@@ -2904,7 +2904,8 @@ do
     -- ITEM_LOCKED: Triggered when an item is picked up from inventory.
     function module:ITEM_LOCKED(inBag, inSlot)
         if not inBag or not inSlot then return end
-        local itemTexture, count, locked, quality, _, _, itemLink = GetContainerItemInfo(inBag, inSlot)
+        local itemTexture, count = GetContainerItemInfo(inBag, inSlot)
+        local itemLink = GetContainerItemLink(inBag, inSlot)
         if not itemLink or not itemTexture then return end
         addon:trace(E.LogMLItemLocked:format(tostring(inBag), tostring(inSlot), tostring(itemLink),
             tostring(count), tostring(ItemIsSoulbound(inBag, inSlot))))
