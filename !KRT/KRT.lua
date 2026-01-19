@@ -1915,7 +1915,22 @@ do
     -- Note: in 3.3.5a GetItemInfo can be nil for uncached items; we fall back to
     -- loot-slot data and the itemLink itself so Master Loot UI + Spam Loot keep working.
     function module:AddItem(itemLink, itemCount, nameHint, rarityHint, textureHint, colorHint)
-        local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
+        local itemName = nameHint
+        local itemRarity = rarityHint
+        local itemTexture = textureHint
+
+        if not itemName or not itemRarity or not itemTexture then
+            local infoName, _, infoRarity, _, _, _, _, _, _, infoTexture = GetItemInfo(itemLink)
+            if not itemName then
+                itemName = infoName
+            end
+            if not itemRarity then
+                itemRarity = infoRarity
+            end
+            if not itemTexture then
+                itemTexture = infoTexture
+            end
+        end
 
         -- Try to warm the item cache (doesn't guarantee immediate GetItemInfo).
         if (not itemName or not itemRarity or not itemTexture) and type(itemLink) == "string" then
