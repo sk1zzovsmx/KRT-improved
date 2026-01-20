@@ -2174,6 +2174,11 @@ do
     end
 
     function module:ResetItemCount(focus)
+        -- During multi-award from loot window we keep ItemCount stable (target N) to avoid
+        -- mid-sequence clamping to the remaining copies.
+        if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
+            return
+        end
         SetItemCountValue(addon.Loot:GetCurrentItemCount(), focus)
     end
 
@@ -2364,6 +2369,7 @@ do
     function module:BtnSelectItem(btn)
         if btn == nil or lootState.lootCount <= 0 then return end
         if countdownRun then return end
+        lootState.multiAward = nil
         if lootState.fromInventory == true then
             addon.Loot:ClearLoot()
             addon.Rolls:ClearRolls()
@@ -2515,11 +2521,71 @@ do
         local result
         if lootState.fromInventory == true then
             result = TradeItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
-        else
-            result = AssignItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
-            if result then
-                RegisterAwardedItem()
+            module:ResetItemCount()
+            return result
+        end
+
+        -- Loot window: support multi-award when ItemCount > 1 by consuming multiple identical copies
+        -- (same itemString) sequentially on LOOT_SLOT_CLEARED.
+        local target = tonumber(lootState.itemCount) or 1
+        if target < 1 then target = 1 end
+        local available = tonumber(addon.Loot:GetCurrentItemCount()) or 1
+        if available < 1 then available = 1 end
+        if target > available then target = available end
+        if lootState.rollsCount and target > lootState.rollsCount then
+            target = lootState.rollsCount
+        end
+        if target and target > 1 then
+            local rolls = addon.Rolls:GetRolls()
+            local winners = {}
+            for i = 1, target do
+                local r = rolls and rolls[i]
+                if r and r.name then
+                    winners[#winners + 1] = { name = r.name, roll = tonumber(r.roll) or 0 }
+                end
             end
+            if #winners <= 0 then
+                addon:warn(L.ErrNoWinnerSelected)
+                module:ResetItemCount()
+                return false
+            end
+
+            -- Stabilize target count for the whole sequence and reflect the clamp in the UI.
+            SetItemCountValue(#winners, false)
+
+            lootState.multiAward = {
+                active   = true,
+                itemLink = itemLink,
+                itemKey  = Utils.getItemStringFromLink(itemLink) or itemLink,
+                rollType = lootState.currentRollType,
+                winners  = winners,
+                pos      = 2, -- first award is immediate; the rest continues on LOOT_SLOT_CLEARED
+                total    = #winners,
+            }
+
+            -- First award immediately.
+            announced = false
+            lootState.winner = winners[1].name
+            result = AssignItem(itemLink, winners[1].name, lootState.currentRollType, winners[1].roll)
+            if result then
+                RegisterAwardedItem(1)
+                -- If this was the last copy for any reason, close the sequence now.
+                if lootState.multiAward and lootState.multiAward.pos > lootState.multiAward.total then
+                    lootState.multiAward = nil
+                    module:ResetItemCount()
+                end
+                return true
+            end
+
+            lootState.multiAward = nil
+            module:ResetItemCount()
+            return false
+        end
+
+        -- Single award (existing behavior): uses the currently selected winner.
+        result = AssignItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
+        if result then
+            RegisterAwardedItem(1)
         end
         module:ResetItemCount()
         return result
@@ -2619,6 +2685,11 @@ do
     end
 
     local function UpdateItemCountFromBox(itemCountBox)
+        -- While a multi-award sequence is running from the loot window, ItemCount represents
+        -- the target number of copies to distribute (not the remaining copies). Ignore edits.
+        if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
+            return
+        end
         if not itemCountBox or not itemCountBox:IsVisible() then return end
         local rawCount = itemCountBox:GetText()
         if rawCount ~= lastUIState.itemCountText then
@@ -2987,6 +3058,7 @@ do
         if addon.Raid:IsMasterLooter() then
             addon:trace(E.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
             addon:trace(E.LogMLLootClosedCleanup)
+            lootState.multiAward = nil
             -- Cancel any scheduled close timer and schedule a new one
             if lootState.closeTimer then
                 addon.CancelTimer(lootState.closeTimer)
@@ -3017,6 +3089,36 @@ do
                 addon:info(E.LogMLLootWindowEmptied)
             end
             module:ResetItemCount()
+
+            -- Continue a multi-award sequence (loot window only). We award one copy per LOOT_SLOT_CLEARED
+            -- to stay in sync with the server/loot window refresh.
+            local ma = lootState.multiAward
+            if ma and ma.active and not lootState.fromInventory then
+                local idx = tonumber(ma.pos) or 1
+                local entry = ma.winners and ma.winners[idx]
+                if not entry then
+                    lootState.multiAward = nil
+                    module:ResetItemCount()
+                    return
+                end
+
+                announced = false
+                lootState.winner = entry.name
+                lootState.currentRollType = ma.rollType
+
+                local ok = AssignItem(ma.itemLink, entry.name, ma.rollType, entry.roll)
+                if ok then
+                    RegisterAwardedItem(1)
+                    ma.pos = idx + 1
+                    if ma.pos > (ma.total or #ma.winners) then
+                        lootState.multiAward = nil
+                        module:ResetItemCount()
+                    end
+                else
+                    lootState.multiAward = nil
+                    module:ResetItemCount()
+                end
+            end
         end
     end
 
