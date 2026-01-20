@@ -55,16 +55,16 @@ end
 
 -- String ends with:
 _G.string.endsWith = function(str, piece)
-    -- Check whether a string ends with the provided piece. Fails gracefully if inputs are not strings.
-    if type(str) ~= "string" or type(piece) ~= "string" then
-        return false
-    end
-    local lenPiece = strlen(piece)
-    -- If the main string is shorter than the piece, it cannot end with it.
-    if #str < lenPiece then
-        return false
-    end
-    return strsub(str, -lenPiece) == piece
+	-- Check whether a string ends with the provided piece. Fails gracefully if inputs are not strings.
+	if type(str) ~= "string" or type(piece) ~= "string" then
+		return false
+	end
+	local lenPiece = strlen(piece)
+	-- If the main string is shorter than the piece, it cannot end with it.
+	if #str < lenPiece then
+		return false
+	end
+	return strsub(str, -lenPiece) == piece
 end
 
 
@@ -166,6 +166,34 @@ function Utils.getItemIdFromLink(itemLink)
 	return itemId
 end
 
+-- Extract a stable "itemString" identifier from an item link.
+--
+-- This is safer than using only itemId because it preserves meaningful
+-- link fields (e.g. random suffix / uniqueId) when present.
+function Utils.getItemStringFromLink(itemLink)
+	if type(itemLink) ~= "string" or itemLink == "" then
+		return nil
+	end
+
+	-- Fast-path: capture the raw itemString from the hyperlink.
+	-- Includes potential negative numbers (suffix IDs) in WotLK links.
+	local itemString = itemLink:match("|H(item:[%-%d:]+)|h")
+	if itemString then
+		return itemString
+	end
+
+	-- Fallback: use LibDeformat pattern used elsewhere in the addon.
+	local _, itemId, rest = addon.Deformat(itemLink, ITEM_LINK_FORMAT)
+	if itemId then
+		if rest and rest ~= "" then
+			return "item:" .. tostring(itemId) .. ":" .. tostring(rest)
+		end
+		return "item:" .. tostring(itemId)
+	end
+
+	return nil
+end
+
 -- =========== UI helpers  =========== --
 
 --
@@ -183,14 +211,14 @@ end
 --       ui.ID:SetText(it.id)
 --   end)
 function Utils.createRowDrawer(fn)
-    local rowHeight
-    return function(row, it)
-        if not rowHeight then
-            rowHeight = (row and row:GetHeight()) or 20
-        end
-        fn(row, it)
-        return rowHeight
-    end
+	local rowHeight
+	return function(row, it)
+		if not rowHeight then
+			rowHeight = (row and row:GetHeight()) or 20
+		end
+		fn(row, it)
+		return rowHeight
+	end
 end
 
 -- =========== Roster helpers  =========== --
@@ -526,17 +554,17 @@ end
 
 -- Convert seconds to readable clock string:
 function Utils.sec2clock(seconds)
-    local sec = tonumber(seconds)
-    if sec <= 0 then
-        return "00:00:00"
-    end
-    -- Compute hours, minutes and seconds properly based on total seconds.
-    -- Use the cached floor function to avoid extra allocations in hot paths.
-    local total = floor(sec)
-    local hours = floor(total / 3600)
-    local minutes = floor((total % 3600) / 60)
-    local secondsPart = floor(total % 60)
-    return format("%02d:%02d:%02d", hours, minutes, secondsPart)
+	local sec = tonumber(seconds)
+	if sec <= 0 then
+		return "00:00:00"
+	end
+	-- Compute hours, minutes and seconds properly based on total seconds.
+	-- Use the cached floor function to avoid extra allocations in hot paths.
+	local total = floor(sec)
+	local hours = floor(total / 3600)
+	local minutes = floor((total % 3600) / 60)
+	local secondsPart = floor(total % 60)
+	return format("%02d:%02d:%02d", hours, minutes, secondsPart)
 end
 
 -- Sends an addOn message to the appropriate channel:

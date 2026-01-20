@@ -1727,7 +1727,8 @@ do
                 btn.selectedBackground:Hide()
             end
 
-            local nameStr, rollStr, counterStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"], _G[btnName .. "Counter"], _G[btnName .. "Star"]
+            local nameStr, rollStr, counterStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"],
+                _G[btnName .. "Counter"], _G[btnName .. "Star"]
 
             if nameStr and nameStr.SetVertexColor then
                 local class = addon.Raid:GetPlayerClass(name)
@@ -1882,13 +1883,29 @@ do
         lootState.fromInventory = false
         self:ClearLoot()
 
+        local indexByItemKey = {}
         for i = 1, GetNumLootItems() do
             if LootSlotIsItem(i) then
                 local itemLink = GetLootSlotLink(i)
                 if itemLink then
                     local icon, name, quantity, quality = GetLootSlotInfo(i)
                     if GetItemFamily(itemLink) ~= 64 then
-                        self:AddItem(itemLink, quantity, name, quality, icon)
+                        local key = Utils.getItemStringFromLink(itemLink) or itemLink
+                        local existing = indexByItemKey[key]
+                        if existing then
+                            lootTable[existing].count = (lootTable[existing].count or 1) + 1
+                        else
+                            local before = lootState.lootCount
+                            -- In loot window we treat each slot as one awardable copy (even if quantity > 1).
+                            self:AddItem(itemLink, 1, name, quality, icon)
+                            if lootState.lootCount > before then
+                                indexByItemKey[key] = lootState.lootCount
+                                local it = lootTable[lootState.lootCount]
+                                if it then
+                                    it.itemKey = key
+                                end
+                            end
+                        end
                     end
                 end
             end
@@ -2327,7 +2344,6 @@ do
         addon.UIMaster = frame
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
-        LocalizeUIFrame()
         frame:SetScript("OnUpdate", UpdateUIFrame)
         frame:SetScript("OnHide", function()
             if selectionFrame then selectionFrame:Hide() end
@@ -2354,6 +2370,10 @@ do
             addon.Rolls:RecordRolls(false)
             announced = false
             lootState.fromInventory = false
+            itemInfo.count = 0
+            itemInfo.isStack = nil
+            itemInfo.bagID = nil
+            itemInfo.slotID = nil
             if lootState.opened == true then addon.Loot:FetchLoot() end
         elseif selectionFrame then
             Utils.toggle(selectionFrame)
@@ -2371,7 +2391,10 @@ do
             for i = 1, lootState.lootCount do
                 local itemLink = GetItemLink(i)
                 if itemLink then
-                    addon:Announce(i .. ". " .. itemLink, "RAID")
+                    local item = GetItem(i)
+                    local count = item and item.count or 1
+                    local suffix = (count and count > 1) and (" x" .. count) or ""
+                    addon:Announce(i .. ". " .. itemLink .. suffix, "RAID")
                 end
             end
         end
@@ -2606,7 +2629,7 @@ do
             local count = tonumber(rawCount)
             if count and count > 0 then
                 lootState.itemCount = count
-                if itemInfo.count and itemInfo.count ~= lootState.itemCount then
+                if lootState.fromInventory and itemInfo.count and itemInfo.count ~= lootState.itemCount then
                     if itemInfo.count < lootState.itemCount then
                         lootState.itemCount = itemInfo.count
                         itemCountBox:SetNumber(itemInfo.count)
@@ -2644,6 +2667,7 @@ do
 
     -- OnUpdate handler for the frame, updates UI elements periodically.
     function UpdateUIFrame(self, elapsed)
+        LocalizeUIFrame()
         Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             local itemCountBox = _G[frameName .. "ItemCount"]
             UpdateItemCountFromBox(itemCountBox)
@@ -2885,7 +2909,13 @@ do
             btn:Show()
             local itemName = GetItemName(i)
             local itemNameBtn = _G[btnName .. "Name"]
-            itemNameBtn:SetText(itemName)
+            local item = GetItem(i)
+            local count = item and item.count or 1
+            if count and count > 1 then
+                itemNameBtn:SetText(itemName .. " x" .. count)
+            else
+                itemNameBtn:SetText(itemName)
+            end
             local itemTexture = GetItemTexture(i)
             local itemTextureBtn = _G[btnName .. "Icon"]
             itemTextureBtn:SetTexture(itemTexture)
@@ -3033,11 +3063,19 @@ do
     -- Assigns an item from the loot window to a player.
     function AssignItem(itemLink, playerName, rollType, rollValue)
         local itemIndex, tempItemLink
+        local wantedKey = Utils.getItemStringFromLink(itemLink) or itemLink
         for i = 1, GetNumLootItems() do
             tempItemLink = GetLootSlotLink(i)
             if tempItemLink == itemLink then
                 itemIndex = i
                 break
+            end
+            if not itemIndex and wantedKey and tempItemLink then
+                local tempKey = Utils.getItemStringFromLink(tempItemLink) or tempItemLink
+                if tempKey == wantedKey then
+                    itemIndex = i
+                    break
+                end
             end
         end
         if itemIndex == nil then
