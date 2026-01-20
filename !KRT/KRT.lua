@@ -2307,8 +2307,8 @@ do
         UpdateEnabled("bank", _G[frameName .. "BankBtn"], state.canBank)
         UpdateEnabled("disenchant", _G[frameName .. "DisenchantBtn"], state.canDisenchant)
         UpdateEnabled("award", _G[frameName .. "AwardBtn"], state.canAward)
-        UpdateEnabled("openReserves", _G[frameName .. "OpenReservesBtn"], state.canOpenReserves)
-        UpdateEnabled("importReserves", _G[frameName .. "ImportReservesBtn"], state.canImportReserves)
+        UpdateText("reserveList", _G[frameName .. "ReserveListBtn"], state.reserveListText)
+        UpdateEnabled("reserveList", _G[frameName .. "ReserveListBtn"], state.canReserveList)
         UpdateEnabled("roll", _G[frameName .. "RollBtn"], state.canRoll)
         UpdateEnabled("clear", _G[frameName .. "ClearBtn"], state.canClear)
         UpdateItemState(state.canChangeItem)
@@ -2433,14 +2433,18 @@ do
         end
     end
 
-    -- Button: Open Reserves List
-    function module:BtnOpenReserves(btn)
-        addon.Reserves:ShowWindow()
+    -- Button: Reserve List (contextual)
+    function module:BtnReserveList(btn)
+        if addon.Reserves:HasData() then
+            addon.Reserves:ShowWindow()
+        else
+            addon.Reserves:ShowImportBox()
+        end
     end
 
-    -- Button: Import Reserves
-    function module:BtnImportReserves(btn)
-        addon.Reserves:ShowImportBox()
+    -- Button: Loot Counter
+    function module:BtnLootCounter(btn)
+        return module:ToggleCountsFrame()
     end
 
     -- Generic function to announce a roll for the current item.
@@ -2711,9 +2715,8 @@ do
             _G[frameName .. "DisenchantBtn"]:SetText(L.BtnDisenchant)
             _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
             _G[frameName .. "RollsHeaderRoll"]:SetText(L.StrRoll)
-            _G[frameName .. "OpenReservesBtn"]:SetText(L.BtnOpenReserves)
-            _G[frameName .. "RaidListBtn"]:SetText(L.BtnRaidList)
-            _G[frameName .. "ImportReservesBtn"]:SetText(L.BtnImportReserves)
+            _G[frameName .. "ReserveListBtn"]:SetText(L.BtnInsertList)
+            _G[frameName .. "LootCounterBtn"]:SetText(L.BtnLootCounter)
         end
         Utils.setFrameTitle(frameName, MASTER_LOOTER)
         _G[frameName .. "ItemCount"]:SetScript("OnTextChanged", function(self)
@@ -2852,8 +2855,8 @@ do
                     canBank = lootState.lootCount >= 1 and lootState.banker,
                     canDisenchant = lootState.lootCount >= 1 and lootState.disenchanter,
                     canAward = lootState.lootCount >= 1 and lootState.rollsCount >= 1 and not countdownRun,
-                    canOpenReserves = hasReserves,
-                    canImportReserves = not hasReserves,
+                    reserveListText = hasReserves and L.BtnOpenList or L.BtnInsertList,
+                    canReserveList = true,
                     canRoll = record and canRoll and rolled == false and countdownRun,
                     canClear = lootState.rollsCount >= 1,
                 })
@@ -4195,7 +4198,12 @@ do
             local hasData = module:HasData()
             local clearButton = _G[frameName .. "ClearButton"]
             if clearButton then
-                Utils.enableDisable(clearButton, hasData)
+                if hasData then
+                    clearButton:Show()
+                    Utils.enableDisable(clearButton, true)
+                else
+                    clearButton:Hide()
+                end
             end
             local queryButton = _G[frameName .. "QueryButton"]
             if queryButton then

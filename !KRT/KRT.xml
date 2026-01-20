@@ -1940,9 +1940,8 @@
 					</Anchor>
 				</Anchors>
 			</Frame>
-			<!-- First row: Import Reserve (left) and Open List (right) -->
-			<Button name="$parentImportReservesBtn" inherits="KRTButtonTemplate"
-				text="Import Reserve">
+			<!-- First row: Reserve List (contextual) -->
+			<Button name="$parentReserveListBtn" inherits="KRTButtonTemplate" text="Insert List">
 				<Size>
 					<AbsDimension x="105" y="25" />
 				</Size>
@@ -1955,10 +1954,10 @@
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnClick>KRT.Master:BtnImportReserves(self, button)</OnClick>
+					<OnClick>KRT.Master:BtnReserveList(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentOpenReservesBtn" inherits="KRTButtonTemplate" text="Open List">
+			<Button name="$parentLootCounterBtn" inherits="KRTButtonTemplate" text="Loot Counter">
 				<Size>
 					<AbsDimension x="105" y="25" />
 				</Size>
@@ -1971,32 +1970,7 @@
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnClick>KRT.Master:BtnOpenReserves(self, button)</OnClick>
-				</Scripts>
-			</Button>
-			<!-- Second row: Raid List, centered above the first row -->
-			<Button name="$parentRaidListBtn" inherits="KRTButtonTemplate" text="Raid List">
-				<Size>
-					<AbsDimension x="230" y="25" />
-				</Size>
-				<Anchors>
-					<!-- left edge aligned with Import Reserve -->
-					<Anchor point="TOPLEFT" relativeTo="$parentImportReservesBtn"
-						relativePoint="BOTTOMLEFT">
-						<Offset>
-							<AbsDimension x="0" y="-5" />
-						</Offset>
-					</Anchor>
-					<!-- right edge aligned with Open List -->
-					<Anchor point="TOPRIGHT" relativeTo="$parentOpenReservesBtn"
-						relativePoint="BOTTOMRIGHT">
-						<Offset>
-							<AbsDimension x="0" y="-5" />
-						</Offset>
-					</Anchor>
-				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:ToggleCountsFrame()</OnClick>
+					<OnClick>KRT.Master:BtnLootCounter(self, button)</OnClick>
 				</Scripts>
 			</Button>
 		</Frames>
@@ -2294,7 +2268,7 @@
 					</Frame>
 				</ScrollChild>
 			</ScrollFrame>
-			<Button name="$parentClearButton" inherits="KRTButtonTemplate" text="Clear List">
+			<Button name="$parentClearButton" inherits="KRTButtonTemplate" text="Clear">
 				<Size>
 					<AbsDimension x="100" y="24" />
 				</Size>
@@ -2306,7 +2280,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentQueryButton" inherits="KRTButtonTemplate" text="Query Server">
+			<Button name="$parentQueryButton" inherits="KRTButtonTemplate" text="Query Item">
 				<Size>
 					<AbsDimension x="120" y="24" />
 				</Size>
