@@ -2590,14 +2590,10 @@ do
                 total    = #winners,
             }
 
-            -- Announce multiple winners once (optional), then suppress per-copy announce.
-            if addon.options.announceOnWin then
-                local names = {}
-                for i = 1, #winners do
-                    names[i] = winners[i].name
-                end
-                addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), itemLink))
-            end
+            lootState.multiAward.announceOnWin = addon.options.announceOnWin and true or false
+            lootState.multiAward.congratsSent = false
+
+            -- Suppress per-copy ChatAward spam during multi-award; announce once on completion.
             announced = true
             -- First award immediately.
             lootState.winner = winners[1].name
@@ -2606,6 +2602,18 @@ do
                 RegisterAwardedItem(1)
                 -- If this was the last copy for any reason, close the sequence now.
                 if lootState.multiAward and lootState.multiAward.pos > lootState.multiAward.total then
+                    local ma = lootState.multiAward
+                    if ma and ma.announceOnWin and not ma.congratsSent then
+                        local names = {}
+                        for i = 1, (ma.total or (ma.winners and #ma.winners) or 0) do
+                            local w = ma.winners and ma.winners[i]
+                            if w and w.name then names[#names + 1] = w.name end
+                        end
+                        if #names > 0 then
+                            addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), ma.itemLink))
+                        end
+                        ma.congratsSent = true
+                    end
                     lootState.multiAward = nil
                     announced = false
                     module:ResetItemCount()
@@ -3165,7 +3173,7 @@ do
                         return
                     end
 
-                    -- Suppress per-copy ChatAward spam: multi-award announces once on start.
+                    -- Suppress per-copy ChatAward spam during multi-award; announce once on completion.
                     announced = true
                     lootState.winner = e2.name
                     lootState.currentRollType = ma2.rollType
@@ -3175,6 +3183,18 @@ do
                         RegisterAwardedItem(1)
                         ma2.pos = idx2 + 1
                         if ma2.pos > (ma2.total or #ma2.winners) then
+                            local ma = lootState.multiAward
+                            if ma and ma.announceOnWin and not ma.congratsSent then
+                                local names = {}
+                                for i = 1, (ma.total or (ma.winners and #ma.winners) or 0) do
+                                    local w = ma.winners and ma.winners[i]
+                                    if w and w.name then names[#names + 1] = w.name end
+                                end
+                                if #names > 0 then
+                                    addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), ma.itemLink))
+                                end
+                                ma.congratsSent = true
+                            end
                             lootState.multiAward = nil
                             announced = false
                             module:ResetItemCount()
