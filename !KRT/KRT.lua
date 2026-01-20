@@ -2532,6 +2532,10 @@ do
             addon:warn("Countdown ancora attivo: attendi la fine (0) prima di assegnare.")
             return
         end
+        if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
+            addon:warn(E.ErrMLMultiAwardInProgress)
+            return
+        end
         if lootState.lootCount <= 0 or lootState.rollsCount <= 0 then
             addon:debug("Award: blocked lootCount=%d rollsCount=%d.", lootState.lootCount or 0,
                 lootState.rollsCount or 0)
@@ -2584,6 +2588,7 @@ do
                 active   = true,
                 itemLink = itemLink,
                 itemKey  = Utils.getItemStringFromLink(itemLink) or itemLink,
+                lastCount = available,
                 rollType = lootState.currentRollType,
                 winners  = winners,
                 pos      = 2, -- first award is immediate; the rest continues on LOOT_SLOT_CLEARED
@@ -3149,6 +3154,19 @@ do
                 if ma.scheduled then
                     return
                 end
+                -- Gate: proceed only when the number of copies for this itemKey has decreased since last award.
+                local currentCount = 0
+                for i = 1, (lootState.lootCount or 0) do
+                    local it = lootTable and lootTable[i]
+                    if it and it.itemKey == ma.itemKey then
+                        currentCount = tonumber(it.count) or 1
+                        break
+                    end
+                end
+                if ma.lastCount and currentCount >= ma.lastCount then
+                    return
+                end
+                ma.lastCount = currentCount
                 local idx = tonumber(ma.pos) or 1
                 local entry = ma.winners and ma.winners[idx]
                 if not entry then
