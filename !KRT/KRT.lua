@@ -1706,6 +1706,28 @@ do
         -- highlight: durante CD = top roll; post-CD = pick (se esiste) altrimenti top roll
         local highlightTarget = selectionAllowed and (pickName or starTarget) or starTarget
 
+        local starWinners
+        if not lootState.fromInventory then
+            local ma = lootState.multiAward
+            if ma and ma.active and ma.winners then
+                starWinners = {}
+                for i = 1, #ma.winners do
+                    local w = ma.winners[i]
+                    if w and w.name then starWinners[w.name] = true end
+                end
+            else
+                local n = tonumber(lootState.itemCount) or 1
+                if n and n > 1 then
+                    if n > #display then n = #display end
+                    starWinners = {}
+                    for i = 1, n do
+                        local e = display[i]
+                        if e and e.name then starWinners[e.name] = true end
+                    end
+                end
+            end
+        end
+
         local starShown, totalHeight = false, 0
         for i = 1, #display do
             local entry = display[i]
@@ -1775,10 +1797,15 @@ do
                 end
             end
 
-            -- Star always marks the top roll (compact list)
-            local showStar = (not starShown) and (starTarget ~= nil) and (name == starTarget)
+            local showStar
+            if starWinners then
+                showStar = (starWinners[name] == true)
+            else
+                -- Default: star marks only the top roll (compact list)
+                showStar = (not starShown) and (starTarget ~= nil) and (name == starTarget)
+            end
             Utils.showHide(star, showStar)
-            if showStar then starShown = true end
+            if (not starWinners) and showStar then starShown = true end
 
             if not btn.krtHasOnClick then
                 btn:SetScript("OnClick", onRollButtonClick)
@@ -2563,8 +2590,16 @@ do
                 total    = #winners,
             }
 
+            -- Announce multiple winners once (optional), then suppress per-copy announce.
+            if addon.options.announceOnWin then
+                local names = {}
+                for i = 1, #winners do
+                    names[i] = winners[i].name
+                end
+                addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), itemLink))
+            end
+            announced = true
             -- First award immediately.
-            announced = false
             lootState.winner = winners[1].name
             result = AssignItem(itemLink, winners[1].name, lootState.currentRollType, winners[1].roll)
             if result then
@@ -2572,12 +2607,14 @@ do
                 -- If this was the last copy for any reason, close the sequence now.
                 if lootState.multiAward and lootState.multiAward.pos > lootState.multiAward.total then
                     lootState.multiAward = nil
+                    announced = false
                     module:ResetItemCount()
                 end
                 return true
             end
 
             lootState.multiAward = nil
+            announced = false
             module:ResetItemCount()
             return false
         end
@@ -3059,6 +3096,7 @@ do
             addon:trace(E.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
             addon:trace(E.LogMLLootClosedCleanup)
             lootState.multiAward = nil
+            announced = false
             -- Cancel any scheduled close timer and schedule a new one
             if lootState.closeTimer then
                 addon.CancelTimer(lootState.closeTimer)
@@ -3091,33 +3129,62 @@ do
             module:ResetItemCount()
 
             -- Continue a multi-award sequence (loot window only). We award one copy per LOOT_SLOT_CLEARED
-            -- to stay in sync with the server/loot window refresh.
+            -- with a small delay to stay in sync with server/loot window refresh (and avoid lag spikes).
             local ma = lootState.multiAward
             if ma and ma.active and not lootState.fromInventory then
+                -- Prevent double-scheduling if the loot window fires multiple clear events quickly.
+                if ma.scheduled then
+                    return
+                end
                 local idx = tonumber(ma.pos) or 1
                 local entry = ma.winners and ma.winners[idx]
                 if not entry then
                     lootState.multiAward = nil
+                    announced = false
                     module:ResetItemCount()
                     return
                 end
 
-                announced = false
-                lootState.winner = entry.name
-                lootState.currentRollType = ma.rollType
+                ma.scheduled = true
+                local delay = tonumber(C.ML_MULTI_AWARD_DELAY) or 0
+                if delay < 0 then delay = 0 end
 
-                local ok = AssignItem(ma.itemLink, entry.name, ma.rollType, entry.roll)
-                if ok then
-                    RegisterAwardedItem(1)
-                    ma.pos = idx + 1
-                    if ma.pos > (ma.total or #ma.winners) then
+                addon.After(delay, function()
+                    local ma2 = lootState.multiAward
+                    if not (ma2 and ma2.active and ma2.scheduled and not lootState.fromInventory) then
+                        return
+                    end
+                    ma2.scheduled = false
+
+                    local idx2 = tonumber(ma2.pos) or 1
+                    local e2 = ma2.winners and ma2.winners[idx2]
+                    if not e2 then
                         lootState.multiAward = nil
+                        announced = false
+                        module:ResetItemCount()
+                        return
+                    end
+
+                    -- Suppress per-copy ChatAward spam: multi-award announces once on start.
+                    announced = true
+                    lootState.winner = e2.name
+                    lootState.currentRollType = ma2.rollType
+
+                    local ok = AssignItem(ma2.itemLink, e2.name, ma2.rollType, e2.roll)
+                    if ok then
+                        RegisterAwardedItem(1)
+                        ma2.pos = idx2 + 1
+                        if ma2.pos > (ma2.total or #ma2.winners) then
+                            lootState.multiAward = nil
+                            announced = false
+                            module:ResetItemCount()
+                        end
+                    else
+                        lootState.multiAward = nil
+                        announced = false
                         module:ResetItemCount()
                     end
-                else
-                    lootState.multiAward = nil
-                    module:ResetItemCount()
-                end
+                end)
             end
         end
     end
