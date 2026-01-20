@@ -2610,7 +2610,12 @@ do
                             if w and w.name then names[#names + 1] = w.name end
                         end
                         if #names > 0 then
-                            addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), ma.itemLink))
+                            if #names == 1 then
+                                addon:Announce(L.ChatAward:format(names[1], ma.itemLink))
+                            else
+                                addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), ma.itemLink))
+                            end
+
                         end
                         ma.congratsSent = true
                     end
@@ -3191,7 +3196,12 @@ do
                                     if w and w.name then names[#names + 1] = w.name end
                                 end
                                 if #names > 0 then
-                                    addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), ma.itemLink))
+                                    if #names == 1 then
+                                        addon:Announce(L.ChatAward:format(names[1], ma.itemLink))
+                                    else
+                                        addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), ma.itemLink))
+                                    end
+
                                 end
                                 ma.congratsSent = true
                             end
