@@ -18,6 +18,14 @@ local L                           = addon.L -- Make a local reference for conven
 L.StrCbErrUsage                   = "Usage: KRT:registerCallback(event, callbacks)"
 L.StrCbErrExec                    = "Error while executing callback %s for event %s: %s"
 
+-- ==================== Logger UI Diagnostics ==================== --
+L.LogLoggerUIShow                 = "[LoggerUI] show %s -> %s"
+L.LogLoggerUIWidgets              = "[LoggerUI:%s] widgets sf=%s sc=%s sfW=%.1f sfH=%.1f scW=%.1f scH=%.1f"
+L.LogLoggerUIMissingWidgets       = "[LoggerUI:%s] Missing ScrollFrame widgets for %s"
+L.LogLoggerUIDeferLayout          = "[LoggerUI:%s] defer (layout not ready): sfW=%.1f"
+L.LogLoggerUIFetch                = "[LoggerUI:%s] fetch count=%d sfW=%.1f sfH=%.1f scW=%.1f scH=%.1f frameW=%.1f frameH=%.1f"
+L.LogLoggerUIError                = "[LoggerUI:%s] %s"
+
 -- ==================== General Buttons ==================== --
 L.BtnConfig                       = "Config"
 L.BtnConfigure                    = "Configure"
@@ -33,7 +41,7 @@ L.StrMinimapLClick                = "|cffffd700Left-Click|r to access menu"
 L.StrMinimapRClick                = "|cffffd700Right-Click|r to access settings"
 L.StrMinimapSClick                = "|cffffd700Shift+Click|r to move"
 L.StrMinimapAClick                = "|cffffd700Alt+Click|r for free drag and drop"
-L.StrLootHistory                  = "Loot History"
+L.StrLootLogger                   = "Loot Logger"
 L.StrLootCounter                  = "Loot Counter"
 L.StrRaidWarnings                 = "Raid Warnings"
 L.StrLFMSpam                      = "LFM Spam"
@@ -43,11 +51,13 @@ L.StrSpamBans                     = "Spam Bans"
 L.StrClearIcons                   = "Clear Raid Icons"
 
 -- ==================== Loot Master Frame ==================== --
-L.BtnLootCounter                 = "Loot Counter"
-L.BtnRaidList                    = "Raid List"
+L.BtnLootCounter                  = "Loot Counter"
+L.BtnInsertList                   = "Import SoftRes"
+L.BtnOpenList                     = "Open SoftRes"
 L.BtnSelectItem                   = "Select Item"
 L.BtnRemoveItem                   = "Remove Item"
 L.BtnSpamLoot                     = "Spam Loot"
+L.BtnManual                       = "Manual"
 L.BtnMS                           = "MS"
 L.BtnOS                           = "OS"
 L.BtnSR                           = "SR"
@@ -78,6 +88,7 @@ L.ChatCountdownTic                = "Rolling ends in %d sec"
 L.ChatCountdownEnd                = "Rolling ends now!"
 L.ChatCountdownBlock              = "Rolls are ignored after countdown!"
 L.ChatAward                       = "Congrats! %s won %s"
+L.ChatAwardMutiple                = "Congrats! %s have won %s"
 L.ChatTrade                       = "Congrats {triangle} %s ! Please trade {star} %s"
 L.ChatTradeMutiple                = "Winners are: %s, Please trade {star} %s"
 L.ChatPlayerRolled                = "%s rolled %s"
@@ -145,8 +156,8 @@ L.StrReserveCountSuffix           = " (x%d)"
 
 -- ==================== Raid Warnings Frame ==================== --
 L.StrMessage                      = "Message"
-L.StrWarningsHelp                 = "Tips:"
-L.StrWarningsHelp                 =
+L.StrWarningsHelpTitle            = "Tips:"
+L.StrWarningsHelpBody             =
 "- |cffffd700Left-Click|r to select a warning, click again to cancel selection.\n- |cffffd700Ctrl-Click|r for a quick raid warning.\n- When you select a warning, you can either |cffffd700Edit|r it, |cffffd700Delete|r it or |cffffd700Announce|r it using the provided buttons."
 L.StrWarningsError                =
 "Only the body of a message is required! Though, we recommend naming your warnings so you never get lost."
@@ -167,6 +178,7 @@ L.ErrChangesNoPlayer              = "The name is required. Leaving the change em
 -- ==================== LFM Spam Frame ==================== --
 L.StrSpammer                      = "LFM Spam"
 L.StrSpammerCompStr               = "Raid Composition"
+L.StrSpammerNeedStr               = "Need"
 L.StrSpammerMessageStr            = "Message"
 L.StrSpammerPreviewStr            = "Preview"
 L.StrSpammerErrLength             = "Your LFM message is too long."
@@ -176,10 +188,14 @@ L.StrSpammerMessageHelp2          = "You can use |cffffd700{ID}|r to include ach
 L.StrSpammerMessageHelp3          =
 "You can find the achievement |cffffd700ID|r using the command: \n|cffffd700/krt ach [link]|r."
 
--- ==================== History Frame ==================== --
+-- ==================== Logger Frame ==================== --
+L.StrNumber                       = "#"
 L.StrDate                         = "Date"
+L.StrZone                         = "Zone"
 L.StrSize                         = "Size"
+L.StrName                         = "Name"
 L.StrTime                         = "Time"
+L.StrMode                         = "Mode"
 L.StrItem                         = "Item"
 L.StrSource                       = "Source"
 L.StrWinner                       = "Winner"
@@ -195,8 +211,13 @@ L.StrRaidCurrentTitle             = "Duplicate Notice"
 L.StrRaidsCurrentHelp             =
 "Sometimes you may notice duplicate raid creation. If that happends, make sure to simply set the selected one as current and delete all similar ones above it."
 L.ErrCannotDeleteRaid             = "Cannot delete the current raid."
-L.ErrCannotSetCurrentRaidSize     = "Cannot set a raid with a different difficulty as current raid."
+L.ErrCannotSetCurrentRaidSize     = "Cannot set a raid with a different size as current raid."
+L.ErrCannotSetCurrentRaidDifficulty = "Cannot set a raid with a different difficulty as current raid."
 L.ErrCannotSetCurrentRaidReset    = "Cannot set an expired raid as current raid."
+L.ErrCannotSetCurrentNotInRaid      = "You must be in a raid group to set the current raid."
+L.ErrCannotSetCurrentNotInInstance   = "You must be inside a raid instance to set the current raid."
+L.ErrCannotSetCurrentZoneMismatch   = "Cannot set a raid from a different zone as current raid."
+L.LogRaidSetCurrent                 = "Current raid set to #%d (%s, %d-player)."
 L.StrNewRaidSessionChange         = "Raid session: zone or size changed; starting a new raid."
 
 -- Boss List:
@@ -220,7 +241,7 @@ L.StrConfirmDeleteItem            = "Are you sure you want to delete this item f
 L.StrEditItemLooter               = "Change winner"
 L.StrEditItemLooterHelp           = "Enter the name of the winner:"
 L.StrEditItemRollType             = "Change roll type"
-L.StrEditItemRollTypeHelp         = "1=MS, 2=OS, 3=Free, 4=Bank, 5=DE, 6=Hold"
+L.StrEditItemRollTypeHelp         = "1=MS, 2=OS, 3=SR, 4=Free, 5=Bank, 6=DE, 7=Hold"
 L.StrEditItemRollValue            = "Change roll value"
 L.StrEditItemRollValueHelp        = "Enter the value of the roll:"
 
@@ -240,7 +261,7 @@ L.ErrAttendeesInvalidRaidBoss     = "Invalid raid or boss ID."
 L.ErrAttendeesPlayerExists        = "This player is already on the boss attendees list."
 L.StrAttendeesAddSuccess          = "Attendees: player added."
 
--- ==================== History: EditBox Frame ==================== --
+-- ==================== Logger: EditBox Frame ==================== --
 L.StrAddEntry                     = "Add Entry"
 L.StrEditEntry                    = "Edit Entry"
 L.StrDateEditBox                  = "Day/Month/Year"
@@ -252,9 +273,15 @@ L.ErrEditBoxInvalidMonth          = "Invalid Month: Please enter a valid month."
 L.ErrEditBoxInvalidDay            = "Invalid Day: Please enter a valid day."
 L.ErrEditBoxInvalidHour           = "Invalid Hour: Please enter a valid hour."
 L.ErrEditBoxInvalidMinute         = "Invalid Minute: Please enter a valid minute."
+L.ErrLoggerInvalidRaid            = "Invalid raid selection for Logger edit."
+L.ErrLoggerInvalidItem            = "Invalid loot item selection for Logger edit."
+L.ErrLoggerWinnerEmpty            = "Please enter a valid winner name."
+L.ErrLoggerWinnerNotFound         = "Winner not found in raid or boss attendees: %s"
+L.ErrLoggerInvalidRollType        = "Invalid roll type. Use a valid roll type number."
+L.ErrLoggerInvalidRollValue       = "Invalid roll value. Enter a non-negative number."
 
--- ==================== History: Export Frame ==================== --
-L.StrExportBoxTitle               = "Export Loot History"
+-- ==================== Logger: Export Frame ==================== --
+L.StrExportBoxTitle               = "Export Loot Logger"
 L.StrExportFormat                 = "Please enter the export format:"
 L.StrExportBoxHelp                = "Copy the data below and paste it to an external location to save it:"
 
@@ -266,7 +293,8 @@ L.StrCmdGrouper                   = "access LFM Spam related commands"
 L.StrCmdAchiev                    = "look for achievement ID to use for LFM"
 L.StrCmdChanges                   = "access ms changes related commands"
 L.StrCmdWarnings                  = "access warnings related commands"
-L.StrCmdHistory                   = "access loot history related commands"
+L.StrCmdLogger                    = "access loot logger related commands"
+L.StrCmdDebug                     = "toggle debugger or set level: debug on|off|level <name|num>"
 L.StrCmdLFMStart                  = "starts LFM spam"
 L.StrCmdLFMStop                   = "stops LFM spam"
 L.StrCmdChangesDemand             = "ask raid members to whisper you their ms changes"
@@ -277,16 +305,17 @@ L.StrCmdMinimapPos                = "set minimap button angle"
 
 L.MsgDebugOn                      = "Debug: enabled."
 L.MsgDebugOff                     = "Debug: disabled."
-L.MsgChatThrottleSet              = "Chat throttle: set to %s sec."
 L.MsgLFMPeriodSet                 = "LFM period: set to %s sec."
 L.MsgMinimapPosSet                = "Minimap: angle set to %s."
 L.MsgDefaultsRestored             = "Options: defaults restored."
 L.MsgLogLevelCurrent              = "Log level: current=%s."
 L.MsgLogLevelSet                  = "Log level: set=%s."
+L.MsgLogLevelUnknown              = "Unknown log level: %s."
+L.MsgLogLevelList                 = "Log levels: error, warn, info, debug, trace, spam (or 1-6)."
 L.MsgReserveItemsRequested        = "Reserves: requested info for %s missing items."
 L.MsgReserveItemsReady            = "Reserves: all item infos are available."
 
-L.LFM_TEMPLATE                   = "[KRT] LFM: {raid} {roles} {time}"
+L.LFM_TEMPLATE                    = "[KRT] LFM: {raid} {roles} {time}"
 
 -- ==================== Raid & Loot Locales ==================== --
 L.ItemValues                      = {
@@ -316,11 +345,11 @@ L.RaidZones                       = {
 	["The Eye of Eternity"] = "The Eye of Eternity",
 	["Vault of Archavon"] = "Vault of Archavon",
 	["Ulduar"] = "Ulduar",
-        ["Onyxia's Lair"] = "Onyxia's Lair",                          -- Note: Onyxia is also present in Classic
+	["Onyxia's Lair"] = "Onyxia's Lair",                          -- Note: Onyxia is also present in Classic
 	["Trial of the Crusader"] = "Trial of the Crusader",
-        ["Trial of the Grand Crusader"] = "Trial of the Grand Crusader", -- Already present, keeping it
+	["Trial of the Grand Crusader"] = "Trial of the Grand Crusader", -- Already present, keeping it
 	["Icecrown Citadel"] = "Icecrown Citadel",
-        ["The Ruby Sanctum"] = "The Ruby Sanctum",                    -- Already present, keeping it
+	["The Ruby Sanctum"] = "The Ruby Sanctum",                    -- Already present, keeping it
 }
 -- The reason we are using these is because of the missing
 -- UNIT_DIED event once these bosses are dealt with.

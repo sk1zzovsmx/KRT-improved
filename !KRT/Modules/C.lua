@@ -10,6 +10,7 @@ C.ITEM_LINK_PATTERN           =
 
 -- Roll Types Enum
 C.rollTypes                   = {
+    MANUAL     = 0,
     MAINSPEC   = 1,
     OFFSPEC    = 2,
     RESERVED   = 3,
@@ -19,26 +20,16 @@ C.rollTypes                   = {
     HOLD       = 7,
 }
 
--- Roll Type Display Text
-C.lootTypesText               = {
-    L.BtnMS,
-    L.BtnOS,
-    L.BtnSR,
-    L.BtnFree,
-    L.BtnBank,
-    L.BtnDisenchant,
-    L.BtnHold,
-}
-
 -- Roll Type Colored Display Text
 C.lootTypesColored            = {
-    "|cff20ff20" .. L.BtnMS .. "|r",
-    "|cffffff9f" .. L.BtnOS .. "|r",
-    "|cffa335ee" .. L.BtnSR .. "|r",
-    "|cffffd200" .. L.BtnFree .. "|r",
-    "|cffff7f00" .. L.BtnBank .. "|r",
-    "|cffff2020" .. L.BtnDisenchant .. "|r",
-    "|cffffffff" .. L.BtnHold .. "|r",
+    [0] = "|cffc0c0c0" .. L.BtnManual .. "|r",
+    [1] = "|cff20ff20" .. L.BtnMS .. "|r",
+    [2] = "|cffffff9f" .. L.BtnOS .. "|r",
+    [3] = "|cffa335ee" .. L.BtnSR .. "|r",
+    [4] = "|cffffd200" .. L.BtnFree .. "|r",
+    [5] = "|cffff7f00" .. L.BtnBank .. "|r",
+    [6] = "|cffff2020" .. L.BtnDisenchant .. "|r",
+    [7] = "|cffffffff" .. L.BtnHold .. "|r",
 }
 
 -- Item Quality Colors
@@ -93,8 +84,11 @@ C.UPDATE_INTERVAL_CONFIG      = 0.1
 C.UPDATE_INTERVAL_WARNINGS    = 0.1
 C.UPDATE_INTERVAL_CHANGES     = 0.1
 C.UPDATE_INTERVAL_SPAMMER     = 0.1
-C.UPDATE_INTERVAL_HISTORY     = 0.1
+C.UPDATE_INTERVAL_LOGGER      = 0.1
 C.LOOT_COUNTER_TICK_INTERVAL  = 0.1
+
+-- Multi-award pacing (seconds) to avoid spamming GiveMasterLoot on laggy servers.
+C.ML_MULTI_AWARD_DELAY        = 0.2
 
 C.LOOT_COUNTER_ROW_HEIGHT     = 25
 C.RESERVES_ROW_HEIGHT         = 42
