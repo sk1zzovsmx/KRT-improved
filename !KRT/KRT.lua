@@ -4188,6 +4188,18 @@ do
             Utils.setFrameTitle(frameName, L.StrRaidReserves)
             addon:debug(E.LogReservesUILocalized:format(L.StrRaidReserves))
         end
+        local clearButton = frameName and _G[frameName .. "ClearButton"]
+        if clearButton then
+            clearButton:SetText(L.BtnClearReserves)
+        end
+        local queryButton = frameName and _G[frameName .. "QueryButton"]
+        if queryButton then
+            queryButton:SetText(L.BtnQueryItem)
+        end
+        local closeButton = frameName and _G[frameName .. "CloseButton"]
+        if closeButton then
+            closeButton:SetText(L.BtnClose)
+        end
         localized = true
     end
 
