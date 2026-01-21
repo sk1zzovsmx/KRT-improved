@@ -1941,7 +1941,7 @@
 				</Anchors>
 			</Frame>
 			<!-- First row: Reserve List (contextual) -->
-			<Button name="$parentReserveListBtn" inherits="KRTButtonTemplate" text="Insert List">
+			<Button name="$parentReserveListBtn" inherits="KRTButtonTemplate" text="Import SoftRes">
 				<Size>
 					<AbsDimension x="105" y="25" />
 				</Size>
