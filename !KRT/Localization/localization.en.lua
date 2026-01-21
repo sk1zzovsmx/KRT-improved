@@ -52,7 +52,8 @@ L.StrClearIcons                   = "Clear Raid Icons"
 
 -- ==================== Loot Master Frame ==================== --
 L.BtnLootCounter                  = "Loot Counter"
-L.BtnRaidList                     = "Raid List"
+L.BtnInsertList                   = "Import SoftRes"
+L.BtnOpenList                     = "Open SoftRes"
 L.BtnSelectItem                   = "Select Item"
 L.BtnRemoveItem                   = "Remove Item"
 L.BtnSpamLoot                     = "Spam Loot"
