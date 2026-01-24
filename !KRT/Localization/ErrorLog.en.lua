@@ -1,7 +1,7 @@
-local _, addon                    = ...
+local _, addon = ...
 
-addon.E                           = addon.E or {}
-local E                           = addon.E
+addon.E = addon.E or {}
+local E = addon.E
 
 -- ==================== Log Messages ==================== --
 E.LogCoreCallbackHandlerMissing   = "[Core] CallbackHandler missing: using fallback event wiring"

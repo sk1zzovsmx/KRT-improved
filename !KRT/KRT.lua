@@ -7401,7 +7401,10 @@ do
         local sel = addon.Logger.selectedRaid
         if not sel then return end
         if addon.Logger.Actions:SetCurrentRaid(sel) then
-            controller:Touch()
+            -- Context change: clear dependent selections and redraw all Logger panels.
+            addon.Logger.selectedRaid = sel
+            addon.Logger:ResetSelections()
+            Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid)
         end
     end
 
@@ -7428,8 +7431,11 @@ do
     end
 
     Utils.registerCallback("RaidCreate", function(_, num)
+        -- Context change: selecting a different raid must clear dependent selections.
         addon.Logger.selectedRaid = tonumber(num)
+        addon.Logger:ResetSelections()
         controller:Dirty()
+        Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid)
     end)
 
     Utils.registerCallback("LoggerSelectRaid", function() controller:Touch() end)
