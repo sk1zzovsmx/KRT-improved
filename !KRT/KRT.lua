@@ -6294,40 +6294,33 @@ do
         raid._lootIdxByNid = nil
     end
 
-    function Store:_BuildBossIndex(raid)
-        local m = {}
-        local bosses = raid.bossKills or {}
-        for i = 1, #bosses do
-            local b = bosses[i]
-            if b and b.bossNid ~= nil then
-                m[tonumber(b.bossNid) or b.bossNid] = i
-            end
-        end
-        raid._bossIdxByNid = m
+    local function _nid(v)
+        return tonumber(v) or v
     end
 
-    function Store:_BuildLootIndex(raid)
+    function Store:_BuildIndex(raid, listField, idField, cacheField)
+        local list = raid[listField] or {}
         local m = {}
-        local loot = raid.loot or {}
-        for i = 1, #loot do
-            local l = loot[i]
-            if l and l.lootNid ~= nil then
-                m[tonumber(l.lootNid) or l.lootNid] = i
+        for i = 1, #list do
+            local e = list[i]
+            local id = e and e[idField]
+            if id ~= nil then
+                m[_nid(id)] = i
             end
         end
-        raid._lootIdxByNid = m
+        raid[cacheField] = m
     end
 
     function Store:BossIdx(raid, bossNid)
         if not (raid and bossNid) then return nil end
-        bossNid = tonumber(bossNid) or bossNid
+        bossNid = _nid(bossNid)
         if not raid._bossIdxByNid then
-            self:_BuildBossIndex(raid)
+            self:_BuildIndex(raid, "bossKills", "bossNid", "_bossIdxByNid")
         end
         local idx = raid._bossIdxByNid[bossNid]
         if not idx then
-            -- The raid may have changed since the last build (new boss added).
-            self:_BuildBossIndex(raid)
+            -- Raid changed since last build (new boss added / list changed)
+            self:_BuildIndex(raid, "bossKills", "bossNid", "_bossIdxByNid")
             idx = raid._bossIdxByNid[bossNid]
         end
         return idx
@@ -6335,14 +6328,14 @@ do
 
     function Store:LootIdx(raid, lootNid)
         if not (raid and lootNid) then return nil end
-        lootNid = tonumber(lootNid) or lootNid
+        lootNid = _nid(lootNid)
         if not raid._lootIdxByNid then
-            self:_BuildLootIndex(raid)
+            self:_BuildIndex(raid, "loot", "lootNid", "_lootIdxByNid")
         end
         local idx = raid._lootIdxByNid[lootNid]
         if not idx then
-            -- The raid may have changed since the last build (new loot added).
-            self:_BuildLootIndex(raid)
+            -- Raid changed since last build (new loot added / list changed)
+            self:_BuildIndex(raid, "loot", "lootNid", "_lootIdxByNid")
             idx = raid._lootIdxByNid[lootNid]
         end
         return idx
@@ -6379,27 +6372,35 @@ do
         return (mode == "h") and "H" or "N"
     end
 
+    function View:BuildRows(out, list, pred, map)
+        if not out then return end
+        twipe(out)
+        if not list then return end
+        local n = 0
+        for i = 1, #list do
+            local e = list[i]
+            if (not pred) or pred(e, i) then
+                n = n + 1
+                out[n] = map(e, i, n)
+            end
+        end
+    end
+
     function View:FillBossList(out, raid)
-        if not (out and raid and raid.bossKills) then return end
-        local bosses = raid.bossKills
-        for i = 1, #bosses do
-            local boss = bosses[i]
+        self:BuildRows(out, raid and raid.bossKills, nil, function(boss, i)
             local it = {}
             it.id = tonumber(boss and boss.bossNid) or (boss and boss.bossNid) or i -- stable nid for highlight/selection
-            it.seq = i                                                              -- display-only (rescales after deletions)
+            it.seq = i -- display-only (rescales after deletions)
             it.name = boss and boss.name or ""
             it.time = boss and boss.time or time()
             it.timeFmt = date("%H:%M", it.time)
             it.mode = self:GetBossModeLabel(boss)
-            out[i] = it
-        end
+            return it
+        end)
     end
 
     function View:FillRaidAttendeesList(out, raid)
-        if not (out and raid and raid.players) then return end
-        local src = raid.players
-        for i = 1, #src do
-            local p = src[i]
+        self:BuildRows(out, raid and raid.players, nil, function(p, i)
             local it = {}
             it.id = i
             it.name = p.name
@@ -6408,12 +6409,14 @@ do
             it.leave = p.leave
             it.joinFmt = p.join and date("%H:%M", p.join) or ""
             it.leaveFmt = p.leave and date("%H:%M", p.leave) or ""
-            out[i] = it
-        end
+            return it
+        end)
     end
 
     function View:FillBossAttendeesList(out, raid, bossNid)
-        if not (out and raid and bossNid) then return end
+        if not out then return end
+        twipe(out)
+        if not (raid and bossNid) then return end
         local bossKill = Store:GetBoss(raid, bossNid)
         if not (bossKill and bossKill.players and raid.players) then return end
 
@@ -6439,34 +6442,31 @@ do
     end
 
     function View:FillLootList(out, raid, bossNid, playerName)
-        if not (out and raid and raid.loot) then return end
-        local loot = raid.loot
         local bossFilter = tonumber(bossNid) or bossNid
-        local n = 0
-        for i = 1, #loot do
-            local v = loot[i]
-            if v then
+        self:BuildRows(out, raid and raid.loot,
+            function(v)
+                if not v then return false end
                 local okBoss = (not bossFilter) or (bossFilter <= 0) or (tonumber(v.bossNid) == bossFilter)
                 local okPlayer = (not playerName) or (v.looter == playerName)
-                if okBoss and okPlayer then
-                    n = n + 1
-                    local it = {}
-                    it.id = v.lootNid
-                    it.itemId = v.itemId
-                    it.itemName = v.itemName
-                    it.itemRarity = v.itemRarity
-                    it.itemTexture = v.itemTexture
-                    it.itemLink = v.itemLink
-                    it.bossNid = v.bossNid
-                    it.looter = v.looter
-                    it.rollType = tonumber(v.rollType) or 0
-                    it.rollValue = v.rollValue
-                    it.time = v.time or time()
-                    it.timeFmt = date("%H:%M", it.time)
-                    out[n] = it
-                end
+                return okBoss and okPlayer
+            end,
+            function(v)
+                local it = {}
+                it.id = v.lootNid
+                it.itemId = v.itemId
+                it.itemName = v.itemName
+                it.itemRarity = v.itemRarity
+                it.itemTexture = v.itemTexture
+                it.itemLink = v.itemLink
+                it.bossNid = v.bossNid
+                it.looter = v.looter
+                it.rollType = tonumber(v.rollType) or 0
+                it.rollValue = v.rollValue
+                it.time = v.time or time()
+                it.timeFmt = date("%H:%M", it.time)
+                return it
             end
-        end
+        )
     end
 
     function Actions:RemoveAll(list, value)
@@ -6476,6 +6476,82 @@ do
             tremove(list, i)
             i = addon.tIndexOf(list, value)
         end
+    end
+
+    function Actions:Commit(raid, opts)
+        if not raid then return end
+        opts = opts or {}
+
+        if opts.invalidate ~= false then
+            Store:InvalidateIndexes(raid)
+        end
+
+        local log = addon.Logger
+        if not log then return end
+
+        local changedBoss, changedPlayer, changedBossPlayer, changedItem = false, false, false, false
+
+        local function clearBossSelection()
+            if log.selectedBoss ~= nil then changedBoss = true end
+            if log.selectedBossPlayer ~= nil then changedBossPlayer = true end
+            if log.selectedItem ~= nil then changedItem = true end
+            log.selectedBoss = nil
+            log.selectedBossPlayer = nil
+            log.selectedItem = nil
+        end
+
+        -- Validate boss selection (bossNid)
+        if log.selectedBoss then
+            local bossKill = Store:GetBoss(raid, log.selectedBoss)
+            if not bossKill then
+                clearBossSelection()
+            end
+        else
+            -- No boss selected: dependent selections must be cleared
+            if log.selectedBossPlayer ~= nil then
+                log.selectedBossPlayer = nil
+                changedBossPlayer = true
+            end
+            if log.selectedItem ~= nil then
+                log.selectedItem = nil
+                changedItem = true
+            end
+        end
+
+        -- Validate loot selection (lootNid)
+        if log.selectedItem then
+            local lootEntry = Store:GetLoot(raid, log.selectedItem)
+            if not lootEntry then
+                log.selectedItem = nil
+                changedItem = true
+            end
+        end
+
+        -- Validate player selections (raid.players index)
+        if opts.clearPlayers then
+            if log.selectedPlayer ~= nil then
+                log.selectedPlayer = nil
+                changedPlayer = true
+            end
+            if log.selectedBossPlayer ~= nil then
+                log.selectedBossPlayer = nil
+                changedBossPlayer = true
+            end
+        else
+            if log.selectedPlayer and (not raid.players or not raid.players[log.selectedPlayer]) then
+                log.selectedPlayer = nil
+                changedPlayer = true
+            end
+            if log.selectedBossPlayer and (not raid.players or not raid.players[log.selectedBossPlayer]) then
+                log.selectedBossPlayer = nil
+                changedBossPlayer = true
+            end
+        end
+
+        if changedBoss then Utils.triggerEvent("LoggerSelectBoss", log.selectedBoss) end
+        if changedPlayer then Utils.triggerEvent("LoggerSelectPlayer", log.selectedPlayer) end
+        if changedBossPlayer then Utils.triggerEvent("LoggerSelectBossPlayer", log.selectedBossPlayer) end
+        if changedItem then Utils.triggerEvent("LoggerSelectItem", log.selectedItem) end
     end
 
     function Actions:DeleteBoss(rID, bossNid)
@@ -6495,7 +6571,7 @@ do
         end
 
         tremove(raid.bossKills, bossIndex)
-        Store:InvalidateIndexes(raid)
+        self:Commit(raid)
 
         if KRT_CurrentRaid == rID and tonumber(KRT_LastBoss) == tonumber(bossNid) then
             KRT_LastBoss = nil
@@ -6510,7 +6586,7 @@ do
         local _, lootIndex = Store:GetLoot(raid, lootNid)
         if not lootIndex then return false end
         tremove(raid.loot, lootIndex)
-        Store:InvalidateIndexes(raid)
+        self:Commit(raid)
         return true
     end
 
@@ -6544,8 +6620,162 @@ do
             end
         end
 
-        Store:InvalidateIndexes(raid)
+        self:Commit(raid, { clearPlayers = true })
         return true
+    end
+
+    -- Logger.Actions: keep all SavedVariables mutations here (UI/View are read-only)
+    function Actions:DeleteRaid(rID)
+        local sel = tonumber(rID)
+        if not sel or not KRT_Raids[sel] then return false end
+
+        if KRT_CurrentRaid and KRT_CurrentRaid == sel then
+            addon:error(L.ErrCannotDeleteRaid)
+            return false
+        end
+
+        tremove(KRT_Raids, sel)
+
+        if KRT_CurrentRaid and KRT_CurrentRaid > sel then
+            KRT_CurrentRaid = KRT_CurrentRaid - 1
+        end
+
+        return true
+    end
+
+    function Actions:SetCurrentRaid(rID)
+        local sel = tonumber(rID)
+        local raid = sel and KRT_Raids[sel] or nil
+        if not (sel and raid) then return false end
+
+        -- This is meant to fix duplicate raid creation while actively raiding.
+        if not addon.IsInRaid() then
+            addon:error(L.ErrCannotSetCurrentNotInRaid)
+            return false
+        end
+
+        local instanceName, instanceType, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
+        if isDyn then
+            instanceDiff = instanceDiff + (2 * dynDiff)
+        end
+        if instanceType ~= "raid" then
+            addon:error(L.ErrCannotSetCurrentNotInInstance)
+            return false
+        end
+        if raid.zone and raid.zone ~= instanceName then
+            addon:error(L.ErrCannotSetCurrentZoneMismatch)
+            return false
+        end
+
+        local raidDiff = tonumber(raid.difficulty)
+        local curDiff = tonumber(instanceDiff)
+        if not (raidDiff and curDiff and raidDiff == curDiff) then
+            addon:error(L.ErrCannotSetCurrentRaidDifficulty)
+            return false
+        end
+
+        local raidSize = tonumber(raid.size)
+        local groupSize = addon.Raid:GetRaidSize()
+        if not raidSize or raidSize ~= groupSize then
+            addon:error(L.ErrCannotSetCurrentRaidSize)
+            return false
+        end
+
+        if addon.Raid:Expired(sel) then
+            addon:error(L.ErrCannotSetCurrentRaidReset)
+            return false
+        end
+
+        KRT_CurrentRaid = sel
+        KRT_LastBoss = nil
+
+        -- Sync roster/dropdowns immediately so subsequent logging targets the selected raid.
+        addon.Raid:UpdateRaidRoster()
+
+        addon:info(L.LogRaidSetCurrent:format(sel, tostring(raid.zone), raidSize))
+        return true
+    end
+
+    -- Upsert boss kill (edit if bossNid provided, otherwise append new boss kill).
+    -- Returns bossNid on success, nil on failure.
+    function Actions:UpsertBossKill(rID, bossNid, name, ts, mode)
+        local raid = Store:GetRaid(rID)
+        if not raid then return nil end
+
+        name = Utils.trimText(name or "")
+        mode = Utils.normalizeLower(mode or "n")
+        ts = tonumber(ts) or time()
+
+        if bossNid then
+            local bossKill = Store:GetBoss(raid, bossNid)
+            if not bossKill then
+                addon:error(L.ErrAttendeesInvalidRaidBoss)
+                return nil
+            end
+            bossKill.name = name
+            bossKill.time = ts
+            bossKill.mode = (mode == "h") and "h" or "n"
+            -- keep existing players/hash; hash is stable per nid
+            self:Commit(raid, { invalidate = false })
+            return bossKill.bossNid
+        end
+
+        local newNid = tonumber(raid.nextBossNid) or 1
+        raid.nextBossNid = newNid + 1
+
+        tinsert(raid.bossKills, {
+            bossNid = newNid,
+            name = name,
+            time = ts,
+            mode = (mode == "h") and "h" or "n",
+            players = {},
+            hash = Utils.encode(rID .. "|" .. name .. "|" .. newNid),
+        })
+
+        self:Commit(raid)
+        return newNid
+    end
+
+    -- Add existing raid player to the selected boss attendees list.
+    -- nameRaw is matched (case-insensitive) against raid.players[].name.
+    function Actions:AddBossAttendee(rID, bossNid, nameRaw)
+        local name = Utils.trimText(nameRaw or "")
+        local normalizedName = Utils.normalizeLower(name)
+        if normalizedName == "" then
+            addon:error(L.ErrAttendeesInvalidName)
+            return false
+        end
+
+        local raid = (rID and bossNid) and Store:GetRaid(rID) or nil
+        if not (raid and bossNid) then
+            addon:error(L.ErrAttendeesInvalidRaidBoss)
+            return false
+        end
+
+        local bossKill = Store:GetBoss(raid, bossNid)
+        if not bossKill then
+            addon:error(L.ErrAttendeesInvalidRaidBoss)
+            return false
+        end
+
+        bossKill.players = bossKill.players or {}
+        for _, n in ipairs(bossKill.players) do
+            if Utils.normalizeLower(n) == normalizedName then
+                addon:error(L.ErrAttendeesPlayerExists)
+                return false
+            end
+        end
+
+        local playerName = Store:FindRaidPlayerByNormName(raid, normalizedName)
+        if playerName then
+            tinsert(bossKill.players, playerName)
+            addon:info(L.StrAttendeesAddSuccess)
+            self:Commit(raid, { invalidate = false })
+            return true
+        end
+
+        addon:error(L.ErrAttendeesInvalidName)
+        return false
     end
 
     Logger.selectedRaid = nil
@@ -6565,6 +6795,37 @@ do
         Logger[field] = (id and id ~= Logger[field]) and id or nil
         if eventName then
             Utils.triggerEvent(eventName, Logger[field])
+        end
+    end
+    -- Logger helpers: resolve current raid/boss/loot and run raid actions with a single refresh.
+    function Logger:NeedRaid()
+        local rID = Logger.selectedRaid
+        local raid = rID and Store:GetRaid(rID) or nil
+        return raid, rID
+    end
+
+    function Logger:NeedBoss(raid)
+        raid = raid or (select(1, Logger:NeedRaid()))
+        if not raid then return nil end
+        local bNid = Logger.selectedBoss
+        if not bNid then return nil end
+        return Store:GetBoss(raid, bNid)
+    end
+
+    function Logger:NeedLoot(raid)
+        raid = raid or (select(1, Logger:NeedRaid()))
+        if not raid then return nil end
+        local lNid = Logger.selectedItem
+        if not lNid then return nil end
+        return Store:GetLoot(raid, lNid)
+    end
+
+    function Logger:Run(fn, refreshEvent)
+        local raid, rID = Logger:NeedRaid()
+        if not raid then return end
+        fn(raid, rID)
+        if refreshEvent ~= false then
+            Utils.triggerEvent(refreshEvent or "LoggerSelectRaid", Logger.selectedRaid)
         end
     end
 
@@ -6705,15 +6966,13 @@ do
                     addon:error(L.ErrLoggerWinnerEmpty)
                     return
                 end
-
-                local raid = KRT_Raids[self.raidId]
+                local raid = Store:GetRaid(self.raidId)
                 if not raid then
                     addon:error(L.ErrLoggerInvalidRaid)
                     return
                 end
 
-                Store:EnsureRaid(raid)
-                local loot = raid and Store:GetLoot(raid, self.itemId)
+                local loot = Store:GetLoot(raid, self.itemId)
                 if not loot then
                     addon:error(L.ErrLoggerInvalidItem)
                     return
@@ -7139,75 +7398,24 @@ do
 
     function Raids:SetCurrent(btn)
         if not btn then return end
-
         local sel = addon.Logger.selectedRaid
-        local raid = sel and KRT_Raids[sel] or nil
-        if not (sel and raid) then return end
-
-        -- This is meant to fix duplicate raid creation while actively raiding.
-        if not addon.IsInRaid() then
-            addon:error(L.ErrCannotSetCurrentNotInRaid)
-            return
+        if not sel then return end
+        if addon.Logger.Actions:SetCurrentRaid(sel) then
+            controller:Touch()
         end
-
-        local instanceName, instanceType, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
-        if isDyn then
-            instanceDiff = instanceDiff + (2 * dynDiff)
-        end
-        if instanceType ~= "raid" then
-            addon:error(L.ErrCannotSetCurrentNotInInstance)
-            return
-        end
-        if raid.zone and raid.zone ~= instanceName then
-            addon:error(L.ErrCannotSetCurrentZoneMismatch)
-            return
-        end
-
-        local raidDiff = tonumber(raid.difficulty)
-        local curDiff = tonumber(instanceDiff)
-        if not (raidDiff and curDiff and raidDiff == curDiff) then
-            addon:error(L.ErrCannotSetCurrentRaidDifficulty)
-            return
-        end
-
-        local raidSize = tonumber(raid.size)
-        local groupSize = addon.Raid:GetRaidSize()
-        if not raidSize or raidSize ~= groupSize then
-            addon:error(L.ErrCannotSetCurrentRaidSize)
-            return
-        end
-
-        if addon.Raid:Expired(sel) then
-            addon:error(L.ErrCannotSetCurrentRaidReset)
-            return
-        end
-
-        KRT_CurrentRaid = sel
-        KRT_LastBoss = nil
-
-        -- Sync roster/dropdowns immediately so subsequent logging targets the selected raid.
-        addon.Raid:UpdateRaidRoster()
-
-        addon:info(L.LogRaidSetCurrent:format(sel, tostring(raid.zone), raidSize))
-        controller:Touch()
     end
 
     do
         local function DeleteRaid()
             local sel = addon.Logger.selectedRaid
-            if not (sel and KRT_Raids[sel]) then return end
-            if KRT_CurrentRaid and KRT_CurrentRaid == sel then
-                addon:error(L.ErrCannotDeleteRaid)
-                return
+            if not sel then return end
+            if addon.Logger.Actions:DeleteRaid(sel) then
+                local n = KRT_Raids and #KRT_Raids or 0
+                addon.Logger.selectedRaid = (n > 0) and ((sel > n) and n or sel) or nil
+                addon.Logger:ResetSelections()
+                controller:Dirty()
+                Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid)
             end
-
-            tremove(KRT_Raids, sel)
-            if KRT_CurrentRaid and KRT_CurrentRaid > sel then
-                KRT_CurrentRaid = KRT_CurrentRaid - 1
-            end
-
-            addon.Logger.selectedRaid = nil
-            controller:Dirty()
         end
 
         function Raids:Delete(btn)
@@ -7254,8 +7462,7 @@ do
         end,
 
         getData = function(out)
-            local rID = addon.Logger.selectedRaid
-            local raid = rID and Store:GetRaid(rID) or nil
+            local raid = addon.Logger:NeedRaid()
             if not raid then return end
             View:FillBossList(out, raid)
         end,
@@ -7300,16 +7507,17 @@ do
 
     do
         local function DeleteBoss()
-            local rID, bNid = addon.Logger.selectedRaid, addon.Logger.selectedBoss
-            if not (rID and bNid) then return end
+            addon.Logger:Run(function(_, rID)
+                local bNid = addon.Logger.selectedBoss
+                if not bNid then return end
 
-            local lootRemoved = Actions:DeleteBoss(rID, bNid)
-            addon:info(E.LogLoggerBossLootRemoved, rID, tonumber(bNid) or -1, lootRemoved)
+                local lootRemoved = Actions:DeleteBoss(rID, bNid)
+                addon:info(E.LogLoggerBossLootRemoved, rID, tonumber(bNid) or -1, lootRemoved)
 
-            addon.Logger.selectedBoss = nil
-            addon.Logger:ResetSelections()
-            Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid)
+                addon.Logger:ResetSelections()
+            end)
         end
+
 
         function Boss:Delete()
             if addon.Logger.selectedBoss then
@@ -7399,16 +7607,17 @@ do
 
     do
         local function DeleteAttendee()
-            local rID = addon.Logger.selectedRaid
-            local bID = addon.Logger.selectedBoss
-            local pID = addon.Logger.selectedBossPlayer
-            if not (rID and bID and pID) then return end
+            addon.Logger:Run(function(_, rID)
+                local bNid = addon.Logger.selectedBoss
+                local pID = addon.Logger.selectedBossPlayer
+                if not (bNid and pID) then return end
 
-            if Actions:DeleteBossAttendee(rID, bID, pID) then
-                addon.Logger.selectedBossPlayer = nil
-                controller:Dirty()
-            end
+                if Actions:DeleteBossAttendee(rID, bNid, pID) then
+                    addon.Logger.selectedBossPlayer = nil
+                end
+            end)
         end
+
 
         function BossAtt:Delete()
             if addon.Logger.selectedBossPlayer then
@@ -7447,8 +7656,7 @@ do
         end,
 
         getData = function(out)
-            local rID = addon.Logger.selectedRaid
-            local raid = rID and Store:GetRaid(rID) or nil
+            local raid = addon.Logger:NeedRaid()
             if not raid then return end
             View:FillRaidAttendeesList(out, raid)
         end,
@@ -7489,14 +7697,16 @@ do
 
     do
         local function DeleteAttendee()
-            local rID, pID = addon.Logger.selectedRaid, addon.Logger.selectedPlayer
-            if not (rID and pID) then return end
+            addon.Logger:Run(function(_, rID)
+                local pID = addon.Logger.selectedPlayer
+                if not pID then return end
 
-            if Actions:DeleteRaidAttendee(rID, pID) then
-                addon.Logger.selectedPlayer = nil
-                controller:Dirty()
-            end
+                if Actions:DeleteRaidAttendee(rID, pID) then
+                    addon.Logger.selectedPlayer = nil
+                end
+            end)
         end
+
 
         function RaidAtt:Delete()
             if addon.Logger.selectedPlayer then
@@ -7546,8 +7756,7 @@ do
         end,
 
         getData = function(out)
-            local rID = addon.Logger.selectedRaid
-            local raid = rID and Store:GetRaid(rID) or nil
+            local raid = addon.Logger:NeedRaid()
             if not raid then return end
 
             local bID = addon.Logger.selectedBoss
@@ -7641,14 +7850,16 @@ do
 
     do
         local function DeleteItem()
-            local rID, lootNid = addon.Logger.selectedRaid, addon.Logger.selectedItem
-            if not (rID and lootNid) then return end
+            addon.Logger:Run(function(_, rID)
+                local lootNid = addon.Logger.selectedItem
+                if not lootNid then return end
 
-            if Actions:DeleteLoot(rID, lootNid) then
-                addon.Logger.selectedItem = nil
-                controller:Dirty()
-            end
+                if Actions:DeleteLoot(rID, lootNid) then
+                    addon.Logger.selectedItem = nil
+                end
+            end)
         end
+
 
         function Loot:Delete()
             if addon.Logger.selectedItem then
@@ -7801,6 +8012,7 @@ do
         end
         _G[frameName .. "Difficulty"]:SetText((mode == "h") and "h" or "n")
 
+        editBossNid = bossData and bossData.bossNid or nil
         isEdit = true
         self:Toggle()
     end
@@ -7830,27 +8042,9 @@ do
         local killDate = { day = day, month = month, year = year, hour = h, min = m }
         local mode = (modeT == "h") and "h" or "n"
 
-        local raid = Store:GetRaid(rID)
-        if not raid then return end
-
-        if isEdit and bossData then
-            bossData.name = name
-            bossData.time = time(killDate)
-            bossData.mode = mode
-        else
-            local bossNid = tonumber(raid.nextBossNid) or 1
-            raid.nextBossNid = bossNid + 1
-            tinsert(raid.bossKills, {
-                bossNid = bossNid,
-                name = name,
-                time = time(killDate),
-                mode = mode,
-                players = {},
-                hash = Utils.encode(rID .. "|" .. name .. "|" .. bossNid),
-            })
-        end
-
-        Store:InvalidateIndexes(raid)
+        local bossNid = isEdit and editBossNid or nil
+        local savedNid = addon.Logger.Actions:UpsertBossKill(rID, bossNid, name, time(killDate), mode)
+        if not savedNid then return end
 
         self:Hide()
         addon.Logger:ResetSelections()
@@ -7861,7 +8055,7 @@ do
         Utils.resetEditBox(_G[frameName .. "Name"])
         Utils.resetEditBox(_G[frameName .. "Difficulty"])
         Utils.resetEditBox(_G[frameName .. "Time"])
-        isEdit, raidData, bossData = false, {}, {}
+        isEdit, raidData, bossData, editBossNid = false, {}, {}, nil
         twipe(tempDate)
     end
 
@@ -7902,42 +8096,12 @@ do
     function Box:Toggle() Utils.toggle(_G[frameName]) end
 
     function Box:Save()
-        local name = Utils.trimText(_G[frameName .. "Name"]:GetText())
-        local normalizedName = Utils.normalizeLower(name)
-        if normalizedName == "" then
-            addon:error(L.ErrAttendeesInvalidName)
-            return
-        end
-
         local rID, bID = addon.Logger.selectedRaid, addon.Logger.selectedBoss
-        local raid = (rID and bID) and Store:GetRaid(rID) or nil
-        if not (raid and bID) then
-            addon:error(L.ErrAttendeesInvalidRaidBoss)
-            return
-        end
-
-        local bossKill = Store:GetBoss(raid, bID)
-        if not bossKill then
-            addon:error(L.ErrAttendeesInvalidRaidBoss)
-            return
-        end
-        for _, n in ipairs(bossKill.players) do
-            if Utils.normalizeLower(n) == normalizedName then
-                addon:error(L.ErrAttendeesPlayerExists)
-                return
-            end
-        end
-
-        local playerName = Store:FindRaidPlayerByNormName(raid, normalizedName)
-        if playerName then
-            tinsert(bossKill.players, playerName)
-            addon:info(L.StrAttendeesAddSuccess)
+        local name = Utils.trimText(_G[frameName .. "Name"]:GetText())
+        if addon.Logger.Actions:AddBossAttendee(rID, bID, name) then
             self:Toggle()
             Utils.triggerEvent("LoggerSelectBoss", addon.Logger.selectedBoss)
-            return
         end
-
-        addon:error(L.ErrAttendeesInvalidName)
     end
 end
 
