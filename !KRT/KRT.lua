@@ -343,6 +343,8 @@ do
             playersByName = {},
             bossKills     = {},
             loot          = {},
+            nextBossNid   = 1,
+            nextLootNid   = 1,
             startTime     = currentTime,
             changes       = {},
         }
@@ -395,6 +397,61 @@ do
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
         module.updateRosterHandle = addon.NewTimer(2, function() module:UpdateRaidRoster() end)
+    end
+
+    -- ----- Stable ID helpers (bossNid / lootNid) ----- --
+    -- NOTE: Fresh SavedVariables only (schema v2). No legacy migration is performed.
+
+    function module:EnsureStableIds(raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = raidNum and KRT_Raids[raidNum]
+        if not raid then return end
+
+        raid.players = raid.players or {}
+        raid.playersByName = raid.playersByName or {}
+        raid.bossKills = raid.bossKills or {}
+        raid.loot = raid.loot or {}
+
+        if raid.nextBossNid == nil then raid.nextBossNid = 1 end
+        if raid.nextLootNid == nil then raid.nextLootNid = 1 end
+    end
+
+    function module:GetBossByNid(bossNid, raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = raidNum and KRT_Raids[raidNum]
+        if not raid or bossNid == nil then return nil end
+        module:EnsureStableIds(raidNum)
+
+        bossNid = tonumber(bossNid) or 0
+        if bossNid <= 0 then return nil end
+
+        local bosses = raid.bossKills
+        for i = 1, #bosses do
+            local b = bosses[i]
+            if b and tonumber(b.bossNid) == bossNid then
+                return b, i
+            end
+        end
+        return nil
+    end
+
+    function module:GetLootByNid(lootNid, raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = raidNum and KRT_Raids[raidNum]
+        if not raid or lootNid == nil then return nil end
+        module:EnsureStableIds(raidNum)
+
+        lootNid = tonumber(lootNid) or 0
+        if lootNid <= 0 then return nil end
+
+        local loot = raid.loot
+        for i = 1, #loot do
+            local l = loot[i]
+            if l and tonumber(l.lootNid) == lootNid then
+                return l, i
+            end
+        end
+        return nil
     end
 
     -- Ends the current raid log entry, marking end time.
@@ -515,13 +572,18 @@ do
             return
         end
 
+        local raid = KRT_Raids[raidNum]
+        if not raid then return end
+        module:EnsureStableIds(raidNum)
+
         local _, _, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
         if manDiff then
-            instanceDiff = (KRT_Raids[raidNum].size == 10) and 1 or 2
+            instanceDiff = (raid.size == 10) and 1 or 2
             if Utils.normalizeLower(manDiff, true) == "h" then instanceDiff = instanceDiff + 2 end
         elseif isDyn then
             instanceDiff = instanceDiff + (2 * dynDiff)
         end
+
         local players = {}
         for unit, owner in addon.UnitIterator(true) do
             if UnitIsConnected(unit) then
@@ -531,16 +593,23 @@ do
                 end
             end
         end
+
         local currentTime = Utils.getCurrentTime()
+        local bossNid = tonumber(raid.nextBossNid) or 1
+        raid.nextBossNid = bossNid + 1
+
         local killInfo = {
+            bossNid    = bossNid,
             name       = bossName,
             difficulty = instanceDiff,
+            mode       = (instanceDiff == 3 or instanceDiff == 4) and "h" or "n",
             players    = players,
-            date       = currentTime,
-            hash       = Utils.encode(raidNum .. "|" .. bossName .. "|" .. (KRT_LastBoss or "0"))
+            time       = currentTime,
+            hash       = Utils.encode(raidNum .. "|" .. bossName .. "|" .. bossNid),
         }
-        tinsert(KRT_Raids[raidNum].bossKills, killInfo)
-        KRT_LastBoss = #KRT_Raids[raidNum].bossKills
+
+        tinsert(raid.bossKills, killInfo)
+        KRT_LastBoss = bossNid
         addon:info(E.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1,
             tonumber(raidNum) or -1, #players))
         addon:debug(E.LogBossLastBossHash:format(tonumber(KRT_LastBoss) or -1, tostring(killInfo.hash)))
@@ -643,6 +712,12 @@ do
             rollValue = addon.Rolls:HighestRoll() or 0
         end
 
+        local raid = KRT_Raids[KRT_CurrentRaid]
+        if not raid then return end
+        module:EnsureStableIds(KRT_CurrentRaid)
+        local lootNid = tonumber(raid.nextLootNid) or 1
+        raid.nextLootNid = lootNid + 1
+
         local lootInfo = {
             itemId      = itemId,
             itemName    = itemName,
@@ -654,13 +729,14 @@ do
             looter      = player,
             rollType    = rollType,
             rollValue   = rollValue,
-            bossNum     = KRT_LastBoss,
+            lootNid     = lootNid,
+            bossNid     = tonumber(KRT_LastBoss) or 0,
             time        = Utils.getCurrentTime(),
         }
-        tinsert(KRT_Raids[KRT_CurrentRaid].loot, lootInfo)
+        tinsert(raid.loot, lootInfo)
         Utils.triggerEvent("RaidLootUpdate", KRT_CurrentRaid, lootInfo)
         addon:debug(E.LogLootLogged:format(tonumber(KRT_CurrentRaid) or -1, tostring(itemId),
-            tostring(KRT_LastBoss), tostring(player)))
+            tostring(lootInfo.bossNid), tostring(player)))
     end
 
     -- ----- Player Count API ----- --
@@ -761,29 +837,29 @@ do
     end
 
     -- Retrieves all loot for a given raid and optional boss number.
-    function module:GetLoot(raidNum, bossNum)
+    function module:GetLoot(raidNum, bossNid)
         raidNum = raidNum or KRT_CurrentRaid
-        bossNum = bossNum or 0
+        bossNid = tonumber(bossNid) or 0
         local raid = raidNum and KRT_Raids[raidNum]
         if not raid then
             return {}
         end
-        local loot = raid.loot
-        if tonumber(bossNum) <= 0 then
-            for k, v in ipairs(loot) do
-                v.id = k
+
+        module:EnsureStableIds(raidNum)
+
+        local loot = raid.loot or {}
+        if bossNid <= 0 then
+            for _, v in ipairs(loot) do
+                v.id = tonumber(v.lootNid) or v.id
             end
             return loot
         end
 
         local items = {}
-        if raid.bossKills[bossNum] then
-            -- Get loot for a specific boss
-            for k, v in ipairs(loot) do
-                if v.bossNum == bossNum then
-                    v.id = k
-                    tinsert(items, v)
-                end
+        for _, v in ipairs(loot) do
+            if tonumber(v.bossNid) == bossNid then
+                v.id = tonumber(v.lootNid) or v.id
+                tinsert(items, v)
             end
         end
         return items
@@ -791,71 +867,86 @@ do
 
     -- Retrieves the position of a specific loot item within the raid's loot table.
     function module:GetLootID(itemID, raidNum, holderName)
-        local pos = 0
-        local loot = self:GetLoot(raidNum)
-        holderName = holderName or Utils.getPlayerName()
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = raidNum and KRT_Raids[raidNum]
+        if not raid then return 0 end
+
+        module:EnsureStableIds(raidNum)
+
         itemID = tonumber(itemID)
-        for k, v in ipairs(loot) do
-            if v.itemId == itemID and v.looter == holderName then
-                pos = k
-                break
+        if not itemID then return 0 end
+
+        local bossNid = tonumber(KRT_LastBoss) or 0
+        local loot = raid.loot or {}
+
+        for i = #loot, 1, -1 do
+            local v = loot[i]
+            if v and tonumber(v.itemId) == itemID then
+                if (not holderName or holderName == "" or v.looter == holderName) then
+                    if bossNid <= 0 or tonumber(v.bossNid) == bossNid then
+                        return tonumber(v.lootNid) or 0
+                    end
+                end
             end
         end
-        return pos
+        return 0
     end
 
     -- Retrieves all boss kills for a given raid.
     function module:GetBosses(raidNum, out)
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = raidNum and KRT_Raids[raidNum]
+        if not raid or not raid.bossKills then return {} end
+
+        module:EnsureStableIds(raidNum)
+
         local bosses = out or {}
         if out then twipe(bosses) end
-        raidNum = raidNum or KRT_CurrentRaid
-        if raidNum and KRT_Raids[raidNum] then
-            local kills = KRT_Raids[raidNum].bossKills
-            for i, b in ipairs(kills) do
-                local info = {
-                    id = i,
-                    difficulty = b.difficulty,
-                    time = b.date,
-                    hash = b.hash or "0",
-                }
-                if b.name == "_TrashMob_" then
-                    info.name = L.StrTrashMob
-                    info.mode = ""
-                else
-                    info.name = b.name
-                    info.mode = (b.difficulty == 3 or b.difficulty == 4) and PLAYER_DIFFICULTY2 or PLAYER_DIFFICULTY1
-                end
-                tinsert(bosses, info)
-            end
+
+        for i = 1, #raid.bossKills do
+            local boss = raid.bossKills[i]
+            bosses[#bosses + 1] = {
+                id   = tonumber(boss.bossNid) or i, -- stable selection id
+                seq  = i,                           -- display order
+                name = boss.name,
+                time = boss.time,
+                mode = boss.mode or ((boss.difficulty == 3 or boss.difficulty == 4) and "h" or "n"),
+            }
         end
-        -- Caller releases when using a pooled table.
+
         return bosses
     end
 
     -- ----- Player Functions ----- --
 
     -- Returns players from the raid log. Can be filtered by boss kill.
-    function module:GetPlayers(raidNum, bossNum, out)
+    function module:GetPlayers(raidNum, bossNid, out)
         raidNum = raidNum or KRT_CurrentRaid
         local raid = raidNum and KRT_Raids[raidNum]
         if not raid then return {} end
+
+        module:EnsureStableIds(raidNum)
 
         local raidPlayers = raid.players or {}
         for k, v in ipairs(raidPlayers) do
             v.id = k
         end
 
-        if bossNum and raid.bossKills[bossNum] then
-            local players = out or {}
-            if out then twipe(players) end
-            local bossPlayers = raid.bossKills[bossNum].players
-            for i, p in ipairs(raidPlayers) do
-                if tContains(bossPlayers, p.name) then
-                    tinsert(players, p)
+        bossNid = tonumber(bossNid) or 0
+        if bossNid > 0 then
+            local bossKill = module:GetBossByNid(bossNid, raidNum)
+            if bossKill and bossKill.players then
+                local players = out or {}
+                if out then twipe(players) end
+                local bossPlayers = bossKill.players
+                for _, p in ipairs(raidPlayers) do
+                    if tContains(bossPlayers, p.name) then
+                        tinsert(players, p)
+                    end
                 end
+                -- Caller releases when using a pooled table.
+                return players
             end
-            -- Caller releases when using a pooled table.
-            return players
         end
 
         return raidPlayers
@@ -915,14 +1006,14 @@ do
     end
 
     -- Returns a table of items looted by the selected player.
-    function module:GetPlayerLoot(name, raidNum, bossNum)
+    function module:GetPlayerLoot(name, raidNum, bossNid)
         local items = {}
-        local loot = module:GetLoot(raidNum, bossNum)
+        local loot = module:GetLoot(raidNum, bossNid)
         local originalName = name
         name = (type(name) == "number") and module:GetPlayerName(name) or name
         for _, v in ipairs(loot) do
             if v.looter == name then
-                -- Keep v.id as the original index assigned by GetLoot()
+                -- Keep v.id stable (lootNid) as assigned by GetLoot()
                 tinsert(items, v)
             end
         end
@@ -2588,14 +2679,14 @@ do
             SetItemCountValue(#winners, false)
 
             lootState.multiAward = {
-                active   = true,
-                itemLink = itemLink,
-                itemKey  = Utils.getItemStringFromLink(itemLink) or itemLink,
+                active    = true,
+                itemLink  = itemLink,
+                itemKey   = Utils.getItemStringFromLink(itemLink) or itemLink,
                 lastCount = available,
-                rollType = lootState.currentRollType,
-                winners  = winners,
-                pos      = 2, -- first award is immediate; the rest continues on LOOT_SLOT_CLEARED
-                total    = #winners,
+                rollType  = lootState.currentRollType,
+                winners   = winners,
+                pos       = 2, -- first award is immediate; the rest continues on LOOT_SLOT_CLEARED
+                total     = #winners,
             }
 
             lootState.multiAward.announceOnWin = addon.options.announceOnWin and true or false
@@ -2623,7 +2714,6 @@ do
                             else
                                 addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), ma.itemLink))
                             end
-
                         end
                         ma.congratsSent = true
                     end
@@ -3221,7 +3311,6 @@ do
                                     else
                                         addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), ma.itemLink))
                                     end
-
                                 end
                                 ma.congratsSent = true
                             end
@@ -6163,11 +6252,301 @@ end
 -- =========== Logger Frame =========== --
 -- Shown loot logger for raids
 do
-    addon.Logger = addon.Logger or {}
-    local Logger = addon.Logger
-    local L = addon.L
+    addon.Logger   = addon.Logger or {}
+    local Logger   = addon.Logger
+    local L        = addon.L
 
     local frameName
+
+    -- Logger: stable-ID data helpers (fresh SavedVariables only; no legacy migration)
+    Logger.Store   = Logger.Store or {}
+    Logger.View    = Logger.View or {}
+    Logger.Actions = Logger.Actions or {}
+
+    local Store    = Logger.Store
+    local View     = Logger.View
+    local Actions  = Logger.Actions
+
+    -- Ensure the raid table has the schema v2 fields required by the Logger.
+    -- This does NOT migrate legacy structures; it only initializes missing fields for fresh SV.
+    function Store:EnsureRaid(raid)
+        if not raid then return end
+        raid.players       = raid.players or {}
+        raid.bossKills     = raid.bossKills or {}
+        raid.loot          = raid.loot or {}
+        raid.nextBossNid   = raid.nextBossNid or 1
+        raid.nextLootNid   = raid.nextLootNid or 1
+
+        -- Runtime-only indexes (not persisted).
+        raid._bossIdxByNid = raid._bossIdxByNid or nil
+        raid._lootIdxByNid = raid._lootIdxByNid or nil
+    end
+
+    function Store:GetRaid(rID)
+        local raid = rID and KRT_Raids[rID] or nil
+        if raid then self:EnsureRaid(raid) end
+        return raid
+    end
+
+    function Store:InvalidateIndexes(raid)
+        if not raid then return end
+        raid._bossIdxByNid = nil
+        raid._lootIdxByNid = nil
+    end
+
+    function Store:_BuildBossIndex(raid)
+        local m = {}
+        local bosses = raid.bossKills or {}
+        for i = 1, #bosses do
+            local b = bosses[i]
+            if b and b.bossNid ~= nil then
+                m[tonumber(b.bossNid) or b.bossNid] = i
+            end
+        end
+        raid._bossIdxByNid = m
+    end
+
+    function Store:_BuildLootIndex(raid)
+        local m = {}
+        local loot = raid.loot or {}
+        for i = 1, #loot do
+            local l = loot[i]
+            if l and l.lootNid ~= nil then
+                m[tonumber(l.lootNid) or l.lootNid] = i
+            end
+        end
+        raid._lootIdxByNid = m
+    end
+
+    function Store:BossIdx(raid, bossNid)
+        if not (raid and bossNid) then return nil end
+        bossNid = tonumber(bossNid) or bossNid
+        if not raid._bossIdxByNid then
+            self:_BuildBossIndex(raid)
+        end
+        local idx = raid._bossIdxByNid[bossNid]
+        if not idx then
+            -- The raid may have changed since the last build (new boss added).
+            self:_BuildBossIndex(raid)
+            idx = raid._bossIdxByNid[bossNid]
+        end
+        return idx
+    end
+
+    function Store:LootIdx(raid, lootNid)
+        if not (raid and lootNid) then return nil end
+        lootNid = tonumber(lootNid) or lootNid
+        if not raid._lootIdxByNid then
+            self:_BuildLootIndex(raid)
+        end
+        local idx = raid._lootIdxByNid[lootNid]
+        if not idx then
+            -- The raid may have changed since the last build (new loot added).
+            self:_BuildLootIndex(raid)
+            idx = raid._lootIdxByNid[lootNid]
+        end
+        return idx
+    end
+
+    function Store:GetBoss(raid, bossNid)
+        local idx = self:BossIdx(raid, bossNid)
+        return idx and raid.bossKills[idx] or nil, idx
+    end
+
+    function Store:GetLoot(raid, lootNid)
+        local idx = self:LootIdx(raid, lootNid)
+        return idx and raid.loot[idx] or nil, idx
+    end
+
+    function Store:FindRaidPlayerByNormName(raid, normalizedLower)
+        if not (raid and normalizedLower) then return nil end
+        local players = raid.players or {}
+        for i = 1, #players do
+            local p = players[i]
+            if p and p.name and Utils.normalizeLower(p.name) == normalizedLower then
+                return p.name, i, p
+            end
+        end
+        return nil
+    end
+
+    function View:GetBossModeLabel(bossData)
+        if not bossData then return "?" end
+        local mode = bossData.mode
+        if not mode and bossData.difficulty then
+            mode = (bossData.difficulty == 3 or bossData.difficulty == 4) and "h" or "n"
+        end
+        return (mode == "h") and "H" or "N"
+    end
+
+    function View:FillBossList(out, raid)
+        if not (out and raid and raid.bossKills) then return end
+        local bosses = raid.bossKills
+        for i = 1, #bosses do
+            local boss = bosses[i]
+            local it = {}
+            it.id = tonumber(boss and boss.bossNid) or (boss and boss.bossNid) or i -- stable nid for highlight/selection
+            it.seq = i                                                              -- display-only (rescales after deletions)
+            it.name = boss and boss.name or ""
+            it.time = boss and boss.time or time()
+            it.timeFmt = date("%H:%M", it.time)
+            it.mode = self:GetBossModeLabel(boss)
+            out[i] = it
+        end
+    end
+
+    function View:FillRaidAttendeesList(out, raid)
+        if not (out and raid and raid.players) then return end
+        local src = raid.players
+        for i = 1, #src do
+            local p = src[i]
+            local it = {}
+            it.id = i
+            it.name = p.name
+            it.class = p.class
+            it.join = p.join
+            it.leave = p.leave
+            it.joinFmt = p.join and date("%H:%M", p.join) or ""
+            it.leaveFmt = p.leave and date("%H:%M", p.leave) or ""
+            out[i] = it
+        end
+    end
+
+    function View:FillBossAttendeesList(out, raid, bossNid)
+        if not (out and raid and bossNid) then return end
+        local bossKill = Store:GetBoss(raid, bossNid)
+        if not (bossKill and bossKill.players and raid.players) then return end
+
+        -- Build a set for O(1) membership checks.
+        local set = {}
+        for i = 1, #bossKill.players do
+            local name = bossKill.players[i]
+            if name then set[name] = true end
+        end
+
+        local n = 0
+        for i = 1, #raid.players do
+            local p = raid.players[i]
+            if p and p.name and set[p.name] then
+                n = n + 1
+                local it = {}
+                it.id = i -- IMPORTANT: stable reference into raid.players (used for delete)
+                it.name = p.name
+                it.class = p.class
+                out[n] = it
+            end
+        end
+    end
+
+    function View:FillLootList(out, raid, bossNid, playerName)
+        if not (out and raid and raid.loot) then return end
+        local loot = raid.loot
+        local bossFilter = tonumber(bossNid) or bossNid
+        local n = 0
+        for i = 1, #loot do
+            local v = loot[i]
+            if v then
+                local okBoss = (not bossFilter) or (bossFilter <= 0) or (tonumber(v.bossNid) == bossFilter)
+                local okPlayer = (not playerName) or (v.looter == playerName)
+                if okBoss and okPlayer then
+                    n = n + 1
+                    local it = {}
+                    it.id = v.lootNid
+                    it.itemId = v.itemId
+                    it.itemName = v.itemName
+                    it.itemRarity = v.itemRarity
+                    it.itemTexture = v.itemTexture
+                    it.itemLink = v.itemLink
+                    it.bossNid = v.bossNid
+                    it.looter = v.looter
+                    it.rollType = tonumber(v.rollType) or 0
+                    it.rollValue = v.rollValue
+                    it.time = v.time or time()
+                    it.timeFmt = date("%H:%M", it.time)
+                    out[n] = it
+                end
+            end
+        end
+    end
+
+    function Actions:RemoveAll(list, value)
+        if not (list and value) then return end
+        local i = addon.tIndexOf(list, value)
+        while i do
+            tremove(list, i)
+            i = addon.tIndexOf(list, value)
+        end
+    end
+
+    function Actions:DeleteBoss(rID, bossNid)
+        local raid = Store:GetRaid(rID)
+        if not (raid and bossNid) then return 0 end
+
+        local _, bossIndex = Store:GetBoss(raid, bossNid)
+        if not bossIndex then return 0 end
+
+        local removed = 0
+        for i = #raid.loot, 1, -1 do
+            local l = raid.loot[i]
+            if l and tonumber(l.bossNid) == tonumber(bossNid) then
+                tremove(raid.loot, i)
+                removed = removed + 1
+            end
+        end
+
+        tremove(raid.bossKills, bossIndex)
+        Store:InvalidateIndexes(raid)
+
+        if KRT_CurrentRaid == rID and tonumber(KRT_LastBoss) == tonumber(bossNid) then
+            KRT_LastBoss = nil
+        end
+
+        return removed
+    end
+
+    function Actions:DeleteLoot(rID, lootNid)
+        local raid = Store:GetRaid(rID)
+        if not (raid and lootNid) then return false end
+        local _, lootIndex = Store:GetLoot(raid, lootNid)
+        if not lootIndex then return false end
+        tremove(raid.loot, lootIndex)
+        Store:InvalidateIndexes(raid)
+        return true
+    end
+
+    function Actions:DeleteBossAttendee(rID, bossNid, playerIdx)
+        local raid = Store:GetRaid(rID)
+        if not (raid and bossNid and playerIdx) then return false end
+        local bossKill = Store:GetBoss(raid, bossNid)
+        if not (bossKill and bossKill.players and raid.players and raid.players[playerIdx]) then return false end
+        local name = raid.players[playerIdx].name
+        if not name then return false end
+        self:RemoveAll(bossKill.players, name)
+        return true
+    end
+
+    function Actions:DeleteRaidAttendee(rID, playerIdx)
+        local raid = Store:GetRaid(rID)
+        if not (raid and raid.players and raid.players[playerIdx]) then return false end
+
+        local name = raid.players[playerIdx].name
+        tremove(raid.players, playerIdx)
+
+        for _, boss in ipairs(raid.bossKills) do
+            if boss and boss.players then
+                self:RemoveAll(boss.players, name)
+            end
+        end
+
+        for i = #raid.loot, 1, -1 do
+            if raid.loot[i] and raid.loot[i].looter == name then
+                tremove(raid.loot, i)
+            end
+        end
+
+        Store:InvalidateIndexes(raid)
+        return true
+    end
 
     Logger.selectedRaid = nil
     Logger.selectedBoss = nil
@@ -6333,13 +6712,14 @@ do
                     return
                 end
 
-                local loot = raid.loot and raid.loot[self.itemId]
+                Store:EnsureRaid(raid)
+                local loot = raid and Store:GetLoot(raid, self.itemId)
                 if not loot then
                     addon:error(L.ErrLoggerInvalidItem)
                     return
                 end
 
-                local bossKill = raid.bossKills and raid.bossKills[loot.bossNum]
+                local bossKill = (loot.bossNid and raid) and Store:GetBoss(raid, loot.bossNid) or nil
                 local winner = findLoggerPlayer(name, raid, bossKill)
                 if not winner then
                     addon:error(L.ErrLoggerWinnerNotFound:format(rawText))
@@ -6704,7 +7084,7 @@ do
 
         drawRow = Utils.createRowDrawer(function(row, it)
             local ui = row._p
-            ui.ID:SetText(it.id)
+            ui.ID:SetText(it.seq or it.id)
             ui.Date:SetText(it.dateFmt)
             ui.Zone:SetText(it.zone)
             ui.Size:SetText(it.sizeLabel or it.size)
@@ -6745,7 +7125,10 @@ do
         end,
 
         sorters = {
-            id = function(a, b, asc) return asc and (a.id < b.id) or (a.id > b.id) end,
+            id = function(a, b, asc)
+                return asc and ((a.seq or a.id) < (b.seq or b.id)) or
+                    ((a.seq or a.id) > (b.seq or b.id))
+            end,
             date = function(a, b, asc) return asc and (a.date < b.date) or (a.date > b.date) end,
             zone = function(a, b, asc) return asc and (a.zone < b.zone) or (a.zone > b.zone) end,
             size = function(a, b, asc) return asc and (a.size < b.size) or (a.size > b.size) end,
@@ -6849,14 +7232,9 @@ do
     addon.Logger.Boss = addon.Logger.Boss or {}
     local Boss = addon.Logger.Boss
     local L = addon.L
-
-    local function getBossModeLabel(bossData)
-        local mode = bossData.mode
-        if not mode and bossData.difficulty then
-            mode = (bossData.difficulty == 3 or bossData.difficulty == 4) and "h" or "n"
-        end
-        return (mode == "h") and "H" or "N"
-    end
+    local Store = addon.Logger.Store
+    local View = addon.Logger.View
+    local Actions = addon.Logger.Actions
 
     local controller = makeLoggerListController {
         keyName = "BossList",
@@ -6877,21 +7255,9 @@ do
 
         getData = function(out)
             local rID = addon.Logger.selectedRaid
-            if not rID then return end
-
-            local raid = KRT_Raids[rID]
-            if not raid or not raid.bossKills then return end
-
-            for i = 1, #raid.bossKills do
-                local boss = raid.bossKills[i]
-                local it = {}
-                it.id = i
-                it.name = boss.name
-                it.time = boss.time or boss.date
-                it.timeFmt = date("%H:%M", it.time or time())
-                it.mode = getBossModeLabel(boss)
-                out[i] = it
-            end
+            local raid = rID and Store:GetRaid(rID) or nil
+            if not raid then return end
+            View:FillBossList(out, raid)
         end,
 
         rowName = function(n, _, i) return n .. "BossBtn" .. i end,
@@ -6899,7 +7265,9 @@ do
 
         drawRow = Utils.createRowDrawer(function(row, it)
             local ui = row._p
-            ui.ID:SetText(it.id)
+            -- Display a sequential number that rescales after deletions.
+            -- Keep it.id as the stable bossNid for selection/highlight.
+            ui.ID:SetText(it.seq)
             ui.Name:SetText(it.name)
             ui.Time:SetText(it.timeFmt)
             ui.Mode:SetText(it.mode)
@@ -6916,7 +7284,8 @@ do
         end,
 
         sorters = {
-            id = function(a, b, asc) return asc and (a.id < b.id) or (a.id > b.id) end,
+            -- Sort by the displayed sequential number, not the stable nid.
+            id = function(a, b, asc) return asc and (a.seq < b.seq) or (a.seq > b.seq) end,
             name = function(a, b, asc) return asc and (a.name < b.name) or (a.name > b.name) end,
             time = function(a, b, asc) return asc and (a.time < b.time) or (a.time > b.time) end,
             mode = function(a, b, asc) return asc and (a.mode < b.mode) or (a.mode > b.mode) end,
@@ -6931,21 +7300,11 @@ do
 
     do
         local function DeleteBoss()
-            local rID, bID = addon.Logger.selectedRaid, addon.Logger.selectedBoss
-            if not (rID and bID and KRT_Raids[rID]) then return end
+            local rID, bNid = addon.Logger.selectedRaid, addon.Logger.selectedBoss
+            if not (rID and bNid) then return end
 
-            local lootRemoved = 0
-            local raid = KRT_Raids[rID]
-            local loot = raid.loot or {}
-            for i = #loot, 1, -1 do
-                if loot[i].bossNum == bID then
-                    tremove(loot, i)
-                    lootRemoved = lootRemoved + 1
-                end
-            end
-
-            tremove(raid.bossKills, bID)
-            addon:info(E.LogLoggerBossLootRemoved, rID, bID, lootRemoved)
+            local lootRemoved = Actions:DeleteBoss(rID, bNid)
+            addon:info(E.LogLoggerBossLootRemoved, rID, tonumber(bNid) or -1, lootRemoved)
 
             addon.Logger.selectedBoss = nil
             addon.Logger:ResetSelections()
@@ -6961,10 +7320,14 @@ do
         controller._makeConfirmPopup("KRTLOGGER_DELETE_BOSS", L.StrConfirmDeleteBoss, DeleteBoss)
     end
 
-    function Boss:GetName(bossId, raidId)
+    function Boss:GetName(bossNid, raidId)
         local rID = raidId or addon.Logger.selectedRaid
-        if not rID or not bossId or not KRT_Raids[rID] then return "" end
-        local boss = KRT_Raids[rID].bossKills[bossId]
+        if not rID or not KRT_Raids[rID] then return "" end
+        bossNid = bossNid or addon.Logger.selectedBoss
+        if not bossNid then return "" end
+
+        local raid = Store:GetRaid(rID)
+        local boss = raid and Store:GetBoss(raid, bossNid) or nil
         return boss and boss.name or ""
     end
 
@@ -6977,6 +7340,9 @@ do
     addon.Logger.BossAttendees = addon.Logger.BossAttendees or {}
     local BossAtt = addon.Logger.BossAttendees
     local L = addon.L
+    local Store = addon.Logger.Store
+    local View = addon.Logger.View
+    local Actions = addon.Logger.Actions
 
     local controller = makeLoggerListController {
         keyName = "BossAttendeesList",
@@ -6992,18 +7358,9 @@ do
         getData = function(out)
             local rID = addon.Logger.selectedRaid
             local bID = addon.Logger.selectedBoss
-            if not (rID and bID) then return end
-
-            local src = addon.Raid:GetPlayers(rID, bID, {})
-            for i = 1, #src do
-                local p = src[i]
-                local it = {}
-                it.id = p.id
-                it.name = p.name
-                it.class = p.class
-                out[i] = it
-            end
-            twipe(src)
+            local raid = (rID and bID) and Store:GetRaid(rID) or nil
+            if not (raid and bID) then return end
+            View:FillBossAttendeesList(out, raid, bID)
         end,
 
         rowName = function(n, _, i) return n .. "PlayerBtn" .. i end,
@@ -7047,19 +7404,10 @@ do
             local pID = addon.Logger.selectedBossPlayer
             if not (rID and bID and pID) then return end
 
-            local raid = KRT_Raids[rID]
-            if not (raid and raid.bossKills and raid.bossKills[bID]) then return end
-
-            local name = addon.Raid:GetPlayerName(pID, rID)
-            local list = raid.bossKills[bID].players
-            local i = addon.tIndexOf(list, name)
-            while i do
-                tremove(list, i)
-                i = addon.tIndexOf(list, name)
+            if Actions:DeleteBossAttendee(rID, bID, pID) then
+                addon.Logger.selectedBossPlayer = nil
+                controller:Dirty()
             end
-
-            addon.Logger.selectedBossPlayer = nil
-            controller:Dirty()
         end
 
         function BossAtt:Delete()
@@ -7080,6 +7428,9 @@ do
     addon.Logger.RaidAttendees = addon.Logger.RaidAttendees or {}
     local RaidAtt = addon.Logger.RaidAttendees
     local L = addon.L
+    local Store = addon.Logger.Store
+    local View = addon.Logger.View
+    local Actions = addon.Logger.Actions
 
     local controller = makeLoggerListController {
         keyName = "RaidAttendeesList",
@@ -7097,21 +7448,9 @@ do
 
         getData = function(out)
             local rID = addon.Logger.selectedRaid
-            if not rID then return end
-
-            local src = addon.Raid:GetPlayers(rID) or {}
-            for i = 1, #src do
-                local p = src[i]
-                local it = {}
-                it.id = p.id
-                it.name = p.name
-                it.class = p.class
-                it.join = p.join
-                it.leave = p.leave
-                it.joinFmt = date("%H:%M", p.join)
-                it.leaveFmt = p.leave and date("%H:%M", p.leave) or ""
-                out[i] = it
-            end
+            local raid = rID and Store:GetRaid(rID) or nil
+            if not raid then return end
+            View:FillRaidAttendeesList(out, raid)
         end,
 
         rowName = function(n, _, i) return n .. "PlayerBtn" .. i end,
@@ -7153,28 +7492,10 @@ do
             local rID, pID = addon.Logger.selectedRaid, addon.Logger.selectedPlayer
             if not (rID and pID) then return end
 
-            local raid = KRT_Raids[rID]
-            if not (raid and raid.players and raid.players[pID]) then return end
-
-            local name = raid.players[pID].name
-            tremove(raid.players, pID)
-
-            for _, boss in ipairs(raid.bossKills) do
-                local i = addon.tIndexOf(boss.players, name)
-                while i do
-                    tremove(boss.players, i)
-                    i = addon.tIndexOf(boss.players, name)
-                end
+            if Actions:DeleteRaidAttendee(rID, pID) then
+                addon.Logger.selectedPlayer = nil
+                controller:Dirty()
             end
-
-            for i = #raid.loot, 1, -1 do
-                if raid.loot[i].looter == name then
-                    tremove(raid.loot, i)
-                end
-            end
-
-            addon.Logger.selectedPlayer = nil
-            controller:Dirty()
         end
 
         function RaidAtt:Delete()
@@ -7195,18 +7516,9 @@ do
     addon.Logger.Loot = addon.Logger.Loot or {}
     local Loot = addon.Logger.Loot
     local L = addon.L
-
-    local function isLootFromBoss(entry, bossId)
-        return not bossId or bossId <= 0 or entry.bossNum == bossId
-    end
-
-    local function isLootByPlayer(entry, playerName)
-        return not playerName or entry.looter == playerName
-    end
-
-    local function passesFilters(entry, bossId, playerName)
-        return isLootFromBoss(entry, bossId) and isLootByPlayer(entry, playerName)
-    end
+    local Store = addon.Logger.Store
+    local View = addon.Logger.View
+    local Actions = addon.Logger.Actions
 
     local controller = makeLoggerListController {
         keyName = "LootList",
@@ -7235,35 +7547,14 @@ do
 
         getData = function(out)
             local rID = addon.Logger.selectedRaid
-            if not rID then return end
-
-            local loot = addon.Raid:GetLoot(rID) or {}
+            local raid = rID and Store:GetRaid(rID) or nil
+            if not raid then return end
 
             local bID = addon.Logger.selectedBoss
             local pID = addon.Logger.selectedBossPlayer or addon.Logger.selectedPlayer
-            local pName = pID and addon.Raid:GetPlayerName(pID, rID) or nil
+            local pName = (pID and raid.players and raid.players[pID] and raid.players[pID].name) or nil
 
-            local n = 0
-            for i = 1, #loot do
-                local v = loot[i]
-                if passesFilters(v, bID, pName) then
-                    n = n + 1
-                    local it = {}
-                    it.id = v.id
-                    it.itemId = v.itemId
-                    it.itemName = v.itemName
-                    it.itemRarity = v.itemRarity
-                    it.itemTexture = v.itemTexture
-                    it.itemLink = v.itemLink
-                    it.bossNum = v.bossNum
-                    it.looter = v.looter
-                    it.rollType = tonumber(v.rollType) or 0
-                    it.rollValue = v.rollValue
-                    it.time = v.time
-                    it.timeFmt = date("%H:%M", v.time)
-                    out[n] = it
-                end
-            end
+            View:FillLootList(out, raid, bID, pName)
         end,
 
         rowName = function(n, _, i) return n .. "ItemBtn" .. i end,
@@ -7284,10 +7575,10 @@ do
             end
 
             local selectedBoss = addon.Logger.selectedBoss
-            if selectedBoss and it.bossNum == selectedBoss then
+            if selectedBoss and tonumber(it.bossNid) == tonumber(selectedBoss) then
                 ui.Source:SetText("")
             else
-                ui.Source:SetText(addon.Logger.Boss:GetName(it.bossNum, addon.Logger.selectedRaid))
+                ui.Source:SetText(addon.Logger.Boss:GetName(it.bossNid, addon.Logger.selectedRaid))
             end
 
             local r, g, b = Utils.getClassColor(addon.Raid:GetPlayerClass(it.looter))
@@ -7318,7 +7609,10 @@ do
 
         sorters = {
             id = function(a, b, asc) return asc and (a.itemId < b.itemId) or (a.itemId > b.itemId) end,
-            source = function(a, b, asc) return asc and (a.bossNum < b.bossNum) or (a.bossNum > b.bossNum) end,
+            source = function(a, b, asc)
+                return asc and ((tonumber(a.bossNid) or 0) < (tonumber(b.bossNid) or 0)) or
+                    ((tonumber(a.bossNid) or 0) > (tonumber(b.bossNid) or 0))
+            end,
             winner = function(a, b, asc) return asc and (a.looter < b.looter) or (a.looter > b.looter) end,
             type = function(a, b, asc) return asc and (a.rollType < b.rollType) or (a.rollType > b.rollType) end,
             roll = function(a, b, asc)
@@ -7347,9 +7641,10 @@ do
 
     do
         local function DeleteItem()
-            local rID, iID = addon.Logger.selectedRaid, addon.Logger.selectedItem
-            if rID and KRT_Raids[rID] and iID then
-                tremove(KRT_Raids[rID].loot, iID)
+            local rID, lootNid = addon.Logger.selectedRaid, addon.Logger.selectedItem
+            if not (rID and lootNid) then return end
+
+            if Actions:DeleteLoot(rID, lootNid) then
                 addon.Logger.selectedItem = nil
                 controller:Dirty()
             end
@@ -7386,8 +7681,9 @@ do
         end
 
         local raid = KRT_Raids[raidID]
+        Store:EnsureRaid(raid)
         local lootCount = raid.loot and #raid.loot or 0
-        local it = raid.loot[itemID]
+        local it = Store:GetLoot(raid, itemID)
         if not it then
             addon:error(E.LogLoggerItemNotFound:format(raidID, tostring(itemID), lootCount))
             return false
@@ -7458,6 +7754,7 @@ do
     addon.Logger.BossBox = addon.Logger.BossBox or {}
     local Box = addon.Logger.BossBox
     local L = addon.L
+    local Store = addon.Logger.Store
 
     local frameName, localized, isEdit = nil, false, false
     local raidData, bossData, tempDate = {}, {}, {}
@@ -7485,15 +7782,15 @@ do
         local rID, bID = addon.Logger.selectedRaid, addon.Logger.selectedBoss
         if not (rID and bID) then return end
 
-        raidData = KRT_Raids[rID]
+        raidData = Store:GetRaid(rID)
         if not raidData then return end
 
-        bossData = raidData.bossKills[bID]
+        bossData = Store:GetBoss(raidData, bID)
         if not bossData then return end
 
         _G[frameName .. "Name"]:SetText(bossData.name or "")
 
-        local bossTime = bossData.time or bossData.date or time()
+        local bossTime = bossData.time or time()
         local d = date("*t", bossTime)
         tempDate = { day = d.day, month = d.month, year = d.year, hour = d.hour, min = d.min }
         _G[frameName .. "Time"]:SetText(("%02d:%02d"):format(tempDate.hour, tempDate.min))
@@ -7533,18 +7830,27 @@ do
         local killDate = { day = day, month = month, year = year, hour = h, min = m }
         local mode = (modeT == "h") and "h" or "n"
 
+        local raid = Store:GetRaid(rID)
+        if not raid then return end
+
         if isEdit and bossData then
             bossData.name = name
             bossData.time = time(killDate)
             bossData.mode = mode
         else
-            tinsert(KRT_Raids[rID].bossKills, {
+            local bossNid = tonumber(raid.nextBossNid) or 1
+            raid.nextBossNid = bossNid + 1
+            tinsert(raid.bossKills, {
+                bossNid = bossNid,
                 name = name,
                 time = time(killDate),
                 mode = mode,
                 players = {},
+                hash = Utils.encode(rID .. "|" .. name .. "|" .. bossNid),
             })
         end
+
+        Store:InvalidateIndexes(raid)
 
         self:Hide()
         addon.Logger:ResetSelections()
@@ -7577,6 +7883,7 @@ do
     addon.Logger.AttendeesBox = addon.Logger.AttendeesBox or {}
     local Box = addon.Logger.AttendeesBox
     local L = addon.L
+    local Store = addon.Logger.Store
 
     local frameName
 
@@ -7603,12 +7910,17 @@ do
         end
 
         local rID, bID = addon.Logger.selectedRaid, addon.Logger.selectedBoss
-        if not (rID and bID and KRT_Raids[rID]) then
+        local raid = (rID and bID) and Store:GetRaid(rID) or nil
+        if not (raid and bID) then
             addon:error(L.ErrAttendeesInvalidRaidBoss)
             return
         end
 
-        local bossKill = KRT_Raids[rID].bossKills[bID]
+        local bossKill = Store:GetBoss(raid, bID)
+        if not bossKill then
+            addon:error(L.ErrAttendeesInvalidRaidBoss)
+            return
+        end
         for _, n in ipairs(bossKill.players) do
             if Utils.normalizeLower(n) == normalizedName then
                 addon:error(L.ErrAttendeesPlayerExists)
@@ -7616,14 +7928,13 @@ do
             end
         end
 
-        for _, p in ipairs(KRT_Raids[rID].players) do
-            if normalizedName == Utils.normalizeLower(p.name) then
-                tinsert(bossKill.players, p.name)
-                addon:info(L.StrAttendeesAddSuccess)
-                self:Toggle()
-                Utils.triggerEvent("LoggerSelectBoss", addon.Logger.selectedBoss)
-                return
-            end
+        local playerName = Store:FindRaidPlayerByNormName(raid, normalizedName)
+        if playerName then
+            tinsert(bossKill.players, playerName)
+            addon:info(L.StrAttendeesAddSuccess)
+            self:Toggle()
+            Utils.triggerEvent("LoggerSelectBoss", addon.Logger.selectedBoss)
+            return
         end
 
         addon:error(L.ErrAttendeesInvalidName)
