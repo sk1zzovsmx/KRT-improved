@@ -3007,6 +3007,8 @@
 		<Scripts>
 			<OnLoad>self:RegisterForClicks("AnyUp")</OnLoad>
 			<OnClick>KRT.Logger:SelectItem(self, button)</OnClick>
+			<OnEnter>KRT.Logger:OnLootRowEnter(self)</OnEnter>
+			<OnLeave>KRT.Logger:OnLootRowLeave(self)</OnLeave>
 		</Scripts>
 	</Button>
 	<!-- The Frame: Logger -->

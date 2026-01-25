@@ -516,6 +516,308 @@ function Utils.toggleHighlight(frame, cond)
 	end
 end
 
+-- =========== Logger row visuals (selection/focus)  =========== --
+-- These helpers avoid using LockHighlight() for persistent selection, so hover highlight remains native.
+-- Safe for 3.3.5a and works with any UI skin (pure texture overlays).
+
+local function _ensureRowVisuals(row)
+	if not row or row._krtSelTex then return end
+
+	-- Persistent selection fill (soft)
+	local sel = row:CreateTexture(nil, "BACKGROUND")
+	sel:SetAllPoints(row)
+	-- Persistent selection highlight (soft). Uses a Blizzard highlight texture so it reads as "highlight",
+	-- while staying independent from the native mouseover HighlightTexture.
+	sel:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+	sel:SetBlendMode("ADD")
+	-- Slightly more pronounced than mouseover.
+	sel:SetVertexColor(0.20, 0.60, 1.00, 0.42)
+	sel:Hide()
+	row._krtSelTex = sel
+
+	-- Focus highlight (stronger). Still a highlight, not a border.
+	local focus = row:CreateTexture(nil, "ARTWORK")
+	focus:SetAllPoints(row)
+	focus:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+	focus:SetBlendMode("ADD")
+	focus:SetVertexColor(0.20, 0.60, 1.00, 0.62)
+	focus:Hide()
+	row._krtFocusTex = focus
+
+	-- Pushed feedback (mouse down)
+	local pushed = row:CreateTexture(nil, "ARTWORK")
+	pushed:SetAllPoints(row)
+	pushed:SetTexture(1, 1, 1, 0.08)
+	row:SetPushedTexture(pushed)
+end
+
+function Utils.ensureRowVisuals(row)
+	_ensureRowVisuals(row)
+end
+
+function Utils.setRowSelected(row, cond)
+	_ensureRowVisuals(row)
+	if not row or not row._krtSelTex then return end
+	if cond then row._krtSelTex:Show() else row._krtSelTex:Hide() end
+end
+
+function Utils.setRowFocused(row, cond)
+	_ensureRowVisuals(row)
+	local t = row and row._krtFocusTex
+	if not t then return end
+	if cond then t:Show() else t:Hide() end
+end
+
+-- Helper: append "(N)" to a button label, preserving the original base label.
+function Utils.setButtonCount(btn, baseText, n)
+	if not btn then return end
+	if not btn._krtBaseText then
+		btn._krtBaseText = baseText or btn:GetText() or ""
+	end
+	local base = baseText or btn._krtBaseText or ""
+	if n and n > 1 then
+		btn:SetText(("%s (%d)"):format(base, n))
+	else
+		btn:SetText(base)
+	end
+end
+
+-- =========== Multi-select utility (reusable)  =========== --
+-- Runtime-only selection state for scrollable lists.
+-- State is keyed by "contextKey" (string) so multiple lists can coexist.
+
+-- Runtime-only selection state for scrollable lists.
+-- State is keyed by "contextKey" (string) so multiple lists can coexist.
+-- IMPORTANT: bind the backing table to a *local* upvalue in the file chunk.
+-- This avoids accidental global lookups (e.g. "MS" becoming nil at runtime).
+
+Utils._multiSelect = Utils._multiSelect or {}
+local MS = Utils._multiSelect
+
+do
+	local function _msKey(id)
+		if id == nil then return nil end
+		local n = tonumber(id)
+		return n or id
+	end
+
+	local function _ensure(contextKey)
+		if not contextKey or contextKey == "" then
+			contextKey = "_default"
+		end
+		local st = MS[contextKey]
+		if not st then
+			st = { set = {}, count = 0, ver = 0 }
+			MS[contextKey] = st
+		end
+		return st, contextKey
+	end
+
+	local function _dbg(msg)
+		if addon and addon.options and addon.options.debug and addon.debug then
+			addon:debug(msg)
+		end
+	end
+
+	function Utils.MultiSelect_Init(contextKey)
+		local st, key = _ensure(contextKey)
+		st.set = {}
+		st.count = 0
+		st.ver = (st.ver or 0) + 1
+		_dbg(("[LoggerSelect] init ctx=%s ver=%d"):format(tostring(key), st.ver))
+		return st
+	end
+
+	function Utils.MultiSelect_Clear(contextKey)
+		return Utils.MultiSelect_Init(contextKey)
+	end
+
+	-- Toggle selection.
+	-- isMulti=false  -> clear + select single (optional: click-again to deselect when allowDeselect=true)
+	-- isMulti=true   -> toggle selection for the given id
+	-- Returns: actionString, selectedCount
+	function Utils.MultiSelect_Toggle(contextKey, id, isMulti, allowDeselect)
+		local st, key = _ensure(contextKey)
+		local k = _msKey(id)
+		if k == nil then return nil, st.count or 0 end
+
+		local before = st.count or 0
+		local action
+
+		local allow = false
+		if allowDeselect == true then
+			allow = true
+		elseif type(allowDeselect) == "table" and allowDeselect.allowDeselect == true then
+			allow = true
+		end
+
+		if isMulti then
+			if st.set[k] then
+				st.set[k] = nil
+				st.count = before - 1
+				action = "TOGGLE_OFF"
+			else
+				st.set[k] = true
+				st.count = before + 1
+				action = "TOGGLE_ON"
+			end
+		else
+			-- OS-like single selection:
+			--   - clear + select single by default
+			--   - optionally allow "click again to deselect" when this is the only selected row
+			local already = (st.set[k] == true)
+			if allow and already and before == 1 then
+				st.set = {}
+				st.count = 0
+				action = "SINGLE_DESELECT"
+			else
+				st.set = {}
+				st.set[k] = true
+				st.count = 1
+				action = "SINGLE_CLEAR+SELECT"
+			end
+		end
+
+		st.ver = (st.ver or 0) + 1
+
+		_dbg(("[LoggerSelect] toggle ctx=%s id=%s multi=%s action=%s count %d->%d ver=%d"):format(
+			tostring(key), tostring(id), isMulti and "1" or "0", tostring(action), before, st.count or 0, st.ver
+		))
+
+		return action, st.count or 0
+	end
+
+	-- Set or clear the range-anchor for SHIFT range selection.
+	-- The anchor is the last non-shift click target for the given context.
+	function Utils.MultiSelect_SetAnchor(contextKey, id)
+		local st, key = _ensure(contextKey)
+		local before = st.anchor
+		local k = _msKey(id)
+		st.anchor = k
+		-- Anchor changes do not affect highlight rendering directly, so we do not bump st.ver here.
+		local ver = st.ver or 0
+		_dbg(("[LoggerSelect] anchor ctx=%s from=%s to=%s ver=%d"):format(
+			tostring(key), tostring(before), tostring(st.anchor), ver
+		))
+		return st.anchor
+	end
+
+	function Utils.MultiSelect_GetAnchor(contextKey)
+		local st = MS[contextKey or "_default"]
+		return st and st.anchor or nil
+	end
+
+	local function _idOf(x)
+		if type(x) == "table" then
+			return x.id
+		end
+		return x
+	end
+
+	local function _findIndex(ordered, key)
+		if not ordered or not key then return nil end
+		for i = 1, #ordered do
+			local id = _idOf(ordered[i])
+			if _msKey(id) == key then
+				return i
+			end
+		end
+		return nil
+	end
+
+	-- SHIFT range selection helper.
+	-- ordered: array of ids OR array of items with .id (e.g. controller.data)
+	-- id: clicked id
+	-- isAdd: when true (CTRL+SHIFT) add the range to the existing selection; otherwise replace selection with the range
+	-- Returns: actionString, selectedCount
+	function Utils.MultiSelect_Range(contextKey, ordered, id, isAdd)
+		local st, key = _ensure(contextKey)
+		local k = _msKey(id)
+		if k == nil then return nil, st.count or 0 end
+
+		local before = st.count or 0
+		local action
+
+		local aKey = st.anchor
+		local ai = _findIndex(ordered, aKey)
+		local bi = _findIndex(ordered, k)
+
+		if not ai or not bi then
+			-- If we cannot resolve indices (missing anchor or id), behave like a single select.
+			st.set = {}
+			st.set[k] = true
+			st.count = 1
+			if not st.anchor then st.anchor = k end
+			action = st.anchor == k and "RANGE_NOANCHOR_SINGLE" or "RANGE_FALLBACK_SINGLE"
+		else
+			if not isAdd then
+				st.set = {}
+				st.count = 0
+			end
+			local from = ai
+			local to = bi
+			if from > to then
+				from, to = to, from
+			end
+
+			for i = from, to do
+				local id2 = _idOf(ordered[i])
+				local k2 = _msKey(id2)
+				if k2 ~= nil and not st.set[k2] then
+					st.set[k2] = true
+					st.count = (st.count or 0) + 1
+				end
+			end
+			action = isAdd and "RANGE_ADD" or "RANGE_SET"
+		end
+
+		st.ver = (st.ver or 0) + 1
+		_dbg(("[LoggerSelect] range ctx=%s id=%s add=%s action=%s count %d->%d ver=%d anchor=%s"):format(
+			tostring(key), tostring(id), isAdd and "1" or "0", tostring(action), before, st.count or 0, st.ver,
+			tostring(st.anchor)
+		))
+		return action, st.count or 0
+	end
+
+	function Utils.MultiSelect_IsSelected(contextKey, id)
+		local st = MS[contextKey or "_default"]
+		if not st or not st.set then return false end
+		local k = _msKey(id)
+		return (k ~= nil) and (st.set[k] == true) or false
+	end
+
+	function Utils.MultiSelect_Count(contextKey)
+		local st = MS[contextKey or "_default"]
+		return (st and st.count) or 0
+	end
+
+	function Utils.MultiSelect_GetVersion(contextKey)
+		local st = MS[contextKey or "_default"]
+		return (st and st.ver) or 0
+	end
+
+	function Utils.MultiSelect_GetSelected(contextKey)
+		local st = MS[contextKey or "_default"]
+		local out = {}
+		if not st or not st.set then return out end
+		local n = 0
+		for id, v in pairs(st.set) do
+			if v then
+				n = n + 1
+				out[n] = id
+			end
+		end
+		-- Stable ordering for UI/debug; safe even if mixed types.
+		table.sort(out, function(a, b)
+			local na, nb = tonumber(a), tonumber(b)
+			if na and nb then return na < nb end
+			return tostring(a) < tostring(b)
+		end)
+		return out
+	end
+end
+
+
 -- Set frame text based on condition:
 function Utils.setText(frame, str1, str2, cond)
 	if cond then
