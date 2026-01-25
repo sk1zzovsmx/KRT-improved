@@ -516,7 +516,7 @@ function Utils.toggleHighlight(frame, cond)
 	end
 end
 
--- =========== Logger row visuals (selection/focus)  =========== --
+-- =========== List row visuals (selection/focus)  =========== --
 -- These helpers avoid using LockHighlight() for persistent selection, so hover highlight remains native.
 -- Safe for 3.3.5a and works with any UI skin (pure texture overlays).
 

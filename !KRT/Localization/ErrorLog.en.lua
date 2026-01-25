@@ -55,6 +55,8 @@ E.LogMLCandidateCacheMiss         = "[ML] Candidate cache miss item=%s player=%s
 E.LogMLAwarded                    = "[ML] Awarded item=%s -> %s type=%d roll=%d slot=%d cand=%d"
 E.LogMLAwardLoggerFailed          = "[ML] Awarded but Logger failed raidId=%s lootNid=%s link=%s"
 E.ErrMLMultiAwardInProgress       = "[ML] Multi-award in progress: wait until it finishes before awarding again."
+E.ErrMLMultiSelectTooMany         = "[ML] Cannot select more than %d winner(s) for this item."
+E.ErrMLMultiSelectNotEnough       = "[ML] Select %d winner(s) before awarding multiple copies (currently %d)."
 E.LogTradeAcceptUpdate            = "[Trade] ACCEPT_UPDATE trader=%s winner=%s t=%s p=%s"
 E.LogTradeCompleted               = "[Trade] Completed item=%s winner=%s type=%d roll=%d"
 E.LogTradeCurrentRollItemMissing  = "[Trade] currentRollItem missing; cannot update loot entry"
