@@ -6482,35 +6482,36 @@ do
         end
     end
 
-    local function markPlayersInactive(raid, removedNames)
-        if not raid.playersByName then return end
-        local now = Utils.getCurrentTime()
-        for name, _ in pairs(removedNames) do
-            local p = raid.playersByName[name]
-            if p and p.leave == nil then
-                p.leave = now
+    local function cleanupRemovedNames(raid, removedNames)
+        if not (raid and removedNames) then return end
+
+        if raid.playersByName then
+            local now = Utils.getCurrentTime()
+            for name, _ in pairs(removedNames) do
+                local p = raid.playersByName[name]
+                if p and p.leave == nil then
+                    p.leave = now
+                end
             end
         end
-    end
 
-    local function removeNamesFromBossKills(raid, removedNames)
-        if not raid.bossKills then return end
-        for _, boss in ipairs(raid.bossKills) do
-            if boss and boss.players then
-                for j = #boss.players, 1, -1 do
-                    if removedNames[boss.players[j]] then
-                        tremove(boss.players, j)
+        if raid.bossKills then
+            for _, boss in ipairs(raid.bossKills) do
+                if boss and boss.players then
+                    for j = #boss.players, 1, -1 do
+                        if removedNames[boss.players[j]] then
+                            tremove(boss.players, j)
+                        end
                     end
                 end
             end
         end
-    end
 
-    local function removeLootByNames(raid, removedNames)
-        if not raid.loot then return end
-        for j = #raid.loot, 1, -1 do
-            if raid.loot[j] and removedNames[raid.loot[j].looter] then
-                tremove(raid.loot, j)
+        if raid.loot then
+            for j = #raid.loot, 1, -1 do
+                if raid.loot[j] and removedNames[raid.loot[j].looter] then
+                    tremove(raid.loot, j)
+                end
             end
         end
     end
@@ -6678,9 +6679,7 @@ do
 
         if name then
             local removedNames = { [name] = true }
-            markPlayersInactive(raid, removedNames)
-            removeNamesFromBossKills(raid, removedNames)
-            removeLootByNames(raid, removedNames)
+            cleanupRemovedNames(raid, removedNames)
         end
 
         self:Commit(raid, { clearPlayers = true })
@@ -6722,13 +6721,7 @@ do
 
         -- Keep playersByName consistent: mark removed names as inactive so UpdateRaidRoster()
         -- can re-add current raid members after manual roster edits.
-        markPlayersInactive(raid, removedNames)
-
-        -- Remove from all boss attendee lists.
-        removeNamesFromBossKills(raid, removedNames)
-
-        -- Remove loot won by removed players.
-        removeLootByNames(raid, removedNames)
+        cleanupRemovedNames(raid, removedNames)
 
         self:Commit(raid, { clearPlayers = true })
         return removed
