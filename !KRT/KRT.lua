@@ -6482,6 +6482,39 @@ do
         end
     end
 
+    local function markPlayersInactive(raid, removedNames)
+        if not raid.playersByName then return end
+        local now = Utils.getCurrentTime()
+        for name, _ in pairs(removedNames) do
+            local p = raid.playersByName[name]
+            if p and p.leave == nil then
+                p.leave = now
+            end
+        end
+    end
+
+    local function removeNamesFromBossKills(raid, removedNames)
+        if not raid.bossKills then return end
+        for _, boss in ipairs(raid.bossKills) do
+            if boss and boss.players then
+                for j = #boss.players, 1, -1 do
+                    if removedNames[boss.players[j]] then
+                        tremove(boss.players, j)
+                    end
+                end
+            end
+        end
+    end
+
+    local function removeLootByNames(raid, removedNames)
+        if not raid.loot then return end
+        for j = #raid.loot, 1, -1 do
+            if raid.loot[j] and removedNames[raid.loot[j].looter] then
+                tremove(raid.loot, j)
+            end
+        end
+    end
+
     function Actions:Commit(raid, opts)
         if not raid then return end
         opts = opts or {}
@@ -6637,114 +6670,69 @@ do
     end
 
     function Actions:DeleteRaidAttendee(rID, playerIdx)
-    local raid = Store:GetRaid(rID)
-    if not (raid and raid.players and raid.players[playerIdx]) then return false end
+        local raid = Store:GetRaid(rID)
+        if not (raid and raid.players and raid.players[playerIdx]) then return false end
 
-    local name = raid.players[playerIdx].name
+        local name = raid.players[playerIdx].name
+        tremove(raid.players, playerIdx)
 
-    -- Keep playersByName consistent: mark this record as inactive so UpdateRaidRoster()
-    -- can safely rebuild raid.players when needed (e.g. after manual roster edits).
-    if name and raid.playersByName and raid.playersByName[name] then
-        local p = raid.playersByName[name]
-        if p and p.leave == nil then
-            p.leave = Utils.getCurrentTime()
+        if name then
+            local removedNames = { [name] = true }
+            markPlayersInactive(raid, removedNames)
+            removeNamesFromBossKills(raid, removedNames)
+            removeLootByNames(raid, removedNames)
         end
+
+        self:Commit(raid, { clearPlayers = true })
+        return true
     end
 
-    tremove(raid.players, playerIdx)
+    -- Bulk delete: removes multiple raid attendees (by playerIdx) with a single Commit()
+    -- Returns: number of removed attendees
+    function Actions:DeleteRaidAttendeeMany(rID, playerIdxs)
+        local raid = Store:GetRaid(rID)
+        if not (raid and raid.players and playerIdxs and #playerIdxs > 0) then return 0 end
 
-    -- Remove from all boss attendee lists.
-    if name and raid.bossKills then
-        for _, boss in ipairs(raid.bossKills) do
-            if boss and boss.players then
-                self:RemoveAll(boss.players, name)
+        -- Normalize + sort descending (indices shift on removal).
+        local ids = {}
+        local seen = {}
+        for i = 1, #playerIdxs do
+            local v = tonumber(playerIdxs[i]) or playerIdxs[i]
+            if v and not seen[v] then
+                seen[v] = true
+                tinsert(ids, v)
             end
         end
-    end
+        table.sort(ids, function(a, b) return a > b end)
 
-    -- Remove loot won by removed player.
-    if name and raid.loot then
-        for i = #raid.loot, 1, -1 do
-            if raid.loot[i] and raid.loot[i].looter == name then
-                tremove(raid.loot, i)
+        -- Collect names + remove players from raid.players.
+        local removedNames = {}
+        local removed = 0
+        for i = 1, #ids do
+            local idx = ids[i]
+            local p = raid.players[idx]
+            if p and p.name then
+                removedNames[p.name] = true
+                tremove(raid.players, idx)
+                removed = removed + 1
             end
         end
+
+        if removed == 0 then return 0 end
+
+        -- Keep playersByName consistent: mark removed names as inactive so UpdateRaidRoster()
+        -- can re-add current raid members after manual roster edits.
+        markPlayersInactive(raid, removedNames)
+
+        -- Remove from all boss attendee lists.
+        removeNamesFromBossKills(raid, removedNames)
+
+        -- Remove loot won by removed players.
+        removeLootByNames(raid, removedNames)
+
+        self:Commit(raid, { clearPlayers = true })
+        return removed
     end
-
-    self:Commit(raid, { clearPlayers = true })
-    return true
-end
-
--- Bulk delete: removes multiple raid attendees (by playerIdx) with a single Commit()
--- Returns: number of removed attendees
-function Actions:DeleteRaidAttendeeMany(rID, playerIdxs)
-    local raid = Store:GetRaid(rID)
-    if not (raid and raid.players and playerIdxs and #playerIdxs > 0) then return 0 end
-
-    -- Normalize + sort descending (indices shift on removal).
-    local ids = {}
-    local seen = {}
-    for i = 1, #playerIdxs do
-        local v = tonumber(playerIdxs[i]) or playerIdxs[i]
-        if v and not seen[v] then
-            seen[v] = true
-            tinsert(ids, v)
-        end
-    end
-    table.sort(ids, function(a, b) return a > b end)
-
-    -- Collect names + remove players from raid.players.
-    local removedNames = {}
-    local removed = 0
-    for i = 1, #ids do
-        local idx = ids[i]
-        local p = raid.players[idx]
-        if p and p.name then
-            removedNames[p.name] = true
-            tremove(raid.players, idx)
-            removed = removed + 1
-        end
-    end
-
-    if removed == 0 then return 0 end
-
-    -- Keep playersByName consistent: mark removed names as inactive so UpdateRaidRoster()
-    -- can re-add current raid members after manual roster edits.
-    if raid.playersByName then
-        local now = Utils.getCurrentTime()
-        for n, _ in pairs(removedNames) do
-            local p = raid.playersByName[n]
-            if p and p.leave == nil then
-                p.leave = now
-            end
-        end
-    end
-
-    -- Remove from all boss attendee lists.
-    if raid.bossKills then
-        for _, boss in ipairs(raid.bossKills) do
-            if boss and boss.players then
-                for j = #boss.players, 1, -1 do
-                    if removedNames[boss.players[j]] then
-                        tremove(boss.players, j)
-                    end
-                end
-            end
-        end
-    end
-
-    -- Remove loot won by removed players.
-    if raid.loot then
-        for j = #raid.loot, 1, -1 do
-            if raid.loot[j] and removedNames[raid.loot[j].looter] then
-                tremove(raid.loot, j)
-            end
-        end
-    end
-
-    self:Commit(raid, { clearPlayers = true })
-    return removed
-end
 
     -- Rebuild the selected raid roster from the *current* in-game raid roster.
     -- This is intended to recover from manual edits (e.g. raid.players emptied) by reconstructing
@@ -6755,7 +6743,7 @@ end
     --  - Only allowed for the current raid session (selected rID == KRT_CurrentRaid).
     --
     -- Returns: true/false, memberCount
--- Logger.Actions: keep all SavedVariables mutations here (UI/View are read-only)
+    -- Logger.Actions: keep all SavedVariables mutations here (UI/View are read-only)
     function Actions:DeleteRaid(rID)
         local sel = tonumber(rID)
         if not sel or not KRT_Raids[sel] then return false end
