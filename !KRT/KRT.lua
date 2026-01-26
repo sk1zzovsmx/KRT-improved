@@ -5444,7 +5444,7 @@ do
             local idx = 0
             for name, spec in pairs(changesTable) do
                 idx = idx + 1
-                out[idx] = { id = name, name = name, spec = spec }
+                out[idx] = { id = idx, name = name, spec = spec }
             end
         end,
 
@@ -5460,7 +5460,7 @@ do
             ui.Spec:SetText(it.spec)
         end),
 
-        highlightId = function() return selectedID end,
+        highlightFn = function(_, it) return it and it.name == selectedID end,
     }
 
     -- ----- Public methods ----- --
