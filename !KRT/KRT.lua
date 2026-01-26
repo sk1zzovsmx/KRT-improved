@@ -5183,7 +5183,6 @@ do
     local UpdateUIFrame
     local updateInterval = C.UPDATE_INTERVAL_WARNINGS
 
-    local FetchWarnings
     local fetched = false
     local warningsDirty = false
 
@@ -5199,6 +5198,30 @@ do
     local SaveWarning
     local isEdit = false
 
+    local controller = Utils.makeListController {
+        keyName = "WarningsList",
+        poolTag = "warnings",
+        _rowParts = { "ID", "Name" },
+
+        getData = function(out)
+            for i = 1, #KRT_Warnings do
+                local w = KRT_Warnings[i]
+                out[i] = { id = i, name = w and w.name or "" }
+            end
+        end,
+
+        rowName = function(n, _, i) return n .. "WarningBtn" .. i end,
+        rowTmpl = "KRTWarningButtonTemplate",
+
+        drawRow = Utils.createRowDrawer(function(row, it)
+            local ui = row._p
+            ui.ID:SetText(it.id)
+            ui.Name:SetText(it.name)
+        end),
+
+        highlightId = function() return selectedID end,
+    }
+
     -- OnLoad frame:
     function module:OnLoad(frame)
         if not frame then return end
@@ -5210,6 +5233,7 @@ do
             lastSelectedID = false
         end)
         frame:SetScript("OnUpdate", UpdateUIFrame)
+        controller:OnLoad(frame)
     end
 
     -- Externally update frame:
@@ -5323,14 +5347,7 @@ do
     end
 
     local function UpdateSelectionUI()
-        if lastSelectedID and _G[frameName .. "WarningBtn" .. lastSelectedID] then
-            _G[frameName .. "WarningBtn" .. lastSelectedID]:UnlockHighlight()
-        end
         if selectedID and KRT_Warnings[selectedID] then
-            local btn = _G[frameName .. "WarningBtn" .. selectedID]
-            if btn then
-                btn:LockHighlight()
-            end
             _G[frameName .. "OutputName"]:SetText(KRT_Warnings[selectedID].name)
             _G[frameName .. "OutputContent"]:SetText(KRT_Warnings[selectedID].content)
             _G[frameName .. "OutputContent"]:SetTextColor(1, 1, 1)
@@ -5347,11 +5364,13 @@ do
         LocalizeUIFrame()
         Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             if warningsDirty or not fetched then
-                FetchWarnings()
+                controller:Dirty()
                 warningsDirty = false
+                fetched = true
             end
             if selectedID ~= lastSelectedID then
                 UpdateSelectionUI()
+                controller:Touch()
             end
             tempName    = _G[frameName .. "Name"]:GetText()
             tempContent = _G[frameName .. "Content"]:GetText()
@@ -5389,28 +5408,6 @@ do
         module:Update()
     end
 
-    -- Fetch module:
-    function FetchWarnings()
-        local scrollFrame = _G[frameName .. "ScrollFrame"]
-        local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
-        local totalHeight = 0
-        scrollChild:SetHeight(scrollFrame:GetHeight())
-        scrollChild:SetWidth(scrollFrame:GetWidth())
-        for i, w in pairs(KRT_Warnings) do
-            local btnName = frameName .. "WarningBtn" .. i
-            local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTWarningButtonTemplate")
-            btn:Show()
-            local ID = _G[btnName .. "ID"]
-            ID:SetText(i)
-            local wName = _G[btnName .. "Name"]
-            wName:SetText(w.name)
-            btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
-            btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
-            totalHeight = totalHeight + btn:GetHeight()
-        end
-        fetched = true
-        lastSelectedID = false
-    end
 end
 
 -- =========== MS Changes Module  =========== --
@@ -5428,7 +5425,7 @@ do
     local updateInterval = C.UPDATE_INTERVAL_CHANGES
 
     local changesTable = {}
-    local FetchChanges, SaveChanges, CancelChanges
+    local SaveChanges, CancelChanges
     local fetched = false
     local changesDirty = false
     local selectedID, tempSelectedID
@@ -5437,6 +5434,34 @@ do
     local lastAddBtnMode
     local isAdd = false
     local isEdit = false
+
+    local controller = Utils.makeListController {
+        keyName = "ChangesList",
+        poolTag = "changes",
+        _rowParts = { "Name", "Spec" },
+
+        getData = function(out)
+            local idx = 0
+            for name, spec in pairs(changesTable) do
+                idx = idx + 1
+                out[idx] = { id = name, name = name, spec = spec }
+            end
+        end,
+
+        rowName = function(n, it) return n .. "PlayerBtn" .. it.id end,
+        rowTmpl = "KRTChangesButtonTemplate",
+
+        drawRow = Utils.createRowDrawer(function(row, it)
+            local ui = row._p
+            ui.Name:SetText(it.name)
+            local class = addon.Raid:GetPlayerClass(it.name)
+            local r, g, b = Utils.getClassColor(class)
+            ui.Name:SetVertexColor(r, g, b)
+            ui.Spec:SetText(it.spec)
+        end),
+
+        highlightId = function() return selectedID end,
+    }
 
     -- ----- Public methods ----- --
 
@@ -5451,6 +5476,7 @@ do
             lastSelectedID = false
         end)
         frame:SetScript("OnUpdate", UpdateUIFrame)
+        controller:OnLoad(frame)
     end
 
     -- Toggle frame visibility:
@@ -5623,8 +5649,9 @@ do
         Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             if changesDirty or not fetched then
                 InitChangesTable()
-                FetchChanges()
+                controller:Dirty()
                 changesDirty = false
+                fetched = true
             end
             local count = addon.tLength(changesTable)
             if count > 0 then
@@ -5633,13 +5660,8 @@ do
                 selectedID = nil
             end
             if selectedID ~= lastSelectedID then
-                if lastSelectedID and _G[frameName .. "PlayerBtn" .. lastSelectedID] then
-                    _G[frameName .. "PlayerBtn" .. lastSelectedID]:UnlockHighlight()
-                end
-                if selectedID and _G[frameName .. "PlayerBtn" .. selectedID] then
-                    _G[frameName .. "PlayerBtn" .. selectedID]:LockHighlight()
-                end
                 lastSelectedID = selectedID
+                controller:Touch()
             end
             Utils.showHide(_G[frameName .. "Name"], (isEdit or isAdd))
             Utils.showHide(_G[frameName .. "Spec"], (isEdit or isAdd))
@@ -5666,33 +5688,6 @@ do
     function InitChangesTable()
         addon:debug(E.LogChangesInitTable)
         changesTable = KRT_CurrentRaid and KRT_Raids[KRT_CurrentRaid].changes or {}
-    end
-
-    -- Fetch All module:
-    function FetchChanges()
-        addon:debug(E.LogChangesFetchAll)
-        if not KRT_CurrentRaid then return end
-        local scrollFrame = _G[frameName .. "ScrollFrame"]
-        local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
-        local totalHeight = 0
-        scrollChild:SetHeight(scrollFrame:GetHeight())
-        scrollChild:SetWidth(scrollFrame:GetWidth())
-        for n, c in pairs(changesTable) do
-            local btnName = frameName .. "PlayerBtn" .. n
-            local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTChangesButtonTemplate")
-            btn:Show()
-            local name = _G[btnName .. "Name"]
-            name:SetText(n)
-            local class = addon.Raid:GetPlayerClass(n)
-            local r, g, b = Utils.getClassColor(class)
-            name:SetVertexColor(r, g, b)
-            _G[btnName .. "Spec"]:SetText(c)
-            btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
-            btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
-            totalHeight = totalHeight + btn:GetHeight()
-        end
-        fetched = true
-        lastSelectedID = false
     end
 
     -- Save module:
