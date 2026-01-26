@@ -414,7 +414,7 @@ function Utils.makeListController(cfg)
 		if not frame then return end
 		self.frameName = frame:GetName()
 
-		frame:SetScript("OnShow", function()
+		frame:HookScript("OnShow", function()
 			if not self._shownOnce then
 				self._shownOnce = true
 				addon:debug(L.LogLoggerUIShow:format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
@@ -436,7 +436,7 @@ function Utils.makeListController(cfg)
 			end
 		end)
 
-		frame:SetScript("OnHide", function()
+		frame:HookScript("OnHide", function()
 			setActive(false)
 		end)
 
