@@ -858,7 +858,7 @@ local function _ensureRowVisuals(row)
 	sel:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
 	sel:SetBlendMode("ADD")
 	-- Slightly more pronounced than mouseover.
-	sel:SetVertexColor(0.20, 0.60, 1.00, 0.42)
+	sel:SetVertexColor(0.20, 0.60, 1.00, 0.52)
 	sel:Hide()
 	row._krtSelTex = sel
 
@@ -867,7 +867,7 @@ local function _ensureRowVisuals(row)
 	focus:SetAllPoints(row)
 	focus:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
 	focus:SetBlendMode("ADD")
-	focus:SetVertexColor(0.20, 0.60, 1.00, 0.62)
+	focus:SetVertexColor(0.20, 0.60, 1.00, 0.72)
 	focus:Hide()
 	row._krtFocusTex = focus
 
