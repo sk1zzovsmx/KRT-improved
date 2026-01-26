@@ -2593,6 +2593,20 @@ do
         UIMaster = frame
         addon.UIMaster = frame
         frameName = frame:GetName()
+        -- Initialize ItemBtn scripts once (clean inventory drop support: click or drag-drop).
+        local itemBtn = _G[frameName .. "ItemBtn"]
+        if itemBtn and not itemBtn.__krtMLInvDropInit then
+            itemBtn.__krtMLInvDropInit = true
+            itemBtn:RegisterForClicks("AnyUp")
+            itemBtn:SetScript("OnReceiveDrag", function(self)
+                module:TryAcceptInventoryItemFromCursor()
+            end)
+            itemBtn:SetScript("OnClick", function(self, button)
+                if CursorHasItem and CursorHasItem() then
+                    module:TryAcceptInventoryItemFromCursor()
+                end
+            end)
+        end
         frame:RegisterForDrag("LeftButton")
         frame:SetScript("OnUpdate", UpdateUIFrame)
         frame:SetScript("OnHide", function()
@@ -3286,6 +3300,96 @@ do
 
     -- ----- Event Handlers & Callbacks ----- --
 
+    -- Pending inventory item (from bags) captured while the item is on the cursor.
+    -- We keep this as a best-effort hint, but the actual drop is resolved at click/drop time via GetCursorInfo().
+    local pendingInv = { bag = nil, slot = nil, link = nil, count = nil }
+
+    local function ClearPendingInv()
+        pendingInv.bag, pendingInv.slot, pendingInv.link, pendingInv.count = nil, nil, nil, nil
+    end
+
+    -- Best-effort: resolve the cursor-held bag item by scanning for a locked bag slot matching the cursor itemLink.
+    local function ResolveCursorBagSlot(itemLink)
+        if not itemLink then return nil end
+        -- Backpack (0) + 4 bag slots (1..4) in WoW 3.3.5a.
+        for bag = 0, 4 do
+            local n = GetContainerNumSlots(bag) or 0
+            for slot = 1, n do
+                local link = GetContainerItemLink(bag, slot)
+                if link and link == itemLink then
+                    local _, count, locked = GetContainerItemInfo(bag, slot)
+                    if locked then
+                        return bag, slot, (count or 1)
+                    end
+                end
+            end
+        end
+        return nil
+    end
+
+    local function ApplyInventoryItem(inBag, inSlot, itemLink, count)
+        if countdownRun then return false end
+        if not itemLink then return false end
+
+        if inBag and inSlot and ItemIsSoulbound(inBag, inSlot) then
+            addon:warn(E.LogMLInventorySoulbound:format(tostring(itemLink)))
+            ClearCursor()
+            return true
+        end
+
+        -- Clear count:
+        Utils.resetEditBox(_G[frameName .. "ItemCount"], true)
+
+        lootState.fromInventory = true
+        addon.Loot:AddItem(itemLink, count)
+        addon.Loot:PrepareItem()
+        announced = false
+
+        itemInfo.bagID = inBag
+        itemInfo.slotID = inSlot
+        itemInfo.count = count or 1
+        itemInfo.isStack = (itemInfo.count > 1)
+
+        module:ResetItemCount(true)
+        ClearCursor()
+        return true
+    end
+
+    -- Accept an item currently held on the cursor (bag drag or click-pickup).
+    -- This is triggered by ItemBtn's OnClick and OnReceiveDrag.
+    function module:TryAcceptInventoryItemFromCursor()
+        if countdownRun then return false end
+        if not CursorHasItem or not CursorHasItem() then return false end
+
+        local infoType, _, itemLink = GetCursorInfo()
+        if infoType ~= "item" or not itemLink then return false end
+
+        local bag, slot, count
+
+        -- Prefer ITEM_LOCKED hint if it matches and is still locked.
+        if pendingInv.bag and pendingInv.slot and pendingInv.link == itemLink then
+            local link = GetContainerItemLink(pendingInv.bag, pendingInv.slot)
+            local _, c, locked = GetContainerItemInfo(pendingInv.bag, pendingInv.slot)
+            if locked and link == itemLink then
+                bag, slot, count = pendingInv.bag, pendingInv.slot, (c or pendingInv.count or 1)
+            end
+        end
+
+        if not bag then
+            bag, slot, count = ResolveCursorBagSlot(itemLink)
+        end
+
+        ClearPendingInv()
+
+        if not bag or not slot then
+            -- Nothing to do; do not clear cursor.
+            addon:trace(("ML: cursor item could not be resolved to a bag/slot (item=%s)."):format(tostring(itemLink)))
+            return false
+        end
+
+        return ApplyInventoryItem(bag, slot, itemLink, (count or 1))
+    end
+
     -- ITEM_LOCKED: Triggered when an item is picked up from inventory.
     function module:ITEM_LOCKED(inBag, inSlot)
         if not inBag or not inSlot then return end
@@ -3295,29 +3399,12 @@ do
         addon:trace(E.LogMLItemLocked:format(tostring(inBag), tostring(inSlot), tostring(itemLink),
             tostring(count), tostring(ItemIsSoulbound(inBag, inSlot))))
         lootState.itemCount = count or lootState.itemCount or 1
-        _G[frameName .. "ItemBtn"]:SetScript("OnClick", function(self)
-            if countdownRun then
-                return
-            end
-            if not ItemIsSoulbound(inBag, inSlot) then
-                -- Clear count:
-                Utils.resetEditBox(_G[frameName .. "ItemCount"], true)
 
-                lootState.fromInventory = true
-                addon.Loot:AddItem(itemLink, count)
-                addon.Loot:PrepareItem()
-                announced        = false
-                -- self.Logger:SetSource("inventory")
-                itemInfo.bagID   = inBag
-                itemInfo.slotID  = inSlot
-                itemInfo.count   = count or 1
-                itemInfo.isStack = (itemInfo.count > 1)
-                module:ResetItemCount(true)
-            else
-                addon:warn(E.LogMLInventorySoulbound:format(tostring(itemLink)))
-            end
-            ClearCursor()
-        end)
+        -- Remember the last picked-up bag item as a best-effort hint.
+        pendingInv.bag = inBag
+        pendingInv.slot = inSlot
+        pendingInv.link = itemLink
+        pendingInv.count = count or 1
     end
 
     -- LOOT_OPENED: Triggered when the loot window opens.
