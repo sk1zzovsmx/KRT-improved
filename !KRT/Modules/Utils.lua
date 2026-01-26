@@ -11,6 +11,7 @@ local format, gsub = string.format, string.gsub
 local strsub, strlen = string.sub, string.len
 local lower, upper = string.lower, string.upper
 local select = select
+local twipe = table.wipe
 local LibStub = LibStub
 local CreateFrame = CreateFrame
 
