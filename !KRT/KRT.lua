@@ -5461,6 +5461,7 @@ do
         end),
 
         highlightFn = function(_, it) return it and it.name == selectedID end,
+        highlightKey = function() return tostring(selectedID or "nil") end,
     }
 
     -- ----- Public methods ----- --
