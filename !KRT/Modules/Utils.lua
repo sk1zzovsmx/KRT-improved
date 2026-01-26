@@ -12,6 +12,7 @@ local strsub, strlen = string.sub, string.len
 local lower, upper = string.lower, string.upper
 local select = select
 local LibStub = LibStub
+local CreateFrame = CreateFrame
 
 local GetTime = GetTime
 local GetRealmName = GetRealmName
@@ -219,6 +220,331 @@ function Utils.createRowDrawer(fn)
 		fn(row, it)
 		return rowHeight
 	end
+end
+
+-- =========== List controller helper  =========== --
+-- Generic scroll list controller with row pooling, sorting, and selection visuals.
+function Utils.makeListController(cfg)
+	local self = {
+		frameName = nil,
+		data = {},
+		_rows = {},
+		_rowByName = {},
+		_asc = false,
+		_lastHL = nil,
+		_active = false,
+		_localized = false,
+		_lastWidth = nil,
+		_dirty = true,
+	}
+
+	local defer = CreateFrame("Frame")
+	defer:Hide()
+
+	local function buildRowParts(btnName, row)
+		if cfg._rowParts and not row._p then
+			local p = {}
+			for i = 1, #cfg._rowParts do
+				local part = cfg._rowParts[i]
+				p[part] = _G[btnName .. part]
+			end
+			row._p = p
+		end
+	end
+
+	local function acquireRow(btnName, parent)
+		local row = self._rowByName[btnName]
+		if row then
+			row:Show()
+			if Utils and Utils.ensureRowVisuals then
+				Utils.ensureRowVisuals(row)
+			end
+			return row
+		end
+
+		row = CreateFrame("Button", btnName, parent, cfg.rowTmpl)
+		self._rowByName[btnName] = row
+		buildRowParts(btnName, row)
+		if Utils and Utils.ensureRowVisuals then
+			Utils.ensureRowVisuals(row)
+		end
+		return row
+	end
+
+	local function releaseData()
+		for i = 1, #self.data do
+			twipe(self.data[i])
+		end
+		twipe(self.data)
+	end
+
+	local function refreshData()
+		releaseData()
+		if cfg.getData then
+			cfg.getData(self.data)
+		end
+	end
+
+	local function ensureLocalized()
+		if not self._localized and cfg.localize then
+			cfg.localize(self.frameName)
+			self._localized = true
+		end
+	end
+
+	local function setActive(active)
+		self._active = active
+		if self._active then
+			ensureLocalized()
+			-- Reset one-shot diagnostics each time the list becomes active (OnShow).
+			self._loggedFetch = nil
+			self._loggedWidgets = nil
+			self._warnW0 = nil
+			self._missingScroll = nil
+			self:Dirty()
+			return
+		end
+		releaseData()
+		for i = 1, #self._rows do
+			local row = self._rows[i]
+			if row then row:Hide() end
+		end
+		self._lastHL = nil
+	end
+
+	local function applyHighlight()
+		-- Selection overlay (multi or legacy single) + Focus border (one row).
+		-- Keep hover highlight native (no LockHighlight for selection).
+		local focusId = (cfg.focusId and cfg.focusId()) or (cfg.highlightId and cfg.highlightId()) or nil
+
+		local selKey
+		if cfg.highlightId then
+			-- Legacy: single selection (use the selected id as key)
+			local sel = cfg.highlightId()
+			selKey = sel and ("id:" .. tostring(sel)) or "id:nil"
+		elseif cfg.highlightFn then
+			selKey = (cfg.highlightKey and cfg.highlightKey()) or false
+		else
+			selKey = false
+		end
+
+		local focusKey = (cfg.focusKey and cfg.focusKey()) or
+			(focusId ~= nil and ("f:" .. tostring(focusId)) or "f:nil")
+		local combo = tostring(selKey) .. "|" .. tostring(focusKey)
+		if combo == self._lastHL then return end
+		self._lastHL = combo
+
+		for i = 1, #self.data do
+			local it = self.data[i]
+			local row = self._rows[i]
+			if row then
+				local isSel = false
+				if cfg.highlightId then
+					local sel = cfg.highlightId()
+					isSel = (sel ~= nil and it.id == sel)
+				elseif cfg.highlightFn then
+					isSel = cfg.highlightFn(it.id, it, i, row) and true or false
+				end
+
+				if Utils and Utils.setRowSelected then
+					Utils.setRowSelected(row, isSel)
+				else
+					-- Fallback to legacy highlight if visuals are missing.
+					Utils.toggleHighlight(row, isSel)
+				end
+
+				if Utils and Utils.setRowFocused then
+					Utils.setRowFocused(row, focusId ~= nil and it.id == focusId)
+				end
+			end
+		end
+
+		if cfg.highlightDebugTag and addon and addon.options and addon.options.debug and addon.debug then
+			local info = (cfg.highlightDebugInfo and cfg.highlightDebugInfo(self)) or ""
+			if info ~= "" then info = " " .. info end
+			addon:debug(("[%s] refresh key=%s%s"):format(tostring(cfg.highlightDebugTag), tostring(selKey), info))
+		end
+	end
+
+	local function postUpdate()
+		if cfg.postUpdate then
+			cfg.postUpdate(self.frameName)
+		end
+	end
+
+	function self:Touch()
+		defer:Show()
+	end
+
+	function self:Dirty()
+		self._dirty = true
+		defer:Show()
+	end
+
+	local function runUpdate()
+		if not self._active or not self.frameName then return end
+
+		if self._dirty then
+			refreshData()
+			local okFetch = self:Fetch()
+			-- If Fetch() returns false we defer until the frame has a real size.
+			if okFetch ~= false then
+				self._dirty = false
+			end
+		end
+
+		applyHighlight()
+		postUpdate()
+	end
+
+	defer:SetScript("OnUpdate", function(f)
+		f:Hide()
+		local ok, err = pcall(runUpdate)
+		if not ok then
+			-- If the user has script errors disabled, this still surfaces the problem in chat.
+			if err ~= self._lastErr then
+				self._lastErr = err
+				addon:error(L.LogLoggerUIError:format(tostring(cfg.keyName or "?"), tostring(err)))
+			end
+		end
+	end)
+
+	function self:OnLoad(frame)
+		if not frame then return end
+		self.frameName = frame:GetName()
+
+		frame:SetScript("OnShow", function()
+			if not self._shownOnce then
+				self._shownOnce = true
+				addon:debug(L.LogLoggerUIShow:format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
+			end
+			setActive(true)
+			if not self._loggedWidgets then
+				self._loggedWidgets = true
+				local n = self.frameName
+				local sf = n and _G[n .. "ScrollFrame"]
+				local sc = n and _G[n .. "ScrollFrameScrollChild"]
+				addon:debug(L.LogLoggerUIWidgets:format(
+					tostring(cfg.keyName or "?"),
+					tostring(sf), tostring(sc),
+					sf and (sf:GetWidth() or 0) or 0,
+					sf and (sf:GetHeight() or 0) or 0,
+					sc and (sc:GetWidth() or 0) or 0,
+					sc and (sc:GetHeight() or 0) or 0
+				))
+			end
+		end)
+
+		frame:SetScript("OnHide", function()
+			setActive(false)
+		end)
+
+		if frame:IsShown() then
+			setActive(true)
+		end
+	end
+
+	function self:Fetch()
+		local n = self.frameName
+		if not n then return end
+
+		local sf = _G[n .. "ScrollFrame"]
+		local sc = _G[n .. "ScrollFrameScrollChild"]
+		if not (sf and sc) then
+			if not self._missingScroll then
+				self._missingScroll = true
+				addon:warn(L.LogLoggerUIMissingWidgets:format(tostring(cfg.keyName or "?"), tostring(n)))
+			end
+			return
+		end
+
+		local scrollW = sf:GetWidth() or 0
+		self._lastWidth = scrollW
+
+		-- Defer draw until the ScrollFrame has a real size (first OnShow can report 0).
+		if scrollW < 10 then
+			if not self._warnW0 then
+				self._warnW0 = true
+				addon:debug(L.LogLoggerUIDeferLayout:format(tostring(cfg.keyName or "?"), scrollW))
+			end
+			defer:Show()
+			return false
+		end
+		if (sc:GetWidth() or 0) < 10 then
+			sc:SetWidth(scrollW)
+		end
+
+		-- One-time diagnostics per list to help debug "empty/blank" frames.
+		if not self._loggedFetch then
+			self._loggedFetch = true
+			addon:debug(L.LogLoggerUIFetch:format(
+				tostring(cfg.keyName or "?"),
+				#self.data,
+				sf:GetWidth() or 0, sf:GetHeight() or 0,
+				sc:GetWidth() or 0, sc:GetHeight() or 0,
+				(_G[n] and _G[n]:GetWidth() or 0),
+				(_G[n] and _G[n]:GetHeight() or 0)
+			))
+		end
+
+		local totalH = 0
+		local count = #self.data
+
+		for i = 1, count do
+			local it = self.data[i]
+			local btnName = cfg.rowName(n, it, i)
+
+			local row = self._rows[i]
+			if not row or row:GetName() ~= btnName then
+				row = acquireRow(btnName, sc)
+				self._rows[i] = row
+			end
+
+			row:SetID(it.id)
+			row:ClearAllPoints()
+			-- Stretch the row to the scrollchild width.
+			-- (Avoid relying on GetWidth() being valid on the first OnShow frame.)
+			row:SetPoint("TOPLEFT", 0, -totalH)
+			row:SetPoint("TOPRIGHT", -20, -totalH)
+
+			local rH = cfg.drawRow(row, it)
+			local usedH = rH or row:GetHeight() or 20
+			totalH = totalH + usedH
+
+			row:Show()
+		end
+
+		for i = count + 1, #self._rows do
+			local r = self._rows[i]
+			if r then r:Hide() end
+		end
+
+		sc:SetHeight(math.max(totalH, sf:GetHeight()))
+		if sf.UpdateScrollChildRect then
+			sf:UpdateScrollChildRect()
+		end
+		self._lastHL = nil
+	end
+
+	function self:Sort(key)
+		local cmp = cfg.sorters and cfg.sorters[key]
+		if not cmp or #self.data <= 1 then return end
+		self._asc = not self._asc
+		table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
+		self:Fetch()
+		applyHighlight()
+		postUpdate()
+	end
+
+	self._makeConfirmPopup = Utils.makeConfirmPopup
+
+	return self
+end
+
+function Utils.bindListController(module, controller)
+	module.OnLoad = function(_, frame) controller:OnLoad(frame) end
+	module.Fetch = function() controller:Fetch() end
+	module.Sort = function(_, t) controller:Sort(t) end
 end
 
 -- =========== Roster helpers  =========== --
