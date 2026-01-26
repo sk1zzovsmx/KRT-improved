@@ -5458,6 +5458,14 @@ do
             local r, g, b = Utils.getClassColor(class)
             ui.Name:SetVertexColor(r, g, b)
             ui.Spec:SetText(it.spec)
+
+            if row._krtSelTex and not row._krtSelStyle then
+                row._krtSelTex:SetVertexColor(0.20, 0.60, 1.00, 0.60)
+                if row._krtFocusTex then
+                    row._krtFocusTex:SetVertexColor(0.20, 0.60, 1.00, 0.80)
+                end
+                row._krtSelStyle = true
+            end
         end),
 
         highlightFn = function(_, it) return it and it.name == selectedID end,
