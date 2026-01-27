@@ -8309,6 +8309,7 @@ do
             if title then title:SetText(L.StrRaidLoot) end
             _G[n .. "ExportBtn"]:SetText(L.BtnExport)
             _G[n .. "ClearBtn"]:SetText(L.BtnClear)
+            _G[n .. "AddBtn"]:SetText(L.BtnAdd)
             _G[n .. "EditBtn"]:SetText(L.BtnEdit)
             _G[n .. "HeaderItem"]:SetText(L.StrItem)
             _G[n .. "HeaderSource"]:SetText(L.StrSource)
