@@ -2933,26 +2933,25 @@ do
     -- Localizes UI frame elements.
     function LocalizeUIFrame()
         if localized then return end
-        if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-            _G[frameName .. "ConfigBtn"]:SetText(L.BtnConfigure)
-            _G[frameName .. "SelectItemBtn"]:SetText(L.BtnSelectItem)
-            _G[frameName .. "SpamLootBtn"]:SetText(L.BtnSpamLoot)
-            _G[frameName .. "MSBtn"]:SetText(L.BtnMS)
-            _G[frameName .. "OSBtn"]:SetText(L.BtnOS)
-            _G[frameName .. "SRBtn"]:SetText(L.BtnSR)
-            _G[frameName .. "FreeBtn"]:SetText(L.BtnFree)
-            _G[frameName .. "CountdownBtn"]:SetText(L.BtnCountdown)
-            _G[frameName .. "AwardBtn"]:SetText(L.BtnAward)
-            _G[frameName .. "RollBtn"]:SetText(L.BtnRoll)
-            _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
-            _G[frameName .. "HoldBtn"]:SetText(L.BtnHold)
-            _G[frameName .. "BankBtn"]:SetText(L.BtnBank)
-            _G[frameName .. "DisenchantBtn"]:SetText(L.BtnDisenchant)
-            _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
-            _G[frameName .. "RollsHeaderRoll"]:SetText(L.StrRoll)
-            _G[frameName .. "ReserveListBtn"]:SetText(L.BtnInsertList)
-            _G[frameName .. "LootCounterBtn"]:SetText(L.BtnLootCounter)
-        end
+        _G[frameName .. "ConfigBtn"]:SetText(L.BtnConfigure)
+        _G[frameName .. "SelectItemBtn"]:SetText(L.BtnSelectItem)
+        _G[frameName .. "SpamLootBtn"]:SetText(L.BtnSpamLoot)
+        _G[frameName .. "MSBtn"]:SetText(L.BtnMS)
+        _G[frameName .. "OSBtn"]:SetText(L.BtnOS)
+        _G[frameName .. "SRBtn"]:SetText(L.BtnSR)
+        _G[frameName .. "FreeBtn"]:SetText(L.BtnFree)
+        _G[frameName .. "CountdownBtn"]:SetText(L.BtnCountdown)
+        _G[frameName .. "AwardBtn"]:SetText(L.BtnAward)
+        _G[frameName .. "RollBtn"]:SetText(L.BtnRoll)
+        _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
+        _G[frameName .. "HoldBtn"]:SetText(L.BtnHold)
+        _G[frameName .. "BankBtn"]:SetText(L.BtnBank)
+        _G[frameName .. "DisenchantBtn"]:SetText(L.BtnDisenchant)
+        _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
+        _G[frameName .. "RollsHeaderPlayer"]:SetText(L.StrPlayer)
+        _G[frameName .. "RollsHeaderRoll"]:SetText(L.StrRoll)
+        _G[frameName .. "ReserveListBtn"]:SetText(L.BtnInsertList)
+        _G[frameName .. "LootCounterBtn"]:SetText(L.BtnLootCounter)
         Utils.setFrameTitle(frameName, MASTER_LOOTER)
         _G[frameName .. "ItemCount"]:SetScript("OnTextChanged", function(self)
             announced = false
@@ -4387,6 +4386,14 @@ do
             addon:error(E.LogReservesImportWindowMissing)
             return
         end
+        local confirmButton = _G["KRTImportConfirmButton"]
+        if confirmButton then
+            confirmButton:SetText(L.BtnImport)
+        end
+        local cancelButton = _G["KRTImportCancelButton"]
+        if cancelButton then
+            cancelButton:SetText(L.BtnClose)
+        end
         frame:Show()
         Utils.resetEditBox(_G["KRTImportEditBox"])
         Utils.setFrameTitle(frame, L.StrImportReservesTitle)
@@ -4967,6 +4974,8 @@ do
     -- Frame update
     local UpdateUIFrame
     local updateInterval = C.UPDATE_INTERVAL_CONFIG
+    local MIN_COUNTDOWN = 5
+    local MAX_COUNTDOWN = 60
 
     -- ----- Private helpers ----- --
     local LocalizeUIFrame
@@ -5051,6 +5060,20 @@ do
         frame:SetScript("OnUpdate", UpdateUIFrame)
     end
 
+    function module:InitCountdownSlider(slider)
+        if not slider then return end
+        local sliderName = slider:GetName()
+        if not sliderName then return end
+        local low = _G[sliderName .. "Low"]
+        if low then
+            low:SetText(tostring(MIN_COUNTDOWN))
+        end
+        local high = _G[sliderName .. "High"]
+        if high then
+            high:SetText(tostring(MAX_COUNTDOWN))
+        end
+    end
+
     -- Toggles the visibility of the configuration frame.
     function module:Toggle()
         local wasShown = UIConfig and UIConfig:IsShown()
@@ -5095,25 +5118,25 @@ do
         end
 
         -- frameName must be ready here (OnLoad sets it before calling)
-        if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-            _G[frameName .. "sortAscendingStr"]:SetText(L.StrConfigSortAscending)
-            _G[frameName .. "useRaidWarningStr"]:SetText(L.StrConfigUseRaidWarning)
-            _G[frameName .. "announceOnWinStr"]:SetText(L.StrConfigAnnounceOnWin)
-            _G[frameName .. "announceOnHoldStr"]:SetText(L.StrConfigAnnounceOnHold)
-            _G[frameName .. "announceOnBankStr"]:SetText(L.StrConfigAnnounceOnBank)
-            _G[frameName .. "announceOnDisenchantStr"]:SetText(L.StrConfigAnnounceOnDisenchant)
-            _G[frameName .. "lootWhispersStr"]:SetText(L.StrConfigLootWhisper)
-            _G[frameName .. "countdownRollsBlockStr"]:SetText(L.StrConfigCountdownRollsBlock)
-            _G[frameName .. "screenReminderStr"]:SetText(L.StrConfigScreenReminder)
-            _G[frameName .. "ignoreStacksStr"]:SetText(L.StrConfigIgnoreStacks)
-            _G[frameName .. "showTooltipsStr"]:SetText(L.StrConfigShowTooltips)
-            _G[frameName .. "minimapButtonStr"]:SetText(L.StrConfigMinimapButton)
-            _G[frameName .. "countdownDurationStr"]:SetText(L.StrConfigCountdownDuration)
-            _G[frameName .. "countdownSimpleRaidMsgStr"]:SetText(L.StrConfigCountdownSimpleRaidMsg)
-        end
+        _G[frameName .. "sortAscendingStr"]:SetText(L.StrConfigSortAscending)
+        _G[frameName .. "useRaidWarningStr"]:SetText(L.StrConfigUseRaidWarning)
+        _G[frameName .. "announceOnWinStr"]:SetText(L.StrConfigAnnounceOnWin)
+        _G[frameName .. "announceOnHoldStr"]:SetText(L.StrConfigAnnounceOnHold)
+        _G[frameName .. "announceOnBankStr"]:SetText(L.StrConfigAnnounceOnBank)
+        _G[frameName .. "announceOnDisenchantStr"]:SetText(L.StrConfigAnnounceOnDisenchant)
+        _G[frameName .. "lootWhispersStr"]:SetText(L.StrConfigLootWhisper)
+        _G[frameName .. "countdownRollsBlockStr"]:SetText(L.StrConfigCountdownRollsBlock)
+        _G[frameName .. "screenReminderStr"]:SetText(L.StrConfigScreenReminder)
+        _G[frameName .. "ignoreStacksStr"]:SetText(L.StrConfigIgnoreStacks)
+        _G[frameName .. "showTooltipsStr"]:SetText(L.StrConfigShowTooltips)
+        _G[frameName .. "minimapButtonStr"]:SetText(L.StrConfigMinimapButton)
+        _G[frameName .. "countdownDurationStr"]:SetText(L.StrConfigCountdownDuration)
+        _G[frameName .. "countdownSimpleRaidMsgStr"]:SetText(L.StrConfigCountdownSimpleRaidMsg)
 
         Utils.setFrameTitle(frameName, SETTINGS)
         _G[frameName .. "AboutStr"]:SetText(L.StrConfigAbout)
+        _G[frameName .. "DefaultsBtn"]:SetText(L.BtnDefaults)
+        _G[frameName .. "CloseBtn"]:SetText(L.BtnClose)
         _G[frameName .. "DefaultsBtn"]:SetScript("OnClick", LoadDefaultOptions)
 
         localized = true
@@ -5333,11 +5356,12 @@ do
     -- Localizing UI frame:
     function LocalizeUIFrame()
         if localized then return end
-        if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-            _G[frameName .. "MessageStr"]:SetText(L.StrMessage)
-            _G[frameName .. "EditBtn"]:SetText(SAVE)
-            _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
-        end
+        _G[frameName .. "NameStr"]:SetText(L.StrName)
+        _G[frameName .. "MessageStr"]:SetText(L.StrMessage)
+        _G[frameName .. "EditBtn"]:SetText(L.BtnSave)
+        _G[frameName .. "DeleteBtn"]:SetText(L.BtnDelete)
+        _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
+        _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
         Utils.setFrameTitle(frameName, RAID_WARNING)
         _G[frameName .. "Name"]:SetScript("OnEscapePressed", module.Cancel)
         _G[frameName .. "Content"]:SetScript("OnEscapePressed", module.Cancel)
@@ -5379,7 +5403,7 @@ do
             Utils.enableDisable(_G[frameName .. "AnnounceBtn"], selectedID ~= nil)
             local editBtnMode = (tempName ~= "" or tempContent ~= "") or selectedID == nil
             if editBtnMode ~= lastEditBtnMode then
-                Utils.setText(_G[frameName .. "EditBtn"], SAVE, L.BtnEdit, editBtnMode)
+                Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
                 lastEditBtnMode = editBtnMode
             end
         end)
@@ -5469,7 +5493,7 @@ do
             local class = addon.Raid:GetPlayerClass(it.name)
             local r, g, b = Utils.getClassColor(class)
             ui.Name:SetVertexColor(r, g, b)
-            ui.Spec:SetText(it.spec)
+            ui.Spec:SetText(it.spec or L.StrNone)
         end),
 
         highlightFn = function(_, it) return it and it.name == selectedID end,
@@ -5644,13 +5668,11 @@ do
     -- Localize UI Frame:
     function LocalizeUIFrame()
         if localized then return end
-        if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-            _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
-            _G[frameName .. "AddBtn"]:SetText(ADD)
-            _G[frameName .. "EditBtn"]:SetText(L.BtnEdit)
-            _G[frameName .. "DemandBtn"]:SetText(L.BtnDemand)
-            _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
-        end
+        _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
+        _G[frameName .. "AddBtn"]:SetText(L.BtnAdd)
+        _G[frameName .. "EditBtn"]:SetText(L.BtnEdit)
+        _G[frameName .. "DemandBtn"]:SetText(L.BtnDemand)
+        _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
         Utils.setFrameTitle(frameName, L.StrChanges)
         _G[frameName .. "Name"]:SetScript("OnEnterPressed", module.Edit)
         _G[frameName .. "Spec"]:SetScript("OnEnterPressed", module.Edit)
@@ -5684,12 +5706,12 @@ do
             Utils.enableDisable(_G[frameName .. "EditBtn"], (selectedID or isEdit or isAdd))
             local editBtnMode = isAdd or (selectedID and isEdit)
             if editBtnMode ~= lastEditBtnMode then
-                Utils.setText(_G[frameName .. "EditBtn"], SAVE, L.BtnEdit, editBtnMode)
+                Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
                 lastEditBtnMode = editBtnMode
             end
             local addBtnMode = (not selectedID and not isEdit and not isAdd)
             if addBtnMode ~= lastAddBtnMode then
-                Utils.setText(_G[frameName .. "AddBtn"], ADD, DELETE, addBtnMode)
+                Utils.setText(_G[frameName .. "AddBtn"], L.BtnAdd, L.BtnDelete, addBtnMode)
                 lastAddBtnMode = addBtnMode
             end
             Utils.showHide(_G[frameName .. "AddBtn"], (not isEdit and not isAdd))
@@ -6127,13 +6149,29 @@ do
     function LocalizeUIFrame()
         if localized then return end
 
-        -- Keep your current behavior (no "point 2")
-        if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-            _G[frameName .. "CompStr"]:SetText(L.StrSpammerCompStr)
-            _G[frameName .. "NeedStr"]:SetText(L.StrSpammerNeedStr)
-            _G[frameName .. "MessageStr"]:SetText(L.StrSpammerMessageStr)
-            _G[frameName .. "PreviewStr"]:SetText(L.StrSpammerPreviewStr)
+        _G[frameName .. "NameStr"]:SetText(L.StrRaid)
+        _G[frameName .. "DurationStr"]:SetText(L.StrDuration)
+        _G[frameName .. "Tick"]:SetText("")
+        _G[frameName .. "CompStr"]:SetText(L.StrSpammerCompStr)
+        _G[frameName .. "NeedStr"]:SetText(L.StrSpammerNeedStr)
+        _G[frameName .. "ClassStr"]:SetText(L.StrClass)
+        _G[frameName .. "TanksStr"]:SetText(L.StrTank)
+        _G[frameName .. "HealersStr"]:SetText(L.StrHealer)
+        _G[frameName .. "MeleesStr"]:SetText(L.StrMelee)
+        _G[frameName .. "RangedStr"]:SetText(L.StrRanged)
+        _G[frameName .. "MessageStr"]:SetText(L.StrSpammerMessageStr)
+        _G[frameName .. "ChannelsStr"]:SetText(L.StrChannels)
+        for i = 1, 8 do
+            local label = _G[frameName .. "Channel" .. i .. "Str"]
+            if label then
+                label:SetText(tostring(i))
+            end
         end
+        _G[frameName .. "ChannelGuildStr"]:SetText(L.StrGuild)
+        _G[frameName .. "ChannelYellStr"]:SetText(L.StrYell)
+        _G[frameName .. "PreviewStr"]:SetText(L.StrSpammerPreviewStr)
+        _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
+        _G[frameName .. "StartBtn"]:SetText(L.BtnStart)
 
         Utils.setFrameTitle(frameName, L.StrSpammer)
         _G[frameName .. "StartBtn"]:SetScript("OnClick", module.Start)
@@ -6367,7 +6405,7 @@ do
             SetInputsLocked(locked)
         end
 
-        Utils.setText(_G[frameName .. "StartBtn"], btnLabel, START, isStop)
+        Utils.setText(_G[frameName .. "StartBtn"], btnLabel, L.BtnStart, isStop)
         Utils.enableDisable(_G[frameName .. "StartBtn"], canStart)
 
         lastControls.locked = locked
@@ -8529,6 +8567,26 @@ do
         frame:RegisterForDrag("LeftButton")
         frame:SetScript("OnUpdate", function(_, elapsed) self:UpdateUIFrame(_, elapsed) end)
         frame:SetScript("OnHide", function() self:CancelAddEdit() end)
+        local nameStr = _G[frameName .. "NameStr"]
+        if nameStr then
+            nameStr:SetText(L.StrName)
+        end
+        local diffStr = _G[frameName .. "DifficultyStr"]
+        if diffStr then
+            diffStr:SetText(L.StrDifficulty)
+        end
+        local timeStr = _G[frameName .. "TimeStr"]
+        if timeStr then
+            timeStr:SetText(L.StrTime)
+        end
+        local saveBtn = _G[frameName .. "SaveBtn"]
+        if saveBtn then
+            saveBtn:SetText(L.BtnSave)
+        end
+        local cancelBtn = _G[frameName .. "CancelBtn"]
+        if cancelBtn then
+            cancelBtn:SetText(L.BtnCancel)
+        end
     end
 
     function Box:Toggle() Utils.toggle(_G[frameName]) end
@@ -8643,6 +8701,22 @@ do
         frame:SetScript("OnHide", function()
             Utils.resetEditBox(_G[frameName .. "Name"])
         end)
+        local title = _G[frameName .. "Title"]
+        if title then
+            title:SetText(L.StrAddPlayer)
+        end
+        local nameStr = _G[frameName .. "NameStr"]
+        if nameStr then
+            nameStr:SetText(L.StrName)
+        end
+        local addBtn = _G[frameName .. "AddBtn"]
+        if addBtn then
+            addBtn:SetText(L.BtnAdd)
+        end
+        local cancelBtn = _G[frameName .. "CancelBtn"]
+        if cancelBtn then
+            cancelBtn:SetText(L.BtnCancel)
+        end
     end
 
     function Box:Toggle() Utils.toggle(_G[frameName]) end

@@ -302,6 +302,7 @@ Throttle high-frequency sources (roster updates, combat log, UI refresh loops).
 ---
 
 ## 17) Change log (edit manually)
+- 2026-03-12: Localized XML UI strings from KRT.xml/Templates.xml via Lua.
 - 2026-03-10: Localized Reserve List window buttons (clear, query item, close).
 - 2026-03-11: Deterministic changes list ordering and refresh after deletions.
 - 2026-03-11: Improved list controller sorting, row sizing, and scroll inset safety.
