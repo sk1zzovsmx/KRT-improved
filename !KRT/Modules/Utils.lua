@@ -231,7 +231,9 @@ function Utils.makeListController(cfg)
 		data = {},
 		_rows = {},
 		_rowByName = {},
+		_usedNames = {},
 		_asc = false,
+		_sortKey = nil,
 		_lastHL = nil,
 		_active = false,
 		_localized = false,
@@ -313,16 +315,51 @@ function Utils.makeListController(cfg)
 		self._lastHL = nil
 	end
 
+	local function safeRightInset(sf, frameName)
+		if cfg.rightInset ~= nil then
+			return cfg.rightInset
+		end
+
+		local sb = nil
+		if sf and sf.GetName then
+			sb = _G[sf:GetName() .. "ScrollBar"]
+		end
+		if not sb and sf then
+			sb = sf.ScrollBar
+		end
+		if not sb and frameName then
+			sb = _G[frameName .. "ScrollFrameScrollBar"]
+		end
+
+		local width = sb and sb.GetWidth and sb:GetWidth()
+		if width and width > 0 then
+			return width + 4
+		end
+
+		return 20
+	end
+
+	local function safeRowHeight(row, declaredHeight)
+		local height = declaredHeight
+		if height == nil and row and row.GetHeight then
+			height = row:GetHeight()
+		end
+		if type(height) ~= "number" or height < 1 then
+			return 20
+		end
+		return height
+	end
+
 	local function applyHighlight()
 		-- Selection overlay (multi or legacy single) + Focus border (one row).
 		-- Keep hover highlight native (no LockHighlight for selection).
-		local focusId = (cfg.focusId and cfg.focusId()) or (cfg.highlightId and cfg.highlightId()) or nil
+		local selectedId = cfg.highlightId and cfg.highlightId() or nil
+		local focusId = (cfg.focusId and cfg.focusId()) or selectedId
 
 		local selKey
 		if cfg.highlightId then
 			-- Legacy: single selection (use the selected id as key)
-			local sel = cfg.highlightId()
-			selKey = sel and ("id:" .. tostring(sel)) or "id:nil"
+			selKey = selectedId and ("id:" .. tostring(selectedId)) or "id:nil"
 		elseif cfg.highlightFn then
 			selKey = (cfg.highlightKey and cfg.highlightKey()) or false
 		else
@@ -341,8 +378,7 @@ function Utils.makeListController(cfg)
 			if row then
 				local isSel = false
 				if cfg.highlightId then
-					local sel = cfg.highlightId()
-					isSel = (sel ~= nil and it.id == sel)
+					isSel = (selectedId ~= nil and it.id == selectedId)
 				elseif cfg.highlightFn then
 					isSel = cfg.highlightFn(it.id, it, i, row) and true or false
 				end
@@ -490,10 +526,20 @@ function Utils.makeListController(cfg)
 
 		local totalH = 0
 		local count = #self.data
+		local used = self._usedNames
+		if twipe then
+			twipe(used)
+		else
+			for k in pairs(used) do
+				used[k] = nil
+			end
+		end
+		local rightInset = safeRightInset(sf, n)
 
 		for i = 1, count do
 			local it = self.data[i]
 			local btnName = cfg.rowName(n, it, i)
+			used[btnName] = true
 
 			local row = self._rows[i]
 			if not row or row:GetName() ~= btnName then
@@ -506,10 +552,10 @@ function Utils.makeListController(cfg)
 			-- Stretch the row to the scrollchild width.
 			-- (Avoid relying on GetWidth() being valid on the first OnShow frame.)
 			row:SetPoint("TOPLEFT", 0, -totalH)
-			row:SetPoint("TOPRIGHT", -20, -totalH)
+			row:SetPoint("TOPRIGHT", -rightInset, -totalH)
 
 			local rH = cfg.drawRow(row, it)
-			local usedH = rH or row:GetHeight() or 20
+			local usedH = safeRowHeight(row, rH)
 			totalH = totalH + usedH
 
 			row:Show()
@@ -518,6 +564,11 @@ function Utils.makeListController(cfg)
 		for i = count + 1, #self._rows do
 			local r = self._rows[i]
 			if r then r:Hide() end
+		end
+		for name, row in pairs(self._rowByName) do
+			if not used[name] and row and row.IsShown and row:IsShown() then
+				row:Hide()
+			end
 		end
 
 		sc:SetHeight(math.max(totalH, sf:GetHeight()))
@@ -530,6 +581,10 @@ function Utils.makeListController(cfg)
 	function self:Sort(key)
 		local cmp = cfg.sorters and cfg.sorters[key]
 		if not cmp or #self.data <= 1 then return end
+		if self._sortKey ~= key then
+			self._sortKey = key
+			self._asc = false
+		end
 		self._asc = not self._asc
 		table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
 		self:Fetch()
