@@ -315,7 +315,7 @@ function Utils.makeListController(cfg)
 		self._lastHL = nil
 	end
 
-	local function safeRightInset(sf, frameName)
+	local function safeRightInset(sf, sc, frameName)
 		if cfg.rightInset ~= nil then
 			return cfg.rightInset
 		end
@@ -331,12 +331,27 @@ function Utils.makeListController(cfg)
 			sb = _G[frameName .. "ScrollFrameScrollBar"]
 		end
 
-		local width = sb and sb.GetWidth and sb:GetWidth()
-		if width and width > 0 then
-			return width + 4
+		-- Robust calc: how far the scroll child extends under the scrollbar.
+		-- Avoid oversized estimated insets that create visible gaps.
+		if sb and sc and sb.IsShown and sb:IsShown() and sb.GetLeft and sc.GetRight then
+			local sbL = sb:GetLeft()
+			local scR = sc:GetRight()
+			if sbL and scR then
+				local overlap = scR - sbL
+				if overlap > 0 then
+					-- No extra padding; row template already handles spacing.
+					return overlap
+				end
+				return 0
+			end
 		end
 
-		return 20
+		-- Fallback: conservative without extra padding.
+		local width = sb and sb.GetWidth and sb:GetWidth()
+		if width and width > 0 then
+			return width
+		end
+		return 0
 	end
 
 	local function safeRowHeight(row, declaredHeight)
@@ -534,7 +549,7 @@ function Utils.makeListController(cfg)
 				used[k] = nil
 			end
 		end
-		local rightInset = safeRightInset(sf, n)
+		local rightInset = safeRightInset(sf, sc, n)
 
 		for i = 1, count do
 			local it = self.data[i]
