@@ -5441,10 +5441,14 @@ do
         _rowParts = { "Name", "Spec" },
 
         getData = function(out)
-            local idx = 0
-            for name, spec in pairs(changesTable) do
-                idx = idx + 1
-                out[idx] = { id = idx, name = name, spec = spec }
+            local names = {}
+            for name in pairs(changesTable) do
+                names[#names + 1] = name
+            end
+            table.sort(names)
+            for i = 1, #names do
+                local name = names[i]
+                out[i] = { id = i, name = name, spec = changesTable[name] }
             end
         end,
 
@@ -5494,15 +5498,13 @@ do
     -- Clear module:
     function module:Clear()
         if not KRT_CurrentRaid or changesTable == nil then return end
-        for n, p in pairs(changesTable) do
+        for n in pairs(changesTable) do
             changesTable[n] = nil
-            if _G[frameName .. "PlayerBtn" .. n] then
-                _G[frameName .. "PlayerBtn" .. n]:Hide()
-            end
         end
         CancelChanges()
         fetched = false
         changesDirty = true
+        controller:Dirty()
     end
 
     -- Selecting Player:
@@ -5518,11 +5520,9 @@ do
         if not addon.Raid:CheckPlayer(name) then found = false end
         if not changesTable[name] then found = false end
         if not found then
-            if _G[frameName .. "PlayerBtn" .. name] then
-                _G[frameName .. "PlayerBtn" .. name]:Hide()
-            end
             fetched = false
             changesDirty = true
+            controller:Dirty()
             return
         end
         -- Quick announce?
@@ -5547,12 +5547,10 @@ do
             isAdd = true
         elseif changesTable[selectedID] then
             changesTable[selectedID] = nil
-            if _G[frameName .. "PlayerBtn" .. selectedID] then
-                _G[frameName .. "PlayerBtn" .. selectedID]:Hide()
-            end
             CancelChanges()
             fetched = false
             changesDirty = true
+            controller:Dirty()
         end
     end
 
@@ -5577,10 +5575,8 @@ do
     function module:Delete(name)
         if not KRT_CurrentRaid or not name then return end
         KRT_Raids[KRT_CurrentRaid].changes[name] = nil
-        if _G[frameName .. "PlayerBtn" .. name] then
-            _G[frameName .. "PlayerBtn" .. name]:Hide()
-        end
         changesDirty = true
+        controller:Dirty()
     end
 
     Utils.registerCallback("RaidLeave", function(e, name)
@@ -5598,7 +5594,7 @@ do
     function module:Announce()
         if not KRT_CurrentRaid then return end
         -- In case of a reload/relog and the frame wasn't loaded
-        if not fetched or #changesTable == 0 then
+        if not fetched or not next(changesTable) then
             InitChangesTable()
         end
         local count = addon.tLength(changesTable)
@@ -5616,11 +5612,15 @@ do
             msg = format(L.StrChangesAnnounceOne, name, changesTable[name])
         else
             msg = L.StrChangesAnnounce
-            local i = count
-            for n, c in pairs(changesTable) do
-                msg = msg .. " " .. n .. "=" .. c
-                i = i - 1
-                if i > 0 then msg = msg .. " /" end
+            local names = {}
+            for n in pairs(changesTable) do
+                names[#names + 1] = n
+            end
+            table.sort(names)
+            for i = 1, #names do
+                local n = names[i]
+                msg = msg .. " " .. n .. "=" .. tostring(changesTable[n])
+                if i < #names then msg = msg .. " /" end
             end
         end
         addon:Announce(msg)
@@ -5707,6 +5707,7 @@ do
         CancelChanges()
         fetched = false
         changesDirty = true
+        controller:Dirty()
     end
 
     -- Cancel all actions:
