@@ -5425,6 +5425,7 @@ do
     local updateInterval = C.UPDATE_INTERVAL_CHANGES
 
     local changesTable = {}
+    local tmpNames = {}
     local SaveChanges, CancelChanges
     local fetched = false
     local changesDirty = false
@@ -5441,7 +5442,14 @@ do
         _rowParts = { "Name", "Spec" },
 
         getData = function(out)
-            local names = {}
+            local names = tmpNames
+            if twipe then
+                twipe(names)
+            else
+                for i = 1, #names do
+                    names[i] = nil
+                end
+            end
             for name in pairs(changesTable) do
                 names[#names + 1] = name
             end
@@ -5612,7 +5620,14 @@ do
             msg = format(L.StrChangesAnnounceOne, name, changesTable[name])
         else
             msg = L.StrChangesAnnounce
-            local names = {}
+            local names = tmpNames
+            if twipe then
+                twipe(names)
+            else
+                for i = 1, #names do
+                    names[i] = nil
+                end
+            end
             for n in pairs(changesTable) do
                 names[#names + 1] = n
             end
@@ -5688,7 +5703,13 @@ do
     -- Initialize changes table:
     function InitChangesTable()
         addon:debug(E.LogChangesInitTable)
-        changesTable = KRT_CurrentRaid and KRT_Raids[KRT_CurrentRaid].changes or {}
+        if not KRT_CurrentRaid then
+            changesTable = {}
+            return
+        end
+        local raid = KRT_Raids[KRT_CurrentRaid]
+        raid.changes = raid.changes or {}
+        changesTable = raid.changes
     end
 
     -- Save module:
