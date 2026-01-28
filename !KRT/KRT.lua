@@ -3082,7 +3082,7 @@ do
                     spamLootText = lootState.fromInventory and READY_CHECK or L.BtnSpamLoot,
                     canSelectItem = (lootState.lootCount > 1
                         or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRun,
-                    canChangeItem = hasItem and not countdownRun,
+                    canChangeItem = not countdownRun,
                     canSpamLoot = lootState.lootCount >= 1,
                     canStartRolls = lootState.lootCount >= 1,
                     canStartSR = lootState.lootCount >= 1 and hasItemReserves,
