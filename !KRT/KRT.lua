@@ -2593,6 +2593,20 @@ do
         UIMaster = frame
         addon.UIMaster = frame
         frameName = frame:GetName()
+        -- Initialize ItemBtn scripts once (clean inventory drop support: click or drag-drop).
+        local itemBtn = _G[frameName .. "ItemBtn"]
+        if itemBtn and not itemBtn.__krtMLInvDropInit then
+            itemBtn.__krtMLInvDropInit = true
+            itemBtn:RegisterForClicks("AnyUp")
+            itemBtn:SetScript("OnReceiveDrag", function(self)
+                module:TryAcceptInventoryItemFromCursor()
+            end)
+            itemBtn:SetScript("OnClick", function(self, button)
+                if CursorHasItem and CursorHasItem() then
+                    module:TryAcceptInventoryItemFromCursor()
+                end
+            end)
+        end
         frame:RegisterForDrag("LeftButton")
         frame:SetScript("OnUpdate", UpdateUIFrame)
         frame:SetScript("OnHide", function()
@@ -2919,26 +2933,25 @@ do
     -- Localizes UI frame elements.
     function LocalizeUIFrame()
         if localized then return end
-        if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-            _G[frameName .. "ConfigBtn"]:SetText(L.BtnConfigure)
-            _G[frameName .. "SelectItemBtn"]:SetText(L.BtnSelectItem)
-            _G[frameName .. "SpamLootBtn"]:SetText(L.BtnSpamLoot)
-            _G[frameName .. "MSBtn"]:SetText(L.BtnMS)
-            _G[frameName .. "OSBtn"]:SetText(L.BtnOS)
-            _G[frameName .. "SRBtn"]:SetText(L.BtnSR)
-            _G[frameName .. "FreeBtn"]:SetText(L.BtnFree)
-            _G[frameName .. "CountdownBtn"]:SetText(L.BtnCountdown)
-            _G[frameName .. "AwardBtn"]:SetText(L.BtnAward)
-            _G[frameName .. "RollBtn"]:SetText(L.BtnRoll)
-            _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
-            _G[frameName .. "HoldBtn"]:SetText(L.BtnHold)
-            _G[frameName .. "BankBtn"]:SetText(L.BtnBank)
-            _G[frameName .. "DisenchantBtn"]:SetText(L.BtnDisenchant)
-            _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
-            _G[frameName .. "RollsHeaderRoll"]:SetText(L.StrRoll)
-            _G[frameName .. "ReserveListBtn"]:SetText(L.BtnInsertList)
-            _G[frameName .. "LootCounterBtn"]:SetText(L.BtnLootCounter)
-        end
+        _G[frameName .. "ConfigBtn"]:SetText(L.BtnConfigure)
+        _G[frameName .. "SelectItemBtn"]:SetText(L.BtnSelectItem)
+        _G[frameName .. "SpamLootBtn"]:SetText(L.BtnSpamLoot)
+        _G[frameName .. "MSBtn"]:SetText(L.BtnMS)
+        _G[frameName .. "OSBtn"]:SetText(L.BtnOS)
+        _G[frameName .. "SRBtn"]:SetText(L.BtnSR)
+        _G[frameName .. "FreeBtn"]:SetText(L.BtnFree)
+        _G[frameName .. "CountdownBtn"]:SetText(L.BtnCountdown)
+        _G[frameName .. "AwardBtn"]:SetText(L.BtnAward)
+        _G[frameName .. "RollBtn"]:SetText(L.BtnRoll)
+        _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
+        _G[frameName .. "HoldBtn"]:SetText(L.BtnHold)
+        _G[frameName .. "BankBtn"]:SetText(L.BtnBank)
+        _G[frameName .. "DisenchantBtn"]:SetText(L.BtnDisenchant)
+        _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
+        _G[frameName .. "RollsHeaderPlayer"]:SetText(L.StrPlayer)
+        _G[frameName .. "RollsHeaderRoll"]:SetText(L.StrRoll)
+        _G[frameName .. "ReserveListBtn"]:SetText(L.BtnInsertList)
+        _G[frameName .. "LootCounterBtn"]:SetText(L.BtnLootCounter)
         Utils.setFrameTitle(frameName, MASTER_LOOTER)
         _G[frameName .. "ItemCount"]:SetScript("OnTextChanged", function(self)
             announced = false
@@ -3286,6 +3299,96 @@ do
 
     -- ----- Event Handlers & Callbacks ----- --
 
+    -- Pending inventory item (from bags) captured while the item is on the cursor.
+    -- We keep this as a best-effort hint, but the actual drop is resolved at click/drop time via GetCursorInfo().
+    local pendingInv = { bag = nil, slot = nil, link = nil, count = nil }
+
+    local function ClearPendingInv()
+        pendingInv.bag, pendingInv.slot, pendingInv.link, pendingInv.count = nil, nil, nil, nil
+    end
+
+    -- Best-effort: resolve the cursor-held bag item by scanning for a locked bag slot matching the cursor itemLink.
+    local function ResolveCursorBagSlot(itemLink)
+        if not itemLink then return nil end
+        -- Backpack (0) + 4 bag slots (1..4) in WoW 3.3.5a.
+        for bag = 0, 4 do
+            local n = GetContainerNumSlots(bag) or 0
+            for slot = 1, n do
+                local link = GetContainerItemLink(bag, slot)
+                if link and link == itemLink then
+                    local _, count, locked = GetContainerItemInfo(bag, slot)
+                    if locked then
+                        return bag, slot, (count or 1)
+                    end
+                end
+            end
+        end
+        return nil
+    end
+
+    local function ApplyInventoryItem(inBag, inSlot, itemLink, count)
+        if countdownRun then return false end
+        if not itemLink then return false end
+
+        if inBag and inSlot and ItemIsSoulbound(inBag, inSlot) then
+            addon:warn(E.LogMLInventorySoulbound:format(tostring(itemLink)))
+            ClearCursor()
+            return true
+        end
+
+        -- Clear count:
+        Utils.resetEditBox(_G[frameName .. "ItemCount"], true)
+
+        lootState.fromInventory = true
+        addon.Loot:AddItem(itemLink, count)
+        addon.Loot:PrepareItem()
+        announced = false
+
+        itemInfo.bagID = inBag
+        itemInfo.slotID = inSlot
+        itemInfo.count = count or 1
+        itemInfo.isStack = (itemInfo.count > 1)
+
+        module:ResetItemCount(true)
+        ClearCursor()
+        return true
+    end
+
+    -- Accept an item currently held on the cursor (bag drag or click-pickup).
+    -- This is triggered by ItemBtn's OnClick and OnReceiveDrag.
+    function module:TryAcceptInventoryItemFromCursor()
+        if countdownRun then return false end
+        if not CursorHasItem or not CursorHasItem() then return false end
+
+        local infoType, _, itemLink = GetCursorInfo()
+        if infoType ~= "item" or not itemLink then return false end
+
+        local bag, slot, count
+
+        -- Prefer ITEM_LOCKED hint if it matches and is still locked.
+        if pendingInv.bag and pendingInv.slot and pendingInv.link == itemLink then
+            local link = GetContainerItemLink(pendingInv.bag, pendingInv.slot)
+            local _, c, locked = GetContainerItemInfo(pendingInv.bag, pendingInv.slot)
+            if locked and link == itemLink then
+                bag, slot, count = pendingInv.bag, pendingInv.slot, (c or pendingInv.count or 1)
+            end
+        end
+
+        if not bag then
+            bag, slot, count = ResolveCursorBagSlot(itemLink)
+        end
+
+        ClearPendingInv()
+
+        if not bag or not slot then
+            -- Nothing to do; do not clear cursor.
+            addon:trace(("ML: cursor item could not be resolved to a bag/slot (item=%s)."):format(tostring(itemLink)))
+            return false
+        end
+
+        return ApplyInventoryItem(bag, slot, itemLink, (count or 1))
+    end
+
     -- ITEM_LOCKED: Triggered when an item is picked up from inventory.
     function module:ITEM_LOCKED(inBag, inSlot)
         if not inBag or not inSlot then return end
@@ -3295,29 +3398,12 @@ do
         addon:trace(E.LogMLItemLocked:format(tostring(inBag), tostring(inSlot), tostring(itemLink),
             tostring(count), tostring(ItemIsSoulbound(inBag, inSlot))))
         lootState.itemCount = count or lootState.itemCount or 1
-        _G[frameName .. "ItemBtn"]:SetScript("OnClick", function(self)
-            if countdownRun then
-                return
-            end
-            if not ItemIsSoulbound(inBag, inSlot) then
-                -- Clear count:
-                Utils.resetEditBox(_G[frameName .. "ItemCount"], true)
 
-                lootState.fromInventory = true
-                addon.Loot:AddItem(itemLink, count)
-                addon.Loot:PrepareItem()
-                announced        = false
-                -- self.Logger:SetSource("inventory")
-                itemInfo.bagID   = inBag
-                itemInfo.slotID  = inSlot
-                itemInfo.count   = count or 1
-                itemInfo.isStack = (itemInfo.count > 1)
-                module:ResetItemCount(true)
-            else
-                addon:warn(E.LogMLInventorySoulbound:format(tostring(itemLink)))
-            end
-            ClearCursor()
-        end)
+        -- Remember the last picked-up bag item as a best-effort hint.
+        pendingInv.bag = inBag
+        pendingInv.slot = inSlot
+        pendingInv.link = itemLink
+        pendingInv.count = count or 1
     end
 
     -- LOOT_OPENED: Triggered when the loot window opens.
@@ -4300,6 +4386,14 @@ do
             addon:error(E.LogReservesImportWindowMissing)
             return
         end
+        local confirmButton = _G["KRTImportConfirmButton"]
+        if confirmButton then
+            confirmButton:SetText(L.BtnImport)
+        end
+        local cancelButton = _G["KRTImportCancelButton"]
+        if cancelButton then
+            cancelButton:SetText(L.BtnClose)
+        end
         frame:Show()
         Utils.resetEditBox(_G["KRTImportEditBox"])
         Utils.setFrameTitle(frame, L.StrImportReservesTitle)
@@ -4880,6 +4974,8 @@ do
     -- Frame update
     local UpdateUIFrame
     local updateInterval = C.UPDATE_INTERVAL_CONFIG
+    local MIN_COUNTDOWN = 5
+    local MAX_COUNTDOWN = 60
 
     -- ----- Private helpers ----- --
     local LocalizeUIFrame
@@ -4964,6 +5060,20 @@ do
         frame:SetScript("OnUpdate", UpdateUIFrame)
     end
 
+    function module:InitCountdownSlider(slider)
+        if not slider then return end
+        local sliderName = slider:GetName()
+        if not sliderName then return end
+        local low = _G[sliderName .. "Low"]
+        if low then
+            low:SetText(tostring(MIN_COUNTDOWN))
+        end
+        local high = _G[sliderName .. "High"]
+        if high then
+            high:SetText(tostring(MAX_COUNTDOWN))
+        end
+    end
+
     -- Toggles the visibility of the configuration frame.
     function module:Toggle()
         local wasShown = UIConfig and UIConfig:IsShown()
@@ -5008,25 +5118,25 @@ do
         end
 
         -- frameName must be ready here (OnLoad sets it before calling)
-        if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-            _G[frameName .. "sortAscendingStr"]:SetText(L.StrConfigSortAscending)
-            _G[frameName .. "useRaidWarningStr"]:SetText(L.StrConfigUseRaidWarning)
-            _G[frameName .. "announceOnWinStr"]:SetText(L.StrConfigAnnounceOnWin)
-            _G[frameName .. "announceOnHoldStr"]:SetText(L.StrConfigAnnounceOnHold)
-            _G[frameName .. "announceOnBankStr"]:SetText(L.StrConfigAnnounceOnBank)
-            _G[frameName .. "announceOnDisenchantStr"]:SetText(L.StrConfigAnnounceOnDisenchant)
-            _G[frameName .. "lootWhispersStr"]:SetText(L.StrConfigLootWhisper)
-            _G[frameName .. "countdownRollsBlockStr"]:SetText(L.StrConfigCountdownRollsBlock)
-            _G[frameName .. "screenReminderStr"]:SetText(L.StrConfigScreenReminder)
-            _G[frameName .. "ignoreStacksStr"]:SetText(L.StrConfigIgnoreStacks)
-            _G[frameName .. "showTooltipsStr"]:SetText(L.StrConfigShowTooltips)
-            _G[frameName .. "minimapButtonStr"]:SetText(L.StrConfigMinimapButton)
-            _G[frameName .. "countdownDurationStr"]:SetText(L.StrConfigCountdownDuration)
-            _G[frameName .. "countdownSimpleRaidMsgStr"]:SetText(L.StrConfigCountdownSimpleRaidMsg)
-        end
+        _G[frameName .. "sortAscendingStr"]:SetText(L.StrConfigSortAscending)
+        _G[frameName .. "useRaidWarningStr"]:SetText(L.StrConfigUseRaidWarning)
+        _G[frameName .. "announceOnWinStr"]:SetText(L.StrConfigAnnounceOnWin)
+        _G[frameName .. "announceOnHoldStr"]:SetText(L.StrConfigAnnounceOnHold)
+        _G[frameName .. "announceOnBankStr"]:SetText(L.StrConfigAnnounceOnBank)
+        _G[frameName .. "announceOnDisenchantStr"]:SetText(L.StrConfigAnnounceOnDisenchant)
+        _G[frameName .. "lootWhispersStr"]:SetText(L.StrConfigLootWhisper)
+        _G[frameName .. "countdownRollsBlockStr"]:SetText(L.StrConfigCountdownRollsBlock)
+        _G[frameName .. "screenReminderStr"]:SetText(L.StrConfigScreenReminder)
+        _G[frameName .. "ignoreStacksStr"]:SetText(L.StrConfigIgnoreStacks)
+        _G[frameName .. "showTooltipsStr"]:SetText(L.StrConfigShowTooltips)
+        _G[frameName .. "minimapButtonStr"]:SetText(L.StrConfigMinimapButton)
+        _G[frameName .. "countdownDurationStr"]:SetText(L.StrConfigCountdownDuration)
+        _G[frameName .. "countdownSimpleRaidMsgStr"]:SetText(L.StrConfigCountdownSimpleRaidMsg)
 
         Utils.setFrameTitle(frameName, SETTINGS)
         _G[frameName .. "AboutStr"]:SetText(L.StrConfigAbout)
+        _G[frameName .. "DefaultsBtn"]:SetText(L.BtnDefaults)
+        _G[frameName .. "CloseBtn"]:SetText(L.BtnClose)
         _G[frameName .. "DefaultsBtn"]:SetScript("OnClick", LoadDefaultOptions)
 
         localized = true
@@ -5096,7 +5206,6 @@ do
     local UpdateUIFrame
     local updateInterval = C.UPDATE_INTERVAL_WARNINGS
 
-    local FetchWarnings
     local fetched = false
     local warningsDirty = false
 
@@ -5112,6 +5221,30 @@ do
     local SaveWarning
     local isEdit = false
 
+    local controller = Utils.makeListController {
+        keyName = "WarningsList",
+        poolTag = "warnings",
+        _rowParts = { "ID", "Name" },
+
+        getData = function(out)
+            for i = 1, #KRT_Warnings do
+                local w = KRT_Warnings[i]
+                out[i] = { id = i, name = w and w.name or "" }
+            end
+        end,
+
+        rowName = function(n, _, i) return n .. "WarningBtn" .. i end,
+        rowTmpl = "KRTWarningButtonTemplate",
+
+        drawRow = Utils.createRowDrawer(function(row, it)
+            local ui = row._p
+            ui.ID:SetText(it.id)
+            ui.Name:SetText(it.name)
+        end),
+
+        highlightId = function() return selectedID end,
+    }
+
     -- OnLoad frame:
     function module:OnLoad(frame)
         if not frame then return end
@@ -5123,6 +5256,7 @@ do
             lastSelectedID = false
         end)
         frame:SetScript("OnUpdate", UpdateUIFrame)
+        controller:OnLoad(frame)
     end
 
     -- Externally update frame:
@@ -5222,11 +5356,12 @@ do
     -- Localizing UI frame:
     function LocalizeUIFrame()
         if localized then return end
-        if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-            _G[frameName .. "MessageStr"]:SetText(L.StrMessage)
-            _G[frameName .. "EditBtn"]:SetText(SAVE)
-            _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
-        end
+        _G[frameName .. "NameStr"]:SetText(L.StrName)
+        _G[frameName .. "MessageStr"]:SetText(L.StrMessage)
+        _G[frameName .. "EditBtn"]:SetText(L.BtnSave)
+        _G[frameName .. "DeleteBtn"]:SetText(L.BtnDelete)
+        _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
+        _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
         Utils.setFrameTitle(frameName, RAID_WARNING)
         _G[frameName .. "Name"]:SetScript("OnEscapePressed", module.Cancel)
         _G[frameName .. "Content"]:SetScript("OnEscapePressed", module.Cancel)
@@ -5236,14 +5371,7 @@ do
     end
 
     local function UpdateSelectionUI()
-        if lastSelectedID and _G[frameName .. "WarningBtn" .. lastSelectedID] then
-            _G[frameName .. "WarningBtn" .. lastSelectedID]:UnlockHighlight()
-        end
         if selectedID and KRT_Warnings[selectedID] then
-            local btn = _G[frameName .. "WarningBtn" .. selectedID]
-            if btn then
-                btn:LockHighlight()
-            end
             _G[frameName .. "OutputName"]:SetText(KRT_Warnings[selectedID].name)
             _G[frameName .. "OutputContent"]:SetText(KRT_Warnings[selectedID].content)
             _G[frameName .. "OutputContent"]:SetTextColor(1, 1, 1)
@@ -5260,11 +5388,13 @@ do
         LocalizeUIFrame()
         Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             if warningsDirty or not fetched then
-                FetchWarnings()
+                controller:Dirty()
                 warningsDirty = false
+                fetched = true
             end
             if selectedID ~= lastSelectedID then
                 UpdateSelectionUI()
+                controller:Touch()
             end
             tempName    = _G[frameName .. "Name"]:GetText()
             tempContent = _G[frameName .. "Content"]:GetText()
@@ -5273,7 +5403,7 @@ do
             Utils.enableDisable(_G[frameName .. "AnnounceBtn"], selectedID ~= nil)
             local editBtnMode = (tempName ~= "" or tempContent ~= "") or selectedID == nil
             if editBtnMode ~= lastEditBtnMode then
-                Utils.setText(_G[frameName .. "EditBtn"], SAVE, L.BtnEdit, editBtnMode)
+                Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
                 lastEditBtnMode = editBtnMode
             end
         end)
@@ -5302,28 +5432,6 @@ do
         module:Update()
     end
 
-    -- Fetch module:
-    function FetchWarnings()
-        local scrollFrame = _G[frameName .. "ScrollFrame"]
-        local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
-        local totalHeight = 0
-        scrollChild:SetHeight(scrollFrame:GetHeight())
-        scrollChild:SetWidth(scrollFrame:GetWidth())
-        for i, w in pairs(KRT_Warnings) do
-            local btnName = frameName .. "WarningBtn" .. i
-            local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTWarningButtonTemplate")
-            btn:Show()
-            local ID = _G[btnName .. "ID"]
-            ID:SetText(i)
-            local wName = _G[btnName .. "Name"]
-            wName:SetText(w.name)
-            btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
-            btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
-            totalHeight = totalHeight + btn:GetHeight()
-        end
-        fetched = true
-        lastSelectedID = false
-    end
 end
 
 -- =========== MS Changes Module  =========== --
@@ -5341,7 +5449,8 @@ do
     local updateInterval = C.UPDATE_INTERVAL_CHANGES
 
     local changesTable = {}
-    local FetchChanges, SaveChanges, CancelChanges
+    local tmpNames = {}
+    local SaveChanges, CancelChanges
     local fetched = false
     local changesDirty = false
     local selectedID, tempSelectedID
@@ -5350,6 +5459,46 @@ do
     local lastAddBtnMode
     local isAdd = false
     local isEdit = false
+
+    local controller = Utils.makeListController {
+        keyName = "ChangesList",
+        poolTag = "changes",
+        _rowParts = { "Name", "Spec" },
+
+        getData = function(out)
+            local names = tmpNames
+            if twipe then
+                twipe(names)
+            else
+                for i = 1, #names do
+                    names[i] = nil
+                end
+            end
+            for name in pairs(changesTable) do
+                names[#names + 1] = name
+            end
+            table.sort(names)
+            for i = 1, #names do
+                local name = names[i]
+                out[i] = { id = i, name = name, spec = changesTable[name] }
+            end
+        end,
+
+        rowName = function(n, it) return n .. "PlayerBtn" .. it.id end,
+        rowTmpl = "KRTChangesButtonTemplate",
+
+        drawRow = Utils.createRowDrawer(function(row, it)
+            local ui = row._p
+            ui.Name:SetText(it.name)
+            local class = addon.Raid:GetPlayerClass(it.name)
+            local r, g, b = Utils.getClassColor(class)
+            ui.Name:SetVertexColor(r, g, b)
+            ui.Spec:SetText(it.spec or L.StrNone)
+        end),
+
+        highlightFn = function(_, it) return it and it.name == selectedID end,
+        highlightKey = function() return tostring(selectedID or "nil") end,
+    }
 
     -- ----- Public methods ----- --
 
@@ -5364,6 +5513,7 @@ do
             lastSelectedID = false
         end)
         frame:SetScript("OnUpdate", UpdateUIFrame)
+        controller:OnLoad(frame)
     end
 
     -- Toggle frame visibility:
@@ -5380,15 +5530,13 @@ do
     -- Clear module:
     function module:Clear()
         if not KRT_CurrentRaid or changesTable == nil then return end
-        for n, p in pairs(changesTable) do
+        for n in pairs(changesTable) do
             changesTable[n] = nil
-            if _G[frameName .. "PlayerBtn" .. n] then
-                _G[frameName .. "PlayerBtn" .. n]:Hide()
-            end
         end
         CancelChanges()
         fetched = false
         changesDirty = true
+        controller:Dirty()
     end
 
     -- Selecting Player:
@@ -5404,11 +5552,9 @@ do
         if not addon.Raid:CheckPlayer(name) then found = false end
         if not changesTable[name] then found = false end
         if not found then
-            if _G[frameName .. "PlayerBtn" .. name] then
-                _G[frameName .. "PlayerBtn" .. name]:Hide()
-            end
             fetched = false
             changesDirty = true
+            controller:Dirty()
             return
         end
         -- Quick announce?
@@ -5433,12 +5579,10 @@ do
             isAdd = true
         elseif changesTable[selectedID] then
             changesTable[selectedID] = nil
-            if _G[frameName .. "PlayerBtn" .. selectedID] then
-                _G[frameName .. "PlayerBtn" .. selectedID]:Hide()
-            end
             CancelChanges()
             fetched = false
             changesDirty = true
+            controller:Dirty()
         end
     end
 
@@ -5463,10 +5607,8 @@ do
     function module:Delete(name)
         if not KRT_CurrentRaid or not name then return end
         KRT_Raids[KRT_CurrentRaid].changes[name] = nil
-        if _G[frameName .. "PlayerBtn" .. name] then
-            _G[frameName .. "PlayerBtn" .. name]:Hide()
-        end
         changesDirty = true
+        controller:Dirty()
     end
 
     Utils.registerCallback("RaidLeave", function(e, name)
@@ -5484,7 +5626,7 @@ do
     function module:Announce()
         if not KRT_CurrentRaid then return end
         -- In case of a reload/relog and the frame wasn't loaded
-        if not fetched or #changesTable == 0 then
+        if not fetched or not next(changesTable) then
             InitChangesTable()
         end
         local count = addon.tLength(changesTable)
@@ -5502,11 +5644,22 @@ do
             msg = format(L.StrChangesAnnounceOne, name, changesTable[name])
         else
             msg = L.StrChangesAnnounce
-            local i = count
-            for n, c in pairs(changesTable) do
-                msg = msg .. " " .. n .. "=" .. c
-                i = i - 1
-                if i > 0 then msg = msg .. " /" end
+            local names = tmpNames
+            if twipe then
+                twipe(names)
+            else
+                for i = 1, #names do
+                    names[i] = nil
+                end
+            end
+            for n in pairs(changesTable) do
+                names[#names + 1] = n
+            end
+            table.sort(names)
+            for i = 1, #names do
+                local n = names[i]
+                msg = msg .. " " .. n .. "=" .. tostring(changesTable[n])
+                if i < #names then msg = msg .. " /" end
             end
         end
         addon:Announce(msg)
@@ -5515,13 +5668,11 @@ do
     -- Localize UI Frame:
     function LocalizeUIFrame()
         if localized then return end
-        if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-            _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
-            _G[frameName .. "AddBtn"]:SetText(ADD)
-            _G[frameName .. "EditBtn"]:SetText(L.BtnEdit)
-            _G[frameName .. "DemandBtn"]:SetText(L.BtnDemand)
-            _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
-        end
+        _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
+        _G[frameName .. "AddBtn"]:SetText(L.BtnAdd)
+        _G[frameName .. "EditBtn"]:SetText(L.BtnEdit)
+        _G[frameName .. "DemandBtn"]:SetText(L.BtnDemand)
+        _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
         Utils.setFrameTitle(frameName, L.StrChanges)
         _G[frameName .. "Name"]:SetScript("OnEnterPressed", module.Edit)
         _G[frameName .. "Spec"]:SetScript("OnEnterPressed", module.Edit)
@@ -5536,8 +5687,9 @@ do
         Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
             if changesDirty or not fetched then
                 InitChangesTable()
-                FetchChanges()
+                controller:Dirty()
                 changesDirty = false
+                fetched = true
             end
             local count = addon.tLength(changesTable)
             if count > 0 then
@@ -5546,25 +5698,20 @@ do
                 selectedID = nil
             end
             if selectedID ~= lastSelectedID then
-                if lastSelectedID and _G[frameName .. "PlayerBtn" .. lastSelectedID] then
-                    _G[frameName .. "PlayerBtn" .. lastSelectedID]:UnlockHighlight()
-                end
-                if selectedID and _G[frameName .. "PlayerBtn" .. selectedID] then
-                    _G[frameName .. "PlayerBtn" .. selectedID]:LockHighlight()
-                end
                 lastSelectedID = selectedID
+                controller:Touch()
             end
             Utils.showHide(_G[frameName .. "Name"], (isEdit or isAdd))
             Utils.showHide(_G[frameName .. "Spec"], (isEdit or isAdd))
             Utils.enableDisable(_G[frameName .. "EditBtn"], (selectedID or isEdit or isAdd))
             local editBtnMode = isAdd or (selectedID and isEdit)
             if editBtnMode ~= lastEditBtnMode then
-                Utils.setText(_G[frameName .. "EditBtn"], SAVE, L.BtnEdit, editBtnMode)
+                Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
                 lastEditBtnMode = editBtnMode
             end
             local addBtnMode = (not selectedID and not isEdit and not isAdd)
             if addBtnMode ~= lastAddBtnMode then
-                Utils.setText(_G[frameName .. "AddBtn"], ADD, DELETE, addBtnMode)
+                Utils.setText(_G[frameName .. "AddBtn"], L.BtnAdd, L.BtnDelete, addBtnMode)
                 lastAddBtnMode = addBtnMode
             end
             Utils.showHide(_G[frameName .. "AddBtn"], (not isEdit and not isAdd))
@@ -5578,34 +5725,13 @@ do
     -- Initialize changes table:
     function InitChangesTable()
         addon:debug(E.LogChangesInitTable)
-        changesTable = KRT_CurrentRaid and KRT_Raids[KRT_CurrentRaid].changes or {}
-    end
-
-    -- Fetch All module:
-    function FetchChanges()
-        addon:debug(E.LogChangesFetchAll)
-        if not KRT_CurrentRaid then return end
-        local scrollFrame = _G[frameName .. "ScrollFrame"]
-        local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
-        local totalHeight = 0
-        scrollChild:SetHeight(scrollFrame:GetHeight())
-        scrollChild:SetWidth(scrollFrame:GetWidth())
-        for n, c in pairs(changesTable) do
-            local btnName = frameName .. "PlayerBtn" .. n
-            local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTChangesButtonTemplate")
-            btn:Show()
-            local name = _G[btnName .. "Name"]
-            name:SetText(n)
-            local class = addon.Raid:GetPlayerClass(n)
-            local r, g, b = Utils.getClassColor(class)
-            name:SetVertexColor(r, g, b)
-            _G[btnName .. "Spec"]:SetText(c)
-            btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
-            btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
-            totalHeight = totalHeight + btn:GetHeight()
+        if not KRT_CurrentRaid then
+            changesTable = {}
+            return
         end
-        fetched = true
-        lastSelectedID = false
+        local raid = KRT_Raids[KRT_CurrentRaid]
+        raid.changes = raid.changes or {}
+        changesTable = raid.changes
     end
 
     -- Save module:
@@ -5624,6 +5750,7 @@ do
         CancelChanges()
         fetched = false
         changesDirty = true
+        controller:Dirty()
     end
 
     -- Cancel all actions:
@@ -6022,13 +6149,29 @@ do
     function LocalizeUIFrame()
         if localized then return end
 
-        -- Keep your current behavior (no "point 2")
-        if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-            _G[frameName .. "CompStr"]:SetText(L.StrSpammerCompStr)
-            _G[frameName .. "NeedStr"]:SetText(L.StrSpammerNeedStr)
-            _G[frameName .. "MessageStr"]:SetText(L.StrSpammerMessageStr)
-            _G[frameName .. "PreviewStr"]:SetText(L.StrSpammerPreviewStr)
+        _G[frameName .. "NameStr"]:SetText(L.StrRaid)
+        _G[frameName .. "DurationStr"]:SetText(L.StrDuration)
+        _G[frameName .. "Tick"]:SetText("")
+        _G[frameName .. "CompStr"]:SetText(L.StrSpammerCompStr)
+        _G[frameName .. "NeedStr"]:SetText(L.StrSpammerNeedStr)
+        _G[frameName .. "ClassStr"]:SetText(L.StrClass)
+        _G[frameName .. "TanksStr"]:SetText(L.StrTank)
+        _G[frameName .. "HealersStr"]:SetText(L.StrHealer)
+        _G[frameName .. "MeleesStr"]:SetText(L.StrMelee)
+        _G[frameName .. "RangedStr"]:SetText(L.StrRanged)
+        _G[frameName .. "MessageStr"]:SetText(L.StrSpammerMessageStr)
+        _G[frameName .. "ChannelsStr"]:SetText(L.StrChannels)
+        for i = 1, 8 do
+            local label = _G[frameName .. "Channel" .. i .. "Str"]
+            if label then
+                label:SetText(tostring(i))
+            end
         end
+        _G[frameName .. "ChannelGuildStr"]:SetText(L.StrGuild)
+        _G[frameName .. "ChannelYellStr"]:SetText(L.StrYell)
+        _G[frameName .. "PreviewStr"]:SetText(L.StrSpammerPreviewStr)
+        _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
+        _G[frameName .. "StartBtn"]:SetText(L.BtnStart)
 
         Utils.setFrameTitle(frameName, L.StrSpammer)
         _G[frameName .. "StartBtn"]:SetScript("OnClick", module.Start)
@@ -6262,7 +6405,7 @@ do
             SetInputsLocked(locked)
         end
 
-        Utils.setText(_G[frameName .. "StartBtn"], btnLabel, START, isStop)
+        Utils.setText(_G[frameName .. "StartBtn"], btnLabel, L.BtnStart, isStop)
         Utils.enableDisable(_G[frameName .. "StartBtn"], canStart)
 
         lastControls.locked = locked
@@ -7553,346 +7696,13 @@ do
     end
 end
 
--- Logger list controller helpers (Logger-only)
-local makeLoggerListController
-local bindLoggerListController
-
-do
-    local CreateFrame = CreateFrame
-    local math_max = math.max
-
-    function makeLoggerListController(cfg)
-        local self = {
-            frameName = nil,
-            data = {},
-            _rows = {},
-            _rowByName = {},
-            _asc = false,
-            _lastHL = nil,
-            _active = false,
-            _localized = false,
-            _lastWidth = nil,
-            _dirty = true,
-        }
-
-        local defer = CreateFrame("Frame")
-        defer:Hide()
-
-        local function buildRowParts(btnName, row)
-            if cfg._rowParts and not row._p then
-                local p = {}
-                for i = 1, #cfg._rowParts do
-                    local part = cfg._rowParts[i]
-                    p[part] = _G[btnName .. part]
-                end
-                row._p = p
-            end
-        end
-
-        local function acquireRow(btnName, parent)
-            local row = self._rowByName[btnName]
-            if row then
-                row:Show()
-                if Utils and Utils.ensureRowVisuals then
-                    Utils.ensureRowVisuals(row)
-                end
-                return row
-            end
-
-            row = CreateFrame("Button", btnName, parent, cfg.rowTmpl)
-            self._rowByName[btnName] = row
-            buildRowParts(btnName, row)
-            if Utils and Utils.ensureRowVisuals then
-                Utils.ensureRowVisuals(row)
-            end
-            return row
-        end
-
-        local function releaseData()
-            for i = 1, #self.data do
-                twipe(self.data[i])
-            end
-            twipe(self.data)
-        end
-
-        local function refreshData()
-            releaseData()
-            if cfg.getData then
-                cfg.getData(self.data)
-            end
-        end
-
-        local function ensureLocalized()
-            if not self._localized and cfg.localize then
-                cfg.localize(self.frameName)
-                self._localized = true
-            end
-        end
-
-        local function setActive(active)
-            self._active = active
-            if self._active then
-                ensureLocalized()
-                -- Reset one-shot diagnostics each time the list becomes active (OnShow).
-                self._loggedFetch = nil
-                self._loggedWidgets = nil
-                self._warnW0 = nil
-                self._missingScroll = nil
-                self:Dirty()
-                return
-            end
-            releaseData()
-            for i = 1, #self._rows do
-                local row = self._rows[i]
-                if row then row:Hide() end
-            end
-            self._lastHL = nil
-        end
-
-        local function applyHighlight()
-            -- Selection overlay (multi or legacy single) + Focus border (one row).
-            -- Keep hover highlight native (no LockHighlight for selection).
-            local focusId = (cfg.focusId and cfg.focusId()) or (cfg.highlightId and cfg.highlightId()) or nil
-
-            local selKey
-            if cfg.highlightId then
-                -- Legacy: single selection (use the selected id as key)
-                local sel = cfg.highlightId()
-                selKey = sel and ("id:" .. tostring(sel)) or "id:nil"
-            elseif cfg.highlightFn then
-                selKey = (cfg.highlightKey and cfg.highlightKey()) or false
-            else
-                selKey = false
-            end
-
-            local focusKey = (cfg.focusKey and cfg.focusKey()) or
-                (focusId ~= nil and ("f:" .. tostring(focusId)) or "f:nil")
-            local combo = tostring(selKey) .. "|" .. tostring(focusKey)
-            if combo == self._lastHL then return end
-            self._lastHL = combo
-
-            for i = 1, #self.data do
-                local it = self.data[i]
-                local row = self._rows[i]
-                if row then
-                    local isSel = false
-                    if cfg.highlightId then
-                        local sel = cfg.highlightId()
-                        isSel = (sel ~= nil and it.id == sel)
-                    elseif cfg.highlightFn then
-                        isSel = cfg.highlightFn(it.id, it, i, row) and true or false
-                    end
-
-                    if Utils and Utils.setRowSelected then
-                        Utils.setRowSelected(row, isSel)
-                    else
-                        -- Fallback to legacy highlight if visuals are missing.
-                        Utils.toggleHighlight(row, isSel)
-                    end
-
-                    if Utils and Utils.setRowFocused then
-                        Utils.setRowFocused(row, focusId ~= nil and it.id == focusId)
-                    end
-                end
-            end
-
-            if cfg.highlightDebugTag and addon and addon.options and addon.options.debug and addon.debug then
-                local info = (cfg.highlightDebugInfo and cfg.highlightDebugInfo(self)) or ""
-                if info ~= "" then info = " " .. info end
-                addon:debug(("[%s] refresh key=%s%s"):format(tostring(cfg.highlightDebugTag), tostring(selKey), info))
-            end
-        end
-
-        local function postUpdate()
-            if cfg.postUpdate then
-                cfg.postUpdate(self.frameName)
-            end
-        end
-
-        function self:Touch()
-            defer:Show()
-        end
-
-        function self:Dirty()
-            self._dirty = true
-            defer:Show()
-        end
-
-        local function runUpdate()
-            if not self._active or not self.frameName then return end
-
-            if self._dirty then
-                refreshData()
-                local okFetch = self:Fetch()
-                -- If Fetch() returns false we defer until the frame has a real size.
-                if okFetch ~= false then
-                    self._dirty = false
-                end
-            end
-
-            applyHighlight()
-            postUpdate()
-        end
-
-        defer:SetScript("OnUpdate", function(f)
-            f:Hide()
-            local ok, err = pcall(runUpdate)
-            if not ok then
-                -- If the user has script errors disabled, this still surfaces the problem in chat.
-                if err ~= self._lastErr then
-                    self._lastErr = err
-                    addon:error(L.LogLoggerUIError:format(tostring(cfg.keyName or "?"), tostring(err)))
-                end
-            end
-        end)
-
-        function self:OnLoad(frame)
-            if not frame then return end
-            self.frameName = frame:GetName()
-
-            frame:SetScript("OnShow", function()
-                if not self._shownOnce then
-                    self._shownOnce = true
-                    addon:debug(L.LogLoggerUIShow:format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
-                end
-                setActive(true)
-                if not self._loggedWidgets then
-                    self._loggedWidgets = true
-                    local n = self.frameName
-                    local sf = n and _G[n .. "ScrollFrame"]
-                    local sc = n and _G[n .. "ScrollFrameScrollChild"]
-                    addon:debug(L.LogLoggerUIWidgets:format(
-                        tostring(cfg.keyName or "?"),
-                        tostring(sf), tostring(sc),
-                        sf and (sf:GetWidth() or 0) or 0,
-                        sf and (sf:GetHeight() or 0) or 0,
-                        sc and (sc:GetWidth() or 0) or 0,
-                        sc and (sc:GetHeight() or 0) or 0
-                    ))
-                end
-            end)
-
-            frame:SetScript("OnHide", function()
-                setActive(false)
-            end)
-
-            if frame:IsShown() then
-                setActive(true)
-            end
-        end
-
-        function self:Fetch()
-            local n = self.frameName
-            if not n then return end
-
-            local sf = _G[n .. "ScrollFrame"]
-            local sc = _G[n .. "ScrollFrameScrollChild"]
-            if not (sf and sc) then
-                if not self._missingScroll then
-                    self._missingScroll = true
-                    addon:warn(L.LogLoggerUIMissingWidgets:format(tostring(cfg.keyName or "?"), tostring(n)))
-                end
-                return
-            end
-
-            local scrollW = sf:GetWidth() or 0
-            local widthChanged = (self._lastWidth ~= scrollW)
-            self._lastWidth = scrollW
-
-            -- Defer draw until the ScrollFrame has a real size (first OnShow can report 0).
-            if scrollW < 10 then
-                if not self._warnW0 then
-                    self._warnW0 = true
-                    addon:debug(L.LogLoggerUIDeferLayout:format(tostring(cfg.keyName or "?"), scrollW))
-                end
-                defer:Show()
-                return false
-            end
-            if (sc:GetWidth() or 0) < 10 then
-                sc:SetWidth(scrollW)
-            end
-
-            -- One-time diagnostics per list to help debug "empty/blank" frames.
-            if not self._loggedFetch then
-                self._loggedFetch = true
-                addon:debug(L.LogLoggerUIFetch:format(
-                    tostring(cfg.keyName or "?"),
-                    #self.data,
-                    sf:GetWidth() or 0, sf:GetHeight() or 0,
-                    sc:GetWidth() or 0, sc:GetHeight() or 0,
-                    (_G[n] and _G[n]:GetWidth() or 0),
-                    (_G[n] and _G[n]:GetHeight() or 0)
-                ))
-            end
-
-            local totalH = 0
-            local count = #self.data
-
-            for i = 1, count do
-                local it = self.data[i]
-                local btnName = cfg.rowName(n, it, i)
-
-                local row = self._rows[i]
-                if not row or row:GetName() ~= btnName then
-                    row = acquireRow(btnName, sc)
-                    self._rows[i] = row
-                end
-
-                row:SetID(it.id)
-                row:ClearAllPoints()
-                -- Stretch the row to the scrollchild width.
-                -- (Avoid relying on GetWidth() being valid on the first OnShow frame.)
-                row:SetPoint("TOPLEFT", 0, -totalH)
-                row:SetPoint("TOPRIGHT", -20, -totalH)
-
-                local rH = cfg.drawRow(row, it)
-                local usedH = rH or row:GetHeight() or 20
-                totalH = totalH + usedH
-
-                row:Show()
-            end
-
-            for i = count + 1, #self._rows do
-                local r = self._rows[i]
-                if r then r:Hide() end
-            end
-
-            sc:SetHeight(math_max(totalH, sf:GetHeight()))
-            if sf.UpdateScrollChildRect then
-                sf:UpdateScrollChildRect()
-            end
-            self._lastHL = nil
-        end
-
-        function self:Sort(key)
-            local cmp = cfg.sorters and cfg.sorters[key]
-            if not cmp or #self.data <= 1 then return end
-            self._asc = not self._asc
-            table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
-            self:Fetch()
-            applyHighlight()
-            postUpdate()
-        end
-
-        self._makeConfirmPopup = Utils.makeConfirmPopup
-
-        return self
-    end
-
-    function bindLoggerListController(module, controller)
-        module.OnLoad = function(_, frame) controller:OnLoad(frame) end
-        module.Fetch = function() controller:Fetch() end
-        module.Sort = function(_, t) controller:Sort(t) end
-    end
-end
-
 -- Raids List
 do
     addon.Logger.Raids = addon.Logger.Raids or {}
     local Raids = addon.Logger.Raids
     local L = addon.L
 
-    local controller = makeLoggerListController {
+    local controller = Utils.makeListController {
         keyName = "RaidsList",
         poolTag = "logger-raids",
         _rowParts = { "ID", "Date", "Zone", "Size" },
@@ -8007,7 +7817,7 @@ do
     }
 
     Raids._ctrl = controller
-    bindLoggerListController(Raids, controller)
+    Utils.bindListController(Raids, controller)
 
     function Raids:SetCurrent(btn)
         if not btn then return end
@@ -8094,7 +7904,7 @@ do
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
 
-    local controller = makeLoggerListController {
+    local controller = Utils.makeListController {
         keyName = "BossList",
         poolTag = "logger-bosses",
         _rowParts = { "ID", "Name", "Time", "Mode" },
@@ -8162,7 +7972,7 @@ do
     }
 
     Boss._ctrl = controller
-    bindLoggerListController(Boss, controller)
+    Utils.bindListController(Boss, controller)
 
     function Boss:Add() addon.Logger.BossBox:Toggle() end
 
@@ -8227,7 +8037,7 @@ do
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
 
-    local controller = makeLoggerListController {
+    local controller = Utils.makeListController {
         keyName = "BossAttendeesList",
         poolTag = "logger-boss-attendees",
         _rowParts = { "Name" },
@@ -8289,7 +8099,7 @@ do
     }
 
     BossAtt._ctrl = controller
-    bindLoggerListController(BossAtt, controller)
+    Utils.bindListController(BossAtt, controller)
 
     function BossAtt:Add() addon.Logger.AttendeesBox:Toggle() end
 
@@ -8333,7 +8143,7 @@ do
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
 
-    local controller = makeLoggerListController {
+    local controller = Utils.makeListController {
         keyName = "RaidAttendeesList",
         poolTag = "logger-raid-attendees",
         _rowParts = { "Name", "Join", "Leave" },
@@ -8409,7 +8219,7 @@ do
     }
 
     RaidAtt._ctrl = controller
-    bindLoggerListController(RaidAtt, controller)
+    Utils.bindListController(RaidAtt, controller)
 
     -- Update raid roster from the live in-game raid roster (current raid only).
     -- Bound to the "Add" button in the RaidAttendees frame (repurposed as Update).
@@ -8489,7 +8299,7 @@ do
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
 
-    local controller = makeLoggerListController {
+    local controller = Utils.makeListController {
         keyName = "LootList",
         poolTag = "logger-loot",
         _rowParts = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
@@ -8499,6 +8309,7 @@ do
             if title then title:SetText(L.StrRaidLoot) end
             _G[n .. "ExportBtn"]:SetText(L.BtnExport)
             _G[n .. "ClearBtn"]:SetText(L.BtnClear)
+            _G[n .. "AddBtn"]:SetText(L.BtnAdd)
             _G[n .. "EditBtn"]:SetText(L.BtnEdit)
             _G[n .. "HeaderItem"]:SetText(L.StrItem)
             _G[n .. "HeaderSource"]:SetText(L.StrSource)
@@ -8605,7 +8416,7 @@ do
     }
 
     Loot._ctrl = controller
-    bindLoggerListController(Loot, controller)
+    Utils.bindListController(Loot, controller)
 
     function Loot:OnEnter(widget)
         if not widget then return end
@@ -8757,6 +8568,26 @@ do
         frame:RegisterForDrag("LeftButton")
         frame:SetScript("OnUpdate", function(_, elapsed) self:UpdateUIFrame(_, elapsed) end)
         frame:SetScript("OnHide", function() self:CancelAddEdit() end)
+        local nameStr = _G[frameName .. "NameStr"]
+        if nameStr then
+            nameStr:SetText(L.StrName)
+        end
+        local diffStr = _G[frameName .. "DifficultyStr"]
+        if diffStr then
+            diffStr:SetText(L.StrDifficulty)
+        end
+        local timeStr = _G[frameName .. "TimeStr"]
+        if timeStr then
+            timeStr:SetText(L.StrTime)
+        end
+        local saveBtn = _G[frameName .. "SaveBtn"]
+        if saveBtn then
+            saveBtn:SetText(L.BtnSave)
+        end
+        local cancelBtn = _G[frameName .. "CancelBtn"]
+        if cancelBtn then
+            cancelBtn:SetText(L.BtnCancel)
+        end
     end
 
     function Box:Toggle() Utils.toggle(_G[frameName]) end
@@ -8871,6 +8702,22 @@ do
         frame:SetScript("OnHide", function()
             Utils.resetEditBox(_G[frameName .. "Name"])
         end)
+        local title = _G[frameName .. "Title"]
+        if title then
+            title:SetText(L.StrAddPlayer)
+        end
+        local nameStr = _G[frameName .. "NameStr"]
+        if nameStr then
+            nameStr:SetText(L.StrName)
+        end
+        local addBtn = _G[frameName .. "AddBtn"]
+        if addBtn then
+            addBtn:SetText(L.BtnAdd)
+        end
+        local cancelBtn = _G[frameName .. "CancelBtn"]
+        if cancelBtn then
+            cancelBtn:SetText(L.BtnCancel)
+        end
     end
 
     function Box:Toggle() Utils.toggle(_G[frameName]) end
