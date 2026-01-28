@@ -2282,7 +2282,10 @@ do
         lootState.lootCount = 0
         frameName = frameName or Utils.getFrameName()
         _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
-        _G[frameName .. "ItemBtn"]:SetNormalTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
+        local itemBtn = _G[frameName .. "ItemBtn"]
+        itemBtn:SetNormalTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
+        itemBtn.tooltip_item = nil
+        GameTooltip:Hide()
         if frameName == UIMaster:GetName() then
             Utils.resetEditBox(_G[frameName .. "ItemCount"], true)
         end
