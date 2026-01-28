@@ -302,6 +302,7 @@ Throttle high-frequency sources (roster updates, combat log, UI refresh loops).
 ---
 
 ## 17) Change log (edit manually)
+- 2026-03-12: Fixed Master Looter inventory insert to match cursor items by itemId fallback.
 - 2026-03-12: Simplified Master Looter bag item selection (click drop, tradeable gate, bag scan).
 - 2026-03-12: Localized XML UI strings from KRT.xml/Templates.xml via Lua.
 - 2026-03-10: Localized Reserve List window buttons (clear, query item, close).

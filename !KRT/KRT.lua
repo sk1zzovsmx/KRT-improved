@@ -3296,9 +3296,10 @@ do
 
     -- ----- Event Handlers & Callbacks ----- --
 
-    local function ScanTradeableInventory(itemLink)
-        if not itemLink then return nil end
-        local wantedKey = Utils.getItemStringFromLink(itemLink) or itemLink
+    local function ScanTradeableInventory(itemLink, itemId)
+        if not itemLink and not itemId then return nil end
+        local wantedKey = itemLink and (Utils.getItemStringFromLink(itemLink) or itemLink) or nil
+        local wantedId = tonumber(itemId) or (itemLink and Utils.getItemIdFromLink(itemLink)) or nil
         local totalCount = 0
         local firstBag, firstSlot, firstSlotCount
         local hasMatch = false
@@ -3309,7 +3310,9 @@ do
                 local link = GetContainerItemLink(bag, slot)
                 if link then
                     local key = Utils.getItemStringFromLink(link) or link
-                    if key == wantedKey then
+                    local linkId = Utils.getItemIdFromLink(link)
+                    local matches = (wantedKey and key == wantedKey) or (wantedId and linkId == wantedId)
+                    if matches then
                         hasMatch = true
                         if not ItemIsSoulbound(bag, slot) then
                             local _, count = GetContainerItemInfo(bag, slot)
@@ -3358,17 +3361,26 @@ do
         if countdownRun then return false end
         if not CursorHasItem or not CursorHasItem() then return false end
 
-        local infoType, _, itemLink = GetCursorInfo()
-        if infoType ~= "item" or not itemLink then return false end
+        local infoType, itemId, itemLink = GetCursorInfo()
+        if infoType ~= "item" then return false end
 
-        local totalCount, bag, slot, slotCount, hasMatch = ScanTradeableInventory(itemLink)
+        local totalCount, bag, slot, slotCount, hasMatch = ScanTradeableInventory(itemLink, itemId)
         if not totalCount or totalCount < 1 then
             if hasMatch then
-                addon:warn(L.ErrMLInventorySoulbound:format(tostring(itemLink)))
-                addon:debug(E.LogMLInventorySoulbound:format(tostring(itemLink)))
+                addon:warn(L.ErrMLInventorySoulbound:format(tostring(itemLink or itemId)))
+                addon:debug(E.LogMLInventorySoulbound:format(tostring(itemLink or itemId)))
             else
-                addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemLink)))
+                addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemLink or itemId)))
             end
+            ClearCursor()
+            return true
+        end
+
+        if not itemLink and bag and slot then
+            itemLink = GetContainerItemLink(bag, slot)
+        end
+        if not itemLink then
+            addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemId)))
             ClearCursor()
             return true
         end
@@ -3716,7 +3728,8 @@ do
             local unit = addon.Raid:GetUnitID(playerName)
             if unit ~= "none" and CheckInteractDistance(unit, 2) == 1 then
                 -- Player is in range for trade
-                local totalCount, bag, slot, slotCount = ScanTradeableInventory(itemLink)
+                local totalCount, bag, slot, slotCount = ScanTradeableInventory(itemLink,
+                    Utils.getItemIdFromLink(itemLink))
                 if bag and slot then
                     itemInfo.bagID = bag
                     itemInfo.slotID = slot
