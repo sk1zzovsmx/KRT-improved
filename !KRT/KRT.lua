@@ -3299,6 +3299,10 @@ do
 
     -- ----- Event Handlers & Callbacks ----- --
 
+    local function GetItemRef(itemLink, itemId)
+        return tostring(itemLink or itemId or "unknown")
+    end
+
     local function ScanTradeableInventory(itemLink, itemId)
         if not itemLink and not itemId then return nil end
         local wantedKey = itemLink and (Utils.getItemStringFromLink(itemLink) or itemLink) or nil
@@ -3370,10 +3374,11 @@ do
         local totalCount, bag, slot, slotCount, hasMatch = ScanTradeableInventory(itemLink, itemId)
         if not totalCount or totalCount < 1 then
             if hasMatch then
-                addon:warn(L.ErrMLInventorySoulbound:format(tostring(itemLink or itemId)))
-                addon:debug(E.LogMLInventorySoulbound:format(tostring(itemLink or itemId)))
+                local itemRef = GetItemRef(itemLink, itemId)
+                addon:warn(L.ErrMLInventorySoulbound:format(itemRef))
+                addon:debug(E.LogMLInventorySoulbound:format(itemRef))
             else
-                addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemLink or itemId)))
+                addon:warn(L.ErrMLInventoryItemMissing:format(GetItemRef(itemLink, itemId)))
             end
             ClearCursor()
             return true
@@ -3383,7 +3388,7 @@ do
             itemLink = GetContainerItemLink(bag, slot)
         end
         if not itemLink then
-            addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemId)))
+            addon:warn(L.ErrMLInventoryItemMissing:format(GetItemRef(itemLink, itemId)))
             ClearCursor()
             return true
         end
