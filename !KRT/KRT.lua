@@ -3391,11 +3391,6 @@ do
         return ApplyInventoryItem(itemLink, totalCount, bag, slot, slotCount)
     end
 
-    -- ITEM_LOCKED: Triggered when an item is picked up from inventory.
-    function module:ITEM_LOCKED(inBag, inSlot)
-        if not inBag or not inSlot then return end
-    end
-
     -- LOOT_OPENED: Triggered when the loot window opens.
     function module:LOOT_OPENED()
         if addon.Raid:IsMasterLooter() then
@@ -8985,7 +8980,6 @@ local addonEvents = {
     PLAYER_ENTERING_WORLD = "PLAYER_ENTERING_WORLD",
     COMBAT_LOG_EVENT_UNFILTERED = "COMBAT_LOG_EVENT_UNFILTERED",
     RAID_INSTANCE_WELCOME = "RAID_INSTANCE_WELCOME",
-    ITEM_LOCKED = "ITEM_LOCKED",
     LOOT_CLOSED = "LOOT_CLOSED",
     LOOT_OPENED = "LOOT_OPENED",
     LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
@@ -8997,7 +8991,6 @@ local addonEvents = {
 -- Master looter events
 do
     local forward = {
-        ITEM_LOCKED = "ITEM_LOCKED",
         LOOT_OPENED = "LOOT_OPENED",
         LOOT_CLOSED = "LOOT_CLOSED",
         LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
