@@ -235,8 +235,7 @@
 		</Size>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString name="$parentsortAscendingStr" inherits="KRTConfigFontStringTemplate"
-					text="Sort rolls ascending">
+				<FontString name="$parentsortAscendingStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT">
 							<Offset>
@@ -245,8 +244,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentuseRaidWarningStr" inherits="KRTConfigFontStringTemplate"
-					text="Use raid warnings">
+				<FontString name="$parentuseRaidWarningStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentsortAscendingStr"
 							relativePoint="BOTTOMLEFT">
@@ -257,7 +255,7 @@
 					</Anchors>
 				</FontString>
 				<FontString name="$parentcountdownSimpleRaidMsgStr"
-					inherits="KRTConfigFontStringTemplate" text="Simple raid messages for countdown">
+					inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentuseRaidWarningStr"
 							relativePoint="BOTTOMLEFT">
@@ -267,8 +265,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentannounceOnWinStr" inherits="KRTConfigFontStringTemplate"
-					text="Announce loot items winners">
+				<FontString name="$parentannounceOnWinStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentcountdownSimpleRaidMsgStr"
 							relativePoint="BOTTOMLEFT">
@@ -278,8 +275,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentannounceOnHoldStr" inherits="KRTConfigFontStringTemplate"
-					text="Announce items held for later roll">
+				<FontString name="$parentannounceOnHoldStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentannounceOnWinStr"
 							relativePoint="BOTTOMLEFT">
@@ -289,8 +285,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentannounceOnBankStr" inherits="KRTConfigFontStringTemplate"
-					text="Announce reserved items (bank)">
+				<FontString name="$parentannounceOnBankStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentannounceOnHoldStr"
 							relativePoint="BOTTOMLEFT">
@@ -301,7 +296,7 @@
 					</Anchors>
 				</FontString>
 				<FontString name="$parentannounceOnDisenchantStr"
-					inherits="KRTConfigFontStringTemplate" text="Announce items to be disenchanted">
+					inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentannounceOnBankStr"
 							relativePoint="BOTTOMLEFT">
@@ -311,8 +306,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentlootWhispersStr" inherits="KRTConfigFontStringTemplate"
-					text="Send whispers to loot holder, banker and disenchanter.">
+				<FontString name="$parentlootWhispersStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentannounceOnDisenchantStr"
 							relativePoint="BOTTOMLEFT">
@@ -323,8 +317,7 @@
 					</Anchors>
 				</FontString>
 				<FontString name="$parentcountdownRollsBlockStr"
-					inherits="KRTConfigFontStringTemplate"
-					text="Ignore all rolls done after countdown">
+					inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentlootWhispersStr"
 							relativePoint="BOTTOMLEFT">
@@ -334,8 +327,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentscreenReminderStr" inherits="KRTConfigFontStringTemplate"
-					text="ScreenShot reminder before trading an item">
+				<FontString name="$parentscreenReminderStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentcountdownRollsBlockStr"
 							relativePoint="BOTTOMLEFT">
@@ -345,8 +337,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentignoreStacksStr" inherits="KRTConfigFontStringTemplate"
-					text="Allow trading a stack of an item">
+				<FontString name="$parentignoreStacksStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentscreenReminderStr"
 							relativePoint="BOTTOMLEFT">
@@ -356,8 +347,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentshowTooltipsStr" inherits="KRTConfigFontStringTemplate"
-					text="Show items tooltips">
+				<FontString name="$parentshowTooltipsStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentignoreStacksStr"
 							relativePoint="BOTTOMLEFT">
@@ -367,8 +357,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentminimapButtonStr" inherits="KRTConfigFontStringTemplate"
-					text="Show minimap button">
+				<FontString name="$parentshowLootCounterDuringMSRollStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentshowTooltipsStr"
 							relativePoint="BOTTOMLEFT">
@@ -378,8 +367,17 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentcountdownDurationStr" inherits="GameFontNormalSmall"
-					text="Countdown Duration">
+				<FontString name="$parentminimapButtonStr" inherits="KRTConfigFontStringTemplate">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentshowLootCounterDuringMSRollStr"
+							relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-7.5" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentcountdownDurationStr" inherits="GameFontNormalSmall">
 					<Anchors>
 						<Anchor point="BOTTOM">
 							<Offset>
@@ -530,6 +528,17 @@
 					</Anchor>
 				</Anchors>
 			</CheckButton>
+			<CheckButton name="$parentshowLootCounterDuringMSRoll" inherits="KRTConfigCheckButtonTemplate">
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativeTo="$parentshowLootCounterDuringMSRollStr"
+						relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="-2.5" y="5" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</CheckButton>
+
 			<CheckButton name="$parentminimapButton" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPRIGHT" relativeTo="$parentminimapButtonStr"
@@ -554,13 +563,12 @@
 				</Anchors>
 				<Scripts>
 					<OnLoad>
-						getglobal(self:GetName() .. "Low"):SetText("5")
-						getglobal(self:GetName() .. "High"):SetText("60")
+						KRT.Config:InitCountdownSlider(self)
 					</OnLoad>
 					<OnValueChanged>KRT.Config:OnClick(self)</OnValueChanged>
 				</Scripts>
 			</Slider>
-			<Button name="$parentDefaultsBtn" inherits="KRTButtonTemplate" text="Defaults">
+			<Button name="$parentDefaultsBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
 				</Size>
@@ -572,7 +580,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentCloseBtn" inherits="KRTButtonTemplate" text="CLOSE">
+			<Button name="$parentCloseBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
 				</Size>
@@ -619,7 +627,7 @@
 		</Size>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString name="$parentNameStr" text="RAID" inherits="GameFontNormalSmall"
+				<FontString name="$parentNameStr" inherits="GameFontNormalSmall"
 					justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="105" y="10" />
@@ -632,7 +640,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentDurationStr" text="AUCTION_DURATION"
+				<FontString name="$parentDurationStr"
 					inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="85" y="10" />
@@ -645,7 +653,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentTick" text="0" inherits="KRTFontStringGray"
+				<FontString name="$parentTick" inherits="KRTFontStringGray"
 					justifyH="RIGHT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="30" y="10" />
@@ -658,7 +666,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentCompStr" text="Raid Composition"
+				<FontString name="$parentCompStr"
 					inherits="GameFontNormalSmall" justifyH="CENTER" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="105" y="10" />
@@ -676,7 +684,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentNeedStr" text="NEED" inherits="KRTFontStringGray"
+				<FontString name="$parentNeedStr" inherits="KRTFontStringGray"
 					justifyH="CENTER" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="105" y="10" />
@@ -694,7 +702,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentClassStr" text="CLASS" inherits="KRTFontStringGray"
+				<FontString name="$parentClassStr" inherits="KRTFontStringGray"
 					justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="105" y="10" />
@@ -712,7 +720,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentTanksStr" text="TANK" inherits="GameFontNormalSmall"
+				<FontString name="$parentTanksStr" inherits="GameFontNormalSmall"
 					justifyH="RIGHT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="55" y="18" />
@@ -725,7 +733,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentHealersStr" text="HEALER" inherits="GameFontNormalSmall"
+				<FontString name="$parentHealersStr" inherits="GameFontNormalSmall"
 					justifyH="RIGHT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="55" y="18" />
@@ -739,7 +747,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentMeleesStr" text="MELEE" inherits="GameFontNormalSmall"
+				<FontString name="$parentMeleesStr" inherits="GameFontNormalSmall"
 					justifyH="RIGHT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="55" y="18" />
@@ -753,7 +761,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentRangedStr" text="RANGED" inherits="GameFontNormalSmall"
+				<FontString name="$parentRangedStr" inherits="GameFontNormalSmall"
 					justifyH="RIGHT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="55" y="18" />
@@ -767,7 +775,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentMessageStr" inherits="GameFontNormalSmall" text="Message"
+				<FontString name="$parentMessageStr" inherits="GameFontNormalSmall"
 					justifyH="RIGHT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="55" y="18" />
@@ -781,7 +789,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannelsStr" inherits="GameFontNormalSmall" text="CHANNELS"
+				<FontString name="$parentChannelsStr" inherits="GameFontNormalSmall"
 					justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="45" y="18" />
@@ -795,7 +803,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel1Str" inherits="GameFontHighlightSmall" text="1"
+				<FontString name="$parentChannel1Str" inherits="GameFontHighlightSmall"
 					justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
@@ -809,7 +817,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel2Str" inherits="GameFontHighlightSmall" text="2"
+				<FontString name="$parentChannel2Str" inherits="GameFontHighlightSmall"
 					justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
@@ -822,7 +830,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel3Str" inherits="GameFontHighlightSmall" text="3"
+				<FontString name="$parentChannel3Str" inherits="GameFontHighlightSmall"
 					justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
@@ -835,7 +843,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel4Str" inherits="GameFontHighlightSmall" text="4"
+				<FontString name="$parentChannel4Str" inherits="GameFontHighlightSmall"
 					justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
@@ -848,7 +856,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel5Str" inherits="GameFontHighlightSmall" text="5"
+				<FontString name="$parentChannel5Str" inherits="GameFontHighlightSmall"
 					justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
@@ -861,7 +869,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel6Str" inherits="GameFontHighlightSmall" text="6"
+				<FontString name="$parentChannel6Str" inherits="GameFontHighlightSmall"
 					justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
@@ -874,7 +882,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel7Str" inherits="GameFontHighlightSmall" text="7"
+				<FontString name="$parentChannel7Str" inherits="GameFontHighlightSmall"
 					justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
@@ -888,7 +896,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel8Str" inherits="GameFontHighlightSmall" text="8"
+				<FontString name="$parentChannel8Str" inherits="GameFontHighlightSmall"
 					justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
@@ -901,8 +909,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannelGuildStr" inherits="GameFontHighlightSmall"
-					text="GUILD " justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentChannelGuildStr" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="35" y="18" />
 					</Size>
@@ -914,8 +921,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannelYellStr" inherits="GameFontHighlightSmall"
-					text="YELL" justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentChannelYellStr" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="35" y="18" />
 					</Size>
@@ -928,7 +934,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentPreviewStr" inherits="GameFontNormal" text="Preview"
+				<FontString name="$parentPreviewStr" inherits="GameFontNormal"
 					justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="55" y="18" />
@@ -946,8 +952,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentOutput" inherits="GameFontHighlightSmall"
-					text="Start typing to see the final message." justifyH="LEFT" justifyV="TOP">
+				<FontString name="$parentOutput" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="TOP">
 					<Size>
 						<AbsDimension x="218" y="0" />
 					</Size>
@@ -964,7 +969,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentLength" inherits="KRTFontStringGray" text="0/255"
+				<FontString name="$parentLength" inherits="KRTFontStringGray"
 					justifyH="RIGHT" justifyV="TOP">
 					<Size>
 						<AbsDimension x="55" y="18" />
@@ -980,7 +985,7 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<Button name="$parentClearBtn" inherits="KRTButtonTemplate" text="Clear">
+			<Button name="$parentClearBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="19" />
 				</Size>
@@ -1010,7 +1015,7 @@
 					<OnTabPressed>KRT.Spammer:Tab("Duration", "Message")</OnTabPressed>
 				</Scripts>
 			</EditBox>
-			<Button name="$parentStartBtn" inherits="KRTButtonTemplate" text="Start">
+			<Button name="$parentStartBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="26" />
 				</Size>
@@ -1334,8 +1339,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentName" inherits="GameFontNormalSmall" justifyH="LEFT"
-					text="NAME">
+				<FontString name="$parentName" inherits="GameFontNormalSmall" justifyH="LEFT">
 					<Size>
 						<AbsDimension x="265" y="10" />
 					</Size>
@@ -1369,7 +1373,7 @@
 		<Layers>
 			<Layer level="ARTWORK">
 				<FontString name="$parentNameStr" inherits="GameFontNormal" justifyH="LEFT"
-					justifyV="BOTTOM" text="NAME">
+					justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="235" y="5" />
 					</Size>
@@ -1382,7 +1386,7 @@
 					</Anchors>
 				</FontString>
 				<FontString name="$parentMessageStr" inherits="GameFontNormal" justifyH="LEFT"
-					justifyV="BOTTOM" text="Message">
+					justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="235" y="5" />
 					</Size>
@@ -1395,7 +1399,7 @@
 					</Anchors>
 				</FontString>
 				<FontString name="$parentOutputName" inherits="GameFontNormal" justifyH="LEFT"
-					justifyV="BOTTOM" text="Tips:">
+					justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="235" y="5" />
 					</Size>
@@ -1473,7 +1477,7 @@
 					<OnTabPressed>_G[self:GetParent():GetName().."Name"]:SetFocus()</OnTabPressed>
 				</Scripts>
 			</EditBox>
-			<Button name="$parentEditBtn" inherits="KRTButtonTemplate" text="Save">
+			<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
 				</Size>
@@ -1488,7 +1492,7 @@
 					<OnClick>KRT.Warnings:Edit(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate" text="DELETE">
+			<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
 				</Size>
@@ -1503,7 +1507,7 @@
 					<OnClick>KRT.Warnings:Delete(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentAnnounceBtn" inherits="KRTButtonTemplate" text="Announce">
+			<Button name="$parentAnnounceBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="85" y="25" />
 				</Size>
@@ -1580,7 +1584,7 @@
 					</Anchors>
 				</Texture>
 				<FontString name="$parentName" inherits="GameFontNormalSmall" justifyH="LEFT"
-					justifyV="MIDDLE" text="No item selected">
+					justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="140" y="32" />
 					</Size>
@@ -1618,7 +1622,7 @@
 		</Size>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString name="$parentName" inherits="KRTFontStringGray" text="No item selected"
+				<FontString name="$parentName" inherits="KRTFontStringGray"
 					justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="140" y="32" />
@@ -1631,8 +1635,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentRollsHeaderPlayer" inherits="KRTFontStringGray"
-					text="PLAYER">
+				<FontString name="$parentRollsHeaderPlayer" inherits="KRTFontStringGray">
 					<Size>
 						<AbsDimension x="80" y="5" />
 					</Size>
@@ -1645,7 +1648,7 @@
 					</Anchors>
 				</FontString>
 				<FontString name="$parentRollsHeaderRoll" inherits="KRTFontStringGray"
-					justifyH="RIGHT" text="Roll">
+					justifyH="RIGHT">
 					<Size>
 						<AbsDimension x="80" y="5" />
 					</Size>
@@ -1660,7 +1663,7 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<Button name="$parentConfigBtn" inherits="KRTButtonTemplate" text="Configure">
+			<Button name="$parentConfigBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="70" y="19" />
 				</Size>
@@ -1675,7 +1678,7 @@
 					<OnClick>KRT.Config:Toggle()</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentSelectItemBtn" inherits="KRTButtonTemplate" text="Select Item">
+			<Button name="$parentSelectItemBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
 				</Size>
@@ -1690,7 +1693,7 @@
 					<OnClick>KRT.Master:BtnSelectItem(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentSpamLootBtn" inherits="KRTButtonTemplate" text="Spam Loot">
+			<Button name="$parentSpamLootBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
 				</Size>
@@ -1732,7 +1735,7 @@
 					<OnEnterPressed>self:ClearFocus()</OnEnterPressed>
 				</Scripts>
 			</EditBox>
-			<Button name="$parentMSBtn" inherits="KRTButtonTemplate" text="MS">
+			<Button name="$parentMSBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="28" y="25" />
 				</Size>
@@ -1747,7 +1750,7 @@
 					<OnClick>KRT.Master:BtnMS(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentOSBtn" inherits="KRTButtonTemplate" text="OS">
+			<Button name="$parentOSBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="28" y="25" />
 				</Size>
@@ -1762,7 +1765,7 @@
 					<OnClick>KRT.Master:BtnOS(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentSRBtn" inherits="KRTButtonTemplate" text="SR">
+			<Button name="$parentSRBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="28" y="25" />
 				</Size>
@@ -1777,7 +1780,7 @@
 					<OnClick>KRT.Master:BtnSR(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentFreeBtn" inherits="KRTButtonTemplate" text="Free">
+			<Button name="$parentFreeBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="35" y="25" />
 				</Size>
@@ -1792,7 +1795,7 @@
 					<OnClick>KRT.Master:BtnFree(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentCountdownBtn" inherits="KRTButtonTemplate" text="Countdown">
+			<Button name="$parentCountdownBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="70" y="25" />
 				</Size>
@@ -1821,7 +1824,7 @@
 					</Anchor>
 				</Anchors>
 			</ScrollFrame>
-			<Button name="$parentAwardBtn" inherits="KRTButtonTemplate" text="Award">
+			<Button name="$parentAwardBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="25" />
 				</Size>
@@ -1837,7 +1840,7 @@
 					<OnClick>KRT.Master:BtnAward(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentRollBtn" inherits="KRTButtonTemplate" text="Roll">
+			<Button name="$parentRollBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="55" y="25" />
 				</Size>
@@ -1852,7 +1855,7 @@
 					<OnClick>KRT.Rolls:Roll(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentClearBtn" inherits="KRTButtonTemplate" text="Clear">
+			<Button name="$parentClearBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="68" y="25" />
 				</Size>
@@ -1867,7 +1870,7 @@
 					<OnClick>KRT.Master:BtnClear(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentHoldBtn" inherits="KRTButtonTemplate" text="Hold">
+			<Button name="$parentHoldBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="25" />
 				</Size>
@@ -1891,7 +1894,7 @@
 					</Anchor>
 				</Anchors>
 			</Frame>
-			<Button name="$parentBankBtn" inherits="KRTButtonTemplate" text="Bank">
+			<Button name="$parentBankBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="25" />
 				</Size>
@@ -1915,7 +1918,7 @@
 					</Anchor>
 				</Anchors>
 			</Frame>
-			<Button name="$parentDisenchantBtn" inherits="KRTButtonTemplate" text="DE">
+			<Button name="$parentDisenchantBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="25" />
 				</Size>
@@ -1941,7 +1944,7 @@
 				</Anchors>
 			</Frame>
 			<!-- First row: Reserve List (contextual) -->
-			<Button name="$parentReserveListBtn" inherits="KRTButtonTemplate" text="Import SoftRes">
+			<Button name="$parentReserveListBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
 				</Size>
@@ -1957,7 +1960,7 @@
 					<OnClick>KRT.Master:BtnReserveList(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentLootCounterBtn" inherits="KRTButtonTemplate" text="Loot Counter">
+			<Button name="$parentLootCounterBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
 				</Size>
@@ -2034,17 +2037,17 @@
 			<Layer level="BACKGROUND">
 				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
 					<Size>
-						<AbsDimension x="10" y="22" />
+						<AbsDimension x="10" y="23" />
 					</Size>
 					<Anchors>
 						<Anchor point="TOPLEFT">
 							<Offset>
-								<AbsDimension x="0" y="0" />
+								<AbsDimension x="0" y="2" />
 							</Offset>
 						</Anchor>
 						<Anchor point="BOTTOMRIGHT">
 							<Offset>
-								<AbsDimension x="0" y="2" />
+								<AbsDimension x="0" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
@@ -2052,8 +2055,7 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<FontString name="$parentName" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					text="PLAYER">
+				<FontString name="$parentName" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Size>
 						<AbsDimension x="95" y="5" />
 					</Size>
@@ -2065,8 +2067,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentSpec" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					text="None">
+				<FontString name="$parentSpec" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Size>
 						<AbsDimension x="95" y="5" />
 					</Size>
@@ -2098,7 +2099,7 @@
 			<AbsDimension x="248" y="205" />
 		</Size>
 		<Frames>
-			<Button name="$parentClearBtn" inherits="KRTButtonTemplate" text="Clear">
+			<Button name="$parentClearBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="19" />
 				</Size>
@@ -2145,7 +2146,7 @@
 					<OnTabPressed>_G[self:GetParent():GetName().."Name"]:SetFocus()</OnTabPressed>
 				</Scripts>
 			</EditBox>
-			<Button name="$parentEditBtn" inherits="KRTButtonTemplate" text="Edit">
+			<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
 				</Size>
@@ -2160,7 +2161,7 @@
 					<OnClick>KRT.Changes:Edit(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentAddBtn" inherits="KRTButtonTemplate" text="ADD">
+			<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
 				</Size>
@@ -2175,7 +2176,7 @@
 					<OnClick>KRT.Changes:Add(self, button)</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentDemandBtn" inherits="KRTButtonTemplate" text="Demand">
+			<Button name="$parentDemandBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
 				</Size>
@@ -2190,7 +2191,7 @@
 					<OnClick>KRT.Changes:Demand()</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="$parentAnnounceBtn" inherits="KRTButtonTemplate" text="Announce">
+			<Button name="$parentAnnounceBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
 				</Size>
@@ -2268,7 +2269,7 @@
 					</Frame>
 				</ScrollChild>
 			</ScrollFrame>
-			<Button name="$parentClearButton" inherits="KRTButtonTemplate" text="Clear">
+			<Button name="$parentClearButton" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="100" y="24" />
 				</Size>
@@ -2280,7 +2281,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentQueryButton" inherits="KRTButtonTemplate" text="Query Item">
+			<Button name="$parentQueryButton" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="120" y="24" />
 				</Size>
@@ -2292,7 +2293,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentCloseButton" inherits="KRTButtonTemplate" text="Close">
+			<Button name="$parentCloseButton" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="80" y="24" />
 				</Size>
@@ -2358,7 +2359,7 @@
 				</ScrollChild>
 			</ScrollFrame>
 			<!-- Import Button -->
-			<Button name="KRTImportConfirmButton" inherits="KRTButtonTemplate" text="Import">
+			<Button name="KRTImportConfirmButton" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="100" y="24" />
 				</Size>
@@ -2374,7 +2375,7 @@
 				</Scripts>
 			</Button>
 			<!-- Cancel Button -->
-			<Button name="KRTImportCancelButton" inherits="KRTButtonTemplate" text="Close">
+			<Button name="KRTImportCancelButton" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="100" y="24" />
 				</Size>
@@ -2523,7 +2524,7 @@
 					</Anchors>
 				</FontString>
 				<FontString name="$parentDate" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE" text="Date">
+					justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="95" y="18" />
 					</Size>
@@ -2536,7 +2537,7 @@
 					</Anchors>
 				</FontString>
 				<FontString name="$parentZone" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE" text="ZONE">
+					justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="120" y="18" />
 					</Size>
@@ -2549,7 +2550,7 @@
 					</Anchors>
 				</FontString>
 				<FontString name="$parentSize" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE" text="Size">
+					justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="36" y="18" />
 					</Size>
@@ -2629,7 +2630,7 @@
 					</Anchors>
 				</FontString>
 				<FontString name="$parentName" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE" text="NAME">
+					justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="142" y="18" />
 					</Size>
@@ -2642,7 +2643,7 @@
 					</Anchors>
 				</FontString>
 				<FontString name="$parentTime" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE" text="Time">
+					justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="40" y="18" />
 					</Size>
@@ -2655,7 +2656,7 @@
 					</Anchors>
 				</FontString>
 				<FontString name="$parentMode" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE" text="MODE">
+					justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="55" y="18" />
 					</Size>
@@ -2722,7 +2723,7 @@
 			</Layer>
 			<Layer level="ARTWORK">
 				<FontString name="$parentName" font="GameFontNormalSmall" justifyH="LEFT"
-					justifyV="MIDDLE" text="NAME">
+					justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="80" y="18" />
 					</Size>
@@ -2790,7 +2791,7 @@
 			</Layer>
 			<Layer level="ARTWORK">
 				<FontString name="$parentName" font="GameFontNormalSmall" justifyH="LEFT"
-					justifyV="MIDDLE" text="NAME">
+					justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="80" y="18" />
 					</Size>
@@ -2803,7 +2804,7 @@
 					</Anchors>
 				</FontString>
 				<FontString name="$parentJoin" inherits="GameFontHighlightSmall" justifyH="CENTER"
-					justifyV="MIDDLE" text="Join">
+					justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="50" y="18" />
 					</Size>
@@ -3030,8 +3031,7 @@
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER"
-							text="Raids List">
+						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER">
 							<Size>
 								<AbsDimension x="280" y="5" />
 							</Size>
@@ -3051,7 +3051,7 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button name="$parentCurrentBtn" inherits="KRTButtonTemplate" text="Set Current">
+					<Button name="$parentCurrentBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="75" y="25" />
 						</Size>
@@ -3066,7 +3066,7 @@
 							<OnClick>KRT.Logger.Raids:SetCurrent(self, button)</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentExportBtn" inherits="KRTButtonTemplate" text="Export">
+					<Button name="$parentExportBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3078,7 +3078,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate" text="DELETE">
+					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3189,8 +3189,7 @@
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER"
-							text="Bosses">
+						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER">
 							<Size>
 								<AbsDimension x="280" y="5" />
 							</Size>
@@ -3210,7 +3209,7 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button name="$parentAddBtn" inherits="KRTButtonTemplate" text="ADD">
+					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3225,7 +3224,7 @@
 							<OnClick>KRT.Logger.Boss:Add(self, button)</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentEditBtn" inherits="KRTButtonTemplate" text="Edit">
+					<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3240,7 +3239,7 @@
 							<OnClick>KRT.Logger.Boss:Edit(self, button)</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate" text="DELETE">
+					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3351,8 +3350,7 @@
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER"
-							text="Boss Attendees">
+						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER">
 							<Size>
 								<AbsDimension x="280" y="5" />
 							</Size>
@@ -3372,7 +3370,7 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button name="$parentAddBtn" inherits="KRTButtonTemplate" text="ADD">
+					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3387,7 +3385,7 @@
 							<OnClick>KRT.Logger.BossAttendees:Add(self, button)</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentRemoveBtn" inherits="KRTButtonTemplate" text="DELETE">
+					<Button name="$parentRemoveBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3450,8 +3448,7 @@
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER"
-							text="Raid Attendees">
+						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER">
 							<Size>
 								<AbsDimension x="280" y="5" />
 							</Size>
@@ -3471,7 +3468,7 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button name="$parentAddBtn" inherits="KRTButtonTemplate" text="ADD">
+					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3486,7 +3483,7 @@
 							<OnClick>KRT.Logger.RaidAttendees:Add(self, button)</OnClick>
 						</Scripts>
 					</Button>
-					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate" text="DELETE">
+					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3582,8 +3579,7 @@
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER"
-							text="Raid Loot">
+						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER">
 							<Size>
 								<AbsDimension x="280" y="5" />
 							</Size>
@@ -3603,7 +3599,7 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button name="$parentExportBtn" inherits="KRTButtonTemplate" text="Export">
+					<Button name="$parentExportBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3615,7 +3611,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentClearBtn" inherits="KRTButtonTemplate" text="Clear">
+					<Button name="$parentClearBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3627,7 +3623,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentAddBtn" inherits="KRTButtonTemplate" text="ADD">
+					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3639,7 +3635,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentEditBtn" inherits="KRTButtonTemplate" text="Edit">
+					<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3651,7 +3647,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate" text="DELETE">
+					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3815,8 +3811,7 @@
 						</Texture>
 					</Layer>
 					<Layer level="ARTWORK">
-						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER"
-							text="Add Boss">
+						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER">
 							<Size>
 								<AbsDimension x="200" y="5" />
 							</Size>
@@ -3825,7 +3820,8 @@
 								<Anchor point="RIGHT" x="-10" />
 							</Anchors>
 						</FontString>
-						<FontString inherits="KRTFontString" font="GameFontNormalSmall" text="NAME">
+						<FontString name="$parentNameStr" inherits="KRTFontString"
+							font="GameFontNormalSmall">
 							<Size>
 								<AbsDimension x="200" y="5" />
 							</Size>
@@ -3835,7 +3831,7 @@
 							</Anchors>
 						</FontString>
 						<FontString name="$parentDifficultyStr" inherits="KRTFontString"
-							font="GameFontNormalSmall" text="Difficulty">
+							font="GameFontNormalSmall">
 							<Size>
 								<AbsDimension x="200" y="5" />
 							</Size>
@@ -3845,7 +3841,7 @@
 							</Anchors>
 						</FontString>
 						<FontString name="$parentTimeStr" inherits="KRTFontString"
-							font="GameFontNormalSmall" text="Time">
+							font="GameFontNormalSmall">
 							<Size>
 								<AbsDimension x="200" y="5" />
 							</Size>
@@ -3887,7 +3883,7 @@
 							<OnEnterPressed>KRT.Logger.BossBox:Save()</OnEnterPressed>
 						</Scripts>
 					</EditBox>
-					<Button name="$parentSaveBtn" inherits="KRTButtonTemplate" text="SAVE">
+					<Button name="$parentSaveBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3902,7 +3898,7 @@
 							<OnClick>KRT.Logger.BossBox:Save()</OnClick>
 						</Scripts>
 					</Button>
-					<Button inherits="KRTButtonTemplate" text="CANCEL">
+					<Button name="$parentCancelBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -3957,8 +3953,7 @@
 						</Texture>
 					</Layer>
 					<Layer level="ARTWORK">
-						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER"
-							text="Add Player">
+						<FontString name="$parentTitle" font="GameFontNormal" justifyH="CENTER">
 							<Size>
 								<AbsDimension x="200" y="5" />
 							</Size>
@@ -3967,7 +3962,8 @@
 								<Anchor point="RIGHT" x="-10" />
 							</Anchors>
 						</FontString>
-						<FontString inherits="KRTFontString" font="GameFontNormalSmall" text="NAME">
+						<FontString name="$parentNameStr" inherits="KRTFontString"
+							font="GameFontNormalSmall">
 							<Size>
 								<AbsDimension x="200" y="5" />
 							</Size>
@@ -3986,7 +3982,7 @@
 							<Anchor point="RIGHT" x="-10" />
 						</Anchors>
 					</EditBox>
-					<Button name="$parentAddBtn" inherits="KRTButtonTemplate" text="ADD">
+					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -4001,7 +3997,7 @@
 							<OnClick>KRT.Logger.AttendeesBox:Save()</OnClick>
 						</Scripts>
 					</Button>
-					<Button inherits="KRTButtonTemplate" text="CANCEL">
+					<Button name="$parentCancelBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>

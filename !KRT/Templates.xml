@@ -12,7 +12,7 @@
 		</Anchors>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString inherits="GameFontNormalSmall" name="$parentTitle" justifyH="LEFT" text="">
+				<FontString inherits="GameFontNormalSmall" name="$parentTitle" justifyH="LEFT">
 					<Anchors>
 						<Anchor point="LEFT" relativeTo="$parentTitleBG" relativePoint="LEFT">
 							<Offset>
@@ -245,7 +245,7 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<FontString name="$parentRoll" inherits="GameFontNormalSmall" justifyH="RIGHT" text="0">
+				<FontString name="$parentRoll" inherits="GameFontNormalSmall" justifyH="RIGHT">
 					<Size>
 						<AbsDimension x="22" />
 					</Size>
@@ -258,7 +258,7 @@
 					</Anchors>
 					<Color r="1" g="1" b="1" a="1" />
 				</FontString>
-				<FontString name="$parentCounter" inherits="GameFontNormalSmall" justifyH="RIGHT" text="">
+				<FontString name="$parentCounter" inherits="GameFontNormalSmall" justifyH="RIGHT">
 					<Size>
 						<AbsDimension x="30" />
 					</Size>
@@ -271,7 +271,7 @@
 					</Anchors>
 					<Color r="1" g="1" b="1" a="1" />
 				</FontString>
-				<FontString name="$parentName" inherits="GameFontNormal" justifyH="LEFT" text="PLAYER">
+				<FontString name="$parentName" inherits="GameFontNormal" justifyH="LEFT">
 					<Anchors>
 						<Anchor point="LEFT">
 							<Offset>
