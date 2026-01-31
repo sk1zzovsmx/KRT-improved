@@ -4202,7 +4202,6 @@ do
 
     -- State variables
     local localized = false
-    local refreshPending = false
     local reservesData = {}
     local reservesByItemID = {}
     local reservesDisplayList = {}
@@ -4756,14 +4755,10 @@ do
         end
     end
 
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return reserveListFrame end, UpdateUIFrame)
+
     function module:RequestRefresh()
-        if not reserveListFrame or refreshPending then return end
-        refreshPending = true
-        reserveListFrame:SetScript("OnUpdate", function()
-            reserveListFrame:SetScript("OnUpdate", nil)
-            refreshPending = false
-            UpdateUIFrame()
-        end)
+        RequestRefresh()
     end
 
     -- ----- Reserve Data Handling ----- --
@@ -5196,7 +5191,6 @@ do
 
     -- Frame update
     local UpdateUIFrame
-    local refreshPending = false
     local MIN_COUNTDOWN = 5
     local MAX_COUNTDOWN = 60
 
@@ -5420,14 +5414,10 @@ do
         configDirty = false
     end
 
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIConfig end, UpdateUIFrame)
+
     function module:RequestRefresh()
-        if not UIConfig or refreshPending then return end
-        refreshPending = true
-        UIConfig:SetScript("OnUpdate", function()
-            UIConfig:SetScript("OnUpdate", nil)
-            refreshPending = false
-            UpdateUIFrame()
-        end)
+        RequestRefresh()
     end
 end
 
@@ -5443,8 +5433,6 @@ do
     local localized = false
 
     local UpdateUIFrame
-    local refreshPending = false
-
     local fetched = false
     local warningsDirty = false
 
@@ -5661,14 +5649,10 @@ do
         end
     end
 
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIWarnings end, UpdateUIFrame)
+
     function module:RequestRefresh()
-        if not UIWarnings or refreshPending then return end
-        refreshPending = true
-        UIWarnings:SetScript("OnUpdate", function()
-            UIWarnings:SetScript("OnUpdate", nil)
-            refreshPending = false
-            UpdateUIFrame()
-        end)
+        RequestRefresh()
     end
 
     -- Saving a Warning:
@@ -5707,8 +5691,6 @@ do
     local localized = false
 
     local UpdateUIFrame
-    local refreshPending = false
-
     local changesTable = {}
     local tmpNames = {}
     local SaveChanges, CancelChanges
@@ -5997,14 +5979,10 @@ do
         Utils.enableDisable(_G[frameName .. "DemandBtn"], KRT_CurrentRaid)
     end
 
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIChanges end, UpdateUIFrame)
+
     function module:RequestRefresh()
-        if not UIChanges or refreshPending then return end
-        refreshPending = true
-        UIChanges:SetScript("OnUpdate", function()
-            UIChanges:SetScript("OnUpdate", nil)
-            refreshPending = false
-            UpdateUIFrame()
-        end)
+        RequestRefresh()
     end
 
     -- Initialize changes table:

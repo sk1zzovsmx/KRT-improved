@@ -792,6 +792,72 @@ function Utils.setShown(frame, show)
 	end
 end
 
+-- =========== Coalesced refresh helpers (event-driven UI)  =========== --
+
+-- Creates a refresh requester that coalesces multiple triggers into a single UI update.
+-- Notes:
+--  - Uses a dedicated driver frame (does NOT touch the target frame's OnUpdate).
+--  - If called while the target frame is hidden, marks it dirty and refreshes on next OnShow.
+--  - WoW 3.3.5a compatible (no C_Timer).
+function Utils.makeEventDrivenRefresher(targetOrGetter, updateFn)
+	if type(updateFn) ~= "function" then
+		error("Utils.makeEventDrivenRefresher: updateFn must be a function")
+	end
+
+	local driver = CreateFrame("Frame")
+	local pending = false
+	local dirtyWhileHidden = false
+	local hookedFrame = nil
+
+	local function resolveTarget()
+		if type(targetOrGetter) == "function" then
+			return targetOrGetter()
+		end
+		return targetOrGetter
+	end
+
+	local function ensureHook(target)
+		if not target or not target.HookScript then return end
+		if hookedFrame == target then return end
+		hookedFrame = target
+		target:HookScript("OnShow", function()
+			if dirtyWhileHidden then
+				dirtyWhileHidden = false
+				updateFn()
+			end
+		end)
+	end
+
+	local function run()
+		driver:SetScript("OnUpdate", nil)
+		pending = false
+
+		local target = resolveTarget()
+		if not target or not target.IsShown or not target:IsShown() then
+			dirtyWhileHidden = true
+			if target then ensureHook(target) end
+			return
+		end
+		updateFn()
+	end
+
+	return function()
+		local target = resolveTarget()
+		if not target then return end
+		ensureHook(target)
+
+		if not target:IsShown() then
+			dirtyWhileHidden = true
+			return
+		end
+
+		if pending then return end
+		pending = true
+		driver:SetScript("OnUpdate", run)
+	end
+end
+
+
 -- =========== Tooltip helpers  =========== --
 
 do
