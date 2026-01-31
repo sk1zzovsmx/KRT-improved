@@ -1415,6 +1415,26 @@ do
     state.itemCounts = newItemCounts and newItemCounts() or {}
 
     -- ----- Private helpers ----- --
+    local function GetAllowedRolls(itemId, name)
+        if not itemId or not name then return 1 end
+        if lootState.currentRollType ~= rollTypes.RESERVED then
+            return 1
+        end
+        local reserves = addon.Reserves:GetReserveCountForItem(itemId, name)
+        return (reserves and reserves > 0) and reserves or 1
+    end
+
+    local function UpdateLocalRollState(itemId, name)
+        if not itemId or not name then
+            state.rolled = false
+            return false
+        end
+        local allowed = GetAllowedRolls(itemId, name)
+        local used = state.playerCounts[itemId] or 0
+        state.rolled = used >= allowed
+        return state.rolled
+    end
+
     local function AcquireItemTracker(itemId)
         local tracker = state.itemCounts
         if not tracker[itemId] then
@@ -1643,11 +1663,7 @@ do
         if not itemId then return end
 
         local name = Utils.getPlayerName()
-        local allowed = 1
-        if lootState.currentRollType == rollTypes.RESERVED then
-            local reserve = addon.Reserves:GetReserveCountForItem(itemId, name)
-            allowed = (reserve > 0) and reserve or 1
-        end
+        local allowed = GetAllowedRolls(itemId, name)
 
         state.playerCounts[itemId] = state.playerCounts[itemId] or 0
         if state.playerCounts[itemId] >= allowed then
@@ -1657,13 +1673,16 @@ do
         end
 
         RandomRoll(1, 100)
-        state.rolled = true
         state.playerCounts[itemId] = state.playerCounts[itemId] + 1
+        UpdateLocalRollState(itemId, name)
         addon:debug(E.LogRollsPlayerRolled:format(name, itemId))
     end
 
     -- Returns the current roll session state.
     function module:RollStatus()
+        local itemId = self:GetCurrentRollItemID()
+        local name = Utils.getPlayerName()
+        UpdateLocalRollState(itemId, name)
         return lootState.currentRollType, state.record, state.canRoll, state.rolled
     end
 
@@ -1737,7 +1756,9 @@ do
 
     -- Sets the flag indicating the player has rolled.
     function module:SetRolled()
-        state.rolled = true
+        local itemId = self:GetCurrentRollItemID()
+        local name = Utils.getPlayerName()
+        UpdateLocalRollState(itemId, name)
     end
 
     -- Checks if a player has already used all their rolls for an item.
