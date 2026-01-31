@@ -302,6 +302,7 @@ Throttle high-frequency sources (roster updates, combat log, UI refresh loops).
 ---
 
 ## 17) Change log (edit manually)
+- 2026-03-14: Master Loot roll button now respects multi-reserve roll counts for the local player.
 - 2026-03-13: Converted Config/Warnings/Changes/Reserves/BossBox UI refresh to on-demand updates.
 - 2026-03-12: Fixed Master Looter inventory insert to match cursor items by itemId fallback.
 - 2026-03-12: Simplified Master Looter bag item selection (click drop, tradeable gate, bag scan).
