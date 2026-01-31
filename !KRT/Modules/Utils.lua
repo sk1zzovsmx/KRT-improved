@@ -857,7 +857,6 @@ function Utils.makeEventDrivenRefresher(targetOrGetter, updateFn)
 	end
 end
 
-
 -- =========== Tooltip helpers  =========== --
 
 do
@@ -1288,31 +1287,6 @@ function Utils.setText(frame, str1, str2, cond)
 	else
 		frame:SetText(str2)
 	end
-end
-
--- =========== Throttles  =========== --
-
--- Throttle frame OnUpdate:
-function Utils.throttle(frame, name, period, elapsed)
-	local t = frame[name] or 0
-	t = t + elapsed
-	if t > period then
-		frame[name] = 0
-		return true
-	end
-	frame[name] = t
-	return false
-end
-
-function Utils.throttledUIUpdate(frame, frameName, period, elapsed, fn)
-	if not frameName or type(fn) ~= "function" then
-		return false
-	end
-	if Utils.throttle(frame, frameName, period, elapsed) then
-		fn()
-		return true
-	end
-	return false
 end
 
 -- =========== Chat + comms helpers  =========== --
