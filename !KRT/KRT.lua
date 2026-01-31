@@ -3961,13 +3961,15 @@ do
         header.count:SetPoint("RIGHT", header.action, "LEFT", -COL_GAP, 0)
         header.count:SetWidth(COUNT_COL_W)
         header.count:SetJustifyH("CENTER")
-        header.count:SetText(L.StrCount or "Count")
+        header.count:SetText(L.StrCount)
+        header.count:SetTextColor(0.5, 0.5, 0.5)
 
         header.name = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         header.name:SetPoint("LEFT", header, "LEFT", 0, 0)
         header.name:SetPoint("RIGHT", header.count, "LEFT", -COL_GAP, 0)
         header.name:SetJustifyH("LEFT")
-        header.name:SetText(L.StrPlayer or "Player")
+        header.name:SetText(L.StrPlayer)
+        header.name:SetTextColor(0.5, 0.5, 0.5)
     end
 
 
@@ -4045,9 +4047,9 @@ do
                 return b
             end
 
-            row.reset = MakeBtn("R", L.TipLootCounterReset or "Reset to 0")
-            row.minus = MakeBtn("-", L.TipLootCounterMinus or "Decrement")
-            row.plus  = MakeBtn("+", L.TipLootCounterPlus or "Increment")
+            row.reset = MakeBtn("R", L.TipLootCounterReset)
+            row.minus = MakeBtn("-", L.TipLootCounterMinus)
+            row.plus  = MakeBtn("+", L.TipLootCounterPlus)
 
             row.reset:SetPoint("RIGHT", row.actions, "RIGHT", 0, 0)
             row.minus:SetPoint("RIGHT", row.reset, "LEFT", -BTN_GAP, 0)
@@ -4092,6 +4094,7 @@ do
         local rowHeight = C.LOOT_COUNTER_ROW_HEIGHT
 
         local contentHeight = HEADER_HEIGHT + (numPlayers * rowHeight)
+        local priorScroll = scrollFrame:GetVerticalScroll() or 0
 
         -- Ensure the scroll child has a valid size (UIPanelScrollFrameTemplate needs this)
         local contentW = scrollFrame:GetWidth() or 0
@@ -4101,7 +4104,12 @@ do
         contentW = math.max(1, contentW - sbw - 6)
         scrollChild:SetWidth(contentW)
         scrollChild:SetHeight(math.max(contentHeight, scrollFrame:GetHeight()))
-        scrollFrame:SetVerticalScroll(0)
+        local maxScroll = contentHeight - scrollFrame:GetHeight()
+        if maxScroll < 0 then maxScroll = 0 end
+        if priorScroll > maxScroll then
+            priorScroll = maxScroll
+        end
+        scrollFrame:SetVerticalScroll(priorScroll)
         if header then header:Show() end
 
         for i = 1, numPlayers do
@@ -4127,6 +4135,9 @@ do
             row:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, y)
             row._playerName = name
             row.name:SetText(name)
+            local class = addon.Raid:GetPlayerClass(name)
+            local r, g, b = Utils.getClassColor(class)
+            row.name:SetTextColor(r, g, b)
             row.count:SetText(tostring(addon.Raid:GetPlayerCount(name, KRT_CurrentRaid) or 0))
             row:Show()
         end
