@@ -357,9 +357,19 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentminimapButtonStr" inherits="KRTConfigFontStringTemplate">
+				<FontString name="$parentshowLootCounterDuringMSRollStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentshowTooltipsStr"
+							relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-7.5" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentminimapButtonStr" inherits="KRTConfigFontStringTemplate">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentshowLootCounterDuringMSRollStr"
 							relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
@@ -518,6 +528,17 @@
 					</Anchor>
 				</Anchors>
 			</CheckButton>
+			<CheckButton name="$parentshowLootCounterDuringMSRoll" inherits="KRTConfigCheckButtonTemplate">
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativeTo="$parentshowLootCounterDuringMSRollStr"
+						relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="-2.5" y="5" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</CheckButton>
+
 			<CheckButton name="$parentminimapButton" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPRIGHT" relativeTo="$parentminimapButtonStr"
