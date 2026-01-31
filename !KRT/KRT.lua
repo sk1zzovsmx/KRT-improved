@@ -3962,12 +3962,14 @@ do
         header.count:SetWidth(COUNT_COL_W)
         header.count:SetJustifyH("CENTER")
         header.count:SetText(L.StrCount)
+        header.count:SetTextColor(0.5, 0.5, 0.5)
 
         header.name = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         header.name:SetPoint("LEFT", header, "LEFT", 0, 0)
         header.name:SetPoint("RIGHT", header.count, "LEFT", -COL_GAP, 0)
         header.name:SetJustifyH("LEFT")
         header.name:SetText(L.StrPlayer)
+        header.name:SetTextColor(0.5, 0.5, 0.5)
     end
 
 
