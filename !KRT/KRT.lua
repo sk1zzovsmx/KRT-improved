@@ -811,7 +811,13 @@ do
         if not players then return end
         for i, p in ipairs(players) do
             if p.name == name then
-                p.count = value
+                local old = tonumber(p.count) or 0
+                if old ~= value then
+                    p.count = value
+                    Utils.triggerEvent("PlayerCountChanged", name, value, old, raidNum)
+                else
+                    p.count = value
+                end
                 return
             end
         end
@@ -1415,6 +1421,26 @@ do
     state.itemCounts = newItemCounts and newItemCounts() or {}
 
     -- ----- Private helpers ----- --
+    local function GetAllowedRolls(itemId, name)
+        if not itemId or not name then return 1 end
+        if lootState.currentRollType ~= rollTypes.RESERVED then
+            return 1
+        end
+        local reserves = addon.Reserves:GetReserveCountForItem(itemId, name)
+        return (reserves and reserves > 0) and reserves or 1
+    end
+
+    local function UpdateLocalRollState(itemId, name)
+        if not itemId or not name then
+            state.rolled = false
+            return false
+        end
+        local allowed = GetAllowedRolls(itemId, name)
+        local used = state.playerCounts[itemId] or 0
+        state.rolled = used >= allowed
+        return state.rolled
+    end
+
     local function AcquireItemTracker(itemId)
         local tracker = state.itemCounts
         if not tracker[itemId] then
@@ -1643,11 +1669,7 @@ do
         if not itemId then return end
 
         local name = Utils.getPlayerName()
-        local allowed = 1
-        if lootState.currentRollType == rollTypes.RESERVED then
-            local reserve = addon.Reserves:GetReserveCountForItem(itemId, name)
-            allowed = (reserve > 0) and reserve or 1
-        end
+        local allowed = GetAllowedRolls(itemId, name)
 
         state.playerCounts[itemId] = state.playerCounts[itemId] or 0
         if state.playerCounts[itemId] >= allowed then
@@ -1657,13 +1679,16 @@ do
         end
 
         RandomRoll(1, 100)
-        state.rolled = true
         state.playerCounts[itemId] = state.playerCounts[itemId] + 1
+        UpdateLocalRollState(itemId, name)
         addon:debug(E.LogRollsPlayerRolled:format(name, itemId))
     end
 
     -- Returns the current roll session state.
     function module:RollStatus()
+        local itemId = self:GetCurrentRollItemID()
+        local name = Utils.getPlayerName()
+        UpdateLocalRollState(itemId, name)
         return lootState.currentRollType, state.record, state.canRoll, state.rolled
     end
 
@@ -1737,7 +1762,9 @@ do
 
     -- Sets the flag indicating the player has rolled.
     function module:SetRolled()
-        state.rolled = true
+        local itemId = self:GetCurrentRollItemID()
+        local name = Utils.getPlayerName()
+        UpdateLocalRollState(itemId, name)
     end
 
     -- Checks if a player has already used all their rolls for an item.
@@ -2079,6 +2106,10 @@ do
             btn:Hide()
             j = j + 1
             btn = _G[frameName .. "PlayerBtn" .. j]
+        end
+
+        if addon.Master and addon.Master.RequestRefresh then
+            addon.Master:RequestRefresh()
         end
     end
 
@@ -2422,7 +2453,13 @@ do
     local localized = false
 
     local UpdateUIFrame
-    local updateInterval = C.UPDATE_INTERVAL_MASTER
+
+    local RequestRefresh
+    function module:RequestRefresh()
+        if RequestRefresh then
+            RequestRefresh()
+        end
+    end
 
     local InitializeDropDowns, PrepareDropDowns, UpdateDropDowns
     local dropDownData, dropDownGroupData = {}, {}
@@ -2533,6 +2570,7 @@ do
             -- At zero: stop roll (enables selection in rolls) and refresh the UI
             addon.Rolls:RecordRolls(false)
             addon.Rolls:FetchRolls()
+            module:RequestRefresh()
         end)
     end
 
@@ -2675,7 +2713,11 @@ do
             end)
         end
         frame:RegisterForDrag("LeftButton")
-        frame:SetScript("OnUpdate", UpdateUIFrame)
+
+        -- Event-driven UI refresher (no polling on the UI frame itself).
+        if not RequestRefresh then
+            RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIMaster end, UpdateUIFrame)
+        end
         frame:SetScript("OnHide", function()
             if selectionFrame then selectionFrame:Hide() end
         end)
@@ -2683,7 +2725,14 @@ do
 
     -- Toggles the visibility of the Master Looter frame.
     function module:Toggle()
-        Utils.toggle(UIMaster)
+        if not UIMaster then return end
+        if UIMaster:IsShown() then
+            Utils.setShown(UIMaster, false)
+        else
+            -- Request while hidden to avoid an extra refresh (dirty-while-hidden will refresh on OnShow).
+            module:RequestRefresh()
+            Utils.setShown(UIMaster, true)
+        end
     end
 
     -- Hides the Master Looter frame.
@@ -2710,6 +2759,7 @@ do
         elseif selectionFrame then
             Utils.toggle(selectionFrame)
         end
+        module:RequestRefresh()
     end
 
     -- Button: Spam Loot Links or Do Ready Check
@@ -2776,6 +2826,7 @@ do
             addon:Announce(message)
             _G[frameName .. "ItemCount"]:ClearFocus()
             lootState.currentRollItem = addon.Raid:GetLootID(itemID)
+            module:RequestRefresh()
         end
     end
 
@@ -2786,10 +2837,14 @@ do
         if not itemLink then return end
         lootState.currentRollType = rollType
         local target = lootState[targetKey]
+        local ok
         if lootState.fromInventory then
-            return TradeItem(itemLink, target, rollType, 0)
+            ok = TradeItem(itemLink, target, rollType, 0)
+        else
+            ok = AssignItem(itemLink, target, rollType, 0)
         end
-        return AssignItem(itemLink, target, rollType, 0)
+        module:RequestRefresh()
+        return ok
     end
 
     function module:BtnMS(btn)
@@ -2814,19 +2869,22 @@ do
             addon.Rolls:RecordRolls(false)
             StopCountdown()
             addon.Rolls:FetchRolls()
+            module:RequestRefresh()
         elseif not lootState.rollStarted then
             return
         else
             addon.Rolls:RecordRolls(true)
             announced = false
             StartCountdown()
+            module:RequestRefresh()
         end
     end
 
     -- Button: Clear Rolls
     function module:BtnClear(btn)
         announced = false
-        return addon.Rolls:ClearRolls()
+        addon.Rolls:ClearRolls()
+        module:RequestRefresh()
     end
 
     -- Button: Award/Trade
@@ -2855,6 +2913,7 @@ do
         if lootState.fromInventory == true then
             result = TradeItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
             module:ResetItemCount()
+            module:RequestRefresh()
             return result
         end
 
@@ -2952,12 +3011,14 @@ do
                     announced = false
                     module:ResetItemCount()
                 end
+                module:RequestRefresh()
                 return true
             end
 
             lootState.multiAward = nil
             announced = false
             module:ResetItemCount()
+            module:RequestRefresh()
             return false
         end
 
@@ -2967,6 +3028,7 @@ do
             RegisterAwardedItem(1)
         end
         module:ResetItemCount()
+        module:RequestRefresh()
         return result
     end
 
@@ -2994,6 +3056,7 @@ do
             selectionFrame:Hide()
             addon.Loot:SelectItem(index)
             module:ResetItemCount()
+            module:RequestRefresh()
         end
     end
 
@@ -3020,10 +3083,31 @@ do
         _G[frameName .. "ReserveListBtn"]:SetText(L.BtnInsertList)
         _G[frameName .. "LootCounterBtn"]:SetText(L.BtnLootCounter)
         Utils.setFrameTitle(frameName, MASTER_LOOTER)
-        _G[frameName .. "ItemCount"]:SetScript("OnTextChanged", function(self)
-            announced = false
-            dirtyFlags.itemCount = true
-        end)
+
+        local itemCountBox = _G[frameName .. "ItemCount"]
+        if itemCountBox and not itemCountBox.__krtMLHooked then
+            itemCountBox.__krtMLHooked = true
+            itemCountBox:SetScript("OnTextChanged", function(self, isUserInput)
+                if not isUserInput then return end
+                announced = false
+                dirtyFlags.itemCount = true
+                dirtyFlags.buttons = true
+                module:RequestRefresh()
+            end)
+            itemCountBox:SetScript("OnEnterPressed", function(self)
+                self:ClearFocus()
+                announced = false
+                dirtyFlags.itemCount = true
+                dirtyFlags.buttons = true
+                module:RequestRefresh()
+            end)
+            itemCountBox:SetScript("OnEditFocusLost", function(self)
+                announced = false
+                dirtyFlags.itemCount = true
+                dirtyFlags.buttons = true
+                module:RequestRefresh()
+            end)
+        end
         if next(dropDownData) == nil then
             for i = 1, 8 do dropDownData[i] = {} end
         end
@@ -3093,87 +3177,85 @@ do
             dirtyFlags.buttons = true
         end
     end
-
-    -- OnUpdate handler for the frame, updates UI elements periodically.
-    function UpdateUIFrame(self, elapsed)
+    -- Refreshes the UI once (event-driven; coalesced via module:RequestRefresh()).
+    function UpdateUIFrame()
         LocalizeUIFrame()
-        Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
-            local itemCountBox = _G[frameName .. "ItemCount"]
-            UpdateItemCountFromBox(itemCountBox)
 
-            if dropDownDirty then
-                dirtyFlags.dropdowns = true
-            end
+        local itemCountBox = _G[frameName .. "ItemCount"]
+        UpdateItemCountFromBox(itemCountBox)
 
-            local record, canRoll, rolled = UpdateRollStatusState()
-            if lastUIState.rollsCount ~= lootState.rollsCount then
-                lastUIState.rollsCount = lootState.rollsCount
-                dirtyFlags.rolls = true
-                dirtyFlags.buttons = true
-            end
+        if dropDownDirty then
+            dirtyFlags.dropdowns = true
+        end
 
-            if lastUIState.winner ~= lootState.winner then
-                lastUIState.winner = lootState.winner
-                dirtyFlags.winner = true
-                dirtyFlags.buttons = true
-            end
+        local record, canRoll, rolled = UpdateRollStatusState()
+        if lastUIState.rollsCount ~= lootState.rollsCount then
+            lastUIState.rollsCount = lootState.rollsCount
+            dirtyFlags.rolls = true
+            dirtyFlags.buttons = true
+        end
 
-            FlagButtonsOnChange("lootCount", lootState.lootCount)
-            FlagButtonsOnChange("fromInventory", lootState.fromInventory)
-            FlagButtonsOnChange("holder", lootState.holder)
-            FlagButtonsOnChange("banker", lootState.banker)
-            FlagButtonsOnChange("disenchanter", lootState.disenchanter)
+        if lastUIState.winner ~= lootState.winner then
+            lastUIState.winner = lootState.winner
+            dirtyFlags.winner = true
+            dirtyFlags.buttons = true
+        end
 
-            local hasReserves = addon.Reserves:HasData()
-            FlagButtonsOnChange("hasReserves", hasReserves)
+        FlagButtonsOnChange("lootCount", lootState.lootCount)
+        FlagButtonsOnChange("fromInventory", lootState.fromInventory)
+        FlagButtonsOnChange("holder", lootState.holder)
+        FlagButtonsOnChange("banker", lootState.banker)
+        FlagButtonsOnChange("disenchanter", lootState.disenchanter)
 
-            local hasItem = ItemExists()
-            FlagButtonsOnChange("hasItem", hasItem)
+        local hasReserves = addon.Reserves:HasData()
+        FlagButtonsOnChange("hasReserves", hasReserves)
 
-            local itemId
-            if hasItem then
-                itemId = Utils.getItemIdFromLink(GetItemLink())
-            end
-            local hasItemReserves = itemId and addon.Reserves:HasItemReserves(itemId) or false
-            FlagButtonsOnChange("hasItemReserves", hasItemReserves)
-            FlagButtonsOnChange("countdownRun", countdownRun)
+        local hasItem = ItemExists()
+        FlagButtonsOnChange("hasItem", hasItem)
 
-            local available = tonumber(addon.Loot:GetCurrentItemCount()) or 1
-            if available < 1 then available = 1 end
-            local pickMode = (not lootState.fromInventory)
-            local msCount = pickMode and (Utils.MultiSelect_Count("MLRollWinners") or 0) or 0
-            FlagButtonsOnChange("msCount", msCount)
+        local itemId
+        if hasItem then
+            itemId = Utils.getItemIdFromLink(GetItemLink())
+        end
+        local hasItemReserves = itemId and addon.Reserves:HasItemReserves(itemId) or false
+        FlagButtonsOnChange("hasItemReserves", hasItemReserves)
+        FlagButtonsOnChange("countdownRun", countdownRun)
 
-            if dirtyFlags.buttons then
-                UpdateMasterButtonsIfChanged({
-                    countdownText = countdownRun and L.BtnStop or L.BtnCountdown,
-                    awardText = lootState.fromInventory and TRADE or L.BtnAward,
-                    selectItemText = lootState.fromInventory and L.BtnRemoveItem or L.BtnSelectItem,
-                    spamLootText = lootState.fromInventory and READY_CHECK or L.BtnSpamLoot,
-                    canSelectItem = (lootState.lootCount > 1
-                        or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRun,
-                    canChangeItem = not countdownRun,
-                    canSpamLoot = lootState.lootCount >= 1,
-                    canStartRolls = lootState.lootCount >= 1,
-                    canStartSR = lootState.lootCount >= 1 and hasItemReserves,
-                    canCountdown = lootState.lootCount >= 1 and hasItem
-                        and (lootState.rollStarted or countdownRun),
-                    canHold = lootState.lootCount >= 1 and lootState.holder,
-                    canBank = lootState.lootCount >= 1 and lootState.banker,
-                    canDisenchant = lootState.lootCount >= 1 and lootState.disenchanter,
-                    canAward = lootState.lootCount >= 1 and lootState.rollsCount >= 1 and not countdownRun and
-                        (not pickMode or msCount > 0),
-                    reserveListText = hasReserves and L.BtnOpenList or L.BtnInsertList,
-                    canReserveList = true,
-                    canRoll = record and canRoll and rolled == false and countdownRun,
-                    canClear = lootState.rollsCount >= 1,
-                })
-                dirtyFlags.buttons = false
-            end
+        local available = tonumber(addon.Loot:GetCurrentItemCount()) or 1
+        if available < 1 then available = 1 end
+        local pickMode = (not lootState.fromInventory)
+        local msCount = pickMode and (Utils.MultiSelect_Count("MLRollWinners") or 0) or 0
+        FlagButtonsOnChange("msCount", msCount)
 
-            dirtyFlags.rolls = false
-            dirtyFlags.winner = false
-        end)
+        if dirtyFlags.buttons then
+            UpdateMasterButtonsIfChanged({
+                countdownText = countdownRun and L.BtnStop or L.BtnCountdown,
+                awardText = lootState.fromInventory and TRADE or L.BtnAward,
+                selectItemText = lootState.fromInventory and L.BtnRemoveItem or L.BtnSelectItem,
+                spamLootText = lootState.fromInventory and READY_CHECK or L.BtnSpamLoot,
+                canSelectItem = (lootState.lootCount > 1
+                    or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRun,
+                canChangeItem = not countdownRun,
+                canSpamLoot = lootState.lootCount >= 1,
+                canStartRolls = lootState.lootCount >= 1,
+                canStartSR = lootState.lootCount >= 1 and hasItemReserves,
+                canCountdown = lootState.lootCount >= 1 and hasItem
+                    and (lootState.rollStarted or countdownRun),
+                canHold = lootState.lootCount >= 1 and lootState.holder,
+                canBank = lootState.lootCount >= 1 and lootState.banker,
+                canDisenchant = lootState.lootCount >= 1 and lootState.disenchanter,
+                canAward = lootState.lootCount >= 1 and lootState.rollsCount >= 1 and not countdownRun and
+                    (not pickMode or msCount > 0),
+                reserveListText = hasReserves and L.BtnOpenList or L.BtnInsertList,
+                canReserveList = true,
+                canRoll = record and canRoll and rolled == false and countdownRun,
+                canClear = lootState.rollsCount >= 1,
+            })
+            dirtyFlags.buttons = false
+        end
+
+        dirtyFlags.rolls = false
+        dirtyFlags.winner = false
     end
 
     -- Initializes the dropdown menus for player selection.
@@ -3272,6 +3354,7 @@ do
         dirtyFlags.dropdowns = true
         dirtyFlags.buttons = true
         CloseDropDownMenus()
+        module:RequestRefresh()
     end
 
     -- Updates the text of the dropdowns to reflect the current selection.
@@ -3422,6 +3505,7 @@ do
 
         module:ResetItemCount(true)
         ClearCursor()
+        module:RequestRefresh()
         return true
     end
 
@@ -3468,12 +3552,21 @@ do
             addon:trace(E.LogMLLootOpenedTrace:format(lootState.lootCount or 0,
                 tostring(lootState.fromInventory)))
             UpdateSelectionFrame()
-            if lootState.lootCount >= 1 then UIMaster:Show() end
             if not addon.Logger.container then
                 addon.Logger.source = UnitName("target")
             end
             addon:info(E.LogMLLootOpenedInfo:format(lootState.lootCount or 0,
                 tostring(lootState.fromInventory), tostring(UnitName("target"))))
+
+            local shouldShow = (lootState.lootCount or 0) >= 1
+            if shouldShow and UIMaster then
+                -- Request while hidden to refresh immediately on OnShow (avoid an extra refresh).
+                module:RequestRefresh()
+                UIMaster:Show()
+            else
+                -- Keep state dirty for the next time the frame is shown.
+                module:RequestRefresh()
+            end
         end
     end
 
@@ -3497,6 +3590,7 @@ do
                 addon.Loot:ClearLoot()
                 addon.Rolls:ClearRolls()
                 addon.Rolls:RecordRolls(false)
+                module:RequestRefresh()
             end)
         end
     end
@@ -3507,13 +3601,22 @@ do
             addon.Loot:FetchLoot()
             addon:trace(E.LogMLLootSlotCleared:format(lootState.lootCount or 0))
             UpdateSelectionFrame()
-            if lootState.lootCount >= 1 then
-                UIMaster:Show()
+            module:ResetItemCount()
+
+            local shouldShow = (lootState.lootCount or 0) >= 1
+            if shouldShow then
+                local wasShown = UIMaster and UIMaster:IsShown()
+                if not wasShown then
+                    -- Request while hidden to refresh immediately on OnShow (avoid an extra refresh).
+                    module:RequestRefresh()
+                    if UIMaster then UIMaster:Show() end
+                else
+                    module:RequestRefresh()
+                end
             else
-                UIMaster:Hide()
+                if UIMaster then UIMaster:Hide() end
                 addon:info(E.LogMLLootWindowEmptied)
             end
-            module:ResetItemCount()
 
             -- Continue a multi-award sequence (loot window only). We award one copy per LOOT_SLOT_CLEARED
             -- with a small delay to stay in sync with server/loot window refresh (and avoid lag spikes).
@@ -3542,6 +3645,7 @@ do
                     lootState.multiAward = nil
                     announced = false
                     module:ResetItemCount()
+                    module:RequestRefresh()
                     return
                 end
 
@@ -3562,6 +3666,7 @@ do
                         lootState.multiAward = nil
                         announced = false
                         module:ResetItemCount()
+                        module:RequestRefresh()
                         return
                     end
 
@@ -3569,6 +3674,7 @@ do
                     announced = true
                     lootState.winner = e2.name
                     lootState.currentRollType = ma2.rollType
+                    module:RequestRefresh()
 
                     local ok = AssignItem(ma2.itemLink, e2.name, ma2.rollType, e2.roll)
                     if ok then
@@ -3594,11 +3700,13 @@ do
                             lootState.multiAward = nil
                             announced = false
                             module:ResetItemCount()
+                            module:RequestRefresh()
                         end
                     else
                         lootState.multiAward = nil
                         announced = false
                         module:ResetItemCount()
+                        module:RequestRefresh()
                     end
                 end)
             end
@@ -3637,6 +3745,7 @@ do
                     addon.Raid:ClearRaidIcons()
                 end
                 screenshotWarn = false
+                module:RequestRefresh()
             end
         end
     end
@@ -3644,11 +3753,13 @@ do
     -- TRADE_CLOSED: trade window closed (completed or canceled)
     function module:TRADE_CLOSED()
         ResetTradeState("TRADE_CLOSED")
+        module:RequestRefresh()
     end
 
     -- TRADE_REQUEST_CANCEL: trade request canceled before opening
     function module:TRADE_REQUEST_CANCEL()
         ResetTradeState("TRADE_REQUEST_CANCEL")
+        module:RequestRefresh()
     end
 
     -- Assigns an item from the loot window to a player.
@@ -3773,13 +3884,19 @@ do
         elseif lootState.itemCount > 1 then
             -- Announce multiple winners
             addon.Raid:ClearRaidIcons()
-            SetRaidTarget(lootState.trader, 1)
+            if lootState.trader ~= lootState.winner then
+                SetRaidTarget(lootState.trader, 1)
+            end
             local rolls = addon.Rolls:GetRolls()
             local winners = {}
             for i = 1, lootState.itemCount do
                 if rolls[i] then
                     if rolls[i].name == lootState.trader then
-                        tinsert(winners, "{star} " .. rolls[i].name .. "(" .. rolls[i].roll .. ")")
+                        if lootState.trader ~= lootState.winner then
+                            tinsert(winners, "{star} " .. rolls[i].name .. "(" .. rolls[i].roll .. ")")
+                        else
+                            tinsert(winners, rolls[i].name .. "(" .. rolls[i].roll .. ")")
+                        end
                     else
                         SetRaidTarget(rolls[i].name, i + 1)
                         tinsert(winners, RAID_TARGET_MARKERS[i] .. " " .. rolls[i].name .. "(" .. rolls[i].roll .. ")")
@@ -3886,7 +4003,8 @@ do
     local rows, raidPlayers = {}, {}
     local twipe = twipe
     local countsFrame, scrollFrame, scrollChild, header = nil, nil, nil, nil
-    local needsUpdate, countsTicker = false, nil
+    local RequestCountsRefresh -- forward declaration
+    local countsRefresher = nil
     -- Single-line column header.
     local HEADER_HEIGHT = 18
 
@@ -3898,49 +4016,30 @@ do
     local ACTION_COL_W = (BTN_W * 3) + (BTN_GAP * 2) + 2 -- (+/-/R + gaps + right pad)
     local COUNT_COL_W = 40
 
-    local function RequestCountsUpdate()
-        needsUpdate = true
-    end
-
-    local function TickCounts()
-        if needsUpdate then
-            needsUpdate = false
-            module:UpdateCountsFrame()
-        end
-    end
-
-    local function StartCountsTicker()
-        if not countsTicker then
-            countsTicker = addon.NewTicker(C.LOOT_COUNTER_TICK_INTERVAL, TickCounts)
-        end
-    end
-
-    local function StopCountsTicker()
-        if countsTicker then
-            addon.CancelTimer(countsTicker, true)
-            countsTicker = nil
-        end
-    end
-
     local function EnsureFrames()
         countsFrame = countsFrame or _G["KRTLootCounterFrame"]
         scrollFrame = scrollFrame or _G["KRTLootCounterFrameScrollFrame"]
         scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         if countsFrame and not countsFrame._krtCounterHook then
             Utils.setFrameTitle("KRTLootCounterFrame", L.StrLootCounter)
-
-            -- Preserve XML OnShow while still managing our ticker.
-            countsFrame:HookScript("OnShow", function()
-                StartCountsTicker()
-                RequestCountsUpdate()
-            end)
-            countsFrame:HookScript("OnHide", function()
-                StopCountsTicker()
-            end)
-
             countsFrame._krtCounterHook = true
         end
     end
+
+    RequestCountsRefresh = function()
+        EnsureFrames()
+        if not countsFrame then return end
+        if not countsRefresher then
+            countsRefresher = Utils.makeEventDrivenRefresher(function() return countsFrame end,
+                function() module:UpdateCountsFrame() end)
+        end
+        countsRefresher()
+    end
+
+    function module:RequestCountsRefresh()
+        return RequestCountsRefresh()
+    end
+
     local function EnsureHeader()
         if header or not scrollChild then return end
 
@@ -4001,7 +4100,8 @@ do
         if countsFrame:IsShown() then
             Utils.setShown(countsFrame, false)
         else
-            RequestCountsUpdate()
+            -- Request while hidden so the refresher can refresh immediately on OnShow (no double refresh).
+            if RequestCountsRefresh then RequestCountsRefresh() end
             Utils.setShown(countsFrame, true)
         end
     end
@@ -4059,21 +4159,21 @@ do
                 local n = row._playerName
                 if n then
                     addon.Raid:AddPlayerCount(n, 1, KRT_CurrentRaid)
-                    RequestCountsUpdate()
+                    RequestCountsRefresh()
                 end
             end)
             row.minus:SetScript("OnClick", function()
                 local n = row._playerName
                 if n then
                     addon.Raid:AddPlayerCount(n, -1, KRT_CurrentRaid)
-                    RequestCountsUpdate()
+                    RequestCountsRefresh()
                 end
             end)
             row.reset:SetScript("OnClick", function()
                 local n = row._playerName
                 if n then
                     addon.Raid:SetPlayerCount(n, 0, KRT_CurrentRaid)
-                    RequestCountsUpdate()
+                    RequestCountsRefresh()
                 end
             end)
 
@@ -4131,14 +4231,26 @@ do
             local row = EnsureRow(i, rowHeight)
             row:ClearAllPoints()
             local y = -(HEADER_HEIGHT + (i - 1) * rowHeight)
-            row:SetPoint("TOPLEFT",  scrollChild, "TOPLEFT",  0, y)
+            row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, y)
             row:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, y)
             row._playerName = name
-            row.name:SetText(name)
+            if row._lastName ~= name then
+                row.name:SetText(name)
+                row._lastName = name
+            end
+
             local class = addon.Raid:GetPlayerClass(name)
-            local r, g, b = Utils.getClassColor(class)
-            row.name:SetTextColor(r, g, b)
-            row.count:SetText(tostring(addon.Raid:GetPlayerCount(name, KRT_CurrentRaid) or 0))
+            if row._lastClass ~= class then
+                local r, g, b = Utils.getClassColor(class)
+                row.name:SetTextColor(r, g, b)
+                row._lastClass = class
+            end
+
+            local cnt = addon.Raid:GetPlayerCount(name, KRT_CurrentRaid) or 0
+            if row._lastCount ~= cnt then
+                row.count:SetText(tostring(cnt))
+                row._lastCount = cnt
+            end
             row:Show()
         end
 
@@ -4171,17 +4283,21 @@ do
 
     -- Auto-refresh when loot is logged (MS-only counting happens in Raid:AddLoot).
     Utils.registerCallback("RaidLootUpdate", function()
-        RequestCountsUpdate()
+        RequestCountsRefresh()
     end)
 
     -- Refresh on roster updates (to keep list aligned).
     if addon.Raid and addon.Raid.UpdateRaidRoster then
-        hooksecurefunc(addon.Raid, "UpdateRaidRoster", RequestCountsUpdate)
+        hooksecurefunc(addon.Raid, "UpdateRaidRoster", RequestCountsRefresh)
     end
 
     -- New raid session: reset view.
     Utils.registerCallback("RaidCreate", function()
-        RequestCountsUpdate()
+        RequestCountsRefresh()
+    end)
+
+    Utils.registerCallback("PlayerCountChanged", function()
+        RequestCountsRefresh()
     end)
 end
 
@@ -4202,7 +4318,6 @@ do
 
     -- State variables
     local localized = false
-    local updateInterval = C.UPDATE_INTERVAL_RESERVES
     local reservesData = {}
     local reservesByItemID = {}
     local reservesDisplayList = {}
@@ -4557,6 +4672,7 @@ do
         reservesDirty = true
         self:RefreshWindow()
         self:CloseWindow()
+        self:RequestRefresh()
         addon:info(L.StrReserveListCleared)
     end
 
@@ -4580,6 +4696,7 @@ do
         addon:debug(E.LogReservesShowWindow)
         reserveListFrame:Show()
         self:RefreshWindow()
+        self:RequestRefresh()
     end
 
     function module:CloseWindow()
@@ -4605,6 +4722,7 @@ do
         frame:Show()
         Utils.resetEditBox(_G["KRTImportEditBox"])
         Utils.setFrameTitle(frame, L.StrImportReservesTitle)
+        self:RequestRefresh()
     end
 
     function module:CloseImportWindow()
@@ -4633,8 +4751,6 @@ do
         frame:RegisterForDrag("LeftButton")
         frame:SetScript("OnDragStart", frame.StartMoving)
         frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-        frame:SetScript("OnUpdate", UpdateUIFrame)
-
         scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"]
         scrollChild = scrollFrame and scrollFrame.ScrollChild or _G["KRTReserveListFrameScrollChild"]
 
@@ -4733,24 +4849,28 @@ do
     end
 
     -- Update UI Frame:
-    function UpdateUIFrame(self, elapsed)
+    function UpdateUIFrame()
         LocalizeUIFrame()
-        Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
-            local hasData = module:HasData()
-            local clearButton = _G[frameName .. "ClearButton"]
-            if clearButton then
-                if hasData then
-                    clearButton:Show()
-                    Utils.enableDisable(clearButton, true)
-                else
-                    clearButton:Hide()
-                end
+        local hasData = module:HasData()
+        local clearButton = _G[frameName .. "ClearButton"]
+        if clearButton then
+            if hasData then
+                clearButton:Show()
+                Utils.enableDisable(clearButton, true)
+            else
+                clearButton:Hide()
             end
-            local queryButton = _G[frameName .. "QueryButton"]
-            if queryButton then
-                Utils.enableDisable(queryButton, hasData)
-            end
-        end)
+        end
+        local queryButton = _G[frameName .. "QueryButton"]
+        if queryButton then
+            Utils.enableDisable(queryButton, hasData)
+        end
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return reserveListFrame end, UpdateUIFrame)
+
+    function module:RequestRefresh()
+        RequestRefresh()
     end
 
     -- ----- Reserve Data Handling ----- --
@@ -4854,6 +4974,7 @@ do
         addon:debug(E.LogReservesParseComplete:format(addon.tLength(reservesData)))
         addon:info(E.LogSRImportComplete:format(addon.tLength(reservesData)))
         self:RefreshWindow()
+        self:RequestRefresh()
         self:Save()
     end
 
@@ -4931,6 +5052,7 @@ do
         end
         if updated and reserveListFrame and reserveListFrame:IsShown() then
             self:RefreshWindow()
+            self:RequestRefresh()
         end
         if not silent then
             if count > 0 then
@@ -5181,7 +5303,6 @@ do
 
     -- Frame update
     local UpdateUIFrame
-    local updateInterval = C.UPDATE_INTERVAL_CONFIG
     local MIN_COUNTDOWN = 5
     local MAX_COUNTDOWN = 60
 
@@ -5225,6 +5346,7 @@ do
         KRT_Options = options
         addon.options = options
         configDirty = true
+        module:RequestRefresh()
         addon:info(L.MsgDefaultsRestored)
     end
 
@@ -5239,6 +5361,7 @@ do
 
         Utils.applyDebugSetting(addon.options.debug)
         configDirty = true
+        module:RequestRefresh()
 
         if KRT_MINIMAP_GUI then
             addon.Minimap:SetPos(addon.options.minimapPos or 325)
@@ -5265,8 +5388,9 @@ do
 
         -- Localize once (no per-tick calls)
         LocalizeUIFrame()
-
-        frame:SetScript("OnUpdate", UpdateUIFrame)
+        frame:HookScript("OnShow", function()
+            configDirty = true
+        end)
     end
 
     function module:InitCountdownSlider(slider)
@@ -5285,10 +5409,14 @@ do
 
     -- Toggles the visibility of the configuration frame.
     function module:Toggle()
-        local wasShown = UIConfig and UIConfig:IsShown()
-        Utils.toggle(UIConfig)
-        if UIConfig and UIConfig:IsShown() and not wasShown then
+        if not UIConfig then return end
+        if UIConfig:IsShown() then
+            Utils.setShown(UIConfig, false)
+        else
             configDirty = true
+            -- Request while hidden to refresh immediately on OnShow (no extra refresh).
+            module:RequestRefresh()
+            Utils.setShown(UIConfig, true)
         end
     end
 
@@ -5318,6 +5446,7 @@ do
         KRT_Options[name] = value
 
         configDirty = true
+        module:RequestRefresh()
     end
 
     -- Localizes UI elements.
@@ -5353,53 +5482,56 @@ do
     end
 
     -- OnUpdate handler for the configuration frame.
-    function UpdateUIFrame(self, elapsed)
-        if configDirty then
-            Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
-                _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)
-                _G[frameName .. "useRaidWarning"]:SetChecked(addon.options.useRaidWarning == true)
-                _G[frameName .. "announceOnWin"]:SetChecked(addon.options.announceOnWin == true)
-                _G[frameName .. "announceOnHold"]:SetChecked(addon.options.announceOnHold == true)
-                _G[frameName .. "announceOnBank"]:SetChecked(addon.options.announceOnBank == true)
-                _G[frameName .. "announceOnDisenchant"]:SetChecked(addon.options.announceOnDisenchant == true)
-                _G[frameName .. "lootWhispers"]:SetChecked(addon.options.lootWhispers == true)
-                _G[frameName .. "countdownRollsBlock"]:SetChecked(addon.options.countdownRollsBlock == true)
-                _G[frameName .. "screenReminder"]:SetChecked(addon.options.screenReminder == true)
-                _G[frameName .. "ignoreStacks"]:SetChecked(addon.options.ignoreStacks == true)
-                _G[frameName .. "showTooltips"]:SetChecked(addon.options.showTooltips == true)
-                _G[frameName .. "showLootCounterDuringMSRoll"]:SetChecked(addon.options.showLootCounterDuringMSRoll == true)
-                _G[frameName .. "minimapButton"]:SetChecked(addon.options.minimapButton == true)
+    function UpdateUIFrame()
+        if not configDirty then return end
+        _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)
+        _G[frameName .. "useRaidWarning"]:SetChecked(addon.options.useRaidWarning == true)
+        _G[frameName .. "announceOnWin"]:SetChecked(addon.options.announceOnWin == true)
+        _G[frameName .. "announceOnHold"]:SetChecked(addon.options.announceOnHold == true)
+        _G[frameName .. "announceOnBank"]:SetChecked(addon.options.announceOnBank == true)
+        _G[frameName .. "announceOnDisenchant"]:SetChecked(addon.options.announceOnDisenchant == true)
+        _G[frameName .. "lootWhispers"]:SetChecked(addon.options.lootWhispers == true)
+        _G[frameName .. "countdownRollsBlock"]:SetChecked(addon.options.countdownRollsBlock == true)
+        _G[frameName .. "screenReminder"]:SetChecked(addon.options.screenReminder == true)
+        _G[frameName .. "ignoreStacks"]:SetChecked(addon.options.ignoreStacks == true)
+        _G[frameName .. "showTooltips"]:SetChecked(addon.options.showTooltips == true)
+        _G[frameName .. "showLootCounterDuringMSRoll"]:SetChecked(addon.options.showLootCounterDuringMSRoll == true)
+        _G[frameName .. "minimapButton"]:SetChecked(addon.options.minimapButton == true)
 
-                -- IMPORTANT: always update checked state (even if disabled)
-                _G[frameName .. "countdownSimpleRaidMsg"]:SetChecked(addon.options.countdownSimpleRaidMsg == true)
+        -- IMPORTANT: always update checked state (even if disabled)
+        _G[frameName .. "countdownSimpleRaidMsg"]:SetChecked(addon.options.countdownSimpleRaidMsg == true)
 
-                _G[frameName .. "countdownDuration"]:SetValue(addon.options.countdownDuration)
-                _G[frameName .. "countdownDurationText"]:SetText(addon.options.countdownDuration)
+        _G[frameName .. "countdownDuration"]:SetValue(addon.options.countdownDuration)
+        _G[frameName .. "countdownDurationText"]:SetText(addon.options.countdownDuration)
 
-                -- Dependency: if Use Raid Warnings is OFF, keep check state but grey out + disable.
-                do
-                    local useRaidWarning = addon.options.useRaidWarning == true
-                    local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
-                    local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
+        -- Dependency: if Use Raid Warnings is OFF, keep check state but grey out + disable.
+        do
+            local useRaidWarning = addon.options.useRaidWarning == true
+            local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
+            local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
 
-                    if countdownSimpleRaidMsgBtn and countdownSimpleRaidMsgStr then
-                        if useRaidWarning then
-                            countdownSimpleRaidMsgBtn:Enable()
-                            countdownSimpleRaidMsgStr:SetTextColor(
-                                HIGHLIGHT_FONT_COLOR.r,
-                                HIGHLIGHT_FONT_COLOR.g,
-                                HIGHLIGHT_FONT_COLOR.b
-                            )
-                        else
-                            countdownSimpleRaidMsgBtn:Disable()
-                            countdownSimpleRaidMsgStr:SetTextColor(0.5, 0.5, 0.5)
-                        end
-                    end
+            if countdownSimpleRaidMsgBtn and countdownSimpleRaidMsgStr then
+                if useRaidWarning then
+                    countdownSimpleRaidMsgBtn:Enable()
+                    countdownSimpleRaidMsgStr:SetTextColor(
+                        HIGHLIGHT_FONT_COLOR.r,
+                        HIGHLIGHT_FONT_COLOR.g,
+                        HIGHLIGHT_FONT_COLOR.b
+                    )
+                else
+                    countdownSimpleRaidMsgBtn:Disable()
+                    countdownSimpleRaidMsgStr:SetTextColor(0.5, 0.5, 0.5)
                 end
-
-                configDirty = false
-            end)
+            end
         end
+
+        configDirty = false
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIConfig end, UpdateUIFrame)
+
+    function module:RequestRefresh()
+        RequestRefresh()
     end
 end
 
@@ -5415,8 +5547,6 @@ do
     local localized = false
 
     local UpdateUIFrame
-    local updateInterval = C.UPDATE_INTERVAL_WARNINGS
-
     local fetched = false
     local warningsDirty = false
 
@@ -5466,18 +5596,27 @@ do
             warningsDirty = true
             lastSelectedID = false
         end)
-        frame:SetScript("OnUpdate", UpdateUIFrame)
         controller:OnLoad(frame)
     end
 
     -- Externally update frame:
     function module:Update()
         warningsDirty = true
+        module:RequestRefresh()
     end
 
     -- Toggle frame visibility:
     function module:Toggle()
-        Utils.toggle(UIWarnings)
+        if not UIWarnings then return end
+        if UIWarnings:IsShown() then
+            Utils.setShown(UIWarnings, false)
+        else
+            warningsDirty = true
+            lastSelectedID = false
+            -- Request while hidden to refresh immediately on OnShow (no extra refresh).
+            module:RequestRefresh()
+            Utils.setShown(UIWarnings, true)
+        end
     end
 
     -- Hide frame:
@@ -5497,6 +5636,7 @@ do
             return self:Announce(tempSelectedID)
         end
         selectedID = (wID ~= selectedID) and wID or nil
+        module:RequestRefresh()
     end
 
     -- Edit/Save warning:
@@ -5513,6 +5653,7 @@ do
                 _G[frameName .. "Name"]:SetFocus()
                 _G[frameName .. "Content"]:SetText(w.content)
                 isEdit = true
+                module:RequestRefresh()
                 return
             end
         end
@@ -5542,6 +5683,7 @@ do
             selectedID = selectedID - 1
         end
         warningsDirty = true
+        module:RequestRefresh()
     end
 
     -- Announce Warning:
@@ -5562,6 +5704,7 @@ do
         selectedID = nil
         tempSelectedID = nil
         isEdit = false
+        module:RequestRefresh()
     end
 
     -- Localizing UI frame:
@@ -5578,6 +5721,16 @@ do
         _G[frameName .. "Content"]:SetScript("OnEscapePressed", module.Cancel)
         _G[frameName .. "Name"]:SetScript("OnEnterPressed", module.Edit)
         _G[frameName .. "Content"]:SetScript("OnEnterPressed", module.Edit)
+        _G[frameName .. "Name"]:SetScript("OnTextChanged", function(_, isUserInput)
+            if isUserInput then
+                module:RequestRefresh()
+            end
+        end)
+        _G[frameName .. "Content"]:SetScript("OnTextChanged", function(_, isUserInput)
+            if isUserInput then
+                module:RequestRefresh()
+            end
+        end)
         localized = true
     end
 
@@ -5595,29 +5748,33 @@ do
     end
 
     -- OnUpdate frame:
-    function UpdateUIFrame(self, elapsed)
+    function UpdateUIFrame()
         LocalizeUIFrame()
-        Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
-            if warningsDirty or not fetched then
-                controller:Dirty()
-                warningsDirty = false
-                fetched = true
-            end
-            if selectedID ~= lastSelectedID then
-                UpdateSelectionUI()
-                controller:Touch()
-            end
-            tempName    = _G[frameName .. "Name"]:GetText()
-            tempContent = _G[frameName .. "Content"]:GetText()
-            Utils.enableDisable(_G[frameName .. "EditBtn"], (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
-            Utils.enableDisable(_G[frameName .. "DeleteBtn"], selectedID ~= nil)
-            Utils.enableDisable(_G[frameName .. "AnnounceBtn"], selectedID ~= nil)
-            local editBtnMode = (tempName ~= "" or tempContent ~= "") or selectedID == nil
-            if editBtnMode ~= lastEditBtnMode then
-                Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
-                lastEditBtnMode = editBtnMode
-            end
-        end)
+        if warningsDirty or not fetched then
+            controller:Dirty()
+            warningsDirty = false
+            fetched = true
+        end
+        if selectedID ~= lastSelectedID then
+            UpdateSelectionUI()
+            controller:Touch()
+        end
+        tempName    = _G[frameName .. "Name"]:GetText()
+        tempContent = _G[frameName .. "Content"]:GetText()
+        Utils.enableDisable(_G[frameName .. "EditBtn"], (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
+        Utils.enableDisable(_G[frameName .. "DeleteBtn"], selectedID ~= nil)
+        Utils.enableDisable(_G[frameName .. "AnnounceBtn"], selectedID ~= nil)
+        local editBtnMode = (tempName ~= "" or tempContent ~= "") or selectedID == nil
+        if editBtnMode ~= lastEditBtnMode then
+            Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
+            lastEditBtnMode = editBtnMode
+        end
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIWarnings end, UpdateUIFrame)
+
+    function module:RequestRefresh()
+        RequestRefresh()
     end
 
     -- Saving a Warning:
@@ -5656,8 +5813,6 @@ do
     local localized = false
 
     local UpdateUIFrame
-    local updateInterval = C.UPDATE_INTERVAL_CHANGES
-
     local changesTable = {}
     local tmpNames = {}
     local SaveChanges, CancelChanges
@@ -5722,14 +5877,22 @@ do
             changesDirty = true
             lastSelectedID = false
         end)
-        frame:SetScript("OnUpdate", UpdateUIFrame)
         controller:OnLoad(frame)
     end
 
     -- Toggle frame visibility:
     function module:Toggle()
         CancelChanges()
-        Utils.toggle(UIChanges)
+        if not UIChanges then return end
+        if UIChanges:IsShown() then
+            Utils.setShown(UIChanges, false)
+        else
+            changesDirty = true
+            lastSelectedID = false
+            -- Request while hidden to refresh immediately on OnShow (no extra refresh).
+            module:RequestRefresh()
+            Utils.setShown(UIChanges, true)
+        end
     end
 
     -- Hide frame:
@@ -5747,6 +5910,7 @@ do
         fetched = false
         changesDirty = true
         controller:Dirty()
+        module:RequestRefresh()
     end
 
     -- Selecting Player:
@@ -5777,6 +5941,7 @@ do
         selectedID = (name ~= selectedID) and name or nil
         isAdd = false
         isEdit = false
+        module:RequestRefresh()
     end
 
     -- Add / Delete:
@@ -5787,12 +5952,14 @@ do
             _G[frameName .. "Name"]:Show()
             _G[frameName .. "Name"]:SetFocus()
             isAdd = true
+            module:RequestRefresh()
         elseif changesTable[selectedID] then
             changesTable[selectedID] = nil
             CancelChanges()
             fetched = false
             changesDirty = true
             controller:Dirty()
+            module:RequestRefresh()
         end
     end
 
@@ -5810,6 +5977,7 @@ do
             _G[frameName .. "Spec"]:SetFocus()
             isAdd = false
             isEdit = true
+            module:RequestRefresh()
         end
     end
 
@@ -5819,6 +5987,7 @@ do
         KRT_Raids[KRT_CurrentRaid].changes[name] = nil
         changesDirty = true
         controller:Dirty()
+        module:RequestRefresh()
     end
 
     Utils.registerCallback("RaidLeave", function(e, name)
@@ -5888,48 +6057,61 @@ do
         _G[frameName .. "Spec"]:SetScript("OnEnterPressed", module.Edit)
         _G[frameName .. "Name"]:SetScript("OnEscapePressed", CancelChanges)
         _G[frameName .. "Spec"]:SetScript("OnEscapePressed", CancelChanges)
+        _G[frameName .. "Name"]:SetScript("OnTextChanged", function(_, isUserInput)
+            if isUserInput then
+                module:RequestRefresh()
+            end
+        end)
+        _G[frameName .. "Spec"]:SetScript("OnTextChanged", function(_, isUserInput)
+            if isUserInput then
+                module:RequestRefresh()
+            end
+        end)
         localized = true
     end
 
     -- OnUpdate frame:
-    function UpdateUIFrame(self, elapsed)
+    function UpdateUIFrame()
         LocalizeUIFrame()
-        Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
-            if changesDirty or not fetched then
-                InitChangesTable()
-                controller:Dirty()
-                changesDirty = false
-                fetched = true
-            end
-            local count = addon.tLength(changesTable)
-            if count > 0 then
-            else
-                tempSelectedID = nil
-                selectedID = nil
-            end
-            if selectedID ~= lastSelectedID then
-                lastSelectedID = selectedID
-                controller:Touch()
-            end
-            Utils.showHide(_G[frameName .. "Name"], (isEdit or isAdd))
-            Utils.showHide(_G[frameName .. "Spec"], (isEdit or isAdd))
-            Utils.enableDisable(_G[frameName .. "EditBtn"], (selectedID or isEdit or isAdd))
-            local editBtnMode = isAdd or (selectedID and isEdit)
-            if editBtnMode ~= lastEditBtnMode then
-                Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
-                lastEditBtnMode = editBtnMode
-            end
-            local addBtnMode = (not selectedID and not isEdit and not isAdd)
-            if addBtnMode ~= lastAddBtnMode then
-                Utils.setText(_G[frameName .. "AddBtn"], L.BtnAdd, L.BtnDelete, addBtnMode)
-                lastAddBtnMode = addBtnMode
-            end
-            Utils.showHide(_G[frameName .. "AddBtn"], (not isEdit and not isAdd))
-            Utils.enableDisable(_G[frameName .. "ClearBtn"], count > 0)
-            Utils.enableDisable(_G[frameName .. "AnnounceBtn"], count > 0)
-            Utils.enableDisable(_G[frameName .. "AddBtn"], KRT_CurrentRaid)
-            Utils.enableDisable(_G[frameName .. "DemandBtn"], KRT_CurrentRaid)
-        end)
+        if changesDirty or not fetched then
+            InitChangesTable()
+            controller:Dirty()
+            changesDirty = false
+            fetched = true
+        end
+        local count = addon.tLength(changesTable)
+        if count <= 0 then
+            tempSelectedID = nil
+            selectedID = nil
+        end
+        if selectedID ~= lastSelectedID then
+            lastSelectedID = selectedID
+            controller:Touch()
+        end
+        Utils.showHide(_G[frameName .. "Name"], (isEdit or isAdd))
+        Utils.showHide(_G[frameName .. "Spec"], (isEdit or isAdd))
+        Utils.enableDisable(_G[frameName .. "EditBtn"], (selectedID or isEdit or isAdd))
+        local editBtnMode = isAdd or (selectedID and isEdit)
+        if editBtnMode ~= lastEditBtnMode then
+            Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
+            lastEditBtnMode = editBtnMode
+        end
+        local addBtnMode = (not selectedID and not isEdit and not isAdd)
+        if addBtnMode ~= lastAddBtnMode then
+            Utils.setText(_G[frameName .. "AddBtn"], L.BtnAdd, L.BtnDelete, addBtnMode)
+            lastAddBtnMode = addBtnMode
+        end
+        Utils.showHide(_G[frameName .. "AddBtn"], (not isEdit and not isAdd))
+        Utils.enableDisable(_G[frameName .. "ClearBtn"], count > 0)
+        Utils.enableDisable(_G[frameName .. "AnnounceBtn"], count > 0)
+        Utils.enableDisable(_G[frameName .. "AddBtn"], KRT_CurrentRaid)
+        Utils.enableDisable(_G[frameName .. "DemandBtn"], KRT_CurrentRaid)
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIChanges end, UpdateUIFrame)
+
+    function module:RequestRefresh()
+        RequestRefresh()
     end
 
     -- Initialize changes table:
@@ -5961,6 +6143,7 @@ do
         fetched = false
         changesDirty = true
         controller:Dirty()
+        module:RequestRefresh()
     end
 
     -- Cancel all actions:
@@ -5971,6 +6154,7 @@ do
         tempSelectedID = nil
         Utils.resetEditBox(_G[frameName .. "Name"])
         Utils.resetEditBox(_G[frameName .. "Spec"])
+        module:RequestRefresh()
     end
 end
 
@@ -5987,9 +6171,6 @@ do
     local localized = false
 
     local UpdateUIFrame
-    local updateInterval = C.UPDATE_INTERVAL_SPAMMER
-    local updateTicker
-
     -- Defaults / constants
     local DEFAULT_DURATION_STR = "60"
     local DEFAULT_DURATION_NUM = 60
@@ -6071,10 +6252,7 @@ do
         message = nil,
         duration = nil, -- string
     }
-
     -- Forward declarations
-    local StartTicker
-    local StopTicker
     local RenderPreview
     local StartSpamCycle
     local StopSpamCycle
@@ -6183,11 +6361,12 @@ do
         LocalizeUIFrame()
 
         frame:RegisterForDrag("LeftButton")
-        frame:SetScript("OnShow", StartTicker)
-        frame:SetScript("OnHide", StopTicker)
+        frame:SetScript("OnShow", function()
+            module:RequestRefresh()
+        end)
 
         if frame:IsShown() then
-            StartTicker()
+            module:RequestRefresh()
         end
     end
 
@@ -6237,6 +6416,7 @@ do
 
         loaded = false
         previewDirty = true
+        module:RequestRefresh()
     end
 
     -- Start/Stop/Pause
@@ -6257,10 +6437,9 @@ do
                 ticking = true
                 paused = false
                 SetInputsLocked(true)
-                StartTicker()
                 StartSpamCycle(true)
             end
-            UpdateControls()
+            module:RequestRefresh()
         end
     end
 
@@ -6269,12 +6448,7 @@ do
         paused = false
         StopSpamCycle(true)
         SetInputsLocked(false)
-
-        if UISpammer and not UISpammer:IsShown() then
-            StopTicker()
-        end
-
-        UpdateControls()
+        module:RequestRefresh()
     end
 
     function module:Pause()
@@ -6282,7 +6456,7 @@ do
         paused = true
         StopSpamCycle(false)
         SetInputsLocked(false)
-        UpdateControls()
+        module:RequestRefresh()
     end
 
     -- Spam
@@ -6412,11 +6586,12 @@ do
                 if inputsLocked then return end
                 if isUserInput then
                     previewDirty = true
+                    module:RequestRefresh()
                 end
             end)
 
             box:SetScript("OnEnterPressed", function(self)
-                module:Save(self)
+                self:ClearFocus()
             end)
 
             box:SetScript("OnEditFocusLost", function(self)
@@ -6522,25 +6697,6 @@ do
 
             UpdateTickDisplay()
         end)
-    end
-
-    -- UI ticker
-    function StartTicker()
-        if updateTicker then return end
-
-        local interval = tonumber(updateInterval) or 0.05
-        updateTicker = addon.NewTicker(interval, function()
-            if UISpammer then
-                UpdateUIFrame(UISpammer, interval)
-            end
-        end)
-    end
-
-    function StopTicker()
-        if not updateTicker then return end
-        -- Stop and clear the UI update ticker
-        addon.CancelTimer(updateTicker, true)
-        updateTicker = nil
     end
 
     -- Build output
@@ -6694,49 +6850,52 @@ do
     end
 
     -- UI update tick
-    function UpdateUIFrame(self, elapsed)
+    function UpdateUIFrame()
         if not (UISpammer and UISpammer:IsShown()) then
-            StopTicker()
             return
         end
 
-        Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
-            if not loaded then
-                KRT_Spammer.Duration = KRT_Spammer.Duration or DEFAULT_DURATION_STR
+        if not loaded then
+            KRT_Spammer.Duration = KRT_Spammer.Duration or DEFAULT_DURATION_STR
 
-                ResetAllChannelCheckboxes()
+            ResetAllChannelCheckboxes()
 
-                for k, v in pairs(KRT_Spammer) do
-                    if k == "Channels" then
-                        for i, c in ipairs(v) do
-                            local id = tonumber(c) or select(1, GetChannelName(c))
-                            id = (id and id > 0) and id or c
-                            v[i] = id
-                            SetCheckbox("Chat" .. id, true)
-                        end
-                    elseif _G[frameName .. k] then
-                        _G[frameName .. k]:SetText(v)
+            for k, v in pairs(KRT_Spammer) do
+                if k == "Channels" then
+                    for i, c in ipairs(v) do
+                        local id = tonumber(c) or select(1, GetChannelName(c))
+                        id = (id and id > 0) and id or c
+                        v[i] = id
+                        SetCheckbox("Chat" .. id, true)
                     end
+                elseif _G[frameName .. k] then
+                    _G[frameName .. k]:SetText(v)
                 end
-
-                loaded = true
-                previewDirty = true
             end
 
-            if ticking and not paused then
-                UpdateControls()
-                UpdateTickDisplay()
-                return
-            end
+            loaded = true
+            previewDirty = true
+        end
 
-            if previewDirty then
-                RenderPreview()
-                previewDirty = false
-            else
-                UpdateControls()
-                UpdateTickDisplay()
-            end
-        end)
+        if ticking and not paused then
+            UpdateControls()
+            UpdateTickDisplay()
+            return
+        end
+
+        if previewDirty then
+            RenderPreview()
+            previewDirty = false
+        else
+            UpdateControls()
+            UpdateTickDisplay()
+        end
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UISpammer end, UpdateUIFrame)
+
+    function module:RequestRefresh()
+        RequestRefresh()
     end
 end
 
@@ -6882,7 +7041,8 @@ do
         self:BuildRows(out, raid and raid.bossKills, nil, function(boss, i)
             local it = {}
             it.id = tonumber(boss and boss.bossNid) or (boss and boss.bossNid) or i -- stable nid for highlight/selection
-            it.seq = i -- display-only (rescales after deletions)
+            it.seq =
+            i                                                                       -- display-only (rescales after deletions)
             it.name = boss and boss.name or ""
             it.time = boss and boss.time or time()
             it.timeFmt = date("%H:%M", it.time)
@@ -8770,13 +8930,14 @@ do
 
     local frameName, localized, isEdit = nil, false, false
     local raidData, bossData, tempDate = {}, {}, {}
-    local updateInterval = C.UPDATE_INTERVAL_LOGGER
 
     function Box:OnLoad(frame)
         if not frame then return end
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
-        frame:SetScript("OnUpdate", function(_, elapsed) self:UpdateUIFrame(_, elapsed) end)
+        frame:SetScript("OnShow", function()
+            self:UpdateUIFrame()
+        end)
         frame:SetScript("OnHide", function() self:CancelAddEdit() end)
         local nameStr = _G[frameName .. "NameStr"]
         if nameStr then
@@ -8880,16 +9041,14 @@ do
         twipe(tempDate)
     end
 
-    function Box:UpdateUIFrame(frame, elapsed)
+    function Box:UpdateUIFrame()
         if not localized then
             addon:SetTooltip(_G[frameName .. "Name"], L.StrBossNameHelp, "ANCHOR_LEFT")
             addon:SetTooltip(_G[frameName .. "Difficulty"], L.StrBossDifficultyHelp, "ANCHOR_LEFT")
             addon:SetTooltip(_G[frameName .. "Time"], L.StrBossTimeHelp, "ANCHOR_RIGHT")
             localized = true
         end
-        Utils.throttledUIUpdate(frame, frameName, updateInterval, elapsed, function()
-            Utils.setText(_G[frameName .. "Title"], L.StrEditBoss, L.StrAddBoss, isEdit)
-        end)
+        Utils.setText(_G[frameName .. "Title"], L.StrEditBoss, L.StrAddBoss, isEdit)
     end
 end
 
@@ -9239,6 +9398,11 @@ end
 -- RAID_ROSTER_UPDATE: Updates the raid roster when it changes.
 function addon:RAID_ROSTER_UPDATE()
     addon.Raid:UpdateRaidRoster()
+
+    -- Keep Master Looter UI in sync (event-driven; no polling).
+    if addon.Master and addon.Master.RequestRefresh and addon.UIMaster and addon.UIMaster.IsShown and addon.UIMaster:IsShown() then
+        addon.Master:RequestRefresh()
+    end
 
     -- If the Logger is open on the *current* raid, keep the visible lists in sync automatically.
     -- (Throttled to avoid multiple redraws during bursty roster updates.)
