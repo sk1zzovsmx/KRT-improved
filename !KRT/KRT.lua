@@ -3794,13 +3794,19 @@ do
         elseif lootState.itemCount > 1 then
             -- Announce multiple winners
             addon.Raid:ClearRaidIcons()
-            SetRaidTarget(lootState.trader, 1)
+            if lootState.trader ~= lootState.winner then
+                SetRaidTarget(lootState.trader, 1)
+            end
             local rolls = addon.Rolls:GetRolls()
             local winners = {}
             for i = 1, lootState.itemCount do
                 if rolls[i] then
                     if rolls[i].name == lootState.trader then
-                        tinsert(winners, "{star} " .. rolls[i].name .. "(" .. rolls[i].roll .. ")")
+                        if lootState.trader ~= lootState.winner then
+                            tinsert(winners, "{star} " .. rolls[i].name .. "(" .. rolls[i].roll .. ")")
+                        else
+                            tinsert(winners, rolls[i].name .. "(" .. rolls[i].roll .. ")")
+                        end
                     else
                         SetRaidTarget(rolls[i].name, i + 1)
                         tinsert(winners, RAID_TARGET_MARKERS[i] .. " " .. rolls[i].name .. "(" .. rolls[i].roll .. ")")
