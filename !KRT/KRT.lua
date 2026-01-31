@@ -736,6 +736,13 @@ do
             bossNid     = tonumber(KRT_LastBoss) or 0,
             time        = Utils.getCurrentTime(),
         }
+
+        -- LootCounter (MS only): increment the winner's count when the loot is actually awarded.
+        -- This runs off the authoritative LOOT_ITEM / LOOT_ITEM_MULTIPLE chat event.
+        if tonumber(rollType) == rollTypes.MAINSPEC then
+            module:AddPlayerCount(player, itemCount, KRT_CurrentRaid)
+        end
+
         tinsert(raid.loot, lootInfo)
         Utils.triggerEvent("RaidLootUpdate", KRT_CurrentRaid, lootInfo)
         addon:debug(E.LogLootLogged:format(tonumber(KRT_CurrentRaid) or -1, tostring(itemId),
@@ -744,6 +751,41 @@ do
 
     -- ----- Player Count API ----- --
 
+    -- Adds (or subtracts) from the per-raid player count.
+    -- Used by LootCounter UI and MS auto-counting.
+    -- Clamps to 0 (never negative).
+    function module:AddPlayerCount(name, delta, raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        if not raidNum or not name then return end
+
+        delta = tonumber(delta) or 0
+        if delta == 0 then return end
+
+        -- Normalize/resolve name if possible.
+        local ok, fixed = module:CheckPlayer(name, raidNum)
+        if ok and fixed then
+            name = fixed
+        end
+
+        -- Ensure the player exists in the raid log.
+        if module:GetPlayerID(name, raidNum) == 0 then
+            module:AddPlayer({
+                name     = name,
+                rank     = 0,
+                subgroup = 1,
+                class    = "UNKNOWN",
+                join     = Utils.getCurrentTime(),
+                leave    = nil,
+                count    = 0,
+            }, raidNum)
+        end
+
+        local current = module:GetPlayerCount(name, raidNum) or 0
+        local nextVal = current + delta
+        if nextVal < 0 then nextVal = 0 end
+        module:SetPlayerCount(name, nextVal, raidNum)
+    end
+
     function module:GetPlayerCount(name, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
         local raid = raidNum and KRT_Raids[raidNum]
@@ -751,7 +793,8 @@ do
         if not players then return 0 end
         for i, p in ipairs(players) do
             if p.name == name then
-                return p.count or 0
+                local c = tonumber(p.count) or 0
+                return c
             end
         end
         return 0
@@ -760,11 +803,9 @@ do
     function module:SetPlayerCount(name, value, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
 
-        -- Prevent setting a negative count
-        if value < 0 then
-            addon:error(L.ErrPlayerCountBelowZero:format(name))
-            return
-        end
+        value = tonumber(value) or 0
+        -- Hard clamp: counts are always non-negative.
+        if value < 0 then value = 0 end
 
         local players = KRT_Raids[raidNum] and KRT_Raids[raidNum].players
         if not players then return end
@@ -794,7 +835,8 @@ do
 
         local c = module:GetPlayerCount(name, raidNum)
         if c <= 0 then
-            addon:error(L.ErrPlayerCountBelowZero:format(name))
+            -- Already at floor; keep it at 0 without spamming errors.
+            module:SetPlayerCount(name, 0, raidNum)
             return
         end
         module:SetPlayerCount(name, c - 1, raidNum)
@@ -1984,6 +2026,7 @@ do
             end
 
             -- SR roll counter: show only (used/allowed) on the single compact row
+            -- Optional: during MS rolls, show the player's positive MS loot count in the same column ("+N"), if enabled in config.
             if counterStr then
                 if isSR and itemId and self:IsReserved(itemId, name) then
                     local allowed = self:GetAllowedReserves(itemId, name)
@@ -1994,7 +2037,18 @@ do
                         counterStr:SetText("")
                     end
                 else
-                    counterStr:SetText("")
+                    if addon.options.showLootCounterDuringMSRoll == true
+                        and lootState.currentRollType == rollTypes.MAINSPEC
+                    then
+                        local c = addon.Raid:GetPlayerCount(name, KRT_CurrentRaid) or 0
+                        if c > 0 then
+                            counterStr:SetText("+" .. c)
+                        else
+                            counterStr:SetText("")
+                        end
+                    else
+                        counterStr:SetText("")
+                    end
                 end
             end
 
@@ -2601,10 +2655,23 @@ do
         if itemBtn and not itemBtn.__krtMLInvDropInit then
             itemBtn.__krtMLInvDropInit = true
             itemBtn:RegisterForClicks("AnyUp")
-            itemBtn:SetScript("OnClick", function(self, button)
+            itemBtn:RegisterForDrag("LeftButton")
+
+            -- Blizz-like gesture support:
+            -- - Click while holding an item on the cursor
+            -- - Drag&drop (release) an item onto the button
+            local function TryAcceptFromCursor()
                 if CursorHasItem and CursorHasItem() then
                     module:TryAcceptInventoryItemFromCursor()
                 end
+            end
+
+            itemBtn:SetScript("OnClick", function(self, button)
+                TryAcceptFromCursor()
+            end)
+
+            itemBtn:SetScript("OnReceiveDrag", function(self)
+                TryAcceptFromCursor()
             end)
         end
         frame:RegisterForDrag("LeftButton")
@@ -3557,6 +3624,12 @@ do
                 else
                     addon:warn(E.LogTradeCurrentRollItemMissing)
                 end
+
+                -- LootCounter (MS only): trade awards don't emit LOOT_ITEM for the winner.
+                if tonumber(lootState.currentRollType) == rollTypes.MAINSPEC then
+                    addon.Raid:AddPlayerCount(lootState.winner, 1, KRT_CurrentRaid)
+                end
+
                 local done = RegisterAwardedItem()
                 ResetTradeState()
                 if done then
@@ -3718,6 +3791,12 @@ do
         elseif lootState.trader == lootState.winner then
             -- Trader won, clear state
             addon:info(E.LogTradeTraderKeeps:format(tostring(itemLink), tostring(playerName)))
+
+            -- LootCounter (MS only): award is immediate (no trade window completion event).
+            if tonumber(rollType) == rollTypes.MAINSPEC then
+                addon.Raid:AddPlayerCount(playerName, 1, KRT_CurrentRaid)
+            end
+
             local done = RegisterAwardedItem(lootState.itemCount)
             if done then
                 addon.Loot:ClearLoot()
@@ -3806,7 +3885,18 @@ do
 
     local rows, raidPlayers = {}, {}
     local twipe = twipe
-    local countsFrame, scrollChild, needsUpdate, countsTicker = nil, nil, false, nil
+    local countsFrame, scrollFrame, scrollChild, header = nil, nil, nil, nil
+    local needsUpdate, countsTicker = false, nil
+    -- Single-line column header.
+    local HEADER_HEIGHT = 18
+
+
+    -- Layout constants (columns: Name | Count | Actions)
+    local BTN_W, BTN_H = 20, 18
+    local BTN_GAP = 2
+    local COL_GAP = 8
+    local ACTION_COL_W = (BTN_W * 3) + (BTN_GAP * 2) + 2 -- (+/-/R + gaps + right pad)
+    local COUNT_COL_W = 40
 
     local function RequestCountsUpdate()
         needsUpdate = true
@@ -3815,7 +3905,7 @@ do
     local function TickCounts()
         if needsUpdate then
             needsUpdate = false
-            addon.Master:UpdateCountsFrame()
+            module:UpdateCountsFrame()
         end
     end
 
@@ -3826,132 +3916,227 @@ do
     end
 
     local function StopCountsTicker()
-        -- Stop and clear the counts update ticker
         if countsTicker then
             addon.CancelTimer(countsTicker, true)
             countsTicker = nil
         end
     end
 
-    -- Helper to ensure frames exist
     local function EnsureFrames()
         countsFrame = countsFrame or _G["KRTLootCounterFrame"]
+        scrollFrame = scrollFrame or _G["KRTLootCounterFrameScrollFrame"]
         scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         if countsFrame and not countsFrame._krtCounterHook then
-            local title = _G["KRTLootCounterFrameTitle"]
             Utils.setFrameTitle("KRTLootCounterFrame", L.StrLootCounter)
-            if title then title:Show() end
-            countsFrame:SetScript("OnShow", StartCountsTicker)
-            countsFrame:SetScript("OnHide", StopCountsTicker)
+
+            -- Preserve XML OnShow while still managing our ticker.
+            countsFrame:HookScript("OnShow", function()
+                StartCountsTicker()
+                RequestCountsUpdate()
+            end)
+            countsFrame:HookScript("OnHide", function()
+                StopCountsTicker()
+            end)
+
             countsFrame._krtCounterHook = true
         end
     end
+    local function EnsureHeader()
+        if header or not scrollChild then return end
 
-    -- Return sorted array of player names currently in the raid.
+        header = CreateFrame("Frame", nil, scrollChild)
+        header:SetHeight(HEADER_HEIGHT)
+        header:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, 0)
+        header:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, 0)
+
+        -- Column labels: Player | Count | (blank actions column)
+        -- Layout: actions anchored hard-right, count just to its left, name fills remaining space.
+        header.action = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        header.action:SetPoint("RIGHT", header, "RIGHT", -2, 0)
+        header.action:SetWidth(ACTION_COL_W)
+        header.action:SetJustifyH("RIGHT")
+        header.action:SetText("")
+
+        header.count = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        header.count:SetPoint("RIGHT", header.action, "LEFT", -COL_GAP, 0)
+        header.count:SetWidth(COUNT_COL_W)
+        header.count:SetJustifyH("CENTER")
+        header.count:SetText(L.StrCount or "Count")
+
+        header.name = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        header.name:SetPoint("LEFT", header, "LEFT", 0, 0)
+        header.name:SetPoint("RIGHT", header.count, "LEFT", -COL_GAP, 0)
+        header.name:SetJustifyH("LEFT")
+        header.name:SetText(L.StrPlayer or "Player")
+    end
+
+
     local function GetCurrentRaidPlayers()
         twipe(raidPlayers)
         if not addon.IsInGroup() then
             return raidPlayers
         end
-        for unit, owner in addon.UnitIterator(true) do
+
+        -- Keep the internal roster aligned with the live raid for stable counts.
+        if addon.Raid and addon.Raid.UpdateRaidRoster then
+            addon.Raid:UpdateRaidRoster()
+        end
+
+        for unit in addon.UnitIterator(true) do
             local name = UnitName(unit)
             if name and name ~= "" then
                 raidPlayers[#raidPlayers + 1] = name
-                if KRT_PlayerCounts[name] == nil then
-                    KRT_PlayerCounts[name] = 0
-                end
             end
         end
         table.sort(raidPlayers)
         return raidPlayers
     end
 
-    -- Show or hide the loot counter frame.
     function module:ToggleCountsFrame()
         EnsureFrames()
-        if countsFrame then
-            if countsFrame:IsShown() then
-                Utils.setShown(countsFrame, false)
-            else
-                RequestCountsUpdate()
-                Utils.setShown(countsFrame, true)
-            end
+        if not countsFrame then return end
+
+        if countsFrame:IsShown() then
+            Utils.setShown(countsFrame, false)
+        else
+            RequestCountsUpdate()
+            Utils.setShown(countsFrame, true)
         end
     end
 
-    -- Update the loot counter UI with current player counts.
+    local function EnsureRow(i, rowHeight)
+        local row = rows[i]
+        if not row then
+            row = CreateFrame("Frame", nil, scrollChild)
+            row:SetHeight(rowHeight)
+
+            -- Actions container: hard-right, next to the scrollbar.
+            row.actions = CreateFrame("Frame", nil, row)
+            row.actions:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+            row.actions:SetSize(ACTION_COL_W, rowHeight)
+
+            row.count = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            row.count:SetPoint("RIGHT", row.actions, "LEFT", -COL_GAP, 0)
+            row.count:SetWidth(COUNT_COL_W)
+            row.count:SetJustifyH("CENTER")
+
+            row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
+            row.name:SetPoint("RIGHT", row.count, "LEFT", -COL_GAP, 0)
+            row.name:SetJustifyH("LEFT")
+
+            local function SetupTooltip(btn, text)
+                if not text or text == "" then return end
+                btn:HookScript("OnEnter", function(self)
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    GameTooltip:SetText(text, 1, 1, 1, true)
+                    GameTooltip:Show()
+                end)
+                btn:HookScript("OnLeave", function()
+                    GameTooltip:Hide()
+                end)
+            end
+
+            local function MakeBtn(label, tip)
+                local b = CreateFrame("Button", nil, row.actions, "KRTButtonTemplate")
+                b:SetSize(BTN_W, BTN_H)
+                b:SetText(label)
+                SetupTooltip(b, tip)
+                return b
+            end
+
+            row.reset = MakeBtn("R", L.TipLootCounterReset or "Reset to 0")
+            row.minus = MakeBtn("-", L.TipLootCounterMinus or "Decrement")
+            row.plus  = MakeBtn("+", L.TipLootCounterPlus or "Increment")
+
+            row.reset:SetPoint("RIGHT", row.actions, "RIGHT", 0, 0)
+            row.minus:SetPoint("RIGHT", row.reset, "LEFT", -BTN_GAP, 0)
+            row.plus:SetPoint("RIGHT", row.minus, "LEFT", -BTN_GAP, 0)
+
+            row.plus:SetScript("OnClick", function()
+                local n = row._playerName
+                if n then
+                    addon.Raid:AddPlayerCount(n, 1, KRT_CurrentRaid)
+                    RequestCountsUpdate()
+                end
+            end)
+            row.minus:SetScript("OnClick", function()
+                local n = row._playerName
+                if n then
+                    addon.Raid:AddPlayerCount(n, -1, KRT_CurrentRaid)
+                    RequestCountsUpdate()
+                end
+            end)
+            row.reset:SetScript("OnClick", function()
+                local n = row._playerName
+                if n then
+                    addon.Raid:SetPlayerCount(n, 0, KRT_CurrentRaid)
+                    RequestCountsUpdate()
+                end
+            end)
+
+            rows[i] = row
+        end
+        return row
+    end
+
+
     function module:UpdateCountsFrame()
         EnsureFrames()
         if not countsFrame or not scrollChild then return end
 
+        EnsureHeader()
+
         local players = GetCurrentRaidPlayers()
         local numPlayers = #players
         local rowHeight = C.LOOT_COUNTER_ROW_HEIGHT
-        local counts = KRT_PlayerCounts
 
-        scrollChild:SetHeight(numPlayers * rowHeight)
+        local contentHeight = HEADER_HEIGHT + (numPlayers * rowHeight)
 
-        -- Create/reuse rows for each player
+        -- Ensure the scroll child has a valid size (UIPanelScrollFrameTemplate needs this)
+        local contentW = scrollFrame:GetWidth() or 0
+        local sb = scrollFrame.ScrollBar or (scrollFrame.GetName and _G[scrollFrame:GetName() .. "ScrollBar"]) or nil
+        local sbw = (sb and sb.GetWidth and sb:GetWidth()) or 16
+        if sbw <= 0 then sbw = 16 end
+        contentW = math.max(1, contentW - sbw - 6)
+        scrollChild:SetWidth(contentW)
+        scrollChild:SetHeight(math.max(contentHeight, scrollFrame:GetHeight()))
+        scrollFrame:SetVerticalScroll(0)
+        if header then header:Show() end
+
         for i = 1, numPlayers do
             local name = players[i]
-            local row  = rows[i]
-            if not row then
-                row = CreateFrame("Frame", nil, scrollChild)
-                row:SetSize(160, 24)
-                row:SetPoint("TOPLEFT", 0, -(i - 1) * rowHeight)
 
-                row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
-
-                row.count = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                row.count:SetPoint("LEFT", row.name, "RIGHT", 10, 0)
-
-                row.plus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
-                row.plus:SetSize(22, 22)
-                row.plus:SetText("+")
-                row.plus:SetPoint("LEFT", row.count, "RIGHT", 5, 0)
-
-                row.minus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
-                row.minus:SetSize(22, 22)
-                row.minus:SetText("-")
-                row.minus:SetPoint("LEFT", row.plus, "RIGHT", 2, 0)
-
-                row.plus:SetScript("OnClick", function()
-                    local n = row._playerName
-                    if n then
-                        counts[n] = (counts[n] or 0) + 1
-                        RequestCountsUpdate()
-                    end
-                end)
-                row.minus:SetScript("OnClick", function()
-                    local n = row._playerName
-                    if n then
-                        local c = (counts[n] or 0) - 1
-                        counts[n] = c > 0 and c or 0
-                        RequestCountsUpdate()
-                    end
-                end)
-
-                rows[i] = row
-            else
-                -- Move if needed (in case of roster change)
-                row:SetPoint("TOPLEFT", 0, -(i - 1) * rowHeight)
+            -- Defensive: ensure the player exists in the active raid log.
+            if addon.Raid:GetPlayerID(name, KRT_CurrentRaid) == 0 then
+                addon.Raid:AddPlayer({
+                    name     = name,
+                    rank     = 0,
+                    subgroup = 1,
+                    class    = "UNKNOWN",
+                    join     = Utils.getCurrentTime(),
+                    leave    = nil,
+                    count    = 0,
+                }, KRT_CurrentRaid)
             end
 
+            local row = EnsureRow(i, rowHeight)
+            row:ClearAllPoints()
+            local y = -(HEADER_HEIGHT + (i - 1) * rowHeight)
+            row:SetPoint("TOPLEFT",  scrollChild, "TOPLEFT",  0, y)
+            row:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, y)
             row._playerName = name
             row.name:SetText(name)
-            row.count:SetText(tostring(counts[name] or 0))
+            row.count:SetText(tostring(addon.Raid:GetPlayerCount(name, KRT_CurrentRaid) or 0))
             row:Show()
         end
 
-        -- Hide extra rows not needed
         for i = numPlayers + 1, #rows do
             if rows[i] then rows[i]:Hide() end
         end
     end
 
     -- Add a button to the master loot frame to open the loot counter UI
-    -- ----- Event hooks ----- --
     local function SetupMasterLootFrameHooks()
         local f = _G["KRTMasterLootFrame"]
         if f and not f.KRT_LootCounterBtn then
@@ -3972,6 +4157,21 @@ do
         end
     end
     hooksecurefunc(addon.Master, "OnLoad", SetupMasterLootFrameHooks)
+
+    -- Auto-refresh when loot is logged (MS-only counting happens in Raid:AddLoot).
+    Utils.registerCallback("RaidLootUpdate", function()
+        RequestCountsUpdate()
+    end)
+
+    -- Refresh on roster updates (to keep list aligned).
+    if addon.Raid and addon.Raid.UpdateRaidRoster then
+        hooksecurefunc(addon.Raid, "UpdateRaidRoster", RequestCountsUpdate)
+    end
+
+    -- New raid session: reset view.
+    Utils.registerCallback("RaidCreate", function()
+        RequestCountsUpdate()
+    end)
 end
 
 -- =========== Reserves Module  =========== --
@@ -4981,20 +5181,21 @@ do
 
     -- Default options for the addon.
     local defaultOptions = {
-        sortAscending          = false,
-        useRaidWarning         = true,
-        announceOnWin          = true,
-        announceOnHold         = true,
-        announceOnBank         = false,
-        announceOnDisenchant   = false,
-        lootWhispers           = false,
-        screenReminder         = true,
-        ignoreStacks           = false,
-        showTooltips           = true,
-        minimapButton          = true,
-        countdownSimpleRaidMsg = false,
-        countdownDuration      = 5,
-        countdownRollsBlock    = true,
+        sortAscending               = false,
+        useRaidWarning              = true,
+        announceOnWin               = true,
+        announceOnHold              = true,
+        announceOnBank              = false,
+        announceOnDisenchant        = false,
+        lootWhispers                = false,
+        screenReminder              = true,
+        ignoreStacks                = false,
+        showTooltips                = true,
+        showLootCounterDuringMSRoll = false,
+        minimapButton               = true,
+        countdownSimpleRaidMsg      = false,
+        countdownDuration           = 5,
+        countdownRollsBlock         = true,
     }
 
     -- Creates a fresh options table seeded with defaults.
@@ -5126,6 +5327,7 @@ do
         _G[frameName .. "screenReminderStr"]:SetText(L.StrConfigScreenReminder)
         _G[frameName .. "ignoreStacksStr"]:SetText(L.StrConfigIgnoreStacks)
         _G[frameName .. "showTooltipsStr"]:SetText(L.StrConfigShowTooltips)
+        _G[frameName .. "showLootCounterDuringMSRollStr"]:SetText(L.StrConfigShowLootCounterDuringMSRoll)
         _G[frameName .. "minimapButtonStr"]:SetText(L.StrConfigMinimapButton)
         _G[frameName .. "countdownDurationStr"]:SetText(L.StrConfigCountdownDuration)
         _G[frameName .. "countdownSimpleRaidMsgStr"]:SetText(L.StrConfigCountdownSimpleRaidMsg)
@@ -5154,6 +5356,7 @@ do
                 _G[frameName .. "screenReminder"]:SetChecked(addon.options.screenReminder == true)
                 _G[frameName .. "ignoreStacks"]:SetChecked(addon.options.ignoreStacks == true)
                 _G[frameName .. "showTooltips"]:SetChecked(addon.options.showTooltips == true)
+                _G[frameName .. "showLootCounterDuringMSRoll"]:SetChecked(addon.options.showLootCounterDuringMSRoll == true)
                 _G[frameName .. "minimapButton"]:SetChecked(addon.options.minimapButton == true)
 
                 -- IMPORTANT: always update checked state (even if disabled)
@@ -5428,7 +5631,6 @@ do
         module:Cancel()
         module:Update()
     end
-
 end
 
 -- =========== MS Changes Module  =========== --
