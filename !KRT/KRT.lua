@@ -4202,7 +4202,7 @@ do
 
     -- State variables
     local localized = false
-    local updateInterval = C.UPDATE_INTERVAL_RESERVES
+    local refreshPending = false
     local reservesData = {}
     local reservesByItemID = {}
     local reservesDisplayList = {}
@@ -4557,6 +4557,7 @@ do
         reservesDirty = true
         self:RefreshWindow()
         self:CloseWindow()
+        self:RequestRefresh()
         addon:info(L.StrReserveListCleared)
     end
 
@@ -4580,6 +4581,7 @@ do
         addon:debug(E.LogReservesShowWindow)
         reserveListFrame:Show()
         self:RefreshWindow()
+        self:RequestRefresh()
     end
 
     function module:CloseWindow()
@@ -4605,6 +4607,7 @@ do
         frame:Show()
         Utils.resetEditBox(_G["KRTImportEditBox"])
         Utils.setFrameTitle(frame, L.StrImportReservesTitle)
+        self:RequestRefresh()
     end
 
     function module:CloseImportWindow()
@@ -4633,7 +4636,9 @@ do
         frame:RegisterForDrag("LeftButton")
         frame:SetScript("OnDragStart", frame.StartMoving)
         frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-        frame:SetScript("OnUpdate", UpdateUIFrame)
+        frame:HookScript("OnShow", function()
+            module:RequestRefresh()
+        end)
 
         scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"]
         scrollChild = scrollFrame and scrollFrame.ScrollChild or _G["KRTReserveListFrameScrollChild"]
@@ -4733,23 +4738,31 @@ do
     end
 
     -- Update UI Frame:
-    function UpdateUIFrame(self, elapsed)
+    function UpdateUIFrame()
         LocalizeUIFrame()
-        Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
-            local hasData = module:HasData()
-            local clearButton = _G[frameName .. "ClearButton"]
-            if clearButton then
-                if hasData then
-                    clearButton:Show()
-                    Utils.enableDisable(clearButton, true)
-                else
-                    clearButton:Hide()
-                end
+        local hasData = module:HasData()
+        local clearButton = _G[frameName .. "ClearButton"]
+        if clearButton then
+            if hasData then
+                clearButton:Show()
+                Utils.enableDisable(clearButton, true)
+            else
+                clearButton:Hide()
             end
-            local queryButton = _G[frameName .. "QueryButton"]
-            if queryButton then
-                Utils.enableDisable(queryButton, hasData)
-            end
+        end
+        local queryButton = _G[frameName .. "QueryButton"]
+        if queryButton then
+            Utils.enableDisable(queryButton, hasData)
+        end
+    end
+
+    function module:RequestRefresh()
+        if not reserveListFrame or refreshPending then return end
+        refreshPending = true
+        reserveListFrame:SetScript("OnUpdate", function()
+            reserveListFrame:SetScript("OnUpdate", nil)
+            refreshPending = false
+            UpdateUIFrame()
         end)
     end
 
@@ -4854,6 +4867,7 @@ do
         addon:debug(E.LogReservesParseComplete:format(addon.tLength(reservesData)))
         addon:info(E.LogSRImportComplete:format(addon.tLength(reservesData)))
         self:RefreshWindow()
+        self:RequestRefresh()
         self:Save()
     end
 
@@ -4931,6 +4945,7 @@ do
         end
         if updated and reserveListFrame and reserveListFrame:IsShown() then
             self:RefreshWindow()
+            self:RequestRefresh()
         end
         if not silent then
             if count > 0 then
@@ -5181,7 +5196,7 @@ do
 
     -- Frame update
     local UpdateUIFrame
-    local updateInterval = C.UPDATE_INTERVAL_CONFIG
+    local refreshPending = false
     local MIN_COUNTDOWN = 5
     local MAX_COUNTDOWN = 60
 
@@ -5225,6 +5240,7 @@ do
         KRT_Options = options
         addon.options = options
         configDirty = true
+        module:RequestRefresh()
         addon:info(L.MsgDefaultsRestored)
     end
 
@@ -5239,6 +5255,7 @@ do
 
         Utils.applyDebugSetting(addon.options.debug)
         configDirty = true
+        module:RequestRefresh()
 
         if KRT_MINIMAP_GUI then
             addon.Minimap:SetPos(addon.options.minimapPos or 325)
@@ -5265,8 +5282,10 @@ do
 
         -- Localize once (no per-tick calls)
         LocalizeUIFrame()
-
-        frame:SetScript("OnUpdate", UpdateUIFrame)
+        frame:HookScript("OnShow", function()
+            configDirty = true
+            module:RequestRefresh()
+        end)
     end
 
     function module:InitCountdownSlider(slider)
@@ -5289,6 +5308,7 @@ do
         Utils.toggle(UIConfig)
         if UIConfig and UIConfig:IsShown() and not wasShown then
             configDirty = true
+            module:RequestRefresh()
         end
     end
 
@@ -5318,6 +5338,7 @@ do
         KRT_Options[name] = value
 
         configDirty = true
+        module:RequestRefresh()
     end
 
     -- Localizes UI elements.
@@ -5353,53 +5374,60 @@ do
     end
 
     -- OnUpdate handler for the configuration frame.
-    function UpdateUIFrame(self, elapsed)
-        if configDirty then
-            Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
-                _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)
-                _G[frameName .. "useRaidWarning"]:SetChecked(addon.options.useRaidWarning == true)
-                _G[frameName .. "announceOnWin"]:SetChecked(addon.options.announceOnWin == true)
-                _G[frameName .. "announceOnHold"]:SetChecked(addon.options.announceOnHold == true)
-                _G[frameName .. "announceOnBank"]:SetChecked(addon.options.announceOnBank == true)
-                _G[frameName .. "announceOnDisenchant"]:SetChecked(addon.options.announceOnDisenchant == true)
-                _G[frameName .. "lootWhispers"]:SetChecked(addon.options.lootWhispers == true)
-                _G[frameName .. "countdownRollsBlock"]:SetChecked(addon.options.countdownRollsBlock == true)
-                _G[frameName .. "screenReminder"]:SetChecked(addon.options.screenReminder == true)
-                _G[frameName .. "ignoreStacks"]:SetChecked(addon.options.ignoreStacks == true)
-                _G[frameName .. "showTooltips"]:SetChecked(addon.options.showTooltips == true)
-                _G[frameName .. "showLootCounterDuringMSRoll"]:SetChecked(addon.options.showLootCounterDuringMSRoll == true)
-                _G[frameName .. "minimapButton"]:SetChecked(addon.options.minimapButton == true)
+    function UpdateUIFrame()
+        if not configDirty then return end
+        _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)
+        _G[frameName .. "useRaidWarning"]:SetChecked(addon.options.useRaidWarning == true)
+        _G[frameName .. "announceOnWin"]:SetChecked(addon.options.announceOnWin == true)
+        _G[frameName .. "announceOnHold"]:SetChecked(addon.options.announceOnHold == true)
+        _G[frameName .. "announceOnBank"]:SetChecked(addon.options.announceOnBank == true)
+        _G[frameName .. "announceOnDisenchant"]:SetChecked(addon.options.announceOnDisenchant == true)
+        _G[frameName .. "lootWhispers"]:SetChecked(addon.options.lootWhispers == true)
+        _G[frameName .. "countdownRollsBlock"]:SetChecked(addon.options.countdownRollsBlock == true)
+        _G[frameName .. "screenReminder"]:SetChecked(addon.options.screenReminder == true)
+        _G[frameName .. "ignoreStacks"]:SetChecked(addon.options.ignoreStacks == true)
+        _G[frameName .. "showTooltips"]:SetChecked(addon.options.showTooltips == true)
+        _G[frameName .. "showLootCounterDuringMSRoll"]:SetChecked(addon.options.showLootCounterDuringMSRoll == true)
+        _G[frameName .. "minimapButton"]:SetChecked(addon.options.minimapButton == true)
 
-                -- IMPORTANT: always update checked state (even if disabled)
-                _G[frameName .. "countdownSimpleRaidMsg"]:SetChecked(addon.options.countdownSimpleRaidMsg == true)
+        -- IMPORTANT: always update checked state (even if disabled)
+        _G[frameName .. "countdownSimpleRaidMsg"]:SetChecked(addon.options.countdownSimpleRaidMsg == true)
 
-                _G[frameName .. "countdownDuration"]:SetValue(addon.options.countdownDuration)
-                _G[frameName .. "countdownDurationText"]:SetText(addon.options.countdownDuration)
+        _G[frameName .. "countdownDuration"]:SetValue(addon.options.countdownDuration)
+        _G[frameName .. "countdownDurationText"]:SetText(addon.options.countdownDuration)
 
-                -- Dependency: if Use Raid Warnings is OFF, keep check state but grey out + disable.
-                do
-                    local useRaidWarning = addon.options.useRaidWarning == true
-                    local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
-                    local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
+        -- Dependency: if Use Raid Warnings is OFF, keep check state but grey out + disable.
+        do
+            local useRaidWarning = addon.options.useRaidWarning == true
+            local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
+            local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
 
-                    if countdownSimpleRaidMsgBtn and countdownSimpleRaidMsgStr then
-                        if useRaidWarning then
-                            countdownSimpleRaidMsgBtn:Enable()
-                            countdownSimpleRaidMsgStr:SetTextColor(
-                                HIGHLIGHT_FONT_COLOR.r,
-                                HIGHLIGHT_FONT_COLOR.g,
-                                HIGHLIGHT_FONT_COLOR.b
-                            )
-                        else
-                            countdownSimpleRaidMsgBtn:Disable()
-                            countdownSimpleRaidMsgStr:SetTextColor(0.5, 0.5, 0.5)
-                        end
-                    end
+            if countdownSimpleRaidMsgBtn and countdownSimpleRaidMsgStr then
+                if useRaidWarning then
+                    countdownSimpleRaidMsgBtn:Enable()
+                    countdownSimpleRaidMsgStr:SetTextColor(
+                        HIGHLIGHT_FONT_COLOR.r,
+                        HIGHLIGHT_FONT_COLOR.g,
+                        HIGHLIGHT_FONT_COLOR.b
+                    )
+                else
+                    countdownSimpleRaidMsgBtn:Disable()
+                    countdownSimpleRaidMsgStr:SetTextColor(0.5, 0.5, 0.5)
                 end
-
-                configDirty = false
-            end)
+            end
         end
+
+        configDirty = false
+    end
+
+    function module:RequestRefresh()
+        if not UIConfig or refreshPending then return end
+        refreshPending = true
+        UIConfig:SetScript("OnUpdate", function()
+            UIConfig:SetScript("OnUpdate", nil)
+            refreshPending = false
+            UpdateUIFrame()
+        end)
     end
 end
 
@@ -5415,7 +5443,7 @@ do
     local localized = false
 
     local UpdateUIFrame
-    local updateInterval = C.UPDATE_INTERVAL_WARNINGS
+    local refreshPending = false
 
     local fetched = false
     local warningsDirty = false
@@ -5465,14 +5493,15 @@ do
         frame:HookScript("OnShow", function()
             warningsDirty = true
             lastSelectedID = false
+            module:RequestRefresh()
         end)
-        frame:SetScript("OnUpdate", UpdateUIFrame)
         controller:OnLoad(frame)
     end
 
     -- Externally update frame:
     function module:Update()
         warningsDirty = true
+        module:RequestRefresh()
     end
 
     -- Toggle frame visibility:
@@ -5497,6 +5526,7 @@ do
             return self:Announce(tempSelectedID)
         end
         selectedID = (wID ~= selectedID) and wID or nil
+        module:RequestRefresh()
     end
 
     -- Edit/Save warning:
@@ -5513,6 +5543,7 @@ do
                 _G[frameName .. "Name"]:SetFocus()
                 _G[frameName .. "Content"]:SetText(w.content)
                 isEdit = true
+                module:RequestRefresh()
                 return
             end
         end
@@ -5542,6 +5573,7 @@ do
             selectedID = selectedID - 1
         end
         warningsDirty = true
+        module:RequestRefresh()
     end
 
     -- Announce Warning:
@@ -5562,6 +5594,7 @@ do
         selectedID = nil
         tempSelectedID = nil
         isEdit = false
+        module:RequestRefresh()
     end
 
     -- Localizing UI frame:
@@ -5578,6 +5611,16 @@ do
         _G[frameName .. "Content"]:SetScript("OnEscapePressed", module.Cancel)
         _G[frameName .. "Name"]:SetScript("OnEnterPressed", module.Edit)
         _G[frameName .. "Content"]:SetScript("OnEnterPressed", module.Edit)
+        _G[frameName .. "Name"]:SetScript("OnTextChanged", function(_, isUserInput)
+            if isUserInput then
+                module:RequestRefresh()
+            end
+        end)
+        _G[frameName .. "Content"]:SetScript("OnTextChanged", function(_, isUserInput)
+            if isUserInput then
+                module:RequestRefresh()
+            end
+        end)
         localized = true
     end
 
@@ -5595,28 +5638,36 @@ do
     end
 
     -- OnUpdate frame:
-    function UpdateUIFrame(self, elapsed)
+    function UpdateUIFrame()
         LocalizeUIFrame()
-        Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
-            if warningsDirty or not fetched then
-                controller:Dirty()
-                warningsDirty = false
-                fetched = true
-            end
-            if selectedID ~= lastSelectedID then
-                UpdateSelectionUI()
-                controller:Touch()
-            end
-            tempName    = _G[frameName .. "Name"]:GetText()
-            tempContent = _G[frameName .. "Content"]:GetText()
-            Utils.enableDisable(_G[frameName .. "EditBtn"], (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
-            Utils.enableDisable(_G[frameName .. "DeleteBtn"], selectedID ~= nil)
-            Utils.enableDisable(_G[frameName .. "AnnounceBtn"], selectedID ~= nil)
-            local editBtnMode = (tempName ~= "" or tempContent ~= "") or selectedID == nil
-            if editBtnMode ~= lastEditBtnMode then
-                Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
-                lastEditBtnMode = editBtnMode
-            end
+        if warningsDirty or not fetched then
+            controller:Dirty()
+            warningsDirty = false
+            fetched = true
+        end
+        if selectedID ~= lastSelectedID then
+            UpdateSelectionUI()
+            controller:Touch()
+        end
+        tempName    = _G[frameName .. "Name"]:GetText()
+        tempContent = _G[frameName .. "Content"]:GetText()
+        Utils.enableDisable(_G[frameName .. "EditBtn"], (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
+        Utils.enableDisable(_G[frameName .. "DeleteBtn"], selectedID ~= nil)
+        Utils.enableDisable(_G[frameName .. "AnnounceBtn"], selectedID ~= nil)
+        local editBtnMode = (tempName ~= "" or tempContent ~= "") or selectedID == nil
+        if editBtnMode ~= lastEditBtnMode then
+            Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
+            lastEditBtnMode = editBtnMode
+        end
+    end
+
+    function module:RequestRefresh()
+        if not UIWarnings or refreshPending then return end
+        refreshPending = true
+        UIWarnings:SetScript("OnUpdate", function()
+            UIWarnings:SetScript("OnUpdate", nil)
+            refreshPending = false
+            UpdateUIFrame()
         end)
     end
 
@@ -5656,7 +5707,7 @@ do
     local localized = false
 
     local UpdateUIFrame
-    local updateInterval = C.UPDATE_INTERVAL_CHANGES
+    local refreshPending = false
 
     local changesTable = {}
     local tmpNames = {}
@@ -5721,8 +5772,8 @@ do
         frame:HookScript("OnShow", function()
             changesDirty = true
             lastSelectedID = false
+            module:RequestRefresh()
         end)
-        frame:SetScript("OnUpdate", UpdateUIFrame)
         controller:OnLoad(frame)
     end
 
@@ -5730,6 +5781,7 @@ do
     function module:Toggle()
         CancelChanges()
         Utils.toggle(UIChanges)
+        module:RequestRefresh()
     end
 
     -- Hide frame:
@@ -5747,6 +5799,7 @@ do
         fetched = false
         changesDirty = true
         controller:Dirty()
+        module:RequestRefresh()
     end
 
     -- Selecting Player:
@@ -5777,6 +5830,7 @@ do
         selectedID = (name ~= selectedID) and name or nil
         isAdd = false
         isEdit = false
+        module:RequestRefresh()
     end
 
     -- Add / Delete:
@@ -5787,12 +5841,14 @@ do
             _G[frameName .. "Name"]:Show()
             _G[frameName .. "Name"]:SetFocus()
             isAdd = true
+            module:RequestRefresh()
         elseif changesTable[selectedID] then
             changesTable[selectedID] = nil
             CancelChanges()
             fetched = false
             changesDirty = true
             controller:Dirty()
+            module:RequestRefresh()
         end
     end
 
@@ -5810,6 +5866,7 @@ do
             _G[frameName .. "Spec"]:SetFocus()
             isAdd = false
             isEdit = true
+            module:RequestRefresh()
         end
     end
 
@@ -5819,6 +5876,7 @@ do
         KRT_Raids[KRT_CurrentRaid].changes[name] = nil
         changesDirty = true
         controller:Dirty()
+        module:RequestRefresh()
     end
 
     Utils.registerCallback("RaidLeave", function(e, name)
@@ -5888,47 +5946,64 @@ do
         _G[frameName .. "Spec"]:SetScript("OnEnterPressed", module.Edit)
         _G[frameName .. "Name"]:SetScript("OnEscapePressed", CancelChanges)
         _G[frameName .. "Spec"]:SetScript("OnEscapePressed", CancelChanges)
+        _G[frameName .. "Name"]:SetScript("OnTextChanged", function(_, isUserInput)
+            if isUserInput then
+                module:RequestRefresh()
+            end
+        end)
+        _G[frameName .. "Spec"]:SetScript("OnTextChanged", function(_, isUserInput)
+            if isUserInput then
+                module:RequestRefresh()
+            end
+        end)
         localized = true
     end
 
     -- OnUpdate frame:
-    function UpdateUIFrame(self, elapsed)
+    function UpdateUIFrame()
         LocalizeUIFrame()
-        Utils.throttledUIUpdate(self, frameName, updateInterval, elapsed, function()
-            if changesDirty or not fetched then
-                InitChangesTable()
-                controller:Dirty()
-                changesDirty = false
-                fetched = true
-            end
-            local count = addon.tLength(changesTable)
-            if count > 0 then
-            else
-                tempSelectedID = nil
-                selectedID = nil
-            end
-            if selectedID ~= lastSelectedID then
-                lastSelectedID = selectedID
-                controller:Touch()
-            end
-            Utils.showHide(_G[frameName .. "Name"], (isEdit or isAdd))
-            Utils.showHide(_G[frameName .. "Spec"], (isEdit or isAdd))
-            Utils.enableDisable(_G[frameName .. "EditBtn"], (selectedID or isEdit or isAdd))
-            local editBtnMode = isAdd or (selectedID and isEdit)
-            if editBtnMode ~= lastEditBtnMode then
-                Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
-                lastEditBtnMode = editBtnMode
-            end
-            local addBtnMode = (not selectedID and not isEdit and not isAdd)
-            if addBtnMode ~= lastAddBtnMode then
-                Utils.setText(_G[frameName .. "AddBtn"], L.BtnAdd, L.BtnDelete, addBtnMode)
-                lastAddBtnMode = addBtnMode
-            end
-            Utils.showHide(_G[frameName .. "AddBtn"], (not isEdit and not isAdd))
-            Utils.enableDisable(_G[frameName .. "ClearBtn"], count > 0)
-            Utils.enableDisable(_G[frameName .. "AnnounceBtn"], count > 0)
-            Utils.enableDisable(_G[frameName .. "AddBtn"], KRT_CurrentRaid)
-            Utils.enableDisable(_G[frameName .. "DemandBtn"], KRT_CurrentRaid)
+        if changesDirty or not fetched then
+            InitChangesTable()
+            controller:Dirty()
+            changesDirty = false
+            fetched = true
+        end
+        local count = addon.tLength(changesTable)
+        if count <= 0 then
+            tempSelectedID = nil
+            selectedID = nil
+        end
+        if selectedID ~= lastSelectedID then
+            lastSelectedID = selectedID
+            controller:Touch()
+        end
+        Utils.showHide(_G[frameName .. "Name"], (isEdit or isAdd))
+        Utils.showHide(_G[frameName .. "Spec"], (isEdit or isAdd))
+        Utils.enableDisable(_G[frameName .. "EditBtn"], (selectedID or isEdit or isAdd))
+        local editBtnMode = isAdd or (selectedID and isEdit)
+        if editBtnMode ~= lastEditBtnMode then
+            Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
+            lastEditBtnMode = editBtnMode
+        end
+        local addBtnMode = (not selectedID and not isEdit and not isAdd)
+        if addBtnMode ~= lastAddBtnMode then
+            Utils.setText(_G[frameName .. "AddBtn"], L.BtnAdd, L.BtnDelete, addBtnMode)
+            lastAddBtnMode = addBtnMode
+        end
+        Utils.showHide(_G[frameName .. "AddBtn"], (not isEdit and not isAdd))
+        Utils.enableDisable(_G[frameName .. "ClearBtn"], count > 0)
+        Utils.enableDisable(_G[frameName .. "AnnounceBtn"], count > 0)
+        Utils.enableDisable(_G[frameName .. "AddBtn"], KRT_CurrentRaid)
+        Utils.enableDisable(_G[frameName .. "DemandBtn"], KRT_CurrentRaid)
+    end
+
+    function module:RequestRefresh()
+        if not UIChanges or refreshPending then return end
+        refreshPending = true
+        UIChanges:SetScript("OnUpdate", function()
+            UIChanges:SetScript("OnUpdate", nil)
+            refreshPending = false
+            UpdateUIFrame()
         end)
     end
 
@@ -5961,6 +6036,7 @@ do
         fetched = false
         changesDirty = true
         controller:Dirty()
+        module:RequestRefresh()
     end
 
     -- Cancel all actions:
@@ -5971,6 +6047,7 @@ do
         tempSelectedID = nil
         Utils.resetEditBox(_G[frameName .. "Name"])
         Utils.resetEditBox(_G[frameName .. "Spec"])
+        module:RequestRefresh()
     end
 end
 
@@ -8770,13 +8847,14 @@ do
 
     local frameName, localized, isEdit = nil, false, false
     local raidData, bossData, tempDate = {}, {}, {}
-    local updateInterval = C.UPDATE_INTERVAL_LOGGER
 
     function Box:OnLoad(frame)
         if not frame then return end
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
-        frame:SetScript("OnUpdate", function(_, elapsed) self:UpdateUIFrame(_, elapsed) end)
+        frame:SetScript("OnShow", function()
+            self:UpdateUIFrame()
+        end)
         frame:SetScript("OnHide", function() self:CancelAddEdit() end)
         local nameStr = _G[frameName .. "NameStr"]
         if nameStr then
@@ -8880,16 +8958,14 @@ do
         twipe(tempDate)
     end
 
-    function Box:UpdateUIFrame(frame, elapsed)
+    function Box:UpdateUIFrame()
         if not localized then
             addon:SetTooltip(_G[frameName .. "Name"], L.StrBossNameHelp, "ANCHOR_LEFT")
             addon:SetTooltip(_G[frameName .. "Difficulty"], L.StrBossDifficultyHelp, "ANCHOR_LEFT")
             addon:SetTooltip(_G[frameName .. "Time"], L.StrBossTimeHelp, "ANCHOR_RIGHT")
             localized = true
         end
-        Utils.throttledUIUpdate(frame, frameName, updateInterval, elapsed, function()
-            Utils.setText(_G[frameName .. "Title"], L.StrEditBoss, L.StrAddBoss, isEdit)
-        end)
+        Utils.setText(_G[frameName .. "Title"], L.StrEditBoss, L.StrAddBoss, isEdit)
     end
 end
 
