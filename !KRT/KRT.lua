@@ -4133,6 +4133,9 @@ do
             row:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, y)
             row._playerName = name
             row.name:SetText(name)
+            local class = addon.Raid:GetPlayerClass(name)
+            local r, g, b = Utils.getClassColor(class)
+            row.name:SetTextColor(r, g, b)
             row.count:SetText(tostring(addon.Raid:GetPlayerCount(name, KRT_CurrentRaid) or 0))
             row:Show()
         end
