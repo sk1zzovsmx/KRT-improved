@@ -77,7 +77,6 @@ Frames.main                = Frames.main or CreateFrame("Frame")
 
 -- Addon UI Frames
 local mainFrame            = Frames.main
-local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings, UILogger, UILoggerItemBox, UIReserve, UIReserveImport, UILootCounter
 
 -- Player info helper
 coreState.player           = coreState.player or {}
@@ -211,8 +210,6 @@ end
 do
     addon.Raid              = addon.Raid or {}
     local module            = addon.Raid
-    local L                 = addon.L
-
     -- ----- Internal state ----- --
     local inRaid            = false
     local numRaid           = 0
@@ -406,8 +403,9 @@ do
     -- NOTE: Fresh SavedVariables only (schema v2). No legacy migration is performed.
 
     function module:EnsureStableIds(raidNum)
-        raidNum = raidNum or KRT_CurrentRaid
-        local raid = raidNum and KRT_Raids[raidNum]
+        local raid
+
+        raid, raidNum = Utils.getRaid(raidNum)
         if not raid then return end
 
         raid.players = raid.players or {}
@@ -420,8 +418,9 @@ do
     end
 
     function module:GetBossByNid(bossNid, raidNum)
-        raidNum = raidNum or KRT_CurrentRaid
-        local raid = raidNum and KRT_Raids[raidNum]
+        local raid
+
+        raid, raidNum = Utils.getRaid(raidNum)
         if not raid or bossNid == nil then return nil end
         module:EnsureStableIds(raidNum)
 
@@ -439,8 +438,9 @@ do
     end
 
     function module:GetLootByNid(lootNid, raidNum)
-        raidNum = raidNum or KRT_CurrentRaid
-        local raid = raidNum and KRT_Raids[raidNum]
+        local raid
+
+        raid, raidNum = Utils.getRaid(raidNum)
         if not raid or lootNid == nil then return nil end
         module:EnsureStableIds(raidNum)
 
@@ -787,8 +787,9 @@ do
     end
 
     function module:GetPlayerCount(name, raidNum)
-        raidNum = raidNum or KRT_CurrentRaid
-        local raid = raidNum and KRT_Raids[raidNum]
+        local raid
+
+        raid, raidNum = Utils.getRaid(raidNum)
         local players = raid and raid.players
         if not players then return 0 end
         for i, p in ipairs(players) do
@@ -801,13 +802,15 @@ do
     end
 
     function module:SetPlayerCount(name, value, raidNum)
-        raidNum = raidNum or KRT_CurrentRaid
+        local raid
+
+        raid, raidNum = Utils.getRaid(raidNum)
 
         value = tonumber(value) or 0
         -- Hard clamp: counts are always non-negative.
         if value < 0 then value = 0 end
 
-        local players = KRT_Raids[raidNum] and KRT_Raids[raidNum].players
+        local players = raid and raid.players
         if not players then return end
         for i, p in ipairs(players) do
             if p.name == name then
@@ -870,8 +873,8 @@ do
 
     -- Checks if a raid log is expired (older than the weekly reset).
     function module:Expired(rID)
-        rID = rID or KRT_CurrentRaid
-        local raid = rID and KRT_Raids[rID]
+        local raid, resolvedID = Utils.getRaid(rID)
+        rID = resolvedID
         if not raid then
             return true
         end
@@ -889,13 +892,13 @@ do
 
     -- Retrieves all loot for a given raid and optional boss number.
     function module:GetLoot(raidNum, bossNid)
-        raidNum = raidNum or KRT_CurrentRaid
+        local raid
+
+        raid, raidNum = Utils.getRaid(raidNum)
         bossNid = tonumber(bossNid) or 0
-        local raid = raidNum and KRT_Raids[raidNum]
         if not raid then
             return {}
         end
-
         module:EnsureStableIds(raidNum)
 
         local loot = raid.loot or {}
@@ -918,8 +921,9 @@ do
 
     -- Retrieves the position of a specific loot item within the raid's loot table.
     function module:GetLootID(itemID, raidNum, holderName)
-        raidNum = raidNum or KRT_CurrentRaid
-        local raid = raidNum and KRT_Raids[raidNum]
+        local raid
+
+        raid, raidNum = Utils.getRaid(raidNum)
         if not raid then return 0 end
 
         module:EnsureStableIds(raidNum)
@@ -945,8 +949,9 @@ do
 
     -- Retrieves all boss kills for a given raid.
     function module:GetBosses(raidNum, out)
-        raidNum = raidNum or KRT_CurrentRaid
-        local raid = raidNum and KRT_Raids[raidNum]
+        local raid
+
+        raid, raidNum = Utils.getRaid(raidNum)
         if not raid or not raid.bossKills then return {} end
 
         module:EnsureStableIds(raidNum)
@@ -972,8 +977,9 @@ do
 
     -- Returns players from the raid log. Can be filtered by boss kill.
     function module:GetPlayers(raidNum, bossNid, out)
-        raidNum = raidNum or KRT_CurrentRaid
-        local raid = raidNum and KRT_Raids[raidNum]
+        local raid
+
+        raid, raidNum = Utils.getRaid(raidNum)
         if not raid then return {} end
 
         module:EnsureStableIds(raidNum)
@@ -1165,8 +1171,6 @@ end
 do
     addon.Chat            = addon.Chat or {}
     local module          = addon.Chat
-    local L               = addon.L
-
     -- ----- Internal state (non-exposed local variables) ----- --
     local output          = C.CHAT_OUTPUT_FORMAT
     local chatPrefix      = C.CHAT_PREFIX
@@ -1218,8 +1222,6 @@ end
 do
     addon.Minimap = addon.Minimap or {}
     local module = addon.Minimap
-    local L = addon.L
-
     -- ----- Internal state (non-exposed local variables) ----- --
     local addonMenu
     local dragMode
@@ -1358,8 +1360,6 @@ end
 do
     addon.Rolls = addon.Rolls or {}
     local module = addon.Rolls
-    local L = addon.L
-
     -- Multi-selection context for manual multi-award winner picking (Master Loot window)
     local MS_CTX_ROLLS = "MLRollWinners"
 
@@ -2106,7 +2106,6 @@ end
 do
     addon.Loot = addon.Loot or {}
     local module = addon.Loot
-    local L = addon.L
     local frameName
 
     -- ----- Internal state ----- --
@@ -2337,7 +2336,8 @@ do
         local itemBtn = _G[frameName .. "ItemBtn"]
         itemBtn.tooltip_item = nil
         GameTooltip:Hide()
-        if frameName == UIMaster:GetName() then
+        local mf = addon.Master and addon.Master.frame
+        if mf and frameName == mf:GetName() then
             Utils.resetEditBox(_G[frameName .. "ItemCount"], true)
         end
     end
@@ -2411,7 +2411,6 @@ end
 do
     addon.Master = addon.Master or {}
     local module = addon.Master
-    local L = addon.L
     local frameName
 
     -- ----- Internal state ----- --
@@ -2420,13 +2419,17 @@ do
 
     local UpdateUIFrame
 
-    local RequestRefresh
-    function module:RequestRefresh()
-        if RequestRefresh then
-            RequestRefresh()
-        end
+    local function getFrame()
+        local frame = module.frame or _G["KRTMaster"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
     end
 
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame, function() module:Refresh() end)
+
+    function module:RequestRefresh()
+        RequestRefresh()
+    end
     function module:Refresh()
         if UpdateUIFrame then UpdateUIFrame() end
     end
@@ -2470,8 +2473,10 @@ do
 
     -- ----- Private helpers ----- --
     local function SetItemCountValue(count, focus)
+        local frame = getFrame()
+        if not frame then return end
         frameName = frameName or Utils.getFrameName()
-        if not frameName or frameName ~= UIMaster:GetName() then return end
+        if not frameName or frameName ~= frame:GetName() then return end
         local itemCountBox = _G[frameName .. "ItemCount"]
         if not itemCountBox then return end
         count = tonumber(count) or 1
@@ -2655,9 +2660,11 @@ do
     -- OnLoad frame:
     function module:OnLoad(frame)
         if not frame then return end
-        UIMaster = frame
-        addon.UIMaster = frame
+        module.frame = frame
         frameName = frame:GetName()
+
+        -- Drag registration kept in Lua (avoid template logic in XML).
+        Utils.enableDrag(frame)
         -- Initialize ItemBtn scripts once (clean inventory drop support: click-to-drop).
         local itemBtn = _G[frameName .. "ItemBtn"]
         if itemBtn and not itemBtn.__krtMLInvDropInit then
@@ -2682,13 +2689,6 @@ do
                 TryAcceptFromCursor()
             end)
         end
-        frame:RegisterForDrag("LeftButton")
-
-        -- Event-driven UI refresher (no polling on the UI frame itself).
-        if not RequestRefresh then
-            RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIMaster end,
-                function() module:Refresh() end)
-        end
         frame:SetScript("OnHide", function()
             if selectionFrame then selectionFrame:Hide() end
         end)
@@ -2696,19 +2696,23 @@ do
 
     -- Toggles the visibility of the Master Looter frame.
     function module:Toggle()
-        if not UIMaster then return end
-        if UIMaster:IsShown() then
-            Utils.setShown(UIMaster, false)
+        local frame = getFrame()
+        if not frame then return end
+        if frame:IsShown() then
+            Utils.setShown(frame, false)
         else
             -- Request while hidden to avoid an extra refresh (dirty-while-hidden will refresh on OnShow).
             module:RequestRefresh()
-            Utils.setShown(UIMaster, true)
+            Utils.setShown(frame, true)
         end
     end
 
     -- Hides the Master Looter frame.
     function module:Hide()
-        Utils.hideFrame(UIMaster)
+        local frame = getFrame()
+        if frame then
+            Utils.hideFrame(frame)
+        end
     end
 
     -- Button: Select/Remove Item
@@ -3374,7 +3378,9 @@ do
     -- Creates the item selection frame if it doesn't exist.
     local function CreateSelectionFrame()
         if selectionFrame == nil then
-            selectionFrame = CreateFrame("Frame", nil, UIMaster, "KRTSimpleFrameTemplate")
+            local frame = getFrame()
+            if not frame then return end
+            selectionFrame = CreateFrame("Frame", nil, frame, "KRTSimpleFrameTemplate")
             selectionFrame:Hide()
         end
         local index = 1
@@ -3530,10 +3536,11 @@ do
                 tostring(lootState.fromInventory), tostring(UnitName("target"))))
 
             local shouldShow = (lootState.lootCount or 0) >= 1
-            if shouldShow and UIMaster then
+            local frame = getFrame()
+            if shouldShow and frame then
                 -- Request while hidden to refresh immediately on OnShow (avoid an extra refresh).
                 module:RequestRefresh()
-                UIMaster:Show()
+                frame:Show()
             else
                 -- Keep state dirty for the next time the frame is shown.
                 module:RequestRefresh()
@@ -3557,7 +3564,8 @@ do
                 lootState.closeTimer = nil
                 lootState.opened = false
                 lootState.pendingAwards = {}
-                UIMaster:Hide()
+                local frame = getFrame()
+                if frame then frame:Hide() end
                 addon.Loot:ClearLoot()
                 addon.Rolls:ClearRolls()
                 addon.Rolls:RecordRolls(false)
@@ -3576,16 +3584,17 @@ do
 
             local shouldShow = (lootState.lootCount or 0) >= 1
             if shouldShow then
-                local wasShown = UIMaster and UIMaster:IsShown()
+                local frame = getFrame()
+                local wasShown = frame and frame:IsShown()
                 if not wasShown then
                     -- Request while hidden to refresh immediately on OnShow (avoid an extra refresh).
                     module:RequestRefresh()
-                    if UIMaster then UIMaster:Show() end
+                    if frame then frame:Show() end
                 else
                     module:RequestRefresh()
                 end
             else
-                if UIMaster then UIMaster:Hide() end
+                if frame then frame:Hide() end
                 addon:info(E.LogMLLootWindowEmptied)
             end
 
@@ -3977,7 +3986,17 @@ do
     local rows, raidPlayers = {}, {}
     local twipe = twipe
     local scrollFrame, scrollChild, header
-    local refresher -- event-driven refresher
+    local function getFrame()
+        local frame = module.frame or _G["KRTLootCounterFrame"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame, function() module:Refresh() end)
+
+	function module:RequestRefresh()
+		RequestRefresh()
+	end
 
     -- Single-line column header.
     local HEADER_HEIGHT = 18
@@ -3990,14 +4009,14 @@ do
     local COUNT_COL_W = 40
 
     local function EnsureFrames()
-        UILootCounter = UILootCounter or _G["KRTLootCounterFrame"]
-        if not UILootCounter then
+        local frame = getFrame()
+        if not frame then
             return false
         end
 
-        frameName = frameName or (UILootCounter.GetName and UILootCounter:GetName()) or "KRTLootCounterFrame"
+        frameName = frameName or (frame.GetName and frame:GetName()) or "KRTLootCounterFrame"
         scrollFrame = scrollFrame
-            or UILootCounter.ScrollFrame
+            or frame.ScrollFrame
             or _G[frameName .. "ScrollFrame"]
             or _G["KRTLootCounterFrameScrollFrame"]
 
@@ -4005,9 +4024,9 @@ do
             or (scrollFrame and scrollFrame.ScrollChild)
             or _G["KRTLootCounterFrameScrollFrameScrollChild"]
 
-        if not UILootCounter._krtCounterInit then
+        if not frame._krtCounterInit then
             Utils.setFrameTitle(frameName, L.StrLootCounter)
-            UILootCounter._krtCounterInit = true
+            frame._krtCounterInit = true
         end
 
         return true
@@ -4143,56 +4162,31 @@ do
 
     function module:OnLoad(frame)
         if frame then
-            UILootCounter = frame
+            module.frame = frame
         end
         if not EnsureFrames() then return end
 
-        -- Drag support, like other KRT windows.
-        UILootCounter:RegisterForDrag("LeftButton")
-        UILootCounter:SetScript("OnDragStart", UILootCounter.StartMoving)
-        UILootCounter:SetScript("OnDragStop", UILootCounter.StopMovingOrSizing)
+        local f = getFrame()
+        if not f then return end
 
-        if not UILootCounter._krtCounterOnShowHook then
-            UILootCounter:HookScript("OnShow", function()
-                module:RequestRefresh()
-            end)
-            UILootCounter._krtCounterOnShowHook = true
-        end
+        -- Drag registration kept in Lua (avoid template logic in XML).
+        Utils.enableDrag(f)
+
+        module:RequestRefresh()
     end
 
-    function module:OnShow()
-        self:RequestRefresh()
-    end
-
-    function module:Toggle()
-        if not EnsureFrames() then return end
-
-        if UILootCounter:IsShown() then
-            Utils.setShown(UILootCounter, false)
-        else
-            -- Request while hidden so the refresher can refresh immediately on OnShow (no double refresh).
-            self:RequestRefresh()
-            Utils.setShown(UILootCounter, true)
-        end
-    end
-
-    function module:Hide()
-        Utils.hideFrame(UILootCounter)
-    end
-
-    function module:RequestRefresh()
-        if not EnsureFrames() then return end
-        if not refresher then
-            refresher = Utils.makeEventDrivenRefresher(function() return UILootCounter end, function()
-                module:Refresh()
-            end)
-        end
-        refresher()
+	    -- Called from XML: <OnShow>KRT.LootCounter:OnShow(self)</OnShow>
+	    function module:OnShow(frame)
+	        if frame then
+	            module.frame = frame
+	        end
+	        module:RequestRefresh()
     end
 
     function module:Refresh()
         if not EnsureFrames() then return end
-        if not UILootCounter or not scrollFrame or not scrollChild then return end
+        local frame = getFrame()
+        if not frame or not scrollFrame or not scrollChild then return end
 
         EnsureHeader()
 
@@ -4267,7 +4261,39 @@ do
         end
     end
 
-    -- Add a button to the master loot frame to open the loot counter UI.
+    
+    -- ----- UI Window Management ----- --
+
+    local function ShowLootCounter()
+        local frame = getFrame()
+        if not frame then
+            addon:error("LootCounter frame missing")
+            return
+        end
+        Utils.setShown(frame, true)
+    end
+
+    function module:Hide()
+        local frame = getFrame()
+        if frame then
+            Utils.setShown(frame, false)
+        end
+    end
+
+    function module:Toggle()
+        local frame = getFrame()
+        if not frame then
+            addon:error("LootCounter frame missing")
+            return
+        end
+        if frame:IsShown() then
+            module:Hide()
+        else
+            ShowLootCounter()
+        end
+    end
+
+-- Add a button to the master loot frame to open the loot counter UI.
     local function SetupMasterLootFrameHooks()
         local f = _G["KRTMasterLootFrame"]
         if f and not f.KRT_LootCounterBtn then
@@ -4288,7 +4314,6 @@ do
     hooksecurefunc(addon.Master, "OnLoad", SetupMasterLootFrameHooks)
 
     local function Request()
-        module:RequestRefresh()
     end
 
     -- Auto-refresh when loot is logged (MS-only counting happens in Raid:AddLoot).
@@ -4311,13 +4336,13 @@ end
 do
     addon.Reserves = addon.Reserves or {}
     local module = addon.Reserves
-    local L = addon.L
     local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
 
     -- ----- Internal state ----- --
     -- UI Elements
     local frameName
-    local reserveListFrame, scrollFrame, scrollChild
+    local getFrame
+    local scrollFrame, scrollChild
     local reserveHeaders = {}
     local reserveItemRows, rowsByItemID = {}, {}
 
@@ -4383,7 +4408,8 @@ do
         addon:debug(E.LogReservesItemReady:format(itemId, pendingItemCount))
         if pendingItemCount == 0 then
             addon:debug(E.LogReservesPendingComplete)
-            if reserveListFrame and reserveListFrame:IsShown() then
+            local frame = getFrame()
+            if frame and frame:IsShown() then
                 module:Refresh()
             end
         end
@@ -4693,18 +4719,12 @@ do
 
     -- ----- UI Window Management ----- --
 
-    local function GetReserveListFrame()
-        return UIReserve or reserveListFrame or _G["KRTReserveListFrame"]
-    end
-
     local function ShowReserveList()
-        local frame = GetReserveListFrame()
+        local frame = getFrame()
         if not frame then
             addon:error(E.LogReservesFrameMissing)
             return
         end
-        UIReserve = frame
-        reserveListFrame = frame
         addon:debug(E.LogReservesShowWindow)
         module:Refresh()
         module:RequestRefresh()
@@ -4712,7 +4732,7 @@ do
     end
 
     function module:Hide()
-        local frame = GetReserveListFrame()
+        local frame = getFrame()
         if frame then
             addon:debug(E.LogReservesHideWindow)
             Utils.setShown(frame, false)
@@ -4720,7 +4740,7 @@ do
     end
 
     function module:Toggle()
-        local frame = GetReserveListFrame()
+        local frame = getFrame()
         if not frame then
             addon:error(E.LogReservesFrameMissing)
             return
@@ -4734,13 +4754,11 @@ do
 
     function module:OnLoad(frame)
         addon:debug(E.LogReservesFrameLoaded)
-        UIReserve = frame
-        reserveListFrame = frame
         frameName = frame:GetName()
 
-        frame:RegisterForDrag("LeftButton")
-        frame:SetScript("OnDragStart", frame.StartMoving)
-        frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+        -- Drag registration kept in Lua (avoid template logic in XML).
+        Utils.enableDrag(frame)
+
         scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"]
         scrollChild = scrollFrame and scrollFrame.ScrollChild or _G["KRTReserveListFrameScrollChild"]
 
@@ -4859,12 +4877,19 @@ do
 
     function module:Refresh()
         if UpdateUIFrame then UpdateUIFrame() end
-        if (reserveListFrame or UIReserve) and RenderReserveListUI then
+        local frame = getFrame()
+        if frame and RenderReserveListUI then
             RenderReserveListUI()
         end
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIReserve or reserveListFrame end,
+    getFrame = function()
+        local frame = module.frame or _G["KRTReserveListFrame"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
         function() module:Refresh() end)
 
     function module:RequestRefresh()
@@ -5050,7 +5075,8 @@ do
                 end
             end
         end
-        if updated and reserveListFrame and reserveListFrame:IsShown() then
+        local frame = getFrame()
+        if updated and frame and frame:IsShown() then
             self:Refresh()
             self:RequestRefresh()
         end
@@ -5144,7 +5170,9 @@ do
     -- ----- UI Display ----- --
 
     function RenderReserveListUI()
-        if not reserveListFrame or not scrollChild then return end
+        local frame = getFrame()
+        if not frame or not scrollChild then return end
+        module.frame = frame
 
         -- Hide and clear old rows
         for i = 1, #reserveItemRows do
@@ -5295,15 +5323,12 @@ end
 do
     addon.ReserveImport = addon.ReserveImport or {}
     local module = addon.ReserveImport
-    local L = addon.L
-    local E = addon.E
-
     local frameName
     local localized = false
 
     local function LocalizeUIFrame()
         if localized then return end
-        local frame = UIReserveImport or _G["KRTImportWindow"]
+        local frame = module.frame or _G["KRTImportWindow"]
         if not frame then return end
         frameName = frame:GetName() or "KRTImportWindow"
 
@@ -5320,12 +5345,13 @@ do
     end
 
     function module:OnLoad(frame)
-        UIReserveImport = frame
+        module.frame = frame
         if frame then
             frameName = frame:GetName()
-            frame:RegisterForDrag("LeftButton")
-            frame:SetScript("OnDragStart", frame.StartMoving)
-            frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+
+            -- Drag registration kept in Lua (avoid template logic in XML).
+            Utils.enableDrag(frame)
+
             frame:HookScript("OnShow", function() module:RequestRefresh() end)
         end
         module:RequestRefresh()
@@ -5339,24 +5365,28 @@ do
         end
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(
-        function() return UIReserveImport or _G["KRTImportWindow"] end,
-        function() module:Refresh() end
-    )
+    local function getFrame()
+        local frame = module.frame or _G["KRTImportWindow"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
+        function() module:Refresh() end)
 
     function module:RequestRefresh()
         RequestRefresh()
     end
 
     function module:Hide()
-        local frame = UIReserveImport or _G["KRTImportWindow"]
+        local frame = getFrame()
         if frame then
             Utils.setShown(frame, false)
         end
     end
 
     function module:Toggle()
-        local frame = UIReserveImport or _G["KRTImportWindow"]
+        local frame = getFrame()
         if not frame then
             addon:error(E.LogReservesImportWindowMissing)
             return
@@ -5367,7 +5397,6 @@ do
             return
         end
 
-        UIReserveImport = frame
         module:RequestRefresh()
         Utils.setShown(frame, true)
 
@@ -5405,7 +5434,7 @@ do
                 status:SetTextColor(0.2, 1, 0.2)
             end
             module:Hide()
-            local rf = UIReserve or _G["KRTReserveListFrame"]
+            local rf = (addon.Reserves and addon.Reserves.frame) or _G["KRTReserveListFrame"]
             if not (rf and rf.IsShown and rf:IsShown()) then
                 addon.Reserves:Toggle()
             else
@@ -5426,9 +5455,9 @@ end
 do
     addon.Config = addon.Config or {}
     local module = addon.Config
-    local L = addon.L
     local frameName
 
+    local getFrame
     -- ----- Internal state ----- --
     local localized = false
     local configDirty = false
@@ -5514,9 +5543,11 @@ do
     -- OnLoad handler for the configuration frame.
     function module:OnLoad(frame)
         if not frame then return end
-        UIConfig = frame
+        module.frame = frame
         frameName = frame:GetName()
-        frame:RegisterForDrag("LeftButton")
+
+        -- Drag registration kept in Lua (avoid template logic in XML).
+        Utils.enableDrag(frame)
 
         -- Localize once (no per-tick calls)
         LocalizeUIFrame()
@@ -5541,20 +5572,24 @@ do
 
     -- Toggles the visibility of the configuration frame.
     function module:Toggle()
-        if not UIConfig then return end
-        if UIConfig:IsShown() then
-            Utils.setShown(UIConfig, false)
+        local frame = getFrame()
+        if not frame then return end
+        if frame:IsShown() then
+            Utils.setShown(frame, false)
         else
             configDirty = true
             -- Request while hidden to refresh immediately on OnShow (no extra refresh).
             module:RequestRefresh()
-            Utils.setShown(UIConfig, true)
+            Utils.setShown(frame, true)
         end
     end
 
     -- Hides the configuration frame.
     function module:Hide()
-        Utils.hideFrame(UIConfig)
+        local frame = getFrame()
+        if frame then
+            Utils.hideFrame(frame)
+        end
     end
 
     -- OnClick handler for option controls.
@@ -5664,7 +5699,14 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIConfig end, function() module:Refresh() end)
+    getFrame = function()
+        local frame = module.frame or _G["KRTConfig"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
+        function() module:Refresh() end)
 
     function module:RequestRefresh()
         RequestRefresh()
@@ -5675,9 +5717,9 @@ end
 do
     addon.Warnings = addon.Warnings or {}
     local module = addon.Warnings
-    local L = addon.L
     local frameName
 
+    local getFrame
     -- ----- Internal state ----- --
     local LocalizeUIFrame
     local localized = false
@@ -5725,9 +5767,11 @@ do
     -- OnLoad frame:
     function module:OnLoad(frame)
         if not frame then return end
-        UIWarnings = frame
+        module.frame = frame
         frameName = frame:GetName()
-        frame:RegisterForDrag("LeftButton")
+
+		-- Drag registration kept in Lua (avoid template logic in XML).
+		Utils.enableDrag(frame)
         frame:HookScript("OnShow", function()
             warningsDirty = true
             lastSelectedID = false
@@ -5743,21 +5787,25 @@ do
 
     -- Toggle frame visibility:
     function module:Toggle()
-        if not UIWarnings then return end
-        if UIWarnings:IsShown() then
-            Utils.setShown(UIWarnings, false)
+        local frame = getFrame()
+        if not frame then return end
+        if frame:IsShown() then
+            Utils.setShown(frame, false)
         else
             warningsDirty = true
             lastSelectedID = false
             -- Request while hidden to refresh immediately on OnShow (no extra refresh).
             module:RequestRefresh()
-            Utils.setShown(UIWarnings, true)
+            Utils.setShown(frame, true)
         end
     end
 
     -- Hide frame:
     function module:Hide()
-        Utils.hideFrame(UIWarnings)
+        local frame = getFrame()
+        if frame then
+            Utils.hideFrame(frame)
+        end
     end
 
     -- Warning selection:
@@ -5911,7 +5959,13 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIWarnings end,
+    getFrame = function()
+        local frame = module.frame or _G["KRTWarnings"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
         function() module:Refresh() end)
 
     function module:RequestRefresh()
@@ -5946,9 +6000,9 @@ end
 do
     addon.Changes = addon.Changes or {}
     local module = addon.Changes
-    local L = addon.L
     local frameName
 
+    local getFrame
     -- ----- Internal state ----- --
     local LocalizeUIFrame
     local localized = false
@@ -6011,9 +6065,11 @@ do
     -- OnLoad frame:
     function module:OnLoad(frame)
         if not frame then return end
-        UIChanges = frame
+        module.frame = frame
         frameName = frame:GetName()
-        frame:RegisterForDrag("LeftButton")
+
+		-- Drag registration kept in Lua (avoid template logic in XML).
+		Utils.enableDrag(frame)
         frame:HookScript("OnShow", function()
             changesDirty = true
             lastSelectedID = false
@@ -6024,21 +6080,25 @@ do
     -- Toggle frame visibility:
     function module:Toggle()
         CancelChanges()
-        if not UIChanges then return end
-        if UIChanges:IsShown() then
-            Utils.setShown(UIChanges, false)
+        local frame = getFrame()
+        if not frame then return end
+        if frame:IsShown() then
+            Utils.setShown(frame, false)
         else
             changesDirty = true
             lastSelectedID = false
             -- Request while hidden to refresh immediately on OnShow (no extra refresh).
             module:RequestRefresh()
-            Utils.setShown(UIChanges, true)
+            Utils.setShown(frame, true)
         end
     end
 
     -- Hide frame:
     function module:Hide()
-        Utils.hideFrame(UIChanges, CancelChanges)
+        local frame = getFrame()
+        if frame then
+            Utils.hideFrame(frame, CancelChanges)
+        end
     end
 
     -- Clear module:
@@ -6253,7 +6313,13 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIChanges end,
+    getFrame = function()
+        local frame = module.frame or _G["KRTChanges"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
         function() module:Refresh() end)
 
     function module:RequestRefresh()
@@ -6308,11 +6374,10 @@ end
 do
     addon.Spammer = addon.Spammer or {}
     local module = addon.Spammer
-    local L = addon.L
-
     -- ----- Internal state ----- --
     local frameName
 
+    local getFrame
     local LocalizeUIFrame
     local localized = false
 
@@ -6441,8 +6506,9 @@ do
     -- Deterministic: sync Duration immediately from UI/SV (no waiting for preview tick)
     local function SyncDurationNow()
         local value
+        local frame = getFrame()
 
-        if UISpammer and UISpammer:IsShown() then
+        if frame and frame:IsShown() then
             local box = _G[frameName .. "Duration"]
             if box then
                 value = box:GetText()
@@ -6464,11 +6530,13 @@ do
         KRT_Spammer.Duration = value
     end
 
+
     -- Deterministic: ensure preview/output is computed before Start/Resume
     local function EnsureReadyForStart()
         SyncDurationNow()
 
-        if UISpammer and UISpammer:IsShown() then
+        local frame = getFrame()
+        if frame and frame:IsShown() then
             if previewDirty or not finalOutput or finalOutput == "" then
                 RenderPreview()
                 previewDirty = false
@@ -6476,8 +6544,10 @@ do
         end
     end
 
+
     local function ResetLengthUI()
-        if not UISpammer then return end
+        local frame = getFrame()
+        if not frame then return end
         local len = strlen(DEFAULT_OUTPUT)
         local lenStr = len .. "/255"
 
@@ -6500,13 +6570,15 @@ do
     function module:OnLoad(frame)
         if not frame then return end
 
-        UISpammer = frame
+        module.frame = frame
         frameName = frame:GetName()
+
+        -- Drag registration kept in Lua (avoid template logic in XML).
+        Utils.enableDrag(frame)
 
         -- Localize once (not per tick)
         LocalizeUIFrame()
 
-        frame:RegisterForDrag("LeftButton")
         frame:SetScript("OnShow", function()
             module:RequestRefresh()
         end)
@@ -6518,17 +6590,21 @@ do
 
     -- Toggle/Hide
     function module:Toggle()
-        if not UISpammer then return end
-        if UISpammer:IsShown() then
-            Utils.setShown(UISpammer, false)
+        local frame = getFrame()
+        if not frame then return end
+        if frame:IsShown() then
+            Utils.setShown(frame, false)
         else
             module:RequestRefresh()
-            Utils.setShown(UISpammer, true)
+            Utils.setShown(frame, true)
         end
     end
 
     function module:Hide()
-        Utils.hideFrame(UISpammer)
+        local frame = getFrame()
+        if frame then
+            Utils.hideFrame(frame)
+        end
     end
 
     -- Save (EditBox / Checkbox)
@@ -6919,7 +6995,8 @@ do
             return
         end
 
-        if UISpammer then
+        local frame = getFrame()
+            if frame then
             SetInputsLocked(locked)
         end
 
@@ -6934,7 +7011,8 @@ do
 
     -- Preview render
     function RenderPreview()
-        if not UISpammer or not UISpammer:IsShown() then return end
+        local frame = getFrame()
+        if not frame or not frame:IsShown() then return end
 
         local changed = false
 
@@ -7003,7 +7081,8 @@ do
 
     -- UI update tick
     function UpdateUIFrame()
-        if not (UISpammer and UISpammer:IsShown()) then
+        local frame = getFrame()
+        if not (frame and frame:IsShown()) then
             return
         end
 
@@ -7048,7 +7127,13 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UISpammer end,
+    getFrame = function()
+        local frame = module.frame or _G["KRTSpammer"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
         function() module:Refresh() end)
 
     function module:RequestRefresh()
@@ -7059,23 +7144,21 @@ end
 -- =========== Logger Frame =========== --
 -- Shown loot logger for raids
 do
-    addon.Logger   = addon.Logger or {}
-    local Logger   = addon.Logger
-    local L        = addon.L
-    local E        = addon.E
-
+    addon.Logger = addon.Logger or {}
+    local module = addon.Logger
     local frameName
 
-    -- Logger: stable-ID data helpers (fresh SavedVariables only; no legacy migration)
-    Logger.Store   = Logger.Store or {}
-    Logger.View    = Logger.View or {}
-    Logger.Actions = Logger.Actions or {}
+    local getFrame
+    -- module: stable-ID data helpers (fresh SavedVariables only; no legacy migration)
+    module.Store   = module.Store or {}
+    module.View    = module.View or {}
+    module.Actions = module.Actions or {}
 
-    local Store    = Logger.Store
-    local View     = Logger.View
-    local Actions  = Logger.Actions
+    local Store    = module.Store
+    local View     = module.View
+    local Actions  = module.Actions
 
-    -- Ensure the raid table has the schema v2 fields required by the Logger.
+    -- Ensure the raid table has the schema v2 fields required by the module.
     -- This does NOT migrate legacy structures; it only initializes missing fields for fresh SV.
     function Store:EnsureRaid(raid)
         if not raid then return end
@@ -7703,33 +7786,33 @@ do
         return false
     end
 
-    Logger.selectedRaid = nil
-    Logger.selectedBoss = nil
-    Logger.selectedPlayer = nil
-    Logger.selectedBossPlayer = nil
-    Logger.selectedItem = nil
+    module.selectedRaid = nil
+    module.selectedBoss = nil
+    module.selectedPlayer = nil
+    module.selectedBossPlayer = nil
+    module.selectedItem = nil
 
     -- Multi-select context keys (runtime-only)
     -- NOTE: selection state lives in Utils.lua and is keyed by these context strings.
-    Logger._msRaidCtx = Logger._msRaidCtx or "LoggerRaids"
-    Logger._msBossCtx = Logger._msBossCtx or "LoggerBosses"
-    Logger._msBossAttCtx = Logger._msBossAttCtx or "LoggerBossAttendees"
-    Logger._msRaidAttCtx = Logger._msRaidAttCtx or "LoggerRaidAttendees"
-    Logger._msLootCtx = Logger._msLootCtx or "LoggerLoot"
+    module._msRaidCtx = module._msRaidCtx or "LoggerRaids"
+    module._msBossCtx = module._msBossCtx or "LoggerBosses"
+    module._msBossAttCtx = module._msBossAttCtx or "LoggerBossAttendees"
+    module._msRaidAttCtx = module._msRaidAttCtx or "LoggerRaidAttendees"
+    module._msLootCtx = module._msLootCtx or "LoggerLoot"
 
-    local MS_CTX_RAID = Logger._msRaidCtx
-    local MS_CTX_BOSS = Logger._msBossCtx
-    local MS_CTX_BOSSATT = Logger._msBossAttCtx
-    local MS_CTX_RAIDATT = Logger._msRaidAttCtx
-    local MS_CTX_LOOT = Logger._msLootCtx
+    local MS_CTX_RAID = module._msRaidCtx
+    local MS_CTX_BOSS = module._msBossCtx
+    local MS_CTX_BOSSATT = module._msBossAttCtx
+    local MS_CTX_RAIDATT = module._msRaidAttCtx
+    local MS_CTX_LOOT = module._msLootCtx
 
     -- Clears selections that depend on the currently focused raid (boss/player/loot panels).
     -- Intentionally does NOT clear the raid selection itself.
     local function clearSelections()
-        Logger.selectedBoss = nil
-        Logger.selectedPlayer = nil
-        Logger.selectedBossPlayer = nil
-        Logger.selectedItem = nil
+        module.selectedBoss = nil
+        module.selectedPlayer = nil
+        module.selectedBossPlayer = nil
+        module.selectedItem = nil
         Utils.MultiSelect_Clear(MS_CTX_BOSS)
         Utils.MultiSelect_Clear(MS_CTX_BOSSATT)
         Utils.MultiSelect_Clear(MS_CTX_RAIDATT)
@@ -7737,84 +7820,93 @@ do
     end
 
     local function toggleSelection(field, id, eventName)
-        Logger[field] = (id and id ~= Logger[field]) and id or nil
+        module[field] = (id and id ~= module[field]) and id or nil
         if eventName then
-            Utils.triggerEvent(eventName, Logger[field])
+            Utils.triggerEvent(eventName, module[field])
         end
     end
     -- Logger helpers: resolve current raid/boss/loot and run raid actions with a single refresh.
-    function Logger:NeedRaid()
-        local rID = Logger.selectedRaid
+    function module:NeedRaid()
+        local rID = module.selectedRaid
         local raid = rID and Store:GetRaid(rID) or nil
         return raid, rID
     end
 
-    function Logger:NeedBoss(raid)
-        raid = raid or (select(1, Logger:NeedRaid()))
+    function module:NeedBoss(raid)
+        raid = raid or (select(1, module:NeedRaid()))
         if not raid then return nil end
-        local bNid = Logger.selectedBoss
+        local bNid = module.selectedBoss
         if not bNid then return nil end
         return Store:GetBoss(raid, bNid)
     end
 
-    function Logger:NeedLoot(raid)
-        raid = raid or (select(1, Logger:NeedRaid()))
+    function module:NeedLoot(raid)
+        raid = raid or (select(1, module:NeedRaid()))
         if not raid then return nil end
-        local lNid = Logger.selectedItem
+        local lNid = module.selectedItem
         if not lNid then return nil end
         return Store:GetLoot(raid, lNid)
     end
 
-    function Logger:Run(fn, refreshEvent)
-        local raid, rID = Logger:NeedRaid()
+    function module:Run(fn, refreshEvent)
+        local raid, rID = module:NeedRaid()
         if not raid then return end
         fn(raid, rID)
         if refreshEvent ~= false then
-            Utils.triggerEvent(refreshEvent or "LoggerSelectRaid", Logger.selectedRaid)
+            Utils.triggerEvent(refreshEvent or "LoggerSelectRaid", module.selectedRaid)
         end
     end
 
-    function Logger:ResetSelections()
+    function module:ResetSelections()
         clearSelections()
     end
 
-    function Logger:OnLoad(frame)
-        UILogger, frameName = frame, frame:GetName()
-        frame:RegisterForDrag("LeftButton")
+    function module:OnLoad(frame)
+        if not frame then return end
+        module.frame = frame
+        frameName = frame:GetName()
         Utils.setFrameTitle(frameName, L.StrLootLogger)
 
+        -- Drag registration kept in Lua (avoid template logic in XML).
+        Utils.enableDrag(frame)
+
         frame:SetScript("OnShow", function()
-            if not Logger.selectedRaid then
-                Logger.selectedRaid = KRT_CurrentRaid
+            if not module.selectedRaid then
+                module.selectedRaid = KRT_CurrentRaid
             end
             clearSelections()
-            Utils.triggerEvent("LoggerSelectRaid", Logger.selectedRaid)
+            Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
         end)
 
         frame:SetScript("OnHide", function()
-            Logger.selectedRaid = KRT_CurrentRaid
+            module.selectedRaid = KRT_CurrentRaid
             clearSelections()
         end)
     end
 
-    function Logger:Toggle()
-        if not UILogger then return end
-        if UILogger:IsShown() then
-            Logger:Hide()
+    function module:Toggle()
+        local frame = getFrame()
+        if not frame then return end
+        if frame:IsShown() then
+            module:Hide()
         else
-            Logger:RequestRefresh()
-            Utils.setShown(UILogger, true)
+            module:RequestRefresh()
+            Utils.setShown(frame, true)
         end
     end
 
     function module:Hide()
         module.selectedRaid = KRT_CurrentRaid
         clearSelections()
-        Utils.setShown(UILogger, false)
+        local frame = getFrame()
+        if frame then
+            Utils.setShown(frame, false)
+        end
     end
 
     function module:Refresh()
-        if not UILogger then return end
+        local frame = getFrame()
+        if not frame then return end
         if not module.selectedRaid then
             module.selectedRaid = KRT_CurrentRaid
         end
@@ -7822,7 +7914,14 @@ do
         Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UILogger end, function() module:Refresh() end)
+    getFrame = function()
+        local frame = module.frame or _G["KRTLogger"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
+        function() module:Refresh() end)
 
     function module:RequestRefresh()
         RequestRefresh()
@@ -8249,8 +8348,6 @@ end
 do
     addon.Logger.Raids = addon.Logger.Raids or {}
     local Raids = addon.Logger.Raids
-    local L = addon.L
-
     local controller = Utils.makeListController {
         keyName = "RaidsList",
         poolTag = "logger-raids",
@@ -8448,7 +8545,6 @@ end
 do
     addon.Logger.Boss = addon.Logger.Boss or {}
     local Boss = addon.Logger.Boss
-    local L = addon.L
     local Store = addon.Logger.Store
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
@@ -8581,7 +8677,6 @@ end
 do
     addon.Logger.BossAttendees = addon.Logger.BossAttendees or {}
     local BossAtt = addon.Logger.BossAttendees
-    local L = addon.L
     local Store = addon.Logger.Store
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
@@ -8687,7 +8782,6 @@ end
 do
     addon.Logger.RaidAttendees = addon.Logger.RaidAttendees or {}
     local RaidAtt = addon.Logger.RaidAttendees
-    local L = addon.L
     local Store = addon.Logger.Store
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
@@ -8843,7 +8937,6 @@ end
 do
     addon.Logger.Loot = addon.Logger.Loot or {}
     local Loot = addon.Logger.Loot
-    local L = addon.L
     local Store = addon.Logger.Store
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
@@ -9104,7 +9197,6 @@ end
 do
     addon.Logger.BossBox = addon.Logger.BossBox or {}
     local Box = addon.Logger.BossBox
-    local L = addon.L
     local Store = addon.Logger.Store
 
     local frameName, localized, isEdit = nil, false, false
@@ -9113,7 +9205,10 @@ do
     function Box:OnLoad(frame)
         if not frame then return end
         frameName = frame:GetName()
-        frame:RegisterForDrag("LeftButton")
+
+        -- Drag registration kept in Lua (avoid template logic in XML).
+        Utils.enableDrag(frame)
+
         frame:SetScript("OnShow", function()
             self:UpdateUIFrame()
         end)
@@ -9235,7 +9330,6 @@ end
 do
     addon.Logger.AttendeesBox = addon.Logger.AttendeesBox or {}
     local Box = addon.Logger.AttendeesBox
-    local L = addon.L
     local Store = addon.Logger.Store
 
     local frameName
@@ -9243,7 +9337,10 @@ do
     function Box:OnLoad(frame)
         if not frame then return end
         frameName = frame:GetName()
-        frame:RegisterForDrag("LeftButton")
+
+        -- Drag registration kept in Lua (avoid template logic in XML).
+        Utils.enableDrag(frame)
+
         frame:SetScript("OnShow", function()
             Utils.resetEditBox(_G[frameName .. "Name"])
         end)
@@ -9284,8 +9381,6 @@ end
 do
     addon.Slash = addon.Slash or {}
     local module = addon.Slash
-    local L = addon.L
-
     module.sub = module.sub or {}
 
     local cmdAchiev = { "ach", "achi", "achiev", "achievement" }
@@ -9579,21 +9674,23 @@ function addon:RAID_ROSTER_UPDATE()
     addon.Raid:UpdateRaidRoster()
 
     -- Keep Master Looter UI in sync (event-driven; no polling).
-    if addon.Master and addon.Master.RequestRefresh and addon.UIMaster and addon.UIMaster.IsShown and addon.UIMaster:IsShown() then
+    local mf = addon.Master and addon.Master.frame
+    if addon.Master and addon.Master.RequestRefresh and mf and mf.IsShown and mf:IsShown() then
         addon.Master:RequestRefresh()
     end
 
     -- If the Logger is open on the *current* raid, keep the visible lists in sync automatically.
     -- (Throttled to avoid multiple redraws during bursty roster updates.)
     local log = addon.Logger
-    if not (log and UILogger and UILogger.IsShown and UILogger:IsShown()) then return end
+    local logFrame = log and log.frame
+    if not (log and logFrame and logFrame.IsShown and logFrame:IsShown()) then return end
     if not (KRT_CurrentRaid and log.selectedRaid and tonumber(log.selectedRaid) == tonumber(KRT_CurrentRaid)) then
         return
     end
 
     addon.CancelTimer(log._rosterUiHandle, true)
     log._rosterUiHandle = addon.NewTimer(0.25, function()
-        if not (UILogger and UILogger.IsShown and UILogger:IsShown()) then return end
+        if not (logFrame and logFrame.IsShown and logFrame:IsShown()) then return end
         if not (KRT_CurrentRaid and log.selectedRaid and tonumber(log.selectedRaid) == tonumber(KRT_CurrentRaid)) then
             return
         end

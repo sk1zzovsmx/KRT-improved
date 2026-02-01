@@ -24,7 +24,6 @@
 			</Layer>
 		</Layers>
 		<Scripts>
-			<OnLoad>self:RegisterForDrag("LeftButton")</OnLoad>
 			<OnDragStart>self:StartMoving()</OnDragStart>
 			<OnDragStop>self:StopMovingOrSizing()</OnDragStop>
 		</Scripts>

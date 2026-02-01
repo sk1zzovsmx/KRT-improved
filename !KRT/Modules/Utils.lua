@@ -101,6 +101,27 @@ function Utils.getPlayerName()
 	return name
 end
 
+-- =========== Raid/state helpers  =========== --
+
+-- Resolve a raid table and raid number.
+--
+-- Returns:
+--   raidTableOrNil, resolvedRaidNumOrNil
+--
+-- Notes:
+-- - Uses current raid (KRT_CurrentRaid) when raidNum is nil.
+-- - Safe when KRT_Raids is nil.
+function Utils.getRaid(raidNum)
+	raidNum = raidNum or KRT_CurrentRaid
+	if not raidNum then return nil, nil end
+	local raids = KRT_Raids
+	local raid = raids and raids[raidNum] or nil
+	return raid, raidNum
+end
+
+-- Backwards-friendly alias (some callers prefer PascalCase).
+Utils.GetRaid = Utils.getRaid
+
 -- =========== String helpers  =========== --
 
 function Utils.ucfirst(value)
@@ -197,6 +218,18 @@ function Utils.getItemStringFromLink(itemLink)
 end
 
 -- =========== UI helpers  =========== --
+
+-- Enable basic drag-to-move behavior on a frame.
+--
+-- Intentionally kept in Lua (not XML) so window behavior is standardized
+-- without embedding logic into Templates.xml.
+function Utils.enableDrag(frame, dragButton)
+	if not frame or not frame.RegisterForDrag then return end
+	-- Ensure the frame is draggable even if XML didn't set these.
+	if frame.SetMovable then frame:SetMovable(true) end
+	if frame.EnableMouse then frame:EnableMouse(true) end
+	frame:RegisterForDrag(dragButton or "LeftButton")
+end
 
 --
 -- createRowDrawer(fn)
