@@ -1230,63 +1230,28 @@ do
     local rad, atan2, deg = math.rad, math.atan2, math.deg
 
     -- ----- Private helpers ----- --
-    -- Initializes and opens the right-click menu for the minimap button.
+    -- Menu definition for EasyMenu (built once).
+    local minimapMenu = {
+        { text = MASTER_LOOTER,      notCheckable = 1, func = function() addon.Master:Toggle() end },
+        { text = L.StrLootCounter,   notCheckable = 1, func = function() addon.LootCounter:Toggle() end },
+        { text = L.StrLootLogger,    notCheckable = 1, func = function() addon.Logger:Toggle() end },
+        { text = " ", disabled = 1, notCheckable = 1 },
+        { text = L.StrClearIcons,    notCheckable = 1, func = function() addon.Raid:ClearRaidIcons() end },
+        { text = " ", disabled = 1, notCheckable = 1 },
+        { text = RAID_WARNING,       notCheckable = 1, func = function() addon.Warnings:Toggle() end },
+        { text = " ", disabled = 1, notCheckable = 1 },
+        { text = L.StrMSChanges,     notCheckable = 1, func = function() addon.Changes:Toggle() end },
+        { text = L.BtnDemand,        notCheckable = 1, func = function() addon.Changes:Demand() end },
+        { text = CHAT_ANNOUNCE,      notCheckable = 1, func = function() addon.Changes:Announce() end },
+        { text = " ", disabled = 1, notCheckable = 1 },
+        { text = L.StrLFMSpam,       notCheckable = 1, func = function() addon.Spammer:Toggle() end },
+    }
+
+    -- Initializes and opens the menu for the minimap button.
     local function OpenMenu()
-        local info = {}
-        local function AddMenuButton(level, text, func)
-            twipe(info)
-            info.text = text
-            info.notCheckable = 1
-            info.func = func
-            UIDropDownMenu_AddButton(info, level)
-        end
-
-        local function AddMenuTitle(level, text)
-            twipe(info)
-            info.isTitle = 1
-            info.text = text
-            info.notCheckable = 1
-            UIDropDownMenu_AddButton(info, level)
-        end
-
-        local function AddMenuSeparator(level)
-            twipe(info)
-            info.disabled = 1
-            info.notCheckable = 1
-            UIDropDownMenu_AddButton(info, level)
-        end
-
         addonMenu = addonMenu or CreateFrame("Frame", "KRTMenu", UIParent, "UIDropDownMenuTemplate")
-        addonMenu.displayMode = "MENU"
-        addonMenu.initialize = function(self, level)
-            if level == 1 then
-                -- Toggle master loot frame:
-                AddMenuButton(level, MASTER_LOOTER, function() addon.Master:Toggle() end)
-                -- Toggle loot counter frame:
-                AddMenuButton(level, L.StrLootCounter, function() addon.LootCounter:Toggle() end)
-                -- Toggle loot logger frame:
-                AddMenuButton(level, L.StrLootLogger, function() addon.Logger:Toggle() end)
-                -- Separator:
-                AddMenuSeparator(level)
-                -- Clear raid icons:
-                AddMenuButton(level, L.StrClearIcons, function() addon.Raid:ClearRaidIcons() end)
-                -- Separator:
-                AddMenuSeparator(level)
-                -- Toggle raid warnings frame:
-                AddMenuButton(level, RAID_WARNING, function() addon.Warnings:Toggle() end)
-                -- Separator:
-                AddMenuSeparator(level)
-                -- MS changes:
-                AddMenuButton(level, L.StrMSChanges, function() addon.Changes:Toggle() end)
-                AddMenuButton(level, L.BtnDemand, function() addon.Changes:Demand() end)
-                AddMenuButton(level, CHAT_ANNOUNCE, function() addon.Changes:Announce() end)
-                -- Separator:
-                AddMenuSeparator(level)
-                -- Toggle lfm spammer frame:
-                AddMenuButton(level, L.StrLFMSpam, function() addon.Spammer:Toggle() end)
-            end
-        end
-        ToggleDropDownMenu(1, nil, addonMenu, KRT_MINIMAP_GUI, 0, 0)
+        -- EasyMenu handles UIDropDownMenu initialization and opening.
+        EasyMenu(minimapMenu, addonMenu, KRT_MINIMAP_GUI, 0, 0, "MENU")
     end
 
     -- Moves the minimap button while dragging.
@@ -7842,56 +7807,56 @@ do
         end
     end
 
-    function Logger:Hide()
-        Logger.selectedRaid = KRT_CurrentRaid
+    function module:Hide()
+        module.selectedRaid = KRT_CurrentRaid
         clearSelections()
         Utils.setShown(UILogger, false)
     end
 
-    function Logger:Refresh()
+    function module:Refresh()
         if not UILogger then return end
-        if not Logger.selectedRaid then
-            Logger.selectedRaid = KRT_CurrentRaid
+        if not module.selectedRaid then
+            module.selectedRaid = KRT_CurrentRaid
         end
         clearSelections()
-        Utils.triggerEvent("LoggerSelectRaid", Logger.selectedRaid)
+        Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UILogger end, function() Logger:Refresh() end)
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UILogger end, function() module:Refresh() end)
 
-    function Logger:RequestRefresh()
+    function module:RequestRefresh()
         RequestRefresh()
     end
 
     -- Selectors
-    function Logger:SelectRaid(btn, button)
+    function module:SelectRaid(btn, button)
         if button and button ~= "LeftButton" then return end
         local id = btn and btn.GetID and btn:GetID()
         if not id then return end
 
         local isMulti = (IsControlKeyDown and IsControlKeyDown()) or false
         local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
-        local prevFocus = Logger.selectedRaid
+        local prevFocus = module.selectedRaid
 
         local action, count
         if isRange then
             local ordered = addon.Logger.Raids and addon.Logger.Raids._ctrl and addon.Logger.Raids._ctrl.data or nil
             action, count = Utils.MultiSelect_Range(MS_CTX_RAID, ordered, id, isMulti)
             -- SHIFT range always sets the focused row to the click target.
-            Logger.selectedRaid = id
+            module.selectedRaid = id
         else
             action, count = Utils.MultiSelect_Toggle(MS_CTX_RAID, id, isMulti, true)
 
             -- Keep a single "focused" raid for the dependent panels (Boss / Attendees / Loot).
             if action == "SINGLE_DESELECT" then
-                Logger.selectedRaid = nil
+                module.selectedRaid = nil
             elseif action == "TOGGLE_OFF" then
-                if Logger.selectedRaid == id then
+                if module.selectedRaid == id then
                     local sel = Utils.MultiSelect_GetSelected(MS_CTX_RAID)
-                    Logger.selectedRaid = sel[1] or nil
+                    module.selectedRaid = sel[1] or nil
                 end
             else
-                Logger.selectedRaid = id
+                module.selectedRaid = id
             end
 
             -- Range anchor (OS-like): update on non-shift clicks only.
@@ -7906,45 +7871,45 @@ do
             addon:debug(("[LoggerSelect] click list=Raid id=%s ctrl=%d shift=%d action=%s selectedCount=%d focus=%s")
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
-                    tostring(Logger.selectedRaid)
+                    tostring(module.selectedRaid)
                 ))
         end
 
         -- If the focused raid changed, reset dependent selections (boss/player/loot panels).
-        if prevFocus ~= Logger.selectedRaid then
+        if prevFocus ~= module.selectedRaid then
             clearSelections()
         end
 
-        Utils.triggerEvent("LoggerSelectRaid", Logger.selectedRaid)
+        Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
     end
 
-    function Logger:SelectBoss(btn, button)
+    function module:SelectBoss(btn, button)
         if button and button ~= "LeftButton" then return end
         local id = btn and btn.GetID and btn:GetID()
         if not id then return end
 
         local isMulti = (IsControlKeyDown and IsControlKeyDown()) or false
         local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
-        local prevFocus = Logger.selectedBoss
+        local prevFocus = module.selectedBoss
 
         local action, count
         if isRange then
             local ordered = addon.Logger.Boss and addon.Logger.Boss._ctrl and addon.Logger.Boss._ctrl.data or nil
             action, count = Utils.MultiSelect_Range(MS_CTX_BOSS, ordered, id, isMulti)
-            Logger.selectedBoss = id
+            module.selectedBoss = id
         else
             action, count = Utils.MultiSelect_Toggle(MS_CTX_BOSS, id, isMulti, true)
 
             -- Keep a single "focused" boss for dependent panels (BossAttendees / Loot).
             if action == "SINGLE_DESELECT" then
-                Logger.selectedBoss = nil
+                module.selectedBoss = nil
             elseif action == "TOGGLE_OFF" then
-                if Logger.selectedBoss == id then
+                if module.selectedBoss == id then
                     local sel = Utils.MultiSelect_GetSelected(MS_CTX_BOSS)
-                    Logger.selectedBoss = sel[1] or nil
+                    module.selectedBoss = sel[1] or nil
                 end
             else
-                Logger.selectedBoss = id
+                module.selectedBoss = id
             end
 
             if (tonumber(count) or 0) > 0 then
@@ -7958,37 +7923,37 @@ do
             addon:debug(("[LoggerSelect] click list=Boss id=%s ctrl=%d shift=%d action=%s selectedCount=%d focus=%s")
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
-                    tostring(Logger.selectedBoss)
+                    tostring(module.selectedBoss)
                 ))
         end
 
         -- If the focused boss changed, reset boss-attendees + loot selection (filters changed).
-        if prevFocus ~= Logger.selectedBoss then
-            Logger.selectedBossPlayer = nil
+        if prevFocus ~= module.selectedBoss then
+            module.selectedBossPlayer = nil
             Utils.MultiSelect_Clear(MS_CTX_BOSSATT)
 
-            Logger.selectedItem = nil
+            module.selectedItem = nil
             Utils.MultiSelect_Clear(MS_CTX_LOOT)
 
-            Utils.triggerEvent("LoggerSelectItem", Logger.selectedItem)
-            Utils.triggerEvent("LoggerSelectBossPlayer", Logger.selectedBossPlayer)
+            Utils.triggerEvent("LoggerSelectItem", module.selectedItem)
+            Utils.triggerEvent("LoggerSelectBossPlayer", module.selectedBossPlayer)
         end
 
-        Utils.triggerEvent("LoggerSelectBoss", Logger.selectedBoss)
+        Utils.triggerEvent("LoggerSelectBoss", module.selectedBoss)
     end
 
     -- Player filter: only one active at a time
-    function Logger:SelectBossPlayer(btn, button)
+    function module:SelectBossPlayer(btn, button)
         if button and button ~= "LeftButton" then return end
         local id = btn and btn.GetID and btn:GetID()
         if not id then return end
 
         local isMulti = (IsControlKeyDown and IsControlKeyDown()) or false
         local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
-        local prevFocus = Logger.selectedBossPlayer
+        local prevFocus = module.selectedBossPlayer
 
         -- Mutual exclusion: selecting a boss-attendee filter clears the raid-attendee filter (and its multi-select).
-        Logger.selectedPlayer = nil
+        module.selectedPlayer = nil
         Utils.MultiSelect_Clear(MS_CTX_RAIDATT)
 
         local action, count
@@ -7996,20 +7961,20 @@ do
             local ordered = addon.Logger.BossAttendees and addon.Logger.BossAttendees._ctrl and
                 addon.Logger.BossAttendees._ctrl.data or nil
             action, count = Utils.MultiSelect_Range(MS_CTX_BOSSATT, ordered, id, isMulti)
-            Logger.selectedBossPlayer = id
+            module.selectedBossPlayer = id
         else
             action, count = Utils.MultiSelect_Toggle(MS_CTX_BOSSATT, id, isMulti, true)
 
             -- Keep a single "focused" boss-attendee for loot filtering.
             if action == "SINGLE_DESELECT" then
-                Logger.selectedBossPlayer = nil
+                module.selectedBossPlayer = nil
             elseif action == "TOGGLE_OFF" then
-                if Logger.selectedBossPlayer == id then
+                if module.selectedBossPlayer == id then
                     local sel = Utils.MultiSelect_GetSelected(MS_CTX_BOSSATT)
-                    Logger.selectedBossPlayer = sel[1] or nil
+                    module.selectedBossPlayer = sel[1] or nil
                 end
             else
-                Logger.selectedBossPlayer = id
+                module.selectedBossPlayer = id
             end
 
             if (tonumber(count) or 0) > 0 then
@@ -8023,32 +7988,32 @@ do
             addon:debug(("[LoggerSelect] click list=BossAttendees id=%s ctrl=%d shift=%d action=%s selectedCount=%d focus=%s")
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
-                    tostring(Logger.selectedBossPlayer)
+                    tostring(module.selectedBossPlayer)
                 ))
         end
 
         -- If the focused attendee changed, reset loot (multi) selection (filter changed).
-        if prevFocus ~= Logger.selectedBossPlayer then
-            Logger.selectedItem = nil
+        if prevFocus ~= module.selectedBossPlayer then
+            module.selectedItem = nil
             Utils.MultiSelect_Clear(MS_CTX_LOOT)
-            Utils.triggerEvent("LoggerSelectItem", Logger.selectedItem)
+            Utils.triggerEvent("LoggerSelectItem", module.selectedItem)
         end
 
-        Utils.triggerEvent("LoggerSelectBossPlayer", Logger.selectedBossPlayer)
-        Utils.triggerEvent("LoggerSelectPlayer", Logger.selectedPlayer)
+        Utils.triggerEvent("LoggerSelectBossPlayer", module.selectedBossPlayer)
+        Utils.triggerEvent("LoggerSelectPlayer", module.selectedPlayer)
     end
 
-    function Logger:SelectPlayer(btn, button)
+    function module:SelectPlayer(btn, button)
         if button and button ~= "LeftButton" then return end
         local id = btn and btn.GetID and btn:GetID()
         if not id then return end
 
         local isMulti = (IsControlKeyDown and IsControlKeyDown()) or false
         local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
-        local prevFocus = Logger.selectedPlayer
+        local prevFocus = module.selectedPlayer
 
         -- Mutual exclusion: selecting a raid-attendee filter clears the boss-attendee filter (and its multi-select).
-        Logger.selectedBossPlayer = nil
+        module.selectedBossPlayer = nil
         Utils.MultiSelect_Clear(MS_CTX_BOSSATT)
 
         local action, count
@@ -8056,20 +8021,20 @@ do
             local ordered = addon.Logger.RaidAttendees and addon.Logger.RaidAttendees._ctrl and
                 addon.Logger.RaidAttendees._ctrl.data or nil
             action, count = Utils.MultiSelect_Range(MS_CTX_RAIDATT, ordered, id, isMulti)
-            Logger.selectedPlayer = id
+            module.selectedPlayer = id
         else
             action, count = Utils.MultiSelect_Toggle(MS_CTX_RAIDATT, id, isMulti, true)
 
             -- Keep a single "focused" raid-attendee for loot filtering.
             if action == "SINGLE_DESELECT" then
-                Logger.selectedPlayer = nil
+                module.selectedPlayer = nil
             elseif action == "TOGGLE_OFF" then
-                if Logger.selectedPlayer == id then
+                if module.selectedPlayer == id then
                     local sel = Utils.MultiSelect_GetSelected(MS_CTX_RAIDATT)
-                    Logger.selectedPlayer = sel[1] or nil
+                    module.selectedPlayer = sel[1] or nil
                 end
             else
-                Logger.selectedPlayer = id
+                module.selectedPlayer = id
             end
 
             if (tonumber(count) or 0) > 0 then
@@ -8083,19 +8048,19 @@ do
             addon:debug(("[LoggerSelect] click list=RaidAttendees id=%s ctrl=%d shift=%d action=%s selectedCount=%d focus=%s")
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
-                    tostring(Logger.selectedPlayer)
+                    tostring(module.selectedPlayer)
                 ))
         end
 
         -- If the focused attendee changed, reset loot (multi) selection (filter changed).
-        if prevFocus ~= Logger.selectedPlayer then
-            Logger.selectedItem = nil
+        if prevFocus ~= module.selectedPlayer then
+            module.selectedItem = nil
             Utils.MultiSelect_Clear(MS_CTX_LOOT)
-            Utils.triggerEvent("LoggerSelectItem", Logger.selectedItem)
+            Utils.triggerEvent("LoggerSelectItem", module.selectedItem)
         end
 
-        Utils.triggerEvent("LoggerSelectPlayer", Logger.selectedPlayer)
-        Utils.triggerEvent("LoggerSelectBossPlayer", Logger.selectedBossPlayer)
+        Utils.triggerEvent("LoggerSelectPlayer", module.selectedPlayer)
+        Utils.triggerEvent("LoggerSelectBossPlayer", module.selectedBossPlayer)
     end
 
     -- Item: left select, right menu
@@ -8111,7 +8076,7 @@ do
             }, f, "cursor", 0, 0, "MENU")
         end
 
-        function Logger:SelectItem(btn, button)
+        function module:SelectItem(btn, button)
             local id = btn and btn.GetID and btn:GetID()
             if not id then return end
 
@@ -8124,21 +8089,21 @@ do
                 if isRange then
                     local ordered = addon.Logger.Loot and addon.Logger.Loot._ctrl and addon.Logger.Loot._ctrl.data or nil
                     action, count = Utils.MultiSelect_Range(MS_CTX_LOOT, ordered, id, isMulti)
-                    Logger.selectedItem = id
+                    module.selectedItem = id
                 else
                     action, count = Utils.MultiSelect_Toggle(MS_CTX_LOOT, id, isMulti, true)
 
                     -- Keep a single "focused" item for context menu / edit popups.
                     if action == "SINGLE_DESELECT" then
-                        Logger.selectedItem = nil
+                        module.selectedItem = nil
                     elseif action == "TOGGLE_OFF" then
-                        if Logger.selectedItem == id then
+                        if module.selectedItem == id then
                             local sel = Utils.MultiSelect_GetSelected(MS_CTX_LOOT)
-                            Logger.selectedItem = sel[1] or nil
+                            module.selectedItem = sel[1] or nil
                         end
                         -- If we toggled OFF a non-focused item, keep current focus.
                     else
-                        Logger.selectedItem = id
+                        module.selectedItem = id
                     end
 
                     if (tonumber(count) or 0) > 0 then
@@ -8152,15 +8117,15 @@ do
                     addon:debug(("[LoggerSelect] click list=Loot id=%s ctrl=%d shift=%d action=%s selectedCount=%d focus=%s")
                         :format(
                             tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
-                            tostring(Logger.selectedItem)
+                            tostring(module.selectedItem)
                         ))
                 end
 
-                Utils.triggerEvent("LoggerSelectItem", Logger.selectedItem)
+                Utils.triggerEvent("LoggerSelectItem", module.selectedItem)
             elseif button == "RightButton" then
                 -- Context menu works on a single focused row.
                 local action, count = Utils.MultiSelect_Toggle(MS_CTX_LOOT, id, false)
-                Logger.selectedItem = id
+                module.selectedItem = id
 
                 if addon and addon.options and addon.options.debug and addon.debug then
                     addon:debug(("[LoggerSelect] click id=%s ctrl=0 action=CONTEXT_MENU(%s) selectedCount=%d"):format(
@@ -8168,18 +8133,18 @@ do
                     ))
                 end
 
-                Utils.triggerEvent("LoggerSelectItem", Logger.selectedItem)
+                Utils.triggerEvent("LoggerSelectItem", module.selectedItem)
                 openItemMenu()
             end
         end
 
         -- Hover sync: keep selection highlight persistent, while leaving hover highlight to the default Button highlight.
-        function Logger:OnLootRowEnter(row)
+        function module:OnLootRowEnter(row)
             -- No-op: persistent selection is rendered via overlay textures (Utils.setRowSelected/Focused).
             -- Leave native hover highlight behavior intact.
         end
 
-        function Logger:OnLootRowLeave(row)
+        function module:OnLootRowLeave(row)
             -- No-op: persistent selection is rendered via overlay textures.
         end
 
@@ -8408,7 +8373,7 @@ do
         local sel = addon.Logger.selectedRaid
         if not sel then return end
         if addon.Logger.Actions:SetCurrentRaid(sel) then
-            -- Context change: clear dependent selections and redraw all Logger panels.
+            -- Context change: clear dependent selections and redraw all module panels.
             addon.Logger.selectedRaid = sel
             addon.Logger:ResetSelections()
             Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid)
@@ -9050,8 +9015,8 @@ do
         if raidIDOverride then
             raidID = raidIDOverride
         else
-            -- If the Logger window is open and browsing an old raid, selectedRaid may differ from KRT_CurrentRaid.
-            -- Runtime sources must always write into the CURRENT raid session, while Logger UI edits target selectedRaid.
+            -- If the module window is open and browsing an old raid, selectedRaid may differ from KRT_CurrentRaid.
+            -- Runtime sources must always write into the CURRENT raid session, while module UI edits target selectedRaid.
             local isLoggerSource = (type(source) == "string") and (source:find("^LOGGER_") ~= nil)
             if isLoggerSource then
                 raidID = addon.Logger.selectedRaid or KRT_CurrentRaid
@@ -9135,7 +9100,7 @@ do
     Utils.registerCallback("LoggerSelectItem", function() controller:Touch() end)
 end
 
--- Logger: Add/Edit Boss Popup  (Patch #1 - normalize to time/mode)
+-- module: Add/Edit Boss Popup  (Patch #1 - normalize to time/mode)
 do
     addon.Logger.BossBox = addon.Logger.BossBox or {}
     local Box = addon.Logger.BossBox
@@ -9266,7 +9231,7 @@ do
     end
 end
 
--- Logger: Add Attendee Popup
+-- module: Add Attendee Popup
 do
     addon.Logger.AttendeesBox = addon.Logger.AttendeesBox or {}
     local Box = addon.Logger.AttendeesBox
@@ -9318,10 +9283,10 @@ end
 -- =========== Slash Commands  =========== --
 do
     addon.Slash = addon.Slash or {}
-    local Slash = addon.Slash
+    local module = addon.Slash
     local L = addon.L
 
-    Slash.sub = Slash.sub or {}
+    module.sub = module.sub or {}
 
     local cmdAchiev = { "ach", "achi", "achiev", "achievement" }
     local cmdLFM = { "pug", "lfm", "group", "grouper" }
@@ -9353,15 +9318,15 @@ do
 
     local function registerAliases(list, fn)
         for _, cmd in ipairs(list) do
-            Slash.sub[cmd] = fn
+            module.sub[cmd] = fn
         end
     end
 
-    function Slash:Register(cmd, fn)
+    function module:Register(cmd, fn)
         self.sub[cmd] = fn
     end
 
-    function Slash:Handle(msg)
+    function module:Handle(msg)
         if not msg or msg == "" then return end
         local cmd, rest = Utils.splitArgs(msg)
         if cmd == "show" or cmd == "toggle" then
@@ -9549,7 +9514,7 @@ do
     -- Register slash commands
     SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
     SlashCmdList["KRT"] = function(msg)
-        Slash:Handle(msg)
+        module:Handle(msg)
     end
 
     SLASH_KRTCOUNTS1 = "/krtcounts"
