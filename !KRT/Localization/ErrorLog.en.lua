@@ -1,7 +1,7 @@
-local _, addon = ...
+local _, addon                    = ...
 
-addon.E = addon.E or {}
-local E = addon.E
+addon.E                           = addon.E or {}
+local E                           = addon.E
 
 -- ==================== Log Messages ==================== --
 E.LogCoreCallbackHandlerMissing   = "[Core] CallbackHandler missing: using fallback event wiring"
@@ -10,8 +10,8 @@ E.LogCoreEventsRegistered         = "[Core] Events registered=%d"
 E.LogCorePlayerEnteringWorld      = "[Core] PLAYER_ENTERING_WORLD -> scheduling FirstCheck"
 E.LogRaidLeftGroupEndSession      = "[Raid] Left group -> ending current raid session"
 E.LogRaidRosterUpdate             = "[Raid] RosterUpdate v=%d num=%d"
-E.ErrLoggerUpdateRosterNotInRaid = "[Logger] Cannot update roster: you are not in a raid."
-E.ErrLoggerUpdateRosterNotCurrent= "[Logger] Cannot update roster: selected raid is not the current raid."
+E.ErrLoggerUpdateRosterNotInRaid  = "[Logger] Cannot update roster: you are not in a raid."
+E.ErrLoggerUpdateRosterNotCurrent = "[Logger] Cannot update roster: selected raid is not the current raid."
 E.LogRaidCreated                  = "[Raid] Created id=%d zone=%s size=%d players=%d"
 E.LogRaidEnded                    = "[Raid] Ended id=%d zone=%s size=%d bosses=%d loot=%d duration=%d"
 E.LogRaidCheck                    = "[Raid] Check zone=%s diff=%s current=%s"

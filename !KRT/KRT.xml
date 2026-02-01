@@ -2011,7 +2011,8 @@
 			</ScrollFrame>
 		</Frames>
 		<Scripts>
-			<OnShow>KRT.Master:UpdateCountsFrame()</OnShow>
+			<OnLoad>KRT.LootCounter:OnLoad(self)</OnLoad>
+			<OnShow>KRT.LootCounter:OnShow(self)</OnShow>
 		</Scripts>
 	</Frame>
 	<!-- ====== End of Loot Counter Frame ====== -->
@@ -2334,6 +2335,33 @@
 			</BackgroundInsets>
 		</Backdrop>
 		<Frames>
+			<FontString name="$parentHint" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="TOP">
+				<Size>
+					<AbsDimension x="360" y="24" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="20" y="-34" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<TextInsets>
+					<AbsInset top="0" right="0" bottom="0" left="0" />
+				</TextInsets>
+			</FontString>
+			<FontString name="$parentStatus" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
+				<Size>
+					<AbsDimension x="360" y="18" />
+				</Size>
+				<Anchors>
+					<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="20" y="52" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</FontString>
 			<!-- Multiline EditBox for CSV -->
 			<ScrollFrame name="KRTImportScrollFrame" inherits="KRTScrollFrameTemplate">
 				<Size>
@@ -2342,7 +2370,7 @@
 				<Anchors>
 					<Anchor point="TOP" relativePoint="TOP">
 						<Offset>
-							<AbsDimension x="-5" y="-30" />
+							<AbsDimension x="-5" y="-60" />
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -2371,7 +2399,7 @@
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnClick>KRT.Reserves:ImportFromEditBox()</OnClick>
+					<OnClick>KRT.ReserveImport:ImportFromEditBox()</OnClick>
 				</Scripts>
 			</Button>
 			<!-- Cancel Button -->
@@ -2387,11 +2415,14 @@
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnClick>KRT.Reserves:CloseImportWindow()</OnClick>
+					<OnClick>KRT.ReserveImport:Hide()</OnClick>
 				</Scripts>
 			</Button>
 		</Frames>
-	</Frame>
+			<Scripts>
+			<OnLoad>KRT.ReserveImport:OnLoad(self)</OnLoad>
+		</Scripts>
+</Frame>
 	<!-- ====== End of Reserve Import Window ====== -->
 	<!-- ====== Start of Loot Bans Frame ====== -->
 	<!-- ====== End of Loot Bans Frame ====== -->

@@ -77,7 +77,7 @@ Frames.main                = Frames.main or CreateFrame("Frame")
 
 -- Addon UI Frames
 local mainFrame            = Frames.main
-local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings, UILogger, UILoggerItemBox
+local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings, UILogger, UILoggerItemBox, UIReserve, UIReserveImport, UILootCounter
 
 -- Player info helper
 coreState.player           = coreState.player or {}
@@ -1262,8 +1262,8 @@ do
             if level == 1 then
                 -- Toggle master loot frame:
                 AddMenuButton(level, MASTER_LOOTER, function() addon.Master:Toggle() end)
-                -- Toggle raid warnings frame:
-                AddMenuButton(level, RAID_WARNING, function() addon.Warnings:Toggle() end)
+                -- Toggle loot counter frame:
+                AddMenuButton(level, L.StrLootCounter, function() addon.LootCounter:Toggle() end)
                 -- Toggle loot logger frame:
                 AddMenuButton(level, L.StrLootLogger, function() addon.Logger:Toggle() end)
                 -- Separator:
@@ -1272,14 +1272,15 @@ do
                 AddMenuButton(level, L.StrClearIcons, function() addon.Raid:ClearRaidIcons() end)
                 -- Separator:
                 AddMenuSeparator(level)
-                -- MS changes header:
-                AddMenuTitle(level, L.StrMSChanges)
-                -- Toggle MS Changes frame:
-                AddMenuButton(level, L.BtnConfigure, function() addon.Changes:Toggle() end)
-                -- Ask for MS changes:
+                -- Toggle raid warnings frame:
+                AddMenuButton(level, RAID_WARNING, function() addon.Warnings:Toggle() end)
+                -- Separator:
+                AddMenuSeparator(level)
+                -- MS changes:
+                AddMenuButton(level, L.StrMSChanges, function() addon.Changes:Toggle() end)
                 AddMenuButton(level, L.BtnDemand, function() addon.Changes:Demand() end)
-                -- Spam ms changes:
                 AddMenuButton(level, CHAT_ANNOUNCE, function() addon.Changes:Announce() end)
+                -- Separator:
                 AddMenuSeparator(level)
                 -- Toggle lfm spammer frame:
                 AddMenuButton(level, L.StrLFMSpam, function() addon.Spammer:Toggle() end)
@@ -2461,6 +2462,10 @@ do
         end
     end
 
+    function module:Refresh()
+        if UpdateUIFrame then UpdateUIFrame() end
+    end
+
     local InitializeDropDowns, PrepareDropDowns, UpdateDropDowns
     local dropDownData, dropDownGroupData = {}, {}
     -- Ensure subgroup tables exist even when the Master UI hasn't been opened yet.
@@ -2716,7 +2721,8 @@ do
 
         -- Event-driven UI refresher (no polling on the UI frame itself).
         if not RequestRefresh then
-            RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIMaster end, UpdateUIFrame)
+            RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIMaster end,
+                function() module:Refresh() end)
         end
         frame:SetScript("OnHide", function()
             if selectionFrame then selectionFrame:Hide() end
@@ -2785,15 +2791,15 @@ do
     -- Button: Reserve List (contextual)
     function module:BtnReserveList(btn)
         if addon.Reserves:HasData() then
-            addon.Reserves:ShowWindow()
+            addon.Reserves:Toggle()
         else
-            addon.Reserves:ShowImportBox()
+            addon.ReserveImport:Toggle()
         end
     end
 
     -- Button: Loot Counter
     function module:BtnLootCounter(btn)
-        return module:ToggleCountsFrame()
+        if addon.LootCounter and addon.LootCounter.Toggle then addon.LootCounter:Toggle() end
     end
 
     -- Generic function to announce a roll for the current item.
@@ -3996,18 +4002,20 @@ do
 end
 
 -- =========== Loot Counter Module  =========== --
--- Counter and display item distribution.
+-- Counter and display item distribution (MS wins).
 do
-    local module = addon.Master
+    addon.LootCounter = addon.LootCounter or {}
+    local module = addon.LootCounter
 
+    -- ----- Internal state ----- --
+    local frameName
     local rows, raidPlayers = {}, {}
     local twipe = twipe
-    local countsFrame, scrollFrame, scrollChild, header = nil, nil, nil, nil
-    local RequestCountsRefresh -- forward declaration
-    local countsRefresher = nil
+    local scrollFrame, scrollChild, header
+    local refresher -- event-driven refresher
+
     -- Single-line column header.
     local HEADER_HEIGHT = 18
-
 
     -- Layout constants (columns: Name | Count | Actions)
     local BTN_W, BTN_H = 20, 18
@@ -4017,27 +4025,27 @@ do
     local COUNT_COL_W = 40
 
     local function EnsureFrames()
-        countsFrame = countsFrame or _G["KRTLootCounterFrame"]
-        scrollFrame = scrollFrame or _G["KRTLootCounterFrameScrollFrame"]
-        scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
-        if countsFrame and not countsFrame._krtCounterHook then
-            Utils.setFrameTitle("KRTLootCounterFrame", L.StrLootCounter)
-            countsFrame._krtCounterHook = true
+        UILootCounter = UILootCounter or _G["KRTLootCounterFrame"]
+        if not UILootCounter then
+            return false
         end
-    end
 
-    RequestCountsRefresh = function()
-        EnsureFrames()
-        if not countsFrame then return end
-        if not countsRefresher then
-            countsRefresher = Utils.makeEventDrivenRefresher(function() return countsFrame end,
-                function() module:UpdateCountsFrame() end)
+        frameName = frameName or (UILootCounter.GetName and UILootCounter:GetName()) or "KRTLootCounterFrame"
+        scrollFrame = scrollFrame
+            or UILootCounter.ScrollFrame
+            or _G[frameName .. "ScrollFrame"]
+            or _G["KRTLootCounterFrameScrollFrame"]
+
+        scrollChild = scrollChild
+            or (scrollFrame and scrollFrame.ScrollChild)
+            or _G["KRTLootCounterFrameScrollFrameScrollChild"]
+
+        if not UILootCounter._krtCounterInit then
+            Utils.setFrameTitle(frameName, L.StrLootCounter)
+            UILootCounter._krtCounterInit = true
         end
-        countsRefresher()
-    end
 
-    function module:RequestCountsRefresh()
-        return RequestCountsRefresh()
+        return true
     end
 
     local function EnsureHeader()
@@ -4071,7 +4079,6 @@ do
         header.name:SetTextColor(0.5, 0.5, 0.5)
     end
 
-
     local function GetCurrentRaidPlayers()
         twipe(raidPlayers)
         if not addon.IsInGroup() then
@@ -4091,19 +4098,6 @@ do
         end
         table.sort(raidPlayers)
         return raidPlayers
-    end
-
-    function module:ToggleCountsFrame()
-        EnsureFrames()
-        if not countsFrame then return end
-
-        if countsFrame:IsShown() then
-            Utils.setShown(countsFrame, false)
-        else
-            -- Request while hidden so the refresher can refresh immediately on OnShow (no double refresh).
-            if RequestCountsRefresh then RequestCountsRefresh() end
-            Utils.setShown(countsFrame, true)
-        end
     end
 
     local function EnsureRow(i, rowHeight)
@@ -4159,21 +4153,21 @@ do
                 local n = row._playerName
                 if n then
                     addon.Raid:AddPlayerCount(n, 1, KRT_CurrentRaid)
-                    RequestCountsRefresh()
+                    module:RequestRefresh()
                 end
             end)
             row.minus:SetScript("OnClick", function()
                 local n = row._playerName
                 if n then
                     addon.Raid:AddPlayerCount(n, -1, KRT_CurrentRaid)
-                    RequestCountsRefresh()
+                    module:RequestRefresh()
                 end
             end)
             row.reset:SetScript("OnClick", function()
                 local n = row._playerName
                 if n then
                     addon.Raid:SetPlayerCount(n, 0, KRT_CurrentRaid)
-                    RequestCountsRefresh()
+                    module:RequestRefresh()
                 end
             end)
 
@@ -4182,10 +4176,58 @@ do
         return row
     end
 
+    function module:OnLoad(frame)
+        if frame then
+            UILootCounter = frame
+        end
+        if not EnsureFrames() then return end
 
-    function module:UpdateCountsFrame()
-        EnsureFrames()
-        if not countsFrame or not scrollChild then return end
+        -- Drag support, like other KRT windows.
+        UILootCounter:RegisterForDrag("LeftButton")
+        UILootCounter:SetScript("OnDragStart", UILootCounter.StartMoving)
+        UILootCounter:SetScript("OnDragStop", UILootCounter.StopMovingOrSizing)
+
+        if not UILootCounter._krtCounterOnShowHook then
+            UILootCounter:HookScript("OnShow", function()
+                module:RequestRefresh()
+            end)
+            UILootCounter._krtCounterOnShowHook = true
+        end
+    end
+
+    function module:OnShow()
+        self:RequestRefresh()
+    end
+
+    function module:Toggle()
+        if not EnsureFrames() then return end
+
+        if UILootCounter:IsShown() then
+            Utils.setShown(UILootCounter, false)
+        else
+            -- Request while hidden so the refresher can refresh immediately on OnShow (no double refresh).
+            self:RequestRefresh()
+            Utils.setShown(UILootCounter, true)
+        end
+    end
+
+    function module:Hide()
+        Utils.hideFrame(UILootCounter)
+    end
+
+    function module:RequestRefresh()
+        if not EnsureFrames() then return end
+        if not refresher then
+            refresher = Utils.makeEventDrivenRefresher(function() return UILootCounter end, function()
+                module:Refresh()
+            end)
+        end
+        refresher()
+    end
+
+    function module:Refresh()
+        if not EnsureFrames() then return end
+        if not UILootCounter or not scrollFrame or not scrollChild then return end
 
         EnsureHeader()
 
@@ -4234,6 +4276,7 @@ do
             row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, y)
             row:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, y)
             row._playerName = name
+
             if row._lastName ~= name then
                 row.name:SetText(name)
                 row._lastName = name
@@ -4259,7 +4302,7 @@ do
         end
     end
 
-    -- Add a button to the master loot frame to open the loot counter UI
+    -- Add a button to the master loot frame to open the loot counter UI.
     local function SetupMasterLootFrameHooks()
         local f = _G["KRTMasterLootFrame"]
         if f and not f.KRT_LootCounterBtn then
@@ -4268,38 +4311,35 @@ do
             btn:SetText(L.BtnLootCounter)
             btn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -20, -20)
             btn:SetScript("OnClick", function()
-                addon.Master:ToggleCountsFrame()
+                module:Toggle()
             end)
             f.KRT_LootCounterBtn = btn
 
             f:HookScript("OnHide", function()
-                if countsFrame and countsFrame:IsShown() then
-                    Utils.setShown(countsFrame, false)
-                end
+                module:Hide()
             end)
         end
     end
     hooksecurefunc(addon.Master, "OnLoad", SetupMasterLootFrameHooks)
 
+    local function Request()
+        module:RequestRefresh()
+    end
+
     -- Auto-refresh when loot is logged (MS-only counting happens in Raid:AddLoot).
-    Utils.registerCallback("RaidLootUpdate", function()
-        RequestCountsRefresh()
-    end)
+    Utils.registerCallback("RaidLootUpdate", Request)
 
     -- Refresh on roster updates (to keep list aligned).
     if addon.Raid and addon.Raid.UpdateRaidRoster then
-        hooksecurefunc(addon.Raid, "UpdateRaidRoster", RequestCountsRefresh)
+        hooksecurefunc(addon.Raid, "UpdateRaidRoster", Request)
     end
 
     -- New raid session: reset view.
-    Utils.registerCallback("RaidCreate", function()
-        RequestCountsRefresh()
-    end)
+    Utils.registerCallback("RaidCreate", Request)
 
-    Utils.registerCallback("PlayerCountChanged", function()
-        RequestCountsRefresh()
-    end)
+    Utils.registerCallback("PlayerCountChanged", Request)
 end
+
 
 -- =========== Reserves Module  =========== --
 -- Manages item reserves, import, and display.
@@ -4379,7 +4419,7 @@ do
         if pendingItemCount == 0 then
             addon:debug(E.LogReservesPendingComplete)
             if reserveListFrame and reserveListFrame:IsShown() then
-                module:RefreshWindow()
+                module:Refresh()
             end
         end
     end
@@ -4635,7 +4675,7 @@ do
         if not source then return end
         collapsedBossGroups[source] = not collapsedBossGroups[source]
         addon:debug(E.LogReservesToggleCollapse:format(source, tostring(collapsedBossGroups[source])))
-        module:RefreshWindow()
+        module:Refresh()
     end
 
     -- ----- Public methods ----- --
@@ -4643,7 +4683,7 @@ do
     -- Local functions
     local LocalizeUIFrame
     local UpdateUIFrame
-
+    local RenderReserveListUI
     -- ----- Saved Data Management ----- --
 
     function module:Save()
@@ -4670,8 +4710,8 @@ do
         twipe(reservesByItemID)
         twipe(reservesDisplayList)
         reservesDirty = true
-        self:RefreshWindow()
-        self:CloseWindow()
+        self:Refresh()
+        self:Hide()
         self:RequestRefresh()
         addon:info(L.StrReserveListCleared)
     end
@@ -4688,63 +4728,48 @@ do
 
     -- ----- UI Window Management ----- --
 
-    function module:ShowWindow()
-        if not reserveListFrame then
+    local function GetReserveListFrame()
+        return UIReserve or reserveListFrame or _G["KRTReserveListFrame"]
+    end
+
+    local function ShowReserveList()
+        local frame = GetReserveListFrame()
+        if not frame then
             addon:error(E.LogReservesFrameMissing)
             return
         end
+        UIReserve = frame
+        reserveListFrame = frame
         addon:debug(E.LogReservesShowWindow)
-        reserveListFrame:Show()
-        self:RefreshWindow()
-        self:RequestRefresh()
+        module:Refresh()
+        module:RequestRefresh()
+        Utils.setShown(frame, true)
     end
 
-    function module:CloseWindow()
-        addon:debug(E.LogReservesHideWindow)
-        if reserveListFrame then reserveListFrame:Hide() end
+    function module:Hide()
+        local frame = GetReserveListFrame()
+        if frame then
+            addon:debug(E.LogReservesHideWindow)
+            Utils.setShown(frame, false)
+        end
     end
 
-    function module:ShowImportBox()
-        addon:debug(E.LogReservesOpenImportWindow)
-        local frame = _G["KRTImportWindow"]
+    function module:Toggle()
+        local frame = GetReserveListFrame()
         if not frame then
-            addon:error(E.LogReservesImportWindowMissing)
+            addon:error(E.LogReservesFrameMissing)
             return
         end
-        local confirmButton = _G["KRTImportConfirmButton"]
-        if confirmButton then
-            confirmButton:SetText(L.BtnImport)
+        if frame:IsShown() then
+            module:Hide()
+        else
+            ShowReserveList()
         end
-        local cancelButton = _G["KRTImportCancelButton"]
-        if cancelButton then
-            cancelButton:SetText(L.BtnClose)
-        end
-        frame:Show()
-        Utils.resetEditBox(_G["KRTImportEditBox"])
-        Utils.setFrameTitle(frame, L.StrImportReservesTitle)
-        self:RequestRefresh()
-    end
-
-    function module:CloseImportWindow()
-        local frame = _G["KRTImportWindow"]
-        if frame then
-            frame:Hide()
-        end
-    end
-
-    function module:ImportFromEditBox()
-        local editBox = _G["KRTImportEditBox"]
-        if not editBox then return end
-        local csv = editBox:GetText()
-        if csv and csv ~= "" then
-            addon:info(E.LogSRImportRequested:format(#csv))
-            self:ParseCSV(csv)
-        end
-        self:CloseImportWindow()
     end
 
     function module:OnLoad(frame)
         addon:debug(E.LogReservesFrameLoaded)
+        UIReserve = frame
         reserveListFrame = frame
         frameName = frame:GetName()
 
@@ -4755,7 +4780,7 @@ do
         scrollChild = scrollFrame and scrollFrame.ScrollChild or _G["KRTReserveListFrameScrollChild"]
 
         local buttons = {
-            CloseButton = "CloseWindow",
+            CloseButton = "Hide",
             ClearButton = "ResetSaved",
             QueryButton = "QueryMissingItems",
         }
@@ -4867,7 +4892,15 @@ do
         end
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return reserveListFrame end, UpdateUIFrame)
+    function module:Refresh()
+        if UpdateUIFrame then UpdateUIFrame() end
+        if (reserveListFrame or UIReserve) and RenderReserveListUI then
+            RenderReserveListUI()
+        end
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIReserve or reserveListFrame end,
+        function() module:Refresh() end)
 
     function module:RequestRefresh()
         RequestRefresh()
@@ -4971,11 +5004,13 @@ do
         end
 
         RebuildIndex()
-        addon:debug(E.LogReservesParseComplete:format(addon.tLength(reservesData)))
-        addon:info(E.LogSRImportComplete:format(addon.tLength(reservesData)))
-        self:RefreshWindow()
+        local nPlayers = addon.tLength(reservesData)
+        addon:debug(E.LogReservesParseComplete:format(nPlayers))
+        addon:info(format(L.SuccessReservesParsed, tostring(nPlayers)))
+        self:Refresh()
         self:RequestRefresh()
         self:Save()
+        return true, nPlayers
     end
 
     -- ----- Item Info Querying ----- --
@@ -5051,7 +5086,7 @@ do
             end
         end
         if updated and reserveListFrame and reserveListFrame:IsShown() then
-            self:RefreshWindow()
+            self:Refresh()
             self:RequestRefresh()
         end
         if not silent then
@@ -5143,7 +5178,7 @@ do
 
     -- ----- UI Display ----- --
 
-    function module:RefreshWindow()
+    function RenderReserveListUI()
         if not reserveListFrame or not scrollChild then return end
 
         -- Hide and clear old rows
@@ -5287,6 +5322,138 @@ do
         -- Log the list of players found for the item
         addon:debug(E.LogReservesPlayersList:format(itemId, tconcat(list, ", ")))
         return #list > 0 and tconcat(list, ", ") or ""
+    end
+end
+
+-- =========== Reserve Import Window Module  =========== --
+-- Handles the CSV import dialog for Reserves.
+do
+    addon.ReserveImport = addon.ReserveImport or {}
+    local module = addon.ReserveImport
+    local L = addon.L
+    local E = addon.E
+
+    local frameName
+    local localized = false
+
+    local function LocalizeUIFrame()
+        if localized then return end
+        local frame = UIReserveImport or _G["KRTImportWindow"]
+        if not frame then return end
+        frameName = frame:GetName() or "KRTImportWindow"
+
+        local confirmButton = _G["KRTImportConfirmButton"]
+        if confirmButton then confirmButton:SetText(L.BtnImport) end
+        local cancelButton = _G["KRTImportCancelButton"]
+        if cancelButton then cancelButton:SetText(L.BtnClose) end
+
+        Utils.setFrameTitle(frame, L.StrImportReservesTitle)
+        local hint = _G["KRTImportWindowHint"]
+        if hint then hint:SetText(L.StrImportReservesHint) end
+
+        localized = true
+    end
+
+    function module:OnLoad(frame)
+        UIReserveImport = frame
+        if frame then
+            frameName = frame:GetName()
+            frame:RegisterForDrag("LeftButton")
+            frame:SetScript("OnDragStart", frame.StartMoving)
+            frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+            frame:HookScript("OnShow", function() module:RequestRefresh() end)
+        end
+        module:RequestRefresh()
+    end
+
+    function module:Refresh()
+        LocalizeUIFrame()
+        local status = _G["KRTImportWindowStatus"]
+        if status and (status:GetText() == nil or status:GetText() == "") then
+            status:SetText("")
+        end
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(
+        function() return UIReserveImport or _G["KRTImportWindow"] end,
+        function() module:Refresh() end
+    )
+
+    function module:RequestRefresh()
+        RequestRefresh()
+    end
+
+    function module:Hide()
+        local frame = UIReserveImport or _G["KRTImportWindow"]
+        if frame then
+            Utils.setShown(frame, false)
+        end
+    end
+
+    function module:Toggle()
+        local frame = UIReserveImport or _G["KRTImportWindow"]
+        if not frame then
+            addon:error(E.LogReservesImportWindowMissing)
+            return
+        end
+
+        if frame:IsShown() then
+            module:Hide()
+            return
+        end
+
+        UIReserveImport = frame
+        module:RequestRefresh()
+        Utils.setShown(frame, true)
+
+        Utils.resetEditBox(_G["KRTImportEditBox"])
+        local editBox = _G["KRTImportEditBox"]
+        if editBox then
+            editBox:SetFocus()
+            editBox:HighlightText()
+        end
+        local status = _G["KRTImportWindowStatus"]
+        if status then status:SetText("") end
+    end
+
+    function module:ImportFromEditBox()
+        local editBox = _G["KRTImportEditBox"]
+        local status = _G["KRTImportWindowStatus"]
+        if status then status:SetText("") end
+        if not editBox then return false, 0 end
+
+        local csv = editBox:GetText()
+        if type(csv) ~= "string" or not csv:match("%S") then
+            if status then
+                status:SetText(L.ErrImportReservesEmpty or "Import failed: empty or invalid data.")
+                status:SetTextColor(1, 0.2, 0.2)
+            end
+            addon:error(E.LogReservesImportFailedEmpty)
+            return false, 0
+        end
+
+        addon:info(E.LogSRImportRequested:format(#csv))
+        local ok, nPlayers = addon.Reserves:ParseCSV(csv)
+        if ok then
+            if status then
+                status:SetText(string.format(L.SuccessReservesParsed, tostring(nPlayers)))
+                status:SetTextColor(0.2, 1, 0.2)
+            end
+            module:Hide()
+            local rf = UIReserve or _G["KRTReserveListFrame"]
+            if not (rf and rf.IsShown and rf:IsShown()) then
+                addon.Reserves:Toggle()
+            else
+                addon.Reserves:RequestRefresh()
+            end
+            return true, nPlayers
+        else
+            if status then
+                status:SetText(L.ErrImportReservesEmpty or "Import failed: empty or invalid data.")
+                status:SetTextColor(1, 0.2, 0.2)
+            end
+            return false, 0
+        end
     end
 end
 
@@ -5528,7 +5695,11 @@ do
         configDirty = false
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIConfig end, UpdateUIFrame)
+    function module:Refresh()
+        if UpdateUIFrame then UpdateUIFrame() end
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIConfig end, function() module:Refresh() end)
 
     function module:RequestRefresh()
         RequestRefresh()
@@ -5771,7 +5942,12 @@ do
         end
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIWarnings end, UpdateUIFrame)
+    function module:Refresh()
+        if UpdateUIFrame then UpdateUIFrame() end
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIWarnings end,
+        function() module:Refresh() end)
 
     function module:RequestRefresh()
         RequestRefresh()
@@ -6108,7 +6284,12 @@ do
         Utils.enableDisable(_G[frameName .. "DemandBtn"], KRT_CurrentRaid)
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIChanges end, UpdateUIFrame)
+    function module:Refresh()
+        if UpdateUIFrame then UpdateUIFrame() end
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UIChanges end,
+        function() module:Refresh() end)
 
     function module:RequestRefresh()
         RequestRefresh()
@@ -6372,7 +6553,13 @@ do
 
     -- Toggle/Hide
     function module:Toggle()
-        Utils.toggle(UISpammer)
+        if not UISpammer then return end
+        if UISpammer:IsShown() then
+            Utils.setShown(UISpammer, false)
+        else
+            module:RequestRefresh()
+            Utils.setShown(UISpammer, true)
+        end
     end
 
     function module:Hide()
@@ -6892,7 +7079,12 @@ do
         end
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UISpammer end, UpdateUIFrame)
+    function module:Refresh()
+        if UpdateUIFrame then UpdateUIFrame() end
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UISpammer end,
+        function() module:Refresh() end)
 
     function module:RequestRefresh()
         RequestRefresh()
@@ -7041,8 +7233,7 @@ do
         self:BuildRows(out, raid and raid.bossKills, nil, function(boss, i)
             local it = {}
             it.id = tonumber(boss and boss.bossNid) or (boss and boss.bossNid) or i -- stable nid for highlight/selection
-            it.seq =
-            i                                                                       -- display-only (rescales after deletions)
+            it.seq = i -- display-only (rescales after deletions)
             it.name = boss and boss.name or ""
             it.time = boss and boss.time or time()
             it.timeFmt = date("%H:%M", it.time)
@@ -7641,12 +7832,35 @@ do
         end)
     end
 
-    function Logger:Toggle() Utils.toggle(UILogger) end
+    function Logger:Toggle()
+        if not UILogger then return end
+        if UILogger:IsShown() then
+            Logger:Hide()
+        else
+            Logger:RequestRefresh()
+            Utils.setShown(UILogger, true)
+        end
+    end
 
     function Logger:Hide()
         Logger.selectedRaid = KRT_CurrentRaid
         clearSelections()
-        Utils.showHide(UILogger, false)
+        Utils.setShown(UILogger, false)
+    end
+
+    function Logger:Refresh()
+        if not UILogger then return end
+        if not Logger.selectedRaid then
+            Logger.selectedRaid = KRT_CurrentRaid
+        end
+        clearSelections()
+        Utils.triggerEvent("LoggerSelectRaid", Logger.selectedRaid)
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(function() return UILogger end, function() Logger:Refresh() end)
+
+    function Logger:RequestRefresh()
+        RequestRefresh()
     end
 
     -- Selectors
@@ -9306,9 +9520,9 @@ do
     registerAliases(cmdReserves, function(rest)
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
-            addon.Reserves:ShowWindow()
+            addon.Reserves:Toggle()
         elseif sub == "import" then
-            addon.Reserves:ShowImportBox()
+            if addon.ReserveImport and addon.ReserveImport.Toggle then addon.ReserveImport:Toggle() end
         else
             addon:info(format(L.StrCmdCommands, "krt res"), "KRT")
             printHelp("toggle", L.StrCmdToggle)
@@ -9340,7 +9554,7 @@ do
 
     SLASH_KRTCOUNTS1 = "/krtcounts"
     SlashCmdList["KRTCOUNTS"] = function()
-        addon.Master:ToggleCountsFrame() -- Loot Counter is not yet refactored.
+        if addon.LootCounter and addon.LootCounter.Toggle then addon.LootCounter:Toggle() end
     end
 end
 
