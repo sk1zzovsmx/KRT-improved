@@ -1234,19 +1234,19 @@ do
     -- ----- Private helpers ----- --
     -- Menu definition for EasyMenu (built once).
     local minimapMenu = {
-        { text = MASTER_LOOTER,      notCheckable = 1, func = function() addon.Master:Toggle() end },
-        { text = L.StrLootCounter,   notCheckable = 1, func = function() addon.LootCounter:Toggle() end },
-        { text = L.StrLootLogger,    notCheckable = 1, func = function() addon.Logger:Toggle() end },
-        { text = " ", disabled = 1, notCheckable = 1 },
-        { text = L.StrClearIcons,    notCheckable = 1, func = function() addon.Raid:ClearRaidIcons() end },
-        { text = " ", disabled = 1, notCheckable = 1 },
-        { text = RAID_WARNING,       notCheckable = 1, func = function() addon.Warnings:Toggle() end },
-        { text = " ", disabled = 1, notCheckable = 1 },
-        { text = L.StrMSChanges,     notCheckable = 1, func = function() addon.Changes:Toggle() end },
-        { text = L.BtnDemand,        notCheckable = 1, func = function() addon.Changes:Demand() end },
-        { text = CHAT_ANNOUNCE,      notCheckable = 1, func = function() addon.Changes:Announce() end },
-        { text = " ", disabled = 1, notCheckable = 1 },
-        { text = L.StrLFMSpam,       notCheckable = 1, func = function() addon.Spammer:Toggle() end },
+        { text = MASTER_LOOTER,    notCheckable = 1, func = function() addon.Master:Toggle() end },
+        { text = L.StrLootCounter, notCheckable = 1, func = function() addon.LootCounter:Toggle() end },
+        { text = L.StrLootLogger,  notCheckable = 1, func = function() addon.Logger:Toggle() end },
+        { text = " ",              disabled = 1,     notCheckable = 1 },
+        { text = L.StrClearIcons,  notCheckable = 1, func = function() addon.Raid:ClearRaidIcons() end },
+        { text = " ",              disabled = 1,     notCheckable = 1 },
+        { text = RAID_WARNING,     notCheckable = 1, func = function() addon.Warnings:Toggle() end },
+        { text = " ",              disabled = 1,     notCheckable = 1 },
+        { text = L.StrMSChanges,   notCheckable = 1, func = function() addon.Changes:Toggle() end },
+        { text = L.BtnDemand,      notCheckable = 1, func = function() addon.Changes:Demand() end },
+        { text = CHAT_ANNOUNCE,    notCheckable = 1, func = function() addon.Changes:Announce() end },
+        { text = " ",              disabled = 1,     notCheckable = 1 },
+        { text = L.StrLFMSpam,     notCheckable = 1, func = function() addon.Spammer:Toggle() end },
     }
 
     -- Initializes and opens the menu for the minimap button.
@@ -2430,6 +2430,7 @@ do
     function module:RequestRefresh()
         RequestRefresh()
     end
+
     function module:Refresh()
         if UpdateUIFrame then UpdateUIFrame() end
     end
@@ -3994,9 +3995,9 @@ do
 
     local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame, function() module:Refresh() end)
 
-	function module:RequestRefresh()
-		RequestRefresh()
-	end
+    function module:RequestRefresh()
+        RequestRefresh()
+    end
 
     -- Single-line column header.
     local HEADER_HEIGHT = 18
@@ -4171,16 +4172,6 @@ do
 
         -- Drag registration kept in Lua (avoid template logic in XML).
         Utils.enableDrag(f)
-
-        module:RequestRefresh()
-    end
-
-	    -- Called from XML: <OnShow>KRT.LootCounter:OnShow(self)</OnShow>
-	    function module:OnShow(frame)
-	        if frame then
-	            module.frame = frame
-	        end
-	        module:RequestRefresh()
     end
 
     function module:Refresh()
@@ -4261,7 +4252,6 @@ do
         end
     end
 
-    
     -- ----- UI Window Management ----- --
 
     local function ShowLootCounter()
@@ -4271,6 +4261,7 @@ do
             return
         end
         Utils.setShown(frame, true)
+        module:RequestRefresh()
     end
 
     function module:Hide()
@@ -4293,7 +4284,7 @@ do
         end
     end
 
--- Add a button to the master loot frame to open the loot counter UI.
+    -- Add a button to the master loot frame to open the loot counter UI.
     local function SetupMasterLootFrameHooks()
         local f = _G["KRTMasterLootFrame"]
         if f and not f.KRT_LootCounterBtn then
@@ -4314,6 +4305,8 @@ do
     hooksecurefunc(addon.Master, "OnLoad", SetupMasterLootFrameHooks)
 
     local function Request()
+        -- Coalesced, event-driven refresh (safe even if frame is hidden/not yet created).
+        module:RequestRefresh()
     end
 
     -- Auto-refresh when loot is logged (MS-only counting happens in Raid:AddLoot).
@@ -5770,8 +5763,8 @@ do
         module.frame = frame
         frameName = frame:GetName()
 
-		-- Drag registration kept in Lua (avoid template logic in XML).
-		Utils.enableDrag(frame)
+        -- Drag registration kept in Lua (avoid template logic in XML).
+        Utils.enableDrag(frame)
         frame:HookScript("OnShow", function()
             warningsDirty = true
             lastSelectedID = false
@@ -6068,8 +6061,8 @@ do
         module.frame = frame
         frameName = frame:GetName()
 
-		-- Drag registration kept in Lua (avoid template logic in XML).
-		Utils.enableDrag(frame)
+        -- Drag registration kept in Lua (avoid template logic in XML).
+        Utils.enableDrag(frame)
         frame:HookScript("OnShow", function()
             changesDirty = true
             lastSelectedID = false
@@ -6996,7 +6989,7 @@ do
         end
 
         local frame = getFrame()
-            if frame then
+        if frame then
             SetInputsLocked(locked)
         end
 
@@ -7144,8 +7137,8 @@ end
 -- =========== Logger Frame =========== --
 -- Shown loot logger for raids
 do
-    addon.Logger = addon.Logger or {}
-    local module = addon.Logger
+    addon.Logger   = addon.Logger or {}
+    local module   = addon.Logger
     local frameName
 
     local getFrame

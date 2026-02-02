@@ -2012,7 +2012,6 @@
 		</Frames>
 		<Scripts>
 			<OnLoad>KRT.LootCounter:OnLoad(self)</OnLoad>
-			<OnShow>KRT.LootCounter:OnShow(self)</OnShow>
 		</Scripts>
 	</Frame>
 	<!-- ====== End of Loot Counter Frame ====== -->

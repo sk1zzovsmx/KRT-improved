@@ -228,6 +228,29 @@ function Utils.enableDrag(frame, dragButton)
 	-- Ensure the frame is draggable even if XML didn't set these.
 	if frame.SetMovable then frame:SetMovable(true) end
 	if frame.EnableMouse then frame:EnableMouse(true) end
+	if frame.SetClampedToScreen then frame:SetClampedToScreen(true) end
+
+	-- Provide default drag handlers in Lua so Templates.xml stays layout-only.
+	--
+	-- IMPORTANT: do NOT override custom drag scripts (some frames intentionally
+	-- move their parent). Only set handlers when none exist.
+	if frame.GetScript and frame.SetScript then
+		if not frame:GetScript("OnDragStart") then
+			frame:SetScript("OnDragStart", function(self)
+				if self.StartMoving then
+					self:StartMoving()
+				end
+			end)
+		end
+		if not frame:GetScript("OnDragStop") then
+			frame:SetScript("OnDragStop", function(self)
+				if self.StopMovingOrSizing then
+					self:StopMovingOrSizing()
+				end
+			end)
+		end
+	end
+
 	frame:RegisterForDrag(dragButton or "LeftButton")
 end
 
