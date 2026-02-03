@@ -1,8 +1,7 @@
-<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+<Ui xmlns="http://www.blizzard.com/wow/ui/"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
 	<!-- ====== Start of Minimap Button ====== -->
-	<Button name="KRT_MINIMAP_GUI" parent="Minimap" movable="true" userPlaced="true"
-		frameStrata="MEDIUM" hidden="false">
+	<Button name="KRT_MINIMAP_GUI" parent="Minimap" movable="true" userPlaced="true" frameStrata="MEDIUM" hidden="false">
 		<Size>
 			<AbsDimension x="33" y="33" />
 		</Size>
@@ -212,8 +211,7 @@
 	<!-- ====== End Reserve List Templates ====== -->
 	<!-- ====== Start of Config Frame ====== -->
 	<!-- CheckButton Template -->
-	<CheckButton name="KRTConfigCheckButtonTemplate" inherits="InterfaceOptionsCheckButtonTemplate"
-		virtual="true">
+	<CheckButton name="KRTConfigCheckButtonTemplate" inherits="InterfaceOptionsCheckButtonTemplate" virtual="true">
 		<Size>
 			<AbsDimension x="20" y="20" />
 		</Size>
@@ -222,8 +220,7 @@
 		</Scripts>
 	</CheckButton>
 	<!-- FontString Template -->
-	<FontString name="KRTConfigFontStringTemplate" inherits="GameFontHighlightSmall" justifyH="LEFT"
-		justifyV="TOP" virtual="true">
+	<FontString name="KRTConfigFontStringTemplate" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="TOP" virtual="true">
 		<Size>
 			<AbsDimension x="185" y="0" />
 		</Size>
@@ -246,19 +243,16 @@
 				</FontString>
 				<FontString name="$parentuseRaidWarningStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentsortAscendingStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentsortAscendingStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentcountdownSimpleRaidMsgStr"
-					inherits="KRTConfigFontStringTemplate">
+				<FontString name="$parentcountdownSimpleRaidMsgStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentuseRaidWarningStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentuseRaidWarningStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
@@ -267,8 +261,7 @@
 				</FontString>
 				<FontString name="$parentannounceOnWinStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentcountdownSimpleRaidMsgStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentcountdownSimpleRaidMsgStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
@@ -277,8 +270,7 @@
 				</FontString>
 				<FontString name="$parentannounceOnHoldStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentannounceOnWinStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentannounceOnWinStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
@@ -287,19 +279,16 @@
 				</FontString>
 				<FontString name="$parentannounceOnBankStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentannounceOnHoldStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentannounceOnHoldStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentannounceOnDisenchantStr"
-					inherits="KRTConfigFontStringTemplate">
+				<FontString name="$parentannounceOnDisenchantStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentannounceOnBankStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentannounceOnBankStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
@@ -308,19 +297,16 @@
 				</FontString>
 				<FontString name="$parentlootWhispersStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentannounceOnDisenchantStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentannounceOnDisenchantStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentcountdownRollsBlockStr"
-					inherits="KRTConfigFontStringTemplate">
+				<FontString name="$parentcountdownRollsBlockStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentlootWhispersStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentlootWhispersStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
@@ -329,8 +315,7 @@
 				</FontString>
 				<FontString name="$parentscreenReminderStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentcountdownRollsBlockStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentcountdownRollsBlockStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
@@ -339,8 +324,7 @@
 				</FontString>
 				<FontString name="$parentignoreStacksStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentscreenReminderStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentscreenReminderStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
@@ -349,8 +333,7 @@
 				</FontString>
 				<FontString name="$parentshowTooltipsStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentignoreStacksStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentignoreStacksStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
@@ -359,8 +342,7 @@
 				</FontString>
 				<FontString name="$parentshowLootCounterDuringMSRollStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentshowTooltipsStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentshowTooltipsStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
@@ -369,8 +351,7 @@
 				</FontString>
 				<FontString name="$parentminimapButtonStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentshowLootCounterDuringMSRollStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentshowLootCounterDuringMSRollStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
@@ -403,8 +384,7 @@
 		<Frames>
 			<CheckButton name="$parentsortAscending" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentsortAscendingStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentsortAscendingStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -413,8 +393,7 @@
 			</CheckButton>
 			<CheckButton name="$parentuseRaidWarning" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentuseRaidWarningStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentuseRaidWarningStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -424,11 +403,9 @@
 					<OnClick>KRT.Config:OnClick(self, button)</OnClick>
 				</Scripts>
 			</CheckButton>
-			<CheckButton name="$parentcountdownSimpleRaidMsg"
-				inherits="KRTConfigCheckButtonTemplate">
+			<CheckButton name="$parentcountdownSimpleRaidMsg" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentcountdownSimpleRaidMsgStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentcountdownSimpleRaidMsgStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -440,8 +417,7 @@
 			</CheckButton>
 			<CheckButton name="$parentannounceOnWin" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentannounceOnWinStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentannounceOnWinStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -450,8 +426,7 @@
 			</CheckButton>
 			<CheckButton name="$parentannounceOnHold" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentannounceOnHoldStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentannounceOnHoldStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -460,8 +435,7 @@
 			</CheckButton>
 			<CheckButton name="$parentannounceOnBank" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentannounceOnBankStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentannounceOnBankStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -470,8 +444,7 @@
 			</CheckButton>
 			<CheckButton name="$parentannounceOnDisenchant" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentannounceOnDisenchantStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentannounceOnDisenchantStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -480,8 +453,7 @@
 			</CheckButton>
 			<CheckButton name="$parentlootWhispers" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentlootWhispersStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentlootWhispersStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -490,8 +462,7 @@
 			</CheckButton>
 			<CheckButton name="$parentcountdownRollsBlock" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentcountdownRollsBlockStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentcountdownRollsBlockStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -500,8 +471,7 @@
 			</CheckButton>
 			<CheckButton name="$parentscreenReminder" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentscreenReminderStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentscreenReminderStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -510,8 +480,7 @@
 			</CheckButton>
 			<CheckButton name="$parentignoreStacks" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentignoreStacksStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentignoreStacksStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -520,8 +489,7 @@
 			</CheckButton>
 			<CheckButton name="$parentshowTooltips" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentshowTooltipsStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentshowTooltipsStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -530,8 +498,7 @@
 			</CheckButton>
 			<CheckButton name="$parentshowLootCounterDuringMSRoll" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentshowLootCounterDuringMSRollStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentshowLootCounterDuringMSRollStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
@@ -541,16 +508,14 @@
 
 			<CheckButton name="$parentminimapButton" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeTo="$parentminimapButtonStr"
-						relativePoint="TOPLEFT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentminimapButtonStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>
 					</Anchor>
 				</Anchors>
 			</CheckButton>
-			<Slider name="$parentcountdownDuration" inherits="OptionsSliderTemplate" minValue="5.0"
-				maxValue="60.0" defaultValue="5.0" valueStep="5.0">
+			<Slider name="$parentcountdownDuration" inherits="OptionsSliderTemplate" minValue="5.0" maxValue="60.0" defaultValue="5.0" valueStep="5.0">
 				<Size>
 					<AbsDimension x="180" y="15" />
 				</Size>
@@ -627,8 +592,7 @@
 		</Size>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString name="$parentNameStr" inherits="GameFontNormalSmall"
-					justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentNameStr" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="105" y="10" />
 					</Size>
@@ -640,8 +604,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentDurationStr"
-					inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentDurationStr" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="85" y="10" />
 					</Size>
@@ -653,8 +616,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentTick" inherits="KRTFontStringGray"
-					justifyH="RIGHT" justifyV="BOTTOM">
+				<FontString name="$parentTick" inherits="KRTFontStringGray" justifyH="RIGHT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="30" y="10" />
 					</Size>
@@ -666,8 +628,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentCompStr"
-					inherits="GameFontNormalSmall" justifyH="CENTER" justifyV="BOTTOM">
+				<FontString name="$parentCompStr" inherits="GameFontNormalSmall" justifyH="CENTER" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="105" y="10" />
 					</Size>
@@ -684,8 +645,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentNeedStr" inherits="KRTFontStringGray"
-					justifyH="CENTER" justifyV="BOTTOM">
+				<FontString name="$parentNeedStr" inherits="KRTFontStringGray" justifyH="CENTER" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="105" y="10" />
 					</Size>
@@ -702,8 +662,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentClassStr" inherits="KRTFontStringGray"
-					justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentClassStr" inherits="KRTFontStringGray" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="105" y="10" />
 					</Size>
@@ -720,8 +679,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentTanksStr" inherits="GameFontNormalSmall"
-					justifyH="RIGHT" justifyV="BOTTOM">
+				<FontString name="$parentTanksStr" inherits="GameFontNormalSmall" justifyH="RIGHT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="55" y="18" />
 					</Size>
@@ -733,92 +691,79 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentHealersStr" inherits="GameFontNormalSmall"
-					justifyH="RIGHT" justifyV="BOTTOM">
+				<FontString name="$parentHealersStr" inherits="GameFontNormalSmall" justifyH="RIGHT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="55" y="18" />
 					</Size>
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentTanksStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentTanksStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-10" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentMeleesStr" inherits="GameFontNormalSmall"
-					justifyH="RIGHT" justifyV="BOTTOM">
+				<FontString name="$parentMeleesStr" inherits="GameFontNormalSmall" justifyH="RIGHT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="55" y="18" />
 					</Size>
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentHealersStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentHealersStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-10" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentRangedStr" inherits="GameFontNormalSmall"
-					justifyH="RIGHT" justifyV="BOTTOM">
+				<FontString name="$parentRangedStr" inherits="GameFontNormalSmall" justifyH="RIGHT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="55" y="18" />
 					</Size>
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentMeleesStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentMeleesStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-10" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentMessageStr" inherits="GameFontNormalSmall"
-					justifyH="RIGHT" justifyV="BOTTOM">
+				<FontString name="$parentMessageStr" inherits="GameFontNormalSmall" justifyH="RIGHT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="55" y="18" />
 					</Size>
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentRangedStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentRangedStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-10" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannelsStr" inherits="GameFontNormalSmall"
-					justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentChannelsStr" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="45" y="18" />
 					</Size>
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentMessageStr"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentMessageStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="-5" y="-10" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel1Str" inherits="GameFontHighlightSmall"
-					justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentChannel1Str" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
 					</Size>
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentChannelsStr"
-							relativePoint="TOPRIGHT">
+						<Anchor point="TOPLEFT" relativeTo="$parentChannelsStr" relativePoint="TOPRIGHT">
 							<Offset>
 								<AbsDimension x="20" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel2Str" inherits="GameFontHighlightSmall"
-					justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentChannel2Str" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
 					</Size>
@@ -830,8 +775,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel3Str" inherits="GameFontHighlightSmall"
-					justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentChannel3Str" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
 					</Size>
@@ -843,8 +787,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel4Str" inherits="GameFontHighlightSmall"
-					justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentChannel4Str" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
 					</Size>
@@ -856,8 +799,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel5Str" inherits="GameFontHighlightSmall"
-					justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentChannel5Str" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
 					</Size>
@@ -869,8 +811,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel6Str" inherits="GameFontHighlightSmall"
-					justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentChannel6Str" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
 					</Size>
@@ -882,22 +823,19 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel7Str" inherits="GameFontHighlightSmall"
-					justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentChannel7Str" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
 					</Size>
 					<Anchors>
-						<Anchor point="TOPLEFT" relativeTo="$parentChannel1Str"
-							relativePoint="BOTTOMLEFT">
+						<Anchor point="TOPLEFT" relativeTo="$parentChannel1Str" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="2" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentChannel8Str" inherits="GameFontHighlightSmall"
-					justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentChannel8Str" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="10" y="18" />
 					</Size>
@@ -926,16 +864,14 @@
 						<AbsDimension x="35" y="18" />
 					</Size>
 					<Anchors>
-						<Anchor point="LEFT" relativeTo="$parentChannelGuildStr"
-							relativePoint="RIGHT">
+						<Anchor point="LEFT" relativeTo="$parentChannelGuildStr" relativePoint="RIGHT">
 							<Offset>
 								<AbsDimension x="17" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentPreviewStr" inherits="GameFontNormal"
-					justifyH="LEFT" justifyV="BOTTOM">
+				<FontString name="$parentPreviewStr" inherits="GameFontNormal" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="55" y="18" />
 					</Size>
@@ -969,8 +905,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentLength" inherits="KRTFontStringGray"
-					justifyH="RIGHT" justifyV="TOP">
+				<FontString name="$parentLength" inherits="KRTFontStringGray" justifyH="RIGHT" justifyV="TOP">
 					<Size>
 						<AbsDimension x="55" y="18" />
 					</Size>
@@ -1177,8 +1112,7 @@
 							<AbsDimension x="0" y="-15" />
 						</Offset>
 					</Anchor>
-					<Anchor point="TOPRIGHT" relativeTo="$parentRangedClass"
-						relativePoint="BOTTOMRIGHT">
+					<Anchor point="TOPRIGHT" relativeTo="$parentRangedClass" relativePoint="BOTTOMRIGHT">
 						<Offset>
 							<AbsDimension x="0" y="-15" />
 						</Offset>
@@ -1372,8 +1306,7 @@
 		</Size>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString name="$parentNameStr" inherits="GameFontNormal" justifyH="LEFT"
-					justifyV="BOTTOM">
+				<FontString name="$parentNameStr" inherits="GameFontNormal" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="235" y="5" />
 					</Size>
@@ -1385,8 +1318,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentMessageStr" inherits="GameFontNormal" justifyH="LEFT"
-					justifyV="BOTTOM">
+				<FontString name="$parentMessageStr" inherits="GameFontNormal" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="235" y="5" />
 					</Size>
@@ -1398,8 +1330,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentOutputName" inherits="GameFontNormal" justifyH="LEFT"
-					justifyV="BOTTOM">
+				<FontString name="$parentOutputName" inherits="GameFontNormal" justifyH="LEFT" justifyV="BOTTOM">
 					<Size>
 						<AbsDimension x="235" y="5" />
 					</Size>
@@ -1411,8 +1342,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentOutputContent" inherits="KRTFontStringGray" justifyH="LEFT"
-					justifyV="TOP">
+				<FontString name="$parentOutputContent" inherits="KRTFontStringGray" justifyH="LEFT" justifyV="TOP">
 					<Size>
 						<AbsDimension x="235" y="5" />
 					</Size>
@@ -1532,8 +1462,7 @@
 	<!-- ====== End of Warnings ====== -->
 	<!-- ====== Start of Master Loot Frame ====== -->
 	<!-- Item Selection Frame -->
-	<Frame name="KRTItemSelectionFrame" toplevel="true" hidden="true" frameStrata="FULLSCREEN"
-		virtual="true">
+	<Frame name="KRTItemSelectionFrame" toplevel="true" hidden="true" frameStrata="FULLSCREEN" virtual="true">
 		<Size>
 			<AbsDimension x="225" y="100" />
 		</Size>
@@ -1583,8 +1512,7 @@
 						</Anchor>
 					</Anchors>
 				</Texture>
-				<FontString name="$parentName" inherits="GameFontNormalSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentName" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="140" y="32" />
 					</Size>
@@ -1622,8 +1550,7 @@
 		</Size>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString name="$parentName" inherits="KRTFontStringGray"
-					justifyH="LEFT" justifyV="MIDDLE">
+				<FontString name="$parentName" inherits="KRTFontStringGray" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="140" y="32" />
 					</Size>
@@ -1647,8 +1574,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentRollsHeaderRoll" inherits="KRTFontStringGray"
-					justifyH="RIGHT">
+				<FontString name="$parentRollsHeaderRoll" inherits="KRTFontStringGray" justifyH="RIGHT">
 					<Size>
 						<AbsDimension x="80" y="5" />
 					</Size>
@@ -1710,16 +1636,14 @@
 			</Button>
 			<Button name="$parentItemBtn" inherits="KRTItemButtonTemplate">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentSelectItemBtn"
-						relativePoint="BOTTOMLEFT">
+					<Anchor point="TOPLEFT" relativeTo="$parentSelectItemBtn" relativePoint="BOTTOMLEFT">
 						<Offset>
 							<AbsDimension x="5" y="-5" />
 						</Offset>
 					</Anchor>
 				</Anchors>
 			</Button>
-			<EditBox name="$parentItemCount" inherits="KRTEditBoxTemplate" numeric="true"
-				letters="2" hidden="true">
+			<EditBox name="$parentItemCount" inherits="KRTEditBoxTemplate" numeric="true" letters="2" hidden="true">
 				<Size>
 					<AbsDimension x="20" y="18" />
 				</Size>
@@ -1829,8 +1753,7 @@
 					<AbsDimension x="75" y="25" />
 				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentScrollFrame"
-						relativePoint="BOTTOMLEFT">
+					<Anchor point="TOPLEFT" relativeTo="$parentScrollFrame" relativePoint="BOTTOMLEFT">
 						<Offset>
 							<AbsDimension x="-5" y="-7.5" />
 						</Offset>
@@ -1935,8 +1858,7 @@
 			</Button>
 			<Frame name="$parentDisenchantDropDown" inherits="UIDropDownMenuTemplate">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentDisenchantBtn"
-						relativePoint="TOPRIGHT">
+					<Anchor point="TOPLEFT" relativeTo="$parentDisenchantBtn" relativePoint="TOPRIGHT">
 						<Offset>
 							<AbsDimension x="-15" y="2" />
 						</Offset>
@@ -1983,8 +1905,7 @@
 	</Frame>
 	<!-- ====== End of Master Loot Frame ====== -->
 	<!-- ====== Start of Loot Counter Frame ====== -->
-	<Frame name="KRTLootCounterFrame" inherits="KRTFrameTemplate" hidden="true" enableMouse="true"
-		registerForDrag="LeftButton">
+	<Frame name="KRTLootCounterFrame" inherits="KRTFrameTemplate" hidden="true" enableMouse="true" registerForDrag="LeftButton">
 		<Size>
 			<AbsDimension x="260" y="360" />
 		</Size>
@@ -2227,8 +2148,7 @@
 	</Frame>
 	<!-- ====== End of Changes ====== -->
 	<!-- ====== Reserve List Window ====== -->
-	<Frame name="KRTReserveListFrame" inherits="KRTFrameTemplate" toplevel="true" hidden="true"
-		frameStrata="MEDIUM">
+	<Frame name="KRTReserveListFrame" inherits="KRTFrameTemplate" toplevel="true" hidden="true" frameStrata="MEDIUM">
 		<Size>
 			<AbsDimension x="368" y="520" />
 		</Size>
@@ -2314,8 +2234,7 @@
 	</Frame>
 	<!-- ====== End Reserve List Window ====== -->
 	<!-- ====== Start of Reserve Import Window ====== -->
-	<Frame name="KRTImportWindow" inherits="KRTFrameTemplate" toplevel="true" hidden="true"
-		frameStrata="DIALOG">
+	<Frame name="KRTImportWindow" inherits="KRTFrameTemplate" toplevel="true" hidden="true" frameStrata="DIALOG">
 		<Size>
 			<AbsDimension x="400" y="300" />
 		</Size>
@@ -2361,23 +2280,40 @@
 					</Anchor>
 				</Anchors>
 			</FontString>
-			<!-- Multiline EditBox for CSV -->
-			<ScrollFrame name="KRTImportScrollFrame" inherits="KRTScrollFrameTemplate">
+
+			<!-- Import mode: Multi-reserve vs Plus System -->
+			<Slider name="$parentModeSlider" inherits="OptionsSliderTemplate">
 				<Size>
-					<AbsDimension x="340" y="180" />
+					<AbsDimension x="260" y="16" />
 				</Size>
 				<Anchors>
 					<Anchor point="TOP" relativePoint="TOP">
 						<Offset>
-							<AbsDimension x="-5" y="-60" />
+							<AbsDimension x="0" y="-60" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnLoad>KRT.ReserveImport:OnModeSliderLoad(self)</OnLoad>
+					<OnValueChanged>KRT.ReserveImport:OnModeSliderChanged(self, value)</OnValueChanged>
+				</Scripts>
+			</Slider>
+			<!-- Multiline EditBox for CSV -->
+			<ScrollFrame name="KRTImportScrollFrame" inherits="KRTScrollFrameTemplate">
+				<Size>
+					<AbsDimension x="340" y="160" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOP" relativePoint="TOP">
+						<Offset>
+							<AbsDimension x="-5" y="-92" />
 						</Offset>
 					</Anchor>
 				</Anchors>
 				<ScrollChild>
-					<EditBox name="KRTImportEditBox" multiline="true" autoFocus="false"
-						inherits="InputBoxTemplate">
+					<EditBox name="KRTImportEditBox" multiline="true" autoFocus="false" inherits="InputBoxTemplate">
 						<Size>
-							<AbsDimension x="320" y="180" />
+							<AbsDimension x="320" y="160" />
 						</Size>
 						<Scripts>
 							<OnEscapePressed>self:ClearFocus()</OnEscapePressed>
@@ -2418,10 +2354,10 @@
 				</Scripts>
 			</Button>
 		</Frames>
-			<Scripts>
+		<Scripts>
 			<OnLoad>KRT.ReserveImport:OnLoad(self)</OnLoad>
 		</Scripts>
-</Frame>
+	</Frame>
 	<!-- ====== End of Reserve Import Window ====== -->
 	<!-- ====== Start of Loot Bans Frame ====== -->
 	<!-- ====== End of Loot Bans Frame ====== -->
@@ -2479,8 +2415,7 @@
 			</Anchors>
 		</ButtonText>
 		<NormalFont style="GameFontHighlightSmall" />
-		<HighlightTexture file="Interface\PaperDollInfoFrame\UI-Character-Tab-Highlight"
-			alphaMode="ADD">
+		<HighlightTexture file="Interface\PaperDollInfoFrame\UI-Character-Tab-Highlight" alphaMode="ADD">
 			<Size>
 				<AbsDimension x="5" y="24" />
 			</Size>
@@ -2540,8 +2475,7 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<FontString name="$parentID" font="GameFontNormalSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentID" font="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="35" y="18" />
 					</Size>
@@ -2553,8 +2487,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentDate" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentDate" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="95" y="18" />
 					</Size>
@@ -2566,8 +2499,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentZone" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentZone" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="120" y="18" />
 					</Size>
@@ -2579,8 +2511,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentSize" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentSize" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="36" y="18" />
 					</Size>
@@ -2646,8 +2577,7 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<FontString name="$parentID" font="GameFontNormalSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentID" font="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="30" y="18" />
 					</Size>
@@ -2659,8 +2589,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentName" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentName" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="142" y="18" />
 					</Size>
@@ -2672,8 +2601,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentTime" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentTime" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="40" y="18" />
 					</Size>
@@ -2685,8 +2613,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentMode" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentMode" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="55" y="18" />
 					</Size>
@@ -2752,8 +2679,7 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<FontString name="$parentName" font="GameFontNormalSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentName" font="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="80" y="18" />
 					</Size>
@@ -2820,8 +2746,7 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<FontString name="$parentName" font="GameFontNormalSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentName" font="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="80" y="18" />
 					</Size>
@@ -2833,8 +2758,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentJoin" inherits="GameFontHighlightSmall" justifyH="CENTER"
-					justifyV="MIDDLE">
+				<FontString name="$parentJoin" inherits="GameFontHighlightSmall" justifyH="CENTER" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="50" y="18" />
 					</Size>
@@ -2846,8 +2770,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentLeave" inherits="GameFontHighlightSmall" justifyH="CENTER"
-					justifyV="MIDDLE">
+				<FontString name="$parentLeave" inherits="GameFontHighlightSmall" justifyH="CENTER" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="50" y="18" />
 					</Size>
@@ -2913,8 +2836,7 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<FontString name="$parentName" font="GameFontNormalSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentName" font="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="162" y="10" />
 					</Size>
@@ -2926,8 +2848,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentSource" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentSource" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="125" y="10" />
 					</Size>
@@ -2939,8 +2860,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentWinner" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentWinner" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="85" y="10" />
 					</Size>
@@ -2952,8 +2872,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentType" inherits="GameFontHighlightSmall" justifyH="LEFT"
-					justifyV="MIDDLE">
+				<FontString name="$parentType" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="45" y="10" />
 					</Size>
@@ -2965,8 +2884,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentRoll" inherits="GameFontHighlightSmall" justifyH="RIGHT"
-					justifyV="MIDDLE">
+				<FontString name="$parentRoll" inherits="GameFontHighlightSmall" justifyH="RIGHT" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="37" y="10" />
 					</Size>
@@ -2978,8 +2896,7 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentTime" inherits="GameFontHighlightSmall" justifyH="CENTER"
-					justifyV="MIDDLE">
+				<FontString name="$parentTime" inherits="GameFontHighlightSmall" justifyH="CENTER" justifyV="MIDDLE">
 					<Size>
 						<AbsDimension x="35" y="10" />
 					</Size>
@@ -3144,8 +3061,7 @@
 							<AbsDimension x="100" y="20" />
 						</Size>
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeTo="$parentHeaderNum"
-								relativePoint="TOPRIGHT">
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderNum" relativePoint="TOPRIGHT">
 								<Offset>
 									<AbsDimension x="0" y="0" />
 								</Offset>
@@ -3160,8 +3076,7 @@
 							<AbsDimension x="123" y="20" />
 						</Size>
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeTo="$parentHeaderDate"
-								relativePoint="TOPRIGHT">
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderDate" relativePoint="TOPRIGHT">
 								<Offset>
 									<AbsDimension x="0" y="0" />
 								</Offset>
@@ -3176,8 +3091,7 @@
 							<AbsDimension x="45" y="20" />
 						</Size>
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeTo="$parentHeaderZone"
-								relativePoint="TOPRIGHT">
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderZone" relativePoint="TOPRIGHT">
 								<Offset>
 									<AbsDimension x="0" y="0" />
 								</Offset>
@@ -3305,8 +3219,7 @@
 							<AbsDimension x="148" y="20" />
 						</Size>
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeTo="$parentHeaderNum"
-								relativePoint="TOPRIGHT">
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderNum" relativePoint="TOPRIGHT">
 								<Offset>
 									<AbsDimension x="0" y="0" />
 								</Offset>
@@ -3321,8 +3234,7 @@
 							<AbsDimension x="45" y="20" />
 						</Size>
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeTo="$parentHeaderName"
-								relativePoint="TOPRIGHT">
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderName" relativePoint="TOPRIGHT">
 								<Offset>
 									<AbsDimension x="0" y="0" />
 								</Offset>
@@ -3337,8 +3249,7 @@
 							<AbsDimension x="65" y="20" />
 						</Size>
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeTo="$parentHeaderTime"
-								relativePoint="TOPRIGHT">
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderTime" relativePoint="TOPRIGHT">
 								<Offset>
 									<AbsDimension x="0" y="0" />
 								</Offset>
@@ -3549,8 +3460,7 @@
 							<AbsDimension x="55" y="20" />
 						</Size>
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeTo="$parentHeaderName"
-								relativePoint="TOPRIGHT">
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderName" relativePoint="TOPRIGHT">
 								<Offset>
 									<AbsDimension x="0" y="0" />
 								</Offset>
@@ -3565,8 +3475,7 @@
 							<AbsDimension x="55" y="20" />
 						</Size>
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeTo="$parentHeaderJoin"
-								relativePoint="TOPRIGHT">
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderJoin" relativePoint="TOPRIGHT">
 								<Offset>
 									<AbsDimension x="0" y="0" />
 								</Offset>
@@ -3600,8 +3509,7 @@
 					<AbsDimension x="578" y="235" />
 				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentRaidAttendees"
-						relativePoint="TOPRIGHT">
+					<Anchor point="TOPLEFT" relativeTo="$parentRaidAttendees" relativePoint="TOPRIGHT">
 						<Offset>
 							<AbsDimension x="7" y="0" />
 						</Offset>
@@ -3713,8 +3621,7 @@
 							<AbsDimension x="135" y="20" />
 						</Size>
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeTo="$parentHeaderItem"
-								relativePoint="TOPRIGHT">
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderItem" relativePoint="TOPRIGHT">
 								<Offset>
 									<AbsDimension x="0" y="0" />
 								</Offset>
@@ -3729,8 +3636,7 @@
 							<AbsDimension x="90" y="20" />
 						</Size>
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeTo="$parentHeaderSource"
-								relativePoint="TOPRIGHT">
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderSource" relativePoint="TOPRIGHT">
 								<Offset>
 									<AbsDimension x="0" y="0" />
 								</Offset>
@@ -3745,8 +3651,7 @@
 							<AbsDimension x="50" y="20" />
 						</Size>
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeTo="$parentHeaderWinner"
-								relativePoint="TOPRIGHT">
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderWinner" relativePoint="TOPRIGHT">
 								<Offset>
 									<AbsDimension x="0" y="0" />
 								</Offset>
@@ -3761,8 +3666,7 @@
 							<AbsDimension x="45" y="20" />
 						</Size>
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeTo="$parentHeaderType"
-								relativePoint="TOPRIGHT">
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderType" relativePoint="TOPRIGHT">
 								<Offset>
 									<AbsDimension x="0" y="0" />
 								</Offset>
@@ -3777,8 +3681,7 @@
 							<AbsDimension x="45" y="20" />
 						</Size>
 						<Anchors>
-							<Anchor point="TOPLEFT" relativeTo="$parentHeaderRoll"
-								relativePoint="TOPRIGHT">
+							<Anchor point="TOPLEFT" relativeTo="$parentHeaderRoll" relativePoint="TOPRIGHT">
 								<Offset>
 									<AbsDimension x="0" y="0" />
 								</Offset>
@@ -3808,8 +3711,7 @@
 				</Scripts>
 			</Frame>
 			<!-- Add/Edit Boss: -->
-			<Frame name="KRTLoggerBossBox" inherits="KRTSimpleFrameTemplate" frameStrata="HIGH"
-				parent="KRTLogger">
+			<Frame name="KRTLoggerBossBox" inherits="KRTSimpleFrameTemplate" frameStrata="HIGH" parent="KRTLogger">
 				<Size>
 					<AbsDimension x="185" y="145" />
 				</Size>
@@ -3825,14 +3727,12 @@
 					<Layer level="BACKGROUND">
 						<Texture file="Interface\DialogFrame\UI-DialogBox-Background-Dark">
 							<Anchors>
-								<Anchor point="TOPLEFT" relativeTo="KRTLogger"
-									relativePoint="TOPLEFT">
+								<Anchor point="TOPLEFT" relativeTo="KRTLogger" relativePoint="TOPLEFT">
 									<Offset>
 										<AbsDimension x="10" y="-32" />
 									</Offset>
 								</Anchor>
-								<Anchor point="BOTTOMRIGHT" relativeTo="KRTLogger"
-									relativePoint="BOTTOMRIGHT">
+								<Anchor point="BOTTOMRIGHT" relativeTo="KRTLogger" relativePoint="BOTTOMRIGHT">
 									<Offset>
 										<AbsDimension x="-10" y="10" />
 									</Offset>
@@ -3850,8 +3750,7 @@
 								<Anchor point="RIGHT" x="-10" />
 							</Anchors>
 						</FontString>
-						<FontString name="$parentNameStr" inherits="KRTFontString"
-							font="GameFontNormalSmall">
+						<FontString name="$parentNameStr" inherits="KRTFontString" font="GameFontNormalSmall">
 							<Size>
 								<AbsDimension x="200" y="5" />
 							</Size>
@@ -3860,8 +3759,7 @@
 								<Anchor point="RIGHT" x="-10" />
 							</Anchors>
 						</FontString>
-						<FontString name="$parentDifficultyStr" inherits="KRTFontString"
-							font="GameFontNormalSmall">
+						<FontString name="$parentDifficultyStr" inherits="KRTFontString" font="GameFontNormalSmall">
 							<Size>
 								<AbsDimension x="200" y="5" />
 							</Size>
@@ -3870,8 +3768,7 @@
 								<Anchor point="RIGHT" x="-90" />
 							</Anchors>
 						</FontString>
-						<FontString name="$parentTimeStr" inherits="KRTFontString"
-							font="GameFontNormalSmall">
+						<FontString name="$parentTimeStr" inherits="KRTFontString" font="GameFontNormalSmall">
 							<Size>
 								<AbsDimension x="200" y="5" />
 							</Size>
@@ -3951,8 +3848,7 @@
 				</Scripts>
 			</Frame>
 			<!-- Add/Edit Boss Attendee: -->
-			<Frame name="$parentPlayerBox" inherits="KRTSimpleFrameTemplate" frameStrata="HIGH"
-				hidden="true" parent="KRTLogger">
+			<Frame name="$parentPlayerBox" inherits="KRTSimpleFrameTemplate" frameStrata="HIGH" hidden="true" parent="KRTLogger">
 				<Size>
 					<AbsDimension x="185" y="100" />
 				</Size>
@@ -3967,14 +3863,12 @@
 					<Layer level="BACKGROUND">
 						<Texture file="Interface\DialogFrame\UI-DialogBox-Background-Dark">
 							<Anchors>
-								<Anchor point="TOPLEFT" relativeTo="KRTLogger"
-									relativePoint="TOPLEFT">
+								<Anchor point="TOPLEFT" relativeTo="KRTLogger" relativePoint="TOPLEFT">
 									<Offset>
 										<AbsDimension x="10" y="-32" />
 									</Offset>
 								</Anchor>
-								<Anchor point="BOTTOMRIGHT" relativeTo="KRTLogger"
-									relativePoint="BOTTOMRIGHT">
+								<Anchor point="BOTTOMRIGHT" relativeTo="KRTLogger" relativePoint="BOTTOMRIGHT">
 									<Offset>
 										<AbsDimension x="-10" y="10" />
 									</Offset>
@@ -3992,8 +3886,7 @@
 								<Anchor point="RIGHT" x="-10" />
 							</Anchors>
 						</FontString>
-						<FontString name="$parentNameStr" inherits="KRTFontString"
-							font="GameFontNormalSmall">
+						<FontString name="$parentNameStr" inherits="KRTFontString" font="GameFontNormalSmall">
 							<Size>
 								<AbsDimension x="200" y="5" />
 							</Size>

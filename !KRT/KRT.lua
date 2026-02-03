@@ -1418,20 +1418,37 @@ do
 
     local function PickBestReserved(itemId)
         if not itemId then return nil end
-        local bestName, bestRoll = nil, nil
+        local bestName, bestRoll, bestPlus = nil, nil, nil
         local wantLow = addon.options.sortAscending == true
+
+        -- SR "Plus priority" is enabled only when the item has no multi-reserve entries.
+        local usePlus = addon.Reserves
+            and addon.Reserves.GetPlusForItem
+            and addon.Reserves.GetImportMode
+            and (addon.Reserves:IsPlusSystem())
 
         for _, entry in ipairs(state.rolls) do
             if module:IsReserved(itemId, entry.name) then
+                local roll = entry.roll
+                local plus = usePlus and (addon.Reserves:GetPlusForItem(itemId, entry.name) or 0) or 0
+
                 if not bestName then
-                    bestName, bestRoll = entry.name, entry.roll
-                elseif wantLow then
-                    if entry.roll < bestRoll then
-                        bestName, bestRoll = entry.name, entry.roll
-                    end
+                    bestName, bestRoll, bestPlus = entry.name, roll, plus
                 else
-                    if entry.roll > bestRoll then
-                        bestName, bestRoll = entry.name, entry.roll
+                    if usePlus and plus ~= bestPlus then
+                        if plus > bestPlus then
+                            bestName, bestRoll, bestPlus = entry.name, roll, plus
+                        end
+                    else
+                        if wantLow then
+                            if roll < bestRoll then
+                                bestName, bestRoll, bestPlus = entry.name, roll, plus
+                            end
+                        else
+                            if roll > bestRoll then
+                                bestName, bestRoll, bestPlus = entry.name, roll, plus
+                            end
+                        end
                     end
                 end
             end
@@ -1458,8 +1475,26 @@ do
             return
         end
 
-        local isSR    = (lootState.currentRollType == rollTypes.RESERVED)
-        local wantLow = (addon.options.sortAscending == true)
+        local isSR         = (lootState.currentRollType == rollTypes.RESERVED)
+        local wantLow      = (addon.options.sortAscending == true)
+
+        local plusPriority = isSR and itemId
+            and addon.Reserves
+            and addon.Reserves.GetPlusForItem
+            and addon.Reserves.GetImportMode
+            and (addon.Reserves:IsPlusSystem())
+
+        local plusCache    = {}
+        local function GetPlus(name)
+            local v = plusCache[name]
+            if v == nil then
+                v = (addon.Reserves and addon.Reserves.GetPlusForItem)
+                    and (addon.Reserves:GetPlusForItem(itemId, name) or 0)
+                    or 0
+                plusCache[name] = v
+            end
+            return v
+        end
 
         table.sort(rolls, function(a, b)
             -- SR: reserved first (session itemId)
@@ -1468,6 +1503,15 @@ do
                 local br = module:IsReserved(itemId, b.name)
                 if ar ~= br then
                     return ar -- true first
+                end
+
+                -- SR + Plus priority (only when no multi-reserve exists for this item)
+                if plusPriority and ar and br then
+                    local ap = GetPlus(a.name)
+                    local bp = GetPlus(b.name)
+                    if ap ~= bp then
+                        return ap > bp
+                    end
                 end
             end
 
@@ -1840,6 +1884,24 @@ do
         local itemId = self:GetCurrentRollItemID()
         local isSR = lootState.currentRollType == rollTypes.RESERVED
 
+        local plusPriority = isSR and itemId
+            and addon.Reserves
+            and addon.Reserves.GetPlusForItem
+            and addon.Reserves.GetImportMode
+            and (addon.Reserves:IsPlusSystem())
+
+        local plusCache = {}
+        local function GetPlus(name)
+            local v = plusCache[name]
+            if v == nil then
+                v = (addon.Reserves and addon.Reserves.GetPlusForItem)
+                    and (addon.Reserves:GetPlusForItem(itemId, name) or 0)
+                    or 0
+                plusCache[name] = v
+            end
+            return v
+        end
+
         local wantAsc = addon.options.sortAscending == true
         if state.lastSortAsc ~= wantAsc or state.lastSortType ~= lootState.currentRollType then
             sortRolls(itemId)
@@ -1876,6 +1938,15 @@ do
                 local br = module:IsReserved(itemId, b.name)
                 if ar ~= br then
                     return ar
+                end
+
+                -- SR + Plus priority (only when no multi-reserve exists for this item)
+                if plusPriority and ar and br then
+                    local ap = GetPlus(a.name)
+                    local bp = GetPlus(b.name)
+                    if ap ~= bp then
+                        return ap > bp
+                    end
                 end
             end
 
@@ -2022,12 +2093,22 @@ do
             -- Optional: during MS rolls, show the player's positive MS loot count in the same column ("+N"), if enabled in config.
             if counterStr then
                 if isSR and itemId and self:IsReserved(itemId, name) then
-                    local allowed = self:GetAllowedReserves(itemId, name)
-                    if allowed and allowed > 1 then
-                        local used = self:GetUsedReserveCount(itemId, name)
-                        counterStr:SetText(format("(%d/%d)", used or 0, allowed))
+                    -- SR + Plus priority (only when no multi-reserve exists for this item)
+                    if plusPriority then
+                        local p = GetPlus(name)
+                        if p and p > 0 then
+                            counterStr:SetText(format("(P+%d)", p))
+                        else
+                            counterStr:SetText("")
+                        end
                     else
-                        counterStr:SetText("")
+                        local allowed = self:GetAllowedReserves(itemId, name)
+                        if allowed and allowed > 1 then
+                            local used = self:GetUsedReserveCount(itemId, name)
+                            counterStr:SetText(format("(%d/%d)", used or 0, allowed))
+                        else
+                            counterStr:SetText("")
+                        end
                     end
                 else
                     if addon.options.showLootCounterDuringMSRoll == true
@@ -3055,6 +3136,7 @@ do
         _G[frameName .. "DisenchantBtn"]:SetText(L.BtnDisenchant)
         _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
         _G[frameName .. "RollsHeaderPlayer"]:SetText(L.StrPlayer)
+        --_G[frameName .. "RollsHeaderCounter"]:SetText(L.StrCounter) -- (future use)
         _G[frameName .. "RollsHeaderRoll"]:SetText(L.StrRoll)
         _G[frameName .. "ReserveListBtn"]:SetText(L.BtnInsertList)
         _G[frameName .. "LootCounterBtn"]:SetText(L.BtnLootCounter)
@@ -4343,8 +4425,11 @@ do
     local localized = false
     local reservesData = {}
     local reservesByItemID = {}
+    local reservesByItemPlayer = {}
+    local playerItemsByName = {}
     local reservesDisplayList = {}
     local reservesDirty = false
+    local importMode = nil -- 'multi' or 'plus'
     local pendingItemInfo = {}
     local pendingItemCount = 0
     local collapsedBossGroups = {}
@@ -4408,11 +4493,21 @@ do
         end
     end
 
-    local function FormatReservePlayerName(name, count)
-        if count and count > 1 then
-            return name .. format(L.StrReserveCountSuffix, count)
+    local function FormatReservePlayerName(itemId, name, count)
+        local out = name
+
+        if module:IsMultiReserve() and count and count > 1 then
+            out = out .. format(L.StrReserveCountSuffix, count)
         end
-        return name
+
+        if module:IsPlusSystem() and itemId then
+            local p = module:GetPlusForItem(itemId, name)
+            if p and p > 0 then
+                out = out .. format(" (P+%d)", p)
+            end
+        end
+
+        return out
     end
 
     local function AddReservePlayer(data, name, count)
@@ -4427,12 +4522,23 @@ do
         end
     end
 
-    local function BuildPlayersText(players, counts)
+    local function BuildPlayersText(itemId, players, counts)
         if not players then return "" end
+
+        -- In Plus System, show highest Plus first for readability.
+        if module:IsPlusSystem() and itemId then
+            table.sort(players, function(a, b)
+                local ap = module:GetPlusForItem(itemId, a) or 0
+                local bp = module:GetPlusForItem(itemId, b) or 0
+                if ap ~= bp then return ap > bp end
+                return tostring(a) < tostring(b)
+            end)
+        end
+
         twipe(playerTextTemp)
         for i = 1, #players do
             local name = players[i]
-            playerTextTemp[#playerTextTemp + 1] = FormatReservePlayerName(name, counts and counts[name] or 1)
+            playerTextTemp[#playerTextTemp + 1] = FormatReservePlayerName(itemId, name, counts and counts[name] or 1)
         end
         return tconcat(playerTextTemp, ", ")
     end
@@ -4505,12 +4611,12 @@ do
                         target.players[i] = name
                         target.playerCounts[name] = data.playerCounts[name]
                     end
-                    target.playersText = BuildPlayersText(target.players, target.playerCounts)
+                    target.playersText = BuildPlayersText(itemId, target.players, target.playerCounts)
                     target.players = nil
                     target.playerCounts = nil
                     remaining[#remaining + 1] = target
                 else
-                    data.playersText = BuildPlayersText(data.players, data.playerCounts)
+                    data.playersText = BuildPlayersText(itemId, data.players, data.playerCounts)
                     data.players = nil
                     data.playerCounts = nil
                     remaining[#remaining + 1] = data
@@ -4526,20 +4632,37 @@ do
 
     local function RebuildIndex()
         twipe(reservesByItemID)
+        twipe(reservesByItemPlayer)
+        twipe(playerItemsByName)
         reservesDirty = true
-        for _, player in pairs(reservesData) do
+
+        -- Build fast lookup indices
+        for playerKey, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
                 local playerName = player.original or "?"
+                local normalizedPlayer = Utils.normalizeLower(playerName, true) or playerKey
+                playerItemsByName[normalizedPlayer] = playerItemsByName[normalizedPlayer] or {}
+
                 for i = 1, #player.reserves do
                     local r = player.reserves[i]
                     if type(r) == "table" and r.rawID then
                         r.player = r.player or playerName
-                        local list = reservesByItemID[r.rawID]
+                        local itemId = r.rawID
+
+                        local list = reservesByItemID[itemId]
                         if not list then
                             list = {}
-                            reservesByItemID[r.rawID] = list
+                            reservesByItemID[itemId] = list
                         end
                         list[#list + 1] = r
+
+                        local byP = reservesByItemPlayer[itemId]
+                        if not byP then
+                            byP = {}
+                            reservesByItemPlayer[itemId] = byP
+                        end
+                        byP[normalizedPlayer] = r
+                        playerItemsByName[normalizedPlayer][itemId] = true
                     end
                 end
             end
@@ -4585,7 +4708,7 @@ do
 
         for _, byItem in pairs(grouped) do
             for _, data in pairs(byItem) do
-                data.playersText = BuildPlayersText(data.players, data.playerCounts)
+                data.playersText = BuildPlayersText(itemId, data.players, data.playerCounts)
                 data.players = nil
                 data.playerCounts = nil
                 reservesDisplayList[#reservesDisplayList + 1] = data
@@ -4684,6 +4807,34 @@ do
         if KRT_SavedReserves then
             addon.tCopy(reservesData, KRT_SavedReserves)
         end
+
+        -- Infer import mode from saved data when possible.
+        -- If we detect any multi-item or quantity>1 entries, treat it as Multi-reserve.
+        importMode = nil
+        local inferred
+        for _, p in pairs(reservesData) do
+            if type(p) == "table" and type(p.reserves) == "table" then
+                if #p.reserves > 1 then
+                    inferred = "multi"
+                    break
+                end
+                for i = 1, #p.reserves do
+                    local r = p.reserves[i]
+                    local qty = (type(r) == "table" and tonumber(r.quantity)) or 1
+                    if qty and qty > 1 then
+                        inferred = "multi"
+                        break
+                    end
+                end
+            end
+            if inferred == "multi" then break end
+        end
+        if not inferred then
+            local v = addon.options and addon.options.srImportMode
+            inferred = (v == 1) and "plus" or "multi"
+        end
+        importMode = inferred
+
         RebuildIndex()
     end
 
@@ -4912,81 +5063,289 @@ do
         return reservesData
     end
 
-    -- Parse imported text
-    function module:ParseCSV(csv)
-        if type(csv) ~= "string" or not csv:match("%S") then
-            addon:error(E.LogReservesImportFailedEmpty)
-            return
+    -- Parse imported text (SoftRes CSV)
+    -- mode: "multi" (multi-reserve enabled; Plus ignored) or "plus" (priority; requires 1 item per player)
+    function module:GetImportMode()
+        if importMode == nil then
+            local v = addon.options and addon.options.srImportMode
+            importMode = (v == 1) and "plus" or "multi"
         end
+        return importMode
+    end
 
-        addon:debug(E.LogReservesParseStart)
-        twipe(reservesData)
-        twipe(reservesByItemID)
-        reservesDirty = true
+    function module:IsPlusSystem()
+        return self:GetImportMode() == "plus"
+    end
 
-        local function cleanCSVField(field)
-            if not field then return nil end
-            return Utils.trimText(field:gsub('^"(.-)"$', '%1'), true)
+    function module:IsMultiReserve()
+        return self:GetImportMode() == "multi"
+    end
+
+    -- Strategy objects to keep Plus/Multi behaviors isolated.
+    local importStrategies = {}
+
+    local function cleanCSVField(field)
+        if not field then return nil end
+        return Utils.trimText(field:gsub('^"(.-)"$', '%1'), true)
+    end
+
+    local function splitCSVLine(line)
+        local out, field = {}, ""
+        local inQuotes = false
+        local i = 1
+        while i <= #line do
+            local ch = line:sub(i, i)
+            if ch == '"' then
+                local nextCh = line:sub(i + 1, i + 1)
+                if inQuotes and nextCh == '"' then
+                    field = field .. '"'
+                    i = i + 1
+                else
+                    inQuotes = not inQuotes
+                end
+            elseif ch == ',' and not inQuotes then
+                out[#out + 1] = field
+                field = ""
+            else
+                field = field .. ch
+            end
+            i = i + 1
         end
+        out[#out + 1] = field
+        return out
+    end
 
+    local function buildHeaderMap(fields)
+        local map = {}
+        for i = 1, #fields do
+            local key = cleanCSVField(fields[i])
+            if key and key ~= "" then
+                map[Utils.normalizeLower(key)] = i
+            end
+        end
+        -- Consider it a header only if it includes key columns.
+        if map["itemid"] and map["name"] then
+            return map, true
+        end
+        return map, false
+    end
+
+    local function getField(fields, headerMap, key, fallbackIndex)
+        if headerMap and headerMap[key] then
+            return fields[headerMap[key]]
+        end
+        return fields[fallbackIndex]
+    end
+
+    local function parseCSVRows(csv)
+        local rows = {}
+        local headerMap = nil
         local firstLine = true
-        for line in csv:gmatch("[^\r\n]+") do
+
+        for line in csv:gmatch("[^\n]+") do
+            line = line:gsub("\r$", "")
             if firstLine then
                 firstLine = false
-            else
-                local _, itemIdStr, source, playerName, class, spec, note, plus = line:match(
-                    '^"?(.-)"?,(.-),(.-),(.-),(.-),(.-),(.-),(.-)')
+                local maybeHeader = splitCSVLine(line)
+                local map, isHeader = buildHeaderMap(maybeHeader)
+                if isHeader then
+                    headerMap = map
+                else
+                    -- No header detected: treat first line as data
+                    local fields     = maybeHeader
 
-                itemIdStr = cleanCSVField(itemIdStr)
-                source = cleanCSVField(source)
-                playerName = cleanCSVField(playerName)
-                class = cleanCSVField(class)
-                spec = cleanCSVField(spec)
-                note = cleanCSVField(note)
-                plus = cleanCSVField(plus)
+                    local itemIdStr  = cleanCSVField(getField(fields, headerMap, "itemid", 2))
+                    local source     = cleanCSVField(getField(fields, headerMap, "from", 3))
+                    local playerName = cleanCSVField(getField(fields, headerMap, "name", 4))
+                    local class      = cleanCSVField(getField(fields, headerMap, "class", 5))
+                    local spec       = cleanCSVField(getField(fields, headerMap, "spec", 6))
+                    local note       = cleanCSVField(getField(fields, headerMap, "note", 7))
+                    local plus       = cleanCSVField(getField(fields, headerMap, "plus", 8))
 
-                local itemId = tonumber(itemIdStr)
-                local normalized = Utils.normalizeLower(playerName, true)
-
-                if normalized and itemId then
-                    reservesData[normalized] = reservesData[normalized] or {
-                        original = playerName,
-                        reserves = {}
-                    }
-
-                    local list = reservesData[normalized].reserves
-                    local found = false
-                    for i = 1, #list do
-                        local entry = list[i]
-                        if entry and entry.rawID == itemId then
-                            entry.quantity = (entry.quantity or 1) + 1
-                            found = true
-                            break
-                        end
-                    end
-
-                    if not found then
-                        list[#list + 1] = {
-                            rawID = itemId,
-                            itemLink = nil,
-                            itemName = nil,
-                            itemIcon = nil,
-                            quantity = 1,
+                    local itemId     = tonumber(itemIdStr)
+                    local playerKey  = Utils.normalizeLower(playerName, true)
+                    if itemId and playerKey then
+                        rows[#rows + 1] = {
+                            itemId = itemId,
+                            player = playerName,
+                            playerKey = playerKey,
+                            source = source ~= "" and source or nil,
                             class = class ~= "" and class or nil,
                             spec = spec ~= "" and spec or nil,
                             note = note ~= "" and note or nil,
                             plus = tonumber(plus) or 0,
-                            source = source ~= "" and source or nil,
-                            player = playerName
                         }
                     end
+                end
+            else
+                local fields     = splitCSVLine(line)
+
+                local itemIdStr  = cleanCSVField(getField(fields, headerMap, "itemid", 2))
+                local source     = cleanCSVField(getField(fields, headerMap, "from", 3))
+                local playerName = cleanCSVField(getField(fields, headerMap, "name", 4))
+                local class      = cleanCSVField(getField(fields, headerMap, "class", 5))
+                local spec       = cleanCSVField(getField(fields, headerMap, "spec", 6))
+                local note       = cleanCSVField(getField(fields, headerMap, "note", 7))
+                local plus       = cleanCSVField(getField(fields, headerMap, "plus", 8))
+
+                local itemId     = tonumber(itemIdStr)
+                local playerKey  = Utils.normalizeLower(playerName, true)
+
+                if itemId and playerKey then
+                    rows[#rows + 1] = {
+                        itemId = itemId,
+                        player = playerName,
+                        playerKey = playerKey,
+                        source = source ~= "" and source or nil,
+                        class = class ~= "" and class or nil,
+                        spec = spec ~= "" and spec or nil,
+                        note = note ~= "" and note or nil,
+                        plus = tonumber(plus) or 0,
+                    }
                 else
                     addon:warn(E.LogSRParseSkippedLine:format(tostring(line)))
                 end
             end
         end
 
+        return rows
+    end
+    local function validatePlusRows(rows)
+        -- Plus System requires exactly 1 reserve entry per player (SoftRes set to 1 SR per player).
+        -- If a player appears more than once (even for the same item), it means a multi-reserve CSV was pasted.
+        local seen = {}
+        for i = 1, #rows do
+            local row = rows[i]
+            local rec = seen[row.playerKey]
+            if not rec then
+                seen[row.playerKey] = { itemId = row.itemId, player = row.player, count = 1 }
+            else
+                rec.count = (rec.count or 1) + 1
+                if rec.itemId ~= row.itemId then
+                    return false, "CSV_WRONG_FOR_PLUS", {
+                        player = row.player,
+                        reason = "multi_item",
+                        first = rec.itemId,
+                        second = row.itemId,
+                        count = rec.count,
+                    }
+                end
+                return false, "CSV_WRONG_FOR_PLUS", {
+                    player = row.player,
+                    reason = "duplicate",
+                    itemId = row.itemId,
+                    count = rec.count,
+                }
+            end
+        end
+        return true
+    end
+
+    local function aggregateRows(rows, allowMulti)
+        local newReservesData = {}
+        local byItemPerPlayer = {}
+
+        for i = 1, #rows do
+            local row = rows[i]
+            local pKey = row.playerKey
+
+            local container = newReservesData[pKey]
+            if not container then
+                container = { original = row.player, reserves = {} }
+                newReservesData[pKey] = container
+                byItemPerPlayer[pKey] = {}
+            end
+
+            local idx = byItemPerPlayer[pKey]
+            local entry = idx[row.itemId]
+            if entry then
+                if allowMulti then
+                    entry.quantity = (tonumber(entry.quantity) or 1) + 1
+                else
+                    entry.quantity = 1
+                end
+                local p = tonumber(row.plus) or 0
+                if p > (tonumber(entry.plus) or 0) then
+                    entry.plus = p
+                end
+            else
+                entry = {
+                    rawID = row.itemId,
+                    itemLink = nil,
+                    itemName = nil,
+                    itemIcon = nil,
+                    quantity = 1,
+                    class = row.class,
+                    spec = row.spec,
+                    note = row.note,
+                    plus = tonumber(row.plus) or 0,
+                    source = row.source,
+                    player = row.player,
+                }
+                idx[row.itemId] = entry
+                container.reserves[#container.reserves + 1] = entry
+            end
+        end
+
+        return newReservesData
+    end
+
+    importStrategies.multi = {
+        id = "multi",
+        Validate = function(rows) return true end,
+        Aggregate = function(rows) return aggregateRows(rows, true) end,
+    }
+
+    importStrategies.plus = {
+        id = "plus",
+        Validate = validatePlusRows,
+        Aggregate = function(rows) return aggregateRows(rows, false) end,
+    }
+
+    function module:GetImportStrategy(mode)
+        mode = (mode == "plus" or mode == "multi") and mode or self:GetImportMode()
+        return importStrategies[mode] or importStrategies.multi
+    end
+
+    function module:ParseCSV(csv, mode)
+        if type(csv) ~= "string" or not csv:match("%S") then
+            addon:error(E.LogReservesImportFailedEmpty)
+            return false, 0, "EMPTY"
+        end
+
+        mode = (mode == "plus" or mode == "multi") and mode or self:GetImportMode()
+        local strat = self:GetImportStrategy(mode)
+
+        addon:debug(E.LogReservesParseStart)
+
+        -- Transactional parse: parse → validate → aggregate → commit.
+        local rows = parseCSVRows(csv)
+        if not rows or #rows == 0 then
+            addon:warn(L.WarnNoValidRows or "No valid rows found in CSV.")
+            return false, 0, "NO_ROWS"
+        end
+
+        local ok, errCode, errData = strat.Validate(rows)
+        if not ok then
+            addon:warn(E.LogReservesImportWrongModePlus
+                and E.LogReservesImportWrongModePlus:format(tostring(errData and errData.player))
+                or ("Wrong CSV for Plus System: " .. tostring(errData and errData.player)))
+            return false, 0, errCode or "CSV_INVALID", errData
+        end
+
+        local newReservesData = strat.Aggregate(rows)
+
+        -- Commit
+        reservesData = newReservesData
+        importMode = mode
+        twipe(reservesByItemID)
+        twipe(reservesByItemPlayer)
+        twipe(reservesDisplayList)
+        twipe(playerItemsByName)
+        reservesDirty = true
+
         RebuildIndex()
+
         local nPlayers = addon.tLength(reservesData)
         addon:debug(E.LogReservesParseComplete:format(nPlayers))
         addon:info(format(L.SuccessReservesParsed, tostring(nPlayers)))
@@ -4997,7 +5356,6 @@ do
     end
 
     -- ----- Item Info Querying ----- --
-
     function module:QueryItemInfo(itemId)
         if not itemId then return end
         addon:debug(E.LogReservesQueryItemInfo:format(itemId))
@@ -5146,18 +5504,74 @@ do
 
     -- Get reserve count for a specific item for a player
     function module:GetReserveCountForItem(itemId, playerName)
-        local normalized = Utils.normalizeLower(playerName, true)
-        local entry = reservesData[normalized]
-        if not entry then return 0 end
-        addon:debug(E.LogReservesCheckCount:format(itemId, playerName))
+        local r = self:GetReserveEntryForItem(itemId, playerName)
+        if not r then return 0 end
+        return tonumber(r.quantity) or 1
+    end
+
+    -- Gets the reserve entry table for a specific item for a player (or nil).
+    function module:GetReserveEntryForItem(itemId, playerName)
+        if not itemId or not playerName then return nil end
+        local playerKey = Utils.normalizeLower(playerName, true)
+        if not playerKey then return nil end
+
+        local byP = reservesByItemPlayer[itemId]
+        if type(byP) == "table" then
+            local r = byP[playerKey]
+            if r then return r end
+        end
+
+        -- Fallback (should be rare if indices are up to date)
+        local entry = reservesData[playerKey]
+        if not entry then return nil end
         for _, r in ipairs(entry.reserves or {}) do
-            if r.rawID == itemId then
-                addon:debug(E.LogReservesFoundCount:format(itemId, playerName, r.quantity))
-                return r.quantity or 1
+            if r and r.rawID == itemId then
+                return r
             end
         end
-        addon:debug(E.LogReservesNoCount:format(itemId, playerName))
-        return 0
+        return nil
+    end
+
+    -- Gets the "Plus" value for a reserved item for a player (0 if missing).
+    function module:GetPlusForItem(itemId, playerName)
+        -- Plus values are meaningful only in Plus System mode.
+        if self:GetImportMode() ~= "plus" then return 0 end
+        local r = self:GetReserveEntryForItem(itemId, playerName)
+        return (r and tonumber(r.plus)) or 0
+    end
+
+    -- Returns true if the item has any multi-reserve entry (quantity > 1).
+    -- When true, SR "Plus priority" should be disabled for this item.
+    function module:HasMultiReserveForItem(itemId)
+        if self:GetImportMode() ~= "multi" then return false end
+        if not itemId then return false end
+        local list = reservesByItemID[itemId]
+        if type(list) == "table" then
+            for i = 1, #list do
+                local r = list[i]
+                local qty = (type(r) == "table" and tonumber(r.quantity)) or 1
+                if (qty or 1) > 1 then
+                    return true
+                end
+            end
+            return false
+        end
+
+        -- Fallback: scan all players (should be rare if index is up to date)
+        for _, player in pairs(reservesData) do
+            if type(player) == "table" and type(player.reserves) == "table" then
+                for i = 1, #player.reserves do
+                    local r = player.reserves[i]
+                    if type(r) == "table" and r.rawID == itemId then
+                        local qty = tonumber(r.quantity) or 1
+                        if qty > 1 then
+                            return true
+                        end
+                    end
+                end
+            end
+        end
+        return false
     end
 
     -- ----- UI Display ----- --
@@ -5318,6 +5732,97 @@ do
     local module = addon.ReserveImport
     local frameName
     local localized = false
+    -- Import mode slider: 0 = Multi-reserve, 1 = Plus System (priority)
+    local MODE_MULTI, MODE_PLUS = 0, 1
+
+    local function GetImportModeString()
+        local v = addon.options and addon.options.srImportMode
+        if v == MODE_PLUS then return "plus" end
+        return "multi"
+    end
+
+    local function GetModeSlider()
+        return _G["KRTImportWindowModeSlider"] or _G["KRTImportModeSlider"]
+    end
+
+    function module:SetImportMode(modeValue, suppressSlider)
+        addon.options = addon.options or KRT_Options or {}
+        addon.options.srImportMode = (modeValue == MODE_PLUS) and MODE_PLUS or MODE_MULTI
+        if not suppressSlider then
+            local s = GetModeSlider()
+            if s and s.SetValue then
+                s:SetValue(addon.options.srImportMode)
+            end
+        end
+    end
+
+    function module:OnModeSliderLoad(slider)
+        if not slider then return end
+        slider:SetMinMaxValues(MODE_MULTI, MODE_PLUS)
+        slider:SetValueStep(1)
+        if slider.SetObeyStepOnDrag then slider:SetObeyStepOnDrag(true) end
+
+        local low = _G[slider:GetName() .. "Low"]
+        local high = _G[slider:GetName() .. "High"]
+        local text = _G[slider:GetName() .. "Text"]
+        if low then low:SetText(L.StrImportModeMulti or "Multi-reserve") end
+        if high then high:SetText(L.StrImportModePlus or "Plus System") end
+        if text then text:SetText(L.StrImportModeLabel or "") end
+
+        addon.options = addon.options or KRT_Options or {}
+        local v = addon.options.srImportMode
+        if v ~= MODE_MULTI and v ~= MODE_PLUS then v = MODE_MULTI end
+        slider:SetValue(v)
+    end
+
+    function module:OnModeSliderChanged(slider, value)
+        if not slider then return end
+        local v = tonumber(value) or MODE_MULTI
+        if v >= 0.5 then v = MODE_PLUS else v = MODE_MULTI end
+        module:SetImportMode(v, true)
+    end
+
+    -- Popup shown when Plus System is selected but CSV contains multi-item reserves per player.
+    local function EnsureWrongCSVPopup()
+        if StaticPopupDialogs and StaticPopupDialogs["KRT_WRONG_CSV_FOR_PLUS"] then return end
+        if not StaticPopupDialogs then return end
+
+        StaticPopupDialogs["KRT_WRONG_CSV_FOR_PLUS"] = {
+            text = L.ErrCSVWrongForPlus
+                or "Wrong CSV format for Plus System.\nThis CSV contains players with multiple reserved items.\nSwitch to Multi-reserve or check your SoftRes settings.",
+            button1 = L.BtnSwitchToMulti or "Switch to Multi-reserve",
+            button2 = L.BtnCancel or (L.BtnClose or "Cancel"),
+            OnShow = function(self, data)
+                if not self or not self.text then return end
+                if type(data) == "table" and data.player then
+                    local msg = L.ErrCSVWrongForPlusWithPlayer
+                        or "Wrong CSV format for Plus System.\nPlayer '%s' has multiple reserved items.\nSwitch to Multi-reserve or check your SoftRes settings."
+                    self.text:SetText(msg:format(tostring(data.player)))
+                end
+            end,
+            OnAccept = function(self, data)
+                if type(data) ~= "table" or type(data.csv) ~= "string" then return end
+                module:SetImportMode(MODE_MULTI)
+
+                -- Re-run import in multi mode (Plus ignored by definition).
+                local ok, nPlayers = addon.Reserves:ParseCSV(data.csv, "multi")
+                if ok then
+                    module:Hide()
+                    local rf = (addon.Reserves and addon.Reserves.frame) or _G["KRTReserveListFrame"]
+                    if not (rf and rf.IsShown and rf:IsShown()) then
+                        addon.Reserves:Toggle()
+                    else
+                        addon.Reserves:RequestRefresh()
+                    end
+                end
+            end,
+            timeout = 0,
+            whileDead = 1,
+            hideOnEscape = 1,
+            preferredIndex = 3,
+        }
+    end
+
 
     local function LocalizeUIFrame()
         if localized then return end
@@ -5352,6 +5857,13 @@ do
 
     function module:Refresh()
         LocalizeUIFrame()
+        local slider = GetModeSlider()
+        if slider and slider.SetValue then
+            addon.options = addon.options or KRT_Options or {}
+            local v = addon.options.srImportMode
+            if v ~= MODE_MULTI and v ~= MODE_PLUS then v = MODE_MULTI end
+            slider:SetValue(v)
+        end
         local status = _G["KRTImportWindowStatus"]
         if status and (status:GetText() == nil or status:GetText() == "") then
             status:SetText("")
@@ -5420,7 +5932,23 @@ do
         end
 
         addon:info(E.LogSRImportRequested:format(#csv))
-        local ok, nPlayers = addon.Reserves:ParseCSV(csv)
+        EnsureWrongCSVPopup()
+        local mode = GetImportModeString()
+        local ok, nPlayers, errCode, errData = addon.Reserves:ParseCSV(csv, mode)
+        if (not ok) and errCode == "CSV_WRONG_FOR_PLUS" then
+            if status then
+                status:SetText(L.ErrCSVWrongForPlusShort or "Wrong CSV format for Plus System.")
+                status:SetTextColor(1, 0.2, 0.2)
+            end
+            local popupData = { csv = csv }
+            if type(errData) == "table" then
+                for k, v in pairs(errData) do
+                    popupData[k] = v
+                end
+            end
+            StaticPopup_Show("KRT_WRONG_CSV_FOR_PLUS", nil, nil, popupData)
+            return false, 0
+        end
         if ok then
             if status then
                 status:SetText(string.format(L.SuccessReservesParsed, tostring(nPlayers)))
@@ -5482,6 +6010,7 @@ do
         countdownSimpleRaidMsg      = false,
         countdownDuration           = 5,
         countdownRollsBlock         = true,
+        srImportMode                = 0,
     }
 
     -- Creates a fresh options table seeded with defaults.
