@@ -756,9 +756,6 @@ end
 -- =========== Frame helpers  =========== --
 
 function Utils.getFrameName()
-	if not addon.UIMaster or not addon.UIMaster.GetName then
-		return nil
-	end
 	return addon.UIMaster:GetName()
 end
 
