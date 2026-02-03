@@ -2412,6 +2412,7 @@ do
         lootTable = twipe(lootTable)
         lootState.lootCount = 0
         frameName = frameName or Utils.getFrameName()
+        if not frameName then return end
         _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
         _G[frameName .. "ItemBtn"]:SetNormalTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
         local itemBtn = _G[frameName .. "ItemBtn"]
