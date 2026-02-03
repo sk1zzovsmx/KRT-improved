@@ -302,6 +302,7 @@ Throttle high-frequency sources (roster updates, combat log, UI refresh loops).
 ---
 
 ## 17) Change log (edit manually)
+- 2026-03-16: Guarded loot UI clearing when the master frame is not yet available.
 - 2026-03-15: Skip raid target icon on the master looter when they win their own trade.
 - 2026-03-14: Master Loot roll button now respects multi-reserve roll counts for the local player.
 - 2026-03-13: Converted Config/Warnings/Changes/Reserves/BossBox UI refresh to on-demand updates.
