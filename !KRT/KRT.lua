@@ -2,19 +2,18 @@
     KRT.lua
 ]]
 
-local addonName, addon = ...
-addon                  = addon or {}
-addon.name             = addon.name or addonName
-addon.L                = addon.L or {}
-addon.E                = addon.E or {}
-local L                = addon.L
-local E                = addon.E
-local Utils            = addon.Utils
-local C                = addon.C
+local addonName, addon    = ...
+addon                     = addon or {}
+addon.name                = addon.name or addonName
+addon.L                   = addon.L or {}
+addon.E                   = addon.E or {}
+local L                   = addon.L
+local E                   = addon.E
+local Utils               = addon.Utils
+local C                   = addon.C
 
-local _G               = _G
-_G["KRT"]              = addon
-
+local _G                  = _G
+_G["KRT"]                 = addon
 
 -- =========== Constants  =========== --
 
@@ -629,7 +628,6 @@ do
             player, itemLink = addon.Deformat(msg, LOOT_ITEM)
             itemCount = 1
         end
-
 
         -- Self loot (no player name in the string)
         if not itemLink then
@@ -1363,7 +1361,6 @@ do
     -- Multi-selection context for manual multi-award winner picking (Master Loot window)
     local MS_CTX_ROLLS = "MLRollWinners"
 
-
     -- ---Internal state ----- --
     local state = {
         record       = false,
@@ -1455,14 +1452,6 @@ do
         end
 
         return bestName, bestRoll
-    end
-
-    -- Returns the "real" winner for UI (top roll, with SR priority if active).
-    local function GetEffectiveWinner(itemId)
-        if lootState.currentRollType == rollTypes.RESERVED then
-            return PickBestReserved(itemId) or lootState.winner
-        end
-        return lootState.winner
     end
 
     -- Sorts rolls table + updates lootState.winner (top entry after sort).
@@ -1956,7 +1945,6 @@ do
 
             return tostring(a.name) < tostring(b.name)
         end)
-
 
         -- Cache current display order (used for manual multi-winner selection / shift-range).
         state.display = display
@@ -4405,7 +4393,6 @@ do
     Utils.registerCallback("PlayerCountChanged", Request)
 end
 
-
 -- =========== Reserves Module  =========== --
 -- Manages item reserves, import, and display.
 do
@@ -4493,15 +4480,116 @@ do
         end
     end
 
-    local function FormatReservePlayerName(itemId, name, count)
-        local out = name
+    -- SoftRes exports class names like "Warrior", "Death Knight", etc.
+    -- Normalize them to WoW class tokens (e.g. "WARRIOR", "DEATHKNIGHT") so we can use C.CLASS_COLORS.
+    local function NormalizeClassToken(className)
+        if not className then return nil end
+        local token = tostring(className):upper()
+        token = token:gsub("%s+", ""):gsub("%-", "")
+        if C and C.CLASS_COLORS and C.CLASS_COLORS[token] then return token end
+        if RAID_CLASS_COLORS and RAID_CLASS_COLORS[token] then return token end
+        return nil
+    end
+
+    local function GetClassColorStr(className)
+        local token = NormalizeClassToken(className) or "UNKNOWN"
+        if C and C.CLASS_COLORS and C.CLASS_COLORS[token] then
+            return token, C.CLASS_COLORS[token]
+        end
+        local _, _, _, colorStr = addon.GetClassColor(token)
+        return token, colorStr
+    end
+
+    local function ColorizeReserveName(itemId, playerName, className)
+        if not playerName then return playerName end
+
+        local cls = className
+        if (not cls or cls == "") and itemId then
+            local r = module:GetReserveEntryForItem(itemId, playerName)
+            cls = r and r.class
+        end
+        if (not cls or cls == "") and addon.Raid and addon.Raid.GetPlayerClass then
+            cls = addon.Raid:GetPlayerClass(playerName)
+        end
+        if not cls or cls == "" then return playerName end
+
+        local _, colorStr = GetClassColorStr(cls)
+        if colorStr and colorStr ~= "ffffffff" then
+            return "|c" .. colorStr .. playerName .. "|r"
+        end
+        return playerName
+    end
+
+    local function AddReservePlayer(data, rOrName, countOverride)
+        if not data.players then data.players = {} end
+        if not data.playerCounts then data.playerCounts = {} end
+        if not data.playerMeta then data.playerMeta = {} end
+
+        local name, count, cls, plus
+        if type(rOrName) == "table" then
+            name = rOrName.player or "?"
+            count = tonumber(rOrName.quantity) or 1
+            cls = rOrName.class
+            plus = tonumber(rOrName.plus) or 0
+        else
+            name = rOrName or "?"
+            count = tonumber(countOverride) or 1
+        end
+        count = count or 1
+
+        local existing = data.playerCounts[name]
+        if existing then
+            data.playerCounts[name] = existing + count
+        else
+            data.players[#data.players + 1] = name
+            data.playerCounts[name] = count
+        end
+
+        local meta = data.playerMeta[name]
+        if not meta then
+            meta = { plus = 0, class = nil }
+            data.playerMeta[name] = meta
+        end
+        if cls and cls ~= "" and (not meta.class or meta.class == "") then
+            meta.class = cls
+        end
+        if plus and plus > (meta.plus or 0) then
+            meta.plus = plus
+        end
+    end
+
+    local function GetMetaForPlayer(metaByName, itemId, playerName)
+        local meta = metaByName and metaByName[playerName]
+        if meta and (meta.class or meta.plus) then return meta end
+
+        -- Fallback: resolve from index (keeps compatibility even if meta isn't passed).
+        if not meta then meta = { plus = 0, class = nil } end
+        if itemId and playerName then
+            local r = module:GetReserveEntryForItem(itemId, playerName)
+            if r then
+                if r.class and r.class ~= "" and (not meta.class or meta.class == "") then
+                    meta.class = r.class
+                end
+                local p = tonumber(r.plus) or 0
+                if p > (meta.plus or 0) then meta.plus = p end
+            end
+            if (not meta.class or meta.class == "") and addon.Raid and addon.Raid.GetPlayerClass then
+                meta.class = addon.Raid:GetPlayerClass(playerName)
+            end
+        end
+        return meta
+    end
+
+    local function FormatReservePlayerName(itemId, name, count, metaByName)
+        local meta = GetMetaForPlayer(metaByName, itemId, name)
+        local out = ColorizeReserveName(itemId, name, meta and meta.class)
 
         if module:IsMultiReserve() and count and count > 1 then
             out = out .. format(L.StrReserveCountSuffix, count)
         end
 
         if module:IsPlusSystem() and itemId then
-            local p = module:GetPlusForItem(itemId, name)
+            local p = (meta and tonumber(meta.plus)) or module:GetPlusForItem(itemId, name) or 0
             if p and p > 0 then
                 out = out .. format(" (P+%d)", p)
             end
@@ -4510,37 +4598,124 @@ do
         return out
     end
 
-    local function AddReservePlayer(data, name, count)
-        if not data.players then data.players = {} end
-        if not data.playerCounts then data.playerCounts = {} end
-        local existing = data.playerCounts[name]
-        if existing then
-            data.playerCounts[name] = existing + (count or 1)
-        else
-            data.players[#data.players + 1] = name
-            data.playerCounts[name] = count or 1
-        end
-    end
+    local function SortPlayersForDisplay(itemId, players, counts, metaByName)
+        if not players then return end
 
-    local function BuildPlayersText(itemId, players, counts)
-        if not players then return "" end
-
-        -- In Plus System, show highest Plus first for readability.
         if module:IsPlusSystem() and itemId then
             table.sort(players, function(a, b)
-                local ap = module:GetPlusForItem(itemId, a) or 0
-                local bp = module:GetPlusForItem(itemId, b) or 0
+                local am = GetMetaForPlayer(metaByName, itemId, a)
+                local bm = GetMetaForPlayer(metaByName, itemId, b)
+                local ap = (am and tonumber(am.plus)) or 0
+                local bp = (bm and tonumber(bm.plus)) or 0
                 if ap ~= bp then return ap > bp end
                 return tostring(a) < tostring(b)
             end)
+        elseif module:IsMultiReserve() and counts then
+            -- Optional: show higher quantities first for readability.
+            table.sort(players, function(a, b)
+                local aq = counts[a] or 1
+                local bq = counts[b] or 1
+                if aq ~= bq then return aq > bq end
+                return tostring(a) < tostring(b)
+            end)
         end
+    end
 
+    local function BuildPlayerTokens(itemId, players, counts, metaByName)
+        if not players then return {} end
+        SortPlayersForDisplay(itemId, players, counts, metaByName)
         twipe(playerTextTemp)
         for i = 1, #players do
             local name = players[i]
-            playerTextTemp[#playerTextTemp + 1] = FormatReservePlayerName(itemId, name, counts and counts[name] or 1)
+            playerTextTemp[#playerTextTemp + 1] = FormatReservePlayerName(itemId, name, counts and counts[name] or 1, metaByName)
         end
-        return tconcat(playerTextTemp, ", ")
+        return playerTextTemp
+    end
+
+    -- How many player tokens we show inline in the Reserve List row before truncating.
+    -- Long lists are rendered in a dedicated tooltip on the players line.
+    local RESERVE_ROW_MAX_PLAYERS_INLINE = 6
+
+    local function FormatReservePlayerNameBase(itemId, name, metaByName)
+        local meta = GetMetaForPlayer(metaByName, itemId, name)
+        return ColorizeReserveName(itemId, name, meta and meta.class)
+    end
+
+    local function BuildPlayersTooltipLines(itemId, players, counts, metaByName, shownCount, hiddenCount)
+        local lines = {}
+        local total = players and #players or 0
+        lines[#lines + 1] = "Total: " .. tostring(total)
+        if hiddenCount and hiddenCount > 0 and shownCount and shownCount > 0 then
+            lines[#lines + 1] = "Shown: " .. tostring(shownCount) .. " | Hidden: +" .. tostring(hiddenCount)
+        end
+
+        if not players or total == 0 then
+            return lines
+        end
+
+        if module:IsPlusSystem() and itemId then
+            -- Group by plus value (desc)
+            local groups, keys = {}, {}
+            for i = 1, #players do
+                local name = players[i]
+                local meta = GetMetaForPlayer(metaByName, itemId, name)
+                local p = (meta and tonumber(meta.plus)) or 0
+                if groups[p] == nil then
+                    groups[p] = {}
+                    keys[#keys + 1] = p
+                end
+                groups[p][#groups[p] + 1] = FormatReservePlayerNameBase(itemId, name, metaByName)
+            end
+            table.sort(keys, function(a, b) return a > b end)
+            for i = 1, #keys do
+                local p = keys[i]
+                lines[#lines + 1] = string.format("P+%d: %s", p, tconcat(groups[p], ", "))
+            end
+        elseif module:IsMultiReserve() and counts then
+            -- Group by quantity (desc)
+            local groups, keys = {}, {}
+            for i = 1, #players do
+                local name = players[i]
+                local q = counts[name] or 1
+                if groups[q] == nil then
+                    groups[q] = {}
+                    keys[#keys + 1] = q
+                end
+                groups[q][#groups[q] + 1] = FormatReservePlayerNameBase(itemId, name, metaByName)
+            end
+            table.sort(keys, function(a, b) return a > b end)
+            for i = 1, #keys do
+                local q = keys[i]
+                lines[#lines + 1] = string.format("x%d: %s", q, tconcat(groups[q], ", "))
+            end
+        else
+            -- Fallback: just list names
+            local names = {}
+            for i = 1, #players do
+                names[i] = FormatReservePlayerNameBase(itemId, players[i], metaByName)
+            end
+            lines[#lines + 1] = tconcat(names, ", ")
+        end
+
+        return lines
+    end
+
+    local function BuildPlayersText(itemId, players, counts, metaByName)
+        if not players then return "", {}, "" end
+        BuildPlayerTokens(itemId, players, counts, metaByName)
+        local total = #playerTextTemp
+        local shown = total
+        if RESERVE_ROW_MAX_PLAYERS_INLINE and RESERVE_ROW_MAX_PLAYERS_INLINE > 0 then
+            shown = math.min(total, RESERVE_ROW_MAX_PLAYERS_INLINE)
+        end
+        local hidden = total - shown
+        local shortText = tconcat(playerTextTemp, ", ", 1, shown)
+        if hidden > 0 then
+            shortText = shortText .. string.format(" ... +%d", hidden)
+        end
+        local fullText = tconcat(playerTextTemp, ", ")
+        local tooltipLines = BuildPlayersTooltipLines(itemId, players, counts, metaByName, shown, hidden)
+        return shortText, tooltipLines, fullText
     end
 
     local function UpdateDisplayEntryForItem(itemId)
@@ -4572,10 +4747,11 @@ do
                             source = source,
                             players = {},
                             playerCounts = {},
+                            playerMeta = {},
                         }
                         bySource[itemId] = data
                     end
-                    AddReservePlayer(data, r.player or "?", r.quantity or 1)
+                    AddReservePlayer(data, r)
                 end
             end
         end
@@ -4604,21 +4780,35 @@ do
                     target.source = source
                     target.players = target.players or {}
                     target.playerCounts = target.playerCounts or {}
+                    target.playerMeta = target.playerMeta or {}
                     twipe(target.players)
                     twipe(target.playerCounts)
+                    twipe(target.playerMeta)
                     for i = 1, #data.players do
                         local name = data.players[i]
                         target.players[i] = name
                         target.playerCounts[name] = data.playerCounts[name]
                     end
-                    target.playersText = BuildPlayersText(itemId, target.players, target.playerCounts)
+                    if data.playerMeta then
+                        for n, m in pairs(data.playerMeta) do
+                            local tm = target.playerMeta[n]
+                            if not tm then
+                                tm = {}; target.playerMeta[n] = tm
+                            end
+                            tm.plus = (m and tonumber(m.plus)) or 0
+                            tm.class = m and m.class or tm.class
+                        end
+                    end
+                    target.playersText, target.playersTooltipLines, target.playersTextFull = BuildPlayersText(itemId, target.players, target.playerCounts, target.playerMeta)
                     target.players = nil
                     target.playerCounts = nil
+                    target.playerMeta = nil
                     remaining[#remaining + 1] = target
                 else
-                    data.playersText = BuildPlayersText(itemId, data.players, data.playerCounts)
+                    data.playersText, data.playersTooltipLines, data.playersTextFull = BuildPlayersText(data.itemId, data.players, data.playerCounts, data.playerMeta)
                     data.players = nil
                     data.playerCounts = nil
+                    data.playerMeta = nil
                     remaining[#remaining + 1] = data
                 end
             end
@@ -4696,11 +4886,12 @@ do
                                 source = source,
                                 players = {},
                                 playerCounts = {},
+                                playerMeta = {},
                             }
                             bySource[itemId] = data
                         end
 
-                        AddReservePlayer(data, r.player or "?", r.quantity or 1)
+                        AddReservePlayer(data, r)
                     end
                 end
             end
@@ -4708,20 +4899,30 @@ do
 
         for _, byItem in pairs(grouped) do
             for _, data in pairs(byItem) do
-                data.playersText = BuildPlayersText(itemId, data.players, data.playerCounts)
+                data.playersText, data.playersTooltipLines, data.playersTextFull = BuildPlayersText(data.itemId, data.players, data.playerCounts, data.playerMeta)
                 data.players = nil
                 data.playerCounts = nil
+                data.playerMeta = nil
                 reservesDisplayList[#reservesDisplayList + 1] = data
             end
         end
     end
 
     local function SetupReserveRowTooltip(row)
-        if not row or not row.iconBtn then return end
-        row.iconBtn:SetScript("OnEnter", function()
-            GameTooltip:SetOwner(row.iconBtn, "ANCHOR_RIGHT")
-            if row._itemLink then
-                GameTooltip:SetHyperlink(row._tooltipTitle)
+        if not row then return end
+
+        local function HideTooltip()
+            GameTooltip:Hide()
+        end
+
+        local function ShowItemTooltip(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            local link = row._itemLink
+            if (not link or link == "") and row._itemId then
+                link = "item:" .. tostring(row._itemId)
+            end
+            if link then
+                GameTooltip:SetHyperlink(link)
             elseif row._tooltipTitle then
                 GameTooltip:SetText(row._tooltipTitle, 1, 1, 1)
             end
@@ -4729,10 +4930,102 @@ do
                 GameTooltip:AddLine(row._tooltipSource, 0.8, 0.8, 0.8)
             end
             GameTooltip:Show()
-        end)
-        row.iconBtn:SetScript("OnLeave", function()
-            GameTooltip:Hide()
-        end)
+        end
+
+        local function ShowPlayersTooltip(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(row._tooltipTitle or "Reserves", 1, 1, 1)
+            if row._tooltipSource then
+                GameTooltip:AddLine(row._tooltipSource, 0.8, 0.8, 0.8)
+            end
+            local lines = row._playersTooltipLines
+            if type(lines) == "table" then
+                for i = 1, #lines do
+                    GameTooltip:AddLine(lines[i], 0.9, 0.9, 0.9, true)
+                end
+            elseif row._playersTextFull and row._playersTextFull ~= "" then
+                GameTooltip:AddLine(row._playersTextFull, 0.9, 0.9, 0.9, true)
+            end
+            GameTooltip:Show()
+        end
+
+        -- Icon = item tooltip (keeps the classic behavior)
+        if row.iconBtn then
+            row.iconBtn:SetScript("OnEnter", ShowItemTooltip)
+            row.iconBtn:SetScript("OnLeave", HideTooltip)
+        end
+
+        -- Two tooltips (no XML changes):
+        -- * Item tooltip on the TOP line (item name)
+        -- * Full players list tooltip on the BOTTOM line (players)
+        if row.textBlock then
+            row.textBlock:EnableMouse(false)
+
+            if not row._nameHotspot then
+                local hs = CreateFrame("Button", nil, row.textBlock)
+                hs:ClearAllPoints()
+                hs:SetPoint("TOPLEFT", row.textBlock, "TOPLEFT", 0, 0)
+                hs:SetHeight(16)
+                hs:SetWidth(row.textBlock:GetWidth() > 0 and row.textBlock:GetWidth() or 200)
+                hs:SetFrameLevel(row.textBlock:GetFrameLevel() + 2)
+                hs:EnableMouse(true)
+                hs:SetScript("OnEnter", ShowItemTooltip)
+                hs:SetScript("OnLeave", HideTooltip)
+                row._nameHotspot = hs
+            end
+
+            if not row._playersHotspot then
+                local hs = CreateFrame("Button", nil, row.textBlock)
+                hs:ClearAllPoints()
+                hs:SetPoint("BOTTOMLEFT", row.textBlock, "BOTTOMLEFT", 0, 0)
+                hs:SetHeight(16)
+                hs:SetWidth(row.textBlock:GetWidth() > 0 and row.textBlock:GetWidth() or 200)
+                hs:SetFrameLevel(row.textBlock:GetFrameLevel() + 2)
+                hs:EnableMouse(true)
+                hs:SetScript("OnEnter", ShowPlayersTooltip)
+                hs:SetScript("OnLeave", HideTooltip)
+                row._playersHotspot = hs
+            end
+        end
+    end
+
+    local function Clamp(v, lo, hi)
+        if v < lo then return lo end
+        if v > hi then return hi end
+        return v
+    end
+
+    -- Limit the hover area (hotspots) to the actual rendered text width,
+    -- instead of the full row width.
+    local function UpdateReserveRowHotspots(row)
+        if not row or not row.textBlock then return end
+        local maxW = row.textBlock:GetWidth() or 0
+        if maxW <= 0 then maxW = 200 end
+        local pad = 8
+
+        if row._nameHotspot and row.nameText then
+            local t = row.nameText:GetText() or ""
+            if t ~= "" then
+                local w = row.nameText.GetStringWidth and row.nameText:GetStringWidth() or 0
+                row._nameHotspot:SetWidth(Clamp(w + pad, 2, maxW))
+                row._nameHotspot:EnableMouse(true)
+            else
+                row._nameHotspot:SetWidth(2)
+                row._nameHotspot:EnableMouse(false)
+            end
+        end
+
+        if row._playersHotspot and row.playerText then
+            local t = row.playerText:GetText() or ""
+            if t ~= "" then
+                local w = row.playerText.GetStringWidth and row.playerText:GetStringWidth() or 0
+                row._playersHotspot:SetWidth(Clamp(w + pad, 2, maxW))
+                row._playersHotspot:EnableMouse(true)
+            else
+                row._playersHotspot:SetWidth(2)
+                row._playersHotspot:EnableMouse(false)
+            end
+        end
     end
 
     local function ApplyReserveRowData(row, info, index)
@@ -4743,6 +5036,8 @@ do
         row._source = info.source
         row._tooltipTitle = info.itemLink or info.itemName or ("Item ID: " .. (info.itemId or "?"))
         row._tooltipSource = info.source and ("Dropped by: " .. info.source) or nil
+        row._playersTooltipLines = info.playersTooltipLines
+        row._playersTextFull = info.playersTextFull or info.playersText
 
         if row.background then
             row.background:SetVertexColor(index % 2 == 0 and 0.1 or 0, 0.1, 0.1, 0.3)
@@ -4775,6 +5070,8 @@ do
         if row.quantityText then
             row.quantityText:Hide()
         end
+
+        UpdateReserveRowHotspots(row)
     end
 
     local function ReserveHeaderOnClick(self)
@@ -5705,15 +6002,21 @@ do
         local list = reservesByItemID[itemId]
         if type(list) ~= "table" then return {} end
 
-        local players = {}
+        -- Aggregate per player so we can apply sorting and reuse meta (class/plus).
+        local data = { players = {}, playerCounts = {}, playerMeta = {} }
         for i = 1, #list do
             local r = list[i]
-            local qty = (type(r) == "table" and r.quantity) or 1
-            qty = qty or 1
-            local name = (type(r) == "table" and r.player) or "?"
-            players[#players + 1] = FormatReservePlayerName(name, qty)
+            if type(r) == "table" then
+                AddReservePlayer(data, r)
+            end
         end
-        return players
+
+        local tokens = BuildPlayerTokens(itemId, data.players, data.playerCounts, data.playerMeta)
+        local out = {}
+        for i = 1, #tokens do
+            out[i] = tokens[i]
+        end
+        return out
     end
 
     function module:FormatReservedPlayersLine(itemId)
@@ -5822,7 +6125,6 @@ do
             preferredIndex = 3,
         }
     end
-
 
     local function LocalizeUIFrame()
         if localized then return end
@@ -7052,7 +7354,6 @@ do
         KRT_Spammer.Duration = value
     end
 
-
     -- Deterministic: ensure preview/output is computed before Start/Resume
     local function EnsureReadyForStart()
         SyncDurationNow()
@@ -7065,7 +7366,6 @@ do
             end
         end
     end
-
 
     local function ResetLengthUI()
         local frame = getFrame()
@@ -7803,7 +8103,7 @@ do
         self:BuildRows(out, raid and raid.bossKills, nil, function(boss, i)
             local it = {}
             it.id = tonumber(boss and boss.bossNid) or (boss and boss.bossNid) or i -- stable nid for highlight/selection
-            it.seq = i -- display-only (rescales after deletions)
+            it.seq = i                                                              -- display-only (rescales after deletions)
             it.name = boss and boss.name or ""
             it.time = boss and boss.time or time()
             it.timeFmt = date("%H:%M", it.time)
@@ -8341,12 +8641,6 @@ do
         Utils.MultiSelect_Clear(MS_CTX_LOOT)
     end
 
-    local function toggleSelection(field, id, eventName)
-        module[field] = (id and id ~= module[field]) and id or nil
-        if eventName then
-            Utils.triggerEvent(eventName, module[field])
-        end
-    end
     -- Logger helpers: resolve current raid/boss/loot and run raid actions with a single refresh.
     function module:NeedRaid()
         local rID = module.selectedRaid
@@ -9614,7 +9908,6 @@ do
                 end
             end)
         end
-
 
         function Loot:Delete()
             if Utils.MultiSelect_Count(addon.Logger._msLootCtx) > 0 then
