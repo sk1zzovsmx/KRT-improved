@@ -1383,6 +1383,12 @@ do
     local newItemCounts, delItemCounts = addon.TablePool and addon.TablePool("k")
     state.itemCounts = newItemCounts and newItemCounts() or {}
 
+    local function GetMasterFrameName()
+        local mf = (addon.Master and addon.Master.frame) or _G["KRTMaster"]
+        if mf and addon.Master and not addon.Master.frame then addon.Master.frame = mf end
+        return mf and mf:GetName() or nil
+    end
+
     -- ----- Private helpers ----- --
     local function GetAllowedRolls(itemId, name)
         if not itemId or not name then return 1 end
@@ -1812,7 +1818,7 @@ do
 
     -- Clears all roll-related state and UI elements.
     function module:ClearRolls(rec)
-        local frameName = Utils.getFrameName()
+        local frameName = GetMasterFrameName()
         resetRolls(rec)
         if frameName then
             local i, btn = 1, _G[frameName .. "PlayerBtn1"]
@@ -1864,7 +1870,8 @@ do
 
     -- Rebuilds the roll list UI and marks the top roller or selected winner.
     function module:FetchRolls()
-        local frameName = Utils.getFrameName()
+        local frameName = GetMasterFrameName()
+        if not frameName then return end
         local scrollFrame = _G[frameName .. "ScrollFrame"]
         local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
         scrollChild:SetHeight(scrollFrame:GetHeight())
@@ -2177,6 +2184,15 @@ do
     local module = addon.Loot
     local frameName
 
+    local function GetMasterFrameName()
+        if frameName then return frameName end
+        local mf = (addon.Master and addon.Master.frame) or _G["KRTMaster"]
+        if mf and addon.Master and not addon.Master.frame then addon.Master.frame = mf end
+        if not mf then return nil end
+        frameName = mf:GetName()
+        return frameName
+    end
+
     -- ----- Internal state ----- --
     local lootTable = {}
 
@@ -2363,7 +2379,7 @@ do
     -- Sets the main item display in the UI.
     function module:SetItem(i)
         if i.itemName and i.itemLink and i.itemTexture and i.itemColor then
-            frameName = frameName or Utils.getFrameName()
+            frameName = GetMasterFrameName()
             if frameName == nil then return end
 
             local currentItemLink = _G[frameName .. "Name"]
@@ -2399,7 +2415,8 @@ do
     function module:ClearLoot()
         lootTable = twipe(lootTable)
         lootState.lootCount = 0
-        frameName = frameName or Utils.getFrameName()
+        frameName = GetMasterFrameName()
+        if not frameName then return end
         _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
         _G[frameName .. "ItemBtn"]:SetNormalTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
         local itemBtn = _G[frameName .. "ItemBtn"]
@@ -2545,7 +2562,7 @@ do
     local function SetItemCountValue(count, focus)
         local frame = getFrame()
         if not frame then return end
-        frameName = frameName or Utils.getFrameName()
+        frameName = frameName or frame:GetName()
         if not frameName or frameName ~= frame:GetName() then return end
         local itemCountBox = _G[frameName .. "ItemCount"]
         if not itemCountBox then return end

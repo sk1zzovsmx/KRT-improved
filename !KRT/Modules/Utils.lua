@@ -755,10 +755,6 @@ end
 
 -- =========== Frame helpers  =========== --
 
-function Utils.getFrameName()
-	return addon.UIMaster:GetName()
-end
-
 function Utils.makeConfirmPopup(key, text, onAccept, cancels)
 	StaticPopupDialogs[key] = {
 		text = text,
