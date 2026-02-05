@@ -1,14 +1,14 @@
 # Architecture Overview
 
 Goal: in ~5 minutes, understand **what exists**, **where it lives**, and **how modules interact**.
-This is the primary “start here” card for humans and AI coding agents.
+This is the primary “start here” doc for humans and AI coding agents.
 
-Single source of truth: keep this doc navigational and coarse (diagrams + links).
+Keep it navigational and coarse (diagrams + links).
 Detailed behaviour belongs in `docs/Features/*`; detailed decisions/invariants belong in `docs/ADR/*`.
 
 ---
 
-## Summary (keep it short)
+## Summary
 
 - **System:** World of Warcraft addon `!KRT` (WotLK 3.3.5a / Interface 30300), Lua 5.1 + XML UI.
 - **Where is the code:** runtime code lives under [`!KRT/`](../../!KRT/). Core logic is **monolithic** in
@@ -36,12 +36,9 @@ How to map a change quickly:
 
 ---
 
-## 2) Diagrams (Mermaid) — primary context
+## Diagrams (Mermaid)
 
-Diagrams are for humans and AI agents. They must be self-describing.
-Model real modules/interfaces and key shared helpers (not every file).
-
-### 2.1 System / module map (blocks + modules)
+### 1) System / module map
 
 ```mermaid
 flowchart LR
@@ -119,7 +116,7 @@ flowchart LR
   Utils --> Libs
 ```
 
-### 2.2 Interfaces / contracts map (how modules talk)
+### 2) Interfaces / contracts map
 
 ```mermaid
 flowchart LR
@@ -144,7 +141,7 @@ Contracts to remember:
 - **Refresh contract:** `module:RequestRefresh()` / `module:Refresh()` via `Utils.makeEventDrivenRefresher`.
 - **Lists contract:** `Utils.makeListController` provides row pooling, sorting, and `controller:Dirty()`.
 
-### 2.3 Key data structures / types map (high-signal only)
+### 3) Key data structures (high-signal only)
 
 ```mermaid
 flowchart LR
@@ -167,65 +164,59 @@ flowchart LR
 
 ---
 
-## 3) Navigation index (required, keep it tiny)
+## Navigation index
 
-Goal: jump from any diagram element to the right docs/code without repo-wide scanning.
-
-### 3.1 Modules (diagram nodes)
+### Modules (diagram nodes)
 
 - **Core / entry plumbing**
-  - `addon event dispatcher` — code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `SetScript("OnEvent"`).
-  - `addon.Slash` — code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `SLASH_KRT1` / `SlashCmdList`).
-  - `addon.Config` — code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Config =`).
+  - `addon event dispatcher` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `SetScript("OnEvent"`).
+  - `addon.Slash` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `SLASH_KRT1` / `SlashCmdList`).
+  - `addon.Config` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Config =`).
 
 - **Feature modules (all in `KRT.lua`)**
-  - `addon.Raid` — state/roster/session helpers; code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Raid`).
-  - `addon.Rolls` — roll tracking + winner logic; code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Rolls`).
-  - `addon.Reserves` — SR model + list UI; code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Reserves`).
-  - `addon.ReserveImport` — SR import window glue; code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.ReserveImport`).
-  - `addon.Loot` — loot parsing/selection/export; code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Loot`).
-  - `addon.Master` — master-loot helpers/award/trade; code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Master`).
-  - `addon.LootCounter` — loot counter UI/data; code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.LootCounter`).
-  - `addon.Logger` — loot history UI/store/actions; code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Logger`).
-  - `addon.Warnings` — announce templates/throttling; code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Warnings`).
-  - `addon.Changes` — MS changes list/announce; code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Changes`).
-  - `addon.Spammer` — LFM helper; code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Spammer`).
-  - `addon.Minimap` — minimap button + EasyMenu; code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Minimap`).
-  - `addon.Chat` — chat output helpers; code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Chat`).
+  - `addon.Raid` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Raid`).
+  - `addon.Rolls` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Rolls`).
+  - `addon.Reserves` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Reserves`).
+  - `addon.ReserveImport` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.ReserveImport`).
+  - `addon.Loot` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Loot`).
+  - `addon.Master` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Master`).
+  - `addon.LootCounter` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.LootCounter`).
+  - `addon.Logger` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Logger`).
+  - `addon.Warnings` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Warnings`).
+  - `addon.Changes` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Changes`).
+  - `addon.Spammer` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Spammer`).
+  - `addon.Minimap` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Minimap`).
+  - `addon.Chat` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Chat`).
 
 - **Shared / data**
-  - `Utils` — controllers, refreshers, list utils: [`!KRT/Modules/Utils.lua`](../../!KRT/Modules/Utils.lua)
-  - `C` — constants/enums/patterns: [`!KRT/Modules/C.lua`](../../!KRT/Modules/C.lua)
-  - `ignoredItems` — data list/filter: [`!KRT/Modules/ignoredItems.lua`](../../!KRT/Modules/ignoredItems.lua)
-  - UI layout: [`!KRT/KRT.xml`](../../!KRT/KRT.xml), templates: [`!KRT/Templates.xml`](../../!KRT/Templates.xml)
+  - `Utils` — [`!KRT/Modules/Utils.lua`](../../!KRT/Modules/Utils.lua)
+  - `C` — [`!KRT/Modules/C.lua`](../../!KRT/Modules/C.lua)
+  - `ignoredItems` — [`!KRT/Modules/ignoredItems.lua`](../../!KRT/Modules/ignoredItems.lua)
+  - UI: [`!KRT/KRT.xml`](../../!KRT/KRT.xml), templates: [`!KRT/Templates.xml`](../../!KRT/Templates.xml)
 
-### 3.2 Interfaces / contracts (diagram edges)
+### Interfaces / contracts (diagram edges)
 
-- **Event dispatcher (`WoW event` → `addon`):**
-  - Source of truth: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `RegisterEvent`).
-- **Slash commands:**
-  - Source of truth: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `SLASH_KRT1`, `SlashCmdList`).
-- **Event-driven UI refresh (Request → Refresh):**
-  - Source of truth: [`!KRT/Modules/Utils.lua`](../../!KRT/Modules/Utils.lua) (search: `makeEventDrivenRefresher`).
-- **List rendering + row pooling:**
-  - Source of truth: [`!KRT/Modules/Utils.lua`](../../!KRT/Modules/Utils.lua) (search: `makeListController`).
-- **Localization contract (`addon.L` / `addon.E`):**
-  - User strings: [`!KRT/Localization/localization.en.lua`](../../!KRT/Localization/localization.en.lua)
-  - Log templates: [`!KRT/Localization/ErrorLog.en.lua`](../../!KRT/Localization/ErrorLog.en.lua)
+- **Event dispatcher (`WoW event` → `addon`):** [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `RegisterEvent`).
+- **Slash commands:** [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `SLASH_KRT1`, `SlashCmdList`).
+- **Event-driven UI refresh:** [`!KRT/Modules/Utils.lua`](../../!KRT/Modules/Utils.lua) (search: `makeEventDrivenRefresher`).
+- **List rendering + row pooling:** [`!KRT/Modules/Utils.lua`](../../!KRT/Modules/Utils.lua) (search: `makeListController`).
+- **Localization (`addon.L` / `addon.E`):**
+  - [`!KRT/Localization/localization.en.lua`](../../!KRT/Localization/localization.en.lua)
+  - [`!KRT/Localization/ErrorLog.en.lua`](../../!KRT/Localization/ErrorLog.en.lua)
 - **SavedVariables schema:**
-  - Declared in toc: [`!KRT/!KRT.toc`](../../!KRT/!KRT.toc)
-  - Used by code: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `KRT_Options`, `KRT_Raids`, etc.)
+  - Declared: [`!KRT/!KRT.toc`](../../!KRT/!KRT.toc)
+  - Used: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `KRT_Options`, `KRT_Raids`, etc.)
 
 ---
 
-## 4) Dependency rules (must be explicit)
+## Dependency rules (explicit)
 
-- **Allowed dependencies:**
-  - Any feature module may depend on `Utils`, `C`, `addon.L` / `addon.E`.
+- **Allowed:**
+  - Feature modules may depend on `Utils`, `C`, `addon.L` / `addon.E`.
   - Feature modules may call other feature modules when it is a real domain dependency (avoid cycles).
-  - UI (`KRT.xml`) may call module methods, but should not contain core logic.
+  - XML UI may call module methods, but should not contain core logic.
 
-- **Forbidden dependencies:**
+- **Forbidden:**
   - `Modules/Utils.lua` and `Modules/C.lua` must not depend on feature modules.
   - Localization files must not depend on feature modules.
   - Do not introduce Ace3.
@@ -235,24 +226,9 @@ Goal: jump from any diagram element to the right docs/code without repo-wide sca
   - Prefer event-driven refresh (no polling `OnUpdate` loops for feature UI).
   - Use LibCompat timers for throttling (not modern `C_Timer`).
 
-- **Shared code policy:**
-  - Shared helpers belong in `Modules/Utils.lua` (or a small new reusable file if justified).
-  - Static data lists belong in `Modules/*.lua` and must be documented in the changelog if added.
-
 ---
 
-## 5) Key decisions (ADRs)
-
-This repo currently encodes architectural decisions in:
-- [`AGENTS.md`](../../AGENTS.md) — binding rules (monolith, load order, event-driven UI refresh, language policy).
-- [`CHANGELOG.md`](../../CHANGELOG.md) — user-visible change history.
-
-If/when ADRs are introduced:
-- Put them under `docs/ADR/` and link them here.
-
----
-
-## 6) Where to go next
+## Where to go next
 
 - Agent rules: [`AGENTS.md`](../../AGENTS.md)
 - Change history: [`CHANGELOG.md`](../../CHANGELOG.md)
