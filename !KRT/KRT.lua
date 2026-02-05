@@ -2873,7 +2873,8 @@ do
             local message = ""
 
             if rollType == rollTypes.RESERVED then
-                local srList = addon.Reserves:FormatReservedPlayersLine(itemID)
+                -- Chat output must be plain: colored names (|c...|r) can be dropped by chat filters.
+                local srList = addon.Reserves:FormatReservedPlayersLine(itemID, false)
                 local suff = addon.options.sortAscending and "Low" or "High"
                 message = lootState.itemCount > 1
                     and L[chatMsg .. "Multiple" .. suff]:format(srList, itemLink, lootState.itemCount)
@@ -4597,9 +4598,16 @@ do
         return meta
     end
 
-    local function FormatReservePlayerName(itemId, name, count, metaByName)
+    -- useColor: when false, returns plain names (no |c...|r) but preserves suffixes (x2, P+X).
+    -- Default is colored (UI).
+    local function FormatReservePlayerName(itemId, name, count, metaByName, useColor)
         local meta = GetMetaForPlayer(metaByName, itemId, name)
-        local out = ColorizeReserveName(itemId, name, meta and meta.class)
+        local out
+        if useColor == false then
+            out = name
+        else
+            out = ColorizeReserveName(itemId, name, meta and meta.class)
+        end
 
         if module:IsMultiReserve() and count and count > 1 then
             out = out .. format(L.StrReserveCountSuffix, count)
@@ -4638,13 +4646,13 @@ do
         end
     end
 
-    local function BuildPlayerTokens(itemId, players, counts, metaByName)
+    local function BuildPlayerTokens(itemId, players, counts, metaByName, useColor)
         if not players then return {} end
         SortPlayersForDisplay(itemId, players, counts, metaByName)
         twipe(playerTextTemp)
         for i = 1, #players do
             local name = players[i]
-            playerTextTemp[#playerTextTemp + 1] = FormatReservePlayerName(itemId, name, counts and counts[name] or 1, metaByName)
+            playerTextTemp[#playerTextTemp + 1] = FormatReservePlayerName(itemId, name, counts and counts[name] or 1, metaByName, useColor)
         end
         return playerTextTemp
     end
@@ -4653,8 +4661,9 @@ do
     -- Long lists are rendered in a dedicated tooltip on the players line.
     local RESERVE_ROW_MAX_PLAYERS_INLINE = 6
 
-    local function FormatReservePlayerNameBase(itemId, name, metaByName)
+    local function FormatReservePlayerNameBase(itemId, name, metaByName, useColor)
         local meta = GetMetaForPlayer(metaByName, itemId, name)
+        if useColor == false then return name end
         return ColorizeReserveName(itemId, name, meta and meta.class)
     end
 
@@ -6014,7 +6023,9 @@ do
 
     -- ----- SR Announcement Formatting ----- --
 
-    function module:GetPlayersForItem(itemId)
+    -- useColor: when false, returns plain tokens suitable for chat output.
+    -- Default is colored (UI).
+    function module:GetPlayersForItem(itemId, useColor)
         if not itemId then return {} end
         local list = reservesByItemID[itemId]
         if type(list) ~= "table" then return {} end
@@ -6028,7 +6039,7 @@ do
             end
         end
 
-        local tokens = BuildPlayerTokens(itemId, data.players, data.playerCounts, data.playerMeta)
+        local tokens = BuildPlayerTokens(itemId, data.players, data.playerCounts, data.playerMeta, useColor)
         local out = {}
         for i = 1, #tokens do
             out[i] = tokens[i]
@@ -6036,9 +6047,10 @@ do
         return out
     end
 
-    function module:FormatReservedPlayersLine(itemId)
+    -- useColor: when false, returns a chat-safe line without |c...|r codes.
+    function module:FormatReservedPlayersLine(itemId, useColor)
         addon:debug(E.LogReservesFormatPlayers:format(itemId))
-        local list = self:GetPlayersForItem(itemId)
+        local list = self:GetPlayersForItem(itemId, useColor)
         -- Log the list of players found for the item
         addon:debug(E.LogReservesPlayersList:format(itemId, tconcat(list, ", ")))
         return #list > 0 and tconcat(list, ", ") or ""
