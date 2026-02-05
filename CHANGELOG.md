@@ -4,6 +4,9 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- UI: KRT button templates now inherit Blizzard `UIPanelButtonTemplate` and
+  `ItemButtonTemplate` to reduce duplicate XML and keep default button/item visual states
+  consistent.
 - Docs: updated AGENTS.md with explicit `.luacheckrc` maintenance guidance for addon globals.
 - Docs: fixed OVERVIEW.md repository links to use root-relative paths.
 - Tooling: refreshed `.luacheckrc` with explicit KRT frame/global allowlist entries.
