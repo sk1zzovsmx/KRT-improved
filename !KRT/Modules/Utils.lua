@@ -1109,13 +1109,13 @@ Utils._multiSelect = Utils._multiSelect or {}
 local MS = Utils._multiSelect
 
 do
-	local function _msKey(id)
+	local function msKey(id)
 		if id == nil then return nil end
 		local n = tonumber(id)
 		return n or id
 	end
 
-	local function _ensure(contextKey)
+	local function ensureContext(contextKey)
 		if not contextKey or contextKey == "" then
 			contextKey = "_default"
 		end
@@ -1127,32 +1127,32 @@ do
 		return st, contextKey
 	end
 
-	local function _dbg(msg)
+	local function debugLog(msg)
 		if addon and addon.options and addon.options.debug and addon.debug then
 			addon:debug(msg)
 		end
 	end
 
-	function Utils.MultiSelect_Init(contextKey)
-		local st, key = _ensure(contextKey)
+	function Utils.multiSelectInit(contextKey)
+		local st, key = ensureContext(contextKey)
 		st.set = {}
 		st.count = 0
 		st.ver = (st.ver or 0) + 1
-		_dbg(("[LoggerSelect] init ctx=%s ver=%d"):format(tostring(key), st.ver))
+		debugLog(("[LoggerSelect] init ctx=%s ver=%d"):format(tostring(key), st.ver))
 		return st
 	end
 
-	function Utils.MultiSelect_Clear(contextKey)
-		return Utils.MultiSelect_Init(contextKey)
+	function Utils.multiSelectClear(contextKey)
+		return Utils.multiSelectInit(contextKey)
 	end
 
 	-- Toggle selection.
 	-- isMulti=false  -> clear + select single (optional: click-again to deselect when allowDeselect=true)
 	-- isMulti=true   -> toggle selection for the given id
 	-- Returns: actionString, selectedCount
-	function Utils.MultiSelect_Toggle(contextKey, id, isMulti, allowDeselect)
-		local st, key = _ensure(contextKey)
-		local k = _msKey(id)
+	function Utils.multiSelectToggle(contextKey, id, isMulti, allowDeselect)
+		local st, key = ensureContext(contextKey)
+		local k = msKey(id)
 		if k == nil then return nil, st.count or 0 end
 
 		local before = st.count or 0
@@ -1194,7 +1194,7 @@ do
 
 		st.ver = (st.ver or 0) + 1
 
-		_dbg(("[LoggerSelect] toggle ctx=%s id=%s multi=%s action=%s count %d->%d ver=%d"):format(
+		debugLog(("[LoggerSelect] toggle ctx=%s id=%s multi=%s action=%s count %d->%d ver=%d"):format(
 			tostring(key), tostring(id), isMulti and "1" or "0", tostring(action), before, st.count or 0, st.ver
 		))
 
@@ -1203,36 +1203,36 @@ do
 
 	-- Set or clear the range-anchor for SHIFT range selection.
 	-- The anchor is the last non-shift click target for the given context.
-	function Utils.MultiSelect_SetAnchor(contextKey, id)
-		local st, key = _ensure(contextKey)
+	function Utils.multiSelectSetAnchor(contextKey, id)
+		local st, key = ensureContext(contextKey)
 		local before = st.anchor
-		local k = _msKey(id)
+		local k = msKey(id)
 		st.anchor = k
 		-- Anchor changes do not affect highlight rendering directly, so we do not bump st.ver here.
 		local ver = st.ver or 0
-		_dbg(("[LoggerSelect] anchor ctx=%s from=%s to=%s ver=%d"):format(
+		debugLog(("[LoggerSelect] anchor ctx=%s from=%s to=%s ver=%d"):format(
 			tostring(key), tostring(before), tostring(st.anchor), ver
 		))
 		return st.anchor
 	end
 
-	function Utils.MultiSelect_GetAnchor(contextKey)
+	function Utils.multiSelectGetAnchor(contextKey)
 		local st = MS[contextKey or "_default"]
 		return st and st.anchor or nil
 	end
 
-	local function _idOf(x)
+	local function idOf(x)
 		if type(x) == "table" then
 			return x.id
 		end
 		return x
 	end
 
-	local function _findIndex(ordered, key)
+	local function findIndex(ordered, key)
 		if not ordered or not key then return nil end
 		for i = 1, #ordered do
-			local id = _idOf(ordered[i])
-			if _msKey(id) == key then
+			local id = idOf(ordered[i])
+			if msKey(id) == key then
 				return i
 			end
 		end
@@ -1244,17 +1244,17 @@ do
 	-- id: clicked id
 	-- isAdd: when true (CTRL+SHIFT) add the range to the existing selection; otherwise replace selection with the range
 	-- Returns: actionString, selectedCount
-	function Utils.MultiSelect_Range(contextKey, ordered, id, isAdd)
-		local st, key = _ensure(contextKey)
-		local k = _msKey(id)
+	function Utils.multiSelectRange(contextKey, ordered, id, isAdd)
+		local st, key = ensureContext(contextKey)
+		local k = msKey(id)
 		if k == nil then return nil, st.count or 0 end
 
 		local before = st.count or 0
 		local action
 
 		local aKey = st.anchor
-		local ai = _findIndex(ordered, aKey)
-		local bi = _findIndex(ordered, k)
+		local ai = findIndex(ordered, aKey)
+		local bi = findIndex(ordered, k)
 
 		if not ai or not bi then
 			-- If we cannot resolve indices (missing anchor or id), behave like a single select.
@@ -1275,8 +1275,8 @@ do
 			end
 
 			for i = from, to do
-				local id2 = _idOf(ordered[i])
-				local k2 = _msKey(id2)
+				local id2 = idOf(ordered[i])
+				local k2 = msKey(id2)
 				if k2 ~= nil and not st.set[k2] then
 					st.set[k2] = true
 					st.count = (st.count or 0) + 1
@@ -1286,31 +1286,31 @@ do
 		end
 
 		st.ver = (st.ver or 0) + 1
-		_dbg(("[LoggerSelect] range ctx=%s id=%s add=%s action=%s count %d->%d ver=%d anchor=%s"):format(
+		debugLog(("[LoggerSelect] range ctx=%s id=%s add=%s action=%s count %d->%d ver=%d anchor=%s"):format(
 			tostring(key), tostring(id), isAdd and "1" or "0", tostring(action), before, st.count or 0, st.ver,
 			tostring(st.anchor)
 		))
 		return action, st.count or 0
 	end
 
-	function Utils.MultiSelect_IsSelected(contextKey, id)
+	function Utils.multiSelectIsSelected(contextKey, id)
 		local st = MS[contextKey or "_default"]
 		if not st or not st.set then return false end
-		local k = _msKey(id)
+		local k = msKey(id)
 		return (k ~= nil) and (st.set[k] == true) or false
 	end
 
-	function Utils.MultiSelect_Count(contextKey)
+	function Utils.multiSelectCount(contextKey)
 		local st = MS[contextKey or "_default"]
 		return (st and st.count) or 0
 	end
 
-	function Utils.MultiSelect_GetVersion(contextKey)
+	function Utils.multiSelectGetVersion(contextKey)
 		local st = MS[contextKey or "_default"]
 		return (st and st.ver) or 0
 	end
 
-	function Utils.MultiSelect_GetSelected(contextKey)
+	function Utils.multiSelectGetSelected(contextKey)
 		local st = MS[contextKey or "_default"]
 		local out = {}
 		if not st or not st.set then return out end
@@ -1329,6 +1329,18 @@ do
 		end)
 		return out
 	end
+
+	-- Backward-compatible aliases for legacy call sites.
+	Utils.MultiSelect_Init = Utils.multiSelectInit
+	Utils.MultiSelect_Clear = Utils.multiSelectClear
+	Utils.MultiSelect_Toggle = Utils.multiSelectToggle
+	Utils.MultiSelect_SetAnchor = Utils.multiSelectSetAnchor
+	Utils.MultiSelect_GetAnchor = Utils.multiSelectGetAnchor
+	Utils.MultiSelect_Range = Utils.multiSelectRange
+	Utils.MultiSelect_IsSelected = Utils.multiSelectIsSelected
+	Utils.MultiSelect_Count = Utils.multiSelectCount
+	Utils.MultiSelect_GetVersion = Utils.multiSelectGetVersion
+	Utils.MultiSelect_GetSelected = Utils.multiSelectGetSelected
 end
 
 

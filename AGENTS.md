@@ -1,100 +1,137 @@
-# KRT - AGENTS.md (WoW 3.3.5a - Lua 5.1)
+# KRT - AGENTS.md (WoW 3.3.5a / Lua 5.1)
 
-**Context file for AI coding agents.** Lives at repo root. Keep lines short (<= 120 chars). Keep this current.
+Context file for AI coding agents. Lives at repo root as `AGENTS.md`.
+Keep lines <= 120 chars. Keep this file current.
 
-**Default:** guidelines are non-binding; when in doubt, follow existing KRT patterns.
-**Exception:** sections marked **BINDING** must be followed for every change.
+Default: guidelines are non-binding; when in doubt, follow existing KRT patterns.
+Exception: sections marked **BINDING** must be followed for every change.
+
+Changelog: **CHANGELOG.md** is the single source of truth for behavior/user-visible changes.
+
+---
+
+## Conversations (Self-Learning)
+
+Update requirement:
+- Before starting any task, scan the latest user message for new permanent rules/preferences.
+- If a new durable rule is detected, update this file first, then do the task.
+
+Do NOT record:
+- one-off instructions for a single task,
+- temporary exceptions.
+
+Durable preferences learned from recent conversations:
+- Prefer PascalCase for addon module table names.
+- Prefer camelCase for utility functions and local variables; avoid snake_case for new naming.
 
 ---
 
 ## 1) Purpose
-KRT (Kader Raid Tools) provides raid-lead QoL for WotLK 3.3.5a: loot handling (MS/OS/SR), soft reserves,
-loot history/logger, master-loot helpers, LFM spammer, warnings/announces, and export/import utilities.
 
-UI is **XML + Lua** (no Ace3 GUI). Libraries are vendored via **LibStub**.
+KRT (Kader Raid Tools) provides raid-lead QoL for WotLK 3.3.5a:
+- loot handling (MS/OS/SR) + master-loot helpers,
+- soft reserves (import/export, reserve list),
+- loot history/logger,
+- warnings/announces, LFM spammer,
+- small utilities (export strings, helpers).
 
----
-
-## 2) Hard constraints
-- **Client/API:** Wrath of the Lich King **3.3.5a** (Interface **30300**), **Lua 5.1** runtime.
-- **Addon folder name:** `!KRT` (leading `!` is intentional).
-- **Architecture:** **KRT.lua stays MONOLITHIC** for feature/core logic. (**BINDING**)
-- **SV compatibility:** do not break SavedVariables keys without migration + change log note.
-- **Dependencies:** do not introduce Ace3. Prefer existing vendored libs.
+UI is XML + Lua (no Ace3 GUI). Libraries are vendored via LibStub.
 
 ---
 
-## 3) Monolithic KRT.lua policy (BINDING)
+## 2) Hard constraints (**BINDING**)
+
+- Client/API: Wrath of the Lich King 3.3.5a (Interface 30300), Lua 5.1 runtime.
+- Addon folder name: `!KRT` (leading `!` is intentional).
+- No Ace3 dependencies (do not introduce Ace3).
+- SavedVariables compatibility: do not break SV keys/shape without migration + CHANGELOG entry.
+
+---
+
+## 3) Monolithic `KRT.lua` policy (**BINDING**)
+
 Monolithic means:
-- Feature logic (Raid/Rolls/Reserves/Loot/Logger/Master/Warnings/Spammer/Changes/Config/Slash) lives in **KRT.lua**
-  and is organized as `do ... end` module blocks.
-- `Modules/` is reserved for existing **utility/const/data lists** (e.g., `Utils.lua`, `C.lua`, `ignoredItems.lua`).
+- Feature logic lives in `!KRT/KRT.lua` and is organized as `do ... end` module blocks.
+- `!KRT/Modules/` is reserved for utilities/constants/static data (e.g., `Utils.lua`, `C.lua`, `ignoredItems.lua`).
   It must not become a feature plugin system.
 
-Binding rules:
-1) New features and major refactors MUST be implemented inside **KRT.lua**, not as new files.
+Rules:
+1) New features and major refactors MUST be implemented inside `KRT.lua` (not new feature files).
 2) A new file is allowed only if it is:
-   - a static data list (IDs/lookup tables), or
+   - a static data list (IDs / lookup tables), or
    - a generic reusable utility, or
    - required by technical constraints/load order,
-   and it MUST be documented in **17) Change log**.
-3) Each in-file module block must be self-contained (private state local to the block; exports only on `addon.X`).
+   and it MUST be documented in CHANGELOG.md.
+3) Each in-file module block should keep private state local; public exports go on `addon.*`.
 
 ---
 
-## 4) Load order (BINDING)
-WoW file load order matters. Keep (or restore) this logical order in the `.toc`:
+## 4) Load order (**BINDING**)
 
-1) **LibStub**
-2) **CallbackHandler-1.0**
-3) **LibCompat-1.0** (includes internal libs)
-4) **LibDeformat-3.0**
-5) **LibLogger-1.0**
-6) **LibBossIDs-1.0**
-7) **Localization/localization.en.lua** (defines `addon.L`)
-8) **Templates.xml**
-9) **Modules/Utils.lua**, **Modules/C.lua**
-10) **KRT.lua** (monolithic core + modules)
-11) **KRT.xml** (main UI)
-12) **Modules/ignoredItems.lua** (intentionally after KRT.lua)
+WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
+
+1) LibStub
+2) CallbackHandler-1.0
+3) LibBossIDs-1.0
+4) LibDeformat-3.0
+5) LibCompat-1.0
+6) LibLogger-1.0
+7) Localization/localization.en.lua (defines `addon.L`)
+8) Localization/ErrorLog.en.lua (defines `addon.E`)
+9) Templates.xml
+10) Modules/Utils.lua, Modules/C.lua
+11) KRT.lua
+12) KRT.xml
+13) Modules/ignoredItems.lua (intentionally after KRT.lua/KRT.xml)
 
 ---
 
-## 5) Real repo layout
+## 5) Repo layout (actual)
+
 ```
 !KRT/
   !KRT.toc
   KRT.lua                  # MONOLITH: core + modules
-  KRT.xml                  # main UI (keep frame scripts thin)
+  KRT.xml                  # main UI (keep scripts thin)
   Templates.xml            # reusable XML templates
 
   Localization/
-    localization.en.lua    # canonical user strings (enUS)
+    localization.en.lua    # user-facing strings (enUS) -> addon.L
+    ErrorLog.en.lua        # log/debug templates (enUS) -> addon.E
 
   Modules/
-    Utils.lua              # helpers (addon.Utils)
+    Utils.lua              # helpers + UI controllers (addon.Utils)
     C.lua                  # constants/enums/patterns (addon.C)
     ignoredItems.lua       # data lists / filters
 
   Libs/
     LibStub/
     CallbackHandler-1.0/
-    LibCompat-1.0/
-    LibDeformat-3.0/
-    LibLogger-1.0/
     LibBossIDs-1.0/
+    LibDeformat-3.0/
+    LibCompat-1.0/
+    LibLogger-1.0/
 ```
 
 ---
 
-## 6) Globals & SavedVariables (BINDING)
+## 6) Globals & SavedVariables (**BINDING**)
 
-### 6.1 Intentional globals
-- `_G["KRT"] = addon` is set by `KRT.lua` for debugging/interop and is intentional.
-- Do not introduce additional globals.
+### 6.1 Intentional globals (allowed)
+
+- `_G["KRT"] = addon` is set by `KRT.lua` for debugging/interop.
+- Named XML frames become globals (normal WoW UI behavior). Examples:
+  - `KRTConfig`, `KRTWarnings`, `KRTMaster`, `KRTLogger`, `KRTChanges`, `KRTSpammer`
+  - `KRTLootCounterFrame`, `KRTReserveListFrame`, `KRTImportWindow`, `KRTItemSelectionFrame`
+  - `KRTLoggerBossBox`, `KRT_MINIMAP_GUI`
+- `Modules/Utils.lua` intentionally defines a few global convenience helpers:
+  - `table.shuffle`, `table.reverse`, `string.trim`, `string.startsWith`, `string.endsWith`
+
+Do not introduce additional non-frame globals (tables/vars/functions) unless explicitly required and documented.
 
 ### 6.2 SavedVariables (account)
-These keys are used by the addon and must remain compatible:
+
+These keys are persisted and must remain compatible:
 - `KRT_Options`
 - `KRT_Raids`
 - `KRT_Players`
@@ -107,75 +144,87 @@ These keys are used by the addon and must remain compatible:
 - `KRT_SavedReserves`
 - `KRT_PlayerCounts`
 
+---
+
+## 7) Language & strings (**BINDING**)
+
+KRT is standardized on English.
+
 Rules:
-- Do not rename/re-structure SV without a migration.
-- Any user-visible change MUST be documented in **17) Change log**.
+1) All new/modified content must be English (comments, logs, UI labels, chat text).
+2) User-facing strings MUST go through `addon.L` (Localization/localization.en.lua).
+3) Log/debug templates MUST go through `addon.E` (Localization/ErrorLog.en.lua) when appropriate.
+4) Prefer format placeholders over sentence concatenation (use `format(L.Key, a, b)`).
+5) Prefer ASCII-only in code/comments/logs (avoid typographic quotes/dashes and emojis).
 
 ---
 
-## 7) Language policy (BINDING)
-KRT is standardized on **English**.
+## 8) Call style: `:` vs `.` (**BINDING**)
 
-Binding rules:
-1) **All new or modified content must be English**:
-   - code comments,
-   - log/debug messages (LibLogger),
-   - UI labels/help text,
-   - chat/whisper text.
-2) User-facing text MUST go through localization (`addon.L`):
-   - `Localization/localization.en.lua` (enUS) is the canonical source of truth.
-   - Do not add hardcoded user strings in code unless it is debug-only and clearly marked.
-3) Localization keys SHOULD be English and stable. Do not rename keys without a migration plan.
-4) Avoid string concatenation for sentences; prefer format placeholders (e.g., `format(L.X, a, b)`).
-5) Existing non-English comments/strings SHOULD be migrated opportunistically when touched, but avoid mass rewrites that
-6) Prefer ASCII-only text in code/comments/logs. Avoid typographic quotes/dashes and emojis.
-   do not change behavior.
+Lua method call depends on whether the function expects `self`:
+
+- Use `:` for true methods (first parameter is `self`):
+  - `addon:info(...)`, `addon:ADDON_LOADED(...)`, `module:Toggle()`, `Store:GetRaid(...)`
+- Use `.` for plain functions (no `self`):
+  - `Utils.getRaid(...)`, `addon.NewTimer(...)`, `addon.CancelTimer(...)`, `addon.After(...)`, `addon.LoadOptions()`
+
+Rule: do not mechanically convert `.` <-> `:` unless you verified the function signature.
 
 ---
 
-## 8) UI: main windows (KRT.xml)
-Main frames (keep compatibility):
-- `KRTConfig`
-- `KRTWarnings`
-- `KRTMaster`
-- `KRTLogger`
-- `KRTChanges`
-- `KRTSpammer`
-- `KRTLootCounterFrame`
-- Common helpers: `KRTImportWindow`, `KRTItemSelectionFrame`, `KRTReserveListFrame`
+## 9) UI refresh policy: event-driven (**BINDING**)
 
-Guidelines:
-- XML stays thin: route logic into `KRT.lua` module methods.
-- Reuse templates from `Templates.xml`.
+KRT is actively refactoring away from polling-style UI updates.
 
----
+Rules:
+- Prefer on-demand UI redraws via `Utils.makeEventDrivenRefresher(getFrame, updateFn)`.
+- Modules should expose:
+  - `module:Refresh()` (pure redraw) and `module:RequestRefresh()` (throttled request).
+- Avoid setting `OnUpdate` on feature frames to poll state.
+- Allowed exceptions:
+  - minimap drag movement,
+  - LibCompat internal timers,
+  - Utils internal driver frames used by `makeEventDrivenRefresher`.
 
-## 9) Slash commands
-- `/krt`, `/kraidtools` -> main dispatcher (handled by `addon.Slash`).
-- `/krtcounts` -> toggles loot counter (`addon.Master:ToggleCountsFrame()`).
-
-Rule:
-- Do not break existing commands. Additions require help output + localization updates.
+For scroll lists:
+- Prefer `Utils.makeListController({...})` + `controller:Dirty()` over manual row loops.
+- For multi-selection, use `Utils.MultiSelect_*` with stable IDs.
 
 ---
 
-## 10) Module map (KRT.lua)
-Modules are tables on `addon.*` inside `KRT.lua`:
+## 10) Options access pattern
 
-- `addon.State`     - shared runtime state
-- `addon.Chat`      - chat output helpers
-- `addon.Slash`     - command parsing + help
-- `addon.Config`    - options & SavedVariables
-- `addon.Minimap`   - minimap button
-- `addon.Raid`      - raid/session, roster, instance detection
-- `addon.Rolls`     - roll tracking, sorting, winner logic (MS/OS/SR)
-- `addon.Reserves`  - soft reserve model + import/export
-- `addon.Loot`      - loot parsing, item selection, export strings
-- `addon.Logger`    - loot history logging + UI refresh
-- `addon.Master`    - master-loot helpers, award/trade tracking, loot counter frame
-- `addon.Warnings`  - announce templates, throttling, channel selection
-- `addon.Changes`   - MS change collection/announce
-- `addon.Spammer`   - LFM spam helper
+- SV table is `KRT_Options`.
+- Runtime options are mirrored on `addon.options` by `addon.LoadOptions()` (called on ADDON_LOADED).
+- When changing an option:
+  - update `KRT_Options[key]`,
+  - update `addon.options[key]` (if present),
+  - request a refresh of the owning UI module.
+
+---
+
+## 11) Module map (KRT.lua)
+
+Top-level feature modules on `addon.*`:
+- `addon.Raid`          - raid/session, roster, instance detection
+- `addon.Chat`          - output helpers (Print/Announce)
+- `addon.Minimap`       - minimap button + EasyMenu
+- `addon.Rolls`         - roll tracking, sorting, winner logic
+- `addon.Loot`          - loot parsing, item selection, export strings
+- `addon.Master`        - master-loot helpers, award/trade tracking
+- `addon.LootCounter`   - loot counter UI + data
+- `addon.Reserves`      - soft reserves model + list UI
+- `addon.ReserveImport` - SR import window glue + validation
+- `addon.Config`        - options UI + defaults/load
+- `addon.Warnings`      - warnings list + announce helpers
+- `addon.Changes`       - MS changes list + announce
+- `addon.Spammer`       - LFM spam helper
+- `addon.Logger`        - loot logger UI + raid editor
+
+`addon.Logger` internal structure (pattern for complex modules):
+- `addon.Logger.Store`   - data access helpers + stable-ID indexing
+- `addon.Logger.View`    - view-model row builders (UI-friendly data)
+- `addon.Logger.Actions` - mutations + commit/refresh boundaries
 
 External modules:
 - `addon.Utils` (Modules/Utils.lua)
@@ -183,167 +232,80 @@ External modules:
 
 ---
 
-## 11) Canonical in-file module pattern (BINDING)
-Every module block inside `KRT.lua` MUST follow this skeleton:
+## 12) Lua 5.1 coding standard (**BINDING**)
 
-```lua
-do
-    addon.ModuleName = addon.ModuleName or {}
-    local module = addon.ModuleName
+Non-negotiables:
+1) No accidental globals: everything is `local` unless intentionally exported.
+2) Prefer locals for performance/readability.
+3) Avoid environment hacks in addon logic (`getfenv/setfenv` only for niche debug tools).
 
-    local L = addon.L
-    local Utils = addon.Utils
-    local C = addon.C
+Formatting:
+- Indentation: 4 spaces (legacy code may contain tabs; do not mass-reformat).
+- No trailing whitespace. No semicolons.
 
-    -- Private state (local to this block)
-    local state = {
-        enabled = true,
-    }
+Errors/returns:
+- Recoverable failure: `return nil, "reason"` or `return false` with a localized error message.
+- Programmer errors/invariants: `assert()` or `error()`.
 
-    -- Private helpers (local functions) above the public API
-
-    -- Public API
-    function module:Init()
-    end
-end
-```
-
-Rules:
-- Working variables and state are `local` to the block.
-- Public exports only via `addon.ModuleName`.
-- Avoid circular dependencies. If needed, move shared helpers into `Utils` or implement a minimal bridge.
-
----
-
-## 12) Lua 5.1 coding standard (BINDING)
-This standard defines the repository-wide Lua 5.1 style. New code MUST follow it.
-
-### 12.1 Non-negotiables
-1) No accidental globals: everything is `local` unless exported via `addon` or documented as intentional global.
-2) Prefer locals (performance + readability).
-3) Do not use environment hacks in application logic (`getfenv/setfenv` only for tests/sandbox).
-
-### 12.2 Formatting
-- Indentation: **4 spaces** (no tabs).
-- No trailing whitespace.
-- No semicolons.
-- Strings: prefer `"..."` in new code; `[[...]]` for multiline.
-
-### 12.3 Naming
-- Exported modules/tables: **PascalCase** (e.g., `Reserves`, `Loot`).
-- Public functions: **lowerCamelCase** verbs (e.g., `getRaidSize`, `setEnabled`).
-- Private helpers: `local function name()` (optional `_prefix`).
-- Constants: **UPPER_SNAKE_CASE**.
-- Booleans: `is/has/can/should` prefix.
-
-### 12.4 Errors and returns
-- Recoverable failures: `return nil, "reason"`.
-- Success: return a non-nil primary value (`true`, result table, etc.).
-- `assert()` only for invariants/programmer errors.
-- `pcall/xpcall` only at untrusted boundaries (parsing external input, plugin hooks).
-
-### 12.5 Tables and iteration
+Iteration:
 - Arrays are 1-indexed.
 - If holes are possible, do not rely on `#t`.
-- Use `for i = 1, #arr do ... end` for sequences; `pairs()` for maps.
-- Avoid `ipairs()` if nil holes are possible.
-
-### 12.6 Performance/GC
-- Avoid allocations in tight loops (reuse tables).
-- Avoid concatenation in loops; use `table.concat` where appropriate.
-- Cache stdlib functions locally only in hot paths.
-
-### 12.7 Optional dev-only global guard
-```lua
--- DEV ONLY: fail on new globals
-setmetatable(_G, {
-    __newindex = function(_, k, _)
-        error("Attempt to create global '" .. tostring(k) .. "'", 2)
-    end
-})
-```
+- Prefer `for i = 1, #arr do ... end` for sequences; `pairs()` for maps.
 
 ---
 
-## 13) Logging (LibLogger-1.0) guidelines
-Use consistent levels:
-- `error`: breaks functionality or corrupts state
-- `warn`: abnormal but non-blocking behavior
-- `info`: major lifecycle events (raid created, boss kill, award, trade)
-- `debug/trace`: detailed flow (avoid spam, especially in combat)
+## 13) Logging (LibLogger-1.0)
 
-Throttle high-frequency sources (roster updates, combat log, UI refresh loops).
+Use consistent levels:
+- error: breaks functionality or corrupts state
+- warn: abnormal but non-blocking behavior
+- info: major lifecycle events (raid created, award, trade, boss kill)
+- debug/trace: detailed flow (avoid spam, especially in combat)
+
+Throttle high-frequency sources (roster bursts, combat log, UI refresh loops) with LibCompat timers.
 
 ---
 
 ## 14) WoW 3.3.5a compatibility
+
 - Do not use modern APIs (`C_Timer`, `C_` namespaces, etc.).
-- Avoid `io/os/debug` (not available in WoW).
-- Respect combat lockdown (do not manipulate secure frames in combat).
+- Avoid `io/os/debug` (not available in WoW runtime).
+- Respect combat lockdown (avoid secure frame changes in combat).
 
 ---
 
 ## 15) Manual test checklist
+
 - Login: no errors; `/krt` opens.
-- Raid detection: instance/difficulty detected; `KRT_CurrentRaid` created.
+- Raid detection: instance/difficulty detected; current raid created; roster updates.
 - Rolls: MS/OS/SR works; stable sorting; deterministic winner.
 - Reserves: import/export; caps; roll gating consistent.
-- Logger: records append; UI refresh; filters keep order.
-- Master: award/trade tracking; `/krtcounts` toggles `KRTLootCounterFrame`.
-- Warnings/Spammer: correct channels + throttling.
+- Logger: loot entries append; filters; delete flows; selection highlight works.
+- Master: award/trade tracking; multi-award; `/krtcounts` toggles Loot Counter.
+- Warnings/Changes/Spammer: correct channels + throttling; no UI spam.
 - Persistency: `/reload` keeps SV and expected state.
 
 ---
 
 ## 16) Do / Don't
-**Do:** small testable changes; reuse templates; local scope; logs that help without spamming.
-**Don't:** Ace3, long blocking loops, new SV without migration, undocumented globals, moving features into new files.
+
+Do:
+- small testable changes,
+- reuse templates and Utils controllers,
+- keep state local to module blocks,
+- document user-visible changes in CHANGELOG.md.
+
+Don't:
+- Ace3,
+- long blocking loops,
+- new SV keys without migration,
+- new globals (beyond allowed ones),
+- moving features into new files.
 
 ---
 
-## 17) Change log (edit manually)
-- 2026-03-15: Skip raid target icon on the master looter when they win their own trade.
-- 2026-03-14: Master Loot roll button now respects multi-reserve roll counts for the local player.
-- 2026-03-13: Converted Config/Warnings/Changes/Reserves/BossBox UI refresh to on-demand updates.
-- 2026-03-12: Fixed Master Looter inventory insert to match cursor items by itemId fallback.
-- 2026-03-12: Simplified Master Looter bag item selection (click drop, tradeable gate, bag scan).
-- 2026-03-12: Localized XML UI strings from KRT.xml/Templates.xml via Lua.
-- 2026-03-12: Loot Counter keeps scroll position and relies on localization strings.
-- 2026-03-12: Loot Counter player names now use class colors.
-- 2026-03-12: Loot Counter headers use the same grey styling as Master Looter.
-- 2026-03-10: Localized Reserve List window buttons (clear, query item, close).
-- 2026-03-11: Deterministic changes list ordering and refresh after deletions.
-- 2026-03-11: Improved list controller sorting, row sizing, and scroll inset safety.
-- 2026-03-10: Master Loot reserve list button toggles insert/open; Loot Counter uses former Raid List button.
-- 2026-03-09: Master Looter uses GetContainerItemLink for inventory item links in 3.3.5a.
-- 2026-03-08: Split log localization strings into Localization/ErrorLog.en.lua.
-- 2026-01-13: Standardized repository language to English (AGENTS + codebase rules).
-- 2026-01-13: Reaffirmed **KRT.lua monolithic** policy and in-file module skeleton.
-- 2026-01-13: Codified Lua 5.1 style rules (globals, formatting, naming, errors/returns, iteration).
-- 2026-03-07_: Clear rolls when self-awarding stacked inventory items (multi-count trade keep path).
-- 2026-03-06_: Master Looter buttons: countdown gates item selection, roll start, SR gated by reserved item, roll/award gating, reset rolls on awards; selection now enables Hold/Bank/DE buttons.
-- 2026-03-05_: Removed Docs/KRT_STANDARD.md and Docs/WoW_Addons.pdf references and files.
-- 2026-03-05_: Removed TemplatesLua directory references from AGENTS and deleted TemplatesLua.
-- 2026-03-02_: Removed `/krt lfm period` command and default LFM period SV entry.
-- 2026-01-02_: Standardized module skeleton (use `local module`), updated TemplatesLua + Docs, and introduced `addon.LootCounter` module (kept Master aliases).
-- 2025-09-05_: Initial lightweight version; removed binding “recipes”. Added `dev`-only branching policy.
-- 2025-09-07_: Clarified monolithic structure and updated CLI command list.
-- 2025-09-08_: Renamed Logger module to History to avoid conflict with debugging logger.
-- 2025-09-09_: Integrate new template. Removed unused Libs.
-- 2025-09-10_: Clarified proprietary WoW API requirement.
-- 2025-09-13_: Updated nil-check and API fallback guidelines.
-- 2025-12-24_: Added BINDING `Docs/KRT_STANDARD.md` and `TemplatesLua/` as canonical patterns for all work.
-- 2026-01-07_: Simplified SavedVariables: removed unused versioning/audit keys.
-- 2025-12-27_: Hardened debug logger guard, trimmed slash args, removed unused CHAT_MSG_ADDON entry.
-- 2025-09-20_: Enlarged Loot Counter window, centered title, and enabled dragging.
-- 2025-09-21_: Prefer vendored libs, avoid Utils/KRT duplicates, and skip fallbacks when libs are vendored.
-- 2025-09-22_: Expanded vendored library guidance into explicit bullet rules.
-- 2025-09-23_: Reset Master Loot ItemCount on item change/award and refresh counts for loot sources.
-- 2025-09-24_: Centered reserve list row alignment and auto-queried missing item icons on open.
-- 2025-09-25_: Reserve list rows now place text to the right of icons and hide icons until item data loads.
-- 2025-09-26_: Load saved SR reserves during addon initialization.
-- 2025-09-27_: SR roll button allows non-reserved players to roll once (SR priority remains).
-- 2026-02-01_: Fixed CallbackHandler OnUsed/OnUnused wiring in event dispatcher and templates.
-- 2026-02-15_: Parse pushed loot messages and refresh Loot Logger on new loot.
-- 2026-02-21_: Removed KRT_Debug SavedVariable (log levels are runtime-only).
-- 2026-03-01_: Renamed History module to Logger (UI, strings, and references).
+## 17) Static analysis (`.luacheckrc`)
+
+- Keep `.luacheckrc` aligned with current addon globals and frame names.
+- When XML introduces/removes named frames, update `.luacheckrc` global allowlist in the same change.
+- Prefer additive, explicit entries grouped under a `KRT addon globals` comment block.
