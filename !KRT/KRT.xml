@@ -1362,7 +1362,7 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+			<ScrollFrame name="$parentScrollFrame" inherits="BasicHybridScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT">
 						<Offset>
@@ -2127,7 +2127,7 @@
 					<OnClick>KRT.Changes:Announce()</OnClick>
 				</Scripts>
 			</Button>
-			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+			<ScrollFrame name="$parentScrollFrame" inherits="BasicHybridScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT">
 						<Offset>
@@ -3101,7 +3101,7 @@
 							<OnClick>KRT.Logger.Raids:Sort("size")</OnClick>
 						</Scripts>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="BasicHybridScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -3259,7 +3259,7 @@
 							<OnClick>KRT.Logger.Boss:Sort("mode")</OnClick>
 						</Scripts>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="BasicHybridScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -3357,7 +3357,7 @@
 							<OnClick>KRT.Logger.BossAttendees:Sort("name")</OnClick>
 						</Scripts>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="BasicHybridScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -3485,7 +3485,7 @@
 							<OnClick>KRT.Logger.RaidAttendees:Sort("leave")</OnClick>
 						</Scripts>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="BasicHybridScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -3691,7 +3691,7 @@
 							<OnClick>KRT.Logger.Loot:Sort("time")</OnClick>
 						</Scripts>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="BasicHybridScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>

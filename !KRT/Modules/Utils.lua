@@ -286,8 +286,6 @@ function Utils.makeListController(cfg)
 		frameName = nil,
 		data = {},
 		_rows = {},
-		_rowByName = {},
-		_usedNames = {},
 		_asc = false,
 		_sortKey = nil,
 		_lastHL = nil,
@@ -311,23 +309,37 @@ function Utils.makeListController(cfg)
 		end
 	end
 
-	local function acquireRow(btnName, parent)
-		local row = self._rowByName[btnName]
-		if row then
-			row:Show()
+
+	local function ensureHybridRows(sf)
+		if not sf or not HybridScrollFrame_CreateButtons then return false end
+		if sf.buttons and #sf.buttons > 0 then
+			self._rows = sf.buttons
+			return true
+		end
+
+		local probe = CreateFrame("Button", nil, sf, cfg.rowTmpl)
+		if not probe then return false end
+		local probeHeight = probe:GetHeight() or 20
+		if probe.Hide then probe:Hide() end
+
+		HybridScrollFrame_CreateButtons(sf, cfg.rowTmpl)
+		if not sf.buttons or #sf.buttons == 0 then
+			return false
+		end
+
+		for i = 1, #sf.buttons do
+			local row = sf.buttons[i]
+			if cfg._rowParts and not row._p then
+				buildRowParts(row:GetName() or "", row)
+			end
 			if Utils and Utils.ensureRowVisuals then
 				Utils.ensureRowVisuals(row)
 			end
-			return row
 		end
 
-		row = CreateFrame("Button", btnName, parent, cfg.rowTmpl)
-		self._rowByName[btnName] = row
-		buildRowParts(btnName, row)
-		if Utils and Utils.ensureRowVisuals then
-			Utils.ensureRowVisuals(row)
-		end
-		return row
+		self._rows = sf.buttons
+		self._rowHeight = probeHeight
+		return true
 	end
 
 	local function releaseData()
@@ -371,45 +383,6 @@ function Utils.makeListController(cfg)
 		self._lastHL = nil
 	end
 
-	local function safeRightInset(sf, sc, frameName)
-		if cfg.rightInset ~= nil then
-			return cfg.rightInset
-		end
-
-		local sb = nil
-		if sf and sf.GetName then
-			sb = _G[sf:GetName() .. "ScrollBar"]
-		end
-		if not sb and sf then
-			sb = sf.ScrollBar
-		end
-		if not sb and frameName then
-			sb = _G[frameName .. "ScrollFrameScrollBar"]
-		end
-
-		-- Robust calc: how far the scroll child extends under the scrollbar.
-		-- Avoid oversized estimated insets that create visible gaps.
-		if sb and sc and sb.IsShown and sb:IsShown() and sb.GetLeft and sc.GetRight then
-			local sbL = sb:GetLeft()
-			local scR = sc:GetRight()
-			if sbL and scR then
-				local overlap = scR - sbL
-				if overlap > 0 then
-					-- No extra padding; row template already handles spacing.
-					return overlap
-				end
-				return 0
-			end
-		end
-
-		-- Fallback: conservative without extra padding.
-		local width = sb and sb.GetWidth and sb:GetWidth()
-		if width and width > 0 then
-			return width
-		end
-		return 0
-	end
-
 	local function safeRowHeight(row, declaredHeight)
 		local height = declaredHeight
 		if height == nil and row and row.GetHeight then
@@ -443,14 +416,19 @@ function Utils.makeListController(cfg)
 		if combo == self._lastHL then return end
 		self._lastHL = combo
 
-		for i = 1, #self.data do
-			local it = self.data[i]
+		local offset = 0
+		if HybridScrollFrame_GetOffset and self._scrollFrame then
+			offset = HybridScrollFrame_GetOffset(self._scrollFrame) or 0
+		end
+
+		for i = 1, #self._rows do
 			local row = self._rows[i]
+			local it = self.data[offset + i]
 			if row then
 				local isSel = false
-				if cfg.highlightId then
+				if it and cfg.highlightId then
 					isSel = (selectedId ~= nil and it.id == selectedId)
-				elseif cfg.highlightFn then
+				elseif it and cfg.highlightFn then
 					isSel = cfg.highlightFn(it.id, it, i, row) and true or false
 				end
 
@@ -462,7 +440,7 @@ function Utils.makeListController(cfg)
 				end
 
 				if Utils and Utils.setRowFocused then
-					Utils.setRowFocused(row, focusId ~= nil and it.id == focusId)
+					Utils.setRowFocused(row, it and focusId ~= nil and it.id == focusId)
 				end
 			end
 		end
@@ -547,6 +525,17 @@ function Utils.makeListController(cfg)
 			setActive(false)
 		end)
 
+		local sf = _G[self.frameName .. "ScrollFrame"]
+		if sf then
+			sf:HookScript("OnVerticalScroll", function()
+				if self._active then
+					self:Fetch()
+					applyHighlight()
+					postUpdate()
+				end
+			end)
+		end
+
 		if frame:IsShown() then
 			setActive(true)
 		end
@@ -557,14 +546,20 @@ function Utils.makeListController(cfg)
 		if not n then return end
 
 		local sf = _G[n .. "ScrollFrame"]
-		local sc = _G[n .. "ScrollFrameScrollChild"]
-		if not (sf and sc) then
+		if not sf then
 			if not self._missingScroll then
 				self._missingScroll = true
 				addon:warn(L.LogLoggerUIMissingWidgets:format(tostring(cfg.keyName or "?"), tostring(n)))
 			end
 			return
 		end
+
+		if not ensureHybridRows(sf) then
+			local sc = _G[n .. "ScrollFrameScrollChild"]
+			if not sc then return end
+			self._rows = self._rows or {}
+		end
+		self._scrollFrame = sf
 
 		local scrollW = sf:GetWidth() or 0
 		self._lastWidth = scrollW
@@ -578,73 +573,49 @@ function Utils.makeListController(cfg)
 			defer:Show()
 			return false
 		end
-		if (sc:GetWidth() or 0) < 10 then
-			sc:SetWidth(scrollW)
-		end
-
 		-- One-time diagnostics per list to help debug "empty/blank" frames.
 		if not self._loggedFetch then
 			self._loggedFetch = true
+			local sc = _G[n .. "ScrollFrameScrollChild"]
 			addon:debug(L.LogLoggerUIFetch:format(
 				tostring(cfg.keyName or "?"),
 				#self.data,
 				sf:GetWidth() or 0, sf:GetHeight() or 0,
-				sc:GetWidth() or 0, sc:GetHeight() or 0,
+				sc and (sc:GetWidth() or 0) or 0, sc and (sc:GetHeight() or 0) or 0,
 				(_G[n] and _G[n]:GetWidth() or 0),
 				(_G[n] and _G[n]:GetHeight() or 0)
 			))
 		end
 
-		local totalH = 0
 		local count = #self.data
-		local used = self._usedNames
-		if twipe then
-			twipe(used)
-		else
-			for k in pairs(used) do
-				used[k] = nil
-			end
+		local rowHeight = self._rowHeight
+		if not rowHeight then
+			local firstRow = self._rows[1]
+			rowHeight = safeRowHeight(firstRow)
+			self._rowHeight = rowHeight
 		end
-		local rightInset = safeRightInset(sf, sc, n)
 
-		for i = 1, count do
-			local it = self.data[i]
-			local btnName = cfg.rowName(n, it, i)
-			used[btnName] = true
+		local offset = HybridScrollFrame_GetOffset and HybridScrollFrame_GetOffset(sf) or 0
+		local totalHeight = count * rowHeight
 
+		for i = 1, #self._rows do
+			local index = offset + i
 			local row = self._rows[i]
-			if not row or row:GetName() ~= btnName then
-				row = acquireRow(btnName, sc)
-				self._rows[i] = row
-			end
-
-			row:SetID(it.id)
-			row:ClearAllPoints()
-			-- Stretch the row to the scrollchild width.
-			-- (Avoid relying on GetWidth() being valid on the first OnShow frame.)
-			row:SetPoint("TOPLEFT", 0, -totalH)
-			row:SetPoint("TOPRIGHT", -rightInset, -totalH)
-
-			local rH = cfg.drawRow(row, it)
-			local usedH = safeRowHeight(row, rH)
-			totalH = totalH + usedH
-
-			row:Show()
-		end
-
-		for i = count + 1, #self._rows do
-			local r = self._rows[i]
-			if r then r:Hide() end
-		end
-		for name, row in pairs(self._rowByName) do
-			if not used[name] and row and row.IsShown and row:IsShown() then
+			local it = self.data[index]
+			if it then
+				row:SetID(it.id)
+				local rH = cfg.drawRow(row, it)
+				if not self._rowHeight and rH then
+					self._rowHeight = safeRowHeight(row, rH)
+				end
+				row:Show()
+			else
 				row:Hide()
 			end
 		end
 
-		sc:SetHeight(math.max(totalH, sf:GetHeight()))
-		if sf.UpdateScrollChildRect then
-			sf:UpdateScrollChildRect()
+		if HybridScrollFrame_Update then
+			HybridScrollFrame_Update(sf, totalHeight, rowHeight)
 		end
 		self._lastHL = nil
 	end
