@@ -4,7 +4,9 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
-- (add entries here)
+- Docs: updated AGENTS.md with explicit `.luacheckrc` maintenance guidance for addon globals.
+- Docs: fixed OVERVIEW.md repository links to use root-relative paths.
+- Tooling: refreshed `.luacheckrc` with explicit KRT frame/global allowlist entries.
 
 ## 2026-02-05
 - Docs: Split change log out of AGENTS.md into CHANGELOG.md (no runtime behavior change).

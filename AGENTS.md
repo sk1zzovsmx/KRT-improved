@@ -297,3 +297,11 @@ Don't:
 - new SV keys without migration,
 - new globals (beyond allowed ones),
 - moving features into new files.
+
+---
+
+## 17) Static analysis (`.luacheckrc`)
+
+- Keep `.luacheckrc` aligned with current addon globals and frame names.
+- When XML introduces/removes named frames, update `.luacheckrc` global allowlist in the same change.
+- Prefer additive, explicit entries grouped under a `KRT addon globals` comment block.

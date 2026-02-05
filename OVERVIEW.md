@@ -11,14 +11,14 @@ Detailed behaviour belongs in `docs/Features/*`; detailed decisions/invariants b
 ## Summary
 
 - **System:** World of Warcraft addon `!KRT` (WotLK 3.3.5a / Interface 30300), Lua 5.1 + XML UI.
-- **Where is the code:** runtime code lives under [`!KRT/`](../../!KRT/). Core logic is **monolithic** in
-  [`!KRT/KRT.lua`](../../!KRT/KRT.lua). UI layout in [`!KRT/KRT.xml`](../../!KRT/KRT.xml) and
-  [`!KRT/Templates.xml`](../../!KRT/Templates.xml).
+- **Where is the code:** runtime code lives under [`!KRT/`](./!KRT/). Core logic is **monolithic** in
+  [`!KRT/KRT.lua`](./!KRT/KRT.lua). UI layout in [`!KRT/KRT.xml`](./!KRT/KRT.xml) and
+  [`!KRT/Templates.xml`](./!KRT/Templates.xml).
 - **Entry points:** WoW events (e.g., `ADDON_LOADED`), XML UI scripts (OnShow/OnClick), slash commands
   (`/krt`, `/kraidtools`, `/krtcounts`), LibCompat timers used for throttling.
-- **Dependencies:** vendored libs via [`!KRT/Libs/`](../../!KRT/Libs/) (LibStub, LibCompat, LibLogger, etc.),
-  localization via [`!KRT/Localization/`](../../!KRT/Localization/), shared helpers in
-  [`!KRT/Modules/Utils.lua`](../../!KRT/Modules/Utils.lua) and [`!KRT/Modules/C.lua`](../../!KRT/Modules/C.lua).
+- **Dependencies:** vendored libs via [`!KRT/Libs/`](./!KRT/Libs/) (LibStub, LibCompat, LibLogger, etc.),
+  localization via [`!KRT/Localization/`](./!KRT/Localization/), shared helpers in
+  [`!KRT/Modules/Utils.lua`](./!KRT/Modules/Utils.lua) and [`!KRT/Modules/C.lua`](./!KRT/Modules/C.lua).
 
 ---
 
@@ -169,43 +169,44 @@ flowchart LR
 ### Modules (diagram nodes)
 
 - **Core / entry plumbing**
-  - `addon event dispatcher` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `SetScript("OnEvent"`).
-  - `addon.Slash` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `SLASH_KRT1` / `SlashCmdList`).
-  - `addon.Config` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Config =`).
+  - `addon event dispatcher` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `SetScript("OnEvent"`).
+  - `addon.Slash` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `SLASH_KRT1` / `SlashCmdList`).
+  - `addon.Config` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.Config =`).
 
 - **Feature modules (all in `KRT.lua`)**
-  - `addon.Raid` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Raid`).
-  - `addon.Rolls` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Rolls`).
-  - `addon.Reserves` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Reserves`).
-  - `addon.ReserveImport` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.ReserveImport`).
-  - `addon.Loot` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Loot`).
-  - `addon.Master` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Master`).
-  - `addon.LootCounter` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.LootCounter`).
-  - `addon.Logger` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Logger`).
-  - `addon.Warnings` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Warnings`).
-  - `addon.Changes` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Changes`).
-  - `addon.Spammer` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Spammer`).
-  - `addon.Minimap` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Minimap`).
-  - `addon.Chat` — [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `addon.Chat`).
+  - `addon.Raid` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.Raid`).
+  - `addon.Rolls` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.Rolls`).
+  - `addon.Reserves` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.Reserves`).
+  - `addon.ReserveImport` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.ReserveImport`).
+  - `addon.Loot` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.Loot`).
+  - `addon.Master` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.Master`).
+  - `addon.LootCounter` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.LootCounter`).
+  - `addon.Logger` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.Logger`).
+  - `addon.Warnings` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.Warnings`).
+  - `addon.Changes` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.Changes`).
+  - `addon.Spammer` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.Spammer`).
+  - `addon.Minimap` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.Minimap`).
+  - `addon.Chat` — [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `addon.Chat`).
 
 - **Shared / data**
-  - `Utils` — [`!KRT/Modules/Utils.lua`](../../!KRT/Modules/Utils.lua)
-  - `C` — [`!KRT/Modules/C.lua`](../../!KRT/Modules/C.lua)
-  - `ignoredItems` — [`!KRT/Modules/ignoredItems.lua`](../../!KRT/Modules/ignoredItems.lua)
-  - UI: [`!KRT/KRT.xml`](../../!KRT/KRT.xml), templates: [`!KRT/Templates.xml`](../../!KRT/Templates.xml)
+  - `Utils` — [`!KRT/Modules/Utils.lua`](./!KRT/Modules/Utils.lua)
+  - `C` — [`!KRT/Modules/C.lua`](./!KRT/Modules/C.lua)
+  - `ignoredItems` — [`!KRT/Modules/ignoredItems.lua`](./!KRT/Modules/ignoredItems.lua)
+  - UI: [`!KRT/KRT.xml`](./!KRT/KRT.xml), templates: [`!KRT/Templates.xml`](./!KRT/Templates.xml)
 
 ### Interfaces / contracts (diagram edges)
 
-- **Event dispatcher (`WoW event` → `addon`):** [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `RegisterEvent`).
-- **Slash commands:** [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `SLASH_KRT1`, `SlashCmdList`).
-- **Event-driven UI refresh:** [`!KRT/Modules/Utils.lua`](../../!KRT/Modules/Utils.lua) (search: `makeEventDrivenRefresher`).
-- **List rendering + row pooling:** [`!KRT/Modules/Utils.lua`](../../!KRT/Modules/Utils.lua) (search: `makeListController`).
+- **Event dispatcher (`WoW event` → `addon`):** [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `RegisterEvent`).
+- **Slash commands:** [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `SLASH_KRT1`, `SlashCmdList`).
+- **Event-driven UI refresh:** [`!KRT/Modules/Utils.lua`](./!KRT/Modules/Utils.lua)
+  (search: `makeEventDrivenRefresher`).
+- **List rendering + row pooling:** [`!KRT/Modules/Utils.lua`](./!KRT/Modules/Utils.lua) (search: `makeListController`).
 - **Localization (`addon.L` / `addon.E`):**
-  - [`!KRT/Localization/localization.en.lua`](../../!KRT/Localization/localization.en.lua)
-  - [`!KRT/Localization/ErrorLog.en.lua`](../../!KRT/Localization/ErrorLog.en.lua)
+  - [`!KRT/Localization/localization.en.lua`](./!KRT/Localization/localization.en.lua)
+  - [`!KRT/Localization/ErrorLog.en.lua`](./!KRT/Localization/ErrorLog.en.lua)
 - **SavedVariables schema:**
-  - Declared: [`!KRT/!KRT.toc`](../../!KRT/!KRT.toc)
-  - Used: [`!KRT/KRT.lua`](../../!KRT/KRT.lua) (search: `KRT_Options`, `KRT_Raids`, etc.)
+  - Declared: [`!KRT/!KRT.toc`](./!KRT/!KRT.toc)
+  - Used: [`!KRT/KRT.lua`](./!KRT/KRT.lua) (search: `KRT_Options`, `KRT_Raids`, etc.)
 
 ---
 
@@ -230,8 +231,8 @@ flowchart LR
 
 ## Where to go next
 
-- Agent rules: [`AGENTS.md`](../../AGENTS.md)
-- Change history: [`CHANGELOG.md`](../../CHANGELOG.md)
-- Runtime core: [`!KRT/KRT.lua`](../../!KRT/KRT.lua)
-- Shared controllers: [`!KRT/Modules/Utils.lua`](../../!KRT/Modules/Utils.lua)
-- UI: [`!KRT/KRT.xml`](../../!KRT/KRT.xml), [`!KRT/Templates.xml`](../../!KRT/Templates.xml)
+- Agent rules: [`AGENTS.md`](./AGENTS.md)
+- Change history: [`CHANGELOG.md`](./CHANGELOG.md)
+- Runtime core: [`!KRT/KRT.lua`](./!KRT/KRT.lua)
+- Shared controllers: [`!KRT/Modules/Utils.lua`](./!KRT/Modules/Utils.lua)
+- UI: [`!KRT/KRT.xml`](./!KRT/KRT.xml), [`!KRT/Templates.xml`](./!KRT/Templates.xml)
