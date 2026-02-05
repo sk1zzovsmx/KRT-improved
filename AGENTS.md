@@ -20,6 +20,10 @@ Do NOT record:
 - one-off instructions for a single task,
 - temporary exceptions.
 
+Durable preferences learned from recent conversations:
+- Prefer PascalCase for addon module table names.
+- Prefer camelCase for utility functions and local variables; avoid snake_case for new naming.
+
 ---
 
 ## 1) Purpose
