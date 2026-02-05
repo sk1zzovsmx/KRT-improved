@@ -2873,7 +2873,7 @@ do
             local message = ""
 
             if rollType == rollTypes.RESERVED then
-                -- Chat output must be plain: colored names (|c...|r) can be dropped by chat filters.
+                -- Chat-safe: keep UI colors in the Reserve Frame, but do not send class color codes in chat.
                 local srList = addon.Reserves:FormatReservedPlayersLine(itemID, false)
                 local suff = addon.options.sortAscending and "Low" or "High"
                 message = lootState.itemCount > 1
@@ -4598,8 +4598,10 @@ do
         return meta
     end
 
-    -- useColor: when false, returns plain names (no |c...|r) but preserves suffixes (x2, P+X).
-    -- Default is colored (UI).
+    -- Formats a single player token for display.
+    -- useColor:
+    --   true/nil -> UI rendering (class colors enabled)
+    --   false    -> chat-safe rendering (no class color codes)
     local function FormatReservePlayerName(itemId, name, count, metaByName, useColor)
         local meta = GetMetaForPlayer(metaByName, itemId, name)
         local out
@@ -4661,9 +4663,8 @@ do
     -- Long lists are rendered in a dedicated tooltip on the players line.
     local RESERVE_ROW_MAX_PLAYERS_INLINE = 6
 
-    local function FormatReservePlayerNameBase(itemId, name, metaByName, useColor)
+    local function FormatReservePlayerNameBase(itemId, name, metaByName)
         local meta = GetMetaForPlayer(metaByName, itemId, name)
-        if useColor == false then return name end
         return ColorizeReserveName(itemId, name, meta and meta.class)
     end
 
@@ -6023,8 +6024,10 @@ do
 
     -- ----- SR Announcement Formatting ----- --
 
-    -- useColor: when false, returns plain tokens suitable for chat output.
-    -- Default is colored (UI).
+    -- Returns a list of formatted player tokens for an item.
+    -- useColor:
+    --   true/nil -> UI rendering (class colors)
+    --   false    -> chat-safe rendering (no class color codes)
     function module:GetPlayersForItem(itemId, useColor)
         if not itemId then return {} end
         local list = reservesByItemID[itemId]
@@ -6047,7 +6050,8 @@ do
         return out
     end
 
-    -- useColor: when false, returns a chat-safe line without |c...|r codes.
+    -- Returns the formatted player list for an item (comma-separated).
+    -- useColor follows the same rules as GetPlayersForItem.
     function module:FormatReservedPlayersLine(itemId, useColor)
         addon:debug(E.LogReservesFormatPlayers:format(itemId))
         local list = self:GetPlayersForItem(itemId, useColor)
