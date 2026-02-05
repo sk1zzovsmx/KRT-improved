@@ -57,6 +57,21 @@ globals = {
 	"GetNumGroupMembers",
 	"LibCompat_TimerFrame",
 
+	-- KRT addon globals (runtime alias + named XML frames)
+	"KRT",
+	"KRTConfig",
+	"KRTWarnings",
+	"KRTMaster",
+	"KRTLogger",
+	"KRTChanges",
+	"KRTSpammer",
+	"KRTLootCounterFrame",
+	"KRTReserveListFrame",
+	"KRTImportWindow",
+	"KRTItemSelectionFrame",
+	"KRTLoggerBossBox",
+	"KRT_MINIMAP_GUI",
+
 	"AceGUIWidgetLSMlists",
 	"UIDropDownMenu_AddSeparator",
 
