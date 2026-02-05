@@ -5,6 +5,7 @@ Dates are in YYYY-MM-DD.
 
 ## Unreleased
 - UI: migrated Warnings, Changes, and Logger list panes to HybridScrollFrame-based virtualization to render only visible rows.
+- Fix: stabilized HybridScrollFrame list rendering by using named pooled rows and safe scrollbar syncing.
 - Docs: updated AGENTS.md with explicit `.luacheckrc` maintenance guidance for addon globals.
 - Docs: fixed OVERVIEW.md repository links to use root-relative paths.
 - Tooling: refreshed `.luacheckrc` with explicit KRT frame/global allowlist entries.
