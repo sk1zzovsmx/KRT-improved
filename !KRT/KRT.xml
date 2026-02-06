@@ -2924,7 +2924,7 @@
 				</Anchors>
 				<Layers>
 					<Layer level="BORDER">
-						<Texture name="$parentItemIconTexture" />
+						<Texture name="$parentIconTexture" />
 					</Layer>
 				</Layers>
 				<NormalTexture name="$parentNormalTexture" file="Interface\Buttons\UI-Quickslot2">
