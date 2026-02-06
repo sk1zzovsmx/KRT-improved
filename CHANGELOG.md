@@ -4,6 +4,9 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- UI: switched migrated Warnings, Changes, and Logger scroll frames to KRT_HybridScrollFrameTemplate.
+- UI: Hybrid list highlight/focus overlays now refresh during scroll-driven updates.
+- Utils: makeHybridListController now binds row parts into row._p during button creation with nil-safe lookups.
 - Warnings: fixed delete flow after Hybrid list migration by removing legacy per-row hide calls.
 - UI: migrated Warnings, Changes, and Logger lists to Hybrid list controllers.
 - UI: makeListController now aliases the Hybrid controller to remove the legacy path.
