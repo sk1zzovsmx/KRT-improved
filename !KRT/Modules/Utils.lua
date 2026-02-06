@@ -398,6 +398,26 @@ function Utils.makeHybridListController(cfg)
         self._buttonsCreated = true
 
         local buttons = sf.buttons
+        if buttons then
+            for i = 1, #buttons do
+                local row = buttons[i]
+                if row then
+                    local parts = {}
+                    row._p = parts
+
+                    if cfg._rowParts then
+                        local rowName = row:GetName()
+                        if rowName then
+                            for j = 1, #cfg._rowParts do
+                                local part = cfg._rowParts[j]
+                                parts[part] = _G[rowName .. part]
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
         self._createdRowCount = buttons and #buttons or 0
         if buttons and buttons[1] and buttons[1].GetHeight then
             local h = buttons[1]:GetHeight()
@@ -454,8 +474,6 @@ function Utils.makeHybridListController(cfg)
             self:Fetch()
         end
 
-        applyHighlight()
-        postUpdate()
     end
 
     defer:SetScript("OnUpdate", function(f)
@@ -533,6 +551,8 @@ function Utils.makeHybridListController(cfg)
         end
 
         self._lastHL = nil
+        applyHighlight()
+        postUpdate()
     end
 
     function self:Sort(key)
@@ -545,8 +565,6 @@ function Utils.makeHybridListController(cfg)
         self._asc = not self._asc
         table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
         self:Fetch()
-        applyHighlight()
-        postUpdate()
     end
 
     self._makeConfirmPopup = Utils.makeConfirmPopup
