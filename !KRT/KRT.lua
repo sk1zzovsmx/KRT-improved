@@ -6708,7 +6708,6 @@ do
         if btn == nil or selectedID == nil then return end
         local oldWarnings = {}
         for i, w in ipairs(KRT_Warnings) do
-            _G[frameName .. "WarningBtn" .. i]:Hide()
             if i ~= selectedID then
                 tinsert(oldWarnings, w)
             end
