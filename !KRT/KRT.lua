@@ -3671,9 +3671,9 @@ do
             UpdateSelectionFrame()
             module:ResetItemCount()
 
+            local frame = getFrame()
             local shouldShow = (lootState.lootCount or 0) >= 1
             if shouldShow then
-                local frame = getFrame()
                 local wasShown = frame and frame:IsShown()
                 if not wasShown then
                     -- Request while hidden to refresh immediately on OnShow (avoid an extra refresh).
