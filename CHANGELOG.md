@@ -4,6 +4,9 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- Warnings: fixed delete flow after Hybrid list migration by removing legacy per-row hide calls.
+- UI: migrated Warnings, Changes, and Logger lists to Hybrid list controllers.
+- UI: makeListController now aliases the Hybrid controller to remove the legacy path.
 - UI: added a reusable hybrid scroll template and a virtualized list controller in Utils for large lists.
 - Logger: migrated LootList rendering to HybridScrollFrame virtualization to keep row creation near viewport size.
 - Docs: updated AGENTS.md with explicit `.luacheckrc` maintenance guidance for addon globals.
