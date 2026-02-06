@@ -6597,7 +6597,7 @@ do
     local SaveWarning
     local isEdit = false
 
-    local controller = Utils.makeListController {
+    local controller = Utils.makeHybridListController {
         keyName = "WarningsList",
         poolTag = "warnings",
         _rowParts = { "ID", "Name" },
@@ -6877,7 +6877,7 @@ do
     local isAdd = false
     local isEdit = false
 
-    local controller = Utils.makeListController {
+    local controller = Utils.makeHybridListController {
         keyName = "ChangesList",
         poolTag = "changes",
         _rowParts = { "Name", "Spec" },
@@ -9197,7 +9197,7 @@ end
 do
     addon.Logger.Raids = addon.Logger.Raids or {}
     local Raids = addon.Logger.Raids
-    local controller = Utils.makeListController {
+    local controller = Utils.makeHybridListController {
         keyName = "RaidsList",
         poolTag = "logger-raids",
         _rowParts = { "ID", "Date", "Zone", "Size" },
@@ -9398,7 +9398,7 @@ do
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
 
-    local controller = Utils.makeListController {
+    local controller = Utils.makeHybridListController {
         keyName = "BossList",
         poolTag = "logger-bosses",
         _rowParts = { "ID", "Name", "Time", "Mode" },
@@ -9530,7 +9530,7 @@ do
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
 
-    local controller = Utils.makeListController {
+    local controller = Utils.makeHybridListController {
         keyName = "BossAttendeesList",
         poolTag = "logger-boss-attendees",
         _rowParts = { "Name" },
@@ -9573,11 +9573,10 @@ do
 
         postUpdate = function(n)
             local bSel = addon.Logger.selectedBoss
-            local pSel = addon.Logger.selectedBossPlayer
             local addBtn = _G[n .. "AddBtn"]
             local removeBtn = _G[n .. "RemoveBtn"]
+            local attSelCount = Utils.multiSelectCount(addon.Logger._msBossAttCtx)
             if addBtn then
-                local attSelCount = Utils.multiSelectCount(addon.Logger._msBossAttCtx)
                 Utils.enableDisable(addBtn, bSel and ((attSelCount or 0) == 0))
             end
             if removeBtn then
@@ -9635,7 +9634,7 @@ do
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
 
-    local controller = Utils.makeListController {
+    local controller = Utils.makeHybridListController {
         keyName = "RaidAttendeesList",
         poolTag = "logger-raid-attendees",
         _rowParts = { "Name", "Join", "Leave" },
