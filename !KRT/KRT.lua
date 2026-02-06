@@ -9790,7 +9790,7 @@ do
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
 
-    local controller = Utils.makeListController {
+    local controller = Utils.makeHybridListController {
         keyName = "LootList",
         poolTag = "logger-loot",
         _rowParts = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
@@ -9828,8 +9828,9 @@ do
             View:FillLootList(out, raid, bID, pName)
         end,
 
-        rowName = function(n, _, i) return n .. "ItemBtn" .. i end,
         rowTmpl = "KRTLoggerLootButton",
+        rowHeight = 26,
+        debugVirtualization = true,
 
         drawRow = Utils.createRowDrawer(function(row, it)
             local ui = row._p

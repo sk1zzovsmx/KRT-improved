@@ -162,6 +162,8 @@
 			</Frame>
 		</ScrollChild>
 	</ScrollFrame>
+	<!-- Hybrid scroll template for virtualized lists -->
+	<ScrollFrame name="KRT_HybridScrollFrameTemplate" inherits="BasicHybridScrollFrameTemplate" virtual="true" />
 	<!-- EditBox Template -->
 	<EditBox name="KRTEditBoxTemplate" inherits="InputBoxTemplate" autoFocus="false" virtual="true">
 		<FontString inherits="GameFontHighlight" />
