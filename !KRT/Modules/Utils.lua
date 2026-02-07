@@ -282,390 +282,471 @@ end
 -- =========== List controller helper  =========== --
 -- Generic scroll list controller with row pooling, sorting, and selection visuals.
 function Utils.makeListController(cfg)
-	local self = {
-		frameName = nil,
-		data = {},
-		_rows = {},
-		_rowByName = {},
-		_usedNames = {},
-		_asc = false,
-		_sortKey = nil,
-		_lastHL = nil,
-		_active = false,
-		_localized = false,
-		_lastWidth = nil,
-		_dirty = true,
-	}
+    -- Legacy alias kept for incremental migrations.
+    -- All lists now use the Hybrid implementation to avoid duplicated scroll logic.
+    return Utils.makeHybridListController(cfg)
+end
 
-	local defer = CreateFrame("Frame")
-	defer:Hide()
 
-	local function buildRowParts(btnName, row)
-		if cfg._rowParts and not row._p then
-			local p = {}
-			for i = 1, #cfg._rowParts do
-				local part = cfg._rowParts[i]
-				p[part] = _G[btnName .. part]
-			end
-			row._p = p
-		end
-	end
+-- =========== Hybrid list binding helpers (WotLK 3.3.5a)  =========== --
+-- These helpers allow binding row widgets robustly even when the named regions are nested.
+-- They are only used during row creation/binding (small number of buttons), not per-update.
 
-	local function acquireRow(btnName, parent)
-		local row = self._rowByName[btnName]
-		if row then
-			row:Show()
-			if Utils and Utils.ensureRowVisuals then
-				Utils.ensureRowVisuals(row)
-			end
-			return row
-		end
+local function _krtIterChildren(frame)
+    -- GetChildren returns varargs; pack into a table for iteration.
+    if not (frame and frame.GetChildren) then return nil end
+    return { frame:GetChildren() }
+end
 
-		row = CreateFrame("Button", btnName, parent, cfg.rowTmpl)
-		self._rowByName[btnName] = row
-		buildRowParts(btnName, row)
-		if Utils and Utils.ensureRowVisuals then
-			Utils.ensureRowVisuals(row)
-		end
-		return row
-	end
+local function _krtIterRegions(frame)
+    if not (frame and frame.GetRegions) then return nil end
+    return { frame:GetRegions() }
+end
 
-	local function releaseData()
-		for i = 1, #self.data do
-			twipe(self.data[i])
-		end
-		twipe(self.data)
-	end
+-- Depth-first search for a descendant (child frame or region) whose full name matches exactly.
+function Utils.findNamedDescendant(root, fullName)
+    if not (root and fullName and fullName ~= "") then return nil end
+    local function scan(frame)
+        local regions = _krtIterRegions(frame)
+        if regions then
+            for i = 1, #regions do
+                local r = regions[i]
+                if r and r.GetName and r:GetName() == fullName then
+                    return r
+                end
+            end
+        end
 
-	local function refreshData()
-		releaseData()
-		if cfg.getData then
-			cfg.getData(self.data)
-		end
-	end
+        local children = _krtIterChildren(frame)
+        if children then
+            for i = 1, #children do
+                local c = children[i]
+                if c then
+                    if c.GetName and c:GetName() == fullName then
+                        return c
+                    end
+                    local found = scan(c)
+                    if found then return found end
+                end
+            end
+        end
+        return nil
+    end
+    return scan(root)
+end
 
-	local function ensureLocalized()
-		if not self._localized and cfg.localize then
-			cfg.localize(self.frameName)
-			self._localized = true
-		end
-	end
+-- Depth-first search for a descendant whose name ends with the given suffix.
+-- Useful when the element is nested and you only know the tail (e.g. "IconTexture").
+function Utils.findDescendantBySuffix(root, suffix)
+    if not (root and suffix and suffix ~= "") then return nil end
+    local function endsWith(name)
+        return type(name) == "string" and name:endsWith(suffix)
+    end
 
-	local function setActive(active)
-		self._active = active
-		if self._active then
-			ensureLocalized()
-			-- Reset one-shot diagnostics each time the list becomes active (OnShow).
-			self._loggedFetch = nil
-			self._loggedWidgets = nil
-			self._warnW0 = nil
-			self._missingScroll = nil
-			self:Dirty()
-			return
-		end
-		releaseData()
-		for i = 1, #self._rows do
-			local row = self._rows[i]
-			if row then row:Hide() end
-		end
-		self._lastHL = nil
-	end
+    local function scan(frame)
+        local regions = _krtIterRegions(frame)
+        if regions then
+            for i = 1, #regions do
+                local r = regions[i]
+                local n = r and r.GetName and r:GetName()
+                if n and endsWith(n) then
+                    return r
+                end
+            end
+        end
 
-	local function safeRightInset(sf, sc, frameName)
-		if cfg.rightInset ~= nil then
-			return cfg.rightInset
-		end
+        local children = _krtIterChildren(frame)
+        if children then
+            for i = 1, #children do
+                local c = children[i]
+                if c then
+                    local n = c.GetName and c:GetName()
+                    if n and endsWith(n) then
+                        return c
+                    end
+                    local found = scan(c)
+                    if found then return found end
+                end
+            end
+        end
+        return nil
+    end
+    return scan(root)
+end
 
-		local sb = nil
-		if sf and sf.GetName then
-			sb = _G[sf:GetName() .. "ScrollBar"]
-		end
-		if not sb and sf then
-			sb = sf.ScrollBar
-		end
-		if not sb and frameName then
-			sb = _G[frameName .. "ScrollFrameScrollBar"]
-		end
+-- Bind named parts on a Hybrid row. Tries exact (rowName..part) first; falls back to suffix search.
+function Utils.bindRowParts(row, parts, out)
+    if not (row and parts) then return out end
+    out = out or {}
+    local rowName = row.GetName and row:GetName() or nil
+    for i = 1, #parts do
+        local key = parts[i]
+        if type(key) == "string" then
+            local full = rowName and (rowName .. key) or key
+            out[key] = _G[full] or Utils.findNamedDescendant(row, full) or Utils.findDescendantBySuffix(row, key)
+        end
+    end
+    row._p = out
+    return out
+end
 
-		-- Robust calc: how far the scroll child extends under the scrollbar.
-		-- Avoid oversized estimated insets that create visible gaps.
-		if sb and sc and sb.IsShown and sb:IsShown() and sb.GetLeft and sc.GetRight then
-			local sbL = sb:GetLeft()
-			local scR = sc:GetRight()
-			if sbL and scR then
-				local overlap = scR - sbL
-				if overlap > 0 then
-					-- No extra padding; row template already handles spacing.
-					return overlap
-				end
-				return 0
-			end
-		end
+-- Clear transient fields for Logger loot rows (Hybrid reuse).
+function Utils.clearLoggerLootRow(row)
+    if not row then return end
+    row._itemId = nil
+    row._itemLink = nil
+    row._itemName = nil
+    row._source = nil
+    row._tooltipTitle = nil
+    row._tooltipSource = nil
+    local ui = row._p
+    if ui and ui.ItemIconTexture and ui.ItemIconTexture.SetTexture then
+        ui.ItemIconTexture:SetTexture(nil)
+    end
+end
 
-		-- Fallback: conservative without extra padding.
-		local width = sb and sb.GetWidth and sb:GetWidth()
-		if width and width > 0 then
-			return width
-		end
-		return 0
-	end
+-- Clear transient fields for Logger attendee rows (Hybrid reuse).
+function Utils.clearLoggerAttendeeRow(row)
+    if not row then return end
+    row._playerName = nil
+    local ui = row._p
+    if ui then
+        if ui.Name and ui.Name.SetText then ui.Name:SetText("") end
+        if ui.Name and ui.Name.SetVertexColor then ui.Name:SetVertexColor(1, 1, 1) end
+        if ui.Join and ui.Join.SetText then ui.Join:SetText("") end
+        if ui.Leave and ui.Leave.SetText then ui.Leave:SetText("") end
+    end
+end
 
-	local function safeRowHeight(row, declaredHeight)
-		local height = declaredHeight
-		if height == nil and row and row.GetHeight then
-			height = row:GetHeight()
-		end
-		if type(height) ~= "number" or height < 1 then
-			return 20
-		end
-		return height
-	end
 
-	local function applyHighlight()
-		-- Selection overlay (multi or legacy single) + Focus border (one row).
-		-- Keep hover highlight native (no LockHighlight for selection).
-		local selectedId = cfg.highlightId and cfg.highlightId() or nil
-		local focusId = (cfg.focusId and cfg.focusId()) or selectedId
+function Utils.makeHybridListController(cfg)
+    local self = {
+        frameName = nil,
+        data = {},
+        _asc = false,
+        _sortKey = nil,
+        _lastHL = nil,
+        _active = false,
+        _localized = false,
+        _dirty = true,
+        _rowHeight = tonumber(cfg.rowHeight) or 20,
+        _createdRowCount = 0,
+    }
 
-		local selKey
-		if cfg.highlightId then
-			-- Legacy: single selection (use the selected id as key)
-			selKey = selectedId and ("id:" .. tostring(selectedId)) or "id:nil"
-		elseif cfg.highlightFn then
-			selKey = (cfg.highlightKey and cfg.highlightKey()) or false
-		else
-			selKey = false
-		end
+    local defer = CreateFrame("Frame")
+    defer:Hide()
 
-		local focusKey = (cfg.focusKey and cfg.focusKey()) or
-			(focusId ~= nil and ("f:" .. tostring(focusId)) or "f:nil")
-		local combo = tostring(selKey) .. "|" .. tostring(focusKey)
-		if combo == self._lastHL then return end
-		self._lastHL = combo
+    local function releaseData()
+        for i = 1, #self.data do
+            twipe(self.data[i])
+        end
+        twipe(self.data)
+    end
 
-		for i = 1, #self.data do
-			local it = self.data[i]
-			local row = self._rows[i]
-			if row then
-				local isSel = false
-				if cfg.highlightId then
-					isSel = (selectedId ~= nil and it.id == selectedId)
-				elseif cfg.highlightFn then
-					isSel = cfg.highlightFn(it.id, it, i, row) and true or false
-				end
+    local function refreshData()
+        releaseData()
+        if cfg.getData then
+            cfg.getData(self.data)
+        end
+    end
 
-				if Utils and Utils.setRowSelected then
-					Utils.setRowSelected(row, isSel)
-				else
-					-- Fallback to legacy highlight if visuals are missing.
-					Utils.toggleHighlight(row, isSel)
-				end
+    local function ensureLocalized()
+        if not self._localized and cfg.localize then
+            cfg.localize(self.frameName)
+            self._localized = true
+        end
+    end
 
-				if Utils and Utils.setRowFocused then
-					Utils.setRowFocused(row, focusId ~= nil and it.id == focusId)
-				end
-			end
-		end
+    local function postUpdate()
+        if cfg.postUpdate then
+            cfg.postUpdate(self.frameName)
+        end
+    end
 
-		if cfg.highlightDebugTag and addon and addon.options and addon.options.debug and addon.debug then
-			local info = (cfg.highlightDebugInfo and cfg.highlightDebugInfo(self)) or ""
-			if info ~= "" then info = " " .. info end
-			addon:debug(("[%s] refresh key=%s%s"):format(tostring(cfg.highlightDebugTag), tostring(selKey), info))
-		end
-	end
+    local function applyHighlight()
+        local selectedId = cfg.highlightId and cfg.highlightId() or nil
+        local focusId = (cfg.focusId and cfg.focusId()) or selectedId
 
-	local function postUpdate()
-		if cfg.postUpdate then
-			cfg.postUpdate(self.frameName)
-		end
-	end
+        local selKey
+        if cfg.highlightId then
+            selKey = selectedId and ("id:" .. tostring(selectedId)) or "id:nil"
+        elseif cfg.highlightFn then
+            selKey = (cfg.highlightKey and cfg.highlightKey()) or false
+        else
+            selKey = false
+        end
 
-	function self:Touch()
-		defer:Show()
-	end
+        local focusKey = (cfg.focusKey and cfg.focusKey()) or
+            (focusId ~= nil and ("f:" .. tostring(focusId)) or "f:nil")
+        local combo = tostring(selKey) .. "|" .. tostring(focusKey)
+        if combo == self._lastHL then return end
+        self._lastHL = combo
 
-	function self:Dirty()
-		self._dirty = true
-		defer:Show()
-	end
+        local n = self.frameName
+        local sf = n and _G[n .. "ScrollFrame"]
+        local buttons = sf and sf.buttons
+        if not buttons then return end
 
-	local function runUpdate()
-		if not self._active or not self.frameName then return end
+        local offset = HybridScrollFrame_GetOffset(sf)
+        for i = 1, #buttons do
+            local row = buttons[i]
+            local dataIndex = offset + i
+            local it = self.data[dataIndex]
+            if row and it then
+                local isSel = false
+                if cfg.highlightId then
+                    isSel = (selectedId ~= nil and it.id == selectedId)
+                elseif cfg.highlightFn then
+                    isSel = cfg.highlightFn(it.id, it, dataIndex, row) and true or false
+                end
 
-		if self._dirty then
-			refreshData()
-			local okFetch = self:Fetch()
-			-- If Fetch() returns false we defer until the frame has a real size.
-			if okFetch ~= false then
-				self._dirty = false
-			end
-		end
+                if Utils and Utils.setRowSelected then
+                    Utils.setRowSelected(row, isSel)
+                else
+                    Utils.toggleHighlight(row, isSel)
+                end
 
-		applyHighlight()
-		postUpdate()
-	end
+                if Utils and Utils.setRowFocused then
+                    Utils.setRowFocused(row, focusId ~= nil and it.id == focusId)
+                end
+            end
+        end
 
-	defer:SetScript("OnUpdate", function(f)
-		f:Hide()
-		local ok, err = pcall(runUpdate)
-		if not ok then
-			-- If the user has script errors disabled, this still surfaces the problem in chat.
-			if err ~= self._lastErr then
-				self._lastErr = err
-				addon:error(L.LogLoggerUIError:format(tostring(cfg.keyName or "?"), tostring(err)))
-			end
-		end
-	end)
+        if cfg.highlightDebugTag and addon and addon.options and addon.options.debug and addon.debug then
+            local info = (cfg.highlightDebugInfo and cfg.highlightDebugInfo(self)) or ""
+            if info ~= "" then info = " " .. info end
+            addon:debug(("[%s] refresh key=%s%s"):format(tostring(cfg.highlightDebugTag), tostring(selKey), info))
+        end
+    end
 
-	function self:OnLoad(frame)
-		if not frame then return end
-		self.frameName = frame:GetName()
+    local function ensureButtons(sf)
+        if not (sf and sf.scrollChild and HybridScrollFrame_Update and HybridScrollFrame_CreateButtons) then
+            return false
+        end
 
-		frame:HookScript("OnShow", function()
-			if not self._shownOnce then
-				self._shownOnce = true
-				addon:debug(L.LogLoggerUIShow:format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
-			end
-			setActive(true)
-			if not self._loggedWidgets then
-				self._loggedWidgets = true
-				local n = self.frameName
-				local sf = n and _G[n .. "ScrollFrame"]
-				local sc = n and _G[n .. "ScrollFrameScrollChild"]
-				addon:debug(L.LogLoggerUIWidgets:format(
-					tostring(cfg.keyName or "?"),
-					tostring(sf), tostring(sc),
-					sf and (sf:GetWidth() or 0) or 0,
-					sf and (sf:GetHeight() or 0) or 0,
-					sc and (sc:GetWidth() or 0) or 0,
-					sc and (sc:GetHeight() or 0) or 0
-				))
-			end
-		end)
+        -- 1) First creation (Blizzard helper). This resets scroll to 0, which is fine the first time.
+        if not sf.buttons then
+            HybridScrollFrame_CreateButtons(sf, cfg.rowTmpl, 0, 0)
+        end
 
-		frame:HookScript("OnHide", function()
-			setActive(false)
-		end)
+        local buttons = sf.buttons
+        if not (buttons and buttons[1]) then
+            return false
+        end
 
-		if frame:IsShown() then
-			setActive(true)
-		end
-	end
+        -- Track rowHeight from the real template height (authoritative).
+        local h = buttons[1].GetHeight and buttons[1]:GetHeight()
+        if h and h > 0 then
+            self._rowHeight = h
+        end
 
-	function self:Fetch()
-		local n = self.frameName
-		if not n then return end
+        -- 2) Resize-safe: if the scroll frame grows, ask Blizzard helper to add missing buttons.
+        --    HybridScrollFrame_CreateButtons() resets the scroll bar value to 0, so we preserve it.
+        local scrollH = sf.GetHeight and sf:GetHeight() or 0
+        local rowH = (self._rowHeight and self._rowHeight > 0) and self._rowHeight or 20
+        local wanted = math.ceil(scrollH / rowH) + 1
+        if wanted < 1 then wanted = 1 end
 
-		local sf = _G[n .. "ScrollFrame"]
-		local sc = _G[n .. "ScrollFrameScrollChild"]
-		if not (sf and sc) then
-			if not self._missingScroll then
-				self._missingScroll = true
-				addon:warn(L.LogLoggerUIMissingWidgets:format(tostring(cfg.keyName or "?"), tostring(n)))
-			end
-			return
-		end
+        if #buttons < wanted then
+            local sb = sf.scrollBar
+            local prev = (sb and sb.GetValue) and sb:GetValue() or 0
 
-		local scrollW = sf:GetWidth() or 0
-		self._lastWidth = scrollW
+            -- Prevent re-entrant updates while we rebuild buttons.
+            local oldUpdate = sf.update
+            sf.update = nil
+            HybridScrollFrame_CreateButtons(sf, cfg.rowTmpl, 0, 0)
+            sf.update = oldUpdate
 
-		-- Defer draw until the ScrollFrame has a real size (first OnShow can report 0).
-		if scrollW < 10 then
-			if not self._warnW0 then
-				self._warnW0 = true
-				addon:debug(L.LogLoggerUIDeferLayout:format(tostring(cfg.keyName or "?"), scrollW))
-			end
-			defer:Show()
-			return false
-		end
-		if (sc:GetWidth() or 0) < 10 then
-			sc:SetWidth(scrollW)
-		end
+            buttons = sf.buttons or buttons
+            if sb and sb.GetMinMaxValues and sb.SetValue then
+                local minVal, maxVal = sb:GetMinMaxValues()
+                if prev < minVal then prev = minVal end
+                if prev > maxVal then prev = maxVal end
+                sb:SetValue(prev)
+            end
+        end
 
-		-- One-time diagnostics per list to help debug "empty/blank" frames.
-		if not self._loggedFetch then
-			self._loggedFetch = true
-			addon:debug(L.LogLoggerUIFetch:format(
-				tostring(cfg.keyName or "?"),
-				#self.data,
-				sf:GetWidth() or 0, sf:GetHeight() or 0,
-				sc:GetWidth() or 0, sc:GetHeight() or 0,
-				(_G[n] and _G[n]:GetWidth() or 0),
-				(_G[n] and _G[n]:GetHeight() or 0)
-			))
-		end
+        -- 3) Bind row widgets once (Option B: cfg.bindRow). Falls back to cfg._rowParts.
+        for i = 1, #buttons do
+            local row = buttons[i]
+            if row and not row._krtBound then
+                if cfg.bindRow then
+                    cfg.bindRow(row)
+                elseif cfg._rowParts then
+                    Utils.bindRowParts(row, cfg._rowParts)
+                else
+                    row._p = row._p or {}
+                end
+                row._krtBound = true
+            end
+        end
 
-		local totalH = 0
-		local count = #self.data
-		local used = self._usedNames
-		if twipe then
-			twipe(used)
-		else
-			for k in pairs(used) do
-				used[k] = nil
-			end
-		end
-		local rightInset = safeRightInset(sf, sc, n)
+        self._createdRowCount = #buttons
 
-		for i = 1, count do
-			local it = self.data[i]
-			local btnName = cfg.rowName(n, it, i)
-			used[btnName] = true
+        if not sf.update then
+            sf.update = function()
+                self:Fetch()
+            end
+        end
 
-			local row = self._rows[i]
-			if not row or row:GetName() ~= btnName then
-				row = acquireRow(btnName, sc)
-				self._rows[i] = row
-			end
+        if cfg.debugVirtualization and addon and addon.options and addon.options.debug and addon.debug then
+            addon:debug(("[Hybrid:%s] rowsCreated=%d"):format(tostring(cfg.keyName or "?"), self._createdRowCount))
+        end
 
-			row:SetID(it.id)
-			row:ClearAllPoints()
-			-- Stretch the row to the scrollchild width.
-			-- (Avoid relying on GetWidth() being valid on the first OnShow frame.)
-			row:SetPoint("TOPLEFT", 0, -totalH)
-			row:SetPoint("TOPRIGHT", -rightInset, -totalH)
+        return true
+    end
 
-			local rH = cfg.drawRow(row, it)
-			local usedH = safeRowHeight(row, rH)
-			totalH = totalH + usedH
+    local function setActive(active)
+        self._active = active
+        if self._active then
+            ensureLocalized()
+            self:Dirty()
+            return
+        end
+        releaseData()
+        self._lastHL = nil
+    end
 
-			row:Show()
-		end
+    function self:Touch()
+        defer:Show()
+    end
 
-		for i = count + 1, #self._rows do
-			local r = self._rows[i]
-			if r then r:Hide() end
-		end
-		for name, row in pairs(self._rowByName) do
-			if not used[name] and row and row.IsShown and row:IsShown() then
-				row:Hide()
-			end
-		end
+    function self:Dirty()
+        self._dirty = true
+        defer:Show()
+    end
 
-		sc:SetHeight(math.max(totalH, sf:GetHeight()))
-		if sf.UpdateScrollChildRect then
-			sf:UpdateScrollChildRect()
-		end
-		self._lastHL = nil
-	end
+    local function runUpdate()
+        if not self._active or not self.frameName then return end
 
-	function self:Sort(key)
-		local cmp = cfg.sorters and cfg.sorters[key]
-		if not cmp or #self.data <= 1 then return end
-		if self._sortKey ~= key then
-			self._sortKey = key
-			self._asc = false
-		end
-		self._asc = not self._asc
-		table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
-		self:Fetch()
-		applyHighlight()
-		postUpdate()
-	end
+        if self._dirty then
+            refreshData()
+            local okFetch = self:Fetch()
+            if okFetch ~= false then
+                self._dirty = false
+            end
+        else
+            self:Fetch()
+        end
+    end
 
-	self._makeConfirmPopup = Utils.makeConfirmPopup
+    defer:SetScript("OnUpdate", function(f)
+        f:Hide()
+        local ok, err = pcall(runUpdate)
+        if not ok and err ~= self._lastErr then
+            self._lastErr = err
+            addon:error(L.LogLoggerUIError:format(tostring(cfg.keyName or "?"), tostring(err)))
+        end
+    end)
 
-	return self
+    function self:OnLoad(frame)
+        if not frame then return end
+        self.frameName = frame:GetName()
+
+        frame:HookScript("OnShow", function()
+            setActive(true)
+        end)
+
+        frame:HookScript("OnHide", function()
+            setActive(false)
+        end)
+
+        if frame:IsShown() then
+            setActive(true)
+        end
+    end
+
+    local function clearRow(row)
+        if not row then return end
+        row._dataIndex = nil
+        row._data = nil
+        if cfg.clearRow then
+            cfg.clearRow(row)
+        end
+    end
+
+    function self:Fetch()
+        if self._fetching then return end
+        self._fetching = true
+        local n = self.frameName
+        if not n then self._fetching = false; return end
+
+        local sf = _G[n .. "ScrollFrame"]
+        if not sf then self._fetching = false; return end
+
+        local scrollH = sf:GetHeight() or 0
+        if scrollH < 10 then
+            defer:Show()
+            self._fetching = false
+            return false
+        end
+
+        if not ensureButtons(sf) then
+            self._fetching = false
+            return false
+        end
+
+        local buttons = sf.buttons
+        if not buttons then
+            self._fetching = false
+            return false
+        end
+
+        local totalCount = #self.data
+        local totalHeight = totalCount * self._rowHeight
+        -- Blizzard usage (3.3.5a): displayedHeight is the total height of the created buttons.
+        local displayedHeight = (#buttons) * self._rowHeight
+        HybridScrollFrame_Update(sf, totalHeight, displayedHeight)
+
+        local offset = HybridScrollFrame_GetOffset(sf)
+        for i = 1, #buttons do
+            local row = buttons[i]
+            local dataIndex = offset + i
+            local it = self.data[dataIndex]
+            if it then
+                row:SetID(it.id)
+                row._dataIndex = dataIndex
+                row._data = it
+                cfg.drawRow(row, it, dataIndex)
+                row:Show()
+            else
+                row:Hide()
+                clearRow(row)
+            end
+        end
+
+        if cfg.debugVirtualization and addon and addon.options and addon.options.debug and addon.debug then
+            addon:debug(("[Hybrid:%s] total=%d visible=%d created=%d offset=%d"):format(
+                tostring(cfg.keyName or "?"),
+                totalCount,
+                #buttons,
+                self._createdRowCount,
+                offset
+            ))
+        end
+
+        self._lastHL = nil
+        applyHighlight()
+        postUpdate()
+
+        self._fetching = false
+    end
+
+    function self:Sort(key)
+        local cmp = cfg.sorters and cfg.sorters[key]
+        if not cmp or #self.data <= 1 then return end
+        if self._sortKey ~= key then
+            self._sortKey = key
+            self._asc = false
+        end
+        self._asc = not self._asc
+        table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
+        self:Fetch()
+    end
+
+    self._makeConfirmPopup = Utils.makeConfirmPopup
+
+    return self
 end
 
 function Utils.bindListController(module, controller)
