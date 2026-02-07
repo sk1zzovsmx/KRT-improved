@@ -1232,18 +1232,6 @@ do
     -- ----- Private helpers ----- --
     -- Menu definition for EasyMenu (built once).
     local minimapMenu = {
-        {
-            text = L.StrConfigMinimapButton,
-            checked = function()
-                addon.options = addon.options or KRT_Options or {}
-                return addon.options.minimapButton ~= false
-            end,
-            keepShownOnClick = 1,
-            func = function()
-                module:ToggleMinimapButton()
-            end,
-        },
-        { text = " ",              disabled = 1,     notCheckable = 1 },
         { text = MASTER_LOOTER,    notCheckable = 1, func = function() addon.Master:Toggle() end },
         { text = L.StrLootCounter, notCheckable = 1, func = function() addon.LootCounter:Toggle() end },
         { text = L.StrLootLogger,  notCheckable = 1, func = function() addon.Logger:Toggle() end },
@@ -1264,6 +1252,18 @@ do
         addonMenu = addonMenu or CreateFrame("Frame", "KRTMenu", UIParent, "UIDropDownMenuTemplate")
         -- EasyMenu handles UIDropDownMenu initialization and opening.
         EasyMenu(minimapMenu, addonMenu, KRT_MINIMAP_GUI, 0, 0, "MENU")
+    end
+
+    local function IsMenuOpen()
+        return addonMenu and UIDROPDOWNMENU_OPEN_MENU == addonMenu and DropDownList1 and DropDownList1:IsShown()
+    end
+
+    local function ToggleMenu()
+        if IsMenuOpen() then
+            CloseDropDownMenus()
+            return
+        end
+        OpenMenu()
     end
 
     -- Moves the minimap button while dragging.
@@ -1331,7 +1331,7 @@ do
             if button == "RightButton" then
                 addon.Config:Toggle()
             elseif button == "LeftButton" then
-                OpenMenu()
+                ToggleMenu()
             end
         end)
         KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
@@ -1355,12 +1355,8 @@ do
     -- Toggles the visibility of the minimap button.
     function module:ToggleMinimapButton()
         addon.options = addon.options or KRT_Options or {}
-        local newState = not (addon.options.minimapButton ~= false)
-        addon.options.minimapButton = newState
-        if KRT_Options then
-            KRT_Options.minimapButton = newState
-        end
-        SetMinimapShown(newState)
+        addon.options.minimapButton = not addon.options.minimapButton
+        SetMinimapShown(addon.options.minimapButton)
     end
 
     -- Hides the minimap button.
