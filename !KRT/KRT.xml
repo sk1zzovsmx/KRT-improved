@@ -2324,6 +2324,7 @@
 				</Anchors>
 				<Scripts>
 					<OnEscapePressed>self:ClearFocus()</OnEscapePressed>
+					<OnTextChanged>KRT.ReserveImport:OnEditBoxTextChanged(self)</OnTextChanged>
 				</Scripts>
 			</EditBox>
 			<!-- Import Button -->

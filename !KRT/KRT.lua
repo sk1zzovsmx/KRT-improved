@@ -6087,6 +6087,12 @@ do
     -- Import mode slider: 0 = Multi-reserve, 1 = Plus System (priority)
     local MODE_MULTI, MODE_PLUS = 0, 1
 
+    local IMPORT_BASE_FRAME_HEIGHT = 300
+    local IMPORT_BASE_EDIT_HEIGHT = 160
+    local IMPORT_BASE_LINE_COUNT = 8
+    local IMPORT_EXTRA_LINE_HEIGHT = 12
+    local IMPORT_MAX_EXTRA_HEIGHT = 140
+
     local function GetImportModeString()
         local v = addon.options and addon.options.srImportMode
         if v == MODE_PLUS then return "plus" end
@@ -6095,6 +6101,28 @@ do
 
     local function GetModeSlider()
         return _G["KRTImportWindowModeSlider"] or _G["KRTImportModeSlider"]
+    end
+
+    local function UpdateImportWindowHeight(editBox)
+        local frame = module.frame or _G["KRTImportWindow"]
+        local box = editBox or _G["KRTImportEditBox"]
+        if not frame or not box then return end
+
+        local lineCount = 1
+        if box.GetNumberOfLines then
+            lineCount = tonumber(box:GetNumberOfLines()) or 1
+        end
+        if lineCount < 1 then lineCount = 1 end
+
+        local extraLines = lineCount - IMPORT_BASE_LINE_COUNT
+        if extraLines < 0 then extraLines = 0 end
+        local extraHeight = extraLines * IMPORT_EXTRA_LINE_HEIGHT
+        if extraHeight > IMPORT_MAX_EXTRA_HEIGHT then
+            extraHeight = IMPORT_MAX_EXTRA_HEIGHT
+        end
+
+        frame:SetHeight(IMPORT_BASE_FRAME_HEIGHT + extraHeight)
+        box:SetHeight(IMPORT_BASE_EDIT_HEIGHT + extraHeight)
     end
 
     local function UpdateModeDescription(modeValue)
@@ -6221,6 +6249,10 @@ do
         localized = true
     end
 
+    function module:OnEditBoxTextChanged(editBox)
+        UpdateImportWindowHeight(editBox)
+    end
+
     function module:OnLoad(frame)
         module.frame = frame
         if frame then
@@ -6244,6 +6276,7 @@ do
             slider:SetValue(v)
             UpdateModeDescription(v)
         end
+        UpdateImportWindowHeight(_G["KRTImportEditBox"])
         local status = _G["KRTImportWindowStatus"]
         if status and (status:GetText() == nil or status:GetText() == "") then
             status:SetText("")
@@ -6288,6 +6321,7 @@ do
         Utils.resetEditBox(_G["KRTImportEditBox"])
         local editBox = _G["KRTImportEditBox"]
         if editBox then
+            UpdateImportWindowHeight(editBox)
             editBox:SetFocus()
             editBox:HighlightText()
         end
