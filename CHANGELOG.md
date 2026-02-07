@@ -4,6 +4,7 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- Reserve Import: added mode description text above the slider to explain Multi-reserve vs Plus System behavior.
 - Master Looter: Hold/Bank/DE clears rolls only after completed assignment; inventory trade setup no longer wipes rolls early.
 - Minimap: left-clicking the minimap icon now toggles the context menu open/closed.
 - Docs: updated AGENTS.md with explicit `.luacheckrc` maintenance guidance for addon globals.

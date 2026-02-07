@@ -6097,6 +6097,16 @@ do
         return _G["KRTImportWindowModeSlider"] or _G["KRTImportModeSlider"]
     end
 
+    local function UpdateModeDescription(modeValue)
+        local modeDesc = _G["KRTImportWindowModeDescription"]
+        if not modeDesc then return end
+        if modeValue == MODE_PLUS then
+            modeDesc:SetText(L.StrImportModeDescPlus or "This setting counts the plus column in SoftRes CSV as a priority point.")
+        else
+            modeDesc:SetText(L.StrImportModeDescMulti or "This setting keeps in mind any reserves as item.")
+        end
+    end
+
     function module:SetImportMode(modeValue, suppressSlider)
         addon.options = addon.options or KRT_Options or {}
         addon.options.srImportMode = (modeValue == MODE_PLUS) and MODE_PLUS or MODE_MULTI
@@ -6106,6 +6116,7 @@ do
                 s:SetValue(addon.options.srImportMode)
             end
         end
+        UpdateModeDescription(addon.options.srImportMode)
     end
 
     function module:OnModeSliderLoad(slider)
@@ -6125,6 +6136,7 @@ do
         local v = addon.options.srImportMode
         if v ~= MODE_MULTI and v ~= MODE_PLUS then v = MODE_MULTI end
         slider:SetValue(v)
+        UpdateModeDescription(v)
     end
 
     function module:OnModeSliderChanged(slider, value)
@@ -6132,6 +6144,7 @@ do
         local v = tonumber(value) or MODE_MULTI
         if v >= 0.5 then v = MODE_PLUS else v = MODE_MULTI end
         module:SetImportMode(v, true)
+        UpdateModeDescription(v)
     end
 
     -- Popup shown when Plus System is selected but CSV contains multi-item reserves per player.
@@ -6189,6 +6202,7 @@ do
         Utils.setFrameTitle(frame, L.StrImportReservesTitle)
         local hint = _G["KRTImportWindowHint"]
         if hint then hint:SetText(L.StrImportReservesHint) end
+        UpdateModeDescription(GetImportModeString() == "plus" and MODE_PLUS or MODE_MULTI)
 
         localized = true
     end
@@ -6214,6 +6228,7 @@ do
             local v = addon.options.srImportMode
             if v ~= MODE_MULTI and v ~= MODE_PLUS then v = MODE_MULTI end
             slider:SetValue(v)
+            UpdateModeDescription(v)
         end
         local status = _G["KRTImportWindowStatus"]
         if status and (status:GetText() == nil or status:GetText() == "") then
