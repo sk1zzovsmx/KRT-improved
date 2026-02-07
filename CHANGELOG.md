@@ -4,6 +4,7 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- Minimap: added a context-menu toggle to show/hide the minimap icon and synced the setting to SavedVariables.
 - Docs: updated AGENTS.md with explicit `.luacheckrc` maintenance guidance for addon globals.
 - Docs: fixed OVERVIEW.md repository links to use root-relative paths.
 - Tooling: refreshed `.luacheckrc` with explicit KRT frame/global allowlist entries.

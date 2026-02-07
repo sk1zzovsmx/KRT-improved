@@ -1232,6 +1232,18 @@ do
     -- ----- Private helpers ----- --
     -- Menu definition for EasyMenu (built once).
     local minimapMenu = {
+        {
+            text = L.StrConfigMinimapButton,
+            checked = function()
+                addon.options = addon.options or KRT_Options or {}
+                return addon.options.minimapButton ~= false
+            end,
+            keepShownOnClick = 1,
+            func = function()
+                module:ToggleMinimapButton()
+            end,
+        },
+        { text = " ",              disabled = 1,     notCheckable = 1 },
         { text = MASTER_LOOTER,    notCheckable = 1, func = function() addon.Master:Toggle() end },
         { text = L.StrLootCounter, notCheckable = 1, func = function() addon.LootCounter:Toggle() end },
         { text = L.StrLootLogger,  notCheckable = 1, func = function() addon.Logger:Toggle() end },
@@ -1343,8 +1355,12 @@ do
     -- Toggles the visibility of the minimap button.
     function module:ToggleMinimapButton()
         addon.options = addon.options or KRT_Options or {}
-        addon.options.minimapButton = not addon.options.minimapButton
-        SetMinimapShown(addon.options.minimapButton)
+        local newState = not (addon.options.minimapButton ~= false)
+        addon.options.minimapButton = newState
+        if KRT_Options then
+            KRT_Options.minimapButton = newState
+        end
+        SetMinimapShown(newState)
     end
 
     -- Hides the minimap button.
