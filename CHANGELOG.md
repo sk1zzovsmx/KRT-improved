@@ -4,6 +4,7 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- Reserve Import: mode description now uses two lines for clearer readability.
 - Reserve Import: fixed mode help text visibility by anchoring the description above the slider
   and adding a fallback label update.
 - Reserve Import: added mode description text above the slider to explain Multi-reserve vs Plus System behavior.

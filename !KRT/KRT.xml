@@ -2300,7 +2300,7 @@
 			</Slider>
 			<FontString name="$parentModeDescription" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="TOP">
 				<Size>
-					<AbsDimension x="340" y="24" />
+					<AbsDimension x="340" y="30" />
 				</Size>
 				<Anchors>
 					<Anchor point="BOTTOM" relativeTo="$parentModeSlider" relativePoint="TOP">
