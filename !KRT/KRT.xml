@@ -2313,12 +2313,12 @@
 			<!-- Multiline EditBox for CSV (no scroll bar) -->
 			<EditBox name="KRTImportEditBox" multiline="true" autoFocus="false" inherits="InputBoxTemplate">
 				<Size>
-					<AbsDimension x="340" y="160" />
+					<AbsDimension x="360" y="160" />
 				</Size>
 				<Anchors>
 					<Anchor point="TOP" relativePoint="TOP">
 						<Offset>
-							<AbsDimension x="-5" y="-92" />
+							<AbsDimension x="0" y="-92" />
 						</Offset>
 					</Anchor>
 				</Anchors>
