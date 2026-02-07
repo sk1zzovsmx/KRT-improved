@@ -8056,7 +8056,7 @@ do
         return tonumber(v) or v
     end
 
-    function Store:BuildIndex(raid, listField, idField, cacheField)
+    local function buildIndex(raid, listField, idField, cacheField)
         local list = raid[listField] or {}
         local m = {}
         for i = 1, #list do
@@ -8069,29 +8069,29 @@ do
         raid[cacheField] = m
     end
 
-    function Store:GetIndexedPositionByNid(raid, queryNid, listField, idField, cacheField)
+    local function getIndexedPositionByNid(raid, queryNid, listField, idField, cacheField)
         if not (raid and queryNid) then return nil end
 
         local normalizedNid = normalizeNid(queryNid)
         if not raid[cacheField] then
-            self:BuildIndex(raid, listField, idField, cacheField)
+            buildIndex(raid, listField, idField, cacheField)
         end
 
         local idx = raid[cacheField][normalizedNid]
         if not idx then
             -- Raid changed since last build (new entry added / list changed)
-            self:BuildIndex(raid, listField, idField, cacheField)
+            buildIndex(raid, listField, idField, cacheField)
             idx = raid[cacheField][normalizedNid]
         end
         return idx
     end
 
     function Store:BossIdx(raid, bossNid)
-        return self:GetIndexedPositionByNid(raid, bossNid, "bossKills", "bossNid", "_bossIdxByNid")
+        return getIndexedPositionByNid(raid, bossNid, "bossKills", "bossNid", "_bossIdxByNid")
     end
 
     function Store:LootIdx(raid, lootNid)
-        return self:GetIndexedPositionByNid(raid, lootNid, "loot", "lootNid", "_lootIdxByNid")
+        return getIndexedPositionByNid(raid, lootNid, "loot", "lootNid", "_lootIdxByNid")
     end
 
     function Store:GetBoss(raid, bossNid)

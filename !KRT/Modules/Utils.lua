@@ -1034,7 +1034,7 @@ end
 -- These helpers avoid using LockHighlight() for persistent selection, so hover highlight remains native.
 -- Safe for 3.3.5a and works with any UI skin (pure texture overlays).
 
-local function _ensureRowVisuals(row)
+local function ensureRowVisuals(row)
 	if not row or row._krtSelTex then return end
 
 	-- Persistent selection fill (soft)
@@ -1066,17 +1066,17 @@ local function _ensureRowVisuals(row)
 end
 
 function Utils.ensureRowVisuals(row)
-	_ensureRowVisuals(row)
+	ensureRowVisuals(row)
 end
 
 function Utils.setRowSelected(row, cond)
-	_ensureRowVisuals(row)
+	ensureRowVisuals(row)
 	if not row or not row._krtSelTex then return end
 	if cond then row._krtSelTex:Show() else row._krtSelTex:Hide() end
 end
 
 function Utils.setRowFocused(row, cond)
-	_ensureRowVisuals(row)
+	ensureRowVisuals(row)
 	local t = row and row._krtFocusTex
 	if not t then return end
 	if cond then t:Show() else t:Hide() end
