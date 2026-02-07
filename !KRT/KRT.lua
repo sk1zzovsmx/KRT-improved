@@ -2918,6 +2918,10 @@ do
         else
             ok = AssignItem(itemLink, target, rollType, 0)
         end
+        if ok and not lootState.fromInventory then
+            announced = false
+            addon.Rolls:ClearRolls()
+        end
         module:RequestRefresh()
         return ok
     end
