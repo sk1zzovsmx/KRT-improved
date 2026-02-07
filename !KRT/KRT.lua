@@ -6087,11 +6087,11 @@ do
     -- Import mode slider: 0 = Multi-reserve, 1 = Plus System (priority)
     local MODE_MULTI, MODE_PLUS = 0, 1
 
-    local IMPORT_BASE_FRAME_HEIGHT = 420
-    local IMPORT_BASE_EDIT_HEIGHT = 260
-    local IMPORT_BASE_LINE_COUNT = 13
+    local IMPORT_BASE_FRAME_HEIGHT = 520
+    local IMPORT_BASE_EDIT_HEIGHT = 360
+    local IMPORT_BASE_LINE_COUNT = 18
     local IMPORT_EXTRA_LINE_HEIGHT = 12
-    local IMPORT_MAX_EXTRA_HEIGHT = 220
+    local IMPORT_MAX_EXTRA_HEIGHT = 280
 
     local function GetImportModeString()
         local v = addon.options and addon.options.srImportMode

@@ -4,6 +4,7 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- Reserve Import: significantly increased CSV input box height to show much more pasted text.
 - Reserve Import: further widened the CSV input box and import window width.
 - Reserve Import: enlarged the CSV field and base import window size for better readability.
 - Reserve Import: import panel now grows in height dynamically based on CSV text length.

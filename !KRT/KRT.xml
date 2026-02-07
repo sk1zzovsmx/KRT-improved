@@ -2236,7 +2236,7 @@
 	<!-- ====== Start of Reserve Import Window ====== -->
 	<Frame name="KRTImportWindow" inherits="KRTFrameTemplate" toplevel="true" hidden="true" frameStrata="DIALOG">
 		<Size>
-			<AbsDimension x="560" y="420" />
+			<AbsDimension x="560" y="520" />
 		</Size>
 		<Anchors>
 			<Anchor point="CENTER" />
@@ -2313,7 +2313,7 @@
 			<!-- Multiline EditBox for CSV (no scroll bar) -->
 			<EditBox name="KRTImportEditBox" multiline="true" autoFocus="false" inherits="InputBoxTemplate">
 				<Size>
-					<AbsDimension x="520" y="260" />
+					<AbsDimension x="520" y="360" />
 				</Size>
 				<Anchors>
 					<Anchor point="TOP" relativePoint="TOP">
