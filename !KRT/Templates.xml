@@ -151,27 +151,12 @@
 		justifyV="MIDDLE" virtual="true">
 		<Color r="0.5" g="0.5" b="0.5" a="1" />
 	</FontString>
-	<!-- ScrollFrame template -->
-	<ScrollFrame name="KRTScrollFrameTemplate" inherits="UIPanelScrollFrameTemplate" virtual="true">
-		<ScrollChild>
-			<Frame name="$parentScrollChild">
-				<Anchors>
-					<Anchor point="TOPLEFT" />
-					<Anchor point="TOPRIGHT" />
-				</Anchors>
-			</Frame>
-		</ScrollChild>
-	</ScrollFrame>
-	<!-- Hybrid scroll template for virtualized lists -->
-	<!--
-		HybridScrollFrame (WotLK 3.3.5a)
-
-		Why this wrapper exists:
-		- The stock BasicHybridScrollFrameTemplate defines $parentScrollBar using a <Frame> tag inheriting HybridScrollBarTemplate.
-		  Some 3.3.5... clients treat that as a Frame (missing Slider methods), which breaks HybridScrollFrame.lua.
-		- This wrapper keeps everything native (HybridScrollFrameTemplate + HybridScrollBarTemplate) but guarantees the ScrollBar is a Slider.
-	-->
-	<ScrollFrame name="KRT_HybridScrollFrameTemplate" inherits="HybridScrollFrameTemplate" virtual="true">
+	<!-- ScrollFrame template (Hybrid for list virtualisation) -->
+	<ScrollFrame name="KRTScrollFrameTemplate" inherits="HybridScrollFrameTemplate" virtual="true">
+		<Anchors>
+			<Anchor point="TOPLEFT"/>
+			<Anchor point="BOTTOMRIGHT"/>
+		</Anchors>
 		<Frames>
 			<Slider name="$parentScrollBar" inherits="HybridScrollBarTemplate"/>
 		</Frames>
