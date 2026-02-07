@@ -909,6 +909,36 @@ function Utils.makeEventDrivenRefresher(targetOrGetter, updateFn)
 	end
 end
 
+-- =========== UI Frame Controller Factory  =========== --
+-- Consolidates recurring Toggle/Hide/Show patterns across UI modules.
+function Utils.makeUIFrameController(getFrame, requestRefreshFn)
+	return {
+		Toggle = function(self)
+			local frame = getFrame()
+			if not frame then return end
+			if frame:IsShown() then
+				Utils.setShown(frame, false)
+			else
+				if requestRefreshFn then requestRefreshFn() end
+				Utils.setShown(frame, true)
+			end
+		end,
+		Hide = function(self)
+			local frame = getFrame()
+			if frame then
+				Utils.setShown(frame, false)
+			end
+		end,
+		Show = function(self)
+			local frame = getFrame()
+			if frame then
+				if requestRefreshFn then requestRefreshFn() end
+				Utils.setShown(frame, true)
+			end
+		end,
+	}
+end
+
 -- =========== Tooltip helpers  =========== --
 
 do

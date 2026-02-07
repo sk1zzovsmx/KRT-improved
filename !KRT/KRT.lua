@@ -204,6 +204,12 @@ do
     addon:RegisterEvent("ADDON_LOADED")
 end
 
+-- Alias: redirect to Utils for backwards compatibility
+-- (function moved to Utils.lua; this wrapper allows existing code to use addon:makeUIFrameController(...))
+function addon:makeUIFrameController(getFrame, requestRefreshFn)
+    return Utils.makeUIFrameController(getFrame, requestRefreshFn)
+end
+
 -- =========== Raid Helpers Module  =========== --
 -- Manages raid state, roster, boss kills, and loot logging.
 do
@@ -3414,22 +3420,33 @@ do
 
     module.PrepareDropDowns = PrepareDropDowns
 
-    -- OnClick handler for dropdown menu items.
+    -- Dropdown field metadata: maps frame name suffixes to state keys (lazily bound at runtime).
+    local function FindDropDownField(frameNameFull)
+        if not frameNameFull then return nil end
+        
+        -- Match dropdown frame name to find the field type
+        if frameNameFull == dropDownFrameHolder:GetName() then
+            return { stateKey = "holder", raidKey = "holder", frame = dropDownFrameHolder }
+        elseif frameNameFull == dropDownFrameBanker:GetName() then
+            return { stateKey = "banker", raidKey = "banker", frame = dropDownFrameBanker }
+        elseif frameNameFull == dropDownFrameDisenchanter:GetName() then
+            return { stateKey = "disenchanter", raidKey = "disenchanter", frame = dropDownFrameDisenchanter }
+        end
+        return nil
+    end
+
+    -- OnClick handler for dropdown menu items (consolidated from 3 similar branches).
     function module:OnClickDropDown(owner, value)
         if not KRT_CurrentRaid then return end
         UIDropDownMenu_SetText(owner, value)
         UIDropDownMenu_SetSelectedValue(owner, value)
-        local name = owner:GetName()
-        if name == dropDownFrameHolder:GetName() then
-            KRT_Raids[KRT_CurrentRaid].holder = value
-            lootState.holder = value
-        elseif name == dropDownFrameBanker:GetName() then
-            KRT_Raids[KRT_CurrentRaid].banker = value
-            lootState.banker = value
-        elseif name == dropDownFrameDisenchanter:GetName() then
-            KRT_Raids[KRT_CurrentRaid].disenchanter = value
-            lootState.disenchanter = value
+
+        local field = FindDropDownField(owner:GetName())
+        if field then
+            KRT_Raids[KRT_CurrentRaid][field.raidKey] = value
+            lootState[field.stateKey] = value
         end
+
         dropDownDirty = true
         dirtyFlags.dropdowns = true
         dirtyFlags.buttons = true
@@ -3437,46 +3454,27 @@ do
         module:RequestRefresh()
     end
 
-    -- Updates the text of the dropdowns to reflect the current selection.
+    -- Updates the text of the dropdowns to reflect the current selection (consolidated from 3 similar branches).
     function UpdateDropDowns(frame)
         if not frame or not KRT_CurrentRaid then return end
-        local name = frame:GetName()
-        -- Update loot holder:
-        if name == dropDownFrameHolder:GetName() then
-            lootState.holder = KRT_Raids[KRT_CurrentRaid].holder
-            if lootState.holder and addon.Raid:GetUnitID(lootState.holder) == "none" then
-                KRT_Raids[KRT_CurrentRaid].holder = nil
-                lootState.holder = nil
-            end
-            if lootState.holder then
-                UIDropDownMenu_SetText(dropDownFrameHolder, lootState.holder)
-                UIDropDownMenu_SetSelectedValue(dropDownFrameHolder, lootState.holder)
-                dirtyFlags.buttons = true
-            end
-            -- Update loot banker:
-        elseif name == dropDownFrameBanker:GetName() then
-            lootState.banker = KRT_Raids[KRT_CurrentRaid].banker
-            if lootState.banker and addon.Raid:GetUnitID(lootState.banker) == "none" then
-                KRT_Raids[KRT_CurrentRaid].banker = nil
-                lootState.banker = nil
-            end
-            if lootState.banker then
-                UIDropDownMenu_SetText(dropDownFrameBanker, lootState.banker)
-                UIDropDownMenu_SetSelectedValue(dropDownFrameBanker, lootState.banker)
-                dirtyFlags.buttons = true
-            end
-            -- Update loot disenchanter:
-        elseif name == dropDownFrameDisenchanter:GetName() then
-            lootState.disenchanter = KRT_Raids[KRT_CurrentRaid].disenchanter
-            if lootState.disenchanter and addon.Raid:GetUnitID(lootState.disenchanter) == "none" then
-                KRT_Raids[KRT_CurrentRaid].disenchanter = nil
-                lootState.disenchanter = nil
-            end
-            if lootState.disenchanter then
-                UIDropDownMenu_SetText(dropDownFrameDisenchanter, lootState.disenchanter)
-                UIDropDownMenu_SetSelectedValue(dropDownFrameDisenchanter, lootState.disenchanter)
-                dirtyFlags.buttons = true
-            end
+
+        local field = FindDropDownField(frame:GetName())
+        if not field then return end
+
+        -- Sync state from raid data
+        lootState[field.stateKey] = KRT_Raids[KRT_CurrentRaid][field.raidKey]
+
+        -- Clear if unit is no longer in raid
+        if lootState[field.stateKey] and addon.Raid:GetUnitID(lootState[field.stateKey]) == "none" then
+            KRT_Raids[KRT_CurrentRaid][field.raidKey] = nil
+            lootState[field.stateKey] = nil
+        end
+
+        -- Update UI if value is valid
+        if lootState[field.stateKey] then
+            UIDropDownMenu_SetText(field.frame, lootState[field.stateKey])
+            UIDropDownMenu_SetSelectedValue(field.frame, lootState[field.stateKey])
+            dirtyFlags.buttons = true
         end
     end
 

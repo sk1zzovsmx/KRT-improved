@@ -4,6 +4,10 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- Refactor: Moved `makeUIFrameController` factory from KRT.lua to Utils.lua (shared utility factory layer); added backwards-compatible alias in KRT.lua.
+- Refactor: Master Looter dropdown handlers (holder/banker/disenchanter) consolidated to eliminate 3 identical branches via parameterized FindDropDownField.
+- Refactor: Master Looter UpdateDropDowns consolidated from 3 repetitive if-elseif blocks to single loop via FindDropDownField (reduces code duplication).
+- Refactor: Added addon:makeUIFrameController() factory to consolidate recurring Toggle/Hide/Show patterns across 7+ UI modules.
 - Master Looter: Hold/Bank/DE clears rolls only after completed assignment; inventory trade setup no longer wipes rolls early.
 - Minimap: left-clicking the minimap icon now toggles the context menu open/closed.
 - Docs: updated AGENTS.md with explicit `.luacheckrc` maintenance guidance for addon globals.
