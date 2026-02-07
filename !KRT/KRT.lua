@@ -4654,7 +4654,8 @@ do
         twipe(playerTextTemp)
         for i = 1, #players do
             local name = players[i]
-            playerTextTemp[#playerTextTemp + 1] = FormatReservePlayerName(itemId, name, counts and counts[name] or 1, metaByName, useColor)
+            playerTextTemp[#playerTextTemp + 1] = FormatReservePlayerName(itemId, name, counts and counts[name] or 1,
+                metaByName, useColor)
         end
         return playerTextTemp
     end
@@ -4826,13 +4827,15 @@ do
                             tm.class = m and m.class or tm.class
                         end
                     end
-                    target.playersText, target.playersTooltipLines, target.playersTextFull = BuildPlayersText(itemId, target.players, target.playerCounts, target.playerMeta)
+                    target.playersText, target.playersTooltipLines, target.playersTextFull = BuildPlayersText(itemId,
+                        target.players, target.playerCounts, target.playerMeta)
                     target.players = nil
                     target.playerCounts = nil
                     target.playerMeta = nil
                     remaining[#remaining + 1] = target
                 else
-                    data.playersText, data.playersTooltipLines, data.playersTextFull = BuildPlayersText(data.itemId, data.players, data.playerCounts, data.playerMeta)
+                    data.playersText, data.playersTooltipLines, data.playersTextFull = BuildPlayersText(data.itemId,
+                        data.players, data.playerCounts, data.playerMeta)
                     data.players = nil
                     data.playerCounts = nil
                     data.playerMeta = nil
@@ -4926,7 +4929,8 @@ do
 
         for _, byItem in pairs(grouped) do
             for _, data in pairs(byItem) do
-                data.playersText, data.playersTooltipLines, data.playersTextFull = BuildPlayersText(data.itemId, data.players, data.playerCounts, data.playerMeta)
+                data.playersText, data.playersTooltipLines, data.playersTextFull = BuildPlayersText(data.itemId,
+                    data.players, data.playerCounts, data.playerMeta)
                 data.players = nil
                 data.playerCounts = nil
                 data.playerMeta = nil
@@ -6125,14 +6129,16 @@ do
 
         StaticPopupDialogs["KRT_WRONG_CSV_FOR_PLUS"] = {
             text = L.ErrCSVWrongForPlus
-                or "Wrong CSV format for Plus System.\nThis CSV contains players with multiple reserved items.\nSwitch to Multi-reserve or check your SoftRes settings.",
+                or
+                "Wrong CSV format for Plus System.\nThis CSV contains players with multiple reserved items.\nSwitch to Multi-reserve or check your SoftRes settings.",
             button1 = L.BtnSwitchToMulti or "Switch to Multi-reserve",
             button2 = L.BtnCancel or (L.BtnClose or "Cancel"),
             OnShow = function(self, data)
                 if not self or not self.text then return end
                 if type(data) == "table" and data.player then
                     local msg = L.ErrCSVWrongForPlusWithPlayer
-                        or "Wrong CSV format for Plus System.\nPlayer '%s' has multiple reserved items.\nSwitch to Multi-reserve or check your SoftRes settings."
+                        or
+                        "Wrong CSV format for Plus System.\nPlayer '%s' has multiple reserved items.\nSwitch to Multi-reserve or check your SoftRes settings."
                     self.text:SetText(msg:format(tostring(data.player)))
                 end
             end,
@@ -6608,8 +6614,6 @@ do
                 out[i] = { id = i, name = w and w.name or "" }
             end
         end,
-
-        rowName = function(n, _, i) return n .. "WarningBtn" .. i end,
         rowTmpl = "KRTWarningButtonTemplate",
 
         drawRow = Utils.createRowDrawer(function(row, it)
@@ -6899,8 +6903,6 @@ do
                 out[i] = { id = i, name = name, spec = changesTable[name] }
             end
         end,
-
-        rowName = function(n, it) return n .. "PlayerBtn" .. it.id end,
         rowTmpl = "KRTChangesButtonTemplate",
 
         drawRow = Utils.createRowDrawer(function(row, it)
@@ -9200,6 +9202,8 @@ do
         keyName = "RaidsList",
         poolTag = "logger-raids",
         _rowParts = { "ID", "Date", "Zone", "Size" },
+        bindRow = function(row) Utils.bindRowParts(row, { "ID", "Date", "Zone", "Size" }) end,
+
 
         localize = function(n)
             local title = _G[n .. "Title"]
@@ -9230,8 +9234,6 @@ do
                 out[i] = it
             end
         end,
-
-        rowName = function(n, _, i) return n .. "RaidBtn" .. i end,
         rowTmpl = "KRTLoggerRaidButton",
 
         drawRow = Utils.createRowDrawer(function(row, it)
@@ -9401,6 +9403,8 @@ do
         keyName = "BossList",
         poolTag = "logger-bosses",
         _rowParts = { "ID", "Name", "Time", "Mode" },
+        bindRow = function(row) Utils.bindRowParts(row, { "ID", "Name", "Time", "Mode" }) end,
+
 
         localize = function(n)
             local title = _G[n .. "Title"]
@@ -9420,8 +9424,6 @@ do
             if not raid then return end
             View:FillBossList(out, raid)
         end,
-
-        rowName = function(n, _, i) return n .. "BossBtn" .. i end,
         rowTmpl = "KRTLoggerBossButton",
 
         drawRow = Utils.createRowDrawer(function(row, it)
@@ -9533,6 +9535,9 @@ do
         keyName = "BossAttendeesList",
         poolTag = "logger-boss-attendees",
         _rowParts = { "Name" },
+        bindRow = function(row) Utils.bindRowParts(row, { "Name" }) end,
+        clearRow = Utils.clearLoggerAttendeeRow,
+
 
         localize = function(n)
             local title = _G[n .. "Title"]
@@ -9549,8 +9554,6 @@ do
             if not (raid and bID) then return end
             View:FillBossAttendeesList(out, raid, bID)
         end,
-
-        rowName = function(n, _, i) return n .. "PlayerBtn" .. i end,
         rowTmpl = "KRTLoggerBossAttendeeButton",
 
         drawRow = Utils.createRowDrawer(function(row, it)
@@ -9637,6 +9640,9 @@ do
         keyName = "RaidAttendeesList",
         poolTag = "logger-raid-attendees",
         _rowParts = { "Name", "Join", "Leave" },
+        bindRow = function(row) Utils.bindRowParts(row, { "Name", "Join", "Leave" }) end,
+        clearRow = Utils.clearLoggerAttendeeRow,
+
 
         localize = function(n)
             local title = _G[n .. "Title"]
@@ -9657,8 +9663,6 @@ do
             if not raid then return end
             View:FillRaidAttendeesList(out, raid)
         end,
-
-        rowName = function(n, _, i) return n .. "PlayerBtn" .. i end,
         rowTmpl = "KRTLoggerRaidAttendeeButton",
 
         drawRow = Utils.createRowDrawer(function(row, it)
@@ -9792,6 +9796,10 @@ do
         keyName = "LootList",
         poolTag = "logger-loot",
         _rowParts = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
+        bindRow = function(row) Utils.bindRowParts(row,
+                { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" }) end,
+        clearRow = Utils.clearLoggerLootRow,
+
 
         localize = function(n)
             local title = _G[n .. "Title"]

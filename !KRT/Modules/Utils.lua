@@ -287,6 +287,138 @@ function Utils.makeListController(cfg)
     return Utils.makeHybridListController(cfg)
 end
 
+
+-- =========== Hybrid list binding helpers (WotLK 3.3.5a)  =========== --
+-- These helpers allow binding row widgets robustly even when the named regions are nested.
+-- They are only used during row creation/binding (small number of buttons), not per-update.
+
+local function _krtIterChildren(frame)
+    -- GetChildren returns varargs; pack into a table for iteration.
+    if not (frame and frame.GetChildren) then return nil end
+    return { frame:GetChildren() }
+end
+
+local function _krtIterRegions(frame)
+    if not (frame and frame.GetRegions) then return nil end
+    return { frame:GetRegions() }
+end
+
+-- Depth-first search for a descendant (child frame or region) whose full name matches exactly.
+function Utils.findNamedDescendant(root, fullName)
+    if not (root and fullName and fullName ~= "") then return nil end
+    local function scan(frame)
+        local regions = _krtIterRegions(frame)
+        if regions then
+            for i = 1, #regions do
+                local r = regions[i]
+                if r and r.GetName and r:GetName() == fullName then
+                    return r
+                end
+            end
+        end
+
+        local children = _krtIterChildren(frame)
+        if children then
+            for i = 1, #children do
+                local c = children[i]
+                if c then
+                    if c.GetName and c:GetName() == fullName then
+                        return c
+                    end
+                    local found = scan(c)
+                    if found then return found end
+                end
+            end
+        end
+        return nil
+    end
+    return scan(root)
+end
+
+-- Depth-first search for a descendant whose name ends with the given suffix.
+-- Useful when the element is nested and you only know the tail (e.g. "IconTexture").
+function Utils.findDescendantBySuffix(root, suffix)
+    if not (root and suffix and suffix ~= "") then return nil end
+    local function endsWith(name)
+        return type(name) == "string" and name:endsWith(suffix)
+    end
+
+    local function scan(frame)
+        local regions = _krtIterRegions(frame)
+        if regions then
+            for i = 1, #regions do
+                local r = regions[i]
+                local n = r and r.GetName and r:GetName()
+                if n and endsWith(n) then
+                    return r
+                end
+            end
+        end
+
+        local children = _krtIterChildren(frame)
+        if children then
+            for i = 1, #children do
+                local c = children[i]
+                if c then
+                    local n = c.GetName and c:GetName()
+                    if n and endsWith(n) then
+                        return c
+                    end
+                    local found = scan(c)
+                    if found then return found end
+                end
+            end
+        end
+        return nil
+    end
+    return scan(root)
+end
+
+-- Bind named parts on a Hybrid row. Tries exact (rowName..part) first; falls back to suffix search.
+function Utils.bindRowParts(row, parts, out)
+    if not (row and parts) then return out end
+    out = out or {}
+    local rowName = row.GetName and row:GetName() or nil
+    for i = 1, #parts do
+        local key = parts[i]
+        if type(key) == "string" then
+            local full = rowName and (rowName .. key) or key
+            out[key] = _G[full] or Utils.findNamedDescendant(row, full) or Utils.findDescendantBySuffix(row, key)
+        end
+    end
+    row._p = out
+    return out
+end
+
+-- Clear transient fields for Logger loot rows (Hybrid reuse).
+function Utils.clearLoggerLootRow(row)
+    if not row then return end
+    row._itemId = nil
+    row._itemLink = nil
+    row._itemName = nil
+    row._source = nil
+    row._tooltipTitle = nil
+    row._tooltipSource = nil
+    local ui = row._p
+    if ui and ui.ItemIconTexture and ui.ItemIconTexture.SetTexture then
+        ui.ItemIconTexture:SetTexture(nil)
+    end
+end
+
+-- Clear transient fields for Logger attendee rows (Hybrid reuse).
+function Utils.clearLoggerAttendeeRow(row)
+    if not row then return end
+    row._playerName = nil
+    local ui = row._p
+    if ui then
+        if ui.Name and ui.Name.SetText then ui.Name:SetText("") end
+        if ui.Name and ui.Name.SetVertexColor then ui.Name:SetVertexColor(1, 1, 1) end
+        if ui.Join and ui.Join.SetText then ui.Join:SetText("") end
+        if ui.Leave and ui.Leave.SetText then ui.Leave:SetText("") end
+    end
+end
+
+
 function Utils.makeHybridListController(cfg)
     local self = {
         frameName = nil,
@@ -297,7 +429,6 @@ function Utils.makeHybridListController(cfg)
         _active = false,
         _localized = false,
         _dirty = true,
-        _buttonsCreated = false,
         _rowHeight = tonumber(cfg.rowHeight) or 20,
         _createdRowCount = 0,
     }
@@ -389,52 +520,76 @@ function Utils.makeHybridListController(cfg)
     end
 
     local function ensureButtons(sf)
-        if self._buttonsCreated then return true end
-        if not (sf and HybridScrollFrame_CreateButtons) then
+        if not (sf and sf.scrollChild and HybridScrollFrame_Update and HybridScrollFrame_CreateButtons) then
             return false
         end
 
-        HybridScrollFrame_CreateButtons(sf, cfg.rowTmpl, 0, 0)
-        self._buttonsCreated = true
+        -- 1) First creation (Blizzard helper). This resets scroll to 0, which is fine the first time.
+        if not sf.buttons then
+            HybridScrollFrame_CreateButtons(sf, cfg.rowTmpl, 0, 0)
+        end
 
         local buttons = sf.buttons
-        if buttons then
-            for i = 1, #buttons do
-                local row = buttons[i]
-                if row then
-                    local parts = {}
-                    row._p = parts
+        if not (buttons and buttons[1]) then
+            return false
+        end
 
-                    if cfg._rowParts then
-                        local rowName = row:GetName()
-                        if rowName then
-                            for j = 1, #cfg._rowParts do
-                                local part = cfg._rowParts[j]
-                                parts[part] = _G[rowName .. part]
-                            end
-                        end
-                    end
+        -- Track rowHeight from the real template height (authoritative).
+        local h = buttons[1].GetHeight and buttons[1]:GetHeight()
+        if h and h > 0 then
+            self._rowHeight = h
+        end
+
+        -- 2) Resize-safe: if the scroll frame grows, ask Blizzard helper to add missing buttons.
+        --    HybridScrollFrame_CreateButtons() resets the scroll bar value to 0, so we preserve it.
+        local scrollH = sf.GetHeight and sf:GetHeight() or 0
+        local rowH = (self._rowHeight and self._rowHeight > 0) and self._rowHeight or 20
+        local wanted = math.ceil(scrollH / rowH) + 1
+        if wanted < 1 then wanted = 1 end
+
+        if #buttons < wanted then
+            local sb = sf.scrollBar
+            local prev = (sb and sb.GetValue) and sb:GetValue() or 0
+
+            -- Prevent re-entrant updates while we rebuild buttons.
+            local oldUpdate = sf.update
+            sf.update = nil
+            HybridScrollFrame_CreateButtons(sf, cfg.rowTmpl, 0, 0)
+            sf.update = oldUpdate
+
+            buttons = sf.buttons or buttons
+            if sb and sb.GetMinMaxValues and sb.SetValue then
+                local minVal, maxVal = sb:GetMinMaxValues()
+                if prev < minVal then prev = minVal end
+                if prev > maxVal then prev = maxVal end
+                sb:SetValue(prev)
+            end
+        end
+
+        -- 3) Bind row widgets once (Option B: cfg.bindRow). Falls back to cfg._rowParts.
+        for i = 1, #buttons do
+            local row = buttons[i]
+            if row and not row._krtBound then
+                if cfg.bindRow then
+                    cfg.bindRow(row)
+                elseif cfg._rowParts then
+                    Utils.bindRowParts(row, cfg._rowParts)
+                else
+                    row._p = row._p or {}
                 end
+                row._krtBound = true
             end
         end
 
-        self._createdRowCount = buttons and #buttons or 0
-        if buttons and buttons[1] and buttons[1].GetHeight then
-            local h = buttons[1]:GetHeight()
-            if h and h > 0 then
-                self._rowHeight = h
+        self._createdRowCount = #buttons
+
+        if not sf.update then
+            sf.update = function()
+                self:Fetch()
             end
         end
 
-        sf.update = function()
-            self:Fetch()
-        end
-
-        sf:SetScript("OnVerticalScroll", function(frame, offset)
-            HybridScrollFrame_OnVerticalScroll(frame, offset, self._rowHeight, frame.update)
-        end)
-
-        if addon and addon.options and addon.options.debug and addon.debug then
+        if cfg.debugVirtualization and addon and addon.options and addon.options.debug and addon.debug then
             addon:debug(("[Hybrid:%s] rowsCreated=%d"):format(tostring(cfg.keyName or "?"), self._createdRowCount))
         end
 
@@ -473,7 +628,6 @@ function Utils.makeHybridListController(cfg)
         else
             self:Fetch()
         end
-
     end
 
     defer:SetScript("OnUpdate", function(f)
@@ -502,29 +656,47 @@ function Utils.makeHybridListController(cfg)
         end
     end
 
+    local function clearRow(row)
+        if not row then return end
+        row._dataIndex = nil
+        row._data = nil
+        if cfg.clearRow then
+            cfg.clearRow(row)
+        end
+    end
+
     function self:Fetch()
+        if self._fetching then return end
+        self._fetching = true
         local n = self.frameName
-        if not n then return end
+        if not n then self._fetching = false; return end
 
         local sf = _G[n .. "ScrollFrame"]
-        if not sf then return end
+        if not sf then self._fetching = false; return end
 
         local scrollH = sf:GetHeight() or 0
         if scrollH < 10 then
             defer:Show()
+            self._fetching = false
             return false
         end
 
         if not ensureButtons(sf) then
+            self._fetching = false
             return false
         end
 
         local buttons = sf.buttons
-        if not buttons then return end
+        if not buttons then
+            self._fetching = false
+            return false
+        end
 
         local totalCount = #self.data
         local totalHeight = totalCount * self._rowHeight
-        HybridScrollFrame_Update(sf, totalHeight, scrollH)
+        -- Blizzard usage (3.3.5a): displayedHeight is the total height of the created buttons.
+        local displayedHeight = (#buttons) * self._rowHeight
+        HybridScrollFrame_Update(sf, totalHeight, displayedHeight)
 
         local offset = HybridScrollFrame_GetOffset(sf)
         for i = 1, #buttons do
@@ -533,10 +705,13 @@ function Utils.makeHybridListController(cfg)
             local it = self.data[dataIndex]
             if it then
                 row:SetID(it.id)
-                cfg.drawRow(row, it)
+                row._dataIndex = dataIndex
+                row._data = it
+                cfg.drawRow(row, it, dataIndex)
                 row:Show()
             else
                 row:Hide()
+                clearRow(row)
             end
         end
 
@@ -553,6 +728,8 @@ function Utils.makeHybridListController(cfg)
         self._lastHL = nil
         applyHighlight()
         postUpdate()
+
+        self._fetching = false
     end
 
     function self:Sort(key)
