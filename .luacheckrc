@@ -68,6 +68,7 @@ globals = {
 	"KRTLootCounterFrame",
 	"KRTReserveListFrame",
 	"KRTImportWindow",
+	"KRTImportWindowModeDescription",
 	"KRTItemSelectionFrame",
 	"KRTLoggerBossBox",
 	"KRT_MINIMAP_GUI",

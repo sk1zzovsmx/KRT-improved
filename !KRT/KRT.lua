@@ -6099,11 +6099,25 @@ do
 
     local function UpdateModeDescription(modeValue)
         local modeDesc = _G["KRTImportWindowModeDescription"]
-        if not modeDesc then return end
+        local descText
         if modeValue == MODE_PLUS then
-            modeDesc:SetText(L.StrImportModeDescPlus or "This setting counts the plus column in SoftRes CSV as a priority point.")
+            descText = L.StrImportModeDescPlus
+                or "Uses the SoftRes CSV plus column as priority points (more plus = higher priority)."
         else
-            modeDesc:SetText(L.StrImportModeDescMulti or "This setting keeps in mind any reserves as item.")
+            descText = L.StrImportModeDescMulti
+                or "Each reserved item counts separately; players can reserve multiple items."
+        end
+
+        if modeDesc and modeDesc.SetText then
+            modeDesc:SetText(descText)
+            return
+        end
+
+        local slider = GetModeSlider()
+        if not slider or not slider.GetName then return end
+        local sliderText = _G[slider:GetName() .. "Text"]
+        if sliderText and sliderText.SetText then
+            sliderText:SetText(descText)
         end
     end
 

@@ -2280,18 +2280,6 @@
 					</Anchor>
 				</Anchors>
 			</FontString>
-			<FontString name="$parentModeDescription" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="TOP">
-				<Size>
-					<AbsDimension x="340" y="28" />
-				</Size>
-				<Anchors>
-					<Anchor point="TOP" relativePoint="TOP">
-						<Offset>
-							<AbsDimension x="0" y="-74" />
-						</Offset>
-					</Anchor>
-				</Anchors>
-			</FontString>
 
 			<!-- Import mode: Multi-reserve vs Plus System -->
 			<Slider name="$parentModeSlider" inherits="OptionsSliderTemplate">
@@ -2310,6 +2298,18 @@
 					<OnValueChanged>KRT.ReserveImport:OnModeSliderChanged(self, value)</OnValueChanged>
 				</Scripts>
 			</Slider>
+			<FontString name="$parentModeDescription" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="TOP">
+				<Size>
+					<AbsDimension x="340" y="24" />
+				</Size>
+				<Anchors>
+					<Anchor point="BOTTOM" relativeTo="$parentModeSlider" relativePoint="TOP">
+						<Offset>
+							<AbsDimension x="0" y="8" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</FontString>
 			<!-- Multiline EditBox for CSV -->
 			<ScrollFrame name="KRTImportScrollFrame" inherits="KRTScrollFrameTemplate">
 				<Size>
