@@ -2236,7 +2236,7 @@
 	<!-- ====== Start of Reserve Import Window ====== -->
 	<Frame name="KRTImportWindow" inherits="KRTFrameTemplate" toplevel="true" hidden="true" frameStrata="DIALOG">
 		<Size>
-			<AbsDimension x="500" y="420" />
+			<AbsDimension x="560" y="420" />
 		</Size>
 		<Anchors>
 			<Anchor point="CENTER" />
@@ -2255,7 +2255,7 @@
 		<Frames>
 			<FontString name="$parentHint" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="TOP">
 				<Size>
-					<AbsDimension x="460" y="24" />
+					<AbsDimension x="520" y="24" />
 				</Size>
 				<Anchors>
 					<Anchor point="TOPLEFT" relativePoint="TOPLEFT">
@@ -2270,7 +2270,7 @@
 			</FontString>
 			<FontString name="$parentStatus" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
 				<Size>
-					<AbsDimension x="460" y="18" />
+					<AbsDimension x="520" y="18" />
 				</Size>
 				<Anchors>
 					<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMLEFT">
@@ -2300,7 +2300,7 @@
 			</Slider>
 			<FontString name="$parentModeDescription" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="TOP">
 				<Size>
-					<AbsDimension x="440" y="30" />
+					<AbsDimension x="500" y="30" />
 				</Size>
 				<Anchors>
 					<Anchor point="BOTTOM" relativeTo="$parentModeSlider" relativePoint="TOP">
@@ -2313,7 +2313,7 @@
 			<!-- Multiline EditBox for CSV (no scroll bar) -->
 			<EditBox name="KRTImportEditBox" multiline="true" autoFocus="false" inherits="InputBoxTemplate">
 				<Size>
-					<AbsDimension x="460" y="260" />
+					<AbsDimension x="520" y="260" />
 				</Size>
 				<Anchors>
 					<Anchor point="TOP" relativePoint="TOP">
