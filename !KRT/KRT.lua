@@ -8052,51 +8052,46 @@ do
         raid._lootIdxByNid = nil
     end
 
-    local function _nid(v)
+    local function normalizeNid(v)
         return tonumber(v) or v
     end
 
-    function Store:_BuildIndex(raid, listField, idField, cacheField)
+    function Store:BuildIndex(raid, listField, idField, cacheField)
         local list = raid[listField] or {}
         local m = {}
         for i = 1, #list do
             local e = list[i]
             local id = e and e[idField]
             if id ~= nil then
-                m[_nid(id)] = i
+                m[normalizeNid(id)] = i
             end
         end
         raid[cacheField] = m
     end
 
-    function Store:BossIdx(raid, bossNid)
-        if not (raid and bossNid) then return nil end
-        bossNid = _nid(bossNid)
-        if not raid._bossIdxByNid then
-            self:_BuildIndex(raid, "bossKills", "bossNid", "_bossIdxByNid")
+    function Store:GetIndexedPositionByNid(raid, queryNid, listField, idField, cacheField)
+        if not (raid and queryNid) then return nil end
+
+        local normalizedNid = normalizeNid(queryNid)
+        if not raid[cacheField] then
+            self:BuildIndex(raid, listField, idField, cacheField)
         end
-        local idx = raid._bossIdxByNid[bossNid]
+
+        local idx = raid[cacheField][normalizedNid]
         if not idx then
-            -- Raid changed since last build (new boss added / list changed)
-            self:_BuildIndex(raid, "bossKills", "bossNid", "_bossIdxByNid")
-            idx = raid._bossIdxByNid[bossNid]
+            -- Raid changed since last build (new entry added / list changed)
+            self:BuildIndex(raid, listField, idField, cacheField)
+            idx = raid[cacheField][normalizedNid]
         end
         return idx
     end
 
+    function Store:BossIdx(raid, bossNid)
+        return self:GetIndexedPositionByNid(raid, bossNid, "bossKills", "bossNid", "_bossIdxByNid")
+    end
+
     function Store:LootIdx(raid, lootNid)
-        if not (raid and lootNid) then return nil end
-        lootNid = _nid(lootNid)
-        if not raid._lootIdxByNid then
-            self:_BuildIndex(raid, "loot", "lootNid", "_lootIdxByNid")
-        end
-        local idx = raid._lootIdxByNid[lootNid]
-        if not idx then
-            -- Raid changed since last build (new loot added / list changed)
-            self:_BuildIndex(raid, "loot", "lootNid", "_lootIdxByNid")
-            idx = raid._lootIdxByNid[lootNid]
-        end
-        return idx
+        return self:GetIndexedPositionByNid(raid, lootNid, "loot", "lootNid", "_lootIdxByNid")
     end
 
     function Store:GetBoss(raid, bossNid)
