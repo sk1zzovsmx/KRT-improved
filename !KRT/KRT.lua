@@ -1254,6 +1254,18 @@ do
         EasyMenu(minimapMenu, addonMenu, KRT_MINIMAP_GUI, 0, 0, "MENU")
     end
 
+    local function IsMenuOpen()
+        return addonMenu and UIDROPDOWNMENU_OPEN_MENU == addonMenu and DropDownList1 and DropDownList1:IsShown()
+    end
+
+    local function ToggleMenu()
+        if IsMenuOpen() then
+            CloseDropDownMenus()
+            return
+        end
+        OpenMenu()
+    end
+
     -- Moves the minimap button while dragging.
     local function moveButton(self)
         local centerX, centerY = Minimap:GetCenter()
@@ -1319,7 +1331,7 @@ do
             if button == "RightButton" then
                 addon.Config:Toggle()
             elseif button == "LeftButton" then
-                OpenMenu()
+                ToggleMenu()
             end
         end)
         KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
