@@ -2310,8 +2310,8 @@
 					</Anchor>
 				</Anchors>
 			</FontString>
-			<!-- Multiline EditBox for CSV -->
-			<ScrollFrame name="KRTImportScrollFrame" inherits="KRTScrollFrameTemplate">
+			<!-- Multiline EditBox for CSV (no scroll bar) -->
+			<EditBox name="KRTImportEditBox" multiline="true" autoFocus="false" inherits="InputBoxTemplate">
 				<Size>
 					<AbsDimension x="340" y="160" />
 				</Size>
@@ -2322,17 +2322,10 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<ScrollChild>
-					<EditBox name="KRTImportEditBox" multiline="true" autoFocus="false" inherits="InputBoxTemplate">
-						<Size>
-							<AbsDimension x="320" y="160" />
-						</Size>
-						<Scripts>
-							<OnEscapePressed>self:ClearFocus()</OnEscapePressed>
-						</Scripts>
-					</EditBox>
-				</ScrollChild>
-			</ScrollFrame>
+				<Scripts>
+					<OnEscapePressed>self:ClearFocus()</OnEscapePressed>
+				</Scripts>
+			</EditBox>
 			<!-- Import Button -->
 			<Button name="KRTImportConfirmButton" inherits="KRTButtonTemplate">
 				<Size>
