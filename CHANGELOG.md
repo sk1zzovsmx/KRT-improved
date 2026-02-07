@@ -4,6 +4,7 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- Master Looter: Hold/Bank/DE assignments now clear the roll list after a successful assign/trade.
 - Minimap: left-clicking the minimap icon now toggles the context menu open/closed.
 - Docs: updated AGENTS.md with explicit `.luacheckrc` maintenance guidance for addon globals.
 - Docs: fixed OVERVIEW.md repository links to use root-relative paths.
