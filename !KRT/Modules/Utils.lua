@@ -18,8 +18,8 @@ local CreateFrame = CreateFrame
 local GetTime = GetTime
 local GetRealmName = GetRealmName
 local GetAchievementLink = GetAchievementLink
-local UnitIsGroupAssistant = UnitIsGroupAssistant
-local UnitIsGroupLeader = UnitIsGroupLeader
+local UnitIsGroupAssistant = _G.UnitIsGroupAssistant
+local UnitIsGroupLeader = _G.UnitIsGroupLeader
 
 local ITEM_LINK_FORMAT = "|c%s|Hitem:%d:%s|h[%s]|h|r"
 

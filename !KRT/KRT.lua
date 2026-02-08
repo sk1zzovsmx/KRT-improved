@@ -1441,7 +1441,10 @@ do
         displayNames = nil,   -- array of names in display order
         msPrefilled  = false, -- true after first Top-N prefill in multi-pick mode
     }
-    local newItemCounts, delItemCounts = addon.TablePool and addon.TablePool("k")
+    local newItemCounts, delItemCounts
+    if addon.TablePool then
+        newItemCounts, delItemCounts = addon.TablePool("k")
+    end
     state.itemCounts = newItemCounts and newItemCounts() or {}
 
     -- ----- Private helpers ----- --
@@ -3432,7 +3435,7 @@ do
     -- Dropdown field metadata: maps frame name suffixes to state keys (lazily bound at runtime).
     local function FindDropDownField(frameNameFull)
         if not frameNameFull then return nil end
-        
+
         -- Match dropdown frame name to find the field type
         if frameNameFull == dropDownFrameHolder:GetName() then
             return { stateKey = "holder", raidKey = "holder", frame = dropDownFrameHolder }
@@ -3721,7 +3724,7 @@ do
                 -- Gate: proceed only when the number of copies for this itemKey has decreased since last award.
                 local currentCount = 0
                 for i = 1, (lootState.lootCount or 0) do
-                    local it = lootTable and lootTable[i]
+                    local it = GetItem and GetItem(i)
                     if it and it.itemKey == ma.itemKey then
                         currentCount = tonumber(it.count) or 1
                         break
@@ -3864,7 +3867,7 @@ do
                 itemIndex = i
                 break
             end
-            if not itemIndex and wantedKey and tempItemLink then
+            if wantedKey and tempItemLink then
                 local tempKey = Utils.getItemStringFromLink(tempItemLink) or tempItemLink
                 if tempKey == wantedKey then
                     itemIndex = i
@@ -6049,7 +6052,6 @@ end
 do
     addon.ReserveImport = addon.ReserveImport or {}
     local module = addon.ReserveImport
-    local frameName
     local getFrame = makeModuleFrameGetter(module, "KRTImportWindow")
     local localized = false
     -- Import mode slider: 0 = Multi-reserve, 1 = Plus System (priority)
@@ -6147,7 +6149,6 @@ do
         if localized then return end
         local frame = getFrame()
         if not frame then return end
-        frameName = frame:GetName() or "KRTImportWindow"
 
         local confirmButton = _G["KRTImportConfirmButton"]
         if confirmButton then confirmButton:SetText(L.BtnImport) end
@@ -6164,8 +6165,6 @@ do
     function module:OnLoad(frame)
         module.frame = frame
         if frame then
-            frameName = frame:GetName()
-
             -- Drag registration kept in Lua (avoid template logic in XML).
             Utils.enableDrag(frame)
 
@@ -9426,8 +9425,8 @@ do
             local pSel = addon.Logger.selectedBossPlayer
             local addBtn = _G[n .. "AddBtn"]
             local removeBtn = _G[n .. "RemoveBtn"]
+            local attSelCount = Utils.multiSelectCount(addon.Logger._msBossAttCtx)
             if addBtn then
-                local attSelCount = Utils.multiSelectCount(addon.Logger._msBossAttCtx)
                 Utils.enableDisable(addBtn, bSel and ((attSelCount or 0) == 0))
             end
             if removeBtn then
@@ -10413,7 +10412,8 @@ end
 -- RAID_INSTANCE_WELCOME: Triggered when entering a raid instance.
 function addon:RAID_INSTANCE_WELCOME(...)
     local instanceName, instanceType, instanceDiff = GetInstanceInfo()
-    _, KRT_NextReset = ...
+    local _, nextReset = ...
+    KRT_NextReset = nextReset
     addon:trace(E.LogRaidInstanceWelcome:format(tostring(instanceName), tostring(instanceType),
         tostring(instanceDiff), tostring(KRT_NextReset)))
     if instanceType == "raid" and not L.RaidZones[instanceName] then
