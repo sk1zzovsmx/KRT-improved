@@ -6,6 +6,8 @@ Dates are in YYYY-MM-DD.
 ## Unreleased
 - **Bugfix:** Fixed nil getFrame error in UI module factories (Reserves, ReserveImport, Config, Warnings, Changes, Logger). Each module now properly initializes getFrame with `Utils.makeFrameGetter()` before using it in `makeUIFrameController()`.
 - **Bugfix:** Logger module had getFrame redefined after factory initialization; removed duplicate definition to preserve correct execution order.
+- **Bugfix:** Added missing `E.LogReservesImportWrongModePlus` log template used by Reserves CSV validation.
+- **Localization:** Moved hardcoded Reserves tooltip/display strings (item/source labels and summary lines) into `addon.L`.
 
 ## 2026-02-08
 **REFACTORING PROJECT COMPLETE** — Code consolidation initiative (3 phases) concluded.

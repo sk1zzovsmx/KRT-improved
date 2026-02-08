@@ -4653,9 +4653,9 @@ do
     local function BuildPlayersTooltipLines(itemId, players, counts, metaByName, shownCount, hiddenCount)
         local lines = {}
         local total = players and #players or 0
-        lines[#lines + 1] = "Total: " .. tostring(total)
+        lines[#lines + 1] = format(L.StrReservesTooltipTotal, total)
         if hiddenCount and hiddenCount > 0 and shownCount and shownCount > 0 then
-            lines[#lines + 1] = "Shown: " .. tostring(shownCount) .. " | Hidden: +" .. tostring(hiddenCount)
+            lines[#lines + 1] = format(L.StrReservesTooltipShownHidden, shownCount, hiddenCount)
         end
 
         if not players or total == 0 then
@@ -4678,7 +4678,7 @@ do
             table.sort(keys, function(a, b) return a > b end)
             for i = 1, #keys do
                 local p = keys[i]
-                lines[#lines + 1] = string.format("P+%d: %s", p, tconcat(groups[p], ", "))
+                lines[#lines + 1] = format(L.StrReservesTooltipPlus, p, tconcat(groups[p], ", "))
             end
         elseif module:IsMultiReserve() and counts then
             -- Group by quantity (desc)
@@ -4695,7 +4695,7 @@ do
             table.sort(keys, function(a, b) return a > b end)
             for i = 1, #keys do
                 local q = keys[i]
-                lines[#lines + 1] = string.format("x%d: %s", q, tconcat(groups[q], ", "))
+                lines[#lines + 1] = format(L.StrReservesTooltipQuantity, q, tconcat(groups[q], ", "))
             end
         else
             -- Fallback: just list names
@@ -4720,11 +4720,31 @@ do
         local hidden = total - shown
         local shortText = tconcat(playerTextTemp, ", ", 1, shown)
         if hidden > 0 then
-            shortText = shortText .. string.format(" ... +%d", hidden)
+            shortText = shortText .. format(L.StrReservesPlayersHiddenSuffix, hidden)
         end
         local fullText = tconcat(playerTextTemp, ", ")
         local tooltipLines = BuildPlayersTooltipLines(itemId, players, counts, metaByName, shown, hidden)
         return shortText, tooltipLines, fullText
+    end
+
+    local function GetReserveSource(source)
+        if source and source ~= "" then
+            return source
+        end
+        return L.StrUnknown
+    end
+
+    local function FormatReserveItemIdLabel(itemId)
+        return format(L.StrReservesItemIdLabel, tostring(itemId or "?"))
+    end
+
+    local function FormatReserveDroppedBy(source)
+        if not source or source == "" then return nil end
+        return format(L.StrReservesTooltipDroppedBy, source)
+    end
+
+    local function FormatReserveItemFallback(itemId)
+        return format(L.StrReservesItemFallback, tostring(itemId or "?"))
     end
 
     local function UpdateDisplayEntryForItem(itemId)
@@ -4737,7 +4757,7 @@ do
             for i = 1, #list do
                 local r = list[i]
                 if type(r) == "table" then
-                    local source = r.source or "Unknown"
+                    local source = GetReserveSource(r.source)
                     local bySource = groupedBySource[source]
                     if not bySource then
                         bySource = {}
@@ -4874,7 +4894,7 @@ do
                 for i = 1, #list do
                     local r = list[i]
                     if type(r) == "table" then
-                        local source = r.source or "Unknown"
+                        local source = GetReserveSource(r.source)
 
                         local bySource = grouped[source]
                         if not bySource then
@@ -4943,7 +4963,7 @@ do
 
         local function ShowPlayersTooltip(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText(row._tooltipTitle or "Reserves", 1, 1, 1)
+            GameTooltip:SetText(row._tooltipTitle or L.StrReservesTooltipTitle, 1, 1, 1)
             if row._tooltipSource then
                 GameTooltip:AddLine(row._tooltipSource, 0.8, 0.8, 0.8)
             end
@@ -5043,8 +5063,8 @@ do
         row._itemLink = info.itemLink
         row._itemName = info.itemName
         row._source = info.source
-        row._tooltipTitle = info.itemLink or info.itemName or ("Item ID: " .. (info.itemId or "?"))
-        row._tooltipSource = info.source and ("Dropped by: " .. info.source) or nil
+        row._tooltipTitle = info.itemLink or info.itemName or FormatReserveItemIdLabel(info.itemId)
+        row._tooltipSource = FormatReserveDroppedBy(info.source)
         row._playersTooltipLines = info.playersTooltipLines
         row._playersTextFull = info.playersTextFull or info.playersText
 
@@ -5070,7 +5090,7 @@ do
         end
 
         if row.nameText then
-            row.nameText:SetText(info.itemLink or info.itemName or ("[Item " .. info.itemId .. "]"))
+            row.nameText:SetText(info.itemLink or info.itemName or FormatReserveItemFallback(info.itemId))
         end
 
         if row.playerText then
@@ -5778,8 +5798,8 @@ do
             row._itemId = itemId
             row._itemLink = itemLink
             row._itemName = itemName
-            row._tooltipTitle = itemLink or itemName or ("Item ID: " .. itemId)
-            row._tooltipSource = row._source and ("Dropped by: " .. row._source) or nil
+            row._tooltipTitle = itemLink or itemName or FormatReserveItemIdLabel(itemId)
+            row._tooltipSource = FormatReserveDroppedBy(row._source)
             if row.iconTexture then
                 local resolvedIcon = icon
                 if type(resolvedIcon) ~= "string" or resolvedIcon == "" then
@@ -5789,7 +5809,7 @@ do
                 row.iconTexture:Show()
             end
             if row.nameText then
-                row.nameText:SetText(itemLink or itemName or ("Item ID: " .. itemId))
+                row.nameText:SetText(itemLink or itemName or FormatReserveItemFallback(itemId))
             end
         end
     end
