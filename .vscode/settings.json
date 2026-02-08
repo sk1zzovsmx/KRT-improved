@@ -73,10 +73,11 @@
   ],
   "luacheck.path": "C:\\Tools\\luacheck.exe",
   "Lua.type.weakUnionCheck": true,
-
   "Lua.format.enable": true,
   "[lua]": {
     "editor.defaultFormatter": "sumneko.lua",
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4
   }
 }
