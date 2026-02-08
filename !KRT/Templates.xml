@@ -1,9 +1,7 @@
-<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+<Ui xmlns="http://www.blizzard.com/wow/ui/"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
 	<!-- Default Frames Template -->
-	<Frame name="KRTFrameTemplate" inherits="UIPanelDialogTemplate" parent="UIParent" movable="true"
-		enableMouse="true" frameStrata="MEDIUM" toplevel="true" hidden="true" clampedToScreen="true"
-		virtual="true">
+	<Frame name="KRTFrameTemplate" inherits="UIPanelDialogTemplate" parent="UIParent" movable="true" enableMouse="true" frameStrata="MEDIUM" toplevel="true" hidden="true" clampedToScreen="true" virtual="true">
 		<Size>
 			<AbsDimension x="230" y="385" />
 		</Size>
@@ -25,16 +23,14 @@
 		</Layers>
 	</Frame>
 	<!-- Simple almost border-less frame template -->
-	<Frame name="KRTSimpleFrameTemplate" parent="UIParent" movable="true" enableMouse="true"
-		hidden="true" clampedToScreen="true" virtual="true">
+	<Frame name="KRTSimpleFrameTemplate" parent="UIParent" movable="true" enableMouse="true" hidden="true" clampedToScreen="true" virtual="true">
 		<Size>
 			<AbsDimension x="230" y="385" />
 		</Size>
 		<Anchors>
 			<Anchor point="CENTER" />
 		</Anchors>
-		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background-Dark"
-			edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background-Dark" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
 			<TileSize>
 				<AbsValue val="8" />
 			</TileSize>
@@ -144,11 +140,9 @@
 		</NormalTexture>
 	</Button>
 	<!-- General FontString template -->
-	<FontString name="KRTFontString" font="GameFontNormal" justifyH="LEFT" justifyV="MIDDLE"
-		virtual="true" />
+	<FontString name="KRTFontString" font="GameFontNormal" justifyH="LEFT" justifyV="MIDDLE" virtual="true" />
 	<!-- Gray FontString template -->
-	<FontString name="KRTFontStringGray" inherits="GameFontNormalSmall" justifyH="LEFT"
-		justifyV="MIDDLE" virtual="true">
+	<FontString name="KRTFontStringGray" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE" virtual="true">
 		<Color r="0.5" g="0.5" b="0.5" a="1" />
 	</FontString>
 	<!-- ScrollFrame template -->
@@ -170,8 +164,7 @@
 		</Scripts>
 	</EditBox>
 	<!-- Simple Border-less EdtiBox Template -->
-	<EditBox name="KRTEditBoxSimpleTemplate" font="GameFontHighlightSmall" autoFocus="false"
-		virtual="true">
+	<EditBox name="KRTEditBoxSimpleTemplate" font="GameFontHighlightSmall" autoFocus="false" virtual="true">
 		<Layers>
 			<Layer level="BACKGROUND">
 				<Texture file="Interface\DialogFrame\UI-DialogBox-Background">
@@ -256,7 +249,8 @@
 					<Anchors>
 						<Anchor point="RIGHT" relativeTo="$parentRoll" relativePoint="LEFT">
 							<Offset>
-								<AbsDimension x="0" y="0" /> <!-- was -1 -->
+								<AbsDimension x="0" y="0" />
+								<!-- was -1 -->
 							</Offset>
 						</Anchor>
 					</Anchors>

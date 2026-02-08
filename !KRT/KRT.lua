@@ -1552,7 +1552,7 @@ do
             and addon.Reserves.GetImportMode
             and (addon.Reserves:IsPlusSystem())
 
-        local GetPlus = MakePlusGetter(itemId)
+        local GetPlus      = MakePlusGetter(itemId)
 
         table.sort(rolls, function(a, b)
             -- SR: reserved first (session itemId)
@@ -10088,7 +10088,7 @@ do
     local cmdLogger = { "logger", "history", "log" }
     local cmdDebug = { "debug", "dbg", "debugger" }
     local cmdLoot = { "loot", "ml", "master" }
-    local cmdCounter = { "counter" , "counters" , "counts"}
+    local cmdCounter = { "counter", "counters", "counts" }
     local cmdReserves = { "res", "reserves", "reserve" }
     local cmdMinimap = { "minimap", "mm" }
 
