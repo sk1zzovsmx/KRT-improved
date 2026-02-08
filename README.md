@@ -137,9 +137,9 @@ When rolling loot **directly from the loot window**, KRT supports **manual multi
 
 ### 2) SoftRes Reserves (Import + List + SR Roll Support)
 
-<img width="231" height="483" alt="image" src="https://github.com/user-attachments/assets/2cbfba09-01eb-42cd-ab9a-0a7e1059d6ab" />
-
 This fork adds a full reserves system that integrates directly into the Master Looter workflow.
+
+<img width="231" height="483" alt="image" src="https://github.com/user-attachments/assets/2cbfba09-01eb-42cd-ab9a-0a7e1059d6ab" />
 
 #### Import (SoftRes CSV)
 Open the import dialog:
@@ -150,14 +150,14 @@ Open the import dialog:
 
 You can switch import mode:
 - **Multi-reserve**: supports *quantity > 1* reserves and/or multiple reserves per player.
-  
+
   If you are able to see if a player has reserved the same item multiple times, even if it is already reserved.
 
 <img width="375" height="531" alt="image" src="https://github.com/user-attachments/assets/a096b162-d8dc-4878-b44f-bcf244eb3a30" />
 
 - **Plus System (P+)**: supports **one reserved item per player**, with optional **priority (P+)** values.
 
-  Due the limitation of Soft Reserve you have to force only **one item pick** for player so you can use the **plus** function on the website as a priority.
+  Due the limitation of Soft Reserve you have to force only **one item pick** for player, so use the **plus** on the website as a priority.
 
 <img width="371" height="531" alt="image" src="https://github.com/user-attachments/assets/9abbd237-8749-4515-a026-8a741465c8d2" />
 
@@ -171,7 +171,7 @@ If you try to import a CSV that doesn’t match the selected mode, the addon wil
 
 #### SR Roll integration
 When rolling as **SR**:
-- Reserved players are highlighted in the roll list.
+- Reserved players are highlighted, with blue colour, in the roll list.
 - **Multi-reserve**:
   - The addon tracks how many rolls each player is allowed (e.g. 2 reserves → up to 2 valid rolls)
   - Extra rolls are blocked (and can be whispered)
