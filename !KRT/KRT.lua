@@ -10084,6 +10084,7 @@ do
     local cmdLogger = { "logger", "history", "log" }
     local cmdDebug = { "debug", "dbg", "debugger" }
     local cmdLoot = { "loot", "ml", "master" }
+    local cmdCounter = { "counter" , "counters" , "counts"}
     local cmdReserves = { "res", "reserves", "reserve" }
     local cmdMinimap = { "minimap", "mm" }
 
@@ -10101,6 +10102,7 @@ do
         printHelp("warnings", L.StrCmdWarnings)
         printHelp("logger", L.StrCmdLogger)
         printHelp("debug", L.StrCmdDebug)
+        printHelp("counter", L.StrCmdCounter)
         printHelp("reserves", L.StrCmdReserves)
     end
 
@@ -10270,6 +10272,13 @@ do
         end
     end)
 
+    registerAliases(cmdCounter, function(rest)
+        local sub = Utils.splitArgs(rest)
+        if not sub or sub == "" or sub == "toggle" then
+            if addon.LootCounter and addon.LootCounter.Toggle then addon.LootCounter:Toggle() end
+        end
+    end)
+
     registerAliases(cmdReserves, function(rest)
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
@@ -10303,11 +10312,6 @@ do
     SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
     SlashCmdList["KRT"] = function(msg)
         module:Handle(msg)
-    end
-
-    SLASH_KRTCOUNTS1 = "/krtcounts"
-    SlashCmdList["KRTCOUNTS"] = function()
-        if addon.LootCounter and addon.LootCounter.Toggle then addon.LootCounter:Toggle() end
     end
 end
 

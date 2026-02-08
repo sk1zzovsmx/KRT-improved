@@ -15,6 +15,7 @@ Dates are in YYYY-MM-DD.
   (`RequestRefresh`) and no longer perform redundant immediate redraw calls.
 - **Behavior:** Loot Counter refresh is now driven by `RaidRosterUpdate` and
   `PlayerCountChanged`; removed in-refresh `UpdateRaidRoster()` calls to prevent loop spam.
+- **Behavior:** Removed standalone `/krtcounts`; Loot Counter is now toggled via `/krt counter`.
 
 ## 2026-02-08
 **REFACTORING PROJECT COMPLETE** — Code consolidation initiative (3 phases) concluded.

@@ -283,7 +283,7 @@ Throttle high-frequency sources (roster bursts, combat log, UI refresh loops) wi
 - Rolls: MS/OS/SR works; stable sorting; deterministic winner.
 - Reserves: import/export; caps; roll gating consistent.
 - Logger: loot entries append; filters; delete flows; selection highlight works.
-- Master: award/trade tracking; multi-award; `/krtcounts` toggles Loot Counter.
+- Master: award/trade tracking; multi-award; `/krt counter` toggles Loot Counter.
 - Warnings/Changes/Spammer: correct channels + throttling; no UI spam.
 - Persistency: `/reload` keeps SV and expected state.
 
