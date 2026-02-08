@@ -13,6 +13,8 @@ Dates are in YYYY-MM-DD.
   after SoftRes import and list clear operations.
 - **Refactor:** Loot Counter and Reserve List windows now use only coalesced event-driven refresh
   (`RequestRefresh`) and no longer perform redundant immediate redraw calls.
+- **Behavior:** Loot Counter refresh is now driven by `RaidRosterUpdate` and
+  `PlayerCountChanged`; removed in-refresh `UpdateRaidRoster()` calls to prevent loop spam.
 
 ## 2026-02-08
 **REFACTORING PROJECT COMPLETE** — Code consolidation initiative (3 phases) concluded.

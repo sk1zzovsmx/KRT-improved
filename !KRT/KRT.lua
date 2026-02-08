@@ -4173,11 +4173,6 @@ do
             return raidPlayers
         end
 
-        -- Keep the internal roster aligned with the live raid for stable counts.
-        if addon.Raid and addon.Raid.UpdateRaidRoster then
-            addon.Raid:UpdateRaidRoster()
-        end
-
         for unit in addon.UnitIterator(true) do
             local name = UnitName(unit)
             if name and name ~= "" then
@@ -4386,18 +4381,14 @@ do
         module:RequestRefresh()
     end
 
-    -- Auto-refresh when loot is logged (MS-only counting happens in Raid:AddLoot).
-    Utils.registerCallback("RaidLootUpdate", Request)
-
     -- Refresh on roster updates (to keep list aligned).
-    if addon.Raid and addon.Raid.UpdateRaidRoster then
-        hooksecurefunc(addon.Raid, "UpdateRaidRoster", Request)
-    end
+    Utils.registerCallback("RaidRosterUpdate", Request)
+
+    -- Refresh when counts actually change (MS loot award or manual +/-/reset).
+    Utils.registerCallback("PlayerCountChanged", Request)
 
     -- New raid session: reset view.
     Utils.registerCallback("RaidCreate", Request)
-
-    Utils.registerCallback("PlayerCountChanged", Request)
 end
 
 -- =========== Reserves Module  =========== --
@@ -10374,7 +10365,8 @@ end
 -- RAID_ROSTER_UPDATE: Updates the raid roster when it changes.
 function addon:RAID_ROSTER_UPDATE()
     addon.Raid:UpdateRaidRoster()
-
+    -- Broadcast a normalized roster-change event for UI modules.
+    Utils.triggerEvent("RaidRosterUpdate")
     -- Keep Master Looter UI in sync (event-driven; no polling).
     local mf = addon.Master and addon.Master.frame
     if addon.Master and addon.Master.RequestRefresh and mf and mf.IsShown and mf:IsShown() then
