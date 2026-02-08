@@ -4080,6 +4080,11 @@ do
             announced = false
         end
     end)
+
+    -- Keep Master UI in sync when SoftRes data changes (import/clear), event-driven.
+    Utils.registerCallback("ReservesDataChanged", function()
+        module:RequestRefresh()
+    end)
 end
 
 -- =========== Loot Counter Module  =========== --
@@ -5138,6 +5143,7 @@ do
     local LocalizeUIFrame
     local UpdateUIFrame
     local RenderReserveListUI
+
     -- ----- Saved Data Management ----- --
 
     function module:Save()
@@ -5189,12 +5195,10 @@ do
         addon:debug(E.LogReservesResetSaved)
         KRT_SavedReserves = nil
         twipe(reservesData)
-        twipe(reservesByItemID)
-        twipe(reservesDisplayList)
-        reservesDirty = true
-        self:Refresh()
+        RebuildIndex()
         self:Hide()
         self:RequestRefresh()
+        Utils.triggerEvent("ReservesDataChanged", "clear")
         addon:info(L.StrReserveListCleared)
     end
 
@@ -5662,20 +5666,13 @@ do
         -- Commit
         reservesData = newReservesData
         importMode = mode
-        twipe(reservesByItemID)
-        twipe(reservesByItemPlayer)
-        twipe(reservesDisplayList)
-        twipe(playerItemsByName)
-        reservesDirty = true
-
-        RebuildIndex()
+        self:Save()
 
         local nPlayers = addon.tLength(reservesData)
         addon:debug(E.LogReservesParseComplete:format(nPlayers))
         addon:info(format(L.SuccessReservesParsed, tostring(nPlayers)))
-        self:Refresh()
         self:RequestRefresh()
-        self:Save()
+        Utils.triggerEvent("ReservesDataChanged", "import", nPlayers, mode)
         return true, nPlayers
     end
 
