@@ -150,10 +150,14 @@ Open the import dialog:
 
 You can switch import mode:
 - **Multi-reserve**: supports *quantity > 1* reserves and/or multiple reserves per player.
+  
+  If you are able to see if a player has reserved the same item multiple times, even if it is already reserved.
 
 <img width="375" height="531" alt="image" src="https://github.com/user-attachments/assets/a096b162-d8dc-4878-b44f-bcf244eb3a30" />
 
 - **Plus System (P+)**: supports **one reserved item per player**, with optional **priority (P+)** values.
+
+  Due the limitation of Soft Reserve you have to force only **one item pick** for player so you can use the **plus** function on the website as a priority.
 
 <img width="371" height="531" alt="image" src="https://github.com/user-attachments/assets/9abbd237-8749-4515-a026-8a741465c8d2" />
 
