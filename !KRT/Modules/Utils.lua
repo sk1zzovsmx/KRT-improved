@@ -101,6 +101,27 @@ function Utils.getPlayerName()
 	return name
 end
 
+-- =========== Raid/state helpers  =========== --
+
+-- Resolve a raid table and raid number.
+--
+-- Returns:
+--   raidTableOrNil, resolvedRaidNumOrNil
+--
+-- Notes:
+-- - Uses current raid (KRT_CurrentRaid) when raidNum is nil.
+-- - Safe when KRT_Raids is nil.
+function Utils.getRaid(raidNum)
+	raidNum = raidNum or KRT_CurrentRaid
+	if not raidNum then return nil, nil end
+	local raids = KRT_Raids
+	local raid = raids and raids[raidNum] or nil
+	return raid, raidNum
+end
+
+-- Backwards-friendly alias (some callers prefer PascalCase).
+Utils.GetRaid = Utils.getRaid
+
 -- =========== String helpers  =========== --
 
 function Utils.ucfirst(value)
@@ -197,6 +218,41 @@ function Utils.getItemStringFromLink(itemLink)
 end
 
 -- =========== UI helpers  =========== --
+
+-- Enable basic drag-to-move behavior on a frame.
+--
+-- Intentionally kept in Lua (not XML) so window behavior is standardized
+-- without embedding logic into Templates.xml.
+function Utils.enableDrag(frame, dragButton)
+	if not frame or not frame.RegisterForDrag then return end
+	-- Ensure the frame is draggable even if XML didn't set these.
+	if frame.SetMovable then frame:SetMovable(true) end
+	if frame.EnableMouse then frame:EnableMouse(true) end
+	if frame.SetClampedToScreen then frame:SetClampedToScreen(true) end
+
+	-- Provide default drag handlers in Lua so Templates.xml stays layout-only.
+	--
+	-- IMPORTANT: do NOT override custom drag scripts (some frames intentionally
+	-- move their parent). Only set handlers when none exist.
+	if frame.GetScript and frame.SetScript then
+		if not frame:GetScript("OnDragStart") then
+			frame:SetScript("OnDragStart", function(self)
+				if self.StartMoving then
+					self:StartMoving()
+				end
+			end)
+		end
+		if not frame:GetScript("OnDragStop") then
+			frame:SetScript("OnDragStop", function(self)
+				if self.StopMovingOrSizing then
+					self:StopMovingOrSizing()
+				end
+			end)
+		end
+	end
+
+	frame:RegisterForDrag(dragButton or "LeftButton")
+end
 
 --
 -- createRowDrawer(fn)
@@ -699,10 +755,6 @@ end
 
 -- =========== Frame helpers  =========== --
 
-function Utils.getFrameName()
-	return addon.UIMaster:GetName()
-end
-
 function Utils.makeConfirmPopup(key, text, onAccept, cancels)
 	StaticPopupDialogs[key] = {
 		text = text,
@@ -790,6 +842,114 @@ function Utils.setShown(frame, show)
 	elseif frame:IsShown() then
 		frame:Hide()
 	end
+end
+
+-- =========== Coalesced refresh helpers (event-driven UI)  =========== --
+
+-- Creates a refresh requester that coalesces multiple triggers into a single UI update.
+-- Notes:
+--  - Uses a dedicated driver frame (does NOT touch the target frame's OnUpdate).
+--  - If called while the target frame is hidden, marks it dirty and refreshes on next OnShow.
+--  - WoW 3.3.5a compatible (no C_Timer).
+function Utils.makeEventDrivenRefresher(targetOrGetter, updateFn)
+	if type(updateFn) ~= "function" then
+		error("Utils.makeEventDrivenRefresher: updateFn must be a function")
+	end
+
+	local driver = CreateFrame("Frame")
+	local pending = false
+	local dirtyWhileHidden = false
+	local hookedFrame = nil
+
+	local function resolveTarget()
+		if type(targetOrGetter) == "function" then
+			return targetOrGetter()
+		end
+		return targetOrGetter
+	end
+
+	local function ensureHook(target)
+		if not target or not target.HookScript then return end
+		if hookedFrame == target then return end
+		hookedFrame = target
+		target:HookScript("OnShow", function()
+			if dirtyWhileHidden then
+				dirtyWhileHidden = false
+				updateFn()
+			end
+		end)
+	end
+
+	local function run()
+		driver:SetScript("OnUpdate", nil)
+		pending = false
+
+		local target = resolveTarget()
+		if not target or not target.IsShown or not target:IsShown() then
+			dirtyWhileHidden = true
+			if target then ensureHook(target) end
+			return
+		end
+		updateFn()
+	end
+
+	return function()
+		local target = resolveTarget()
+		if not target then return end
+		ensureHook(target)
+
+		if not target:IsShown() then
+			dirtyWhileHidden = true
+			return
+		end
+
+		if pending then return end
+		pending = true
+		driver:SetScript("OnUpdate", run)
+	end
+end
+
+-- =========== Frame Getter Factory  =========== --
+-- Creates a lazy-caching getter for global UI frames.
+-- Usage: local getFrame = Utils.makeFrameGetter("KRTMaster")
+function Utils.makeFrameGetter(globalFrameName)
+	local cached = nil
+	return function()
+		if cached then return cached end
+		local frame = _G[globalFrameName]
+		if frame then cached = frame end
+		return frame
+	end
+end
+
+-- =========== UI Frame Controller Factory  =========== --
+-- Consolidates recurring Toggle/Hide/Show patterns across UI modules.
+function Utils.makeUIFrameController(getFrame, requestRefreshFn)
+	return {
+		Toggle = function(self)
+			local frame = getFrame()
+			if not frame then return end
+			if frame:IsShown() then
+				Utils.setShown(frame, false)
+			else
+				if requestRefreshFn then requestRefreshFn() end
+				Utils.setShown(frame, true)
+			end
+		end,
+		Hide = function(self)
+			local frame = getFrame()
+			if frame then
+				Utils.setShown(frame, false)
+			end
+		end,
+		Show = function(self)
+			local frame = getFrame()
+			if frame then
+				if requestRefreshFn then requestRefreshFn() end
+				Utils.setShown(frame, true)
+			end
+		end,
+	}
 end
 
 -- =========== Tooltip helpers  =========== --
@@ -917,7 +1077,7 @@ end
 -- These helpers avoid using LockHighlight() for persistent selection, so hover highlight remains native.
 -- Safe for 3.3.5a and works with any UI skin (pure texture overlays).
 
-local function _ensureRowVisuals(row)
+local function ensureRowVisuals(row)
 	if not row or row._krtSelTex then return end
 
 	-- Persistent selection fill (soft)
@@ -949,17 +1109,17 @@ local function _ensureRowVisuals(row)
 end
 
 function Utils.ensureRowVisuals(row)
-	_ensureRowVisuals(row)
+	ensureRowVisuals(row)
 end
 
 function Utils.setRowSelected(row, cond)
-	_ensureRowVisuals(row)
+	ensureRowVisuals(row)
 	if not row or not row._krtSelTex then return end
 	if cond then row._krtSelTex:Show() else row._krtSelTex:Hide() end
 end
 
 function Utils.setRowFocused(row, cond)
-	_ensureRowVisuals(row)
+	ensureRowVisuals(row)
 	local t = row and row._krtFocusTex
 	if not t then return end
 	if cond then t:Show() else t:Hide() end
@@ -992,13 +1152,13 @@ Utils._multiSelect = Utils._multiSelect or {}
 local MS = Utils._multiSelect
 
 do
-	local function _msKey(id)
+	local function msKey(id)
 		if id == nil then return nil end
 		local n = tonumber(id)
 		return n or id
 	end
 
-	local function _ensure(contextKey)
+	local function ensureContext(contextKey)
 		if not contextKey or contextKey == "" then
 			contextKey = "_default"
 		end
@@ -1010,32 +1170,32 @@ do
 		return st, contextKey
 	end
 
-	local function _dbg(msg)
+	local function debugLog(msg)
 		if addon and addon.options and addon.options.debug and addon.debug then
 			addon:debug(msg)
 		end
 	end
 
-	function Utils.MultiSelect_Init(contextKey)
-		local st, key = _ensure(contextKey)
+	function Utils.multiSelectInit(contextKey)
+		local st, key = ensureContext(contextKey)
 		st.set = {}
 		st.count = 0
 		st.ver = (st.ver or 0) + 1
-		_dbg(("[LoggerSelect] init ctx=%s ver=%d"):format(tostring(key), st.ver))
+		debugLog(("[LoggerSelect] init ctx=%s ver=%d"):format(tostring(key), st.ver))
 		return st
 	end
 
-	function Utils.MultiSelect_Clear(contextKey)
-		return Utils.MultiSelect_Init(contextKey)
+	function Utils.multiSelectClear(contextKey)
+		return Utils.multiSelectInit(contextKey)
 	end
 
 	-- Toggle selection.
 	-- isMulti=false  -> clear + select single (optional: click-again to deselect when allowDeselect=true)
 	-- isMulti=true   -> toggle selection for the given id
 	-- Returns: actionString, selectedCount
-	function Utils.MultiSelect_Toggle(contextKey, id, isMulti, allowDeselect)
-		local st, key = _ensure(contextKey)
-		local k = _msKey(id)
+	function Utils.multiSelectToggle(contextKey, id, isMulti, allowDeselect)
+		local st, key = ensureContext(contextKey)
+		local k = msKey(id)
 		if k == nil then return nil, st.count or 0 end
 
 		local before = st.count or 0
@@ -1077,7 +1237,7 @@ do
 
 		st.ver = (st.ver or 0) + 1
 
-		_dbg(("[LoggerSelect] toggle ctx=%s id=%s multi=%s action=%s count %d->%d ver=%d"):format(
+		debugLog(("[LoggerSelect] toggle ctx=%s id=%s multi=%s action=%s count %d->%d ver=%d"):format(
 			tostring(key), tostring(id), isMulti and "1" or "0", tostring(action), before, st.count or 0, st.ver
 		))
 
@@ -1086,36 +1246,36 @@ do
 
 	-- Set or clear the range-anchor for SHIFT range selection.
 	-- The anchor is the last non-shift click target for the given context.
-	function Utils.MultiSelect_SetAnchor(contextKey, id)
-		local st, key = _ensure(contextKey)
+	function Utils.multiSelectSetAnchor(contextKey, id)
+		local st, key = ensureContext(contextKey)
 		local before = st.anchor
-		local k = _msKey(id)
+		local k = msKey(id)
 		st.anchor = k
 		-- Anchor changes do not affect highlight rendering directly, so we do not bump st.ver here.
 		local ver = st.ver or 0
-		_dbg(("[LoggerSelect] anchor ctx=%s from=%s to=%s ver=%d"):format(
+		debugLog(("[LoggerSelect] anchor ctx=%s from=%s to=%s ver=%d"):format(
 			tostring(key), tostring(before), tostring(st.anchor), ver
 		))
 		return st.anchor
 	end
 
-	function Utils.MultiSelect_GetAnchor(contextKey)
+	function Utils.multiSelectGetAnchor(contextKey)
 		local st = MS[contextKey or "_default"]
 		return st and st.anchor or nil
 	end
 
-	local function _idOf(x)
+	local function idOf(x)
 		if type(x) == "table" then
 			return x.id
 		end
 		return x
 	end
 
-	local function _findIndex(ordered, key)
+	local function findIndex(ordered, key)
 		if not ordered or not key then return nil end
 		for i = 1, #ordered do
-			local id = _idOf(ordered[i])
-			if _msKey(id) == key then
+			local id = idOf(ordered[i])
+			if msKey(id) == key then
 				return i
 			end
 		end
@@ -1127,17 +1287,17 @@ do
 	-- id: clicked id
 	-- isAdd: when true (CTRL+SHIFT) add the range to the existing selection; otherwise replace selection with the range
 	-- Returns: actionString, selectedCount
-	function Utils.MultiSelect_Range(contextKey, ordered, id, isAdd)
-		local st, key = _ensure(contextKey)
-		local k = _msKey(id)
+	function Utils.multiSelectRange(contextKey, ordered, id, isAdd)
+		local st, key = ensureContext(contextKey)
+		local k = msKey(id)
 		if k == nil then return nil, st.count or 0 end
 
 		local before = st.count or 0
 		local action
 
 		local aKey = st.anchor
-		local ai = _findIndex(ordered, aKey)
-		local bi = _findIndex(ordered, k)
+		local ai = findIndex(ordered, aKey)
+		local bi = findIndex(ordered, k)
 
 		if not ai or not bi then
 			-- If we cannot resolve indices (missing anchor or id), behave like a single select.
@@ -1158,8 +1318,8 @@ do
 			end
 
 			for i = from, to do
-				local id2 = _idOf(ordered[i])
-				local k2 = _msKey(id2)
+				local id2 = idOf(ordered[i])
+				local k2 = msKey(id2)
 				if k2 ~= nil and not st.set[k2] then
 					st.set[k2] = true
 					st.count = (st.count or 0) + 1
@@ -1169,31 +1329,31 @@ do
 		end
 
 		st.ver = (st.ver or 0) + 1
-		_dbg(("[LoggerSelect] range ctx=%s id=%s add=%s action=%s count %d->%d ver=%d anchor=%s"):format(
+		debugLog(("[LoggerSelect] range ctx=%s id=%s add=%s action=%s count %d->%d ver=%d anchor=%s"):format(
 			tostring(key), tostring(id), isAdd and "1" or "0", tostring(action), before, st.count or 0, st.ver,
 			tostring(st.anchor)
 		))
 		return action, st.count or 0
 	end
 
-	function Utils.MultiSelect_IsSelected(contextKey, id)
+	function Utils.multiSelectIsSelected(contextKey, id)
 		local st = MS[contextKey or "_default"]
 		if not st or not st.set then return false end
-		local k = _msKey(id)
+		local k = msKey(id)
 		return (k ~= nil) and (st.set[k] == true) or false
 	end
 
-	function Utils.MultiSelect_Count(contextKey)
+	function Utils.multiSelectCount(contextKey)
 		local st = MS[contextKey or "_default"]
 		return (st and st.count) or 0
 	end
 
-	function Utils.MultiSelect_GetVersion(contextKey)
+	function Utils.multiSelectGetVersion(contextKey)
 		local st = MS[contextKey or "_default"]
 		return (st and st.ver) or 0
 	end
 
-	function Utils.MultiSelect_GetSelected(contextKey)
+	function Utils.multiSelectGetSelected(contextKey)
 		local st = MS[contextKey or "_default"]
 		local out = {}
 		if not st or not st.set then return out end
@@ -1212,6 +1372,18 @@ do
 		end)
 		return out
 	end
+
+	-- Backward-compatible aliases for legacy call sites.
+	Utils.MultiSelect_Init = Utils.multiSelectInit
+	Utils.MultiSelect_Clear = Utils.multiSelectClear
+	Utils.MultiSelect_Toggle = Utils.multiSelectToggle
+	Utils.MultiSelect_SetAnchor = Utils.multiSelectSetAnchor
+	Utils.MultiSelect_GetAnchor = Utils.multiSelectGetAnchor
+	Utils.MultiSelect_Range = Utils.multiSelectRange
+	Utils.MultiSelect_IsSelected = Utils.multiSelectIsSelected
+	Utils.MultiSelect_Count = Utils.multiSelectCount
+	Utils.MultiSelect_GetVersion = Utils.multiSelectGetVersion
+	Utils.MultiSelect_GetSelected = Utils.multiSelectGetSelected
 end
 
 
@@ -1222,31 +1394,6 @@ function Utils.setText(frame, str1, str2, cond)
 	else
 		frame:SetText(str2)
 	end
-end
-
--- =========== Throttles  =========== --
-
--- Throttle frame OnUpdate:
-function Utils.throttle(frame, name, period, elapsed)
-	local t = frame[name] or 0
-	t = t + elapsed
-	if t > period then
-		frame[name] = 0
-		return true
-	end
-	frame[name] = t
-	return false
-end
-
-function Utils.throttledUIUpdate(frame, frameName, period, elapsed, fn)
-	if not frameName or type(fn) ~= "function" then
-		return false
-	end
-	if Utils.throttle(frame, frameName, period, elapsed) then
-		fn()
-		return true
-	end
-	return false
 end
 
 -- =========== Chat + comms helpers  =========== --
