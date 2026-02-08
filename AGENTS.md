@@ -25,6 +25,8 @@ Durable preferences learned from recent conversations:
 - Prefer camelCase for utility functions and local variables; avoid snake_case for new naming.
 - UI refactors: centralize shared UI glue/patterns in `KRT.lua`; keep feature-specific UI logic in each module.
 - Move helpers to `Modules/Utils.lua` only when they are generic and reused, not for KRT-specific glue.
+- Keep diagnostic templates in `addon.Diagnose`; use severity buckets `I/W/E/D` (`DiagnoseLog.en.lua`).
+- Prefer local `Diag` wrapper aliases over direct `Diagnose.*` chains in implementation files.
 - For XML and Lua analysis/reference, use Townlong-Yak FrameXML 3.3.5:
   `https://www.townlong-yak.com/framexml/3.3.5`.
 
@@ -81,7 +83,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 5) LibCompat-1.0
 6) LibLogger-1.0
 7) Localization/localization.en.lua (defines `addon.L`)
-8) Localization/ErrorLog.en.lua (defines `addon.E`)
+8) Localization/DiagnoseLog.en.lua (defines `addon.Diagnose`)
 9) Templates.xml
 10) Modules/Utils.lua, Modules/C.lua
 11) KRT.lua
@@ -101,7 +103,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 
   Localization/
     localization.en.lua    # user-facing strings (enUS) -> addon.L
-    ErrorLog.en.lua        # log/debug templates (enUS) -> addon.E
+    DiagnoseLog.en.lua     # diagnostic templates (enUS) -> addon.Diagnose
 
   Modules/
     Utils.lua              # helpers + UI controllers (addon.Utils)
@@ -157,7 +159,7 @@ KRT is standardized on English.
 Rules:
 1) All new/modified content must be English (comments, logs, UI labels, chat text).
 2) User-facing strings MUST go through `addon.L` (Localization/localization.en.lua).
-3) Log/debug templates MUST go through `addon.E` (Localization/ErrorLog.en.lua) when appropriate.
+3) Log/debug templates MUST go through `addon.Diagnose` (Localization/DiagnoseLog.en.lua).
 4) Prefer format placeholders over sentence concatenation (use `format(L.Key, a, b)`).
 5) Prefer ASCII-only in code/comments/logs (avoid typographic quotes/dashes and emojis).
 

@@ -4,11 +4,19 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Renamed `Localization/ErrorLog.en.lua` to `Localization/DiagnoseLog.en.lua` and
+  migrated diagnostic storage from `addon.E` to `addon.Diagnose`.
+- **Refactor:** Added local `Diag` wrappers and switched diagnostic callsites from `Diagnose.*` to
+  `Diag.*`; reorganized `DiagnoseLog.en.lua` by feature categories.
+- **Behavior:** Diagnostic templates are now categorized by severity buckets:
+  `Diagnose.I`, `Diagnose.W`, `Diagnose.E`, `Diagnose.D`, with matching callsites in `KRT.lua`.
+- **Refactor:** Moved remaining hardcoded diagnostic strings in `KRT.lua`/`Modules/Utils.lua` into
+  `Localization/DiagnoseLog.en.lua` (LoggerSelect, LoggerUI, callback execution, manual loot tag).
 - **Bugfix:** Removed the `table: XXXXXXXX:` chat prefix from logger output by overriding
   `addon:Print` to forward through LibCompat without the addon self-label.
 - **Bugfix:** Fixed nil getFrame error in UI module factories (Reserves, ReserveImport, Config, Warnings, Changes, Logger). Each module now properly initializes getFrame with `Utils.makeFrameGetter()` before using it in `makeUIFrameController()`.
 - **Bugfix:** Logger module had getFrame redefined after factory initialization; removed duplicate definition to preserve correct execution order.
-- **Bugfix:** Added missing `E.LogReservesImportWrongModePlus` log template used by Reserves CSV validation.
+- **Bugfix:** Added missing `Diagnose.D.LogReservesImportWrongModePlus` log template used by Reserves CSV validation.
 - **Localization:** Moved hardcoded Reserves tooltip/display strings (item/source labels and summary lines) into `addon.L`.
 - **Behavior:** Reserved-roll announce text now hides `(P+N)` and `(xN)` suffixes and shows only the player list.
 - **Bugfix:** Master Looter `Import SoftRes/Open SoftRes` button now updates immediately

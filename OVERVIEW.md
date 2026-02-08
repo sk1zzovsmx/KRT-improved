@@ -37,7 +37,7 @@ Process and invariants belong in `AGENTS.md`.
 
   Localization/
     localization.en.lua    # user-facing strings (addon.L)
-    ErrorLog.en.lua        # log/debug templates (addon.E)
+    DiagnoseLog.en.lua        # log/debug templates (addon.Diagnose)
 
   Modules/
     Utils.lua              # generic utilities + UI controllers
@@ -87,7 +87,7 @@ flowchart LR
   subgraph SHARED["Shared code and data"]
     Utils["Modules/Utils.lua"]
     Cmod["Modules/C.lua"]
-    L10n["Localization (addon.L / addon.E)"]
+    L10n["Localization (addon.L / addon.Diagnose)"]
     Ignored["Modules/ignoredItems.lua"]
     Libs["Vendored libs"]
   end
@@ -141,7 +141,7 @@ flowchart LR
   U -->|throttle| T["LibCompat timer"]
 
   M -->|render list| LC["Utils.makeListController"]
-  M -->|text| L["addon.L / addon.E"]
+  M -->|text| L["addon.L / addon.Diagnose"]
   M -->|persist| SV["SavedVariables"]
 ```
 
@@ -264,7 +264,7 @@ Add or change option behavior:
 
 Add or change displayed text/log templates:
 - User-facing text: `!KRT/Localization/localization.en.lua` (`addon.L`).
-- Log/debug templates: `!KRT/Localization/ErrorLog.en.lua` (`addon.E`).
+- Log/debug templates: `!KRT/Localization/DiagnoseLog.en.lua` (`addon.Diagnose`).
 
 ---
 

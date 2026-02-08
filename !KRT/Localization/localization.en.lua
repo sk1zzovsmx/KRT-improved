@@ -16,15 +16,6 @@ local L                                = addon.L -- Make a local reference for c
 
 -- ==================== Callbacks ==================== --
 L.StrCbErrUsage                        = "Usage: KRT:registerCallback(event, callbacks)"
-L.StrCbErrExec                         = "Error while executing callback %s for event %s: %s"
-
--- ==================== Logger UI Diagnostics ==================== --
-L.LogLoggerUIShow                      = "[LoggerUI] show %s -> %s"
-L.LogLoggerUIWidgets                   = "[LoggerUI:%s] widgets sf=%s sc=%s sfW=%.1f sfH=%.1f scW=%.1f scH=%.1f"
-L.LogLoggerUIMissingWidgets            = "[LoggerUI:%s] Missing ScrollFrame widgets for %s"
-L.LogLoggerUIDeferLayout               = "[LoggerUI:%s] defer (layout not ready): sfW=%.1f"
-L.LogLoggerUIFetch                     = "[LoggerUI:%s] fetch count=%d sfW=%.1f sfH=%.1f scW=%.1f scH=%.1f frameW=%.1f frameH=%.1f"
-L.LogLoggerUIError                     = "[LoggerUI:%s] %s"
 
 -- ==================== General Buttons ==================== --
 L.BtnConfig                            = "Config"

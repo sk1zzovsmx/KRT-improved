@@ -23,7 +23,7 @@ Libs\LibLogger-1.0\lib.xml
 
 # Localization (moved to the top for 'L' to be available):
 Localization\localization.en.lua
-Localization\ErrorLog.en.lua
+Localization\DiagnoseLog.en.lua
 
 # Templates File:
 Templates.xml
