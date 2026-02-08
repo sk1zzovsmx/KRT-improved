@@ -11,6 +11,8 @@ Dates are in YYYY-MM-DD.
 - **Behavior:** Reserved-roll announce text now hides `(P+N)` and `(xN)` suffixes and shows only the player list.
 - **Bugfix:** Master Looter `Import SoftRes/Open SoftRes` button now updates immediately
   after SoftRes import and list clear operations.
+- **Refactor:** Loot Counter and Reserve List windows now use only coalesced event-driven refresh
+  (`RequestRefresh`) and no longer perform redundant immediate redraw calls.
 
 ## 2026-02-08
 **REFACTORING PROJECT COMPLETE** — Code consolidation initiative (3 phases) concluded.

@@ -4357,18 +4357,8 @@ do
 
     -- ----- UI Window Management ----- --
 
-    local function ShowLootCounter()
-        local frame = getFrame()
-        if not frame then
-            addon:error("LootCounter frame missing")
-            return
-        end
-        Utils.setShown(frame, true)
-        module:RequestRefresh()
-    end
-
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function() ShowLootCounter() end)
+    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
     bindModuleToggleHide(module, uiController)
 
     -- Add a button to the master loot frame to open the loot counter UI.
@@ -4490,10 +4480,7 @@ do
         addon:debug(E.LogReservesItemReady:format(itemId, pendingItemCount))
         if pendingItemCount == 0 then
             addon:debug(E.LogReservesPendingComplete)
-            local frame = getFrame()
-            if frame and frame:IsShown() then
-                module:Refresh()
-            end
+            module:RequestRefresh()
         end
     end
 
@@ -5134,7 +5121,7 @@ do
         if not source then return end
         collapsedBossGroups[source] = not collapsedBossGroups[source]
         addon:debug(E.LogReservesToggleCollapse:format(source, tostring(collapsedBossGroups[source])))
-        module:Refresh()
+        module:RequestRefresh()
     end
 
     -- ----- Public methods ----- --
@@ -5214,20 +5201,11 @@ do
 
     -- ----- UI Window Management ----- --
 
-    local function ShowReserveList()
-        local frame = getFrame()
-        if not frame then
-            addon:error(E.LogReservesFrameMissing)
-            return
-        end
-        addon:debug(E.LogReservesShowWindow)
-        module:Refresh()
-        module:RequestRefresh()
-        Utils.setShown(frame, true)
-    end
-
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function() ShowReserveList() end)
+    local uiController = addon:makeUIFrameController(getFrame, function()
+        addon:debug(E.LogReservesShowWindow)
+        module:RequestRefresh()
+    end)
     bindModuleToggleHide(module, uiController)
 
     function module:Hide()
@@ -5747,9 +5725,7 @@ do
                 end
             end
         end
-        local frame = getFrame()
-        if updated and frame and frame:IsShown() then
-            self:Refresh()
+        if updated then
             self:RequestRefresh()
         end
         if not silent then
