@@ -11,13 +11,15 @@ local format, gsub = string.format, string.gsub
 local strsub, strlen = string.sub, string.len
 local lower, upper = string.lower, string.upper
 local select = select
+local twipe = table.wipe
 local LibStub = LibStub
+local CreateFrame = CreateFrame
 
 local GetTime = GetTime
 local GetRealmName = GetRealmName
 local GetAchievementLink = GetAchievementLink
-local UnitIsGroupAssistant = UnitIsGroupAssistant
-local UnitIsGroupLeader = UnitIsGroupLeader
+local UnitIsGroupAssistant = _G.UnitIsGroupAssistant
+local UnitIsGroupLeader = _G.UnitIsGroupLeader
 
 local ITEM_LINK_FORMAT = "|c%s|Hitem:%d:%s|h[%s]|h|r"
 
@@ -98,6 +100,27 @@ function Utils.getPlayerName()
 	addon.State.player.name = name
 	return name
 end
+
+-- =========== Raid/state helpers  =========== --
+
+-- Resolve a raid table and raid number.
+--
+-- Returns:
+--   raidTableOrNil, resolvedRaidNumOrNil
+--
+-- Notes:
+-- - Uses current raid (KRT_CurrentRaid) when raidNum is nil.
+-- - Safe when KRT_Raids is nil.
+function Utils.getRaid(raidNum)
+	raidNum = raidNum or KRT_CurrentRaid
+	if not raidNum then return nil, nil end
+	local raids = KRT_Raids
+	local raid = raids and raids[raidNum] or nil
+	return raid, raidNum
+end
+
+-- Backwards-friendly alias (some callers prefer PascalCase).
+Utils.GetRaid = Utils.getRaid
 
 -- =========== String helpers  =========== --
 
@@ -196,6 +219,41 @@ end
 
 -- =========== UI helpers  =========== --
 
+-- Enable basic drag-to-move behavior on a frame.
+--
+-- Intentionally kept in Lua (not XML) so window behavior is standardized
+-- without embedding logic into Templates.xml.
+function Utils.enableDrag(frame, dragButton)
+	if not frame or not frame.RegisterForDrag then return end
+	-- Ensure the frame is draggable even if XML didn't set these.
+	if frame.SetMovable then frame:SetMovable(true) end
+	if frame.EnableMouse then frame:EnableMouse(true) end
+	if frame.SetClampedToScreen then frame:SetClampedToScreen(true) end
+
+	-- Provide default drag handlers in Lua so Templates.xml stays layout-only.
+	--
+	-- IMPORTANT: do NOT override custom drag scripts (some frames intentionally
+	-- move their parent). Only set handlers when none exist.
+	if frame.GetScript and frame.SetScript then
+		if not frame:GetScript("OnDragStart") then
+			frame:SetScript("OnDragStart", function(self)
+				if self.StartMoving then
+					self:StartMoving()
+				end
+			end)
+		end
+		if not frame:GetScript("OnDragStop") then
+			frame:SetScript("OnDragStop", function(self)
+				if self.StopMovingOrSizing then
+					self:StopMovingOrSizing()
+				end
+			end)
+		end
+	end
+
+	frame:RegisterForDrag(dragButton or "LeftButton")
+end
+
 --
 -- createRowDrawer(fn)
 --
@@ -219,6 +277,401 @@ function Utils.createRowDrawer(fn)
 		fn(row, it)
 		return rowHeight
 	end
+end
+
+-- =========== List controller helper  =========== --
+-- Generic scroll list controller with row pooling, sorting, and selection visuals.
+function Utils.makeListController(cfg)
+	local self = {
+		frameName = nil,
+		data = {},
+		_rows = {},
+		_rowByName = {},
+		_usedNames = {},
+		_asc = false,
+		_sortKey = nil,
+		_lastHL = nil,
+		_active = false,
+		_localized = false,
+		_lastWidth = nil,
+		_dirty = true,
+	}
+
+	local defer = CreateFrame("Frame")
+	defer:Hide()
+
+	local function buildRowParts(btnName, row)
+		if cfg._rowParts and not row._p then
+			local p = {}
+			for i = 1, #cfg._rowParts do
+				local part = cfg._rowParts[i]
+				p[part] = _G[btnName .. part]
+			end
+			row._p = p
+		end
+	end
+
+	local function acquireRow(btnName, parent)
+		local row = self._rowByName[btnName]
+		if row then
+			row:Show()
+			if Utils and Utils.ensureRowVisuals then
+				Utils.ensureRowVisuals(row)
+			end
+			return row
+		end
+
+		row = CreateFrame("Button", btnName, parent, cfg.rowTmpl)
+		self._rowByName[btnName] = row
+		buildRowParts(btnName, row)
+		if Utils and Utils.ensureRowVisuals then
+			Utils.ensureRowVisuals(row)
+		end
+		return row
+	end
+
+	local function releaseData()
+		for i = 1, #self.data do
+			twipe(self.data[i])
+		end
+		twipe(self.data)
+	end
+
+	local function refreshData()
+		releaseData()
+		if cfg.getData then
+			cfg.getData(self.data)
+		end
+	end
+
+	local function ensureLocalized()
+		if not self._localized and cfg.localize then
+			cfg.localize(self.frameName)
+			self._localized = true
+		end
+	end
+
+	local function setActive(active)
+		self._active = active
+		if self._active then
+			ensureLocalized()
+			-- Reset one-shot diagnostics each time the list becomes active (OnShow).
+			self._loggedFetch = nil
+			self._loggedWidgets = nil
+			self._warnW0 = nil
+			self._missingScroll = nil
+			self:Dirty()
+			return
+		end
+		releaseData()
+		for i = 1, #self._rows do
+			local row = self._rows[i]
+			if row then row:Hide() end
+		end
+		self._lastHL = nil
+	end
+
+	local function safeRightInset(sf, sc, frameName)
+		if cfg.rightInset ~= nil then
+			return cfg.rightInset
+		end
+
+		local sb = nil
+		if sf and sf.GetName then
+			sb = _G[sf:GetName() .. "ScrollBar"]
+		end
+		if not sb and sf then
+			sb = sf.ScrollBar
+		end
+		if not sb and frameName then
+			sb = _G[frameName .. "ScrollFrameScrollBar"]
+		end
+
+		-- Robust calc: how far the scroll child extends under the scrollbar.
+		-- Avoid oversized estimated insets that create visible gaps.
+		if sb and sc and sb.IsShown and sb:IsShown() and sb.GetLeft and sc.GetRight then
+			local sbL = sb:GetLeft()
+			local scR = sc:GetRight()
+			if sbL and scR then
+				local overlap = scR - sbL
+				if overlap > 0 then
+					-- No extra padding; row template already handles spacing.
+					return overlap
+				end
+				return 0
+			end
+		end
+
+		-- Fallback: conservative without extra padding.
+		local width = sb and sb.GetWidth and sb:GetWidth()
+		if width and width > 0 then
+			return width
+		end
+		return 0
+	end
+
+	local function safeRowHeight(row, declaredHeight)
+		local height = declaredHeight
+		if height == nil and row and row.GetHeight then
+			height = row:GetHeight()
+		end
+		if type(height) ~= "number" or height < 1 then
+			return 20
+		end
+		return height
+	end
+
+	local function applyHighlight()
+		-- Selection overlay (multi or legacy single) + Focus border (one row).
+		-- Keep hover highlight native (no LockHighlight for selection).
+		local selectedId = cfg.highlightId and cfg.highlightId() or nil
+		local focusId = (cfg.focusId and cfg.focusId()) or selectedId
+
+		local selKey
+		if cfg.highlightId then
+			-- Legacy: single selection (use the selected id as key)
+			selKey = selectedId and ("id:" .. tostring(selectedId)) or "id:nil"
+		elseif cfg.highlightFn then
+			selKey = (cfg.highlightKey and cfg.highlightKey()) or false
+		else
+			selKey = false
+		end
+
+		local focusKey = (cfg.focusKey and cfg.focusKey()) or
+			(focusId ~= nil and ("f:" .. tostring(focusId)) or "f:nil")
+		local combo = tostring(selKey) .. "|" .. tostring(focusKey)
+		if combo == self._lastHL then return end
+		self._lastHL = combo
+
+		for i = 1, #self.data do
+			local it = self.data[i]
+			local row = self._rows[i]
+			if row then
+				local isSel = false
+				if cfg.highlightId then
+					isSel = (selectedId ~= nil and it.id == selectedId)
+				elseif cfg.highlightFn then
+					isSel = cfg.highlightFn(it.id, it, i, row) and true or false
+				end
+
+				if Utils and Utils.setRowSelected then
+					Utils.setRowSelected(row, isSel)
+				else
+					-- Fallback to legacy highlight if visuals are missing.
+					Utils.toggleHighlight(row, isSel)
+				end
+
+				if Utils and Utils.setRowFocused then
+					Utils.setRowFocused(row, focusId ~= nil and it.id == focusId)
+				end
+			end
+		end
+
+		if cfg.highlightDebugTag and addon and addon.options and addon.options.debug and addon.debug then
+			local info = (cfg.highlightDebugInfo and cfg.highlightDebugInfo(self)) or ""
+			if info ~= "" then info = " " .. info end
+			addon:debug(("[%s] refresh key=%s%s"):format(tostring(cfg.highlightDebugTag), tostring(selKey), info))
+		end
+	end
+
+	local function postUpdate()
+		if cfg.postUpdate then
+			cfg.postUpdate(self.frameName)
+		end
+	end
+
+	function self:Touch()
+		defer:Show()
+	end
+
+	function self:Dirty()
+		self._dirty = true
+		defer:Show()
+	end
+
+	local function runUpdate()
+		if not self._active or not self.frameName then return end
+
+		if self._dirty then
+			refreshData()
+			local okFetch = self:Fetch()
+			-- If Fetch() returns false we defer until the frame has a real size.
+			if okFetch ~= false then
+				self._dirty = false
+			end
+		end
+
+		applyHighlight()
+		postUpdate()
+	end
+
+	defer:SetScript("OnUpdate", function(f)
+		f:Hide()
+		local ok, err = pcall(runUpdate)
+		if not ok then
+			-- If the user has script errors disabled, this still surfaces the problem in chat.
+			if err ~= self._lastErr then
+				self._lastErr = err
+				addon:error(L.LogLoggerUIError:format(tostring(cfg.keyName or "?"), tostring(err)))
+			end
+		end
+	end)
+
+	function self:OnLoad(frame)
+		if not frame then return end
+		self.frameName = frame:GetName()
+
+		frame:HookScript("OnShow", function()
+			if not self._shownOnce then
+				self._shownOnce = true
+				addon:debug(L.LogLoggerUIShow:format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
+			end
+			setActive(true)
+			if not self._loggedWidgets then
+				self._loggedWidgets = true
+				local n = self.frameName
+				local sf = n and _G[n .. "ScrollFrame"]
+				local sc = n and _G[n .. "ScrollFrameScrollChild"]
+				addon:debug(L.LogLoggerUIWidgets:format(
+					tostring(cfg.keyName or "?"),
+					tostring(sf), tostring(sc),
+					sf and (sf:GetWidth() or 0) or 0,
+					sf and (sf:GetHeight() or 0) or 0,
+					sc and (sc:GetWidth() or 0) or 0,
+					sc and (sc:GetHeight() or 0) or 0
+				))
+			end
+		end)
+
+		frame:HookScript("OnHide", function()
+			setActive(false)
+		end)
+
+		if frame:IsShown() then
+			setActive(true)
+		end
+	end
+
+	function self:Fetch()
+		local n = self.frameName
+		if not n then return end
+
+		local sf = _G[n .. "ScrollFrame"]
+		local sc = _G[n .. "ScrollFrameScrollChild"]
+		if not (sf and sc) then
+			if not self._missingScroll then
+				self._missingScroll = true
+				addon:warn(L.LogLoggerUIMissingWidgets:format(tostring(cfg.keyName or "?"), tostring(n)))
+			end
+			return
+		end
+
+		local scrollW = sf:GetWidth() or 0
+		self._lastWidth = scrollW
+
+		-- Defer draw until the ScrollFrame has a real size (first OnShow can report 0).
+		if scrollW < 10 then
+			if not self._warnW0 then
+				self._warnW0 = true
+				addon:debug(L.LogLoggerUIDeferLayout:format(tostring(cfg.keyName or "?"), scrollW))
+			end
+			defer:Show()
+			return false
+		end
+		if (sc:GetWidth() or 0) < 10 then
+			sc:SetWidth(scrollW)
+		end
+
+		-- One-time diagnostics per list to help debug "empty/blank" frames.
+		if not self._loggedFetch then
+			self._loggedFetch = true
+			addon:debug(L.LogLoggerUIFetch:format(
+				tostring(cfg.keyName or "?"),
+				#self.data,
+				sf:GetWidth() or 0, sf:GetHeight() or 0,
+				sc:GetWidth() or 0, sc:GetHeight() or 0,
+				(_G[n] and _G[n]:GetWidth() or 0),
+				(_G[n] and _G[n]:GetHeight() or 0)
+			))
+		end
+
+		local totalH = 0
+		local count = #self.data
+		local used = self._usedNames
+		if twipe then
+			twipe(used)
+		else
+			for k in pairs(used) do
+				used[k] = nil
+			end
+		end
+		local rightInset = safeRightInset(sf, sc, n)
+
+		for i = 1, count do
+			local it = self.data[i]
+			local btnName = cfg.rowName(n, it, i)
+			used[btnName] = true
+
+			local row = self._rows[i]
+			if not row or row:GetName() ~= btnName then
+				row = acquireRow(btnName, sc)
+				self._rows[i] = row
+			end
+
+			row:SetID(it.id)
+			row:ClearAllPoints()
+			-- Stretch the row to the scrollchild width.
+			-- (Avoid relying on GetWidth() being valid on the first OnShow frame.)
+			row:SetPoint("TOPLEFT", 0, -totalH)
+			row:SetPoint("TOPRIGHT", -rightInset, -totalH)
+
+			local rH = cfg.drawRow(row, it)
+			local usedH = safeRowHeight(row, rH)
+			totalH = totalH + usedH
+
+			row:Show()
+		end
+
+		for i = count + 1, #self._rows do
+			local r = self._rows[i]
+			if r then r:Hide() end
+		end
+		for name, row in pairs(self._rowByName) do
+			if not used[name] and row and row.IsShown and row:IsShown() then
+				row:Hide()
+			end
+		end
+
+		sc:SetHeight(math.max(totalH, sf:GetHeight()))
+		if sf.UpdateScrollChildRect then
+			sf:UpdateScrollChildRect()
+		end
+		self._lastHL = nil
+	end
+
+	function self:Sort(key)
+		local cmp = cfg.sorters and cfg.sorters[key]
+		if not cmp or #self.data <= 1 then return end
+		if self._sortKey ~= key then
+			self._sortKey = key
+			self._asc = false
+		end
+		self._asc = not self._asc
+		table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
+		self:Fetch()
+		applyHighlight()
+		postUpdate()
+	end
+
+	self._makeConfirmPopup = Utils.makeConfirmPopup
+
+	return self
+end
+
+function Utils.bindListController(module, controller)
+	module.OnLoad = function(_, frame) controller:OnLoad(frame) end
+	module.Fetch = function() controller:Fetch() end
+	module.Sort = function(_, t) controller:Sort(t) end
 end
 
 -- =========== Roster helpers  =========== --
@@ -301,10 +754,6 @@ do
 end
 
 -- =========== Frame helpers  =========== --
-
-function Utils.getFrameName()
-	return addon.UIMaster:GetName()
-end
 
 function Utils.makeConfirmPopup(key, text, onAccept, cancels)
 	StaticPopupDialogs[key] = {
@@ -393,6 +842,114 @@ function Utils.setShown(frame, show)
 	elseif frame:IsShown() then
 		frame:Hide()
 	end
+end
+
+-- =========== Coalesced refresh helpers (event-driven UI)  =========== --
+
+-- Creates a refresh requester that coalesces multiple triggers into a single UI update.
+-- Notes:
+--  - Uses a dedicated driver frame (does NOT touch the target frame's OnUpdate).
+--  - If called while the target frame is hidden, marks it dirty and refreshes on next OnShow.
+--  - WoW 3.3.5a compatible (no C_Timer).
+function Utils.makeEventDrivenRefresher(targetOrGetter, updateFn)
+	if type(updateFn) ~= "function" then
+		error("Utils.makeEventDrivenRefresher: updateFn must be a function")
+	end
+
+	local driver = CreateFrame("Frame")
+	local pending = false
+	local dirtyWhileHidden = false
+	local hookedFrame = nil
+
+	local function resolveTarget()
+		if type(targetOrGetter) == "function" then
+			return targetOrGetter()
+		end
+		return targetOrGetter
+	end
+
+	local function ensureHook(target)
+		if not target or not target.HookScript then return end
+		if hookedFrame == target then return end
+		hookedFrame = target
+		target:HookScript("OnShow", function()
+			if dirtyWhileHidden then
+				dirtyWhileHidden = false
+				updateFn()
+			end
+		end)
+	end
+
+	local function run()
+		driver:SetScript("OnUpdate", nil)
+		pending = false
+
+		local target = resolveTarget()
+		if not target or not target.IsShown or not target:IsShown() then
+			dirtyWhileHidden = true
+			if target then ensureHook(target) end
+			return
+		end
+		updateFn()
+	end
+
+	return function()
+		local target = resolveTarget()
+		if not target then return end
+		ensureHook(target)
+
+		if not target:IsShown() then
+			dirtyWhileHidden = true
+			return
+		end
+
+		if pending then return end
+		pending = true
+		driver:SetScript("OnUpdate", run)
+	end
+end
+
+-- =========== Frame Getter Factory  =========== --
+-- Creates a lazy-caching getter for global UI frames.
+-- Usage: local getFrame = Utils.makeFrameGetter("KRTMaster")
+function Utils.makeFrameGetter(globalFrameName)
+	local cached = nil
+	return function()
+		if cached then return cached end
+		local frame = _G[globalFrameName]
+		if frame then cached = frame end
+		return frame
+	end
+end
+
+-- =========== UI Frame Controller Factory  =========== --
+-- Consolidates recurring Toggle/Hide/Show patterns across UI modules.
+function Utils.makeUIFrameController(getFrame, requestRefreshFn)
+	return {
+		Toggle = function(self)
+			local frame = getFrame()
+			if not frame then return end
+			if frame:IsShown() then
+				Utils.setShown(frame, false)
+			else
+				if requestRefreshFn then requestRefreshFn() end
+				Utils.setShown(frame, true)
+			end
+		end,
+		Hide = function(self)
+			local frame = getFrame()
+			if frame then
+				Utils.setShown(frame, false)
+			end
+		end,
+		Show = function(self)
+			local frame = getFrame()
+			if frame then
+				if requestRefreshFn then requestRefreshFn() end
+				Utils.setShown(frame, true)
+			end
+		end,
+	}
 end
 
 -- =========== Tooltip helpers  =========== --
@@ -516,6 +1073,320 @@ function Utils.toggleHighlight(frame, cond)
 	end
 end
 
+-- =========== List row visuals (selection/focus)  =========== --
+-- These helpers avoid using LockHighlight() for persistent selection, so hover highlight remains native.
+-- Safe for 3.3.5a and works with any UI skin (pure texture overlays).
+
+local function ensureRowVisuals(row)
+	if not row or row._krtSelTex then return end
+
+	-- Persistent selection fill (soft)
+	local sel = row:CreateTexture(nil, "BACKGROUND")
+	sel:SetAllPoints(row)
+	-- Persistent selection highlight (soft). Uses a Blizzard highlight texture so it reads as "highlight",
+	-- while staying independent from the native mouseover HighlightTexture.
+	sel:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+	sel:SetBlendMode("ADD")
+	-- Slightly more pronounced than mouseover.
+	sel:SetVertexColor(0.20, 0.60, 1.00, 0.52)
+	sel:Hide()
+	row._krtSelTex = sel
+
+	-- Focus highlight (stronger). Still a highlight, not a border.
+	local focus = row:CreateTexture(nil, "ARTWORK")
+	focus:SetAllPoints(row)
+	focus:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+	focus:SetBlendMode("ADD")
+	focus:SetVertexColor(0.20, 0.60, 1.00, 0.72)
+	focus:Hide()
+	row._krtFocusTex = focus
+
+	-- Pushed feedback (mouse down)
+	local pushed = row:CreateTexture(nil, "ARTWORK")
+	pushed:SetAllPoints(row)
+	pushed:SetTexture(1, 1, 1, 0.08)
+	row:SetPushedTexture(pushed)
+end
+
+function Utils.ensureRowVisuals(row)
+	ensureRowVisuals(row)
+end
+
+function Utils.setRowSelected(row, cond)
+	ensureRowVisuals(row)
+	if not row or not row._krtSelTex then return end
+	if cond then row._krtSelTex:Show() else row._krtSelTex:Hide() end
+end
+
+function Utils.setRowFocused(row, cond)
+	ensureRowVisuals(row)
+	local t = row and row._krtFocusTex
+	if not t then return end
+	if cond then t:Show() else t:Hide() end
+end
+
+-- Helper: append "(N)" to a button label, preserving the original base label.
+function Utils.setButtonCount(btn, baseText, n)
+	if not btn then return end
+	if not btn._krtBaseText then
+		btn._krtBaseText = baseText or btn:GetText() or ""
+	end
+	local base = baseText or btn._krtBaseText or ""
+	if n and n > 1 then
+		btn:SetText(("%s (%d)"):format(base, n))
+	else
+		btn:SetText(base)
+	end
+end
+
+-- =========== Multi-select utility (reusable)  =========== --
+-- Runtime-only selection state for scrollable lists.
+-- State is keyed by "contextKey" (string) so multiple lists can coexist.
+
+-- Runtime-only selection state for scrollable lists.
+-- State is keyed by "contextKey" (string) so multiple lists can coexist.
+-- IMPORTANT: bind the backing table to a *local* upvalue in the file chunk.
+-- This avoids accidental global lookups (e.g. "MS" becoming nil at runtime).
+
+Utils._multiSelect = Utils._multiSelect or {}
+local MS = Utils._multiSelect
+
+do
+	local function msKey(id)
+		if id == nil then return nil end
+		local n = tonumber(id)
+		return n or id
+	end
+
+	local function ensureContext(contextKey)
+		if not contextKey or contextKey == "" then
+			contextKey = "_default"
+		end
+		local st = MS[contextKey]
+		if not st then
+			st = { set = {}, count = 0, ver = 0 }
+			MS[contextKey] = st
+		end
+		return st, contextKey
+	end
+
+	local function debugLog(msg)
+		if addon and addon.options and addon.options.debug and addon.debug then
+			addon:debug(msg)
+		end
+	end
+
+	function Utils.multiSelectInit(contextKey)
+		local st, key = ensureContext(contextKey)
+		st.set = {}
+		st.count = 0
+		st.ver = (st.ver or 0) + 1
+		debugLog(("[LoggerSelect] init ctx=%s ver=%d"):format(tostring(key), st.ver))
+		return st
+	end
+
+	function Utils.multiSelectClear(contextKey)
+		return Utils.multiSelectInit(contextKey)
+	end
+
+	-- Toggle selection.
+	-- isMulti=false  -> clear + select single (optional: click-again to deselect when allowDeselect=true)
+	-- isMulti=true   -> toggle selection for the given id
+	-- Returns: actionString, selectedCount
+	function Utils.multiSelectToggle(contextKey, id, isMulti, allowDeselect)
+		local st, key = ensureContext(contextKey)
+		local k = msKey(id)
+		if k == nil then return nil, st.count or 0 end
+
+		local before = st.count or 0
+		local action
+
+		local allow = false
+		if allowDeselect == true then
+			allow = true
+		elseif type(allowDeselect) == "table" and allowDeselect.allowDeselect == true then
+			allow = true
+		end
+
+		if isMulti then
+			if st.set[k] then
+				st.set[k] = nil
+				st.count = before - 1
+				action = "TOGGLE_OFF"
+			else
+				st.set[k] = true
+				st.count = before + 1
+				action = "TOGGLE_ON"
+			end
+		else
+			-- OS-like single selection:
+			--   - clear + select single by default
+			--   - optionally allow "click again to deselect" when this is the only selected row
+			local already = (st.set[k] == true)
+			if allow and already and before == 1 then
+				st.set = {}
+				st.count = 0
+				action = "SINGLE_DESELECT"
+			else
+				st.set = {}
+				st.set[k] = true
+				st.count = 1
+				action = "SINGLE_CLEAR+SELECT"
+			end
+		end
+
+		st.ver = (st.ver or 0) + 1
+
+		debugLog(("[LoggerSelect] toggle ctx=%s id=%s multi=%s action=%s count %d->%d ver=%d"):format(
+			tostring(key), tostring(id), isMulti and "1" or "0", tostring(action), before, st.count or 0, st.ver
+		))
+
+		return action, st.count or 0
+	end
+
+	-- Set or clear the range-anchor for SHIFT range selection.
+	-- The anchor is the last non-shift click target for the given context.
+	function Utils.multiSelectSetAnchor(contextKey, id)
+		local st, key = ensureContext(contextKey)
+		local before = st.anchor
+		local k = msKey(id)
+		st.anchor = k
+		-- Anchor changes do not affect highlight rendering directly, so we do not bump st.ver here.
+		local ver = st.ver or 0
+		debugLog(("[LoggerSelect] anchor ctx=%s from=%s to=%s ver=%d"):format(
+			tostring(key), tostring(before), tostring(st.anchor), ver
+		))
+		return st.anchor
+	end
+
+	function Utils.multiSelectGetAnchor(contextKey)
+		local st = MS[contextKey or "_default"]
+		return st and st.anchor or nil
+	end
+
+	local function idOf(x)
+		if type(x) == "table" then
+			return x.id
+		end
+		return x
+	end
+
+	local function findIndex(ordered, key)
+		if not ordered or not key then return nil end
+		for i = 1, #ordered do
+			local id = idOf(ordered[i])
+			if msKey(id) == key then
+				return i
+			end
+		end
+		return nil
+	end
+
+	-- SHIFT range selection helper.
+	-- ordered: array of ids OR array of items with .id (e.g. controller.data)
+	-- id: clicked id
+	-- isAdd: when true (CTRL+SHIFT) add the range to the existing selection; otherwise replace selection with the range
+	-- Returns: actionString, selectedCount
+	function Utils.multiSelectRange(contextKey, ordered, id, isAdd)
+		local st, key = ensureContext(contextKey)
+		local k = msKey(id)
+		if k == nil then return nil, st.count or 0 end
+
+		local before = st.count or 0
+		local action
+
+		local aKey = st.anchor
+		local ai = findIndex(ordered, aKey)
+		local bi = findIndex(ordered, k)
+
+		if not ai or not bi then
+			-- If we cannot resolve indices (missing anchor or id), behave like a single select.
+			st.set = {}
+			st.set[k] = true
+			st.count = 1
+			if not st.anchor then st.anchor = k end
+			action = st.anchor == k and "RANGE_NOANCHOR_SINGLE" or "RANGE_FALLBACK_SINGLE"
+		else
+			if not isAdd then
+				st.set = {}
+				st.count = 0
+			end
+			local from = ai
+			local to = bi
+			if from > to then
+				from, to = to, from
+			end
+
+			for i = from, to do
+				local id2 = idOf(ordered[i])
+				local k2 = msKey(id2)
+				if k2 ~= nil and not st.set[k2] then
+					st.set[k2] = true
+					st.count = (st.count or 0) + 1
+				end
+			end
+			action = isAdd and "RANGE_ADD" or "RANGE_SET"
+		end
+
+		st.ver = (st.ver or 0) + 1
+		debugLog(("[LoggerSelect] range ctx=%s id=%s add=%s action=%s count %d->%d ver=%d anchor=%s"):format(
+			tostring(key), tostring(id), isAdd and "1" or "0", tostring(action), before, st.count or 0, st.ver,
+			tostring(st.anchor)
+		))
+		return action, st.count or 0
+	end
+
+	function Utils.multiSelectIsSelected(contextKey, id)
+		local st = MS[contextKey or "_default"]
+		if not st or not st.set then return false end
+		local k = msKey(id)
+		return (k ~= nil) and (st.set[k] == true) or false
+	end
+
+	function Utils.multiSelectCount(contextKey)
+		local st = MS[contextKey or "_default"]
+		return (st and st.count) or 0
+	end
+
+	function Utils.multiSelectGetVersion(contextKey)
+		local st = MS[contextKey or "_default"]
+		return (st and st.ver) or 0
+	end
+
+	function Utils.multiSelectGetSelected(contextKey)
+		local st = MS[contextKey or "_default"]
+		local out = {}
+		if not st or not st.set then return out end
+		local n = 0
+		for id, v in pairs(st.set) do
+			if v then
+				n = n + 1
+				out[n] = id
+			end
+		end
+		-- Stable ordering for UI/debug; safe even if mixed types.
+		table.sort(out, function(a, b)
+			local na, nb = tonumber(a), tonumber(b)
+			if na and nb then return na < nb end
+			return tostring(a) < tostring(b)
+		end)
+		return out
+	end
+
+	-- Backward-compatible aliases for legacy call sites.
+	Utils.MultiSelect_Init = Utils.multiSelectInit
+	Utils.MultiSelect_Clear = Utils.multiSelectClear
+	Utils.MultiSelect_Toggle = Utils.multiSelectToggle
+	Utils.MultiSelect_SetAnchor = Utils.multiSelectSetAnchor
+	Utils.MultiSelect_GetAnchor = Utils.multiSelectGetAnchor
+	Utils.MultiSelect_Range = Utils.multiSelectRange
+	Utils.MultiSelect_IsSelected = Utils.multiSelectIsSelected
+	Utils.MultiSelect_Count = Utils.multiSelectCount
+	Utils.MultiSelect_GetVersion = Utils.multiSelectGetVersion
+	Utils.MultiSelect_GetSelected = Utils.multiSelectGetSelected
+end
+
+
 -- Set frame text based on condition:
 function Utils.setText(frame, str1, str2, cond)
 	if cond then
@@ -523,31 +1394,6 @@ function Utils.setText(frame, str1, str2, cond)
 	else
 		frame:SetText(str2)
 	end
-end
-
--- =========== Throttles  =========== --
-
--- Throttle frame OnUpdate:
-function Utils.throttle(frame, name, period, elapsed)
-	local t = frame[name] or 0
-	t = t + elapsed
-	if t > period then
-		frame[name] = 0
-		return true
-	end
-	frame[name] = t
-	return false
-end
-
-function Utils.throttledUIUpdate(frame, frameName, period, elapsed, fn)
-	if not frameName or type(fn) ~= "function" then
-		return false
-	end
-	if Utils.throttle(frame, frameName, period, elapsed) then
-		fn()
-		return true
-	end
-	return false
 end
 
 -- =========== Chat + comms helpers  =========== --

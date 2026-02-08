@@ -1,9 +1,7 @@
-<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+<Ui xmlns="http://www.blizzard.com/wow/ui/"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
 	<!-- Default Frames Template -->
-	<Frame name="KRTFrameTemplate" inherits="UIPanelDialogTemplate" parent="UIParent" movable="true"
-		enableMouse="true" frameStrata="MEDIUM" toplevel="true" hidden="true" clampedToScreen="true"
-		virtual="true">
+	<Frame name="KRTFrameTemplate" inherits="UIPanelDialogTemplate" parent="UIParent" movable="true" enableMouse="true" frameStrata="MEDIUM" toplevel="true" hidden="true" clampedToScreen="true" virtual="true">
 		<Size>
 			<AbsDimension x="230" y="385" />
 		</Size>
@@ -12,7 +10,7 @@
 		</Anchors>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString inherits="GameFontNormalSmall" name="$parentTitle" justifyH="LEFT" text="">
+				<FontString inherits="GameFontNormalSmall" name="$parentTitle" justifyH="LEFT">
 					<Anchors>
 						<Anchor point="LEFT" relativeTo="$parentTitleBG" relativePoint="LEFT">
 							<Offset>
@@ -23,23 +21,16 @@
 				</FontString>
 			</Layer>
 		</Layers>
-		<Scripts>
-			<OnLoad>self:RegisterForDrag("LeftButton")</OnLoad>
-			<OnDragStart>self:StartMoving()</OnDragStart>
-			<OnDragStop>self:StopMovingOrSizing()</OnDragStop>
-		</Scripts>
 	</Frame>
 	<!-- Simple almost border-less frame template -->
-	<Frame name="KRTSimpleFrameTemplate" parent="UIParent" movable="true" enableMouse="true"
-		hidden="true" clampedToScreen="true" virtual="true">
+	<Frame name="KRTSimpleFrameTemplate" parent="UIParent" movable="true" enableMouse="true" hidden="true" clampedToScreen="true" virtual="true">
 		<Size>
 			<AbsDimension x="230" y="385" />
 		</Size>
 		<Anchors>
 			<Anchor point="CENTER" />
 		</Anchors>
-		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background-Dark"
-			edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background-Dark" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
 			<TileSize>
 				<AbsValue val="8" />
 			</TileSize>
@@ -50,10 +41,6 @@
 				<AbsInset top="1" right="1" bottom="1" left="1" />
 			</BackgroundInsets>
 		</Backdrop>
-		<Scripts>
-			<OnDragStart>self:StartMoving()</OnDragStart>
-			<OnDragStop>self:StopMovingOrSizing()</OnDragStop>
-		</Scripts>
 	</Frame>
 	<!-- Default buttons template -->
 	<Button name="KRTButtonTemplate" virtual="true">
@@ -153,11 +140,9 @@
 		</NormalTexture>
 	</Button>
 	<!-- General FontString template -->
-	<FontString name="KRTFontString" font="GameFontNormal" justifyH="LEFT" justifyV="MIDDLE"
-		virtual="true" />
+	<FontString name="KRTFontString" font="GameFontNormal" justifyH="LEFT" justifyV="MIDDLE" virtual="true" />
 	<!-- Gray FontString template -->
-	<FontString name="KRTFontStringGray" inherits="GameFontNormalSmall" justifyH="LEFT"
-		justifyV="MIDDLE" virtual="true">
+	<FontString name="KRTFontStringGray" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE" virtual="true">
 		<Color r="0.5" g="0.5" b="0.5" a="1" />
 	</FontString>
 	<!-- ScrollFrame template -->
@@ -179,8 +164,7 @@
 		</Scripts>
 	</EditBox>
 	<!-- Simple Border-less EdtiBox Template -->
-	<EditBox name="KRTEditBoxSimpleTemplate" font="GameFontHighlightSmall" autoFocus="false"
-		virtual="true">
+	<EditBox name="KRTEditBoxSimpleTemplate" font="GameFontHighlightSmall" autoFocus="false" virtual="true">
 		<Layers>
 			<Layer level="BACKGROUND">
 				<Texture file="Interface\DialogFrame\UI-DialogBox-Background">
@@ -245,7 +229,7 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<FontString name="$parentRoll" inherits="GameFontNormalSmall" justifyH="RIGHT" text="0">
+				<FontString name="$parentRoll" inherits="GameFontNormalSmall" justifyH="RIGHT">
 					<Size>
 						<AbsDimension x="22" />
 					</Size>
@@ -258,20 +242,21 @@
 					</Anchors>
 					<Color r="1" g="1" b="1" a="1" />
 				</FontString>
-				<FontString name="$parentCounter" inherits="GameFontNormalSmall" justifyH="RIGHT" text="">
+				<FontString name="$parentCounter" inherits="GameFontNormalSmall" justifyH="RIGHT">
 					<Size>
 						<AbsDimension x="30" />
 					</Size>
 					<Anchors>
 						<Anchor point="RIGHT" relativeTo="$parentRoll" relativePoint="LEFT">
 							<Offset>
-								<AbsDimension x="0" y="0" /> <!-- was -1 -->
+								<AbsDimension x="0" y="0" />
+								<!-- was -1 -->
 							</Offset>
 						</Anchor>
 					</Anchors>
 					<Color r="1" g="1" b="1" a="1" />
 				</FontString>
-				<FontString name="$parentName" inherits="GameFontNormal" justifyH="LEFT" text="PLAYER">
+				<FontString name="$parentName" inherits="GameFontNormal" justifyH="LEFT">
 					<Anchors>
 						<Anchor point="LEFT">
 							<Offset>
