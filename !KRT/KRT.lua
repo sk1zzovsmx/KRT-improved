@@ -7008,6 +7008,7 @@ do
             fetched = false
             changesDirty = true
             controller:Dirty()
+            module:RequestRefresh()
             return
         end
         -- Quick announce?
