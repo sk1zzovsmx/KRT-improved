@@ -78,15 +78,6 @@ C.CHAT_PREFIX                 = "Kader Raid Tools"
 C.CHAT_PREFIX_SHORT           = "KRT"
 C.CHAT_PREFIX_HEX             = C.K_COLOR
 
-C.UPDATE_INTERVAL_MASTER      = 0.05
-C.UPDATE_INTERVAL_RESERVES    = 0.5
-C.UPDATE_INTERVAL_CONFIG      = 0.1
-C.UPDATE_INTERVAL_WARNINGS    = 0.1
-C.UPDATE_INTERVAL_CHANGES     = 0.1
-C.UPDATE_INTERVAL_SPAMMER     = 0.1
-C.UPDATE_INTERVAL_LOGGER      = 0.1
-C.LOOT_COUNTER_TICK_INTERVAL  = 0.1
-
 -- Multi-award pacing (seconds) to avoid spamming GiveMasterLoot on laggy servers.
 C.ML_MULTI_AWARD_DELAY        = 0.2
 
