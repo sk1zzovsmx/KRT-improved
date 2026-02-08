@@ -4,6 +4,8 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Packaging:** GitHub source archives now export only the `!KRT` addon folder by marking
+  repository docs and dev files as `export-ignore`.
 - **Refactor:** Renamed `Localization/ErrorLog.en.lua` to `Localization/DiagnoseLog.en.lua` and
   migrated diagnostic storage from `addon.E` to `addon.Diagnose`.
 - **Refactor:** Added local `Diag` wrappers and switched diagnostic callsites from `Diagnose.*` to

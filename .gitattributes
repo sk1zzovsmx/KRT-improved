@@ -1,16 +1,22 @@
-# Escludi dal git archive (zip/tag)
+# Exclude repository-only files from GitHub source archives.
 .github            export-ignore
+.devcontainer      export-ignore
+.vscode            export-ignore
 .gitattributes     export-ignore
 .gitignore         export-ignore
 .luacheckrc        export-ignore
 .travis.yml        export-ignore
 .editorconfig      export-ignore
+AGENTS.md          export-ignore
+CHANGELOG.md       export-ignore
+OVERVIEW.md        export-ignore
 README.md          export-ignore
+screenshot.jpg     export-ignore
 
-# Default: tratta tutto come testo dove possibile
+# Default: treat files as text where possible.
 * text=auto
 
-# Forza LF per i sorgenti (così non ti ritrovi CRLF in repo)
+# Enforce LF for source files.
 *.lua  text eol=lf
 *.xml  text eol=lf
 *.toc  text eol=lf
@@ -18,10 +24,10 @@ README.md          export-ignore
 *.yml  text eol=lf
 *.yaml text eol=lf
 
-# Librerie vendorizzate: non normalizzare/convertire line endings
-KRT/Libs/** -text
+# Vendored libraries: do not normalize/convert line endings.
+\!KRT/Libs/** -text
 
-# Binari
+# Binary assets.
 *.ttf binary
 *.ogg binary
 *.mp3 binary
