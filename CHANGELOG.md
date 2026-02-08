@@ -8,6 +8,7 @@ Dates are in YYYY-MM-DD.
 - **Bugfix:** Logger module had getFrame redefined after factory initialization; removed duplicate definition to preserve correct execution order.
 - **Bugfix:** Added missing `E.LogReservesImportWrongModePlus` log template used by Reserves CSV validation.
 - **Localization:** Moved hardcoded Reserves tooltip/display strings (item/source labels and summary lines) into `addon.L`.
+- **Behavior:** Reserved-roll announce text now hides `(P+N)` and `(xN)` suffixes and shows only the player list.
 
 ## 2026-02-08
 **REFACTORING PROJECT COMPLETE** — Code consolidation initiative (3 phases) concluded.

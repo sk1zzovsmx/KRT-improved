@@ -2874,7 +2874,7 @@ do
 
             if rollType == rollTypes.RESERVED then
                 -- Chat-safe: keep UI colors in the Reserve Frame, but do not send class color codes in chat.
-                local srList = addon.Reserves:FormatReservedPlayersLine(itemID, false)
+                local srList = addon.Reserves:FormatReservedPlayersLine(itemID, false, false, false)
                 local suff = addon.options.sortAscending and "Low" or "High"
                 message = lootState.itemCount > 1
                     and L[chatMsg .. "Multiple" .. suff]:format(srList, itemLink, lootState.itemCount)
@@ -4584,7 +4584,7 @@ do
     -- useColor:
     --   true/nil -> UI rendering (class colors enabled)
     --   false    -> chat-safe rendering (no class color codes)
-    local function FormatReservePlayerName(itemId, name, count, metaByName, useColor)
+    local function FormatReservePlayerName(itemId, name, count, metaByName, useColor, showPlus, showMulti)
         local meta = GetMetaForPlayer(metaByName, itemId, name)
         local out
         if useColor == false then
@@ -4593,11 +4593,11 @@ do
             out = ColorizeReserveName(itemId, name, meta and meta.class)
         end
 
-        if module:IsMultiReserve() and count and count > 1 then
+        if showMulti ~= false and module:IsMultiReserve() and count and count > 1 then
             out = out .. format(L.StrReserveCountSuffix, count)
         end
 
-        if module:IsPlusSystem() and itemId then
+        if showPlus ~= false and module:IsPlusSystem() and itemId then
             local p = (meta and tonumber(meta.plus)) or module:GetPlusForItem(itemId, name) or 0
             if p and p > 0 then
                 out = out .. format(" (P+%d)", p)
@@ -4630,13 +4630,22 @@ do
         end
     end
 
-    local function BuildPlayerTokens(itemId, players, counts, metaByName, useColor)
+    local function BuildPlayerTokens(itemId, players, counts, metaByName, useColor, showPlus, showMulti)
         if not players then return {} end
         SortPlayersForDisplay(itemId, players, counts, metaByName)
         twipe(playerTextTemp)
         for i = 1, #players do
             local name = players[i]
-            playerTextTemp[#playerTextTemp + 1] = FormatReservePlayerName(itemId, name, counts and counts[name] or 1, metaByName, useColor)
+            playerTextTemp[#playerTextTemp + 1] =
+                FormatReservePlayerName(
+                    itemId,
+                    name,
+                    counts and counts[name] or 1,
+                    metaByName,
+                    useColor,
+                    showPlus,
+                    showMulti
+                )
         end
         return playerTextTemp
     end
@@ -6016,7 +6025,13 @@ do
     -- useColor:
     --   true/nil -> UI rendering (class colors)
     --   false    -> chat-safe rendering (no class color codes)
-    function module:GetPlayersForItem(itemId, useColor)
+    -- showPlus:
+    --   true/nil -> include "(P+N)" when Plus System is enabled
+    --   false    -> hide Plus suffixes from formatted player tokens
+    -- showMulti:
+    --   true/nil -> include "(xN)" when Multi-reserve is enabled
+    --   false    -> hide multi-reserve count suffixes from player tokens
+    function module:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
         if not itemId then return {} end
         local list = reservesByItemID[itemId]
         if type(list) ~= "table" then return {} end
@@ -6030,7 +6045,15 @@ do
             end
         end
 
-        local tokens = BuildPlayerTokens(itemId, data.players, data.playerCounts, data.playerMeta, useColor)
+        local tokens = BuildPlayerTokens(
+            itemId,
+            data.players,
+            data.playerCounts,
+            data.playerMeta,
+            useColor,
+            showPlus,
+            showMulti
+        )
         local out = {}
         for i = 1, #tokens do
             out[i] = tokens[i]
@@ -6039,10 +6062,10 @@ do
     end
 
     -- Returns the formatted player list for an item (comma-separated).
-    -- useColor follows the same rules as GetPlayersForItem.
-    function module:FormatReservedPlayersLine(itemId, useColor)
+    -- useColor, showPlus, and showMulti follow the same rules as GetPlayersForItem.
+    function module:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti)
         addon:debug(E.LogReservesFormatPlayers:format(itemId))
-        local list = self:GetPlayersForItem(itemId, useColor)
+        local list = self:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
         -- Log the list of players found for the item
         addon:debug(E.LogReservesPlayersList:format(itemId, tconcat(list, ", ")))
         return #list > 0 and tconcat(list, ", ") or ""
