@@ -506,6 +506,13 @@ do
                         tonumber(instanceDiff) or -1))
                     module:Create(instanceName, 10)
                 end
+            else
+                -- Zone changed: start a new raid session
+                addon:info(L.StrNewRaidSessionChange)
+                local newSize = (instanceDiff % 2 == 0 and 25 or 10)
+                addon:info(E.LogRaidSessionChange:format(tostring(instanceName), newSize,
+                    tonumber(instanceDiff) or -1))
+                module:Create(instanceName, newSize)
             end
         elseif (instanceDiff % 2 == 0) then
             addon:info(L.StrNewRaidSessionChange)
