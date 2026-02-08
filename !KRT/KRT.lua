@@ -210,6 +210,37 @@ function addon:makeUIFrameController(getFrame, requestRefreshFn)
     return Utils.makeUIFrameController(getFrame, requestRefreshFn)
 end
 
+local function bindModuleRequestRefresh(module, getFrame)
+    local requestRefresh = Utils.makeEventDrivenRefresher(getFrame, function()
+        module:Refresh()
+    end)
+
+    function module:RequestRefresh()
+        requestRefresh()
+    end
+end
+
+local function bindModuleToggleHide(module, uiController)
+    function module:Toggle()
+        return uiController:Toggle()
+    end
+
+    function module:Hide()
+        return uiController:Hide()
+    end
+end
+
+local function makeModuleFrameGetter(module, globalFrameName)
+    local getGlobalFrame = Utils.makeFrameGetter(globalFrameName)
+    return function()
+        local frame = module.frame or getGlobalFrame()
+        if frame and not module.frame then
+            module.frame = frame
+        end
+        return frame
+    end
+end
+
 -- =========== Raid Helpers Module  =========== --
 -- Manages raid state, roster, boss kills, and loot logging.
 do
@@ -2523,11 +2554,7 @@ do
 
     local getFrame = Utils.makeFrameGetter("KRTMaster")
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame, function() module:Refresh() end)
-
-    function module:RequestRefresh()
-        RequestRefresh()
-    end
+    bindModuleRequestRefresh(module, getFrame)
 
     function module:Refresh()
         if UpdateUIFrame then UpdateUIFrame() end
@@ -2795,12 +2822,7 @@ do
 
     -- Initialize UI controller for Toggle/Hide.
     local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-    function module:Toggle()
-        return uiController:Toggle()
-    end
-    function module:Hide()
-        return uiController:Hide()
-    end
+    bindModuleToggleHide(module, uiController)
 
     -- Button: Select/Remove Item
     function module:BtnSelectItem(btn)
@@ -4073,11 +4095,7 @@ do
     local scrollFrame, scrollChild, header
     local getFrame = Utils.makeFrameGetter("KRTLootCounterFrame")
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame, function() module:Refresh() end)
-
-    function module:RequestRefresh()
-        RequestRefresh()
-    end
+    bindModuleRequestRefresh(module, getFrame)
 
     -- Single-line column header.
     local HEADER_HEIGHT = 18
@@ -4346,13 +4364,7 @@ do
 
     -- Initialize UI controller for Toggle/Hide.
     local uiController = addon:makeUIFrameController(getFrame, function() ShowLootCounter() end)
-    function module:Hide()
-        return uiController:Hide()
-    end
-
-    function module:Toggle()
-        return uiController:Toggle()
-    end
+    bindModuleToggleHide(module, uiController)
 
     -- Add a button to the master loot frame to open the loot counter UI.
     local function SetupMasterLootFrameHooks()
@@ -5212,13 +5224,11 @@ do
 
     -- Initialize UI controller for Toggle/Hide.
     local uiController = addon:makeUIFrameController(getFrame, function() ShowReserveList() end)
+    bindModuleToggleHide(module, uiController)
+
     function module:Hide()
         addon:debug(E.LogReservesHideWindow)
         return uiController:Hide()
-    end
-
-    function module:Toggle()
-        return uiController:Toggle()
     end
 
     function module:OnLoad(frame)
@@ -5352,14 +5362,7 @@ do
         end
     end
 
-    getFrame = Utils.makeFrameGetter("KRTReserveListFrame")
-
-    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
-        function() module:Refresh() end)
-
-    function module:RequestRefresh()
-        RequestRefresh()
-    end
+    bindModuleRequestRefresh(module, getFrame)
 
     -- ----- Reserve Data Handling ----- --
 
@@ -6078,7 +6081,7 @@ do
     addon.ReserveImport = addon.ReserveImport or {}
     local module = addon.ReserveImport
     local frameName
-    local getFrame = Utils.makeFrameGetter("KRTImportWindow")
+    local getFrame = makeModuleFrameGetter(module, "KRTImportWindow")
     local localized = false
     -- Import mode slider: 0 = Multi-reserve, 1 = Plus System (priority)
     local MODE_MULTI, MODE_PLUS = 0, 1
@@ -6173,7 +6176,7 @@ do
 
     local function LocalizeUIFrame()
         if localized then return end
-        local frame = module.frame or _G["KRTImportWindow"]
+        local frame = getFrame()
         if not frame then return end
         frameName = frame:GetName() or "KRTImportWindow"
 
@@ -6217,24 +6220,11 @@ do
         end
     end
 
-    local function getFrame()
-        local frame = module.frame or _G["KRTImportWindow"]
-        if frame and not module.frame then module.frame = frame end
-        return frame
-    end
-
-    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
-        function() module:Refresh() end)
-
-    function module:RequestRefresh()
-        RequestRefresh()
-    end
+    bindModuleRequestRefresh(module, getFrame)
 
     -- Initialize UI controller for Toggle/Hide.
     local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-    function module:Hide()
-        return uiController:Hide()
-    end
+    bindModuleToggleHide(module, uiController)
 
     function module:Toggle()
         local frame = getFrame()
@@ -6323,7 +6313,7 @@ do
     local module = addon.Config
     local frameName
 
-    local getFrame = Utils.makeFrameGetter("KRTConfig")
+    local getFrame = makeModuleFrameGetter(module, "KRTConfig")
     -- ----- Internal state ----- --
     local localized = false
     local configDirty = false
@@ -6442,16 +6432,7 @@ do
         configDirty = true
         module:RequestRefresh()
     end)
-
-    -- Toggles the visibility of the configuration frame.
-    function module:Toggle()
-        return uiController:Toggle()
-    end
-
-    -- Hides the configuration frame.
-    function module:Hide()
-        return uiController:Hide()
-    end
+    bindModuleToggleHide(module, uiController)
 
     -- OnClick handler for option controls.
     function module:OnClick(btn)
@@ -6560,18 +6541,7 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 
-    getFrame = function()
-        local frame = module.frame or _G["KRTConfig"]
-        if frame and not module.frame then module.frame = frame end
-        return frame
-    end
-
-    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
-        function() module:Refresh() end)
-
-    function module:RequestRefresh()
-        RequestRefresh()
-    end
+    bindModuleRequestRefresh(module, getFrame)
 end
 
 -- =========== Warnings Frame Module  =========== --
@@ -6580,7 +6550,7 @@ do
     local module = addon.Warnings
     local frameName
 
-    local getFrame = Utils.makeFrameGetter("KRTWarnings")
+    local getFrame = makeModuleFrameGetter(module, "KRTWarnings")
     -- ----- Internal state ----- --
     local LocalizeUIFrame
     local localized = false
@@ -6652,12 +6622,7 @@ do
         lastSelectedID = false
         module:RequestRefresh()
     end)
-    function module:Toggle()
-        return uiController:Toggle()
-    end
-    function module:Hide()
-        return uiController:Hide()
-    end
+    bindModuleToggleHide(module, uiController)
 
     -- Warning selection:
     function module:Select(btn)
@@ -6810,18 +6775,7 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 
-    getFrame = function()
-        local frame = module.frame or _G["KRTWarnings"]
-        if frame and not module.frame then module.frame = frame end
-        return frame
-    end
-
-    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
-        function() module:Refresh() end)
-
-    function module:RequestRefresh()
-        RequestRefresh()
-    end
+    bindModuleRequestRefresh(module, getFrame)
 
     -- Saving a Warning:
     function SaveWarning(wContent, wName, wID)
@@ -6853,7 +6807,7 @@ do
     local module = addon.Changes
     local frameName
 
-    local getFrame = Utils.makeFrameGetter("KRTChanges")
+    local getFrame = makeModuleFrameGetter(module, "KRTChanges")
     -- ----- Internal state ----- --
     local LocalizeUIFrame
     local localized = false
@@ -7160,18 +7114,7 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 
-    getFrame = function()
-        local frame = module.frame or _G["KRTChanges"]
-        if frame and not module.frame then module.frame = frame end
-        return frame
-    end
-
-    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
-        function() module:Refresh() end)
-
-    function module:RequestRefresh()
-        RequestRefresh()
-    end
+    bindModuleRequestRefresh(module, getFrame)
 
     -- Initialize changes table:
     function InitChangesTable()
@@ -7224,7 +7167,7 @@ do
     -- ----- Internal state ----- --
     local frameName
 
-    local getFrame = Utils.makeFrameGetter("KRTSpammer")
+    local getFrame = makeModuleFrameGetter(module, "KRTSpammer")
     local LocalizeUIFrame
     local localized = false
 
@@ -7435,12 +7378,7 @@ do
 
     -- Initialize UI controller for Toggle/Hide.
     local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-    function module:Toggle()
-        return uiController:Toggle()
-    end
-    function module:Hide()
-        return uiController:Hide()
-    end
+    bindModuleToggleHide(module, uiController)
 
     -- Save (EditBox / Checkbox)
     function module:Save(box)
@@ -7962,18 +7900,7 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 
-    getFrame = function()
-        local frame = module.frame or _G["KRTSpammer"]
-        if frame and not module.frame then module.frame = frame end
-        return frame
-    end
-
-    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
-        function() module:Refresh() end)
-
-    function module:RequestRefresh()
-        RequestRefresh()
-    end
+    bindModuleRequestRefresh(module, getFrame)
 end
 
 -- =========== Logger Frame =========== --
@@ -8710,10 +8637,7 @@ do
 
     -- Initialize UI controller for Toggle/Hide.
     local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-
-    function module:Toggle()
-        return uiController:Toggle()
-    end
+    bindModuleToggleHide(module, uiController)
 
     function module:Hide()
         module.selectedRaid = KRT_CurrentRaid
@@ -8731,12 +8655,7 @@ do
         Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
     end
 
-    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
-        function() module:Refresh() end)
-
-    function module:RequestRefresh()
-        RequestRefresh()
-    end
+    bindModuleRequestRefresh(module, getFrame)
 
     -- Selectors
     function module:SelectRaid(btn, button)

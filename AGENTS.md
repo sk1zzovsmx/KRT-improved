@@ -23,6 +23,8 @@ Do NOT record:
 Durable preferences learned from recent conversations:
 - Prefer PascalCase for addon module table names.
 - Prefer camelCase for utility functions and local variables; avoid snake_case for new naming.
+- UI refactors: centralize shared UI glue/patterns in `KRT.lua`; keep feature-specific UI logic in each module.
+- Move helpers to `Modules/Utils.lua` only when they are generic and reused, not for KRT-specific glue.
 
 ---
 
