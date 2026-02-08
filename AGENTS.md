@@ -25,6 +25,8 @@ Durable preferences learned from recent conversations:
 - Prefer camelCase for utility functions and local variables; avoid snake_case for new naming.
 - UI refactors: centralize shared UI glue/patterns in `KRT.lua`; keep feature-specific UI logic in each module.
 - Move helpers to `Modules/Utils.lua` only when they are generic and reused, not for KRT-specific glue.
+- For XML and Lua analysis/reference, use Townlong-Yak FrameXML 3.3.5:
+  `https://www.townlong-yak.com/framexml/3.3.5`.
 
 ---
 

@@ -71,6 +71,8 @@
     "~\\.vscode\\extensions\\ketho.wow-api-0.22.1\\Annotations\\Core",
     "~\\.vscode\\extensions\\ketho.wow-api-0.22.1\\Annotations\\FrameXML"
   ],
+  // FrameXML 3.3.5 reference for XML and Lua analysis:
+  // https://www.townlong-yak.com/framexml/3.3.5
   "luacheck.path": "C:\\Tools\\luacheck.exe",
   "Lua.type.weakUnionCheck": true,
   "Lua.format.enable": true,
