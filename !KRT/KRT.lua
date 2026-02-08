@@ -1408,12 +1408,6 @@ do
     local newItemCounts, delItemCounts = addon.TablePool and addon.TablePool("k")
     state.itemCounts = newItemCounts and newItemCounts() or {}
 
-    local function GetMasterFrameName()
-        local mf = (addon.Master and addon.Master.frame) or _G["KRTMaster"]
-        if mf and addon.Master and not addon.Master.frame then addon.Master.frame = mf end
-        return mf and mf:GetName() or nil
-    end
-
     -- ----- Private helpers ----- --
     local function GetAllowedRolls(itemId, name)
         if not itemId or not name then return 1 end
@@ -1485,6 +1479,21 @@ do
         return bestName, bestRoll
     end
 
+    -- Factory to create a GetPlus function with its own cache for a specific itemId.
+    local function MakePlusGetter(itemId)
+        local plusCache = {}
+        return function(name)
+            local v = plusCache[name]
+            if v == nil then
+                v = (addon.Reserves and addon.Reserves.GetPlusForItem)
+                    and (addon.Reserves:GetPlusForItem(itemId, name) or 0)
+                    or 0
+                plusCache[name] = v
+            end
+            return v
+        end
+    end
+
     -- Sorts rolls table + updates lootState.winner (top entry after sort).
     local function sortRolls(itemId)
         local rolls = state.rolls
@@ -1504,17 +1513,7 @@ do
             and addon.Reserves.GetImportMode
             and (addon.Reserves:IsPlusSystem())
 
-        local plusCache    = {}
-        local function GetPlus(name)
-            local v = plusCache[name]
-            if v == nil then
-                v = (addon.Reserves and addon.Reserves.GetPlusForItem)
-                    and (addon.Reserves:GetPlusForItem(itemId, name) or 0)
-                    or 0
-                plusCache[name] = v
-            end
-            return v
-        end
+        local GetPlus = MakePlusGetter(itemId)
 
         table.sort(rolls, function(a, b)
             -- SR: reserved first (session itemId)
@@ -1843,7 +1842,8 @@ do
 
     -- Clears all roll-related state and UI elements.
     function module:ClearRolls(rec)
-        local frameName = GetMasterFrameName()
+        local mf = (addon.Master and addon.Master.frame) or _G["KRTMaster"]
+        local frameName = mf and mf:GetName() or nil
         resetRolls(rec)
         if frameName then
             local i, btn = 1, _G[frameName .. "PlayerBtn1"]
@@ -1895,7 +1895,8 @@ do
 
     -- Rebuilds the roll list UI and marks the top roller or selected winner.
     function module:FetchRolls()
-        local frameName = GetMasterFrameName()
+        local mf = (addon.Master and addon.Master.frame) or _G["KRTMaster"]
+        local frameName = mf and mf:GetName() or nil
         if not frameName then return end
         local scrollFrame = _G[frameName .. "ScrollFrame"]
         local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
@@ -1911,17 +1912,7 @@ do
             and addon.Reserves.GetImportMode
             and (addon.Reserves:IsPlusSystem())
 
-        local plusCache = {}
-        local function GetPlus(name)
-            local v = plusCache[name]
-            if v == nil then
-                v = (addon.Reserves and addon.Reserves.GetPlusForItem)
-                    and (addon.Reserves:GetPlusForItem(itemId, name) or 0)
-                    or 0
-                plusCache[name] = v
-            end
-            return v
-        end
+        local GetPlus = MakePlusGetter(itemId)
 
         local wantAsc = addon.options.sortAscending == true
         if state.lastSortAsc ~= wantAsc or state.lastSortType ~= lootState.currentRollType then
@@ -2530,11 +2521,7 @@ do
 
     local UpdateUIFrame
 
-    local function getFrame()
-        local frame = module.frame or _G["KRTMaster"]
-        if frame and not module.frame then module.frame = frame end
-        return frame
-    end
+    local getFrame = Utils.makeFrameGetter("KRTMaster")
 
     local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame, function() module:Refresh() end)
 
@@ -2806,25 +2793,13 @@ do
         end)
     end
 
-    -- Toggles the visibility of the Master Looter frame.
+    -- Initialize UI controller for Toggle/Hide.
+    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
     function module:Toggle()
-        local frame = getFrame()
-        if not frame then return end
-        if frame:IsShown() then
-            Utils.setShown(frame, false)
-        else
-            -- Request while hidden to avoid an extra refresh (dirty-while-hidden will refresh on OnShow).
-            module:RequestRefresh()
-            Utils.setShown(frame, true)
-        end
+        return uiController:Toggle()
     end
-
-    -- Hides the Master Looter frame.
     function module:Hide()
-        local frame = getFrame()
-        if frame then
-            Utils.hideFrame(frame)
-        end
+        return uiController:Hide()
     end
 
     -- Button: Select/Remove Item
@@ -4096,11 +4071,7 @@ do
     local rows, raidPlayers = {}, {}
     local twipe = twipe
     local scrollFrame, scrollChild, header
-    local function getFrame()
-        local frame = module.frame or _G["KRTLootCounterFrame"]
-        if frame and not module.frame then module.frame = frame end
-        return frame
-    end
+    local getFrame = Utils.makeFrameGetter("KRTLootCounterFrame")
 
     local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame, function() module:Refresh() end)
 
@@ -4373,24 +4344,14 @@ do
         module:RequestRefresh()
     end
 
+    -- Initialize UI controller for Toggle/Hide.
+    local uiController = addon:makeUIFrameController(getFrame, function() ShowLootCounter() end)
     function module:Hide()
-        local frame = getFrame()
-        if frame then
-            Utils.setShown(frame, false)
-        end
+        return uiController:Hide()
     end
 
     function module:Toggle()
-        local frame = getFrame()
-        if not frame then
-            addon:error("LootCounter frame missing")
-            return
-        end
-        if frame:IsShown() then
-            module:Hide()
-        else
-            ShowLootCounter()
-        end
+        return uiController:Toggle()
     end
 
     -- Add a button to the master loot frame to open the loot counter UI.
@@ -4442,7 +4403,7 @@ do
     -- ----- Internal state ----- --
     -- UI Elements
     local frameName
-    local getFrame
+    local getFrame = Utils.makeFrameGetter("KRTReserveListFrame")
     local scrollFrame, scrollChild
     local reserveHeaders = {}
     local reserveItemRows, rowsByItemID = {}, {}
@@ -5220,25 +5181,15 @@ do
         Utils.setShown(frame, true)
     end
 
+    -- Initialize UI controller for Toggle/Hide.
+    local uiController = addon:makeUIFrameController(getFrame, function() ShowReserveList() end)
     function module:Hide()
-        local frame = getFrame()
-        if frame then
-            addon:debug(E.LogReservesHideWindow)
-            Utils.setShown(frame, false)
-        end
+        addon:debug(E.LogReservesHideWindow)
+        return uiController:Hide()
     end
 
     function module:Toggle()
-        local frame = getFrame()
-        if not frame then
-            addon:error(E.LogReservesFrameMissing)
-            return
-        end
-        if frame:IsShown() then
-            module:Hide()
-        else
-            ShowReserveList()
-        end
+        return uiController:Toggle()
     end
 
     function module:OnLoad(frame)
@@ -5372,11 +5323,7 @@ do
         end
     end
 
-    getFrame = function()
-        local frame = module.frame or _G["KRTReserveListFrame"]
-        if frame and not module.frame then module.frame = frame end
-        return frame
-    end
+    getFrame = Utils.makeFrameGetter("KRTReserveListFrame")
 
     local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
         function() module:Refresh() end)
@@ -6088,6 +6035,7 @@ do
     addon.ReserveImport = addon.ReserveImport or {}
     local module = addon.ReserveImport
     local frameName
+    local getFrame = Utils.makeFrameGetter("KRTImportWindow")
     local localized = false
     -- Import mode slider: 0 = Multi-reserve, 1 = Plus System (priority)
     local MODE_MULTI, MODE_PLUS = 0, 1
@@ -6239,11 +6187,10 @@ do
         RequestRefresh()
     end
 
+    -- Initialize UI controller for Toggle/Hide.
+    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
     function module:Hide()
-        local frame = getFrame()
-        if frame then
-            Utils.setShown(frame, false)
-        end
+        return uiController:Hide()
     end
 
     function module:Toggle()
@@ -6254,12 +6201,11 @@ do
         end
 
         if frame:IsShown() then
-            module:Hide()
+            uiController:Hide()
             return
         end
 
-        module:RequestRefresh()
-        Utils.setShown(frame, true)
+        uiController:Show()
 
         Utils.resetEditBox(_G["KRTImportEditBox"])
         local editBox = _G["KRTImportEditBox"]
@@ -6334,7 +6280,7 @@ do
     local module = addon.Config
     local frameName
 
-    local getFrame
+    local getFrame = Utils.makeFrameGetter("KRTConfig")
     -- ----- Internal state ----- --
     local localized = false
     local configDirty = false
@@ -6448,26 +6394,20 @@ do
         end
     end
 
+    -- Initialize UI controller for Toggle/Hide.
+    local uiController = addon:makeUIFrameController(getFrame, function()
+        configDirty = true
+        module:RequestRefresh()
+    end)
+
     -- Toggles the visibility of the configuration frame.
     function module:Toggle()
-        local frame = getFrame()
-        if not frame then return end
-        if frame:IsShown() then
-            Utils.setShown(frame, false)
-        else
-            configDirty = true
-            -- Request while hidden to refresh immediately on OnShow (no extra refresh).
-            module:RequestRefresh()
-            Utils.setShown(frame, true)
-        end
+        return uiController:Toggle()
     end
 
     -- Hides the configuration frame.
     function module:Hide()
-        local frame = getFrame()
-        if frame then
-            Utils.hideFrame(frame)
-        end
+        return uiController:Hide()
     end
 
     -- OnClick handler for option controls.
@@ -6597,7 +6537,7 @@ do
     local module = addon.Warnings
     local frameName
 
-    local getFrame
+    local getFrame = Utils.makeFrameGetter("KRTWarnings")
     -- ----- Internal state ----- --
     local LocalizeUIFrame
     local localized = false
@@ -6663,27 +6603,17 @@ do
         module:RequestRefresh()
     end
 
-    -- Toggle frame visibility:
+    -- Initialize UI controller for Toggle/Hide.
+    local uiController = addon:makeUIFrameController(getFrame, function()
+        warningsDirty = true
+        lastSelectedID = false
+        module:RequestRefresh()
+    end)
     function module:Toggle()
-        local frame = getFrame()
-        if not frame then return end
-        if frame:IsShown() then
-            Utils.setShown(frame, false)
-        else
-            warningsDirty = true
-            lastSelectedID = false
-            -- Request while hidden to refresh immediately on OnShow (no extra refresh).
-            module:RequestRefresh()
-            Utils.setShown(frame, true)
-        end
+        return uiController:Toggle()
     end
-
-    -- Hide frame:
     function module:Hide()
-        local frame = getFrame()
-        if frame then
-            Utils.hideFrame(frame)
-        end
+        return uiController:Hide()
     end
 
     -- Warning selection:
@@ -6880,7 +6810,7 @@ do
     local module = addon.Changes
     local frameName
 
-    local getFrame
+    local getFrame = Utils.makeFrameGetter("KRTChanges")
     -- ----- Internal state ----- --
     local LocalizeUIFrame
     local localized = false
@@ -6955,28 +6885,23 @@ do
         controller:OnLoad(frame)
     end
 
+    -- Initialize UI controller for Toggle/Hide.
+    local uiController = addon:makeUIFrameController(getFrame, function()
+        changesDirty = true
+        lastSelectedID = false
+        module:RequestRefresh()
+    end)
+
     -- Toggle frame visibility:
     function module:Toggle()
         CancelChanges()
-        local frame = getFrame()
-        if not frame then return end
-        if frame:IsShown() then
-            Utils.setShown(frame, false)
-        else
-            changesDirty = true
-            lastSelectedID = false
-            -- Request while hidden to refresh immediately on OnShow (no extra refresh).
-            module:RequestRefresh()
-            Utils.setShown(frame, true)
-        end
+        return uiController:Toggle()
     end
 
     -- Hide frame:
     function module:Hide()
-        local frame = getFrame()
-        if frame then
-            Utils.hideFrame(frame, CancelChanges)
-        end
+        CancelChanges()
+        return uiController:Hide()
     end
 
     -- Clear module:
@@ -7256,7 +7181,7 @@ do
     -- ----- Internal state ----- --
     local frameName
 
-    local getFrame
+    local getFrame = Utils.makeFrameGetter("KRTSpammer")
     local LocalizeUIFrame
     local localized = false
 
@@ -7465,23 +7390,13 @@ do
         end
     end
 
-    -- Toggle/Hide
+    -- Initialize UI controller for Toggle/Hide.
+    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
     function module:Toggle()
-        local frame = getFrame()
-        if not frame then return end
-        if frame:IsShown() then
-            Utils.setShown(frame, false)
-        else
-            module:RequestRefresh()
-            Utils.setShown(frame, true)
-        end
+        return uiController:Toggle()
     end
-
     function module:Hide()
-        local frame = getFrame()
-        if frame then
-            Utils.hideFrame(frame)
-        end
+        return uiController:Hide()
     end
 
     -- Save (EditBox / Checkbox)
@@ -8025,7 +7940,7 @@ do
     local module   = addon.Logger
     local frameName
 
-    local getFrame
+    local getFrame = Utils.makeFrameGetter("KRTLogger")
     -- module: stable-ID data helpers (fresh SavedVariables only; no legacy migration)
     module.Store   = module.Store or {}
     module.View    = module.View or {}
@@ -8750,24 +8665,17 @@ do
         end)
     end
 
+    -- Initialize UI controller for Toggle/Hide.
+    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
+
     function module:Toggle()
-        local frame = getFrame()
-        if not frame then return end
-        if frame:IsShown() then
-            module:Hide()
-        else
-            module:RequestRefresh()
-            Utils.setShown(frame, true)
-        end
+        return uiController:Toggle()
     end
 
     function module:Hide()
         module.selectedRaid = KRT_CurrentRaid
         clearSelections()
-        local frame = getFrame()
-        if frame then
-            Utils.setShown(frame, false)
-        end
+        return uiController:Hide()
     end
 
     function module:Refresh()
@@ -8778,12 +8686,6 @@ do
         end
         clearSelections()
         Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
-    end
-
-    getFrame = function()
-        local frame = module.frame or _G["KRTLogger"]
-        if frame and not module.frame then module.frame = frame end
-        return frame
     end
 
     local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,

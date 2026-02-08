@@ -909,6 +909,19 @@ function Utils.makeEventDrivenRefresher(targetOrGetter, updateFn)
 	end
 end
 
+-- =========== Frame Getter Factory  =========== --
+-- Creates a lazy-caching getter for global UI frames.
+-- Usage: local getFrame = Utils.makeFrameGetter("KRTMaster")
+function Utils.makeFrameGetter(globalFrameName)
+	local cached = nil
+	return function()
+		if cached then return cached end
+		local frame = _G[globalFrameName]
+		if frame then cached = frame end
+		return frame
+	end
+end
+
 -- =========== UI Frame Controller Factory  =========== --
 -- Consolidates recurring Toggle/Hide/Show patterns across UI modules.
 function Utils.makeUIFrameController(getFrame, requestRefreshFn)

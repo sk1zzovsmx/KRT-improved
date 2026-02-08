@@ -4,10 +4,31 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Bugfix:** Fixed nil getFrame error in UI module factories (Reserves, ReserveImport, Config, Warnings, Changes, Logger). Each module now properly initializes getFrame with `Utils.makeFrameGetter()` before using it in `makeUIFrameController()`.
+- **Bugfix:** Logger module had getFrame redefined after factory initialization; removed duplicate definition to preserve correct execution order.
+
+## 2026-02-08
+**REFACTORING PROJECT COMPLETE** — Code consolidation initiative (3 phases) concluded.
+
+### Consolidation Summary (Total: ~108-123 lines eliminated)
+- **Phase 1 (High priority, Low risk):** 33 lines
+  - Consolidated duplicated `GetPlus()` helper via `MakePlusGetter()` factory (8 lines)
+  - Consolidated `GetMasterFrameName()` duplicate handling (10 lines)
+  - Created `Utils.makeFrameGetter()` factory consolidating 3x identical frame getter patterns (15 lines)
+  
+- **Phase 2 (Medium risk, Significant impact):** 75-90 lines
+  - Added `addon:makeUIFrameController()` factory consolidating Toggle/Hide/Show patterns across 9 UI modules
+  - Applied to: Master Looter, LootCounter, Reserves, ReserveImport, Config, Warnings, Changes, Spammer, Logger
+  
+- **Phase 3 (Low priority, Optional):** Analysis completed; no additional consolidations identified
+  - Verified CheckPlayer pattern already centralized in addon.Raid
+  - Verified dropdown logic already parameterized via FindDropDownField
+  - Verified all major consolidations already completed
+
+### Changes
 - Refactor: Moved `makeUIFrameController` factory from KRT.lua to Utils.lua (shared utility factory layer); added backwards-compatible alias in KRT.lua.
 - Refactor: Master Looter dropdown handlers (holder/banker/disenchanter) consolidated to eliminate 3 identical branches via parameterized FindDropDownField.
 - Refactor: Master Looter UpdateDropDowns consolidated from 3 repetitive if-elseif blocks to single loop via FindDropDownField (reduces code duplication).
-- Refactor: Added addon:makeUIFrameController() factory to consolidate recurring Toggle/Hide/Show patterns across 7+ UI modules.
 - Master Looter: Hold/Bank/DE clears rolls only after completed assignment; inventory trade setup no longer wipes rolls early.
 - Minimap: left-clicking the minimap icon now toggles the context menu open/closed.
 - Docs: updated AGENTS.md with explicit `.luacheckrc` maintenance guidance for addon globals.
