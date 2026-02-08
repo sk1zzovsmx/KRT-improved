@@ -4,6 +4,8 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Bugfix:** Removed the `table: XXXXXXXX:` chat prefix from logger output by overriding
+  `addon:Print` to forward through LibCompat without the addon self-label.
 - **Bugfix:** Fixed nil getFrame error in UI module factories (Reserves, ReserveImport, Config, Warnings, Changes, Logger). Each module now properly initializes getFrame with `Utils.makeFrameGetter()` before using it in `makeUIFrameController()`.
 - **Bugfix:** Logger module had getFrame redefined after factory initialization; removed duplicate definition to preserve correct execution order.
 - **Bugfix:** Added missing `E.LogReservesImportWrongModePlus` log template used by Reserves CSV validation.

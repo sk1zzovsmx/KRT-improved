@@ -51,6 +51,11 @@ addon.CallbackHandler     = LibStub("CallbackHandler-1.0")
 Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
 addon.Debugger:Embed(addon)
 
+-- Keep LibCompat chat output behavior, but without prepending tostring(addon) ("table: ...").
+function addon:Print(...)
+    return Compat.Print(Compat, ...)
+end
+
 -- Local aliases (safe and fast)
 local UnitIsGroupLeader    = addon.UnitIsGroupLeader
 local UnitIsGroupAssistant = addon.UnitIsGroupAssistant
