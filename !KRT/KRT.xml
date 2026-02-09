@@ -139,12 +139,12 @@
 							<Anchors>
 								<Anchor point="TOPLEFT">
 									<Offset>
-										<AbsDimension x="0" y="0" />
+										<AbsDimension x="0" y="-3" />
 									</Offset>
 								</Anchor>
-								<Anchor point="RIGHT">
+								<Anchor point="TOPRIGHT">
 									<Offset>
-										<AbsDimension x="0" y="0" />
+										<AbsDimension x="0" y="-3" />
 									</Offset>
 								</Anchor>
 							</Anchors>
@@ -173,9 +173,9 @@
 										<AbsDimension x="0" y="-2" />
 									</Offset>
 								</Anchor>
-								<Anchor point="RIGHT">
+								<Anchor point="TOPRIGHT" relativeTo="$parentName" relativePoint="BOTTOMRIGHT">
 									<Offset>
-										<AbsDimension x="0" y="0" />
+										<AbsDimension x="0" y="-2" />
 									</Offset>
 								</Anchor>
 							</Anchors>

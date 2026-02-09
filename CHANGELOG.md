@@ -4,6 +4,14 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **UI:** Reserve List rows now use a stronger odd/even stripe contrast and a subtle horizontal delimiter line
+  on each row for better readability.
+- **UI:** Reserve List now also draws the delimiter on top of the first visible row of each
+  collapsible group.
+- **UI:** Reserve List item and player lines are vertically re-aligned to better center on the icon middle.
+- **UI:** Reserve List now uses slightly more spacing between item and player lines while keeping icon-centered
+  alignment.
+- **UI:** Reserve List tooltips no longer show the boss/source line (keeps tooltip content minimal).
 - **Packaging:** GitHub source archives now export only the `!KRT` addon folder by marking
   repository docs and dev files as `export-ignore`.
 - **Refactor:** Renamed `Localization/ErrorLog.en.lua` to `Localization/DiagnoseLog.en.lua` and
