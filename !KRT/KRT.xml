@@ -2155,17 +2155,6 @@
 		<Anchors>
 			<Anchor point="CENTER" />
 		</Anchors>
-		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" tile="true">
-			<TileSize>
-				<AbsValue val="6" />
-			</TileSize>
-			<EdgeSize>
-				<AbsValue val="6" />
-			</EdgeSize>
-			<BackgroundInsets>
-				<AbsInset top="3" right="3" bottom="2" left="2" />
-			</BackgroundInsets>
-		</Backdrop>
 		<Frames>
 			<!-- ScrollFrame con ScrollChild -->
 			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">

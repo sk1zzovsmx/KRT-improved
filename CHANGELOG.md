@@ -4,6 +4,8 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Bugfix:** Reserve List window now relies on the inherited `KRTFrameTemplate` background to prevent
+  background bleed outside the panel border.
 - **UI:** Reserve List rows now use a stronger odd/even stripe contrast and a subtle horizontal delimiter line
   on each row for better readability.
 - **UI:** Reserve List now also draws the delimiter on top of the first visible row of each
