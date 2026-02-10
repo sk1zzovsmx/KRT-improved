@@ -10268,6 +10268,19 @@ do
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             addon.Logger:Toggle()
+        elseif sub == "sync" then
+            if addon.Logger and addon.Logger.Sync and addon.Logger.Sync.Share then
+                addon.Logger.Sync:Share()
+            end
+        elseif sub == "request" then
+            if addon.Logger and addon.Logger.Sync and addon.Logger.Sync.Request then
+                addon.Logger.Sync:Request()
+            end
+        else
+            addon:info(format(L.StrCmdCommands, "krt logger"), "KRT")
+            printHelp("toggle", L.StrCmdToggle)
+            printHelp("sync", L.StrCmdLoggerSync)
+            printHelp("request", L.StrCmdLoggerRequest)
         end
     end)
 
@@ -10321,11 +10334,515 @@ do
     end
 end
 
+-- =========== Logger Sync (Group Addon Messages) =========== --
+do
+    local logger = addon.Logger or {}
+    addon.Logger = logger
+    logger.Sync = logger.Sync or {}
+
+    local module = logger.Sync
+    local Store = logger.Store
+    local Actions = logger.Actions
+
+    local SYNC_PREFIX = "KRT-LoggerSync"
+    local PROTOCOL_VERSION = "1"
+    local MSG_MAX_CHARS = 220
+    local SESSION_TTL = 45
+    local REPLY_COOLDOWN = 10
+
+    local function enc(v)
+        local s = tostring(v or "")
+        return (s:gsub("([^%w%._%-])", function(c)
+            return format("%%%02X", string.byte(c))
+        end))
+    end
+
+    local function dec(v)
+        local s = tostring(v or "")
+        return (s:gsub("%%(%x%x)", function(hex)
+            return string.char(tonumber(hex, 16))
+        end))
+    end
+
+    local function splitBy(str, sep)
+        local out = {}
+        if not str or str == "" then return out end
+        local pat = "([^" .. sep .. "]+)"
+        for token in str:gmatch(pat) do
+            out[#out + 1] = token
+        end
+        return out
+    end
+
+    local function serializeRaid(raid)
+        if not raid then return nil end
+
+        local lines = {}
+        lines[#lines + 1] = table.concat({
+            "H",
+            enc(raid.zone),
+            enc(raid.difficulty),
+            tostring(tonumber(raid.startTime) or 0),
+            tostring(tonumber(raid.endTime) or 0),
+            tostring(tonumber(raid.nextBossNid) or 1),
+            tostring(tonumber(raid.nextLootNid) or 1),
+        }, "|")
+
+        local playerRows = {}
+        for i = 1, #(raid.players or {}) do
+            local p = raid.players[i]
+            if p and p.name then
+                playerRows[#playerRows + 1] = table.concat({
+                    enc(p.name),
+                    enc(p.class),
+                    tostring(tonumber(p.join) or 0),
+                    tostring(tonumber(p.leave) or 0),
+                }, ",")
+            end
+        end
+        lines[#lines + 1] = "P|" .. table.concat(playerRows, ";")
+
+        local bossRows = {}
+        for i = 1, #(raid.bossKills or {}) do
+            local b = raid.bossKills[i]
+            if b then
+                local names = {}
+                for j = 1, #(b.players or {}) do
+                    names[#names + 1] = enc(b.players[j])
+                end
+                bossRows[#bossRows + 1] = table.concat({
+                    tostring(tonumber(b.bossNid) or 0),
+                    enc(b.name),
+                    tostring(tonumber(b.time) or 0),
+                    enc(b.mode),
+                    tostring(tonumber(b.difficulty) or 0),
+                    table.concat(names, "~"),
+                }, ",")
+            end
+        end
+        lines[#lines + 1] = "B|" .. table.concat(bossRows, ";")
+
+        local lootRows = {}
+        for i = 1, #(raid.loot or {}) do
+            local l = raid.loot[i]
+            if l then
+                lootRows[#lootRows + 1] = table.concat({
+                    tostring(tonumber(l.lootNid) or 0),
+                    tostring(tonumber(l.itemId) or 0),
+                    enc(l.itemName),
+                    tostring(tonumber(l.itemRarity) or 0),
+                    enc(l.itemTexture),
+                    enc(l.itemLink),
+                    tostring(tonumber(l.bossNid) or 0),
+                    enc(l.looter),
+                    tostring(tonumber(l.rollType) or 0),
+                    tostring(tonumber(l.rollValue) or 0),
+                    tostring(tonumber(l.time) or 0),
+                }, ",")
+            end
+        end
+        lines[#lines + 1] = "L|" .. table.concat(lootRows, ";")
+
+        return table.concat(lines, "\n")
+    end
+
+    local function deserializeRaid(payload)
+        if not payload or payload == "" then return nil end
+
+        local raid = {
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextBossNid = 1,
+            nextLootNid = 1,
+        }
+
+        for line in payload:gmatch("[^\n]+") do
+            local tag, body = line:match("^(%a)%|(.*)$")
+            if tag == "H" then
+                local fields = splitBy(body, "|")
+                raid.zone = dec(fields[1] or "")
+                raid.difficulty = dec(fields[2] or "")
+                raid.startTime = tonumber(fields[3]) or 0
+                raid.endTime = tonumber(fields[4]) or 0
+                raid.nextBossNid = tonumber(fields[5]) or 1
+                raid.nextLootNid = tonumber(fields[6]) or 1
+            elseif tag == "P" and body and body ~= "" then
+                local rows = splitBy(body, ";")
+                for i = 1, #rows do
+                    local f = splitBy(rows[i], ",")
+                    raid.players[#raid.players + 1] = {
+                        name = dec(f[1] or ""),
+                        class = dec(f[2] or ""),
+                        join = tonumber(f[3]) or 0,
+                        leave = tonumber(f[4]) or 0,
+                    }
+                end
+            elseif tag == "B" and body and body ~= "" then
+                local rows = splitBy(body, ";")
+                for i = 1, #rows do
+                    local f = splitBy(rows[i], ",")
+                    local names = splitBy(f[6] or "", "~")
+                    for j = 1, #names do
+                        names[j] = dec(names[j])
+                    end
+                    raid.bossKills[#raid.bossKills + 1] = {
+                        bossNid = tonumber(f[1]) or 0,
+                        name = dec(f[2] or ""),
+                        time = tonumber(f[3]) or 0,
+                        mode = dec(f[4] or ""),
+                        difficulty = tonumber(f[5]) or 0,
+                        players = names,
+                    }
+                end
+            elseif tag == "L" and body and body ~= "" then
+                local rows = splitBy(body, ";")
+                for i = 1, #rows do
+                    local f = splitBy(rows[i], ",")
+                    raid.loot[#raid.loot + 1] = {
+                        lootNid = tonumber(f[1]) or 0,
+                        itemId = tonumber(f[2]) or 0,
+                        itemName = dec(f[3] or ""),
+                        itemRarity = tonumber(f[4]) or 0,
+                        itemTexture = dec(f[5] or ""),
+                        itemLink = dec(f[6] or ""),
+                        bossNid = tonumber(f[7]) or 0,
+                        looter = dec(f[8] or ""),
+                        rollType = tonumber(f[9]) or 0,
+                        rollValue = tonumber(f[10]) or 0,
+                        time = tonumber(f[11]) or 0,
+                    }
+                end
+            end
+        end
+
+        if raid.zone == nil then return nil end
+        return raid
+    end
+
+    local function pickRaidForShare()
+        local selectedRaid = logger.selectedRaid and tonumber(logger.selectedRaid) or nil
+        local rID = selectedRaid or KRT_CurrentRaid
+        return rID, rID and KRT_Raids[rID] or nil
+    end
+
+    local function makeRaidSig(raid)
+        if not raid then return "" end
+        return table.concat({
+            enc(raid.zone),
+            enc(raid.difficulty),
+            tostring(tonumber(raid.startTime) or 0),
+        }, "|")
+    end
+
+    local function parseRaidSig(sig)
+        local fields = splitBy(sig or "", "|")
+        return dec(fields[1] or ""), dec(fields[2] or ""), tonumber(fields[3]) or 0
+    end
+
+    function module:Share(wantedSig)
+        local rID, raid = pickRaidForShare()
+        if not (rID and raid) then
+            addon:warn(L.MsgLoggerSyncNoRaid)
+            return false
+        end
+
+        local payload = serializeRaid(raid)
+        if not payload then
+            addon:warn(L.MsgLoggerSyncNoRaid)
+            return false
+        end
+
+        local raidSig = makeRaidSig(raid)
+        if wantedSig and wantedSig ~= "" and raidSig ~= wantedSig then
+            return false
+        end
+
+        local syncId = tostring(time()) .. "-" .. tostring(random(1000, 9999))
+        local total = math.ceil(strlen(payload) / MSG_MAX_CHARS)
+        if total < 1 then total = 1 end
+
+        for idx = 1, total do
+            local fromPos = ((idx - 1) * MSG_MAX_CHARS) + 1
+            local toPos = idx * MSG_MAX_CHARS
+            local chunk = strsub(payload, fromPos, toPos)
+            Utils.sync(SYNC_PREFIX, table.concat({
+                "S",
+                PROTOCOL_VERSION,
+                syncId,
+                raidSig,
+                tostring(total),
+                tostring(idx),
+                chunk,
+            }, "\t"))
+        end
+
+        addon:info(L.MsgLoggerSyncShared, rID, total)
+        return true
+    end
+
+    function module:Request()
+        local _, raid = pickRaidForShare()
+        local sig = makeRaidSig(raid)
+        Utils.sync(SYNC_PREFIX, table.concat({ "REQ", PROTOCOL_VERSION, sig }, "\t"))
+        addon:info(L.MsgLoggerSyncRequestSent)
+    end
+
+    local sessions = {}
+    local lastReplyBySender = {}
+
+    local function cleanupSessions(nowTs)
+        local now = nowTs or time()
+        for id, sess in pairs(sessions) do
+            if (now - (tonumber(sess.ts) or now)) > SESSION_TTL then
+                sessions[id] = nil
+            end
+        end
+    end
+
+    local function mergeRaidData(remote)
+        if not remote then return nil end
+
+        local targetID = nil
+        for i = 1, #KRT_Raids do
+            local localRaid = KRT_Raids[i]
+            if localRaid and localRaid.zone == remote.zone and
+                tostring(localRaid.difficulty) == tostring(remote.difficulty) then
+                local dt = math.abs((tonumber(localRaid.startTime) or 0) - (tonumber(remote.startTime) or 0))
+                if dt <= 1200 then
+                    targetID = i
+                    break
+                end
+            end
+        end
+
+        if not targetID then
+            KRT_Raids[#KRT_Raids + 1] = remote
+            targetID = #KRT_Raids
+            Store:EnsureRaid(KRT_Raids[targetID])
+            return targetID
+        end
+
+        local localRaid = KRT_Raids[targetID]
+        Store:EnsureRaid(localRaid)
+
+        local playersByName = {}
+        for i = 1, #(localRaid.players or {}) do
+            local p = localRaid.players[i]
+            if p and p.name then
+                playersByName[Utils.normalizeLower(p.name)] = p
+            end
+        end
+
+        for i = 1, #(remote.players or {}) do
+            local p = remote.players[i]
+            if p and p.name then
+                local key = Utils.normalizeLower(p.name)
+                local existing = playersByName[key]
+                if existing then
+                    if (existing.class == nil or existing.class == "") and p.class and p.class ~= "" then
+                        existing.class = p.class
+                    end
+                    if tonumber(p.join) and ((tonumber(existing.join) or 0) == 0 or p.join < existing.join) then
+                        existing.join = p.join
+                    end
+                    if tonumber(p.leave) and p.leave > (tonumber(existing.leave) or 0) then
+                        existing.leave = p.leave
+                    end
+                else
+                    localRaid.players[#localRaid.players + 1] = p
+                    playersByName[key] = p
+                end
+            end
+        end
+
+        local bossByNid = {}
+        for i = 1, #(localRaid.bossKills or {}) do
+            local b = localRaid.bossKills[i]
+            if b and b.bossNid then
+                bossByNid[tonumber(b.bossNid) or b.bossNid] = b
+            end
+        end
+
+        for i = 1, #(remote.bossKills or {}) do
+            local b = remote.bossKills[i]
+            if b and b.bossNid then
+                local key = tonumber(b.bossNid) or b.bossNid
+                local existing = bossByNid[key]
+                if not existing then
+                    localRaid.bossKills[#localRaid.bossKills + 1] = b
+                    bossByNid[key] = b
+                else
+                    local sameBoss = (tostring(existing.name or "") == tostring(b.name or "")) and
+                        ((tonumber(existing.time) or 0) == (tonumber(b.time) or 0))
+                    if not sameBoss then
+                        local newNid = tonumber(localRaid.nextBossNid) or (#localRaid.bossKills + 1)
+                        if newNid <= 0 then newNid = #localRaid.bossKills + 1 end
+                        while bossByNid[newNid] do
+                            newNid = newNid + 1
+                        end
+                        local clone = b
+                        clone.bossNid = newNid
+                        localRaid.bossKills[#localRaid.bossKills + 1] = clone
+                        bossByNid[newNid] = clone
+                        localRaid.nextBossNid = newNid + 1
+                    elseif b.players and #b.players > 0 then
+                        existing.players = existing.players or {}
+                        for j = 1, #b.players do
+                            if not tContains(existing.players, b.players[j]) then
+                                existing.players[#existing.players + 1] = b.players[j]
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        local lootByNid = {}
+        for i = 1, #(localRaid.loot or {}) do
+            local l = localRaid.loot[i]
+            if l and l.lootNid then
+                lootByNid[tonumber(l.lootNid) or l.lootNid] = l
+            end
+        end
+
+        for i = 1, #(remote.loot or {}) do
+            local l = remote.loot[i]
+            if l and l.lootNid then
+                local key = tonumber(l.lootNid) or l.lootNid
+                local existing = lootByNid[key]
+                if not existing then
+                    localRaid.loot[#localRaid.loot + 1] = l
+                    lootByNid[key] = l
+                else
+                    local sameLoot = (tonumber(existing.itemId) or 0) == (tonumber(l.itemId) or 0) and
+                        (tostring(existing.itemLink or "") == tostring(l.itemLink or "")) and
+                        ((tonumber(existing.time) or 0) == (tonumber(l.time) or 0))
+                    if not sameLoot then
+                        local newNid = tonumber(localRaid.nextLootNid) or (#localRaid.loot + 1)
+                        if newNid <= 0 then newNid = #localRaid.loot + 1 end
+                        while lootByNid[newNid] do
+                            newNid = newNid + 1
+                        end
+                        local clone = l
+                        clone.lootNid = newNid
+                        localRaid.loot[#localRaid.loot + 1] = clone
+                        lootByNid[newNid] = clone
+                        localRaid.nextLootNid = newNid + 1
+                    else
+                        if (existing.looter == nil or existing.looter == "") and l.looter and l.looter ~= "" then
+                            existing.looter = l.looter
+                        end
+                        if (tonumber(existing.rollType) or 0) == 0 and (tonumber(l.rollType) or 0) ~= 0 then
+                            existing.rollType = l.rollType
+                        end
+                        if (tonumber(existing.rollValue) or 0) == 0 and (tonumber(l.rollValue) or 0) ~= 0 then
+                            existing.rollValue = l.rollValue
+                        end
+                    end
+                end
+            end
+        end
+
+        localRaid.nextBossNid = math.max(tonumber(localRaid.nextBossNid) or 1, tonumber(remote.nextBossNid) or 1)
+        localRaid.nextLootNid = math.max(tonumber(localRaid.nextLootNid) or 1, tonumber(remote.nextLootNid) or 1)
+
+        Actions:Commit(localRaid)
+        return targetID
+    end
+
+    function module:OnAddonMessage(prefix, msg, channel, sender)
+        if prefix ~= SYNC_PREFIX then return end
+        if not msg or msg == "" then return end
+        if sender and Utils.normalizeLower(sender) == Utils.normalizeLower(Utils.getPlayerName()) then return end
+
+        cleanupSessions(time())
+
+        if msg == "REQ" then
+            local nowTs = time()
+            local key = Utils.normalizeLower(sender or "")
+            if (tonumber(lastReplyBySender[key]) or 0) + REPLY_COOLDOWN <= nowTs then
+                lastReplyBySender[key] = nowTs
+                self:Share()
+            end
+            return
+        end
+
+        local reqOp, reqVersion, reqSig = msg:match("^(REQ)\t([^\t]+)\t?(.*)$")
+        if reqOp == "REQ" then
+            if reqVersion ~= PROTOCOL_VERSION then return end
+            local nowTs = time()
+            local key = Utils.normalizeLower(sender or "")
+            if (tonumber(lastReplyBySender[key]) or 0) + REPLY_COOLDOWN <= nowTs then
+                lastReplyBySender[key] = nowTs
+                self:Share(reqSig)
+            end
+            return
+        end
+
+        local op, version, syncId, sig, totalStr, indexStr, chunk = msg:match(
+            "^(%u)\t([^\t]+)\t([^\t]+)\t([^\t]*)\t([^\t]+)\t([^\t]+)\t(.*)$")
+
+        if not op then
+            local oldOp, oldSyncId, _, oldTotal, oldIndex, oldChunk = msg:match(
+                "^(%u)\t([^\t]+)\t([^\t]*)\t([^\t]+)\t([^\t]+)\t(.*)$")
+            op, version, syncId, sig, totalStr, indexStr, chunk = oldOp, PROTOCOL_VERSION, oldSyncId, "", oldTotal,
+                oldIndex, oldChunk
+        end
+
+        if op ~= "S" or version ~= PROTOCOL_VERSION then return end
+
+        local total = tonumber(totalStr) or 0
+        local index = tonumber(indexStr) or 0
+        if total < 1 or index < 1 or index > total then return end
+
+        sessions[syncId] = sessions[syncId] or { total = total, chunks = {}, sender = sender, ts = time(), sig = sig }
+        local sess = sessions[syncId]
+        if sess.total ~= total then
+            sessions[syncId] = nil
+            return
+        end
+
+        sess.ts = time()
+        if not sess.chunks[index] then
+            sess.chunks[index] = chunk or ""
+            sess.count = (sess.count or 0) + 1
+        end
+
+        if sess.count ~= total then return end
+
+        local payload = table.concat(sess.chunks, "")
+        sessions[syncId] = nil
+        local remote = deserializeRaid(payload)
+        if not remote then
+            addon:warn(L.MsgLoggerSyncInvalid)
+            return
+        end
+
+        local sigZone, sigDiff, sigStart = parseRaidSig(sig)
+        if sig ~= "" then
+            if tostring(remote.zone or "") ~= tostring(sigZone or "") then return end
+            if tostring(remote.difficulty or "") ~= tostring(sigDiff or "") then return end
+            if (tonumber(remote.startTime) or 0) ~= (tonumber(sigStart) or 0) then return end
+        end
+
+        local targetID = mergeRaidData(remote)
+        if targetID then
+            addon:info(L.MsgLoggerSyncApplied, tostring(sender or "?"), targetID)
+            Utils.triggerEvent("RaidLootUpdate", targetID)
+            Utils.triggerEvent("RaidRosterUpdate")
+        end
+    end
+
+    module.Prefix = SYNC_PREFIX
+end
+
 -- =========== Main Event Handlers  =========== --
 local addonEvents = {
     CHAT_MSG_SYSTEM = "CHAT_MSG_SYSTEM",
     CHAT_MSG_LOOT = "CHAT_MSG_LOOT",
     CHAT_MSG_MONSTER_YELL = "CHAT_MSG_MONSTER_YELL",
+    CHAT_MSG_ADDON = "CHAT_MSG_ADDON",
     RAID_ROSTER_UPDATE = "RAID_ROSTER_UPDATE",
     PLAYER_ENTERING_WORLD = "PLAYER_ENTERING_WORLD",
     COMBAT_LOG_EVENT_UNFILTERED = "COMBAT_LOG_EVENT_UNFILTERED",
@@ -10365,6 +10882,9 @@ function addon:ADDON_LOADED(name)
         tostring(lvl), tostring(true)))
     addon.LoadOptions()
     addon.Reserves:Load()
+    if RegisterAddonMessagePrefix and addon.Logger and addon.Logger.Sync and addon.Logger.Sync.Prefix then
+        RegisterAddonMessagePrefix(addon.Logger.Sync.Prefix)
+    end
     for event in pairs(addonEvents) do
         self:RegisterEvent(event)
     end
@@ -10451,6 +10971,14 @@ end
 -- CHAT_MSG_SYSTEM: Forwards roll messages to the Rolls module.
 function addon:CHAT_MSG_SYSTEM(msg)
     addon.Rolls:CHAT_MSG_SYSTEM(msg)
+end
+
+-- CHAT_MSG_ADDON: Handles loot history sync payloads.
+function addon:CHAT_MSG_ADDON(prefix, msg, channel, sender)
+    local sync = addon.Logger and addon.Logger.Sync
+    if sync and sync.OnAddonMessage then
+        sync:OnAddonMessage(prefix, msg, channel, sender)
+    end
 end
 
 -- CHAT_MSG_MONSTER_YELL: Logs a boss kill based on specific boss yells.
