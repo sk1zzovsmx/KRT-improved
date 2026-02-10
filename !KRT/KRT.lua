@@ -10346,7 +10346,8 @@ do
 
     local SYNC_PREFIX = "KRT-LoggerSync"
     local PROTOCOL_VERSION = "1"
-    local MSG_MAX_CHARS = 220
+    local MSG_MAX_CHARS = 120
+    local CHUNK_SEND_DELAY = 0.05
     local SESSION_TTL = 45
     local REPLY_COOLDOWN = 10
 
@@ -10522,7 +10523,7 @@ do
 
     local function pickRaidForShare()
         local selectedRaid = logger.selectedRaid and tonumber(logger.selectedRaid) or nil
-        local rID = selectedRaid or KRT_CurrentRaid
+        local rID = KRT_CurrentRaid or selectedRaid
         return rID, rID and KRT_Raids[rID] or nil
     end
 
@@ -10566,15 +10567,17 @@ do
             local fromPos = ((idx - 1) * MSG_MAX_CHARS) + 1
             local toPos = idx * MSG_MAX_CHARS
             local chunk = strsub(payload, fromPos, toPos)
-            Utils.sync(SYNC_PREFIX, table.concat({
-                "S",
-                PROTOCOL_VERSION,
-                syncId,
-                raidSig,
-                tostring(total),
-                tostring(idx),
-                chunk,
-            }, "\t"))
+            addon.After((idx - 1) * CHUNK_SEND_DELAY, function()
+                Utils.sync(SYNC_PREFIX, table.concat({
+                    "S",
+                    PROTOCOL_VERSION,
+                    syncId,
+                    raidSig,
+                    tostring(total),
+                    tostring(idx),
+                    chunk,
+                }, "\t"))
+            end)
         end
 
         addon:info(L.MsgLoggerSyncShared, rID, total)
@@ -10582,7 +10585,11 @@ do
     end
 
     function module:Request()
-        local _, raid = pickRaidForShare()
+        local raid = (KRT_CurrentRaid and KRT_Raids[KRT_CurrentRaid]) or nil
+        if not raid then
+            local _, picked = pickRaidForShare()
+            raid = picked
+        end
         local sig = makeRaidSig(raid)
         Utils.sync(SYNC_PREFIX, table.concat({ "REQ", PROTOCOL_VERSION, sig }, "\t"))
         addon:info(L.MsgLoggerSyncRequestSent)

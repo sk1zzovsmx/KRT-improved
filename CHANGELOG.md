@@ -4,6 +4,8 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Bugfix:** Logger sync now prioritizes current active raid context for share/request and sends
+  chunked addon messages with a short stagger to reduce dropped packets in raid channels.
 - **Behavior:** Hardened Logger sync protocol with versioned frames, session timeout cleanup,
   request reply cooldown, and safer merge rules for conflicting boss/loot NIDs.
 - **Feature:** Added group loot-history sync for Logger via addon messages (`/krt logger sync` and
