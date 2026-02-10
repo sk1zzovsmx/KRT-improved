@@ -4,6 +4,12 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Bugfix:** Logger sync now prioritizes current active raid context for share/request and sends
+  chunked addon messages with a short stagger to reduce dropped packets in raid channels.
+- **Behavior:** Hardened Logger sync protocol with versioned frames, session timeout cleanup,
+  request reply cooldown, and safer merge rules for conflicting boss/loot NIDs.
+- **Feature:** Added group loot-history sync for Logger via addon messages (`/krt logger sync` and
+  `/krt logger request`) so players with KRT can share/merge raid history when master looter changes.
 - **Packaging:** GitHub source archives now export only the `!KRT` addon folder by marking
   repository docs and dev files as `export-ignore`.
 - **Refactor:** Renamed `Localization/ErrorLog.en.lua` to `Localization/DiagnoseLog.en.lua` and
