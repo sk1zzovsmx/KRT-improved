@@ -4429,6 +4429,11 @@ do
     local pendingItemCount = 0
     local collapsedBossGroups = {}
     local grouped = {}
+    local reserveRowStyle = {
+        odd = { 0.04, 0.06, 0.09, 0.30 },
+        even = { 0.08, 0.10, 0.14, 0.36 },
+        separator = { 1.0, 1.0, 1.0, 0.10 },
+    }
 
     -- ----- Private helpers ----- --
 
@@ -4752,6 +4757,7 @@ do
         return format(L.StrReservesItemIdLabel, tostring(itemId or "?"))
     end
 
+    -- Kept for potential future tooltip/source variants.
     local function FormatReserveDroppedBy(source)
         if not source or source == "" then return nil end
         return format(L.StrReservesTooltipDroppedBy, source)
@@ -4969,18 +4975,12 @@ do
             elseif row._tooltipTitle then
                 GameTooltip:SetText(row._tooltipTitle, 1, 1, 1)
             end
-            if row._tooltipSource then
-                GameTooltip:AddLine(row._tooltipSource, 0.8, 0.8, 0.8)
-            end
             GameTooltip:Show()
         end
 
         local function ShowPlayersTooltip(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetText(row._tooltipTitle or L.StrReservesTooltipTitle, 1, 1, 1)
-            if row._tooltipSource then
-                GameTooltip:AddLine(row._tooltipSource, 0.8, 0.8, 0.8)
-            end
             local lines = row._playersTooltipLines
             if type(lines) == "table" then
                 for i = 1, #lines do
@@ -5071,7 +5071,7 @@ do
         end
     end
 
-    local function ApplyReserveRowData(row, info, index)
+    local function ApplyReserveRowData(row, info, index, isFirstInGroup)
         if not row or not info then return end
         row._itemId = info.itemId
         row._itemLink = info.itemLink
@@ -5082,8 +5082,33 @@ do
         row._playersTooltipLines = info.playersTooltipLines
         row._playersTextFull = info.playersTextFull or info.playersText
 
+        local isEvenRow = (index % 2 == 0)
         if row.background then
-            row.background:SetVertexColor(index % 2 == 0 and 0.1 or 0, 0.1, 0.1, 0.3)
+            local bg = isEvenRow and reserveRowStyle.even or reserveRowStyle.odd
+            row.background:SetVertexColor(bg[1], bg[2], bg[3], bg[4])
+        end
+        if row.separator then
+            local sepAlpha = isEvenRow and 0.1 or reserveRowStyle.separator[4]
+            row.separator:SetVertexColor(
+                reserveRowStyle.separator[1],
+                reserveRowStyle.separator[2],
+                reserveRowStyle.separator[3],
+                sepAlpha
+            )
+            row.separator:Show()
+        end
+        if row.topSeparator then
+            row.topSeparator:SetVertexColor(
+                reserveRowStyle.separator[1],
+                reserveRowStyle.separator[2],
+                reserveRowStyle.separator[3],
+                reserveRowStyle.separator[4]
+            )
+            if isFirstInGroup then
+                row.topSeparator:Show()
+            else
+                row.topSeparator:Hide()
+            end
         end
 
         if row.iconTexture then
@@ -5903,6 +5928,7 @@ do
 
         local rowHeight, yOffset = C.RESERVES_ROW_HEIGHT, 0
         local seenSources = {}
+        local firstRenderedRowBySource = {}
         local rowIndex = 0
         local headerIndex = 0
 
@@ -5920,7 +5946,9 @@ do
 
             if not collapsedBossGroups[source] then
                 rowIndex = rowIndex + 1
-                local row = module:CreateReserveRow(scrollChild, entry, yOffset, rowIndex)
+                local isFirstInGroup = not firstRenderedRowBySource[source]
+                local row = module:CreateReserveRow(scrollChild, entry, yOffset, rowIndex, isFirstInGroup)
+                firstRenderedRowBySource[source] = true
                 reserveItemRows[#reserveItemRows + 1] = row
                 yOffset = yOffset + rowHeight
             end
@@ -5961,8 +5989,27 @@ do
         row.iconTexture:SetDrawLayer("OVERLAY")
     end
 
+    local function SetupReserveRowDecor(row)
+        if not row or row._decorInitialized then return end
+        local topSeparator = row:CreateTexture(nil, "BORDER")
+        topSeparator:SetTexture("Interface\\Buttons\\WHITE8x8")
+        topSeparator:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+        topSeparator:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, 0)
+        topSeparator:SetHeight(1)
+        topSeparator:Hide()
+        row.topSeparator = topSeparator
+
+        local separator = row:CreateTexture(nil, "BORDER")
+        separator:SetTexture("Interface\\Buttons\\WHITE8x8")
+        separator:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
+        separator:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 0)
+        separator:SetHeight(1)
+        row.separator = separator
+        row._decorInitialized = true
+    end
+
     -- Create a new row for displaying a reserve
-    function module:CreateReserveRow(parent, info, yOffset, index)
+    function module:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
         local rowName = frameName .. "ReserveRow" .. index
         local row = _G[rowName] or CreateFrame("Frame", rowName, parent, "KRTReserveRowTemplate")
         row:ClearAllPoints()
@@ -5974,6 +6021,7 @@ do
             row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
             row.textBlock = _G[rowName .. "TextBlock"]
             SetupReserveIcon(row)
+            SetupReserveRowDecor(row)
             if row.textBlock and row.iconBtn then
                 row.textBlock:SetFrameLevel(row.iconBtn:GetFrameLevel() + 1)
             end
@@ -5988,7 +6036,7 @@ do
             end
             row._initialized = true
         end
-        ApplyReserveRowData(row, info, index)
+        ApplyReserveRowData(row, info, index, isFirstInGroup)
         row:Show()
         rowsByItemID[info.itemId] = rowsByItemID[info.itemId] or {}
         tinsert(rowsByItemID[info.itemId], row)
