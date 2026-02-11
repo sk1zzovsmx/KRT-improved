@@ -4548,6 +4548,30 @@ do
 
     local playerTextTemp = {}
 
+    local function NormalizeImportMode(mode)
+        return (mode == "plus") and "plus" or "multi"
+    end
+
+    local function ImportModeToOptionValue(mode)
+        return (NormalizeImportMode(mode) == "plus") and 1 or 0
+    end
+
+    local function SetImportMode(mode, syncOptions)
+        local resolved = NormalizeImportMode(mode)
+        importMode = resolved
+
+        if syncOptions ~= false then
+            local value = ImportModeToOptionValue(resolved)
+            addon.options = addon.options or KRT_Options or {}
+            addon.options.srImportMode = value
+            if type(KRT_Options) == "table" then
+                KRT_Options.srImportMode = value
+            end
+        end
+
+        return importMode
+    end
+
     local function MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
         if not itemId then return nil end
         local pending = pendingItemInfo[itemId]
@@ -5308,7 +5332,7 @@ do
             local v = addon.options and addon.options.srImportMode
             inferred = (v == 1) and "plus" or "multi"
         end
-        importMode = inferred
+        SetImportMode(inferred, true)
 
         RebuildIndex()
     end
@@ -5509,9 +5533,13 @@ do
     function module:GetImportMode()
         if importMode == nil then
             local v = addon.options and addon.options.srImportMode
-            importMode = (v == 1) and "plus" or "multi"
+            SetImportMode((v == 1) and "plus" or "multi", false)
         end
         return importMode
+    end
+
+    function module:SetImportMode(mode, syncOptions)
+        return SetImportMode(mode, syncOptions)
     end
 
     function module:IsPlusSystem()
@@ -5778,7 +5806,7 @@ do
 
         -- Commit
         reservesData = newReservesData
-        importMode = mode
+        SetImportMode(mode, true)
         self:Save()
 
         local nPlayers = addon.tLength(reservesData)
@@ -6217,9 +6245,16 @@ do
     local MODE_MULTI, MODE_PLUS = 0, 1
 
     local function GetImportModeString()
+        if addon.Reserves and addon.Reserves.GetImportMode then
+            return addon.Reserves:GetImportMode()
+        end
         local v = addon.options and addon.options.srImportMode
         if v == MODE_PLUS then return "plus" end
         return "multi"
+    end
+
+    local function GetImportModeValue()
+        return (GetImportModeString() == "plus") and MODE_PLUS or MODE_MULTI
     end
 
     local function GetModeSlider()
@@ -6227,12 +6262,21 @@ do
     end
 
     function module:SetImportMode(modeValue, suppressSlider)
-        addon.options = addon.options or KRT_Options or {}
-        addon.options.srImportMode = (modeValue == MODE_PLUS) and MODE_PLUS or MODE_MULTI
+        local mode = (modeValue == MODE_PLUS) and "plus" or "multi"
+        if addon.Reserves and addon.Reserves.SetImportMode then
+            addon.Reserves:SetImportMode(mode, true)
+        else
+            addon.options = addon.options or KRT_Options or {}
+            addon.options.srImportMode = (mode == "plus") and MODE_PLUS or MODE_MULTI
+            if type(KRT_Options) == "table" then
+                KRT_Options.srImportMode = addon.options.srImportMode
+            end
+        end
+
         if not suppressSlider then
             local s = GetModeSlider()
             if s and s.SetValue then
-                s:SetValue(addon.options.srImportMode)
+                s:SetValue(GetImportModeValue())
             end
         end
     end
@@ -6250,10 +6294,7 @@ do
         if high then high:SetText(L.StrImportModePlus or "Plus System") end
         if text then text:SetText(L.StrImportModeLabel or "") end
 
-        addon.options = addon.options or KRT_Options or {}
-        local v = addon.options.srImportMode
-        if v ~= MODE_MULTI and v ~= MODE_PLUS then v = MODE_MULTI end
-        slider:SetValue(v)
+        slider:SetValue(GetImportModeValue())
     end
 
     function module:OnModeSliderChanged(slider, value)
@@ -6336,10 +6377,7 @@ do
         LocalizeUIFrame()
         local slider = GetModeSlider()
         if slider and slider.SetValue then
-            addon.options = addon.options or KRT_Options or {}
-            local v = addon.options.srImportMode
-            if v ~= MODE_MULTI and v ~= MODE_PLUS then v = MODE_MULTI end
-            slider:SetValue(v)
+            slider:SetValue(GetImportModeValue())
         end
         local status = _G["KRTImportWindowStatus"]
         if status and (status:GetText() == nil or status:GetText() == "") then

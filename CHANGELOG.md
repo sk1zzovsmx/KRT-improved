@@ -4,6 +4,8 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Bugfix:** SoftRes import mode is now synchronized between runtime reserves state and
+  `addon.options/KRT_Options`, so ReserveImport slider/parsing always matches the active mode after load/import.
 - **Bugfix:** Reserve List window now relies on the inherited `KRTFrameTemplate` background to prevent
   background bleed outside the panel border.
 - **UI:** Reserve List rows now use a stronger odd/even stripe contrast and a subtle horizontal delimiter line
