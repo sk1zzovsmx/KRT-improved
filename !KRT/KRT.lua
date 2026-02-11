@@ -3643,14 +3643,18 @@ do
             lootState.opened = true
             announced = false
             addon.Loot:FetchLoot()
-            addon:trace(Diag.D.LogMLLootOpenedTrace:format(lootState.lootCount or 0,
-                tostring(lootState.fromInventory)))
+            if addon.hasTrace then
+                addon:trace(Diag.D.LogMLLootOpenedTrace:format(lootState.lootCount or 0,
+                    tostring(lootState.fromInventory)))
+            end
             UpdateSelectionFrame()
             if not addon.Logger.container then
                 addon.Logger.source = UnitName("target")
             end
-            addon:debug(Diag.D.LogMLLootOpenedInfo:format(lootState.lootCount or 0,
-                tostring(lootState.fromInventory), tostring(UnitName("target"))))
+            if addon.hasDebug then
+                addon:debug(Diag.D.LogMLLootOpenedInfo:format(lootState.lootCount or 0,
+                    tostring(lootState.fromInventory), tostring(UnitName("target"))))
+            end
 
             local shouldShow = (lootState.lootCount or 0) >= 1
             local frame = getFrame()
@@ -3668,8 +3672,10 @@ do
     -- LOOT_CLOSED: Triggered when the loot window closes.
     function module:LOOT_CLOSED()
         if addon.Raid:IsMasterLooter() then
-            addon:trace(Diag.D.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
-            addon:trace(Diag.D.LogMLLootClosedCleanup)
+            if addon.hasTrace then
+                addon:trace(Diag.D.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
+                addon:trace(Diag.D.LogMLLootClosedCleanup)
+            end
             lootState.multiAward = nil
             announced = false
             -- Cancel any scheduled close timer and schedule a new one
@@ -3695,7 +3701,9 @@ do
     function module:LOOT_SLOT_CLEARED()
         if addon.Raid:IsMasterLooter() then
             addon.Loot:FetchLoot()
-            addon:trace(Diag.D.LogMLLootSlotCleared:format(lootState.lootCount or 0))
+            if addon.hasTrace then
+                addon:trace(Diag.D.LogMLLootSlotCleared:format(lootState.lootCount or 0))
+            end
             UpdateSelectionFrame()
             module:ResetItemCount()
 
@@ -3811,13 +3819,17 @@ do
     end
 
     function module:TRADE_ACCEPT_UPDATE(tAccepted, pAccepted)
-        addon:trace(Diag.D.LogTradeAcceptUpdate:format(tostring(lootState.trader), tostring(lootState.winner),
-            tostring(tAccepted), tostring(pAccepted)))
+        if addon.hasTrace then
+            addon:trace(Diag.D.LogTradeAcceptUpdate:format(tostring(lootState.trader), tostring(lootState.winner),
+                tostring(tAccepted), tostring(pAccepted)))
+        end
         if lootState.trader and lootState.winner and lootState.trader ~= lootState.winner then
             if tAccepted == 1 and pAccepted == 1 then
-                addon:debug(Diag.D.LogTradeCompleted:format(tostring(lootState.currentRollItem),
-                    tostring(lootState.winner), tonumber(lootState.currentRollType) or -1,
-                    addon.Rolls:HighestRoll()))
+                if addon.hasDebug then
+                    addon:debug(Diag.D.LogTradeCompleted:format(tostring(lootState.currentRollItem),
+                        tostring(lootState.winner), tonumber(lootState.currentRollType) or -1,
+                        addon.Rolls:HighestRoll()))
+                end
                 if lootState.currentRollItem and lootState.currentRollItem > 0 then
                     local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.winner,
                         lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT", KRT_CurrentRaid)
