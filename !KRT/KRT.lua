@@ -283,11 +283,11 @@ do
             numRaid = 0
             addon:debug(Diag.D.LogRaidLeftGroupEndSession)
             module:End()
-            if changed and addon.Master and addon.Master.PrepareDropDowns then
-                addon.Master:PrepareDropDowns()
-            end
             if changed then
                 rosterVersion = rosterVersion + 1
+            end
+            if changed and addon.Master and addon.Master.PrepareDropDowns then
+                addon.Master:PrepareDropDowns()
             end
             return changed
         end
@@ -315,10 +315,10 @@ do
         if n == 0 then
             changed = true
             module:End()
+            rosterVersion = rosterVersion + 1
             if addon.Master and addon.Master.PrepareDropDowns then
                 addon.Master:PrepareDropDowns()
             end
-            rosterVersion = rosterVersion + 1
             return changed
         end
 
@@ -4098,6 +4098,7 @@ do
             if unit ~= "none" and CheckInteractDistance(unit, 2) == 1 then
                 -- Player is in range for trade
                 local totalCount, bag, slot, slotCount
+                local usedFastPath = false
                 local wantedKey = Utils.getItemStringFromLink(itemLink) or itemLink
                 local wantedId = Utils.getItemIdFromLink(itemLink)
 
@@ -4116,22 +4117,25 @@ do
                             bag = cachedBag
                             slot = cachedSlot
                             slotCount = tonumber(count) or 1
+                            usedFastPath = true
                         end
                     end
                 end
 
                 if not (bag and slot) then
                     totalCount, bag, slot, slotCount = ScanTradeableInventory(itemLink, wantedId)
+                elseif usedFastPath then
+                    if (tonumber(lootState.itemCount) or 1) > 1 then
+                        totalCount = ScanTradeableInventory(itemLink, wantedId)
+                    else
+                        totalCount = tonumber(slotCount) or 1
+                    end
                 end
                 if bag and slot then
                     itemInfo.bagID = bag
                     itemInfo.slotID = slot
                     itemInfo.isStack = (tonumber(slotCount) or 1) > 1
-                    if totalCount then
-                        itemInfo.count = totalCount
-                    elseif not itemInfo.count then
-                        itemInfo.count = tonumber(slotCount) or 1
-                    end
+                    itemInfo.count = tonumber(totalCount) or tonumber(slotCount) or 1
                 else
                     addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemLink)))
                     return false
