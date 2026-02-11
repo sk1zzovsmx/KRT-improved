@@ -2606,17 +2606,24 @@ do
         tip:Show()
 
         local num = tip:NumLines()
+        local isSoulbound = false
         for i = num, 1, -1 do
-            local t = _G["KRT_FakeTooltipTextLeft" .. i]:GetText()
-            if addon.Deformat(t, BIND_TRADE_TIME_REMAINING) ~= nil then
-                return false
-            elseif t == ITEM_SOULBOUND then
-                return true
+            local fs = _G["KRT_FakeTooltipTextLeft" .. i]
+            local t = fs and fs:GetText() or nil
+            if t and t ~= "" then
+                -- Fast check first: exact global string compare.
+                if t == ITEM_SOULBOUND then
+                    isSoulbound = true
+                end
+                if addon.Deformat(t, BIND_TRADE_TIME_REMAINING) ~= nil then
+                    tip:Hide()
+                    return false
+                end
             end
         end
 
         tip:Hide()
-        return false
+        return isSoulbound
     end
 end
 
@@ -4090,13 +4097,41 @@ do
             local unit = addon.Raid:GetUnitID(playerName)
             if unit ~= "none" and CheckInteractDistance(unit, 2) == 1 then
                 -- Player is in range for trade
-                local totalCount, bag, slot, slotCount = ScanTradeableInventory(itemLink,
-                    Utils.getItemIdFromLink(itemLink))
+                local totalCount, bag, slot, slotCount
+                local wantedKey = Utils.getItemStringFromLink(itemLink) or itemLink
+                local wantedId = Utils.getItemIdFromLink(itemLink)
+
+                -- Fast-path: reuse the previously selected bag slot when still valid.
+                local cachedBag = tonumber(itemInfo.bagID)
+                local cachedSlot = tonumber(itemInfo.slotID)
+                if cachedBag and cachedSlot then
+                    local cachedLink = GetContainerItemLink(cachedBag, cachedSlot)
+                    if cachedLink then
+                        local cachedKey = Utils.getItemStringFromLink(cachedLink) or cachedLink
+                        local cachedId = Utils.getItemIdFromLink(cachedLink)
+                        local sameItem = (wantedKey and cachedKey == wantedKey)
+                            or (wantedId and cachedId == wantedId)
+                        if sameItem and not ItemIsSoulbound(cachedBag, cachedSlot) then
+                            local _, count = GetContainerItemInfo(cachedBag, cachedSlot)
+                            bag = cachedBag
+                            slot = cachedSlot
+                            slotCount = tonumber(count) or 1
+                        end
+                    end
+                end
+
+                if not (bag and slot) then
+                    totalCount, bag, slot, slotCount = ScanTradeableInventory(itemLink, wantedId)
+                end
                 if bag and slot then
                     itemInfo.bagID = bag
                     itemInfo.slotID = slot
                     itemInfo.isStack = (tonumber(slotCount) or 1) > 1
-                    itemInfo.count = totalCount or itemInfo.count
+                    if totalCount then
+                        itemInfo.count = totalCount
+                    elseif not itemInfo.count then
+                        itemInfo.count = tonumber(slotCount) or 1
+                    end
                 else
                     addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemLink)))
                     return false
