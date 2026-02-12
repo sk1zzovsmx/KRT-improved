@@ -17,7 +17,6 @@ local makeModuleFrameGetter = Core.makeModuleFrameGetter
 
 local _G = _G
 
-
 local strlen = string.len
 local strsub = string.sub
 local tostring = tostring
@@ -258,5 +257,3 @@ do
 
     bindModuleRequestRefresh(module, getFrame)
 end
-
-

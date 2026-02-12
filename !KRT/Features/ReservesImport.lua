@@ -23,7 +23,6 @@ local _G = _G
 
 local pairs, type = pairs, type
 
-
 local tostring, tonumber = tostring, tonumber
 
 -- =========== Reserve Import Window Module  =========== --
@@ -103,14 +102,18 @@ do
 
         StaticPopupDialogs["KRT_WRONG_CSV_FOR_PLUS"] = {
             text = L.ErrCSVWrongForPlus
-                or "Wrong CSV format for Plus System.\nThis CSV contains players with multiple reserved items.\nSwitch to Multi-reserve or check your SoftRes settings.",
+                or ("Wrong CSV format for Plus System.\n"
+                    .. "This CSV contains players with multiple reserved items.\n"
+                    .. "Switch to Multi-reserve or check your SoftRes settings."),
             button1 = L.BtnSwitchToMulti or "Switch to Multi-reserve",
             button2 = L.BtnCancel or (L.BtnClose or "Cancel"),
             OnShow = function(self, data)
                 if not self or not self.text then return end
                 if type(data) == "table" and data.player then
                     local msg = L.ErrCSVWrongForPlusWithPlayer
-                        or "Wrong CSV format for Plus System.\nPlayer '%s' has multiple reserved items.\nSwitch to Multi-reserve or check your SoftRes settings."
+                        or ("Wrong CSV format for Plus System.\n"
+                            .. "Player '%s' has multiple reserved items.\n"
+                            .. "Switch to Multi-reserve or check your SoftRes settings.")
                     self.text:SetText(msg:format(tostring(data.player)))
                 end
             end,
@@ -263,7 +266,3 @@ do
         end
     end
 end
-
-
-
-

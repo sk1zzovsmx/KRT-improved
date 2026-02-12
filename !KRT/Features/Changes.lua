@@ -384,7 +384,3 @@ do
         module:RequestRefresh()
     end
 end
-
-
-
-

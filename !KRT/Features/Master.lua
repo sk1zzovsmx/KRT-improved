@@ -932,7 +932,7 @@ do
             if name and name ~= "" then
                 local subgroup = 1
 
-                -- Se siamo in raid, ricava il subgroup reale
+                -- If we are in raid, resolve the real subgroup.
                 local idx = tonumber(unit:match("^raid(%d+)$"))
                 if idx then
                     subgroup = (select(3, GetRaidRosterInfo(idx))) or 1
@@ -1304,7 +1304,10 @@ do
                                     if #names == 1 then
                                         addon:Announce(L.ChatAward:format(names[1], ma.itemLink))
                                     else
-                                        addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), ma.itemLink))
+                                        addon:Announce(L.ChatAwardMutiple:format(
+                                            table.concat(names, ", "),
+                                            ma.itemLink
+                                        ))
                                     end
                                 end
                                 ma.congratsSent = true
@@ -1643,7 +1646,3 @@ do
         module:RequestRefresh()
     end)
 end
-
-
-
-

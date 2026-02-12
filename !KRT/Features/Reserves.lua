@@ -18,7 +18,6 @@ local Core = addon.Core or {}
 local bindModuleRequestRefresh = Core.bindModuleRequestRefresh
 local bindModuleToggleHide = Core.bindModuleToggleHide
 
-
 local _G = _G
 local tinsert, tconcat, twipe = table.insert, table.concat, table.wipe
 local pairs, ipairs, type, next = pairs, ipairs, type, next
@@ -497,13 +496,25 @@ do
                             tm.class = m and m.class or tm.class
                         end
                     end
-                    target.playersText, target.playersTooltipLines, target.playersTextFull = BuildPlayersText(itemId, target.players, target.playerCounts, target.playerMeta)
+                    target.playersText, target.playersTooltipLines, target.playersTextFull =
+                        BuildPlayersText(
+                            itemId,
+                            target.players,
+                            target.playerCounts,
+                            target.playerMeta
+                        )
                     target.players = nil
                     target.playerCounts = nil
                     target.playerMeta = nil
                     remaining[#remaining + 1] = target
                 else
-                    data.playersText, data.playersTooltipLines, data.playersTextFull = BuildPlayersText(data.itemId, data.players, data.playerCounts, data.playerMeta)
+                    data.playersText, data.playersTooltipLines, data.playersTextFull =
+                        BuildPlayersText(
+                            data.itemId,
+                            data.players,
+                            data.playerCounts,
+                            data.playerMeta
+                        )
                     data.players = nil
                     data.playerCounts = nil
                     data.playerMeta = nil
@@ -597,7 +608,13 @@ do
 
         for _, byItem in pairs(grouped) do
             for _, data in pairs(byItem) do
-                data.playersText, data.playersTooltipLines, data.playersTextFull = BuildPlayersText(data.itemId, data.players, data.playerCounts, data.playerMeta)
+                data.playersText, data.playersTooltipLines, data.playersTextFull =
+                    BuildPlayersText(
+                        data.itemId,
+                        data.players,
+                        data.playerCounts,
+                        data.playerMeta
+                    )
                 data.players = nil
                 data.playerCounts = nil
                 data.playerMeta = nil
@@ -1303,7 +1320,7 @@ do
 
         addon:debug(Diag.D.LogReservesParseStart)
 
-        -- Transactional parse: parse Ã¢â€ â€™ validate Ã¢â€ â€™ aggregate Ã¢â€ â€™ commit.
+        -- Transactional parse flow: parse -> validate -> aggregate -> commit.
         local rows = parseCSVRows(csv)
         if not rows or #rows == 0 then
             addon:warn(L.WarnNoValidRows)
@@ -1749,7 +1766,3 @@ do
         return #list > 0 and tconcat(list, ", ") or ""
     end
 end
-
-
-
-

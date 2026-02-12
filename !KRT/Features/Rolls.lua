@@ -778,7 +778,8 @@ do
             end
 
             -- SR roll counter: show only (used/allowed) on the single compact row
-            -- Optional: during MS rolls, show the player's positive MS loot count in the same column ("+N"), if enabled in config.
+            -- Optional: during MS rolls, show the player's positive MS loot count
+            -- in the same column ("+N"), if enabled in config.
             if counterStr then
                 if isSR and itemId and self:IsReserved(itemId, name) then
                     -- SR + Plus priority (only when no multi-reserve exists for this item)
@@ -869,9 +870,3 @@ do
         addon.Rolls:FetchRolls()
     end)
 end
-
-
-
-
-
-

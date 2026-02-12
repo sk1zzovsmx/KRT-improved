@@ -19,7 +19,6 @@ local _G = _G
 local tinsert, twipe = table.insert, table.wipe
 local ipairs = ipairs
 
-
 local tonumber = tonumber
 
 -- =========== Warnings Frame Module  =========== --
@@ -278,7 +277,3 @@ do
         module:Update()
     end
 end
-
-
-
-

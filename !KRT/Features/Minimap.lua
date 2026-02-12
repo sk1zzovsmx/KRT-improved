@@ -161,7 +161,3 @@ do
         return Utils.setShown(KRT_MINIMAP_GUI, false)
     end
 end
-
-
-
-

@@ -323,7 +323,3 @@ do
     -- New raid session: reset view.
     Utils.registerCallback("RaidCreate", Request)
 end
-
-
-
-

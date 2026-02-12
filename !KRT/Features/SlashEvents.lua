@@ -16,8 +16,6 @@ local C = addon.C
 
 local RT_COLOR = C.RT_COLOR
 
-
-
 local pairs, ipairs, select = pairs, ipairs, select
 local format = string.format
 local upper = string.upper
@@ -455,6 +453,3 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
         self.Raid:AddBoss(boss)
     end
 end
-
-
-

@@ -18,7 +18,6 @@ local Core = addon.Core or {}
 local bindModuleRequestRefresh = Core.bindModuleRequestRefresh
 local bindModuleToggleHide = Core.bindModuleToggleHide
 
-
 local rollTypes = C and C.rollTypes or {}
 local lootTypesColored = C and C.lootTypesColored or {}
 local itemColors = C and C.itemColors or {}
@@ -26,7 +25,6 @@ local itemColors = C and C.itemColors or {}
 local _G = _G
 local tinsert, tremove, twipe = table.insert, table.remove, table.wipe
 local pairs, ipairs, type, select = pairs, ipairs, type, select
-
 
 local tostring, tonumber = tostring, tonumber
 
@@ -164,8 +162,10 @@ do
     function View:FillBossList(out, raid)
         self:BuildRows(out, raid and raid.bossKills, nil, function(boss, i)
             local it = {}
-            it.id = tonumber(boss and boss.bossNid) or (boss and boss.bossNid) or i -- stable nid for highlight/selection
-            it.seq = i                                                              -- display-only (rescales after deletions)
+            -- Stable NID used for highlight/selection.
+            it.id = tonumber(boss and boss.bossNid) or (boss and boss.bossNid) or i
+            -- Display-only index (rescales after deletions).
+            it.seq = i
             it.name = boss and boss.name or ""
             it.time = boss and boss.time or time()
             it.timeFmt = date("%H:%M", it.time)
@@ -1043,7 +1043,10 @@ do
 
                 local action, count
                 if isRange then
-                    local ordered = addon.Logger.Loot and addon.Logger.Loot._ctrl and addon.Logger.Loot._ctrl.data or nil
+                    local ordered = addon.Logger.Loot
+                        and addon.Logger.Loot._ctrl
+                        and addon.Logger.Loot._ctrl.data
+                        or nil
                     action, count = Utils.multiSelectRange(MS_CTX_LOOT, ordered, id, isMulti)
                     module.selectedItem = id
                 else
@@ -1072,7 +1075,8 @@ do
                 if addon and addon.options and addon.options.debug and addon.debug then
                     addon:debug((Diag.D.LogLoggerSelectClickLoot)
                         :format(
-                            tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
+                            tostring(id), isMulti and 1 or 0, isRange and 1 or 0,
+                            tostring(action), tonumber(count) or 0,
                             tostring(module.selectedItem)
                         ))
                 end
@@ -1094,7 +1098,7 @@ do
             end
         end
 
-        -- Hover sync: keep selection highlight persistent, while leaving hover highlight to the default Button highlight.
+        -- Hover sync: keep selection highlight persistent while hover uses default Button behavior.
         function module:OnLootRowEnter(row)
             -- No-op: persistent selection is rendered via overlay textures (Utils.setRowSelected/Focused).
             -- Leave native hover highlight behavior intact.
@@ -1965,7 +1969,8 @@ do
             raidID = raidIDOverride
         else
             -- If the module window is open and browsing an old raid, selectedRaid may differ from KRT_CurrentRaid.
-            -- Runtime sources must always write into the CURRENT raid session, while module UI edits target selectedRaid.
+            -- Runtime sources must always write into the CURRENT raid session.
+            -- Logger UI edits target selectedRaid.
             local isLoggerSource = (type(source) == "string") and (source:find("^LOGGER_") ~= nil)
             if isLoggerSource then
                 raidID = addon.Logger.selectedRaid or KRT_CurrentRaid
@@ -2232,7 +2237,3 @@ do
         end
     end
 end
-
-
-
-

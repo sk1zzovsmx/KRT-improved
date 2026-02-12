@@ -67,7 +67,3 @@ do
         module:Announce(text, channel)
     end
 end
-
-
-
-

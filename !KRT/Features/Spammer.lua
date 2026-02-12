@@ -764,6 +764,3 @@ do
 
     bindModuleRequestRefresh(module, getFrame)
 end
-
-
-
