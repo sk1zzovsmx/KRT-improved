@@ -110,18 +110,16 @@ do
 
     -- OnLoad handler for the configuration frame.
     function module:OnLoad(frame)
-        if not frame then return end
-        module.frame = frame
-        frameName = frame:GetName()
-
-        -- Drag registration kept in Lua (avoid template logic in XML).
-        Utils.enableDrag(frame)
+        frameName = Utils.initModuleFrame(module, frame, {
+            enableDrag = true,
+            hookOnShow = function()
+                configDirty = true
+            end,
+        })
+        if not frameName then return end
 
         -- Localize once (no per-tick calls)
         LocalizeUIFrame()
-        frame:HookScript("OnShow", function()
-            configDirty = true
-        end)
     end
 
     function module:InitCountdownSlider(slider)
@@ -139,11 +137,13 @@ do
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function()
+    local uiController = Utils.bootstrapModuleUi(module, getFrame, function()
         configDirty = true
         module:RequestRefresh()
-    end)
-    bindModuleToggleHide(module, uiController)
+    end, {
+        bindToggleHide = bindModuleToggleHide,
+        bindRequestRefresh = bindModuleRequestRefresh,
+    })
 
     -- OnClick handler for option controls.
     function module:OnClick(btn)
@@ -163,7 +163,7 @@ do
 
         name = strsub(name, strlen(frameName) + 1)
         Utils.triggerEvent("Config" .. name, value)
-        KRT_Options[name] = value
+        Utils.setOption(name, value)
 
         configDirty = true
         module:RequestRefresh()
@@ -251,6 +251,4 @@ do
     function module:Refresh()
         if UpdateUIFrame then UpdateUIFrame() end
     end
-
-    bindModuleRequestRefresh(module, getFrame)
 end

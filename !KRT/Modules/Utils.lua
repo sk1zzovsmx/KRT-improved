@@ -94,6 +94,32 @@ function Utils.applyDebugSetting(enabled)
 	end
 end
 
+-- Write an addon option and keep runtime and SavedVariables in sync.
+function Utils.setOption(key, value)
+	if type(key) ~= "string" or key == "" then
+		return false
+	end
+
+	local options = addon and addon.options
+	if type(options) ~= "table" then
+		if type(KRT_Options) == "table" then
+			options = KRT_Options
+		else
+			options = {}
+			KRT_Options = options
+		end
+		addon.options = options
+	end
+
+	options[key] = value
+
+	if type(KRT_Options) == "table" and KRT_Options ~= options then
+		KRT_Options[key] = value
+	end
+
+	return true
+end
+
 function Utils.getPlayerName()
 	addon.State = addon.State or {}
 	addon.State.player = addon.State.player or {}
@@ -924,6 +950,51 @@ function Utils.makeFrameGetter(globalFrameName)
 		if frame then cached = frame end
 		return frame
 	end
+end
+
+-- =========== Module Bootstrap Helpers  =========== --
+-- Initializes shared frame wiring used by multiple feature modules.
+function Utils.initModuleFrame(module, frame, opts)
+	if not frame then return nil end
+	if module then
+		module.frame = frame
+	end
+
+	local frameName = frame:GetName()
+	opts = opts or {}
+
+	if opts.enableDrag then
+		Utils.enableDrag(frame, opts.dragButton)
+	end
+
+	if opts.hookOnShow then
+		frame:HookScript("OnShow", opts.hookOnShow)
+	end
+	if opts.setOnShow then
+		frame:SetScript("OnShow", opts.setOnShow)
+	end
+	if opts.hookOnHide then
+		frame:HookScript("OnHide", opts.hookOnHide)
+	end
+	if opts.setOnHide then
+		frame:SetScript("OnHide", opts.setOnHide)
+	end
+
+	return frameName
+end
+
+-- Creates and binds a standard module UI controller with optional shared hooks.
+function Utils.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
+	local uiController = Utils.makeUIFrameController(getFrame, requestRefreshFn)
+	if opts then
+		if opts.bindToggleHide then
+			opts.bindToggleHide(module, uiController)
+		end
+		if opts.bindRequestRefresh then
+			opts.bindRequestRefresh(module, getFrame)
+		end
+	end
+	return uiController
 end
 
 -- =========== UI Frame Controller Factory  =========== --

@@ -87,25 +87,25 @@ do
 
     -- OnLoad frame:
     function module:OnLoad(frame)
-        if not frame then return end
-        module.frame = frame
-        frameName = frame:GetName()
-
-        -- Drag registration kept in Lua (avoid template logic in XML).
-        Utils.enableDrag(frame)
-        frame:HookScript("OnShow", function()
-            changesDirty = true
-            lastSelectedID = false
-        end)
+        frameName = Utils.initModuleFrame(module, frame, {
+            enableDrag = true,
+            hookOnShow = function()
+                changesDirty = true
+                lastSelectedID = false
+            end,
+        })
+        if not frameName then return end
         controller:OnLoad(frame)
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function()
+    local uiController = Utils.bootstrapModuleUi(module, getFrame, function()
         changesDirty = true
         lastSelectedID = false
         module:RequestRefresh()
-    end)
+    end, {
+        bindRequestRefresh = bindModuleRequestRefresh,
+    })
 
     -- Toggle frame visibility:
     function module:Toggle()
@@ -331,8 +331,6 @@ do
     function module:Refresh()
         if UpdateUIFrame then UpdateUIFrame() end
     end
-
-    bindModuleRequestRefresh(module, getFrame)
 
     -- Initialize changes table:
     function InitChangesTable()

@@ -72,11 +72,7 @@ do
 
         if syncOptions ~= false then
             local value = ImportModeToOptionValue(resolved)
-            addon.options = addon.options or KRT_Options or {}
-            addon.options.srImportMode = value
-            if type(KRT_Options) == "table" then
-                KRT_Options.srImportMode = value
-            end
+            Utils.setOption("srImportMode", value)
         end
 
         return importMode
@@ -889,11 +885,13 @@ do
     -- ----- UI Window Management ----- --
 
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function()
+    local uiController = Utils.bootstrapModuleUi(module, getFrame, function()
         addon:debug(Diag.D.LogReservesShowWindow)
         module:RequestRefresh()
-    end)
-    bindModuleToggleHide(module, uiController)
+    end, {
+        bindToggleHide = bindModuleToggleHide,
+        bindRequestRefresh = bindModuleRequestRefresh,
+    })
 
     function module:Hide()
         addon:debug(Diag.D.LogReservesHideWindow)
@@ -902,10 +900,8 @@ do
 
     function module:OnLoad(frame)
         addon:debug(Diag.D.LogReservesFrameLoaded)
-        frameName = frame:GetName()
-
-        -- Drag registration kept in Lua (avoid template logic in XML).
-        Utils.enableDrag(frame)
+        frameName = Utils.initModuleFrame(module, frame, { enableDrag = true })
+        if not frameName then return end
 
         scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"]
         scrollChild = scrollFrame and scrollFrame.ScrollChild or _G["KRTReserveListFrameScrollChild"]
@@ -1030,8 +1026,6 @@ do
             RenderReserveListUI()
         end
     end
-
-    bindModuleRequestRefresh(module, getFrame)
 
     -- ----- Reserve Data Handling ----- --
 

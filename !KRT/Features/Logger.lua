@@ -735,31 +735,29 @@ do
     end
 
     function module:OnLoad(frame)
-        if not frame then return end
-        module.frame = frame
-        frameName = frame:GetName()
-        Utils.setFrameTitle(frameName, L.StrLootLogger)
-
-        -- Drag registration kept in Lua (avoid template logic in XML).
-        Utils.enableDrag(frame)
-
-        frame:SetScript("OnShow", function()
-            if not module.selectedRaid then
+        frameName = Utils.initModuleFrame(module, frame, {
+            enableDrag = true,
+            setOnShow = function()
+                if not module.selectedRaid then
+                    module.selectedRaid = KRT_CurrentRaid
+                end
+                clearSelections()
+                Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
+            end,
+            setOnHide = function()
                 module.selectedRaid = KRT_CurrentRaid
-            end
-            clearSelections()
-            Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
-        end)
-
-        frame:SetScript("OnHide", function()
-            module.selectedRaid = KRT_CurrentRaid
-            clearSelections()
-        end)
+                clearSelections()
+            end,
+        })
+        if not frameName then return end
+        Utils.setFrameTitle(frameName, L.StrLootLogger)
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-    bindModuleToggleHide(module, uiController)
+    local uiController = Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+        bindToggleHide = bindModuleToggleHide,
+        bindRequestRefresh = bindModuleRequestRefresh,
+    })
 
     function module:Hide()
         module.selectedRaid = KRT_CurrentRaid
@@ -776,8 +774,6 @@ do
         clearSelections()
         Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
     end
-
-    bindModuleRequestRefresh(module, getFrame)
 
     -- Selectors
     function module:SelectRaid(btn, button)
@@ -2057,18 +2053,20 @@ do
 
     local frameName, localized, isEdit = nil, false, false
     local raidData, bossData, tempDate = {}, {}, {}
+    local getFrame = Utils.makeFrameGetter("KRTLoggerBossBox")
 
     function Box:OnLoad(frame)
-        if not frame then return end
-        frameName = frame:GetName()
+        frameName = Utils.initModuleFrame(Box, frame, {
+            enableDrag = true,
+            setOnShow = function()
+                Box:UpdateUIFrame()
+            end,
+            setOnHide = function()
+                Box:CancelAddEdit()
+            end,
+        })
+        if not frameName then return end
 
-        -- Drag registration kept in Lua (avoid template logic in XML).
-        Utils.enableDrag(frame)
-
-        frame:SetScript("OnShow", function()
-            self:UpdateUIFrame()
-        end)
-        frame:SetScript("OnHide", function() self:CancelAddEdit() end)
         local nameStr = _G[frameName .. "NameStr"]
         if nameStr then
             nameStr:SetText(L.StrName)
@@ -2091,12 +2089,13 @@ do
         end
     end
 
-    function Box:Toggle() Utils.toggle(_G[frameName]) end
+    local uiController = Utils.bootstrapModuleUi(Box, getFrame, function()
+        Box:UpdateUIFrame()
+    end)
 
-    function Box:Hide()
-        local f = _G[frameName]
-        Utils.setShown(f, false)
-    end
+    function Box:Toggle() return uiController:Toggle() end
+
+    function Box:Hide() return uiController:Hide() end
 
     -- Campi uniformi:
     --   bossData.time : timestamp
@@ -2189,20 +2188,20 @@ do
     local Store = addon.Logger.Store
 
     local frameName
+    local getFrame = Utils.makeFrameGetter("KRTLoggerAttendeesBox")
 
     function Box:OnLoad(frame)
-        if not frame then return end
-        frameName = frame:GetName()
+        frameName = Utils.initModuleFrame(Box, frame, {
+            enableDrag = true,
+            setOnShow = function()
+                Utils.resetEditBox(_G[frameName .. "Name"])
+            end,
+            setOnHide = function()
+                Utils.resetEditBox(_G[frameName .. "Name"])
+            end,
+        })
+        if not frameName then return end
 
-        -- Drag registration kept in Lua (avoid template logic in XML).
-        Utils.enableDrag(frame)
-
-        frame:SetScript("OnShow", function()
-            Utils.resetEditBox(_G[frameName .. "Name"])
-        end)
-        frame:SetScript("OnHide", function()
-            Utils.resetEditBox(_G[frameName .. "Name"])
-        end)
         local title = _G[frameName .. "Title"]
         if title then
             title:SetText(L.StrAddPlayer)
@@ -2221,7 +2220,9 @@ do
         end
     end
 
-    function Box:Toggle() Utils.toggle(_G[frameName]) end
+    local uiController = Utils.bootstrapModuleUi(Box, getFrame)
+
+    function Box:Toggle() return uiController:Toggle() end
 
     function Box:Save()
         local rID, bID = addon.Logger.selectedRaid, addon.Logger.selectedBoss

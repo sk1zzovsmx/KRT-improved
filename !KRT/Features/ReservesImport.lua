@@ -51,11 +51,7 @@ do
         if addon.Reserves and addon.Reserves.SetImportMode then
             addon.Reserves:SetImportMode(mode, true)
         else
-            addon.options = addon.options or KRT_Options or {}
-            addon.options.srImportMode = (mode == "plus") and MODE_PLUS or MODE_MULTI
-            if type(KRT_Options) == "table" then
-                KRT_Options.srImportMode = addon.options.srImportMode
-            end
+            Utils.setOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
         end
 
         if not suppressSlider then
@@ -152,13 +148,12 @@ do
     end
 
     function module:OnLoad(frame)
-        module.frame = frame
-        if frame then
-            -- Drag registration kept in Lua (avoid template logic in XML).
-            Utils.enableDrag(frame)
-
-            frame:HookScript("OnShow", function() module:RequestRefresh() end)
-        end
+        Utils.initModuleFrame(module, frame, {
+            enableDrag = true,
+            hookOnShow = function()
+                module:RequestRefresh()
+            end,
+        })
         module:RequestRefresh()
     end
 
@@ -174,11 +169,11 @@ do
         end
     end
 
-    bindModuleRequestRefresh(module, getFrame)
-
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-    bindModuleToggleHide(module, uiController)
+    local uiController = Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+        bindToggleHide = bindModuleToggleHide,
+        bindRequestRefresh = bindModuleRequestRefresh,
+    })
 
     function module:Toggle()
         local frame = getFrame()

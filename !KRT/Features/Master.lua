@@ -76,8 +76,6 @@ do
 
     local getFrame = Utils.makeFrameGetter("KRTMaster")
 
-    bindModuleRequestRefresh(module, getFrame)
-
     function module:Refresh()
         if UpdateUIFrame then UpdateUIFrame() end
     end
@@ -307,12 +305,14 @@ do
 
     -- OnLoad frame:
     function module:OnLoad(frame)
-        if not frame then return end
-        module.frame = frame
-        frameName = frame:GetName()
+        frameName = Utils.initModuleFrame(module, frame, {
+            enableDrag = true,
+            setOnHide = function()
+                if selectionFrame then selectionFrame:Hide() end
+            end,
+        })
+        if not frameName then return end
 
-        -- Drag registration kept in Lua (avoid template logic in XML).
-        Utils.enableDrag(frame)
         -- Initialize ItemBtn scripts once (clean inventory drop support: click-to-drop).
         local itemBtn = _G[frameName .. "ItemBtn"]
         if itemBtn and not itemBtn.__krtMLInvDropInit then
@@ -337,14 +337,13 @@ do
                 TryAcceptFromCursor()
             end)
         end
-        frame:SetScript("OnHide", function()
-            if selectionFrame then selectionFrame:Hide() end
-        end)
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-    bindModuleToggleHide(module, uiController)
+    local uiController = Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+        bindToggleHide = bindModuleToggleHide,
+        bindRequestRefresh = bindModuleRequestRefresh,
+    })
 
     -- Button: Select/Remove Item
     function module:BtnSelectItem(btn)

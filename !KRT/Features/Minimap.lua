@@ -86,19 +86,18 @@ do
     end
 
     function module:SetPos(angle)
-        addon.options = addon.options or KRT_Options or {}
         angle = angle % 360
-        addon.options.minimapPos = angle
+        Utils.setOption("minimapPos", angle)
         local r = rad(angle)
         KRT_MINIMAP_GUI:ClearAllPoints()
         KRT_MINIMAP_GUI:SetPoint("CENTER", cos(r) * 80, sin(r) * 80)
     end
 
     function module:OnLoad()
-        addon.options = addon.options or KRT_Options or {}
+        local options = addon.options or KRT_Options or {}
         KRT_MINIMAP_GUI:SetUserPlaced(true)
-        self:SetPos(addon.options.minimapPos or 325)
-        SetMinimapShown(addon.options.minimapButton ~= false)
+        self:SetPos(options.minimapPos or 325)
+        SetMinimapShown(options.minimapButton ~= false)
         KRT_MINIMAP_GUI:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         KRT_MINIMAP_GUI:SetScript("OnMouseDown", function(self, button)
             if IsAltKeyDown() then
@@ -149,9 +148,10 @@ do
 
     -- Toggles the visibility of the minimap button.
     function module:ToggleMinimapButton()
-        addon.options = addon.options or KRT_Options or {}
-        addon.options.minimapButton = not addon.options.minimapButton
-        SetMinimapShown(addon.options.minimapButton)
+        local options = addon.options or KRT_Options or {}
+        local nextValue = not options.minimapButton
+        Utils.setOption("minimapButton", nextValue)
+        SetMinimapShown(nextValue)
     end
 
     -- Hides the minimap button.

@@ -215,20 +215,16 @@ do
 
     -- OnLoad frame
     function module:OnLoad(frame)
-        if not frame then return end
-
-        module.frame = frame
-        frameName = frame:GetName()
-
-        -- Drag registration kept in Lua (avoid template logic in XML).
-        Utils.enableDrag(frame)
+        frameName = Utils.initModuleFrame(module, frame, {
+            enableDrag = true,
+            setOnShow = function()
+                module:RequestRefresh()
+            end,
+        })
+        if not frameName then return end
 
         -- Localize once (not per tick)
         LocalizeUIFrame()
-
-        frame:SetScript("OnShow", function()
-            module:RequestRefresh()
-        end)
 
         if frame:IsShown() then
             module:RequestRefresh()
@@ -236,8 +232,10 @@ do
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-    bindModuleToggleHide(module, uiController)
+    local uiController = Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+        bindToggleHide = bindModuleToggleHide,
+        bindRequestRefresh = bindModuleRequestRefresh,
+    })
 
     -- Save (EditBox / Checkbox)
     function module:Save(box)
@@ -758,6 +756,4 @@ do
     function module:Refresh()
         if UpdateUIFrame then UpdateUIFrame() end
     end
-
-    bindModuleRequestRefresh(module, getFrame)
 end

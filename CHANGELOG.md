@@ -4,6 +4,12 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Added `Utils.setOption(key, value)` and migrated option writes in
+  `Config`, `Minimap`, `Reserves`, and `ReservesImport` to keep runtime options and SV in sync centrally.
+- **Refactor:** Added shared UI bootstrap helpers `Utils.initModuleFrame(...)` and
+  `Utils.bootstrapModuleUi(...)`; migrated `Config`, `Warnings`, `Changes`, `Spammer`, `ReservesImport`,
+  `Logger`, `Master`, `LootCounter`, and `Reserves` to reduce repeated OnLoad/controller wiring without
+  behavior changes; same pattern also applied to Logger internal popups (`BossBox`, `AttendeesBox`).
 - **Refactor:** Removed feature bootstrap migration fallbacks and standardized all
   `Features/*.lua` modules on direct `addon.Core.getFeatureShared()` usage.
 - **Refactor:** Removed deprecated placeholder files `Features/CoreGameplay.lua` and

@@ -30,8 +30,6 @@ do
     local scrollFrame, scrollChild, header
     local getFrame = Utils.makeFrameGetter("KRTLootCounterFrame")
 
-    bindModuleRequestRefresh(module, getFrame)
-
     -- Single-line column header.
     local HEADER_HEIGHT = 18
 
@@ -190,16 +188,9 @@ do
     end
 
     function module:OnLoad(frame)
-        if frame then
-            module.frame = frame
-        end
+        local f = frame or getFrame()
+        frameName = Utils.initModuleFrame(module, f, { enableDrag = true }) or frameName
         if not EnsureFrames() then return end
-
-        local f = getFrame()
-        if not f then return end
-
-        -- Drag registration kept in Lua (avoid template logic in XML).
-        Utils.enableDrag(f)
     end
 
     function module:Refresh()
@@ -283,8 +274,10 @@ do
     -- ----- UI Window Management ----- --
 
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-    bindModuleToggleHide(module, uiController)
+    local uiController = Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+        bindToggleHide = bindModuleToggleHide,
+        bindRequestRefresh = bindModuleRequestRefresh,
+    })
 
     -- Add a button to the master loot frame to open the loot counter UI.
     local function SetupMasterLootFrameHooks()
