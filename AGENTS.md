@@ -125,8 +125,6 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Loot.lua               # loot parsing, item selection, export strings
     Master.lua             # master-loot helpers, award/trade tracking
     LootCounter.lua        # loot counter UI + data
-    CoreGameplay.lua       # deprecated wave 4 compatibility placeholder (not loaded in TOC)
-    LootStack.lua          # deprecated wave 4c compatibility placeholder (not loaded in TOC)
     Reserves.lua           # soft reserves model + list UI
     ReservesImport.lua     # SR import window glue + validation
     Logger.lua             # loot logger module stack (store/view/actions/ui)

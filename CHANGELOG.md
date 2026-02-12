@@ -4,6 +4,8 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Removed deprecated placeholder files `Features/CoreGameplay.lua` and
+  `Features/LootStack.lua` (both were not loaded by TOC).
 - **Refactor:** Renamed feature file paths `Features/ReserveImport.lua` -> `Features/ReservesImport.lua`
   and `UI/ReserveImport.xml` -> `UI/ReservesImport.xml`; runtime module is now `addon.ReservesImport`.
 - **Behavior:** Simplified account SavedVariables to feature-scoped keys:
