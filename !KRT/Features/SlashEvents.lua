@@ -3,18 +3,14 @@
 ]]
 
 local addonName, addon = ...
-addon = addon or {}
-addon.L = addon.L or {}
-addon.Diagnose = addon.Diagnose or {}
-local L = addon.L
-local Diagnose = addon.Diagnose
-local Diag = setmetatable({}, {
-    __index = Diagnose,
-})
-local Utils = addon.Utils
-local C = addon.C
+local feature = addon.Core.getFeatureShared()
 
-local RT_COLOR = C.RT_COLOR
+local L = feature.L
+local Diag = feature.Diag
+local Utils = feature.Utils
+local C = feature.C
+
+local RT_COLOR = feature.RT_COLOR
 
 local pairs, ipairs, select = pairs, ipairs, select
 local format = string.format

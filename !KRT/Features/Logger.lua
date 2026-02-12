@@ -3,24 +3,19 @@
 ]]
 
 local addon = select(2, ...)
-addon = addon or {}
-addon.L = addon.L or {}
-addon.Diagnose = addon.Diagnose or {}
-local L = addon.L
-local Diagnose = addon.Diagnose
-local Diag = setmetatable({}, {
-    __index = Diagnose,
-})
-local Utils = addon.Utils
-local C = addon.C
-local Core = addon.Core or {}
+local feature = addon.Core.getFeatureShared()
 
-local bindModuleRequestRefresh = Core.bindModuleRequestRefresh
-local bindModuleToggleHide = Core.bindModuleToggleHide
+local L = feature.L
+local Diag = feature.Diag
+local Utils = feature.Utils
+local C = feature.C
 
-local rollTypes = C and C.rollTypes or {}
-local lootTypesColored = C and C.lootTypesColored or {}
-local itemColors = C and C.itemColors or {}
+local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
+local bindModuleToggleHide = feature.bindModuleToggleHide
+
+local rollTypes = feature.rollTypes
+local lootTypesColored = feature.lootTypesColored
+local itemColors = feature.itemColors
 
 local _G = _G
 local tinsert, tremove, twipe = table.insert, table.remove, table.wipe

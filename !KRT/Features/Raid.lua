@@ -3,21 +3,19 @@
 ]]
 
 local addon = select(2, ...)
-addon = addon or {}
+local feature = addon.Core.getFeatureShared()
 
-local feature = (addon.Core and addon.Core.getFeatureShared and addon.Core.getFeatureShared()) or {}
+local L = feature.L
+local Diag = feature.Diag
+local Utils = feature.Utils
+local C = feature.C
 
-local L = feature.L or addon.L or {}
-local Diag = feature.Diag or {}
-local Utils = feature.Utils or addon.Utils
-local C = feature.C or addon.C or {}
+local tContains = feature.tContains
 
-local tContains = feature.tContains or _G.tContains
+local ITEM_LINK_PATTERN = feature.ITEM_LINK_PATTERN
+local rollTypes = feature.rollTypes
 
-local ITEM_LINK_PATTERN = feature.ITEM_LINK_PATTERN or C.ITEM_LINK_PATTERN
-local rollTypes = feature.rollTypes or C.rollTypes
-
-local lootState = feature.lootState or ((feature.coreState or addon.State or {}).loot) or {}
+local lootState = feature.lootState
 
 local tinsert, twipe = table.insert, table.wipe
 local pairs, ipairs, type, select = pairs, ipairs, type, select

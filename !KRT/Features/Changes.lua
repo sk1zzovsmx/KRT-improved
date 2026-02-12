@@ -3,21 +3,14 @@
 ]]
 
 local addon = select(2, ...)
-addon = addon or {}
-addon.L = addon.L or {}
-addon.Diagnose = addon.Diagnose or {}
-local L = addon.L
-local Diagnose = addon.Diagnose
-local Diag = setmetatable({}, {
-    __index = Diagnose,
-})
-local Utils = addon.Utils
+local feature = addon.Core.getFeatureShared()
 
-local Core = addon.Core or {}
+local L = feature.L
+local Diag = feature.Diag
+local Utils = feature.Utils
 
-local bindModuleRequestRefresh = Core.bindModuleRequestRefresh
-
-local makeModuleFrameGetter = Core.makeModuleFrameGetter
+local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
+local makeModuleFrameGetter = feature.makeModuleFrameGetter
 
 local _G = _G
 local twipe = table.wipe

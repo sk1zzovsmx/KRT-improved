@@ -3,17 +3,14 @@
 ]]
 
 local addon = select(2, ...)
-addon = addon or {}
-addon.L = addon.L or {}
-addon.Diagnose = addon.Diagnose or {}
-local L = addon.L
-local Utils = addon.Utils
+local feature = addon.Core.getFeatureShared()
 
-local Core = addon.Core or {}
+local L = feature.L
+local Utils = feature.Utils
 
-local bindModuleRequestRefresh = Core.bindModuleRequestRefresh
-local bindModuleToggleHide = Core.bindModuleToggleHide
-local makeModuleFrameGetter = Core.makeModuleFrameGetter
+local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
+local bindModuleToggleHide = feature.bindModuleToggleHide
+local makeModuleFrameGetter = feature.makeModuleFrameGetter
 
 local _G = _G
 local tinsert, tremove, tconcat = table.insert, table.remove, table.concat

@@ -3,16 +3,14 @@
 ]]
 
 local addon = select(2, ...)
-addon = addon or {}
+local feature = addon.Core.getFeatureShared()
 
-local feature = (addon.Core and addon.Core.getFeatureShared and addon.Core.getFeatureShared()) or {}
+local L = feature.L
+local Utils = feature.Utils
+local C = feature.C
 
-local L = feature.L or addon.L or {}
-local Utils = feature.Utils or addon.Utils
-local C = feature.C or addon.C or {}
-
-local UnitIsGroupLeader = feature.UnitIsGroupLeader or addon.UnitIsGroupLeader
-local UnitIsGroupAssistant = feature.UnitIsGroupAssistant or addon.UnitIsGroupAssistant
+local UnitIsGroupLeader = feature.UnitIsGroupLeader
+local UnitIsGroupAssistant = feature.UnitIsGroupAssistant
 
 local find = string.find
 local tostring = tostring

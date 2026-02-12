@@ -3,19 +3,17 @@
 ]]
 
 local addon = select(2, ...)
-addon = addon or {}
+local feature = addon.Core.getFeatureShared()
 
-local feature = (addon.Core and addon.Core.getFeatureShared and addon.Core.getFeatureShared()) or {}
+local L = feature.L
+local Diag = feature.Diag
+local Utils = feature.Utils
+local C = feature.C
 
-local L = feature.L or addon.L or {}
-local Diag = feature.Diag or {}
-local Utils = feature.Utils or addon.Utils
-local C = feature.C or addon.C or {}
+local itemColors = feature.itemColors
 
-local itemColors = feature.itemColors or C.itemColors
-
-local lootState = feature.lootState or ((feature.coreState or addon.State or {}).loot) or {}
-local itemInfo = feature.itemInfo or lootState.itemInfo or {}
+local lootState = feature.lootState
+local itemInfo = feature.itemInfo
 
 local ItemExists, ItemIsSoulbound, GetItem
 local GetItemName, GetItemLink, GetItemTexture

@@ -3,15 +3,13 @@
 ]]
 
 local addon = select(2, ...)
-addon = addon or {}
+local feature = addon.Core.getFeatureShared()
 
-local feature = (addon.Core and addon.Core.getFeatureShared and addon.Core.getFeatureShared()) or {}
+local L = feature.L
+local Utils = feature.Utils
+local C = feature.C
 
-local L = feature.L or addon.L or {}
-local Utils = feature.Utils or addon.Utils
-local C = feature.C or addon.C or {}
-
-local K_COLOR = feature.K_COLOR or C.K_COLOR
+local K_COLOR = feature.K_COLOR
 
 -- =========== Minimap Button Module  =========== --
 do
