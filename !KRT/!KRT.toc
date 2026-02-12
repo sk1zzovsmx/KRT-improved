@@ -42,7 +42,7 @@ Features\Loot.lua
 Features\Master.lua
 Features\LootCounter.lua
 Features\Reserves.lua
-Features\ReserveImport.lua
+Features\ReservesImport.lua
 Features\Logger.lua
 Features\Config.lua
 Features\Warnings.lua

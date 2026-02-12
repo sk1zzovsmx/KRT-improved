@@ -4,6 +4,8 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Renamed feature file paths `Features/ReserveImport.lua` -> `Features/ReservesImport.lua`
+  and `UI/ReserveImport.xml` -> `UI/ReservesImport.xml`; runtime module is now `addon.ReservesImport`.
 - **Behavior:** Simplified account SavedVariables to feature-scoped keys:
   `KRT_Raids`, `KRT_Players`, `KRT_Reserves`, `KRT_Warnings`, `KRT_Spammer`, and `KRT_Options`.
   Runtime session keys (`KRT_CurrentRaid`, `KRT_LastBoss`, `KRT_NextReset`) are no longer persisted.
@@ -28,8 +30,8 @@ Dates are in YYYY-MM-DD.
   (Store/View/Actions/lists/popups) moved to `Features/Logger.lua`, and Logger UI moved to `UI/Logger.xml`,
   with `KRT.lua`/`KRT.xml` keeping only migration placeholders and include orchestration.
 - **Refactor:** Continued modular architecture migration (wave 2). `Reserves` and `ReserveImport` were
-  extracted into `Features/Reserves.lua` and `Features/ReserveImport.lua` with matching `UI/Reserves.xml`
-  and `UI/ReserveImport.xml`, preserving existing behavior and public module APIs.
+  extracted into `Features/Reserves.lua` and `Features/ReservesImport.lua` with matching `UI/Reserves.xml`
+  and `UI/ReservesImport.xml`, preserving existing behavior and public module APIs.
 - **Refactor:** Started modular architecture migration (wave 1). `KRT.lua`/`KRT.xml` are now split with
   `Features/*.lua` and `UI/*.xml` include files, preserving existing runtime behavior and public module APIs.
 - **Bugfix:** SoftRes import mode is now synchronized between runtime reserves state and

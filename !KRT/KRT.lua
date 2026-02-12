@@ -292,7 +292,7 @@ end
 -- [MIGRATED] See Features/Reserves.lua
 
 -- =========== Reserve Import Window Module  =========== --
--- [MIGRATED] See Features/ReserveImport.lua
+-- [MIGRATED] See Features/ReservesImport.lua
 
 -- =========== Configuration Frame Module  =========== --
 -- [MIGRATED] See Features/Config.lua

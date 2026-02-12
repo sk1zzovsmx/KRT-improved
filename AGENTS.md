@@ -96,7 +96,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 17) Features/Master.lua
 18) Features/LootCounter.lua
 19) Features/Reserves.lua
-20) Features/ReserveImport.lua
+20) Features/ReservesImport.lua
 21) Features/Logger.lua
 22) Features/Config.lua
 23) Features/Warnings.lua
@@ -128,7 +128,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     CoreGameplay.lua       # deprecated wave 4 compatibility placeholder (not loaded in TOC)
     LootStack.lua          # deprecated wave 4c compatibility placeholder (not loaded in TOC)
     Reserves.lua           # soft reserves model + list UI
-    ReserveImport.lua      # SR import window glue + validation
+    ReservesImport.lua     # SR import window glue + validation
     Logger.lua             # loot logger module stack (store/view/actions/ui)
     Config.lua             # options UI logic
     Warnings.lua           # warnings list + announce helpers
@@ -140,7 +140,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Minimap.xml            # minimap button frame
     ReservesTemplates.xml  # reserve list templates
     Reserves.xml           # reserve list UI
-    ReserveImport.xml      # reserve import UI
+    ReservesImport.xml     # reserve import UI
     Logger.xml             # logger templates + frames
     Config.xml             # config UI
     Spammer.xml            # spammer UI
@@ -263,7 +263,7 @@ Top-level feature modules on `addon.*`:
 - `addon.Master`        - master-loot helpers, award/trade tracking
 - `addon.LootCounter`   - loot counter UI + data
 - `addon.Reserves`      - soft reserves model + list UI
-- `addon.ReserveImport` - SR import window glue + validation
+- `addon.ReservesImport` - SR import window glue + validation
 - `addon.Config`        - options UI + defaults/load
 - `addon.Warnings`      - warnings list + announce helpers
 - `addon.Changes`       - MS changes list + announce
@@ -277,7 +277,7 @@ Top-level feature modules on `addon.*`:
 
 Implementation placement (current wave):
 - `KRT.lua`: core + most gameplay/logger logic
-- `Features/*.lua`: Reserves, ReserveImport, Logger, Config, Warnings, Changes, Spammer
+- `Features/*.lua`: Reserves, ReservesImport, Logger, Config, Warnings, Changes, Spammer
 
 External modules:
 - `addon.Utils` (Modules/Utils.lua)

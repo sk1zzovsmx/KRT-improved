@@ -396,7 +396,7 @@ do
         if addon.Reserves:HasData() then
             addon.Reserves:Toggle()
         else
-            addon.ReserveImport:Toggle()
+            addon.ReservesImport:Toggle()
         end
     end
 

@@ -9,7 +9,7 @@
     <Include file="UI\LootCounter.xml"/>
     <Include file="UI\Changes.xml"/>
     <Include file="UI\Reserves.xml"/>
-    <Include file="UI\ReserveImport.xml"/>
+    <Include file="UI\ReservesImport.xml"/>
     <Include file="UI\Logger.xml"/>
 </Ui>
 

@@ -1,5 +1,5 @@
 --[[
-    Features/ReserveImport.lua
+    Features/ReservesImport.lua
 ]]
 
 local addon = select(2, ...)
@@ -29,8 +29,8 @@ local tostring, tonumber = tostring, tonumber
 -- =========== Reserve Import Window Module  =========== --
 -- Handles the CSV import dialog for Reserves.
 do
-    addon.ReserveImport = addon.ReserveImport or {}
-    local module = addon.ReserveImport
+    addon.ReservesImport = addon.ReservesImport or {}
+    local module = addon.ReservesImport
     local getFrame = makeModuleFrameGetter(module, "KRTImportWindow")
     local localized = false
     -- Import mode slider: 0 = Multi-reserve, 1 = Plus System (priority)

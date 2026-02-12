@@ -237,7 +237,7 @@ do
         if not sub or sub == "" or sub == "toggle" then
             addon.Reserves:Toggle()
         elseif sub == "import" then
-            if addon.ReserveImport and addon.ReserveImport.Toggle then addon.ReserveImport:Toggle() end
+            if addon.ReservesImport and addon.ReservesImport.Toggle then addon.ReservesImport:Toggle() end
         else
             addon:info(format(L.StrCmdCommands, "krt res"), "KRT")
             printHelp("toggle", L.StrCmdToggle)

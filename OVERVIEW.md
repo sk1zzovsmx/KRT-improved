@@ -77,7 +77,7 @@ flowchart LR
     Master["addon.Master"]
     LootCounter["addon.LootCounter"]
     Reserves["addon.Reserves"]
-    ReserveImport["addon.ReserveImport"]
+    ReservesImport["addon.ReservesImport"]
     Warnings["addon.Warnings"]
     Changes["addon.Changes"]
     Spammer["addon.Spammer"]
@@ -165,7 +165,7 @@ Top-level modules defined in `!KRT/KRT.lua`:
 - `addon.Master`: master-loot workflow, award/trade handling.
 - `addon.LootCounter`: player loot counts UI and data updates.
 - `addon.Reserves`: soft-reserve model and reserve list UI.
-- `addon.ReserveImport`: SR import UI and CSV validation.
+- `addon.ReservesImport`: SR import UI and CSV validation.
 - `addon.Config`: options defaults/load and config UI.
 - `addon.Warnings`: warning list CRUD and announces.
 - `addon.Changes`: MS changes list and announce flows.
