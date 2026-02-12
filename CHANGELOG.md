@@ -4,6 +4,30 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Continued modular architecture migration (wave 4d). UI legacy XML was decomposed into
+  `UI/Minimap.xml`, `UI/ReservesTemplates.xml`, `UI/Master.xml`, and `UI/LootCounter.xml`; `KRT.xml`
+  now includes these feature files directly, with no behavior changes.
+- **Refactor:** Completed wave 4d cleanup by removing deprecated `UI/LegacyHead.xml`,
+  `UI/LegacyMid.xml`, and `UI/LegacyTail.xml` placeholders from the repository.
+- **Refactor:** Continued modular architecture migration (wave 4c.1). Core feature headers now consume
+  shared context from `addon.Core.getFeatureShared()` in `KRT.lua`, reducing repeated local/bootstrap blocks
+  in `Raid/Chat/Minimap/Rolls/Loot/Master/LootCounter` files without behavior changes.
+- **Refactor:** Continued modular architecture migration (wave 4c). `Features/LootStack.lua` was split into
+  `Features/Rolls.lua`, `Features/Loot.lua`, and `Features/Master.lua`; `LootStack.lua` remains as placeholder.
+- **Refactor:** Continued modular architecture migration (wave 4b). Runtime core split further into
+  `Features/Raid.lua`, `Features/Chat.lua`, `Features/Minimap.lua`, `Features/LootStack.lua`,
+  and `Features/LootCounter.lua`; `Features/CoreGameplay.lua` is now a migration placeholder.
+- **Refactor:** Continued modular architecture migration (wave 4). Core gameplay runtime modules
+  (`Raid/Chat/Minimap/Rolls/Loot/Master/LootCounter`) moved to `Features/CoreGameplay.lua`,
+  and slash/event wiring moved to `Features/SlashEvents.lua`, leaving `KRT.lua` as thin bootstrap/glue.
+- **Refactor:** Continued modular architecture migration (wave 3). Logger runtime stack
+  (Store/View/Actions/lists/popups) moved to `Features/Logger.lua`, and Logger UI moved to `UI/Logger.xml`,
+  with `KRT.lua`/`KRT.xml` keeping only migration placeholders and include orchestration.
+- **Refactor:** Continued modular architecture migration (wave 2). `Reserves` and `ReserveImport` were
+  extracted into `Features/Reserves.lua` and `Features/ReserveImport.lua` with matching `UI/Reserves.xml`
+  and `UI/ReserveImport.xml`, preserving existing behavior and public module APIs.
+- **Refactor:** Started modular architecture migration (wave 1). `KRT.lua`/`KRT.xml` are now split with
+  `Features/*.lua` and `UI/*.xml` include files, preserving existing runtime behavior and public module APIs.
 - **Bugfix:** SoftRes import mode is now synchronized between runtime reserves state and
   `addon.options/KRT_Options`, so ReserveImport slider/parsing always matches the active mode after load/import.
 - **Bugfix:** Reserve List window now relies on the inherited `KRTFrameTemplate` background to prevent

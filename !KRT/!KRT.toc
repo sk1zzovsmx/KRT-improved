@@ -34,6 +34,21 @@ Modules\C.lua
 
 # Core Files:
 KRT.lua
+Features\Raid.lua
+Features\Chat.lua
+Features\Minimap.lua
+Features\Rolls.lua
+Features\Loot.lua
+Features\Master.lua
+Features\LootCounter.lua
+Features\Reserves.lua
+Features\ReserveImport.lua
+Features\Logger.lua
+Features\Config.lua
+Features\Warnings.lua
+Features\Changes.lua
+Features\Spammer.lua
+Features\SlashEvents.lua
 KRT.xml
 
 # Modules
