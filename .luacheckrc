@@ -75,6 +75,17 @@ globals = {
 	"KRTLoggerItemMenuFrame",
 	"KRTMasterLootFrame",
 
+	-- KRT SavedVariables and runtime session globals
+	"KRT_Raids",
+	"KRT_Players",
+	"KRT_Reserves",
+	"KRT_Warnings",
+	"KRT_Spammer",
+	"KRT_Options",
+	"KRT_CurrentRaid",
+	"KRT_LastBoss",
+	"KRT_NextReset",
+
 	-- KRT XML templates and derived frame globals
 	"KRTButtonTemplate",
 	"KRTChangesButtonTemplate",

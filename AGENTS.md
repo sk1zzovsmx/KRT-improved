@@ -32,6 +32,7 @@ Durable preferences learned from recent conversations:
 - Move helpers to `Modules/Utils.lua` only when they are generic and reused, not for KRT-specific glue.
 - Keep diagnostic templates in `addon.Diagnose`; use severity buckets `I/W/E/D` (`DiagnoseLog.en.lua`).
 - Prefer local `Diag` wrapper aliases over direct `Diagnose.*` chains in implementation files.
+- For naming/API uniformization, choose the most repeated in-repo pattern and apply it consistently and robustly.
 - For XML and Lua analysis/reference, use Townlong-Yak FrameXML 3.3.5:
   `https://www.townlong-yak.com/framexml/3.3.5`.
 
@@ -252,6 +253,7 @@ For scroll lists:
   - update `KRT_Options[key]`,
   - update `addon.options[key]` (if present),
   - request a refresh of the owning UI module.
+- Exception: `debug` is runtime-only state and must not be persisted in `KRT_Options`.
 
 ---
 

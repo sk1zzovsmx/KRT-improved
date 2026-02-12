@@ -85,10 +85,12 @@ do
         if KRT_Options then
             addon.tCopy(options, KRT_Options)
         end
+        -- Debug flag is runtime-only and must not persist in SavedVariables.
+        options.debug = nil
         KRT_Options = options
         addon.options = options
 
-        Utils.applyDebugSetting(addon.options.debug)
+        Utils.applyDebugSetting(false)
         configDirty = true
         module:RequestRefresh()
 
@@ -201,7 +203,7 @@ do
         localized = true
     end
 
-    -- OnUpdate handler for the configuration frame.
+    -- UI refresh handler for the configuration frame.
     function UpdateUIFrame()
         if not configDirty then return end
         _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)

@@ -307,7 +307,7 @@ do
     function module:OnLoad(frame)
         frameName = Utils.initModuleFrame(module, frame, {
             enableDrag = true,
-            setOnHide = function()
+            hookOnHide = function()
                 if selectionFrame then selectionFrame:Hide() end
             end,
         })

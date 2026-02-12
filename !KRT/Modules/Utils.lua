@@ -74,11 +74,13 @@ end
 
 -- =========== Debug/state helpers  =========== --
 
+function Utils.isDebugEnabled()
+	return addon and addon.State and addon.State.debugEnabled == true
+end
+
 function Utils.applyDebugSetting(enabled)
-	local options = addon and addon.options
-	if options then
-		options.debug = enabled and true or false
-	end
+	addon.State = addon.State or {}
+	addon.State.debugEnabled = enabled and true or false
 
 	local level
 	if enabled then
@@ -495,7 +497,7 @@ function Utils.makeListController(cfg)
 			end
 		end
 
-		if cfg.highlightDebugTag and addon and addon.options and addon.options.debug and addon.debug then
+		if cfg.highlightDebugTag and Utils.isDebugEnabled() and addon.debug then
 			local info = (cfg.highlightDebugInfo and cfg.highlightDebugInfo(self)) or ""
 			if info ~= "" then info = " " .. info end
 			addon:debug((Diag.D.LogListHighlightRefresh):format(
@@ -1246,7 +1248,7 @@ do
 	end
 
 	local function debugLog(msg)
-		if addon and addon.options and addon.options.debug and addon.debug then
+		if Utils.isDebugEnabled() and addon.debug then
 			addon:debug(msg)
 		end
 	end

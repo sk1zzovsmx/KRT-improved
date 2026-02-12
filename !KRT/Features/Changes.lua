@@ -10,6 +10,7 @@ local Diag = feature.Diag
 local Utils = feature.Utils
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
+local bindModuleToggleHide = feature.bindModuleToggleHide
 local makeModuleFrameGetter = feature.makeModuleFrameGetter
 
 local _G = _G
@@ -95,6 +96,9 @@ do
                 changesDirty = true
                 lastSelectedID = false
             end,
+            hookOnHide = function()
+                CancelChanges()
+            end,
         })
         if not frameName then return end
         controller:OnLoad(frame)
@@ -106,20 +110,9 @@ do
         lastSelectedID = false
         module:RequestRefresh()
     end, {
+        bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
-
-    -- Toggle frame visibility:
-    function module:Toggle()
-        CancelChanges()
-        return uiController:Toggle()
-    end
-
-    -- Hide frame:
-    function module:Hide()
-        CancelChanges()
-        return uiController:Hide()
-    end
 
     -- Clear module:
     function module:Clear()
@@ -292,7 +285,7 @@ do
         localized = true
     end
 
-    -- OnUpdate frame:
+    -- UI refresh.
     function UpdateUIFrame()
         LocalizeUIFrame()
         if changesDirty or not fetched then

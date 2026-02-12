@@ -4,6 +4,21 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Strict UI controller uniformization for `Changes`, `Reserves`, `ReservesImport`,
+  and `Logger`: removed manual `Toggle/Hide` overrides and kept side effects in `hookOnShow/OnHide`.
+- **Refactor:** Standardized top-level feature frame getters for `Logger` and `LootCounter` to
+  `makeModuleFrameGetter(...)` (module-cached + global fallback pattern).
+- **Behavior:** Debug mode is now runtime-only by policy. Debug state is tracked in runtime state
+  (`Utils.isDebugEnabled()`), not persisted in `KRT_Options`; legacy `debug` key is cleared on load.
+- **Refactor:** Continued UI API uniformization across feature modules by standardizing
+  `initModuleFrame` callbacks to `hookOnShow/hookOnHide` for additive wiring and by removing
+  the Warnings-only `Update()` public method in favor of the common `RequestRefresh()` path.
+- **Bugfix:** `/krt minimap on|off` now writes `minimapButton` via `Utils.setOption(...)`, keeping
+  runtime options (`addon.options`) and SavedVariables (`KRT_Options`) synchronized.
+- **Localization:** Removed hardcoded fallback texts in `ReservesImport` popup/status paths and now
+  always source those messages from `addon.L`.
+- **Localization:** LFM preview output in `Spammer` now uses localized role labels and localized
+  `Need` token (`L.StrSpammerNeedStr`).
 - **Refactor:** Standardized `Features/*.lua` top-level module scaffolding around canonical section headers
   (`Internal state`, `Private helpers`, `Public methods`) and kept public module APIs in PascalCase
   (no mass rename/breaking API changes).

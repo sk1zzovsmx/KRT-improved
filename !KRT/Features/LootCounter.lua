@@ -11,6 +11,7 @@ local C = feature.C
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
+local makeModuleFrameGetter = feature.makeModuleFrameGetter
 
 local _G = _G
 local twipe = table.wipe
@@ -28,7 +29,7 @@ do
     local rows, raidPlayers = {}, {}
     local twipe = twipe
     local scrollFrame, scrollChild, header
-    local getFrame = Utils.makeFrameGetter("KRTLootCounterFrame")
+    local getFrame = makeModuleFrameGetter(module, "KRTLootCounterFrame")
 
     -- Single-line column header.
     local HEADER_HEIGHT = 18

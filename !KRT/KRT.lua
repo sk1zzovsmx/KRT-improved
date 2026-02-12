@@ -51,7 +51,7 @@ end
 
 do
     local lv = addon.Debugger.logLevels.INFO
-    if KRT_Options and KRT_Options.debug then
+    if addon.State and addon.State.debugEnabled then
         lv = addon.Debugger.logLevels.DEBUG
     end
     addon:SetLogLevel(lv)

@@ -123,10 +123,10 @@ do
         elseif subCmd == "off" then
             Utils.applyDebugSetting(false)
         else
-            Utils.applyDebugSetting(not addon.options.debug)
+            Utils.applyDebugSetting(not Utils.isDebugEnabled())
         end
 
-        if addon.options.debug then
+        if Utils.isDebugEnabled() then
             addon:info(L.MsgDebugOn)
         else
             addon:info(L.MsgDebugOff)
@@ -136,10 +136,10 @@ do
     registerAliases(cmdMinimap, function(rest)
         local sub, arg = Utils.splitArgs(rest)
         if sub == "on" then
-            addon.options.minimapButton = true
+            Utils.setOption("minimapButton", true)
             Utils.setShown(KRT_MINIMAP_GUI, true)
         elseif sub == "off" then
-            addon.options.minimapButton = false
+            Utils.setOption("minimapButton", false)
             Utils.setShown(KRT_MINIMAP_GUI, false)
         elseif sub == "pos" and arg ~= "" then
             local angle = tonumber(arg)

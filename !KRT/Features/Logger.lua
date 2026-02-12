@@ -12,6 +12,7 @@ local C = feature.C
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
+local makeModuleFrameGetter = feature.makeModuleFrameGetter
 
 local rollTypes = feature.rollTypes
 local lootTypesColored = feature.lootTypesColored
@@ -31,7 +32,7 @@ do
 
     -- ----- Internal state ----- --
     local frameName
-    local getFrame = Utils.makeFrameGetter("KRTLogger")
+    local getFrame = makeModuleFrameGetter(module, "KRTLogger")
     -- module: stable-ID data helpers (fresh SavedVariables only; no legacy migration)
     module.Store   = module.Store or {}
     module.View    = module.View or {}
@@ -740,14 +741,14 @@ do
     function module:OnLoad(frame)
         frameName = Utils.initModuleFrame(module, frame, {
             enableDrag = true,
-            setOnShow = function()
+            hookOnShow = function()
                 if not module.selectedRaid then
                     module.selectedRaid = KRT_CurrentRaid
                 end
                 clearSelections()
                 Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
             end,
-            setOnHide = function()
+            hookOnHide = function()
                 module.selectedRaid = KRT_CurrentRaid
                 clearSelections()
             end,
@@ -761,12 +762,6 @@ do
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
-
-    function module:Hide()
-        module.selectedRaid = KRT_CurrentRaid
-        clearSelections()
-        return uiController:Hide()
-    end
 
     function module:Refresh()
         local frame = getFrame()
@@ -817,7 +812,7 @@ do
             end
         end
 
-        if addon and addon.options and addon.options.debug and addon.debug then
+        if Utils.isDebugEnabled() and addon.debug then
             addon:debug((Diag.D.LogLoggerSelectClickRaid)
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
@@ -869,7 +864,7 @@ do
             end
         end
 
-        if addon and addon.options and addon.options.debug and addon.debug then
+        if Utils.isDebugEnabled() and addon.debug then
             addon:debug((Diag.D.LogLoggerSelectClickBoss)
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
@@ -934,7 +929,7 @@ do
             end
         end
 
-        if addon and addon.options and addon.options.debug and addon.debug then
+        if Utils.isDebugEnabled() and addon.debug then
             addon:debug((Diag.D.LogLoggerSelectClickBossAttendees)
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
@@ -994,7 +989,7 @@ do
             end
         end
 
-        if addon and addon.options and addon.options.debug and addon.debug then
+        if Utils.isDebugEnabled() and addon.debug then
             addon:debug((Diag.D.LogLoggerSelectClickRaidAttendees)
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
@@ -1066,7 +1061,7 @@ do
                     end
                 end
 
-                if addon and addon.options and addon.options.debug and addon.debug then
+                if Utils.isDebugEnabled() and addon.debug then
                     addon:debug((Diag.D.LogLoggerSelectClickLoot)
                         :format(
                             tostring(id), isMulti and 1 or 0, isRange and 1 or 0,
@@ -1081,7 +1076,7 @@ do
                 local action, count = Utils.multiSelectToggle(MS_CTX_LOOT, id, false)
                 module.selectedItem = id
 
-                if addon and addon.options and addon.options.debug and addon.debug then
+                if Utils.isDebugEnabled() and addon.debug then
                     addon:debug((Diag.D.LogLoggerSelectClickContextMenu):format(
                         tostring(id), tostring(action), tonumber(count) or 0
                     ))
@@ -1941,7 +1936,7 @@ do
                     addon.Logger.selectedItem = nil
                     Utils.triggerEvent("LoggerSelectItem", addon.Logger.selectedItem)
 
-                    if addon and addon.options and addon.options.debug and addon.debug then
+                    if Utils.isDebugEnabled() and addon.debug then
                         addon:debug((Diag.D.LogLoggerSelectDeleteItems):format(removed))
                     end
                 end
@@ -2061,10 +2056,10 @@ do
     function Box:OnLoad(frame)
         frameName = Utils.initModuleFrame(Box, frame, {
             enableDrag = true,
-            setOnShow = function()
+            hookOnShow = function()
                 Box:UpdateUIFrame()
             end,
-            setOnHide = function()
+            hookOnHide = function()
                 Box:CancelAddEdit()
             end,
         })
@@ -2196,10 +2191,10 @@ do
     function Box:OnLoad(frame)
         frameName = Utils.initModuleFrame(Box, frame, {
             enableDrag = true,
-            setOnShow = function()
+            hookOnShow = function()
                 Utils.resetEditBox(_G[frameName .. "Name"])
             end,
-            setOnHide = function()
+            hookOnHide = function()
                 Utils.resetEditBox(_G[frameName .. "Name"])
             end,
         })

@@ -219,7 +219,7 @@ do
     function module:OnLoad(frame)
         frameName = Utils.initModuleFrame(module, frame, {
             enableDrag = true,
-            setOnShow = function()
+            hookOnShow = function()
                 module:RequestRefresh()
             end,
         })
@@ -581,13 +581,15 @@ do
             end
         end
 
-        addNeed(lastState.tank, "Tank", lastState.tankClass)
-        addNeed(lastState.healer, "Healer", lastState.healerClass)
-        addNeed(lastState.melee, "Melee", lastState.meleeClass)
-        addNeed(lastState.ranged, "Ranged", lastState.rangedClass)
+        addNeed(lastState.tank, L.StrTank, lastState.tankClass)
+        addNeed(lastState.healer, L.StrHealer, lastState.healerClass)
+        addNeed(lastState.melee, L.StrMelee, lastState.meleeClass)
+        addNeed(lastState.ranged, L.StrRanged, lastState.rangedClass)
 
         if #needParts > 0 then
-            outBuf[#outBuf + 1] = " - Need "
+            outBuf[#outBuf + 1] = " - "
+            outBuf[#outBuf + 1] = L.StrSpammerNeedStr
+            outBuf[#outBuf + 1] = " "
             outBuf[#outBuf + 1] = tconcat(needParts, ", ")
         end
 

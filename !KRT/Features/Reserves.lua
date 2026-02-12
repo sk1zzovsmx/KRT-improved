@@ -886,21 +886,23 @@ do
 
     -- Initialize UI controller for Toggle/Hide.
     local uiController = Utils.bootstrapModuleUi(module, getFrame, function()
-        addon:debug(Diag.D.LogReservesShowWindow)
         module:RequestRefresh()
     end, {
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
 
-    function module:Hide()
-        addon:debug(Diag.D.LogReservesHideWindow)
-        return uiController:Hide()
-    end
-
     function module:OnLoad(frame)
         addon:debug(Diag.D.LogReservesFrameLoaded)
-        frameName = Utils.initModuleFrame(module, frame, { enableDrag = true })
+        frameName = Utils.initModuleFrame(module, frame, {
+            enableDrag = true,
+            hookOnShow = function()
+                addon:debug(Diag.D.LogReservesShowWindow)
+            end,
+            hookOnHide = function()
+                addon:debug(Diag.D.LogReservesHideWindow)
+            end,
+        })
         if not frameName then return end
 
         scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"]

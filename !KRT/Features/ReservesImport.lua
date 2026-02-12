@@ -95,21 +95,16 @@ do
         if not StaticPopupDialogs then return end
 
         StaticPopupDialogs["KRT_WRONG_CSV_FOR_PLUS"] = {
-            text = L.ErrCSVWrongForPlus
-                or ("Wrong CSV format for Plus System.\n"
-                    .. "This CSV contains players with multiple reserved items.\n"
-                    .. "Switch to Multi-reserve or check your SoftRes settings."),
-            button1 = L.BtnSwitchToMulti or "Switch to Multi-reserve",
-            button2 = L.BtnCancel or (L.BtnClose or "Cancel"),
+            text = L.ErrCSVWrongForPlus,
+            button1 = L.BtnSwitchToMulti,
+            button2 = L.BtnCancel,
             OnShow = function(self, data)
                 if not self or not self.text then return end
+                local msg = L.ErrCSVWrongForPlus
                 if type(data) == "table" and data.player then
-                    local msg = L.ErrCSVWrongForPlusWithPlayer
-                        or ("Wrong CSV format for Plus System.\n"
-                            .. "Player '%s' has multiple reserved items.\n"
-                            .. "Switch to Multi-reserve or check your SoftRes settings.")
-                    self.text:SetText(msg:format(tostring(data.player)))
+                    msg = L.ErrCSVWrongForPlusWithPlayer:format(tostring(data.player))
                 end
+                self.text:SetText(msg)
             end,
             OnAccept = function(self, data)
                 if type(data) ~= "table" or type(data.csv) ~= "string" then return end
@@ -155,6 +150,14 @@ do
         Utils.initModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
+                Utils.resetEditBox(_G["KRTImportEditBox"])
+                local editBox = _G["KRTImportEditBox"]
+                if editBox then
+                    editBox:SetFocus()
+                    editBox:HighlightText()
+                end
+                local status = _G["KRTImportWindowStatus"]
+                if status then status:SetText("") end
                 module:RequestRefresh()
             end,
         })
@@ -179,30 +182,6 @@ do
         bindRequestRefresh = bindModuleRequestRefresh,
     })
 
-    function module:Toggle()
-        local frame = getFrame()
-        if not frame then
-            addon:error(Diag.E.LogReservesImportWindowMissing)
-            return
-        end
-
-        if frame:IsShown() then
-            uiController:Hide()
-            return
-        end
-
-        uiController:Show()
-
-        Utils.resetEditBox(_G["KRTImportEditBox"])
-        local editBox = _G["KRTImportEditBox"]
-        if editBox then
-            editBox:SetFocus()
-            editBox:HighlightText()
-        end
-        local status = _G["KRTImportWindowStatus"]
-        if status then status:SetText("") end
-    end
-
     function module:ImportFromEditBox()
         local editBox = _G["KRTImportEditBox"]
         local status = _G["KRTImportWindowStatus"]
@@ -212,7 +191,7 @@ do
         local csv = editBox:GetText()
         if type(csv) ~= "string" or not csv:match("%S") then
             if status then
-                status:SetText(L.ErrImportReservesEmpty or "Import failed: empty or invalid data.")
+                status:SetText(L.ErrImportReservesEmpty)
                 status:SetTextColor(1, 0.2, 0.2)
             end
             addon:warn(Diag.W.LogReservesImportFailedEmpty)
@@ -225,7 +204,7 @@ do
         local ok, nPlayers, errCode, errData = addon.Reserves:ParseCSV(csv, mode)
         if (not ok) and errCode == "CSV_WRONG_FOR_PLUS" then
             if status then
-                status:SetText(L.ErrCSVWrongForPlusShort or "Wrong CSV format for Plus System.")
+                status:SetText(L.ErrCSVWrongForPlusShort)
                 status:SetTextColor(1, 0.2, 0.2)
             end
             local popupData = { csv = csv }
@@ -252,7 +231,7 @@ do
             return true, nPlayers
         else
             if status then
-                status:SetText(L.ErrImportReservesEmpty or "Import failed: empty or invalid data.")
+                status:SetText(L.ErrImportReservesEmpty)
                 status:SetTextColor(1, 0.2, 0.2)
             end
             return false, 0

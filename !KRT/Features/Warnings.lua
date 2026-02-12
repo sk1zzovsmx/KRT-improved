@@ -82,12 +82,6 @@ do
         controller:OnLoad(frame)
     end
 
-    -- Externally update frame:
-    function module:Update()
-        warningsDirty = true
-        module:RequestRefresh()
-    end
-
     -- Initialize UI controller for Toggle/Hide.
     local uiController = Utils.bootstrapModuleUi(module, getFrame, function()
         warningsDirty = true
@@ -221,7 +215,7 @@ do
         lastSelectedID = selectedID
     end
 
-    -- OnUpdate frame:
+    -- UI refresh.
     function UpdateUIFrame()
         LocalizeUIFrame()
         if warningsDirty or not fetched then
@@ -269,6 +263,7 @@ do
             tinsert(KRT_Warnings, { name = wName, content = wContent })
         end
         module:Cancel()
-        module:Update()
+        warningsDirty = true
+        module:RequestRefresh()
     end
 end
