@@ -19,13 +19,15 @@ local tostring = tostring
 do
     addon.Chat            = addon.Chat or {}
     local module          = addon.Chat
-    -- ----- Internal state (non-exposed local variables) ----- --
+    -- ----- Internal state ----- --
     local output          = C.CHAT_OUTPUT_FORMAT
     local chatPrefix      = C.CHAT_PREFIX
     local chatPrefixShort = C.CHAT_PREFIX_SHORT
     local prefixHex       = C.CHAT_PREFIX_HEX
 
-    -- ----- Public module functions ----- --
+    -- ----- Private helpers ----- --
+
+    -- ----- Public methods ----- --
     function module:Print(text, prefix)
         local msg = Utils.formatChatMessage(text, prefix or chatPrefixShort, output, prefixHex)
         addon:info("%s", msg)

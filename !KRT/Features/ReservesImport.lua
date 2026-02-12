@@ -24,11 +24,14 @@ local tostring, tonumber = tostring, tonumber
 do
     addon.ReservesImport = addon.ReservesImport or {}
     local module = addon.ReservesImport
+
+    -- ----- Internal state ----- --
     local getFrame = makeModuleFrameGetter(module, "KRTImportWindow")
     local localized = false
     -- Import mode slider: 0 = Multi-reserve, 1 = Plus System (priority)
     local MODE_MULTI, MODE_PLUS = 0, 1
 
+    -- ----- Private helpers ----- --
     local function GetImportModeString()
         if addon.Reserves and addon.Reserves.GetImportMode then
             return addon.Reserves:GetImportMode()
@@ -46,6 +49,7 @@ do
         return _G["KRTImportWindowModeSlider"] or _G["KRTImportModeSlider"]
     end
 
+    -- ----- Public methods ----- --
     function module:SetImportMode(modeValue, suppressSlider)
         local mode = (modeValue == MODE_PLUS) and "plus" or "multi"
         if addon.Reserves and addon.Reserves.SetImportMode then

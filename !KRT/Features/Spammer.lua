@@ -122,6 +122,7 @@ do
     local SetInputsLocked
     local GetValidDuration
 
+    -- ----- Private helpers ----- --
     -- Small helpers
     local function ResetLastState()
         lastState.name = nil
@@ -213,6 +214,7 @@ do
         end
     end
 
+    -- ----- Public methods ----- --
     -- OnLoad frame
     function module:OnLoad(frame)
         frameName = Utils.initModuleFrame(module, frame, {

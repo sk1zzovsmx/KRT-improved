@@ -21,6 +21,8 @@ local tostring, tonumber = tostring, tonumber
 do
     addon.Slash = addon.Slash or {}
     local module = addon.Slash
+
+    -- ----- Internal state ----- --
     module.sub = module.sub or {}
 
     local cmdAchiev = { "ach", "achi", "achiev", "achievement" }
@@ -35,6 +37,7 @@ do
     local cmdReserves = { "res", "reserves", "reserve" }
     local cmdMinimap = { "minimap", "mm" }
 
+    -- ----- Private helpers ----- --
     local helpString = "%s: %s"
     local function printHelp(cmd, desc)
         addon:info("%s", helpString:format(addon.WrapTextInColorCode(cmd, Utils.normalizeHexColor(RT_COLOR)), desc))
@@ -59,6 +62,7 @@ do
         end
     end
 
+    -- ----- Public methods ----- --
     function module:Register(cmd, fn)
         self.sub[cmd] = fn
     end

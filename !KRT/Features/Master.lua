@@ -76,10 +76,6 @@ do
 
     local getFrame = Utils.makeFrameGetter("KRTMaster")
 
-    function module:Refresh()
-        if UpdateUIFrame then UpdateUIFrame() end
-    end
-
     local InitializeDropDowns, PrepareDropDowns, UpdateDropDowns
     local dropDownData, dropDownGroupData = {}, {}
     -- Ensure subgroup tables exist even when the Master UI hasn't been opened yet.
@@ -131,15 +127,6 @@ do
         Utils.setEditBoxValue(itemCountBox, count, focus)
         lastUIState.itemCountText = tostring(count)
         dirtyFlags.itemCount = false
-    end
-
-    function module:ResetItemCount(focus)
-        -- During multi-award from loot window we keep ItemCount stable (target N) to avoid
-        -- mid-sequence clamping to the remaining copies.
-        if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
-            return
-        end
-        SetItemCountValue(addon.Loot:GetCurrentItemCount(), focus)
     end
 
     local function StopCountdown()
@@ -302,6 +289,19 @@ do
     end
 
     -- ----- Public methods ----- --
+
+    function module:Refresh()
+        if UpdateUIFrame then UpdateUIFrame() end
+    end
+
+    function module:ResetItemCount(focus)
+        -- During multi-award from loot window we keep ItemCount stable (target N) to avoid
+        -- mid-sequence clamping to the remaining copies.
+        if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
+            return
+        end
+        SetItemCountValue(addon.Loot:GetCurrentItemCount(), focus)
+    end
 
     -- OnLoad frame:
     function module:OnLoad(frame)

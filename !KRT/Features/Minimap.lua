@@ -15,7 +15,7 @@ local K_COLOR = feature.K_COLOR
 do
     addon.Minimap = addon.Minimap or {}
     local module = addon.Minimap
-    -- ----- Internal state (non-exposed local variables) ----- --
+    -- ----- Internal state ----- --
     local addonMenu
     local dragMode
 
@@ -80,11 +80,11 @@ do
         end
     end
 
-    -- ----- Public methods ----- --
     local function SetMinimapShown(show)
         Utils.setShown(KRT_MINIMAP_GUI, show)
     end
 
+    -- ----- Public methods ----- --
     function module:SetPos(angle)
         angle = angle % 360
         Utils.setOption("minimapPos", angle)

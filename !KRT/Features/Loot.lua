@@ -48,7 +48,8 @@ do
         return tostring(itemLink) .. "\001" .. tostring(looter)
     end
 
-    -- ----- Pending award helpers (shared with Master/Raid flows) ----- --
+    -- ----- Public methods ----- --
+    -- Pending award helpers (shared with Master/Raid flows).
     function module:QueuePendingAward(itemLink, looter, rollType, rollValue)
         if not itemLink or not looter then
             return
@@ -96,8 +97,6 @@ do
         end
         return nil
     end
-
-    -- ----- Public methods ----- --
 
     -- Fetches items from the currently open loot window.
     function module:FetchLoot()

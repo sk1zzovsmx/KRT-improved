@@ -83,6 +83,8 @@ do
         highlightKey = function() return tostring(selectedID or "nil") end,
     }
 
+    -- ----- Private helpers ----- --
+
     -- ----- Public methods ----- --
 
     -- OnLoad frame:

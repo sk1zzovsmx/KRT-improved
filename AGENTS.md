@@ -22,7 +22,12 @@ Do NOT record:
 
 Durable preferences learned from recent conversations:
 - Prefer PascalCase for addon module table names.
+- Prefer PascalCase for public exported methods on feature modules (`module:*`, `Store:*`, `View:*`, `Actions:*`,
+  `Box:*`); keep WoW-required event names unchanged (UPPERCASE handlers).
 - Prefer camelCase for utility functions and local variables; avoid snake_case for new naming.
+- In `Features/*.lua`, prefer canonical top-level section headers in order:
+  `-- ----- Internal state ----- --`, `-- ----- Private helpers ----- --`,
+  `-- ----- Public methods ----- --`.
 - UI refactors: centralize shared UI glue/patterns in `KRT.lua`; keep feature-specific UI logic in each module.
 - Move helpers to `Modules/Utils.lua` only when they are generic and reused, not for KRT-specific glue.
 - Keep diagnostic templates in `addon.Diagnose`; use severity buckets `I/W/E/D` (`DiagnoseLog.en.lua`).

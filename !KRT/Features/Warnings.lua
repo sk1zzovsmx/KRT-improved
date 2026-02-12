@@ -33,10 +33,6 @@ do
     local fetched = false
     local warningsDirty = false
 
-    -- ----- Private helpers ----- --
-
-    -- ----- Public methods ----- --
-
     local selectedID, tempSelectedID
     local lastSelectedID = false
     local lastEditBtnMode
@@ -44,6 +40,10 @@ do
     local tempName, tempContent
     local SaveWarning
     local isEdit = false
+
+    -- ----- Private helpers ----- --
+
+    -- ----- Public methods ----- --
 
     local controller = Utils.makeListController {
         keyName = "WarningsList",

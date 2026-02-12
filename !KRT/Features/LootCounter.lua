@@ -40,6 +40,7 @@ do
     local ACTION_COL_W = (BTN_W * 3) + (BTN_GAP * 2) + 2 -- (+/-/R + gaps + right pad)
     local COUNT_COL_W = 40
 
+    -- ----- Private helpers ----- --
     local function EnsureFrames()
         local frame = getFrame()
         if not frame then
@@ -187,6 +188,7 @@ do
         return row
     end
 
+    -- ----- Public methods ----- --
     function module:OnLoad(frame)
         local f = frame or getFrame()
         frameName = Utils.initModuleFrame(module, f, { enableDrag = true }) or frameName

@@ -4,6 +4,9 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Standardized `Features/*.lua` top-level module scaffolding around canonical section headers
+  (`Internal state`, `Private helpers`, `Public methods`) and kept public module APIs in PascalCase
+  (no mass rename/breaking API changes).
 - **Refactor:** Added `Utils.setOption(key, value)` and migrated option writes in
   `Config`, `Minimap`, `Reserves`, and `ReservesImport` to keep runtime options and SV in sync centrally.
 - **Refactor:** Added shared UI bootstrap helpers `Utils.initModuleFrame(...)` and

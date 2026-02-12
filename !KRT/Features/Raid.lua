@@ -37,6 +37,9 @@ do
     local GetRaidRosterInfo = GetRaidRosterInfo
     local UnitIsUnit        = UnitIsUnit
 
+    -- ----- Private helpers ----- --
+
+    -- ----- Public methods ----- --
     -- ----- Logger Functions ----- --
 
     function module:GetRosterVersion()

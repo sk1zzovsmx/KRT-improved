@@ -28,8 +28,9 @@ local tostring, tonumber = tostring, tonumber
 do
     addon.Logger   = addon.Logger or {}
     local module   = addon.Logger
-    local frameName
 
+    -- ----- Internal state ----- --
+    local frameName
     local getFrame = Utils.makeFrameGetter("KRTLogger")
     -- module: stable-ID data helpers (fresh SavedVariables only; no legacy migration)
     module.Store   = module.Store or {}
@@ -40,33 +41,7 @@ do
     local View     = module.View
     local Actions  = module.Actions
 
-    -- Ensure the raid table has the schema v2 fields required by the module.
-    -- This does NOT migrate legacy structures; it only initializes missing fields for fresh SV.
-    function Store:EnsureRaid(raid)
-        if not raid then return end
-        raid.players       = raid.players or {}
-        raid.bossKills     = raid.bossKills or {}
-        raid.loot          = raid.loot or {}
-        raid.nextBossNid   = raid.nextBossNid or 1
-        raid.nextLootNid   = raid.nextLootNid or 1
-
-        -- Runtime-only indexes (not persisted).
-        raid._bossIdxByNid = raid._bossIdxByNid or nil
-        raid._lootIdxByNid = raid._lootIdxByNid or nil
-    end
-
-    function Store:GetRaid(rID)
-        local raid = rID and KRT_Raids[rID] or nil
-        if raid then self:EnsureRaid(raid) end
-        return raid
-    end
-
-    function Store:InvalidateIndexes(raid)
-        if not raid then return end
-        raid._bossIdxByNid = nil
-        raid._lootIdxByNid = nil
-    end
-
+    -- ----- Private helpers ----- --
     local function normalizeNid(v)
         return tonumber(v) or v
     end
@@ -99,6 +74,34 @@ do
             idx = raid[cacheField][normalizedNid]
         end
         return idx
+    end
+
+    -- ----- Public methods ----- --
+    -- Ensure the raid table has the schema v2 fields required by the module.
+    -- This does NOT migrate legacy structures; it only initializes missing fields for fresh SV.
+    function Store:EnsureRaid(raid)
+        if not raid then return end
+        raid.players       = raid.players or {}
+        raid.bossKills     = raid.bossKills or {}
+        raid.loot          = raid.loot or {}
+        raid.nextBossNid   = raid.nextBossNid or 1
+        raid.nextLootNid   = raid.nextLootNid or 1
+
+        -- Runtime-only indexes (not persisted).
+        raid._bossIdxByNid = raid._bossIdxByNid or nil
+        raid._lootIdxByNid = raid._lootIdxByNid or nil
+    end
+
+    function Store:GetRaid(rID)
+        local raid = rID and KRT_Raids[rID] or nil
+        if raid then self:EnsureRaid(raid) end
+        return raid
+    end
+
+    function Store:InvalidateIndexes(raid)
+        if not raid then return end
+        raid._bossIdxByNid = nil
+        raid._lootIdxByNid = nil
     end
 
     function Store:BossIdx(raid, bossNid)

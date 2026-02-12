@@ -44,7 +44,7 @@ do
     -- Multi-selection context for manual multi-award winner picking (Master Loot window)
     local MS_CTX_ROLLS = "MLRollWinners"
 
-    -- ---Internal state ----- --
+    -- ----- Internal state ----- --
     local state = {
         record       = false,
         canRoll      = true,
