@@ -7,7 +7,6 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Utils = feature.Utils
-local C = feature.C
 
 local K_COLOR = feature.K_COLOR
 
@@ -20,7 +19,7 @@ do
     local dragMode
 
     -- Cached math functions
-    local abs, sqrt = math.abs, math.sqrt
+    local sqrt = math.sqrt
     local cos, sin = math.cos, math.sin
     local rad, atan2, deg = math.rad, math.atan2, math.deg
 

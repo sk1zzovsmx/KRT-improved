@@ -111,7 +111,7 @@ do
                 module:SetImportMode(MODE_MULTI)
 
                 -- Re-run import in multi mode (Plus ignored by definition).
-                local ok, nPlayers = addon.Reserves:ParseCSV(data.csv, "multi")
+                local ok = addon.Reserves:ParseCSV(data.csv, "multi")
                 if ok then
                     module:Hide()
                     local rf = (addon.Reserves and addon.Reserves.frame) or _G["KRTReserveListFrame"]
@@ -177,7 +177,7 @@ do
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+    Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })

@@ -139,7 +139,7 @@ do
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = Utils.bootstrapModuleUi(module, getFrame, function()
+    Utils.bootstrapModuleUi(module, getFrame, function()
         configDirty = true
         module:RequestRefresh()
     end, {
@@ -151,7 +151,8 @@ do
     function module:OnClick(btn)
         if not btn then return end
         frameName = frameName or btn:GetParent():GetName()
-        local value, name = nil, btn:GetName()
+        local value
+        local name = btn:GetName()
 
         if name ~= frameName .. "countdownDuration" then
             value = (btn:GetChecked() == 1) or false

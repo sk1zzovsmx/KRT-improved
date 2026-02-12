@@ -8,7 +8,6 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
-local C = feature.C
 
 local RT_COLOR = feature.RT_COLOR
 

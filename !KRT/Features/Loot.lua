@@ -114,7 +114,7 @@ do
             if LootSlotIsItem(i) then
                 local itemLink = GetLootSlotLink(i)
                 if itemLink then
-                    local icon, name, quantity, quality = GetLootSlotInfo(i)
+                    local icon, name, _, quality = GetLootSlotInfo(i)
                     if GetItemFamily(itemLink) ~= 64 then
                         local key = Utils.getItemStringFromLink(itemLink) or itemLink
                         local existing = indexByItemKey[key]

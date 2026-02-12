@@ -8,7 +8,6 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
-local C = feature.C
 
 local tContains = feature.tContains
 
@@ -677,8 +676,6 @@ do
 
         -- highlight: durante CD = top roll; post-CD = pick (se esiste) altrimenti top roll
         local highlightTarget = selectionAllowed and (pickName or starTarget) or starTarget
-        local available = tonumber(addon.Loot:GetCurrentItemCount()) or 1
-        if available < 1 then available = 1 end
         local pickMode = selectionAllowed and (not lootState.fromInventory)
 
         -- Prefill MultiSelect with top-N winners (Top-N = ItemCount) in pick mode.

@@ -885,7 +885,7 @@ do
     -- ----- UI Window Management ----- --
 
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = Utils.bootstrapModuleUi(module, getFrame, function()
+    Utils.bootstrapModuleUi(module, getFrame, function()
         module:RequestRefresh()
     end, {
         bindToggleHide = bindModuleToggleHide,

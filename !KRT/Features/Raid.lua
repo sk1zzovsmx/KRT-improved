@@ -8,7 +8,6 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
-local C = feature.C
 
 local tContains = feature.tContains
 
@@ -30,7 +29,6 @@ do
     addon.Raid              = addon.Raid or {}
     local module            = addon.Raid
     -- ----- Internal state ----- --
-    local inRaid            = false
     local numRaid           = 0
     local rosterVersion     = 0
     local GetLootMethod     = GetLootMethod
@@ -285,7 +283,7 @@ do
     function module:EnsureStableIds(raidNum)
         local raid
 
-        raid, raidNum = Utils.getRaid(raidNum)
+        raid = Utils.getRaid(raidNum)
         if not raid then return end
 
         raid.players = raid.players or {}
@@ -475,7 +473,7 @@ do
         end
 
         local players = {}
-        for unit, owner in addon.UnitIterator(true) do
+        for unit in addon.UnitIterator(true) do
             if UnitIsConnected(unit) then
                 local name = UnitName(unit)
                 if name then
@@ -674,10 +672,10 @@ do
     function module:GetPlayerCount(name, raidNum)
         local raid
 
-        raid, raidNum = Utils.getRaid(raidNum)
+        raid = Utils.getRaid(raidNum)
         local players = raid and raid.players
         if not players then return 0 end
-        for i, p in ipairs(players) do
+        for _, p in ipairs(players) do
             if p.name == name then
                 local c = tonumber(p.count) or 0
                 return c
@@ -697,7 +695,7 @@ do
 
         local players = raid and raid.players
         if not players then return end
-        for i, p in ipairs(players) do
+        for _, p in ipairs(players) do
             if p.name == name then
                 local old = tonumber(p.count) or 0
                 if old ~= value then
@@ -758,8 +756,7 @@ do
 
     -- Checks if a raid log is expired (older than the weekly reset).
     function module:Expired(rID)
-        local raid, resolvedID = Utils.getRaid(rID)
-        rID = resolvedID
+        local raid = Utils.getRaid(rID)
         if not raid then
             return true
         end
@@ -898,10 +895,9 @@ do
     function module:CheckPlayer(name, raidNum)
         local found = false
         local players = module:GetPlayers(raidNum)
-        local originalName = name
         if players ~= nil then
             name = Utils.normalizeName(name)
-            for i, p in ipairs(players) do
+            for _, p in ipairs(players) do
                 if name == p.name then
                     found = true
                     break
@@ -951,7 +947,6 @@ do
     function module:GetPlayerLoot(name, raidNum, bossNid)
         local items = {}
         local loot = module:GetLoot(raidNum, bossNid)
-        local originalName = name
         name = (type(name) == "number") and module:GetPlayerName(name) or name
         for _, v in ipairs(loot) do
             if v.looter == name then
@@ -967,7 +962,6 @@ do
         local raid = raidNum and KRT_Raids[raidNum]
         local players = raid and raid.players or {}
         local rank = 0
-        local originalName = name
         name = name or Utils.getPlayerName() or UnitName("player")
         if #players == 0 then
             if addon.IsInGroup() then
@@ -980,7 +974,7 @@ do
                 end
             end
         else
-            for i, p in ipairs(players) do
+            for _, p in ipairs(players) do
                 if p.name == name then
                     rank = p.rank or 0
                     break
@@ -1046,7 +1040,7 @@ do
     -- Clears all raid target icons.
     function module:ClearRaidIcons()
         local players = module:GetPlayers()
-        for i, p in ipairs(players) do
+        for i = 1, #players do
             SetRaidTarget("raid" .. tostring(i), 0)
         end
     end

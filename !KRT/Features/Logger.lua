@@ -758,7 +758,7 @@ do
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+    Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
@@ -1574,7 +1574,6 @@ do
 
         postUpdate = function(n)
             local bSel = addon.Logger.selectedBoss
-            local pSel = addon.Logger.selectedBossPlayer
             local addBtn = _G[n .. "AddBtn"]
             local removeBtn = _G[n .. "RemoveBtn"]
             local attSelCount = Utils.multiSelectCount(addon.Logger._msBossAttCtx)
@@ -1632,7 +1631,6 @@ end
 do
     addon.Logger.RaidAttendees = addon.Logger.RaidAttendees or {}
     local RaidAtt = addon.Logger.RaidAttendees
-    local Store = addon.Logger.Store
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
 
@@ -2183,7 +2181,6 @@ end
 do
     addon.Logger.AttendeesBox = addon.Logger.AttendeesBox or {}
     local Box = addon.Logger.AttendeesBox
-    local Store = addon.Logger.Store
 
     local frameName
     local getFrame = Utils.makeFrameGetter("KRTLoggerAttendeesBox")

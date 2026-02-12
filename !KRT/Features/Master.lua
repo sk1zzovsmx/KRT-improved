@@ -340,7 +340,7 @@ do
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+    Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
@@ -413,7 +413,7 @@ do
 
             local itemLink = GetItemLink()
             local itemID = Utils.getItemIdFromLink(itemLink)
-            local message = ""
+            local message
 
             if rollType == rollTypes.RESERVED then
                 -- Chat-safe: keep UI colors in the Reserve Frame, but do not send class color codes in chat.
@@ -832,8 +832,6 @@ do
         FlagButtonsOnChange("hasItemReserves", hasItemReserves)
         FlagButtonsOnChange("countdownRun", countdownRun)
 
-        local available = tonumber(addon.Loot:GetCurrentItemCount()) or 1
-        if available < 1 then available = 1 end
         local pickMode = (not lootState.fromInventory)
         local msCount = pickMode and (Utils.multiSelectCount("MLRollWinners") or 0) or 0
         FlagButtonsOnChange("msCount", msCount)
@@ -874,7 +872,7 @@ do
         if UIDROPDOWNMENU_MENU_LEVEL == 2 then
             local g = UIDROPDOWNMENU_MENU_VALUE
             local m = dropDownData[g]
-            for key, value in pairs(m) do
+            for key in pairs(m) do
                 local info        = UIDropDownMenu_CreateInfo()
                 info.hasArrow     = false
                 info.notCheckable = 1
@@ -886,7 +884,7 @@ do
             end
         end
         if UIDROPDOWNMENU_MENU_LEVEL == 1 then
-            for key, value in pairs(dropDownData) do
+            for key in pairs(dropDownData) do
                 if dropDownGroupData[key] == true then
                     local info        = UIDropDownMenu_CreateInfo()
                     info.hasArrow     = 1
@@ -923,7 +921,7 @@ do
         dropDownGroupData = dropDownGroupData or {}
         twipe(dropDownGroupData)
 
-        for unit, owner in addon.UnitIterator(true) do
+        for unit in addon.UnitIterator(true) do
             local name = UnitName(unit)
             if name and name ~= "" then
                 local subgroup = 1

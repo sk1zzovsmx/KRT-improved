@@ -105,7 +105,7 @@ do
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    local uiController = Utils.bootstrapModuleUi(module, getFrame, function()
+    Utils.bootstrapModuleUi(module, getFrame, function()
         changesDirty = true
         lastSelectedID = false
         module:RequestRefresh()

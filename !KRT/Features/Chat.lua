@@ -21,7 +21,6 @@ do
     local module          = addon.Chat
     -- ----- Internal state ----- --
     local output          = C.CHAT_OUTPUT_FORMAT
-    local chatPrefix      = C.CHAT_PREFIX
     local chatPrefixShort = C.CHAT_PREFIX_SHORT
     local prefixHex       = C.CHAT_PREFIX_HEX
 
@@ -37,11 +36,8 @@ do
         local ch = channel
 
         if not ch then
-            local isCountdown = false
-            do
-                local seconds = addon.Deformat(text, L.ChatCountdownTic)
-                isCountdown = (seconds ~= nil) or (find(text, L.ChatCountdownEnd) ~= nil)
-            end
+            local seconds = addon.Deformat(text, L.ChatCountdownTic)
+            local isCountdown = (seconds ~= nil) or (find(text, L.ChatCountdownEnd) ~= nil)
 
             local groupType = addon.GetGroupTypeAndCount()
             if groupType == "raid" then
