@@ -186,17 +186,12 @@ Do not introduce additional non-frame globals (tables/vars/functions) unless exp
 ### 6.2 SavedVariables (account)
 
 These keys are persisted and must remain compatible:
-- `KRT_Options`
 - `KRT_Raids`
 - `KRT_Players`
+- `KRT_Reserves`
 - `KRT_Warnings`
-- `KRT_ExportString`
 - `KRT_Spammer`
-- `KRT_CurrentRaid`
-- `KRT_LastBoss`
-- `KRT_NextReset`
-- `KRT_SavedReserves`
-- `KRT_PlayerCounts`
+- `KRT_Options`
 
 ---
 

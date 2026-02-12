@@ -21,17 +21,17 @@ _G["KRT"] = addon
 -- =========== Saved Variables  =========== --
 -- These variables are persisted across sessions for the addon.
 
-KRT_Options = KRT_Options or {}
 KRT_Raids = KRT_Raids or {}
 KRT_Players = KRT_Players or {}
+KRT_Reserves = (type(KRT_Reserves) == "table") and KRT_Reserves or {}
 KRT_Warnings = KRT_Warnings or {}
-KRT_ExportString = KRT_ExportString or "$I,$N,$S,$W,$T,$R,$H:$M,$d/$m/$y"
 KRT_Spammer = KRT_Spammer or {}
+KRT_Options = KRT_Options or {}
+
+-- Runtime-only session state (not persisted in TOC SavedVariables)
 KRT_CurrentRaid = KRT_CurrentRaid or nil
 KRT_LastBoss = KRT_LastBoss or nil
 KRT_NextReset = KRT_NextReset or 0
-KRT_SavedReserves = KRT_SavedReserves or {}
-KRT_PlayerCounts = KRT_PlayerCounts or {}
 
 -- =========== External Libraries / Bootstrap  =========== --
 local Compat = LibStub("LibCompat-1.0")

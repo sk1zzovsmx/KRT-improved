@@ -209,17 +209,12 @@ Notes:
 
 Declared in `!KRT/!KRT.toc`:
 
-- `KRT_Options`
 - `KRT_Raids`
 - `KRT_Players`
+- `KRT_Reserves`
 - `KRT_Warnings`
-- `KRT_ExportString`
 - `KRT_Spammer`
-- `KRT_CurrentRaid`
-- `KRT_LastBoss`
-- `KRT_NextReset`
-- `KRT_SavedReserves`
-- `KRT_PlayerCounts`
+- `KRT_Options`
 
 Rule of thumb:
 - Preserve key names and shapes.

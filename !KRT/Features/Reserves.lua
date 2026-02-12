@@ -813,14 +813,14 @@ do
         addon:debug(Diag.D.LogReservesSaveEntries:format(addon.tLength(reservesData)))
         local saved = {}
         addon.tCopy(saved, reservesData)
-        KRT_SavedReserves = saved
+        KRT_Reserves = saved
     end
 
     function module:Load()
-        addon:debug(Diag.D.LogReservesLoadData:format(tostring(KRT_SavedReserves ~= nil)))
+        addon:debug(Diag.D.LogReservesLoadData:format(tostring(KRT_Reserves ~= nil)))
         twipe(reservesData)
-        if KRT_SavedReserves then
-            addon.tCopy(reservesData, KRT_SavedReserves)
+        if KRT_Reserves then
+            addon.tCopy(reservesData, KRT_Reserves)
         end
 
         -- Infer import mode from saved data when possible.
@@ -855,7 +855,7 @@ do
 
     function module:ResetSaved()
         addon:debug(Diag.D.LogReservesResetSaved)
-        KRT_SavedReserves = nil
+        KRT_Reserves = nil
         twipe(reservesData)
         RebuildIndex()
         self:Hide()

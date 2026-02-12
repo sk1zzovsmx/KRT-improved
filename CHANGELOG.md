@@ -4,6 +4,10 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Behavior:** Simplified account SavedVariables to feature-scoped keys:
+  `KRT_Raids`, `KRT_Players`, `KRT_Reserves`, `KRT_Warnings`, `KRT_Spammer`, and `KRT_Options`.
+  Runtime session keys (`KRT_CurrentRaid`, `KRT_LastBoss`, `KRT_NextReset`) are no longer persisted.
+- **Behavior:** SavedVariables now assume a fresh model only (no legacy import path).
 - **Refactor:** Continued modular architecture migration (wave 4d). UI legacy XML was decomposed into
   `UI/Minimap.xml`, `UI/ReservesTemplates.xml`, `UI/Master.xml`, and `UI/LootCounter.xml`; `KRT.xml`
   now includes these feature files directly, with no behavior changes.
