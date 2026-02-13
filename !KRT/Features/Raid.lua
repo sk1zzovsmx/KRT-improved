@@ -39,11 +39,13 @@ do
     local liveUnitsByName   = {}
     local liveNamesByUnit   = {}
     local pendingUnits      = {}
+    local raidInstanceCheckHandles = {}
 
     local UNKNOWN_OBJECT = UNKNOWNOBJECT
     local UNKNOWN_BEING = UKNOWNBEING
     local RETRY_DELAY_SECONDS = 1
     local RETRY_MAX_ATTEMPTS = 5
+    local RAID_INSTANCE_CHECK_DELAYS = { 0.3, 0.8, 1.5, 2.5, 3.5 }
 
     -- ----- Private helpers ----- --
     local function isUnknownName(name)
@@ -135,15 +137,100 @@ do
         known.sex = UnitSex(unitID) or 0
     end
 
+    local function resolveRaidDifficulty(instanceDiff)
+        local diff = tonumber(instanceDiff)
+        local _, instanceType, liveDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
+        if instanceType ~= "raid" then
+            return diff
+        end
+
+        liveDiff = tonumber(liveDiff)
+        if isDyn then
+            local baseDiff = liveDiff or diff
+            if baseDiff then
+                return baseDiff + (2 * (tonumber(dynDiff) or 0))
+            end
+            return nil
+        end
+
+        -- Prefer live difficulty from GetInstanceInfo(): event payload can be stale during
+        -- automatic fallback (for example 25H requested, 25N applied by the instance).
+        return liveDiff or diff
+    end
+
+    local function getRaidSizeFromDifficulty(instanceDiff)
+        local diff = tonumber(instanceDiff)
+        if not diff then
+            return nil
+        end
+        return (diff % 2 == 0) and 25 or 10
+    end
+
+    local function cancelRaidInstanceChecks()
+        for idx, handle in pairs(raidInstanceCheckHandles) do
+            addon.CancelTimer(handle, true)
+            raidInstanceCheckHandles[idx] = nil
+        end
+    end
+
+    local function runLiveRaidInstanceCheck()
+        local instanceName, instanceType, instanceDiff = GetInstanceInfo()
+        if instanceType ~= "raid" then
+            return
+        end
+        if L.RaidZones[instanceName] == nil then
+            return
+        end
+        module:Check(instanceName, instanceDiff)
+    end
+
+    local function createRaidSessionWithReason(instanceName, newSize, instanceDiff, isCreate)
+        local created = module:Create(instanceName, newSize, instanceDiff)
+        if not created then
+            return false
+        end
+        addon:info(L.StrNewRaidSessionChange)
+        local template = isCreate and Diag.D.LogRaidSessionCreate or Diag.D.LogRaidSessionChange
+        addon:debug(template:format(tostring(instanceName), newSize, tonumber(instanceDiff) or -1))
+        return true
+    end
+
     -- ----- Public methods ----- --
 
     function module:GetRosterVersion()
         return rosterVersion
     end
 
+    function module:CancelInstanceChecks()
+        cancelRaidInstanceChecks()
+    end
+
+    function module:ScheduleInstanceChecks()
+        cancelRaidInstanceChecks()
+
+        -- Immediate live check, then short retries to catch delayed server fallback updates.
+        runLiveRaidInstanceCheck()
+
+        for i = 1, #RAID_INSTANCE_CHECK_DELAYS do
+            local idx = i
+            local delaySeconds = RAID_INSTANCE_CHECK_DELAYS[idx]
+            raidInstanceCheckHandles[idx] = addon.NewTimer(delaySeconds, function()
+                raidInstanceCheckHandles[idx] = nil
+                runLiveRaidInstanceCheck()
+            end)
+        end
+    end
+
     -- Updates the current raid roster, adding new players and marking those who left.
     -- Returns rosterChanged, delta where delta contains joined/updated/left/unresolved lists.
     function module:UpdateRaidRoster()
+        if addon.IsInRaid() then
+            local instanceName, instanceType, instanceDiff = GetInstanceInfo()
+            if instanceType == "raid" and L.RaidZones[instanceName] ~= nil then
+                module:Check(instanceName, instanceDiff)
+            end
+        end
+
         if not KRT_CurrentRaid then
             resetPendingUnitRetry()
             resetLiveUnitCaches()
@@ -338,14 +425,15 @@ do
     end
 
     -- Creates a new raid log entry.
-    function module:Create(zoneName, raidSize)
+    function module:Create(zoneName, raidSize, raidDiff)
+        if not addon.IsInRaid() then return false end
+
+        local num = GetNumRaidMembers()
+        if num == 0 then return false end
+
         if KRT_CurrentRaid then
             self:End()
         end
-        if not addon.IsInRaid() then return end
-
-        local num = GetNumRaidMembers()
-        if num == 0 then return end
 
         numRaid = num
 
@@ -353,9 +441,9 @@ do
         local realmPlayers = ensureRealmPlayerMeta(realm)
         local currentTime = Utils.getCurrentTime()
 
-        local _, _, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
-        if isDyn then
-            instanceDiff = instanceDiff + (2 * dynDiff)
+        local instanceDiff = tonumber(raidDiff)
+        if not instanceDiff then
+            instanceDiff = resolveRaidDifficulty()
         end
 
         local raidInfo = Core.createRaidRecord({
@@ -410,6 +498,7 @@ do
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
         module.updateRosterHandle = addon.NewTimer(2, function() module:UpdateRaidRoster() end)
+        return true
     end
 
     -- Stable-ID helpers (bossNid / lootNid).
@@ -461,6 +550,7 @@ do
 
     -- Ends the current raid log entry, marking end time.
     function module:End()
+        cancelRaidInstanceChecks()
         addon.CancelTimer(module.pendingUnitRetryHandle, true)
         module.pendingUnitRetryHandle = nil
         twipe(pendingUnits)
@@ -488,44 +578,31 @@ do
 
     -- Checks the current raid status and creates a new session if needed.
     function module:Check(instanceName, instanceDiff)
+        instanceDiff = resolveRaidDifficulty(instanceDiff)
+        local newSize = getRaidSizeFromDifficulty(instanceDiff)
         addon:debug(Diag.D.LogRaidCheck:format(tostring(instanceName), tostring(instanceDiff),
             tostring(KRT_CurrentRaid)))
+        if not newSize then
+            return
+        end
+
         if not KRT_CurrentRaid then
-            module:Create(instanceName, (instanceDiff % 2 == 0 and 25 or 10))
+            module:Create(instanceName, newSize, instanceDiff)
+            return
         end
 
         local current = Core.ensureRaidById(KRT_CurrentRaid)
-        if current then
-            if current.zone == instanceName then
-                if current.size == 10 and (instanceDiff % 2 == 0) then
-                    addon:info(L.StrNewRaidSessionChange)
-                    addon:debug(Diag.D.LogRaidSessionChange:format(tostring(instanceName), 25,
-                        tonumber(instanceDiff) or -1))
-                    module:Create(instanceName, 25)
-                elseif current.size == 25 and (instanceDiff % 2 ~= 0) then
-                    addon:info(L.StrNewRaidSessionChange)
-                    addon:debug(Diag.D.LogRaidSessionChange:format(tostring(instanceName), 10,
-                        tonumber(instanceDiff) or -1))
-                    module:Create(instanceName, 10)
-                end
-            else
-                -- Zone changed: start a new raid session
-                addon:info(L.StrNewRaidSessionChange)
-                local newSize = (instanceDiff % 2 == 0 and 25 or 10)
-                addon:debug(Diag.D.LogRaidSessionChange:format(tostring(instanceName), newSize,
-                    tonumber(instanceDiff) or -1))
-                module:Create(instanceName, newSize)
-            end
-        elseif (instanceDiff % 2 == 0) then
-            addon:info(L.StrNewRaidSessionChange)
-            addon:debug(Diag.D.LogRaidSessionCreate:format(tostring(instanceName), 25,
-                tonumber(instanceDiff) or -1))
-            module:Create(instanceName, 25)
-        elseif (instanceDiff % 2 ~= 0) then
-            addon:info(L.StrNewRaidSessionChange)
-            addon:debug(Diag.D.LogRaidSessionCreate:format(tostring(instanceName), 10,
-                tonumber(instanceDiff) or -1))
-            module:Create(instanceName, 10)
+        if not current then
+            createRaidSessionWithReason(instanceName, newSize, instanceDiff, true)
+            return
+        end
+
+        local shouldCreate = current.zone ~= instanceName
+            or tonumber(current.size) ~= newSize
+            or tonumber(current.difficulty) ~= instanceDiff
+
+        if shouldCreate then
+            createRaidSessionWithReason(instanceName, newSize, instanceDiff, false)
         end
     end
 
@@ -602,12 +679,10 @@ do
         if not raid then return end
         Core.ensureRaidSchema(raid)
 
-        local _, _, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
+        local instanceDiff = resolveRaidDifficulty()
         if manDiff then
             instanceDiff = (raid.size == 10) and 1 or 2
             if Utils.normalizeLower(manDiff, true) == "h" then instanceDiff = instanceDiff + 2 end
-        elseif isDyn then
-            instanceDiff = instanceDiff + (2 * dynDiff)
         end
 
         local players = {}

@@ -44,6 +44,8 @@ Durable preferences learned from recent conversations:
   `_playersByName` as a derived runtime index/cache.
 - Treat fresh SavedVariables as strict mode: avoid legacy/migration cleanups and avoid fallback to
   volatile array indices when stable NIDs (`playerNid`, `bossNid`, `lootNid`) are available.
+- Keep `Features/SlashEvents.lua` focused on `/cmd` handling only.
+- Keep main WoW event handlers centralized in `KRT.lua`; modules should expose callable APIs used by those handlers.
 
 ---
 

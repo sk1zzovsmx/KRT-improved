@@ -14,12 +14,13 @@ local Diag = setmetatable({}, {
 })
 local Utils = addon.Utils
 local C = addon.C
+local L = addon.L
 
 local _G = _G
 local tremove = table.remove
 local pairs, select, type = pairs, select, type
 local error, pcall = error, pcall
-local tostring = tostring
+local tostring, tonumber = tostring, tonumber
 
 _G["KRT"] = addon
 
@@ -608,4 +609,226 @@ end
 -- [MIGRATED] See Features/SlashEvents.lua
 
 -- =========== Main Event Handlers  =========== --
--- [MIGRATED] See Features/SlashEvents.lua
+local addonEvents = {
+    CHAT_MSG_SYSTEM = "CHAT_MSG_SYSTEM",
+    CHAT_MSG_LOOT = "CHAT_MSG_LOOT",
+    CHAT_MSG_MONSTER_YELL = "CHAT_MSG_MONSTER_YELL",
+    RAID_ROSTER_UPDATE = "RAID_ROSTER_UPDATE",
+    PLAYER_ENTERING_WORLD = "PLAYER_ENTERING_WORLD",
+    COMBAT_LOG_EVENT_UNFILTERED = "COMBAT_LOG_EVENT_UNFILTERED",
+    RAID_INSTANCE_WELCOME = "RAID_INSTANCE_WELCOME",
+    PLAYER_DIFFICULTY_CHANGED = "PLAYER_DIFFICULTY_CHANGED",
+    UPDATE_INSTANCE_INFO = "UPDATE_INSTANCE_INFO",
+    LOOT_CLOSED = "LOOT_CLOSED",
+    LOOT_OPENED = "LOOT_OPENED",
+    LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
+    TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
+    TRADE_REQUEST_CANCEL = "TRADE_REQUEST_CANCEL",
+    TRADE_CLOSED = "TRADE_CLOSED",
+    PLAYER_LOGOUT = "PLAYER_LOGOUT",
+}
+
+do
+    local forward = {
+        LOOT_OPENED = "LOOT_OPENED",
+        LOOT_CLOSED = "LOOT_CLOSED",
+        LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
+        TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
+        TRADE_REQUEST_CANCEL = "TRADE_REQUEST_CANCEL",
+        TRADE_CLOSED = "TRADE_CLOSED",
+    }
+    for e, m in pairs(forward) do
+        local method = m
+        addon[e] = function(_, ...)
+            addon.Master[method](addon.Master, ...)
+        end
+    end
+end
+
+-- ADDON_LOADED: Initializes the addon after loading.
+function addon:ADDON_LOADED(name)
+    if name ~= addonName then return end
+    self:UnregisterEvent("ADDON_LOADED")
+    local lvl = addon.GetLogLevel and addon:GetLogLevel()
+    addon:info(Diag.I.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
+        tostring(lvl), tostring(true)))
+    addon.LoadOptions()
+    addon.Reserves:Load()
+    for event in pairs(addonEvents) do
+        self:RegisterEvent(event)
+    end
+    addon:debug(Diag.D.LogCoreEventsRegistered:format(addon.tLength(addonEvents)))
+    self:RAID_ROSTER_UPDATE(true)
+end
+
+local rosterUpdateDebounceSeconds = 0.2
+
+local function isLoggerViewingCurrentRaid(log, logFrame)
+    if not (log and logFrame and logFrame.IsShown and logFrame:IsShown()) then
+        return false
+    end
+    return KRT_CurrentRaid and log.selectedRaid and tonumber(log.selectedRaid) == tonumber(KRT_CurrentRaid)
+end
+
+local function scheduleRaidInstanceChecksIfRecognized(instanceName, instanceType, instanceDiff, emitRecognizedLog)
+    if instanceType ~= "raid" or L.RaidZones[instanceName] == nil then
+        return false
+    end
+    if emitRecognizedLog then
+        addon:debug(Diag.D.LogRaidInstanceRecognized:format(tostring(instanceName), tostring(instanceDiff)))
+    end
+    addon.Raid:ScheduleInstanceChecks()
+    return true
+end
+
+local function processRaidRosterUpdate()
+    local changed, delta = addon.Raid:UpdateRaidRoster()
+    if not changed then
+        return
+    end
+
+    -- Single source of truth for roster change notifications (join/update/leave delta).
+    Utils.triggerEvent("RaidRosterDelta", delta, addon.Raid:GetRosterVersion(), KRT_CurrentRaid)
+    -- Keep Master Looter UI in sync (event-driven; no polling).
+    local mf = addon.Master and addon.Master.frame
+    if addon.Master and addon.Master.RequestRefresh and mf and mf.IsShown and mf:IsShown() then
+        addon.Master:RequestRefresh()
+    end
+
+    -- If the Logger is open on the *current* raid, keep the visible lists in sync automatically.
+    -- (Throttled to avoid multiple redraws during bursty roster updates.)
+    local log = addon.Logger
+    local logFrame = log and log.frame
+    if not isLoggerViewingCurrentRaid(log, logFrame) then
+        return
+    end
+
+    addon.CancelTimer(log._rosterUiHandle, true)
+    log._rosterUiHandle = addon.NewTimer(0.25, function()
+        if not isLoggerViewingCurrentRaid(log, logFrame) then
+            return
+        end
+
+        if log.RaidAttendees and log.RaidAttendees._ctrl and log.RaidAttendees._ctrl.Dirty then
+            log.RaidAttendees._ctrl:Dirty()
+        end
+        if log.BossAttendees and log.BossAttendees._ctrl and log.BossAttendees._ctrl.Dirty then
+            log.BossAttendees._ctrl:Dirty()
+        end
+        if log.Loot and log.Loot._ctrl and log.Loot._ctrl.Dirty then
+            log.Loot._ctrl:Dirty()
+        end
+    end)
+end
+
+-- RAID_ROSTER_UPDATE: Updates the raid roster when it changes.
+function addon:RAID_ROSTER_UPDATE(forceImmediate)
+    addon.CancelTimer(self._raidRosterUpdateHandle, true)
+    self._raidRosterUpdateHandle = nil
+
+    if forceImmediate then
+        processRaidRosterUpdate()
+        return
+    end
+
+    self._raidRosterUpdateHandle = addon.NewTimer(rosterUpdateDebounceSeconds, function()
+        self._raidRosterUpdateHandle = nil
+        processRaidRosterUpdate()
+    end)
+end
+
+-- RAID_INSTANCE_WELCOME: Triggered when entering a raid instance.
+function addon:RAID_INSTANCE_WELCOME(...)
+    local instanceName, instanceType, instanceDiff = GetInstanceInfo()
+    local _, nextReset = ...
+    KRT_NextReset = nextReset
+    addon:trace(Diag.D.LogRaidInstanceWelcome:format(tostring(instanceName), tostring(instanceType),
+        tostring(instanceDiff), tostring(KRT_NextReset)))
+    if instanceType == "raid" and not L.RaidZones[instanceName] then
+        addon:warn(Diag.W.LogRaidUnmappedZone:format(tostring(instanceName), tostring(instanceDiff)))
+    end
+    if instanceType == "raid" then
+        RequestRaidInfo()
+    end
+    scheduleRaidInstanceChecksIfRecognized(instanceName, instanceType, instanceDiff, true)
+end
+
+-- PLAYER_DIFFICULTY_CHANGED: Re-check raid session when raid difficulty changes.
+function addon:PLAYER_DIFFICULTY_CHANGED()
+    local instanceName, instanceType, instanceDiff = GetInstanceInfo()
+    scheduleRaidInstanceChecksIfRecognized(instanceName, instanceType, instanceDiff, false)
+end
+
+-- UPDATE_INSTANCE_INFO: Re-check raid session after server pushes instance-save info refreshes.
+function addon:UPDATE_INSTANCE_INFO()
+    local instanceName, instanceType, instanceDiff = GetInstanceInfo()
+    scheduleRaidInstanceChecksIfRecognized(instanceName, instanceType, instanceDiff, false)
+end
+
+-- PLAYER_ENTERING_WORLD: Performs initial checks when the player logs in.
+function addon:PLAYER_ENTERING_WORLD()
+    self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+    local module = self.Raid
+    addon:trace(Diag.D.LogCorePlayerEnteringWorld)
+    module:CancelInstanceChecks()
+    -- Restart the first-check timer on login
+    addon.CancelTimer(module.firstCheckHandle, true)
+    module.firstCheckHandle = nil
+    module.firstCheckHandle = addon.NewTimer(3, function() module:FirstCheck() end)
+end
+
+-- CHAT_MSG_LOOT: Adds looted items to the raid log.
+function addon:CHAT_MSG_LOOT(msg)
+    addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
+    if KRT_CurrentRaid then
+        self.Raid:AddLoot(msg)
+    end
+end
+
+-- CHAT_MSG_SYSTEM: Forwards roll messages to the Rolls module.
+function addon:CHAT_MSG_SYSTEM(msg)
+    addon.Rolls:CHAT_MSG_SYSTEM(msg)
+end
+
+-- CHAT_MSG_MONSTER_YELL: Logs a boss kill based on specific boss yells.
+function addon:CHAT_MSG_MONSTER_YELL(...)
+    local text = ...
+    if L.BossYells[text] and KRT_CurrentRaid then
+        addon:trace(Diag.D.LogBossYellMatched:format(tostring(text), tostring(L.BossYells[text])))
+        self.Raid:AddBoss(L.BossYells[text])
+    end
+end
+
+-- COMBAT_LOG_EVENT_UNFILTERED: Logs a boss kill when a boss unit dies.
+function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
+    if not KRT_CurrentRaid then return end
+
+    -- Hot-path fast check: inspect the event type before unpacking extra args.
+    local subEvent = select(2, ...)
+    if subEvent ~= "UNIT_DIED" then return end
+
+    -- 3.3.5a base params (8):
+    -- timestamp, event, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags
+    local destGUID, destName, destFlags = select(6, ...)
+    if bit.band(destFlags or 0, COMBATLOG_OBJECT_TYPE_PLAYER) ~= 0 then return end
+
+    -- LibCompat embeds GetCreatureId with the 3.3.5a GUID parsing rules.
+    local npcId = destGUID and addon.GetCreatureId(destGUID)
+    local bossLib = addon.BossIDs
+    local bossIds = bossLib and bossLib.BossIDs
+    if not (npcId and bossIds and bossIds[npcId]) then return end
+
+    local boss = destName or bossLib:GetBossName(npcId)
+    if boss then
+        addon:trace(Diag.D.LogBossUnitDiedMatched:format(tonumber(npcId) or -1, tostring(boss)))
+        self.Raid:AddBoss(boss)
+    end
+end
+
+-- PLAYER_LOGOUT: Strip runtime-only raid caches before SavedVariables are written.
+function addon:PLAYER_LOGOUT()
+    if type(KRT_Raids) ~= "table" then return end
+    for i = 1, #KRT_Raids do
+        addon.Core.stripRuntimeRaidCaches(KRT_Raids[i])
+    end
+end

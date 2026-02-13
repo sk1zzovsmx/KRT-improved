@@ -4,6 +4,23 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Bugfix:** Raid session switching no longer drops the previous current raid when roster data is
+  temporarily unavailable (`GetNumRaidMembers()==0`); `Raid:Create(...)` now validates readiness
+  before ending the previous session.
+- **Behavior:** Added `UPDATE_INSTANCE_INFO` re-checks (plus `RequestRaidInfo()` on raid welcome)
+  to catch delayed server-side raid difficulty/instance state updates.
+- **Bugfix:** Raid session detection now self-heals on `RAID_ROSTER_UPDATE`: if no current raid
+  exists while grouped in a recognized raid instance, KRT runs a live `Raid:Check(...)` and creates
+  the session as soon as roster data is available.
+- **Bugfix:** Added `PLAYER_DIFFICULTY_CHANGED` handling in `KRT.lua` to re-run raid session checks
+  when raid difficulty changes or is adjusted by server fallback.
+- **Refactor:** Main WoW event handlers moved back to `KRT.lua`; `Features/SlashEvents.lua`
+  now contains slash-command routing only.
+- **Bugfix:** Raid enter checks now re-read live instance data with short staged retries
+  (0.3/0.8/1.5/2.5/3.5s) instead of relying on stale event payloads, so automatic unsupported-mode fallback
+  (for example Naxx 25H -> 25N) correctly triggers a new raid session without long waits.
+- **Bugfix:** Raid session auto-detection now correctly starts a new session on any raid difficulty
+  switch (10/25 and Normal/Heroic), using normalized live raid difficulty (dynamic + heroic mode).
 - **Refactor:** Fresh-SV canonical raid model finalized: `players[]` is canonical, `_playersByName`
   is derived runtime-only, legacy `playersByName` cleanup paths were removed, and runtime raid caches
   (`_playersByName`, `_playerIdxByNid`, `_bossIdxByNid`, `_lootIdxByNid`) are stripped on logout.
