@@ -19,9 +19,6 @@ local RAID_TARGET_MARKERS = feature.RAID_TARGET_MARKERS
 local lootState = feature.lootState
 local itemInfo = feature.itemInfo
 
-local ItemExists, ItemIsSoulbound, GetItem
-local GetItemName, GetItemLink, GetItemTexture
-
 local _G = _G
 local tinsert, tconcat, twipe = table.insert, table.concat, table.wipe
 local pairs, select, next = pairs, select, next
@@ -32,32 +29,32 @@ local function GetLootModule()
     return addon.Loot
 end
 
-GetItem = function(i)
+local function GetItem(i)
     local loot = GetLootModule()
     return loot and loot.GetItem and loot.GetItem(i) or nil
 end
 
-GetItemName = function(i)
+local function GetItemName(i)
     local loot = GetLootModule()
     return loot and loot.GetItemName and loot.GetItemName(i) or nil
 end
 
-GetItemLink = function(i)
+local function GetItemLink(i)
     local loot = GetLootModule()
     return loot and loot.GetItemLink and loot.GetItemLink(i) or nil
 end
 
-GetItemTexture = function(i)
+local function GetItemTexture(i)
     local loot = GetLootModule()
     return loot and loot.GetItemTexture and loot.GetItemTexture(i) or nil
 end
 
-ItemExists = function(i)
+local function ItemExists(i)
     local loot = GetLootModule()
     return loot and loot.ItemExists and loot.ItemExists(i) or false
 end
 
-ItemIsSoulbound = function(bag, slot)
+local function ItemIsSoulbound(bag, slot)
     local loot = GetLootModule()
     return loot and loot.ItemIsSoulbound and loot.ItemIsSoulbound(bag, slot) or false
 end
