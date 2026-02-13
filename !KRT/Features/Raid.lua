@@ -8,6 +8,7 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Core = feature.Core
 
 local tContains = feature.tContains
 
@@ -152,16 +153,12 @@ do
             return rosterChanged
         end
 
-        local raid = KRT_Raids[KRT_CurrentRaid]
+        local raid = Core.ensureRaidById(KRT_CurrentRaid)
         if not raid then return false end
 
         local realm = Utils.getRealmName()
         KRT_Players[realm] = KRT_Players[realm] or {}
-
-        raid.players = raid.players or {}
-
-        raid.playersByName = raid.playersByName or {}
-        local playersByName = raid.playersByName
+        local playersByName = raid._playersByName
 
         local prevNumRaid = numRaid
         local n = GetNumRaidMembers()
@@ -222,6 +219,7 @@ do
                     local newSubgroup = subgroup or (prevPlayer and prevPlayer.subgroup) or 1
                     local newClass = class or (prevPlayer and prevPlayer.class) or "UNKNOWN"
                     player = {
+                        playerNid = prevPlayer and prevPlayer.playerNid or nil,
                         name     = name,
                         rank     = newRank,
                         subgroup = newSubgroup,
@@ -361,20 +359,13 @@ do
             instanceDiff = instanceDiff + (2 * dynDiff)
         end
 
-        local raidInfo = {
-            realm         = realm,
-            zone          = zoneName,
-            size          = raidSize,
-            difficulty    = tonumber(instanceDiff) or nil,
-            players       = {},
-            playersByName = {},
-            bossKills     = {},
-            loot          = {},
-            nextBossNid   = 1,
-            nextLootNid   = 1,
-            startTime     = currentTime,
-            changes       = {},
-        }
+        local raidInfo = Core.createRaidRecord({
+            realm = realm,
+            zone = zoneName,
+            size = raidSize,
+            difficulty = tonumber(instanceDiff) or nil,
+            startTime = currentTime,
+        })
 
         for i = 1, num do
             local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
@@ -383,6 +374,7 @@ do
                 local raceL, race = UnitRace(unitID)
 
                 local p = {
+                    playerNid = raidInfo.nextPlayerNid,
                     name     = name,
                     rank     = rank or 0,
                     subgroup = subgroup or 1,
@@ -391,9 +383,9 @@ do
                     leave    = nil,
                     count    = 0,
                 }
+                raidInfo.nextPlayerNid = (tonumber(raidInfo.nextPlayerNid) or 1) + 1
 
                 tinsert(raidInfo.players, p)
-                raidInfo.playersByName[name] = p
 
                 -- Overwrite always
                 KRT_Players[realm][name] = {
@@ -431,29 +423,19 @@ do
     end
 
     -- ----- Stable ID helpers (bossNid / lootNid) ----- --
-    -- NOTE: Fresh SavedVariables only (schema v2). No legacy migration is performed.
+    -- NOTE: Fresh SavedVariables only. Schema is normalized by Core.ensureRaidSchema().
 
     function module:EnsureStableIds(raidNum)
-        local raid
-
-        raid = Utils.getRaid(raidNum)
+        local raid = Core.ensureRaidById(raidNum)
         if not raid then return end
-
-        raid.players = raid.players or {}
-        raid.playersByName = raid.playersByName or {}
-        raid.bossKills = raid.bossKills or {}
-        raid.loot = raid.loot or {}
-
-        if raid.nextBossNid == nil then raid.nextBossNid = 1 end
-        if raid.nextLootNid == nil then raid.nextLootNid = 1 end
+        Core.ensureRaidSchema(raid)
     end
 
     function module:GetBossByNid(bossNid, raidNum)
-        local raid
-
-        raid, raidNum = Utils.getRaid(raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = Core.ensureRaidById(raidNum)
         if not raid or bossNid == nil then return nil end
-        module:EnsureStableIds(raidNum)
+        Core.ensureRaidSchema(raid)
 
         bossNid = tonumber(bossNid) or 0
         if bossNid <= 0 then return nil end
@@ -469,11 +451,10 @@ do
     end
 
     function module:GetLootByNid(lootNid, raidNum)
-        local raid
-
-        raid, raidNum = Utils.getRaid(raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = Core.ensureRaidById(raidNum)
         if not raid or lootNid == nil then return nil end
-        module:EnsureStableIds(raidNum)
+        Core.ensureRaidSchema(raid)
 
         lootNid = tonumber(lootNid) or 0
         if lootNid <= 0 then return nil end
@@ -499,17 +480,18 @@ do
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
         local currentTime = Utils.getCurrentTime()
-        local raid = KRT_Raids[KRT_CurrentRaid]
+        local raid = Core.ensureRaidById(KRT_CurrentRaid)
         if raid then
             local duration = currentTime - (raid.startTime or currentTime)
             addon:info(Diag.I.LogRaidEnded:format(KRT_CurrentRaid or -1, tostring(raid.zone),
                 tonumber(raid.size) or -1, raid.bossKills and #raid.bossKills or 0,
                 raid.loot and #raid.loot or 0, duration))
+
+            for _, v in pairs(raid.players) do
+                if not v.leave then v.leave = currentTime end
+            end
+            raid.endTime = currentTime
         end
-        for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
-            if not v.leave then v.leave = currentTime end
-        end
-        KRT_Raids[KRT_CurrentRaid].endTime = currentTime
         KRT_CurrentRaid = nil
         KRT_LastBoss = nil
     end
@@ -522,7 +504,7 @@ do
             module:Create(instanceName, (instanceDiff % 2 == 0 and 25 or 10))
         end
 
-        local current = KRT_Raids[KRT_CurrentRaid]
+        local current = Core.ensureRaidById(KRT_CurrentRaid)
         if current then
             if current.zone == instanceName then
                 if current.size == 10 and (instanceDiff % 2 == 0) then
@@ -585,24 +567,33 @@ do
     function module:AddPlayer(t, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
         if not raidNum or not t or not t.name then return end
-        local raid = KRT_Raids[raidNum]
-        raid.playersByName = raid.playersByName or {}
+        local raid = Core.ensureRaidById(raidNum)
+        if not raid then return end
+        Core.ensureRaidSchema(raid)
+
         local players = module:GetPlayers(raidNum)
         local found = false
+        local nextPlayerNid = tonumber(raid.nextPlayerNid) or 1
+
         for i, p in ipairs(players) do
             if t.name == p.name then
                 -- Preserve count if present
                 t.count = t.count or p.count or 0
+                t.playerNid = tonumber(t.playerNid) or tonumber(p.playerNid) or nextPlayerNid
+                if tonumber(t.playerNid) >= nextPlayerNid then
+                    raid.nextPlayerNid = tonumber(t.playerNid) + 1
+                end
                 raid.players[i] = t
-                raid.playersByName[t.name] = t
                 found = true
                 break
             end
         end
+
         if not found then
             t.count = t.count or 0
+            t.playerNid = tonumber(t.playerNid) or nextPlayerNid
+            raid.nextPlayerNid = tonumber(t.playerNid) + 1
             tinsert(raid.players, t)
-            raid.playersByName[t.name] = t
             addon:trace(Diag.D.LogRaidPlayerJoin:format(tostring(t.name), tonumber(raidNum) or -1))
         else
             addon:trace(Diag.D.LogRaidPlayerRefresh:format(tostring(t.name), tonumber(raidNum) or -1))
@@ -617,9 +608,9 @@ do
             return
         end
 
-        local raid = KRT_Raids[raidNum]
+        local raid = Core.ensureRaidById(raidNum)
         if not raid then return end
-        module:EnsureStableIds(raidNum)
+        Core.ensureRaidSchema(raid)
 
         local _, _, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
         if manDiff then
@@ -755,9 +746,9 @@ do
             rollValue = addon.Rolls:HighestRoll() or 0
         end
 
-        local raid = KRT_Raids[KRT_CurrentRaid]
+        local raid = Core.ensureRaidById(KRT_CurrentRaid)
         if not raid then return end
-        module:EnsureStableIds(KRT_CurrentRaid)
+        Core.ensureRaidSchema(raid)
         local lootNid = tonumber(raid.nextLootNid) or 1
         raid.nextLootNid = lootNid + 1
 
@@ -791,6 +782,68 @@ do
 
     -- ----- Player Count API ----- --
 
+    local function findRaidPlayerByNid(raid, playerNid)
+        local nid = tonumber(playerNid)
+        if not nid or nid <= 0 then
+            return nil
+        end
+
+        local players = raid and raid.players or {}
+        for i = #players, 1, -1 do
+            local p = players[i]
+            if p and tonumber(p.playerNid) == nid then
+                return p
+            end
+        end
+        return nil
+    end
+
+    function module:GetPlayerCountByNid(playerNid, raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = Core.ensureRaidById(raidNum)
+        if not raid then return 0 end
+        Core.ensureRaidSchema(raid)
+
+        local player = findRaidPlayerByNid(raid, playerNid)
+        if not player then return 0 end
+        return tonumber(player.count) or 0
+    end
+
+    function module:SetPlayerCountByNid(playerNid, value, raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = Core.ensureRaidById(raidNum)
+        if not raid then return end
+        Core.ensureRaidSchema(raid)
+
+        local player = findRaidPlayerByNid(raid, playerNid)
+        if not player then return end
+
+        value = tonumber(value) or 0
+        -- Hard clamp: counts are always non-negative.
+        if value < 0 then value = 0 end
+
+        local old = tonumber(player.count) or 0
+        player.count = value
+
+        if old ~= value then
+            Utils.triggerEvent("PlayerCountChanged", player.name, value, old, raidNum)
+        end
+    end
+
+    function module:AddPlayerCountByNid(playerNid, delta, raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        if not raidNum then return end
+
+        delta = tonumber(delta) or 0
+        if delta == 0 then return end
+
+        local current = module:GetPlayerCountByNid(playerNid, raidNum) or 0
+        local nextVal = current + delta
+        if nextVal < 0 then nextVal = 0 end
+
+        module:SetPlayerCountByNid(playerNid, nextVal, raidNum)
+    end
+
     -- Adds (or subtracts) from the per-raid player count.
     -- Used by LootCounter UI and MS auto-counting.
     -- Clamps to 0 (never negative).
@@ -808,7 +861,8 @@ do
         end
 
         -- Ensure the player exists in the raid log.
-        if module:GetPlayerID(name, raidNum) == 0 then
+        local playerNid = module:GetPlayerID(name, raidNum)
+        if playerNid == 0 then
             module:AddPlayer({
                 name     = name,
                 rank     = 0,
@@ -818,52 +872,28 @@ do
                 leave    = nil,
                 count    = 0,
             }, raidNum)
+            playerNid = module:GetPlayerID(name, raidNum)
         end
 
-        local current = module:GetPlayerCount(name, raidNum) or 0
-        local nextVal = current + delta
-        if nextVal < 0 then nextVal = 0 end
-        module:SetPlayerCount(name, nextVal, raidNum)
+        if playerNid == 0 then
+            return
+        end
+
+        module:AddPlayerCountByNid(playerNid, delta, raidNum)
     end
 
     function module:GetPlayerCount(name, raidNum)
-        local raid
-
-        raid = Utils.getRaid(raidNum)
-        local players = raid and raid.players
-        if not players then return 0 end
-        for _, p in ipairs(players) do
-            if p.name == name then
-                local c = tonumber(p.count) or 0
-                return c
-            end
-        end
-        return 0
+        if not name then return 0 end
+        local playerNid = module:GetPlayerID(name, raidNum)
+        if playerNid == 0 then return 0 end
+        return module:GetPlayerCountByNid(playerNid, raidNum)
     end
 
     function module:SetPlayerCount(name, value, raidNum)
-        local raid
-
-        raid, raidNum = Utils.getRaid(raidNum)
-
-        value = tonumber(value) or 0
-        -- Hard clamp: counts are always non-negative.
-        if value < 0 then value = 0 end
-
-        local players = raid and raid.players
-        if not players then return end
-        for _, p in ipairs(players) do
-            if p.name == name then
-                local old = tonumber(p.count) or 0
-                if old ~= value then
-                    p.count = value
-                    Utils.triggerEvent("PlayerCountChanged", name, value, old, raidNum)
-                else
-                    p.count = value
-                end
-                return
-            end
-        end
+        if not name then return end
+        local playerNid = module:GetPlayerID(name, raidNum)
+        if playerNid == 0 then return end
+        module:SetPlayerCountByNid(playerNid, value, raidNum)
     end
 
     function module:IncrementPlayerCount(name, raidNum)
@@ -913,7 +943,7 @@ do
 
     -- Checks if a raid log is expired (older than the weekly reset).
     function module:Expired(rID)
-        local raid = Utils.getRaid(rID)
+        local raid = Core.ensureRaidById(rID)
         if not raid then
             return true
         end
@@ -931,27 +961,22 @@ do
 
     -- Retrieves all loot for a given raid and optional boss number.
     function module:GetLoot(raidNum, bossNid)
-        local raid
-
-        raid, raidNum = Utils.getRaid(raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = Core.ensureRaidById(raidNum)
         bossNid = tonumber(bossNid) or 0
         if not raid then
             return {}
         end
-        module:EnsureStableIds(raidNum)
+        Core.ensureRaidSchema(raid)
 
         local loot = raid.loot or {}
         if bossNid <= 0 then
-            for _, v in ipairs(loot) do
-                v.id = tonumber(v.lootNid) or v.id
-            end
             return loot
         end
 
         local items = {}
         for _, v in ipairs(loot) do
             if tonumber(v.bossNid) == bossNid then
-                v.id = tonumber(v.lootNid) or v.id
                 tinsert(items, v)
             end
         end
@@ -960,12 +985,11 @@ do
 
     -- Retrieves the position of a specific loot item within the raid's loot table.
     function module:GetLootID(itemID, raidNum, holderName)
-        local raid
-
-        raid, raidNum = Utils.getRaid(raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = Core.ensureRaidById(raidNum)
         if not raid then return 0 end
 
-        module:EnsureStableIds(raidNum)
+        Core.ensureRaidSchema(raid)
 
         itemID = tonumber(itemID)
         if not itemID then return 0 end
@@ -988,12 +1012,11 @@ do
 
     -- Retrieves all boss kills for a given raid.
     function module:GetBosses(raidNum, out)
-        local raid
-
-        raid, raidNum = Utils.getRaid(raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = Core.ensureRaidById(raidNum)
         if not raid or not raid.bossKills then return {} end
 
-        module:EnsureStableIds(raidNum)
+        Core.ensureRaidSchema(raid)
 
         local bosses = out or {}
         if out then twipe(bosses) end
@@ -1001,7 +1024,7 @@ do
         for i = 1, #raid.bossKills do
             local boss = raid.bossKills[i]
             bosses[#bosses + 1] = {
-                id   = tonumber(boss.bossNid) or i, -- stable selection id
+                id   = tonumber(boss.bossNid), -- stable selection id
                 seq  = i,                           -- display order
                 name = boss.name,
                 time = boss.time,
@@ -1016,17 +1039,13 @@ do
 
     -- Returns players from the raid log. Can be filtered by boss kill.
     function module:GetPlayers(raidNum, bossNid, out)
-        local raid
-
-        raid, raidNum = Utils.getRaid(raidNum)
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = Core.ensureRaidById(raidNum)
         if not raid then return {} end
 
-        module:EnsureStableIds(raidNum)
+        Core.ensureRaidSchema(raid)
 
         local raidPlayers = raid.players or {}
-        for k, v in ipairs(raidPlayers) do
-            v.id = k
-        end
 
         bossNid = tonumber(bossNid) or 0
         if bossNid > 0 then
@@ -1046,6 +1065,39 @@ do
         end
 
         return raidPlayers
+    end
+
+    -- Returns LootCounter rows from canonical raid data (unique by player name).
+    function module:GetLootCounterRows(raidNum, out)
+        raidNum = raidNum or KRT_CurrentRaid
+        local raid = Core.ensureRaidById(raidNum)
+        local rows = out or {}
+        if out then twipe(rows) end
+        if not raid or not raid.players then
+            return rows
+        end
+
+        Core.ensureRaidSchema(raid)
+
+        local seenByName = {}
+        for i = #raid.players, 1, -1 do
+            local p = raid.players[i]
+            if p and p.name and not seenByName[p.name] then
+                seenByName[p.name] = true
+                rows[#rows + 1] = {
+                    playerNid = tonumber(p.playerNid),
+                    name = p.name,
+                    class = p.class,
+                    count = tonumber(p.count) or 0,
+                }
+            end
+        end
+
+        table.sort(rows, function(a, b)
+            return tostring(a.name or "") < tostring(b.name or "")
+        end)
+
+        return rows
     end
 
     -- Checks if a player is in the raid log.
@@ -1068,30 +1120,37 @@ do
         return found, name
     end
 
-    -- Returns the player's internal ID from the raid log.
+    -- Returns the player's stable ID (playerNid) from the raid log.
     function module:GetPlayerID(name, raidNum)
-        local id = 0
+        local playerNid = 0
         raidNum = raidNum or KRT_CurrentRaid
-        if raidNum and KRT_Raids[raidNum] then
+        local raid = raidNum and Core.ensureRaidById(raidNum)
+        if raid then
             name = name or Utils.getPlayerName()
-            local players = KRT_Raids[raidNum].players
-            for i, p in ipairs(players) do
-                if p.name == name then
-                    id = i
+            local players = raid.players or {}
+            for i = #players, 1, -1 do
+                local p = players[i]
+                if p and p.name == name then
+                    playerNid = tonumber(p.playerNid) or 0
                     break
                 end
             end
         end
-        return id
+        return playerNid
     end
 
-    -- Gets a player's name by their internal ID.
+    -- Gets a player's name by stable ID (playerNid).
     function module:GetPlayerName(id, raidNum)
         local name
         raidNum = raidNum or addon.Logger.selectedRaid or KRT_CurrentRaid
-        if raidNum and KRT_Raids[raidNum] then
-            for k, p in ipairs(KRT_Raids[raidNum].players) do
-                if k == id then
+        local raid = raidNum and Core.ensureRaidById(raidNum)
+        if raid then
+            local qid = tonumber(id) or id
+            local players = raid.players or {}
+            for i = 1, #players do
+                local p = players[i]
+                local pid = p and (tonumber(p.playerNid) or p.playerNid)
+                if pid == qid then
                     name = p.name
                     break
                 end
@@ -1104,10 +1163,9 @@ do
     function module:GetPlayerLoot(name, raidNum, bossNid)
         local items = {}
         local loot = module:GetLoot(raidNum, bossNid)
-        name = (type(name) == "number") and module:GetPlayerName(name) or name
+        name = (type(name) == "number") and module:GetPlayerName(name, raidNum) or name
         for _, v in ipairs(loot) do
             if v.looter == name then
-                -- Keep v.id stable (lootNid) as assigned by GetLoot()
                 tinsert(items, v)
             end
         end
@@ -1116,7 +1174,7 @@ do
 
     -- Gets a player's rank.
     function module:GetPlayerRank(name, raidNum)
-        local raid = raidNum and KRT_Raids[raidNum]
+        local raid = raidNum and Core.ensureRaidById(raidNum)
         local players = raid and raid.players or {}
         local rank = 0
         name = name or Utils.getPlayerName() or UnitName("player")

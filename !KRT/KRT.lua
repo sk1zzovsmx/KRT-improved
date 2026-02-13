@@ -78,6 +78,8 @@ local mainFrame = frames.main
 addon.Core = addon.Core or {}
 local Core = addon.Core
 
+local RAID_SCHEMA_VERSION = 1
+
 -- =========== Event System (WoW API events)  =========== --
 -- Clean frame-based dispatcher (NO CallbackHandler here)
 do
@@ -209,6 +211,294 @@ end
 Core.bindModuleRequestRefresh = bindModuleRequestRefresh
 Core.bindModuleToggleHide = bindModuleToggleHide
 Core.makeModuleFrameGetter = makeModuleFrameGetter
+
+local function ensureRaidSchema(raid)
+    if type(raid) ~= "table" then
+        return nil
+    end
+
+    local assignedByRef = {}
+    local usedPlayerNids = {}
+    local nextPlayerNid = tonumber(raid.nextPlayerNid) or 1
+    if nextPlayerNid < 1 then
+        nextPlayerNid = 1
+    end
+
+    local usedBossNids = {}
+    local nextBossNid = tonumber(raid.nextBossNid) or 1
+    if nextBossNid < 1 then
+        nextBossNid = 1
+    end
+
+    local usedLootNids = {}
+    local nextLootNid = tonumber(raid.nextLootNid) or 1
+    if nextLootNid < 1 then
+        nextLootNid = 1
+    end
+
+    local function allocatePlayerNid(preferred)
+        local pid = tonumber(preferred)
+        if pid and pid > 0 and not usedPlayerNids[pid] then
+            usedPlayerNids[pid] = true
+            return pid
+        end
+
+        while usedPlayerNids[nextPlayerNid] do
+            nextPlayerNid = nextPlayerNid + 1
+        end
+
+        local out = nextPlayerNid
+        usedPlayerNids[out] = true
+        nextPlayerNid = out + 1
+        return out
+    end
+
+    local function allocateBossNid(preferred)
+        local bid = tonumber(preferred)
+        if bid and bid > 0 and not usedBossNids[bid] then
+            usedBossNids[bid] = true
+            return bid
+        end
+
+        while usedBossNids[nextBossNid] do
+            nextBossNid = nextBossNid + 1
+        end
+
+        local out = nextBossNid
+        usedBossNids[out] = true
+        nextBossNid = out + 1
+        return out
+    end
+
+    local function allocateLootNid(preferred)
+        local lid = tonumber(preferred)
+        if lid and lid > 0 and not usedLootNids[lid] then
+            usedLootNids[lid] = true
+            return lid
+        end
+
+        while usedLootNids[nextLootNid] do
+            nextLootNid = nextLootNid + 1
+        end
+
+        local out = nextLootNid
+        usedLootNids[out] = true
+        nextLootNid = out + 1
+        return out
+    end
+
+    local function normalizePlayerCount(player)
+        if type(player) ~= "table" then
+            return
+        end
+
+        local already = assignedByRef[player]
+        if already then
+            player.playerNid = already
+        else
+            local pid = allocatePlayerNid(player.playerNid)
+            player.playerNid = pid
+            assignedByRef[player] = pid
+        end
+
+        local count = tonumber(player.count) or 0
+        if count < 0 then
+            count = 0
+        end
+        player.count = count
+    end
+
+    local function normalizeBossNid(bossKill)
+        if type(bossKill) ~= "table" then
+            return
+        end
+        bossKill.bossNid = allocateBossNid(bossKill.bossNid)
+    end
+
+    local function normalizeLootNid(lootEntry)
+        if type(lootEntry) ~= "table" then
+            return
+        end
+        lootEntry.lootNid = allocateLootNid(lootEntry.lootNid)
+    end
+
+    raid.schemaVersion = tonumber(raid.schemaVersion) or RAID_SCHEMA_VERSION
+    raid.raidNid = tonumber(raid.raidNid)
+    raid.players = raid.players or {}
+    local playersByName = raid._playersByName
+    if type(playersByName) ~= "table" then
+        playersByName = {}
+        raid._playersByName = playersByName
+    else
+        for name in pairs(playersByName) do
+            playersByName[name] = nil
+        end
+    end
+    raid.bossKills = raid.bossKills or {}
+    raid.loot = raid.loot or {}
+    raid.changes = raid.changes or {}
+
+    for i = 1, #raid.players do
+        local player = raid.players[i]
+        normalizePlayerCount(player)
+        if player and player.name then
+            playersByName[player.name] = player
+        end
+    end
+
+    for i = 1, #raid.bossKills do
+        normalizeBossNid(raid.bossKills[i])
+    end
+
+    for i = 1, #raid.loot do
+        normalizeLootNid(raid.loot[i])
+    end
+
+    raid.nextPlayerNid = nextPlayerNid
+    raid.nextBossNid = nextBossNid
+    raid.nextLootNid = nextLootNid
+
+    return raid
+end
+
+function Core.getRaidSchemaVersion()
+    return RAID_SCHEMA_VERSION
+end
+
+function Core.ensureRaidSchema(raid)
+    return ensureRaidSchema(raid)
+end
+
+local function ensureRaidsSchema()
+    if type(KRT_Raids) ~= "table" then
+        coreState.raidIdxByNid = nil
+        coreState.nextRaidNid = 1
+        return
+    end
+
+    local usedRaidNids = {}
+    local raidIdxByNid = {}
+    local nextRaidNid = 1
+
+    local function allocateRaidNid(preferred)
+        local rid = tonumber(preferred)
+        if rid and rid > 0 and not usedRaidNids[rid] then
+            usedRaidNids[rid] = true
+            if rid >= nextRaidNid then
+                nextRaidNid = rid + 1
+            end
+            return rid
+        end
+
+        while usedRaidNids[nextRaidNid] do
+            nextRaidNid = nextRaidNid + 1
+        end
+
+        local out = nextRaidNid
+        usedRaidNids[out] = true
+        nextRaidNid = out + 1
+        return out
+    end
+
+    for i = 1, #KRT_Raids do
+        local raid = ensureRaidSchema(KRT_Raids[i])
+        if raid then
+            local raidNid = allocateRaidNid(raid.raidNid)
+            raid.raidNid = raidNid
+            raidIdxByNid[raidNid] = i
+        end
+    end
+
+    coreState.raidIdxByNid = raidIdxByNid
+    coreState.nextRaidNid = nextRaidNid
+end
+
+function Core.ensureRaidById(raidNum)
+    local id = tonumber(raidNum)
+    if not id then
+        return nil, nil
+    end
+
+    ensureRaidsSchema()
+
+    local raid = KRT_Raids and KRT_Raids[id] or nil
+    if raid then
+        ensureRaidSchema(raid)
+    end
+    return raid, id
+end
+
+function Core.ensureRaidByNid(raidNid)
+    local nid = tonumber(raidNid)
+    if not nid then
+        return nil, nil, nil
+    end
+
+    ensureRaidsSchema()
+
+    local raidIdxByNid = coreState.raidIdxByNid
+    local idx = raidIdxByNid and raidIdxByNid[nid] or nil
+    if not idx then
+        return nil, nil, nid
+    end
+
+    local raid = KRT_Raids and KRT_Raids[idx] or nil
+    if raid then
+        ensureRaidSchema(raid)
+    end
+    return raid, idx, nid
+end
+
+function Core.getRaidNidById(raidNum)
+    local raid = Core.ensureRaidById(raidNum)
+    return raid and tonumber(raid.raidNid) or nil
+end
+
+function Core.getRaidIdByNid(raidNid)
+    local _, idx = Core.ensureRaidByNid(raidNid)
+    return idx
+end
+
+function Core.createRaidRecord(args)
+    args = args or {}
+
+    ensureRaidsSchema()
+    local raidNid = tonumber(args.raidNid)
+    if not raidNid or raidNid <= 0 then
+        raidNid = tonumber(coreState.nextRaidNid) or 1
+        coreState.nextRaidNid = raidNid + 1
+    end
+
+    local raid = {
+        schemaVersion = RAID_SCHEMA_VERSION,
+        raidNid = raidNid,
+        realm = args.realm,
+        zone = args.zone,
+        size = args.size,
+        difficulty = args.difficulty,
+        startTime = args.startTime or Utils.getCurrentTime(),
+        endTime = args.endTime,
+        players = {},
+        bossKills = {},
+        loot = {},
+        changes = {},
+        nextBossNid = 1,
+        nextLootNid = 1,
+        nextPlayerNid = 1,
+    }
+
+    return ensureRaidSchema(raid)
+end
+
+function Core.stripRuntimeRaidCaches(raid)
+    if type(raid) ~= "table" then
+        return
+    end
+    raid._playersByName = nil
+    raid._playerIdxByNid = nil
+    raid._bossIdxByNid = nil
+    raid._lootIdxByNid = nil
+end
 
 -- Shared feature header context for extracted runtime modules.
 local function ensureLootRuntimeState()

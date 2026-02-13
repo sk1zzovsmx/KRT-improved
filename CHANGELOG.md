@@ -4,6 +4,23 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Fresh-SV canonical raid model finalized: `players[]` is canonical, `_playersByName`
+  is derived runtime-only, legacy `playersByName` cleanup paths were removed, and runtime raid caches
+  (`_playersByName`, `_playerIdxByNid`, `_bossIdxByNid`, `_lootIdxByNid`) are stripped on logout.
+- **Refactor:** Raid schema normalization now enforces stable/unique `playerNid` / `bossNid` /
+  `lootNid` and realigns `nextPlayerNid` / `nextBossNid` / `nextLootNid` to canonical data.
+- **Refactor:** Added canonical stable `raidNid` for raid records; Logger raid selection/delete
+  now resolves by `raidNid` instead of volatile array indices.
+- **Refactor:** Raid read APIs are now side-effect free (`GetPlayers`, `GetLoot`) and stable-ID based
+  (`GetPlayerID`, `GetPlayerName`).
+- **Refactor:** Logger attendee selection/filter/delete flows are now fully stable-ID based
+  (`playerNid`), with no fallback to volatile array indices in view-model IDs.
+- **Bugfix:** Logger NID index lookups now validate cached index targets and rebuild stale maps after
+  list mutations, preventing wrong-row resolutions.
+- **Behavior:** Loot Counter now reads canonical raid rows (unique by player name), preserving
+  historical `count` values when switching current raid.
+- **Refactor:** Loot Counter mutations (`+/-/reset`) now target canonical `playerNid`
+  (`Add/Get/SetPlayerCountByNid`) instead of volatile row/index assumptions.
 - **Behavior:** Raid roster sync now publishes incremental `RaidRosterDelta` payloads and
   stabilizes transient unknown `raidN` slots with bounded retries to avoid false leave/join churn.
 - **Refactor:** Removed legacy internal `RaidRosterUpdate` callback emission; roster listeners now

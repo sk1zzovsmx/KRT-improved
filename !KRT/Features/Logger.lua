@@ -9,6 +9,7 @@ local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
 local C = feature.C
+local Core = feature.Core
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -48,7 +49,10 @@ do
     end
 
     local function buildIndex(raid, listField, idField, cacheField)
-        local list = raid[listField] or {}
+        local list = raid[listField]
+        if type(list) ~= "table" then
+            list = {}
+        end
         local m = {}
         for i = 1, #list do
             local e = list[i]
@@ -60,42 +64,59 @@ do
         raid[cacheField] = m
     end
 
+    local function isIndexedMatch(raid, idx, listField, idField, normalizedNid)
+        if not idx then return false end
+        local list = raid[listField]
+        if type(list) ~= "table" then return false end
+        local e = list[idx]
+        if not e then return false end
+        local id = e[idField]
+        if id == nil then return false end
+        return normalizeNid(id) == normalizedNid
+    end
+
     local function getIndexedPositionByNid(raid, queryNid, listField, idField, cacheField)
         if not (raid and queryNid) then return nil end
 
         local normalizedNid = normalizeNid(queryNid)
-        if not raid[cacheField] then
+        if type(raid[cacheField]) ~= "table" then
             buildIndex(raid, listField, idField, cacheField)
         end
 
         local idx = raid[cacheField][normalizedNid]
-        if not idx then
-            -- Raid changed since last build (new entry added / list changed)
+        if not isIndexedMatch(raid, idx, listField, idField, normalizedNid) then
+            -- Raid changed since last build (new entry added / list changed / shifted indices)
             buildIndex(raid, listField, idField, cacheField)
             idx = raid[cacheField][normalizedNid]
+            if not isIndexedMatch(raid, idx, listField, idField, normalizedNid) then
+                return nil
+            end
         end
         return idx
     end
 
     -- ----- Public methods ----- --
-    -- Ensure the raid table has the schema v2 fields required by the module.
-    -- This does NOT migrate legacy structures; it only initializes missing fields for fresh SV.
+    -- Ensure the raid table follows the canonical fresh-SV schema.
     function Store:EnsureRaid(raid)
-        if not raid then return end
-        raid.players       = raid.players or {}
-        raid.bossKills     = raid.bossKills or {}
-        raid.loot          = raid.loot or {}
-        raid.nextBossNid   = raid.nextBossNid or 1
-        raid.nextLootNid   = raid.nextLootNid or 1
-
-        -- Runtime-only indexes (not persisted).
-        raid._bossIdxByNid = raid._bossIdxByNid or nil
-        raid._lootIdxByNid = raid._lootIdxByNid or nil
+        return Core.ensureRaidSchema(raid)
     end
 
     function Store:GetRaid(rID)
-        local raid = rID and KRT_Raids[rID] or nil
-        if raid then self:EnsureRaid(raid) end
+        local raid = rID and Core.ensureRaidById(rID) or nil
+        if raid then
+            self:EnsureRaid(raid)
+        end
+        return raid
+    end
+
+    function Store:GetRaidByNid(raidNid)
+        local raid = nil
+        if raidNid then
+            raid = select(1, Core.ensureRaidByNid(raidNid))
+        end
+        if raid then
+            self:EnsureRaid(raid)
+        end
         return raid
     end
 
@@ -103,6 +124,7 @@ do
         if not raid then return end
         raid._bossIdxByNid = nil
         raid._lootIdxByNid = nil
+        raid._playerIdxByNid = nil
     end
 
     function Store:BossIdx(raid, bossNid)
@@ -121,6 +143,15 @@ do
     function Store:GetLoot(raid, lootNid)
         local idx = self:LootIdx(raid, lootNid)
         return idx and raid.loot[idx] or nil, idx
+    end
+
+    function Store:PlayerIdx(raid, playerNid)
+        return getIndexedPositionByNid(raid, playerNid, "players", "playerNid", "_playerIdxByNid")
+    end
+
+    function Store:GetPlayer(raid, playerNid)
+        local idx = self:PlayerIdx(raid, playerNid)
+        return idx and raid.players[idx] or nil, idx
     end
 
     function Store:FindRaidPlayerByNormName(raid, normalizedLower)
@@ -162,7 +193,7 @@ do
         self:BuildRows(out, raid and raid.bossKills, nil, function(boss, i)
             local it = {}
             -- Stable NID used for highlight/selection.
-            it.id = tonumber(boss and boss.bossNid) or (boss and boss.bossNid) or i
+            it.id = tonumber(boss and boss.bossNid)
             -- Display-only index (rescales after deletions).
             it.seq = i
             it.name = boss and boss.name or ""
@@ -176,7 +207,7 @@ do
     function View:FillRaidAttendeesList(out, raid)
         self:BuildRows(out, raid and raid.players, nil, function(p, i)
             local it = {}
-            it.id = i
+            it.id = tonumber(p and p.playerNid)
             it.name = p.name
             it.class = p.class
             it.join = p.join
@@ -207,7 +238,7 @@ do
             if p and p.name and set[p.name] then
                 n = n + 1
                 local it = {}
-                it.id = i -- IMPORTANT: stable reference into raid.players (used for delete)
+                it.id = tonumber(p.playerNid)
                 it.name = p.name
                 it.class = p.class
                 out[n] = it
@@ -256,6 +287,9 @@ do
         if not raid then return end
         opts = opts or {}
 
+        -- Rebuild canonical raid schema/runtime indexes after in-place mutations.
+        Core.ensureRaidSchema(raid)
+
         if opts.invalidate ~= false then
             Store:InvalidateIndexes(raid)
         end
@@ -301,7 +335,7 @@ do
             end
         end
 
-        -- Validate player selections (raid.players index)
+        -- Validate player selections (playerNid).
         if opts.clearPlayers then
             if log.selectedPlayer ~= nil then
                 log.selectedPlayer = nil
@@ -312,11 +346,11 @@ do
                 changedBossPlayer = true
             end
         else
-            if log.selectedPlayer and (not raid.players or not raid.players[log.selectedPlayer]) then
+            if log.selectedPlayer and not Store:GetPlayer(raid, log.selectedPlayer) then
                 log.selectedPlayer = nil
                 changedPlayer = true
             end
-            if log.selectedBossPlayer and (not raid.players or not raid.players[log.selectedBossPlayer]) then
+            if log.selectedBossPlayer and not Store:GetPlayer(raid, log.selectedBossPlayer) then
                 log.selectedBossPlayer = nil
                 changedBossPlayer = true
             end
@@ -395,31 +429,27 @@ do
         return removed
     end
 
-    function Actions:DeleteBossAttendee(rID, bossNid, playerIdx)
+    function Actions:DeleteBossAttendee(rID, bossNid, playerNid)
         local raid = Store:GetRaid(rID)
-        if not (raid and bossNid and playerIdx) then return false end
+        if not (raid and bossNid and playerNid) then return false end
         local bossKill = Store:GetBoss(raid, bossNid)
-        if not (bossKill and bossKill.players and raid.players and raid.players[playerIdx]) then return false end
-        local name = raid.players[playerIdx].name
+        if not (bossKill and bossKill.players and raid.players) then return false end
+        local player = Store:GetPlayer(raid, playerNid)
+        if not player then return false end
+        local name = player.name
         if not name then return false end
         self:RemoveAll(bossKill.players, name)
         return true
     end
 
-    function Actions:DeleteRaidAttendee(rID, playerIdx)
+    function Actions:DeleteRaidAttendee(rID, playerNid)
         local raid = Store:GetRaid(rID)
-        if not (raid and raid.players and raid.players[playerIdx]) then return false end
+        if not (raid and raid.players and playerNid) then return false end
 
-        local name = raid.players[playerIdx].name
-
-        -- Keep playersByName consistent: mark this record as inactive so UpdateRaidRoster()
-        -- can safely rebuild raid.players when needed (e.g. after manual roster edits).
-        if name and raid.playersByName and raid.playersByName[name] then
-            local p = raid.playersByName[name]
-            if p and p.leave == nil then
-                p.leave = Utils.getCurrentTime()
-            end
-        end
+        local _, playerIdx = Store:GetPlayer(raid, playerNid)
+        if not playerIdx then return false end
+        local name = raid.players[playerIdx] and raid.players[playerIdx].name
+        if not name then return false end
 
         tremove(raid.players, playerIdx)
 
@@ -445,20 +475,23 @@ do
         return true
     end
 
-    -- Bulk delete: removes multiple raid attendees (by playerIdx) with a single Commit()
+    -- Bulk delete: removes multiple raid attendees (by playerNid) with a single Commit()
     -- Returns: number of removed attendees
-    function Actions:DeleteRaidAttendeeMany(rID, playerIdxs)
+    function Actions:DeleteRaidAttendeeMany(rID, playerNids)
         local raid = Store:GetRaid(rID)
-        if not (raid and raid.players and playerIdxs and #playerIdxs > 0) then return 0 end
+        if not (raid and raid.players and playerNids and #playerNids > 0) then return 0 end
 
-        -- Normalize + sort descending (indices shift on removal).
+        -- Normalize NIDs to indices, then sort descending (indices shift on removal).
         local ids = {}
         local seen = {}
-        for i = 1, #playerIdxs do
-            local v = tonumber(playerIdxs[i]) or playerIdxs[i]
-            if v and not seen[v] then
-                seen[v] = true
-                tinsert(ids, v)
+        for i = 1, #playerNids do
+            local nid = tonumber(playerNids[i]) or playerNids[i]
+            if nid ~= nil then
+                local _, idx = Store:GetPlayer(raid, nid)
+                if idx and not seen[idx] then
+                    seen[idx] = true
+                    tinsert(ids, idx)
+                end
             end
         end
         table.sort(ids, function(a, b) return a > b end)
@@ -477,18 +510,6 @@ do
         end
 
         if removed == 0 then return 0 end
-
-        -- Keep playersByName consistent: mark removed names as inactive so UpdateRaidRoster()
-        -- can re-add current raid members after manual roster edits.
-        if raid.playersByName then
-            local now = Utils.getCurrentTime()
-            for n, _ in pairs(removedNames) do
-                local p = raid.playersByName[n]
-                if p and p.leave == nil then
-                    p.leave = now
-                end
-            end
-        end
 
         -- Remove from all boss attendee lists.
         if raid.bossKills then
@@ -518,7 +539,8 @@ do
 
     function Actions:DeleteRaid(rID)
         local sel = tonumber(rID)
-        if not sel or not KRT_Raids[sel] then return false end
+        local raid = sel and Core.ensureRaidById(sel) or nil
+        if not raid then return false end
 
         if KRT_CurrentRaid and KRT_CurrentRaid == sel then
             addon:error(L.ErrCannotDeleteRaid)
@@ -534,9 +556,30 @@ do
         return true
     end
 
+    function Actions:DeleteRaidByNid(raidNid)
+        local nid = tonumber(raidNid)
+        if not nid then return false end
+        local raid, sel = Core.ensureRaidByNid(nid)
+        if not (raid and sel) then return false end
+
+        local currentRaidNid = Core.getRaidNidById(KRT_CurrentRaid)
+        if currentRaidNid and tonumber(currentRaidNid) == nid then
+            addon:error(L.ErrCannotDeleteRaid)
+            return false
+        end
+
+        tremove(KRT_Raids, sel)
+
+        if KRT_CurrentRaid and KRT_CurrentRaid > sel then
+            KRT_CurrentRaid = KRT_CurrentRaid - 1
+        end
+
+        return true
+    end
+
     function Actions:SetCurrentRaid(rID)
         local sel = tonumber(rID)
-        local raid = sel and KRT_Raids[sel] or nil
+        local raid = sel and Core.ensureRaidById(sel) or nil
         if not (sel and raid) then return false end
 
         -- This is meant to fix duplicate raid creation while actively raiding.
@@ -702,6 +745,14 @@ do
         Utils.multiSelectClear(MS_CTX_LOOT)
     end
 
+    local function getRaidNidByIndex(raidIndex)
+        return raidIndex and Core.getRaidNidById(raidIndex) or nil
+    end
+
+    local function getRaidIndexByNid(raidNid)
+        return raidNid and Core.getRaidIdByNid(raidNid) or nil
+    end
+
     -- Logger helpers: resolve current raid/boss/loot and run raid actions with a single refresh.
     function module:NeedRaid()
         local rID = module.selectedRaid
@@ -776,8 +827,10 @@ do
     -- Selectors
     function module:SelectRaid(btn, button)
         if button and button ~= "LeftButton" then return end
-        local id = btn and btn.GetID and btn:GetID()
-        if not id then return end
+        local raidNid = btn and btn.GetID and btn:GetID()
+        if not raidNid then return end
+        local raidIndex = getRaidIndexByNid(raidNid)
+        if not raidIndex then return end
 
         local isMulti = (IsControlKeyDown and IsControlKeyDown()) or false
         local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
@@ -786,27 +839,27 @@ do
         local action, count
         if isRange then
             local ordered = addon.Logger.Raids and addon.Logger.Raids._ctrl and addon.Logger.Raids._ctrl.data or nil
-            action, count = Utils.multiSelectRange(MS_CTX_RAID, ordered, id, isMulti)
+            action, count = Utils.multiSelectRange(MS_CTX_RAID, ordered, raidNid, isMulti)
             -- SHIFT range always sets the focused row to the click target.
-            module.selectedRaid = id
+            module.selectedRaid = raidIndex
         else
-            action, count = Utils.multiSelectToggle(MS_CTX_RAID, id, isMulti, true)
+            action, count = Utils.multiSelectToggle(MS_CTX_RAID, raidNid, isMulti, true)
 
             -- Keep a single "focused" raid for the dependent panels (Boss / Attendees / Loot).
             if action == "SINGLE_DESELECT" then
                 module.selectedRaid = nil
             elseif action == "TOGGLE_OFF" then
-                if module.selectedRaid == id then
+                if getRaidNidByIndex(module.selectedRaid) == raidNid then
                     local sel = Utils.multiSelectGetSelected(MS_CTX_RAID)
-                    module.selectedRaid = sel[1] or nil
+                    module.selectedRaid = sel[1] and getRaidIndexByNid(sel[1]) or nil
                 end
             else
-                module.selectedRaid = id
+                module.selectedRaid = raidIndex
             end
 
             -- Range anchor (OS-like): update on non-shift clicks only.
             if (tonumber(count) or 0) > 0 then
-                Utils.multiSelectSetAnchor(MS_CTX_RAID, id)
+                Utils.multiSelectSetAnchor(MS_CTX_RAID, raidNid)
             else
                 Utils.multiSelectSetAnchor(MS_CTX_RAID, nil)
             end
@@ -815,7 +868,7 @@ do
         if Utils.isDebugEnabled() and addon.debug then
             addon:debug((Diag.D.LogLoggerSelectClickRaid)
                 :format(
-                    tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
+                    tostring(raidNid), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
                     tostring(module.selectedRaid)
                 ))
         end
@@ -1219,17 +1272,20 @@ do
 
         getData = function(out)
             for i = 1, #KRT_Raids do
-                local r = KRT_Raids[i]
-                local it = {}
-                it.id = i
-                it.zone = r.zone
-                it.size = r.size
-                it.difficulty = tonumber(r.difficulty)
-                local mode = it.difficulty and ((it.difficulty == 3 or it.difficulty == 4) and "H" or "N") or "?"
-                it.sizeLabel = tostring(it.size or "") .. mode
-                it.date = r.startTime
-                it.dateFmt = date("%d/%m/%Y %H:%M", r.startTime)
-                out[i] = it
+                local r = Core.ensureRaidById(i)
+                if r then
+                    local it = {}
+                    it.id = tonumber(r.raidNid)
+                    it.seq = i
+                    it.zone = r.zone
+                    it.size = r.size
+                    it.difficulty = tonumber(r.difficulty)
+                    local mode = it.difficulty and ((it.difficulty == 3 or it.difficulty == 4) and "H" or "N") or "?"
+                    it.sizeLabel = tostring(it.size or "") .. mode
+                    it.date = r.startTime
+                    it.dateFmt = date("%d/%m/%Y %H:%M", r.startTime)
+                    out[i] = it
+                end
             end
         end,
 
@@ -1245,8 +1301,15 @@ do
         end),
 
         highlightFn = function(id) return Utils.multiSelectIsSelected(addon.Logger._msRaidCtx, id) end,
-        focusId = function() return addon.Logger.selectedRaid end,
-        focusKey = function() return tostring(addon.Logger.selectedRaid or "nil") end,
+        focusId = function()
+            local selected = addon.Logger.selectedRaid
+            return selected and Core.getRaidNidById(selected) or nil
+        end,
+        focusKey = function()
+            local selected = addon.Logger.selectedRaid
+            local raidNid = selected and Core.getRaidNidById(selected) or nil
+            return tostring(raidNid or "nil")
+        end,
         highlightKey = function() return Utils.multiSelectGetVersion(addon.Logger._msRaidCtx) end,
         highlightDebugTag = "LoggerSelect",
         highlightDebugInfo = function()
@@ -1256,7 +1319,7 @@ do
 
         postUpdate = function(n)
             local sel = addon.Logger.selectedRaid
-            local raid = sel and KRT_Raids[sel] or nil
+            local raid = sel and Core.ensureRaidById(sel) or nil
 
             local canSetCurrent = false
             if sel and raid and sel ~= KRT_CurrentRaid then
@@ -1288,9 +1351,10 @@ do
             local selCount = Utils.multiSelectCount(ctx)
             local canDelete = (selCount and selCount > 0) or false
             if canDelete and KRT_CurrentRaid then
+                local currentRaidNid = Core.getRaidNidById(KRT_CurrentRaid)
                 local ids = Utils.multiSelectGetSelected(ctx)
                 for i = 1, #ids do
-                    if tonumber(ids[i]) == tonumber(KRT_CurrentRaid) then
+                    if currentRaidNid and tonumber(ids[i]) == tonumber(currentRaidNid) then
                         canDelete = false
                         break
                     end
@@ -1333,24 +1397,31 @@ do
             local ids = Utils.multiSelectGetSelected(ctx)
             if not (ids and #ids > 0) then return end
 
+            local raidNids = {}
+            local seenNids = {}
+            for i = 1, #ids do
+                local nid = tonumber(ids[i])
+                if nid and not seenNids[nid] then
+                    seenNids[nid] = true
+                    raidNids[#raidNids + 1] = nid
+                end
+            end
+            if #raidNids == 0 then return end
+
             -- Safety: never delete the current raid
-            if KRT_CurrentRaid then
-                for i = 1, #ids do
-                    if tonumber(ids[i]) == tonumber(KRT_CurrentRaid) then
+            local currentRaidNid = Core.getRaidNidById(KRT_CurrentRaid)
+            if currentRaidNid then
+                for i = 1, #raidNids do
+                    if tonumber(raidNids[i]) == tonumber(currentRaidNid) then
                         return
                     end
                 end
             end
 
-            -- Deleting by index: sort descending to avoid shifting issues.
-            table.sort(ids, function(a, b) return (tonumber(a) or a) > (tonumber(b) or b) end)
-
             local prevFocus = addon.Logger.selectedRaid
-            local removed = 0
-            for i = 1, #ids do
-                if addon.Logger.Actions:DeleteRaid(ids[i]) then
-                    removed = removed + 1
-                end
+            local prevFocusNid = prevFocus and Core.getRaidNidById(prevFocus) or nil
+            for i = 1, #raidNids do
+                addon.Logger.Actions:DeleteRaidByNid(raidNids[i])
             end
 
             Utils.multiSelectClear(ctx)
@@ -1358,10 +1429,13 @@ do
             local n = KRT_Raids and #KRT_Raids or 0
             local newFocus = nil
             if n > 0 then
-                local base = tonumber(prevFocus) or n
-                if base > n then base = n end
-                if base < 1 then base = 1 end
-                newFocus = base
+                newFocus = prevFocusNid and Core.getRaidIdByNid(prevFocusNid) or nil
+                if not newFocus then
+                    local base = tonumber(prevFocus) or n
+                    if base > n then base = n end
+                    if base < 1 then base = 1 end
+                    newFocus = base
+                end
             end
 
             addon.Logger.selectedRaid = newFocus
@@ -1510,11 +1584,12 @@ do
 
     function Boss:GetName(bossNid, raidId)
         local rID = raidId or addon.Logger.selectedRaid
-        if not rID or not KRT_Raids[rID] then return "" end
+        if not rID then return "" end
         bossNid = bossNid or addon.Logger.selectedBoss
         if not bossNid then return "" end
 
         local raid = Store:GetRaid(rID)
+        if not raid then return "" end
         local boss = raid and Store:GetBoss(raid, bossNid) or nil
         return boss and boss.name or ""
     end
@@ -1732,7 +1807,7 @@ do
             -- Update the roster from the live in-game raid roster.
             addon.Raid:UpdateRaidRoster()
 
-            -- Clear selections that depend on raid.players indices.
+            -- Clear dependent selections after roster sync.
             Utils.multiSelectClear(addon.Logger._msRaidAttCtx)
             Utils.multiSelectClear(addon.Logger._msBossAttCtx)
             Utils.multiSelectClear(addon.Logger._msLootCtx)
@@ -1756,7 +1831,7 @@ do
                     Utils.multiSelectClear(ctx)
                     addon.Logger.selectedPlayer = nil
 
-                    -- Indices shifted: clear boss-attendees selection too (it is indexed by raid.players).
+                    -- Player filters changed: clear boss-attendees selection too.
                     addon.Logger.selectedBossPlayer = nil
                     Utils.multiSelectClear(addon.Logger._msBossAttCtx)
 
@@ -1822,7 +1897,8 @@ do
 
             local bID = addon.Logger.selectedBoss
             local pID = addon.Logger.selectedBossPlayer or addon.Logger.selectedPlayer
-            local pName = (pID and raid.players and raid.players[pID] and raid.players[pID].name) or nil
+            local p = pID and Store:GetPlayer(raid, pID) or nil
+            local pName = p and p.name or nil
 
             View:FillLootList(out, raid, bID, pName)
         end,
@@ -1967,12 +2043,12 @@ do
         end
         addon:trace(Diag.D.LogLoggerLootLogAttempt:format(tostring(source), tostring(raidID), tostring(itemID),
             tostring(looter), tostring(rollType), tostring(rollValue), tostring(KRT_LastBoss)))
-        if not raidID or not KRT_Raids[raidID] then
+        local raid = raidID and Core.ensureRaidById(raidID) or nil
+        if not raid then
             addon:error(Diag.E.LogLoggerNoRaidSession:format(tostring(raidID), tostring(itemID)))
             return false
         end
 
-        local raid = KRT_Raids[raidID]
         Store:EnsureRaid(raid)
         local lootCount = raid.loot and #raid.loot or 0
         local it = Store:GetLoot(raid, itemID)

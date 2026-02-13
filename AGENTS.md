@@ -38,6 +38,12 @@ Durable preferences learned from recent conversations:
 - For naming/API uniformization, choose the most repeated in-repo pattern and apply it consistently and robustly.
 - For XML and Lua analysis/reference, use Townlong-Yak FrameXML 3.3.5:
   `https://www.townlong-yak.com/framexml/3.3.5`.
+- Treat raid `players[].count` (LootCounter) as canonical persisted raid data; restoring/selecting an old current raid
+  must preserve and reuse historical counts.
+- Prefer a clean persisted raid schema: keep `players[]` as the canonical persisted player store; treat
+  `_playersByName` as a derived runtime index/cache.
+- Treat fresh SavedVariables as strict mode: avoid legacy/migration cleanups and avoid fallback to
+  volatile array indices when stable NIDs (`playerNid`, `bossNid`, `lootNid`) are available.
 
 ---
 

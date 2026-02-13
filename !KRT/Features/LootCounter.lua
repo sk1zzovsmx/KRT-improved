@@ -8,6 +8,7 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Utils = feature.Utils
 local C = feature.C
+local Core = feature.Core
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -99,18 +100,14 @@ do
 
     local function GetCurrentRaidPlayers()
         twipe(raidPlayers)
-        if not addon.IsInGroup() then
+        if not KRT_CurrentRaid then
             return raidPlayers
         end
-
-        for unit in addon.UnitIterator(true) do
-            local name = UnitName(unit)
-            if name and name ~= "" then
-                raidPlayers[#raidPlayers + 1] = name
-            end
+        local raid = Core.ensureRaidById(KRT_CurrentRaid)
+        if not raid then
+            return raidPlayers
         end
-        table.sort(raidPlayers)
-        return raidPlayers
+        return addon.Raid:GetLootCounterRows(KRT_CurrentRaid, raidPlayers)
     end
 
     local function EnsureRow(i, rowHeight)
@@ -163,23 +160,23 @@ do
             row.plus:SetPoint("RIGHT", row.minus, "LEFT", -BTN_GAP, 0)
 
             row.plus:SetScript("OnClick", function()
-                local n = row._playerName
-                if n then
-                    addon.Raid:AddPlayerCount(n, 1, KRT_CurrentRaid)
+                local playerNid = row._playerNid
+                if playerNid then
+                    addon.Raid:AddPlayerCountByNid(playerNid, 1, KRT_CurrentRaid)
                     module:RequestRefresh()
                 end
             end)
             row.minus:SetScript("OnClick", function()
-                local n = row._playerName
-                if n then
-                    addon.Raid:AddPlayerCount(n, -1, KRT_CurrentRaid)
+                local playerNid = row._playerNid
+                if playerNid then
+                    addon.Raid:AddPlayerCountByNid(playerNid, -1, KRT_CurrentRaid)
                     module:RequestRefresh()
                 end
             end)
             row.reset:SetScript("OnClick", function()
-                local n = row._playerName
-                if n then
-                    addon.Raid:SetPlayerCount(n, 0, KRT_CurrentRaid)
+                local playerNid = row._playerNid
+                if playerNid then
+                    addon.Raid:SetPlayerCountByNid(playerNid, 0, KRT_CurrentRaid)
                     module:RequestRefresh()
                 end
             end)
@@ -227,41 +224,32 @@ do
         if header then header:Show() end
 
         for i = 1, numPlayers do
-            local name = players[i]
-
-            -- Defensive: ensure the player exists in the active raid log.
-            if addon.Raid:GetPlayerID(name, KRT_CurrentRaid) == 0 then
-                addon.Raid:AddPlayer({
-                    name     = name,
-                    rank     = 0,
-                    subgroup = 1,
-                    class    = "UNKNOWN",
-                    join     = Utils.getCurrentTime(),
-                    leave    = nil,
-                    count    = 0,
-                }, KRT_CurrentRaid)
-            end
+            local data = players[i]
+            local name = data and data.name
+            local playerNid = data and tonumber(data.playerNid)
 
             local row = EnsureRow(i, rowHeight)
             row:ClearAllPoints()
             local y = -(HEADER_HEIGHT + (i - 1) * rowHeight)
             row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, y)
             row:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, y)
-            row._playerName = name
+            row._playerNid = playerNid
 
             if row._lastName ~= name then
                 row.name:SetText(name)
                 row._lastName = name
             end
 
-            local class = addon.Raid:GetPlayerClass(name)
+            local class = data and data.class or addon.Raid:GetPlayerClass(name)
             if row._lastClass ~= class then
                 local r, g, b = Utils.getClassColor(class)
                 row.name:SetTextColor(r, g, b)
                 row._lastClass = class
             end
 
-            local cnt = addon.Raid:GetPlayerCount(name, KRT_CurrentRaid) or 0
+            local cnt = (data and tonumber(data.count))
+                or (playerNid and addon.Raid:GetPlayerCountByNid(playerNid, KRT_CurrentRaid))
+                or 0
             if row._lastCount ~= cnt then
                 row.count:SetText(tostring(cnt))
                 row._lastCount = cnt

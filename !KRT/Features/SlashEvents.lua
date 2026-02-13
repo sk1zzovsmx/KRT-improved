@@ -280,6 +280,7 @@ local addonEvents = {
     TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
     TRADE_REQUEST_CANCEL = "TRADE_REQUEST_CANCEL",
     TRADE_CLOSED = "TRADE_CLOSED",
+    PLAYER_LOGOUT = "PLAYER_LOGOUT",
 }
 
 -- Master looter events
@@ -450,5 +451,13 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
     if boss then
         addon:trace(Diag.D.LogBossUnitDiedMatched:format(tonumber(npcId) or -1, tostring(boss)))
         self.Raid:AddBoss(boss)
+    end
+end
+
+-- PLAYER_LOGOUT: Strip runtime-only raid caches before SavedVariables are written.
+function addon:PLAYER_LOGOUT()
+    if type(KRT_Raids) ~= "table" then return end
+    for i = 1, #KRT_Raids do
+        addon.Core.stripRuntimeRaidCaches(KRT_Raids[i])
     end
 end
