@@ -4,6 +4,12 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Behavior:** Raid roster sync now publishes incremental `RaidRosterDelta` payloads and
+  stabilizes transient unknown `raidN` slots with bounded retries to avoid false leave/join churn.
+- **Refactor:** Removed legacy internal `RaidRosterUpdate` callback emission; roster listeners now
+  consume `RaidRosterDelta` directly.
+- **Refactor:** `addon.Raid:GetUnitID()` now uses a live name<->unit cache from roster scans with
+  iterator fallback, reducing repeated full-group scans in Master Looter flows.
 - **Refactor:** Strict UI controller uniformization for `Changes`, `Reserves`, `ReservesImport`,
   and `Logger`: removed manual `Toggle/Hide` overrides and kept side effects in `hookOnShow/OnHide`.
 - **Refactor:** Standardized top-level feature frame getters for `Logger` and `LootCounter` to
@@ -95,7 +101,7 @@ Dates are in YYYY-MM-DD.
   after SoftRes import and list clear operations.
 - **Refactor:** Loot Counter and Reserve List windows now use only coalesced event-driven refresh
   (`RequestRefresh`) and no longer perform redundant immediate redraw calls.
-- **Behavior:** Loot Counter refresh is now driven by `RaidRosterUpdate` and
+- **Behavior:** Loot Counter refresh is now driven by `RaidRosterDelta` and
   `PlayerCountChanged`; removed in-refresh `UpdateRaidRoster()` calls to prevent loop spam.
 - **Behavior:** Removed standalone `/krtcounts`; Loot Counter is now toggled via `/krt counter`.
 

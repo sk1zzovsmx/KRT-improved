@@ -21,6 +21,8 @@ Do NOT record:
 - temporary exceptions.
 
 Durable preferences learned from recent conversations:
+- Do not introduce Ace dependencies (Ace2/Ace3); prefer native KRT + LibCompat patterns.
+- Avoid runtime backward-compat shims when refactoring; target the fresh-SV model directly.
 - Prefer LuaRocks Lua Style Guide for formatting/layout when it does not conflict with KRT binding conventions.
 - Prefer PascalCase for addon module table names.
 - Prefer PascalCase for public exported methods on feature modules (`module:*`, `Store:*`, `View:*`, `Actions:*`,

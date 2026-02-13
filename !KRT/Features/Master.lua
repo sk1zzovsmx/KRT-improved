@@ -1897,7 +1897,7 @@ do
         end
     end)
 
-    Utils.registerCallback("RaidRosterUpdate", function()
+    Utils.registerCallback("RaidRosterDelta", function()
         cachedRosterVersion = nil
         InvalidateCandidateCache()
         dropDownDirty = true

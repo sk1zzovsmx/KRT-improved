@@ -319,13 +319,13 @@ end
 local rosterUpdateDebounceSeconds = 0.2
 
 local function processRaidRosterUpdate()
-    local changed = addon.Raid:UpdateRaidRoster()
+    local changed, delta = addon.Raid:UpdateRaidRoster()
     if not changed then
         return
     end
 
-    -- Broadcast a normalized roster-change event for UI modules.
-    Utils.triggerEvent("RaidRosterUpdate")
+    -- Single source of truth for roster change notifications (join/update/leave delta).
+    Utils.triggerEvent("RaidRosterDelta", delta, addon.Raid:GetRosterVersion(), KRT_CurrentRaid)
     -- Keep Master Looter UI in sync (event-driven; no polling).
     local mf = addon.Master and addon.Master.frame
     if addon.Master and addon.Master.RequestRefresh and mf and mf.IsShown and mf:IsShown() then

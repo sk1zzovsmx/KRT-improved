@@ -308,7 +308,7 @@ do
     end
 
     -- Refresh on roster updates (to keep list aligned).
-    Utils.registerCallback("RaidRosterUpdate", Request)
+    Utils.registerCallback("RaidRosterDelta", Request)
 
     -- Refresh when counts actually change (MS loot award or manual +/-/reset).
     Utils.registerCallback("PlayerCountChanged", Request)

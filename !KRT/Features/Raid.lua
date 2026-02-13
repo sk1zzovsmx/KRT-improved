@@ -19,6 +19,7 @@ local lootState = feature.lootState
 local tinsert, twipe = table.insert, table.wipe
 local pairs, ipairs, type, select = pairs, ipairs, type, select
 local strlen = string.len
+local strmatch = string.match
 
 local tostring, tonumber = tostring, tonumber
 local UnitRace, UnitSex = UnitRace, UnitSex
@@ -34,8 +35,79 @@ do
     local GetLootMethod     = GetLootMethod
     local GetRaidRosterInfo = GetRaidRosterInfo
     local UnitIsUnit        = UnitIsUnit
+    local liveUnitsByName   = {}
+    local liveNamesByUnit   = {}
+    local pendingUnits      = {}
+
+    local UNKNOWN_OBJECT = UNKNOWNOBJECT
+    local UNKNOWN_BEING = UKNOWNBEING
+    local RETRY_DELAY_SECONDS = 1
+    local RETRY_MAX_ATTEMPTS = 5
 
     -- ----- Private helpers ----- --
+    local function IsUnknownName(name)
+        return (not name) or name == "" or name == UNKNOWN_OBJECT or name == UNKNOWN_BEING
+    end
+
+    local function ResetLiveUnitCaches()
+        twipe(liveUnitsByName)
+        twipe(liveNamesByUnit)
+    end
+
+    local function ResetPendingUnitRetry()
+        addon.CancelTimer(module.pendingUnitRetryHandle, true)
+        module.pendingUnitRetryHandle = nil
+        twipe(pendingUnits)
+    end
+
+    local function MarkPendingUnit(unitID)
+        local tries = tonumber(pendingUnits[unitID]) or 0
+        if tries < RETRY_MAX_ATTEMPTS then
+            pendingUnits[unitID] = tries + 1
+        end
+    end
+
+    local function TrimPendingUnits(maxRaidSize)
+        for unitID in pairs(pendingUnits) do
+            local idx = tonumber(strmatch(unitID, "^raid(%d+)$")) or 0
+            if idx <= 0 or idx > maxRaidSize then
+                pendingUnits[unitID] = nil
+            end
+        end
+    end
+
+    local function HasRetryablePendingUnits()
+        for _, tries in pairs(pendingUnits) do
+            if (tonumber(tries) or 0) < RETRY_MAX_ATTEMPTS then
+                return true
+            end
+        end
+        return false
+    end
+
+    local function SchedulePendingUnitRetry()
+        if not HasRetryablePendingUnits() then
+            return
+        end
+
+        addon.CancelTimer(module.pendingUnitRetryHandle, true)
+        module.pendingUnitRetryHandle = addon.NewTimer(RETRY_DELAY_SECONDS, function()
+            module.pendingUnitRetryHandle = nil
+            if not addon.IsInRaid() then return end
+            addon:RAID_ROSTER_UPDATE(true)
+        end)
+    end
+
+    local function FinalizeRosterDelta(delta)
+        if #delta.joined == 0 then delta.joined = nil end
+        if #delta.updated == 0 then delta.updated = nil end
+        if #delta.left == 0 then delta.left = nil end
+        if #delta.unresolved == 0 then delta.unresolved = nil end
+        if delta.joined or delta.updated or delta.left or delta.unresolved then
+            return delta
+        end
+        return nil
+    end
 
     -- ----- Public methods ----- --
     -- ----- Logger Functions ----- --
@@ -45,27 +117,39 @@ do
     end
 
     -- Updates the current raid roster, adding new players and marking those who left.
-    -- Returns true only when roster data actually changed.
+    -- Returns rosterChanged, delta where delta contains joined/updated/left/unresolved lists.
     function module:UpdateRaidRoster()
-        if not KRT_CurrentRaid then return false end
+        if not KRT_CurrentRaid then
+            ResetPendingUnitRetry()
+            ResetLiveUnitCaches()
+            return false
+        end
         -- Cancel any pending roster update timer and clear the handle
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
 
-        local changed = false
+        local rosterChanged = false
+        local delta = {
+            joined = {},
+            updated = {},
+            left = {},
+            unresolved = {},
+        }
 
         if not addon.IsInRaid() then
-            changed = true
+            rosterChanged = true
             numRaid = 0
             addon:debug(Diag.D.LogRaidLeftGroupEndSession)
+            ResetPendingUnitRetry()
+            ResetLiveUnitCaches()
             module:End()
-            if changed then
+            if rosterChanged then
                 rosterVersion = rosterVersion + 1
             end
-            if changed and addon.Master and addon.Master.PrepareDropDowns then
+            if rosterChanged and addon.Master and addon.Master.PrepareDropDowns then
                 addon.Master:PrepareDropDowns()
             end
-            return changed
+            return rosterChanged
         end
 
         local raid = KRT_Raids[KRT_CurrentRaid]
@@ -85,51 +169,99 @@ do
         -- Keep internal state consistent immediately
         numRaid = n
         if n ~= prevNumRaid then
-            changed = true
+            rosterChanged = true
         end
 
         if n == 0 then
-            changed = true
+            rosterChanged = true
+            ResetPendingUnitRetry()
+            ResetLiveUnitCaches()
             module:End()
             rosterVersion = rosterVersion + 1
             if addon.Master and addon.Master.PrepareDropDowns then
                 addon.Master:PrepareDropDowns()
             end
-            return changed
+            return rosterChanged
         end
 
+        local prevUnitsByName = liveUnitsByName
+        local prevNamesByUnit = liveNamesByUnit
+        local nextUnitsByName = {}
+        local nextNamesByUnit = {}
         local seen = {}
         local now = Utils.getCurrentTime()
+        local hasUnknownUnits = false
 
         for i = 1, n do
+            local unitID = "raid" .. tostring(i)
             local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
-            if name then
-                local unitID = "raid" .. tostring(i)
-                local raceL, race = UnitRace(unitID)
+            if IsUnknownName(name) then
+                hasUnknownUnits = true
+                MarkPendingUnit(unitID)
+                local prevName = prevNamesByUnit[unitID]
+                if prevName and not nextUnitsByName[prevName] then
+                    seen[prevName] = true
+                    nextUnitsByName[prevName] = unitID
+                    nextNamesByUnit[unitID] = prevName
+                end
+                tinsert(delta.unresolved, { unitID = unitID, name = prevName })
+            else
+                pendingUnits[unitID] = nil
+                nextUnitsByName[name] = unitID
+                nextNamesByUnit[unitID] = name
 
-                local player = playersByName[name]
-                local active = player and player.leave == nil
+                local raceL, race = UnitRace(unitID)
+                local oldUnitID = prevUnitsByName[name]
+                local prevPlayer = playersByName[name]
+                local active = prevPlayer and prevPlayer.leave == nil
+                local player = prevPlayer
 
                 if not active then
-                    changed = true
+                    rosterChanged = true
+                    local newRank = rank or (prevPlayer and prevPlayer.rank) or 0
+                    local newSubgroup = subgroup or (prevPlayer and prevPlayer.subgroup) or 1
+                    local newClass = class or (prevPlayer and prevPlayer.class) or "UNKNOWN"
                     player = {
                         name     = name,
-                        rank     = rank or 0,
-                        subgroup = subgroup or 1,
-                        class    = class or "UNKNOWN",
+                        rank     = newRank,
+                        subgroup = newSubgroup,
+                        class    = newClass,
                         join     = now,
                         leave    = nil,
-                        count    = (player and player.count) or 0,
+                        count    = (prevPlayer and prevPlayer.count) or 0,
                     }
+                    tinsert(delta.joined, {
+                        name = name,
+                        unitID = unitID,
+                        rank = newRank,
+                        subgroup = newSubgroup,
+                        class = newClass,
+                    })
                 else
-                    local newRank = rank or player.rank or 0
-                    local newSubgroup = subgroup or player.subgroup or 1
-                    local newClass = class or player.class or "UNKNOWN"
+                    local oldRank = player.rank or 0
+                    local oldSubgroup = player.subgroup or 1
+                    local oldClass = player.class or "UNKNOWN"
+                    local newRank = rank or oldRank
+                    local newSubgroup = subgroup or oldSubgroup
+                    local newClass = class or oldClass
+                    local fieldChanged = (oldRank ~= newRank)
+                        or (oldSubgroup ~= newSubgroup)
+                        or (oldClass ~= newClass)
+                    local unitChanged = oldUnitID and (oldUnitID ~= unitID)
 
-                    if player.rank ~= newRank
-                        or player.subgroup ~= newSubgroup
-                        or player.class ~= newClass then
-                        changed = true
+                    if fieldChanged or unitChanged then
+                        rosterChanged = true
+                        tinsert(delta.updated, {
+                            name = name,
+                            oldUnitID = oldUnitID,
+                            unitID = unitID,
+                            oldRank = oldRank,
+                            rank = newRank,
+                            oldSubgroup = oldSubgroup,
+                            subgroup = newSubgroup,
+                            oldClass = oldClass,
+                            class = newClass,
+                        })
                     end
 
                     player.rank = newRank
@@ -153,7 +285,7 @@ do
                     or known.class ~= newClass
                     or known.classL ~= classL
                     or known.sex ~= newSex then
-                    changed = true
+                    -- Profile metadata changed only; this should not force full roster consumers to refresh.
                 end
 
                 -- Keep identity stable to avoid per-update table churn on roster bursts.
@@ -171,22 +303,41 @@ do
             end
         end
 
+        TrimPendingUnits(n)
+        liveUnitsByName = nextUnitsByName
+        liveNamesByUnit = nextNamesByUnit
+
         -- Mark leavers
         for pname, p in pairs(playersByName) do
             if p.leave == nil and not seen[pname] then
                 p.leave = now
-                changed = true
+                rosterChanged = true
+                tinsert(delta.left, {
+                    name = pname,
+                    unitID = prevUnitsByName[pname],
+                    rank = p.rank or 0,
+                    subgroup = p.subgroup or 1,
+                    class = p.class or "UNKNOWN",
+                })
             end
         end
 
-        if changed then
+        if hasUnknownUnits then
+            SchedulePendingUnitRetry()
+        else
+            ResetPendingUnitRetry()
+        end
+
+        delta = FinalizeRosterDelta(delta)
+
+        if rosterChanged then
             rosterVersion = rosterVersion + 1
             addon:debug(Diag.D.LogRaidRosterUpdate:format(rosterVersion, n))
             if addon.Master and addon.Master.PrepareDropDowns then
                 addon.Master:PrepareDropDowns()
             end
         end
-        return changed
+        return rosterChanged, delta
     end
 
     -- Creates a new raid log entry.
@@ -261,6 +412,8 @@ do
         KRT_CurrentRaid = #KRT_Raids
         -- New session context: force version-gated roster consumers (e.g. Master dropdowns) to rebuild.
         rosterVersion = rosterVersion + 1
+        ResetPendingUnitRetry()
+        ResetLiveUnitCaches()
 
         addon:info(Diag.I.LogRaidCreated:format(
             KRT_CurrentRaid or -1,
@@ -337,6 +490,10 @@ do
 
     -- Ends the current raid log entry, marking end time.
     function module:End()
+        addon.CancelTimer(module.pendingUnitRetryHandle, true)
+        module.pendingUnitRetryHandle = nil
+        twipe(pendingUnits)
+        ResetLiveUnitCaches()
         if not KRT_CurrentRaid then return end
         -- Stop any pending roster update when ending the raid
         addon.CancelTimer(module.updateRosterHandle, true)
@@ -965,12 +1122,9 @@ do
         name = name or Utils.getPlayerName() or UnitName("player")
         if #players == 0 then
             if addon.IsInGroup() then
-                for unit in addon.UnitIterator(true) do
-                    local pname = UnitName(unit)
-                    if pname == name then
-                        rank = Utils.getUnitRank(unit)
-                        break
-                    end
+                local unit = module:GetUnitID(name)
+                if unit and unit ~= "none" then
+                    rank = Utils.getUnitRank(unit) or 0
                 end
             end
         else
@@ -997,17 +1151,34 @@ do
 
     -- Gets a player's unit ID (e.g., "raid1").
     function module:GetUnitID(name)
-        local id = "none"
         if not addon.IsInGroup() or not name then
-            return id
+            return "none"
         end
-        for unit in addon.UnitIterator(true) do
-            if UnitName(unit) == name then
-                id = unit
-                break
+
+        name = Utils.normalizeName(name)
+        local cachedUnit = liveUnitsByName[name]
+        if cachedUnit then
+            if UnitExists(cachedUnit) and UnitName(cachedUnit) == name then
+                return cachedUnit
+            end
+            liveUnitsByName[name] = nil
+            if liveNamesByUnit[cachedUnit] == name then
+                liveNamesByUnit[cachedUnit] = nil
             end
         end
-        return id
+
+        for unit in addon.UnitIterator(true) do
+            local unitName = UnitName(unit)
+            if unitName then
+                unitName = Utils.normalizeName(unitName)
+                liveUnitsByName[unitName] = unit
+                liveNamesByUnit[unit] = unitName
+                if unitName == name then
+                    return unit
+                end
+            end
+        end
+        return "none"
     end
 
     -- ----- Raid & Loot Status Checks ----- --
