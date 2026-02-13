@@ -294,6 +294,63 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 
+    function module:SetCurrentItemView(itemName, itemLink, itemTexture, itemColor)
+        if not (itemName and itemLink and itemTexture and itemColor) then
+            return false
+        end
+
+        local frame = getFrame()
+        if not frame then return false end
+        frameName = frameName or frame:GetName()
+        if not frameName or frameName ~= frame:GetName() then return false end
+
+        local currentItemLink = _G[frameName .. "Name"]
+        local currentItemBtn = _G[frameName .. "ItemBtn"]
+        if not (currentItemLink and currentItemBtn) then
+            return false
+        end
+
+        currentItemLink:SetText(addon.WrapTextInColorCode(
+            itemName,
+            Utils.normalizeHexColor(itemColor)
+        ))
+        currentItemBtn:SetNormalTexture(itemTexture)
+
+        local options = addon.options or KRT_Options or {}
+        if options.showTooltips then
+            currentItemBtn.tooltip_item = itemLink
+            addon:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
+        end
+        return true
+    end
+
+    function module:ClearCurrentItemView(focusItemCount)
+        local frame = getFrame()
+        if not frame then return false end
+        frameName = frameName or frame:GetName()
+        if not frameName or frameName ~= frame:GetName() then return false end
+
+        local currentItemLink = _G[frameName .. "Name"]
+        local currentItemBtn = _G[frameName .. "ItemBtn"]
+        if not (currentItemLink and currentItemBtn) then
+            return false
+        end
+
+        currentItemLink:SetText(L.StrNoItemSelected)
+        currentItemBtn:SetNormalTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
+        currentItemBtn.tooltip_item = nil
+        GameTooltip:Hide()
+
+        local mf = module.frame
+        if mf and frameName == mf:GetName() then
+            local itemCountBox = _G[frameName .. "ItemCount"]
+            if itemCountBox then
+                Utils.resetEditBox(itemCountBox, focusItemCount and true or false)
+            end
+        end
+        return true
+    end
+
     function module:ResetItemCount(focus)
         -- During multi-award from loot window we keep ItemCount stable (target N) to avoid
         -- mid-sequence clamping to the remaining copies.

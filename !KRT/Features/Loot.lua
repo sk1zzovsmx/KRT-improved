@@ -5,7 +5,6 @@
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
-local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
 local C = feature.C
@@ -29,16 +28,6 @@ local tostring, tonumber = tostring, tonumber
 do
     addon.Loot = addon.Loot or {}
     local module = addon.Loot
-    local frameName
-
-    local function GetMasterFrameName()
-        if frameName then return frameName end
-        local mf = (addon.Master and addon.Master.frame) or _G["KRTMaster"]
-        if mf and addon.Master and not addon.Master.frame then addon.Master.frame = mf end
-        if not mf then return nil end
-        frameName = mf:GetName()
-        return frameName
-    end
 
     -- ----- Internal state ----- --
     local lootTable = {}
@@ -224,26 +213,11 @@ do
 
     -- Sets the main item display in the UI.
     function module:SetItem(i)
-        if i.itemName and i.itemLink and i.itemTexture and i.itemColor then
-            frameName = GetMasterFrameName()
-            if frameName == nil then return end
-
-            local currentItemLink = _G[frameName .. "Name"]
-            currentItemLink:SetText(addon.WrapTextInColorCode(
-                i.itemName,
-                Utils.normalizeHexColor(i.itemColor)
-            ))
-
-            local currentItemBtn = _G[frameName .. "ItemBtn"]
-            currentItemBtn:SetNormalTexture(i.itemTexture)
-
-            local options = addon.options or KRT_Options or {}
-            if options.showTooltips then
-                currentItemBtn.tooltip_item = i.itemLink
-                addon:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
-            end
-            Utils.triggerEvent("SetItem", i.itemLink)
-        end
+        local master = addon.Master
+        if not (i.itemName and i.itemLink and i.itemTexture and i.itemColor) then return end
+        if not (master and master.SetCurrentItemView) then return end
+        if not master:SetCurrentItemView(i.itemName, i.itemLink, i.itemTexture, i.itemColor) then return end
+        Utils.triggerEvent("SetItem", i.itemLink)
     end
 
     -- Selects an item from the loot list by its index.
@@ -261,16 +235,9 @@ do
     function module:ClearLoot()
         lootTable = twipe(lootTable)
         lootState.lootCount = 0
-        frameName = GetMasterFrameName()
-        if not frameName then return end
-        _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
-        _G[frameName .. "ItemBtn"]:SetNormalTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
-        local itemBtn = _G[frameName .. "ItemBtn"]
-        itemBtn.tooltip_item = nil
-        GameTooltip:Hide()
-        local mf = addon.Master and addon.Master.frame
-        if mf and frameName == mf:GetName() then
-            Utils.resetEditBox(_G[frameName .. "ItemCount"], true)
+        local master = addon.Master
+        if master and master.ClearCurrentItemView then
+            master:ClearCurrentItemView(true)
         end
     end
 
