@@ -116,7 +116,7 @@ do
 
     -- Clear module:
     function module:Clear()
-        if not addon.State.currentRaid or changesTable == nil then return end
+        if not addon.Core.getCurrentRaid() or changesTable == nil then return end
         for n in pairs(changesTable) do
             changesTable[n] = nil
         end
@@ -161,7 +161,7 @@ do
 
     -- Add / Delete:
     function module:Add(btn)
-        if not addon.State.currentRaid or not btn then return end
+        if not addon.Core.getCurrentRaid() or not btn then return end
         if not selectedID then
             btn:Hide()
             _G[frameName .. "Name"]:Show()
@@ -180,7 +180,7 @@ do
 
     -- Edit / Save
     function module:Edit()
-        if not addon.State.currentRaid then return end
+        if not addon.Core.getCurrentRaid() then return end
         if not selectedID or isEdit then
             local name = _G[frameName .. "Name"]:GetText()
             local spec = _G[frameName .. "Spec"]:GetText()
@@ -198,8 +198,8 @@ do
 
     -- Remove player's change:
     function module:Delete(name)
-        if not addon.State.currentRaid or not name then return end
-        KRT_Raids[addon.State.currentRaid].changes[name] = nil
+        if not addon.Core.getCurrentRaid() or not name then return end
+        KRT_Raids[addon.Core.getCurrentRaid()].changes[name] = nil
         changesDirty = true
         controller:Dirty()
         module:RequestRefresh()
@@ -212,13 +212,13 @@ do
 
     -- Ask For module:
     function module:Demand()
-        if not addon.State.currentRaid then return end
+        if not addon.Core.getCurrentRaid() then return end
         addon:Announce(L.StrChangesDemand)
     end
 
     -- Spam module:
     function module:Announce()
-        if not addon.State.currentRaid then return end
+        if not addon.Core.getCurrentRaid() then return end
         -- In case of a reload/relog and the frame wasn't loaded
         if not fetched or not next(changesTable) then
             InitChangesTable()
@@ -319,8 +319,8 @@ do
         Utils.showHide(_G[frameName .. "AddBtn"], (not isEdit and not isAdd))
         Utils.enableDisable(_G[frameName .. "ClearBtn"], count > 0)
         Utils.enableDisable(_G[frameName .. "AnnounceBtn"], count > 0)
-        Utils.enableDisable(_G[frameName .. "AddBtn"], addon.State.currentRaid)
-        Utils.enableDisable(_G[frameName .. "DemandBtn"], addon.State.currentRaid)
+        Utils.enableDisable(_G[frameName .. "AddBtn"], addon.Core.getCurrentRaid())
+        Utils.enableDisable(_G[frameName .. "DemandBtn"], addon.Core.getCurrentRaid())
     end
 
     function module:Refresh()
@@ -330,18 +330,18 @@ do
     -- Initialize changes table:
     function InitChangesTable()
         addon:debug(Diag.D.LogChangesInitTable)
-        if not addon.State.currentRaid then
+        if not addon.Core.getCurrentRaid() then
             changesTable = {}
             return
         end
-        local raid = KRT_Raids[addon.State.currentRaid]
+        local raid = KRT_Raids[addon.Core.getCurrentRaid()]
         raid.changes = raid.changes or {}
         changesTable = raid.changes
     end
 
     -- Save module:
     function SaveChanges(name, spec)
-        if not addon.State.currentRaid or not name then return end
+        if not addon.Core.getCurrentRaid() or not name then return end
         name = Utils.normalizeName(name)
         spec = Utils.normalizeName(spec)
         -- Is the player in the raid?

@@ -98,10 +98,10 @@ do
 
     local function getCurrentRaidPlayers()
         twipe(raidPlayers)
-        if not addon.State.currentRaid then
+        if not addon.Core.getCurrentRaid() then
             return raidPlayers
         end
-        return addon.Raid:GetLootCounterRows(addon.State.currentRaid, raidPlayers)
+        return addon.Raid:GetLootCounterRows(addon.Core.getCurrentRaid(), raidPlayers)
     end
 
     local function ensureRow(i, rowHeight)
@@ -156,21 +156,21 @@ do
             row.plus:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:AddPlayerCountByNid(playerNid, 1, addon.State.currentRaid)
+                    addon.Raid:AddPlayerCountByNid(playerNid, 1, addon.Core.getCurrentRaid())
                     module:RequestRefresh()
                 end
             end)
             row.minus:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:AddPlayerCountByNid(playerNid, -1, addon.State.currentRaid)
+                    addon.Raid:AddPlayerCountByNid(playerNid, -1, addon.Core.getCurrentRaid())
                     module:RequestRefresh()
                 end
             end)
             row.reset:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:SetPlayerCountByNid(playerNid, 0, addon.State.currentRaid)
+                    addon.Raid:SetPlayerCountByNid(playerNid, 0, addon.Core.getCurrentRaid())
                     module:RequestRefresh()
                 end
             end)
@@ -242,7 +242,7 @@ do
             end
 
             local cnt = (data and tonumber(data.count))
-                or (playerNid and addon.Raid:GetPlayerCountByNid(playerNid, addon.State.currentRaid))
+                or (playerNid and addon.Raid:GetPlayerCountByNid(playerNid, addon.Core.getCurrentRaid()))
                 or 0
             if row._lastCount ~= cnt then
                 row.count:SetText(tostring(cnt))

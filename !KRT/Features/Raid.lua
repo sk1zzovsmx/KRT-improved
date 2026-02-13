@@ -231,7 +231,7 @@ do
             end
         end
 
-        if not addon.State.currentRaid then
+        if not Core.getCurrentRaid() then
             resetPendingUnitRetry()
             resetLiveUnitCaches()
             return false
@@ -264,7 +264,7 @@ do
             return rosterChanged
         end
 
-        local raid = Core.ensureRaidById(addon.State.currentRaid)
+        local raid = Core.ensureRaidById(Core.getCurrentRaid())
         if not raid then return false end
 
         local realm = Utils.getRealmName()
@@ -431,7 +431,7 @@ do
         local num = GetNumRaidMembers()
         if num == 0 then return false end
 
-        if addon.State.currentRaid then
+        if Core.getCurrentRaid() then
             self:End()
         end
 
@@ -479,20 +479,20 @@ do
         end
 
         tinsert(KRT_Raids, raidInfo)
-        addon.State.currentRaid = #KRT_Raids
+        Core.setCurrentRaid(#KRT_Raids)
         -- New session context: force version-gated roster consumers (e.g. Master dropdowns) to rebuild.
         rosterVersion = rosterVersion + 1
         resetPendingUnitRetry()
         resetLiveUnitCaches()
 
         addon:info(Diag.I.LogRaidCreated:format(
-            addon.State.currentRaid or -1,
+            Core.getCurrentRaid() or -1,
             tostring(zoneName),
             tonumber(raidSize) or -1,
             #raidInfo.players
         ))
 
-        Utils.triggerEvent("RaidCreate", addon.State.currentRaid)
+        Utils.triggerEvent("RaidCreate", Core.getCurrentRaid())
 
         -- Schedule one delayed roster refresh.
         addon.CancelTimer(module.updateRosterHandle, true)
@@ -511,7 +511,7 @@ do
     end
 
     function module:GetBossByNid(bossNid, raidNum)
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         local raid = Core.ensureRaidById(raidNum)
         if not raid or bossNid == nil then return nil end
         Core.ensureRaidSchema(raid)
@@ -530,7 +530,7 @@ do
     end
 
     function module:GetLootByNid(lootNid, raidNum)
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         local raid = Core.ensureRaidById(raidNum)
         if not raid or lootNid == nil then return nil end
         Core.ensureRaidSchema(raid)
@@ -555,15 +555,15 @@ do
         module.pendingUnitRetryHandle = nil
         twipe(pendingUnits)
         resetLiveUnitCaches()
-        if not addon.State.currentRaid then return end
+        if not Core.getCurrentRaid() then return end
         -- Stop any pending roster update when ending the raid
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
         local currentTime = Utils.getCurrentTime()
-        local raid = Core.ensureRaidById(addon.State.currentRaid)
+        local raid = Core.ensureRaidById(Core.getCurrentRaid())
         if raid then
             local duration = currentTime - (raid.startTime or currentTime)
-            addon:info(Diag.I.LogRaidEnded:format(addon.State.currentRaid or -1, tostring(raid.zone),
+            addon:info(Diag.I.LogRaidEnded:format(Core.getCurrentRaid() or -1, tostring(raid.zone),
                 tonumber(raid.size) or -1, raid.bossKills and #raid.bossKills or 0,
                 raid.loot and #raid.loot or 0, duration))
 
@@ -572,8 +572,8 @@ do
             end
             raid.endTime = currentTime
         end
-        addon.State.currentRaid = nil
-        addon.State.lastBoss = nil
+        Core.setCurrentRaid(nil)
+        Core.setLastBoss(nil)
     end
 
     -- Checks the current raid status and creates a new session if needed.
@@ -581,17 +581,17 @@ do
         instanceDiff = resolveRaidDifficulty(instanceDiff)
         local newSize = getRaidSizeFromDifficulty(instanceDiff)
         addon:debug(Diag.D.LogRaidCheck:format(tostring(instanceName), tostring(instanceDiff),
-            tostring(addon.State.currentRaid)))
+            tostring(Core.getCurrentRaid())))
         if not newSize then
             return
         end
 
-        if not addon.State.currentRaid then
+        if not Core.getCurrentRaid() then
             module:Create(instanceName, newSize, instanceDiff)
             return
         end
 
-        local current = Core.ensureRaidById(addon.State.currentRaid)
+        local current = Core.ensureRaidById(Core.getCurrentRaid())
         if not current then
             createRaidSessionWithReason(instanceName, newSize, instanceDiff, true)
             return
@@ -613,7 +613,7 @@ do
         module.firstCheckHandle = nil
         if not addon.IsInGroup() then return end
 
-        if addon.State.currentRaid and module:CheckPlayer(Utils.getPlayerName(), addon.State.currentRaid) then
+        if Core.getCurrentRaid() and module:CheckPlayer(Utils.getPlayerName(), Core.getCurrentRaid()) then
             -- Restart the roster update timer: cancel the old one and schedule a new one
             addon.CancelTimer(module.updateRosterHandle, true)
             module.updateRosterHandle = nil
@@ -622,7 +622,7 @@ do
         end
 
         local instanceName, instanceType, instanceDiff = GetInstanceInfo()
-        addon:debug(Diag.D.LogRaidFirstCheck:format(tostring(addon.IsInGroup()), tostring(addon.State.currentRaid ~= nil),
+        addon:debug(Diag.D.LogRaidFirstCheck:format(tostring(addon.IsInGroup()), tostring(Core.getCurrentRaid() ~= nil),
             tostring(instanceName), tostring(instanceType), tostring(instanceDiff)))
         if instanceType == "raid" then
             module:Check(instanceName, instanceDiff)
@@ -632,7 +632,7 @@ do
 
     -- Adds a player to the raid log.
     function module:AddPlayer(t, raidNum)
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         if not raidNum or not t or not t.name then return end
         local raid = Core.ensureRaidById(raidNum)
         if not raid then return end
@@ -669,7 +669,7 @@ do
 
     -- Adds a boss kill to the active raid log.
     function module:AddBoss(bossName, manDiff, raidNum)
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         if not raidNum or not bossName then
             addon:debug(Diag.D.LogBossAddSkipped:format(tostring(raidNum), tostring(bossName)))
             return
@@ -710,10 +710,10 @@ do
         }
 
         tinsert(raid.bossKills, killInfo)
-        addon.State.lastBoss = bossNid
+        Core.setLastBoss(bossNid)
         addon:info(Diag.I.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1,
             tonumber(raidNum) or -1, #players))
-        addon:debug(Diag.D.LogBossLastBossHash:format(tonumber(addon.State.lastBoss) or -1, tostring(killInfo.hash)))
+        addon:debug(Diag.D.LogBossLastBossHash:format(tonumber(Core.getLastBoss()) or -1, tostring(killInfo.hash)))
     end
 
     -- Adds a loot item to the active raid log.
@@ -779,7 +779,7 @@ do
             return
         end
 
-        if not addon.State.lastBoss then
+        if not Core.getLastBoss() then
             addon:debug(Diag.D.LogBossNoContextTrash)
             self:AddBoss("_TrashMob_")
         end
@@ -805,7 +805,7 @@ do
             rollValue = addon.Rolls:HighestRoll() or 0
         end
 
-        local raid = Core.ensureRaidById(addon.State.currentRaid)
+        local raid = Core.ensureRaidById(Core.getCurrentRaid())
         if not raid then return end
         Core.ensureRaidSchema(raid)
         local lootNid = tonumber(raid.nextLootNid) or 1
@@ -823,19 +823,19 @@ do
             rollType    = rollType,
             rollValue   = rollValue,
             lootNid     = lootNid,
-            bossNid     = tonumber(addon.State.lastBoss) or 0,
+            bossNid     = tonumber(Core.getLastBoss()) or 0,
             time        = Utils.getCurrentTime(),
         }
 
         -- LootCounter (MS only): increment the winner's count when the loot is actually awarded.
         -- This runs off the authoritative LOOT_ITEM / LOOT_ITEM_MULTIPLE chat event.
         if tonumber(rollType) == rollTypes.MAINSPEC then
-            module:AddPlayerCount(player, itemCount, addon.State.currentRaid)
+            module:AddPlayerCount(player, itemCount, Core.getCurrentRaid())
         end
 
         tinsert(raid.loot, lootInfo)
-        Utils.triggerEvent("RaidLootUpdate", addon.State.currentRaid, lootInfo)
-        addon:debug(Diag.D.LogLootLogged:format(tonumber(addon.State.currentRaid) or -1, tostring(itemId),
+        Utils.triggerEvent("RaidLootUpdate", Core.getCurrentRaid(), lootInfo)
+        addon:debug(Diag.D.LogLootLogged:format(tonumber(Core.getCurrentRaid()) or -1, tostring(itemId),
             tostring(lootInfo.bossNid), tostring(player)))
     end
 
@@ -858,7 +858,7 @@ do
     end
 
     function module:GetPlayerCountByNid(playerNid, raidNum)
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         local raid = Core.ensureRaidById(raidNum)
         if not raid then return 0 end
         Core.ensureRaidSchema(raid)
@@ -869,7 +869,7 @@ do
     end
 
     function module:SetPlayerCountByNid(playerNid, value, raidNum)
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         local raid = Core.ensureRaidById(raidNum)
         if not raid then return end
         Core.ensureRaidSchema(raid)
@@ -890,7 +890,7 @@ do
     end
 
     function module:AddPlayerCountByNid(playerNid, delta, raidNum)
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         if not raidNum then return end
 
         delta = tonumber(delta) or 0
@@ -907,7 +907,7 @@ do
     -- Used by LootCounter UI and MS auto-counting.
     -- Clamps to 0 (never negative).
     function module:AddPlayerCount(name, delta, raidNum)
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         if not raidNum or not name then return end
 
         delta = tonumber(delta) or 0
@@ -1013,8 +1013,8 @@ do
         local currentTime = Utils.getCurrentTime()
         local week = 604800 -- 7 days in seconds
 
-        if addon.State.nextReset and addon.State.nextReset > currentTime then
-            return startTime < (addon.State.nextReset - week)
+        if Core.getNextReset() and Core.getNextReset() > currentTime then
+            return startTime < (Core.getNextReset() - week)
         end
 
         return currentTime >= startTime + week
@@ -1022,7 +1022,7 @@ do
 
     -- Retrieves all loot for a given raid and optional boss number.
     function module:GetLoot(raidNum, bossNid)
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         local raid = Core.ensureRaidById(raidNum)
         bossNid = tonumber(bossNid) or 0
         if not raid then
@@ -1046,7 +1046,7 @@ do
 
     -- Retrieves the position of a specific loot item within the raid's loot table.
     function module:GetLootID(itemID, raidNum, holderName)
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         local raid = Core.ensureRaidById(raidNum)
         if not raid then return 0 end
 
@@ -1055,7 +1055,7 @@ do
         itemID = tonumber(itemID)
         if not itemID then return 0 end
 
-        local bossNid = tonumber(addon.State.lastBoss) or 0
+        local bossNid = tonumber(Core.getLastBoss()) or 0
         local loot = raid.loot or {}
 
         for i = #loot, 1, -1 do
@@ -1073,7 +1073,7 @@ do
 
     -- Retrieves all boss kills for a given raid.
     function module:GetBosses(raidNum, out)
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         local raid = Core.ensureRaidById(raidNum)
         if not raid or not raid.bossKills then return {} end
 
@@ -1100,7 +1100,7 @@ do
 
     -- Returns players from the raid log. Can be filtered by boss kill.
     function module:GetPlayers(raidNum, bossNid, out)
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         local raid = Core.ensureRaidById(raidNum)
         if not raid then return {} end
 
@@ -1130,7 +1130,7 @@ do
 
     -- Returns LootCounter rows from canonical raid data (unique by player name).
     function module:GetLootCounterRows(raidNum, out)
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         local raid = Core.ensureRaidById(raidNum)
         local rows = out or {}
         if out then twipe(rows) end
@@ -1184,7 +1184,7 @@ do
     -- Returns the player's stable ID (playerNid) from the raid log.
     function module:GetPlayerID(name, raidNum)
         local playerNid = 0
-        raidNum = raidNum or addon.State.currentRaid
+        raidNum = raidNum or Core.getCurrentRaid()
         local raid = raidNum and Core.ensureRaidById(raidNum)
         if raid then
             name = name or Utils.getPlayerName()
@@ -1203,7 +1203,7 @@ do
     -- Gets a player's name by stable ID (playerNid).
     function module:GetPlayerName(id, raidNum)
         local name
-        raidNum = raidNum or addon.Logger.selectedRaid or addon.State.currentRaid
+        raidNum = raidNum or addon.Logger.selectedRaid or Core.getCurrentRaid()
         local raid = raidNum and Core.ensureRaidById(raidNum)
         if raid then
             local qid = tonumber(id) or id

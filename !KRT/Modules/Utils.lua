@@ -163,11 +163,18 @@ end
 --   raidTableOrNil, resolvedRaidNumOrNil
 --
 -- Notes:
--- - Uses current raid (addon.State.currentRaid) when raidNum is nil.
+-- - Uses current raid via addon.Core.getCurrentRaid() when raidNum is nil.
 -- - Safe when KRT_Raids is nil.
 function Utils.getRaid(raidNum)
-    local state = addon.State
-    raidNum = raidNum or (state and state.currentRaid)
+    if raidNum == nil then
+        local core = addon.Core
+        if core and core.getCurrentRaid then
+            raidNum = core.getCurrentRaid()
+        else
+            local state = addon.State
+            raidNum = state and state.currentRaid or nil
+        end
+    end
     if not raidNum then return nil, nil end
     local raids = KRT_Raids
     local raid = raids and raids[raidNum] or nil

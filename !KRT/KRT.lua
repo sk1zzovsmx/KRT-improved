@@ -79,6 +79,33 @@ local Core = addon.Core
 
 local RAID_SCHEMA_VERSION = 1
 
+function Core.getCurrentRaid()
+    return coreState.currentRaid
+end
+
+function Core.setCurrentRaid(raidNum)
+    coreState.currentRaid = raidNum
+    return coreState.currentRaid
+end
+
+function Core.getLastBoss()
+    return coreState.lastBoss
+end
+
+function Core.setLastBoss(bossNid)
+    coreState.lastBoss = bossNid
+    return coreState.lastBoss
+end
+
+function Core.getNextReset()
+    return tonumber(coreState.nextReset) or 0
+end
+
+function Core.setNextReset(nextReset)
+    coreState.nextReset = tonumber(nextReset) or 0
+    return coreState.nextReset
+end
+
 -- =========== Event System (WoW API events)  =========== --
 -- Clean frame-based dispatcher (NO CallbackHandler here)
 do
@@ -665,8 +692,8 @@ local function isLoggerViewingCurrentRaid(log, logFrame)
     if not (log and logFrame and logFrame.IsShown and logFrame:IsShown()) then
         return false
     end
-    return addon.State.currentRaid and log.selectedRaid
-        and tonumber(log.selectedRaid) == tonumber(addon.State.currentRaid)
+    local currentRaid = Core.getCurrentRaid()
+    return currentRaid and log.selectedRaid and tonumber(log.selectedRaid) == tonumber(currentRaid)
 end
 
 local function scheduleRaidInstanceChecksIfRecognized(instanceName, instanceType, instanceDiff, emitRecognizedLog)
@@ -687,7 +714,7 @@ local function processRaidRosterUpdate()
     end
 
     -- Single source of truth for roster change notifications (join/update/leave delta).
-    Utils.triggerEvent("RaidRosterDelta", delta, addon.Raid:GetRosterVersion(), addon.State.currentRaid)
+    Utils.triggerEvent("RaidRosterDelta", delta, addon.Raid:GetRosterVersion(), Core.getCurrentRaid())
     -- Keep Master Looter UI in sync (event-driven; no polling).
     local mf = addon.Master and addon.Master.frame
     if addon.Master and addon.Master.RequestRefresh and mf and mf.IsShown and mf:IsShown() then
@@ -740,9 +767,9 @@ end
 function addon:RAID_INSTANCE_WELCOME(...)
     local instanceName, instanceType, instanceDiff = GetInstanceInfo()
     local _, nextReset = ...
-    addon.State.nextReset = nextReset
+    local resolvedNextReset = Core.setNextReset(nextReset)
     addon:trace(Diag.D.LogRaidInstanceWelcome:format(tostring(instanceName), tostring(instanceType),
-        tostring(instanceDiff), tostring(addon.State.nextReset)))
+        tostring(instanceDiff), tostring(resolvedNextReset)))
     if instanceType == "raid" and not L.RaidZones[instanceName] then
         addon:warn(Diag.W.LogRaidUnmappedZone:format(tostring(instanceName), tostring(instanceDiff)))
     end
@@ -779,7 +806,7 @@ end
 -- CHAT_MSG_LOOT: Adds looted items to the raid log.
 function addon:CHAT_MSG_LOOT(msg)
     addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
-    if addon.State.currentRaid then
+    if Core.getCurrentRaid() then
         self.Raid:AddLoot(msg)
     end
 end
@@ -792,7 +819,7 @@ end
 -- CHAT_MSG_MONSTER_YELL: Logs a boss kill based on specific boss yells.
 function addon:CHAT_MSG_MONSTER_YELL(...)
     local text = ...
-    if L.BossYells[text] and addon.State.currentRaid then
+    if L.BossYells[text] and Core.getCurrentRaid() then
         addon:trace(Diag.D.LogBossYellMatched:format(tostring(text), tostring(L.BossYells[text])))
         self.Raid:AddBoss(L.BossYells[text])
     end
@@ -800,7 +827,7 @@ end
 
 -- COMBAT_LOG_EVENT_UNFILTERED: Logs a boss kill when a boss unit dies.
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
-    if not addon.State.currentRaid then return end
+    if not Core.getCurrentRaid() then return end
 
     -- Hot-path fast check: inspect the event type before unpacking extra args.
     local subEvent = select(2, ...)
