@@ -28,37 +28,37 @@ local pairs, select, next = pairs, select, next
 
 local tostring, tonumber = tostring, tonumber
 
-local function getLootModule()
+local function GetLootModule()
     return addon.Loot
 end
 
 GetItem = function(i)
-    local loot = getLootModule()
+    local loot = GetLootModule()
     return loot and loot.GetItem and loot.GetItem(i) or nil
 end
 
 GetItemName = function(i)
-    local loot = getLootModule()
+    local loot = GetLootModule()
     return loot and loot.GetItemName and loot.GetItemName(i) or nil
 end
 
 GetItemLink = function(i)
-    local loot = getLootModule()
+    local loot = GetLootModule()
     return loot and loot.GetItemLink and loot.GetItemLink(i) or nil
 end
 
 GetItemTexture = function(i)
-    local loot = getLootModule()
+    local loot = GetLootModule()
     return loot and loot.GetItemTexture and loot.GetItemTexture(i) or nil
 end
 
 ItemExists = function(i)
-    local loot = getLootModule()
+    local loot = GetLootModule()
     return loot and loot.ItemExists and loot.ItemExists(i) or false
 end
 
 ItemIsSoulbound = function(bag, slot)
-    local loot = getLootModule()
+    local loot = GetLootModule()
     return loot and loot.ItemIsSoulbound and loot.ItemIsSoulbound(bag, slot) or false
 end
 
@@ -109,6 +109,16 @@ do
     local announced = false
     local cachedRosterVersion
     local ROLL_WINNERS_CTX = "MLRollWinners"
+    local FLOW_STATES = {
+        IDLE = "idle",
+        LOOT = "loot",
+        ROLLING = "rolling",
+        COUNTDOWN = "countdown",
+        INVENTORY = "inventory",
+        MULTI_AWARD = "multi_award",
+        TRADE = "trade",
+    }
+    local flowState = FLOW_STATES.IDLE
     local rollAnnouncementKeys = {
         [rollTypes.MAINSPEC] = "ChatRollMS",
         [rollTypes.OFFSPEC] = "ChatRollOS",
@@ -117,6 +127,7 @@ do
     }
     local candidateCache = {
         itemLink = nil,
+        rosterVersion = nil,
         indexByName = {},
     }
 
@@ -134,6 +145,56 @@ do
         Utils.setEditBoxValue(itemCountBox, count, focus)
         lastUIState.itemCountText = tostring(count)
         dirtyFlags.itemCount = false
+    end
+
+    local function GetRaidRosterVersion()
+        local raid = addon.Raid
+        if raid and raid.GetRosterVersion then
+            return raid:GetRosterVersion()
+        end
+        return nil
+    end
+
+    local function InvalidateCandidateCache()
+        candidateCache.itemLink = nil
+        candidateCache.rosterVersion = nil
+        twipe(candidateCache.indexByName)
+    end
+
+    local function ComputeFlowState()
+        if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
+            return FLOW_STATES.MULTI_AWARD
+        end
+        if lootState.trader then
+            return FLOW_STATES.TRADE
+        end
+        if lootState.fromInventory then
+            return FLOW_STATES.INVENTORY
+        end
+        if countdownRun then
+            return FLOW_STATES.COUNTDOWN
+        end
+        if lootState.rollStarted then
+            return FLOW_STATES.ROLLING
+        end
+        if (lootState.lootCount or 0) > 0 then
+            return FLOW_STATES.LOOT
+        end
+        return FLOW_STATES.IDLE
+    end
+
+    local function SyncFlowState()
+        local nextState = ComputeFlowState()
+        if flowState ~= nextState then
+            flowState = nextState
+            dirtyFlags.buttons = true
+        end
+        return flowState
+    end
+
+    local function ResetItemCountAndRefresh(focus)
+        module:ResetItemCount(focus)
+        module:RequestRefresh()
     end
 
     local function StopCountdown()
@@ -263,6 +324,7 @@ do
 
     local function BuildCandidateCache(itemLink)
         candidateCache.itemLink = itemLink
+        candidateCache.rosterVersion = GetRaidRosterVersion()
         twipe(candidateCache.indexByName)
         for p = 1, addon.GetNumGroupMembers() do
             local candidate = GetMasterLootCandidate(p)
@@ -292,7 +354,9 @@ do
     end
 
     local function ResolveCandidateIndex(itemLink, playerName)
-        if candidateCache.itemLink ~= itemLink then
+        local rosterVersion = GetRaidRosterVersion()
+        local rosterChanged = rosterVersion and candidateCache.rosterVersion ~= rosterVersion
+        if candidateCache.itemLink ~= itemLink or rosterChanged then
             BuildCandidateCache(itemLink)
         end
         local candidateIndex = candidateCache.indexByName[playerName]
@@ -477,8 +541,7 @@ do
         if result then
             RegisterAwardedItem(1)
         end
-        module:ResetItemCount()
-        module:RequestRefresh()
+        ResetItemCountAndRefresh()
         return result
     end
 
@@ -578,8 +641,7 @@ do
 
         if lootState.fromInventory == true then
             local result = TradeItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
-            module:ResetItemCount()
-            module:RequestRefresh()
+            ResetItemCountAndRefresh()
             return result
         end
 
@@ -616,6 +678,10 @@ do
 
     function module:Refresh()
         if UpdateUIFrame then UpdateUIFrame() end
+    end
+
+    function module:GetFlowState()
+        return SyncFlowState()
     end
 
     function module:SetCurrentItemView(itemName, itemLink, itemTexture, itemColor)
@@ -906,8 +972,7 @@ do
             announced = false
             selectionFrame:Hide()
             addon.Loot:SelectItem(index)
-            module:ResetItemCount()
-            module:RequestRefresh()
+            ResetItemCountAndRefresh()
         end
     end
 
@@ -1032,6 +1097,7 @@ do
     -- Refreshes the UI once (event-driven; coalesced via module:RequestRefresh()).
     function UpdateUIFrame()
         LocalizeUIFrame()
+        local currentFlowState = SyncFlowState()
 
         local itemCountBox = _G[frameName .. "ItemCount"]
         UpdateItemCountFromBox(itemCountBox)
@@ -1072,8 +1138,9 @@ do
         local hasItemReserves = itemId and addon.Reserves:HasItemReserves(itemId) or false
         FlagButtonsOnChange("hasItemReserves", hasItemReserves)
         FlagButtonsOnChange("countdownRun", countdownRun)
+        FlagButtonsOnChange("flowState", currentFlowState)
 
-        local pickMode = (not lootState.fromInventory)
+        local pickMode = (currentFlowState ~= FLOW_STATES.INVENTORY and currentFlowState ~= FLOW_STATES.TRADE)
         local msCount = pickMode and (Utils.multiSelectCount(ROLL_WINNERS_CTX) or 0) or 0
         FlagButtonsOnChange("msCount", msCount)
 
@@ -1085,7 +1152,7 @@ do
                 spamLootText = lootState.fromInventory and READY_CHECK or L.BtnSpamLoot,
                 canSelectItem = (lootState.lootCount > 1
                     or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRun,
-                canChangeItem = not countdownRun,
+                canChangeItem = (currentFlowState ~= FLOW_STATES.COUNTDOWN),
                 canSpamLoot = lootState.lootCount >= 1,
                 canStartRolls = lootState.lootCount >= 1,
                 canStartSR = lootState.lootCount >= 1 and hasItemReserves,
@@ -1141,9 +1208,12 @@ do
 
     -- Prepares the data for the dropdowns by fetching the raid roster.
     function PrepareDropDowns()
-        local rosterVersion = addon.Raid.GetRosterVersion and addon.Raid:GetRosterVersion() or nil
+        local rosterVersion = GetRaidRosterVersion()
         if rosterVersion and cachedRosterVersion == rosterVersion then
             return
+        end
+        if rosterVersion ~= cachedRosterVersion then
+            InvalidateCandidateCache()
         end
         cachedRosterVersion = rosterVersion
         dropDownDirty = true
@@ -1347,9 +1417,8 @@ do
         itemInfo.count = itemCount
         itemInfo.isStack = (tonumber(slotCount) or 1) > 1
 
-        module:ResetItemCount(true)
         ClearCursor()
-        module:RequestRefresh()
+        ResetItemCountAndRefresh(true)
         return true
     end
 
@@ -1387,6 +1456,69 @@ do
         return ApplyInventoryItem(itemLink, totalCount, bag, slot, slotCount)
     end
 
+    local function RefreshAndMaybeShowLootFrame(shouldShow)
+        local frame = getFrame()
+        if not shouldShow then
+            return frame, false
+        end
+
+        -- Request while hidden to refresh immediately on OnShow (avoid an extra refresh).
+        module:RequestRefresh()
+        if frame and not frame:IsShown() then
+            frame:Show()
+        end
+        return frame, true
+    end
+
+    local function HandleLootOpenedVisibility()
+        local shouldShow = (lootState.lootCount or 0) >= 1
+        if shouldShow then
+            RefreshAndMaybeShowLootFrame(true)
+        else
+            -- Keep state dirty for the next time the frame is shown.
+            module:RequestRefresh()
+        end
+    end
+
+    local function HandleLootSlotClearedVisibility()
+        local shouldShow = (lootState.lootCount or 0) >= 1
+        local frame, shown = RefreshAndMaybeShowLootFrame(shouldShow)
+        if shown then
+            return
+        end
+
+        if frame then
+            frame:Hide()
+        end
+        addon:debug(Diag.D.LogMLLootWindowEmptied)
+    end
+
+    local function CompleteLootClosedCleanup()
+        lootState.opened = false
+        lootState.pendingAwards = {}
+        local frame = getFrame()
+        if frame then
+            frame:Hide()
+        end
+        addon.Loot:ClearLoot()
+        addon.Rolls:ClearRolls()
+        addon.Rolls:RecordRolls(false)
+        module:RequestRefresh()
+    end
+
+    local function ScheduleLootClosedCleanup()
+        -- Cancel any scheduled close timer and schedule a new one.
+        if lootState.closeTimer then
+            addon.CancelTimer(lootState.closeTimer)
+            lootState.closeTimer = nil
+        end
+
+        lootState.closeTimer = addon.NewTimer(0.1, function()
+            lootState.closeTimer = nil
+            CompleteLootClosedCleanup()
+        end)
+    end
+
     -- LOOT_OPENED: Triggered when the loot window opens.
     function module:LOOT_OPENED()
         if addon.Raid:IsMasterLooter() then
@@ -1401,17 +1533,7 @@ do
             end
             addon:debug(Diag.D.LogMLLootOpenedInfo:format(lootState.lootCount or 0,
                 tostring(lootState.fromInventory), tostring(UnitName("target"))))
-
-            local shouldShow = (lootState.lootCount or 0) >= 1
-            local frame = getFrame()
-            if shouldShow and frame then
-                -- Request while hidden to refresh immediately on OnShow (avoid an extra refresh).
-                module:RequestRefresh()
-                frame:Show()
-            else
-                -- Keep state dirty for the next time the frame is shown.
-                module:RequestRefresh()
-            end
+            HandleLootOpenedVisibility()
         end
     end
 
@@ -1421,22 +1543,7 @@ do
             addon:trace(Diag.D.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
             addon:trace(Diag.D.LogMLLootClosedCleanup)
             ClearMultiAwardState(false)
-            -- Cancel any scheduled close timer and schedule a new one
-            if lootState.closeTimer then
-                addon.CancelTimer(lootState.closeTimer)
-                lootState.closeTimer = nil
-            end
-            lootState.closeTimer = addon.NewTimer(0.1, function()
-                lootState.closeTimer = nil
-                lootState.opened = false
-                lootState.pendingAwards = {}
-                local frame = getFrame()
-                if frame then frame:Hide() end
-                addon.Loot:ClearLoot()
-                addon.Rolls:ClearRolls()
-                addon.Rolls:RecordRolls(false)
-                module:RequestRefresh()
-            end)
+            ScheduleLootClosedCleanup()
         end
     end
 
@@ -1447,22 +1554,7 @@ do
             addon:trace(Diag.D.LogMLLootSlotCleared:format(lootState.lootCount or 0))
             UpdateSelectionFrame()
             module:ResetItemCount()
-
-            local frame = getFrame()
-            local shouldShow = (lootState.lootCount or 0) >= 1
-            if shouldShow then
-                local wasShown = frame and frame:IsShown()
-                if not wasShown then
-                    -- Request while hidden to refresh immediately on OnShow (avoid an extra refresh).
-                    module:RequestRefresh()
-                    if frame then frame:Show() end
-                else
-                    module:RequestRefresh()
-                end
-            else
-                if frame then frame:Hide() end
-                addon:debug(Diag.D.LogMLLootWindowEmptied)
-            end
+            HandleLootSlotClearedVisibility()
 
             -- Continue a multi-award sequence (loot window only).
             ContinueMultiAwardOnLootSlotCleared()
@@ -1557,6 +1649,196 @@ do
         return false
     end
 
+    local function BuildTradeInitialOutput(itemLink, playerName, rollType, isAwardRoll)
+        if isAwardRoll and addon.options.announceOnWin then
+            return L.ChatAward:format(playerName, itemLink)
+        end
+        if rollType == rollTypes.HOLD and addon.options.announceOnHold then
+            return L.ChatNoneRolledHold:format(itemLink, playerName)
+        end
+        if rollType == rollTypes.BANK and addon.options.announceOnBank then
+            return L.ChatNoneRolledBank:format(itemLink, playerName)
+        end
+        if rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
+            return L.ChatNoneRolledDisenchant:format(itemLink, playerName)
+        end
+        return nil
+    end
+
+    local function BuildTradeKeepWhisper(itemLink, rollType)
+        if rollType == rollTypes.HOLD then
+            return L.WhisperHoldTrade:format(itemLink)
+        end
+        if rollType == rollTypes.BANK then
+            return L.WhisperBankTrade:format(itemLink)
+        end
+        if rollType == rollTypes.DISENCHANT then
+            return L.WhisperDisenchantTrade:format(itemLink)
+        end
+        return nil
+    end
+
+    local function BuildTradeMultiWinnersOutput()
+        addon.Raid:ClearRaidIcons()
+        if lootState.trader ~= lootState.winner then
+            SetRaidTarget(lootState.trader, 1)
+        end
+
+        local winners = {}
+        local rolls = addon.Rolls:GetRolls()
+        local maxWinners = tonumber(lootState.itemCount) or 0
+        for i = 1, maxWinners do
+            local roll = rolls[i]
+            if roll then
+                if roll.name == lootState.trader then
+                    if lootState.trader ~= lootState.winner then
+                        tinsert(winners, "{star} " .. roll.name .. "(" .. roll.roll .. ")")
+                    else
+                        tinsert(winners, roll.name .. "(" .. roll.roll .. ")")
+                    end
+                else
+                    SetRaidTarget(roll.name, i + 1)
+                    tinsert(winners, RAID_TARGET_MARKERS[i] .. " " .. roll.name .. "(" .. roll.roll .. ")")
+                end
+            end
+        end
+
+        return L.ChatTradeMutiple:format(tconcat(winners, ", "), lootState.trader)
+    end
+
+    local function ResolveTradeableInventoryItem(itemLink)
+        local totalCount, bag, slot, slotCount
+        local usedFastPath = false
+        local wantedKey = Utils.getItemStringFromLink(itemLink) or itemLink
+        local wantedId = Utils.getItemIdFromLink(itemLink)
+
+        -- Fast-path: reuse the previously selected bag slot when still valid.
+        local cachedBag = tonumber(itemInfo.bagID)
+        local cachedSlot = tonumber(itemInfo.slotID)
+        if cachedBag and cachedSlot then
+            local cachedLink = GetContainerItemLink(cachedBag, cachedSlot)
+            if cachedLink then
+                local cachedKey = Utils.getItemStringFromLink(cachedLink) or cachedLink
+                local cachedId = Utils.getItemIdFromLink(cachedLink)
+                local sameItem = (wantedKey and cachedKey == wantedKey)
+                    or (wantedId and cachedId == wantedId)
+                if sameItem and not ItemIsSoulbound(cachedBag, cachedSlot) then
+                    local _, count = GetContainerItemInfo(cachedBag, cachedSlot)
+                    bag = cachedBag
+                    slot = cachedSlot
+                    slotCount = tonumber(count) or 1
+                    usedFastPath = true
+                end
+            end
+        end
+
+        if not (bag and slot) then
+            totalCount, bag, slot, slotCount = ScanTradeableInventory(itemLink, wantedId)
+        elseif usedFastPath then
+            if (tonumber(lootState.itemCount) or 1) > 1 then
+                totalCount = ScanTradeableInventory(itemLink, wantedId)
+            else
+            totalCount = tonumber(slotCount) or 1
+            end
+        end
+
+        if not (bag and slot) then
+            return nil
+        end
+
+        return {
+            bag = bag,
+            slot = slot,
+            slotCount = tonumber(slotCount) or 1,
+            totalCount = tonumber(totalCount) or tonumber(slotCount) or 1,
+        }
+    end
+
+    local function PrepareTradeableItem(itemLink)
+        local itemData = ResolveTradeableInventoryItem(itemLink)
+        if not itemData then
+            addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemLink)))
+            return false
+        end
+
+        itemInfo.bagID = itemData.bag
+        itemInfo.slotID = itemData.slot
+        itemInfo.isStack = itemData.slotCount > 1
+        itemInfo.count = itemData.totalCount
+
+        if itemInfo.isStack and not addon.options.ignoreStacks then
+            addon:debug(Diag.D.LogTradeStackBlocked:format(tostring(addon.options.ignoreStacks), tostring(itemLink)))
+            addon:warn(L.ErrItemStack:format(itemLink))
+            return false
+        end
+
+        return true
+    end
+
+    local function TryInitiateTrade(itemLink, playerName, isAwardRoll)
+        local unit = addon.Raid:GetUnitID(playerName)
+        if unit == "none" then
+            return true, nil
+        end
+
+        if CheckInteractDistance(unit, 2) ~= 1 then
+            addon:warn(Diag.W.LogTradeDelayedOutOfRange:format(tostring(playerName), tostring(itemLink)))
+            addon.Raid:ClearRaidIcons()
+            SetRaidTarget(lootState.trader, 1)
+            if isAwardRoll then
+                SetRaidTarget(playerName, 4)
+            end
+            return true, L.ChatTrade:format(playerName, itemLink)
+        end
+
+        if not PrepareTradeableItem(itemLink) then
+            return false, nil
+        end
+
+        ClearCursor()
+        PickupContainerItem(itemInfo.bagID, itemInfo.slotID)
+        if CursorHasItem() then
+            InitiateTrade(playerName)
+            addon:debug(Diag.D.LogTradeInitiated:format(tostring(itemLink), tostring(playerName)))
+            if addon.options.screenReminder and not screenshotWarn then
+                addon:warn(L.ErrScreenReminder)
+                screenshotWarn = true
+            end
+        end
+
+        return true, nil
+    end
+
+    local function FinalizeTradeNotifications(itemLink, playerName, rollType, rollValue, output, whisper)
+        if announced then
+            return true
+        end
+
+        if output then
+            addon:Announce(output)
+        end
+        if whisper then
+            if playerName == lootState.trader then
+                addon.Loot:ClearLoot()
+                addon.Rolls:ClearRolls()
+                addon.Rolls:RecordRolls(false)
+            else
+                Utils.whisper(playerName, whisper)
+            end
+        end
+        if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE
+            and playerName == lootState.trader then
+            local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.trader, rollType, rollValue,
+                "TRADE_KEEP", KRT_CurrentRaid)
+            if not ok then
+                addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(KRT_CurrentRaid),
+                    tostring(lootState.currentRollItem), tostring(itemLink)))
+            end
+        end
+        announced = true
+        return true
+    end
+
     -- Trades an item from inventory to a player.
     function TradeItem(itemLink, playerName, rollType, rollValue)
         if itemLink ~= GetItemLink() then return end
@@ -1572,52 +1854,16 @@ do
             lootState.itemCount or 1))
 
         -- Prepare initial output and whisper:
-        local output, whisper
+        local output = BuildTradeInitialOutput(itemLink, playerName, rollType, isAwardRoll)
+        local whisper
         local keep = not isAwardRoll
-
-        if isAwardRoll and addon.options.announceOnWin then
-            output = L.ChatAward:format(playerName, itemLink)
-        elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
-            output = L.ChatNoneRolledHold:format(itemLink, playerName)
-        elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
-            output = L.ChatNoneRolledBank:format(itemLink, playerName)
-        elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
-            output = L.ChatNoneRolledDisenchant:format(itemLink, playerName)
-        end
 
         -- Keeping the item:
         if keep then
-            if rollType == rollTypes.HOLD then
-                whisper = L.WhisperHoldTrade:format(itemLink)
-            elseif rollType == rollTypes.BANK then
-                whisper = L.WhisperBankTrade:format(itemLink)
-            elseif rollType == rollTypes.DISENCHANT then
-                whisper = L.WhisperDisenchantTrade:format(itemLink)
-            end
+            whisper = BuildTradeKeepWhisper(itemLink, rollType)
             -- Multiple winners:
         elseif lootState.itemCount > 1 then
-            -- Announce multiple winners
-            addon.Raid:ClearRaidIcons()
-            if lootState.trader ~= lootState.winner then
-                SetRaidTarget(lootState.trader, 1)
-            end
-            local rolls = addon.Rolls:GetRolls()
-            local winners = {}
-            for i = 1, lootState.itemCount do
-                if rolls[i] then
-                    if rolls[i].name == lootState.trader then
-                        if lootState.trader ~= lootState.winner then
-                            tinsert(winners, "{star} " .. rolls[i].name .. "(" .. rolls[i].roll .. ")")
-                        else
-                            tinsert(winners, rolls[i].name .. "(" .. rolls[i].roll .. ")")
-                        end
-                    else
-                        SetRaidTarget(rolls[i].name, i + 1)
-                        tinsert(winners, RAID_TARGET_MARKERS[i] .. " " .. rolls[i].name .. "(" .. rolls[i].roll .. ")")
-                    end
-                end
-            end
-            output = L.ChatTradeMutiple:format(tconcat(winners, ", "), lootState.trader)
+            output = BuildTradeMultiWinnersOutput()
             -- Trader is the winner:
         elseif lootState.trader == lootState.winner then
             -- Trader won, clear state
@@ -1634,102 +1880,16 @@ do
                 addon.Raid:ClearRaidIcons()
             end
         else
-            local unit = addon.Raid:GetUnitID(playerName)
-            if unit ~= "none" and CheckInteractDistance(unit, 2) == 1 then
-                -- Player is in range for trade
-                local totalCount, bag, slot, slotCount
-                local usedFastPath = false
-                local wantedKey = Utils.getItemStringFromLink(itemLink) or itemLink
-                local wantedId = Utils.getItemIdFromLink(itemLink)
-
-                -- Fast-path: reuse the previously selected bag slot when still valid.
-                local cachedBag = tonumber(itemInfo.bagID)
-                local cachedSlot = tonumber(itemInfo.slotID)
-                if cachedBag and cachedSlot then
-                    local cachedLink = GetContainerItemLink(cachedBag, cachedSlot)
-                    if cachedLink then
-                        local cachedKey = Utils.getItemStringFromLink(cachedLink) or cachedLink
-                        local cachedId = Utils.getItemIdFromLink(cachedLink)
-                        local sameItem = (wantedKey and cachedKey == wantedKey)
-                            or (wantedId and cachedId == wantedId)
-                        if sameItem and not ItemIsSoulbound(cachedBag, cachedSlot) then
-                            local _, count = GetContainerItemInfo(cachedBag, cachedSlot)
-                            bag = cachedBag
-                            slot = cachedSlot
-                            slotCount = tonumber(count) or 1
-                            usedFastPath = true
-                        end
-                    end
-                end
-
-                if not (bag and slot) then
-                    totalCount, bag, slot, slotCount = ScanTradeableInventory(itemLink, wantedId)
-                elseif usedFastPath then
-                    if (tonumber(lootState.itemCount) or 1) > 1 then
-                        totalCount = ScanTradeableInventory(itemLink, wantedId)
-                    else
-                        totalCount = tonumber(slotCount) or 1
-                    end
-                end
-                if bag and slot then
-                    itemInfo.bagID = bag
-                    itemInfo.slotID = slot
-                    itemInfo.isStack = (tonumber(slotCount) or 1) > 1
-                    itemInfo.count = tonumber(totalCount) or tonumber(slotCount) or 1
-                else
-                    addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemLink)))
-                    return false
-                end
-                if itemInfo.isStack and not addon.options.ignoreStacks then
-                    addon:debug(Diag.D.LogTradeStackBlocked:format(tostring(addon.options.ignoreStacks),
-                        tostring(itemLink)))
-                    addon:warn(L.ErrItemStack:format(itemLink))
-                    return false
-                end
-                ClearCursor()
-                PickupContainerItem(itemInfo.bagID, itemInfo.slotID)
-                if CursorHasItem() then
-                    InitiateTrade(playerName)
-                    addon:debug(Diag.D.LogTradeInitiated:format(tostring(itemLink), tostring(playerName)))
-                    if addon.options.screenReminder and not screenshotWarn then
-                        addon:warn(L.ErrScreenReminder)
-                        screenshotWarn = true
-                    end
-                end
-                -- Cannot trade the player?
-            elseif unit ~= "none" then
-                -- Player is out of range
-                addon:warn(Diag.W.LogTradeDelayedOutOfRange:format(tostring(playerName), tostring(itemLink)))
-                addon.Raid:ClearRaidIcons()
-                SetRaidTarget(lootState.trader, 1)
-                if isAwardRoll then SetRaidTarget(playerName, 4) end
-                output = L.ChatTrade:format(playerName, itemLink)
+            local ok, outputOverride = TryInitiateTrade(itemLink, playerName, isAwardRoll)
+            if not ok then
+                return false
+            end
+            if outputOverride then
+                output = outputOverride
             end
         end
 
-        if not announced then
-            if output then addon:Announce(output) end
-            if whisper then
-                if playerName == lootState.trader then
-                    addon.Loot:ClearLoot()
-                    addon.Rolls:ClearRolls()
-                    addon.Rolls:RecordRolls(false)
-                else
-                    Utils.whisper(playerName, whisper)
-                end
-            end
-            if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE
-                and playerName == lootState.trader then
-                local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.trader, rollType, rollValue,
-                    "TRADE_KEEP", KRT_CurrentRaid)
-                if not ok then
-                    addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(KRT_CurrentRaid),
-                        tostring(lootState.currentRollItem), tostring(itemLink)))
-                end
-            end
-            announced = true
-        end
-        return true
+        return FinalizeTradeNotifications(itemLink, playerName, rollType, rollValue, output, whisper)
     end
 
     -- Register some callbacks:
@@ -1738,6 +1898,14 @@ do
         if oldItem ~= itemLink then
             announced = false
         end
+    end)
+
+    Utils.registerCallback("RaidRosterUpdate", function()
+        cachedRosterVersion = nil
+        InvalidateCandidateCache()
+        dropDownDirty = true
+        dirtyFlags.dropdowns = true
+        module:RequestRefresh()
     end)
 
     -- Keep Master UI in sync when SoftRes data changes (import/clear), event-driven.
