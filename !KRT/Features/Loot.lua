@@ -37,6 +37,35 @@ do
         return tostring(itemLink) .. "\001" .. tostring(looter)
     end
 
+    local function AddLootWindowSlot(indexByItemKey, slot)
+        if not LootSlotIsItem(slot) then
+            return
+        end
+
+        local itemLink = GetLootSlotLink(slot)
+        if not itemLink or GetItemFamily(itemLink) == 64 then
+            return
+        end
+
+        local key = Utils.getItemStringFromLink(itemLink) or itemLink
+        local existing = indexByItemKey[key]
+        if existing then
+            lootTable[existing].count = (lootTable[existing].count or 1) + 1
+            return
+        end
+
+        local icon, name, _, quality = GetLootSlotInfo(slot)
+        local before = lootState.lootCount
+        module:AddItem(itemLink, 1, name, quality, icon)
+        if lootState.lootCount > before then
+            indexByItemKey[key] = lootState.lootCount
+            local item = lootTable[lootState.lootCount]
+            if item then
+                item.itemKey = key
+            end
+        end
+    end
+
     -- ----- Public methods ----- --
     -- Pending award helpers (shared with Master/Raid flows).
     function module:QueuePendingAward(itemLink, looter, rollType, rollValue)
@@ -100,30 +129,8 @@ do
 
         local indexByItemKey = {}
         for i = 1, GetNumLootItems() do
-            if LootSlotIsItem(i) then
-                local itemLink = GetLootSlotLink(i)
-                if itemLink then
-                    local icon, name, _, quality = GetLootSlotInfo(i)
-                    if GetItemFamily(itemLink) ~= 64 then
-                        local key = Utils.getItemStringFromLink(itemLink) or itemLink
-                        local existing = indexByItemKey[key]
-                        if existing then
-                            lootTable[existing].count = (lootTable[existing].count or 1) + 1
-                        else
-                            local before = lootState.lootCount
-                            -- In loot window we treat each slot as one awardable copy (even if quantity > 1).
-                            self:AddItem(itemLink, 1, name, quality, icon)
-                            if lootState.lootCount > before then
-                                indexByItemKey[key] = lootState.lootCount
-                                local it = lootTable[lootState.lootCount]
-                                if it then
-                                    it.itemKey = key
-                                end
-                            end
-                        end
-                    end
-                end
-            end
+            -- In loot window we treat each slot as one awardable copy (even if quantity > 1).
+            AddLootWindowSlot(indexByItemKey, i)
         end
 
         lootState.currentItemIndex = 1
