@@ -8,7 +8,6 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Utils = feature.Utils
 local C = feature.C
-local Core = feature.Core
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -19,8 +18,8 @@ local twipe = table.wipe
 
 local tostring = tostring
 
--- =========== Loot Counter Module  =========== --
--- Counter and display item distribution (MS wins).
+-- Loot counter module.
+-- Tracks and edits item distribution counts (MS wins).
 do
     addon.LootCounter = addon.LootCounter or {}
     local module = addon.LootCounter
@@ -28,7 +27,6 @@ do
     -- ----- Internal state ----- --
     local frameName
     local rows, raidPlayers = {}, {}
-    local twipe = twipe
     local scrollFrame, scrollChild, header
     local getFrame = makeModuleFrameGetter(module, "KRTLootCounterFrame")
 
@@ -43,7 +41,7 @@ do
     local COUNT_COL_W = 40
 
     -- ----- Private helpers ----- --
-    local function EnsureFrames()
+    local function ensureFrames()
         local frame = getFrame()
         if not frame then
             return false
@@ -67,7 +65,7 @@ do
         return true
     end
 
-    local function EnsureHeader()
+    local function ensureHeader()
         if header or not scrollChild then return end
 
         header = CreateFrame("Frame", nil, scrollChild)
@@ -98,19 +96,15 @@ do
         header.name:SetTextColor(0.5, 0.5, 0.5)
     end
 
-    local function GetCurrentRaidPlayers()
+    local function getCurrentRaidPlayers()
         twipe(raidPlayers)
         if not KRT_CurrentRaid then
-            return raidPlayers
-        end
-        local raid = Core.ensureRaidById(KRT_CurrentRaid)
-        if not raid then
             return raidPlayers
         end
         return addon.Raid:GetLootCounterRows(KRT_CurrentRaid, raidPlayers)
     end
 
-    local function EnsureRow(i, rowHeight)
+    local function ensureRow(i, rowHeight)
         local row = rows[i]
         if not row then
             row = CreateFrame("Frame", nil, scrollChild)
@@ -131,7 +125,7 @@ do
             row.name:SetPoint("RIGHT", row.count, "LEFT", -COL_GAP, 0)
             row.name:SetJustifyH("LEFT")
 
-            local function SetupTooltip(btn, text)
+            local function setupTooltip(btn, text)
                 if not text or text == "" then return end
                 btn:HookScript("OnEnter", function(self)
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -143,17 +137,17 @@ do
                 end)
             end
 
-            local function MakeBtn(label, tip)
+            local function makeBtn(label, tip)
                 local b = CreateFrame("Button", nil, row.actions, "KRTButtonTemplate")
                 b:SetSize(BTN_W, BTN_H)
                 b:SetText(label)
-                SetupTooltip(b, tip)
+                setupTooltip(b, tip)
                 return b
             end
 
-            row.reset = MakeBtn("R", L.TipLootCounterReset)
-            row.minus = MakeBtn("-", L.TipLootCounterMinus)
-            row.plus  = MakeBtn("+", L.TipLootCounterPlus)
+            row.reset = makeBtn("R", L.TipLootCounterReset)
+            row.minus = makeBtn("-", L.TipLootCounterMinus)
+            row.plus  = makeBtn("+", L.TipLootCounterPlus)
 
             row.reset:SetPoint("RIGHT", row.actions, "RIGHT", 0, 0)
             row.minus:SetPoint("RIGHT", row.reset, "LEFT", -BTN_GAP, 0)
@@ -190,17 +184,17 @@ do
     function module:OnLoad(frame)
         local f = frame or getFrame()
         frameName = Utils.initModuleFrame(module, f, { enableDrag = true }) or frameName
-        if not EnsureFrames() then return end
+        if not ensureFrames() then return end
     end
 
     function module:Refresh()
-        if not EnsureFrames() then return end
+        if not ensureFrames() then return end
         local frame = getFrame()
         if not frame or not scrollFrame or not scrollChild then return end
 
-        EnsureHeader()
+        ensureHeader()
 
-        local players = GetCurrentRaidPlayers()
+        local players = getCurrentRaidPlayers()
         local numPlayers = #players
         local rowHeight = C.LOOT_COUNTER_ROW_HEIGHT
 
@@ -228,7 +222,7 @@ do
             local name = data and data.name
             local playerNid = data and tonumber(data.playerNid)
 
-            local row = EnsureRow(i, rowHeight)
+            local row = ensureRow(i, rowHeight)
             row:ClearAllPoints()
             local y = -(HEADER_HEIGHT + (i - 1) * rowHeight)
             row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, y)
@@ -262,7 +256,7 @@ do
         end
     end
 
-    -- ----- UI Window Management ----- --
+    -- UI window management.
 
     -- Initialize UI controller for Toggle/Hide.
     Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
@@ -271,7 +265,7 @@ do
     })
 
     -- Add a button to the master loot frame to open the loot counter UI.
-    local function SetupMasterLootFrameHooks()
+    local function setupMasterLootFrameHooks()
         local f = _G["KRTMasterLootFrame"]
         if f and not f.KRT_LootCounterBtn then
             local btn = CreateFrame("Button", nil, f, "KRTButtonTemplate")
@@ -288,19 +282,19 @@ do
             end)
         end
     end
-    hooksecurefunc(addon.Master, "OnLoad", SetupMasterLootFrameHooks)
+    hooksecurefunc(addon.Master, "OnLoad", setupMasterLootFrameHooks)
 
-    local function Request()
+    local function requestRefresh()
         -- Coalesced, event-driven refresh (safe even if frame is hidden/not yet created).
         module:RequestRefresh()
     end
 
     -- Refresh on roster updates (to keep list aligned).
-    Utils.registerCallback("RaidRosterDelta", Request)
+    Utils.registerCallback("RaidRosterDelta", requestRefresh)
 
     -- Refresh when counts actually change (MS loot award or manual +/-/reset).
-    Utils.registerCallback("PlayerCountChanged", Request)
+    Utils.registerCallback("PlayerCountChanged", requestRefresh)
 
     -- New raid session: reset view.
-    Utils.registerCallback("RaidCreate", Request)
+    Utils.registerCallback("RaidCreate", requestRefresh)
 end

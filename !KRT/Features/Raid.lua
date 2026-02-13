@@ -25,7 +25,7 @@ local strmatch = string.match
 local tostring, tonumber = tostring, tonumber
 local UnitRace, UnitSex = UnitRace, UnitSex
 
--- =========== Raid Helpers Module  =========== --
+-- Raid helper module.
 -- Manages raid state, roster, boss kills, and loot logging.
 do
     addon.Raid              = addon.Raid or {}
@@ -33,9 +33,9 @@ do
     -- ----- Internal state ----- --
     local numRaid           = 0
     local rosterVersion     = 0
-    local GetLootMethod     = GetLootMethod
-    local GetRaidRosterInfo = GetRaidRosterInfo
-    local UnitIsUnit        = UnitIsUnit
+    local getLootMethod     = GetLootMethod
+    local getRaidRosterInfo = GetRaidRosterInfo
+    local unitIsUnit        = UnitIsUnit
     local liveUnitsByName   = {}
     local liveNamesByUnit   = {}
     local pendingUnits      = {}
@@ -46,29 +46,29 @@ do
     local RETRY_MAX_ATTEMPTS = 5
 
     -- ----- Private helpers ----- --
-    local function IsUnknownName(name)
+    local function isUnknownName(name)
         return (not name) or name == "" or name == UNKNOWN_OBJECT or name == UNKNOWN_BEING
     end
 
-    local function ResetLiveUnitCaches()
+    local function resetLiveUnitCaches()
         twipe(liveUnitsByName)
         twipe(liveNamesByUnit)
     end
 
-    local function ResetPendingUnitRetry()
+    local function resetPendingUnitRetry()
         addon.CancelTimer(module.pendingUnitRetryHandle, true)
         module.pendingUnitRetryHandle = nil
         twipe(pendingUnits)
     end
 
-    local function MarkPendingUnit(unitID)
+    local function markPendingUnit(unitID)
         local tries = tonumber(pendingUnits[unitID]) or 0
         if tries < RETRY_MAX_ATTEMPTS then
             pendingUnits[unitID] = tries + 1
         end
     end
 
-    local function TrimPendingUnits(maxRaidSize)
+    local function trimPendingUnits(maxRaidSize)
         for unitID in pairs(pendingUnits) do
             local idx = tonumber(strmatch(unitID, "^raid(%d+)$")) or 0
             if idx <= 0 or idx > maxRaidSize then
@@ -77,7 +77,7 @@ do
         end
     end
 
-    local function HasRetryablePendingUnits()
+    local function hasRetryablePendingUnits()
         for _, tries in pairs(pendingUnits) do
             if (tonumber(tries) or 0) < RETRY_MAX_ATTEMPTS then
                 return true
@@ -86,8 +86,8 @@ do
         return false
     end
 
-    local function SchedulePendingUnitRetry()
-        if not HasRetryablePendingUnits() then
+    local function schedulePendingUnitRetry()
+        if not hasRetryablePendingUnits() then
             return
         end
 
@@ -99,7 +99,7 @@ do
         end)
     end
 
-    local function FinalizeRosterDelta(delta)
+    local function finalizeRosterDelta(delta)
         if #delta.joined == 0 then delta.joined = nil end
         if #delta.updated == 0 then delta.updated = nil end
         if #delta.left == 0 then delta.left = nil end
@@ -110,8 +110,32 @@ do
         return nil
     end
 
+    local function ensureRealmPlayerMeta(realm)
+        KRT_Players[realm] = KRT_Players[realm] or {}
+        return KRT_Players[realm]
+    end
+
+    local function upsertPlayerMeta(realmPlayers, name, unitID, level, race, raceL, class, classL)
+        if not (realmPlayers and name and unitID) then
+            return
+        end
+
+        local known = realmPlayers[name]
+        if not known then
+            known = {}
+            realmPlayers[name] = known
+        end
+
+        known.name = name
+        known.level = level or 0
+        known.race = race
+        known.raceL = raceL
+        known.class = class or "UNKNOWN"
+        known.classL = classL
+        known.sex = UnitSex(unitID) or 0
+    end
+
     -- ----- Public methods ----- --
-    -- ----- Logger Functions ----- --
 
     function module:GetRosterVersion()
         return rosterVersion
@@ -121,11 +145,11 @@ do
     -- Returns rosterChanged, delta where delta contains joined/updated/left/unresolved lists.
     function module:UpdateRaidRoster()
         if not KRT_CurrentRaid then
-            ResetPendingUnitRetry()
-            ResetLiveUnitCaches()
+            resetPendingUnitRetry()
+            resetLiveUnitCaches()
             return false
         end
-        -- Cancel any pending roster update timer and clear the handle
+        -- Cancel any pending roster update timer.
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
 
@@ -141,8 +165,8 @@ do
             rosterChanged = true
             numRaid = 0
             addon:debug(Diag.D.LogRaidLeftGroupEndSession)
-            ResetPendingUnitRetry()
-            ResetLiveUnitCaches()
+            resetPendingUnitRetry()
+            resetLiveUnitCaches()
             module:End()
             if rosterChanged then
                 rosterVersion = rosterVersion + 1
@@ -157,13 +181,13 @@ do
         if not raid then return false end
 
         local realm = Utils.getRealmName()
-        KRT_Players[realm] = KRT_Players[realm] or {}
+        local realmPlayers = ensureRealmPlayerMeta(realm)
         local playersByName = raid._playersByName
 
         local prevNumRaid = numRaid
         local n = GetNumRaidMembers()
 
-        -- Keep internal state consistent immediately
+        -- Keep local raid-size cache in sync.
         numRaid = n
         if n ~= prevNumRaid then
             rosterChanged = true
@@ -171,8 +195,8 @@ do
 
         if n == 0 then
             rosterChanged = true
-            ResetPendingUnitRetry()
-            ResetLiveUnitCaches()
+            resetPendingUnitRetry()
+            resetLiveUnitCaches()
             module:End()
             rosterVersion = rosterVersion + 1
             if addon.Master and addon.Master.PrepareDropDowns then
@@ -191,10 +215,10 @@ do
 
         for i = 1, n do
             local unitID = "raid" .. tostring(i)
-            local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
-            if IsUnknownName(name) then
+            local name, rank, subgroup, level, classL, class = getRaidRosterInfo(i)
+            if isUnknownName(name) then
                 hasUnknownUnits = true
-                MarkPendingUnit(unitID)
+                markPendingUnit(unitID)
                 local prevName = prevNamesByUnit[unitID]
                 if prevName and not nextUnitsByName[prevName] then
                     seen[prevName] = true
@@ -267,41 +291,16 @@ do
                     player.class = newClass
                 end
 
-                -- IMPORTANT: ensure raid.players stays consistent even if the array was cleared/edited.
+                -- Keep raid.players consistent even if rows were manually edited.
                 module:AddPlayer(player)
 
                 seen[name] = true
 
-                local known = KRT_Players[realm][name]
-                local newLevel = level or 0
-                local newClass = class or "UNKNOWN"
-                local newSex = UnitSex(unitID) or 0
-                if not known
-                    or known.level ~= newLevel
-                    or known.race ~= race
-                    or known.raceL ~= raceL
-                    or known.class ~= newClass
-                    or known.classL ~= classL
-                    or known.sex ~= newSex then
-                    -- Profile metadata changed only; this should not force full roster consumers to refresh.
-                end
-
-                -- Keep identity stable to avoid per-update table churn on roster bursts.
-                if not known then
-                    known = {}
-                    KRT_Players[realm][name] = known
-                end
-                known.name = name
-                known.level = newLevel
-                known.race = race
-                known.raceL = raceL
-                known.class = newClass
-                known.classL = classL
-                known.sex = newSex
+                upsertPlayerMeta(realmPlayers, name, unitID, level, race, raceL, class, classL)
             end
         end
 
-        TrimPendingUnits(n)
+        trimPendingUnits(n)
         liveUnitsByName = nextUnitsByName
         liveNamesByUnit = nextNamesByUnit
 
@@ -321,12 +320,12 @@ do
         end
 
         if hasUnknownUnits then
-            SchedulePendingUnitRetry()
+            schedulePendingUnitRetry()
         else
-            ResetPendingUnitRetry()
+            resetPendingUnitRetry()
         end
 
-        delta = FinalizeRosterDelta(delta)
+        delta = finalizeRosterDelta(delta)
 
         if rosterChanged then
             rosterVersion = rosterVersion + 1
@@ -351,7 +350,7 @@ do
         numRaid = num
 
         local realm = Utils.getRealmName()
-        KRT_Players[realm] = KRT_Players[realm] or {}
+        local realmPlayers = ensureRealmPlayerMeta(realm)
         local currentTime = Utils.getCurrentTime()
 
         local _, _, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
@@ -368,7 +367,7 @@ do
         })
 
         for i = 1, num do
-            local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
+            local name, rank, subgroup, level, classL, class = getRaidRosterInfo(i)
             if name then
                 local unitID = "raid" .. tostring(i)
                 local raceL, race = UnitRace(unitID)
@@ -387,16 +386,7 @@ do
 
                 tinsert(raidInfo.players, p)
 
-                -- Overwrite always
-                KRT_Players[realm][name] = {
-                    name   = name,
-                    level  = level or 0,
-                    race   = race,
-                    raceL  = raceL,
-                    class  = class or "UNKNOWN",
-                    classL = classL,
-                    sex    = UnitSex(unitID) or 0,
-                }
+                upsertPlayerMeta(realmPlayers, name, unitID, level, race, raceL, class, classL)
             end
         end
 
@@ -404,8 +394,8 @@ do
         KRT_CurrentRaid = #KRT_Raids
         -- New session context: force version-gated roster consumers (e.g. Master dropdowns) to rebuild.
         rosterVersion = rosterVersion + 1
-        ResetPendingUnitRetry()
-        ResetLiveUnitCaches()
+        resetPendingUnitRetry()
+        resetLiveUnitCaches()
 
         addon:info(Diag.I.LogRaidCreated:format(
             KRT_CurrentRaid or -1,
@@ -416,14 +406,14 @@ do
 
         Utils.triggerEvent("RaidCreate", KRT_CurrentRaid)
 
-        -- One clean refresh shortly after: cancel existing timer then start a new one
+        -- Schedule one delayed roster refresh.
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
         module.updateRosterHandle = addon.NewTimer(2, function() module:UpdateRaidRoster() end)
     end
 
-    -- ----- Stable ID helpers (bossNid / lootNid) ----- --
-    -- NOTE: Fresh SavedVariables only. Schema is normalized by Core.ensureRaidSchema().
+    -- Stable-ID helpers (bossNid / lootNid).
+    -- Fresh SavedVariables only. Schema is normalized by Core.ensureRaidSchema().
 
     function module:EnsureStableIds(raidNum)
         local raid = Core.ensureRaidById(raidNum)
@@ -474,7 +464,7 @@ do
         addon.CancelTimer(module.pendingUnitRetryHandle, true)
         module.pendingUnitRetryHandle = nil
         twipe(pendingUnits)
-        ResetLiveUnitCaches()
+        resetLiveUnitCaches()
         if not KRT_CurrentRaid then return end
         -- Stop any pending roster update when ending the raid
         addon.CancelTimer(module.updateRosterHandle, true)
@@ -653,8 +643,7 @@ do
 
     -- Adds a loot item to the active raid log.
     function module:AddLoot(msg, rollType, rollValue)
-        -- Master Loot / Loot chat parsing
-        -- Supports both "...receives loot:" and "...receives item:" variants.
+        -- Parse loot chat variants ("receives loot" and "receives item").
         local player, itemLink, count = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
         local itemCount = count or 1
 
@@ -663,7 +652,7 @@ do
             itemCount = 1
         end
 
-        -- Self loot (no player name in the string)
+        -- Self loot path (no player name in the string).
         if not itemLink then
             local link
             link, count = addon.Deformat(msg, LOOT_ITEM_SELF_MULTIPLE)
@@ -683,7 +672,7 @@ do
             end
         end
 
-        -- Other Loot Rolls
+        -- Fallback for alternate loot-roll chat formats.
         if not player or not itemLink then
             itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
             player = Utils.getPlayerName()
@@ -703,7 +692,7 @@ do
         itemId = tonumber(itemId)
         addon:trace(Diag.D.LogLootParsed:format(tostring(player), tostring(itemLink), itemCount))
 
-        -- We don't proceed if lower than threshold or ignored.
+        -- Ignore low-rarity and explicitly ignored items.
         local lootThreshold = GetLootThreshold()
         if itemRarity and itemRarity < lootThreshold then
             addon:debug(Diag.D.LogLootIgnoredBelowThreshold:format(tostring(itemRarity),
@@ -719,11 +708,7 @@ do
             addon:debug(Diag.D.LogBossNoContextTrash)
             self:AddBoss("_TrashMob_")
         end
-        -- Award source detection:
-        -- 1) If we have a pending award staged by this addon (AssignItem/TradeItem), consume it.
-        -- 2) Otherwise, if THIS client is the master looter (Master Loot method), treat it as MANUAL
-        --    (loot-window dropdown assignment or direct click-to-self).
-        -- 3) Otherwise, fall back to the current roll type.
+        -- Resolve award source: pending award -> master-looter manual -> current roll type.
         if not rollType then
             local p = addon.Loot:ConsumePendingAward(itemLink, player, 5)
             if p then
@@ -733,8 +718,7 @@ do
                 rollType  = rollTypes.MANUAL
                 rollValue = 0
 
-                -- Debug-only marker: helps verify why this loot was tagged as MANUAL.
-                -- Only runs for Master Looter clients (by condition above).
+                -- Debug marker for manual-tagged loot.
                 addon:debug(Diag.D.LogLootTaggedManual,
                     tostring(itemLink), tostring(player), tostring(lootState.currentRollType))
             else
@@ -780,7 +764,7 @@ do
             tostring(lootInfo.bossNid), tostring(player)))
     end
 
-    -- ----- Player Count API ----- --
+    -- Player count API.
 
     local function findRaidPlayerByNid(raid, playerNid)
         local nid = tonumber(playerNid)
@@ -897,31 +881,33 @@ do
     end
 
     function module:IncrementPlayerCount(name, raidNum)
-        if module:GetPlayerID(name, raidNum) == 0 then
+        local playerNid = module:GetPlayerID(name, raidNum)
+        if playerNid == 0 then
             addon:error(L.ErrCannotFindPlayer:format(name))
             return
         end
 
-        local c = module:GetPlayerCount(name, raidNum)
-        module:SetPlayerCount(name, c + 1, raidNum)
+        local c = module:GetPlayerCountByNid(playerNid, raidNum)
+        module:SetPlayerCountByNid(playerNid, c + 1, raidNum)
     end
 
     function module:DecrementPlayerCount(name, raidNum)
-        if module:GetPlayerID(name, raidNum) == 0 then
+        local playerNid = module:GetPlayerID(name, raidNum)
+        if playerNid == 0 then
             addon:error(L.ErrCannotFindPlayer:format(name))
             return
         end
 
-        local c = module:GetPlayerCount(name, raidNum)
+        local c = module:GetPlayerCountByNid(playerNid, raidNum)
         if c <= 0 then
             -- Already at floor; keep it at 0 without spamming errors.
-            module:SetPlayerCount(name, 0, raidNum)
+            module:SetPlayerCountByNid(playerNid, 0, raidNum)
             return
         end
-        module:SetPlayerCount(name, c - 1, raidNum)
+        module:SetPlayerCountByNid(playerNid, c - 1, raidNum)
     end
 
-    -- ----- Raid Functions ----- --
+    -- Raid functions.
 
     -- Returns the number of members in the raid.
     function module:GetNumRaid()
@@ -1035,7 +1021,7 @@ do
         return bosses
     end
 
-    -- ----- Player Functions ----- --
+    -- Player functions.
 
     -- Returns players from the raid log. Can be filtered by boss kill.
     function module:GetPlayers(raidNum, bossNid, out)
@@ -1239,27 +1225,27 @@ do
         return "none"
     end
 
-    -- ----- Raid & Loot Status Checks ----- --
+    -- Raid and loot status checks.
 
     -- Checks if the group is using the Master Looter system.
     function module:IsMasterLoot()
-        local method = select(1, GetLootMethod())
+        local method = select(1, getLootMethod())
         return (method == "master")
     end
 
     -- Checks if the player is the Master Looter.
     function module:IsMasterLooter()
-        local method, partyMaster, raidMaster = GetLootMethod()
+        local method, partyMaster, raidMaster = getLootMethod()
         if method ~= "master" then
             return false
         end
         if partyMaster then
-            if partyMaster == 0 or UnitIsUnit("party" .. tostring(partyMaster), "player") then
+            if partyMaster == 0 or unitIsUnit("party" .. tostring(partyMaster), "player") then
                 return true
             end
         end
         if raidMaster then
-            if raidMaster == 0 or UnitIsUnit("raid" .. tostring(raidMaster), "player") then
+            if raidMaster == 0 or unitIsUnit("raid" .. tostring(raidMaster), "player") then
                 return true
             end
         end

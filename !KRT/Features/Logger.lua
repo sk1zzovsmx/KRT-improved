@@ -25,8 +25,7 @@ local pairs, ipairs, type, select = pairs, ipairs, type, select
 
 local tostring, tonumber = tostring, tonumber
 
--- =========== Logger Frame =========== --
--- Shown loot logger for raids
+-- Logger frame module.
 do
     addon.Logger   = addon.Logger or {}
     local module   = addon.Logger
@@ -34,7 +33,7 @@ do
     -- ----- Internal state ----- --
     local frameName
     local getFrame = makeModuleFrameGetter(module, "KRTLogger")
-    -- module: stable-ID data helpers (fresh SavedVariables only; no legacy migration)
+    -- Stable-ID data helpers (fresh SavedVariables only; no legacy migration).
     module.Store   = module.Store or {}
     module.View    = module.View or {}
     module.Actions = module.Actions or {}
@@ -110,10 +109,7 @@ do
     end
 
     function Store:GetRaidByNid(raidNid)
-        local raid = nil
-        if raidNid then
-            raid = select(1, Core.ensureRaidByNid(raidNid))
-        end
+        local raid = raidNid and Core.ensureRaidByNid(raidNid) or nil
         if raid then
             self:EnsureRaid(raid)
         end
@@ -1247,7 +1243,7 @@ do
     end
 end
 
--- Raids List
+-- Raids list.
 do
     addon.Logger.Raids = addon.Logger.Raids or {}
     local Raids = addon.Logger.Raids
@@ -1267,7 +1263,7 @@ do
             _G[n .. "ExportBtn"]:SetText(L.BtnExport)
             local del = _G[n .. "DeleteBtn"]; if del then del:SetText(L.BtnDelete) end
             addon:SetTooltip(_G[n .. "CurrentBtn"], L.StrRaidsCurrentHelp, nil, L.StrRaidCurrentTitle)
-            _G[n .. "ExportBtn"]:Disable() -- non implementato
+            _G[n .. "ExportBtn"]:Disable() -- Not implemented.
         end,
 
         getData = function(out)
@@ -1465,7 +1461,7 @@ do
     Utils.registerCallback("LoggerSelectRaid", function() controller:Touch() end)
 end
 
--- Boss List
+-- Boss list.
 do
     addon.Logger.Boss = addon.Logger.Boss or {}
     local Boss = addon.Logger.Boss
@@ -1598,7 +1594,7 @@ do
     Utils.registerCallback("LoggerSelectBoss", function() controller:Touch() end)
 end
 
--- Boss Attendees List
+-- Boss attendees list.
 do
     addon.Logger.BossAttendees = addon.Logger.BossAttendees or {}
     local BossAtt = addon.Logger.BossAttendees
@@ -1702,7 +1698,7 @@ do
     Utils.registerCallback("LoggerSelectBossPlayer", function() controller:Touch() end)
 end
 
--- Raid Attendees List
+-- Raid attendees list.
 do
     addon.Logger.RaidAttendees = addon.Logger.RaidAttendees or {}
     local RaidAtt = addon.Logger.RaidAttendees
@@ -1856,7 +1852,7 @@ do
     Utils.registerCallback("LoggerSelectPlayer", function() controller:Touch() end)
 end
 
--- Loot List (filters by selected boss and player)
+-- Loot list (filters by selected boss and player).
 do
     addon.Logger.Loot = addon.Logger.Loot or {}
     local Loot = addon.Logger.Loot
@@ -2117,7 +2113,7 @@ do
     Utils.registerCallback("LoggerSelectItem", function() controller:Touch() end)
 end
 
--- module: Add/Edit Boss Popup  (Patch #1 - normalize to time/mode)
+-- Add/edit boss popup (time/mode normalization).
 do
     addon.Logger.BossBox = addon.Logger.BossBox or {}
     local Box = addon.Logger.BossBox
@@ -2253,7 +2249,7 @@ do
     end
 end
 
--- module: Add Attendee Popup
+-- Add attendee popup.
 do
     addon.Logger.AttendeesBox = addon.Logger.AttendeesBox or {}
     local Box = addon.Logger.AttendeesBox
