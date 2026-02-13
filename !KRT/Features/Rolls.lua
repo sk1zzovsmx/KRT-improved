@@ -796,7 +796,7 @@ do
                     if addon.options.showLootCounterDuringMSRoll == true
                         and lootState.currentRollType == rollTypes.MAINSPEC
                     then
-                        local c = addon.Raid:GetPlayerCount(name, KRT_CurrentRaid) or 0
+                        local c = addon.Raid:GetPlayerCount(name, addon.State.currentRaid) or 0
                         if c > 0 then
                             counterStr:SetText("+" .. c)
                         else

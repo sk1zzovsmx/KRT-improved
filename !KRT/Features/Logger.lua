@@ -377,8 +377,8 @@ do
         tremove(raid.bossKills, bossIndex)
         self:Commit(raid)
 
-        if KRT_CurrentRaid == rID and tonumber(KRT_LastBoss) == tonumber(bossNid) then
-            KRT_LastBoss = nil
+        if addon.State.currentRaid == rID and tonumber(addon.State.lastBoss) == tonumber(bossNid) then
+            addon.State.lastBoss = nil
         end
 
         return removed
@@ -538,15 +538,15 @@ do
         local raid = sel and Core.ensureRaidById(sel) or nil
         if not raid then return false end
 
-        if KRT_CurrentRaid and KRT_CurrentRaid == sel then
+        if addon.State.currentRaid and addon.State.currentRaid == sel then
             addon:error(L.ErrCannotDeleteRaid)
             return false
         end
 
         tremove(KRT_Raids, sel)
 
-        if KRT_CurrentRaid and KRT_CurrentRaid > sel then
-            KRT_CurrentRaid = KRT_CurrentRaid - 1
+        if addon.State.currentRaid and addon.State.currentRaid > sel then
+            addon.State.currentRaid = addon.State.currentRaid - 1
         end
 
         return true
@@ -558,7 +558,7 @@ do
         local raid, sel = Core.ensureRaidByNid(nid)
         if not (raid and sel) then return false end
 
-        local currentRaidNid = Core.getRaidNidById(KRT_CurrentRaid)
+        local currentRaidNid = Core.getRaidNidById(addon.State.currentRaid)
         if currentRaidNid and tonumber(currentRaidNid) == nid then
             addon:error(L.ErrCannotDeleteRaid)
             return false
@@ -566,8 +566,8 @@ do
 
         tremove(KRT_Raids, sel)
 
-        if KRT_CurrentRaid and KRT_CurrentRaid > sel then
-            KRT_CurrentRaid = KRT_CurrentRaid - 1
+        if addon.State.currentRaid and addon.State.currentRaid > sel then
+            addon.State.currentRaid = addon.State.currentRaid - 1
         end
 
         return true
@@ -616,8 +616,8 @@ do
             return false
         end
 
-        KRT_CurrentRaid = sel
-        KRT_LastBoss = nil
+        addon.State.currentRaid = sel
+        addon.State.lastBoss = nil
 
         -- Sync roster/dropdowns immediately so subsequent logging targets the selected raid.
         addon.Raid:UpdateRaidRoster()
@@ -790,13 +790,13 @@ do
             enableDrag = true,
             hookOnShow = function()
                 if not module.selectedRaid then
-                    module.selectedRaid = KRT_CurrentRaid
+                    module.selectedRaid = addon.State.currentRaid
                 end
                 clearSelections()
                 Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
             end,
             hookOnHide = function()
-                module.selectedRaid = KRT_CurrentRaid
+                module.selectedRaid = addon.State.currentRaid
                 clearSelections()
             end,
         })
@@ -814,7 +814,7 @@ do
         local frame = getFrame()
         if not frame then return end
         if not module.selectedRaid then
-            module.selectedRaid = KRT_CurrentRaid
+            module.selectedRaid = addon.State.currentRaid
         end
         clearSelections()
         Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
@@ -1318,7 +1318,7 @@ do
             local raid = sel and Core.ensureRaidById(sel) or nil
 
             local canSetCurrent = false
-            if sel and raid and sel ~= KRT_CurrentRaid then
+            if sel and raid and sel ~= addon.State.currentRaid then
                 -- This button is intended to resolve duplicate raid creation while actively raiding.
                 if not addon.IsInRaid() then
                     canSetCurrent = false
@@ -1346,8 +1346,8 @@ do
             local ctx = addon.Logger._msRaidCtx
             local selCount = Utils.multiSelectCount(ctx)
             local canDelete = (selCount and selCount > 0) or false
-            if canDelete and KRT_CurrentRaid then
-                local currentRaidNid = Core.getRaidNidById(KRT_CurrentRaid)
+            if canDelete and addon.State.currentRaid then
+                local currentRaidNid = Core.getRaidNidById(addon.State.currentRaid)
                 local ids = Utils.multiSelectGetSelected(ctx)
                 for i = 1, #ids do
                     if currentRaidNid and tonumber(ids[i]) == tonumber(currentRaidNid) then
@@ -1405,7 +1405,7 @@ do
             if #raidNids == 0 then return end
 
             -- Safety: never delete the current raid
-            local currentRaidNid = Core.getRaidNidById(KRT_CurrentRaid)
+            local currentRaidNid = Core.getRaidNidById(addon.State.currentRaid)
             if currentRaidNid then
                 for i = 1, #raidNids do
                     if tonumber(raidNids[i]) == tonumber(currentRaidNid) then
@@ -1763,8 +1763,8 @@ do
             local addBtn = _G[n .. "AddBtn"]
             if addBtn then
                 -- Update is only meaningful for the current raid session while actively raiding.
-                local can = addon.IsInRaid() and KRT_CurrentRaid and addon.Logger.selectedRaid
-                    and (tonumber(KRT_CurrentRaid) == tonumber(addon.Logger.selectedRaid))
+                local can = addon.IsInRaid() and addon.State.currentRaid and addon.Logger.selectedRaid
+                    and (tonumber(addon.State.currentRaid) == tonumber(addon.Logger.selectedRaid))
                 Utils.enableDisable(addBtn, can)
             end
         end,
@@ -1795,7 +1795,7 @@ do
                 return
             end
 
-            if not (KRT_CurrentRaid and tonumber(KRT_CurrentRaid) == sel) then
+            if not (addon.State.currentRaid and tonumber(addon.State.currentRaid) == sel) then
                 addon:warn(Diag.W.ErrLoggerUpdateRosterNotCurrent)
                 return
             end
@@ -2027,18 +2027,18 @@ do
         if raidIDOverride then
             raidID = raidIDOverride
         else
-            -- If the module window is open and browsing an old raid, selectedRaid may differ from KRT_CurrentRaid.
+            -- If the module window is open and browsing an old raid, selectedRaid may differ from addon.State.currentRaid.
             -- Runtime sources must always write into the CURRENT raid session.
             -- Logger UI edits target selectedRaid.
             local isLoggerSource = (type(source) == "string") and (source:find("^LOGGER_") ~= nil)
             if isLoggerSource then
-                raidID = addon.Logger.selectedRaid or KRT_CurrentRaid
+                raidID = addon.Logger.selectedRaid or addon.State.currentRaid
             else
-                raidID = KRT_CurrentRaid or addon.Logger.selectedRaid
+                raidID = addon.State.currentRaid or addon.Logger.selectedRaid
             end
         end
         addon:trace(Diag.D.LogLoggerLootLogAttempt:format(tostring(source), tostring(raidID), tostring(itemID),
-            tostring(looter), tostring(rollType), tostring(rollValue), tostring(KRT_LastBoss)))
+            tostring(looter), tostring(rollType), tostring(rollValue), tostring(addon.State.lastBoss)))
         local raid = raidID and Core.ensureRaidById(raidID) or nil
         if not raid then
             addon:error(Diag.E.LogLoggerNoRaidSession:format(tostring(raidID), tostring(itemID)))
@@ -2098,7 +2098,7 @@ do
         end
 
         addon:debug(Diag.D.LogLoggerVerified:format(raidID, tostring(itemID)))
-        if not KRT_LastBoss then
+        if not addon.State.lastBoss then
             addon:debug(Diag.D.LogLoggerRecordedNoBossContext:format(raidID, tostring(itemID), tostring(it.itemLink)))
         end
         return true

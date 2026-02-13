@@ -46,6 +46,7 @@ Durable preferences learned from recent conversations:
   volatile array indices when stable NIDs (`playerNid`, `bossNid`, `lootNid`) are available.
 - Keep `Features/SlashEvents.lua` focused on `/cmd` handling only.
 - Keep main WoW event handlers centralized in `KRT.lua`; modules should expose callable APIs used by those handlers.
+- Prefer storing runtime-only addon state under `addon.State` (or feature state tables) over global runtime vars.
 
 ---
 

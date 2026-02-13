@@ -34,11 +34,6 @@ KRT_Warnings = KRT_Warnings or {}
 KRT_Spammer = KRT_Spammer or {}
 KRT_Options = KRT_Options or {}
 
--- Runtime-only session state (not persisted in TOC SavedVariables)
-KRT_CurrentRaid = KRT_CurrentRaid or nil
-KRT_LastBoss = KRT_LastBoss or nil
-KRT_NextReset = KRT_NextReset or 0
-
 -- =========== External Libraries / Bootstrap  =========== --
 local Compat = LibStub("LibCompat-1.0")
 addon.Compat = Compat
@@ -68,6 +63,9 @@ end
 -- Centralized addon state
 addon.State = addon.State or {}
 local coreState = addon.State
+if coreState.nextReset == nil then
+    coreState.nextReset = 0
+end
 
 coreState.frames = coreState.frames or {}
 local frames = coreState.frames
@@ -667,7 +665,8 @@ local function isLoggerViewingCurrentRaid(log, logFrame)
     if not (log and logFrame and logFrame.IsShown and logFrame:IsShown()) then
         return false
     end
-    return KRT_CurrentRaid and log.selectedRaid and tonumber(log.selectedRaid) == tonumber(KRT_CurrentRaid)
+    return addon.State.currentRaid and log.selectedRaid
+        and tonumber(log.selectedRaid) == tonumber(addon.State.currentRaid)
 end
 
 local function scheduleRaidInstanceChecksIfRecognized(instanceName, instanceType, instanceDiff, emitRecognizedLog)
@@ -688,7 +687,7 @@ local function processRaidRosterUpdate()
     end
 
     -- Single source of truth for roster change notifications (join/update/leave delta).
-    Utils.triggerEvent("RaidRosterDelta", delta, addon.Raid:GetRosterVersion(), KRT_CurrentRaid)
+    Utils.triggerEvent("RaidRosterDelta", delta, addon.Raid:GetRosterVersion(), addon.State.currentRaid)
     -- Keep Master Looter UI in sync (event-driven; no polling).
     local mf = addon.Master and addon.Master.frame
     if addon.Master and addon.Master.RequestRefresh and mf and mf.IsShown and mf:IsShown() then
@@ -741,9 +740,9 @@ end
 function addon:RAID_INSTANCE_WELCOME(...)
     local instanceName, instanceType, instanceDiff = GetInstanceInfo()
     local _, nextReset = ...
-    KRT_NextReset = nextReset
+    addon.State.nextReset = nextReset
     addon:trace(Diag.D.LogRaidInstanceWelcome:format(tostring(instanceName), tostring(instanceType),
-        tostring(instanceDiff), tostring(KRT_NextReset)))
+        tostring(instanceDiff), tostring(addon.State.nextReset)))
     if instanceType == "raid" and not L.RaidZones[instanceName] then
         addon:warn(Diag.W.LogRaidUnmappedZone:format(tostring(instanceName), tostring(instanceDiff)))
     end
@@ -780,7 +779,7 @@ end
 -- CHAT_MSG_LOOT: Adds looted items to the raid log.
 function addon:CHAT_MSG_LOOT(msg)
     addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
-    if KRT_CurrentRaid then
+    if addon.State.currentRaid then
         self.Raid:AddLoot(msg)
     end
 end
@@ -793,7 +792,7 @@ end
 -- CHAT_MSG_MONSTER_YELL: Logs a boss kill based on specific boss yells.
 function addon:CHAT_MSG_MONSTER_YELL(...)
     local text = ...
-    if L.BossYells[text] and KRT_CurrentRaid then
+    if L.BossYells[text] and addon.State.currentRaid then
         addon:trace(Diag.D.LogBossYellMatched:format(tostring(text), tostring(L.BossYells[text])))
         self.Raid:AddBoss(L.BossYells[text])
     end
@@ -801,7 +800,7 @@ end
 
 -- COMBAT_LOG_EVENT_UNFILTERED: Logs a boss kill when a boss unit dies.
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
-    if not KRT_CurrentRaid then return end
+    if not addon.State.currentRaid then return end
 
     -- Hot-path fast check: inspect the event type before unpacking extra args.
     local subEvent = select(2, ...)

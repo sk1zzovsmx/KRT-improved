@@ -98,10 +98,10 @@ do
 
     local function getCurrentRaidPlayers()
         twipe(raidPlayers)
-        if not KRT_CurrentRaid then
+        if not addon.State.currentRaid then
             return raidPlayers
         end
-        return addon.Raid:GetLootCounterRows(KRT_CurrentRaid, raidPlayers)
+        return addon.Raid:GetLootCounterRows(addon.State.currentRaid, raidPlayers)
     end
 
     local function ensureRow(i, rowHeight)
@@ -156,21 +156,21 @@ do
             row.plus:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:AddPlayerCountByNid(playerNid, 1, KRT_CurrentRaid)
+                    addon.Raid:AddPlayerCountByNid(playerNid, 1, addon.State.currentRaid)
                     module:RequestRefresh()
                 end
             end)
             row.minus:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:AddPlayerCountByNid(playerNid, -1, KRT_CurrentRaid)
+                    addon.Raid:AddPlayerCountByNid(playerNid, -1, addon.State.currentRaid)
                     module:RequestRefresh()
                 end
             end)
             row.reset:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:SetPlayerCountByNid(playerNid, 0, KRT_CurrentRaid)
+                    addon.Raid:SetPlayerCountByNid(playerNid, 0, addon.State.currentRaid)
                     module:RequestRefresh()
                 end
             end)
@@ -242,7 +242,7 @@ do
             end
 
             local cnt = (data and tonumber(data.count))
-                or (playerNid and addon.Raid:GetPlayerCountByNid(playerNid, KRT_CurrentRaid))
+                or (playerNid and addon.Raid:GetPlayerCountByNid(playerNid, addon.State.currentRaid))
                 or 0
             if row._lastCount ~= cnt then
                 row.count:SetText(tostring(cnt))
