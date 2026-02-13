@@ -17,45 +17,56 @@ local tostring = tostring
 
 -- =========== Chat Output Helpers  =========== --
 do
-    addon.Chat            = addon.Chat or {}
-    local module          = addon.Chat
+    addon.Chat = addon.Chat or {}
+    local module = addon.Chat
+
     -- ----- Internal state ----- --
-    local output          = C.CHAT_OUTPUT_FORMAT
+    local chatOutputFormat = C.CHAT_OUTPUT_FORMAT
     local chatPrefixShort = C.CHAT_PREFIX_SHORT
-    local prefixHex       = C.CHAT_PREFIX_HEX
+    local chatPrefixHex = C.CHAT_PREFIX_HEX
 
     -- ----- Private helpers ----- --
+    local function IsCountdownMessage(text)
+        local seconds = addon.Deformat(text, L.ChatCountdownTic)
+        return (seconds ~= nil) or (find(text, L.ChatCountdownEnd) ~= nil)
+    end
+
+    local function CanUseRaidWarning()
+        return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
+    end
+
+    local function ResolveAnnounceChannel(text, preferredChannel)
+        if preferredChannel then
+            return preferredChannel
+        end
+
+        local groupType = addon.GetGroupTypeAndCount()
+        if groupType == "raid" then
+            local options = addon.options or {}
+            if IsCountdownMessage(text) and options.countdownSimpleRaidMsg then
+                return "RAID"
+            end
+            if options.useRaidWarning and CanUseRaidWarning() then
+                return "RAID_WARNING"
+            end
+            return "RAID"
+        end
+        if groupType == "party" then
+            return "PARTY"
+        end
+        return "SAY"
+    end
 
     -- ----- Public methods ----- --
     function module:Print(text, prefix)
-        local msg = Utils.formatChatMessage(text, prefix or chatPrefixShort, output, prefixHex)
+        local msg = Utils.formatChatMessage(text, prefix or chatPrefixShort, chatOutputFormat, chatPrefixHex)
         addon:info("%s", msg)
     end
 
     function module:Announce(text, channel)
-        local ch = channel
-
-        if not ch then
-            local seconds = addon.Deformat(text, L.ChatCountdownTic)
-            local isCountdown = (seconds ~= nil) or (find(text, L.ChatCountdownEnd) ~= nil)
-
-            local groupType = addon.GetGroupTypeAndCount()
-            if groupType == "raid" then
-                if isCountdown and addon.options.countdownSimpleRaidMsg then
-                    ch = "RAID"
-                elseif addon.options.useRaidWarning
-                    and (UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")) then
-                    ch = "RAID_WARNING"
-                else
-                    ch = "RAID"
-                end
-            elseif groupType == "party" then
-                ch = "PARTY"
-            else
-                ch = "SAY"
-            end
-        end
-        Utils.chat(tostring(text), ch)
+        local msg = tostring(text)
+        local selectedChannel = ResolveAnnounceChannel(msg, channel)
+        Utils.chat(msg, selectedChannel)
     end
 
     -- ----- Legacy helpers ----- --

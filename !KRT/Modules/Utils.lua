@@ -29,46 +29,70 @@ local ITEM_LINK_FORMAT = "|c%s|Hitem:%d:%s|h[%s]|h|r"
 
 -- Shuffle a table:
 _G.table.shuffle = function(t)
-	local n = #t
-	while n > 1 do
-		local k = random(1, n)
-		t[n], t[k] = t[k], t[n]
-		n = n - 1
-	end
+    if type(t) ~= "table" then
+        return t
+    end
+
+    local n = #t
+    while n > 1 do
+        local k = random(1, n)
+        t[n], t[k] = t[k], t[n]
+        n = n - 1
+    end
+    return t
 end
 
 -- Reverse table:
 _G.table.reverse = function(t, count)
-	local i, j = 1, #t
-	while i < j do
-		t[i], t[j] = t[j], t[i]
-		i = i + 1
-		j = j - 1
-	end
+    if type(t) ~= "table" then
+        return t
+    end
+
+    local maxIndex = tonumber(count) or #t
+    if maxIndex < 2 then
+        return t
+    end
+    if maxIndex > #t then
+        maxIndex = #t
+    end
+
+    local i, j = 1, maxIndex
+    while i < j do
+        t[i], t[j] = t[j], t[i]
+        i = i + 1
+        j = j - 1
+    end
+    return t
 end
 
 -- Trim a string:
 _G.string.trim = function(str)
-	return gsub(str, "^%s*(.-)%s*$", "%1")
+    if str == nil then
+        return ""
+    end
+    return gsub(tostring(str), "^%s*(.-)%s*$", "%1")
 end
 
 -- String starts with:
 _G.string.startsWith = function(str, piece)
-	return strsub(str, 1, strlen(piece)) == piece
+    if type(str) ~= "string" or type(piece) ~= "string" then
+        return false
+    end
+    return strsub(str, 1, strlen(piece)) == piece
 end
 
 -- String ends with:
 _G.string.endsWith = function(str, piece)
-	-- Check whether a string ends with the provided piece. Fails gracefully if inputs are not strings.
-	if type(str) ~= "string" or type(piece) ~= "string" then
-		return false
-	end
-	local lenPiece = strlen(piece)
-	-- If the main string is shorter than the piece, it cannot end with it.
-	if #str < lenPiece then
-		return false
-	end
-	return strsub(str, -lenPiece) == piece
+    -- Check whether a string ends with the provided piece. Fails gracefully if inputs are not strings.
+    if type(str) ~= "string" or type(piece) ~= "string" then
+        return false
+    end
+    local lenPiece = strlen(piece)
+    -- If the main string is shorter than the piece, it cannot end with it.
+    if #str < lenPiece then
+        return false
+    end
+    return strsub(str, -lenPiece) == piece
 end
 
 

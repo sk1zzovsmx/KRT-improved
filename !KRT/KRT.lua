@@ -16,6 +16,11 @@ local Utils = addon.Utils
 local C = addon.C
 
 local _G = _G
+local tremove = table.remove
+local pairs, select, type = pairs, select, type
+local error, pcall = error, pcall
+local tostring = tostring
+
 _G["KRT"] = addon
 
 -- =========== Saved Variables  =========== --
@@ -120,7 +125,7 @@ do
 
         for i = #list, 1, -1 do
             if list[i] == obj then
-                table.remove(list, i)
+                tremove(list, i)
             end
         end
 
