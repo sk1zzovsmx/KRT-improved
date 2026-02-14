@@ -862,4 +862,10 @@ do
     Utils.registerCallback("ConfigsortAscending", function(_, value)
         addon.Rolls:FetchRolls()
     end)
+
+    -- Refresh Master Looter roll list immediately when toggling the MS loot counter column.
+    -- Without this, the user would need to close/reopen the Master frame to see the change.
+    Utils.registerCallback("ConfigshowLootCounterDuringMSRoll", function(_, value)
+        addon.Rolls:FetchRolls()
+    end)
 end
