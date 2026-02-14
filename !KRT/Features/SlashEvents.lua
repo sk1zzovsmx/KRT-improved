@@ -116,6 +116,39 @@ do
             return
         end
 
+        if subCmd == "callbacks" or subCmd == "cb" or subCmd == "bus" then
+            if arg == "reset" then
+                if Utils.resetInternalCallbackStats then
+                    Utils.resetInternalCallbackStats()
+                end
+                addon:info("Internal callback stats reset.")
+            else
+                if Utils.dumpInternalCallbackStats then
+                    Utils.dumpInternalCallbackStats(arg)
+                else
+                    addon:warn("Callback stats not available in this build.")
+                end
+            end
+            return
+        end
+
+        if subCmd == "timers" or subCmd == "timer" then
+            if arg == "reset" then
+                if addon.ResetTimerDebug then
+                    addon:ResetTimerDebug()
+                end
+                addon:info("Timer debug stats reset.")
+            else
+                if addon.DumpTimerDebug then
+                    addon:DumpTimerDebug(arg)
+                else
+                    addon:warn("Timer debug not available in this build.")
+                end
+            end
+            return
+        end
+
+
         if subCmd == "on" then
             Utils.applyDebugSetting(true)
         elseif subCmd == "off" then
