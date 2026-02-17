@@ -50,10 +50,6 @@ local function compareStrings(aValue, bValue, asc)
     return compareValues(tostring(aValue or ""), tostring(bValue or ""), asc)
 end
 
-local function compareStringsFolded(aValue, bValue, asc)
-    return compareValues(strlower(tostring(aValue or "")), strlower(tostring(bValue or "")), asc)
-end
-
 local function getLootSortName(itemName, itemLink, itemId)
     local name = itemName
     if (not name or name == "") and type(itemLink) == "string" then
@@ -1918,6 +1914,22 @@ do
         end
     end
 
+    local function compareLootTie(a, b, asc)
+        local aName = strlower(tostring((a and a.sortName) or ""))
+        local bName = strlower(tostring((b and b.sortName) or ""))
+        if aName ~= bName then
+            return compareValues(aName, bName, asc)
+        end
+
+        local aItemId = tonumber(a and a.itemId) or 0
+        local bItemId = tonumber(b and b.itemId) or 0
+        if aItemId ~= bItemId then
+            return compareValues(aItemId, bItemId, asc)
+        end
+
+        return compareNumbers(a and a.id, b and b.id, asc, 0)
+    end
+
     local controller = Utils.makeListController {
         keyName = "LootList",
         poolTag = "logger-loot",
@@ -2022,26 +2034,47 @@ do
         end,
 
         sorters = {
-            id = function(a, b, asc)
-                if (a.sortName or "") ~= (b.sortName or "") then
-                    return compareStringsFolded(a.sortName, b.sortName, asc)
-                end
-                return compareNumbers(a.itemId, b.itemId, asc, 0)
-            end,
+            id = function(a, b, asc) return compareLootTie(a, b, asc) end,
             source = function(a, b, asc)
-                local aName = tostring(a.sourceName or "")
-                local bName = tostring(b.sourceName or "")
-                if aName ~= bName then
-                    return compareValues(aName, bName, asc)
+                local aSource = strlower(tostring((a and a.sourceName) or ""))
+                local bSource = strlower(tostring((b and b.sourceName) or ""))
+                if aSource ~= bSource then
+                    return compareValues(aSource, bSource, asc)
                 end
-                return compareNumbers(a.bossNid, b.bossNid, asc, 0)
+                return compareLootTie(a, b, asc)
             end,
-            winner = function(a, b, asc) return compareStrings(a.looter, b.looter, asc) end,
-            type = function(a, b, asc) return compareNumbers(a.rollType, b.rollType, asc, 0) end,
+            winner = function(a, b, asc)
+                local aWinner = strlower(tostring((a and a.looter) or ""))
+                local bWinner = strlower(tostring((b and b.looter) or ""))
+                if aWinner ~= bWinner then
+                    return compareValues(aWinner, bWinner, asc)
+                end
+                return compareLootTie(a, b, asc)
+            end,
+            type = function(a, b, asc)
+                local aType = tonumber(a and a.rollType) or 0
+                local bType = tonumber(b and b.rollType) or 0
+                if aType ~= bType then
+                    return compareValues(aType, bType, asc)
+                end
+                return compareLootTie(a, b, asc)
+            end,
             roll = function(a, b, asc)
-                return compareNumbers(a.rollValue, b.rollValue, asc, 0)
+                local aRoll = tonumber(a and a.rollValue) or 0
+                local bRoll = tonumber(b and b.rollValue) or 0
+                if aRoll ~= bRoll then
+                    return compareValues(aRoll, bRoll, asc)
+                end
+                return compareLootTie(a, b, asc)
             end,
-            time = function(a, b, asc) return compareNumbers(a.time, b.time, asc, 0) end,
+            time = function(a, b, asc)
+                local aTime = tonumber(a and a.time) or 0
+                local bTime = tonumber(b and b.time) or 0
+                if aTime ~= bTime then
+                    return compareValues(aTime, bTime, asc)
+                end
+                return compareLootTie(a, b, asc)
+            end,
         },
     }
 

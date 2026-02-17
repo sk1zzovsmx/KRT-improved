@@ -4,6 +4,8 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Behavior:** Logger Loot sorting is now deterministic across all sortable headers; when primary values
+  are equal, ordering falls back to loot name, then item ID, then loot NID to prevent random reshuffles.
 - **Behavior:** Logger Loot `Item` header sorting now uses the displayed loot name text
   (item name/link label), with `itemId` as stable fallback tie-breaker.
 - **Behavior:** Logger Loot `Source` header is now non-sortable while a boss filter is active

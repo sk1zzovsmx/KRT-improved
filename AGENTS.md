@@ -47,6 +47,8 @@ Durable preferences learned from recent conversations:
 - Keep `Features/SlashEvents.lua` focused on `/cmd` handling only.
 - Keep main WoW event handlers centralized in `KRT.lua`; modules should expose callable APIs used by those handlers.
 - Prefer storing runtime-only addon state under `addon.State` (or feature state tables) over global runtime vars.
+- Prefer deterministic sorting with explicit tie-breakers; when primary values are equal, use stable secondary keys
+  (for Logger Loot, prefer loot name, then IDs) to avoid random reordering between sorts.
 
 ---
 
