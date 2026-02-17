@@ -241,9 +241,29 @@ do
     end)
 
     registerAliases(cmdLogger, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub, arg = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             addon.Logger:Toggle()
+        elseif sub == "req" then
+            local raidRefArg, targetArg = Utils.splitArgs(arg)
+            if addon.Syncer and addon.Syncer.RequestLoggerReq then
+                addon.Syncer:RequestLoggerReq(tonumber(raidRefArg), targetArg)
+            end
+        elseif sub == "push" then
+            local raidRefArg, targetArg = Utils.splitArgs(arg)
+            if addon.Syncer and addon.Syncer.BroadcastLoggerPush then
+                addon.Syncer:BroadcastLoggerPush(tonumber(raidRefArg), targetArg)
+            end
+        elseif sub == "sync" then
+            if addon.Syncer and addon.Syncer.RequestLoggerSync then
+                addon.Syncer:RequestLoggerSync()
+            end
+        else
+            addon:info(format(L.StrCmdCommands, "krt logger"), "KRT")
+            printHelp("toggle", L.StrCmdToggle)
+            printHelp("req <raidId|raidNid> <player>", L.StrCmdLoggerReq)
+            printHelp("push <raidId|raidNid> <player>", L.StrCmdLoggerPush)
+            printHelp("sync", L.StrCmdLoggerSync)
         end
     end)
 

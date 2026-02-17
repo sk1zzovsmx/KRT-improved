@@ -191,3 +191,16 @@ Diag.E.LogLoggerVerifyFailed = "[Logger] Loot:Log VERIFY FAILED raidId=%d lootNi
 Diag.D.LogLoggerVerified = "[Logger] Loot:Log verified raidId=%d lootNid=%s"
 Diag.D.LogLoggerRecordedNoBossContext = "[Logger] Loot recorded without boss context raidId=%d lootNid=%s link=%s"
 Diag.D.LogLoggerBossLootRemoved = "[Logger] Boss delete removed loot raidId=%d bossId=%d removed=%d"
+
+-- Syncer --
+Diag.D.LogSyncRequestSent = "[Sync] Request sent req=%s raidNid=%s"
+Diag.D.LogSyncRequestReceived = "[Sync] Request received from=%s req=%s raidNid=%s"
+Diag.D.LogSyncSnapshotSent = "[Sync] Snapshot sent to=%s req=%s raidNid=%s chunks=%d bytes=%d"
+Diag.D.LogSyncChunkReceived = "[Sync] Chunk received from=%s req=%s part=%d/%d"
+Diag.D.LogSyncChunkIgnored = "[Sync] Chunk ignored from=%s req=%s raidNid=%s"
+Diag.D.LogSyncVersionMismatch = "[Sync] Version mismatch from=%s got=%s expected=%s"
+Diag.W.LogSyncChunkMalformed = "[Sync] Malformed chunk from=%s req=%s part=%s/%s"
+Diag.W.LogSyncDecodeFailed = "[Sync] Payload decode failed from=%s req=%s raidNid=%s"
+Diag.W.LogSyncParseFailed = "[Sync] Payload parse failed from=%s req=%s raidNid=%s"
+Diag.E.LogSyncMergeFailed = "[Sync] Merge failed from=%s req=%s raidNid=%s err=%s"
+Diag.D.LogSyncMergeApplied = "[Sync] Merge applied raidNid=%s raidId=%s from=%s bosses=%d loot=%d"

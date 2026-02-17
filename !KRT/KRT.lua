@@ -815,6 +815,9 @@ end
 -- =========== Logger Frame =========== --
 -- [MIGRATED] See Features/Logger.lua
 
+-- =========== Syncer Module  =========== --
+-- [MIGRATED] See Features/Syncer.lua
+
 -- =========== Slash Commands  =========== --
 -- [MIGRATED] See Features/SlashEvents.lua
 
@@ -822,6 +825,7 @@ end
 local addonEvents = {
     CHAT_MSG_SYSTEM = "CHAT_MSG_SYSTEM",
     CHAT_MSG_LOOT = "CHAT_MSG_LOOT",
+    CHAT_MSG_ADDON = "CHAT_MSG_ADDON",
     CHAT_MSG_MONSTER_YELL = "CHAT_MSG_MONSTER_YELL",
     RAID_ROSTER_UPDATE = "RAID_ROSTER_UPDATE",
     PLAYER_ENTERING_WORLD = "PLAYER_ENTERING_WORLD",
@@ -999,6 +1003,14 @@ end
 -- CHAT_MSG_SYSTEM: Forwards roll messages to the Rolls module.
 function addon:CHAT_MSG_SYSTEM(msg)
     addon.Rolls:CHAT_MSG_SYSTEM(msg)
+end
+
+-- CHAT_MSG_ADDON: Forwards addon communication messages to the Syncer module.
+function addon:CHAT_MSG_ADDON(prefix, msg, channel, sender)
+    local syncer = addon.Syncer
+    if syncer and syncer.OnAddonMessage then
+        syncer:OnAddonMessage(prefix, msg, channel, sender)
+    end
 end
 
 -- CHAT_MSG_MONSTER_YELL: Logs a boss kill based on specific boss yells.

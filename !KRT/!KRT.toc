@@ -43,6 +43,7 @@ Features\LootCounter.lua
 Features\Reserves.lua
 Features\ReservesImport.lua
 Features\Logger.lua
+Features\Syncer.lua
 Features\Config.lua
 Features\Warnings.lua
 Features\Changes.lua
