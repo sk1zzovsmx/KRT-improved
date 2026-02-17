@@ -4,6 +4,12 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Behavior:** Logger Loot `Item` header sorting now uses the displayed loot name text
+  (item name/link label), with `itemId` as stable fallback tie-breaker.
+- **Behavior:** Logger Loot `Source` header is now non-sortable while a boss filter is active
+  (column rendered empty), and source sorting now follows the displayed boss name text.
+- **Bugfix:** Logger sortable headers now use strict Lua comparators (no `asc and ... or ...` ambiguity),
+  fixing broken/unstable ordering and sort-time errors when clicking list headers.
 - **Bugfix:** Raid session switching no longer drops the previous current raid when roster data is
   temporarily unavailable (`GetNumRaidMembers()==0`); `Raid:Create(...)` now validates readiness
   before ending the previous session.
