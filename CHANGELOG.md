@@ -4,6 +4,11 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Behavior:** Manual trade is now HOLD-aware for Master Looter inventory handoffs. During an active
+  trade, KRT shows a trade-reason dropdown only when at least one offered item matches an open
+  HOLD/BANK/DE/MANUAL loot record on the ML; on successful dual accept, matched records are reassigned
+  to the trade partner with the selected reason (default HOLD), rollValue=0, and counter updates apply
+  per matched item only for MS/OS/SR/FREE.
 - **Bugfix:** Logger UI now refreshes immediately after incoming Sync snapshots (`req`, `push`, `sync`),
   including the Raids list update without requiring manual reopen or reselection.
 - **Behavior:** Added Logger Sync feature (`Features/Syncer.lua`) using addon-message request/response

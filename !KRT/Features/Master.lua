@@ -20,7 +20,7 @@ local lootState = feature.lootState
 local itemInfo = feature.itemInfo
 
 local _G = _G
-local tinsert, tconcat, twipe = table.insert, table.concat, table.wipe
+local tinsert, tconcat, tremove, twipe = table.insert, table.concat, table.remove, table.wipe
 local pairs, select, next = pairs, select, next
 
 local tostring, tonumber = tostring, tonumber
@@ -102,6 +102,27 @@ do
 
     local AssignItem, TradeItem, RegisterAwardedItem
     local screenshotWarn = false
+
+    local tradeReasonDropDown
+    local tradeReasonLabel
+    local tradeReasonValue = rollTypes.HOLD
+    local tradeMatchLootNids = {}
+
+    local TRADE_REASON_OPTIONS = {
+        { text = L.BtnMS, value = rollTypes.MAINSPEC },
+        { text = L.BtnOS, value = rollTypes.OFFSPEC },
+        { text = L.BtnSR, value = rollTypes.RESERVED },
+        { text = L.BtnFree, value = rollTypes.FREE },
+        { text = L.BtnHold, value = rollTypes.HOLD },
+        { text = L.BtnBank, value = rollTypes.BANK },
+        { text = L.BtnDisenchant, value = rollTypes.DISENCHANT },
+    }
+    local OPEN_TRADE_ROLL_TYPES = {
+        [rollTypes.MANUAL] = true,
+        [rollTypes.HOLD] = true,
+        [rollTypes.BANK] = true,
+        [rollTypes.DISENCHANT] = true,
+    }
 
     local announced = false
     local cachedRosterVersion
@@ -192,6 +213,160 @@ do
     local function ResetItemCountAndRefresh(focus)
         module:ResetItemCount(focus)
         module:RequestRefresh()
+    end
+
+    local function IsCounterRollType(rollType)
+        local t = tonumber(rollType)
+        return t and t >= rollTypes.MAINSPEC and t <= rollTypes.FREE
+    end
+
+    local function GetRollTypeLabel(rollType)
+        for i = 1, #TRADE_REASON_OPTIONS do
+            local entry = TRADE_REASON_OPTIONS[i]
+            if entry and tonumber(entry.value) == tonumber(rollType) then
+                return entry.text
+            end
+        end
+        return L.BtnHold
+    end
+
+    local function EnsureTradeReasonDropdown()
+        if tradeReasonDropDown then return end
+        if not TradeFrame then return end
+
+        tradeReasonLabel = TradeFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        tradeReasonLabel:SetPoint("BOTTOMLEFT", TradeFrame, "BOTTOMLEFT", 20, 20)
+        tradeReasonLabel:SetText(L.StrTradeReason)
+
+        tradeReasonDropDown = CreateFrame("Frame", nil, TradeFrame, "UIDropDownMenuTemplate")
+        tradeReasonDropDown:SetPoint("TOPLEFT", tradeReasonLabel, "BOTTOMLEFT", -18, -2)
+        UIDropDownMenu_SetWidth(tradeReasonDropDown, 112)
+        UIDropDownMenu_Initialize(tradeReasonDropDown, function()
+            for i = 1, #TRADE_REASON_OPTIONS do
+                local entry = TRADE_REASON_OPTIONS[i]
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = entry.text
+                info.value = entry.value
+                info.func = function(_, value)
+                    tradeReasonValue = tonumber(value) or rollTypes.HOLD
+                    UIDropDownMenu_SetSelectedValue(tradeReasonDropDown, tradeReasonValue)
+                    UIDropDownMenu_SetText(tradeReasonDropDown, GetRollTypeLabel(tradeReasonValue))
+                end
+                info.checked = (tonumber(tradeReasonValue) == tonumber(entry.value))
+                UIDropDownMenu_AddButton(info)
+            end
+        end)
+    end
+
+    local function HideTradeReasonDropdown()
+        if tradeReasonDropDown then
+            tradeReasonDropDown:Hide()
+        end
+        if tradeReasonLabel then
+            tradeReasonLabel:Hide()
+        end
+    end
+
+    local function ShowTradeReasonDropdown()
+        EnsureTradeReasonDropdown()
+        if not tradeReasonDropDown then return end
+        tradeReasonValue = tonumber(tradeReasonValue) or rollTypes.HOLD
+        UIDropDownMenu_SetSelectedValue(tradeReasonDropDown, tradeReasonValue)
+        UIDropDownMenu_SetText(tradeReasonDropDown, GetRollTypeLabel(tradeReasonValue))
+        tradeReasonDropDown:Show()
+        if tradeReasonLabel then
+            tradeReasonLabel:Show()
+        end
+    end
+
+    local function CollectOpenHoldLootByLink(raid, holderName)
+        local byLink = {}
+        if not (raid and raid.loot) then
+            return byLink
+        end
+
+        for i = #raid.loot, 1, -1 do
+            local item = raid.loot[i]
+            local rollType = item and tonumber(item.rollType)
+            local lootNid = item and tonumber(item.lootNid)
+            local link = item and item.itemLink
+            if item and lootNid and lootNid > 0 and link and item.looter == holderName
+                and OPEN_TRADE_ROLL_TYPES[rollType] then
+                local key = Utils.getItemStringFromLink(link) or link
+                byLink[key] = byLink[key] or {}
+                byLink[key][#byLink[key] + 1] = lootNid
+            end
+        end
+
+        return byLink
+    end
+
+    local function BuildTradeMatchLootNids()
+        local raidId = addon.Core.getCurrentRaid()
+        local raid = raidId and addon.Core.ensureRaidById(raidId) or nil
+        local holderName = Utils.getPlayerName()
+        local openByLink = CollectOpenHoldLootByLink(raid, holderName)
+        local matched = {}
+
+        for slot = 1, 6 do
+            local link = GetTradePlayerItemLink(slot)
+            if link then
+                local key = Utils.getItemStringFromLink(link) or link
+                local list = openByLink[key]
+                if list and #list > 0 then
+                    local lootNid = tremove(list, 1)
+                    if lootNid and lootNid > 0 then
+                        matched[#matched + 1] = lootNid
+                    end
+                end
+            end
+        end
+
+        return matched
+    end
+
+    local function UpdateManualTradeUIState()
+        tradeMatchLootNids = BuildTradeMatchLootNids()
+        if #tradeMatchLootNids > 0 then
+            ShowTradeReasonDropdown()
+            return
+        end
+        HideTradeReasonDropdown()
+        tradeReasonValue = rollTypes.HOLD
+    end
+
+    local function ResolveTradePartnerName()
+        local raw = TradeFrameRecipientNameText and TradeFrameRecipientNameText:GetText()
+        return Utils.normalizeName(raw, true)
+    end
+
+    local function FinalizeManualTradeHoldItems()
+        if not tradeMatchLootNids or #tradeMatchLootNids <= 0 then
+            return
+        end
+
+        local winner = ResolveTradePartnerName()
+        if not winner or winner == "" then
+            return
+        end
+
+        local raidId = addon.Core.getCurrentRaid()
+        local rollType = tonumber(tradeReasonValue) or rollTypes.HOLD
+        local count = 0
+        for i = 1, #tradeMatchLootNids do
+            local lootNid = tradeMatchLootNids[i]
+            local loot = addon.Raid:GetLootByNid(lootNid, raidId)
+            if loot and loot.looter == Utils.getPlayerName() and OPEN_TRADE_ROLL_TYPES[tonumber(loot.rollType)] then
+                local ok = addon.Logger.Loot:Log(lootNid, winner, rollType, 0, "TRADE_MANUAL_ACCEPT", raidId)
+                if ok then
+                    count = count + 1
+                end
+            end
+        end
+
+        if count > 0 and IsCounterRollType(rollType) then
+            addon.Raid:AddPlayerCount(winner, count, raidId)
+        end
     end
 
     local function StopCountdown()
@@ -1561,6 +1736,11 @@ do
     function module:TRADE_ACCEPT_UPDATE(tAccepted, pAccepted)
         addon:trace(Diag.D.LogTradeAcceptUpdate:format(tostring(lootState.trader), tostring(lootState.winner),
             tostring(tAccepted), tostring(pAccepted)))
+
+        if tAccepted == 1 and pAccepted == 1 then
+            FinalizeManualTradeHoldItems()
+        end
+
         if lootState.trader and lootState.winner and lootState.trader ~= lootState.winner then
             if tAccepted == 1 and pAccepted == 1 then
                 addon:debug(Diag.D.LogTradeCompleted:format(tostring(lootState.currentRollItem),
@@ -1598,13 +1778,28 @@ do
     -- TRADE_CLOSED: trade window closed (completed or canceled)
     function module:TRADE_CLOSED()
         ResetTradeState("TRADE_CLOSED")
+        tradeReasonValue = rollTypes.HOLD
+        tradeMatchLootNids = {}
+        HideTradeReasonDropdown()
         module:RequestRefresh()
     end
 
     -- TRADE_REQUEST_CANCEL: trade request canceled before opening
     function module:TRADE_REQUEST_CANCEL()
         ResetTradeState("TRADE_REQUEST_CANCEL")
+        tradeReasonValue = rollTypes.HOLD
+        tradeMatchLootNids = {}
+        HideTradeReasonDropdown()
         module:RequestRefresh()
+    end
+
+    function module:TRADE_SHOW()
+        tradeReasonValue = rollTypes.HOLD
+        UpdateManualTradeUIState()
+    end
+
+    function module:TRADE_PLAYER_ITEM_CHANGED()
+        UpdateManualTradeUIState()
     end
 
     -- Assigns an item from the loot window to a player.
