@@ -1102,14 +1102,229 @@ do
 
     -- Item: left select, right menu
     do
-        local function openItemMenu()
-            local f = _G.KRTLoggerItemMenuFrame
+        local quickRollTypes = {
+            { rollType = rollTypes.MAINSPEC,   label = L.BtnMS },
+            { rollType = rollTypes.OFFSPEC,    label = L.BtnOS },
+            { rollType = rollTypes.RESERVED,   label = L.BtnSR },
+            { rollType = rollTypes.FREE,       label = L.BtnFree },
+            { rollType = rollTypes.BANK,       label = L.BtnBank },
+            { rollType = rollTypes.DISENCHANT, label = L.BtnDisenchant },
+            { rollType = rollTypes.HOLD,       label = L.BtnHold },
+        }
+        local ROLLTYPE_POPUP_KEY = "KRTLOGGER_ITEM_EDIT_ROLL_PICK"
+        local ROLLTYPE_PICKER_FRAME = "KRTLoggerRollTypePickerFrame"
+        local ROLLTYPE_BUTTON_MIN_WIDTH = 42
+        local ROLLTYPE_BUTTON_MAX_WIDTH = 54
+        local ROLLTYPE_BUTTON_HEIGHT = 22
+        local ROLLTYPE_BUTTON_SPACING = 3
+        local ROLLTYPE_PICKER_SIDE_PADDING = 24
+        local ROLLTYPE_PICKER_TOP_OFFSET = 10
+        local ROLLTYPE_POPUP_EXTRA_HEIGHT = 18
+
+        local function applySelectedItemRollType(itemId, rollType)
+            if not itemId then
+                addon:error(L.ErrLoggerInvalidItem)
+                return
+            end
+            addon.Logger.Loot:Log(itemId, nil, rollType, nil, "LOGGER_EDIT_ROLLTYPE")
+        end
+
+        local function getItemMenuFrame()
+            return _G.KRTLoggerItemMenuFrame
                 or CreateFrame("Frame", "KRTLoggerItemMenuFrame", UIParent, "UIDropDownMenuTemplate")
+        end
+
+        local function ensureRollTypeInsertedFrame()
+            local frame = _G[ROLLTYPE_PICKER_FRAME]
+            if frame then
+                return frame
+            end
+
+            local count = #quickRollTypes
+            local width = (ROLLTYPE_BUTTON_MIN_WIDTH * count) + (ROLLTYPE_BUTTON_SPACING * (count - 1))
+            frame = CreateFrame("Frame", ROLLTYPE_PICKER_FRAME, UIParent)
+            frame:SetWidth(width)
+            frame:SetHeight(ROLLTYPE_BUTTON_HEIGHT)
+            frame:SetFrameStrata("DIALOG")
+            frame:Hide()
+            frame._buttons = frame._buttons or {}
+
+            local prevButton
+            for i = 1, count do
+                local entry = quickRollTypes[i]
+                local rollType = entry.rollType
+                local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+                button:SetWidth(ROLLTYPE_BUTTON_MIN_WIDTH)
+                button:SetHeight(ROLLTYPE_BUTTON_HEIGHT)
+                button:SetText(entry.label)
+                if i == 1 then
+                    button:SetPoint("LEFT", frame, "LEFT", 0, 0)
+                else
+                    button:SetPoint("LEFT", prevButton, "RIGHT", ROLLTYPE_BUTTON_SPACING, 0)
+                end
+                button:SetScript("OnClick", function(btn)
+                    local parent = btn and btn.GetParent and btn:GetParent() or nil
+                    applySelectedItemRollType(parent and parent.itemId, rollType)
+                    StaticPopup_Hide(ROLLTYPE_POPUP_KEY)
+                end)
+                frame._buttons[i] = button
+                prevButton = button
+            end
+
+            return frame
+        end
+
+        local function layoutRollTypeInsertedFrame(popup, picker)
+            local count = #quickRollTypes
+            local spacing = ROLLTYPE_BUTTON_SPACING
+            local sidePadding = ROLLTYPE_PICKER_SIDE_PADDING
+            local popupWidth = popup:GetWidth()
+
+            local available = popupWidth - (sidePadding * 2) - (spacing * (count - 1))
+            local buttonWidth = math.floor(available / count)
+            if buttonWidth < ROLLTYPE_BUTTON_MIN_WIDTH then
+                buttonWidth = ROLLTYPE_BUTTON_MIN_WIDTH
+                local minPopupWidth = (buttonWidth * count) + (spacing * (count - 1)) + (sidePadding * 2)
+                if popupWidth < minPopupWidth then
+                    popup:SetWidth(minPopupWidth)
+                    popupWidth = popup:GetWidth()
+                    available = popupWidth - (sidePadding * 2) - (spacing * (count - 1))
+                    buttonWidth = math.floor(available / count)
+                end
+            end
+            if buttonWidth > ROLLTYPE_BUTTON_MAX_WIDTH then
+                buttonWidth = ROLLTYPE_BUTTON_MAX_WIDTH
+            end
+            if buttonWidth < ROLLTYPE_BUTTON_MIN_WIDTH then
+                buttonWidth = ROLLTYPE_BUTTON_MIN_WIDTH
+            end
+
+            local rowWidth = (buttonWidth * count) + (spacing * (count - 1))
+            picker:SetWidth(rowWidth)
+            picker:SetHeight(ROLLTYPE_BUTTON_HEIGHT)
+
+            local prevButton
+            for i = 1, count do
+                local button = picker._buttons and picker._buttons[i]
+                if button then
+                    button:ClearAllPoints()
+                    button:SetWidth(buttonWidth)
+                    button:SetHeight(ROLLTYPE_BUTTON_HEIGHT)
+                    if i == 1 then
+                        button:SetPoint("LEFT", picker, "LEFT", 0, 0)
+                    else
+                        button:SetPoint("LEFT", prevButton, "RIGHT", spacing, 0)
+                    end
+                    prevButton = button
+                end
+            end
+        end
+
+        local function ensureRollTypePopup()
+            if not StaticPopupDialogs then
+                return false
+            end
+            if StaticPopupDialogs[ROLLTYPE_POPUP_KEY] then
+                return true
+            end
+
+            ensureRollTypeInsertedFrame()
+
+            StaticPopupDialogs[ROLLTYPE_POPUP_KEY] = {
+                text = L.StrEditItemRollType,
+                button1 = L.BtnCancel,
+                timeout = 0,
+                whileDead = 1,
+                hideOnEscape = 1,
+                wide = 1,
+                preferredIndex = 3,
+                OnShow = function(self, data)
+                    local itemId = data and data.itemId or addon.Logger.selectedItem
+                    local picker = ensureRollTypeInsertedFrame()
+                    self._krtExtraHeight = picker:GetHeight() + ROLLTYPE_POPUP_EXTRA_HEIGHT
+
+                    if not self._krtSavedSetHeight then
+                        self._krtSavedSetHeight = self.SetHeight
+                        self.SetHeight = function(dialog, h)
+                            local base = dialog._krtSavedSetHeight
+                            if not base then return end
+                            local extra = dialog._krtExtraHeight or 0
+                            return base(dialog, h + extra)
+                        end
+                    end
+
+                    if self.text then
+                        self.text:SetWidth(self:GetWidth() - 36)
+                    end
+                    if StaticPopup_Resize then
+                        StaticPopup_Resize(self, self.which)
+                    end
+                    layoutRollTypeInsertedFrame(self, picker)
+
+                    picker.itemId = itemId
+                    picker:SetParent(self)
+                    picker:ClearAllPoints()
+                    if self.text then
+                        picker:SetPoint("TOP", self.text, "BOTTOM", 0, -ROLLTYPE_PICKER_TOP_OFFSET)
+                    else
+                        picker:SetPoint("TOP", self, "TOP", 0, -44)
+                    end
+                    picker:SetFrameLevel((self:GetFrameLevel() or 1) + 1)
+                    picker:Show()
+                end,
+                OnHide = function(self)
+                    if self._krtSavedSetHeight then
+                        self.SetHeight = self._krtSavedSetHeight
+                        self._krtSavedSetHeight = nil
+                    end
+                    self._krtExtraHeight = nil
+                    local picker = _G[ROLLTYPE_PICKER_FRAME]
+                    if picker then
+                        picker.itemId = nil
+                        picker:Hide()
+                        picker:SetParent(UIParent)
+                    end
+                end,
+            }
+            return true
+        end
+
+        local function openItemRollTypePopup()
+            local itemId = addon.Logger.selectedItem
+            if not itemId then
+                addon:error(L.ErrLoggerInvalidItem)
+                return
+            end
+
+            if not ensureRollTypePopup() then
+                return
+            end
+
+            CloseDropDownMenus()
+            StaticPopup_Show(ROLLTYPE_POPUP_KEY, nil, nil, {
+                itemId = itemId,
+            })
+        end
+
+        local function openItemMenu()
+            local f = getItemMenuFrame()
 
             EasyMenu({
-                { text = L.StrEditItemLooter,    func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_WINNER") end },
-                { text = L.StrEditItemRollType,  func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_ROLL") end },
-                { text = L.StrEditItemRollValue, func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_VALUE") end },
+                {
+                    text = L.StrEditItemLooter,
+                    notCheckable = 1,
+                    func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_WINNER") end,
+                },
+                {
+                    text = L.StrEditItemRollType,
+                    notCheckable = 1,
+                    func = openItemRollTypePopup,
+                },
+                {
+                    text = L.StrEditItemRollValue,
+                    notCheckable = 1,
+                    func = function() StaticPopup_Show("KRTLOGGER_ITEM_EDIT_VALUE") end,
+                },
             }, f, "cursor", 0, 0, "MENU")
         end
 
@@ -1206,24 +1421,6 @@ do
             end
         end
 
-        local function isValidRollType(rollType)
-            for _, value in pairs(rollTypes) do
-                if rollType == value then
-                    return true
-                end
-            end
-            return false
-        end
-
-        local function validateRollType(_, text)
-            local value = text and tonumber(text)
-            if not value or not isValidRollType(value) then
-                addon:error(L.ErrLoggerInvalidRollType)
-                return false
-            end
-            return true, value
-        end
-
         local function validateRollValue(_, text)
             local value = text and tonumber(text)
             if not value or value < 0 then
@@ -1266,14 +1463,6 @@ do
                 self.raidId = addon.Logger.selectedRaid
                 self.itemId = addon.Logger.selectedItem
             end
-        )
-
-        Utils.makeEditBoxPopup("KRTLOGGER_ITEM_EDIT_ROLL", L.StrEditItemRollTypeHelp,
-            function(self, text)
-                addon.Logger.Loot:Log(self.itemId, nil, text, nil, "LOGGER_EDIT_ROLLTYPE")
-            end,
-            function(self) self.itemId = addon.Logger.selectedItem end,
-            validateRollType
         )
 
         Utils.makeEditBoxPopup("KRTLOGGER_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp,
