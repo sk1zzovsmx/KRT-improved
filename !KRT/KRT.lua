@@ -904,11 +904,6 @@ local function processRaidRosterUpdate()
 
     -- Single source of truth for roster change notifications (join/update/leave delta).
     Utils.triggerEvent("RaidRosterDelta", delta, addon.Raid:GetRosterVersion(), Core.getCurrentRaid())
-    -- Keep Master Looter UI in sync (event-driven; no polling).
-    local mf = addon.Master and addon.Master.frame
-    if addon.Master and addon.Master.RequestRefresh and mf and mf.IsShown and mf:IsShown() then
-        addon.Master:RequestRefresh()
-    end
 
     -- If the Logger is open on the *current* raid, keep the visible lists in sync automatically.
     -- (Throttled to avoid multiple redraws during bursty roster updates.)

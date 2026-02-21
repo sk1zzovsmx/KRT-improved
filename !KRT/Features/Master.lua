@@ -195,6 +195,20 @@ do
         module:RequestRefresh()
     end
 
+    local function RequestLoggerLootLog(itemID, looter, rollType, rollValue, source, raidID)
+        local request = {
+            itemID = itemID,
+            looter = looter,
+            rollType = rollType,
+            rollValue = rollValue,
+            source = source,
+            raidID = raidID,
+            ok = false,
+        }
+        Utils.triggerEvent("LoggerLootLogRequest", request)
+        return request.ok == true
+    end
+
     local function StopCountdown()
         -- Cancel active countdown timers and clear their handles
         addon.CancelTimer(countdownTicker, true)
@@ -1617,9 +1631,6 @@ do
             addon:trace(Diag.D.LogMLLootOpenedTrace:format(lootState.lootCount or 0,
                 tostring(lootState.fromInventory)))
             UpdateSelectionFrame()
-            if not addon.Logger.container then
-                addon.Logger.source = UnitName("target")
-            end
             addon:debug(Diag.D.LogMLLootOpenedInfo:format(lootState.lootCount or 0,
                 tostring(lootState.fromInventory), tostring(UnitName("target"))))
             HandleLootOpenedVisibility()
@@ -1659,8 +1670,9 @@ do
                     tostring(lootState.winner), tonumber(lootState.currentRollType) or -1,
                     addon.Rolls:HighestRoll()))
                 if lootState.currentRollItem and lootState.currentRollItem > 0 then
-                    local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.winner,
-                        lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT", addon.Core.getCurrentRaid())
+                    local ok = RequestLoggerLootLog(lootState.currentRollItem, lootState.winner,
+                        lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT",
+                        addon.Core.getCurrentRaid())
 
                     if not ok then
                         addon:error(Diag.E.LogTradeLoggerLogFailed:format(tostring(addon.Core.getCurrentRaid()),
@@ -1917,7 +1929,7 @@ do
         end
         if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE
             and playerName == lootState.trader then
-            local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.trader, rollType, rollValue,
+            local ok = RequestLoggerLootLog(lootState.currentRollItem, lootState.trader, rollType, rollValue,
                 "TRADE_KEEP", addon.Core.getCurrentRaid())
             if not ok then
                 addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Core.getCurrentRaid()),

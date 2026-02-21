@@ -2429,6 +2429,12 @@ do
         return true
     end
 
+    Utils.registerCallback("LoggerLootLogRequest", function(_, request)
+        if type(request) ~= "table" then return end
+        request.ok = Loot:Log(request.itemID, request.looter, request.rollType, request.rollValue,
+            request.source, request.raidID) == true
+    end)
+
     local function Reset() controller:Dirty() end
     Utils.registerCallbacks(
         { "LoggerSelectRaid", "LoggerSelectBoss", "LoggerSelectPlayer", "LoggerSelectBossPlayer",
