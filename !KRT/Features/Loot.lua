@@ -143,9 +143,6 @@ do
             end
         end
         self:PrepareItem()
-        if addon.Master and addon.Master.ResetItemCount then
-            addon.Master:ResetItemCount()
-        end
         addon:trace(Diag.D.LogLootFetchDone:format(lootState.lootCount or 0, lootState.currentItemIndex or 0))
     end
 
@@ -220,11 +217,12 @@ do
 
     -- Sets the main item display in the UI.
     function module:SetItem(i)
-        local master = addon.Master
+        if not i then
+            Utils.triggerEvent("SetItem", nil, nil)
+            return
+        end
         if not (i.itemName and i.itemLink and i.itemTexture and i.itemColor) then return end
-        if not (master and master.SetCurrentItemView) then return end
-        if not master:SetCurrentItemView(i.itemName, i.itemLink, i.itemTexture, i.itemColor) then return end
-        Utils.triggerEvent("SetItem", i.itemLink)
+        Utils.triggerEvent("SetItem", i.itemLink, i)
     end
 
     -- Selects an item from the loot list by its index.
@@ -232,9 +230,6 @@ do
         if ItemExists(i) then
             lootState.currentItemIndex = i
             self:PrepareItem()
-            if addon.Master and addon.Master.ResetItemCount then
-                addon.Master:ResetItemCount()
-            end
         end
     end
 
@@ -242,10 +237,7 @@ do
     function module:ClearLoot()
         lootTable = twipe(lootTable)
         lootState.lootCount = 0
-        local master = addon.Master
-        if master and master.ClearCurrentItemView then
-            master:ClearCurrentItemView(true)
-        end
+        Utils.triggerEvent("SetItem", nil, nil)
     end
 
     -- Returns the table for the currently selected item.

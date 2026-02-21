@@ -65,6 +65,8 @@ local function getLootSortName(itemName, itemLink, itemId)
     return "Item ?"
 end
 
+local SetSelectedRaid
+
 -- Logger frame module.
 do
     addon.Logger   = addon.Logger or {}
@@ -757,6 +759,17 @@ do
     module.selectedBossPlayer = nil
     module.selectedItem = nil
 
+    SetSelectedRaid = function(raidId)
+        if raidId == nil then
+            module.selectedRaid = nil
+        else
+            module.selectedRaid = tonumber(raidId) or raidId
+        end
+        addon.State = addon.State or {}
+        addon.State.selectedRaid = module.selectedRaid
+        return module.selectedRaid
+    end
+
     -- Multi-select context keys (runtime-only)
     -- NOTE: selection state lives in Utils.lua and is keyed by these context strings.
     module._msRaidCtx = module._msRaidCtx or "LoggerRaids"
@@ -833,13 +846,13 @@ do
             enableDrag = true,
             hookOnShow = function()
                 if not module.selectedRaid then
-                    module.selectedRaid = Core.getCurrentRaid()
+                    SetSelectedRaid(Core.getCurrentRaid())
                 end
                 clearSelections()
-                Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
+                Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid, "ui")
             end,
             hookOnHide = function()
-                module.selectedRaid = Core.getCurrentRaid()
+                SetSelectedRaid(Core.getCurrentRaid())
                 clearSelections()
             end,
         })
@@ -857,10 +870,10 @@ do
         local frame = getFrame()
         if not frame then return end
         if not module.selectedRaid then
-            module.selectedRaid = Core.getCurrentRaid()
+            SetSelectedRaid(Core.getCurrentRaid())
         end
         clearSelections()
-        Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
+        Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid, "ui")
     end
 
     -- Selectors
@@ -880,20 +893,20 @@ do
             local ordered = addon.Logger.Raids and addon.Logger.Raids._ctrl and addon.Logger.Raids._ctrl.data or nil
             action, count = Utils.multiSelectRange(MS_CTX_RAID, ordered, raidNid, isMulti)
             -- SHIFT range always sets the focused row to the click target.
-            module.selectedRaid = raidIndex
+            SetSelectedRaid(raidIndex)
         else
             action, count = Utils.multiSelectToggle(MS_CTX_RAID, raidNid, isMulti, true)
 
             -- Keep a single "focused" raid for the dependent panels (Boss / Attendees / Loot).
             if action == "SINGLE_DESELECT" then
-                module.selectedRaid = nil
+                SetSelectedRaid(nil)
             elseif action == "TOGGLE_OFF" then
                 if getRaidNidByIndex(module.selectedRaid) == raidNid then
                     local sel = Utils.multiSelectGetSelected(MS_CTX_RAID)
-                    module.selectedRaid = sel[1] and getRaidIndexByNid(sel[1]) or nil
+                    SetSelectedRaid(sel[1] and getRaidIndexByNid(sel[1]) or nil)
                 end
             else
-                module.selectedRaid = raidIndex
+                SetSelectedRaid(raidIndex)
             end
 
             -- Range anchor (OS-like): update on non-shift clicks only.
@@ -917,7 +930,7 @@ do
             clearSelections()
         end
 
-        Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
+        Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid, "ui")
     end
 
     function module:SelectBoss(btn, button)
@@ -1473,6 +1486,7 @@ end
 do
     addon.Logger.Raids = addon.Logger.Raids or {}
     local Raids = addon.Logger.Raids
+    local Store = addon.Logger.Store
     local controller = Utils.makeListController {
         keyName = "RaidsList",
         poolTag = "logger-raids",
@@ -1606,9 +1620,9 @@ do
         if not sel then return end
         if addon.Logger.Actions:SetCurrentRaid(sel) then
             -- Context change: clear dependent selections and redraw all module panels.
-            addon.Logger.selectedRaid = sel
+            SetSelectedRaid(sel)
             addon.Logger:ResetSelections()
-            Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid)
+            Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid, "ui")
         end
     end
 
@@ -1659,10 +1673,10 @@ do
                 end
             end
 
-            addon.Logger.selectedRaid = newFocus
+            SetSelectedRaid(newFocus)
             addon.Logger:ResetSelections()
             controller:Dirty()
-            Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid)
+            Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid, "ui")
         end
 
         function Raids:Delete(btn)
@@ -1677,13 +1691,33 @@ do
 
     Utils.registerCallback("RaidCreate", function(_, num)
         -- Context change: selecting a different raid must clear dependent selections.
-        addon.Logger.selectedRaid = tonumber(num)
+        SetSelectedRaid(tonumber(num))
         addon.Logger:ResetSelections()
         controller:Dirty()
-        Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid)
+        Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid, "ui")
     end)
 
-    Utils.registerCallback("LoggerSelectRaid", function() controller:Touch() end)
+    Utils.registerCallback("LoggerSelectRaid", function(_, raidId, reason)
+        local prevRaid = addon.Logger.selectedRaid
+        if raidId ~= nil then
+            SetSelectedRaid(raidId)
+        else
+            SetSelectedRaid(addon.Logger.selectedRaid)
+        end
+
+        if prevRaid ~= addon.Logger.selectedRaid then
+            addon.Logger:ResetSelections()
+        end
+
+        if reason == "sync" then
+            local raid = addon.Logger.selectedRaid and Store:GetRaid(addon.Logger.selectedRaid) or nil
+            if raid and Store.InvalidateIndexes then
+                Store:InvalidateIndexes(raid)
+            end
+        end
+
+        controller:Touch()
+    end)
 end
 
 -- Boss list.
@@ -2518,7 +2552,7 @@ do
 
         self:Hide()
         addon.Logger:ResetSelections()
-        Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid)
+        Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid, "ui")
     end
 
     function Box:CancelAddEdit()

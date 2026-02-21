@@ -570,7 +570,7 @@ do
             return nil, nil
         end
 
-        local selectedRaid = addon.Logger and addon.Logger.selectedRaid
+        local selectedRaid = addon.State and addon.State.selectedRaid
         if selectedRaid then
             local raid = Core.ensureRaidById(selectedRaid)
             if raid then
@@ -697,9 +697,6 @@ do
         )
 
         Core.ensureRaidSchema(raid)
-        if addon.Logger and addon.Logger.Store and addon.Logger.Store.InvalidateIndexes then
-            addon.Logger.Store:InvalidateIndexes(raid)
-        end
 
         return raid
     end
@@ -826,24 +823,10 @@ do
     end
 
     local function refreshLoggerUi(focusRaidId)
-        local logger = addon.Logger
-        local nextFocus = tonumber(focusRaidId)
-        if logger and nextFocus and nextFocus > 0 then
-            local prevFocus = tonumber(logger.selectedRaid)
-            logger.selectedRaid = nextFocus
-            if prevFocus ~= nextFocus and logger.ResetSelections then
-                logger:ResetSelections()
-            end
-        end
-
-        if logger and logger.Raids and logger.Raids._ctrl and logger.Raids._ctrl.Dirty then
-            logger.Raids._ctrl:Dirty()
-        end
-
-        local selectedRaid = (logger and tonumber(logger.selectedRaid))
+        local selectedRaid = tonumber(focusRaidId)
+            or tonumber(addon.State and addon.State.selectedRaid)
             or tonumber(Core.getCurrentRaid())
-
-        Utils.triggerEvent("LoggerSelectRaid", selectedRaid)
+        Utils.triggerEvent("LoggerSelectRaid", selectedRaid, "sync")
     end
 
     local function onSnapshotReady(sender, requestId, mode, snapshot)
@@ -879,7 +862,7 @@ do
             ))
 
             completeRequest(requestId)
-            refreshLoggerUi()
+            refreshLoggerUi(currentId)
             return
         end
 

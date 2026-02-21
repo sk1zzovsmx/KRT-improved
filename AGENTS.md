@@ -384,3 +384,15 @@ Don't:
 - Keep `.luacheckrc` aligned with current addon globals and frame names.
 - When XML introduces/removes named frames, update `.luacheckrc` global allowlist in the same change.
 - Prefer additive, explicit entries grouped under a `KRT addon globals` comment block.
+
+---
+
+## 18) Architecture layering (Parents/Services + Bus) (**BINDING**)
+
+- 5 top-level Parents: `Changes`, `MasterLoot` (`addon.Master`), `Warnings`, `Logger`, `Spammer`.
+- Services MUST NOT call Parents or touch Parent frames.
+- Upward communication uses internal bus (`Utils.registerCallback` / `Utils.triggerEvent`).
+- EntryPoint toggle exception: `Features/SlashEvents.lua` and `Features/Minimap.lua` may call `Parent:Toggle()`.
+- Prefer existing events (`SetItem`, `RaidRosterDelta`) over new UI micro-events.
+- UI ownership: Master frame UI code lives in `Master` (or Master View helpers).
+- Child widgets attach Parent->Child only.
