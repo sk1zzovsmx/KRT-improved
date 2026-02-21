@@ -73,6 +73,14 @@ globals = {
 	"KRT_MINIMAP_GUI",
 	"KRTMenu",
 	"KRTLoggerItemMenuFrame",
+	"KRTLoggerRollTypePickerFrame",
+	"KRTLoggerRollTypePickerFrameMS",
+	"KRTLoggerRollTypePickerFrameOS",
+	"KRTLoggerRollTypePickerFrameSR",
+	"KRTLoggerRollTypePickerFrameFree",
+	"KRTLoggerRollTypePickerFrameBank",
+	"KRTLoggerRollTypePickerFrameDE",
+	"KRTLoggerRollTypePickerFrameHold",
 	"KRTMasterLootFrame",
 
 	-- KRT SavedVariables and runtime session globals
