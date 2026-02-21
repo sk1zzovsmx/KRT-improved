@@ -7,6 +7,8 @@ Dates are in YYYY-MM-DD.
 - **UI:** Logger item context menu now opens a standard `StaticPopup` window with an
   inserted custom button row for direct roll-type selection (`MS/OS/SR/Free/Bank/DE/Hold`)
   plus standard `Cancel`.
+- **Refactor:** Logger roll-type picker row was moved from runtime `CreateFrame(...)` construction
+  to `UI/Logger.xml`, while keeping popup behavior/layout wiring in `Features/Logger.lua`.
 - **Bugfix:** Logger roll-type inserted button row is now explicitly attached/anchored to the
   popup on show, preventing hidden or behind-popup button rendering.
 - **UI:** Logger roll-type popup layout was polished: improved vertical spacing and centered
@@ -20,6 +22,8 @@ Dates are in YYYY-MM-DD.
   title-to-row offset) to reduce empty space while preserving containment.
 - **UI:** Logger roll-type popup horizontal side padding was slightly reduced to trim
   left/right empty space around the 7-button row.
+- **UI:** Logger roll-type popup spacing was further fine-tuned (about 2px) to tighten
+  title/row/cancel vertical rhythm while keeping all controls inside the popup bounds.
 - **Bugfix:** Logger UI now refreshes immediately after incoming Sync snapshots (`req`, `push`, `sync`),
   including the Raids list update without requiring manual reopen or reselection.
 - **Behavior:** Added Logger Sync feature (`Features/Syncer.lua`) using addon-message request/response

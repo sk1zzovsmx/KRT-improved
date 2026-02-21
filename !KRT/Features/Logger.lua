@@ -1103,13 +1103,13 @@ do
     -- Item: left select, right menu
     do
         local quickRollTypes = {
-            { rollType = rollTypes.MAINSPEC,   label = L.BtnMS },
-            { rollType = rollTypes.OFFSPEC,    label = L.BtnOS },
-            { rollType = rollTypes.RESERVED,   label = L.BtnSR },
-            { rollType = rollTypes.FREE,       label = L.BtnFree },
-            { rollType = rollTypes.BANK,       label = L.BtnBank },
-            { rollType = rollTypes.DISENCHANT, label = L.BtnDisenchant },
-            { rollType = rollTypes.HOLD,       label = L.BtnHold },
+            { rollType = rollTypes.MAINSPEC,   label = L.BtnMS,         suffix = "MS" },
+            { rollType = rollTypes.OFFSPEC,    label = L.BtnOS,         suffix = "OS" },
+            { rollType = rollTypes.RESERVED,   label = L.BtnSR,         suffix = "SR" },
+            { rollType = rollTypes.FREE,       label = L.BtnFree,       suffix = "Free" },
+            { rollType = rollTypes.BANK,       label = L.BtnBank,       suffix = "Bank" },
+            { rollType = rollTypes.DISENCHANT, label = L.BtnDisenchant, suffix = "DE" },
+            { rollType = rollTypes.HOLD,       label = L.BtnHold,       suffix = "Hold" },
         }
         local ROLLTYPE_POPUP_KEY = "KRTLOGGER_ITEM_EDIT_ROLL_PICK"
         local ROLLTYPE_PICKER_FRAME = "KRTLoggerRollTypePickerFrame"
@@ -1118,8 +1118,8 @@ do
         local ROLLTYPE_BUTTON_HEIGHT = 22
         local ROLLTYPE_BUTTON_SPACING = 3
         local ROLLTYPE_PICKER_SIDE_PADDING = 24
-        local ROLLTYPE_PICKER_TOP_OFFSET = 10
-        local ROLLTYPE_POPUP_EXTRA_HEIGHT = 18
+        local ROLLTYPE_PICKER_TOP_OFFSET = 8
+        local ROLLTYPE_POPUP_EXTRA_HEIGHT = 16
 
         local function applySelectedItemRollType(itemId, rollType)
             if not itemId then
@@ -1136,41 +1136,32 @@ do
 
         local function ensureRollTypeInsertedFrame()
             local frame = _G[ROLLTYPE_PICKER_FRAME]
-            if frame then
+            if not frame then
+                return nil
+            end
+
+            if frame._buttons and frame._initialized then
                 return frame
             end
 
-            local count = #quickRollTypes
-            local width = (ROLLTYPE_BUTTON_MIN_WIDTH * count) + (ROLLTYPE_BUTTON_SPACING * (count - 1))
-            frame = CreateFrame("Frame", ROLLTYPE_PICKER_FRAME, UIParent)
-            frame:SetWidth(width)
-            frame:SetHeight(ROLLTYPE_BUTTON_HEIGHT)
-            frame:SetFrameStrata("DIALOG")
-            frame:Hide()
             frame._buttons = frame._buttons or {}
-
-            local prevButton
+            local frameName = frame.GetName and frame:GetName() or ROLLTYPE_PICKER_FRAME
+            local count = #quickRollTypes
             for i = 1, count do
                 local entry = quickRollTypes[i]
                 local rollType = entry.rollType
-                local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-                button:SetWidth(ROLLTYPE_BUTTON_MIN_WIDTH)
-                button:SetHeight(ROLLTYPE_BUTTON_HEIGHT)
-                button:SetText(entry.label)
-                if i == 1 then
-                    button:SetPoint("LEFT", frame, "LEFT", 0, 0)
-                else
-                    button:SetPoint("LEFT", prevButton, "RIGHT", ROLLTYPE_BUTTON_SPACING, 0)
+                local button = _G[frameName .. entry.suffix]
+                if button then
+                    button:SetText(entry.label)
+                    button:SetScript("OnClick", function(btn)
+                        local parent = btn and btn.GetParent and btn:GetParent() or nil
+                        applySelectedItemRollType(parent and parent.itemId, rollType)
+                        StaticPopup_Hide(ROLLTYPE_POPUP_KEY)
+                    end)
                 end
-                button:SetScript("OnClick", function(btn)
-                    local parent = btn and btn.GetParent and btn:GetParent() or nil
-                    applySelectedItemRollType(parent and parent.itemId, rollType)
-                    StaticPopup_Hide(ROLLTYPE_POPUP_KEY)
-                end)
                 frame._buttons[i] = button
-                prevButton = button
             end
-
+            frame._initialized = true
             return frame
         end
 
@@ -1241,6 +1232,9 @@ do
                 OnShow = function(self, data)
                     local itemId = data and data.itemId or addon.Logger.selectedItem
                     local picker = ensureRollTypeInsertedFrame()
+                    if not picker then
+                        return
+                    end
                     self._krtExtraHeight = picker:GetHeight() + ROLLTYPE_POPUP_EXTRA_HEIGHT
 
                     if not self._krtSavedSetHeight then
