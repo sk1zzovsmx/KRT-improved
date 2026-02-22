@@ -123,16 +123,15 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 18) Widgets/LootCounter.lua
 19) Services/Reserves.lua
 20) Widgets/ReservesUI.lua
-21) Widgets/ReservesImport.lua
-22) Controllers/Logger.lua
-23) Services/Syncer.lua
-24) Widgets/Config.lua
-25) Controllers/Warnings.lua
-26) Controllers/Changes.lua
-27) Controllers/Spammer.lua
-28) EntryPoints/SlashEvents.lua
-29) KRT.xml (UI include manifest)
-30) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
+21) Controllers/Logger.lua
+22) Services/Syncer.lua
+23) Widgets/Config.lua
+24) Controllers/Warnings.lua
+25) Controllers/Changes.lua
+26) Controllers/Spammer.lua
+27) EntryPoints/SlashEvents.lua
+28) KRT.xml (UI include manifest)
+29) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
 
 ---
 
@@ -162,8 +161,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 
   Widgets/
     LootCounter.lua        # loot counter UI + data
-    ReservesUI.lua         # reserve list frame controller + row/header rendering
-    ReservesImport.lua     # SR import window glue + validation
+    ReservesUI.lua         # reserve list + import frame controller + row/header rendering
     Config.lua             # options UI logic
 
   EntryPoints/
@@ -173,8 +171,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
   UI/
     Minimap.xml            # minimap button frame
     ReservesTemplates.xml  # reserve list templates
-    Reserves.xml           # reserve list UI
-    ReservesImport.xml     # reserve import UI
+    Reserves.xml           # reserve list UI + reserve import window UI
     Logger.xml             # logger templates + frames
     Config.xml             # config UI
     Spammer.xml            # spammer UI
@@ -298,7 +295,7 @@ Top-level feature modules on `addon.*`:
 - `addon.Master`        - master-loot helpers, award/trade tracking
 - `addon.LootCounter`   - loot counter UI + data
 - `addon.Reserves`      - soft reserves model + list UI
-- `addon.ReservesImport` - SR import window glue + validation
+- `addon.ReservesUI.Import` - SR import window widget owner (UI only)
 - `addon.Config`        - options UI + defaults/load
 - `addon.Warnings`      - warnings list + announce helpers
 - `addon.Changes`       - MS changes list + announce

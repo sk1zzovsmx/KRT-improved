@@ -774,52 +774,52 @@ function Core.getFeatureShared()
 end
 
 -- =========== Raid Helpers Module  =========== --
--- [MIGRATED] See Features/Raid.lua
+-- [MIGRATED] See Services/Raid.lua
 
 -- =========== Chat Output Helpers  =========== --
--- [MIGRATED] See Features/Chat.lua
+-- [MIGRATED] See Services/Chat.lua
 
 -- =========== Minimap Button Module  =========== --
--- [MIGRATED] See Features/Minimap.lua
+-- [MIGRATED] See EntryPoints/Minimap.lua
 
 -- =========== Rolls Helpers Module  =========== --
--- [MIGRATED] See Features/Rolls.lua
+-- [MIGRATED] See Services/Rolls.lua
 
 -- =========== Loot Helpers Module  =========== --
--- [MIGRATED] See Features/Loot.lua
+-- [MIGRATED] See Services/Loot.lua
 
 -- =========== Master Looter Frame Module  =========== --
--- [MIGRATED] See Features/Master.lua
+-- [MIGRATED] See Controllers/Master.lua
 
 -- =========== Loot Counter Module  =========== --
--- [MIGRATED] See Features/LootCounter.lua
+-- [MIGRATED] See Widgets/LootCounter.lua
 
 -- =========== Reserves Module  =========== --
--- [MIGRATED] See Features/Reserves.lua
+-- [MIGRATED] See Services/Reserves.lua
 
 -- =========== Reserve Import Window Module  =========== --
--- [MIGRATED] See Features/ReservesImport.lua
+-- [MIGRATED] See Widgets/ReservesUI.lua (Import widget)
 
 -- =========== Configuration Frame Module  =========== --
--- [MIGRATED] See Features/Config.lua
+-- [MIGRATED] See Widgets/Config.lua
 
 -- =========== Warnings Frame Module  =========== --
--- [MIGRATED] See Features/Warnings.lua
+-- [MIGRATED] See Controllers/Warnings.lua
 
 -- =========== MS Changes Module  =========== --
--- [MIGRATED] See Features/Changes.lua
+-- [MIGRATED] See Controllers/Changes.lua
 
 -- =========== LFM Spam Module  =========== --
--- [MIGRATED] See Features/Spammer.lua
+-- [MIGRATED] See Controllers/Spammer.lua
 
 -- =========== Logger Frame =========== --
--- [MIGRATED] See Features/Logger.lua
+-- [MIGRATED] See Controllers/Logger.lua
 
 -- =========== Syncer Module  =========== --
--- [MIGRATED] See Features/Syncer.lua
+-- [MIGRATED] See Services/Syncer.lua
 
 -- =========== Slash Commands  =========== --
--- [MIGRATED] See Features/SlashEvents.lua
+-- [MIGRATED] See EntryPoints/SlashEvents.lua
 
 -- =========== Main Event Handlers  =========== --
 local addonEvents = {

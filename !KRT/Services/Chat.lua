@@ -1,5 +1,5 @@
 --[[
-    Features/Chat.lua
+    Services/Chat.lua
 ]]
 
 local addon = select(2, ...)

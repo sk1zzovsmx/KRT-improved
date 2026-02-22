@@ -1,5 +1,5 @@
 --[[
-    Features/Spammer.lua
+    Controllers/Spammer.lua
 ]]
 
 local addon = select(2, ...)

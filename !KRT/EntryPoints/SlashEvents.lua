@@ -1,5 +1,5 @@
 --[[
-    Features/SlashEvents.lua
+    EntryPoints/SlashEvents.lua
 ]]
 
 local addon = select(2, ...)

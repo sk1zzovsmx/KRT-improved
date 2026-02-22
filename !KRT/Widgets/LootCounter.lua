@@ -1,5 +1,5 @@
 --[[
-    Features/LootCounter.lua
+    Widgets/LootCounter.lua
 ]]
 
 local addon = select(2, ...)

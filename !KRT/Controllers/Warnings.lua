@@ -1,5 +1,5 @@
 --[[
-    Features/Warnings.lua
+    Controllers/Warnings.lua
 ]]
 
 local addon = select(2, ...)

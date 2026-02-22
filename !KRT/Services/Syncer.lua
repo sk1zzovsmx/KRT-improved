@@ -1,5 +1,5 @@
 --[[
-    Features/Syncer.lua
+    Services/Syncer.lua
 ]]
 
 local addon = select(2, ...)

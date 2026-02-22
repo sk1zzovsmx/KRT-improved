@@ -1,5 +1,5 @@
 --[[
-    Features/Config.lua
+    Widgets/Config.lua
 ]]
 
 local addon = select(2, ...)

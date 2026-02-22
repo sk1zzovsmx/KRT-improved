@@ -77,7 +77,7 @@ flowchart LR
     Master["addon.Master"]
     LootCounter["addon.LootCounter"]
     Reserves["addon.Reserves"]
-    ReservesImport["addon.ReservesImport"]
+    ReservesImportWidget["addon.ReservesUI.Import"]
     Warnings["addon.Warnings"]
     Changes["addon.Changes"]
     Spammer["addon.Spammer"]
@@ -165,13 +165,17 @@ Top-level modules defined in `!KRT/KRT.lua`:
 - `addon.Master`: master-loot workflow, award/trade handling.
 - `addon.LootCounter`: player loot counts UI and data updates.
 - `addon.Reserves`: soft-reserve model and reserve list UI.
-- `addon.ReservesImport`: SR import UI and CSV validation.
+- `addon.ReservesUI.Import`: SR import window owned by the Reserves UI widget.
 - `addon.Config`: options defaults/load and config UI.
 - `addon.Warnings`: warning list CRUD and announces.
 - `addon.Changes`: MS changes list and announce flows.
 - `addon.Spammer`: LFM message composition and spam loop.
 - `addon.Logger`: loot logger UI and raid/boss/loot editing.
 - `addon.Slash`: slash command parser and dispatch table.
+
+Notes:
+- Import window is owned by Reserves UI widget.
+- ReservesImport module removed; XML points to Reserves Import widget.
 
 `addon.Logger` internal layering pattern:
 - `addon.Logger.Store`: data access and stable-id indexing.

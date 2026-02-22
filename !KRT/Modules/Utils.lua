@@ -1209,6 +1209,7 @@ end
 do
     local colors = HIGHLIGHT_FONT_COLOR
     local fakeBagTooltip
+    local warmItemTooltip
 
     local function showTooltip(frame)
         if not frame.tooltip_anchor then
@@ -1250,6 +1251,23 @@ do
         if not frame.tooltip_title and not frame.tooltip_text and not frame.tooltip_item then return end
         frame:SetScript("OnEnter", showTooltip)
         frame:SetScript("OnLeave", hideTooltip)
+    end
+
+    -- Warm item cache using a hidden tooltip (nil-safe, no return value).
+    function Utils.warmItemCache(itemLink)
+        if type(itemLink) ~= "string" or itemLink == "" then
+            return
+        end
+        if not itemLink:find("item:", 1, true) then
+            return
+        end
+
+        warmItemTooltip = warmItemTooltip or CreateFrame("GameTooltip", nil, UIParent, "GameTooltipTemplate")
+        warmItemTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+        local ok = pcall(warmItemTooltip.SetHyperlink, warmItemTooltip, itemLink)
+        if ok then
+            warmItemTooltip:Hide()
+        end
     end
 
     -- Tooltip-based soulbound check for bag items (3.3.5a-safe).

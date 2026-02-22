@@ -4,6 +4,8 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Docs:** Import window ownership is documented as `addon.ReservesUI.Import`.
+  Legacy `ReservesImport` module was removed and XML now points to the Reserves Import widget.
 - **UI:** Logger item context menu now opens a standard `StaticPopup` window with an
   inserted custom button row for direct roll-type selection (`MS/OS/SR/Free/Bank/DE/Hold`)
   plus standard `Cancel`.
@@ -84,7 +86,7 @@ Dates are in YYYY-MM-DD.
   consume `RaidRosterDelta` directly.
 - **Refactor:** `addon.Raid:GetUnitID()` now uses a live name<->unit cache from roster scans with
   iterator fallback, reducing repeated full-group scans in Master Looter flows.
-- **Refactor:** Strict UI controller uniformization for `Changes`, `Reserves`, `ReservesImport`,
+- **Refactor:** Strict UI controller uniformization for `Changes`, `Reserves`, and Reserves Import widget,
   and `Logger`: removed manual `Toggle/Hide` overrides and kept side effects in `hookOnShow/OnHide`.
 - **Refactor:** Standardized top-level feature frame getters for `Logger` and `LootCounter` to
   `makeModuleFrameGetter(...)` (module-cached + global fallback pattern).
@@ -95,7 +97,7 @@ Dates are in YYYY-MM-DD.
   the Warnings-only `Update()` public method in favor of the common `RequestRefresh()` path.
 - **Bugfix:** `/krt minimap on|off` now writes `minimapButton` via `Utils.setOption(...)`, keeping
   runtime options (`addon.options`) and SavedVariables (`KRT_Options`) synchronized.
-- **Localization:** Removed hardcoded fallback texts in `ReservesImport` popup/status paths and now
+- **Localization:** Removed hardcoded fallback texts in Reserves Import widget popup/status paths and now
   always source those messages from `addon.L`.
 - **Localization:** LFM preview output in `Spammer` now uses localized role labels and localized
   `Need` token (`L.StrSpammerNeedStr`).
@@ -103,9 +105,9 @@ Dates are in YYYY-MM-DD.
   (`Internal state`, `Private helpers`, `Public methods`) and kept public module APIs in PascalCase
   (no mass rename/breaking API changes).
 - **Refactor:** Added `Utils.setOption(key, value)` and migrated option writes in
-  `Config`, `Minimap`, `Reserves`, and `ReservesImport` to keep runtime options and SV in sync centrally.
+  `Config`, `Minimap`, `Reserves`, and Reserves Import widget to keep runtime options and SV in sync centrally.
 - **Refactor:** Added shared UI bootstrap helpers `Utils.initModuleFrame(...)` and
-  `Utils.bootstrapModuleUi(...)`; migrated `Config`, `Warnings`, `Changes`, `Spammer`, `ReservesImport`,
+  `Utils.bootstrapModuleUi(...)`; migrated `Config`, `Warnings`, `Changes`, `Spammer`, Reserves Import widget,
   `Logger`, `Master`, `LootCounter`, and `Reserves` to reduce repeated OnLoad/controller wiring without
   behavior changes; same pattern also applied to Logger internal popups (`BossBox`, `AttendeesBox`).
 - **Refactor:** Removed feature bootstrap migration fallbacks and standardized all
@@ -113,7 +115,7 @@ Dates are in YYYY-MM-DD.
 - **Refactor:** Removed deprecated placeholder files `Features/CoreGameplay.lua` and
   `Features/LootStack.lua` (both were not loaded by TOC).
 - **Refactor:** Renamed feature file paths `Features/ReserveImport.lua` -> `Features/ReservesImport.lua`
-  and `UI/ReserveImport.xml` -> `UI/ReservesImport.xml`; runtime module is now `addon.ReservesImport`.
+  and `UI/ReserveImport.xml` -> `UI/ReservesImport.xml`; import owner is now `addon.ReservesUI.Import`.
 - **Behavior:** Simplified account SavedVariables to feature-scoped keys:
   `KRT_Raids`, `KRT_Players`, `KRT_Reserves`, `KRT_Warnings`, `KRT_Spammer`, and `KRT_Options`.
   Runtime session keys (`KRT_CurrentRaid`, `KRT_LastBoss`, `KRT_NextReset`) are no longer persisted.

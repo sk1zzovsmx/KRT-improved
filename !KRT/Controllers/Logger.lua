@@ -1,5 +1,5 @@
 --[[
-    Features/Logger.lua
+    Controllers/Logger.lua
 ]]
 
 local addon = select(2, ...)

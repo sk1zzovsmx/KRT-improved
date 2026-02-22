@@ -1,5 +1,5 @@
 --[[
-    Features/Raid.lua
+    Services/Raid.lua
 ]]
 
 local addon = select(2, ...)

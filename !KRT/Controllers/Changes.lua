@@ -1,5 +1,5 @@
 --[[
-    Features/Changes.lua
+    Controllers/Changes.lua
 ]]
 
 local addon = select(2, ...)

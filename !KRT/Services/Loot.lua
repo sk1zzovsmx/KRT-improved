@@ -1,5 +1,5 @@
 --[[
-    Features/Loot.lua
+    Services/Loot.lua
 ]]
 
 local addon = select(2, ...)
@@ -153,9 +153,7 @@ do
 
         -- Try to warm the item cache (doesn't guarantee immediate GetItemInfo).
         if (not itemName or not itemRarity or not itemTexture) and type(itemLink) == "string" then
-            GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
-            GameTooltip:SetHyperlink(itemLink)
-            GameTooltip:Hide()
+            Utils.warmItemCache(itemLink)
         end
 
         if not itemName then

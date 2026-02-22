@@ -1,5 +1,5 @@
 --[[
-    Features/Minimap.lua
+    EntryPoints/Minimap.lua
 ]]
 
 local addon = select(2, ...)
