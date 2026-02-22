@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-22 19:43:02 +01:00
-- Commit: 1110812
+- Generated: 2026-02-22 20:27:07 +01:00
+- Commit: 8aab7c6
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -87,7 +87,9 @@
 |-- .gitignore
 |-- .luacheckrc
 |-- AGENTS.md
+|-- ARCHITECTURE.md
 |-- CHANGELOG.md
+|-- DEV_CHECKS.md
 |-- OVERVIEW.md
 |-- README.md
 \\-- screenshot.jpg

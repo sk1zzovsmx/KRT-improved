@@ -6,9 +6,10 @@ Allowed:
 - Use `Modules/*` helpers/constants and localization tables.
 - Depend on other Services when needed.
 - Emit upward signals through `Utils.triggerEvent(...)`.
-- Use non-parent UI APIs when strictly local/non-owning (for example tooltip probes).
+- Use generic utility helpers that may internally use WoW UI APIs (for example cache warmers in `Utils`).
 
 Disallowed:
-- Calling Parents (`addon.Master`, `addon.Logger`, `addon.Warnings`, `addon.Changes`, `addon.Spammer`).
+- Calling Parent modules directly (`Master`, `Logger`, `Warnings`, `Changes`, `Spammer`).
 - Touching parent frames (`_G["KRT..."]`, `addon.<Parent>.frame`, `hooksecurefunc(addon.<Parent>, ...)`).
 - Direct UI toggles or frame visibility flow.
+- Direct use of frame ownership APIs (`CreateFrame`, frame `:Show/:Hide`, parent frame scripts).

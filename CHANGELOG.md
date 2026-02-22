@@ -10,7 +10,7 @@ Dates are in YYYY-MM-DD.
   inserted custom button row for direct roll-type selection (`MS/OS/SR/Free/Bank/DE/Hold`)
   plus standard `Cancel`.
 - **Refactor:** Logger roll-type picker row was moved from runtime `CreateFrame(...)` construction
-  to `UI/Logger.xml`, while keeping popup behavior/layout wiring in `Features/Logger.lua`.
+  to `UI/Logger.xml`, while keeping popup behavior/layout wiring in `Controllers/Logger.lua`.
 - **Bugfix:** Logger roll-type inserted button row is now explicitly attached/anchored to the
   popup on show, preventing hidden or behind-popup button rendering.
 - **UI:** Logger roll-type popup layout was polished: improved vertical spacing and centered
@@ -28,7 +28,7 @@ Dates are in YYYY-MM-DD.
   title/row/cancel vertical rhythm while keeping all controls inside the popup bounds.
 - **Bugfix:** Logger UI now refreshes immediately after incoming Sync snapshots (`req`, `push`, `sync`),
   including the Raids list update without requiring manual reopen or reselection.
-- **Behavior:** Added Logger Sync feature (`Features/Syncer.lua`) using addon-message request/response
+- **Behavior:** Added Logger Sync feature (`Services/Syncer.lua`) using addon-message request/response
   chunking with three commands:
   `/krt logger req <raidId|raidNid> <player>` requests a specific raid snapshot from one target player
   and imports it as a new raid, `/krt logger push <raidId|raidNid> <player>` pushes a selected raid
@@ -37,7 +37,7 @@ Dates are in YYYY-MM-DD.
 - **Behavior:** `req/push` now require an explicit raid reference and no longer fallback to selected/current
   raid; current-raid flows should use `/krt logger sync`.
 - **Behavior:** Main event wiring now handles `CHAT_MSG_ADDON` in `KRT.lua` and forwards Sync protocol
-  traffic to `addon.Syncer`, keeping slash handling isolated in `Features/SlashEvents.lua`.
+  traffic to `addon.Syncer`, keeping slash handling isolated in `EntryPoints/SlashEvents.lua`.
 - **Behavior:** Logger Loot sorting is now deterministic across all sortable headers; when primary values
   are equal, ordering falls back to loot name, then item ID, then loot NID to prevent random reshuffles.
 - **Behavior:** Logger Loot `Item` header sorting now uses the displayed loot name text
@@ -56,7 +56,7 @@ Dates are in YYYY-MM-DD.
   the session as soon as roster data is available.
 - **Bugfix:** Added `PLAYER_DIFFICULTY_CHANGED` handling in `KRT.lua` to re-run raid session checks
   when raid difficulty changes or is adjusted by server fallback.
-- **Refactor:** Main WoW event handlers moved back to `KRT.lua`; `Features/SlashEvents.lua`
+- **Refactor:** Main WoW event handlers moved back to `KRT.lua`; `EntryPoints/SlashEvents.lua`
   now contains slash-command routing only.
 - **Bugfix:** Raid enter checks now re-read live instance data with short staged retries
   (0.3/0.8/1.5/2.5/3.5s) instead of relying on stale event payloads, so automatic unsupported-mode fallback
@@ -101,7 +101,7 @@ Dates are in YYYY-MM-DD.
   always source those messages from `addon.L`.
 - **Localization:** LFM preview output in `Spammer` now uses localized role labels and localized
   `Need` token (`L.StrSpammerNeedStr`).
-- **Refactor:** Standardized `Features/*.lua` top-level module scaffolding around canonical section headers
+- **Refactor:** Standardized runtime module file scaffolding around canonical section headers
   (`Internal state`, `Private helpers`, `Public methods`) and kept public module APIs in PascalCase
   (no mass rename/breaking API changes).
 - **Refactor:** Added `Utils.setOption(key, value)` and migrated option writes in
@@ -111,7 +111,7 @@ Dates are in YYYY-MM-DD.
   `Logger`, `Master`, `LootCounter`, and `Reserves` to reduce repeated OnLoad/controller wiring without
   behavior changes; same pattern also applied to Logger internal popups (`BossBox`, `AttendeesBox`).
 - **Refactor:** Removed feature bootstrap migration fallbacks and standardized all
-  `Features/*.lua` modules on direct `addon.Core.getFeatureShared()` usage.
+  runtime module files on direct `addon.Core.getFeatureShared()` usage.
 - **Refactor:** Removed deprecated placeholder files `Features/CoreGameplay.lua` and
   `Features/LootStack.lua` (both were not loaded by TOC).
 - **Refactor:** Renamed feature file paths `Features/ReserveImport.lua` -> `Features/ReservesImport.lua`

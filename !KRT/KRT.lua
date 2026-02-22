@@ -773,54 +773,6 @@ function Core.getFeatureShared()
     }
 end
 
--- =========== Raid Helpers Module  =========== --
--- [MIGRATED] See Services/Raid.lua
-
--- =========== Chat Output Helpers  =========== --
--- [MIGRATED] See Services/Chat.lua
-
--- =========== Minimap Button Module  =========== --
--- [MIGRATED] See EntryPoints/Minimap.lua
-
--- =========== Rolls Helpers Module  =========== --
--- [MIGRATED] See Services/Rolls.lua
-
--- =========== Loot Helpers Module  =========== --
--- [MIGRATED] See Services/Loot.lua
-
--- =========== Master Looter Frame Module  =========== --
--- [MIGRATED] See Controllers/Master.lua
-
--- =========== Loot Counter Module  =========== --
--- [MIGRATED] See Widgets/LootCounter.lua
-
--- =========== Reserves Module  =========== --
--- [MIGRATED] See Services/Reserves.lua
-
--- =========== Reserve Import Window Module  =========== --
--- [MIGRATED] See Widgets/ReservesUI.lua (Import widget)
-
--- =========== Configuration Frame Module  =========== --
--- [MIGRATED] See Widgets/Config.lua
-
--- =========== Warnings Frame Module  =========== --
--- [MIGRATED] See Controllers/Warnings.lua
-
--- =========== MS Changes Module  =========== --
--- [MIGRATED] See Controllers/Changes.lua
-
--- =========== LFM Spam Module  =========== --
--- [MIGRATED] See Controllers/Spammer.lua
-
--- =========== Logger Frame =========== --
--- [MIGRATED] See Controllers/Logger.lua
-
--- =========== Syncer Module  =========== --
--- [MIGRATED] See Services/Syncer.lua
-
--- =========== Slash Commands  =========== --
--- [MIGRATED] See EntryPoints/SlashEvents.lua
-
 -- =========== Main Event Handlers  =========== --
 local addonEvents = {
     CHAT_MSG_SYSTEM = "CHAT_MSG_SYSTEM",
