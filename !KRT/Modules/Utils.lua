@@ -766,6 +766,15 @@ do
     -- Internal event bus (lightweight, safe, addon-logged)
     local events = {} -- events[eventName] = { [token]=func, ... }
 
+    -- Event payload contract (high-traffic events; keep in sync with owner handlers):
+    -- SetItem: (itemLink:string|nil, itemData:table|nil)
+    -- RaidRosterDelta: (delta:table, rosterVersion:number, raidId:number|string)
+    -- AddRoll: (name:string, roll:number)
+    -- LoggerSelectRaid: (raidId:number|string, reason:"ui"|"sync"|nil)
+    -- LoggerLootLogRequest: (request:table)
+    --   request fields: itemID, looter, rollType, rollValue, source, raidId, ok:boolean?
+    --   Legacy alias accepted: request.raidID (normalized by Logger handler).
+
     -- Optional debug stats (fan-out + frequency + timing)
     -- stats[eventName] = { listeners, fires, maxListeners, totalMs, lastMs, errors }
     local stats = {}

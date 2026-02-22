@@ -195,14 +195,15 @@ do
         module:RequestRefresh()
     end
 
-    local function RequestLoggerLootLog(itemID, looter, rollType, rollValue, source, raidID)
+    local function RequestLoggerLootLog(itemID, looter, rollType, rollValue, source, raidId)
         local request = {
             itemID = itemID,
             looter = looter,
             rollType = rollType,
             rollValue = rollValue,
             source = source,
-            raidID = raidID,
+            raidId = raidId,
+            raidID = raidId,
             ok = false,
         }
         Utils.triggerEvent("LoggerLootLogRequest", request)
@@ -1995,6 +1996,15 @@ do
 
     -- Register some callbacks:
     Utils.registerCallback("SetItem", function(_, itemLink, itemData)
+        if itemLink ~= nil and type(itemLink) ~= "string" then
+            addon:warn(Diag.W.LogMLSetItemPayloadInvalid:format(tostring(itemLink), type(itemData)))
+            return
+        end
+        if itemData ~= nil and type(itemData) ~= "table" then
+            addon:warn(Diag.W.LogMLSetItemPayloadInvalid:format(tostring(itemLink), type(itemData)))
+            return
+        end
+
         if lastUIState.currentItemLink ~= itemLink then
             announced = false
             lastUIState.currentItemLink = itemLink
@@ -2010,7 +2020,29 @@ do
         module:RequestRefresh()
     end)
 
-    Utils.registerCallback("RaidRosterDelta", function()
+    Utils.registerCallback("RaidRosterDelta", function(_, delta, rosterVersion, raidId)
+        local raidIdType = type(raidId)
+        if type(delta) ~= "table" then
+            addon:warn(Diag.W.LogMLRaidRosterDeltaPayloadInvalid:format(type(delta), tostring(rosterVersion),
+                tostring(raidId)))
+            return
+        end
+        if type(rosterVersion) ~= "number" then
+            addon:warn(Diag.W.LogMLRaidRosterDeltaPayloadInvalid:format(type(delta), tostring(rosterVersion),
+                tostring(raidId)))
+            return
+        end
+        if raidId == nil then
+            addon:warn(Diag.W.LogMLRaidRosterDeltaPayloadInvalid:format(type(delta), tostring(rosterVersion),
+                tostring(raidId)))
+            return
+        end
+        if raidIdType ~= "number" and raidIdType ~= "string" then
+            addon:warn(Diag.W.LogMLRaidRosterDeltaPayloadInvalid:format(type(delta), tostring(rosterVersion),
+                tostring(raidId)))
+            return
+        end
+
         cachedRosterVersion = nil
         InvalidateCandidateCache()
         dropDownDirty = true
@@ -2026,7 +2058,11 @@ do
         module:RequestRefresh()
     end)
 
-    Utils.registerCallback("AddRoll", function()
+    Utils.registerCallback("AddRoll", function(_, name, roll)
+        if type(name) ~= "string" or name == "" or tonumber(roll) == nil then
+            addon:warn(Diag.W.LogMLAddRollPayloadInvalid:format(tostring(name), tostring(roll)))
+            return
+        end
         module:RequestRefresh()
     end)
 

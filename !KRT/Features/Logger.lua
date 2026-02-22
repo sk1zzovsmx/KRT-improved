@@ -1698,12 +1698,22 @@ do
     end)
 
     Utils.registerCallback("LoggerSelectRaid", function(_, raidId, reason)
-        local prevRaid = addon.Logger.selectedRaid
-        if raidId ~= nil then
-            SetSelectedRaid(raidId)
-        else
-            SetSelectedRaid(addon.Logger.selectedRaid)
+        local raidIdType = type(raidId)
+        if raidId == nil then
+            addon:warn(Diag.W.LogLoggerSelectRaidPayloadInvalid:format(tostring(raidId), tostring(reason)))
+            return
         end
+        if raidIdType ~= "number" and raidIdType ~= "string" then
+            addon:warn(Diag.W.LogLoggerSelectRaidPayloadInvalid:format(tostring(raidId), tostring(reason)))
+            return
+        end
+        if reason ~= nil and reason ~= "ui" and reason ~= "sync" then
+            addon:warn(Diag.W.LogLoggerSelectRaidPayloadInvalid:format(tostring(raidId), tostring(reason)))
+            return
+        end
+
+        local prevRaid = addon.Logger.selectedRaid
+        SetSelectedRaid(raidId)
 
         if prevRaid ~= addon.Logger.selectedRaid then
             addon.Logger:ResetSelections()
@@ -2430,9 +2440,13 @@ do
     end
 
     Utils.registerCallback("LoggerLootLogRequest", function(_, request)
-        if type(request) ~= "table" then return end
+        if type(request) ~= "table" then
+            addon:error(Diag.E.LogLoggerLootLogRequestPayloadInvalid:format(type(request)))
+            return
+        end
+        local raidId = request.raidId or request.raidID
         request.ok = Loot:Log(request.itemID, request.looter, request.rollType, request.rollValue,
-            request.source, request.raidID) == true
+            request.source, raidId) == true
     end)
 
     local function Reset() controller:Dirty() end
