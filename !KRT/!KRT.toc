@@ -13,43 +13,48 @@
 ## X-Discord: https://discord.gg/a8z5CyS3eW
 ## X-Localizations: Kader (enUS)
 
-# Libraries:
+# Layer 0 - Third-party libraries
 Libs\LibStub\LibStub.lua
 Libs\LibBossIDs-1.0\lib.xml
 Libs\LibDeformat-3.0\lib.xml
 Libs\LibCompat-1.0\lib.xml
 Libs\LibLogger-1.0\lib.xml
 
-# Localization (moved to the top for 'L' to be available):
+# Layer 1 - Localization (must load before runtime modules)
 Localization\localization.en.lua
 Localization\DiagnoseLog.en.lua
 
-# Templates File:
+# Layer 2 - Shared templates
 Templates.xml
 
-# Utilities Files:
+# Layer 3 - Shared modules (helpers/constants)
 Modules\Utils.lua
 Modules\C.lua
 
-# Core Files:
+# Layer 4 - Core bootstrap and event wiring
 KRT.lua
-Features\Raid.lua
-Features\Chat.lua
-Features\Minimap.lua
-Features\Rolls.lua
-Features\Loot.lua
-Features\Master.lua
-Features\LootCounter.lua
-Features\Reserves.lua
-Features\ReservesImport.lua
-Features\Logger.lua
-Features\Syncer.lua
-Features\Config.lua
-Features\Warnings.lua
-Features\Changes.lua
-Features\Spammer.lua
-Features\SlashEvents.lua
+
+# Layer 5 - Runtime modules (ordered by dependency)
+# Services + entrypoint + parents + child UI controllers
+Services\Raid.lua
+Services\Chat.lua
+EntryPoints\Minimap.lua
+Services\Rolls.lua
+Services\Loot.lua
+Controllers\Master.lua
+UIControllers\LootCounter.lua
+Services\Reserves.lua
+UIControllers\ReservesImport.lua
+Controllers\Logger.lua
+Services\Syncer.lua
+UIControllers\Config.lua
+Controllers\Warnings.lua
+Controllers\Changes.lua
+Controllers\Spammer.lua
+EntryPoints\SlashEvents.lua
+
+# Layer 6 - UI include manifest
 KRT.xml
 
-# Modules
+# Layer 7 - Late data modules (intentional post-runtime load)
 Modules\ignoredItems.lua

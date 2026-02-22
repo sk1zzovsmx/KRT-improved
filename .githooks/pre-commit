@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+if command -v pwsh >/dev/null 2>&1; then
+  ps_cmd="pwsh"
+elif command -v pwsh.exe >/dev/null 2>&1; then
+  ps_cmd="pwsh.exe"
+elif command -v powershell >/dev/null 2>&1; then
+  ps_cmd="powershell"
+elif command -v powershell.exe >/dev/null 2>&1; then
+  ps_cmd="powershell.exe"
+else
+  echo "PowerShell not found. Cannot run KRT pre-commit checks." >&2
+  exit 1
+fi
+
+"$ps_cmd" -NoProfile -ExecutionPolicy Bypass -File "tools/pre-commit.ps1"
