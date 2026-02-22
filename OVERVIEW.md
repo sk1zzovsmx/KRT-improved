@@ -242,13 +242,19 @@ Rule of thumb:
 - Use WoW 3.3.5a-compatible APIs only (avoid modern `C_`/`C_Timer` APIs).
 
 Load order matters (`!KRT/!KRT.toc`):
-1. Vendored libs
-2. Localization files
+1. `Libs/*` (LibStub, CallbackHandler, LibBossIDs, LibDeformat, LibCompat, LibLogger)
+2. `Localization/*.lua`
 3. `Templates.xml`
 4. `Modules/Utils.lua`, `Modules/C.lua`
 5. `KRT.lua`
-6. `KRT.xml`
-7. `Modules/ignoredItems.lua`
+6. Runtime modules in dependency order:
+   `Services/Raid.lua`, `Services/Chat.lua`, `EntryPoints/Minimap.lua`, `Services/Rolls.lua`,
+   `Services/Loot.lua`, `Controllers/Master.lua`, `Widgets/LootCounter.lua`,
+   `Services/Reserves.lua`, `Widgets/ReservesUI.lua`, `Controllers/Logger.lua`,
+   `Services/Syncer.lua`, `Widgets/Config.lua`, `Controllers/Warnings.lua`,
+   `Controllers/Changes.lua`, `Controllers/Spammer.lua`, `EntryPoints/SlashEvents.lua`
+7. `KRT.xml`
+8. `Modules/ignoredItems.lua`
 
 ---
 
@@ -294,3 +300,5 @@ Use this quick pass after behavior changes:
 - Working rules and invariants: `AGENTS.md`
 - User-visible change history: `CHANGELOG.md`
 - High-level feature narrative (legacy): `README.md`
+- Layering map and boundaries: `ARCHITECTURE.md`
+- Copy/paste checks for contributors: `DEV_CHECKS.md`

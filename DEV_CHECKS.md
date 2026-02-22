@@ -1,6 +1,7 @@
 # Dev Checks
 
 Quick, copy-paste checks for layering and ownership rules.
+If `rg` is missing on Windows, run `tools/check-layering.ps1` (it falls back to `Select-String`).
 
 ## Layering checks
 
