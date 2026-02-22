@@ -12,12 +12,13 @@ local C = feature.C
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
+local makeModuleFrameGetter = feature.makeModuleFrameGetter
 
 local _G = _G
 local tinsert, twipe = table.insert, table.wipe
 local pairs, type = pairs, type
 local format = string.format
-local tostring = tostring
+local tostring, tonumber = tostring, tonumber
 
 do
     addon.Reserves = addon.Reserves or {}
@@ -510,6 +511,254 @@ do
                 UI:PrimeItemInfoQuery(itemId)
             end
         end)
+    end
+
+    -- ----- Import widget controller ----- --
+
+    UI.Import = UI.Import or {}
+    local Import = UI.Import
+    local getImportFrame = makeModuleFrameGetter(Import, "KRTImportWindow")
+    local importLocalized = false
+    local MODE_MULTI, MODE_PLUS = 0, 1
+
+    Utils.bootstrapModuleUi(Import, getImportFrame, function()
+        if Import.RequestRefresh then
+            Import:RequestRefresh()
+        end
+    end, {
+        bindToggleHide = bindModuleToggleHide,
+        bindRequestRefresh = bindModuleRequestRefresh,
+    })
+
+    local function GetImportModeString()
+        if addon.Reserves and addon.Reserves.GetImportMode then
+            return addon.Reserves:GetImportMode()
+        end
+        local value = addon.options and addon.options.srImportMode
+        if value == MODE_PLUS then return "plus" end
+        return "multi"
+    end
+
+    local function GetImportModeValue()
+        return (GetImportModeString() == "plus") and MODE_PLUS or MODE_MULTI
+    end
+
+    local function GetModeSlider()
+        return _G["KRTImportWindowModeSlider"] or _G["KRTImportModeSlider"]
+    end
+
+    local function SetImportStatus(text, r, g, b)
+        local status = _G["KRTImportWindowStatus"]
+        if not status then return end
+        status:SetText(text or "")
+        if r and g and b then
+            status:SetTextColor(r, g, b)
+        end
+    end
+
+    local function ShowReservesListAfterImport()
+        if Import.Hide then
+            Import:Hide()
+        end
+        local reserveFrame = (addon.Reserves and addon.Reserves.frame) or _G["KRTReserveListFrame"]
+        if not (reserveFrame and reserveFrame.IsShown and reserveFrame:IsShown()) then
+            addon.Reserves:Toggle()
+        else
+            addon.Reserves:RequestRefresh()
+        end
+    end
+
+    local function EnsureWrongCSVPopup()
+        if not StaticPopupDialogs then return end
+        if StaticPopupDialogs["KRT_WRONG_CSV_FOR_PLUS"] then return end
+
+        StaticPopupDialogs["KRT_WRONG_CSV_FOR_PLUS"] = {
+            text = L.ErrCSVWrongForPlus,
+            button1 = L.BtnSwitchToMulti,
+            button2 = L.BtnCancel,
+            timeout = 0,
+            whileDead = 1,
+            hideOnEscape = 1,
+            preferredIndex = 3,
+            OnShow = function(self, data)
+                if not self or not self.text then return end
+                local text = L.ErrCSVWrongForPlus
+                if type(data) == "table" and data.player then
+                    text = L.ErrCSVWrongForPlusWithPlayer:format(tostring(data.player))
+                end
+                self.text:SetText(text)
+            end,
+            OnAccept = function(_, data)
+                if type(data) ~= "table" or type(data.csv) ~= "string" then return end
+                Import:SetImportMode(MODE_MULTI)
+                local parsed = addon.Reserves:ParseImport(data.csv, "multi")
+                if not parsed then
+                    SetImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
+                    return
+                end
+
+                local ok, nPlayers = addon.Reserves:ApplyImport(parsed, nil, { reason = "import" })
+                if not ok then
+                    SetImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
+                    return
+                end
+
+                SetImportStatus(format(L.SuccessReservesParsed, tostring(nPlayers)), 0.2, 1, 0.2)
+                ShowReservesListAfterImport()
+            end,
+        }
+    end
+
+    local function LocalizeImportFrame()
+        if importLocalized then return end
+        local frame = getImportFrame()
+        if not frame then
+            addon:error(Diag.E.LogReservesImportWindowMissing)
+            return
+        end
+
+        Utils.setFrameTitle(frame, L.StrImportReservesTitle)
+
+        local hint = _G["KRTImportWindowHint"]
+        if hint then hint:SetText(L.StrImportReservesHint) end
+
+        local confirmButton = _G["KRTImportConfirmButton"]
+        if confirmButton then confirmButton:SetText(L.BtnImport) end
+
+        local cancelButton = _G["KRTImportCancelButton"]
+        if cancelButton then cancelButton:SetText(L.BtnClose) end
+
+        importLocalized = true
+    end
+
+    function Import:SetImportMode(modeValue, suppressSlider)
+        local mode = (modeValue == MODE_PLUS) and "plus" or "multi"
+        if addon.Reserves and addon.Reserves.SetImportMode then
+            addon.Reserves:SetImportMode(mode, true)
+        else
+            Utils.setOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
+        end
+
+        if suppressSlider then return end
+
+        local slider = GetModeSlider()
+        if slider and slider.SetValue then
+            slider:SetValue(GetImportModeValue())
+        end
+    end
+
+    function Import:OnModeSliderLoad(slider)
+        if not slider then return end
+        slider:SetMinMaxValues(MODE_MULTI, MODE_PLUS)
+        slider:SetValueStep(1)
+        if slider.SetObeyStepOnDrag then
+            slider:SetObeyStepOnDrag(true)
+        end
+
+        local low = _G[slider:GetName() .. "Low"]
+        local high = _G[slider:GetName() .. "High"]
+        local text = _G[slider:GetName() .. "Text"]
+        if low then low:SetText(L.StrImportModeMulti or "Multi-reserve") end
+        if high then high:SetText(L.StrImportModePlus or "Plus System") end
+        if text then text:SetText(L.StrImportModeLabel or "") end
+
+        slider:SetValue(GetImportModeValue())
+    end
+
+    function Import:OnModeSliderChanged(slider, value)
+        if not slider then return end
+        local modeValue = tonumber(value) or MODE_MULTI
+        if modeValue >= 0.5 then
+            modeValue = MODE_PLUS
+        else
+            modeValue = MODE_MULTI
+        end
+        self:SetImportMode(modeValue, true)
+    end
+
+    function Import:Refresh()
+        LocalizeImportFrame()
+
+        local slider = GetModeSlider()
+        if slider and slider.SetValue then
+            slider:SetValue(GetImportModeValue())
+        end
+
+        local status = _G["KRTImportWindowStatus"]
+        if status and (status:GetText() == nil or status:GetText() == "") then
+            status:SetText("")
+        end
+    end
+
+    function Import:OnLoad(frame)
+        Utils.initModuleFrame(Import, frame, {
+            enableDrag = true,
+            hookOnShow = function()
+                Utils.resetEditBox(_G["KRTImportEditBox"])
+                local editBox = _G["KRTImportEditBox"]
+                if editBox then
+                    editBox:SetFocus()
+                    editBox:HighlightText()
+                end
+                SetImportStatus("")
+                if Import.RequestRefresh then
+                    Import:RequestRefresh()
+                end
+            end,
+        })
+
+        if Import.RequestRefresh then
+            Import:RequestRefresh()
+        end
+    end
+
+    function Import:ImportFromEditBox()
+        local editBox = _G["KRTImportEditBox"]
+        SetImportStatus("")
+        if not editBox then
+            addon:error(Diag.E.LogReservesImportWindowMissing)
+            return false, 0
+        end
+
+        local csv = editBox:GetText()
+        if type(csv) ~= "string" or not csv:match("%S") then
+            SetImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
+            addon:warn(Diag.W.LogReservesImportFailedEmpty)
+            return false, 0, "EMPTY"
+        end
+
+        addon:debug(Diag.D.LogSRImportRequested:format(#csv))
+        EnsureWrongCSVPopup()
+
+        local mode = GetImportModeString()
+        local parsed, errCode, errData = addon.Reserves:ParseImport(csv, mode, { source = "import_window" })
+        if not parsed then
+            if errCode == "CSV_WRONG_FOR_PLUS" then
+                SetImportStatus(L.ErrCSVWrongForPlusShort, 1, 0.2, 0.2)
+                local popupData = { csv = csv }
+                if type(errData) == "table" then
+                    for key, value in pairs(errData) do
+                        popupData[key] = value
+                    end
+                end
+                StaticPopup_Show("KRT_WRONG_CSV_FOR_PLUS", nil, nil, popupData)
+                return false, 0, errCode, errData
+            end
+
+            local errorText = (errCode == "NO_ROWS") and L.WarnNoValidRows or L.ErrImportReservesEmpty
+            SetImportStatus(errorText, 1, 0.2, 0.2)
+            return false, 0, errCode, errData
+        end
+
+        local ok, nPlayersOrErr, applyErrData = addon.Reserves:ApplyImport(parsed, nil, { reason = "import" })
+        if not ok then
+            SetImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
+            return false, 0, nPlayersOrErr, applyErrData
+        end
+
+        SetImportStatus(format(L.SuccessReservesParsed, tostring(nPlayersOrErr)), 0.2, 1, 0.2)
+        ShowReservesListAfterImport()
+        return true, nPlayersOrErr
     end
 
     Utils.registerCallback("ReservesDataChanged", function()

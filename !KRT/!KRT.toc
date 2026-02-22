@@ -45,7 +45,6 @@ Controllers\Master.lua
 Widgets\LootCounter.lua
 Services\Reserves.lua
 Widgets\ReservesUI.lua
-Widgets\ReservesImport.lua
 Controllers\Logger.lua
 Services\Syncer.lua
 Widgets\Config.lua

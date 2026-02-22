@@ -939,44 +939,74 @@ do
         return importStrategies[mode] or importStrategies.multi
     end
 
-    function Service:ParseCSV(csv, mode)
-        if type(csv) ~= "string" or not csv:match("%S") then
+    function Service:ParseImport(text, mode, opts)
+        if type(text) ~= "string" or not text:match("%S") then
             addon:warn(Diag.W.LogReservesImportFailedEmpty)
-            return false, 0, "EMPTY"
+            return nil, "EMPTY"
         end
 
-        mode = (mode == "plus" or mode == "multi") and mode or self:GetImportMode()
-        local strat = self:GetImportStrategy(mode)
+        local resolvedMode = (mode == "plus" or mode == "multi") and mode or self:GetImportMode()
+        local strategy = self:GetImportStrategy(resolvedMode)
 
         addon:debug(Diag.D.LogReservesParseStart)
 
-        -- Transactional parse flow: parse -> validate -> aggregate -> commit.
-        local rows = parseCSVRows(csv)
+        local rows = parseCSVRows(text)
         if not rows or #rows == 0 then
             addon:warn(L.WarnNoValidRows)
-            return false, 0, "NO_ROWS"
+            return nil, "NO_ROWS"
         end
 
-        local ok, errCode, errData = strat.Validate(rows)
+        local ok, errCode, errData = strategy.Validate(rows)
         if not ok then
             addon:debug(Diag.D.LogReservesImportWrongModePlus
                 and Diag.D.LogReservesImportWrongModePlus:format(tostring(errData and errData.player))
                 or ("Wrong CSV for Plus System: " .. tostring(errData and errData.player)))
-            return false, 0, errCode or "CSV_INVALID", errData
+            return nil, errCode or "CSV_INVALID", errData
         end
 
-        local newReservesData = strat.Aggregate(rows)
+        local newReservesData = strategy.Aggregate(rows)
+        local parsed = {
+            mode = resolvedMode,
+            reservesData = newReservesData,
+            nPlayers = addon.tLength(newReservesData),
+            opts = opts,
+        }
+        return parsed
+    end
 
-        -- Commit
-        reservesData = newReservesData
+    function Service:ApplyImport(parsed, raidId, opts)
+        if type(parsed) ~= "table" or type(parsed.reservesData) ~= "table" then
+            return false, "INVALID_PARSED"
+        end
+
+        local mode = (parsed.mode == "plus" or parsed.mode == "multi") and parsed.mode or self:GetImportMode()
+        reservesData = parsed.reservesData
         SetImportMode(mode, true)
         self:Save()
 
-        local nPlayers = addon.tLength(reservesData)
+        local nPlayers = tonumber(parsed.nPlayers) or addon.tLength(reservesData)
         addon:debug(Diag.D.LogReservesParseComplete:format(nPlayers))
-        addon:info(format(L.SuccessReservesParsed, tostring(nPlayers)))
-        Utils.triggerEvent("ReservesDataChanged", "import", nPlayers, mode)
+        if not (opts and opts.silentInfo) then
+            addon:info(format(L.SuccessReservesParsed, tostring(nPlayers)))
+        end
+
+        local reason = (opts and opts.reason) or "import"
+        Utils.triggerEvent("ReservesDataChanged", reason, raidId, mode, nPlayers)
         return true, nPlayers
+    end
+
+    function Service:ParseCSV(csv, mode)
+        local parsed, errCode, errData = self:ParseImport(csv, mode)
+        if not parsed then
+            return false, 0, errCode, errData
+        end
+
+        local ok, nPlayersOrErr, applyErrData = self:ApplyImport(parsed, nil, { reason = "import" })
+        if not ok then
+            return false, 0, nPlayersOrErr, applyErrData
+        end
+
+        return true, nPlayersOrErr
     end
 
     -- ----- Item Info Querying ----- --
@@ -1341,6 +1371,14 @@ do
 
     function module:GetImportStrategy(mode)
         return Service:GetImportStrategy(mode)
+    end
+
+    function module:ParseImport(text, mode, opts)
+        return Service:ParseImport(text, mode, opts)
+    end
+
+    function module:ApplyImport(parsed, raidId, opts)
+        return Service:ApplyImport(parsed, raidId, opts)
     end
 
     function module:ParseCSV(csv, mode)

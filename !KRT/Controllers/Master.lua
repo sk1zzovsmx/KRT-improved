@@ -855,7 +855,9 @@ do
         if addon.Reserves:HasData() then
             addon.Reserves:Toggle()
         else
-            addon.ReservesImport:Toggle()
+            if addon.ReservesUI and addon.ReservesUI.Import and addon.ReservesUI.Import.Toggle then
+                addon.ReservesUI.Import:Toggle()
+            end
         end
     end
 
