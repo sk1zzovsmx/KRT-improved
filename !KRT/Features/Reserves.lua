@@ -25,6 +25,10 @@ local tostring, tonumber = tostring, tonumber
 do
     addon.Reserves = addon.Reserves or {}
     local module = addon.Reserves
+    module.Service = module.Service or {}
+    module.UI = module.UI or {}
+    local Service = module.Service
+    local UI = module.UI
     local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
 
     -- ----- Internal state ----- --
@@ -125,7 +129,7 @@ do
         addon:debug(Diag.D.LogReservesItemReady:format(itemId, pendingItemCount))
         if pendingItemCount == 0 then
             addon:debug(Diag.D.LogReservesPendingComplete)
-            module:RequestRefresh()
+            Utils.triggerEvent("ReservesDataChanged", "iteminfo", itemId)
         end
     end
 
@@ -154,7 +158,7 @@ do
 
         local cls = className
         if (not cls or cls == "") and itemId then
-            local r = module:GetReserveEntryForItem(itemId, playerName)
+            local r = Service:GetReserveEntryForItem(itemId, playerName)
             cls = r and r.class
         end
         if (not cls or cls == "") and addon.Raid and addon.Raid.GetPlayerClass then
@@ -214,7 +218,7 @@ do
         -- Fallback: resolve from index (keeps compatibility even if meta isn't passed).
         if not meta then meta = { plus = 0, class = nil } end
         if itemId and playerName then
-            local r = module:GetReserveEntryForItem(itemId, playerName)
+            local r = Service:GetReserveEntryForItem(itemId, playerName)
             if r then
                 if r.class and r.class ~= "" and (not meta.class or meta.class == "") then
                     meta.class = r.class
@@ -242,12 +246,12 @@ do
             out = ColorizeReserveName(itemId, name, meta and meta.class)
         end
 
-        if showMulti ~= false and module:IsMultiReserve() and count and count > 1 then
+        if showMulti ~= false and Service:IsMultiReserve() and count and count > 1 then
             out = out .. format(L.StrReserveCountSuffix, count)
         end
 
-        if showPlus ~= false and module:IsPlusSystem() and itemId then
-            local p = (meta and tonumber(meta.plus)) or module:GetPlusForItem(itemId, name) or 0
+        if showPlus ~= false and Service:IsPlusSystem() and itemId then
+            local p = (meta and tonumber(meta.plus)) or Service:GetPlusForItem(itemId, name) or 0
             if p and p > 0 then
                 out = out .. format(" (P+%d)", p)
             end
@@ -259,7 +263,7 @@ do
     local function SortPlayersForDisplay(itemId, players, counts, metaByName)
         if not players then return end
 
-        if module:IsPlusSystem() and itemId then
+        if Service:IsPlusSystem() and itemId then
             table.sort(players, function(a, b)
                 local am = GetMetaForPlayer(metaByName, itemId, a)
                 local bm = GetMetaForPlayer(metaByName, itemId, b)
@@ -268,7 +272,7 @@ do
                 if ap ~= bp then return ap > bp end
                 return tostring(a) < tostring(b)
             end)
-        elseif module:IsMultiReserve() and counts then
+        elseif Service:IsMultiReserve() and counts then
             -- Optional: show higher quantities first for readability.
             table.sort(players, function(a, b)
                 local aq = counts[a] or 1
@@ -320,7 +324,7 @@ do
             return lines
         end
 
-        if module:IsPlusSystem() and itemId then
+        if Service:IsPlusSystem() and itemId then
             -- Group by plus value (desc)
             local groups, keys = {}, {}
             for i = 1, #players do
@@ -338,7 +342,7 @@ do
                 local p = keys[i]
                 lines[#lines + 1] = format(L.StrReservesTooltipPlus, p, tconcat(groups[p], ", "))
             end
-        elseif module:IsMultiReserve() and counts then
+        elseif Service:IsMultiReserve() and counts then
             -- Group by quantity (desc)
             local groups, keys = {}, {}
             for i = 1, #players do
@@ -816,7 +820,7 @@ do
 
     -- ----- Saved Data Management ----- --
 
-    function module:Save()
+    function Service:Save()
         RebuildIndex()
         addon:debug(Diag.D.LogReservesSaveEntries:format(addon.tLength(reservesData)))
         local saved = {}
@@ -824,7 +828,7 @@ do
         KRT_Reserves = saved
     end
 
-    function module:Load()
+    function Service:Load()
         addon:debug(Diag.D.LogReservesLoadData:format(tostring(KRT_Reserves ~= nil)))
         twipe(reservesData)
         if KRT_Reserves then
@@ -861,22 +865,20 @@ do
         RebuildIndex()
     end
 
-    function module:ResetSaved()
+    function Service:ResetSaved()
         addon:debug(Diag.D.LogReservesResetSaved)
         KRT_Reserves = nil
         twipe(reservesData)
         RebuildIndex()
-        self:Hide()
-        self:RequestRefresh()
         Utils.triggerEvent("ReservesDataChanged", "clear")
         addon:info(L.StrReserveListCleared)
     end
 
-    function module:HasData()
+    function Service:HasData()
         return next(reservesData) ~= nil
     end
 
-    function module:HasItemReserves(itemId)
+    function Service:HasItemReserves(itemId)
         if not itemId then return false end
         local list = reservesByItemID[itemId]
         return type(list) == "table" and #list > 0
@@ -892,7 +894,7 @@ do
         bindRequestRefresh = bindModuleRequestRefresh,
     })
 
-    function module:OnLoad(frame)
+    function UI:OnLoad(frame)
         addon:debug(Diag.D.LogReservesFrameLoaded)
         frameName = Utils.initModuleFrame(module, frame, {
             enableDrag = true,
@@ -915,8 +917,8 @@ do
         }
         for suff, method in pairs(buttons) do
             local btn = _G["KRTReserveListFrame" .. suff]
-            if btn and self[method] then
-                btn:SetScript("OnClick", function() self[method](self) end)
+            if btn and module[method] then
+                btn:SetScript("OnClick", function() module[method](module) end)
                 addon:debug(Diag.D.LogReservesBindButton:format(suff, method))
             end
         end
@@ -961,7 +963,7 @@ do
 
             if hasName then
                 addon:debug(Diag.D.LogReservesUpdateItemData:format(link))
-                self:UpdateReserveItemData(itemId, name, link, icon)
+                module:UpdateReserveItemData(itemId, name, link, icon)
             else
                 addon:debug(Diag.D.LogReservesItemInfoMissing:format(itemId))
             end
@@ -971,7 +973,7 @@ do
                 CompletePendingItem(itemId)
             else
                 addon:debug(Diag.D.LogReservesItemInfoPending:format(itemId))
-                self:QueryItemInfo(itemId)
+                module:QueryItemInfo(itemId)
             end
         end)
     end
@@ -1005,7 +1007,7 @@ do
     -- Update UI Frame:
     function UpdateUIFrame()
         LocalizeUIFrame()
-        local hasData = module:HasData()
+        local hasData = Service:HasData()
         local clearButton = _G[frameName .. "ClearButton"]
         if clearButton then
             if hasData then
@@ -1021,7 +1023,7 @@ do
         end
     end
 
-    function module:Refresh()
+    function UI:Refresh()
         if UpdateUIFrame then UpdateUIFrame() end
         local frame = getFrame()
         if frame and RenderReserveListUI then
@@ -1031,7 +1033,7 @@ do
 
     -- ----- Reserve Data Handling ----- --
 
-    function module:GetReserve(playerName)
+    function Service:GetReserve(playerName)
         if type(playerName) ~= "string" then return nil end
         local player = Utils.normalizeLower(playerName)
         local reserve = reservesData[player]
@@ -1047,14 +1049,14 @@ do
     end
 
     -- Get all reserves:
-    function module:GetAllReserves()
+    function Service:GetAllReserves()
         addon:debug(Diag.D.LogReservesFetchAll:format(addon.tLength(reservesData)))
         return reservesData
     end
 
     -- Parse imported text (SoftRes CSV)
     -- mode: "multi" (multi-reserve enabled; Plus ignored) or "plus" (priority; requires 1 item per player)
-    function module:GetImportMode()
+    function Service:GetImportMode()
         if importMode == nil then
             local v = addon.options and addon.options.srImportMode
             SetImportMode((v == 1) and "plus" or "multi", false)
@@ -1062,15 +1064,15 @@ do
         return importMode
     end
 
-    function module:SetImportMode(mode, syncOptions)
+    function Service:SetImportMode(mode, syncOptions)
         return SetImportMode(mode, syncOptions)
     end
 
-    function module:IsPlusSystem()
+    function Service:IsPlusSystem()
         return self:GetImportMode() == "plus"
     end
 
-    function module:IsMultiReserve()
+    function Service:IsMultiReserve()
         return self:GetImportMode() == "multi"
     end
 
@@ -1295,12 +1297,12 @@ do
         Aggregate = function(rows) return aggregateRows(rows, false) end,
     }
 
-    function module:GetImportStrategy(mode)
+    function Service:GetImportStrategy(mode)
         mode = (mode == "plus" or mode == "multi") and mode or self:GetImportMode()
         return importStrategies[mode] or importStrategies.multi
     end
 
-    function module:ParseCSV(csv, mode)
+    function Service:ParseCSV(csv, mode)
         if type(csv) ~= "string" or not csv:match("%S") then
             addon:warn(Diag.W.LogReservesImportFailedEmpty)
             return false, 0, "EMPTY"
@@ -1336,13 +1338,12 @@ do
         local nPlayers = addon.tLength(reservesData)
         addon:debug(Diag.D.LogReservesParseComplete:format(nPlayers))
         addon:info(format(L.SuccessReservesParsed, tostring(nPlayers)))
-        self:RequestRefresh()
         Utils.triggerEvent("ReservesDataChanged", "import", nPlayers, mode)
         return true, nPlayers
     end
 
     -- ----- Item Info Querying ----- --
-    function module:QueryItemInfo(itemId)
+    function Service:QueryItemInfo(itemId)
         if not itemId then return end
         addon:debug(Diag.D.LogReservesQueryItemInfo:format(itemId))
         local pending = pendingItemInfo[itemId]
@@ -1384,15 +1385,12 @@ do
             return true
         end
 
-        GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
-        GameTooltip:SetHyperlink("item:" .. itemId)
-        GameTooltip:Hide()
         addon:debug(Diag.D.LogReservesItemInfoPendingQuery:format(itemId))
         return false
     end
 
     -- Query all missing items for reserves
-    function module:QueryMissingItems(silent)
+    function Service:QueryMissingItems(silent, primeFn)
         local seen = {}
         local count = 0
         local updated = false
@@ -1404,6 +1402,9 @@ do
                     if itemId and not seen[itemId] and (not r.itemLink or not r.itemIcon) then
                         seen[itemId] = true
                         if not self:QueryItemInfo(itemId) then
+                            if type(primeFn) == "function" then
+                                primeFn(itemId)
+                            end
                             count = count + 1
                         else
                             updated = true
@@ -1411,9 +1412,6 @@ do
                     end
                 end
             end
-        end
-        if updated then
-            self:RequestRefresh()
         end
         if not silent then
             if count > 0 then
@@ -1424,10 +1422,11 @@ do
         end
         addon:debug(Diag.D.LogReservesMissingItems:format(count))
         addon:debug(Diag.D.LogSRQueryMissingItems:format(tostring(updated), count))
+        return updated, count
     end
 
     -- Update reserve item data
-    function module:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
+    function Service:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
         if not itemId then return end
         local icon = itemIcon
         if (type(icon) ~= "string" or icon == "") and itemName then
@@ -1463,38 +1462,18 @@ do
 
         UpdateDisplayEntryForItem(itemId)
 
-        local rows = rowsByItemID[itemId]
-        if not rows then return end
-        for i = 1, #rows do
-            local row = rows[i]
-            row._itemId = itemId
-            row._itemLink = itemLink
-            row._itemName = itemName
-            row._tooltipTitle = itemLink or itemName or FormatReserveItemIdLabel(itemId)
-            row._tooltipSource = FormatReserveDroppedBy(row._source)
-            if row.iconTexture then
-                local resolvedIcon = icon
-                if type(resolvedIcon) ~= "string" or resolvedIcon == "" then
-                    resolvedIcon = fallbackIcon
-                end
-                row.iconTexture:SetTexture(resolvedIcon)
-                row.iconTexture:Show()
-            end
-            if row.nameText then
-                row.nameText:SetText(itemLink or itemName or FormatReserveItemFallback(itemId))
-            end
-        end
+        return icon
     end
 
     -- Get reserve count for a specific item for a player
-    function module:GetReserveCountForItem(itemId, playerName)
+    function Service:GetReserveCountForItem(itemId, playerName)
         local r = self:GetReserveEntryForItem(itemId, playerName)
         if not r then return 0 end
         return tonumber(r.quantity) or 1
     end
 
     -- Gets the reserve entry table for a specific item for a player (or nil).
-    function module:GetReserveEntryForItem(itemId, playerName)
+    function Service:GetReserveEntryForItem(itemId, playerName)
         if not itemId or not playerName then return nil end
         local playerKey = Utils.normalizeLower(playerName, true)
         if not playerKey then return nil end
@@ -1517,7 +1496,7 @@ do
     end
 
     -- Gets the "Plus" value for a reserved item for a player (0 if missing).
-    function module:GetPlusForItem(itemId, playerName)
+    function Service:GetPlusForItem(itemId, playerName)
         -- Plus values are meaningful only in Plus System mode.
         if self:GetImportMode() ~= "plus" then return 0 end
         local r = self:GetReserveEntryForItem(itemId, playerName)
@@ -1526,7 +1505,7 @@ do
 
     -- Returns true if the item has any multi-reserve entry (quantity > 1).
     -- When true, SR "Plus priority" should be disabled for this item.
-    function module:HasMultiReserveForItem(itemId)
+    function Service:HasMultiReserveForItem(itemId)
         if self:GetImportMode() ~= "multi" then return false end
         if not itemId then return false end
         local list = reservesByItemID[itemId]
@@ -1559,6 +1538,30 @@ do
     end
 
     -- ----- UI Display ----- --
+
+    local function UpdateReserveRowsForItem(itemId, itemName, itemLink, itemIcon)
+        local rows = rowsByItemID[itemId]
+        if not rows then return end
+        for i = 1, #rows do
+            local row = rows[i]
+            row._itemId = itemId
+            row._itemLink = itemLink
+            row._itemName = itemName
+            row._tooltipTitle = itemLink or itemName or FormatReserveItemIdLabel(itemId)
+            row._tooltipSource = FormatReserveDroppedBy(row._source)
+            if row.iconTexture then
+                local resolvedIcon = itemIcon
+                if type(resolvedIcon) ~= "string" or resolvedIcon == "" then
+                    resolvedIcon = fallbackIcon
+                end
+                row.iconTexture:SetTexture(resolvedIcon)
+                row.iconTexture:Show()
+            end
+            if row.nameText then
+                row.nameText:SetText(itemLink or itemName or FormatReserveItemFallback(itemId))
+            end
+        end
+    end
 
     function RenderReserveListUI()
         local frame = getFrame()
@@ -1600,7 +1603,7 @@ do
             if not seenSources[source] then
                 seenSources[source] = true
                 headerIndex = headerIndex + 1
-                local header = module:CreateReserveHeader(scrollChild, source, yOffset, headerIndex)
+                local header = UI:CreateReserveHeader(scrollChild, source, yOffset, headerIndex)
                 reserveHeaders[#reserveHeaders + 1] = header
                 yOffset = yOffset + C.RESERVE_HEADER_HEIGHT
             end
@@ -1608,7 +1611,7 @@ do
             if not collapsedBossGroups[source] then
                 rowIndex = rowIndex + 1
                 local isFirstInGroup = not firstRenderedRowBySource[source]
-                local row = module:CreateReserveRow(scrollChild, entry, yOffset, rowIndex, isFirstInGroup)
+                local row = UI:CreateReserveRow(scrollChild, entry, yOffset, rowIndex, isFirstInGroup)
                 firstRenderedRowBySource[source] = true
                 reserveItemRows[#reserveItemRows + 1] = row
                 yOffset = yOffset + rowHeight
@@ -1621,7 +1624,7 @@ do
         end
     end
 
-    function module:CreateReserveHeader(parent, source, yOffset, index)
+    function UI:CreateReserveHeader(parent, source, yOffset, index)
         local headerName = frameName .. "ReserveHeader" .. index
         local header = _G[headerName] or CreateFrame("Button", headerName, parent, "KRTReserveHeaderTemplate")
         header:ClearAllPoints()
@@ -1670,7 +1673,7 @@ do
     end
 
     -- Create a new row for displaying a reserve
-    function module:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
+    function UI:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
         local rowName = frameName .. "ReserveRow" .. index
         local row = _G[rowName] or CreateFrame("Frame", rowName, parent, "KRTReserveRowTemplate")
         row:ClearAllPoints()
@@ -1717,7 +1720,7 @@ do
     -- showMulti:
     --   true/nil -> include "(xN)" when Multi-reserve is enabled
     --   false    -> hide multi-reserve count suffixes from player tokens
-    function module:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
+    function Service:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
         if not itemId then return {} end
         local list = reservesByItemID[itemId]
         if type(list) ~= "table" then return {} end
@@ -1749,11 +1752,149 @@ do
 
     -- Returns the formatted player list for an item (comma-separated).
     -- useColor, showPlus, and showMulti follow the same rules as GetPlayersForItem.
-    function module:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti)
+    function Service:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti)
         addon:debug(Diag.D.LogReservesFormatPlayers:format(itemId))
         local list = self:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
         -- Log the list of players found for the item
         addon:debug(Diag.D.LogReservesPlayersList:format(itemId, tconcat(list, ", ")))
         return #list > 0 and tconcat(list, ", ") or ""
+    end
+
+    function UI:PrimeItemInfoQuery(itemId)
+        if not itemId then return end
+        GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+        GameTooltip:SetHyperlink("item:" .. itemId)
+        GameTooltip:Hide()
+    end
+
+    function UI:RequestRefresh()
+        if module.RequestRefresh then
+            module:RequestRefresh()
+        end
+    end
+
+    Utils.registerCallback("ReservesDataChanged", function()
+        UI:RequestRefresh()
+    end)
+
+    function module:OnLoad(frame)
+        return UI:OnLoad(frame)
+    end
+
+    function module:Refresh()
+        return UI:Refresh()
+    end
+
+    function module:CreateReserveHeader(parent, source, yOffset, index)
+        return UI:CreateReserveHeader(parent, source, yOffset, index)
+    end
+
+    function module:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
+        return UI:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
+    end
+
+    function module:Save()
+        return Service:Save()
+    end
+
+    function module:Load()
+        return Service:Load()
+    end
+
+    function module:ResetSaved()
+        local out = Service:ResetSaved()
+        self:Hide()
+        UI:RequestRefresh()
+        return out
+    end
+
+    function module:HasData()
+        return Service:HasData()
+    end
+
+    function module:HasItemReserves(itemId)
+        return Service:HasItemReserves(itemId)
+    end
+
+    function module:GetReserve(playerName)
+        return Service:GetReserve(playerName)
+    end
+
+    function module:GetAllReserves()
+        return Service:GetAllReserves()
+    end
+
+    function module:GetImportMode()
+        return Service:GetImportMode()
+    end
+
+    function module:SetImportMode(mode, syncOptions)
+        return Service:SetImportMode(mode, syncOptions)
+    end
+
+    function module:IsPlusSystem()
+        return Service:IsPlusSystem()
+    end
+
+    function module:IsMultiReserve()
+        return Service:IsMultiReserve()
+    end
+
+    function module:GetImportStrategy(mode)
+        return Service:GetImportStrategy(mode)
+    end
+
+    function module:ParseCSV(csv, mode)
+        return Service:ParseCSV(csv, mode)
+    end
+
+    function module:QueryItemInfo(itemId)
+        local resolved = Service:QueryItemInfo(itemId)
+        if resolved then
+            UI:RequestRefresh()
+        else
+            UI:PrimeItemInfoQuery(itemId)
+        end
+        return resolved
+    end
+
+    function module:QueryMissingItems(silent)
+        local updated, count = Service:QueryMissingItems(silent, function(itemId)
+            UI:PrimeItemInfoQuery(itemId)
+        end)
+        if updated then
+            UI:RequestRefresh()
+        end
+        return updated, count
+    end
+
+    function module:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
+        local icon = Service:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
+        UpdateReserveRowsForItem(itemId, itemName, itemLink, icon)
+        return icon
+    end
+
+    function module:GetReserveCountForItem(itemId, playerName)
+        return Service:GetReserveCountForItem(itemId, playerName)
+    end
+
+    function module:GetReserveEntryForItem(itemId, playerName)
+        return Service:GetReserveEntryForItem(itemId, playerName)
+    end
+
+    function module:GetPlusForItem(itemId, playerName)
+        return Service:GetPlusForItem(itemId, playerName)
+    end
+
+    function module:HasMultiReserveForItem(itemId)
+        return Service:HasMultiReserveForItem(itemId)
+    end
+
+    function module:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
+        return Service:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
+    end
+
+    function module:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti)
+        return Service:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti)
     end
 end
