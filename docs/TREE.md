@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-22 15:41:37 +01:00
-- Commit: e57bd8c
+- Generated: 2026-02-22 16:33:42 +01:00
+- Commit: 962f4a4
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -59,11 +59,12 @@
 |   |   |-- ReservesTemplates.xml
 |   |   |-- Spammer.xml
 |   |   \\-- Warnings.xml
-|   |-- UIControllers
+|   |-- Widgets
 |   |   |-- Config.lua
 |   |   |-- LootCounter.lua
 |   |   |-- README.md
-|   |   \\-- ReservesImport.lua
+|   |   |-- ReservesImport.lua
+|   |   \\-- ReservesUI.lua
 |   |-- !KRT.toc
 |   |-- KRT.lua
 |   |-- KRT.xml

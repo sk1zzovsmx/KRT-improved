@@ -42,12 +42,13 @@ EntryPoints\Minimap.lua
 Services\Rolls.lua
 Services\Loot.lua
 Controllers\Master.lua
-UIControllers\LootCounter.lua
+Widgets\LootCounter.lua
 Services\Reserves.lua
-UIControllers\ReservesImport.lua
+Widgets\ReservesUI.lua
+Widgets\ReservesImport.lua
 Controllers\Logger.lua
 Services\Syncer.lua
-UIControllers\Config.lua
+Widgets\Config.lua
 Controllers\Warnings.lua
 Controllers\Changes.lua
 Controllers\Spammer.lua

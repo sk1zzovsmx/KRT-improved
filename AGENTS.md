@@ -28,7 +28,7 @@ Durable preferences learned from recent conversations:
 - Prefer PascalCase for public exported methods on feature modules (`module:*`, `Store:*`, `View:*`, `Actions:*`,
   `Box:*`); keep WoW-required event names unchanged (UPPERCASE handlers).
 - Prefer camelCase for utility functions and local variables; avoid snake_case for new naming.
-- In feature files under `Controllers/`, `Services/`, `UIControllers/`, `EntryPoints/`, prefer canonical top-level
+- In feature files under `Controllers/`, `Services/`, `Widgets/`, `EntryPoints/`, prefer canonical top-level
   section headers in order:
   `-- ----- Internal state ----- --`, `-- ----- Private helpers ----- --`,
   `-- ----- Public methods ----- --`.
@@ -81,8 +81,8 @@ KRT is now modular by design:
 - Core bootstrap, shared runtime state, and global event wiring live in `!KRT/KRT.lua`.
 - Feature implementations live in:
   - `!KRT/Controllers/*.lua` (top-level parent owners),
-  - `!KRT/Services/*.lua` (data/model/gameplay services),
-  - `!KRT/UIControllers/*.lua` (feature-specific UI controllers),
+  - `!KRT/Services/*.lua` (runtime service/model modules),
+  - `!KRT/Widgets/*.lua` (feature-specific UI controllers/widgets),
   - `!KRT/EntryPoints/*.lua` (slash/minimap entrypoints).
 - `!KRT/Modules/` remains reserved for utilities/constants/static data (e.g., `Utils.lua`, `C.lua`,
   `ignoredItems.lua`) and must not become a feature folder.
@@ -90,7 +90,7 @@ KRT is now modular by design:
 
 Rules:
 1) New feature modules SHOULD be placed in the appropriate folder among `Controllers/`, `Services/`,
-   `UIControllers/`,
+   `Widgets/`,
    `EntryPoints/`, unless there is a strong reason to keep them in `KRT.lua`.
 2) `KRT.lua` should stay focused on bootstrap/glue and shared infrastructure that must exist before features.
 3) Prefer `addon.Core.getFeatureShared()` in feature file headers for shared locals/runtime state bootstrap.
@@ -120,18 +120,19 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 15) Services/Rolls.lua
 16) Services/Loot.lua
 17) Controllers/Master.lua
-18) UIControllers/LootCounter.lua
+18) Widgets/LootCounter.lua
 19) Services/Reserves.lua
-20) UIControllers/ReservesImport.lua
-21) Controllers/Logger.lua
-22) Services/Syncer.lua
-23) UIControllers/Config.lua
-24) Controllers/Warnings.lua
-25) Controllers/Changes.lua
-26) Controllers/Spammer.lua
-27) EntryPoints/SlashEvents.lua
-28) KRT.xml (UI include manifest)
-29) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
+20) Widgets/ReservesUI.lua
+21) Widgets/ReservesImport.lua
+22) Controllers/Logger.lua
+23) Services/Syncer.lua
+24) Widgets/Config.lua
+25) Controllers/Warnings.lua
+26) Controllers/Changes.lua
+27) Controllers/Spammer.lua
+28) EntryPoints/SlashEvents.lua
+29) KRT.xml (UI include manifest)
+30) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
 
 ---
 
@@ -156,11 +157,12 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Chat.lua               # output helpers (Print/Announce)
     Rolls.lua              # roll tracking, sorting, winner logic
     Loot.lua               # loot parsing, item selection, export strings
-    Reserves.lua           # soft reserves model + list UI owner (service+ui split internally)
+    Reserves.lua           # soft reserves service/model + import parsing + reserve lookups
     Syncer.lua             # logger synchronization (addon comms)
 
-  UIControllers/
+  Widgets/
     LootCounter.lua        # loot counter UI + data
+    ReservesUI.lua         # reserve list frame controller + row/header rendering
     ReservesImport.lua     # SR import window glue + validation
     Config.lua             # options UI logic
 
@@ -311,7 +313,7 @@ Top-level feature modules on `addon.*`:
 
 Implementation placement (current wave):
 - `KRT.lua`: core + most gameplay/logger logic
-- `Controllers/*.lua`, `Services/*.lua`, `UIControllers/*.lua`, `EntryPoints/*.lua`
+- `Controllers/*.lua`, `Services/*.lua`, `Widgets/*.lua`, `EntryPoints/*.lua`
 
 External modules:
 - `addon.Utils` (Modules/Utils.lua)
@@ -380,7 +382,7 @@ Do:
 - small testable changes,
 - reuse templates and Utils controllers,
 - keep state local to module blocks,
-- keep feature logic in `Controllers/*.lua` / `Services/*.lua` / `UIControllers/*.lua` / `EntryPoints/*.lua`,
+- keep feature logic in `Controllers/*.lua` / `Services/*.lua` / `Widgets/*.lua` / `EntryPoints/*.lua`,
   and shared infra in `KRT.lua`,
 - document user-visible changes in CHANGELOG.md.
 

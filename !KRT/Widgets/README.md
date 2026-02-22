@@ -1,4 +1,4 @@
-# UIControllers
+# Widgets
 
 Child frame controllers for feature-specific UI behavior.
 

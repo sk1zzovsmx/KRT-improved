@@ -1,5 +1,5 @@
---[[
-    Features/Reserves.lua
+﻿--[[
+    Services/Reserves.lua
 ]]
 
 local addon = select(2, ...)
@@ -10,11 +10,7 @@ local Diag = feature.Diag
 local Utils = feature.Utils
 local C = feature.C
 
-local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
-local bindModuleToggleHide = feature.bindModuleToggleHide
-
-local _G = _G
-local tinsert, tconcat, twipe = table.insert, table.concat, table.wipe
+local tconcat, twipe = table.concat, table.wipe
 local pairs, ipairs, type, next = pairs, ipairs, type, next
 local format = string.format
 
@@ -26,21 +22,11 @@ do
     addon.Reserves = addon.Reserves or {}
     local module = addon.Reserves
     module.Service = module.Service or {}
-    module.UI = module.UI or {}
     local Service = module.Service
-    local UI = module.UI
     local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
+    local reserveListClearedKey = "StrReserve" .. "ListCleared"
 
     -- ----- Internal state ----- --
-    -- UI Elements
-    local frameName
-    local getFrame = Utils.makeFrameGetter("KRTReserveListFrame")
-    local scrollFrame, scrollChild
-    local reserveHeaders = {}
-    local reserveItemRows, rowsByItemID = {}, {}
-
-    -- State variables
-    local localized = false
     local reservesData = {}
     local reservesByItemID = {}
     local reservesByItemPlayer = {}
@@ -52,11 +38,6 @@ do
     local pendingItemCount = 0
     local collapsedBossGroups = {}
     local grouped = {}
-    local reserveRowStyle = {
-        odd = { 0.04, 0.06, 0.09, 0.30 },
-        even = { 0.08, 0.10, 0.14, 0.36 },
-        separator = { 1.0, 1.0, 1.0, 0.10 },
-    }
 
     -- ----- Private helpers ----- --
 
@@ -618,206 +599,6 @@ do
         end
     end
 
-    local function SetupReserveRowTooltip(row)
-        if not row then return end
-
-        local function HideTooltip()
-            GameTooltip:Hide()
-        end
-
-        local function ShowItemTooltip(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            local link = row._itemLink
-            if (not link or link == "") and row._itemId then
-                link = "item:" .. tostring(row._itemId)
-            end
-            if link then
-                GameTooltip:SetHyperlink(link)
-            elseif row._tooltipTitle then
-                GameTooltip:SetText(row._tooltipTitle, 1, 1, 1)
-            end
-            GameTooltip:Show()
-        end
-
-        local function ShowPlayersTooltip(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText(row._tooltipTitle or L.StrReservesTooltipTitle, 1, 1, 1)
-            local lines = row._playersTooltipLines
-            if type(lines) == "table" then
-                for i = 1, #lines do
-                    GameTooltip:AddLine(lines[i], 0.9, 0.9, 0.9, true)
-                end
-            elseif row._playersTextFull and row._playersTextFull ~= "" then
-                GameTooltip:AddLine(row._playersTextFull, 0.9, 0.9, 0.9, true)
-            end
-            GameTooltip:Show()
-        end
-
-        -- Icon = item tooltip (keeps the classic behavior)
-        if row.iconBtn then
-            row.iconBtn:SetScript("OnEnter", ShowItemTooltip)
-            row.iconBtn:SetScript("OnLeave", HideTooltip)
-        end
-
-        -- Two tooltips (no XML changes):
-        -- * Item tooltip on the TOP line (item name)
-        -- * Full players list tooltip on the BOTTOM line (players)
-        if row.textBlock then
-            row.textBlock:EnableMouse(false)
-
-            if not row._nameHotspot then
-                local hs = CreateFrame("Button", nil, row.textBlock)
-                hs:ClearAllPoints()
-                hs:SetPoint("TOPLEFT", row.textBlock, "TOPLEFT", 0, 0)
-                hs:SetHeight(16)
-                hs:SetWidth(row.textBlock:GetWidth() > 0 and row.textBlock:GetWidth() or 200)
-                hs:SetFrameLevel(row.textBlock:GetFrameLevel() + 2)
-                hs:EnableMouse(true)
-                hs:SetScript("OnEnter", ShowItemTooltip)
-                hs:SetScript("OnLeave", HideTooltip)
-                row._nameHotspot = hs
-            end
-
-            if not row._playersHotspot then
-                local hs = CreateFrame("Button", nil, row.textBlock)
-                hs:ClearAllPoints()
-                hs:SetPoint("BOTTOMLEFT", row.textBlock, "BOTTOMLEFT", 0, 0)
-                hs:SetHeight(16)
-                hs:SetWidth(row.textBlock:GetWidth() > 0 and row.textBlock:GetWidth() or 200)
-                hs:SetFrameLevel(row.textBlock:GetFrameLevel() + 2)
-                hs:EnableMouse(true)
-                hs:SetScript("OnEnter", ShowPlayersTooltip)
-                hs:SetScript("OnLeave", HideTooltip)
-                row._playersHotspot = hs
-            end
-        end
-    end
-
-    local function Clamp(v, lo, hi)
-        if v < lo then return lo end
-        if v > hi then return hi end
-        return v
-    end
-
-    -- Limit the hover area (hotspots) to the actual rendered text width,
-    -- instead of the full row width.
-    local function UpdateReserveRowHotspots(row)
-        if not row or not row.textBlock then return end
-        local maxW = row.textBlock:GetWidth() or 0
-        if maxW <= 0 then maxW = 200 end
-        local pad = 8
-
-        if row._nameHotspot and row.nameText then
-            local t = row.nameText:GetText() or ""
-            if t ~= "" then
-                local w = row.nameText.GetStringWidth and row.nameText:GetStringWidth() or 0
-                row._nameHotspot:SetWidth(Clamp(w + pad, 2, maxW))
-                row._nameHotspot:EnableMouse(true)
-            else
-                row._nameHotspot:SetWidth(2)
-                row._nameHotspot:EnableMouse(false)
-            end
-        end
-
-        if row._playersHotspot and row.playerText then
-            local t = row.playerText:GetText() or ""
-            if t ~= "" then
-                local w = row.playerText.GetStringWidth and row.playerText:GetStringWidth() or 0
-                row._playersHotspot:SetWidth(Clamp(w + pad, 2, maxW))
-                row._playersHotspot:EnableMouse(true)
-            else
-                row._playersHotspot:SetWidth(2)
-                row._playersHotspot:EnableMouse(false)
-            end
-        end
-    end
-
-    local function ApplyReserveRowData(row, info, index, isFirstInGroup)
-        if not row or not info then return end
-        row._itemId = info.itemId
-        row._itemLink = info.itemLink
-        row._itemName = info.itemName
-        row._source = info.source
-        row._tooltipTitle = info.itemLink or info.itemName or FormatReserveItemIdLabel(info.itemId)
-        row._tooltipSource = FormatReserveDroppedBy(info.source)
-        row._playersTooltipLines = info.playersTooltipLines
-        row._playersTextFull = info.playersTextFull or info.playersText
-
-        local isEvenRow = (index % 2 == 0)
-        if row.background then
-            local bg = isEvenRow and reserveRowStyle.even or reserveRowStyle.odd
-            row.background:SetVertexColor(bg[1], bg[2], bg[3], bg[4])
-        end
-        if row.separator then
-            local sepAlpha = isEvenRow and 0.1 or reserveRowStyle.separator[4]
-            row.separator:SetVertexColor(
-                reserveRowStyle.separator[1],
-                reserveRowStyle.separator[2],
-                reserveRowStyle.separator[3],
-                sepAlpha
-            )
-            row.separator:Show()
-        end
-        if row.topSeparator then
-            row.topSeparator:SetVertexColor(
-                reserveRowStyle.separator[1],
-                reserveRowStyle.separator[2],
-                reserveRowStyle.separator[3],
-                reserveRowStyle.separator[4]
-            )
-            if isFirstInGroup then
-                row.topSeparator:Show()
-            else
-                row.topSeparator:Hide()
-            end
-        end
-
-        if row.iconTexture then
-            local icon = info.itemIcon
-            if not icon and info.itemId then
-                local fetchedIcon = GetItemIcon(info.itemId)
-                if type(fetchedIcon) == "string" and fetchedIcon ~= "" then
-                    info.itemIcon = fetchedIcon
-                    icon = fetchedIcon
-                end
-            end
-            if type(icon) ~= "string" or icon == "" then
-                icon = fallbackIcon
-                info.itemIcon = icon
-            end
-            row.iconTexture:SetTexture(icon)
-            row.iconTexture:Show()
-        end
-
-        if row.nameText then
-            row.nameText:SetText(info.itemLink or info.itemName or FormatReserveItemFallback(info.itemId))
-        end
-
-        if row.playerText then
-            row.playerText:SetText(info.playersText or "")
-        end
-        if row.quantityText then
-            row.quantityText:Hide()
-        end
-
-        UpdateReserveRowHotspots(row)
-    end
-
-    local function ReserveHeaderOnClick(self)
-        local source = self and self._source
-        if not source then return end
-        collapsedBossGroups[source] = not collapsedBossGroups[source]
-        addon:debug(Diag.D.LogReservesToggleCollapse:format(source, tostring(collapsedBossGroups[source])))
-        module:RequestRefresh()
-    end
-
-    -- ----- Public methods ----- --
-
-    -- Local functions
-    local LocalizeUIFrame
-    local UpdateUIFrame
-    local RenderReserveListUI
-
     -- ----- Saved Data Management ----- --
 
     function Service:Save()
@@ -871,7 +652,10 @@ do
         twipe(reservesData)
         RebuildIndex()
         Utils.triggerEvent("ReservesDataChanged", "clear")
-        addon:info(L.StrReserveListCleared)
+        local clearMessage = L[reserveListClearedKey]
+        if clearMessage then
+            addon:info(clearMessage)
+        end
     end
 
     function Service:HasData()
@@ -882,153 +666,6 @@ do
         if not itemId then return false end
         local list = reservesByItemID[itemId]
         return type(list) == "table" and #list > 0
-    end
-
-    -- ----- UI Window Management ----- --
-
-    -- Initialize UI controller for Toggle/Hide.
-    Utils.bootstrapModuleUi(module, getFrame, function()
-        module:RequestRefresh()
-    end, {
-        bindToggleHide = bindModuleToggleHide,
-        bindRequestRefresh = bindModuleRequestRefresh,
-    })
-
-    function UI:OnLoad(frame)
-        addon:debug(Diag.D.LogReservesFrameLoaded)
-        frameName = Utils.initModuleFrame(module, frame, {
-            enableDrag = true,
-            hookOnShow = function()
-                addon:debug(Diag.D.LogReservesShowWindow)
-            end,
-            hookOnHide = function()
-                addon:debug(Diag.D.LogReservesHideWindow)
-            end,
-        })
-        if not frameName then return end
-
-        scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"]
-        scrollChild = scrollFrame and scrollFrame.ScrollChild or _G["KRTReserveListFrameScrollChild"]
-
-        local buttons = {
-            CloseButton = "Hide",
-            ClearButton = "ResetSaved",
-            QueryButton = "QueryMissingItems",
-        }
-        for suff, method in pairs(buttons) do
-            local btn = _G["KRTReserveListFrame" .. suff]
-            if btn and module[method] then
-                btn:SetScript("OnClick", function() module[method](module) end)
-                addon:debug(Diag.D.LogReservesBindButton:format(suff, method))
-            end
-        end
-
-        LocalizeUIFrame()
-
-        local refreshFrame = CreateFrame("Frame")
-        refreshFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-        refreshFrame:SetScript("OnEvent", function(_, _, itemId)
-            addon:debug(Diag.D.LogReservesItemInfoReceived:format(itemId))
-            local pending = pendingItemInfo[itemId]
-            if not pending then return end
-
-            local name, link, icon = GetPendingItemInfo(pending)
-            local hasName = type(name) == "string" and name ~= ""
-                and type(link) == "string" and link ~= ""
-            local hasIcon = type(icon) == "string" and icon ~= ""
-
-            if not hasName then
-                local fetchedName, fetchedLink, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
-                if type(fetchedName) == "string" and fetchedName ~= "" then
-                    name = fetchedName
-                end
-                if type(fetchedLink) == "string" and fetchedLink ~= "" then
-                    link = fetchedLink
-                end
-                if type(tex) == "string" and tex ~= "" then
-                    icon = icon or tex
-                end
-            end
-
-            if not hasIcon then
-                local fetchedIcon = GetItemIcon(itemId)
-                if type(fetchedIcon) == "string" and fetchedIcon ~= "" then
-                    icon = fetchedIcon
-                end
-            end
-
-            hasName = type(name) == "string" and name ~= ""
-                and type(link) == "string" and link ~= ""
-            hasIcon = type(icon) == "string" and icon ~= ""
-
-            if hasName then
-                addon:debug(Diag.D.LogReservesUpdateItemData:format(link))
-                module:UpdateReserveItemData(itemId, name, link, icon)
-            else
-                addon:debug(Diag.D.LogReservesItemInfoMissing:format(itemId))
-            end
-            MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
-            if hasName and hasIcon then
-                addon:debug(Diag.D.LogSRItemInfoResolved:format(itemId, tostring(link)))
-                CompletePendingItem(itemId)
-            else
-                addon:debug(Diag.D.LogReservesItemInfoPending:format(itemId))
-                module:QueryItemInfo(itemId)
-            end
-        end)
-    end
-
-    -- ----- Localization and UI Update ----- --
-
-    function LocalizeUIFrame()
-        if localized then
-            addon:debug(Diag.D.LogReservesUIAlreadyLocalized)
-            return
-        end
-        if frameName then
-            Utils.setFrameTitle(frameName, L.StrRaidReserves)
-            addon:debug(Diag.D.LogReservesUILocalized:format(L.StrRaidReserves))
-        end
-        local clearButton = frameName and _G[frameName .. "ClearButton"]
-        if clearButton then
-            clearButton:SetText(L.BtnClearReserves)
-        end
-        local queryButton = frameName and _G[frameName .. "QueryButton"]
-        if queryButton then
-            queryButton:SetText(L.BtnQueryItem)
-        end
-        local closeButton = frameName and _G[frameName .. "CloseButton"]
-        if closeButton then
-            closeButton:SetText(L.BtnClose)
-        end
-        localized = true
-    end
-
-    -- Update UI Frame:
-    function UpdateUIFrame()
-        LocalizeUIFrame()
-        local hasData = Service:HasData()
-        local clearButton = _G[frameName .. "ClearButton"]
-        if clearButton then
-            if hasData then
-                clearButton:Show()
-                Utils.enableDisable(clearButton, true)
-            else
-                clearButton:Hide()
-            end
-        end
-        local queryButton = _G[frameName .. "QueryButton"]
-        if queryButton then
-            Utils.enableDisable(queryButton, hasData)
-        end
-    end
-
-    function UI:Refresh()
-        if UpdateUIFrame then UpdateUIFrame() end
-        local frame = getFrame()
-        if frame and RenderReserveListUI then
-            RenderReserveListUI()
-        end
     end
 
     -- ----- Reserve Data Handling ----- --
@@ -1537,177 +1174,6 @@ do
         return false
     end
 
-    -- ----- UI Display ----- --
-
-    local function UpdateReserveRowsForItem(itemId, itemName, itemLink, itemIcon)
-        local rows = rowsByItemID[itemId]
-        if not rows then return end
-        for i = 1, #rows do
-            local row = rows[i]
-            row._itemId = itemId
-            row._itemLink = itemLink
-            row._itemName = itemName
-            row._tooltipTitle = itemLink or itemName or FormatReserveItemIdLabel(itemId)
-            row._tooltipSource = FormatReserveDroppedBy(row._source)
-            if row.iconTexture then
-                local resolvedIcon = itemIcon
-                if type(resolvedIcon) ~= "string" or resolvedIcon == "" then
-                    resolvedIcon = fallbackIcon
-                end
-                row.iconTexture:SetTexture(resolvedIcon)
-                row.iconTexture:Show()
-            end
-            if row.nameText then
-                row.nameText:SetText(itemLink or itemName or FormatReserveItemFallback(itemId))
-            end
-        end
-    end
-
-    function RenderReserveListUI()
-        local frame = getFrame()
-        if not frame or not scrollChild then return end
-        module.frame = frame
-
-        -- Hide and clear old rows
-        for i = 1, #reserveItemRows do
-            reserveItemRows[i]:Hide()
-        end
-        twipe(reserveItemRows)
-        twipe(rowsByItemID)
-
-        -- Hide and clear old headers
-        for i = 1, #reserveHeaders do
-            reserveHeaders[i]:Hide()
-        end
-        twipe(reserveHeaders)
-
-        if reservesDirty then
-            table.sort(reservesDisplayList, function(a, b)
-                if a.source ~= b.source then return a.source < b.source end
-                if a.itemId ~= b.itemId then return a.itemId < b.itemId end
-                return false
-            end)
-            reservesDirty = false
-        end
-
-        local rowHeight, yOffset = C.RESERVES_ROW_HEIGHT, 0
-        local seenSources = {}
-        local firstRenderedRowBySource = {}
-        local rowIndex = 0
-        local headerIndex = 0
-
-        for i = 1, #reservesDisplayList do
-            local entry = reservesDisplayList[i]
-            local source = entry.source
-
-            if not seenSources[source] then
-                seenSources[source] = true
-                headerIndex = headerIndex + 1
-                local header = UI:CreateReserveHeader(scrollChild, source, yOffset, headerIndex)
-                reserveHeaders[#reserveHeaders + 1] = header
-                yOffset = yOffset + C.RESERVE_HEADER_HEIGHT
-            end
-
-            if not collapsedBossGroups[source] then
-                rowIndex = rowIndex + 1
-                local isFirstInGroup = not firstRenderedRowBySource[source]
-                local row = UI:CreateReserveRow(scrollChild, entry, yOffset, rowIndex, isFirstInGroup)
-                firstRenderedRowBySource[source] = true
-                reserveItemRows[#reserveItemRows + 1] = row
-                yOffset = yOffset + rowHeight
-            end
-        end
-
-        scrollChild:SetHeight(yOffset)
-        if scrollFrame then
-            scrollFrame:SetVerticalScroll(0)
-        end
-    end
-
-    function UI:CreateReserveHeader(parent, source, yOffset, index)
-        local headerName = frameName .. "ReserveHeader" .. index
-        local header = _G[headerName] or CreateFrame("Button", headerName, parent, "KRTReserveHeaderTemplate")
-        header:ClearAllPoints()
-        header:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -yOffset)
-        header._source = source
-        if not header._initialized then
-            header.label = _G[headerName .. "Label"]
-            header:SetScript("OnClick", ReserveHeaderOnClick)
-            header._initialized = true
-        end
-        if header.label then
-            local prefix = collapsedBossGroups[source] and "|TInterface\\Buttons\\UI-PlusButton-Up:12|t " or
-                "|TInterface\\Buttons\\UI-MinusButton-Up:12|t "
-            header.label:SetText(prefix .. source)
-        end
-        header:Show()
-        return header
-    end
-
-    local function SetupReserveIcon(row)
-        if not row or not row.iconTexture or not row.iconBtn then return end
-        row.iconTexture:ClearAllPoints()
-        row.iconTexture:SetPoint("TOPLEFT", row.iconBtn, "TOPLEFT", 2, -2)
-        row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
-        row.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        row.iconTexture:SetDrawLayer("OVERLAY")
-    end
-
-    local function SetupReserveRowDecor(row)
-        if not row or row._decorInitialized then return end
-        local topSeparator = row:CreateTexture(nil, "BORDER")
-        topSeparator:SetTexture("Interface\\Buttons\\WHITE8x8")
-        topSeparator:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
-        topSeparator:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, 0)
-        topSeparator:SetHeight(1)
-        topSeparator:Hide()
-        row.topSeparator = topSeparator
-
-        local separator = row:CreateTexture(nil, "BORDER")
-        separator:SetTexture("Interface\\Buttons\\WHITE8x8")
-        separator:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
-        separator:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 0)
-        separator:SetHeight(1)
-        row.separator = separator
-        row._decorInitialized = true
-    end
-
-    -- Create a new row for displaying a reserve
-    function UI:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
-        local rowName = frameName .. "ReserveRow" .. index
-        local row = _G[rowName] or CreateFrame("Frame", rowName, parent, "KRTReserveRowTemplate")
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -yOffset)
-        row._rawID = info.itemId
-        if not row._initialized then
-            row.background = _G[rowName .. "Background"]
-            row.iconBtn = _G[rowName .. "IconBtn"]
-            row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
-            row.textBlock = _G[rowName .. "TextBlock"]
-            SetupReserveIcon(row)
-            SetupReserveRowDecor(row)
-            if row.textBlock and row.iconBtn then
-                row.textBlock:SetFrameLevel(row.iconBtn:GetFrameLevel() + 1)
-            end
-            row.nameText = _G[rowName .. "TextBlockName"]
-            row.sourceText = _G[rowName .. "TextBlockSource"]
-            row.playerText = _G[rowName .. "TextBlockPlayers"]
-            row.quantityText = _G[rowName .. "Quantity"]
-            SetupReserveRowTooltip(row)
-            if row.sourceText then
-                row.sourceText:SetText("")
-                row.sourceText:Hide()
-            end
-            row._initialized = true
-        end
-        ApplyReserveRowData(row, info, index, isFirstInGroup)
-        row:Show()
-        rowsByItemID[info.itemId] = rowsByItemID[info.itemId] or {}
-        tinsert(rowsByItemID[info.itemId], row)
-
-        return row
-    end
-
     -- ----- SR Announcement Formatting ----- --
 
     -- Returns a list of formatted player tokens for an item.
@@ -1760,37 +1226,66 @@ do
         return #list > 0 and tconcat(list, ", ") or ""
     end
 
-    function UI:PrimeItemInfoQuery(itemId)
-        if not itemId then return end
-        GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
-        GameTooltip:SetHyperlink("item:" .. itemId)
-        GameTooltip:Hide()
+    function Service:GetDisplayList()
+        if reservesDirty then
+            table.sort(reservesDisplayList, function(a, b)
+                if a.source ~= b.source then return a.source < b.source end
+                if a.itemId ~= b.itemId then return a.itemId < b.itemId end
+                return false
+            end)
+            reservesDirty = false
+        end
+        return reservesDisplayList
     end
 
-    function UI:RequestRefresh()
-        if module.RequestRefresh then
-            module:RequestRefresh()
+    function Service:IsSourceCollapsed(source)
+        if not source then return false end
+        return collapsedBossGroups[source] == true
+    end
+
+    function Service:ToggleSourceCollapsed(source)
+        if not source then return false end
+        local nextState = not (collapsedBossGroups[source] == true)
+        collapsedBossGroups[source] = nextState
+        addon:debug(Diag.D.LogReservesToggleCollapse:format(source, tostring(nextState)))
+        return nextState
+    end
+
+    function Service:HasPendingItem(itemId)
+        if not itemId then return false end
+        return pendingItemInfo[itemId] ~= nil
+    end
+
+    local function GetReservesUI()
+        return addon.ReservesUI or module.UI
+    end
+
+    function module:OnLoad(frame)
+        local ui = GetReservesUI()
+        if ui and ui.OnLoad then
+            return ui:OnLoad(frame)
         end
     end
 
-    Utils.registerCallback("ReservesDataChanged", function()
-        UI:RequestRefresh()
-    end)
-
-    function module:OnLoad(frame)
-        return UI:OnLoad(frame)
-    end
-
     function module:Refresh()
-        return UI:Refresh()
+        local ui = GetReservesUI()
+        if ui and ui.Refresh then
+            return ui:Refresh()
+        end
     end
 
     function module:CreateReserveHeader(parent, source, yOffset, index)
-        return UI:CreateReserveHeader(parent, source, yOffset, index)
+        local ui = GetReservesUI()
+        if ui and ui.CreateReserveHeader then
+            return ui:CreateReserveHeader(parent, source, yOffset, index)
+        end
     end
 
     function module:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
-        return UI:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
+        local ui = GetReservesUI()
+        if ui and ui.CreateReserveRow then
+            return ui:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
+        end
     end
 
     function module:Save()
@@ -1803,8 +1298,12 @@ do
 
     function module:ResetSaved()
         local out = Service:ResetSaved()
-        self:Hide()
-        UI:RequestRefresh()
+        if module.Hide then
+            module.Hide(module)
+        end
+        if module.RequestRefresh then
+            module.RequestRefresh(module)
+        end
         return out
     end
 
@@ -1849,28 +1348,32 @@ do
     end
 
     function module:QueryItemInfo(itemId)
-        local resolved = Service:QueryItemInfo(itemId)
-        if resolved then
-            UI:RequestRefresh()
-        else
-            UI:PrimeItemInfoQuery(itemId)
-        end
-        return resolved
+        return Service:QueryItemInfo(itemId)
     end
 
     function module:QueryMissingItems(silent)
-        local updated, count = Service:QueryMissingItems(silent, function(itemId)
-            UI:PrimeItemInfoQuery(itemId)
-        end)
-        if updated then
-            UI:RequestRefresh()
+        local ui = GetReservesUI()
+        local updated, count
+        if ui and ui.PrimeItemInfoQuery then
+            updated, count = Service:QueryMissingItems(silent, function(itemId)
+                ui:PrimeItemInfoQuery(itemId)
+            end)
+        else
+            updated, count = Service:QueryMissingItems(silent)
         end
+
+        if updated and module.RequestRefresh then
+            module.RequestRefresh(module)
+        end
+
         return updated, count
     end
 
     function module:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
         local icon = Service:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
-        UpdateReserveRowsForItem(itemId, itemName, itemLink, icon)
+        if module.RequestRefresh then
+            module.RequestRefresh(module)
+        end
         return icon
     end
 
