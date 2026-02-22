@@ -440,6 +440,17 @@ do
         GameTooltip:Hide()
     end
 
+    local function ResetSavedFromUI()
+        local out = module:ResetSaved()
+        if module.Hide then
+            module.Hide(module)
+        end
+        if module.RequestRefresh then
+            module.RequestRefresh(module)
+        end
+        return out
+    end
+
     function UI:RequestRefresh()
         if module.RequestRefresh then
             module.RequestRefresh(module)
@@ -481,7 +492,7 @@ do
         local clearButton = _G["KRTReserveListFrameClearButton"]
         if clearButton then
             clearButton:SetScript("OnClick", function()
-                module:ResetSaved()
+                ResetSavedFromUI()
             end)
             addon:debug(Diag.D.LogReservesBindButton:format("ClearButton", "ResetSaved"))
         end

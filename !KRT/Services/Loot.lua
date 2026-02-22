@@ -17,7 +17,6 @@ local itemInfo = feature.itemInfo
 local ItemExists, ItemIsSoulbound, GetItem
 local GetItemName, GetItemLink, GetItemTexture
 
-local _G = _G
 local tremove, twipe = table.remove, table.wipe
 local type = type
 
@@ -284,31 +283,10 @@ do
 
     -- Checks if an item in the player's bags is soulbound.
     function ItemIsSoulbound(bag, slot)
-        local tip = KRT_FakeTooltip or CreateFrame("GameTooltip", "KRT_FakeTooltip", nil, "GameTooltipTemplate")
-        KRT_FakeTooltip = tip
-        tip:SetOwner(UIParent, "ANCHOR_NONE")
-        tip:SetBagItem(bag, slot)
-        tip:Show()
-
-        local num = tip:NumLines()
-        local isSoulbound = false
-        for i = num, 1, -1 do
-            local fs = _G["KRT_FakeTooltipTextLeft" .. i]
-            local t = fs and fs:GetText() or nil
-            if t and t ~= "" then
-                -- Fast check first: exact global string compare.
-                if t == ITEM_SOULBOUND then
-                    isSoulbound = true
-                end
-                if addon.Deformat(t, BIND_TRADE_TIME_REMAINING) ~= nil then
-                    tip:Hide()
-                    return false
-                end
-            end
+        if Utils.isBagItemSoulbound then
+            return Utils.isBagItemSoulbound(bag, slot)
         end
-
-        tip:Hide()
-        return isSoulbound
+        return false
     end
 
     -- Cross-module bridge for split files (Rolls/Master).

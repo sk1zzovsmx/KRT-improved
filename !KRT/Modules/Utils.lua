@@ -1208,6 +1208,7 @@ end
 
 do
     local colors = HIGHLIGHT_FONT_COLOR
+    local fakeBagTooltip
 
     local function showTooltip(frame)
         if not frame.tooltip_anchor then
@@ -1249,6 +1250,39 @@ do
         if not frame.tooltip_title and not frame.tooltip_text and not frame.tooltip_item then return end
         frame:SetScript("OnEnter", showTooltip)
         frame:SetScript("OnLeave", hideTooltip)
+    end
+
+    -- Tooltip-based soulbound check for bag items (3.3.5a-safe).
+    function Utils.isBagItemSoulbound(bag, slot)
+        if bag == nil or slot == nil then
+            return false
+        end
+
+        fakeBagTooltip = fakeBagTooltip or KRT_FakeTooltip
+            or CreateFrame("GameTooltip", "KRT_FakeTooltip", nil, "GameTooltipTemplate")
+        KRT_FakeTooltip = fakeBagTooltip
+        fakeBagTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+        fakeBagTooltip:SetBagItem(bag, slot)
+        fakeBagTooltip:Show()
+
+        local isSoulbound = false
+        local numLines = fakeBagTooltip:NumLines() or 0
+        for i = numLines, 1, -1 do
+            local fs = _G["KRT_FakeTooltipTextLeft" .. i]
+            local text = fs and fs:GetText() or nil
+            if text and text ~= "" then
+                if text == ITEM_SOULBOUND then
+                    isSoulbound = true
+                end
+                if addon.Deformat(text, BIND_TRADE_TIME_REMAINING) ~= nil then
+                    fakeBagTooltip:Hide()
+                    return false
+                end
+            end
+        end
+
+        fakeBagTooltip:Hide()
+        return isSoulbound
     end
 end
 

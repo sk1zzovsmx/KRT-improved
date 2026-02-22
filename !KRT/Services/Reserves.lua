@@ -1327,14 +1327,7 @@ do
     end
 
     function module:ResetSaved()
-        local out = Service:ResetSaved()
-        if module.Hide then
-            module.Hide(module)
-        end
-        if module.RequestRefresh then
-            module.RequestRefresh(module)
-        end
-        return out
+        return Service:ResetSaved()
     end
 
     function module:HasData()
