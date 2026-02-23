@@ -185,19 +185,11 @@ do
         _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
         _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
         Utils.setFrameTitle(frameName, RAID_WARNING)
-        _G[frameName .. "Name"]:SetScript("OnEscapePressed", module.Cancel)
-        _G[frameName .. "Content"]:SetScript("OnEscapePressed", module.Cancel)
-        _G[frameName .. "Name"]:SetScript("OnEnterPressed", module.Edit)
-        _G[frameName .. "Content"]:SetScript("OnEnterPressed", module.Edit)
-        _G[frameName .. "Name"]:SetScript("OnTextChanged", function(_, isUserInput)
-            if isUserInput then
-                module:RequestRefresh()
-            end
-        end)
-        _G[frameName .. "Content"]:SetScript("OnTextChanged", function(_, isUserInput)
-            if isUserInput then
-                module:RequestRefresh()
-            end
+        Utils.bindEditBoxHandlers(frameName, {
+            { suffix = "Name", onEscape = module.Cancel, onEnter = module.Edit },
+            { suffix = "Content", onEscape = module.Cancel, onEnter = module.Edit },
+        }, function()
+            module:RequestRefresh()
         end)
         localized = true
     end
@@ -229,14 +221,18 @@ do
         end
         tempName    = _G[frameName .. "Name"]:GetText()
         tempContent = _G[frameName .. "Content"]:GetText()
-        Utils.enableDisable(_G[frameName .. "EditBtn"], (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
-        Utils.enableDisable(_G[frameName .. "DeleteBtn"], selectedID ~= nil)
-        Utils.enableDisable(_G[frameName .. "AnnounceBtn"], selectedID ~= nil)
+        Utils.enableDisableNamedPart(frameName, "EditBtn", (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
+        Utils.enableDisableNamedPart(frameName, "DeleteBtn", selectedID ~= nil)
+        Utils.enableDisableNamedPart(frameName, "AnnounceBtn", selectedID ~= nil)
         local editBtnMode = (tempName ~= "" or tempContent ~= "") or selectedID == nil
-        if editBtnMode ~= lastEditBtnMode then
-            Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
-            lastEditBtnMode = editBtnMode
-        end
+        lastEditBtnMode = Utils.updateModeTextNamedPart(
+            frameName,
+            "EditBtn",
+            L.BtnSave,
+            L.BtnEdit,
+            editBtnMode,
+            lastEditBtnMode
+        )
     end
 
     function module:Refresh()

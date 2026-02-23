@@ -85,6 +85,82 @@ do
     local Actions  = module.Actions
 
     -- ----- Private helpers ----- --
+    local selectionEvents = {
+        selectedRaid = "LoggerSelectRaid",
+        selectedBoss = "LoggerSelectBoss",
+        selectedPlayer = "LoggerSelectPlayer",
+        selectedBossPlayer = "LoggerSelectBossPlayer",
+        selectedItem = "LoggerSelectItem",
+    }
+
+    local function triggerSelectionEvent(target, key, ...)
+        local eventName = selectionEvents[key]
+        if not eventName then
+            return
+        end
+        Utils.triggerEvent(eventName, target[key], ...)
+    end
+
+    local function clearSelection(target, key, multiSelectCtx)
+        target[key] = nil
+        if multiSelectCtx then
+            Utils.multiSelectClear(multiSelectCtx)
+        end
+    end
+
+    local function applyFocusedMultiSelect(opts)
+        if not opts then
+            return nil, 0
+        end
+
+        local id = opts.id
+        local ctx = opts.context
+        if not (id and ctx and opts.setFocus) then
+            return nil, 0
+        end
+
+        local function setFocusFromSelected(selectedId)
+            if opts.mapSelectedToFocus then
+                opts.setFocus(opts.mapSelectedToFocus(selectedId))
+                return
+            end
+            opts.setFocus(selectedId)
+        end
+
+        if opts.isRange then
+            local action, count = Utils.multiSelectRange(ctx, opts.ordered, id, opts.isMulti)
+            setFocusFromSelected(id)
+            return action, count
+        end
+
+        local action, count = Utils.multiSelectToggle(ctx, id, opts.isMulti, true)
+        if action == "SINGLE_DESELECT" then
+            opts.setFocus(nil)
+        elseif action == "TOGGLE_OFF" then
+            local clickedWasFocused = false
+            if opts.isClickedFocused then
+                clickedWasFocused = opts.isClickedFocused(id) and true or false
+            elseif opts.getFocus then
+                clickedWasFocused = (opts.getFocus() == id)
+            end
+
+            if clickedWasFocused then
+                local selected = Utils.multiSelectGetSelected(ctx)
+                setFocusFromSelected(selected[1])
+            end
+        else
+            setFocusFromSelected(id)
+        end
+
+        if (tonumber(count) or 0) > 0 then
+            Utils.multiSelectSetAnchor(ctx, id)
+        else
+            Utils.multiSelectSetAnchor(ctx, nil)
+        end
+
+        return action, count
+    end
+
     local function normalizeNid(v)
         return tonumber(v) or v
     end
@@ -397,10 +473,10 @@ do
             end
         end
 
-        if changedBoss then Utils.triggerEvent("LoggerSelectBoss", log.selectedBoss) end
-        if changedPlayer then Utils.triggerEvent("LoggerSelectPlayer", log.selectedPlayer) end
-        if changedBossPlayer then Utils.triggerEvent("LoggerSelectBossPlayer", log.selectedBossPlayer) end
-        if changedItem then Utils.triggerEvent("LoggerSelectItem", log.selectedItem) end
+        if changedBoss then triggerSelectionEvent(log, "selectedBoss") end
+        if changedPlayer then triggerSelectionEvent(log, "selectedPlayer") end
+        if changedBossPlayer then triggerSelectionEvent(log, "selectedBossPlayer") end
+        if changedItem then triggerSelectionEvent(log, "selectedItem") end
     end
 
     function Actions:DeleteBoss(rID, bossNid)
@@ -787,14 +863,10 @@ do
     -- Clears selections that depend on the currently focused raid (boss/player/loot panels).
     -- Intentionally does NOT clear the raid selection itself.
     local function clearSelections()
-        module.selectedBoss = nil
-        module.selectedPlayer = nil
-        module.selectedBossPlayer = nil
-        module.selectedItem = nil
-        Utils.multiSelectClear(MS_CTX_BOSS)
-        Utils.multiSelectClear(MS_CTX_BOSSATT)
-        Utils.multiSelectClear(MS_CTX_RAIDATT)
-        Utils.multiSelectClear(MS_CTX_LOOT)
+        clearSelection(module, "selectedBoss", MS_CTX_BOSS)
+        clearSelection(module, "selectedPlayer", MS_CTX_RAIDATT)
+        clearSelection(module, "selectedBossPlayer", MS_CTX_BOSSATT)
+        clearSelection(module, "selectedItem", MS_CTX_LOOT)
     end
 
     local function getRaidNidByIndex(raidIndex)
@@ -849,7 +921,7 @@ do
                     SetSelectedRaid(Core.getCurrentRaid())
                 end
                 clearSelections()
-                Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid, "ui")
+                triggerSelectionEvent(module, "selectedRaid", "ui")
             end,
             hookOnHide = function()
                 SetSelectedRaid(Core.getCurrentRaid())
@@ -873,7 +945,7 @@ do
             SetSelectedRaid(Core.getCurrentRaid())
         end
         clearSelections()
-        Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid, "ui")
+        triggerSelectionEvent(module, "selectedRaid", "ui")
     end
 
     -- Selectors
@@ -888,34 +960,19 @@ do
         local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
         local prevFocus = module.selectedRaid
 
-        local action, count
-        if isRange then
-            local ordered = addon.Logger.Raids and addon.Logger.Raids._ctrl and addon.Logger.Raids._ctrl.data or nil
-            action, count = Utils.multiSelectRange(MS_CTX_RAID, ordered, raidNid, isMulti)
-            -- SHIFT range always sets the focused row to the click target.
-            SetSelectedRaid(raidIndex)
-        else
-            action, count = Utils.multiSelectToggle(MS_CTX_RAID, raidNid, isMulti, true)
-
-            -- Keep a single "focused" raid for the dependent panels (Boss / Attendees / Loot).
-            if action == "SINGLE_DESELECT" then
-                SetSelectedRaid(nil)
-            elseif action == "TOGGLE_OFF" then
-                if getRaidNidByIndex(module.selectedRaid) == raidNid then
-                    local sel = Utils.multiSelectGetSelected(MS_CTX_RAID)
-                    SetSelectedRaid(sel[1] and getRaidIndexByNid(sel[1]) or nil)
-                end
-            else
-                SetSelectedRaid(raidIndex)
-            end
-
-            -- Range anchor (OS-like): update on non-shift clicks only.
-            if (tonumber(count) or 0) > 0 then
-                Utils.multiSelectSetAnchor(MS_CTX_RAID, raidNid)
-            else
-                Utils.multiSelectSetAnchor(MS_CTX_RAID, nil)
-            end
-        end
+        local ordered = addon.Logger.Raids and addon.Logger.Raids._ctrl and addon.Logger.Raids._ctrl.data or nil
+        local action, count = applyFocusedMultiSelect({
+            id = raidNid,
+            context = MS_CTX_RAID,
+            ordered = ordered,
+            isMulti = isMulti,
+            isRange = isRange,
+            setFocus = SetSelectedRaid,
+            mapSelectedToFocus = getRaidIndexByNid,
+            isClickedFocused = function(clickedNid)
+                return getRaidNidByIndex(module.selectedRaid) == clickedNid
+            end,
+        })
 
         if Utils.isDebugEnabled() and addon.debug then
             addon:debug((Diag.D.LogLoggerSelectClickRaid)
@@ -930,7 +987,7 @@ do
             clearSelections()
         end
 
-        Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid, "ui")
+        triggerSelectionEvent(module, "selectedRaid", "ui")
     end
 
     function module:SelectBoss(btn, button)
@@ -942,32 +999,20 @@ do
         local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
         local prevFocus = module.selectedBoss
 
-        local action, count
-        if isRange then
-            local ordered = addon.Logger.Boss and addon.Logger.Boss._ctrl and addon.Logger.Boss._ctrl.data or nil
-            action, count = Utils.multiSelectRange(MS_CTX_BOSS, ordered, id, isMulti)
-            module.selectedBoss = id
-        else
-            action, count = Utils.multiSelectToggle(MS_CTX_BOSS, id, isMulti, true)
-
-            -- Keep a single "focused" boss for dependent panels (BossAttendees / Loot).
-            if action == "SINGLE_DESELECT" then
-                module.selectedBoss = nil
-            elseif action == "TOGGLE_OFF" then
-                if module.selectedBoss == id then
-                    local sel = Utils.multiSelectGetSelected(MS_CTX_BOSS)
-                    module.selectedBoss = sel[1] or nil
-                end
-            else
-                module.selectedBoss = id
-            end
-
-            if (tonumber(count) or 0) > 0 then
-                Utils.multiSelectSetAnchor(MS_CTX_BOSS, id)
-            else
-                Utils.multiSelectSetAnchor(MS_CTX_BOSS, nil)
-            end
-        end
+        local ordered = addon.Logger.Boss and addon.Logger.Boss._ctrl and addon.Logger.Boss._ctrl.data or nil
+        local action, count = applyFocusedMultiSelect({
+            id = id,
+            context = MS_CTX_BOSS,
+            ordered = ordered,
+            isMulti = isMulti,
+            isRange = isRange,
+            getFocus = function()
+                return module.selectedBoss
+            end,
+            setFocus = function(v)
+                module.selectedBoss = v
+            end,
+        })
 
         if Utils.isDebugEnabled() and addon.debug then
             addon:debug((Diag.D.LogLoggerSelectClickBoss)
@@ -979,17 +1024,13 @@ do
 
         -- If the focused boss changed, reset boss-attendees + loot selection (filters changed).
         if prevFocus ~= module.selectedBoss then
-            module.selectedBossPlayer = nil
-            Utils.multiSelectClear(MS_CTX_BOSSATT)
-
-            module.selectedItem = nil
-            Utils.multiSelectClear(MS_CTX_LOOT)
-
-            Utils.triggerEvent("LoggerSelectItem", module.selectedItem)
-            Utils.triggerEvent("LoggerSelectBossPlayer", module.selectedBossPlayer)
+            clearSelection(module, "selectedBossPlayer", MS_CTX_BOSSATT)
+            clearSelection(module, "selectedItem", MS_CTX_LOOT)
+            triggerSelectionEvent(module, "selectedItem")
+            triggerSelectionEvent(module, "selectedBossPlayer")
         end
 
-        Utils.triggerEvent("LoggerSelectBoss", module.selectedBoss)
+        triggerSelectionEvent(module, "selectedBoss")
     end
 
     -- Player filter: only one active at a time
@@ -1003,36 +1044,23 @@ do
         local prevFocus = module.selectedBossPlayer
 
         -- Mutual exclusion: selecting a boss-attendee filter clears the raid-attendee filter (and its multi-select).
-        module.selectedPlayer = nil
-        Utils.multiSelectClear(MS_CTX_RAIDATT)
+        clearSelection(module, "selectedPlayer", MS_CTX_RAIDATT)
 
-        local action, count
-        if isRange then
-            local ordered = addon.Logger.BossAttendees and addon.Logger.BossAttendees._ctrl and
-                addon.Logger.BossAttendees._ctrl.data or nil
-            action, count = Utils.multiSelectRange(MS_CTX_BOSSATT, ordered, id, isMulti)
-            module.selectedBossPlayer = id
-        else
-            action, count = Utils.multiSelectToggle(MS_CTX_BOSSATT, id, isMulti, true)
-
-            -- Keep a single "focused" boss-attendee for loot filtering.
-            if action == "SINGLE_DESELECT" then
-                module.selectedBossPlayer = nil
-            elseif action == "TOGGLE_OFF" then
-                if module.selectedBossPlayer == id then
-                    local sel = Utils.multiSelectGetSelected(MS_CTX_BOSSATT)
-                    module.selectedBossPlayer = sel[1] or nil
-                end
-            else
-                module.selectedBossPlayer = id
-            end
-
-            if (tonumber(count) or 0) > 0 then
-                Utils.multiSelectSetAnchor(MS_CTX_BOSSATT, id)
-            else
-                Utils.multiSelectSetAnchor(MS_CTX_BOSSATT, nil)
-            end
-        end
+        local ordered = addon.Logger.BossAttendees and addon.Logger.BossAttendees._ctrl and
+            addon.Logger.BossAttendees._ctrl.data or nil
+        local action, count = applyFocusedMultiSelect({
+            id = id,
+            context = MS_CTX_BOSSATT,
+            ordered = ordered,
+            isMulti = isMulti,
+            isRange = isRange,
+            getFocus = function()
+                return module.selectedBossPlayer
+            end,
+            setFocus = function(v)
+                module.selectedBossPlayer = v
+            end,
+        })
 
         if Utils.isDebugEnabled() and addon.debug then
             addon:debug((Diag.D.LogLoggerSelectClickBossAttendees)
@@ -1044,13 +1072,12 @@ do
 
         -- If the focused attendee changed, reset loot (multi) selection (filter changed).
         if prevFocus ~= module.selectedBossPlayer then
-            module.selectedItem = nil
-            Utils.multiSelectClear(MS_CTX_LOOT)
-            Utils.triggerEvent("LoggerSelectItem", module.selectedItem)
+            clearSelection(module, "selectedItem", MS_CTX_LOOT)
+            triggerSelectionEvent(module, "selectedItem")
         end
 
-        Utils.triggerEvent("LoggerSelectBossPlayer", module.selectedBossPlayer)
-        Utils.triggerEvent("LoggerSelectPlayer", module.selectedPlayer)
+        triggerSelectionEvent(module, "selectedBossPlayer")
+        triggerSelectionEvent(module, "selectedPlayer")
     end
 
     function module:SelectPlayer(btn, button)
@@ -1063,36 +1090,23 @@ do
         local prevFocus = module.selectedPlayer
 
         -- Mutual exclusion: selecting a raid-attendee filter clears the boss-attendee filter (and its multi-select).
-        module.selectedBossPlayer = nil
-        Utils.multiSelectClear(MS_CTX_BOSSATT)
+        clearSelection(module, "selectedBossPlayer", MS_CTX_BOSSATT)
 
-        local action, count
-        if isRange then
-            local ordered = addon.Logger.RaidAttendees and addon.Logger.RaidAttendees._ctrl and
-                addon.Logger.RaidAttendees._ctrl.data or nil
-            action, count = Utils.multiSelectRange(MS_CTX_RAIDATT, ordered, id, isMulti)
-            module.selectedPlayer = id
-        else
-            action, count = Utils.multiSelectToggle(MS_CTX_RAIDATT, id, isMulti, true)
-
-            -- Keep a single "focused" raid-attendee for loot filtering.
-            if action == "SINGLE_DESELECT" then
-                module.selectedPlayer = nil
-            elseif action == "TOGGLE_OFF" then
-                if module.selectedPlayer == id then
-                    local sel = Utils.multiSelectGetSelected(MS_CTX_RAIDATT)
-                    module.selectedPlayer = sel[1] or nil
-                end
-            else
-                module.selectedPlayer = id
-            end
-
-            if (tonumber(count) or 0) > 0 then
-                Utils.multiSelectSetAnchor(MS_CTX_RAIDATT, id)
-            else
-                Utils.multiSelectSetAnchor(MS_CTX_RAIDATT, nil)
-            end
-        end
+        local ordered = addon.Logger.RaidAttendees and addon.Logger.RaidAttendees._ctrl and
+            addon.Logger.RaidAttendees._ctrl.data or nil
+        local action, count = applyFocusedMultiSelect({
+            id = id,
+            context = MS_CTX_RAIDATT,
+            ordered = ordered,
+            isMulti = isMulti,
+            isRange = isRange,
+            getFocus = function()
+                return module.selectedPlayer
+            end,
+            setFocus = function(v)
+                module.selectedPlayer = v
+            end,
+        })
 
         if Utils.isDebugEnabled() and addon.debug then
             addon:debug((Diag.D.LogLoggerSelectClickRaidAttendees)
@@ -1104,13 +1118,12 @@ do
 
         -- If the focused attendee changed, reset loot (multi) selection (filter changed).
         if prevFocus ~= module.selectedPlayer then
-            module.selectedItem = nil
-            Utils.multiSelectClear(MS_CTX_LOOT)
-            Utils.triggerEvent("LoggerSelectItem", module.selectedItem)
+            clearSelection(module, "selectedItem", MS_CTX_LOOT)
+            triggerSelectionEvent(module, "selectedItem")
         end
 
-        Utils.triggerEvent("LoggerSelectPlayer", module.selectedPlayer)
-        Utils.triggerEvent("LoggerSelectBossPlayer", module.selectedBossPlayer)
+        triggerSelectionEvent(module, "selectedPlayer")
+        triggerSelectionEvent(module, "selectedBossPlayer")
     end
 
     -- Item: left select, right menu
@@ -1344,36 +1357,20 @@ do
                 local isMulti = IsControlKeyDown and IsControlKeyDown() or false
                 local isRange = IsShiftKeyDown and IsShiftKeyDown() or false
 
-                local action, count
-                if isRange then
-                    local ordered = addon.Logger.Loot
-                        and addon.Logger.Loot._ctrl
-                        and addon.Logger.Loot._ctrl.data
-                        or nil
-                    action, count = Utils.multiSelectRange(MS_CTX_LOOT, ordered, id, isMulti)
-                    module.selectedItem = id
-                else
-                    action, count = Utils.multiSelectToggle(MS_CTX_LOOT, id, isMulti, true)
-
-                    -- Keep a single "focused" item for context menu / edit popups.
-                    if action == "SINGLE_DESELECT" then
-                        module.selectedItem = nil
-                    elseif action == "TOGGLE_OFF" then
-                        if module.selectedItem == id then
-                            local sel = Utils.multiSelectGetSelected(MS_CTX_LOOT)
-                            module.selectedItem = sel[1] or nil
-                        end
-                        -- If we toggled OFF a non-focused item, keep current focus.
-                    else
-                        module.selectedItem = id
-                    end
-
-                    if (tonumber(count) or 0) > 0 then
-                        Utils.multiSelectSetAnchor(MS_CTX_LOOT, id)
-                    else
-                        Utils.multiSelectSetAnchor(MS_CTX_LOOT, nil)
-                    end
-                end
+                local ordered = addon.Logger.Loot and addon.Logger.Loot._ctrl and addon.Logger.Loot._ctrl.data or nil
+                local action, count = applyFocusedMultiSelect({
+                    id = id,
+                    context = MS_CTX_LOOT,
+                    ordered = ordered,
+                    isMulti = isMulti,
+                    isRange = isRange,
+                    getFocus = function()
+                        return module.selectedItem
+                    end,
+                    setFocus = function(v)
+                        module.selectedItem = v
+                    end,
+                })
 
                 if Utils.isDebugEnabled() and addon.debug then
                     addon:debug((Diag.D.LogLoggerSelectClickLoot)
@@ -1384,7 +1381,7 @@ do
                         ))
                 end
 
-                Utils.triggerEvent("LoggerSelectItem", module.selectedItem)
+                triggerSelectionEvent(module, "selectedItem")
             elseif button == "RightButton" then
                 -- Context menu works on a single focused row.
                 local action, count = Utils.multiSelectToggle(MS_CTX_LOOT, id, false)
@@ -1396,7 +1393,7 @@ do
                     ))
                 end
 
-                Utils.triggerEvent("LoggerSelectItem", module.selectedItem)
+                triggerSelectionEvent(module, "selectedItem")
                 openItemMenu()
             end
         end
@@ -1622,7 +1619,7 @@ do
             -- Context change: clear dependent selections and redraw all module panels.
             SetSelectedRaid(sel)
             addon.Logger:ResetSelections()
-            Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid, "ui")
+            triggerSelectionEvent(addon.Logger, "selectedRaid", "ui")
         end
     end
 
@@ -1676,7 +1673,7 @@ do
             SetSelectedRaid(newFocus)
             addon.Logger:ResetSelections()
             controller:Dirty()
-            Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid, "ui")
+            triggerSelectionEvent(addon.Logger, "selectedRaid", "ui")
         end
 
         function Raids:Delete(btn)
@@ -1694,7 +1691,7 @@ do
         SetSelectedRaid(tonumber(num))
         addon.Logger:ResetSelections()
         controller:Dirty()
-        Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid, "ui")
+        triggerSelectionEvent(addon.Logger, "selectedRaid", "ui")
     end)
 
     Utils.registerCallback("LoggerSelectRaid", function(_, raidId, reason)
@@ -2339,7 +2336,7 @@ do
                 if removed > 0 then
                     Utils.multiSelectClear(ctx)
                     addon.Logger.selectedItem = nil
-                    Utils.triggerEvent("LoggerSelectItem", addon.Logger.selectedItem)
+                    triggerSelectionEvent(addon.Logger, "selectedItem")
 
                     if Utils.isDebugEnabled() and addon.debug then
                         addon:debug((Diag.D.LogLoggerSelectDeleteItems):format(removed))
@@ -2572,7 +2569,7 @@ do
 
         self:Hide()
         addon.Logger:ResetSelections()
-        Utils.triggerEvent("LoggerSelectRaid", addon.Logger.selectedRaid, "ui")
+        triggerSelectionEvent(addon.Logger, "selectedRaid", "ui")
     end
 
     function Box:CancelAddEdit()
@@ -2641,7 +2638,7 @@ do
         local name = Utils.trimText(_G[frameName .. "Name"]:GetText())
         if addon.Logger.Actions:AddBossAttendee(rID, bID, name) then
             self:Toggle()
-            Utils.triggerEvent("LoggerSelectBoss", addon.Logger.selectedBoss)
+            triggerSelectionEvent(addon.Logger, "selectedBoss")
         end
     end
 end

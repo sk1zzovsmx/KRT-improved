@@ -769,6 +769,56 @@ do
         return fields[fallbackIndex]
     end
 
+    local function readCSVField(fields, headerMap, key, fallbackIndex)
+        return cleanCSVField(getField(fields, headerMap, key, fallbackIndex))
+    end
+
+    local function normalizeOptionalCSVField(value)
+        if value == nil or value == "" then
+            return nil
+        end
+        return value
+    end
+
+    local function buildParsedCSVRow(fields, headerMap)
+        local itemIdStr = readCSVField(fields, headerMap, "itemid", 2)
+        local source = readCSVField(fields, headerMap, "from", 3)
+        local playerName = readCSVField(fields, headerMap, "name", 4)
+        local className = readCSVField(fields, headerMap, "class", 5)
+        local spec = readCSVField(fields, headerMap, "spec", 6)
+        local note = readCSVField(fields, headerMap, "note", 7)
+        local plus = readCSVField(fields, headerMap, "plus", 8)
+
+        local itemId = tonumber(itemIdStr)
+        local playerKey = Utils.normalizeLower(playerName, true)
+        if not itemId or not playerKey then
+            return nil
+        end
+
+        return {
+            itemId = itemId,
+            player = playerName,
+            playerKey = playerKey,
+            source = normalizeOptionalCSVField(source),
+            class = normalizeOptionalCSVField(className),
+            spec = normalizeOptionalCSVField(spec),
+            note = normalizeOptionalCSVField(note),
+            plus = tonumber(plus) or 0,
+        }
+    end
+
+    local function appendParsedCSVRow(rows, fields, headerMap, line, logSkipped)
+        local row = buildParsedCSVRow(fields, headerMap)
+        if row then
+            rows[#rows + 1] = row
+            return true
+        end
+        if logSkipped then
+            addon:debug(Diag.D.LogSRParseSkippedLine:format(tostring(line)))
+        end
+        return false
+    end
+
     local function parseCSVRows(csv)
         local rows = {}
         local headerMap = nil
@@ -784,59 +834,11 @@ do
                     headerMap = map
                 else
                     -- No header detected: treat first line as data
-                    local fields     = maybeHeader
-
-                    local itemIdStr  = cleanCSVField(getField(fields, headerMap, "itemid", 2))
-                    local source     = cleanCSVField(getField(fields, headerMap, "from", 3))
-                    local playerName = cleanCSVField(getField(fields, headerMap, "name", 4))
-                    local class      = cleanCSVField(getField(fields, headerMap, "class", 5))
-                    local spec       = cleanCSVField(getField(fields, headerMap, "spec", 6))
-                    local note       = cleanCSVField(getField(fields, headerMap, "note", 7))
-                    local plus       = cleanCSVField(getField(fields, headerMap, "plus", 8))
-
-                    local itemId     = tonumber(itemIdStr)
-                    local playerKey  = Utils.normalizeLower(playerName, true)
-                    if itemId and playerKey then
-                        rows[#rows + 1] = {
-                            itemId = itemId,
-                            player = playerName,
-                            playerKey = playerKey,
-                            source = source ~= "" and source or nil,
-                            class = class ~= "" and class or nil,
-                            spec = spec ~= "" and spec or nil,
-                            note = note ~= "" and note or nil,
-                            plus = tonumber(plus) or 0,
-                        }
-                    end
+                    appendParsedCSVRow(rows, maybeHeader, headerMap, line, false)
                 end
             else
-                local fields     = splitCSVLine(line)
-
-                local itemIdStr  = cleanCSVField(getField(fields, headerMap, "itemid", 2))
-                local source     = cleanCSVField(getField(fields, headerMap, "from", 3))
-                local playerName = cleanCSVField(getField(fields, headerMap, "name", 4))
-                local class      = cleanCSVField(getField(fields, headerMap, "class", 5))
-                local spec       = cleanCSVField(getField(fields, headerMap, "spec", 6))
-                local note       = cleanCSVField(getField(fields, headerMap, "note", 7))
-                local plus       = cleanCSVField(getField(fields, headerMap, "plus", 8))
-
-                local itemId     = tonumber(itemIdStr)
-                local playerKey  = Utils.normalizeLower(playerName, true)
-
-                if itemId and playerKey then
-                    rows[#rows + 1] = {
-                        itemId = itemId,
-                        player = playerName,
-                        playerKey = playerKey,
-                        source = source ~= "" and source or nil,
-                        class = class ~= "" and class or nil,
-                        spec = spec ~= "" and spec or nil,
-                        note = note ~= "" and note or nil,
-                        plus = tonumber(plus) or 0,
-                    }
-                else
-                    addon:debug(Diag.D.LogSRParseSkippedLine:format(tostring(line)))
-                end
+                local fields = splitCSVLine(line)
+                appendParsedCSVRow(rows, fields, headerMap, line, true)
             end
         end
 

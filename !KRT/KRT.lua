@@ -382,12 +382,6 @@ do
     addon:RegisterEvent("ADDON_LOADED")
 end
 
--- Alias: redirect to Utils for backwards compatibility
--- (function moved to Utils.lua; this wrapper allows existing code to use addon:makeUIFrameController(...))
-function addon:makeUIFrameController(getFrame, requestRefreshFn)
-    return Utils.makeUIFrameController(getFrame, requestRefreshFn)
-end
-
 local function bindModuleRequestRefresh(module, getFrame)
     local requestRefresh = Utils.makeEventDrivenRefresher(getFrame, function()
         module:Refresh()

@@ -1174,6 +1174,37 @@ function Utils.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
     return uiController
 end
 
+-- Binds input handlers for frame edit boxes using suffix descriptors.
+-- specs example:
+--   { suffix = "Name", onEnter = fn, onEscape = fn },
+--   { suffix = "Content", onEnter = fn, onEscape = fn }
+function Utils.bindEditBoxHandlers(frameName, specs, requestRefreshFn)
+    if type(frameName) ~= "string" or type(specs) ~= "table" then
+        return
+    end
+
+    for i = 1, #specs do
+        local spec = specs[i]
+        local suffix = spec and spec.suffix
+        local editBox = suffix and _G[frameName .. suffix] or nil
+        if editBox then
+            if spec.onEscape then
+                editBox:SetScript("OnEscapePressed", spec.onEscape)
+            end
+            if spec.onEnter then
+                editBox:SetScript("OnEnterPressed", spec.onEnter)
+            end
+            if requestRefreshFn then
+                editBox:SetScript("OnTextChanged", function(_, isUserInput)
+                    if isUserInput then
+                        requestRefreshFn()
+                    end
+                end)
+            end
+        end
+    end
+end
+
 -- =========== UI Frame Controller Factory  =========== --
 -- Consolidates recurring Toggle/Hide/Show patterns across UI modules.
 function Utils.makeUIFrameController(getFrame, requestRefreshFn)
@@ -1698,6 +1729,53 @@ function Utils.setText(frame, str1, str2, cond)
     else
         frame:SetText(str2)
     end
+end
+
+-- Resolve a named child/global frame part by concatenating frameName and suffix.
+function Utils.getNamedFramePart(frameName, suffix)
+    if type(frameName) ~= "string" or frameName == "" then
+        return nil
+    end
+    if type(suffix) ~= "string" or suffix == "" then
+        return nil
+    end
+    return _G[frameName .. suffix]
+end
+
+-- Enable/disable a named frame part (safe if missing).
+function Utils.enableDisableNamedPart(frameName, suffix, cond)
+    local frame = Utils.getNamedFramePart(frameName, suffix)
+    if frame then
+        Utils.enableDisable(frame, cond)
+    end
+    return frame
+end
+
+-- Show/hide a named frame part (safe if missing).
+function Utils.showHideNamedPart(frameName, suffix, cond)
+    local frame = Utils.getNamedFramePart(frameName, suffix)
+    if frame then
+        Utils.showHide(frame, cond)
+    end
+    return frame
+end
+
+-- Set text on a named frame part using the same condition contract as Utils.setText.
+function Utils.setTextNamedPart(frameName, suffix, str1, str2, cond)
+    local frame = Utils.getNamedFramePart(frameName, suffix)
+    if frame then
+        Utils.setText(frame, str1, str2, cond)
+    end
+    return frame
+end
+
+-- Update text mode only when the mode value changes; returns the resulting mode cache value.
+function Utils.updateModeTextNamedPart(frameName, suffix, str1, str2, mode, lastMode)
+    if mode ~= lastMode then
+        Utils.setTextNamedPart(frameName, suffix, str1, str2, mode)
+        return mode
+    end
+    return lastMode
 end
 
 -- =========== Chat + comms helpers  =========== --

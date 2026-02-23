@@ -268,19 +268,11 @@ do
         _G[frameName .. "DemandBtn"]:SetText(L.BtnDemand)
         _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
         Utils.setFrameTitle(frameName, L.StrChanges)
-        _G[frameName .. "Name"]:SetScript("OnEnterPressed", module.Edit)
-        _G[frameName .. "Spec"]:SetScript("OnEnterPressed", module.Edit)
-        _G[frameName .. "Name"]:SetScript("OnEscapePressed", CancelChanges)
-        _G[frameName .. "Spec"]:SetScript("OnEscapePressed", CancelChanges)
-        _G[frameName .. "Name"]:SetScript("OnTextChanged", function(_, isUserInput)
-            if isUserInput then
-                module:RequestRefresh()
-            end
-        end)
-        _G[frameName .. "Spec"]:SetScript("OnTextChanged", function(_, isUserInput)
-            if isUserInput then
-                module:RequestRefresh()
-            end
+        Utils.bindEditBoxHandlers(frameName, {
+            { suffix = "Name", onEscape = CancelChanges, onEnter = module.Edit },
+            { suffix = "Spec", onEscape = CancelChanges, onEnter = module.Edit },
+        }, function()
+            module:RequestRefresh()
         end)
         localized = true
     end
@@ -303,24 +295,33 @@ do
             lastSelectedID = selectedID
             controller:Touch()
         end
-        Utils.showHide(_G[frameName .. "Name"], (isEdit or isAdd))
-        Utils.showHide(_G[frameName .. "Spec"], (isEdit or isAdd))
-        Utils.enableDisable(_G[frameName .. "EditBtn"], (selectedID or isEdit or isAdd))
+        Utils.showHideNamedPart(frameName, "Name", (isEdit or isAdd))
+        Utils.showHideNamedPart(frameName, "Spec", (isEdit or isAdd))
+        Utils.enableDisableNamedPart(frameName, "EditBtn", (selectedID or isEdit or isAdd))
         local editBtnMode = isAdd or (selectedID and isEdit)
-        if editBtnMode ~= lastEditBtnMode then
-            Utils.setText(_G[frameName .. "EditBtn"], L.BtnSave, L.BtnEdit, editBtnMode)
-            lastEditBtnMode = editBtnMode
-        end
+        lastEditBtnMode = Utils.updateModeTextNamedPart(
+            frameName,
+            "EditBtn",
+            L.BtnSave,
+            L.BtnEdit,
+            editBtnMode,
+            lastEditBtnMode
+        )
         local addBtnMode = (not selectedID and not isEdit and not isAdd)
-        if addBtnMode ~= lastAddBtnMode then
-            Utils.setText(_G[frameName .. "AddBtn"], L.BtnAdd, L.BtnDelete, addBtnMode)
-            lastAddBtnMode = addBtnMode
-        end
-        Utils.showHide(_G[frameName .. "AddBtn"], (not isEdit and not isAdd))
-        Utils.enableDisable(_G[frameName .. "ClearBtn"], count > 0)
-        Utils.enableDisable(_G[frameName .. "AnnounceBtn"], count > 0)
-        Utils.enableDisable(_G[frameName .. "AddBtn"], addon.Core.getCurrentRaid())
-        Utils.enableDisable(_G[frameName .. "DemandBtn"], addon.Core.getCurrentRaid())
+        lastAddBtnMode = Utils.updateModeTextNamedPart(
+            frameName,
+            "AddBtn",
+            L.BtnAdd,
+            L.BtnDelete,
+            addBtnMode,
+            lastAddBtnMode
+        )
+        Utils.showHideNamedPart(frameName, "AddBtn", (not isEdit and not isAdd))
+        Utils.enableDisableNamedPart(frameName, "ClearBtn", count > 0)
+        Utils.enableDisableNamedPart(frameName, "AnnounceBtn", count > 0)
+        local hasRaid = addon.Core.getCurrentRaid()
+        Utils.enableDisableNamedPart(frameName, "AddBtn", hasRaid)
+        Utils.enableDisableNamedPart(frameName, "DemandBtn", hasRaid)
     end
 
     function module:Refresh()
