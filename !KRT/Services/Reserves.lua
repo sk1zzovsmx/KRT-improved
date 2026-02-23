@@ -599,6 +599,8 @@ do
         end
     end
 
+    -- ----- Public methods ----- --
+
     -- ----- Saved Data Management ----- --
 
     function Service:Save()

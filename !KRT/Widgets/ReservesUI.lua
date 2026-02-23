@@ -29,6 +29,8 @@ do
     local UI = addon.ReservesUI
     module.UI = UI
 
+    -- ----- Internal state ----- --
+
     local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
     local frameName
     local getFrame = Utils.makeFrameGetter("KRTReserveListFrame")
@@ -49,6 +51,8 @@ do
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
+
+    -- ----- Private helpers ----- --
 
     local function FormatReserveItemIdLabel(itemId)
         return format(L.StrReservesItemIdLabel, tostring(itemId or "?"))
@@ -320,6 +324,8 @@ do
         row.separator = separator
         row._decorInitialized = true
     end
+
+    -- ----- Public methods ----- --
 
     function UI:CreateReserveHeader(parent, source, yOffset, index)
         local headerName = frameName .. "ReserveHeader" .. index
