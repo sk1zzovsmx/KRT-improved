@@ -1,7 +1,8 @@
---[[
-    EntryPoints/Minimap.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
@@ -10,10 +11,43 @@ local Utils = feature.Utils
 
 local K_COLOR = feature.K_COLOR
 
+local UI = addon.UI or {}
+if type(UI.Call) ~= "function" then
+    UI.Call = function()
+        return nil
+    end
+end
+
 -- =========== Minimap Button Module  =========== --
 do
     addon.Minimap = addon.Minimap or {}
     local module = addon.Minimap
+
+    local function getMasterController()
+        local controllers = addon.Controllers
+        return controllers and controllers.Master or nil
+    end
+
+    local function getLoggerController()
+        local controllers = addon.Controllers
+        return controllers and controllers.Logger or nil
+    end
+
+    local function getWarningsController()
+        local controllers = addon.Controllers
+        return controllers and controllers.Warnings or nil
+    end
+
+    local function getChangesController()
+        local controllers = addon.Controllers
+        return controllers and controllers.Changes or nil
+    end
+
+    local function getSpammerController()
+        local controllers = addon.Controllers
+        return controllers and controllers.Spammer or nil
+    end
+
     -- ----- Internal state ----- --
     local addonMenu
     local dragMode
@@ -26,19 +60,82 @@ do
     -- ----- Private helpers ----- --
     -- Menu definition for EasyMenu (built once).
     local minimapMenu = {
-        { text = MASTER_LOOTER,    notCheckable = 1, func = function() addon.Master:Toggle() end },
-        { text = L.StrLootCounter, notCheckable = 1, func = function() addon.LootCounter:Toggle() end },
-        { text = L.StrLootLogger,  notCheckable = 1, func = function() addon.Logger:Toggle() end },
+        {
+            text = MASTER_LOOTER,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getMasterController()
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
+        { text = L.StrLootCounter, notCheckable = 1, func = function() UI:Call("LootCounter", "Toggle") end },
+        {
+            text = L.StrLootLogger,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getLoggerController()
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
         { text = " ",              disabled = 1,     notCheckable = 1 },
         { text = L.StrClearIcons,  notCheckable = 1, func = function() addon.Raid:ClearRaidIcons() end },
         { text = " ",              disabled = 1,     notCheckable = 1 },
-        { text = RAID_WARNING,     notCheckable = 1, func = function() addon.Warnings:Toggle() end },
+        {
+            text = RAID_WARNING,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getWarningsController()
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
         { text = " ",              disabled = 1,     notCheckable = 1 },
-        { text = L.StrMSChanges,   notCheckable = 1, func = function() addon.Changes:Toggle() end },
-        { text = L.BtnDemand,      notCheckable = 1, func = function() addon.Changes:Demand() end },
-        { text = CHAT_ANNOUNCE,    notCheckable = 1, func = function() addon.Changes:Announce() end },
+        {
+            text = L.StrMSChanges,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getChangesController()
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
+        {
+            text = L.BtnDemand,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getChangesController()
+                if moduleRef and moduleRef.Demand then
+                    moduleRef:Demand()
+                end
+            end
+        },
+        {
+            text = CHAT_ANNOUNCE,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getChangesController()
+                if moduleRef and moduleRef.Announce then
+                    moduleRef:Announce()
+                end
+            end
+        },
         { text = " ",              disabled = 1,     notCheckable = 1 },
-        { text = L.StrLFMSpam,     notCheckable = 1, func = function() addon.Spammer:Toggle() end },
+        {
+            text = L.StrLFMSpam,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getSpammerController()
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
     }
 
     -- Initializes and opens the menu for the minimap button.
@@ -122,7 +219,7 @@ do
             -- Ignore clicks if Shift or Alt keys are held:
             if IsShiftKeyDown() or IsAltKeyDown() then return end
             if button == "RightButton" then
-                addon.Config:Toggle()
+                UI:Call("Config", "Toggle")
             elseif button == "LeftButton" then
                 ToggleMenu()
             end

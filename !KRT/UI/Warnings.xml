@@ -74,11 +74,7 @@
 			</Anchors>
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
-		<Scripts>
-			<OnLoad>self:RegisterForClicks("LeftButtonUp")</OnLoad>
-			<OnClick>KRT.Warnings:Select(self, button)</OnClick>
-		</Scripts>
-	</Button>
+</Button>
 	<!-- The Frame: Raid Warnings -->
 	<Frame name="KRTWarnings" inherits="KRTFrameTemplate">
 		<Size>
@@ -168,10 +164,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString inherits="GameFontHighlight" />
-				<Scripts>
-					<OnTabPressed>_G[self:GetParent():GetName().."Content"]:SetFocus()</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<EditBox name="$parentContent" inherits="KRTEditBoxTemplate" letters="255">
 				<Size>
 					<AbsDimension x="225" y="20" />
@@ -183,10 +176,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnTabPressed>_G[self:GetParent():GetName().."Name"]:SetFocus()</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
@@ -198,10 +188,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Warnings:Edit(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
@@ -213,10 +200,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Warnings:Delete(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentAnnounceBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="85" y="25" />
@@ -228,19 +212,12 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Warnings:Announce()</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 		</Frames>
-		<Scripts>
-			<OnLoad>KRT.Warnings:OnLoad(self)</OnLoad>
-			<OnShow>KRT.Warnings:Cancel()</OnShow>
-			<OnHide>KRT.Warnings:Cancel()</OnHide>
-		</Scripts>
-	</Frame>
+</Frame>
 	<!-- ====== End of Warnings ====== -->
 	<!-- ====== Start of Master Loot Frame ====== -->
 	<!-- Item Selection Frame -->
 </Ui>
+
 

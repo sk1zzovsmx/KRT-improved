@@ -1,13 +1,15 @@
---[[
-    Widgets/ReservesUI.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Events = feature.Events or addon.Events or {}
 local C = feature.C
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
@@ -20,14 +22,27 @@ local pairs, type = pairs, type
 local format = string.format
 local tostring, tonumber = tostring, tonumber
 
-do
-    addon.Reserves = addon.Reserves or {}
-    local module = addon.Reserves
-    local Service = module.Service
+local InternalEvents = Events.Internal
+local UIFacade = addon.UI
 
-    addon.ReservesUI = addon.ReservesUI or {}
-    local UI = addon.ReservesUI
-    module.UI = UI
+local function isWidgetEnabled(widgetId)
+    if UIFacade and type(UIFacade.IsEnabled) == "function" then
+        return UIFacade:IsEnabled(widgetId)
+    end
+    return true
+end
+
+do
+    if not isWidgetEnabled("Reserves") then
+        return
+    end
+
+    addon.Widgets = addon.Widgets or {}
+    addon.Widgets.ReservesUI = addon.Widgets.ReservesUI or addon.ReservesUI or {}
+    addon.ReservesUI = addon.Widgets.ReservesUI -- Legacy alias during namespacing migration.
+    local module = addon.Widgets.ReservesUI
+    local UI = module
+    local Service = addon.Services and addon.Services.Reserves and addon.Services.Reserves.Service
 
     -- ----- Internal state ----- --
 
@@ -280,7 +295,7 @@ do
 
     local function UpdateUIFrame()
         LocalizeUIFrame()
-        local hasData = module:HasData()
+        local hasData = Service and Service.HasData and Service:HasData() or false
         local clearButton = _G[frameName .. "ClearButton"]
         if clearButton then
             if hasData then
@@ -389,7 +404,6 @@ do
     local function RenderReserveListUI()
         local frame = getFrame()
         if not frame or not scrollChild then return end
-        module.frame = frame
 
         for i = 1, #reserveItemRows do
             reserveItemRows[i]:Hide()
@@ -446,8 +460,34 @@ do
         GameTooltip:Hide()
     end
 
+    function UI:QueryItemInfo(itemId)
+        if not (Service and Service.QueryItemInfo) then
+            return false
+        end
+        return Service:QueryItemInfo(itemId)
+    end
+
+    function UI:QueryMissingItems(silent)
+        if not (Service and Service.QueryMissingItems) then
+            return false, 0
+        end
+
+        local updated, count = Service:QueryMissingItems(silent, function(itemId)
+            UI:PrimeItemInfoQuery(itemId)
+        end)
+
+        if updated then
+            UI:RequestRefresh()
+        end
+
+        return updated, count
+    end
+
     local function ResetSavedFromUI()
-        local out = module:ResetSaved()
+        local out
+        if Service and Service.ResetSaved then
+            out = Service:ResetSaved()
+        end
         if module.Hide then
             module.Hide(module)
         end
@@ -481,7 +521,6 @@ do
         })
         if not frameName then return end
 
-        module.frame = frame
         scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"]
         scrollChild = scrollFrame and scrollFrame.ScrollChild or _G["KRTReserveListFrameScrollChild"]
 
@@ -506,7 +545,7 @@ do
         local queryButton = _G["KRTReserveListFrameQueryButton"]
         if queryButton then
             queryButton:SetScript("OnClick", function()
-                module:QueryMissingItems(false)
+                UI:QueryMissingItems(false)
             end)
             addon:debug(Diag.D.LogReservesBindButton:format("QueryButton", "QueryMissingItems"))
         end
@@ -521,9 +560,9 @@ do
                 return
             end
 
-            local resolved = module:QueryItemInfo(itemId)
+            local resolved = UI:QueryItemInfo(itemId)
             if resolved then
-                module:RequestRefresh()
+                UI:RequestRefresh()
             else
                 UI:PrimeItemInfoQuery(itemId)
             end
@@ -548,8 +587,8 @@ do
     })
 
     local function GetImportModeString()
-        if addon.Reserves and addon.Reserves.GetImportMode then
-            return addon.Reserves:GetImportMode()
+        if Service and Service.GetImportMode then
+            return Service:GetImportMode()
         end
         local value = addon.options and addon.options.srImportMode
         if value == MODE_PLUS then return "plus" end
@@ -577,11 +616,13 @@ do
         if Import.Hide then
             Import:Hide()
         end
-        local reserveFrame = (addon.Reserves and addon.Reserves.frame) or _G["KRTReserveListFrame"]
+        local reserveFrame = getFrame()
         if not (reserveFrame and reserveFrame.IsShown and reserveFrame:IsShown()) then
-            addon.Reserves:Toggle()
+            if module.Toggle then
+                module:Toggle()
+            end
         else
-            addon.Reserves:RequestRefresh()
+            module:RequestRefresh()
         end
     end
 
@@ -608,13 +649,13 @@ do
             OnAccept = function(_, data)
                 if type(data) ~= "table" or type(data.csv) ~= "string" then return end
                 Import:SetImportMode(MODE_MULTI)
-                local parsed = addon.Reserves:ParseImport(data.csv, "multi")
+                local parsed = Service and Service.ParseImport and Service:ParseImport(data.csv, "multi")
                 if not parsed then
                     SetImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
                     return
                 end
 
-                local ok, nPlayers = addon.Reserves:ApplyImport(parsed, nil, { reason = "import" })
+                local ok, nPlayers = Service:ApplyImport(parsed, nil, { reason = "import" })
                 if not ok then
                     SetImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
                     return
@@ -650,8 +691,8 @@ do
 
     function Import:SetImportMode(modeValue, suppressSlider)
         local mode = (modeValue == MODE_PLUS) and "plus" or "multi"
-        if addon.Reserves and addon.Reserves.SetImportMode then
-            addon.Reserves:SetImportMode(mode, true)
+        if Service and Service.SetImportMode then
+            Service:SetImportMode(mode, true)
         else
             Utils.setOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
         end
@@ -748,7 +789,7 @@ do
         EnsureWrongCSVPopup()
 
         local mode = GetImportModeString()
-        local parsed, errCode, errData = addon.Reserves:ParseImport(csv, mode, { source = "import_window" })
+        local parsed, errCode, errData = Service:ParseImport(csv, mode, { source = "import_window" })
         if not parsed then
             if errCode == "CSV_WRONG_FOR_PLUS" then
                 SetImportStatus(L.ErrCSVWrongForPlusShort, 1, 0.2, 0.2)
@@ -767,7 +808,7 @@ do
             return false, 0, errCode, errData
         end
 
-        local ok, nPlayersOrErr, applyErrData = addon.Reserves:ApplyImport(parsed, nil, { reason = "import" })
+        local ok, nPlayersOrErr, applyErrData = Service:ApplyImport(parsed, nil, { reason = "import" })
         if not ok then
             SetImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
             return false, 0, nPlayersOrErr, applyErrData
@@ -778,7 +819,37 @@ do
         return true, nPlayersOrErr
     end
 
-    Utils.registerCallback("ReservesDataChanged", function()
+    if addon.UI and addon.UI.Register then
+        addon.UI:Register("Reserves", {
+            Toggle = function()
+                if module.Toggle then
+                    module:Toggle()
+                end
+            end,
+            Hide = function()
+                if module.Hide then
+                    module:Hide()
+                end
+            end,
+            RequestRefresh = function()
+                if module.RequestRefresh then
+                    module:RequestRefresh()
+                end
+            end,
+            ToggleImport = function()
+                if Import.Toggle then
+                    Import:Toggle()
+                end
+            end,
+            HideImport = function()
+                if Import.Hide then
+                    Import:Hide()
+                end
+            end,
+        })
+    end
+
+    Utils.registerCallback(InternalEvents.ReservesDataChanged, function()
         UI:RequestRefresh()
     end)
 end

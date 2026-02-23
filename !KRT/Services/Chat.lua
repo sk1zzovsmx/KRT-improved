@@ -1,7 +1,8 @@
---[[
-    Services/Chat.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
@@ -17,8 +18,10 @@ local tostring = tostring
 
 -- =========== Chat Output Helpers  =========== --
 do
-    addon.Chat = addon.Chat or {}
-    local module = addon.Chat
+    addon.Services = addon.Services or {}
+    addon.Services.Chat = addon.Services.Chat or {}
+    addon.Chat = addon.Services.Chat -- Legacy alias during namespacing migration.
+    local module = addon.Services.Chat
 
     -- ----- Internal state ----- --
     local chatOutputFormat = C.CHAT_OUTPUT_FORMAT

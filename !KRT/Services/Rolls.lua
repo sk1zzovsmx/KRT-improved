@@ -1,19 +1,23 @@
---[[
-    Services/Rolls.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Events = feature.Events or addon.Events or {}
 
 local tContains = feature.tContains
 
 local rollTypes = feature.rollTypes
 
 local lootState = feature.lootState
+
+local InternalEvents = Events.Internal
 
 local GetItem
 
@@ -29,6 +33,35 @@ local function getLootModule()
     return addon.Loot
 end
 
+local function getReservesService()
+    local services = addon.Services
+    return services and services.Reserves or nil
+end
+
+local function getReserveCountForItem(itemId, name)
+    local reserves = getReservesService()
+    if reserves and reserves.GetReserveCountForItem then
+        return reserves:GetReserveCountForItem(itemId, name) or 0
+    end
+    return 0
+end
+
+local function getPlusForItem(itemId, name)
+    local reserves = getReservesService()
+    if reserves and reserves.GetPlusForItem then
+        return reserves:GetPlusForItem(itemId, name) or 0
+    end
+    return 0
+end
+
+local function isPlusSystemEnabled()
+    local reserves = getReservesService()
+    if reserves and reserves.GetPlusForItem and reserves.GetImportMode and reserves.IsPlusSystem then
+        return reserves:IsPlusSystem()
+    end
+    return false
+end
+
 GetItem = function(i)
     local loot = getLootModule()
     return loot and loot.GetItem and loot.GetItem(i) or nil
@@ -37,8 +70,10 @@ end
 -- =========== Rolls Helpers Module  =========== --
 -- Manages roll tracking, sorting, and winner determination.
 do
-    addon.Rolls = addon.Rolls or {}
-    local module = addon.Rolls
+    addon.Services = addon.Services or {}
+    addon.Services.Rolls = addon.Services.Rolls or addon.Rolls or {}
+    addon.Rolls = addon.Services.Rolls -- Legacy alias during namespacing migration.
+    local module = addon.Services.Rolls
     -- Multi-selection context for manual multi-award winner picking (Master Loot window)
     local MS_CTX_ROLLS = "MLRollWinners"
 
@@ -73,7 +108,7 @@ do
         if lootState.currentRollType ~= rollTypes.RESERVED then
             return 1
         end
-        local reserves = addon.Reserves:GetReserveCountForItem(itemId, name)
+        local reserves = getReserveCountForItem(itemId, name)
         return (reserves and reserves > 0) and reserves or 1
     end
 
@@ -103,15 +138,12 @@ do
         local wantLow = addon.options.sortAscending == true
 
         -- SR "Plus priority" is enabled only when the item has no multi-reserve entries.
-        local usePlus = addon.Reserves
-            and addon.Reserves.GetPlusForItem
-            and addon.Reserves.GetImportMode
-            and (addon.Reserves:IsPlusSystem())
+        local usePlus = isPlusSystemEnabled()
 
         for _, entry in ipairs(state.rolls) do
             if module:IsReserved(itemId, entry.name) then
                 local roll = entry.roll
-                local plus = usePlus and (addon.Reserves:GetPlusForItem(itemId, entry.name) or 0) or 0
+                local plus = usePlus and getPlusForItem(itemId, entry.name) or 0
 
                 if not bestName then
                     bestName, bestRoll, bestPlus = entry.name, roll, plus
@@ -144,9 +176,7 @@ do
         return function(name)
             local v = plusCache[name]
             if v == nil then
-                v = (addon.Reserves and addon.Reserves.GetPlusForItem)
-                    and (addon.Reserves:GetPlusForItem(itemId, name) or 0)
-                    or 0
+                v = getPlusForItem(itemId, name)
                 plusCache[name] = v
             end
             return v
@@ -166,11 +196,7 @@ do
         local isSR         = (lootState.currentRollType == rollTypes.RESERVED)
         local wantLow      = (addon.options.sortAscending == true)
 
-        local plusPriority = isSR and itemId
-            and addon.Reserves
-            and addon.Reserves.GetPlusForItem
-            and addon.Reserves.GetImportMode
-            and (addon.Reserves:IsPlusSystem())
+        local plusPriority = isSR and itemId and isPlusSystemEnabled()
 
         local GetPlus      = MakePlusGetter(itemId)
 
@@ -309,7 +335,7 @@ do
             tracker[name] = (tracker[name] or 0) + 1
         end
 
-        Utils.triggerEvent("AddRoll", name, roll)
+        Utils.triggerEvent(InternalEvents.AddRoll, name, roll)
         sortRolls(itemId)
     end
 
@@ -428,7 +454,7 @@ do
 
         local allowed = 1
         if lootState.currentRollType == rollTypes.RESERVED then
-            local reserves = addon.Reserves:GetReserveCountForItem(itemId, player)
+            local reserves = getReserveCountForItem(itemId, player)
             allowed = reserves > 0 and reserves or 1
         end
 
@@ -469,7 +495,7 @@ do
         end
         local tracker = AcquireItemTracker(itemId)
         local used = tracker[name] or 0
-        local reserve = addon.Reserves:GetReserveCountForItem(itemId, name)
+        local reserve = getReserveCountForItem(itemId, name)
         local allowed = (lootState.currentRollType == rollTypes.RESERVED and reserve > 0) and reserve or 1
         return used >= allowed
     end
@@ -528,14 +554,14 @@ do
         local tracker = AcquireItemTracker(itemId)
         local used = tracker[name] or 0
         local allowed = (lootState.currentRollType == rollTypes.RESERVED)
-            and addon.Reserves:GetReserveCountForItem(itemId, name)
+            and getReserveCountForItem(itemId, name)
             or 1
         return used < allowed
     end
 
     -- Checks if a player has reserved the specified item.
     function module:IsReserved(itemId, name)
-        return addon.Reserves:GetReserveCountForItem(itemId, name) > 0
+        return getReserveCountForItem(itemId, name) > 0
     end
 
     -- Gets the number of reserves a player has used for an item.
@@ -546,7 +572,7 @@ do
 
     -- Gets the total number of reserves a player has for an item.
     function module:GetAllowedReserves(itemId, name)
-        return addon.Reserves:GetReserveCountForItem(itemId, name)
+        return getReserveCountForItem(itemId, name)
     end
 
     -- Rebuilds the roll model consumed by Master UI.
@@ -554,11 +580,7 @@ do
         local itemId = self:GetCurrentRollItemID()
         local isSR = lootState.currentRollType == rollTypes.RESERVED
 
-        local plusPriority = isSR and itemId
-            and addon.Reserves
-            and addon.Reserves.GetPlusForItem
-            and addon.Reserves.GetImportMode
-            and (addon.Reserves:IsPlusSystem())
+        local plusPriority = isSR and itemId and isPlusSystemEnabled()
 
         local GetPlus = MakePlusGetter(itemId)
 

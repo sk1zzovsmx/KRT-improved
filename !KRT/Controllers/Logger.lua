@@ -1,15 +1,19 @@
---[[
-    Controllers/Logger.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Core = feature.Core
+
+local InternalEvents = Events.Internal
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -69,8 +73,10 @@ local SetSelectedRaid
 
 -- Logger frame module.
 do
-    addon.Logger   = addon.Logger or {}
-    local module   = addon.Logger
+    addon.Controllers = addon.Controllers or {}
+    addon.Controllers.Logger = addon.Controllers.Logger or addon.Logger or {}
+    addon.Logger   = addon.Controllers.Logger -- Legacy alias during namespacing migration.
+    local module   = addon.Controllers.Logger
 
     -- ----- Internal state ----- --
     local frameName
@@ -86,11 +92,11 @@ do
 
     -- ----- Private helpers ----- --
     local selectionEvents = {
-        selectedRaid = "LoggerSelectRaid",
-        selectedBoss = "LoggerSelectBoss",
-        selectedPlayer = "LoggerSelectPlayer",
-        selectedBossPlayer = "LoggerSelectBossPlayer",
-        selectedItem = "LoggerSelectItem",
+        selectedRaid = InternalEvents.LoggerSelectRaid,
+        selectedBoss = InternalEvents.LoggerSelectBoss,
+        selectedPlayer = InternalEvents.LoggerSelectPlayer,
+        selectedBossPlayer = InternalEvents.LoggerSelectBossPlayer,
+        selectedItem = InternalEvents.LoggerSelectItem,
     }
 
     local function triggerSelectionEvent(target, key, ...)
@@ -841,8 +847,8 @@ do
         else
             module.selectedRaid = tonumber(raidId) or raidId
         end
-        addon.State = addon.State or {}
-        addon.State.selectedRaid = module.selectedRaid
+        local state = addon.State
+        state.selectedRaid = module.selectedRaid
         return module.selectedRaid
     end
 
@@ -867,6 +873,45 @@ do
         clearSelection(module, "selectedPlayer", MS_CTX_RAIDATT)
         clearSelection(module, "selectedBossPlayer", MS_CTX_BOSSATT)
         clearSelection(module, "selectedItem", MS_CTX_LOOT)
+    end
+
+    local rosterUiRefreshDebounceSeconds = 0.25
+
+    local function isLoggerViewingCurrentRaid()
+        local frame = module.frame or getFrame()
+        if not (frame and frame.IsShown and frame:IsShown()) then
+            return false
+        end
+        local currentRaid = Core.getCurrentRaid()
+        return currentRaid and module.selectedRaid and tonumber(module.selectedRaid) == tonumber(currentRaid)
+    end
+
+    local function refreshRosterBoundLists()
+        local raidAttendeesCtrl = module.RaidAttendees and module.RaidAttendees._ctrl
+        if raidAttendeesCtrl and raidAttendeesCtrl.Dirty then
+            raidAttendeesCtrl:Dirty()
+        end
+
+        local bossAttendeesCtrl = module.BossAttendees and module.BossAttendees._ctrl
+        if bossAttendeesCtrl and bossAttendeesCtrl.Dirty then
+            bossAttendeesCtrl:Dirty()
+        end
+
+        local lootCtrl = module.Loot and module.Loot._ctrl
+        if lootCtrl and lootCtrl.Dirty then
+            lootCtrl:Dirty()
+        end
+    end
+
+    local function requestRosterBoundListsRefresh()
+        addon.CancelTimer(module._rosterUiHandle, true)
+        module._rosterUiHandle = addon.NewTimer(rosterUiRefreshDebounceSeconds, function()
+            module._rosterUiHandle = nil
+            if not isLoggerViewingCurrentRaid() then
+                return
+            end
+            refreshRosterBoundLists()
+        end)
     end
 
     local function getRaidNidByIndex(raidIndex)
@@ -905,7 +950,7 @@ do
         if not raid then return end
         fn(raid, rID)
         if refreshEvent ~= false then
-            Utils.triggerEvent(refreshEvent or "LoggerSelectRaid", module.selectedRaid)
+            Utils.triggerEvent(refreshEvent or InternalEvents.LoggerSelectRaid, module.selectedRaid)
         end
     end
 
@@ -1686,7 +1731,7 @@ do
         controller._makeConfirmPopup("KRTLOGGER_DELETE_RAID", L.StrConfirmDeleteRaid, DeleteRaids)
     end
 
-    Utils.registerCallback("RaidCreate", function(_, num)
+    Utils.registerCallback(InternalEvents.RaidCreate, function(_, num)
         -- Context change: selecting a different raid must clear dependent selections.
         SetSelectedRaid(tonumber(num))
         addon.Logger:ResetSelections()
@@ -1694,7 +1739,7 @@ do
         triggerSelectionEvent(addon.Logger, "selectedRaid", "ui")
     end)
 
-    Utils.registerCallback("LoggerSelectRaid", function(_, raidId, reason)
+    Utils.registerCallback(InternalEvents.LoggerSelectRaid, function(_, raidId, reason)
         local raidIdType = type(raidId)
         if raidId == nil then
             addon:warn(Diag.W.LogLoggerSelectRaidPayloadInvalid:format(tostring(raidId), tostring(reason)))
@@ -1724,6 +1769,27 @@ do
         end
 
         controller:Touch()
+    end)
+
+    Utils.registerCallback(InternalEvents.RaidRosterDelta, function(_, delta, rosterVersion, raidId)
+        local raidIdType = type(raidId)
+        if type(delta) ~= "table" then
+            return
+        end
+        if type(rosterVersion) ~= "number" then
+            return
+        end
+        if raidId == nil then
+            return
+        end
+        if raidIdType ~= "number" and raidIdType ~= "string" then
+            return
+        end
+        if not isLoggerViewingCurrentRaid() then
+            return
+        end
+
+        requestRosterBoundListsRefresh()
     end)
 end
 
@@ -1856,8 +1922,8 @@ do
         return boss and boss.name or ""
     end
 
-    Utils.registerCallback("LoggerSelectRaid", function() controller:Dirty() end)
-    Utils.registerCallback("LoggerSelectBoss", function() controller:Touch() end)
+    Utils.registerCallback(InternalEvents.LoggerSelectRaid, function() controller:Dirty() end)
+    Utils.registerCallback(InternalEvents.LoggerSelectBoss, function() controller:Touch() end)
 end
 
 -- Boss attendees list.
@@ -1960,8 +2026,15 @@ do
         controller._makeConfirmPopup("KRTLOGGER_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendees)
     end
 
-    Utils.registerCallbacks({ "LoggerSelectRaid", "LoggerSelectBoss" }, function() controller:Dirty() end)
-    Utils.registerCallback("LoggerSelectBossPlayer", function() controller:Touch() end)
+    Utils.registerCallbacks({
+        InternalEvents.LoggerSelectRaid,
+        InternalEvents.LoggerSelectBoss,
+    }, function()
+        controller:Dirty()
+    end)
+    Utils.registerCallback(InternalEvents.LoggerSelectBossPlayer, function()
+        controller:Touch()
+    end)
 end
 
 -- Raid attendees list.
@@ -2113,8 +2186,8 @@ do
         controller._makeConfirmPopup("KRTLOGGER_DELETE_RAIDATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendees)
     end
 
-    Utils.registerCallback("LoggerSelectRaid", function() controller:Dirty() end)
-    Utils.registerCallback("LoggerSelectPlayer", function() controller:Touch() end)
+    Utils.registerCallback(InternalEvents.LoggerSelectRaid, function() controller:Dirty() end)
+    Utils.registerCallback(InternalEvents.LoggerSelectPlayer, function() controller:Touch() end)
 end
 
 -- Loot list (filters by selected boss and player).
@@ -2436,7 +2509,7 @@ do
         return true
     end
 
-    Utils.registerCallback("LoggerLootLogRequest", function(_, request)
+    Utils.registerCallback(InternalEvents.LoggerLootLogRequest, function(_, request)
         if type(request) ~= "table" then
             addon:error(Diag.E.LogLoggerLootLogRequestPayloadInvalid:format(type(request)))
             return
@@ -2448,11 +2521,16 @@ do
 
     local function Reset() controller:Dirty() end
     Utils.registerCallbacks(
-        { "LoggerSelectRaid", "LoggerSelectBoss", "LoggerSelectPlayer", "LoggerSelectBossPlayer",
-            "RaidLootUpdate" },
+        {
+            InternalEvents.LoggerSelectRaid,
+            InternalEvents.LoggerSelectBoss,
+            InternalEvents.LoggerSelectPlayer,
+            InternalEvents.LoggerSelectBossPlayer,
+            InternalEvents.RaidLootUpdate,
+        },
         Reset
     )
-    Utils.registerCallback("LoggerSelectItem", function() controller:Touch() end)
+    Utils.registerCallback(InternalEvents.LoggerSelectItem, function() controller:Touch() end)
 end
 
 -- Add/edit boss popup (time/mode normalization).

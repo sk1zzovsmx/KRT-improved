@@ -1,7 +1,8 @@
---[[
-    Controllers/Warnings.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
@@ -20,8 +21,10 @@ local tonumber = tonumber
 
 -- =========== Warnings Frame Module  =========== --
 do
-    addon.Warnings = addon.Warnings or {}
-    local module = addon.Warnings
+    addon.Controllers = addon.Controllers or {}
+    addon.Controllers.Warnings = addon.Controllers.Warnings or {}
+    addon.Warnings = addon.Controllers.Warnings -- Legacy alias during namespacing migration.
+    local module = addon.Controllers.Warnings
     local frameName
 
     local getFrame = makeModuleFrameGetter(module, "KRTWarnings")

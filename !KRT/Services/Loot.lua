@@ -1,15 +1,19 @@
---[[
-    Services/Loot.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Events = feature.Events or addon.Events or {}
 local C = feature.C
 
 local itemColors = feature.itemColors
+
+local InternalEvents = Events.Internal
 
 local lootState = feature.lootState
 local itemInfo = feature.itemInfo
@@ -25,8 +29,10 @@ local tostring, tonumber = tostring, tonumber
 -- =========== Loot Helpers Module  =========== --
 -- Manages the loot window items (fetching from loot/inventory).
 do
-    addon.Loot = addon.Loot or {}
-    local module = addon.Loot
+    addon.Services = addon.Services or {}
+    addon.Services.Loot = addon.Services.Loot or addon.Loot or {}
+    addon.Loot = addon.Services.Loot -- Legacy alias during namespacing migration.
+    local module = addon.Services.Loot
 
     -- ----- Internal state ----- --
     local lootTable = {}
@@ -215,11 +221,11 @@ do
     -- Sets the main item display in the UI.
     function module:SetItem(i)
         if not i then
-            Utils.triggerEvent("SetItem", nil, nil)
+            Utils.triggerEvent(InternalEvents.SetItem, nil, nil)
             return
         end
         if not (i.itemName and i.itemLink and i.itemTexture and i.itemColor) then return end
-        Utils.triggerEvent("SetItem", i.itemLink, i)
+        Utils.triggerEvent(InternalEvents.SetItem, i.itemLink, i)
     end
 
     -- Selects an item from the loot list by its index.
@@ -234,7 +240,7 @@ do
     function module:ClearLoot()
         lootTable = twipe(lootTable)
         lootState.lootCount = 0
-        Utils.triggerEvent("SetItem", nil, nil)
+        Utils.triggerEvent(InternalEvents.SetItem, nil, nil)
     end
 
     -- Returns the table for the currently selected item.

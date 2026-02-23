@@ -1,18 +1,23 @@
-local addonName, addon                 = ...
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 
-local setmetatable                     = setmetatable
-local tostring                         = tostring
-local rawset                           = rawset
+local addon = select(2, ...)
+local feature = addon.Core.getFeatureShared()
 
--- Define L *once* with the metatable and assign it directly to addon.L
-addon.L                                = addon.L or {} -- Ensure addon.L exists before setting metatable
-addon.L                                = setmetatable(addon.L, {
+local setmetatable = setmetatable
+local tostring = tostring
+local rawset = rawset
+
+local L = feature.L
+setmetatable(L, {
     __index = function(self, k)
         if k ~= nil then rawset(self, k, tostring(k)) end
         return tostring(k)
     end
 })
-local L                                = addon.L -- Make a local reference for convenience within this file
 
 -- ==================== Callbacks ==================== --
 L.StrCbErrUsage                        = "Usage: KRT:registerCallback(event, callbacks)"

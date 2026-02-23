@@ -1,7 +1,8 @@
---[[
-    Controllers/Spammer.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
@@ -21,8 +22,10 @@ local tostring, tonumber = tostring, tonumber
 
 -- =========== LFM Spam Module  =========== --
 do
-    addon.Spammer = addon.Spammer or {}
-    local module = addon.Spammer
+    addon.Controllers = addon.Controllers or {}
+    addon.Controllers.Spammer = addon.Controllers.Spammer or {}
+    addon.Spammer = addon.Controllers.Spammer -- Legacy alias during namespacing migration.
+    local module = addon.Controllers.Spammer
     -- ----- Internal state ----- --
     local frameName
 

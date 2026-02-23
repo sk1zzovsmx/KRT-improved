@@ -1,20 +1,31 @@
---[[
-    Controllers/Master.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Events = feature.Events or addon.Events or {}
 local C = feature.C
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
 
+local InternalEvents = Events.Internal
+
 local rollTypes = feature.rollTypes
 local RAID_TARGET_MARKERS = feature.RAID_TARGET_MARKERS
+
+local UI = addon.UI or {}
+if type(UI.Call) ~= "function" then
+    UI.Call = function()
+        return nil
+    end
+end
 
 local lootState = feature.lootState
 local itemInfo = feature.itemInfo
@@ -27,6 +38,11 @@ local tostring, tonumber = tostring, tonumber
 
 local function GetLootModule()
     return addon.Loot
+end
+
+local function GetReservesService()
+    local services = addon.Services
+    return services and services.Reserves or nil
 end
 
 local function GetItem(i)
@@ -61,8 +77,10 @@ end
 
 -- =========== Master Looter Frame Module  =========== --
 do
-    addon.Master = addon.Master or {}
-    local module = addon.Master
+    addon.Controllers = addon.Controllers or {}
+    addon.Controllers.Master = addon.Controllers.Master or addon.Master or {}
+    addon.Master = addon.Controllers.Master -- Legacy alias during namespacing migration.
+    local module = addon.Controllers.Master
     local frameName
 
     -- ----- Internal state ----- --
@@ -206,7 +224,7 @@ do
             raidID = raidId,
             ok = false,
         }
-        Utils.triggerEvent("LoggerLootLogRequest", request)
+        Utils.triggerEvent(InternalEvents.LoggerLootLogRequest, request)
         return request.ok == true
     end
 
@@ -772,9 +790,7 @@ do
             end,
         })
         if not frameName then return end
-        if addon.LootCounter and addon.LootCounter.AttachToMaster then
-            addon.LootCounter:AttachToMaster(frame)
-        end
+        UI:Call("LootCounter", "AttachToMaster", frame)
 
         -- Initialize ItemBtn scripts once (clean inventory drop support: click-to-drop).
         local itemBtn = _G[frameName .. "ItemBtn"]
@@ -852,18 +868,17 @@ do
 
     -- Button: Reserve List (contextual)
     function module:BtnReserveList(btn)
-        if addon.Reserves:HasData() then
-            addon.Reserves:Toggle()
+        local reserves = GetReservesService()
+        if reserves and reserves.HasData and reserves:HasData() then
+            UI:Call("Reserves", "Toggle")
         else
-            if addon.ReservesUI and addon.ReservesUI.Import and addon.ReservesUI.Import.Toggle then
-                addon.ReservesUI.Import:Toggle()
-            end
+            UI:Call("Reserves", "ToggleImport")
         end
     end
 
     -- Button: Loot Counter
     function module:BtnLootCounter(btn)
-        if addon.LootCounter and addon.LootCounter.Toggle then addon.LootCounter:Toggle() end
+        UI:Call("LootCounter", "Toggle")
     end
 
     -- Generic function to announce a roll for the current item.
@@ -882,7 +897,10 @@ do
 
             if rollType == rollTypes.RESERVED then
                 -- Chat-safe: keep UI colors in the Reserve Frame, but do not send class color codes in chat.
-                local srList = addon.Reserves:FormatReservedPlayersLine(itemID, false, false, false)
+                local reserves = GetReservesService()
+                local srList = reserves and reserves.FormatReservedPlayersLine
+                    and reserves:FormatReservedPlayersLine(itemID, false, false, false)
+                    or ""
                 local suff = addon.options.sortAscending and "Low" or "High"
                 message = lootState.itemCount > 1
                     and L[chatMsg .. "Multiple" .. suff]:format(srList, itemLink, lootState.itemCount)
@@ -1229,7 +1247,8 @@ do
         FlagButtonsOnChange("banker", lootState.banker)
         FlagButtonsOnChange("disenchanter", lootState.disenchanter)
 
-        local hasReserves = addon.Reserves:HasData()
+        local reserves = GetReservesService()
+        local hasReserves = reserves and reserves.HasData and reserves:HasData() or false
         FlagButtonsOnChange("hasReserves", hasReserves)
 
         local hasItem = ItemExists()
@@ -1239,7 +1258,8 @@ do
         if hasItem then
             itemId = Utils.getItemIdFromLink(GetItemLink())
         end
-        local hasItemReserves = itemId and addon.Reserves:HasItemReserves(itemId) or false
+        local hasItemReserves = itemId and reserves and reserves.HasItemReserves and reserves:HasItemReserves(itemId)
+            or false
         FlagButtonsOnChange("hasItemReserves", hasItemReserves)
         FlagButtonsOnChange("countdownRun", countdownRun)
         FlagButtonsOnChange("flowState", currentFlowState)
@@ -1997,7 +2017,27 @@ do
     end
 
     -- Register some callbacks:
-    Utils.registerCallback("SetItem", function(_, itemLink, itemData)
+    local wowForwardEvents = {
+        "LOOT_OPENED",
+        "LOOT_CLOSED",
+        "LOOT_SLOT_CLEARED",
+        "TRADE_ACCEPT_UPDATE",
+        "TRADE_REQUEST_CANCEL",
+        "TRADE_CLOSED",
+    }
+
+    for i = 1, #wowForwardEvents do
+        local methodName = wowForwardEvents[i]
+        local wowEventName = Events.wowForwarded and Events.wowForwarded(methodName)
+        Utils.registerCallback(wowEventName, function(_, ...)
+            local fn = module[methodName]
+            if fn then
+                fn(module, ...)
+            end
+        end)
+    end
+
+    Utils.registerCallback(InternalEvents.SetItem, function(_, itemLink, itemData)
         if itemLink ~= nil and type(itemLink) ~= "string" then
             addon:warn(Diag.W.LogMLSetItemPayloadInvalid:format(tostring(itemLink), type(itemData)))
             return
@@ -2022,7 +2062,7 @@ do
         module:RequestRefresh()
     end)
 
-    Utils.registerCallback("RaidRosterDelta", function(_, delta, rosterVersion, raidId)
+    Utils.registerCallback(InternalEvents.RaidRosterDelta, function(_, delta, rosterVersion, raidId)
         local raidIdType = type(raidId)
         if type(delta) ~= "table" then
             addon:warn(Diag.W.LogMLRaidRosterDeltaPayloadInvalid:format(type(delta), tostring(rosterVersion),
@@ -2056,11 +2096,11 @@ do
     end)
 
     -- Keep Master UI in sync when SoftRes data changes (import/clear), event-driven.
-    Utils.registerCallback("ReservesDataChanged", function()
+    Utils.registerCallback(InternalEvents.ReservesDataChanged, function()
         module:RequestRefresh()
     end)
 
-    Utils.registerCallback("AddRoll", function(_, name, roll)
+    Utils.registerCallback(InternalEvents.AddRoll, function(_, name, roll)
         if type(name) ~= "string" or name == "" or tonumber(roll) == nil then
             addon:warn(Diag.W.LogMLAddRollPayloadInvalid:format(tostring(name), tostring(roll)))
             return
@@ -2068,12 +2108,12 @@ do
         module:RequestRefresh()
     end)
 
-    Utils.registerCallback("ConfigsortAscending", function()
+    Utils.registerCallback(InternalEvents.ConfigSortAscending, function()
         module:RequestRefresh()
     end)
 
     -- Immediate redraw when toggling the optional +N column in MS roll list.
-    Utils.registerCallback("ConfigshowLootCounterDuringMSRoll", function()
+    Utils.registerCallback(InternalEvents.ConfigShowLootCounterDuringMSRoll, function()
         module:RequestRefresh()
     end)
 end

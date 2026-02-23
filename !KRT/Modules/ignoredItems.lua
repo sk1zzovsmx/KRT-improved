@@ -1,11 +1,14 @@
--- Modules/ignoredItems.lua
--- This file is loaded after KRT.lua, so the addon table should be defined.
-local addonName, addon = ...
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 
-if not addon then
-    -- This should ideally not happen if the .toc load order is correct,
-    -- but it's a good defensive check.
-    error(addonName .. " addon table not found when loading ignoredItems.lua")
+local addon = select(2, ...)
+local feature = addon.Core.getFeatureShared()
+
+if not feature.Core then
+    error("KRT core not initialized when loading Modules/ignoredItems.lua")
 end
 
 -- Items to ignore when adding raids loot:

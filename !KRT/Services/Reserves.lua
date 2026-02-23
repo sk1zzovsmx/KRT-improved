@@ -1,13 +1,15 @@
-﻿--[[
-    Services/Reserves.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Events = feature.Events or addon.Events or {}
 local C = feature.C
 
 local tconcat, twipe = table.concat, table.wipe
@@ -16,11 +18,15 @@ local format = string.format
 
 local tostring, tonumber = tostring, tonumber
 
+local InternalEvents = Events.Internal
+
 -- =========== Reserves Module  =========== --
 -- Manages item reserves, import, and display.
 do
-    addon.Reserves = addon.Reserves or {}
-    local module = addon.Reserves
+    addon.Services = addon.Services or {}
+    addon.Services.Reserves = addon.Services.Reserves or {}
+    addon.Reserves = addon.Services.Reserves -- Legacy alias during namespacing migration.
+    local module = addon.Services.Reserves
     module.Service = module.Service or {}
     local Service = module.Service
     local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
@@ -110,7 +116,7 @@ do
         addon:debug(Diag.D.LogReservesItemReady:format(itemId, pendingItemCount))
         if pendingItemCount == 0 then
             addon:debug(Diag.D.LogReservesPendingComplete)
-            Utils.triggerEvent("ReservesDataChanged", "iteminfo", itemId)
+            Utils.triggerEvent(InternalEvents.ReservesDataChanged, "iteminfo", itemId)
         end
     end
 
@@ -653,7 +659,7 @@ do
         KRT_Reserves = nil
         twipe(reservesData)
         RebuildIndex()
-        Utils.triggerEvent("ReservesDataChanged", "clear")
+        Utils.triggerEvent(InternalEvents.ReservesDataChanged, "clear")
         local clearMessage = L[reserveListClearedKey]
         if clearMessage then
             addon:info(clearMessage)
@@ -995,7 +1001,8 @@ do
         end
 
         local reason = (opts and opts.reason) or "import"
-        Utils.triggerEvent("ReservesDataChanged", reason, raidId, mode, nPlayers)
+        Utils.triggerEvent(InternalEvents.ReservesDataChanged,
+            reason, raidId, mode, nPlayers)
         return true, nPlayers
     end
 
@@ -1290,38 +1297,6 @@ do
         return pendingItemInfo[itemId] ~= nil
     end
 
-    local function GetReservesUI()
-        return addon.ReservesUI or module.UI
-    end
-
-    function module:OnLoad(frame)
-        local ui = GetReservesUI()
-        if ui and ui.OnLoad then
-            return ui:OnLoad(frame)
-        end
-    end
-
-    function module:Refresh()
-        local ui = GetReservesUI()
-        if ui and ui.Refresh then
-            return ui:Refresh()
-        end
-    end
-
-    function module:CreateReserveHeader(parent, source, yOffset, index)
-        local ui = GetReservesUI()
-        if ui and ui.CreateReserveHeader then
-            return ui:CreateReserveHeader(parent, source, yOffset, index)
-        end
-    end
-
-    function module:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
-        local ui = GetReservesUI()
-        if ui and ui.CreateReserveRow then
-            return ui:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
-        end
-    end
-
     function module:Save()
         return Service:Save()
     end
@@ -1387,29 +1362,11 @@ do
     end
 
     function module:QueryMissingItems(silent)
-        local ui = GetReservesUI()
-        local updated, count
-        if ui and ui.PrimeItemInfoQuery then
-            updated, count = Service:QueryMissingItems(silent, function(itemId)
-                ui:PrimeItemInfoQuery(itemId)
-            end)
-        else
-            updated, count = Service:QueryMissingItems(silent)
-        end
-
-        if updated and module.RequestRefresh then
-            module.RequestRefresh(module)
-        end
-
-        return updated, count
+        return Service:QueryMissingItems(silent)
     end
 
     function module:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
-        local icon = Service:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
-        if module.RequestRefresh then
-            module.RequestRefresh(module)
-        end
-        return icon
+        return Service:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
     end
 
     function module:GetReserveCountForItem(itemId, playerName)

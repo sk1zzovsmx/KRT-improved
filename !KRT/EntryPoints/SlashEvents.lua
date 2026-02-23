@@ -1,7 +1,8 @@
---[[
-    EntryPoints/SlashEvents.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
@@ -9,6 +10,13 @@ local L = feature.L
 local Utils = feature.Utils
 
 local RT_COLOR = feature.RT_COLOR
+
+local UI = addon.UI or {}
+if type(UI.Call) ~= "function" then
+    UI.Call = function()
+        return nil
+    end
+end
 
 local pairs, ipairs = pairs, ipairs
 local format = string.format
@@ -19,6 +27,36 @@ local tostring, tonumber = tostring, tonumber
 do
     addon.Slash = addon.Slash or {}
     local module = addon.Slash
+
+    local function getMasterController()
+        local controllers = addon.Controllers
+        return controllers and controllers.Master or nil
+    end
+
+    local function getLoggerController()
+        local controllers = addon.Controllers
+        return controllers and controllers.Logger or nil
+    end
+
+    local function getWarningsController()
+        local controllers = addon.Controllers
+        return controllers and controllers.Warnings or nil
+    end
+
+    local function getChangesController()
+        local controllers = addon.Controllers
+        return controllers and controllers.Changes or nil
+    end
+
+    local function getSpammerController()
+        local controllers = addon.Controllers
+        return controllers and controllers.Spammer or nil
+    end
+
+    local function getSyncerService()
+        local services = addon.Services
+        return services and services.Syncer or nil
+    end
 
     -- ----- Internal state ----- --
     module.sub = module.sub or {}
@@ -69,7 +107,10 @@ do
         if not msg or msg == "" then return end
         local cmd, rest = Utils.splitArgs(msg)
         if cmd == "show" or cmd == "toggle" then
-            addon.Master:Toggle()
+            local moduleRef = getMasterController()
+            if moduleRef and moduleRef.Toggle then
+                moduleRef:Toggle()
+            end
             return
         end
         local fn = self.sub[cmd]
@@ -205,33 +246,48 @@ do
     registerAliases(cmdConfig, function(rest)
         local sub = Utils.splitArgs(rest)
         if sub == "reset" then
-            addon.Config:Default()
+            UI:Call("Config", "Default")
         else
-            addon.Config:Toggle()
+            UI:Call("Config", "Toggle")
         end
     end)
 
     registerAliases(cmdWarnings, function(rest)
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
-            addon.Warnings:Toggle()
+            local moduleRef = getWarningsController()
+            if moduleRef and moduleRef.Toggle then
+                moduleRef:Toggle()
+            end
         elseif sub == "help" then
             addon:info(format(L.StrCmdCommands, "krt rw"), "KRT")
             printHelp("toggle", L.StrCmdToggle)
             printHelp("[ID]", L.StrCmdWarningAnnounce)
         else
-            addon.Warnings:Announce(tonumber(sub))
+            local moduleRef = getWarningsController()
+            if moduleRef and moduleRef.Announce then
+                moduleRef:Announce(tonumber(sub))
+            end
         end
     end)
 
     registerAliases(cmdChanges, function(rest)
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
-            addon.Changes:Toggle()
+            local moduleRef = getChangesController()
+            if moduleRef and moduleRef.Toggle then
+                moduleRef:Toggle()
+            end
         elseif sub == "demand" or sub == "ask" then
-            addon.Changes:Demand()
+            local moduleRef = getChangesController()
+            if moduleRef and moduleRef.Demand then
+                moduleRef:Demand()
+            end
         elseif sub == "announce" or sub == "spam" then
-            addon.Changes:Announce()
+            local moduleRef = getChangesController()
+            if moduleRef and moduleRef.Announce then
+                moduleRef:Announce()
+            end
         else
             addon:info(format(L.StrCmdCommands, "krt ms"), "KRT")
             printHelp("toggle", L.StrCmdToggle)
@@ -243,20 +299,26 @@ do
     registerAliases(cmdLogger, function(rest)
         local sub, arg = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
-            addon.Logger:Toggle()
+            local moduleRef = getLoggerController()
+            if moduleRef and moduleRef.Toggle then
+                moduleRef:Toggle()
+            end
         elseif sub == "req" then
             local raidRefArg, targetArg = Utils.splitArgs(arg)
-            if addon.Syncer and addon.Syncer.RequestLoggerReq then
-                addon.Syncer:RequestLoggerReq(tonumber(raidRefArg), targetArg)
+            local syncer = getSyncerService()
+            if syncer and syncer.RequestLoggerReq then
+                syncer:RequestLoggerReq(tonumber(raidRefArg), targetArg)
             end
         elseif sub == "push" then
             local raidRefArg, targetArg = Utils.splitArgs(arg)
-            if addon.Syncer and addon.Syncer.BroadcastLoggerPush then
-                addon.Syncer:BroadcastLoggerPush(tonumber(raidRefArg), targetArg)
+            local syncer = getSyncerService()
+            if syncer and syncer.BroadcastLoggerPush then
+                syncer:BroadcastLoggerPush(tonumber(raidRefArg), targetArg)
             end
         elseif sub == "sync" then
-            if addon.Syncer and addon.Syncer.RequestLoggerSync then
-                addon.Syncer:RequestLoggerSync()
+            local syncer = getSyncerService()
+            if syncer and syncer.RequestLoggerSync then
+                syncer:RequestLoggerSync()
             end
         else
             addon:info(format(L.StrCmdCommands, "krt logger"), "KRT")
@@ -270,25 +332,26 @@ do
     registerAliases(cmdLoot, function(rest)
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
-            addon.Master:Toggle()
+            local moduleRef = getMasterController()
+            if moduleRef and moduleRef.Toggle then
+                moduleRef:Toggle()
+            end
         end
     end)
 
     registerAliases(cmdCounter, function(rest)
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
-            if addon.LootCounter and addon.LootCounter.Toggle then addon.LootCounter:Toggle() end
+            UI:Call("LootCounter", "Toggle")
         end
     end)
 
     registerAliases(cmdReserves, function(rest)
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
-            addon.Reserves:Toggle()
+            UI:Call("Reserves", "Toggle")
         elseif sub == "import" then
-            if addon.ReservesUI and addon.ReservesUI.Import and addon.ReservesUI.Import.Toggle then
-                addon.ReservesUI.Import:Toggle()
-            end
+            UI:Call("Reserves", "ToggleImport")
         else
             addon:info(format(L.StrCmdCommands, "krt res"), "KRT")
             printHelp("toggle", L.StrCmdToggle)
@@ -299,11 +362,20 @@ do
     registerAliases(cmdLFM, function(rest)
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" or sub == "show" then
-            addon.Spammer:Toggle()
+            local moduleRef = getSpammerController()
+            if moduleRef and moduleRef.Toggle then
+                moduleRef:Toggle()
+            end
         elseif sub == "start" then
-            addon.Spammer:Start()
+            local moduleRef = getSpammerController()
+            if moduleRef and moduleRef.Start then
+                moduleRef:Start()
+            end
         elseif sub == "stop" then
-            addon.Spammer:Stop()
+            local moduleRef = getSpammerController()
+            if moduleRef and moduleRef.Stop then
+                moduleRef:Stop()
+            end
         else
             addon:info(format(L.StrCmdCommands, "krt pug"), "KRT")
             printHelp("toggle", L.StrCmdToggle)

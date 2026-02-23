@@ -2,21 +2,13 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
 	<EditBox name="KRTSpammerEditBox" inherits="KRTEditBoxTemplate" virtual="true">
 		<FontString inherits="GameFontHighlightSmall" />
-		<Scripts>
-			<OnEnterPressed>KRT.Spammer:Save(self)</OnEnterPressed>
-			<OnEditFocusLost>KRT.Spammer:Save(self)</OnEditFocusLost>
-			<OnTextChanged>KRT.Spammer:Pause()</OnTextChanged>
-		</Scripts>
-	</EditBox>
+</EditBox>
 	<!-- CheckBox Template -->
 	<CheckButton name="KRTSpammerCheckButton" inherits="SendMailRadioButtonTemplate" virtual="true">
 		<Size>
 			<AbsDimension x="15" y="15" />
 		</Size>
-		<Scripts>
-			<OnClick>KRT.Spammer:Save(self, button)</OnClick>
-		</Scripts>
-	</CheckButton>
+</CheckButton>
 	<!-- The Frame: LFM Spam -->
 	<Frame name="KRTSpammer" inherits="KRTFrameTemplate">
 		<Size>
@@ -363,10 +355,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Spammer:Clear()</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<EditBox name="$parentName" inherits="KRTSpammerEditBox" letters="15">
 				<Size>
 					<AbsDimension x="75" y="18" />
@@ -378,10 +367,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnTabPressed>KRT.Spammer:Tab("Duration", "Message")</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<Button name="$parentStartBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="26" />
@@ -406,10 +392,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString inherits="GameFontHighlightSmall" justifyH="CENTER" />
-				<Scripts>
-					<OnTabPressed>KRT.Spammer:Tab("Tank", "Name")</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<EditBox name="$parentTank" inherits="KRTSpammerEditBox" letters="1" numeric="true">
 				<Size>
 					<AbsDimension x="25" y="13" />
@@ -422,10 +405,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString justifyH="CENTER" />
-				<Scripts>
-					<OnTabPressed>KRT.Spammer:Tab("TankClass", "Duration")</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<EditBox name="$parentTankClass" inherits="KRTSpammerEditBox">
 				<Size>
 					<AbsDimension x="100" y="13" />
@@ -437,10 +417,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnTabPressed>KRT.Spammer:Tab("Healer", "Tank")</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<EditBox name="$parentHealer" inherits="KRTSpammerEditBox" letters="1" numeric="true">
 				<Size>
 					<AbsDimension x="25" y="13" />
@@ -453,10 +430,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString justifyH="CENTER" />
-				<Scripts>
-					<OnTabPressed>KRT.Spammer:Tab("HealerClass", "TankClass")</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<EditBox name="$parentHealerClass" inherits="KRTSpammerEditBox">
 				<Size>
 					<AbsDimension x="100" y="13" />
@@ -468,10 +442,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnTabPressed>KRT.Spammer:Tab("Melee", "Healer")</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<EditBox name="$parentMelee" inherits="KRTSpammerEditBox" letters="2" numeric="true">
 				<Size>
 					<AbsDimension x="25" y="13" />
@@ -484,10 +455,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString justifyH="CENTER" />
-				<Scripts>
-					<OnTabPressed>KRT.Spammer:Tab("MeleeClass", "HealerClass")</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<EditBox name="$parentMeleeClass" inherits="KRTSpammerEditBox">
 				<Size>
 					<AbsDimension x="100" y="13" />
@@ -499,10 +467,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnTabPressed>KRT.Spammer:Tab("Ranged", "Melee")</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<EditBox name="$parentRanged" inherits="KRTSpammerEditBox" letters="2" numeric="true">
 				<Size>
 					<AbsDimension x="25" y="13" />
@@ -515,10 +480,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString justifyH="CENTER" />
-				<Scripts>
-					<OnTabPressed>KRT.Spammer:Tab("RangedClass", "MeleeClass")</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<EditBox name="$parentRangedClass" inherits="KRTSpammerEditBox">
 				<Size>
 					<AbsDimension x="100" y="13" />
@@ -530,10 +492,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnTabPressed>KRT.Spammer:Tab("Message", "Ranged")</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<EditBox name="$parentMessage" inherits="KRTSpammerEditBox">
 				<Size>
 					<AbsDimension x="100" y="13" />
@@ -550,10 +509,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnTabPressed>KRT.Spammer:Tab("Name", "RangedClass")</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<CheckButton name="$parentChat1" inherits="KRTSpammerCheckButton">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentMessage" relativePoint="BOTTOMLEFT">
@@ -645,12 +601,10 @@
 				</Anchors>
 			</CheckButton>
 		</Frames>
-		<Scripts>
-			<OnLoad>KRT.Spammer:OnLoad(self)</OnLoad>
-		</Scripts>
-	</Frame>
+</Frame>
 	<!-- ====== End of LFM Spam Frame ====== -->
 	<!-- ====== Start of Warnings ====== -->
 	<!-- Raid Warning Button -->
 </Ui>
+
 

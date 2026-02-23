@@ -68,12 +68,7 @@
 				</Anchors>
 			</Button>
 		</Frames>
-		<Scripts>
-			<OnLoad>
-				KRT.Reserves:OnLoad(self)
-			</OnLoad>
-		</Scripts>
-	</Frame>
+</Frame>
 	<!-- ====== Start of Reserve Import Window ====== -->
 	<Frame name="KRTImportWindow" inherits="KRTFrameTemplate" toplevel="true" hidden="true" frameStrata="DIALOG">
 		<Size>
@@ -134,11 +129,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnLoad>KRT.ReservesUI.Import:OnModeSliderLoad(self)</OnLoad>
-					<OnValueChanged>KRT.ReservesUI.Import:OnModeSliderChanged(self, value)</OnValueChanged>
-				</Scripts>
-			</Slider>
+</Slider>
 			<!-- Multiline EditBox for CSV -->
 			<ScrollFrame name="KRTImportScrollFrame" inherits="KRTScrollFrameTemplate">
 				<Size>
@@ -156,10 +147,7 @@
 						<Size>
 							<AbsDimension x="320" y="160" />
 						</Size>
-						<Scripts>
-							<OnEscapePressed>self:ClearFocus()</OnEscapePressed>
-						</Scripts>
-					</EditBox>
+</EditBox>
 				</ScrollChild>
 			</ScrollFrame>
 			<!-- Import Button -->
@@ -174,10 +162,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.ReservesUI.Import:ImportFromEditBox()</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<!-- Cancel Button -->
 			<Button name="KRTImportCancelButton" inherits="KRTButtonTemplate">
 				<Size>
@@ -190,15 +175,10 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.ReservesUI.Import:Hide()</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 		</Frames>
-		<Scripts>
-			<OnLoad>KRT.ReservesUI.Import:OnLoad(self)</OnLoad>
-		</Scripts>
-	</Frame>
+</Frame>
 	<!-- ====== End Reserve Import Window ====== -->
 	<!-- ====== End Reserve List Window ====== -->
 </Ui>
+

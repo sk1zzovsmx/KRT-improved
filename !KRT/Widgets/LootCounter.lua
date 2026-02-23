@@ -1,12 +1,14 @@
---[[
-    Widgets/LootCounter.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Utils = feature.Utils
+local Events = feature.Events or addon.Events or {}
 local C = feature.C
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
@@ -16,13 +18,29 @@ local makeModuleFrameGetter = feature.makeModuleFrameGetter
 local _G = _G
 local twipe = table.wipe
 
-local tostring = tostring
+local type, tostring = type, tostring
+
+local InternalEvents = Events.Internal
+local UI = addon.UI
+
+local function isWidgetEnabled(widgetId)
+    if UI and type(UI.IsEnabled) == "function" then
+        return UI:IsEnabled(widgetId)
+    end
+    return true
+end
 
 -- Loot counter module.
 -- Tracks and edits item distribution counts (MS wins).
 do
-    addon.LootCounter = addon.LootCounter or {}
-    local module = addon.LootCounter
+    if not isWidgetEnabled("LootCounter") then
+        return
+    end
+
+    addon.Widgets = addon.Widgets or {}
+    addon.Widgets.LootCounter = addon.Widgets.LootCounter or addon.LootCounter or {}
+    addon.LootCounter = addon.Widgets.LootCounter -- Legacy alias during namespacing migration.
+    local module = addon.Widgets.LootCounter
 
     -- ----- Internal state ----- --
     local frameName
@@ -282,11 +300,29 @@ do
     end
 
     -- Refresh on roster updates (to keep list aligned).
-    Utils.registerCallback("RaidRosterDelta", requestRefresh)
+    Utils.registerCallback(InternalEvents.RaidRosterDelta, requestRefresh)
 
     -- Refresh when counts actually change (MS loot award or manual +/-/reset).
-    Utils.registerCallback("PlayerCountChanged", requestRefresh)
+    Utils.registerCallback(InternalEvents.PlayerCountChanged, requestRefresh)
 
     -- New raid session: reset view.
-    Utils.registerCallback("RaidCreate", requestRefresh)
+    Utils.registerCallback(InternalEvents.RaidCreate, requestRefresh)
+
+    if addon.UI and addon.UI.Register then
+        addon.UI:Register("LootCounter", {
+            Toggle = function()
+                if module.Toggle then
+                    module:Toggle()
+                end
+            end,
+            Hide = function()
+                if module.Hide then
+                    module:Hide()
+                end
+            end,
+            AttachToMaster = function(masterFrame)
+                module:AttachToMaster(masterFrame)
+            end,
+        })
+    end
 end

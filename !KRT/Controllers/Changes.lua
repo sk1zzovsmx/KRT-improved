@@ -1,13 +1,15 @@
---[[
-    Controllers/Changes.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Events = feature.Events or addon.Events or {}
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -20,10 +22,14 @@ local format = string.format
 
 local tostring = tostring
 
+local InternalEvents = Events.Internal
+
 -- =========== MS Changes Module  =========== --
 do
-    addon.Changes = addon.Changes or {}
-    local module = addon.Changes
+    addon.Controllers = addon.Controllers or {}
+    addon.Controllers.Changes = addon.Controllers.Changes or {}
+    addon.Changes = addon.Controllers.Changes -- Legacy alias during namespacing migration.
+    local module = addon.Controllers.Changes
     local frameName
 
     local getFrame = makeModuleFrameGetter(module, "KRTChanges")
@@ -205,7 +211,7 @@ do
         module:RequestRefresh()
     end
 
-    Utils.registerCallback("RaidLeave", function(e, name)
+    Utils.registerCallback(InternalEvents.RaidLeave, function(e, name)
         module:Delete(name)
         CancelChanges()
     end)

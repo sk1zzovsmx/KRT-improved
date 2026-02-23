@@ -34,10 +34,7 @@
 				</Offset>
 			</Anchor>
 		</Anchors>
-		<Scripts>
-			<OnClick>KRT.Master:BtnSelectedItem(self, button)</OnClick>
-		</Scripts>
-		<Layers>
+<Layers>
 			<Layer level="OVERLAY" textureSubLevel="1">
 				<Texture name="$parentIcon" file="">
 					<Size>
@@ -139,10 +136,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Config:Toggle()</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentSelectItemBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
@@ -154,10 +148,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnSelectItem(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentSpamLootBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
@@ -169,10 +160,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnSpamLoot(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentItemBtn" inherits="KRTItemButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentSelectItemBtn" relativePoint="BOTTOMLEFT">
@@ -194,10 +182,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString inherits="GameFontHighlightSmall" justifyH="LEFT" />
-				<Scripts>
-					<OnEnterPressed>self:ClearFocus()</OnEnterPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<Button name="$parentMSBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="28" y="25" />
@@ -209,10 +194,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnMS(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentOSBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="28" y="25" />
@@ -224,10 +206,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnOS(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentSRBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="28" y="25" />
@@ -239,10 +218,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnSR(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentFreeBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="35" y="25" />
@@ -254,10 +230,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnFree(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentCountdownBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="70" y="25" />
@@ -269,10 +242,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnCountdown(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT">
@@ -298,10 +268,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnAward(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentRollBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="55" y="25" />
@@ -313,10 +280,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Rolls:Roll(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentClearBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="68" y="25" />
@@ -328,10 +292,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnClear(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentHoldBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="25" />
@@ -343,10 +304,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnHold(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Frame name="$parentHoldDropDown" inherits="UIDropDownMenuTemplate">
 				<Anchors>
 					<Anchor point="LEFT" relativeTo="$parentHoldBtn" relativePoint="RIGHT">
@@ -367,10 +325,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnBank(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Frame name="$parentBankDropDown" inherits="UIDropDownMenuTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentBankBtn" relativePoint="TOPRIGHT">
@@ -391,10 +346,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnDisenchant(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Frame name="$parentDisenchantDropDown" inherits="UIDropDownMenuTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentDisenchantBtn" relativePoint="TOPRIGHT">
@@ -417,10 +369,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnReserveList(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentLootCounterBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
@@ -433,14 +382,9 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Master:BtnLootCounter(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 		</Frames>
-		<Scripts>
-			<OnLoad>KRT.Master:OnLoad(self)</OnLoad>
-		</Scripts>
-	</Frame>
+</Frame>
 	<!-- ====== End of Master Loot Frame ====== -->
 </Ui>
+

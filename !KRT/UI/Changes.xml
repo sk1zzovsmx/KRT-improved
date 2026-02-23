@@ -71,11 +71,7 @@
 			</Anchors>
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
-		<Scripts>
-			<OnClick>KRT.Changes:Select(self, button)</OnClick>
-			<OnDoubleClick>KRT.Changes:Edit(self)</OnDoubleClick>
-		</Scripts>
-	</Button>
+</Button>
 	<!-- The Frame: Changes -->
 	<Frame name="KRTChanges" inherits="KRTFrameTemplate">
 		<Size>
@@ -93,10 +89,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Changes:Clear()</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<EditBox name="$parentName" inherits="KRTEditBoxTemplate" letters="20" hidden="true">
 				<Size>
 					<AbsDimension x="65" y="18" />
@@ -109,10 +102,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString inherits="GameFontHighlightSmall" />
-				<Scripts>
-					<OnTabPressed>_G[self:GetParent():GetName().."Spec"]:SetFocus()</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<EditBox name="$parentSpec" inherits="KRTEditBoxTemplate" letters="20" hidden="true">
 				<Size>
 					<AbsDimension x="65" y="18" />
@@ -125,10 +115,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString inherits="GameFontHighlightSmall" />
-				<Scripts>
-					<OnTabPressed>_G[self:GetParent():GetName().."Name"]:SetFocus()</OnTabPressed>
-				</Scripts>
-			</EditBox>
+</EditBox>
 			<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
@@ -140,10 +127,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Changes:Edit(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
@@ -155,10 +139,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Changes:Add(self, button)</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentDemandBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
@@ -170,10 +151,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Changes:Demand()</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<Button name="$parentAnnounceBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
@@ -185,10 +163,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Changes:Announce()</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT">
@@ -204,11 +179,9 @@
 				</Anchors>
 			</ScrollFrame>
 		</Frames>
-		<Scripts>
-			<OnLoad>KRT.Changes:OnLoad(self)</OnLoad>
-		</Scripts>
-	</Frame>
+</Frame>
 	<!-- ====== End of Changes ====== -->
 	<!-- ====== Reserve List Window ====== -->
 </Ui>
+
 

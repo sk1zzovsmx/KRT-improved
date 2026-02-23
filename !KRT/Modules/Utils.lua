@@ -1,126 +1,80 @@
-local addonName, addon = ...
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
+
+local addon = select(2, ...)
+local feature = addon.Core.getFeatureShared()
+
 addon.Utils = addon.Utils or {}
-addon.Diagnose = addon.Diagnose or {}
-
 local Utils = addon.Utils
-local L = addon.L
-local Diag = addon.Diagnose
 
-local type, ipairs = type, ipairs
-local floor, random = math.floor, math.random
-local find = string.find
-local format, gsub = string.format, string.gsub
-local strsub, strlen = string.sub, string.len
-local lower, upper = string.lower, string.upper
-local select = select
-local twipe = table.wipe
-local CreateFrame = CreateFrame
+local L = feature.L
 
-local GetTime = GetTime
-local GetRealmName = GetRealmName
-local GetAchievementLink = GetAchievementLink
+local type = type
+local format = string.format
+local lower = string.lower
+local tostring = tostring
 local UnitIsGroupAssistant = _G.UnitIsGroupAssistant
 local UnitIsGroupLeader = _G.UnitIsGroupLeader
 
-local ITEM_LINK_FORMAT = "|c%s|Hitem:%d:%s|h[%s]|h|r"
-
--- =========== Global convenience helpers (kept as-is)  =========== --
-
--- Shuffle a table:
-_G.table.shuffle = function(t)
-    if type(t) ~= "table" then
-        return t
-    end
-
-    local n = #t
-    while n > 1 do
-        local k = random(1, n)
-        t[n], t[k] = t[k], t[n]
-        n = n - 1
-    end
-    return t
+local function getStrings()
+    return addon.Strings
 end
 
--- Reverse table:
-_G.table.reverse = function(t, count)
-    if type(t) ~= "table" then
-        return t
-    end
-
-    local maxIndex = tonumber(count) or #t
-    if maxIndex < 2 then
-        return t
-    end
-    if maxIndex > #t then
-        maxIndex = #t
-    end
-
-    local i, j = 1, maxIndex
-    while i < j do
-        t[i], t[j] = t[j], t[i]
-        i = i + 1
-        j = j - 1
-    end
-    return t
+local function getOptions()
+    return Utils.Options
 end
 
--- Trim a string:
-_G.string.trim = function(str)
-    if str == nil then
-        return ""
-    end
-    return gsub(tostring(str), "^%s*(.-)%s*$", "%1")
+local function getRaidState()
+    return Utils.RaidState
 end
 
--- String starts with:
-_G.string.startsWith = function(str, piece)
-    if type(str) ~= "string" or type(piece) ~= "string" then
-        return false
-    end
-    return strsub(str, 1, strlen(piece)) == piece
+local function getEventBusCompat()
+    return Utils.EventBusCompat
 end
 
--- String ends with:
-_G.string.endsWith = function(str, piece)
-    -- Check whether a string ends with the provided piece. Fails gracefully if inputs are not strings.
-    if type(str) ~= "string" or type(piece) ~= "string" then
-        return false
-    end
-    local lenPiece = strlen(piece)
-    -- If the main string is shorter than the piece, it cannot end with it.
-    if #str < lenPiece then
-        return false
-    end
-    return strsub(str, -lenPiece) == piece
+local function getUI()
+    return Utils.UI
 end
 
+local function getTooltip()
+    return Utils.Tooltip
+end
 
 -- =========== Debug/state helpers  =========== --
 
 function Utils.isDebugEnabled()
+    local Options = getOptions()
+    if Options and Options.isDebugEnabled then
+        return Options.isDebugEnabled()
+    end
     return addon and addon.State and addon.State.debugEnabled == true
 end
 
 function Utils.applyDebugSetting(enabled)
-    addon.State = addon.State or {}
-    addon.State.debugEnabled = enabled and true or false
-
-    local level
-    if enabled then
-        local levels = addon and addon.Debugger and addon.Debugger.logLevels
-        level = levels and levels.DEBUG
-    else
-        local levels = addon and addon.Debugger and addon.Debugger.logLevels
-        level = levels and levels.INFO
+    local Options = getOptions()
+    if Options and Options.applyDebugSetting then
+        return Options.applyDebugSetting(enabled)
     end
 
+    local state = addon.State
+    state.debugEnabled = enabled and true or false
+
+    local levels = addon and addon.Debugger and addon.Debugger.logLevels
+    local level = enabled and (levels and levels.DEBUG) or (levels and levels.INFO)
     if level and addon and addon.SetLogLevel then
         addon:SetLogLevel(level)
     end
 end
 
--- Write an addon option and keep runtime and SavedVariables in sync.
 function Utils.setOption(key, value)
+    local Options = getOptions()
+    if Options and Options.setOption then
+        return Options.setOption(key, value)
+    end
+
     if type(key) ~= "string" or key == "" then
         return false
     end
@@ -145,26 +99,26 @@ function Utils.setOption(key, value)
     return true
 end
 
+-- =========== Raid/state helpers  =========== --
+
 function Utils.getPlayerName()
-    addon.State = addon.State or {}
-    addon.State.player = addon.State.player or {}
-    local name = addon.State.player.name
+    local RaidState = getRaidState()
+    if RaidState and RaidState.getPlayerName then
+        return RaidState.getPlayerName()
+    end
+    local state = addon.State
+    state.player = state.player or {}
+    local name = state.player.name
         or addon.UnitFullName("player")
-    addon.State.player.name = name
+    state.player.name = name
     return name
 end
 
--- =========== Raid/state helpers  =========== --
-
--- Resolve a raid table and raid number.
---
--- Returns:
---   raidTableOrNil, resolvedRaidNumOrNil
---
--- Notes:
--- - Uses current raid via addon.Core.getCurrentRaid() when raidNum is nil.
--- - Safe when KRT_Raids is nil.
 function Utils.getRaid(raidNum)
+    local RaidState = getRaidState()
+    if RaidState and RaidState.getRaid then
+        return RaidState.getRaid(raidNum)
+    end
     if raidNum == nil then
         local core = addon.Core
         if core and core.getCurrentRaid then
@@ -174,572 +128,21 @@ function Utils.getRaid(raidNum)
             raidNum = state and state.currentRaid or nil
         end
     end
-    if not raidNum then return nil, nil end
+    if not raidNum then
+        return nil, nil
+    end
     local raids = KRT_Raids
     local raid = raids and raids[raidNum] or nil
     return raid, raidNum
 end
 
--- Backwards-friendly alias (some callers prefer PascalCase).
 Utils.GetRaid = Utils.getRaid
 
--- =========== String helpers  =========== --
-
-function Utils.ucfirst(value)
-    if type(value) ~= "string" then
-        value = tostring(value or "")
-    end
-    value = lower(value)
-    return gsub(value, "%a", upper, 1)
-end
-
-function Utils.trimText(value, allowNil)
-    if value == nil then
-        return allowNil and nil or ""
-    end
-    return tostring(value):trim()
-end
-
-function Utils.normalizeName(value, allowNil)
-    local text = Utils.trimText(value, allowNil)
-    if text == nil then
-        return nil
-    end
-    return Utils.ucfirst(text)
-end
-
-function Utils.normalizeLower(value, allowNil)
-    local text = Utils.trimText(value, allowNil)
-    if text == nil then
-        return nil
-    end
-    return lower(text)
-end
-
-function Utils.findAchievement(inp)
-    local out = inp and inp:trim() or ""
-    if out ~= "" and find(out, "%{%d*%}") then
-        local b, e = find(out, "%{%d*%}")
-        local id = strsub(out, b + 1, e - 1)
-        local link = (id and id ~= "" and GetAchievementLink(id)) or ("[" .. id .. "]")
-        out = strsub(out, 1, b - 1) .. link .. strsub(out, e + 1)
-    end
-    return out
-end
-
-function Utils.formatChatMessage(text, prefix, outputFormat, prefixHex)
-    local msgPrefix = prefix or ""
-    if prefixHex then
-        msgPrefix = addon.WrapTextInColorCode(msgPrefix, Utils.normalizeHexColor(prefixHex))
-    end
-    return format(outputFormat or "%s%s", msgPrefix, tostring(text))
-end
-
-function Utils.splitArgs(msg)
-    msg = Utils.trimText(msg)
-    if msg == "" then
-        return "", ""
-    end
-    local cmd, rest = msg:match("^(%S+)%s*(.-)$")
-    return Utils.normalizeLower(cmd), Utils.trimText(rest)
-end
-
-function Utils.getItemIdFromLink(itemLink)
-    if not itemLink then return nil end
-    local _, itemId = addon.Deformat(itemLink, ITEM_LINK_FORMAT)
-    return itemId
-end
-
--- Extract a stable "itemString" identifier from an item link.
---
--- This is safer than using only itemId because it preserves meaningful
--- link fields (e.g. random suffix / uniqueId) when present.
-function Utils.getItemStringFromLink(itemLink)
-    if type(itemLink) ~= "string" or itemLink == "" then
-        return nil
-    end
-
-    -- Fast-path: capture the raw itemString from the hyperlink.
-    -- Includes potential negative numbers (suffix IDs) in WotLK links.
-    local itemString = itemLink:match("|H(item:[%-%d:]+)|h")
-    if itemString then
-        return itemString
-    end
-
-    -- Fallback: use LibDeformat pattern used elsewhere in the addon.
-    local _, itemId, rest = addon.Deformat(itemLink, ITEM_LINK_FORMAT)
-    if itemId then
-        if rest and rest ~= "" then
-            return "item:" .. tostring(itemId) .. ":" .. tostring(rest)
-        end
-        return "item:" .. tostring(itemId)
-    end
-
-    return nil
-end
-
--- =========== UI helpers  =========== --
-
--- Enable basic drag-to-move behavior on a frame.
---
--- Intentionally kept in Lua (not XML) so window behavior is standardized
--- without embedding logic into Templates.xml.
-function Utils.enableDrag(frame, dragButton)
-    if not frame or not frame.RegisterForDrag then return end
-    -- Ensure the frame is draggable even if XML didn't set these.
-    if frame.SetMovable then frame:SetMovable(true) end
-    if frame.EnableMouse then frame:EnableMouse(true) end
-    if frame.SetClampedToScreen then frame:SetClampedToScreen(true) end
-
-    -- Provide default drag handlers in Lua so Templates.xml stays layout-only.
-    --
-    -- IMPORTANT: do NOT override custom drag scripts (some frames intentionally
-    -- move their parent). Only set handlers when none exist.
-    if frame.GetScript and frame.SetScript then
-        if not frame:GetScript("OnDragStart") then
-            frame:SetScript("OnDragStart", function(self)
-                if self.StartMoving then
-                    self:StartMoving()
-                end
-            end)
-        end
-        if not frame:GetScript("OnDragStop") then
-            frame:SetScript("OnDragStop", function(self)
-                if self.StopMovingOrSizing then
-                    self:StopMovingOrSizing()
-                end
-            end)
-        end
-    end
-
-    frame:RegisterForDrag(dragButton or "LeftButton")
-end
-
---
--- createRowDrawer(fn)
---
--- Wraps a row drawing function with logic to cache and return the row height.
--- Each invocation of this helper returns a new closure with its own cached
--- height. The supplied callback should perform any per-row UI updates but
--- MUST NOT return a value; the wrapper will return the cached height on
--- each call.
---
--- Example:
---   drawRow = Utils.createRowDrawer(function(row, it)
---       local ui = row._p
---       ui.ID:SetText(it.id)
---   end)
-function Utils.createRowDrawer(fn)
-    local rowHeight
-    return function(row, it)
-        if not rowHeight then
-            rowHeight = (row and row:GetHeight()) or 20
-        end
-        fn(row, it)
-        return rowHeight
-    end
-end
-
--- =========== List controller helper  =========== --
--- Generic scroll list controller with row pooling, sorting, and selection visuals.
-function Utils.makeListController(cfg)
-    local self = {
-        frameName = nil,
-        data = {},
-        _rows = {},
-        _rowByName = {},
-        _usedNames = {},
-        _asc = false,
-        _sortKey = nil,
-        _lastHL = nil,
-        _active = false,
-        _localized = false,
-        _lastWidth = nil,
-        _dirty = true,
-    }
-
-    local defer = CreateFrame("Frame")
-    defer:Hide()
-
-    local function buildRowParts(btnName, row)
-        if cfg._rowParts and not row._p then
-            local p = {}
-            for i = 1, #cfg._rowParts do
-                local part = cfg._rowParts[i]
-                p[part] = _G[btnName .. part]
-            end
-            row._p = p
-        end
-    end
-
-    local function acquireRow(btnName, parent)
-        local row = self._rowByName[btnName]
-        if row then
-            row:Show()
-            if Utils and Utils.ensureRowVisuals then
-                Utils.ensureRowVisuals(row)
-            end
-            return row
-        end
-
-        row = CreateFrame("Button", btnName, parent, cfg.rowTmpl)
-        self._rowByName[btnName] = row
-        buildRowParts(btnName, row)
-        if Utils and Utils.ensureRowVisuals then
-            Utils.ensureRowVisuals(row)
-        end
-        return row
-    end
-
-    local function releaseData()
-        for i = 1, #self.data do
-            twipe(self.data[i])
-        end
-        twipe(self.data)
-    end
-
-    local function refreshData()
-        releaseData()
-        if cfg.getData then
-            cfg.getData(self.data)
-        end
-    end
-
-    local function ensureLocalized()
-        if not self._localized and cfg.localize then
-            cfg.localize(self.frameName)
-            self._localized = true
-        end
-    end
-
-    local function setActive(active)
-        self._active = active
-        if self._active then
-            ensureLocalized()
-            -- Reset one-shot diagnostics each time the list becomes active (OnShow).
-            self._loggedFetch = nil
-            self._loggedWidgets = nil
-            self._warnW0 = nil
-            self._missingScroll = nil
-            self:Dirty()
-            return
-        end
-        releaseData()
-        for i = 1, #self._rows do
-            local row = self._rows[i]
-            if row then row:Hide() end
-        end
-        self._lastHL = nil
-    end
-
-    local function safeRightInset(sf, sc, frameName)
-        if cfg.rightInset ~= nil then
-            return cfg.rightInset
-        end
-
-        local sb = nil
-        if sf and sf.GetName then
-            sb = _G[sf:GetName() .. "ScrollBar"]
-        end
-        if not sb and sf then
-            sb = sf.ScrollBar
-        end
-        if not sb and frameName then
-            sb = _G[frameName .. "ScrollFrameScrollBar"]
-        end
-
-        -- Robust calc: how far the scroll child extends under the scrollbar.
-        -- Avoid oversized estimated insets that create visible gaps.
-        if sb and sc and sb.IsShown and sb:IsShown() and sb.GetLeft and sc.GetRight then
-            local sbL = sb:GetLeft()
-            local scR = sc:GetRight()
-            if sbL and scR then
-                local overlap = scR - sbL
-                if overlap > 0 then
-                    -- No extra padding; row template already handles spacing.
-                    return overlap
-                end
-                return 0
-            end
-        end
-
-        -- Fallback: conservative without extra padding.
-        local width = sb and sb.GetWidth and sb:GetWidth()
-        if width and width > 0 then
-            return width
-        end
-        return 0
-    end
-
-    local function safeRowHeight(row, declaredHeight)
-        local height = declaredHeight
-        if height == nil and row and row.GetHeight then
-            height = row:GetHeight()
-        end
-        if type(height) ~= "number" or height < 1 then
-            return 20
-        end
-        return height
-    end
-
-    local function applyHighlight()
-        -- Selection overlay (multi or legacy single) + Focus border (one row).
-        -- Keep hover highlight native (no LockHighlight for selection).
-        local selectedId = cfg.highlightId and cfg.highlightId() or nil
-        local focusId = (cfg.focusId and cfg.focusId()) or selectedId
-
-        local selKey
-        if cfg.highlightId then
-            -- Legacy: single selection (use the selected id as key)
-            selKey = selectedId and ("id:" .. tostring(selectedId)) or "id:nil"
-        elseif cfg.highlightFn then
-            selKey = (cfg.highlightKey and cfg.highlightKey()) or false
-        else
-            selKey = false
-        end
-
-        local focusKey = (cfg.focusKey and cfg.focusKey()) or
-            (focusId ~= nil and ("f:" .. tostring(focusId)) or "f:nil")
-        local combo = tostring(selKey) .. "|" .. tostring(focusKey)
-        if combo == self._lastHL then return end
-        self._lastHL = combo
-
-        for i = 1, #self.data do
-            local it = self.data[i]
-            local row = self._rows[i]
-            if row then
-                local isSel = false
-                if cfg.highlightId then
-                    isSel = (selectedId ~= nil and it.id == selectedId)
-                elseif cfg.highlightFn then
-                    isSel = cfg.highlightFn(it.id, it, i, row) and true or false
-                end
-
-                if Utils and Utils.setRowSelected then
-                    Utils.setRowSelected(row, isSel)
-                else
-                    -- Fallback to legacy highlight if visuals are missing.
-                    Utils.toggleHighlight(row, isSel)
-                end
-
-                if Utils and Utils.setRowFocused then
-                    Utils.setRowFocused(row, focusId ~= nil and it.id == focusId)
-                end
-            end
-        end
-
-        if cfg.highlightDebugTag and Utils.isDebugEnabled() and addon.debug then
-            local info = (cfg.highlightDebugInfo and cfg.highlightDebugInfo(self)) or ""
-            if info ~= "" then info = " " .. info end
-            addon:debug((Diag.D.LogListHighlightRefresh):format(
-                tostring(cfg.highlightDebugTag), tostring(selKey), info
-            ))
-        end
-    end
-
-    local function postUpdate()
-        if cfg.postUpdate then
-            cfg.postUpdate(self.frameName)
-        end
-    end
-
-    function self:Touch()
-        defer:Show()
-    end
-
-    function self:Dirty()
-        self._dirty = true
-        defer:Show()
-    end
-
-    local function runUpdate()
-        if not self._active or not self.frameName then return end
-
-        if self._dirty then
-            refreshData()
-            local okFetch = self:Fetch()
-            -- If Fetch() returns false we defer until the frame has a real size.
-            if okFetch ~= false then
-                self._dirty = false
-            end
-        end
-
-        applyHighlight()
-        postUpdate()
-    end
-
-    defer:SetScript("OnUpdate", function(f)
-        f:Hide()
-        local ok, err = pcall(runUpdate)
-        if not ok then
-            -- If the user has script errors disabled, this still surfaces the problem in chat.
-            if err ~= self._lastErr then
-                self._lastErr = err
-                addon:error((Diag.E.LogLoggerUIError):format(tostring(cfg.keyName or "?"), tostring(err)))
-            end
-        end
-    end)
-
-    function self:OnLoad(frame)
-        if not frame then return end
-        self.frameName = frame:GetName()
-
-        frame:HookScript("OnShow", function()
-            if not self._shownOnce then
-                self._shownOnce = true
-                addon:debug((Diag.D.LogLoggerUIShow):format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
-            end
-            setActive(true)
-            if not self._loggedWidgets then
-                self._loggedWidgets = true
-                local n = self.frameName
-                local sf = n and _G[n .. "ScrollFrame"]
-                local sc = n and _G[n .. "ScrollFrameScrollChild"]
-                addon:debug((Diag.D.LogLoggerUIWidgets):format(
-                    tostring(cfg.keyName or "?"),
-                    tostring(sf), tostring(sc),
-                    sf and (sf:GetWidth() or 0) or 0,
-                    sf and (sf:GetHeight() or 0) or 0,
-                    sc and (sc:GetWidth() or 0) or 0,
-                    sc and (sc:GetHeight() or 0) or 0
-                ))
-            end
-        end)
-
-        frame:HookScript("OnHide", function()
-            setActive(false)
-        end)
-
-        if frame:IsShown() then
-            setActive(true)
-        end
-    end
-
-    function self:Fetch()
-        local n = self.frameName
-        if not n then return end
-
-        local sf = _G[n .. "ScrollFrame"]
-        local sc = _G[n .. "ScrollFrameScrollChild"]
-        if not (sf and sc) then
-            if not self._missingScroll then
-                self._missingScroll = true
-                addon:warn((Diag.W.LogLoggerUIMissingWidgets):format(tostring(cfg.keyName or "?"), tostring(n)))
-            end
-            return
-        end
-
-        local scrollW = sf:GetWidth() or 0
-        self._lastWidth = scrollW
-
-        -- Defer draw until the ScrollFrame has a real size (first OnShow can report 0).
-        if scrollW < 10 then
-            if not self._warnW0 then
-                self._warnW0 = true
-                addon:debug((Diag.D.LogLoggerUIDeferLayout):format(tostring(cfg.keyName or "?"), scrollW))
-            end
-            defer:Show()
-            return false
-        end
-        if (sc:GetWidth() or 0) < 10 then
-            sc:SetWidth(scrollW)
-        end
-
-        -- One-time diagnostics per list to help debug "empty/blank" frames.
-        if not self._loggedFetch then
-            self._loggedFetch = true
-            addon:debug((Diag.D.LogLoggerUIFetch):format(
-                tostring(cfg.keyName or "?"),
-                #self.data,
-                sf:GetWidth() or 0, sf:GetHeight() or 0,
-                sc:GetWidth() or 0, sc:GetHeight() or 0,
-                (_G[n] and _G[n]:GetWidth() or 0),
-                (_G[n] and _G[n]:GetHeight() or 0)
-            ))
-        end
-
-        local totalH = 0
-        local count = #self.data
-        local used = self._usedNames
-        if twipe then
-            twipe(used)
-        else
-            for k in pairs(used) do
-                used[k] = nil
-            end
-        end
-        local rightInset = safeRightInset(sf, sc, n)
-
-        for i = 1, count do
-            local it = self.data[i]
-            local btnName = cfg.rowName(n, it, i)
-            used[btnName] = true
-
-            local row = self._rows[i]
-            if not row or row:GetName() ~= btnName then
-                row = acquireRow(btnName, sc)
-                self._rows[i] = row
-            end
-
-            row:SetID(it.id)
-            row:ClearAllPoints()
-            -- Stretch the row to the scrollchild width.
-            -- (Avoid relying on GetWidth() being valid on the first OnShow frame.)
-            row:SetPoint("TOPLEFT", 0, -totalH)
-            row:SetPoint("TOPRIGHT", -rightInset, -totalH)
-
-            local rH = cfg.drawRow(row, it)
-            local usedH = safeRowHeight(row, rH)
-            totalH = totalH + usedH
-
-            row:Show()
-        end
-
-        for i = count + 1, #self._rows do
-            local r = self._rows[i]
-            if r then r:Hide() end
-        end
-        for name, row in pairs(self._rowByName) do
-            if not used[name] and row and row.IsShown and row:IsShown() then
-                row:Hide()
-            end
-        end
-
-        sc:SetHeight(math.max(totalH, sf:GetHeight()))
-        if sf.UpdateScrollChildRect then
-            sf:UpdateScrollChildRect()
-        end
-        self._lastHL = nil
-    end
-
-    function self:Sort(key)
-        local cmp = cfg.sorters and cfg.sorters[key]
-        if not cmp or #self.data <= 1 then return end
-        if self._sortKey ~= key then
-            self._sortKey = key
-            self._asc = false
-        end
-        self._asc = not self._asc
-        table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
-        self:Fetch()
-        applyHighlight()
-        postUpdate()
-    end
-
-    self._makeConfirmPopup = Utils.makeConfirmPopup
-
-    return self
-end
-
-function Utils.bindListController(module, controller)
-    module.OnLoad = function(_, frame) controller:OnLoad(frame) end
-    module.Fetch = function() controller:Fetch() end
-    module.Sort = function(_, t) controller:Sort(t) end
-end
-
--- =========== Roster helpers  =========== --
-
 function Utils.getRealmName()
+    local RaidState = getRaidState()
+    if RaidState and RaidState.getRealmName then
+        return RaidState.getRealmName()
+    end
     local realm = GetRealmName()
     if type(realm) ~= "string" then
         return ""
@@ -748,6 +151,11 @@ function Utils.getRealmName()
 end
 
 function Utils.getUnitRank(unit, fallback)
+    local RaidState = getRaidState()
+    if RaidState and RaidState.getUnitRank then
+        return RaidState.getUnitRank(unit, fallback)
+    end
+
     local groupLeader = (addon and addon.UnitIsGroupLeader) or UnitIsGroupLeader
     local groupAssistant = (addon and addon.UnitIsGroupAssistant) or UnitIsGroupAssistant
 
@@ -760,1156 +168,640 @@ function Utils.getUnitRank(unit, fallback)
     return fallback or 0
 end
 
--- =========== Callback utilities  =========== --
+-- =========== String helpers  =========== --
 
-do
-    -- Internal event bus (lightweight, safe, addon-logged)
-    local events = {} -- events[eventName] = { [token]=func, ... }
-
-    -- Event payload contract (high-traffic events; keep in sync with owner handlers):
-    -- SetItem: (itemLink:string|nil, itemData:table|nil)
-    -- RaidRosterDelta: (delta:table, rosterVersion:number, raidId:number|string)
-    -- AddRoll: (name:string, roll:number)
-    -- LoggerSelectRaid: (raidId:number|string, reason:"ui"|"sync"|nil)
-    -- LoggerLootLogRequest: (request:table)
-    --   request fields: itemID, looter, rollType, rollValue, source, raidId, ok:boolean?
-    --   Legacy alias accepted: request.raidID (normalized by Logger handler).
-
-    -- Optional debug stats (fan-out + frequency + timing)
-    -- stats[eventName] = { listeners, fires, maxListeners, totalMs, lastMs, errors }
-    local stats = {}
-
-    local function ensureStats(e)
-        local s = stats[e]
-        if not s then
-            s = { listeners = 0, fires = 0, maxListeners = 0, totalMs = 0, lastMs = 0, errors = 0 }
-            stats[e] = s
-        end
-        return s
+function Utils.ucfirst(value)
+    local Strings = getStrings()
+    if Strings and Strings.ucfirst then
+        return Strings.ucfirst(value)
     end
+    return tostring(value or "")
+end
 
-    -- Register a callback for an internal event.
-    -- Returns a handle you can use to unregister later (optional).
-    function Utils.registerCallback(e, func)
-        if not e or type(func) ~= "function" then
-            error(L.StrCbErrUsage)
-        end
-
-        local t = events[e]
-        if not t then
-            t = {}
-            events[e] = t
-        end
-
-        local token = {}
-        t[token] = func
-
-        local s = ensureStats(e)
-        s.listeners = s.listeners + 1
-        if s.listeners > s.maxListeners then
-            s.maxListeners = s.listeners
-        end
-
-        return { e = e, t = token }
+function Utils.trimText(value, allowNil)
+    local Strings = getStrings()
+    if Strings and Strings.trimText then
+        return Strings.trimText(value, allowNil)
     end
-
-    -- Optional: unregister a previously registered callback handle.
-    function Utils.unregisterCallback(handle)
-        if type(handle) ~= "table" or not handle.e or not handle.t then return end
-
-        local e, token = handle.e, handle.t
-        local t = events[e]
-        if t and t[token] then
-            t[token] = nil
-
-            local s = ensureStats(e)
-            if s.listeners > 0 then
-                s.listeners = s.listeners - 1
-            end
-        end
+    if value == nil then
+        return allowNil and nil or ""
     end
+    return tostring(value)
+end
 
-    -- Fire an internal event; callbacks receive (eventName, ...).
-    function Utils.triggerEvent(e, ...)
-        local t = events[e]
-        if not t then return end
-
-        local s = ensureStats(e)
-        s.fires = s.fires + 1
-
-        -- Only do timing when debug is enabled (keeps overhead minimal).
-        local prof = (Utils.isDebugEnabled and Utils.isDebugEnabled() and debugprofilestop) or nil
-        local t0 = prof and prof() or nil
-
-        -- Snapshot tokens to be safe if callbacks register/unregister while firing.
-        local tokens, n = {}, 0
-        for tok in pairs(t) do
-            n = n + 1
-            tokens[n] = tok
-        end
-
-        if n > s.maxListeners then
-            s.maxListeners = n
-        end
-
-        for i = 1, n do
-            local tok = tokens[i]
-            local fn = t[tok] -- may have been unregistered mid-fire
-            if fn then
-                local ok, err = pcall(fn, e, ...)
-                if not ok then
-                    s.errors = s.errors + 1
-                    addon:error((Diag.E.LogUtilsCallbackExec):format(tostring(fn), tostring(e), tostring(err)))
-                end
-            end
-        end
-
-        if prof and t0 then
-            local dt = prof() - t0
-            s.lastMs = dt
-            s.totalMs = s.totalMs + dt
-        end
+function Utils.normalizeName(value, allowNil)
+    local Strings = getStrings()
+    if Strings and Strings.normalizeName then
+        return Strings.normalizeName(value, allowNil)
     end
+    return Utils.trimText(value, allowNil)
+end
 
-    function Utils.registerCallbacks(names, handler)
-        for i = 1, #names do
-            Utils.registerCallback(names[i], handler)
-        end
+function Utils.normalizeLower(value, allowNil)
+    local Strings = getStrings()
+    if Strings and Strings.normalizeLower then
+        return Strings.normalizeLower(value, allowNil)
     end
-
-    -- ===== Debug helpers =====
-
-    -- Returns a COPY of the internal callback stats.
-    function Utils.getInternalCallbackStats()
-        local out = {}
-        for ev, s in pairs(stats) do
-            out[ev] = {
-                listeners = s.listeners or 0,
-                fires = s.fires or 0,
-                maxListeners = s.maxListeners or 0,
-                totalMs = s.totalMs or 0,
-                lastMs = s.lastMs or 0,
-                errors = s.errors or 0,
-            }
-        end
-        return out
+    local text = Utils.trimText(value, allowNil)
+    if text == nil then
+        return nil
     end
+    return lower(text)
+end
 
-    function Utils.resetInternalCallbackStats()
-        for k in pairs(stats) do
-            stats[k] = nil
-        end
+function Utils.findAchievement(inp)
+    local Strings = getStrings()
+    if Strings and Strings.findAchievement then
+        return Strings.findAchievement(inp)
     end
+    return inp and tostring(inp) or ""
+end
 
-    -- Print top events to chat. Sorting options: max|fires|listeners|time|avg|errors
-    function Utils.dumpInternalCallbackStats(sortBy)
-        if not addon or not addon.info then return end
+function Utils.formatChatMessage(text, prefix, outputFormat, prefixHex)
+    local Strings = getStrings()
+    if Strings and Strings.formatChatMessage then
+        return Strings.formatChatMessage(text, prefix, outputFormat, prefixHex)
+    end
+    local msgPrefix = prefix or ""
+    return format(outputFormat or "%s%s", msgPrefix, tostring(text))
+end
 
-        local rows = {}
-        for ev, s in pairs(stats) do
-            local fires = s.fires or 0
-            local total = s.totalMs or 0
-            local avg = (fires > 0) and (total / fires) or 0
-            rows[#rows + 1] = {
-                ev = ev,
-                listeners = s.listeners or 0,
-                fires = fires,
-                max = s.maxListeners or 0,
-                total = total,
-                avg = avg,
-                last = s.lastMs or 0,
-                errors = s.errors or 0,
-            }
-        end
+function Utils.splitArgs(msg)
+    local Strings = getStrings()
+    if Strings and Strings.splitArgs then
+        return Strings.splitArgs(msg)
+    end
+    msg = Utils.trimText(msg)
+    if msg == "" then
+        return "", ""
+    end
+    local cmd, rest = msg:match("^(%S+)%s*(.-)$")
+    return lower(cmd or ""), Utils.trimText(rest)
+end
 
-        local key = "max"
-        local k = tostring(sortBy or ""):lower()
-        if k == "fires" or k == "fire" then
-            key = "fires"
-        elseif k == "listeners" or k == "l" then
-            key = "listeners"
-        elseif k == "time" or k == "total" then
-            key = "total"
-        elseif k == "avg" then
-            key = "avg"
-        elseif k == "errors" or k == "err" then
-            key = "errors"
-        else
-            key = "max"
-        end
+function Utils.getItemIdFromLink(itemLink)
+    local Strings = getStrings()
+    if Strings and Strings.getItemIdFromLink then
+        return Strings.getItemIdFromLink(itemLink)
+    end
+    return nil
+end
 
-        table.sort(rows, function(a, b)
-            if a[key] == b[key] then
-                return tostring(a.ev) < tostring(b.ev)
-            end
-            return a[key] > b[key]
-        end)
+function Utils.getItemStringFromLink(itemLink)
+    local Strings = getStrings()
+    if Strings and Strings.getItemStringFromLink then
+        return Strings.getItemStringFromLink(itemLink)
+    end
+    return nil
+end
 
-        local limit = 20
-        if #rows < limit then limit = #rows end
+-- =========== Event bus facade  =========== --
 
-        addon:info("Internal callbacks: top %d (sort=%s).", limit, key)
-        for i = 1, limit do
-            local r = rows[i]
-            addon:info(
-                "%2d) %s | now:%d max:%d | fires:%d | total:%.2fms avg:%.3fms last:%.3fms | errors:%d",
-                i, tostring(r.ev), r.listeners, r.max, r.fires, r.total, r.avg, r.last, r.errors
-            )
-        end
-        addon:info("Tip: /krt debug callbacks reset  |  /krt debug callbacks fires|max|time|avg|errors")
+function Utils.registerCallback(eventName, callback)
+    local EventBusCompat = getEventBusCompat()
+    if EventBusCompat and EventBusCompat.registerCallback then
+        return EventBusCompat.registerCallback(eventName, callback)
+    end
+    error(L.StrCbErrUsage)
+end
+
+function Utils.unregisterCallback(handle)
+    local EventBusCompat = getEventBusCompat()
+    if EventBusCompat and EventBusCompat.unregisterCallback then
+        return EventBusCompat.unregisterCallback(handle)
     end
 end
 
--- =========== Frame helpers  =========== --
+function Utils.triggerEvent(eventName, ...)
+    local EventBusCompat = getEventBusCompat()
+    if EventBusCompat and EventBusCompat.triggerEvent then
+        return EventBusCompat.triggerEvent(eventName, ...)
+    end
+end
+
+function Utils.registerCallbacks(names, callback)
+    local EventBusCompat = getEventBusCompat()
+    if EventBusCompat and EventBusCompat.registerCallbacks then
+        return EventBusCompat.registerCallbacks(names, callback)
+    end
+end
+
+function Utils.getInternalCallbackStats()
+    local EventBusCompat = getEventBusCompat()
+    if EventBusCompat and EventBusCompat.getInternalCallbackStats then
+        return EventBusCompat.getInternalCallbackStats()
+    end
+    return {}
+end
+
+function Utils.resetInternalCallbackStats()
+    local EventBusCompat = getEventBusCompat()
+    if EventBusCompat and EventBusCompat.resetInternalCallbackStats then
+        return EventBusCompat.resetInternalCallbackStats()
+    end
+end
+
+function Utils.dumpInternalCallbackStats(sortBy)
+    local EventBusCompat = getEventBusCompat()
+    if EventBusCompat and EventBusCompat.dumpInternalCallbackStats then
+        return EventBusCompat.dumpInternalCallbackStats(sortBy)
+    end
+end
+
+-- =========== UI facade  =========== --
+
+function Utils.enableDrag(frame, dragButton)
+    local UI = getUI()
+    if UI and UI.enableDrag then
+        return UI.enableDrag(frame, dragButton)
+    end
+end
+
+function Utils.createRowDrawer(fn)
+    local UI = getUI()
+    if UI and UI.createRowDrawer then
+        return UI.createRowDrawer(fn)
+    end
+    return function(row, it)
+        local rowHeight = (row and row:GetHeight()) or 20
+        fn(row, it)
+        return rowHeight
+    end
+end
+
+function Utils.makeListController(cfg)
+    local UI = getUI()
+    if UI and UI.makeListController then
+        return UI.makeListController(cfg)
+    end
+    return nil
+end
+
+function Utils.bindListController(module, controller)
+    local UI = getUI()
+    if UI and UI.bindListController then
+        return UI.bindListController(module, controller)
+    end
+    module.OnLoad = function(_, frame)
+        controller:OnLoad(frame)
+    end
+    module.Fetch = function()
+        controller:Fetch()
+    end
+    module.Sort = function(_, key)
+        controller:Sort(key)
+    end
+end
 
 function Utils.makeConfirmPopup(key, text, onAccept, cancels)
-    StaticPopupDialogs[key] = {
-        text = text,
-        button1 = OKAY,
-        button2 = CANCEL,
-        OnAccept = onAccept,
-        cancels = cancels or key,
-        timeout = 0,
-        whileDead = 1,
-        hideOnEscape = 1,
-    }
+    local UI = getUI()
+    if UI and UI.makeConfirmPopup then
+        return UI.makeConfirmPopup(key, text, onAccept, cancels)
+    end
 end
 
 function Utils.makeEditBoxPopup(key, text, onAccept, onShow, validate)
-    StaticPopupDialogs[key] = {
-        text = text,
-        button1 = SAVE,
-        button2 = CANCEL,
-        timeout = 0,
-        whileDead = 1,
-        hideOnEscape = 1,
-        hasEditBox = 1,
-        cancels = key,
-        OnShow = function(self)
-            if onShow then
-                onShow(self)
-            end
-        end,
-        OnHide = function(self)
-            self.editBox:SetText("")
-            self.editBox:ClearFocus()
-        end,
-        OnAccept = function(self)
-            local value = Utils.trimText(self.editBox:GetText(), true)
-            if validate then
-                local ok, cleanValue = validate(self, value)
-                if not ok then
-                    return
-                end
-                if cleanValue ~= nil then
-                    value = cleanValue
-                end
-            end
-            onAccept(self, value)
-        end,
-    }
+    local UI = getUI()
+    if UI and UI.makeEditBoxPopup then
+        return UI.makeEditBoxPopup(key, text, onAccept, onShow, validate)
+    end
 end
 
 function Utils.setFrameTitle(frameOrName, titleText, titleFormat)
-    local frameName = frameOrName
-    if type(frameOrName) ~= "string" then
-        frameName = frameOrName and frameOrName.GetName and frameOrName:GetName() or nil
+    local UI = getUI()
+    if UI and UI.setFrameTitle then
+        return UI.setFrameTitle(frameOrName, titleText, titleFormat)
     end
-    if not frameName then return end
-    local titleFrame = _G[frameName .. "Title"]
-    if not titleFrame then return end
-    local fmt = titleFormat or (addon.C and addon.C.titleString) or "%s"
-    titleFrame:SetText(format(fmt, titleText))
 end
 
 function Utils.resetEditBox(editBox, hide)
-    if not editBox then return end
-    editBox:SetText("")
-    editBox:ClearFocus()
-    if hide then
-        editBox:Hide()
+    local UI = getUI()
+    if UI and UI.resetEditBox then
+        return UI.resetEditBox(editBox, hide)
     end
 end
 
 function Utils.setEditBoxValue(editBox, value, focus)
-    if not editBox then return end
-    editBox:SetText(value)
-    editBox:Show()
-    if focus then
-        editBox:SetFocus()
+    local UI = getUI()
+    if UI and UI.setEditBoxValue then
+        return UI.setEditBoxValue(editBox, value, focus)
     end
 end
 
 function Utils.setShown(frame, show)
-    if not frame then return end
-    if show then
-        if not frame:IsShown() then
-            frame:Show()
-        end
-    elseif frame:IsShown() then
-        frame:Hide()
+    local UI = getUI()
+    if UI and UI.setShown then
+        return UI.setShown(frame, show)
     end
 end
 
--- =========== Coalesced refresh helpers (event-driven UI)  =========== --
-
--- Creates a refresh requester that coalesces multiple triggers into a single UI update.
--- Notes:
---  - Uses a dedicated driver frame (does NOT touch the target frame's OnUpdate).
---  - If called while the target frame is hidden, marks it dirty and refreshes on next OnShow.
---  - WoW 3.3.5a compatible (no C_Timer).
 function Utils.makeEventDrivenRefresher(targetOrGetter, updateFn)
-    if type(updateFn) ~= "function" then
-        error("Utils.makeEventDrivenRefresher: updateFn must be a function")
+    local UI = getUI()
+    if UI and UI.makeEventDrivenRefresher then
+        return UI.makeEventDrivenRefresher(targetOrGetter, updateFn)
     end
-
-    local driver = CreateFrame("Frame")
-    local pending = false
-    local dirtyWhileHidden = false
-    local hookedFrame = nil
-
-    local function resolveTarget()
-        if type(targetOrGetter) == "function" then
-            return targetOrGetter()
-        end
-        return targetOrGetter
-    end
-
-    local function ensureHook(target)
-        if not target or not target.HookScript then return end
-        if hookedFrame == target then return end
-        hookedFrame = target
-        target:HookScript("OnShow", function()
-            if dirtyWhileHidden then
-                dirtyWhileHidden = false
-                updateFn()
-            end
-        end)
-    end
-
-    local function run()
-        driver:SetScript("OnUpdate", nil)
-        pending = false
-
-        local target = resolveTarget()
-        if not target or not target.IsShown or not target:IsShown() then
-            dirtyWhileHidden = true
-            if target then ensureHook(target) end
-            return
-        end
-        updateFn()
-    end
-
     return function()
-        local target = resolveTarget()
-        if not target then return end
-        ensureHook(target)
-
-        if not target:IsShown() then
-            dirtyWhileHidden = true
-            return
-        end
-
-        if pending then return end
-        pending = true
-        driver:SetScript("OnUpdate", run)
     end
 end
 
--- =========== Frame Getter Factory  =========== --
--- Creates a lazy-caching getter for global UI frames.
--- Usage: local getFrame = Utils.makeFrameGetter("KRTMaster")
 function Utils.makeFrameGetter(globalFrameName)
-    local cached = nil
+    local UI = getUI()
+    if UI and UI.makeFrameGetter then
+        return UI.makeFrameGetter(globalFrameName)
+    end
     return function()
-        if cached then return cached end
-        local frame = _G[globalFrameName]
-        if frame then cached = frame end
-        return frame
+        return _G[globalFrameName]
     end
 end
 
--- =========== Module Bootstrap Helpers  =========== --
--- Initializes shared frame wiring used by multiple feature modules.
 function Utils.initModuleFrame(module, frame, opts)
-    if not frame then return nil end
+    local UI = getUI()
+    if UI and UI.initModuleFrame then
+        return UI.initModuleFrame(module, frame, opts)
+    end
     if module then
         module.frame = frame
     end
-
-    local frameName = frame:GetName()
-    opts = opts or {}
-
-    if opts.enableDrag then
-        Utils.enableDrag(frame, opts.dragButton)
-    end
-
-    if opts.hookOnShow then
-        frame:HookScript("OnShow", opts.hookOnShow)
-    end
-    if opts.setOnShow then
-        frame:SetScript("OnShow", opts.setOnShow)
-    end
-    if opts.hookOnHide then
-        frame:HookScript("OnHide", opts.hookOnHide)
-    end
-    if opts.setOnHide then
-        frame:SetScript("OnHide", opts.setOnHide)
-    end
-
-    return frameName
+    return frame and frame:GetName() or nil
 end
 
--- Creates and binds a standard module UI controller with optional shared hooks.
 function Utils.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
-    local uiController = Utils.makeUIFrameController(getFrame, requestRefreshFn)
-    if opts then
-        if opts.bindToggleHide then
-            opts.bindToggleHide(module, uiController)
-        end
-        if opts.bindRequestRefresh then
-            opts.bindRequestRefresh(module, getFrame)
-        end
+    local UI = getUI()
+    if UI and UI.bootstrapModuleUi then
+        return UI.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
     end
-    return uiController
+    return Utils.makeUIFrameController(getFrame, requestRefreshFn)
 end
 
--- Binds input handlers for frame edit boxes using suffix descriptors.
--- specs example:
---   { suffix = "Name", onEnter = fn, onEscape = fn },
---   { suffix = "Content", onEnter = fn, onEscape = fn }
 function Utils.bindEditBoxHandlers(frameName, specs, requestRefreshFn)
-    if type(frameName) ~= "string" or type(specs) ~= "table" then
-        return
-    end
-
-    for i = 1, #specs do
-        local spec = specs[i]
-        local suffix = spec and spec.suffix
-        local editBox = suffix and _G[frameName .. suffix] or nil
-        if editBox then
-            if spec.onEscape then
-                editBox:SetScript("OnEscapePressed", spec.onEscape)
-            end
-            if spec.onEnter then
-                editBox:SetScript("OnEnterPressed", spec.onEnter)
-            end
-            if requestRefreshFn then
-                editBox:SetScript("OnTextChanged", function(_, isUserInput)
-                    if isUserInput then
-                        requestRefreshFn()
-                    end
-                end)
-            end
-        end
+    local UI = getUI()
+    if UI and UI.bindEditBoxHandlers then
+        return UI.bindEditBoxHandlers(frameName, specs, requestRefreshFn)
     end
 end
 
--- =========== UI Frame Controller Factory  =========== --
--- Consolidates recurring Toggle/Hide/Show patterns across UI modules.
 function Utils.makeUIFrameController(getFrame, requestRefreshFn)
+    local UI = getUI()
+    if UI and UI.makeUIFrameController then
+        return UI.makeUIFrameController(getFrame, requestRefreshFn)
+    end
     return {
         Toggle = function(self)
             local frame = getFrame()
-            if not frame then return end
+            if not frame then
+                return
+            end
             if frame:IsShown() then
-                Utils.setShown(frame, false)
+                frame:Hide()
             else
-                if requestRefreshFn then requestRefreshFn() end
-                Utils.setShown(frame, true)
+                if requestRefreshFn then
+                    requestRefreshFn()
+                end
+                frame:Show()
             end
         end,
         Hide = function(self)
             local frame = getFrame()
             if frame then
-                Utils.setShown(frame, false)
+                frame:Hide()
             end
         end,
         Show = function(self)
             local frame = getFrame()
             if frame then
-                if requestRefreshFn then requestRefreshFn() end
-                Utils.setShown(frame, true)
+                if requestRefreshFn then
+                    requestRefreshFn()
+                end
+                frame:Show()
             end
         end,
     }
 end
 
--- =========== Tooltip helpers  =========== --
-
-do
-    local colors = HIGHLIGHT_FONT_COLOR
-    local fakeBagTooltip
-    local warmItemTooltip
-
-    local function showTooltip(frame)
-        if not frame.tooltip_anchor then
-            GameTooltip_SetDefaultAnchor(GameTooltip, frame)
-        else
-            GameTooltip:SetOwner(frame, frame.tooltip_anchor)
-        end
-
-        if frame.tooltip_title then
-            GameTooltip:SetText(frame.tooltip_title)
-        end
-
-        if frame.tooltip_text then
-            if type(frame.tooltip_text) == "string" then
-                GameTooltip:AddLine(frame.tooltip_text, colors.r, colors.g, colors.b, true)
-            elseif type(frame.tooltip_text) == "table" then
-                for _, line in ipairs(frame.tooltip_text) do
-                    GameTooltip:AddLine(line, colors.r, colors.g, colors.b, true)
-                end
-            end
-        end
-
-        if frame.tooltip_item then
-            GameTooltip:SetHyperlink(frame.tooltip_item)
-        end
-
-        GameTooltip:Show()
+function Utils.enableDisable(frame, cond)
+    local UI = getUI()
+    if UI and UI.enableDisable then
+        return UI.enableDisable(frame, cond)
     end
+end
 
-    local function hideTooltip()
-        GameTooltip:Hide()
+function Utils.toggle(frame)
+    local UI = getUI()
+    if UI and UI.toggle then
+        return UI.toggle(frame)
     end
+end
 
-    function addon:SetTooltip(frame, text, anchor, title)
-        if not frame then return end
-        frame.tooltip_text = text and text or frame.tooltip_text
-        frame.tooltip_anchor = anchor and anchor or frame.tooltip_anchor
-        frame.tooltip_title = title and title or frame.tooltip_title
-        if not frame.tooltip_title and not frame.tooltip_text and not frame.tooltip_item then return end
-        frame:SetScript("OnEnter", showTooltip)
-        frame:SetScript("OnLeave", hideTooltip)
+function Utils.hideFrame(frame, onHide)
+    local UI = getUI()
+    if UI and UI.hideFrame then
+        return UI.hideFrame(frame, onHide)
     end
+end
 
-    -- Warm item cache using a hidden tooltip (nil-safe, no return value).
-    function Utils.warmItemCache(itemLink)
-        if type(itemLink) ~= "string" or itemLink == "" then
-            return
-        end
-        if not itemLink:find("item:", 1, true) then
-            return
-        end
-
-        warmItemTooltip = warmItemTooltip or CreateFrame("GameTooltip", nil, UIParent, "GameTooltipTemplate")
-        warmItemTooltip:SetOwner(UIParent, "ANCHOR_NONE")
-        local ok = pcall(warmItemTooltip.SetHyperlink, warmItemTooltip, itemLink)
-        if ok then
-            warmItemTooltip:Hide()
-        end
+function Utils.showHide(frame, cond)
+    local UI = getUI()
+    if UI and UI.showHide then
+        return UI.showHide(frame, cond)
     end
+end
 
-    -- Tooltip-based soulbound check for bag items (3.3.5a-safe).
-    function Utils.isBagItemSoulbound(bag, slot)
-        if bag == nil or slot == nil then
-            return false
-        end
-
-        fakeBagTooltip = fakeBagTooltip or KRT_FakeTooltip
-            or CreateFrame("GameTooltip", "KRT_FakeTooltip", nil, "GameTooltipTemplate")
-        KRT_FakeTooltip = fakeBagTooltip
-        fakeBagTooltip:SetOwner(UIParent, "ANCHOR_NONE")
-        fakeBagTooltip:SetBagItem(bag, slot)
-        fakeBagTooltip:Show()
-
-        local isSoulbound = false
-        local numLines = fakeBagTooltip:NumLines() or 0
-        for i = numLines, 1, -1 do
-            local fs = _G["KRT_FakeTooltipTextLeft" .. i]
-            local text = fs and fs:GetText() or nil
-            if text and text ~= "" then
-                if text == ITEM_SOULBOUND then
-                    isSoulbound = true
-                end
-                if addon.Deformat(text, BIND_TRADE_TIME_REMAINING) ~= nil then
-                    fakeBagTooltip:Hide()
-                    return false
-                end
-            end
-        end
-
-        fakeBagTooltip:Hide()
-        return isSoulbound
+function Utils.toggleHighlight(frame, cond)
+    local UI = getUI()
+    if UI and UI.toggleHighlight then
+        return UI.toggleHighlight(frame, cond)
     end
+end
+
+function Utils.ensureRowVisuals(row)
+    local UI = getUI()
+    if UI and UI.ensureRowVisuals then
+        return UI.ensureRowVisuals(row)
+    end
+end
+
+function Utils.setRowSelected(row, cond)
+    local UI = getUI()
+    if UI and UI.setRowSelected then
+        return UI.setRowSelected(row, cond)
+    end
+end
+
+function Utils.setRowFocused(row, cond)
+    local UI = getUI()
+    if UI and UI.setRowFocused then
+        return UI.setRowFocused(row, cond)
+    end
+end
+
+function Utils.setButtonCount(btn, baseText, n)
+    local UI = getUI()
+    if UI and UI.setButtonCount then
+        return UI.setButtonCount(btn, baseText, n)
+    end
+end
+
+function Utils.setText(frame, str1, str2, cond)
+    local UI = getUI()
+    if UI and UI.setText then
+        return UI.setText(frame, str1, str2, cond)
+    end
+end
+
+function Utils.getNamedFramePart(frameName, suffix)
+    local UI = getUI()
+    if UI and UI.getNamedFramePart then
+        return UI.getNamedFramePart(frameName, suffix)
+    end
+    return nil
+end
+
+function Utils.enableDisableNamedPart(frameName, suffix, cond)
+    local UI = getUI()
+    if UI and UI.enableDisableNamedPart then
+        return UI.enableDisableNamedPart(frameName, suffix, cond)
+    end
+    return nil
+end
+
+function Utils.showHideNamedPart(frameName, suffix, cond)
+    local UI = getUI()
+    if UI and UI.showHideNamedPart then
+        return UI.showHideNamedPart(frameName, suffix, cond)
+    end
+    return nil
+end
+
+function Utils.setTextNamedPart(frameName, suffix, str1, str2, cond)
+    local UI = getUI()
+    if UI and UI.setTextNamedPart then
+        return UI.setTextNamedPart(frameName, suffix, str1, str2, cond)
+    end
+    return nil
+end
+
+function Utils.updateModeTextNamedPart(frameName, suffix, str1, str2, mode, lastMode)
+    local UI = getUI()
+    if UI and UI.updateModeTextNamedPart then
+        return UI.updateModeTextNamedPart(frameName, suffix, str1, str2, mode, lastMode)
+    end
+    return lastMode
+end
+
+-- =========== Tooltip facade  =========== --
+
+function addon:SetTooltip(frame, text, anchor, title)
+    local Tooltip = getTooltip()
+    if Tooltip and Tooltip.setTooltip then
+        return Tooltip.setTooltip(frame, text, anchor, title)
+    end
+end
+
+function Utils.warmItemCache(itemLink)
+    local Tooltip = getTooltip()
+    if Tooltip and Tooltip.warmItemCache then
+        return Tooltip.warmItemCache(itemLink)
+    end
+end
+
+function Utils.isBagItemSoulbound(bag, slot)
+    local Tooltip = getTooltip()
+    if Tooltip and Tooltip.isBagItemSoulbound then
+        return Tooltip.isBagItemSoulbound(bag, slot)
+    end
+    return false
 end
 
 -- =========== Color utilities  =========== --
 
 function Utils.normalizeHexColor(color)
-    if type(color) == "string" then
-        local hex = color:gsub("^|c", ""):gsub("|r$", ""):gsub("^#", "")
-        if #hex == 6 then
-            hex = "ff" .. hex
-        end
-        return hex
+    local Colors = addon.Colors
+    if Colors and Colors.normalizeHexColor then
+        return Colors.normalizeHexColor(color)
     end
-
-    if type(color) == "table" and color.GenerateHexColor then
-        local hex = color:GenerateHexColor():gsub("^#", "")
-        if #hex == 6 then
-            hex = "ff" .. hex
-        end
-        return hex
-    end
-
     return "ffffffff"
 end
 
 function Utils.getClassColor(className)
-    local r, g, b = addon.GetClassColor(className)
-    return (r or 1), (g or 1), (b or 1)
-end
-
--- =========== UI helpers  =========== --
-
--- Enable/Disable Frame:
-function Utils.enableDisable(frame, cond)
-    if cond and frame:IsEnabled() == 0 then
-        frame:Enable()
-    elseif not cond and frame:IsEnabled() == 1 then
-        frame:Disable()
+    local Colors = addon.Colors
+    if Colors and Colors.getClassColor then
+        return Colors.getClassColor(className)
     end
-end
-
--- Unconditional show/hide frame:
-function Utils.toggle(frame)
-    if frame:IsVisible() then
-        frame:Hide()
-    else
-        frame:Show()
-    end
-end
-
--- Hide frame with optional onHide callback:
-function Utils.hideFrame(frame, onHide)
-    if frame and frame:IsShown() then
-        if onHide then onHide() end
-        frame:Hide()
-    end
-end
-
--- Conditional Show/Hide Frame:
-function Utils.showHide(frame, cond)
-    if cond and not frame:IsShown() then
-        frame:Show()
-    elseif not cond and frame:IsShown() then
-        frame:Hide()
-    end
-end
-
--- Lock or unlock highlight:
-function Utils.toggleHighlight(frame, cond)
-    if cond then
-        frame:LockHighlight()
-    else
-        frame:UnlockHighlight()
-    end
-end
-
--- =========== List row visuals (selection/focus)  =========== --
--- These helpers avoid using LockHighlight() for persistent selection, so hover highlight remains native.
--- Safe for 3.3.5a and works with any UI skin (pure texture overlays).
-
-local function ensureRowVisuals(row)
-    if not row or row._krtSelTex then return end
-
-    -- Persistent selection fill (soft)
-    local sel = row:CreateTexture(nil, "BACKGROUND")
-    sel:SetAllPoints(row)
-    -- Persistent selection highlight (soft). Uses a Blizzard highlight texture so it reads as "highlight",
-    -- while staying independent from the native mouseover HighlightTexture.
-    sel:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-    sel:SetBlendMode("ADD")
-    -- Slightly more pronounced than mouseover.
-    sel:SetVertexColor(0.20, 0.60, 1.00, 0.52)
-    sel:Hide()
-    row._krtSelTex = sel
-
-    -- Focus highlight (stronger). Still a highlight, not a border.
-    local focus = row:CreateTexture(nil, "ARTWORK")
-    focus:SetAllPoints(row)
-    focus:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-    focus:SetBlendMode("ADD")
-    focus:SetVertexColor(0.20, 0.60, 1.00, 0.72)
-    focus:Hide()
-    row._krtFocusTex = focus
-
-    -- Pushed feedback (mouse down)
-    local pushed = row:CreateTexture(nil, "ARTWORK")
-    pushed:SetAllPoints(row)
-    pushed:SetTexture(1, 1, 1, 0.08)
-    row:SetPushedTexture(pushed)
-end
-
-function Utils.ensureRowVisuals(row)
-    ensureRowVisuals(row)
-end
-
-function Utils.setRowSelected(row, cond)
-    ensureRowVisuals(row)
-    if not row or not row._krtSelTex then return end
-    if cond then row._krtSelTex:Show() else row._krtSelTex:Hide() end
-end
-
-function Utils.setRowFocused(row, cond)
-    ensureRowVisuals(row)
-    local t = row and row._krtFocusTex
-    if not t then return end
-    if cond then t:Show() else t:Hide() end
-end
-
--- Helper: append "(N)" to a button label, preserving the original base label.
-function Utils.setButtonCount(btn, baseText, n)
-    if not btn then return end
-    if not btn._krtBaseText then
-        btn._krtBaseText = baseText or btn:GetText() or ""
-    end
-    local base = baseText or btn._krtBaseText or ""
-    if n and n > 1 then
-        btn:SetText(("%s (%d)"):format(base, n))
-    else
-        btn:SetText(base)
-    end
+    return 1, 1, 1
 end
 
 -- =========== Multi-select utility (reusable)  =========== --
--- Runtime-only selection state for scrollable lists.
--- State is keyed by "contextKey" (string) so multiple lists can coexist.
 
--- Runtime-only selection state for scrollable lists.
--- State is keyed by "contextKey" (string) so multiple lists can coexist.
--- IMPORTANT: bind the backing table to a *local* upvalue in the file chunk.
--- This avoids accidental global lookups (e.g. "MS" becoming nil at runtime).
-
-Utils._multiSelect = Utils._multiSelect or {}
-local MS = Utils._multiSelect
-
-do
-    local function msKey(id)
-        if id == nil then return nil end
-        local n = tonumber(id)
-        return n or id
+function Utils.multiSelectInit(contextKey)
+    local MultiSelect = addon.MultiSelect
+    if MultiSelect and MultiSelect.multiSelectInit then
+        return MultiSelect.multiSelectInit(contextKey)
     end
-
-    local function ensureContext(contextKey)
-        if not contextKey or contextKey == "" then
-            contextKey = "_default"
-        end
-        local st = MS[contextKey]
-        if not st then
-            st = { set = {}, count = 0, ver = 0 }
-            MS[contextKey] = st
-        end
-        return st, contextKey
-    end
-
-    local function debugLog(msg)
-        if Utils.isDebugEnabled() and addon.debug then
-            addon:debug(msg)
-        end
-    end
-
-    function Utils.multiSelectInit(contextKey)
-        local st, key = ensureContext(contextKey)
-        st.set = {}
-        st.count = 0
-        st.ver = (st.ver or 0) + 1
-        debugLog((Diag.D.LogLoggerSelectInit):format(tostring(key), st.ver))
-        return st
-    end
-
-    function Utils.multiSelectClear(contextKey)
-        return Utils.multiSelectInit(contextKey)
-    end
-
-    -- Toggle selection.
-    -- isMulti=false  -> clear + select single (optional: click-again to deselect when allowDeselect=true)
-    -- isMulti=true   -> toggle selection for the given id
-    -- Returns: actionString, selectedCount
-    function Utils.multiSelectToggle(contextKey, id, isMulti, allowDeselect)
-        local st, key = ensureContext(contextKey)
-        local k = msKey(id)
-        if k == nil then return nil, st.count or 0 end
-
-        local before = st.count or 0
-        local action
-
-        local allow = false
-        if allowDeselect == true then
-            allow = true
-        elseif type(allowDeselect) == "table" and allowDeselect.allowDeselect == true then
-            allow = true
-        end
-
-        if isMulti then
-            if st.set[k] then
-                st.set[k] = nil
-                st.count = before - 1
-                action = "TOGGLE_OFF"
-            else
-                st.set[k] = true
-                st.count = before + 1
-                action = "TOGGLE_ON"
-            end
-        else
-            -- OS-like single selection:
-            --   - clear + select single by default
-            --   - optionally allow "click again to deselect" when this is the only selected row
-            local already = (st.set[k] == true)
-            if allow and already and before == 1 then
-                st.set = {}
-                st.count = 0
-                action = "SINGLE_DESELECT"
-            else
-                st.set = {}
-                st.set[k] = true
-                st.count = 1
-                action = "SINGLE_CLEAR+SELECT"
-            end
-        end
-
-        st.ver = (st.ver or 0) + 1
-
-        debugLog((Diag.D.LogLoggerSelectToggle):format(
-            tostring(key), tostring(id), isMulti and "1" or "0", tostring(action), before, st.count or 0, st.ver
-        ))
-
-        return action, st.count or 0
-    end
-
-    -- Set or clear the range-anchor for SHIFT range selection.
-    -- The anchor is the last non-shift click target for the given context.
-    function Utils.multiSelectSetAnchor(contextKey, id)
-        local st, key = ensureContext(contextKey)
-        local before = st.anchor
-        local k = msKey(id)
-        st.anchor = k
-        -- Anchor changes do not affect highlight rendering directly, so we do not bump st.ver here.
-        local ver = st.ver or 0
-        debugLog((Diag.D.LogLoggerSelectAnchor):format(
-            tostring(key), tostring(before), tostring(st.anchor), ver
-        ))
-        return st.anchor
-    end
-
-    function Utils.multiSelectGetAnchor(contextKey)
-        local st = MS[contextKey or "_default"]
-        return st and st.anchor or nil
-    end
-
-    local function idOf(x)
-        if type(x) == "table" then
-            return x.id
-        end
-        return x
-    end
-
-    local function findIndex(ordered, key)
-        if not ordered or not key then return nil end
-        for i = 1, #ordered do
-            local id = idOf(ordered[i])
-            if msKey(id) == key then
-                return i
-            end
-        end
-        return nil
-    end
-
-    -- SHIFT range selection helper.
-    -- ordered: array of ids OR array of items with .id (e.g. controller.data)
-    -- id: clicked id
-    -- isAdd: when true (CTRL+SHIFT) add the range to the existing selection; otherwise replace selection with the range
-    -- Returns: actionString, selectedCount
-    function Utils.multiSelectRange(contextKey, ordered, id, isAdd)
-        local st, key = ensureContext(contextKey)
-        local k = msKey(id)
-        if k == nil then return nil, st.count or 0 end
-
-        local before = st.count or 0
-        local action
-
-        local aKey = st.anchor
-        local ai = findIndex(ordered, aKey)
-        local bi = findIndex(ordered, k)
-
-        if not ai or not bi then
-            -- If we cannot resolve indices (missing anchor or id), behave like a single select.
-            st.set = {}
-            st.set[k] = true
-            st.count = 1
-            if not st.anchor then st.anchor = k end
-            action = st.anchor == k and "RANGE_NOANCHOR_SINGLE" or "RANGE_FALLBACK_SINGLE"
-        else
-            if not isAdd then
-                st.set = {}
-                st.count = 0
-            end
-            local from = ai
-            local to = bi
-            if from > to then
-                from, to = to, from
-            end
-
-            for i = from, to do
-                local id2 = idOf(ordered[i])
-                local k2 = msKey(id2)
-                if k2 ~= nil and not st.set[k2] then
-                    st.set[k2] = true
-                    st.count = (st.count or 0) + 1
-                end
-            end
-            action = isAdd and "RANGE_ADD" or "RANGE_SET"
-        end
-
-        st.ver = (st.ver or 0) + 1
-        debugLog((Diag.D.LogLoggerSelectRange):format(
-            tostring(key), tostring(id), isAdd and "1" or "0", tostring(action), before, st.count or 0, st.ver,
-            tostring(st.anchor)
-        ))
-        return action, st.count or 0
-    end
-
-    function Utils.multiSelectIsSelected(contextKey, id)
-        local st = MS[contextKey or "_default"]
-        if not st or not st.set then return false end
-        local k = msKey(id)
-        return (k ~= nil) and (st.set[k] == true) or false
-    end
-
-    function Utils.multiSelectCount(contextKey)
-        local st = MS[contextKey or "_default"]
-        return (st and st.count) or 0
-    end
-
-    function Utils.multiSelectGetVersion(contextKey)
-        local st = MS[contextKey or "_default"]
-        return (st and st.ver) or 0
-    end
-
-    function Utils.multiSelectGetSelected(contextKey)
-        local st = MS[contextKey or "_default"]
-        local out = {}
-        if not st or not st.set then return out end
-        local n = 0
-        for id, v in pairs(st.set) do
-            if v then
-                n = n + 1
-                out[n] = id
-            end
-        end
-        -- Stable ordering for UI/debug; safe even if mixed types.
-        table.sort(out, function(a, b)
-            local na, nb = tonumber(a), tonumber(b)
-            if na and nb then return na < nb end
-            return tostring(a) < tostring(b)
-        end)
-        return out
-    end
-
-    -- Backward-compatible aliases for legacy call sites.
-    Utils.MultiSelect_Init = Utils.multiSelectInit
-    Utils.MultiSelect_Clear = Utils.multiSelectClear
-    Utils.MultiSelect_Toggle = Utils.multiSelectToggle
-    Utils.MultiSelect_SetAnchor = Utils.multiSelectSetAnchor
-    Utils.MultiSelect_GetAnchor = Utils.multiSelectGetAnchor
-    Utils.MultiSelect_Range = Utils.multiSelectRange
-    Utils.MultiSelect_IsSelected = Utils.multiSelectIsSelected
-    Utils.MultiSelect_Count = Utils.multiSelectCount
-    Utils.MultiSelect_GetVersion = Utils.multiSelectGetVersion
-    Utils.MultiSelect_GetSelected = Utils.multiSelectGetSelected
+    return nil
 end
 
-
--- Set frame text based on condition:
-function Utils.setText(frame, str1, str2, cond)
-    if cond then
-        frame:SetText(str1)
-    else
-        frame:SetText(str2)
+function Utils.multiSelectClear(contextKey)
+    local MultiSelect = addon.MultiSelect
+    if MultiSelect and MultiSelect.multiSelectClear then
+        return MultiSelect.multiSelectClear(contextKey)
     end
+    return nil
 end
 
--- Resolve a named child/global frame part by concatenating frameName and suffix.
-function Utils.getNamedFramePart(frameName, suffix)
-    if type(frameName) ~= "string" or frameName == "" then
-        return nil
+function Utils.multiSelectToggle(contextKey, id, isMulti, allowDeselect)
+    local MultiSelect = addon.MultiSelect
+    if MultiSelect and MultiSelect.multiSelectToggle then
+        return MultiSelect.multiSelectToggle(contextKey, id, isMulti, allowDeselect)
     end
-    if type(suffix) ~= "string" or suffix == "" then
-        return nil
-    end
-    return _G[frameName .. suffix]
+    return nil, 0
 end
 
--- Enable/disable a named frame part (safe if missing).
-function Utils.enableDisableNamedPart(frameName, suffix, cond)
-    local frame = Utils.getNamedFramePart(frameName, suffix)
-    if frame then
-        Utils.enableDisable(frame, cond)
+function Utils.multiSelectSetAnchor(contextKey, id)
+    local MultiSelect = addon.MultiSelect
+    if MultiSelect and MultiSelect.multiSelectSetAnchor then
+        return MultiSelect.multiSelectSetAnchor(contextKey, id)
     end
-    return frame
+    return nil
 end
 
--- Show/hide a named frame part (safe if missing).
-function Utils.showHideNamedPart(frameName, suffix, cond)
-    local frame = Utils.getNamedFramePart(frameName, suffix)
-    if frame then
-        Utils.showHide(frame, cond)
+function Utils.multiSelectGetAnchor(contextKey)
+    local MultiSelect = addon.MultiSelect
+    if MultiSelect and MultiSelect.multiSelectGetAnchor then
+        return MultiSelect.multiSelectGetAnchor(contextKey)
     end
-    return frame
+    return nil
 end
 
--- Set text on a named frame part using the same condition contract as Utils.setText.
-function Utils.setTextNamedPart(frameName, suffix, str1, str2, cond)
-    local frame = Utils.getNamedFramePart(frameName, suffix)
-    if frame then
-        Utils.setText(frame, str1, str2, cond)
+function Utils.multiSelectRange(contextKey, ordered, id, isAdd)
+    local MultiSelect = addon.MultiSelect
+    if MultiSelect and MultiSelect.multiSelectRange then
+        return MultiSelect.multiSelectRange(contextKey, ordered, id, isAdd)
     end
-    return frame
+    return nil, 0
 end
 
--- Update text mode only when the mode value changes; returns the resulting mode cache value.
-function Utils.updateModeTextNamedPart(frameName, suffix, str1, str2, mode, lastMode)
-    if mode ~= lastMode then
-        Utils.setTextNamedPart(frameName, suffix, str1, str2, mode)
-        return mode
+function Utils.multiSelectIsSelected(contextKey, id)
+    local MultiSelect = addon.MultiSelect
+    if MultiSelect and MultiSelect.multiSelectIsSelected then
+        return MultiSelect.multiSelectIsSelected(contextKey, id)
     end
-    return lastMode
+    return false
 end
+
+function Utils.multiSelectCount(contextKey)
+    local MultiSelect = addon.MultiSelect
+    if MultiSelect and MultiSelect.multiSelectCount then
+        return MultiSelect.multiSelectCount(contextKey)
+    end
+    return 0
+end
+
+function Utils.multiSelectGetVersion(contextKey)
+    local MultiSelect = addon.MultiSelect
+    if MultiSelect and MultiSelect.multiSelectGetVersion then
+        return MultiSelect.multiSelectGetVersion(contextKey)
+    end
+    return 0
+end
+
+function Utils.multiSelectGetSelected(contextKey)
+    local MultiSelect = addon.MultiSelect
+    if MultiSelect and MultiSelect.multiSelectGetSelected then
+        return MultiSelect.multiSelectGetSelected(contextKey)
+    end
+    return {}
+end
+
+Utils.MultiSelect_Init = Utils.multiSelectInit
+Utils.MultiSelect_Clear = Utils.multiSelectClear
+Utils.MultiSelect_Toggle = Utils.multiSelectToggle
+Utils.MultiSelect_SetAnchor = Utils.multiSelectSetAnchor
+Utils.MultiSelect_GetAnchor = Utils.multiSelectGetAnchor
+Utils.MultiSelect_Range = Utils.multiSelectRange
+Utils.MultiSelect_IsSelected = Utils.multiSelectIsSelected
+Utils.MultiSelect_Count = Utils.multiSelectCount
+Utils.MultiSelect_GetVersion = Utils.multiSelectGetVersion
+Utils.MultiSelect_GetSelected = Utils.multiSelectGetSelected
 
 -- =========== Chat + comms helpers  =========== --
 
--- Convert seconds to readable clock string:
-function Utils.sec2clock(seconds)
-    local sec = tonumber(seconds)
-    if sec <= 0 then
-        return "00:00:00"
-    end
-    -- Compute hours, minutes and seconds properly based on total seconds.
-    -- Use the cached floor function to avoid extra allocations in hot paths.
-    local total = floor(sec)
-    local hours = floor(total / 3600)
-    local minutes = floor((total % 3600) / 60)
-    local secondsPart = floor(total % 60)
-    return format("%02d:%02d:%02d", hours, minutes, secondsPart)
-end
-
--- Sends an addOn message to the appropriate channel:
 function Utils.sync(prefix, msg)
-    local zone = select(2, IsInInstance())
-    if zone == "pvp" or zone == "arena" then
-        SendAddonMessage(prefix, msg, "BATTLEGROUND")
-    elseif GetRealNumRaidMembers() > 0 then
-        SendAddonMessage(prefix, msg, "RAID")
-    elseif GetRealNumPartyMembers() > 0 then
-        SendAddonMessage(prefix, msg, "PARTY")
+    local Comms = addon.Comms
+    if Comms and Comms.sync then
+        return Comms.sync(prefix, msg)
     end
 end
 
--- Send messages into chat
 function Utils.chat(msg, channel, language, target, bypass)
-    if not msg then return end
-    SendChatMessage(tostring(msg), channel, language, target)
+    local Comms = addon.Comms
+    if Comms and Comms.chat then
+        return Comms.chat(msg, channel, language, target, bypass)
+    end
 end
 
--- Send a whisper to a player by his/her character name
--- Returns true if the message was sent, nil otherwise
 function Utils.whisper(target, msg)
-    if type(target) == "string" and msg then
-        SendChatMessage(msg, "WHISPER", nil, target)
-        return true
+    local Comms = addon.Comms
+    if Comms and Comms.whisper then
+        return Comms.whisper(target, msg)
     end
 end
 
 -- =========== Time helpers  =========== --
 
--- Determines if the player is in a raid instance
+function Utils.sec2clock(seconds)
+    local Time = addon.Time
+    if Time and Time.sec2clock then
+        return Time.sec2clock(seconds)
+    end
+    return "00:00:00"
+end
+
 function Utils.isRaidInstance()
-    local inInstance, instanceType = IsInInstance()
-    return ((inInstance) and (instanceType == "raid"))
+    local Time = addon.Time
+    if Time and Time.isRaidInstance then
+        return Time.isRaidInstance()
+    end
+    return false
 end
 
--- Returns the raid difficulty:
 function Utils.getDifficulty()
-    local difficulty = nil
-    local inInstance, instanceType = IsInInstance()
-    if inInstance and instanceType == "raid" then
-        difficulty = GetRaidDifficulty()
+    local Time = addon.Time
+    if Time and Time.getDifficulty then
+        return Time.getDifficulty()
     end
-    return difficulty
+    return nil
 end
 
--- Returns the current time:
 function Utils.getCurrentTime(server)
-    if server == nil then server = true end
-    local t = time()
-    if server == true then
-        local _, month, day, year = CalendarGetDate()
-        local hour, minute = GetGameTime()
-        t = time({ year = year, month = month, day = day, hour = hour, min = minute })
+    local Time = addon.Time
+    if Time and Time.getCurrentTime then
+        return Time.getCurrentTime(server)
     end
-    return t
+    return time()
 end
 
--- Returns the server offset:
 function Utils.getServerOffset()
-    local sH, sM = GetGameTime()
-    local lH, lM = tonumber(date("%H")), tonumber(date("%M"))
-    local sT = sH + sM / 60
-    local lT = lH + lM / 60
-    local offset = addon.Round((sT - lT) / 0.5) * 0.5
-    if offset >= 12 then
-        offset = offset - 24
-    elseif offset < -12 then
-        offset = offset + 24
+    local Time = addon.Time
+    if Time and Time.getServerOffset then
+        return Time.getServerOffset()
     end
-    return offset
+    return 0
 end
 
 -- =========== Base64 encode/decode  =========== --
 
---[==[ Base64 encode/decode ]==] --
-do
-    -- Characters table string:
-    local char, byte = string.char, string.byte
-    local b = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-
-    -- Encoding:
-    function Utils.encode(data)
-        return ((gsub(data, ".", function(x)
-            local r, b = "", byte(x)
-            for i = 8, 1, -1 do
-                r = r .. (b % 2 ^ i - b % 2 ^ (i - 1) > 0 and "1" or "0")
-            end
-            return r
-        end) .. "0000"):gsub("%d%d%d?%d?%d?%d?", function(x)
-            if #x < 6 then return "" end
-            local c = 0
-            for i = 1, 6 do
-                c = c + (strsub(x, i, i) == "1" and 2 ^ (6 - i) or 0)
-            end
-            return strsub(b, c + 1, c + 1)
-        end) .. ({ "", "==", "=" })[#data % 3 + 1])
+function Utils.encode(data)
+    local Base64 = addon.Base64
+    if Base64 and Base64.encode then
+        return Base64.encode(data)
     end
+    return data
+end
 
-    -- Decoding:
-    function Utils.decode(data)
-        data = gsub(data, "[^" .. b .. "=]", "")
-        return (gsub(data, ".", function(x)
-            if x == "=" then return "" end
-            local r, f = "", (find(b, x) - 1)
-            for i = 6, 1, -1 do
-                r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and "1" or "0")
-            end
-            return r
-        end):gsub("%d%d%d?%d?%d?%d?%d?%d?", function(x)
-            if #x ~= 8 then return "" end
-            local c = 0
-            for i = 1, 8 do
-                c = c + (strsub(x, i, i) == "1" and 2 ^ (8 - i) or 0)
-            end
-            return char(c)
-        end))
+function Utils.decode(data)
+    local Base64 = addon.Base64
+    if Base64 and Base64.decode then
+        return Base64.decode(data)
     end
+    return data
 end

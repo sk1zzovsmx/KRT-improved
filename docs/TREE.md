@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-23 02:47:13 +01:00
-- Commit: 808d708
+- Generated: 2026-02-23 20:10:44 +01:00
+- Commit: f9f3597
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -15,6 +15,8 @@
 |   |   |-- README.md
 |   |   |-- Spammer.lua
 |   |   \\-- Warnings.lua
+|   |-- Core
+|   |   \\-- Init.lua
 |   |-- EntryPoints
 |   |   |-- Minimap.lua
 |   |   |-- README.md
@@ -36,9 +38,28 @@
 |   |   |-- DiagnoseLog.en.lua
 |   |   \\-- localization.en.lua
 |   |-- Modules
+|   |   |-- Base64.lua
+|   |   |-- Bus.lua
 |   |   |-- C.lua
+|   |   |-- Colors.lua
+|   |   |-- Comms.lua
+|   |   |-- Events.lua
+|   |   |-- Features.lua
+|   |   |-- Frames.lua
 |   |   |-- ignoredItems.lua
-|   |   \\-- Utils.lua
+|   |   |-- ListController.lua
+|   |   |-- MultiSelect.lua
+|   |   |-- Strings.lua
+|   |   |-- Time.lua
+|   |   |-- UIBinder.lua
+|   |   |-- UIFacade.lua
+|   |   |-- Utils.EventBusCompat.lua
+|   |   |-- Utils.LegacyGlobals.lua
+|   |   |-- Utils.lua
+|   |   |-- Utils.Options.lua
+|   |   |-- Utils.RaidState.lua
+|   |   |-- Utils.Tooltip.lua
+|   |   \\-- Utils.UI.lua
 |   |-- Services
 |   |   |-- Chat.lua
 |   |   |-- Loot.lua
@@ -64,6 +85,8 @@
 |   |   |-- README.md
 |   |   \\-- ReservesUI.lua
 |   |-- !KRT.toc
+|   |-- KRT.Core.xml
+|   |-- KRT.Full.xml
 |   |-- KRT.lua
 |   |-- KRT.xml
 |   \\-- Templates.xml

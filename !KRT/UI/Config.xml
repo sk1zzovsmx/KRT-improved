@@ -4,10 +4,7 @@
 		<Size>
 			<AbsDimension x="20" y="20" />
 		</Size>
-		<Scripts>
-			<OnClick>KRT.Config:OnClick(self, button)</OnClick>
-		</Scripts>
-	</CheckButton>
+</CheckButton>
 	<!-- FontString Template -->
 	<FontString name="KRTConfigFontStringTemplate" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="TOP" virtual="true">
 		<Size>
@@ -188,10 +185,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Config:OnClick(self, button)</OnClick>
-				</Scripts>
-			</CheckButton>
+</CheckButton>
 			<CheckButton name="$parentcountdownSimpleRaidMsg" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPRIGHT" relativeTo="$parentcountdownSimpleRaidMsgStr" relativePoint="TOPLEFT">
@@ -200,10 +194,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>KRT.Config:OnClick(self, button)</OnClick>
-				</Scripts>
-			</CheckButton>
+</CheckButton>
 			<CheckButton name="$parentannounceOnWin" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPRIGHT" relativeTo="$parentannounceOnWinStr" relativePoint="TOPLEFT">
@@ -315,13 +306,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnLoad>
-						KRT.Config:InitCountdownSlider(self)
-					</OnLoad>
-					<OnValueChanged>KRT.Config:OnClick(self)</OnValueChanged>
-				</Scripts>
-			</Slider>
+</Slider>
 			<Button name="$parentDefaultsBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
@@ -345,17 +330,12 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>self:GetParent():Hide()</OnClick>
-				</Scripts>
-			</Button>
+</Button>
 		</Frames>
-		<Scripts>
-			<OnLoad>KRT.Config:OnLoad(self)</OnLoad>
-		</Scripts>
-	</Frame>
+</Frame>
 	<!-- ====== End of Config Frame ====== -->
 	<!-- ====== Start of LFM Spam Frame ====== -->
 	<!-- EditBox Template -->
 </Ui>
+
 

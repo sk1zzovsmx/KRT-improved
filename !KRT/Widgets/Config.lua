@@ -1,12 +1,14 @@
---[[
-    Widgets/Config.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Utils = feature.Utils
+local Events = feature.Events or addon.Events or {}
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -16,12 +18,27 @@ local _G = _G
 
 local strlen = string.len
 local strsub = string.sub
-local tostring = tostring
+local type, tostring = type, tostring
+
+local UIFacade = addon.UI
+
+local function isWidgetEnabled(widgetId)
+    if UIFacade and type(UIFacade.IsEnabled) == "function" then
+        return UIFacade:IsEnabled(widgetId)
+    end
+    return true
+end
 
 -- =========== Configuration Frame Module  =========== --
 do
-    addon.Config = addon.Config or {}
-    local module = addon.Config
+    if not isWidgetEnabled("Config") then
+        return
+    end
+
+    addon.Widgets = addon.Widgets or {}
+    addon.Widgets.Config = addon.Widgets.Config or addon.Config or {}
+    addon.Config = addon.Widgets.Config -- Legacy alias during namespacing migration.
+    local module = addon.Widgets.Config
     local frameName
 
     local getFrame = makeModuleFrameGetter(module, "KRTConfig")
@@ -166,7 +183,10 @@ do
 
         name = strsub(name, strlen(frameName) + 1)
         Utils.setOption(name, value)
-        Utils.triggerEvent("Config" .. name, value)
+        local eventName = Events.configOptionChanged and Events.configOptionChanged(name)
+        if eventName then
+            Utils.triggerEvent(eventName, value)
+        end
 
         configDirty = true
         module:RequestRefresh()
@@ -253,5 +273,23 @@ do
 
     function module:Refresh()
         if UpdateUIFrame then UpdateUIFrame() end
+    end
+
+    if addon.UI and addon.UI.Register then
+        addon.UI:Register("Config", {
+            Toggle = function()
+                if module.Toggle then
+                    module:Toggle()
+                end
+            end,
+            Hide = function()
+                if module.Hide then
+                    module:Hide()
+                end
+            end,
+            Default = function()
+                module:Default()
+            end,
+        })
     end
 end

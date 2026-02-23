@@ -4,6 +4,27 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Added `Modules/Features.lua` with widget feature profiles (`full`/`core`) and
+  `addon.Features` runtime flags (`Config`, `LootCounter`, `Reserves`).
+- **Behavior:** `Modules/UIFacade.lua` is now feature-aware (`IsEnabled`, `IsRegistered`) and
+  keeps widget calls/registers as no-op when a widget feature is disabled.
+- **Behavior:** `Modules/UIBinder.lua` now skips widget script binding when widget APIs are not
+  registered (or feature-disabled), and `KRTMasterConfigBtn` routes through `KRT.UI:Call(...)`.
+- **Refactor:** Split UI include manifests into `KRT.Core.xml` and `KRT.Full.xml`
+  (default `KRT.xml` now includes `KRT.Full.xml`) to support core/full build profiles.
+- **Behavior:** Added baseline options bootstrap in `Modules/Utils.Options.lua`
+  (`addon.LoadOptions` fallback) so core boot does not depend on `Widgets/Config.lua`.
+- **Refactor:** `Modules/UIBinder.lua` no longer uses `loadstring` for UI script binding.
+  Binder handlers are now parsed into direct Lua functions and normalized up front.
+- **Refactor:** Added centralized event registry in `Modules/Events.lua` for internal bus event names
+  and wow-forwarded events (`wow.*`), and migrated core call sites to use `addon.Events`.
+- **Refactor:** Split `Modules/Utils.lua` into themed modules:
+  `Modules/Utils.LegacyGlobals.lua`, `Modules/Utils.Options.lua`, `Modules/Utils.RaidState.lua`,
+  `Modules/Utils.EventBusCompat.lua`, `Modules/Utils.Tooltip.lua`, and `Modules/Utils.UI.lua`.
+  `Utils.lua` now acts as a compatibility facade/aggregator.
+- **Behavior:** Added legacy alias lockdown in `Core/Init.lua`. Legacy reads like `addon.Raid`/
+  `addon.Logger` now resolve through namespaced targets (`addon.Services.*` / `addon.Controllers.*` /
+  `addon.Widgets.*`) and emit a debug-mode warning once per alias+callsite to prevent new regressions.
 - **Docs:** Import window ownership is documented as `addon.ReservesUI.Import`.
   Legacy `ReservesImport` module was removed and XML now points to the Reserves Import widget.
 - **UI:** Logger item context menu now opens a standard `StaticPopup` window with an

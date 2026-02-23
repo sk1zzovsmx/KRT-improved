@@ -21,21 +21,43 @@ Libs\LibDeformat-3.0\lib.xml
 Libs\LibCompat-1.0\lib.xml
 Libs\LibLogger-1.0\lib.xml
 
-# Layer 1 - Localization (must load before runtime modules)
+# Layer 1 - Core init (must load before all addon Lua files)
+Core\Init.lua
+
+# Layer 2 - Localization (must load before runtime modules)
 Localization\localization.en.lua
 Localization\DiagnoseLog.en.lua
 
-# Layer 2 - Shared templates
+# Layer 3 - Shared templates
 Templates.xml
 
-# Layer 3 - Shared modules (helpers/constants)
-Modules\Utils.lua
+# Layer 4 - Shared modules (helpers/constants)
 Modules\C.lua
+Modules\Events.lua
+Modules\Colors.lua
+Modules\Strings.lua
+Modules\Comms.lua
+Modules\Time.lua
+Modules\Base64.lua
+Modules\Frames.lua
+Modules\MultiSelect.lua
+Modules\ListController.lua
+Modules\Bus.lua
+Modules\Utils.LegacyGlobals.lua
+Modules\Utils.Options.lua
+Modules\Utils.RaidState.lua
+Modules\Utils.EventBusCompat.lua
+Modules\Utils.Tooltip.lua
+Modules\Utils.UI.lua
+Modules\Utils.lua
+Modules\Features.lua
+Modules\UIFacade.lua
+Modules\UIBinder.lua
 
-# Layer 4 - Core bootstrap and event wiring
+# Layer 5 - Core bootstrap and event wiring
 KRT.lua
 
-# Layer 5 - Runtime modules (ordered by dependency)
+# Layer 6 - Runtime modules (ordered by dependency)
 # Services + entrypoint + parents + child UI controllers
 Services\Raid.lua
 Services\Chat.lua
@@ -54,8 +76,9 @@ Controllers\Changes.lua
 Controllers\Spammer.lua
 EntryPoints\SlashEvents.lua
 
-# Layer 6 - UI include manifest
+# Layer 7 - UI include manifest
+# Default profile: full (KRT.xml -> KRT.Full.xml). Core build can swap KRT.xml -> KRT.Core.xml.
 KRT.xml
 
-# Layer 7 - Late data modules (intentional post-runtime load)
+# Layer 8 - Late data modules (intentional post-runtime load)
 Modules\ignoredItems.lua

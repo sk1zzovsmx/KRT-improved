@@ -1,16 +1,20 @@
---[[
-    Services/Raid.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Events = feature.Events or addon.Events or {}
 local Core = feature.Core
 
 local tContains = feature.tContains
+
+local InternalEvents = Events.Internal
 
 local ITEM_LINK_PATTERN = feature.ITEM_LINK_PATTERN
 local rollTypes = feature.rollTypes
@@ -28,8 +32,10 @@ local UnitRace, UnitSex = UnitRace, UnitSex
 -- Raid helper module.
 -- Manages raid state, roster, boss kills, and loot logging.
 do
-    addon.Raid              = addon.Raid or {}
-    local module            = addon.Raid
+    addon.Services = addon.Services or {}
+    addon.Services.Raid = addon.Services.Raid or addon.Raid or {}
+    addon.Raid              = addon.Services.Raid -- Legacy alias during namespacing migration.
+    local module            = addon.Services.Raid
     -- ----- Internal state ----- --
     local numRaid           = 0
     local rosterVersion     = 0
@@ -483,7 +489,7 @@ do
             #raidInfo.players
         ))
 
-        Utils.triggerEvent("RaidCreate", Core.getCurrentRaid())
+        Utils.triggerEvent(InternalEvents.RaidCreate, Core.getCurrentRaid())
 
         -- Schedule one delayed roster refresh.
         addon.CancelTimer(module.updateRosterHandle, true)
@@ -825,7 +831,7 @@ do
         end
 
         tinsert(raid.loot, lootInfo)
-        Utils.triggerEvent("RaidLootUpdate", Core.getCurrentRaid(), lootInfo)
+        Utils.triggerEvent(InternalEvents.RaidLootUpdate, Core.getCurrentRaid(), lootInfo)
         addon:debug(Diag.D.LogLootLogged:format(tonumber(Core.getCurrentRaid()) or -1, tostring(itemId),
             tostring(lootInfo.bossNid), tostring(player)))
     end
@@ -876,7 +882,8 @@ do
         player.count = value
 
         if old ~= value then
-            Utils.triggerEvent("PlayerCountChanged", player.name, value, old, raidNum)
+            Utils.triggerEvent(InternalEvents.PlayerCountChanged,
+                player.name, value, old, raidNum)
         end
     end
 

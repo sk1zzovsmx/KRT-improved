@@ -1,13 +1,15 @@
---[[
-    Services/Syncer.lua
-]]
-
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Events = feature.Events or addon.Events or {}
 local Core = feature.Core
 
 local _G = _G
@@ -22,10 +24,14 @@ local floor = math.floor
 local GetTime = _G.GetTime
 local SendAddonMessage = _G.SendAddonMessage
 
+local InternalEvents = Events.Internal
+
 -- Logger synchronization module.
 do
-    addon.Syncer = addon.Syncer or {}
-    local module = addon.Syncer
+    addon.Services = addon.Services or {}
+    addon.Services.Syncer = addon.Services.Syncer or {}
+    addon.Syncer = addon.Services.Syncer -- Legacy alias during namespacing migration.
+    local module = addon.Services.Syncer
 
     -- ----- Internal state ----- --
     local COMM_PREFIX = "KRTLogSync"
@@ -826,7 +832,7 @@ do
         local selectedRaid = tonumber(focusRaidId)
             or tonumber(addon.State and addon.State.selectedRaid)
             or tonumber(Core.getCurrentRaid())
-        Utils.triggerEvent("LoggerSelectRaid", selectedRaid, "sync")
+        Utils.triggerEvent(InternalEvents.LoggerSelectRaid, selectedRaid, "sync")
     end
 
     local function onSnapshotReady(sender, requestId, mode, snapshot)
