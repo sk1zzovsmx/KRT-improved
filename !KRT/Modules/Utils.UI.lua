@@ -176,6 +176,14 @@ function UI.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
     return UI.makeUIFrameController(getFrame, requestRefreshFn)
 end
 
+function UI.createListPanelScaffold(cfg)
+    local Frames = addon.Frames
+    if Frames and Frames.createListPanelScaffold then
+        return Frames.createListPanelScaffold(cfg)
+    end
+    return nil
+end
+
 function UI.bindEditBoxHandlers(frameName, specs, requestRefreshFn)
     local Frames = addon.Frames
     if Frames and Frames.bindEditBoxHandlers then

@@ -72,28 +72,32 @@ do
         highlightId = function() return selectedID end,
     }
 
-    -- OnLoad frame:
-    function module:OnLoad(frame)
-        frameName = Utils.initModuleFrame(module, frame, {
-            enableDrag = true,
-            hookOnShow = function()
-                warningsDirty = true
-                lastSelectedID = false
-            end,
-        })
-        if not frameName then return end
-        controller:OnLoad(frame)
-    end
-
-    -- Initialize UI controller for Toggle/Hide.
-    Utils.bootstrapModuleUi(module, getFrame, function()
-        warningsDirty = true
-        lastSelectedID = false
-        module:RequestRefresh()
-    end, {
+    local panelScaffold = Utils.createListPanelScaffold({
+        module = module,
+        getFrame = getFrame,
+        controller = controller,
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
+        onShow = function()
+            warningsDirty = true
+            lastSelectedID = false
+        end,
+        localize = function()
+            if LocalizeUIFrame then
+                LocalizeUIFrame()
+            end
+        end,
+        update = function()
+            if UpdateUIFrame then
+                UpdateUIFrame()
+            end
+        end,
     })
+
+    -- OnLoad frame:
+    function module:OnLoad(frame)
+        frameName = panelScaffold:OnLoad(frame)
+    end
 
     -- Warning selection:
     function module:Select(btn)
@@ -212,7 +216,6 @@ do
 
     -- UI refresh.
     function UpdateUIFrame()
-        LocalizeUIFrame()
         if warningsDirty or not fetched then
             controller:Dirty()
             warningsDirty = false
@@ -239,7 +242,7 @@ do
     end
 
     function module:Refresh()
-        if UpdateUIFrame then UpdateUIFrame() end
+        panelScaffold:Refresh()
     end
 
     -- Saving a Warning:

@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-23 20:10:44 +01:00
-- Commit: f9f3597
+- Generated: 2026-02-23 23:00:40 +01:00
+- Commit: 0b63a56
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -99,9 +99,16 @@
 |   \\-- settings.json
 |-- docs
 |   |-- ARCHITECTURE.md
-|   \\-- TREE.md
+|   |-- FN_CLUSTERS.md
+|   |-- FUNCTION_REGISTRY.csv
+|   |-- FUNCTION_REGISTRY.md
+|   |-- REFACTOR_RULES.md
+|   |-- TREE.md
+|   \\-- UTILS_DEPRECATION_MAP.md
 |-- tools
 |   |-- check-layering.ps1
+|   |-- fnmap-classify.ps1
+|   |-- fnmap-inventory.ps1
 |   |-- install-hooks.ps1
 |   |-- pre-commit.ps1
 |   \\-- update-tree.ps1

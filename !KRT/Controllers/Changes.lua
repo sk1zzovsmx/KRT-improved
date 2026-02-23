@@ -90,35 +90,41 @@ do
         highlightKey = function() return tostring(selectedID or "nil") end,
     }
 
+    local panelScaffold = Utils.createListPanelScaffold({
+        module = module,
+        getFrame = getFrame,
+        controller = controller,
+        bindToggleHide = bindModuleToggleHide,
+        bindRequestRefresh = bindModuleRequestRefresh,
+        onShow = function()
+            changesDirty = true
+            lastSelectedID = false
+        end,
+        onHide = function()
+            if CancelChanges then
+                CancelChanges()
+            end
+        end,
+        localize = function()
+            if LocalizeUIFrame then
+                LocalizeUIFrame()
+            end
+        end,
+        update = function()
+            if UpdateUIFrame then
+                UpdateUIFrame()
+            end
+        end,
+    })
+
     -- ----- Private helpers ----- --
 
     -- ----- Public methods ----- --
 
     -- OnLoad frame:
     function module:OnLoad(frame)
-        frameName = Utils.initModuleFrame(module, frame, {
-            enableDrag = true,
-            hookOnShow = function()
-                changesDirty = true
-                lastSelectedID = false
-            end,
-            hookOnHide = function()
-                CancelChanges()
-            end,
-        })
-        if not frameName then return end
-        controller:OnLoad(frame)
+        frameName = panelScaffold:OnLoad(frame)
     end
-
-    -- Initialize UI controller for Toggle/Hide.
-    Utils.bootstrapModuleUi(module, getFrame, function()
-        changesDirty = true
-        lastSelectedID = false
-        module:RequestRefresh()
-    end, {
-        bindToggleHide = bindModuleToggleHide,
-        bindRequestRefresh = bindModuleRequestRefresh,
-    })
 
     -- Clear module:
     function module:Clear()
@@ -285,7 +291,6 @@ do
 
     -- UI refresh.
     function UpdateUIFrame()
-        LocalizeUIFrame()
         if changesDirty or not fetched then
             InitChangesTable()
             controller:Dirty()
@@ -331,7 +336,7 @@ do
     end
 
     function module:Refresh()
-        if UpdateUIFrame then UpdateUIFrame() end
+        panelScaffold:Refresh()
     end
 
     -- Initialize changes table:

@@ -27,7 +27,7 @@ local _G = _G
 local type = type
 local rawget, rawset = rawget, rawset
 local getmetatable, setmetatable = getmetatable, setmetatable
-local tostring = tostring
+local tostring, tonumber = tostring, tonumber
 
 local Core = addon.Core
 local Diagnose = addon.Diagnose
@@ -226,20 +226,63 @@ for i = 1, #LEGACY_ALIAS_PATHS do
     Core.registerLegacyAliasPath(entry[1], entry[2], entry[3])
 end
 
-local function ensureLootRuntimeState()
+function Core.getController(name)
+    if type(name) ~= "string" or name == "" then
+        return nil
+    end
+    local controllers = addon.Controllers
+    return controllers and controllers[name] or nil
+end
+
+function Core.ensureLootRuntimeState()
     local state = addon.State
     state.loot = state.loot or {}
 
     local lootState = state.loot
     lootState.itemInfo = lootState.itemInfo or {}
+    lootState.currentRollType = tonumber(lootState.currentRollType) or 4
+    lootState.currentRollItem = tonumber(lootState.currentRollItem) or 0
+    lootState.currentItemIndex = tonumber(lootState.currentItemIndex) or 0
+
+    lootState.itemCount = tonumber(lootState.itemCount) or 1
+    if lootState.itemCount < 1 then
+        lootState.itemCount = 1
+    end
+    lootState.lootCount = tonumber(lootState.lootCount) or 0
+    if lootState.lootCount < 0 then
+        lootState.lootCount = 0
+    end
+    lootState.rollsCount = tonumber(lootState.rollsCount) or 0
+    if lootState.rollsCount < 0 then
+        lootState.rollsCount = 0
+    end
+    lootState.itemTraded = tonumber(lootState.itemTraded) or 0
+    if lootState.itemTraded < 0 then
+        lootState.itemTraded = 0
+    end
+
+    lootState.rollStarted = lootState.rollStarted == true
+
+    if lootState.opened == nil then
+        lootState.opened = false
+    end
+    if lootState.fromInventory == nil then
+        lootState.fromInventory = false
+    end
+    lootState.pendingAwards = lootState.pendingAwards or {}
 
     return state, lootState, lootState.itemInfo
 end
 
+function Core.GetItemIndex()
+    local _, lootState = Core.ensureLootRuntimeState()
+    return tonumber(lootState.currentItemIndex) or 0
+end
+
 function Core.getFeatureShared()
-    local constants = addon.C
+    local constants = addon.C or {}
     local core = addon.Core
-    local state, lootState, itemInfo = ensureLootRuntimeState()
+    local state, lootState, itemInfo = core.ensureLootRuntimeState()
 
     return {
         L = addon.L,
@@ -269,6 +312,8 @@ function Core.getFeatureShared()
         coreState = state,
         lootState = lootState,
         itemInfo = itemInfo,
-        GetItemIndex = core.GetItemIndex,
+        GetItemIndex = core.GetItemIndex or function()
+            return 0
+        end,
     }
 end

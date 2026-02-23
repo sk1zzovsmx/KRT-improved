@@ -1049,21 +1049,21 @@ local function parseTemplateList(templateList)
     return out
 end
 
-local function trimText(value)
+local function trimBinderToken(value)
     if type(value) ~= "string" then
         return ""
     end
     return strgsub(value, "^%s*(.-)%s*$", "%1")
 end
 
-local function splitArgs(argList)
+local function splitCommaArgs(argList)
     local out = {}
-    local clean = trimText(argList)
+    local clean = trimBinderToken(argList)
     if clean == "" then
         return out
     end
     for token in gmatch(clean, "([^,]+)") do
-        out[#out + 1] = trimText(token)
+        out[#out + 1] = trimBinderToken(token)
     end
     return out
 end
@@ -1174,7 +1174,7 @@ local function parseBodyToHandler(body)
 
     local parentMethod, parentArgs = strmatch(body, "^self:GetParent%(%)%:([%w_]+)%((.-)%)$")
     if parentMethod then
-        local argTokens = splitArgs(parentArgs)
+        local argTokens = splitCommaArgs(parentArgs)
         return function(self, ...)
             local parent = self and self.GetParent and self:GetParent()
             if not parent then
@@ -1195,7 +1195,7 @@ local function parseBodyToHandler(body)
 
     local selfMethod, selfArgs = strmatch(body, "^self:([%w_]+)%((.-)%)$")
     if selfMethod then
-        local argTokens = splitArgs(selfArgs)
+        local argTokens = splitCommaArgs(selfArgs)
         return function(self, ...)
             if not self then
                 return
@@ -1215,7 +1215,7 @@ local function parseBodyToHandler(body)
 
     local objectPath, methodName, methodArgs = strmatch(body, "^([%w_%.]+):([%w_]+)%((.-)%)$")
     if objectPath and methodName then
-        local argTokens = splitArgs(methodArgs)
+        local argTokens = splitCommaArgs(methodArgs)
         return function(self, ...)
             local target = resolveObjectPath(objectPath)
             if not target then
@@ -1245,7 +1245,7 @@ local function compileHandler(frameName, scriptName, body)
         return nil
     end
 
-    local normalizedBody = trimText(strgsub(body, "\r", ""))
+    local normalizedBody = trimBinderToken(strgsub(body, "\r", ""))
     if normalizedBody == "" then
         return nil
     end

@@ -43,6 +43,23 @@ local function getTooltip()
     return Utils.Tooltip
 end
 
+local function warnDeprecatedCompat(legacyName, ownerPath)
+    local state = addon.State
+    if not (state and state.debugEnabled == true) then
+        return
+    end
+
+    state.utilsCompatWarned = state.utilsCompatWarned or {}
+    if state.utilsCompatWarned[legacyName] then
+        return
+    end
+    state.utilsCompatWarned[legacyName] = true
+
+    if addon.warn then
+        addon:warn("[Compat] Utils.%s is deprecated; use %s", tostring(legacyName), tostring(ownerPath))
+    end
+end
+
 -- =========== Debug/state helpers  =========== --
 
 function Utils.isDebugEnabled()
@@ -178,7 +195,10 @@ function Utils.ucfirst(value)
     return tostring(value or "")
 end
 
+-- @compat facade for legacy call-sites.
+-- @deprecated use addon.Strings.trimText
 function Utils.trimText(value, allowNil)
+    warnDeprecatedCompat("trimText", "addon.Strings.trimText")
     local Strings = getStrings()
     if Strings and Strings.trimText then
         return Strings.trimText(value, allowNil)
@@ -189,7 +209,10 @@ function Utils.trimText(value, allowNil)
     return tostring(value)
 end
 
+-- @compat facade for legacy call-sites.
+-- @deprecated use addon.Strings.normalizeName
 function Utils.normalizeName(value, allowNil)
+    warnDeprecatedCompat("normalizeName", "addon.Strings.normalizeName")
     local Strings = getStrings()
     if Strings and Strings.normalizeName then
         return Strings.normalizeName(value, allowNil)
@@ -197,7 +220,10 @@ function Utils.normalizeName(value, allowNil)
     return Utils.trimText(value, allowNil)
 end
 
+-- @compat facade for legacy call-sites.
+-- @deprecated use addon.Strings.normalizeLower
 function Utils.normalizeLower(value, allowNil)
+    warnDeprecatedCompat("normalizeLower", "addon.Strings.normalizeLower")
     local Strings = getStrings()
     if Strings and Strings.normalizeLower then
         return Strings.normalizeLower(value, allowNil)
@@ -226,7 +252,10 @@ function Utils.formatChatMessage(text, prefix, outputFormat, prefixHex)
     return format(outputFormat or "%s%s", msgPrefix, tostring(text))
 end
 
+-- @compat facade for legacy call-sites.
+-- @deprecated use addon.Strings.splitArgs
 function Utils.splitArgs(msg)
+    warnDeprecatedCompat("splitArgs", "addon.Strings.splitArgs")
     local Strings = getStrings()
     if Strings and Strings.splitArgs then
         return Strings.splitArgs(msg)
@@ -431,6 +460,14 @@ function Utils.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
         return UI.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
     end
     return Utils.makeUIFrameController(getFrame, requestRefreshFn)
+end
+
+function Utils.createListPanelScaffold(cfg)
+    local UI = getUI()
+    if UI and UI.createListPanelScaffold then
+        return UI.createListPanelScaffold(cfg)
+    end
+    return nil
 end
 
 function Utils.bindEditBoxHandlers(frameName, specs, requestRefreshFn)

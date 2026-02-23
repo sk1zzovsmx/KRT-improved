@@ -10,6 +10,7 @@ local L = feature.L
 local Utils = feature.Utils
 
 local K_COLOR = feature.K_COLOR
+local Core = feature.Core or addon.Core
 
 local UI = addon.UI or {}
 if type(UI.Call) ~= "function" then
@@ -23,29 +24,12 @@ do
     addon.Minimap = addon.Minimap or {}
     local module = addon.Minimap
 
-    local function getMasterController()
+    local function getController(name)
+        if Core and Core.getController then
+            return Core.getController(name)
+        end
         local controllers = addon.Controllers
-        return controllers and controllers.Master or nil
-    end
-
-    local function getLoggerController()
-        local controllers = addon.Controllers
-        return controllers and controllers.Logger or nil
-    end
-
-    local function getWarningsController()
-        local controllers = addon.Controllers
-        return controllers and controllers.Warnings or nil
-    end
-
-    local function getChangesController()
-        local controllers = addon.Controllers
-        return controllers and controllers.Changes or nil
-    end
-
-    local function getSpammerController()
-        local controllers = addon.Controllers
-        return controllers and controllers.Spammer or nil
+        return controllers and controllers[name] or nil
     end
 
     -- ----- Internal state ----- --
@@ -64,7 +48,7 @@ do
             text = MASTER_LOOTER,
             notCheckable = 1,
             func = function()
-                local moduleRef = getMasterController()
+                local moduleRef = getController("Master")
                 if moduleRef and moduleRef.Toggle then
                     moduleRef:Toggle()
                 end
@@ -75,7 +59,7 @@ do
             text = L.StrLootLogger,
             notCheckable = 1,
             func = function()
-                local moduleRef = getLoggerController()
+                local moduleRef = getController("Logger")
                 if moduleRef and moduleRef.Toggle then
                     moduleRef:Toggle()
                 end
@@ -88,7 +72,7 @@ do
             text = RAID_WARNING,
             notCheckable = 1,
             func = function()
-                local moduleRef = getWarningsController()
+                local moduleRef = getController("Warnings")
                 if moduleRef and moduleRef.Toggle then
                     moduleRef:Toggle()
                 end
@@ -99,7 +83,7 @@ do
             text = L.StrMSChanges,
             notCheckable = 1,
             func = function()
-                local moduleRef = getChangesController()
+                local moduleRef = getController("Changes")
                 if moduleRef and moduleRef.Toggle then
                     moduleRef:Toggle()
                 end
@@ -109,7 +93,7 @@ do
             text = L.BtnDemand,
             notCheckable = 1,
             func = function()
-                local moduleRef = getChangesController()
+                local moduleRef = getController("Changes")
                 if moduleRef and moduleRef.Demand then
                     moduleRef:Demand()
                 end
@@ -119,7 +103,7 @@ do
             text = CHAT_ANNOUNCE,
             notCheckable = 1,
             func = function()
-                local moduleRef = getChangesController()
+                local moduleRef = getController("Changes")
                 if moduleRef and moduleRef.Announce then
                     moduleRef:Announce()
                 end
@@ -130,7 +114,7 @@ do
             text = L.StrLFMSpam,
             notCheckable = 1,
             func = function()
-                local moduleRef = getSpammerController()
+                local moduleRef = getController("Spammer")
                 if moduleRef and moduleRef.Toggle then
                     moduleRef:Toggle()
                 end

@@ -59,3 +59,35 @@ Expected: `0 match`
 rg ":Toggle\\(" -n !KRT/Services !KRT/Widgets !KRT/Controllers
 ```
 Expected: review manually; parent toggles should not be introduced in Services.
+
+## Function unification regression checks
+
+10. `Core.getFeatureShared` must not be redefined in `KRT.lua`:
+```powershell
+rg "function\\s+Core\\.getFeatureShared" -n !KRT/KRT.lua
+```
+Expected: `0 match`
+
+11. `ensureLootRuntimeState` canonical owner is `Core/Init.lua` only:
+```powershell
+rg "local\\s+function\\s+ensureLootRuntimeState|function\\s+Core\\.ensureLootRuntimeState" -n !KRT/KRT.lua
+```
+Expected: `0 match`
+
+12. Reserves formatter helpers should not be duplicated in widget locals:
+```powershell
+rg "local\\s+function\\s+FormatReserve(ItemIdLabel|ItemFallback|DroppedBy)" -n !KRT/Widgets/ReservesUI.lua
+```
+Expected: `0 match`
+
+13. EntryPoints should not re-introduce per-controller getter duplicates:
+```powershell
+rg "local\\s+function\\s+get(Master|Logger|Warnings|Changes|Spammer)Controller" -n !KRT/EntryPoints -g "*.lua"
+```
+Expected: `0 match`
+
+14. UIBinder should not reintroduce `splitArgs` local helper naming collision:
+```powershell
+rg "local\\s+function\\s+splitArgs\\s*\\(" -n !KRT/Modules/UIBinder.lua
+```
+Expected: `0 match`

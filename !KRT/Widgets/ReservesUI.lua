@@ -69,16 +69,44 @@ do
 
     -- ----- Private helpers ----- --
 
-    local function FormatReserveItemIdLabel(itemId)
+    local function getReservesModule()
+        local services = addon.Services
+        return services and services.Reserves or nil
+    end
+
+    local function formatReserveItemIdLabel(itemId)
+        local reserves = getReservesModule()
+        if reserves and reserves.FormatReserveItemIdLabel then
+            return reserves:FormatReserveItemIdLabel(itemId)
+        end
+        if Service and Service.FormatReserveItemIdLabel then
+            return Service:FormatReserveItemIdLabel(itemId)
+        end
         return format(L.StrReservesItemIdLabel, tostring(itemId or "?"))
     end
 
-    local function FormatReserveItemFallback(itemId)
+    local function formatReserveItemFallback(itemId)
+        local reserves = getReservesModule()
+        if reserves and reserves.FormatReserveItemFallback then
+            return reserves:FormatReserveItemFallback(itemId)
+        end
+        if Service and Service.FormatReserveItemFallback then
+            return Service:FormatReserveItemFallback(itemId)
+        end
         return format(L.StrReservesItemFallback, tostring(itemId or "?"))
     end
 
-    local function FormatReserveDroppedBy(source)
-        if not source or source == "" then return nil end
+    local function formatReserveDroppedBy(source)
+        local reserves = getReservesModule()
+        if reserves and reserves.FormatReserveDroppedBy then
+            return reserves:FormatReserveDroppedBy(source)
+        end
+        if Service and Service.FormatReserveDroppedBy then
+            return Service:FormatReserveDroppedBy(source)
+        end
+        if not source or source == "" then
+            return nil
+        end
         return format(L.StrReservesTooltipDroppedBy, source)
     end
 
@@ -196,8 +224,8 @@ do
         row._itemLink = info.itemLink
         row._itemName = info.itemName
         row._source = info.source
-        row._tooltipTitle = info.itemLink or info.itemName or FormatReserveItemIdLabel(info.itemId)
-        row._tooltipSource = FormatReserveDroppedBy(info.source)
+        row._tooltipTitle = info.itemLink or info.itemName or formatReserveItemIdLabel(info.itemId)
+        row._tooltipSource = formatReserveDroppedBy(info.source)
         row._playersTooltipLines = info.playersTooltipLines
         row._playersTextFull = info.playersTextFull or info.playersText
 
@@ -248,7 +276,7 @@ do
         end
 
         if row.nameText then
-            row.nameText:SetText(info.itemLink or info.itemName or FormatReserveItemFallback(info.itemId))
+            row.nameText:SetText(info.itemLink or info.itemName or formatReserveItemFallback(info.itemId))
         end
         if row.playerText then
             row.playerText:SetText(info.playersText or "")

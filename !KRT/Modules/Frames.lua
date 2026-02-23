@@ -282,6 +282,98 @@ function Frames.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
     return uiController
 end
 
+function Frames.createListPanelScaffold(cfg)
+    cfg = cfg or {}
+    local module = cfg.module
+    local getFrame = cfg.getFrame
+    local controller = cfg.controller
+
+    if type(module) ~= "table" then
+        error("Frames.createListPanelScaffold: cfg.module must be a table")
+    end
+    if type(getFrame) ~= "function" then
+        error("Frames.createListPanelScaffold: cfg.getFrame must be a function")
+    end
+    if type(controller) ~= "table" then
+        error("Frames.createListPanelScaffold: cfg.controller must be a table")
+    end
+
+    local frameName
+    local dirty = true
+    local initOpts = cfg.initOpts or {}
+
+    local scaffold = {}
+
+    local function markDirty()
+        dirty = true
+    end
+
+    local function requestRefresh()
+        markDirty()
+        if module.RequestRefresh then
+            module:RequestRefresh()
+        end
+    end
+
+    local frameInitOpts = {
+        enableDrag = (initOpts.enableDrag ~= false),
+        dragButton = initOpts.dragButton,
+        setOnShow = initOpts.setOnShow,
+        setOnHide = initOpts.setOnHide,
+        hookOnShow = function(...)
+            markDirty()
+            if cfg.onShow then
+                cfg.onShow(...)
+            end
+        end,
+        hookOnHide = function(...)
+            if cfg.onHide then
+                cfg.onHide(...)
+            end
+        end,
+    }
+
+    Frames.bootstrapModuleUi(module, getFrame, requestRefresh, {
+        bindToggleHide = cfg.bindToggleHide,
+        bindRequestRefresh = cfg.bindRequestRefresh,
+    })
+
+    function scaffold:OnLoad(frame)
+        frameName = Frames.initModuleFrame(module, frame, frameInitOpts)
+        if not frameName then
+            return nil
+        end
+        if controller.OnLoad then
+            controller:OnLoad(frame)
+        end
+        return frameName
+    end
+
+    function scaffold:Refresh()
+        local frame = getFrame()
+        if not frame then
+            return
+        end
+        if cfg.localize then
+            cfg.localize(frameName, frame)
+        end
+        if cfg.update then
+            cfg.update(frameName, frame, dirty)
+        end
+        dirty = false
+    end
+
+    function scaffold:MarkDirty()
+        markDirty()
+    end
+
+    function scaffold:GetFrameName()
+        return frameName
+    end
+
+    return scaffold
+end
+
 function Frames.bindEditBoxHandlers(frameName, specs, requestRefreshFn)
     if type(frameName) ~= "string" or type(specs) ~= "table" then
         return

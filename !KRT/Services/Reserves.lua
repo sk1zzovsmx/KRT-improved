@@ -383,17 +383,19 @@ do
         return L.StrUnknown
     end
 
-    local function FormatReserveItemIdLabel(itemId)
+    function Service:FormatReserveItemIdLabel(itemId)
         return format(L.StrReservesItemIdLabel, tostring(itemId or "?"))
     end
 
     -- Kept for potential future tooltip/source variants.
-    local function FormatReserveDroppedBy(source)
-        if not source or source == "" then return nil end
+    function Service:FormatReserveDroppedBy(source)
+        if not source or source == "" then
+            return nil
+        end
         return format(L.StrReservesTooltipDroppedBy, source)
     end
 
-    local function FormatReserveItemFallback(itemId)
+    function Service:FormatReserveItemFallback(itemId)
         return format(L.StrReservesItemFallback, tostring(itemId or "?"))
     end
 
@@ -1319,6 +1321,18 @@ do
 
     function module:GetReserve(playerName)
         return Service:GetReserve(playerName)
+    end
+
+    function module:FormatReserveItemIdLabel(itemId)
+        return Service:FormatReserveItemIdLabel(itemId)
+    end
+
+    function module:FormatReserveDroppedBy(source)
+        return Service:FormatReserveDroppedBy(source)
+    end
+
+    function module:FormatReserveItemFallback(itemId)
+        return Service:FormatReserveItemFallback(itemId)
     end
 
     function module:GetAllReserves()

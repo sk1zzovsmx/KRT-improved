@@ -10,6 +10,7 @@ local L = feature.L
 local Utils = feature.Utils
 
 local RT_COLOR = feature.RT_COLOR
+local Core = feature.Core or addon.Core
 
 local UI = addon.UI or {}
 if type(UI.Call) ~= "function" then
@@ -28,29 +29,12 @@ do
     addon.Slash = addon.Slash or {}
     local module = addon.Slash
 
-    local function getMasterController()
+    local function getController(name)
+        if Core and Core.getController then
+            return Core.getController(name)
+        end
         local controllers = addon.Controllers
-        return controllers and controllers.Master or nil
-    end
-
-    local function getLoggerController()
-        local controllers = addon.Controllers
-        return controllers and controllers.Logger or nil
-    end
-
-    local function getWarningsController()
-        local controllers = addon.Controllers
-        return controllers and controllers.Warnings or nil
-    end
-
-    local function getChangesController()
-        local controllers = addon.Controllers
-        return controllers and controllers.Changes or nil
-    end
-
-    local function getSpammerController()
-        local controllers = addon.Controllers
-        return controllers and controllers.Spammer or nil
+        return controllers and controllers[name] or nil
     end
 
     local function getSyncerService()
@@ -107,7 +91,7 @@ do
         if not msg or msg == "" then return end
         local cmd, rest = Utils.splitArgs(msg)
         if cmd == "show" or cmd == "toggle" then
-            local moduleRef = getMasterController()
+            local moduleRef = getController("Master")
             if moduleRef and moduleRef.Toggle then
                 moduleRef:Toggle()
             end
@@ -255,7 +239,7 @@ do
     registerAliases(cmdWarnings, function(rest)
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
-            local moduleRef = getWarningsController()
+            local moduleRef = getController("Warnings")
             if moduleRef and moduleRef.Toggle then
                 moduleRef:Toggle()
             end
@@ -264,7 +248,7 @@ do
             printHelp("toggle", L.StrCmdToggle)
             printHelp("[ID]", L.StrCmdWarningAnnounce)
         else
-            local moduleRef = getWarningsController()
+            local moduleRef = getController("Warnings")
             if moduleRef and moduleRef.Announce then
                 moduleRef:Announce(tonumber(sub))
             end
@@ -274,17 +258,17 @@ do
     registerAliases(cmdChanges, function(rest)
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
-            local moduleRef = getChangesController()
+            local moduleRef = getController("Changes")
             if moduleRef and moduleRef.Toggle then
                 moduleRef:Toggle()
             end
         elseif sub == "demand" or sub == "ask" then
-            local moduleRef = getChangesController()
+            local moduleRef = getController("Changes")
             if moduleRef and moduleRef.Demand then
                 moduleRef:Demand()
             end
         elseif sub == "announce" or sub == "spam" then
-            local moduleRef = getChangesController()
+            local moduleRef = getController("Changes")
             if moduleRef and moduleRef.Announce then
                 moduleRef:Announce()
             end
@@ -299,7 +283,7 @@ do
     registerAliases(cmdLogger, function(rest)
         local sub, arg = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
-            local moduleRef = getLoggerController()
+            local moduleRef = getController("Logger")
             if moduleRef and moduleRef.Toggle then
                 moduleRef:Toggle()
             end
@@ -332,7 +316,7 @@ do
     registerAliases(cmdLoot, function(rest)
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
-            local moduleRef = getMasterController()
+            local moduleRef = getController("Master")
             if moduleRef and moduleRef.Toggle then
                 moduleRef:Toggle()
             end
@@ -362,17 +346,17 @@ do
     registerAliases(cmdLFM, function(rest)
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" or sub == "show" then
-            local moduleRef = getSpammerController()
+            local moduleRef = getController("Spammer")
             if moduleRef and moduleRef.Toggle then
                 moduleRef:Toggle()
             end
         elseif sub == "start" then
-            local moduleRef = getSpammerController()
+            local moduleRef = getController("Spammer")
             if moduleRef and moduleRef.Start then
                 moduleRef:Start()
             end
         elseif sub == "stop" then
-            local moduleRef = getSpammerController()
+            local moduleRef = getController("Spammer")
             if moduleRef and moduleRef.Stop then
                 moduleRef:Stop()
             end

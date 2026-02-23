@@ -191,6 +191,32 @@ Add-RgCheck `
     -Pattern 'addon\.Master\.frame|KRTMaster' `
     -Path "!KRT/KRT.lua"
 
+Add-RgCheck `
+    -Name "Core.getFeatureShared duplicate in KRT.lua" `
+    -Pattern 'function\s+Core\.getFeatureShared' `
+    -Path "!KRT/KRT.lua"
+
+Add-RgCheck `
+    -Name "ensureLootRuntimeState duplicate in KRT.lua" `
+    -Pattern 'local\s+function\s+ensureLootRuntimeState|function\s+Core\.ensureLootRuntimeState' `
+    -Path "!KRT/KRT.lua"
+
+Add-RgCheck `
+    -Name "Reserves formatter duplicate in widget" `
+    -Pattern 'local\s+function\s+FormatReserve(ItemIdLabel|ItemFallback|DroppedBy)' `
+    -Path "!KRT/Widgets/ReservesUI.lua"
+
+Add-RgCheck `
+    -Name "EntryPoint duplicated controller getters" `
+    -Pattern 'local\s+function\s+get(Master|Logger|Warnings|Changes|Spammer)Controller' `
+    -Path "!KRT/EntryPoints" `
+    -ExtraArgs @("--glob", "*.lua")
+
+Add-RgCheck `
+    -Name "UIBinder splitArgs local helper name collision" `
+    -Pattern 'local\s+function\s+splitArgs\s*\(' `
+    -Path "!KRT/Modules/UIBinder.lua"
+
 Add-ControllerOwnershipCheck -FilePath "!KRT/Controllers/Changes.lua" -Owner "Changes"
 Add-ControllerOwnershipCheck -FilePath "!KRT/Controllers/Master.lua" -Owner "Master"
 Add-ControllerOwnershipCheck -FilePath "!KRT/Controllers/Warnings.lua" -Owner "Warnings"
@@ -210,4 +236,5 @@ Write-Host "Checked:"
 Write-Host "  Services -> Parents/frame refs"
 Write-Host "  Services -> hooksecurefunc(addon.Parent, ...)"
 Write-Host "  KRT.lua -> parent frame refs"
+Write-Host "  Quick-win duplicate regressions (Core/Reserves/EntryPoints/UIBinder)"
 Write-Host "  Controllers -> own parent only (addon.Parent and KRTParent* ownership)"
