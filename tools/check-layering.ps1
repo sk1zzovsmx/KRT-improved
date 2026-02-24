@@ -187,6 +187,12 @@ Add-RgCheck `
     -ExtraArgs @("--glob", "*.lua")
 
 Add-RgCheck `
+    -Name "Service direct UI frame APIs (except Loot tooltip probes)" `
+    -Pattern 'CreateFrame|SetScript|:Show\(|:Hide\(' `
+    -Path "!KRT/Services" `
+    -ExtraArgs @("--glob", "*.lua", "--glob", "!Loot.lua")
+
+Add-RgCheck `
     -Name "Core parent frame leak" `
     -Pattern 'addon\.Master\.frame|KRTMaster' `
     -Path "!KRT/KRT.lua"
@@ -250,6 +256,7 @@ Write-Host "Layering check passed." -ForegroundColor Green
 Write-Host "Checked:"
 Write-Host "  Services -> Parents/frame refs"
 Write-Host "  Services -> hooksecurefunc(addon.Parent, ...)"
+Write-Host "  Services -> direct UI APIs (except Services/Loot.lua tooltip probes)"
 Write-Host "  KRT.lua -> parent frame refs"
 Write-Host "  Quick-win duplicate regressions (Core/Reserves/EntryPoints/UIBinder)"
 Write-Host "  UI module back-edges (Frames/ListController/UIBinder -> Utils)"

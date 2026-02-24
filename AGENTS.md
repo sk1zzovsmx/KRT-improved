@@ -72,6 +72,8 @@ Durable preferences learned from recent conversations:
   and avoid `loadstring`-based script compilation.
 - Keep Services pure: no frame lifecycle (`OnLoad`/`Refresh`) or UI delegation in `Services/*`;
   widgets consume `addon.<Feature>.Service` and refresh via bus events (e.g. `ReservesDataChanged`).
+- Allow a narrow technical exception in `Services/Loot.lua` for tooltip-based item metadata probes
+  (`GameTooltip` / `CreateFrame` / `SetBagItem`) used by `warmItemCache` and `isBagItemSoulbound`.
 - Prefer cross-code extraction from `Modules/Utils.lua` into dedicated reusable modules (`Bus`, `ListController`,
   `MultiSelect`, `Frames`, `Strings`, `Colors`, `Comms`, `Base64`, `Time`); keep `Utils.lua` as facade/re-export.
 - Prefer incremental thematic split of `Modules/Utils.lua` into `Modules/Utils.*.lua` files

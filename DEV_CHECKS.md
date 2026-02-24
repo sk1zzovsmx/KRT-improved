@@ -17,9 +17,9 @@ rg "_G\\[\"KRT|addon\\.[A-Za-z]+\\.frame|hooksecurefunc\\(addon\\." -n !KRT/Serv
 ```
 Expected: `0 match`
 
-3. Services should avoid direct UI frame APIs:
+3. Services should avoid direct UI frame APIs (allow tooltip probes in `Services/Loot.lua`):
 ```powershell
-rg "CreateFrame|SetScript|:Show\\(|:Hide\\(" -n !KRT/Services -g "*.lua"
+rg "CreateFrame|SetScript|:Show\\(|:Hide\\(" -n !KRT/Services -g "*.lua" -g "!Loot.lua"
 ```
 Expected: `0 match`
 
