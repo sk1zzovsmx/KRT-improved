@@ -82,6 +82,22 @@ end
 
 local SetSelectedRaid
 
+local selectionEvents = {
+    selectedRaid = InternalEvents.LoggerSelectRaid,
+    selectedBoss = InternalEvents.LoggerSelectBoss,
+    selectedPlayer = InternalEvents.LoggerSelectPlayer,
+    selectedBossPlayer = InternalEvents.LoggerSelectBossPlayer,
+    selectedItem = InternalEvents.LoggerSelectItem,
+}
+
+local function triggerSelectionEvent(target, key, ...)
+    local eventName = selectionEvents[key]
+    if not eventName then
+        return
+    end
+    Bus.triggerEvent(eventName, target[key], ...)
+end
+
 -- Logger frame module.
 do
     addon.Controllers = addon.Controllers or {}
@@ -102,22 +118,6 @@ do
     local Actions  = module.Actions
 
     -- ----- Private helpers ----- --
-    local selectionEvents = {
-        selectedRaid = InternalEvents.LoggerSelectRaid,
-        selectedBoss = InternalEvents.LoggerSelectBoss,
-        selectedPlayer = InternalEvents.LoggerSelectPlayer,
-        selectedBossPlayer = InternalEvents.LoggerSelectBossPlayer,
-        selectedItem = InternalEvents.LoggerSelectItem,
-    }
-
-    local function triggerSelectionEvent(target, key, ...)
-        local eventName = selectionEvents[key]
-        if not eventName then
-            return
-        end
-        Bus.triggerEvent(eventName, target[key], ...)
-    end
-
     local function clearSelection(target, key, multiSelectCtx)
         target[key] = nil
         if multiSelectCtx then
