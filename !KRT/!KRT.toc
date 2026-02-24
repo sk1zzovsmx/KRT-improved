@@ -33,9 +33,7 @@ Templates.xml
 
 # Layer 4 - Shared modules (helpers/constants)
 Modules\C.lua
-Modules\Events.lua
 Modules\Std.lua
-Modules\Features.lua
 Modules\UI\Facade.lua
 Modules\UI\Visuals.lua
 Modules\UI\Frames.lua
