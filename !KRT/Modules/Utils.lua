@@ -16,8 +16,6 @@ local type = type
 local format = string.format
 local lower = string.lower
 local tostring = tostring
-local UnitIsGroupAssistant = _G.UnitIsGroupAssistant
-local UnitIsGroupLeader = _G.UnitIsGroupLeader
 
 local function getStrings()
     return addon.Strings
@@ -25,10 +23,6 @@ end
 
 local function getOptions()
     return Utils.Options
-end
-
-local function getRaidState()
-    return Utils.RaidState
 end
 
 local function getBus()
@@ -114,75 +108,6 @@ function Utils.setOption(key, value)
     end
 
     return true
-end
-
--- =========== Raid/state helpers  =========== --
-
-function Utils.getPlayerName()
-    local RaidState = getRaidState()
-    if RaidState and RaidState.getPlayerName then
-        return RaidState.getPlayerName()
-    end
-    local state = addon.State
-    state.player = state.player or {}
-    local name = state.player.name
-        or addon.UnitFullName("player")
-    state.player.name = name
-    return name
-end
-
-function Utils.getRaid(raidNum)
-    local RaidState = getRaidState()
-    if RaidState and RaidState.getRaid then
-        return RaidState.getRaid(raidNum)
-    end
-    if raidNum == nil then
-        local core = addon.Core
-        if core and core.getCurrentRaid then
-            raidNum = core.getCurrentRaid()
-        else
-            local state = addon.State
-            raidNum = state and state.currentRaid or nil
-        end
-    end
-    if not raidNum then
-        return nil, nil
-    end
-    local raids = KRT_Raids
-    local raid = raids and raids[raidNum] or nil
-    return raid, raidNum
-end
-
-Utils.GetRaid = Utils.getRaid
-
-function Utils.getRealmName()
-    local RaidState = getRaidState()
-    if RaidState and RaidState.getRealmName then
-        return RaidState.getRealmName()
-    end
-    local realm = GetRealmName()
-    if type(realm) ~= "string" then
-        return ""
-    end
-    return realm
-end
-
-function Utils.getUnitRank(unit, fallback)
-    local RaidState = getRaidState()
-    if RaidState and RaidState.getUnitRank then
-        return RaidState.getUnitRank(unit, fallback)
-    end
-
-    local groupLeader = (addon and addon.UnitIsGroupLeader) or UnitIsGroupLeader
-    local groupAssistant = (addon and addon.UnitIsGroupAssistant) or UnitIsGroupAssistant
-
-    if groupLeader and groupLeader(unit) then
-        return 2
-    end
-    if groupAssistant and groupAssistant(unit) then
-        return 1
-    end
-    return fallback or 0
 end
 
 -- =========== String helpers  =========== --

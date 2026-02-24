@@ -28,6 +28,9 @@ local type = type
 local rawget, rawset = rawget, rawset
 local getmetatable, setmetatable = getmetatable, setmetatable
 local tostring, tonumber = tostring, tonumber
+local GetRealmName = _G.GetRealmName
+local UnitIsGroupAssistant = _G.UnitIsGroupAssistant
+local UnitIsGroupLeader = _G.UnitIsGroupLeader
 
 local Core = addon.Core
 local Diagnose = addon.Diagnose
@@ -232,6 +235,35 @@ function Core.getController(name)
     end
     local controllers = addon.Controllers
     return controllers and controllers[name] or nil
+end
+
+function Core.getPlayerName()
+    local state = addon.State
+    state.player = state.player or {}
+    local name = state.player.name or addon.UnitFullName("player")
+    state.player.name = name
+    return name
+end
+
+function Core.getRealmName()
+    local realm = GetRealmName and GetRealmName() or ""
+    if type(realm) ~= "string" then
+        return ""
+    end
+    return realm
+end
+
+function Core.getUnitRank(unit, fallback)
+    local groupLeader = addon.UnitIsGroupLeader or UnitIsGroupLeader
+    local groupAssistant = addon.UnitIsGroupAssistant or UnitIsGroupAssistant
+
+    if groupLeader and groupLeader(unit) then
+        return 2
+    end
+    if groupAssistant and groupAssistant(unit) then
+        return 1
+    end
+    return fallback or 0
 end
 
 function Core.ensureLootRuntimeState()

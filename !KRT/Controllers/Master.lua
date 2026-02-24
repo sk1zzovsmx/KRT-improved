@@ -14,6 +14,7 @@ local UIPrimitives = addon.UIPrimitives
 local UIRowVisuals = addon.UIRowVisuals
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
+local Core = feature.Core
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -1973,7 +1974,7 @@ do
 
         ResetTradeState("TRADE_START")
 
-        lootState.trader = Utils.getPlayerName()
+        lootState.trader = Core.getPlayerName()
         lootState.winner = isAwardRoll and playerName or nil
 
         addon:debug(Diag.D.LogTradeStart:format(tostring(itemLink), tostring(lootState.trader),

@@ -10,6 +10,7 @@ local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
 local Events = feature.Events or addon.Events or {}
+local Core = feature.Core
 
 local tContains = feature.tContains
 
@@ -382,7 +383,7 @@ do
         local itemId = self:GetCurrentRollItemID()
         if not itemId then return end
 
-        local name = Utils.getPlayerName()
+        local name = Core.getPlayerName()
         local allowed = GetAllowedRolls(itemId, name)
 
         state.playerCounts[itemId] = state.playerCounts[itemId] or 0
@@ -401,7 +402,7 @@ do
     -- Returns the current roll session state.
     function module:RollStatus()
         local itemId = self:GetCurrentRollItemID()
-        local name = Utils.getPlayerName()
+        local name = Core.getPlayerName()
         UpdateLocalRollState(itemId, name)
         return lootState.currentRollType, state.record, state.canRoll, state.rolled
     end
@@ -481,7 +482,7 @@ do
     -- Sets the flag indicating the player has rolled.
     function module:SetRolled()
         local itemId = self:GetCurrentRollItemID()
-        local name = Utils.getPlayerName()
+        local name = Core.getPlayerName()
         UpdateLocalRollState(itemId, name)
     end
 

@@ -269,6 +269,23 @@ do
         return rosterVersion
     end
 
+    function module:GetRaid(raidNum)
+        if raidNum == nil then
+            raidNum = Core.getCurrentRaid and Core.getCurrentRaid() or nil
+        end
+        if not raidNum then
+            return nil, nil
+        end
+
+        local raids = KRT_Raids
+        local raid = raids and raids[raidNum] or nil
+        return raid, raidNum
+    end
+
+    function module:ResolveRaid(raidNum)
+        return module:GetRaid(raidNum)
+    end
+
     function module:CancelInstanceChecks()
         cancelRaidInstanceChecks()
     end
@@ -336,7 +353,7 @@ do
         local raid = Core.ensureRaidById(Core.getCurrentRaid())
         if not raid then return false end
 
-        local realm = Utils.getRealmName()
+        local realm = Core.getRealmName()
         local realmPlayers = ensureRealmPlayerMeta(realm)
         local playersByName = raid._playersByName
 
@@ -500,7 +517,7 @@ do
 
         numRaid = num
 
-        local realm = Utils.getRealmName()
+        local realm = Core.getRealmName()
         local realmPlayers = ensureRealmPlayerMeta(realm)
         local currentTime = Utils.getCurrentTime()
 
@@ -676,7 +693,7 @@ do
         module.firstCheckHandle = nil
         if not addon.IsInGroup() then return end
 
-        if Core.getCurrentRaid() and module:CheckPlayer(Utils.getPlayerName(), Core.getCurrentRaid()) then
+        if Core.getCurrentRaid() and module:CheckPlayer(Core.getPlayerName(), Core.getCurrentRaid()) then
             -- Restart the roster update timer: cancel the old one and schedule a new one
             addon.CancelTimer(module.updateRosterHandle, true)
             module.updateRosterHandle = nil
@@ -797,7 +814,7 @@ do
             if link then
                 itemLink = link
                 itemCount = count or 1
-                player = Utils.getPlayerName()
+                player = Core.getPlayerName()
             end
         end
 
@@ -806,14 +823,14 @@ do
             if link then
                 itemLink = link
                 itemCount = 1
-                player = Utils.getPlayerName()
+                player = Core.getPlayerName()
             end
         end
 
         -- Fallback for alternate loot-roll chat formats.
         if not player or not itemLink then
             itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
-            player = Utils.getPlayerName()
+            player = Core.getPlayerName()
             itemCount = 1
         end
         if not itemLink then
@@ -1251,7 +1268,7 @@ do
         raidNum = raidNum or Core.getCurrentRaid()
         local raid = raidNum and Core.ensureRaidById(raidNum)
         if raid then
-            name = name or Utils.getPlayerName()
+            name = name or Core.getPlayerName()
             local players = raid.players or {}
             for i = #players, 1, -1 do
                 local p = players[i]
@@ -1302,12 +1319,12 @@ do
         local raid = raidNum and Core.ensureRaidById(raidNum)
         local players = raid and raid.players or {}
         local rank = 0
-        name = name or Utils.getPlayerName() or UnitName("player")
+        name = name or Core.getPlayerName() or UnitName("player")
         if #players == 0 then
             if addon.IsInGroup() then
                 local unit = module:GetUnitID(name)
                 if unit and unit ~= "none" then
-                    rank = Utils.getUnitRank(unit) or 0
+                    rank = Core.getUnitRank(unit) or 0
                 end
             end
         else
@@ -1324,8 +1341,8 @@ do
     -- Gets a player's class from the saved players database.
     function module:GetPlayerClass(name)
         local class = "UNKNOWN"
-        local realm = Utils.getRealmName()
-        local resolvedName = name or Utils.getPlayerName()
+        local realm = Core.getRealmName()
+        local resolvedName = name or Core.getPlayerName()
         if KRT_Players[realm] and KRT_Players[realm][resolvedName] then
             class = KRT_Players[realm][resolvedName].class or "UNKNOWN"
         end

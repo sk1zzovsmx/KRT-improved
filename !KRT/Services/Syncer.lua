@@ -76,7 +76,7 @@ do
     end
 
     local function isSelfSender(sender)
-        local selfName = Utils.getPlayerName()
+        local selfName = Core.getPlayerName()
         if not selfName then
             return false
         end
