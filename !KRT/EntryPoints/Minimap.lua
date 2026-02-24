@@ -8,6 +8,7 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Utils = feature.Utils
+local Options = feature.Options or addon.Options
 
 local K_COLOR = feature.K_COLOR
 local Core = feature.Core or addon.Core
@@ -167,7 +168,7 @@ do
     -- ----- Public methods ----- --
     function module:SetPos(angle)
         angle = angle % 360
-        Utils.setOption("minimapPos", angle)
+        Options.setOption("minimapPos", angle)
         local r = rad(angle)
         KRT_MINIMAP_GUI:ClearAllPoints()
         KRT_MINIMAP_GUI:SetPoint("CENTER", cos(r) * 80, sin(r) * 80)
@@ -230,7 +231,7 @@ do
     function module:ToggleMinimapButton()
         local options = addon.options or KRT_Options or {}
         local nextValue = not options.minimapButton
-        Utils.setOption("minimapButton", nextValue)
+        Options.setOption("minimapButton", nextValue)
         SetMinimapShown(nextValue)
     end
 

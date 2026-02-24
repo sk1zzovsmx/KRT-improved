@@ -8,6 +8,7 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Utils = feature.Utils
+local Options = feature.Options or addon.Options
 
 local RT_COLOR = feature.RT_COLOR
 local Core = feature.Core or addon.Core
@@ -175,14 +176,14 @@ do
 
 
         if subCmd == "on" then
-            Utils.applyDebugSetting(true)
+            Options.applyDebugSetting(true)
         elseif subCmd == "off" then
-            Utils.applyDebugSetting(false)
+            Options.applyDebugSetting(false)
         else
-            Utils.applyDebugSetting(not Utils.isDebugEnabled())
+            Options.applyDebugSetting(not Options.isDebugEnabled())
         end
 
-        if Utils.isDebugEnabled() then
+        if Options.isDebugEnabled() then
             addon:info(L.MsgDebugOn)
         else
             addon:info(L.MsgDebugOff)
@@ -192,10 +193,10 @@ do
     registerAliases(cmdMinimap, function(rest)
         local sub, arg = Utils.splitArgs(rest)
         if sub == "on" then
-            Utils.setOption("minimapButton", true)
+            Options.setOption("minimapButton", true)
             Utils.setShown(KRT_MINIMAP_GUI, true)
         elseif sub == "off" then
-            Utils.setOption("minimapButton", false)
+            Options.setOption("minimapButton", false)
             Utils.setShown(KRT_MINIMAP_GUI, false)
         elseif sub == "pos" and arg ~= "" then
             local angle = tonumber(arg)

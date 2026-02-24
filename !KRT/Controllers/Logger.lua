@@ -14,6 +14,7 @@ local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Core = feature.Core
+local Options = feature.Options or addon.Options
 
 local InternalEvents = Events.Internal
 
@@ -1021,7 +1022,7 @@ do
             end,
         })
 
-        if Utils.isDebugEnabled() and addon.debug then
+        if Options.isDebugEnabled() and addon.debug then
             addon:debug((Diag.D.LogLoggerSelectClickRaid)
                 :format(
                     tostring(raidNid), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
@@ -1061,7 +1062,7 @@ do
             end,
         })
 
-        if Utils.isDebugEnabled() and addon.debug then
+        if Options.isDebugEnabled() and addon.debug then
             addon:debug((Diag.D.LogLoggerSelectClickBoss)
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
@@ -1109,7 +1110,7 @@ do
             end,
         })
 
-        if Utils.isDebugEnabled() and addon.debug then
+        if Options.isDebugEnabled() and addon.debug then
             addon:debug((Diag.D.LogLoggerSelectClickBossAttendees)
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
@@ -1155,7 +1156,7 @@ do
             end,
         })
 
-        if Utils.isDebugEnabled() and addon.debug then
+        if Options.isDebugEnabled() and addon.debug then
             addon:debug((Diag.D.LogLoggerSelectClickRaidAttendees)
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
@@ -1419,7 +1420,7 @@ do
                     end,
                 })
 
-                if Utils.isDebugEnabled() and addon.debug then
+                if Options.isDebugEnabled() and addon.debug then
                     addon:debug((Diag.D.LogLoggerSelectClickLoot)
                         :format(
                             tostring(id), isMulti and 1 or 0, isRange and 1 or 0,
@@ -1434,7 +1435,7 @@ do
                 local action, count = Utils.multiSelectToggle(MS_CTX_LOOT, id, false)
                 module.selectedItem = id
 
-                if Utils.isDebugEnabled() and addon.debug then
+                if Options.isDebugEnabled() and addon.debug then
                     addon:debug((Diag.D.LogLoggerSelectClickContextMenu):format(
                         tostring(id), tostring(action), tonumber(count) or 0
                     ))
@@ -2413,7 +2414,7 @@ do
                     addon.Logger.selectedItem = nil
                     triggerSelectionEvent(addon.Logger, "selectedItem")
 
-                    if Utils.isDebugEnabled() and addon.debug then
+                    if Options.isDebugEnabled() and addon.debug then
                         addon:debug((Diag.D.LogLoggerSelectDeleteItems):format(removed))
                     end
                 end

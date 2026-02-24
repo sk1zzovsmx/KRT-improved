@@ -21,10 +21,6 @@ local function getStrings()
     return addon.Strings
 end
 
-local function getOptions()
-    return Utils.Options
-end
-
 local function getBus()
     return addon.Bus
 end
@@ -48,62 +44,6 @@ local function warnDeprecatedCompat(legacyName, ownerPath)
     if addon.warn then
         addon:warn("[Compat] Utils.%s is deprecated; use %s", tostring(legacyName), tostring(ownerPath))
     end
-end
-
--- =========== Debug/state helpers  =========== --
-
-function Utils.isDebugEnabled()
-    local Options = getOptions()
-    if Options and Options.isDebugEnabled then
-        return Options.isDebugEnabled()
-    end
-    return addon and addon.State and addon.State.debugEnabled == true
-end
-
-function Utils.applyDebugSetting(enabled)
-    local Options = getOptions()
-    if Options and Options.applyDebugSetting then
-        return Options.applyDebugSetting(enabled)
-    end
-
-    local state = addon.State
-    state.debugEnabled = enabled and true or false
-
-    local levels = addon and addon.Debugger and addon.Debugger.logLevels
-    local level = enabled and (levels and levels.DEBUG) or (levels and levels.INFO)
-    if level and addon and addon.SetLogLevel then
-        addon:SetLogLevel(level)
-    end
-end
-
-function Utils.setOption(key, value)
-    local Options = getOptions()
-    if Options and Options.setOption then
-        return Options.setOption(key, value)
-    end
-
-    if type(key) ~= "string" or key == "" then
-        return false
-    end
-
-    local options = addon and addon.options
-    if type(options) ~= "table" then
-        if type(KRT_Options) == "table" then
-            options = KRT_Options
-        else
-            options = {}
-            KRT_Options = options
-        end
-        addon.options = options
-    end
-
-    options[key] = value
-
-    if type(KRT_Options) == "table" and KRT_Options ~= options then
-        KRT_Options[key] = value
-    end
-
-    return true
 end
 
 -- =========== String helpers  =========== --

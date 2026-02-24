@@ -11,6 +11,7 @@ local Diag = feature.Diag
 local Utils = feature.Utils
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
+local Options = feature.Options or addon.Options
 
 local tconcat, twipe = table.concat, table.wipe
 local pairs, ipairs, type, next = pairs, ipairs, type, next
@@ -63,7 +64,7 @@ do
 
         if syncOptions ~= false then
             local value = ImportModeToOptionValue(resolved)
-            Utils.setOption("srImportMode", value)
+            Options.setOption("srImportMode", value)
         end
 
         return importMode

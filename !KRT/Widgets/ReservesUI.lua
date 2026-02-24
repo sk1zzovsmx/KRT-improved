@@ -13,6 +13,7 @@ local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
+local Options = feature.Options or addon.Options
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -724,7 +725,7 @@ do
         if Service and Service.SetImportMode then
             Service:SetImportMode(mode, true)
         else
-            Utils.setOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
+            Options.setOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
         end
 
         if suppressSlider then return end
