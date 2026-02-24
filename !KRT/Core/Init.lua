@@ -632,6 +632,7 @@ function Core.getFeatureShared()
         Time = addon.Time,
         Base64 = addon.Base64,
         Comms = addon.Comms,
+        ItemProbe = addon.ItemProbe,
 
         UI = addon.UI,
         Frames = addon.Frames,

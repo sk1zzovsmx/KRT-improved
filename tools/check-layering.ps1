@@ -119,6 +119,23 @@ function Add-RgCheck {
     }
 }
 
+function Add-RgRequireMatch {
+    param(
+        [string]$Name,
+        [string]$Pattern,
+        [string]$Path,
+        [string[]]$ExtraArgs = @()
+    )
+
+    $matches = @(Get-PatternMatches -Pattern $Pattern -Path $Path -ExtraArgs $ExtraArgs)
+    if ($matches.Count -gt 0) {
+        return
+    }
+
+    $violations.Add("[$Name]")
+    $violations.Add("  Missing required match for pattern '$Pattern' in '$Path'")
+}
+
 function Add-ControllerOwnershipCheck {
     param(
         [string]$FilePath,
@@ -187,10 +204,27 @@ Add-RgCheck `
     -ExtraArgs @("--glob", "*.lua")
 
 Add-RgCheck `
-    -Name "Service direct UI frame APIs (except Loot tooltip probes)" `
+    -Name "Service direct UI frame APIs" `
     -Pattern 'CreateFrame|SetScript|:Show\(|:Hide\(' `
     -Path "!KRT/Services" `
-    -ExtraArgs @("--glob", "*.lua", "--glob", "!Loot.lua")
+    -ExtraArgs @("--glob", "*.lua")
+
+Add-RgCheck `
+    -Name "Service tooltip probe API refs" `
+    -Pattern 'GameTooltip|CreateFrame\(|Set(Bag|Inventory|Loot)Item|SetHyperlink' `
+    -Path "!KRT/Services" `
+    -ExtraArgs @("--glob", "*.lua")
+
+Add-RgCheck `
+    -Name "ItemProbe tooltip hack leakage outside adapter" `
+    -Pattern 'KRT_ItemProbeTooltip|Set(Bag|Inventory|Loot)Item' `
+    -Path "!KRT" `
+    -ExtraArgs @("--glob", "*.lua", "--glob", "!**/Modules/ItemProbe.lua")
+
+Add-RgRequireMatch `
+    -Name "ItemProbe adapter tooltip implementation missing" `
+    -Pattern 'KRT_ItemProbeTooltip|GameTooltipTemplate|SetBagItem|SetHyperlink' `
+    -Path "!KRT/Modules/ItemProbe.lua"
 
 Add-RgCheck `
     -Name "Core parent frame leak" `
@@ -256,7 +290,9 @@ Write-Host "Layering check passed." -ForegroundColor Green
 Write-Host "Checked:"
 Write-Host "  Services -> Parents/frame refs"
 Write-Host "  Services -> hooksecurefunc(addon.Parent, ...)"
-Write-Host "  Services -> direct UI APIs (except Services/Loot.lua tooltip probes)"
+Write-Host "  Services -> direct UI APIs"
+Write-Host "  Services -> tooltip probe APIs (GameTooltip/CreateFrame/Set*Item/SetHyperlink)"
+Write-Host "  ItemProbe tooltip-hack confinement (Modules/ItemProbe.lua)"
 Write-Host "  KRT.lua -> parent frame refs"
 Write-Host "  Quick-win duplicate regressions (Core/Reserves/EntryPoints/UIBinder)"
 Write-Host "  UI module back-edges (Frames/ListController/UIBinder -> Utils)"

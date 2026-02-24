@@ -12,6 +12,7 @@ local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Bus = feature.Bus or addon.Bus
 local Strings = feature.Strings or addon.Strings
+local ItemProbe = feature.ItemProbe or addon.ItemProbe
 
 local itemColors = feature.itemColors
 
@@ -25,7 +26,6 @@ local GetItemName, GetItemLink, GetItemTexture
 
 local tremove, twipe = table.remove, table.wipe
 local type = type
-local pcall = pcall
 
 local tostring, tonumber = tostring, tonumber
 
@@ -39,8 +39,6 @@ do
 
     -- ----- Internal state ----- --
     local lootTable = {}
-    local fakeBagTooltip
-    local warmItemTooltip
 
     -- ----- Private helpers ----- --
     local function BuildPendingAwardKey(itemLink, looter)
@@ -48,52 +46,18 @@ do
     end
 
     local function warmItemCache(itemLink)
-        if type(itemLink) ~= "string" or itemLink == "" then
-            return
-        end
-        if not itemLink:find("item:", 1, true) then
-            return
-        end
-
-        warmItemTooltip = warmItemTooltip or CreateFrame("GameTooltip", nil, UIParent, "GameTooltipTemplate")
-        warmItemTooltip:SetOwner(UIParent, "ANCHOR_NONE")
-        local ok = pcall(warmItemTooltip.SetHyperlink, warmItemTooltip, itemLink)
-        if ok then
-            warmItemTooltip:Hide()
+        local probe = ItemProbe or addon.ItemProbe
+        if probe and probe.WarmItemCache then
+            probe.WarmItemCache(itemLink)
         end
     end
 
     local function isBagItemSoulbound(bag, slot)
-        if bag == nil or slot == nil then
-            return false
+        local probe = ItemProbe or addon.ItemProbe
+        if probe and probe.IsBagItemSoulbound then
+            return probe.IsBagItemSoulbound(bag, slot)
         end
-
-        fakeBagTooltip = fakeBagTooltip or KRT_FakeTooltip
-            or CreateFrame("GameTooltip", "KRT_FakeTooltip", nil, "GameTooltipTemplate")
-        KRT_FakeTooltip = fakeBagTooltip
-        fakeBagTooltip:SetOwner(UIParent, "ANCHOR_NONE")
-        fakeBagTooltip:SetBagItem(bag, slot)
-        fakeBagTooltip:Show()
-
-        local linePrefix = "KRT_FakeTooltipTextLeft"
-        local isSoulbound = false
-        local numLines = fakeBagTooltip:NumLines() or 0
-        for i = numLines, 1, -1 do
-            local fs = _G[linePrefix .. i]
-            local text = fs and fs:GetText() or nil
-            if text and text ~= "" then
-                if text == ITEM_SOULBOUND then
-                    isSoulbound = true
-                end
-                if addon.Deformat(text, BIND_TRADE_TIME_REMAINING) ~= nil then
-                    fakeBagTooltip:Hide()
-                    return false
-                end
-            end
-        end
-
-        fakeBagTooltip:Hide()
-        return isSoulbound
+        return false
     end
 
     local function AddLootWindowSlot(indexByItemKey, slot)
