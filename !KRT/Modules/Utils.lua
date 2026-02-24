@@ -243,33 +243,6 @@ function Utils.makeFrameGetter(globalFrameName)
     end
 end
 
-function Utils.initModuleFrame(module, frame, opts)
-    local UI = getUI()
-    if UI and UI.initModuleFrame then
-        return UI.initModuleFrame(module, frame, opts)
-    end
-    if module then
-        module.frame = frame
-    end
-    return frame and frame:GetName() or nil
-end
-
-function Utils.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
-    local UI = getUI()
-    if UI and UI.bootstrapModuleUi then
-        return UI.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
-    end
-    return Utils.makeUIFrameController(getFrame, requestRefreshFn)
-end
-
-function Utils.createListPanelScaffold(cfg)
-    local UI = getUI()
-    if UI and UI.createListPanelScaffold then
-        return UI.createListPanelScaffold(cfg)
-    end
-    return nil
-end
-
 function Utils.bindEditBoxHandlers(frameName, specs, requestRefreshFn)
     local UI = getUI()
     if UI and UI.bindEditBoxHandlers then
@@ -315,13 +288,6 @@ function Utils.makeUIFrameController(getFrame, requestRefreshFn)
     }
 end
 
-function Utils.enableDisable(frame, cond)
-    local UI = getUI()
-    if UI and UI.enableDisable then
-        return UI.enableDisable(frame, cond)
-    end
-end
-
 function Utils.toggle(frame)
     local UI = getUI()
     if UI and UI.toggle then
@@ -336,31 +302,10 @@ function Utils.hideFrame(frame, onHide)
     end
 end
 
-function Utils.showHide(frame, cond)
-    local UI = getUI()
-    if UI and UI.showHide then
-        return UI.showHide(frame, cond)
-    end
-end
-
 function Utils.toggleHighlight(frame, cond)
     local UI = getUI()
     if UI and UI.toggleHighlight then
         return UI.toggleHighlight(frame, cond)
-    end
-end
-
-function Utils.ensureRowVisuals(row)
-    local UI = getUI()
-    if UI and UI.ensureRowVisuals then
-        return UI.ensureRowVisuals(row)
-    end
-end
-
-function Utils.setRowSelected(row, cond)
-    local UI = getUI()
-    if UI and UI.setRowSelected then
-        return UI.setRowSelected(row, cond)
     end
 end
 

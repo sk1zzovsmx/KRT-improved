@@ -9,6 +9,7 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Frames = feature.Frames or addon.Frames
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
@@ -965,7 +966,7 @@ do
     end
 
     function module:OnLoad(frame)
-        frameName = Utils.initModuleFrame(module, frame, {
+        frameName = Frames.initModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 if not module.selectedRaid then
@@ -2550,7 +2551,7 @@ do
     local getFrame = Utils.makeFrameGetter("KRTLoggerBossBox")
 
     function Box:OnLoad(frame)
-        frameName = Utils.initModuleFrame(Box, frame, {
+        frameName = Frames.initModuleFrame(Box, frame, {
             enableDrag = true,
             hookOnShow = function()
                 Box:UpdateUIFrame()
@@ -2684,7 +2685,7 @@ do
     local getFrame = Utils.makeFrameGetter("KRTLoggerAttendeesBox")
 
     function Box:OnLoad(frame)
-        frameName = Utils.initModuleFrame(Box, frame, {
+        frameName = Frames.initModuleFrame(Box, frame, {
             enableDrag = true,
             hookOnShow = function()
                 Utils.resetEditBox(_G[frameName .. "Name"])

@@ -8,6 +8,7 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Utils = feature.Utils
+local Frames = feature.Frames or addon.Frames
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
@@ -222,7 +223,7 @@ do
     -- ----- Public methods ----- --
     -- OnLoad frame
     function module:OnLoad(frame)
-        frameName = Utils.initModuleFrame(module, frame, {
+        frameName = Frames.initModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 module:RequestRefresh()

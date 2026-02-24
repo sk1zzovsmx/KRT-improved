@@ -8,6 +8,7 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Utils = feature.Utils
+local Frames = feature.Frames or addon.Frames
 local UIScaffold = addon.UIScaffold
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
@@ -203,7 +204,7 @@ do
     -- ----- Public methods ----- --
     function module:OnLoad(frame)
         local f = frame or getFrame()
-        frameName = Utils.initModuleFrame(module, f, { enableDrag = true }) or frameName
+        frameName = Frames.initModuleFrame(module, f, { enableDrag = true }) or frameName
         if not ensureFrames() then return end
     end
 

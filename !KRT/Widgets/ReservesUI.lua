@@ -9,6 +9,7 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Frames = feature.Frames or addon.Frames
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
@@ -542,7 +543,7 @@ do
 
     function UI:OnLoad(frame)
         addon:debug(Diag.D.LogReservesFrameLoaded)
-        frameName = Utils.initModuleFrame(module, frame, {
+        frameName = Frames.initModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 addon:debug(Diag.D.LogReservesShowWindow)
@@ -781,7 +782,7 @@ do
     end
 
     function Import:OnLoad(frame)
-        Utils.initModuleFrame(Import, frame, {
+        Frames.initModuleFrame(Import, frame, {
             enableDrag = true,
             hookOnShow = function()
                 Utils.resetEditBox(_G["KRTImportEditBox"])

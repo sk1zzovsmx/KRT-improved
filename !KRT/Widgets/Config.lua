@@ -9,6 +9,7 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Utils = feature.Utils
 local Options = feature.Options or addon.Options
+local Frames = feature.Frames or addon.Frames
 local UIScaffold = addon.UIScaffold
 local Events = feature.Events or addon.Events or {}
 local Bus = feature.Bus or addon.Bus
@@ -95,7 +96,7 @@ do
 
     -- OnLoad handler for the configuration frame.
     function module:OnLoad(frame)
-        frameName = Utils.initModuleFrame(module, frame, {
+        frameName = Frames.initModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 configDirty = true

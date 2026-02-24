@@ -9,6 +9,7 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Frames = feature.Frames or addon.Frames
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 local UIRowVisuals = addon.UIRowVisuals
@@ -789,7 +790,7 @@ do
 
     -- OnLoad frame:
     function module:OnLoad(frame)
-        frameName = Utils.initModuleFrame(module, frame, {
+        frameName = Frames.initModuleFrame(module, frame, {
             enableDrag = true,
             hookOnHide = function()
                 if selectionFrame then selectionFrame:Hide() end
