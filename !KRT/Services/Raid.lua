@@ -12,6 +12,9 @@ local Utils = feature.Utils
 local Events = feature.Events or addon.Events or {}
 local Core = feature.Core
 local Bus = feature.Bus or addon.Bus
+local Strings = feature.Strings or addon.Strings
+local Time = feature.Time or addon.Time
+local Base64 = feature.Base64 or addon.Base64
 
 local tContains = feature.tContains
 
@@ -381,7 +384,7 @@ do
         local nextUnitsByName = {}
         local nextNamesByUnit = {}
         local seen = {}
-        local now = Utils.getCurrentTime()
+        local now = Time.getCurrentTime()
         local hasUnknownUnits = false
 
         for i = 1, n do
@@ -520,7 +523,7 @@ do
 
         local realm = Core.getRealmName()
         local realmPlayers = ensureRealmPlayerMeta(realm)
-        local currentTime = Utils.getCurrentTime()
+        local currentTime = Time.getCurrentTime()
 
         local instanceDiff = tonumber(raidDiff)
         if not instanceDiff then
@@ -547,7 +550,7 @@ do
                     rank     = rank or 0,
                     subgroup = subgroup or 1,
                     class    = class or "UNKNOWN",
-                    join     = Utils.getCurrentTime(),
+                    join     = Time.getCurrentTime(),
                     leave    = nil,
                     count    = 0,
                 }
@@ -640,7 +643,7 @@ do
         -- Stop any pending roster update when ending the raid
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
-        local currentTime = Utils.getCurrentTime()
+        local currentTime = Time.getCurrentTime()
         local raid = Core.ensureRaidById(Core.getCurrentRaid())
         if raid then
             local duration = currentTime - (raid.startTime or currentTime)
@@ -763,7 +766,7 @@ do
         local instanceDiff = resolveRaidDifficulty()
         if manDiff then
             instanceDiff = (raid.size == 10) and 1 or 2
-            if Utils.normalizeLower(manDiff, true) == "h" then instanceDiff = instanceDiff + 2 end
+            if Strings.normalizeLower(manDiff, true) == "h" then instanceDiff = instanceDiff + 2 end
         end
 
         local players = {}
@@ -776,7 +779,7 @@ do
             end
         end
 
-        local currentTime = Utils.getCurrentTime()
+        local currentTime = Time.getCurrentTime()
         local bossNid = tonumber(raid.nextBossNid) or 1
         raid.nextBossNid = bossNid + 1
 
@@ -787,7 +790,7 @@ do
             mode       = (instanceDiff == 3 or instanceDiff == 4) and "h" or "n",
             players    = players,
             time       = currentTime,
-            hash       = Utils.encode(raidNum .. "|" .. bossName .. "|" .. bossNid),
+            hash       = Base64.encode(raidNum .. "|" .. bossName .. "|" .. bossNid),
         }
 
         tinsert(raid.bossKills, killInfo)
@@ -905,7 +908,7 @@ do
             rollValue   = rollValue,
             lootNid     = lootNid,
             bossNid     = tonumber(Core.getLastBoss()) or 0,
-            time        = Utils.getCurrentTime(),
+            time        = Time.getCurrentTime(),
         }
 
         -- LootCounter (MS only): increment the winner's count when the loot is actually awarded.
@@ -1009,7 +1012,7 @@ do
                 rank     = 0,
                 subgroup = 1,
                 class    = "UNKNOWN",
-                join     = Utils.getCurrentTime(),
+                join     = Time.getCurrentTime(),
                 leave    = nil,
                 count    = 0,
             }, raidNum)
@@ -1076,7 +1079,7 @@ do
         local _, _, members = addon.GetGroupTypeAndCount()
         if members == 0 then return 0 end
 
-        local diff = addon.Utils.getDifficulty()
+        local diff = Time.getDifficulty()
         if diff then
             return (diff == 1 or diff == 3) and 10 or 25
         end
@@ -1092,7 +1095,7 @@ do
         end
 
         local startTime = raid.startTime
-        local currentTime = Utils.getCurrentTime()
+        local currentTime = Time.getCurrentTime()
         local week = 604800 -- 7 days in seconds
 
         if Core.getNextReset() and Core.getNextReset() > currentTime then
@@ -1248,7 +1251,7 @@ do
         local found = false
         local players = module:GetPlayers(raidNum)
         if players ~= nil then
-            name = Utils.normalizeName(name)
+            name = Strings.normalizeName(name)
             for _, p in ipairs(players) do
                 if name == p.name then
                     found = true
@@ -1356,7 +1359,7 @@ do
             return "none"
         end
 
-        name = Utils.normalizeName(name)
+        name = Strings.normalizeName(name)
         local cachedUnit = liveUnitsByName[name]
         if cachedUnit then
             if UnitExists(cachedUnit) and UnitName(cachedUnit) == name then
@@ -1371,7 +1374,7 @@ do
         for unit in addon.UnitIterator(true) do
             local unitName = UnitName(unit)
             if unitName then
-                unitName = Utils.normalizeName(unitName)
+                unitName = Strings.normalizeName(unitName)
                 liveUnitsByName[unitName] = unit
                 liveNamesByUnit[unit] = unitName
                 if unitName == name then

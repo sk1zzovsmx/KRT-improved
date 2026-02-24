@@ -9,6 +9,8 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Utils = feature.Utils
 local Frames = feature.Frames or addon.Frames
+local Strings = feature.Strings or addon.Strings
+local Comms = feature.Comms or addon.Comms
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
@@ -274,7 +276,7 @@ do
                 end
             end
         else
-            local value = Utils.trimText(box:GetText())
+            local value = Strings.trimText(box:GetText())
             value = (value == "") and nil or value
             KRT_Spammer[target] = value
             box:ClearFocus()
@@ -337,15 +339,15 @@ do
 
         -- CHANGE: fallback SAY (not YELL)
         if #chList <= 0 then
-            Utils.chat(tostring(finalOutput), "SAY", nil, nil, true)
+            Comms.chat(tostring(finalOutput), "SAY", nil, nil, true)
             return
         end
 
         for _, c in ipairs(chList) do
             if type(c) == "number" then
-                Utils.chat(tostring(finalOutput), "CHANNEL", nil, c, true)
+                Comms.chat(tostring(finalOutput), "CHANNEL", nil, c, true)
             else
-                Utils.chat(tostring(finalOutput), upper(c), nil, nil, true)
+                Comms.chat(tostring(finalOutput), upper(c), nil, nil, true)
             end
         end
     end
@@ -375,7 +377,7 @@ do
         module:Stop()
 
         for _, field in ipairs(resetFields) do
-            Utils.resetEditBox(_G[frameName .. field])
+            Frames.resetEditBox(_G[frameName .. field])
         end
 
         local durationBox = _G[frameName .. "Duration"]
@@ -383,7 +385,7 @@ do
         duration = DEFAULT_DURATION_STR
 
         if durationBox then
-            Utils.resetEditBox(durationBox)
+            Frames.resetEditBox(durationBox)
             durationBox:SetText(DEFAULT_DURATION_STR)
         end
 
@@ -423,7 +425,7 @@ do
         _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
         _G[frameName .. "StartBtn"]:SetText(L.BtnStart)
 
-        Utils.setFrameTitle(frameName, L.StrSpammer)
+        Frames.setFrameTitle(frameName, L.StrSpammer)
         _G[frameName .. "StartBtn"]:SetScript("OnClick", module.Start)
 
         local durationBox = _G[frameName .. "Duration"]
@@ -601,7 +603,7 @@ do
 
         if lastState.message and lastState.message ~= "" then
             outBuf[#outBuf + 1] = " - "
-            outBuf[#outBuf + 1] = Utils.findAchievement(lastState.message)
+            outBuf[#outBuf + 1] = Strings.findAchievement(lastState.message)
         end
 
         local temp = tconcat(outBuf)
@@ -662,7 +664,7 @@ do
             if field.number then
                 value = tonumber(box:GetText()) or 0
             else
-                value = Utils.trimText(box:GetText())
+                value = Strings.trimText(box:GetText())
             end
 
             if lastState[field.key] ~= value then

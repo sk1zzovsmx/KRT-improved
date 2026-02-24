@@ -9,6 +9,10 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Utils = feature.Utils
 local Options = feature.Options or addon.Options
+local Frames = feature.Frames or addon.Frames
+local Colors = feature.Colors or addon.Colors
+local Strings = feature.Strings or addon.Strings
+local Bus = feature.Bus or addon.Bus
 
 local K_COLOR = feature.K_COLOR
 local RT_COLOR = feature.RT_COLOR
@@ -168,7 +172,7 @@ do
     end
 
     local function SetMinimapShown(show)
-        Utils.setShown(KRT_MINIMAP_GUI, show)
+        Frames.setShown(KRT_MINIMAP_GUI, show)
     end
 
     -- ----- Public methods ----- --
@@ -218,9 +222,9 @@ do
         KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
             GameTooltip_SetDefaultAnchor(GameTooltip, self)
             GameTooltip:SetText(
-                addon.WrapTextInColorCode("Kader", Utils.normalizeHexColor(K_COLOR))
+                addon.WrapTextInColorCode("Kader", Colors.normalizeHexColor(K_COLOR))
                 .. " "
-                .. addon.WrapTextInColorCode("Raid Tools", Utils.normalizeHexColor("aad4af37"))
+                .. addon.WrapTextInColorCode("Raid Tools", Colors.normalizeHexColor("aad4af37"))
             )
             GameTooltip:AddLine(L.StrMinimapLClick, 1, 1, 1)
             GameTooltip:AddLine(L.StrMinimapRClick, 1, 1, 1)
@@ -243,7 +247,7 @@ do
 
     -- Hides the minimap button.
     function module:HideMinimapButton()
-        return Utils.setShown(KRT_MINIMAP_GUI, false)
+        return Frames.setShown(KRT_MINIMAP_GUI, false)
     end
 end
 
@@ -283,7 +287,7 @@ do
     -- ----- Private helpers ----- --
     local helpString = "%s: %s"
     local function printHelp(cmd, desc)
-        addon:info("%s", helpString:format(addon.WrapTextInColorCode(cmd, Utils.normalizeHexColor(RT_COLOR)), desc))
+        addon:info("%s", helpString:format(addon.WrapTextInColorCode(cmd, Colors.normalizeHexColor(RT_COLOR)), desc))
     end
 
     local function showHelp()
@@ -312,7 +316,7 @@ do
 
     function module:Handle(msg)
         if not msg or msg == "" then return end
-        local cmd, rest = Utils.splitArgs(msg)
+        local cmd, rest = Strings.splitArgs(msg)
         if cmd == "show" or cmd == "toggle" then
             local moduleRef = getController("Master")
             if moduleRef and moduleRef.Toggle then
@@ -328,7 +332,7 @@ do
     end
 
     registerAliases(cmdDebug, function(rest)
-        local subCmd, arg = Utils.splitArgs(rest)
+        local subCmd, arg = Strings.splitArgs(rest)
         if subCmd == "" then subCmd = nil end
 
         if subCmd == "levels" then
@@ -366,13 +370,13 @@ do
 
         if subCmd == "callbacks" or subCmd == "cb" or subCmd == "bus" then
             if arg == "reset" then
-                if Utils.resetInternalCallbackStats then
-                    Utils.resetInternalCallbackStats()
+                if Bus.resetInternalCallbackStats then
+                    Bus.resetInternalCallbackStats()
                 end
                 addon:info("Internal callback stats reset.")
             else
-                if Utils.dumpInternalCallbackStats then
-                    Utils.dumpInternalCallbackStats(arg)
+                if Bus.dumpInternalCallbackStats then
+                    Bus.dumpInternalCallbackStats(arg)
                 else
                     addon:warn("Callback stats not available in this build.")
                 end
@@ -413,13 +417,13 @@ do
     end)
 
     registerAliases(cmdMinimap, function(rest)
-        local sub, arg = Utils.splitArgs(rest)
+        local sub, arg = Strings.splitArgs(rest)
         if sub == "on" then
             Options.setOption("minimapButton", true)
-            Utils.setShown(KRT_MINIMAP_GUI, true)
+            Frames.setShown(KRT_MINIMAP_GUI, true)
         elseif sub == "off" then
             Options.setOption("minimapButton", false)
-            Utils.setShown(KRT_MINIMAP_GUI, false)
+            Frames.setShown(KRT_MINIMAP_GUI, false)
         elseif sub == "pos" and arg ~= "" then
             local angle = tonumber(arg)
             if angle then
@@ -451,7 +455,7 @@ do
     end)
 
     registerAliases(cmdConfig, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if sub == "reset" then
             UI:Call("Config", "Default")
         else
@@ -460,7 +464,7 @@ do
     end)
 
     registerAliases(cmdWarnings, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             local moduleRef = getController("Warnings")
             if moduleRef and moduleRef.Toggle then
@@ -479,7 +483,7 @@ do
     end)
 
     registerAliases(cmdChanges, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             local moduleRef = getController("Changes")
             if moduleRef and moduleRef.Toggle then
@@ -504,20 +508,20 @@ do
     end)
 
     registerAliases(cmdLogger, function(rest)
-        local sub, arg = Utils.splitArgs(rest)
+        local sub, arg = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             local moduleRef = getController("Logger")
             if moduleRef and moduleRef.Toggle then
                 moduleRef:Toggle()
             end
         elseif sub == "req" then
-            local raidRefArg, targetArg = Utils.splitArgs(arg)
+            local raidRefArg, targetArg = Strings.splitArgs(arg)
             local syncer = getSyncerService()
             if syncer and syncer.RequestLoggerReq then
                 syncer:RequestLoggerReq(tonumber(raidRefArg), targetArg)
             end
         elseif sub == "push" then
-            local raidRefArg, targetArg = Utils.splitArgs(arg)
+            local raidRefArg, targetArg = Strings.splitArgs(arg)
             local syncer = getSyncerService()
             if syncer and syncer.BroadcastLoggerPush then
                 syncer:BroadcastLoggerPush(tonumber(raidRefArg), targetArg)
@@ -537,7 +541,7 @@ do
     end)
 
     registerAliases(cmdLoot, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             local moduleRef = getController("Master")
             if moduleRef and moduleRef.Toggle then
@@ -547,14 +551,14 @@ do
     end)
 
     registerAliases(cmdCounter, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             UI:Call("LootCounter", "Toggle")
         end
     end)
 
     registerAliases(cmdReserves, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             UI:Call("Reserves", "Toggle")
         elseif sub == "import" then
@@ -567,7 +571,7 @@ do
     end)
 
     registerAliases(cmdLFM, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" or sub == "show" then
             local moduleRef = getController("Spammer")
             if moduleRef and moduleRef.Toggle then

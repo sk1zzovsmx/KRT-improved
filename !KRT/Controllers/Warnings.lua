@@ -9,6 +9,8 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Utils = feature.Utils
 local ListController = feature.ListController or addon.ListController
+local Frames = feature.Frames or addon.Frames
+local Strings = feature.Strings or addon.Strings
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
@@ -66,7 +68,7 @@ do
         rowName = function(n, _, i) return n .. "WarningBtn" .. i end,
         rowTmpl = "KRTWarningButtonTemplate",
 
-        drawRow = Utils.createRowDrawer(function(row, it)
+        drawRow = ListController.createRowDrawer(function(row, it)
             local ui = row._p
             ui.ID:SetText(it.id)
             ui.Name:SetText(it.name)
@@ -177,8 +179,8 @@ do
 
     -- Cancel editing/adding:
     function module:Cancel()
-        Utils.resetEditBox(_G[frameName .. "Name"])
-        Utils.resetEditBox(_G[frameName .. "Content"])
+        Frames.resetEditBox(_G[frameName .. "Name"])
+        Frames.resetEditBox(_G[frameName .. "Content"])
         selectedID = nil
         tempSelectedID = nil
         isEdit = false
@@ -194,8 +196,8 @@ do
         _G[frameName .. "DeleteBtn"]:SetText(L.BtnDelete)
         _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
         _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
-        Utils.setFrameTitle(frameName, RAID_WARNING)
-        Utils.bindEditBoxHandlers(frameName, {
+        Frames.setFrameTitle(frameName, RAID_WARNING)
+        Frames.bindEditBoxHandlers(frameName, {
             { suffix = "Name", onEscape = module.Cancel, onEnter = module.Edit },
             { suffix = "Content", onEscape = module.Cancel, onEnter = module.Edit },
         }, function()
@@ -251,8 +253,8 @@ do
     -- Saving a Warning:
     function SaveWarning(wContent, wName, wID)
         wID = wID and tonumber(wID) or 0
-        wName = Utils.trimText(wName)
-        wContent = Utils.trimText(wContent)
+        wName = Strings.trimText(wName)
+        wContent = Strings.trimText(wContent)
         if wName == "" then
             wName = (isEdit and wID > 0) and wID or (#KRT_Warnings + 1)
         end

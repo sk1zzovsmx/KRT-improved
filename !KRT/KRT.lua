@@ -13,6 +13,8 @@ local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
 local Bus = feature.Bus or addon.Bus
+local Frames = feature.Frames or addon.Frames
+local Time = feature.Time or addon.Time
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 
@@ -384,7 +386,7 @@ do
 end
 
 local function bindModuleRequestRefresh(module, getFrame)
-    local requestRefresh = Utils.makeEventDrivenRefresher(getFrame, function()
+    local requestRefresh = Frames.makeEventDrivenRefresher(getFrame, function()
         module:Refresh()
     end)
 
@@ -404,7 +406,7 @@ local function bindModuleToggleHide(module, uiController)
 end
 
 local function makeModuleFrameGetter(module, globalFrameName)
-    local getGlobalFrame = Utils.makeFrameGetter(globalFrameName)
+    local getGlobalFrame = Frames.makeFrameGetter(globalFrameName)
     return function()
         local frame = module.frame or getGlobalFrame()
         if frame and not module.frame then
@@ -682,7 +684,7 @@ function Core.createRaidRecord(args)
         zone = args.zone,
         size = args.size,
         difficulty = args.difficulty,
-        startTime = args.startTime or Utils.getCurrentTime(),
+        startTime = args.startTime or Time.getCurrentTime(),
         endTime = args.endTime,
         players = {},
         bossKills = {},

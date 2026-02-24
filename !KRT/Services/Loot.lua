@@ -11,6 +11,7 @@ local Utils = feature.Utils
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Bus = feature.Bus or addon.Bus
+local Strings = feature.Strings or addon.Strings
 
 local itemColors = feature.itemColors
 
@@ -105,7 +106,7 @@ do
             return
         end
 
-        local key = Utils.getItemStringFromLink(itemLink) or itemLink
+        local key = Strings.getItemStringFromLink(itemLink) or itemLink
         local existing = indexByItemKey[key]
         if existing then
             lootTable[existing].count = (lootTable[existing].count or 1) + 1

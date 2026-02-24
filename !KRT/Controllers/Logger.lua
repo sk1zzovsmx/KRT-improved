@@ -19,6 +19,10 @@ local Options = feature.Options or addon.Options
 local Bus = feature.Bus or addon.Bus
 local ListController = feature.ListController or addon.ListController
 local MultiSelect = feature.MultiSelect or addon.MultiSelect
+local Frames = feature.Frames or addon.Frames
+local Strings = feature.Strings or addon.Strings
+local Colors = feature.Colors or addon.Colors
+local Base64 = feature.Base64 or addon.Base64
 
 local InternalEvents = Events.Internal
 
@@ -286,7 +290,7 @@ do
         local players = raid.players or {}
         for i = 1, #players do
             local p = players[i]
-            if p and p.name and Utils.normalizeLower(p.name) == normalizedLower then
+            if p and p.name and Strings.normalizeLower(p.name) == normalizedLower then
                 return p.name, i, p
             end
         end
@@ -766,8 +770,8 @@ do
         local raid = Store:GetRaid(rID)
         if not raid then return nil end
 
-        name = Utils.trimText(name or "")
-        mode = Utils.normalizeLower(mode or "n")
+        name = Strings.trimText(name or "")
+        mode = Strings.normalizeLower(mode or "n")
         ts = tonumber(ts) or time()
 
         if bossNid then
@@ -793,7 +797,7 @@ do
             time = ts,
             mode = (mode == "h") and "h" or "n",
             players = {},
-            hash = Utils.encode(rID .. "|" .. name .. "|" .. newNid),
+            hash = Base64.encode(rID .. "|" .. name .. "|" .. newNid),
         })
 
         self:Commit(raid)
@@ -803,8 +807,8 @@ do
     -- Add existing raid player to the selected boss attendees list.
     -- nameRaw is matched (case-insensitive) against raid.players[].name.
     function Actions:AddBossAttendee(rID, bossNid, nameRaw)
-        local name = Utils.trimText(nameRaw or "")
-        local normalizedName = Utils.normalizeLower(name)
+        local name = Strings.trimText(nameRaw or "")
+        local normalizedName = Strings.normalizeLower(name)
         if normalizedName == "" then
             addon:error(L.ErrAttendeesInvalidName)
             return false
@@ -824,7 +828,7 @@ do
 
         bossKill.players = bossKill.players or {}
         for _, n in ipairs(bossKill.players) do
-            if Utils.normalizeLower(n) == normalizedName then
+            if Strings.normalizeLower(n) == normalizedName then
                 addon:error(L.ErrAttendeesPlayerExists)
                 return false
             end
@@ -860,7 +864,7 @@ do
     end
 
     -- Multi-select context keys (runtime-only)
-    -- NOTE: selection state lives in Utils.lua and is keyed by these context strings.
+    -- NOTE: selection state lives in MultiSelect module and is keyed by these context strings.
     module._msRaidCtx = module._msRaidCtx or "LoggerRaids"
     module._msBossCtx = module._msBossCtx or "LoggerBosses"
     module._msBossAttCtx = module._msBossAttCtx or "LoggerBossAttendees"
@@ -981,7 +985,7 @@ do
             end,
         })
         if not frameName then return end
-        Utils.setFrameTitle(frameName, L.StrLootLogger)
+        Frames.setFrameTitle(frameName, L.StrLootLogger)
     end
 
     -- Initialize UI controller for Toggle/Hide.
@@ -1404,7 +1408,7 @@ do
             local id = btn and btn.GetID and btn:GetID()
             if not id then return end
 
-            -- NOTE: Multi-select is maintained in Utils.lua (context = MS_CTX_LOOT).
+            -- NOTE: Multi-select is maintained in MultiSelect module (context = MS_CTX_LOOT).
             if button == "LeftButton" then
                 local isMulti = IsControlKeyDown and IsControlKeyDown() or false
                 local isRange = IsShiftKeyDown and IsShiftKeyDown() or false
@@ -1463,14 +1467,14 @@ do
         local function findLoggerPlayer(normalizedName, raid, bossKill)
             if raid and raid.players then
                 for _, p in ipairs(raid.players) do
-                    if normalizedName == Utils.normalizeLower(p.name) then
+                    if normalizedName == Strings.normalizeLower(p.name) then
                         return p.name
                     end
                 end
             end
             if bossKill and bossKill.players then
                 for _, name in ipairs(bossKill.players) do
-                    if normalizedName == Utils.normalizeLower(name) then
+                    if normalizedName == Strings.normalizeLower(name) then
                         return name
                     end
                 end
@@ -1486,10 +1490,10 @@ do
             return true, value
         end
 
-        Utils.makeEditBoxPopup("KRTLOGGER_ITEM_EDIT_WINNER", L.StrEditItemLooterHelp,
+        Frames.makeEditBoxPopup("KRTLOGGER_ITEM_EDIT_WINNER", L.StrEditItemLooterHelp,
             function(self, text)
-                local rawText = Utils.trimText(text)
-                local name = Utils.normalizeLower(rawText)
+                local rawText = Strings.trimText(text)
+                local name = Strings.normalizeLower(rawText)
                 if not name or name == "" then
                     addon:error(L.ErrLoggerWinnerEmpty)
                     return
@@ -1521,7 +1525,7 @@ do
             end
         )
 
-        Utils.makeEditBoxPopup("KRTLOGGER_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp,
+        Frames.makeEditBoxPopup("KRTLOGGER_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp,
             function(self, text)
                 addon.Logger.Loot:Log(self.itemId, nil, nil, text, "LOGGER_EDIT_ROLLVALUE")
             end,
@@ -1577,7 +1581,7 @@ do
         rowName = function(n, _, i) return n .. "RaidBtn" .. i end,
         rowTmpl = "KRTLoggerRaidButton",
 
-        drawRow = Utils.createRowDrawer(function(row, it)
+        drawRow = ListController.createRowDrawer(function(row, it)
             local ui = row._p
             ui.ID:SetText(it.seq or it.id)
             ui.Date:SetText(it.dateFmt)
@@ -1835,7 +1839,7 @@ do
         rowName = function(n, _, i) return n .. "BossBtn" .. i end,
         rowTmpl = "KRTLoggerBossButton",
 
-        drawRow = Utils.createRowDrawer(function(row, it)
+        drawRow = ListController.createRowDrawer(function(row, it)
             local ui = row._p
             -- Display a sequential number that rescales after deletions.
             -- Keep it.id as the stable bossNid for selection/highlight.
@@ -1965,9 +1969,9 @@ do
         rowName = function(n, _, i) return n .. "PlayerBtn" .. i end,
         rowTmpl = "KRTLoggerBossAttendeeButton",
 
-        drawRow = Utils.createRowDrawer(function(row, it)
+        drawRow = ListController.createRowDrawer(function(row, it)
             local ui = row._p
-            local r, g, b = Utils.getClassColor(it.class)
+            local r, g, b = Colors.getClassColor(it.class)
             ui.Name:SetText(it.name)
             ui.Name:SetVertexColor(r, g, b)
         end),
@@ -2079,10 +2083,10 @@ do
         rowName = function(n, _, i) return n .. "PlayerBtn" .. i end,
         rowTmpl = "KRTLoggerRaidAttendeeButton",
 
-        drawRow = Utils.createRowDrawer(function(row, it)
+        drawRow = ListController.createRowDrawer(function(row, it)
             local ui = row._p
             ui.Name:SetText(it.name)
-            local r, g, b = Utils.getClassColor(it.class)
+            local r, g, b = Colors.getClassColor(it.class)
             ui.Name:SetVertexColor(r, g, b)
             ui.Join:SetText(it.joinFmt)
             ui.Leave:SetText(it.leaveFmt)
@@ -2277,7 +2281,7 @@ do
         rowName = function(n, _, i) return n .. "ItemBtn" .. i end,
         rowTmpl = "KRTLoggerLootButton",
 
-        drawRow = Utils.createRowDrawer(function(row, it)
+        drawRow = ListController.createRowDrawer(function(row, it)
             local ui = row._p
             -- Preserve the original item link on the row for tooltips.
             row._itemLink = it.itemLink
@@ -2287,7 +2291,7 @@ do
             else
                 ui.Name:SetText(addon.WrapTextInColorCode(
                     nameText,
-                    Utils.normalizeHexColor(itemColors[(it.itemRarity or 1) + 1])
+                    Colors.normalizeHexColor(itemColors[(it.itemRarity or 1) + 1])
                 ))
             end
 
@@ -2298,7 +2302,7 @@ do
                 ui.Source:SetText(it.sourceName or "")
             end
 
-            local r, g, b = Utils.getClassColor(addon.Raid:GetPlayerClass(it.looter))
+            local r, g, b = Colors.getClassColor(addon.Raid:GetPlayerClass(it.looter))
             ui.Winner:SetText(it.looter)
             ui.Winner:SetVertexColor(r, g, b)
 
@@ -2548,7 +2552,7 @@ do
 
     local frameName, localized, isEdit = nil, false, false
     local raidData, bossData, tempDate = {}, {}, {}
-    local getFrame = Utils.makeFrameGetter("KRTLoggerBossBox")
+    local getFrame = Frames.makeFrameGetter("KRTLoggerBossBox")
 
     function Box:OnLoad(frame)
         frameName = Frames.initModuleFrame(Box, frame, {
@@ -2627,9 +2631,9 @@ do
         local rID = addon.Logger.selectedRaid
         if not rID then return end
 
-        local name = Utils.trimText(_G[frameName .. "Name"]:GetText())
-        local modeT = Utils.normalizeLower(_G[frameName .. "Difficulty"]:GetText())
-        local bTime = Utils.trimText(_G[frameName .. "Time"]:GetText())
+        local name = Strings.trimText(_G[frameName .. "Name"]:GetText())
+        local modeT = Strings.normalizeLower(_G[frameName .. "Difficulty"]:GetText())
+        local bTime = Strings.trimText(_G[frameName .. "Time"]:GetText())
 
         name = (name == "") and "_TrashMob_" or name
         if name ~= "_TrashMob_" and (modeT ~= "h" and modeT ~= "n") then
@@ -2658,9 +2662,9 @@ do
     end
 
     function Box:CancelAddEdit()
-        Utils.resetEditBox(_G[frameName .. "Name"])
-        Utils.resetEditBox(_G[frameName .. "Difficulty"])
-        Utils.resetEditBox(_G[frameName .. "Time"])
+        Frames.resetEditBox(_G[frameName .. "Name"])
+        Frames.resetEditBox(_G[frameName .. "Difficulty"])
+        Frames.resetEditBox(_G[frameName .. "Time"])
         isEdit, raidData, bossData, editBossNid = false, {}, {}, nil
         twipe(tempDate)
     end
@@ -2682,16 +2686,16 @@ do
     local Box = addon.Logger.AttendeesBox
 
     local frameName
-    local getFrame = Utils.makeFrameGetter("KRTLoggerAttendeesBox")
+    local getFrame = Frames.makeFrameGetter("KRTLoggerAttendeesBox")
 
     function Box:OnLoad(frame)
         frameName = Frames.initModuleFrame(Box, frame, {
             enableDrag = true,
             hookOnShow = function()
-                Utils.resetEditBox(_G[frameName .. "Name"])
+                Frames.resetEditBox(_G[frameName .. "Name"])
             end,
             hookOnHide = function()
-                Utils.resetEditBox(_G[frameName .. "Name"])
+                Frames.resetEditBox(_G[frameName .. "Name"])
             end,
         })
         if not frameName then return end
@@ -2720,7 +2724,7 @@ do
 
     function Box:Save()
         local rID, bID = addon.Logger.selectedRaid, addon.Logger.selectedBoss
-        local name = Utils.trimText(_G[frameName .. "Name"]:GetText())
+        local name = Strings.trimText(_G[frameName .. "Name"]:GetText())
         if addon.Logger.Actions:AddBossAttendee(rID, bID, name) then
             self:Toggle()
             triggerSelectionEvent(addon.Logger, "selectedBoss")

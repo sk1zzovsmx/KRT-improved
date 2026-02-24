@@ -9,6 +9,7 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Utils = feature.Utils
 local Frames = feature.Frames or addon.Frames
+local Colors = feature.Colors or addon.Colors
 local UIScaffold = addon.UIScaffold
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
@@ -79,7 +80,7 @@ do
             or _G["KRTLootCounterFrameScrollFrameScrollChild"]
 
         if not frame._krtCounterInit then
-            Utils.setFrameTitle(frameName, L.StrLootCounter)
+            Frames.setFrameTitle(frameName, L.StrLootCounter)
             frame._krtCounterInit = true
         end
 
@@ -269,7 +270,7 @@ do
 
             local class = data and data.class or addon.Raid:GetPlayerClass(name)
             if row._lastClass ~= class then
-                local r, g, b = Utils.getClassColor(class)
+                local r, g, b = Colors.getClassColor(class)
                 row.name:SetTextColor(r, g, b)
                 row._lastClass = class
             end

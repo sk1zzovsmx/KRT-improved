@@ -13,6 +13,8 @@ local Events = feature.Events or addon.Events or {}
 local Core = feature.Core
 local Bus = feature.Bus or addon.Bus
 local MultiSelect = feature.MultiSelect or addon.MultiSelect
+local Strings = feature.Strings or addon.Strings
+local Comms = feature.Comms or addon.Comms
 
 local tContains = feature.tContains
 
@@ -316,7 +318,7 @@ do
         state.selectedAuto = false
 
         module:FetchRolls()
-        Utils.sync("KRT-RollWinner", name)
+        Comms.sync("KRT-RollWinner", name)
         return true
     end
 
@@ -465,7 +467,7 @@ do
         local used = tracker[player] or 0
         if used >= allowed then
             if not tContains(state.rerolled, player) then
-                Utils.whisper(player, L.ChatOnlyRollOnce)
+                Comms.whisper(player, L.ChatOnlyRollOnce)
                 tinsert(state.rerolled, player)
             end
             addon:debug(Diag.D.LogRollsDeniedPlayer:format(player, used, allowed))
@@ -547,7 +549,7 @@ do
         local item = GetItem and GetItem(index)
         local itemLink = item and item.itemLink
         if not itemLink then return nil end
-        local itemId = Utils.getItemIdFromLink(itemLink)
+        local itemId = Strings.getItemIdFromLink(itemLink)
         addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(itemId)))
         return itemId
     end

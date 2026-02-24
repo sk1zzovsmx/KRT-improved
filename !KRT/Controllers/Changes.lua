@@ -10,6 +10,9 @@ local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
 local ListController = feature.ListController or addon.ListController
+local Frames = feature.Frames or addon.Frames
+local Colors = feature.Colors or addon.Colors
+local Strings = feature.Strings or addon.Strings
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
@@ -81,11 +84,11 @@ do
         rowName = function(n, it) return n .. "PlayerBtn" .. it.id end,
         rowTmpl = "KRTChangesButtonTemplate",
 
-        drawRow = Utils.createRowDrawer(function(row, it)
+        drawRow = ListController.createRowDrawer(function(row, it)
             local ui = row._p
             ui.Name:SetText(it.name)
             local class = addon.Raid:GetPlayerClass(it.name)
-            local r, g, b = Utils.getClassColor(class)
+            local r, g, b = Colors.getClassColor(class)
             ui.Name:SetVertexColor(r, g, b)
             ui.Spec:SetText(it.spec or L.StrNone)
         end),
@@ -283,8 +286,8 @@ do
         _G[frameName .. "EditBtn"]:SetText(L.BtnEdit)
         _G[frameName .. "DemandBtn"]:SetText(L.BtnDemand)
         _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
-        Utils.setFrameTitle(frameName, L.StrChanges)
-        Utils.bindEditBoxHandlers(frameName, {
+        Frames.setFrameTitle(frameName, L.StrChanges)
+        Frames.bindEditBoxHandlers(frameName, {
             { suffix = "Name", onEscape = CancelChanges, onEnter = module.Edit },
             { suffix = "Spec", onEscape = CancelChanges, onEnter = module.Edit },
         }, function()
@@ -358,8 +361,8 @@ do
     -- Save module:
     function SaveChanges(name, spec)
         if not addon.Core.getCurrentRaid() or not name then return end
-        name = Utils.normalizeName(name)
-        spec = Utils.normalizeName(spec)
+        name = Strings.normalizeName(name)
+        spec = Strings.normalizeName(spec)
         -- Is the player in the raid?
         local found
         found, name = addon.Raid:CheckPlayer(name)
@@ -381,8 +384,8 @@ do
         isEdit = false
         selectedID = nil
         tempSelectedID = nil
-        Utils.resetEditBox(_G[frameName .. "Name"])
-        Utils.resetEditBox(_G[frameName .. "Spec"])
+        Frames.resetEditBox(_G[frameName .. "Name"])
+        Frames.resetEditBox(_G[frameName .. "Spec"])
         module:RequestRefresh()
     end
 end

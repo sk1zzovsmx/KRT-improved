@@ -53,7 +53,7 @@ do
 
     local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
     local frameName
-    local getFrame = Utils.makeFrameGetter("KRTReserveListFrame")
+    local getFrame = Frames.makeFrameGetter("KRTReserveListFrame")
     local scrollFrame, scrollChild
     local reserveHeaders = {}
     local reserveItemRows = {}
@@ -308,7 +308,7 @@ do
             return
         end
         if frameName then
-            Utils.setFrameTitle(frameName, L.StrRaidReserves)
+            Frames.setFrameTitle(frameName, L.StrRaidReserves)
             addon:debug(Diag.D.LogReservesUILocalized:format(L.StrRaidReserves))
         end
         local clearButton = frameName and _G[frameName .. "ClearButton"]
@@ -708,7 +708,7 @@ do
             return
         end
 
-        Utils.setFrameTitle(frame, L.StrImportReservesTitle)
+        Frames.setFrameTitle(frame, L.StrImportReservesTitle)
 
         local hint = _G["KRTImportWindowHint"]
         if hint then hint:SetText(L.StrImportReservesHint) end
@@ -785,7 +785,7 @@ do
         Frames.initModuleFrame(Import, frame, {
             enableDrag = true,
             hookOnShow = function()
-                Utils.resetEditBox(_G["KRTImportEditBox"])
+                Frames.resetEditBox(_G["KRTImportEditBox"])
                 local editBox = _G["KRTImportEditBox"]
                 if editBox then
                     editBox:SetFocus()

@@ -81,9 +81,9 @@ do
         if KRT_MINIMAP_GUI then
             addon.Minimap:SetPos(addon.options.minimapPos or 325)
             if addon.options.minimapButton then
-                Utils.setShown(KRT_MINIMAP_GUI, true)
+                Frames.setShown(KRT_MINIMAP_GUI, true)
             else
-                Utils.setShown(KRT_MINIMAP_GUI, false)
+                Frames.setShown(KRT_MINIMAP_GUI, false)
             end
         end
     end
@@ -184,7 +184,7 @@ do
         _G[frameName .. "countdownDurationStr"]:SetText(L.StrConfigCountdownDuration)
         _G[frameName .. "countdownSimpleRaidMsgStr"]:SetText(L.StrConfigCountdownSimpleRaidMsg)
 
-        Utils.setFrameTitle(frameName, SETTINGS)
+        Frames.setFrameTitle(frameName, SETTINGS)
         _G[frameName .. "AboutStr"]:SetText(L.StrConfigAbout)
         _G[frameName .. "DefaultsBtn"]:SetText(L.BtnDefaults)
         _G[frameName .. "CloseBtn"]:SetText(L.BtnClose)
