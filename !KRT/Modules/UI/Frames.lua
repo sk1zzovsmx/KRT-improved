@@ -9,6 +9,7 @@ local feature = addon.Core.getFeatureShared()
 
 local type = type
 local format = string.format
+local ipairs = ipairs
 
 local _G = _G
 local function CreateFrame(...)
@@ -20,6 +21,7 @@ local Frames = addon.Frames
 
 addon.UIScaffold = addon.UIScaffold or {}
 local UIScaffold = addon.UIScaffold
+local tooltipColor = HIGHLIGHT_FONT_COLOR
 
 function Frames.enableDrag(frame, dragButton)
     if not frame or not frame.RegisterForDrag then
@@ -154,6 +156,52 @@ function Frames.setShown(frame, show)
     elseif frame:IsShown() then
         frame:Hide()
     end
+end
+
+local function showTooltip(frame)
+    if not frame.tooltip_anchor then
+        GameTooltip_SetDefaultAnchor(GameTooltip, frame)
+    else
+        GameTooltip:SetOwner(frame, frame.tooltip_anchor)
+    end
+
+    if frame.tooltip_title then
+        GameTooltip:SetText(frame.tooltip_title)
+    end
+
+    if frame.tooltip_text then
+        if type(frame.tooltip_text) == "string" then
+            GameTooltip:AddLine(frame.tooltip_text, tooltipColor.r, tooltipColor.g, tooltipColor.b, true)
+        elseif type(frame.tooltip_text) == "table" then
+            for _, line in ipairs(frame.tooltip_text) do
+                GameTooltip:AddLine(line, tooltipColor.r, tooltipColor.g, tooltipColor.b, true)
+            end
+        end
+    end
+
+    if frame.tooltip_item then
+        GameTooltip:SetHyperlink(frame.tooltip_item)
+    end
+
+    GameTooltip:Show()
+end
+
+local function hideTooltip()
+    GameTooltip:Hide()
+end
+
+function Frames.setTooltip(frame, text, anchor, title)
+    if not frame then
+        return
+    end
+    frame.tooltip_text = text and text or frame.tooltip_text
+    frame.tooltip_anchor = anchor and anchor or frame.tooltip_anchor
+    frame.tooltip_title = title and title or frame.tooltip_title
+    if not frame.tooltip_title and not frame.tooltip_text and not frame.tooltip_item then
+        return
+    end
+    frame:SetScript("OnEnter", showTooltip)
+    frame:SetScript("OnLeave", hideTooltip)
 end
 
 function Frames.makeEventDrivenRefresher(targetOrGetter, updateFn)

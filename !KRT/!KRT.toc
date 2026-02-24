@@ -50,7 +50,6 @@ Modules\UI\Binder\UIBinder.lua
 Modules\Bus.lua
 Modules\Utils.LegacyGlobals.lua
 Modules\Utils.Options.lua
-Modules\Utils.Tooltip.lua
 Modules\Compat\Utils.UI.lua
 Modules\Utils.lua
 

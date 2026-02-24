@@ -33,10 +33,6 @@ local function getUI()
     return Utils.UI
 end
 
-local function getTooltip()
-    return Utils.Tooltip
-end
-
 local function warnDeprecatedCompat(legacyName, ownerPath)
     local state = addon.State
     if not (state and state.debugEnabled == true) then
@@ -553,25 +549,10 @@ end
 -- =========== Tooltip facade  =========== --
 
 function addon:SetTooltip(frame, text, anchor, title)
-    local Tooltip = getTooltip()
-    if Tooltip and Tooltip.setTooltip then
-        return Tooltip.setTooltip(frame, text, anchor, title)
+    local Frames = addon.Frames
+    if Frames and Frames.setTooltip then
+        return Frames.setTooltip(frame, text, anchor, title)
     end
-end
-
-function Utils.warmItemCache(itemLink)
-    local Tooltip = getTooltip()
-    if Tooltip and Tooltip.warmItemCache then
-        return Tooltip.warmItemCache(itemLink)
-    end
-end
-
-function Utils.isBagItemSoulbound(bag, slot)
-    local Tooltip = getTooltip()
-    if Tooltip and Tooltip.isBagItemSoulbound then
-        return Tooltip.isBagItemSoulbound(bag, slot)
-    end
-    return false
 end
 
 -- =========== Color utilities  =========== --
