@@ -12,6 +12,7 @@ local Utils = feature.Utils
 local Events = feature.Events or addon.Events or {}
 local Core = feature.Core
 local Bus = feature.Bus or addon.Bus
+local MultiSelect = feature.MultiSelect or addon.MultiSelect
 
 local tContains = feature.tContains
 
@@ -281,22 +282,22 @@ do
             end
             if maxSel < 1 then maxSel = 1 end
 
-            local isSel = Utils.multiSelectIsSelected(MS_CTX_ROLLS, name)
-            local cur = Utils.multiSelectCount(MS_CTX_ROLLS) or 0
+            local isSel = MultiSelect.multiSelectIsSelected(MS_CTX_ROLLS, name)
+            local cur = MultiSelect.multiSelectCount(MS_CTX_ROLLS) or 0
             if (not isSel) and cur >= maxSel then
                 if maxSel == 1 then
-                    Utils.multiSelectClear(MS_CTX_ROLLS)
-                    Utils.multiSelectToggle(MS_CTX_ROLLS, name, true)
+                    MultiSelect.multiSelectClear(MS_CTX_ROLLS)
+                    MultiSelect.multiSelectToggle(MS_CTX_ROLLS, name, true)
                 else
                     addon:warn(Diag.W.ErrMLMultiSelectTooMany:format(maxSel))
                     return false
                 end
             else
-                Utils.multiSelectToggle(MS_CTX_ROLLS, name, true)
+                MultiSelect.multiSelectToggle(MS_CTX_ROLLS, name, true)
             end
 
             if shift then
-                Utils.multiSelectSetAnchor(MS_CTX_ROLLS, name)
+                MultiSelect.multiSelectSetAnchor(MS_CTX_ROLLS, name)
             end
 
             local picked = module:GetSelectedWinnersOrdered()
@@ -309,7 +310,7 @@ do
         end
 
         -- Inventory/trade: legacy single selection behavior.
-        Utils.multiSelectClear(MS_CTX_ROLLS)
+        MultiSelect.multiSelectClear(MS_CTX_ROLLS)
         lootState.winner = name
         state.selected = name
         state.selectedAuto = false
@@ -372,8 +373,8 @@ do
 
         -- Clear any manual multi-winner selection (Master Loot window)
         state.msPrefilled = false
-        Utils.multiSelectClear(MS_CTX_ROLLS)
-        Utils.multiSelectSetAnchor(MS_CTX_ROLLS, nil)
+        MultiSelect.multiSelectClear(MS_CTX_ROLLS)
+        MultiSelect.multiSelectSetAnchor(MS_CTX_ROLLS, nil)
 
         if rec == false then state.record = false end
     end
@@ -652,8 +653,8 @@ do
         -- Inventory/trade: keep legacy single-selection behavior.
         -- In loot window (pick mode) we support the same MultiSelect flow for both single and multi-copy items.
         if lootState.fromInventory then
-            Utils.multiSelectClear(MS_CTX_ROLLS)
-            Utils.multiSelectSetAnchor(MS_CTX_ROLLS, nil)
+            MultiSelect.multiSelectClear(MS_CTX_ROLLS)
+            MultiSelect.multiSelectSetAnchor(MS_CTX_ROLLS, nil)
             state.msPrefilled = false
         end
 
@@ -684,11 +685,11 @@ do
             local n = tonumber(lootState.itemCount) or 1
             if n and n >= 1 and #display > 0 then
                 if n > #display then n = #display end
-                if (not state.msPrefilled) and (Utils.multiSelectCount(MS_CTX_ROLLS) or 0) == 0 then
+                if (not state.msPrefilled) and (MultiSelect.multiSelectCount(MS_CTX_ROLLS) or 0) == 0 then
                     for i = 1, n do
                         local e = display[i]
                         if e and e.name then
-                            Utils.multiSelectToggle(MS_CTX_ROLLS, e.name, true)
+                            MultiSelect.multiSelectToggle(MS_CTX_ROLLS, e.name, true)
                         end
                     end
                 end
@@ -696,7 +697,7 @@ do
             end
         end
 
-        local msCount = pickMode and (Utils.multiSelectCount(MS_CTX_ROLLS) or 0) or 0
+        local msCount = pickMode and (MultiSelect.multiSelectCount(MS_CTX_ROLLS) or 0) or 0
         if msCount > 0 then
             -- In pick mode, persistent background highlight comes from MultiSelect.
             highlightTarget = nil
@@ -727,7 +728,7 @@ do
             local entry = display[i]
             local name, roll = entry.name, entry.roll
             local isReserved = isSR and itemId and self:IsReserved(itemId, name)
-            local isSelected = (msCount > 0 and Utils.multiSelectIsSelected(MS_CTX_ROLLS, name))
+            local isSelected = (msCount > 0 and MultiSelect.multiSelectIsSelected(MS_CTX_ROLLS, name))
             local isFocused = (highlightTarget and highlightTarget == name) or false
             local counterText = ""
 
@@ -796,7 +797,7 @@ do
         end
         for i = 1, #display do
             local e = display[i]
-            if e and e.name and Utils.multiSelectIsSelected(MS_CTX_ROLLS, e.name) then
+            if e and e.name and MultiSelect.multiSelectIsSelected(MS_CTX_ROLLS, e.name) then
                 selected[#selected + 1] = { name = e.name, roll = tonumber(e.roll) or 0 }
             end
         end

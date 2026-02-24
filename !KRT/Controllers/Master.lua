@@ -16,6 +16,7 @@ local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Core = feature.Core
 local Bus = feature.Bus or addon.Bus
+local MultiSelect = feature.MultiSelect or addon.MultiSelect
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -475,7 +476,7 @@ do
     end
 
     local function BuildMultiAwardWinners(target)
-        local selCount = Utils.multiSelectCount(ROLL_WINNERS_CTX) or 0
+        local selCount = MultiSelect.multiSelectCount(ROLL_WINNERS_CTX) or 0
         if selCount <= 0 then
             return nil, "empty_selection"
         end
@@ -496,8 +497,8 @@ do
             end
         end
 
-        Utils.multiSelectClear(ROLL_WINNERS_CTX)
-        Utils.multiSelectSetAnchor(ROLL_WINNERS_CTX, nil)
+        MultiSelect.multiSelectClear(ROLL_WINNERS_CTX)
+        MultiSelect.multiSelectSetAnchor(ROLL_WINNERS_CTX, nil)
 
         if #winners <= 0 then
             return nil, "empty_winners"
@@ -1270,7 +1271,7 @@ do
         FlagButtonsOnChange("flowState", currentFlowState)
 
         local pickMode = (currentFlowState ~= FLOW_STATES.INVENTORY and currentFlowState ~= FLOW_STATES.TRADE)
-        local msCount = pickMode and (Utils.multiSelectCount(ROLL_WINNERS_CTX) or 0) or 0
+        local msCount = pickMode and (MultiSelect.multiSelectCount(ROLL_WINNERS_CTX) or 0) or 0
         FlagButtonsOnChange("msCount", msCount)
 
         if dirtyFlags.buttons then

@@ -9,6 +9,7 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local ListController = feature.ListController or addon.ListController
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
@@ -53,7 +54,7 @@ do
     local isAdd = false
     local isEdit = false
 
-    local controller = Utils.makeListController {
+    local controller = ListController.makeListController {
         keyName = "ChangesList",
         poolTag = "changes",
         _rowParts = { "Name", "Spec" },

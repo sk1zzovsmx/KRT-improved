@@ -8,6 +8,7 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Utils = feature.Utils
+local ListController = feature.ListController or addon.ListController
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
@@ -50,7 +51,7 @@ do
 
     -- ----- Public methods ----- --
 
-    local controller = Utils.makeListController {
+    local controller = ListController.makeListController {
         keyName = "WarningsList",
         poolTag = "warnings",
         _rowParts = { "ID", "Name" },
