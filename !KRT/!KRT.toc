@@ -80,6 +80,3 @@ EntryPoints\SlashEvents.lua
 # Layer 7 - UI include manifest
 # Default profile: full (KRT.xml -> KRT.Full.xml). Core build can swap KRT.xml -> KRT.Core.xml.
 KRT.xml
-
-# Layer 8 - Late data modules (intentional post-runtime load)
-Modules\ignoredItems.lua
