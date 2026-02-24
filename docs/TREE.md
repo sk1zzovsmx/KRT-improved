@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-24 03:23:16 +01:00
-- Commit: 86084b2
+- Generated: 2026-02-24 03:25:14 +01:00
+- Commit: aa2cdc8
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -18,9 +18,8 @@
 |   |-- Core
 |   |   \\-- Init.lua
 |   |-- EntryPoints
-|   |   |-- Minimap.lua
-|   |   |-- README.md
-|   |   \\-- SlashEvents.lua
+|   |   |-- EntryPoints.lua
+|   |   \\-- README.md
 |   |-- Libs
 |   |   |-- CallbackHandler-1.0
 |   |   |   \\-- ...
