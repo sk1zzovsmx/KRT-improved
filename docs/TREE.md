@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-24 03:25:14 +01:00
-- Commit: aa2cdc8
+- Generated: 2026-02-24 03:25:57 +01:00
+- Commit: 2a04605
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -53,6 +53,8 @@
 |   |   |-- Rolls.lua
 |   |   \\-- Syncer.lua
 |   |-- UI
+|   |   |-- Templates
+|   |   |   \\-- ...
 |   |   |-- Changes.xml
 |   |   |-- Config.xml
 |   |   |-- Logger.xml
@@ -72,8 +74,7 @@
 |   |-- KRT.Core.xml
 |   |-- KRT.Full.xml
 |   |-- KRT.lua
-|   |-- KRT.xml
-|   \\-- Templates.xml
+|   \\-- KRT.xml
 |-- .devcontainer
 |   \\-- devcontainer.json
 |-- .githooks

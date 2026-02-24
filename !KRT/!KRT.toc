@@ -29,7 +29,7 @@ Localization\localization.en.lua
 Localization\DiagnoseLog.en.lua
 
 # Layer 3 - Shared templates
-Templates.xml
+UI\Templates\Common.xml
 
 # Layer 4 - Shared modules (helpers/constants)
 Modules\C.lua
