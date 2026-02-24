@@ -21,12 +21,12 @@ Legend:
 | Modules/Events.lua | L4 Modules | L1 Core | addon.Events | Inline | Inline in Core/Init.lua |
 | Modules/Features.lua | L4 Modules | L1 Core | addon.Features | Inline | Inline in Core/Init.lua |
 | Modules/ignoredItems.lua | L8 Late data | L6 Features | addon.Raid | Move | Move ignored list into Services/Raid.lua |
-| Modules/Utils.RaidState.lua | L4 Modules | L1+L6 split | addon.Core + addon.Raid | Move | Split helpers between Core and Raid service |
-| Modules/Utils.Tooltip.lua | L4 Modules | L4+L6 split | addon.Frames + addon.Loot | Move | Split tooltip UI and loot item probes |
-| Modules/Utils.Options.lua | L4 Modules | L1 Core | addon.Options | Move | Replace with addon.Options owner |
-| Modules/Utils.LegacyGlobals.lua | L4 Modules | L1 Core | addon.Core | Move | Install legacy globals from core init |
-| Modules/Compat/Utils.UI.lua | L4 Modules | removed | compat facade | Delete | Remove compat UI facade |
-| Modules/Utils.lua | L4 Modules | removed | addon.Utils facade | Delete | Remove mega-facade after migration |
+| Modules/StdFacade.RaidState.lua | L4 Modules | L1+L6 split | addon.Core + addon.Raid | Move | Split helpers between Core and Raid service |
+| Modules/StdFacade.Tooltip.lua | L4 Modules | L4+L6 split | addon.Frames + addon.Loot | Move | Split tooltip UI and loot item probes |
+| Modules/StdFacade.Options.lua | L4 Modules | L1 Core | addon.Options | Move | Replace with addon.Options owner |
+| Modules/StdFacade.LegacyGlobals.lua | L4 Modules | L1 Core | addon.Core | Move | Install legacy globals from core init |
+| Modules/Compat/StdFacade.UI.lua | L4 Modules | removed | compat facade | Delete | Remove compat UI facade |
+| Modules/StdFacade.lua | L4 Modules | removed | addon.StdFacade facade | Delete | Remove mega-facade after migration |
 | Modules/UI/Facade.lua | L4 Modules | L4 Modules | addon.UI | Keep | Widget facade/port |
 | Modules/UI/Visuals.lua | L4 Modules | L4 Modules | addon.UIPrimitives + addon.UIRowVisuals | Keep | Shared row and visual helpers |
 | Modules/UI/Frames.lua | L4 Modules | L4 Modules | addon.Frames + addon.UIScaffold | Keep | Frame scaffolding and tooltip helpers |
@@ -54,6 +54,6 @@ Legend:
 
 Target end-state notes:
 - Keep public `addon.*` APIs stable where practical.
-- Remove `addon.Utils` facade only after all call-site migrations are complete.
+- Remove `addon.StdFacade` facade only after all call-site migrations are complete.
 
 Tag: LAYER_MAP
