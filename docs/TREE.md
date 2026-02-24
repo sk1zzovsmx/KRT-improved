@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-24 03:22:48 +01:00
-- Commit: 8bfaa4b
+- Generated: 2026-02-24 03:23:16 +01:00
+- Commit: 86084b2
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -39,7 +39,6 @@
 |   |   \\-- localization.en.lua
 |   |-- Modules
 |   |   |-- Compat
-|   |   |   \\-- ...
 |   |   |-- UI
 |   |   |   \\-- ...
 |   |   |-- Bus.lua
