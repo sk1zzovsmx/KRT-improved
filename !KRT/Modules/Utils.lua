@@ -31,8 +31,8 @@ local function getRaidState()
     return Utils.RaidState
 end
 
-local function getEventBusCompat()
-    return Utils.EventBusCompat
+local function getBus()
+    return addon.Bus
 end
 
 local function getUI()
@@ -287,53 +287,53 @@ end
 -- =========== Event bus facade  =========== --
 
 function Utils.registerCallback(eventName, callback)
-    local EventBusCompat = getEventBusCompat()
-    if EventBusCompat and EventBusCompat.registerCallback then
-        return EventBusCompat.registerCallback(eventName, callback)
+    local Bus = getBus()
+    if Bus and Bus.registerCallback then
+        return Bus.registerCallback(eventName, callback)
     end
     error(L.StrCbErrUsage)
 end
 
 function Utils.unregisterCallback(handle)
-    local EventBusCompat = getEventBusCompat()
-    if EventBusCompat and EventBusCompat.unregisterCallback then
-        return EventBusCompat.unregisterCallback(handle)
+    local Bus = getBus()
+    if Bus and Bus.unregisterCallback then
+        return Bus.unregisterCallback(handle)
     end
 end
 
 function Utils.triggerEvent(eventName, ...)
-    local EventBusCompat = getEventBusCompat()
-    if EventBusCompat and EventBusCompat.triggerEvent then
-        return EventBusCompat.triggerEvent(eventName, ...)
+    local Bus = getBus()
+    if Bus and Bus.triggerEvent then
+        return Bus.triggerEvent(eventName, ...)
     end
 end
 
 function Utils.registerCallbacks(names, callback)
-    local EventBusCompat = getEventBusCompat()
-    if EventBusCompat and EventBusCompat.registerCallbacks then
-        return EventBusCompat.registerCallbacks(names, callback)
+    local Bus = getBus()
+    if Bus and Bus.registerCallbacks then
+        return Bus.registerCallbacks(names, callback)
     end
 end
 
 function Utils.getInternalCallbackStats()
-    local EventBusCompat = getEventBusCompat()
-    if EventBusCompat and EventBusCompat.getInternalCallbackStats then
-        return EventBusCompat.getInternalCallbackStats()
+    local Bus = getBus()
+    if Bus and Bus.getInternalCallbackStats then
+        return Bus.getInternalCallbackStats()
     end
     return {}
 end
 
 function Utils.resetInternalCallbackStats()
-    local EventBusCompat = getEventBusCompat()
-    if EventBusCompat and EventBusCompat.resetInternalCallbackStats then
-        return EventBusCompat.resetInternalCallbackStats()
+    local Bus = getBus()
+    if Bus and Bus.resetInternalCallbackStats then
+        return Bus.resetInternalCallbackStats()
     end
 end
 
 function Utils.dumpInternalCallbackStats(sortBy)
-    local EventBusCompat = getEventBusCompat()
-    if EventBusCompat and EventBusCompat.dumpInternalCallbackStats then
-        return EventBusCompat.dumpInternalCallbackStats(sortBy)
+    local Bus = getBus()
+    if Bus and Bus.dumpInternalCallbackStats then
+        return Bus.dumpInternalCallbackStats(sortBy)
     end
 end
 

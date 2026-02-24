@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-23 23:00:40 +01:00
-- Commit: 0b63a56
+- Generated: 2026-02-24 03:10:20 +01:00
+- Commit: 26fb6d9
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -38,6 +38,10 @@
 |   |   |-- DiagnoseLog.en.lua
 |   |   \\-- localization.en.lua
 |   |-- Modules
+|   |   |-- Compat
+|   |   |   \\-- ...
+|   |   |-- UI
+|   |   |   \\-- ...
 |   |   |-- Base64.lua
 |   |   |-- Bus.lua
 |   |   |-- C.lua
@@ -45,21 +49,14 @@
 |   |   |-- Comms.lua
 |   |   |-- Events.lua
 |   |   |-- Features.lua
-|   |   |-- Frames.lua
 |   |   |-- ignoredItems.lua
-|   |   |-- ListController.lua
-|   |   |-- MultiSelect.lua
 |   |   |-- Strings.lua
 |   |   |-- Time.lua
-|   |   |-- UIBinder.lua
-|   |   |-- UIFacade.lua
-|   |   |-- Utils.EventBusCompat.lua
 |   |   |-- Utils.LegacyGlobals.lua
 |   |   |-- Utils.lua
 |   |   |-- Utils.Options.lua
 |   |   |-- Utils.RaidState.lua
-|   |   |-- Utils.Tooltip.lua
-|   |   \\-- Utils.UI.lua
+|   |   \\-- Utils.Tooltip.lua
 |   |-- Services
 |   |   |-- Chat.lua
 |   |   |-- Loot.lua
@@ -102,6 +99,7 @@
 |   |-- FN_CLUSTERS.md
 |   |-- FUNCTION_REGISTRY.csv
 |   |-- FUNCTION_REGISTRY.md
+|   |-- MODULES_UI_OWNERSHIP_MAP.md
 |   |-- REFACTOR_RULES.md
 |   |-- TREE.md
 |   \\-- UTILS_DEPRECATION_MAP.md

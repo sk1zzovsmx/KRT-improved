@@ -58,22 +58,24 @@ Durable preferences learned from recent conversations:
   Parents; wire WoW events into `Utils.triggerEvent("wow.EVENT", ...)` and let modules subscribe.
 - Keep Logger-owned roster UI refresh logic inside `Controllers/Logger.lua` (subscribed via `RaidRosterDelta`),
   not in `KRT.lua`.
-- Prefer a widget facade/port via `addon.UI` (`Modules/UIFacade.lua`) for Controller/EntryPoint -> Widget calls.
+- Prefer a widget facade/port via `addon.UI` (`Modules/UI/Facade.lua`) for Controller/EntryPoint -> Widget calls.
 - Avoid direct references to `addon.LootCounter`, `addon.ReservesUI`, and `addon.Config` in
   `Controllers/*.lua` and `EntryPoints/*.lua`; use `addon.UI:Call(...)` instead.
 - Prefer optional widget architecture with `addon.Features` flags and profile-aware toggles (`core` vs `full`).
-- Keep `Modules/UIBinder.lua` resilient for optional widgets: skip bindings when a widget is disabled
+- Keep `Modules/UI/Binder/UIBinder.lua` resilient for optional widgets: skip bindings when a widget is disabled
   by feature flags or not registered in `addon.UI`.
 - Keep XML layout-only: do not use `<Scripts>`/`<On...>` in `UI/*.xml` and `Templates.xml`.
-- Prefer centralized UI script wiring in `Modules/UIBinder.lua` (single binding table/source of truth).
-- Prefer `Modules/UIBinder.lua` bindings as direct Lua functions (`frameName + scriptType -> function`)
+- Prefer centralized UI script wiring in `Modules/UI/Binder/UIBinder.lua`
+  (single binding table/source of truth).
+- Prefer `Modules/UI/Binder/UIBinder.lua` bindings as direct Lua functions
+  (`frameName + scriptType -> function`)
   and avoid `loadstring`-based script compilation.
 - Keep Services pure: no frame lifecycle (`OnLoad`/`Refresh`) or UI delegation in `Services/*`;
   widgets consume `addon.<Feature>.Service` and refresh via bus events (e.g. `ReservesDataChanged`).
 - Prefer cross-code extraction from `Modules/Utils.lua` into dedicated reusable modules (`Bus`, `ListController`,
   `MultiSelect`, `Frames`, `Strings`, `Colors`, `Comms`, `Base64`, `Time`); keep `Utils.lua` as facade/re-export.
 - Prefer incremental thematic split of `Modules/Utils.lua` into `Modules/Utils.*.lua` files
-  (`EventBusCompat`, `UI`, `Tooltip`, `Options`, `RaidState`, `LegacyGlobals`), while keeping `Utils.lua`
+  (`UI`, `Tooltip`, `Options`, `RaidState`, `LegacyGlobals`), while keeping `Utils.lua`
   as compatibility facade/aggregator.
 - Prefer centralized event-name registry in `Modules/Events.lua` for internal bus events and
   wow-forwarded events (avoid ad-hoc string literals in modules).
@@ -154,39 +156,40 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 15) Modules/Comms.lua
 16) Modules/Time.lua
 17) Modules/Base64.lua
-18) Modules/Frames.lua
-19) Modules/MultiSelect.lua
-20) Modules/ListController.lua
-21) Modules/Bus.lua
-22) Modules/Utils.LegacyGlobals.lua
-23) Modules/Utils.Options.lua
-24) Modules/Utils.RaidState.lua
-25) Modules/Utils.EventBusCompat.lua
-26) Modules/Utils.Tooltip.lua
-27) Modules/Utils.UI.lua
-28) Modules/Utils.lua
-29) Modules/Features.lua
-30) Modules/UIFacade.lua
-31) Modules/UIBinder.lua
-32) KRT.lua (runtime bootstrap + event wiring + shared runtime glue)
-33) Services/Raid.lua
-34) Services/Chat.lua
-35) EntryPoints/Minimap.lua
-36) Services/Rolls.lua
-37) Services/Loot.lua
-38) Controllers/Master.lua
-39) Widgets/LootCounter.lua
-40) Services/Reserves.lua
-41) Widgets/ReservesUI.lua
-42) Controllers/Logger.lua
-43) Services/Syncer.lua
-44) Widgets/Config.lua
-45) Controllers/Warnings.lua
-46) Controllers/Changes.lua
-47) Controllers/Spammer.lua
-48) EntryPoints/SlashEvents.lua
-49) KRT.xml (UI include manifest; default profile forwards to `KRT.Full.xml`)
-50) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
+18) Modules/Features.lua
+19) Modules/UI/Facade.lua
+20) Modules/UI/Visuals.lua
+21) Modules/UI/Frames.lua
+22) Modules/UI/ListController.lua
+23) Modules/UI/MultiSelect.lua
+24) Modules/UI/Binder/Map.lua
+25) Modules/UI/Binder/UIBinder.lua
+26) Modules/Bus.lua
+27) Modules/Utils.LegacyGlobals.lua
+28) Modules/Utils.Options.lua
+29) Modules/Utils.RaidState.lua
+30) Modules/Utils.Tooltip.lua
+31) Modules/Compat/Utils.UI.lua
+32) Modules/Utils.lua
+33) KRT.lua (runtime bootstrap + event wiring + shared runtime glue)
+34) Services/Raid.lua
+35) Services/Chat.lua
+36) EntryPoints/Minimap.lua
+37) Services/Rolls.lua
+38) Services/Loot.lua
+39) Controllers/Master.lua
+40) Widgets/LootCounter.lua
+41) Services/Reserves.lua
+42) Widgets/ReservesUI.lua
+43) Controllers/Logger.lua
+44) Services/Syncer.lua
+45) Widgets/Config.lua
+46) Controllers/Warnings.lua
+47) Controllers/Changes.lua
+48) Controllers/Spammer.lua
+49) EntryPoints/SlashEvents.lua
+50) KRT.xml (UI include manifest; default profile forwards to `KRT.Full.xml`)
+51) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
 
 ---
 
@@ -251,20 +254,24 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Comms.lua              # addon chat/whisper/sync helpers (addon.Comms)
     Time.lua               # time/difficulty helpers (addon.Time)
     Base64.lua             # base64 codec helpers (addon.Base64)
-    Frames.lua             # frame glue + coalesced refresh helpers (addon.Frames)
-    MultiSelect.lua        # reusable multiselect state helpers (addon.MultiSelect)
-    ListController.lua     # reusable scroll-list controller (addon.ListController)
+    Features.lua           # feature flags/profile toggles (addon.Features)
+    UI/
+      Facade.lua           # widget facade (addon.UI) with Register/Call no-op routing
+      Visuals.lua          # UI primitives + row visuals (addon.UIPrimitives/addon.UIRowVisuals)
+      Frames.lua           # frame helpers + UI scaffold/orchestration (addon.Frames/addon.UIScaffold)
+      ListController.lua   # reusable scroll-list controller (addon.ListController)
+      MultiSelect.lua      # reusable multiselect state helpers (addon.MultiSelect)
+      Binder/
+        Map.lua            # XML binding datasets/maps (addon.UIBinder.Map)
+        UIBinder.lua       # XML binder runtime/facade + compiler (addon.UIBinder/addon.UIBinder.Compiler)
     Bus.lua                # internal callback bus + metrics (addon.Bus)
     Utils.LegacyGlobals.lua # legacy global monkeypatches (`table.*` / `string.*`)
     Utils.Options.lua      # debug/options helpers (addon.Utils.Options)
     Utils.RaidState.lua    # raid/player state helpers (addon.Utils.RaidState)
-    Utils.EventBusCompat.lua # bus facade helpers (addon.Utils.EventBusCompat)
     Utils.Tooltip.lua      # tooltip/soulbound helpers (addon.Utils.Tooltip)
-    Utils.UI.lua           # drag/show-hide/row-visual/frame helpers (addon.Utils.UI)
+    Compat/
+      Utils.UI.lua         # UI compat facade wrappers (addon.Utils.UI)
     Utils.lua              # compatibility facade/re-exports (addon.Utils)
-    Features.lua           # feature flags/profile toggles (addon.Features)
-    UIFacade.lua           # widget facade (addon.UI) with Register/Call no-op routing
-    UIBinder.lua           # centralized XML script binder (layout-only XML policy)
     ignoredItems.lua       # data lists / filters
 
   Libs/
@@ -398,9 +405,8 @@ External modules:
   - `addon.Utils.LegacyGlobals` (Modules/Utils.LegacyGlobals.lua)
   - `addon.Utils.Options` (Modules/Utils.Options.lua)
   - `addon.Utils.RaidState` (Modules/Utils.RaidState.lua)
-  - `addon.Utils.EventBusCompat` (Modules/Utils.EventBusCompat.lua)
   - `addon.Utils.Tooltip` (Modules/Utils.Tooltip.lua)
-  - `addon.Utils.UI` (Modules/Utils.UI.lua)
+  - `addon.Utils.UI` (Modules/Compat/Utils.UI.lua)
 - `addon.C`     (Modules/C.lua)
 - `addon.Events` (Modules/Events.lua)
 - `addon.Colors` (Modules/Colors.lua)
@@ -408,13 +414,18 @@ External modules:
 - `addon.Comms` (Modules/Comms.lua)
 - `addon.Time` (Modules/Time.lua)
 - `addon.Base64` (Modules/Base64.lua)
-- `addon.Frames` (Modules/Frames.lua)
-- `addon.MultiSelect` (Modules/MultiSelect.lua)
-- `addon.ListController` (Modules/ListController.lua)
+- `addon.UIPrimitives` (Modules/UI/Visuals.lua)
+- `addon.UIRowVisuals` (Modules/UI/Visuals.lua)
+- `addon.Frames` (Modules/UI/Frames.lua)
+- `addon.UIScaffold` (Modules/UI/Frames.lua)
+- `addon.MultiSelect` (Modules/UI/MultiSelect.lua)
+- `addon.ListController` (Modules/UI/ListController.lua)
 - `addon.Bus` (Modules/Bus.lua)
 - `addon.Features` (Modules/Features.lua)
-- `addon.UI`    (Modules/UIFacade.lua)
-- `addon.UIBinder` (Modules/UIBinder.lua)
+- `addon.UI`    (Modules/UI/Facade.lua)
+- `addon.UIBinder.Map` (Modules/UI/Binder/Map.lua)
+- `addon.UIBinder.Compiler` (Modules/UI/Binder/UIBinder.lua)
+- `addon.UIBinder` (Modules/UI/Binder/UIBinder.lua)
 
 ---
 

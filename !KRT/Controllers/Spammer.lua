@@ -8,6 +8,8 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Utils = feature.Utils
+local UIScaffold = addon.UIScaffold
+local UIPrimitives = addon.UIPrimitives
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -237,7 +239,7 @@ do
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+    UIScaffold.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
@@ -511,11 +513,11 @@ do
         end
 
         for i = 1, 8 do
-            Utils.enableDisable(_G[frameName .. "Chat" .. i], not locked)
+            UIPrimitives.enableDisable(_G[frameName .. "Chat" .. i], not locked)
         end
-        Utils.enableDisable(_G[frameName .. "ChatGuild"], not locked)
-        Utils.enableDisable(_G[frameName .. "ChatYell"], not locked)
-        Utils.enableDisable(_G[frameName .. "ClearBtn"], not locked)
+        UIPrimitives.enableDisable(_G[frameName .. "ChatGuild"], not locked)
+        UIPrimitives.enableDisable(_G[frameName .. "ChatYell"], not locked)
+        UIPrimitives.enableDisable(_G[frameName .. "ClearBtn"], not locked)
     end
 
     -- Spam cycle
@@ -637,8 +639,8 @@ do
             SetInputsLocked(locked)
         end
 
-        Utils.setText(_G[frameName .. "StartBtn"], btnLabel, L.BtnStart, isStop)
-        Utils.enableDisable(_G[frameName .. "StartBtn"], canStart)
+        UIPrimitives.setText(_G[frameName .. "StartBtn"], btnLabel, L.BtnStart, isStop)
+        UIPrimitives.enableDisable(_G[frameName .. "StartBtn"], canStart)
 
         lastControls.locked = locked
         lastControls.canStart = canStart
@@ -764,3 +766,4 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 end
+

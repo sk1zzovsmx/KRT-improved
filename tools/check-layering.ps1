@@ -215,7 +215,22 @@ Add-RgCheck `
 Add-RgCheck `
     -Name "UIBinder splitArgs local helper name collision" `
     -Pattern 'local\s+function\s+splitArgs\s*\(' `
-    -Path "!KRT/Modules/UIBinder.lua"
+    -Path "!KRT/Modules/UI/Binder/UIBinder.lua"
+
+Add-RgCheck `
+    -Name "UI back-edge: Frames -> Utils" `
+    -Pattern '\b(addon\.Utils|Utils\.)' `
+    -Path "!KRT/Modules/UI/Frames.lua"
+
+Add-RgCheck `
+    -Name "UI back-edge: ListController -> Utils" `
+    -Pattern '\b(addon\.Utils|Utils\.)' `
+    -Path "!KRT/Modules/UI/ListController.lua"
+
+Add-RgCheck `
+    -Name "UI back-edge: UIBinder -> Utils" `
+    -Pattern '\b(addon\.Utils|Utils\.)' `
+    -Path "!KRT/Modules/UI/Binder/UIBinder.lua"
 
 Add-ControllerOwnershipCheck -FilePath "!KRT/Controllers/Changes.lua" -Owner "Changes"
 Add-ControllerOwnershipCheck -FilePath "!KRT/Controllers/Master.lua" -Owner "Master"
@@ -237,4 +252,5 @@ Write-Host "  Services -> Parents/frame refs"
 Write-Host "  Services -> hooksecurefunc(addon.Parent, ...)"
 Write-Host "  KRT.lua -> parent frame refs"
 Write-Host "  Quick-win duplicate regressions (Core/Reserves/EntryPoints/UIBinder)"
+Write-Host "  UI module back-edges (Frames/ListController/UIBinder -> Utils)"
 Write-Host "  Controllers -> own parent only (addon.Parent and KRTParent* ownership)"

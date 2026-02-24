@@ -9,6 +9,8 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local UIScaffold = addon.UIScaffold
+local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Core = feature.Core
@@ -978,7 +980,7 @@ do
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+    UIScaffold.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
@@ -1445,7 +1447,7 @@ do
 
         -- Hover sync: keep selection highlight persistent while hover uses default Button behavior.
         function module:OnLootRowEnter(row)
-            -- No-op: persistent selection is rendered via overlay textures (Utils.setRowSelected/Focused).
+            -- No-op: persistent selection is rendered via overlay textures (addon.UIRowVisuals).
             -- Leave native hover highlight behavior intact.
         end
 
@@ -1623,7 +1625,7 @@ do
                 end
             end
 
-            Utils.enableDisable(_G[n .. "CurrentBtn"], canSetCurrent)
+            UIPrimitives.enableDisable(_G[n .. "CurrentBtn"], canSetCurrent)
 
             local ctx = addon.Logger._msRaidCtx
             local selCount = Utils.multiSelectCount(ctx)
@@ -1639,8 +1641,8 @@ do
                 end
             end
             local delBtn = _G[n .. "DeleteBtn"]
-            Utils.setButtonCount(delBtn, L.BtnDelete, selCount)
-            Utils.enableDisable(delBtn, canDelete)
+            UIPrimitives.setButtonCount(delBtn, L.BtnDelete, selCount)
+            UIPrimitives.enableDisable(delBtn, canDelete)
         end,
 
         sorters = {
@@ -1851,12 +1853,12 @@ do
         postUpdate = function(n)
             local hasRaid = addon.Logger.selectedRaid
             local hasBoss = addon.Logger.selectedBoss
-            Utils.enableDisable(_G[n .. "AddBtn"], hasRaid ~= nil)
-            Utils.enableDisable(_G[n .. "EditBtn"], hasBoss ~= nil)
+            UIPrimitives.enableDisable(_G[n .. "AddBtn"], hasRaid ~= nil)
+            UIPrimitives.enableDisable(_G[n .. "EditBtn"], hasBoss ~= nil)
             local bossSelCount = Utils.multiSelectCount(addon.Logger._msBossCtx)
             local delBtn = _G[n .. "DeleteBtn"]
-            Utils.setButtonCount(delBtn, L.BtnDelete, bossSelCount)
-            Utils.enableDisable(delBtn, (bossSelCount and bossSelCount > 0) or false)
+            UIPrimitives.setButtonCount(delBtn, L.BtnDelete, bossSelCount)
+            UIPrimitives.enableDisable(delBtn, (bossSelCount and bossSelCount > 0) or false)
         end,
 
         sorters = {
@@ -1981,11 +1983,11 @@ do
             local removeBtn = _G[n .. "RemoveBtn"]
             local attSelCount = Utils.multiSelectCount(addon.Logger._msBossAttCtx)
             if addBtn then
-                Utils.enableDisable(addBtn, bSel and ((attSelCount or 0) == 0))
+                UIPrimitives.enableDisable(addBtn, bSel and ((attSelCount or 0) == 0))
             end
             if removeBtn then
-                Utils.setButtonCount(removeBtn, L.BtnRemove, attSelCount)
-                Utils.enableDisable(removeBtn, bSel and ((attSelCount or 0) > 0))
+                UIPrimitives.setButtonCount(removeBtn, L.BtnRemove, attSelCount)
+                UIPrimitives.enableDisable(removeBtn, bSel and ((attSelCount or 0) > 0))
             end
         end,
 
@@ -2095,8 +2097,8 @@ do
             local deleteBtn = _G[n .. "DeleteBtn"]
             if deleteBtn then
                 local attSelCount = Utils.multiSelectCount(addon.Logger._msRaidAttCtx)
-                Utils.setButtonCount(deleteBtn, L.BtnDelete, attSelCount)
-                Utils.enableDisable(deleteBtn, (attSelCount and attSelCount > 0) or false)
+                UIPrimitives.setButtonCount(deleteBtn, L.BtnDelete, attSelCount)
+                UIPrimitives.enableDisable(deleteBtn, (attSelCount and attSelCount > 0) or false)
             end
 
             local addBtn = _G[n .. "AddBtn"]
@@ -2104,7 +2106,7 @@ do
                 -- Update is only meaningful for the current raid session while actively raiding.
                 local can = addon.IsInRaid() and Core.getCurrentRaid() and addon.Logger.selectedRaid
                     and (tonumber(Core.getCurrentRaid()) == tonumber(addon.Logger.selectedRaid))
-                Utils.enableDisable(addBtn, can)
+                UIPrimitives.enableDisable(addBtn, can)
             end
         end,
 
@@ -2326,8 +2328,8 @@ do
 
             local lootSelCount = Utils.multiSelectCount(addon.Logger._msLootCtx)
             local delBtn = _G[n .. "DeleteBtn"]
-            Utils.setButtonCount(delBtn, L.BtnDelete, lootSelCount)
-            Utils.enableDisable(delBtn, (lootSelCount or 0) > 0)
+            UIPrimitives.setButtonCount(delBtn, L.BtnDelete, lootSelCount)
+            UIPrimitives.enableDisable(delBtn, (lootSelCount or 0) > 0)
         end,
 
         sorters = {
@@ -2577,7 +2579,7 @@ do
         end
     end
 
-    local uiController = Utils.bootstrapModuleUi(Box, getFrame, function()
+    local uiController = UIScaffold.bootstrapModuleUi(Box, getFrame, function()
         Box:UpdateUIFrame()
     end)
 
@@ -2665,7 +2667,7 @@ do
             addon:SetTooltip(_G[frameName .. "Time"], L.StrBossTimeHelp, "ANCHOR_RIGHT")
             localized = true
         end
-        Utils.setText(_G[frameName .. "Title"], L.StrEditBoss, L.StrAddBoss, isEdit)
+        UIPrimitives.setText(_G[frameName .. "Title"], L.StrEditBoss, L.StrAddBoss, isEdit)
     end
 end
 
@@ -2707,7 +2709,7 @@ do
         end
     end
 
-    local uiController = Utils.bootstrapModuleUi(Box, getFrame)
+    local uiController = UIScaffold.bootstrapModuleUi(Box, getFrame)
 
     function Box:Toggle() return uiController:Toggle() end
 
@@ -2720,3 +2722,4 @@ do
         end
     end
 end
+

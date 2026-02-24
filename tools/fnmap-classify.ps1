@@ -49,7 +49,7 @@ function Get-SeedCluster([object]$row, [string]$functionKey) {
         return "entrypoints.controllerGetters.core"
     }
     if (
-        $file -eq "!KRT/Modules/UIBinder.lua" -and
+        $file -eq "!KRT/Modules/UI/Binder/UIBinder.lua" -and
         ($functionKey -eq "splitCommaArgs" -or $functionKey -eq "trimBinderToken")
     ) {
         return "uibinder.trim/split*"

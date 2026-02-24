@@ -39,20 +39,21 @@ Modules\Strings.lua
 Modules\Comms.lua
 Modules\Time.lua
 Modules\Base64.lua
-Modules\Frames.lua
-Modules\MultiSelect.lua
-Modules\ListController.lua
+Modules\Features.lua
+Modules\UI\Facade.lua
+Modules\UI\Visuals.lua
+Modules\UI\Frames.lua
+Modules\UI\ListController.lua
+Modules\UI\MultiSelect.lua
+Modules\UI\Binder\Map.lua
+Modules\UI\Binder\UIBinder.lua
 Modules\Bus.lua
 Modules\Utils.LegacyGlobals.lua
 Modules\Utils.Options.lua
 Modules\Utils.RaidState.lua
-Modules\Utils.EventBusCompat.lua
 Modules\Utils.Tooltip.lua
-Modules\Utils.UI.lua
+Modules\Compat\Utils.UI.lua
 Modules\Utils.lua
-Modules\Features.lua
-Modules\UIFacade.lua
-Modules\UIBinder.lua
 
 # Layer 5 - Core bootstrap and event wiring
 KRT.lua

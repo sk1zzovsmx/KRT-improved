@@ -20,8 +20,12 @@ end
 addon.ListController = addon.ListController or {}
 local ListController = addon.ListController
 
-local function getUtils()
-    return addon.Utils or {}
+local function getRowVisuals()
+    return addon.UIRowVisuals or {}
+end
+
+local function getUIPrimitives()
+    return addon.UIPrimitives or {}
 end
 
 function ListController.createRowDrawer(fn)
@@ -69,9 +73,9 @@ function ListController.makeListController(cfg)
         local row = self._rowByName[btnName]
         if row then
             row:Show()
-            local Utils = getUtils()
-            if Utils.ensureRowVisuals then
-                Utils.ensureRowVisuals(row)
+            local RowVisuals = getRowVisuals()
+            if RowVisuals.ensureRowVisuals then
+                RowVisuals.ensureRowVisuals(row)
             end
             return row
         end
@@ -79,9 +83,9 @@ function ListController.makeListController(cfg)
         row = CreateFrame("Button", btnName, parent, cfg.rowTmpl)
         self._rowByName[btnName] = row
         buildRowParts(btnName, row)
-        local Utils = getUtils()
-        if Utils.ensureRowVisuals then
-            Utils.ensureRowVisuals(row)
+        local RowVisuals = getRowVisuals()
+        if RowVisuals.ensureRowVisuals then
+            RowVisuals.ensureRowVisuals(row)
         end
         return row
     end
@@ -195,7 +199,8 @@ function ListController.makeListController(cfg)
         end
         self._lastHL = combo
 
-        local Utils = getUtils()
+        local RowVisuals = getRowVisuals()
+        local UIPrimitives = getUIPrimitives()
         for i = 1, #self.data do
             local it = self.data[i]
             local row = self._rows[i]
@@ -207,14 +212,14 @@ function ListController.makeListController(cfg)
                     isSel = cfg.highlightFn(it.id, it, i, row) and true or false
                 end
 
-                if Utils.setRowSelected then
-                    Utils.setRowSelected(row, isSel)
-                elseif Utils.toggleHighlight then
-                    Utils.toggleHighlight(row, isSel)
+                if RowVisuals.setRowSelected then
+                    RowVisuals.setRowSelected(row, isSel)
+                elseif UIPrimitives.toggleHighlight then
+                    UIPrimitives.toggleHighlight(row, isSel)
                 end
 
-                if Utils.setRowFocused then
-                    Utils.setRowFocused(row, focusId ~= nil and it.id == focusId)
+                if RowVisuals.setRowFocused then
+                    RowVisuals.setRowFocused(row, focusId ~= nil and it.id == focusId)
                 end
             end
         end

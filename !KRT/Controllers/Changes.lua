@@ -9,6 +9,8 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local UIScaffold = addon.UIScaffold
+local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
@@ -90,7 +92,7 @@ do
         highlightKey = function() return tostring(selectedID or "nil") end,
     }
 
-    local panelScaffold = Utils.createListPanelScaffold({
+    local panelScaffold = UIScaffold.createListPanelScaffold({
         module = module,
         getFrame = getFrame,
         controller = controller,
@@ -306,11 +308,11 @@ do
             lastSelectedID = selectedID
             controller:Touch()
         end
-        Utils.showHideNamedPart(frameName, "Name", (isEdit or isAdd))
-        Utils.showHideNamedPart(frameName, "Spec", (isEdit or isAdd))
-        Utils.enableDisableNamedPart(frameName, "EditBtn", (selectedID or isEdit or isAdd))
+        UIPrimitives.showHideNamedPart(frameName, "Name", (isEdit or isAdd))
+        UIPrimitives.showHideNamedPart(frameName, "Spec", (isEdit or isAdd))
+        UIPrimitives.enableDisableNamedPart(frameName, "EditBtn", (selectedID or isEdit or isAdd))
         local editBtnMode = isAdd or (selectedID and isEdit)
-        lastEditBtnMode = Utils.updateModeTextNamedPart(
+        lastEditBtnMode = UIPrimitives.updateModeTextNamedPart(
             frameName,
             "EditBtn",
             L.BtnSave,
@@ -319,7 +321,7 @@ do
             lastEditBtnMode
         )
         local addBtnMode = (not selectedID and not isEdit and not isAdd)
-        lastAddBtnMode = Utils.updateModeTextNamedPart(
+        lastAddBtnMode = UIPrimitives.updateModeTextNamedPart(
             frameName,
             "AddBtn",
             L.BtnAdd,
@@ -327,12 +329,12 @@ do
             addBtnMode,
             lastAddBtnMode
         )
-        Utils.showHideNamedPart(frameName, "AddBtn", (not isEdit and not isAdd))
-        Utils.enableDisableNamedPart(frameName, "ClearBtn", count > 0)
-        Utils.enableDisableNamedPart(frameName, "AnnounceBtn", count > 0)
+        UIPrimitives.showHideNamedPart(frameName, "AddBtn", (not isEdit and not isAdd))
+        UIPrimitives.enableDisableNamedPart(frameName, "ClearBtn", count > 0)
+        UIPrimitives.enableDisableNamedPart(frameName, "AnnounceBtn", count > 0)
         local hasRaid = addon.Core.getCurrentRaid()
-        Utils.enableDisableNamedPart(frameName, "AddBtn", hasRaid)
-        Utils.enableDisableNamedPart(frameName, "DemandBtn", hasRaid)
+        UIPrimitives.enableDisableNamedPart(frameName, "AddBtn", hasRaid)
+        UIPrimitives.enableDisableNamedPart(frameName, "DemandBtn", hasRaid)
     end
 
     function module:Refresh()
@@ -382,3 +384,4 @@ do
         module:RequestRefresh()
     end
 end
+

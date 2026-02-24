@@ -8,6 +8,7 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Utils = feature.Utils
+local UIScaffold = addon.UIScaffold
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 
@@ -289,7 +290,7 @@ do
     -- UI window management.
 
     -- Initialize UI controller for Toggle/Hide.
-    Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+    UIScaffold.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
@@ -326,3 +327,4 @@ do
         })
     end
 end
+

@@ -18,6 +18,43 @@ end
 addon.Frames = addon.Frames or {}
 local Frames = addon.Frames
 
+addon.UIScaffold = addon.UIScaffold or {}
+local UIScaffold = addon.UIScaffold
+
+function Frames.enableDrag(frame, dragButton)
+    if not frame or not frame.RegisterForDrag then
+        return
+    end
+    if frame.SetMovable then
+        frame:SetMovable(true)
+    end
+    if frame.EnableMouse then
+        frame:EnableMouse(true)
+    end
+    if frame.SetClampedToScreen then
+        frame:SetClampedToScreen(true)
+    end
+
+    if frame.GetScript and frame.SetScript then
+        if not frame:GetScript("OnDragStart") then
+            frame:SetScript("OnDragStart", function(self)
+                if self.StartMoving then
+                    self:StartMoving()
+                end
+            end)
+        end
+        if not frame:GetScript("OnDragStop") then
+            frame:SetScript("OnDragStop", function(self)
+                if self.StopMovingOrSizing then
+                    self:StopMovingOrSizing()
+                end
+            end)
+        end
+    end
+
+    frame:RegisterForDrag(dragButton or "LeftButton")
+end
+
 function Frames.makeConfirmPopup(key, text, onAccept, cancels)
     StaticPopupDialogs[key] = {
         text = text,
@@ -213,10 +250,7 @@ function Frames.initModuleFrame(module, frame, opts)
     opts = opts or {}
 
     if opts.enableDrag then
-        local Utils = addon.Utils
-        if Utils and Utils.enableDrag then
-            Utils.enableDrag(frame, opts.dragButton)
-        end
+        Frames.enableDrag(frame, opts.dragButton)
     end
 
     if opts.hookOnShow then
@@ -235,7 +269,7 @@ function Frames.initModuleFrame(module, frame, opts)
     return frameName
 end
 
-function Frames.makeUIFrameController(getFrame, requestRefreshFn)
+function UIScaffold.makeUIFrameController(getFrame, requestRefreshFn)
     return {
         Toggle = function(self)
             local frame = getFrame()
@@ -269,8 +303,8 @@ function Frames.makeUIFrameController(getFrame, requestRefreshFn)
     }
 end
 
-function Frames.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
-    local uiController = Frames.makeUIFrameController(getFrame, requestRefreshFn)
+function UIScaffold.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
+    local uiController = UIScaffold.makeUIFrameController(getFrame, requestRefreshFn)
     if opts then
         if opts.bindToggleHide then
             opts.bindToggleHide(module, uiController)
@@ -282,20 +316,20 @@ function Frames.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
     return uiController
 end
 
-function Frames.createListPanelScaffold(cfg)
+function UIScaffold.createListPanelScaffold(cfg)
     cfg = cfg or {}
     local module = cfg.module
     local getFrame = cfg.getFrame
     local controller = cfg.controller
 
     if type(module) ~= "table" then
-        error("Frames.createListPanelScaffold: cfg.module must be a table")
+        error("UIScaffold.createListPanelScaffold: cfg.module must be a table")
     end
     if type(getFrame) ~= "function" then
-        error("Frames.createListPanelScaffold: cfg.getFrame must be a function")
+        error("UIScaffold.createListPanelScaffold: cfg.getFrame must be a function")
     end
     if type(controller) ~= "table" then
-        error("Frames.createListPanelScaffold: cfg.controller must be a table")
+        error("UIScaffold.createListPanelScaffold: cfg.controller must be a table")
     end
 
     local frameName
@@ -333,7 +367,7 @@ function Frames.createListPanelScaffold(cfg)
         end,
     }
 
-    Frames.bootstrapModuleUi(module, getFrame, requestRefresh, {
+    UIScaffold.bootstrapModuleUi(module, getFrame, requestRefresh, {
         bindToggleHide = cfg.bindToggleHide,
         bindRequestRefresh = cfg.bindRequestRefresh,
     })
@@ -372,6 +406,33 @@ function Frames.createListPanelScaffold(cfg)
     end
 
     return scaffold
+end
+
+-- @compat
+-- @deprecated use addon.UIScaffold.makeUIFrameController
+function Frames.makeUIFrameController(getFrame, requestRefreshFn)
+    local UIScaffold = addon.UIScaffold
+    if UIScaffold and UIScaffold.makeUIFrameController then
+        return UIScaffold.makeUIFrameController(getFrame, requestRefreshFn)
+    end
+end
+
+-- @compat
+-- @deprecated use addon.UIScaffold.bootstrapModuleUi
+function Frames.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
+    local UIScaffold = addon.UIScaffold
+    if UIScaffold and UIScaffold.bootstrapModuleUi then
+        return UIScaffold.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
+    end
+end
+
+-- @compat
+-- @deprecated use addon.UIScaffold.createListPanelScaffold
+function Frames.createListPanelScaffold(cfg)
+    local UIScaffold = addon.UIScaffold
+    if UIScaffold and UIScaffold.createListPanelScaffold then
+        return UIScaffold.createListPanelScaffold(cfg)
+    end
 end
 
 function Frames.bindEditBoxHandlers(frameName, specs, requestRefreshFn)

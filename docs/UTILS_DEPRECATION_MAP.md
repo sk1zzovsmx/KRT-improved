@@ -22,8 +22,11 @@ This map tracks ownership for `addon.Utils.*` APIs during facade deconflict.
 | Utils API Group | Class | Owner |
 | --- | --- | --- |
 | `Utils.ucfirst`, `Utils.findAchievement`, `Utils.formatChatMessage`, `Utils.getItem*FromLink` | compat-facade | `addon.Strings.*` |
-| `Utils.registerCallback`, `Utils.triggerEvent`, callback stats helpers | compat-facade | `addon.Utils.EventBusCompat.*` |
-| `Utils.enableDrag`, list/frame/button helpers, `Utils.makeEventDrivenRefresher` | compat-facade | `addon.Utils.UI.*` / `addon.Frames.*` |
+| `Utils.registerCallback`, `Utils.triggerEvent`, callback stats helpers | compat-facade | `addon.Bus.*` |
+| `Utils.enableDrag`, frame helpers, `Utils.makeEventDrivenRefresher` | compat-facade | `addon.Frames.*` via `addon.Utils.UI.*` |
+| `Utils.bootstrapModuleUi`, `Utils.makeUIFrameController`, `Utils.createListPanelScaffold` | compat-facade | `addon.UIScaffold.*` via `addon.Utils.UI.*` |
+| `Utils.enableDisable`, `Utils.showHide`, `Utils.toggleHighlight`, named-part helpers | compat-facade | `addon.UIPrimitives.*` via `addon.Utils.UI.*` |
+| `Utils.ensureRowVisuals`, `Utils.setRowSelected`, `Utils.setRowFocused` | compat-facade | `addon.UIRowVisuals.*` via `addon.Utils.UI.*` |
 | `Utils.makeListController`, `Utils.createRowDrawer`, `Utils.bindListController` | compat-facade | `addon.ListController.*` via `addon.Utils.UI.*` |
 | `Utils.warmItemCache`, `Utils.isBagItemSoulbound`, `addon:SetTooltip` | compat-facade | `addon.Utils.Tooltip.*` |
 | `Utils.normalizeHexColor`, `Utils.getClassColor` | compat-facade | `addon.Colors.*` |
@@ -44,4 +47,4 @@ This map tracks ownership for `addon.Utils.*` APIs during facade deconflict.
 
 1. New code should call owner modules directly when available.
 2. Keep compat facades until all critical call-sites migrate.
-3. Deprecated facades keep warning in debug mode only, once per session.
+3. Deprecated facades are documented via `@deprecated` tags in compat wrappers.

@@ -33,4 +33,8 @@ Permanent guardrails for function mapping and unification work.
 - `Core.getController`: `!KRT/Core/Init.lua`
 - Reserves formatters: `!KRT/Services/Reserves.lua`
 - EntryPoint controller lookup: `Core.getController(name)`
-- Binder arg-token helpers: `trimBinderToken` / `splitCommaArgs` in `!KRT/Modules/UIBinder.lua`
+- UI primitives: `!KRT/Modules/UI/Visuals.lua`
+- UI row visuals: `!KRT/Modules/UI/Visuals.lua`
+- UI scaffold orchestration: `!KRT/Modules/UI/Frames.lua` (`addon.UIScaffold.*`)
+- Binder map datasets: `!KRT/Modules/UI/Binder/Map.lua`
+- Binder arg-token helpers: `trimBinderToken` / `splitCommaArgs` in `!KRT/Modules/UI/Binder/UIBinder.lua`

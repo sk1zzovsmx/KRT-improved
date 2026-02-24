@@ -9,6 +9,9 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local UIScaffold = addon.UIScaffold
+local UIPrimitives = addon.UIPrimitives
+local UIRowVisuals = addon.UIRowVisuals
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 
@@ -287,7 +290,7 @@ do
 
         local function UpdateEnabled(key, frame, enabled)
             if buttons[key] ~= enabled then
-                Utils.enableDisable(frame, enabled)
+                UIPrimitives.enableDisable(frame, enabled)
                 buttons[key] = enabled
             end
         end
@@ -295,7 +298,7 @@ do
         local function UpdateItemState(enabled)
             local itemBtn = _G[frameName .. "ItemBtn"]
             if itemBtn and buttons.itemBtn ~= enabled then
-                Utils.enableDisable(itemBtn, enabled)
+                UIPrimitives.enableDisable(itemBtn, enabled)
                 local texture = itemBtn:GetNormalTexture()
                 if texture and texture.SetDesaturated then
                     texture:SetDesaturated(not enabled)
@@ -819,7 +822,7 @@ do
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+    UIScaffold.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
@@ -1167,7 +1170,7 @@ do
             btn:EnableMouse(data.canClick == true)
             btn:Show()
 
-            Utils.ensureRowVisuals(btn)
+            UIRowVisuals.ensureRowVisuals(btn)
 
             local nameStr = _G[btn:GetName() .. "Name"]
             local rollStr = _G[btn:GetName() .. "Roll"]
@@ -1192,9 +1195,9 @@ do
                 counterStr:SetText(data.counterText or "")
             end
 
-            Utils.setRowSelected(btn, data.isSelected == true)
-            Utils.setRowFocused(btn, data.isFocused == true)
-            Utils.showHide(star, data.showStar == true)
+            UIRowVisuals.setRowSelected(btn, data.isSelected == true)
+            UIRowVisuals.setRowFocused(btn, data.isFocused == true)
+            UIPrimitives.showHide(star, data.showStar == true)
 
             btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
             btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
@@ -2117,3 +2120,4 @@ do
         module:RequestRefresh()
     end)
 end
+

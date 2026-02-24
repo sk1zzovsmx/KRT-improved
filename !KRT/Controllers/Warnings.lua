@@ -8,6 +8,8 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Utils = feature.Utils
+local UIScaffold = addon.UIScaffold
+local UIPrimitives = addon.UIPrimitives
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -72,7 +74,7 @@ do
         highlightId = function() return selectedID end,
     }
 
-    local panelScaffold = Utils.createListPanelScaffold({
+    local panelScaffold = UIScaffold.createListPanelScaffold({
         module = module,
         getFrame = getFrame,
         controller = controller,
@@ -227,11 +229,11 @@ do
         end
         tempName    = _G[frameName .. "Name"]:GetText()
         tempContent = _G[frameName .. "Content"]:GetText()
-        Utils.enableDisableNamedPart(frameName, "EditBtn", (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
-        Utils.enableDisableNamedPart(frameName, "DeleteBtn", selectedID ~= nil)
-        Utils.enableDisableNamedPart(frameName, "AnnounceBtn", selectedID ~= nil)
+        UIPrimitives.enableDisableNamedPart(frameName, "EditBtn", (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
+        UIPrimitives.enableDisableNamedPart(frameName, "DeleteBtn", selectedID ~= nil)
+        UIPrimitives.enableDisableNamedPart(frameName, "AnnounceBtn", selectedID ~= nil)
         local editBtnMode = (tempName ~= "" or tempContent ~= "") or selectedID == nil
-        lastEditBtnMode = Utils.updateModeTextNamedPart(
+        lastEditBtnMode = UIPrimitives.updateModeTextNamedPart(
             frameName,
             "EditBtn",
             L.BtnSave,
@@ -269,3 +271,4 @@ do
         module:RequestRefresh()
     end
 end
+

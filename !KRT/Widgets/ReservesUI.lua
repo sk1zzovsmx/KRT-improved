@@ -9,6 +9,8 @@ local feature = addon.Core.getFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local UIScaffold = addon.UIScaffold
+local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 
@@ -60,7 +62,7 @@ do
         separator = { 1.0, 1.0, 1.0, 0.10 },
     }
 
-    Utils.bootstrapModuleUi(module, getFrame, function()
+    UIScaffold.bootstrapModuleUi(module, getFrame, function()
         module:RequestRefresh()
     end, {
         bindToggleHide = bindModuleToggleHide,
@@ -328,14 +330,14 @@ do
         if clearButton then
             if hasData then
                 clearButton:Show()
-                Utils.enableDisable(clearButton, true)
+                UIPrimitives.enableDisable(clearButton, true)
             else
                 clearButton:Hide()
             end
         end
         local queryButton = _G[frameName .. "QueryButton"]
         if queryButton then
-            Utils.enableDisable(queryButton, hasData)
+            UIPrimitives.enableDisable(queryButton, hasData)
         end
     end
 
@@ -605,7 +607,7 @@ do
     local importLocalized = false
     local MODE_MULTI, MODE_PLUS = 0, 1
 
-    Utils.bootstrapModuleUi(Import, getImportFrame, function()
+    UIScaffold.bootstrapModuleUi(Import, getImportFrame, function()
         if Import.RequestRefresh then
             Import:RequestRefresh()
         end
@@ -881,3 +883,4 @@ do
         UI:RequestRefresh()
     end)
 end
+
