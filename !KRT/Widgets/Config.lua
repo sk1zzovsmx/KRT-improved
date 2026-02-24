@@ -11,6 +11,7 @@ local Utils = feature.Utils
 local Options = feature.Options or addon.Options
 local UIScaffold = addon.UIScaffold
 local Events = feature.Events or addon.Events or {}
+local Bus = feature.Bus or addon.Bus
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -152,7 +153,7 @@ do
         end
         local eventName = Events.configOptionChanged and Events.configOptionChanged(name)
         if eventName then
-            Utils.triggerEvent(eventName, value)
+            Bus.triggerEvent(eventName, value)
         end
 
         configDirty = true

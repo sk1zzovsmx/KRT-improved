@@ -10,6 +10,7 @@ local Diag = feature.Diag
 local Utils = feature.Utils
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
+local Bus = feature.Bus or addon.Bus
 
 local itemColors = feature.itemColors
 
@@ -273,11 +274,11 @@ do
     -- Sets the main item display in the UI.
     function module:SetItem(i)
         if not i then
-            Utils.triggerEvent(InternalEvents.SetItem, nil, nil)
+            Bus.triggerEvent(InternalEvents.SetItem, nil, nil)
             return
         end
         if not (i.itemName and i.itemLink and i.itemTexture and i.itemColor) then return end
-        Utils.triggerEvent(InternalEvents.SetItem, i.itemLink, i)
+        Bus.triggerEvent(InternalEvents.SetItem, i.itemLink, i)
     end
 
     -- Selects an item from the loot list by its index.
@@ -292,7 +293,7 @@ do
     function module:ClearLoot()
         lootTable = twipe(lootTable)
         lootState.lootCount = 0
-        Utils.triggerEvent(InternalEvents.SetItem, nil, nil)
+        Bus.triggerEvent(InternalEvents.SetItem, nil, nil)
     end
 
     -- Returns the table for the currently selected item.

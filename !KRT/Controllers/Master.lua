@@ -15,6 +15,7 @@ local UIRowVisuals = addon.UIRowVisuals
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Core = feature.Core
+local Bus = feature.Bus or addon.Bus
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -228,7 +229,7 @@ do
             raidID = raidId,
             ok = false,
         }
-        Utils.triggerEvent(InternalEvents.LoggerLootLogRequest, request)
+        Bus.triggerEvent(InternalEvents.LoggerLootLogRequest, request)
         return request.ok == true
     end
 
@@ -2033,7 +2034,7 @@ do
     for i = 1, #wowForwardEvents do
         local methodName = wowForwardEvents[i]
         local wowEventName = Events.wowForwarded and Events.wowForwarded(methodName)
-        Utils.registerCallback(wowEventName, function(_, ...)
+        Bus.registerCallback(wowEventName, function(_, ...)
             local fn = module[methodName]
             if fn then
                 fn(module, ...)
@@ -2041,7 +2042,7 @@ do
         end)
     end
 
-    Utils.registerCallback(InternalEvents.SetItem, function(_, itemLink, itemData)
+    Bus.registerCallback(InternalEvents.SetItem, function(_, itemLink, itemData)
         if itemLink ~= nil and type(itemLink) ~= "string" then
             addon:warn(Diag.W.LogMLSetItemPayloadInvalid:format(tostring(itemLink), type(itemData)))
             return
@@ -2066,7 +2067,7 @@ do
         module:RequestRefresh()
     end)
 
-    Utils.registerCallback(InternalEvents.RaidRosterDelta, function(_, delta, rosterVersion, raidId)
+    Bus.registerCallback(InternalEvents.RaidRosterDelta, function(_, delta, rosterVersion, raidId)
         local raidIdType = type(raidId)
         if type(delta) ~= "table" then
             addon:warn(Diag.W.LogMLRaidRosterDeltaPayloadInvalid:format(type(delta), tostring(rosterVersion),
@@ -2100,11 +2101,11 @@ do
     end)
 
     -- Keep Master UI in sync when SoftRes data changes (import/clear), event-driven.
-    Utils.registerCallback(InternalEvents.ReservesDataChanged, function()
+    Bus.registerCallback(InternalEvents.ReservesDataChanged, function()
         module:RequestRefresh()
     end)
 
-    Utils.registerCallback(InternalEvents.AddRoll, function(_, name, roll)
+    Bus.registerCallback(InternalEvents.AddRoll, function(_, name, roll)
         if type(name) ~= "string" or name == "" or tonumber(roll) == nil then
             addon:warn(Diag.W.LogMLAddRollPayloadInvalid:format(tostring(name), tostring(roll)))
             return
@@ -2112,12 +2113,12 @@ do
         module:RequestRefresh()
     end)
 
-    Utils.registerCallback(InternalEvents.ConfigSortAscending, function()
+    Bus.registerCallback(InternalEvents.ConfigSortAscending, function()
         module:RequestRefresh()
     end)
 
     -- Immediate redraw when toggling the optional +N column in MS roll list.
-    Utils.registerCallback(InternalEvents.ConfigShowLootCounterDuringMSRoll, function()
+    Bus.registerCallback(InternalEvents.ConfigShowLootCounterDuringMSRoll, function()
         module:RequestRefresh()
     end)
 end

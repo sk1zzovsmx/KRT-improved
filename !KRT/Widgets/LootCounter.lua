@@ -11,6 +11,7 @@ local Utils = feature.Utils
 local UIScaffold = addon.UIScaffold
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
+local Bus = feature.Bus or addon.Bus
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -301,13 +302,13 @@ do
     end
 
     -- Refresh on roster updates (to keep list aligned).
-    Utils.registerCallback(InternalEvents.RaidRosterDelta, requestRefresh)
+    Bus.registerCallback(InternalEvents.RaidRosterDelta, requestRefresh)
 
     -- Refresh when counts actually change (MS loot award or manual +/-/reset).
-    Utils.registerCallback(InternalEvents.PlayerCountChanged, requestRefresh)
+    Bus.registerCallback(InternalEvents.PlayerCountChanged, requestRefresh)
 
     -- New raid session: reset view.
-    Utils.registerCallback(InternalEvents.RaidCreate, requestRefresh)
+    Bus.registerCallback(InternalEvents.RaidCreate, requestRefresh)
 
     if addon.UI and addon.UI.Register then
         addon.UI:Register("LootCounter", {

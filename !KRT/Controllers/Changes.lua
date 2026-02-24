@@ -12,6 +12,7 @@ local Utils = feature.Utils
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
+local Bus = feature.Bus or addon.Bus
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -219,7 +220,7 @@ do
         module:RequestRefresh()
     end
 
-    Utils.registerCallback(InternalEvents.RaidLeave, function(e, name)
+    Bus.registerCallback(InternalEvents.RaidLeave, function(e, name)
         module:Delete(name)
         CancelChanges()
     end)

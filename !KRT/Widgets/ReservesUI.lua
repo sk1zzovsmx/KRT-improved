@@ -14,6 +14,7 @@ local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Options = feature.Options or addon.Options
+local Bus = feature.Bus or addon.Bus
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -880,7 +881,7 @@ do
         })
     end
 
-    Utils.registerCallback(InternalEvents.ReservesDataChanged, function()
+    Bus.registerCallback(InternalEvents.ReservesDataChanged, function()
         UI:RequestRefresh()
     end)
 end

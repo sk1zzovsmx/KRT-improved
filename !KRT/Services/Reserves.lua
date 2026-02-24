@@ -12,6 +12,7 @@ local Utils = feature.Utils
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Options = feature.Options or addon.Options
+local Bus = feature.Bus or addon.Bus
 
 local tconcat, twipe = table.concat, table.wipe
 local pairs, ipairs, type, next = pairs, ipairs, type, next
@@ -117,7 +118,7 @@ do
         addon:debug(Diag.D.LogReservesItemReady:format(itemId, pendingItemCount))
         if pendingItemCount == 0 then
             addon:debug(Diag.D.LogReservesPendingComplete)
-            Utils.triggerEvent(InternalEvents.ReservesDataChanged, "iteminfo", itemId)
+            Bus.triggerEvent(InternalEvents.ReservesDataChanged, "iteminfo", itemId)
         end
     end
 
@@ -662,7 +663,7 @@ do
         KRT_Reserves = nil
         twipe(reservesData)
         RebuildIndex()
-        Utils.triggerEvent(InternalEvents.ReservesDataChanged, "clear")
+        Bus.triggerEvent(InternalEvents.ReservesDataChanged, "clear")
         local clearMessage = L[reserveListClearedKey]
         if clearMessage then
             addon:info(clearMessage)
@@ -1004,7 +1005,7 @@ do
         end
 
         local reason = (opts and opts.reason) or "import"
-        Utils.triggerEvent(InternalEvents.ReservesDataChanged,
+        Bus.triggerEvent(InternalEvents.ReservesDataChanged,
             reason, raidId, mode, nPlayers)
         return true, nPlayers
     end

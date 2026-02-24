@@ -12,6 +12,7 @@ local addonName = addon.name
 local L = feature.L
 local Diag = feature.Diag
 local Utils = feature.Utils
+local Bus = feature.Bus or addon.Bus
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 
@@ -739,7 +740,7 @@ do
     for eventName, busEventName in pairs(wowBusEvents) do
         local eventKey = busEventName
         addon[eventName] = function(_, ...)
-            Utils.triggerEvent(eventKey, ...)
+            Bus.triggerEvent(eventKey, ...)
         end
     end
 end
@@ -783,7 +784,7 @@ local function processRaidRosterUpdate()
     end
 
     -- Single source of truth for roster change notifications (join/update/leave delta).
-    Utils.triggerEvent(InternalEvents.RaidRosterDelta,
+    Bus.triggerEvent(InternalEvents.RaidRosterDelta,
         delta, addon.Raid:GetRosterVersion(), Core.getCurrentRaid())
 end
 

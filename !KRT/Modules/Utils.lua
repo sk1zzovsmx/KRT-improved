@@ -147,43 +147,6 @@ end
 
 -- =========== Event bus facade  =========== --
 
-function Utils.registerCallback(eventName, callback)
-    local Bus = getBus()
-    if Bus and Bus.registerCallback then
-        return Bus.registerCallback(eventName, callback)
-    end
-    error(L.StrCbErrUsage)
-end
-
-function Utils.unregisterCallback(handle)
-    local Bus = getBus()
-    if Bus and Bus.unregisterCallback then
-        return Bus.unregisterCallback(handle)
-    end
-end
-
-function Utils.triggerEvent(eventName, ...)
-    local Bus = getBus()
-    if Bus and Bus.triggerEvent then
-        return Bus.triggerEvent(eventName, ...)
-    end
-end
-
-function Utils.registerCallbacks(names, callback)
-    local Bus = getBus()
-    if Bus and Bus.registerCallbacks then
-        return Bus.registerCallbacks(names, callback)
-    end
-end
-
-function Utils.getInternalCallbackStats()
-    local Bus = getBus()
-    if Bus and Bus.getInternalCallbackStats then
-        return Bus.getInternalCallbackStats()
-    end
-    return {}
-end
-
 function Utils.resetInternalCallbackStats()
     local Bus = getBus()
     if Bus and Bus.resetInternalCallbackStats then

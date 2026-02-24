@@ -11,6 +11,7 @@ local Diag = feature.Diag
 local Utils = feature.Utils
 local Events = feature.Events or addon.Events or {}
 local Core = feature.Core
+local Bus = feature.Bus or addon.Bus
 
 local _G = _G
 local tinsert = table.insert
@@ -832,7 +833,7 @@ do
         local selectedRaid = tonumber(focusRaidId)
             or tonumber(addon.State and addon.State.selectedRaid)
             or tonumber(Core.getCurrentRaid())
-        Utils.triggerEvent(InternalEvents.LoggerSelectRaid, selectedRaid, "sync")
+        Bus.triggerEvent(InternalEvents.LoggerSelectRaid, selectedRaid, "sync")
     end
 
     local function onSnapshotReady(sender, requestId, mode, snapshot)

@@ -15,6 +15,7 @@ local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Core = feature.Core
 local Options = feature.Options or addon.Options
+local Bus = feature.Bus or addon.Bus
 
 local InternalEvents = Events.Internal
 
@@ -107,7 +108,7 @@ do
         if not eventName then
             return
         end
-        Utils.triggerEvent(eventName, target[key], ...)
+        Bus.triggerEvent(eventName, target[key], ...)
     end
 
     local function clearSelection(target, key, multiSelectCtx)
@@ -953,7 +954,7 @@ do
         if not raid then return end
         fn(raid, rID)
         if refreshEvent ~= false then
-            Utils.triggerEvent(refreshEvent or InternalEvents.LoggerSelectRaid, module.selectedRaid)
+            Bus.triggerEvent(refreshEvent or InternalEvents.LoggerSelectRaid, module.selectedRaid)
         end
     end
 
@@ -1734,7 +1735,7 @@ do
         controller._makeConfirmPopup("KRTLOGGER_DELETE_RAID", L.StrConfirmDeleteRaid, DeleteRaids)
     end
 
-    Utils.registerCallback(InternalEvents.RaidCreate, function(_, num)
+    Bus.registerCallback(InternalEvents.RaidCreate, function(_, num)
         -- Context change: selecting a different raid must clear dependent selections.
         SetSelectedRaid(tonumber(num))
         addon.Logger:ResetSelections()
@@ -1742,7 +1743,7 @@ do
         triggerSelectionEvent(addon.Logger, "selectedRaid", "ui")
     end)
 
-    Utils.registerCallback(InternalEvents.LoggerSelectRaid, function(_, raidId, reason)
+    Bus.registerCallback(InternalEvents.LoggerSelectRaid, function(_, raidId, reason)
         local raidIdType = type(raidId)
         if raidId == nil then
             addon:warn(Diag.W.LogLoggerSelectRaidPayloadInvalid:format(tostring(raidId), tostring(reason)))
@@ -1774,7 +1775,7 @@ do
         controller:Touch()
     end)
 
-    Utils.registerCallback(InternalEvents.RaidRosterDelta, function(_, delta, rosterVersion, raidId)
+    Bus.registerCallback(InternalEvents.RaidRosterDelta, function(_, delta, rosterVersion, raidId)
         local raidIdType = type(raidId)
         if type(delta) ~= "table" then
             return
@@ -1925,8 +1926,8 @@ do
         return boss and boss.name or ""
     end
 
-    Utils.registerCallback(InternalEvents.LoggerSelectRaid, function() controller:Dirty() end)
-    Utils.registerCallback(InternalEvents.LoggerSelectBoss, function() controller:Touch() end)
+    Bus.registerCallback(InternalEvents.LoggerSelectRaid, function() controller:Dirty() end)
+    Bus.registerCallback(InternalEvents.LoggerSelectBoss, function() controller:Touch() end)
 end
 
 -- Boss attendees list.
@@ -2029,13 +2030,13 @@ do
         controller._makeConfirmPopup("KRTLOGGER_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendees)
     end
 
-    Utils.registerCallbacks({
+    Bus.registerCallbacks({
         InternalEvents.LoggerSelectRaid,
         InternalEvents.LoggerSelectBoss,
     }, function()
         controller:Dirty()
     end)
-    Utils.registerCallback(InternalEvents.LoggerSelectBossPlayer, function()
+    Bus.registerCallback(InternalEvents.LoggerSelectBossPlayer, function()
         controller:Touch()
     end)
 end
@@ -2189,8 +2190,8 @@ do
         controller._makeConfirmPopup("KRTLOGGER_DELETE_RAIDATTENDEE", L.StrConfirmDeleteAttendee, DeleteAttendees)
     end
 
-    Utils.registerCallback(InternalEvents.LoggerSelectRaid, function() controller:Dirty() end)
-    Utils.registerCallback(InternalEvents.LoggerSelectPlayer, function() controller:Touch() end)
+    Bus.registerCallback(InternalEvents.LoggerSelectRaid, function() controller:Dirty() end)
+    Bus.registerCallback(InternalEvents.LoggerSelectPlayer, function() controller:Touch() end)
 end
 
 -- Loot list (filters by selected boss and player).
@@ -2512,7 +2513,7 @@ do
         return true
     end
 
-    Utils.registerCallback(InternalEvents.LoggerLootLogRequest, function(_, request)
+    Bus.registerCallback(InternalEvents.LoggerLootLogRequest, function(_, request)
         if type(request) ~= "table" then
             addon:error(Diag.E.LogLoggerLootLogRequestPayloadInvalid:format(type(request)))
             return
@@ -2523,7 +2524,7 @@ do
     end)
 
     local function Reset() controller:Dirty() end
-    Utils.registerCallbacks(
+    Bus.registerCallbacks(
         {
             InternalEvents.LoggerSelectRaid,
             InternalEvents.LoggerSelectBoss,
@@ -2533,7 +2534,7 @@ do
         },
         Reset
     )
-    Utils.registerCallback(InternalEvents.LoggerSelectItem, function() controller:Touch() end)
+    Bus.registerCallback(InternalEvents.LoggerSelectItem, function() controller:Touch() end)
 end
 
 -- Add/edit boss popup (time/mode normalization).

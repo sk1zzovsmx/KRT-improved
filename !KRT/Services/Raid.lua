@@ -11,6 +11,7 @@ local Diag = feature.Diag
 local Utils = feature.Utils
 local Events = feature.Events or addon.Events or {}
 local Core = feature.Core
+local Bus = feature.Bus or addon.Bus
 
 local tContains = feature.tContains
 
@@ -572,7 +573,7 @@ do
             #raidInfo.players
         ))
 
-        Utils.triggerEvent(InternalEvents.RaidCreate, Core.getCurrentRaid())
+        Bus.triggerEvent(InternalEvents.RaidCreate, Core.getCurrentRaid())
 
         -- Schedule one delayed roster refresh.
         addon.CancelTimer(module.updateRosterHandle, true)
@@ -914,7 +915,7 @@ do
         end
 
         tinsert(raid.loot, lootInfo)
-        Utils.triggerEvent(InternalEvents.RaidLootUpdate, Core.getCurrentRaid(), lootInfo)
+        Bus.triggerEvent(InternalEvents.RaidLootUpdate, Core.getCurrentRaid(), lootInfo)
         addon:debug(Diag.D.LogLootLogged:format(tonumber(Core.getCurrentRaid()) or -1, tostring(itemId),
             tostring(lootInfo.bossNid), tostring(player)))
     end
@@ -965,7 +966,7 @@ do
         player.count = value
 
         if old ~= value then
-            Utils.triggerEvent(InternalEvents.PlayerCountChanged,
+            Bus.triggerEvent(InternalEvents.PlayerCountChanged,
                 player.name, value, old, raidNum)
         end
     end

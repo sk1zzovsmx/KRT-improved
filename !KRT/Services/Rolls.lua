@@ -11,6 +11,7 @@ local Diag = feature.Diag
 local Utils = feature.Utils
 local Events = feature.Events or addon.Events or {}
 local Core = feature.Core
+local Bus = feature.Bus or addon.Bus
 
 local tContains = feature.tContains
 
@@ -336,7 +337,7 @@ do
             tracker[name] = (tracker[name] or 0) + 1
         end
 
-        Utils.triggerEvent(InternalEvents.AddRoll, name, roll)
+        Bus.triggerEvent(InternalEvents.AddRoll, name, roll)
         sortRolls(itemId)
     end
 
