@@ -626,6 +626,25 @@ function Core.getFeatureShared()
         Features = addon.Features,
         C = constants,
         Core = core,
+        Bus = addon.Bus,
+
+        Strings = addon.Strings,
+        Colors = addon.Colors,
+        Time = addon.Time,
+        Base64 = addon.Base64,
+        Comms = addon.Comms,
+
+        UI = addon.UI,
+        Frames = addon.Frames,
+        UIScaffold = addon.UIScaffold,
+        UIPrimitives = addon.UIPrimitives,
+        UIRowVisuals = addon.UIRowVisuals,
+        ListController = addon.ListController,
+        MultiSelect = addon.MultiSelect,
+
+        Services = addon.Services,
+        Controllers = addon.Controllers,
+        Widgets = addon.Widgets,
 
         bindModuleRequestRefresh = core.bindModuleRequestRefresh,
         bindModuleToggleHide = core.bindModuleToggleHide,
