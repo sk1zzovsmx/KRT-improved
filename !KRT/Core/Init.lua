@@ -31,6 +31,9 @@ local tostring, tonumber = tostring, tonumber
 local GetRealmName = _G.GetRealmName
 local UnitIsGroupAssistant = _G.UnitIsGroupAssistant
 local UnitIsGroupLeader = _G.UnitIsGroupLeader
+local random = math.random
+local gsub = string.gsub
+local strsub, strlen = string.sub, string.len
 
 local Core = addon.Core
 local Diagnose = addon.Diagnose
@@ -228,6 +231,77 @@ for i = 1, #LEGACY_ALIAS_PATHS do
     local entry = LEGACY_ALIAS_PATHS[i]
     Core.registerLegacyAliasPath(entry[1], entry[2], entry[3])
 end
+
+local function installCompatGlobalFunctions()
+    if addon._globalCompatInstalled then
+        return
+    end
+
+    _G.table.shuffle = function(t)
+        if type(t) ~= "table" then
+            return t
+        end
+
+        local n = #t
+        while n > 1 do
+            local k = random(1, n)
+            t[n], t[k] = t[k], t[n]
+            n = n - 1
+        end
+        return t
+    end
+
+    _G.table.reverse = function(t, count)
+        if type(t) ~= "table" then
+            return t
+        end
+
+        local maxIndex = tonumber(count) or #t
+        if maxIndex < 2 then
+            return t
+        end
+        if maxIndex > #t then
+            maxIndex = #t
+        end
+
+        local i, j = 1, maxIndex
+        while i < j do
+            t[i], t[j] = t[j], t[i]
+            i = i + 1
+            j = j - 1
+        end
+        return t
+    end
+
+    _G.string.trim = function(str)
+        if str == nil then
+            return ""
+        end
+        return gsub(tostring(str), "^%s*(.-)%s*$", "%1")
+    end
+
+    _G.string.startsWith = function(str, piece)
+        if type(str) ~= "string" or type(piece) ~= "string" then
+            return false
+        end
+        return strsub(str, 1, strlen(piece)) == piece
+    end
+
+    _G.string.endsWith = function(str, piece)
+        if type(str) ~= "string" or type(piece) ~= "string" then
+            return false
+        end
+        local lenPiece = strlen(piece)
+        if #str < lenPiece then
+            return false
+        end
+        return strsub(str, -lenPiece) == piece
+    end
+
+    addon._globalCompatInstalled = true
+end
+
+installCompatGlobalFunctions()
 
 function Core.getController(name)
     if type(name) ~= "string" or name == "" then

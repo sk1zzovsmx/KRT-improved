@@ -48,7 +48,6 @@ Modules\UI\MultiSelect.lua
 Modules\UI\Binder\Map.lua
 Modules\UI\Binder\UIBinder.lua
 Modules\Bus.lua
-Modules\Utils.LegacyGlobals.lua
 Modules\Compat\Utils.UI.lua
 Modules\Utils.lua
 

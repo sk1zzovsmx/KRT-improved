@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-24 03:19:51 +01:00
-- Commit: 890e122
+- Generated: 2026-02-24 03:20:34 +01:00
+- Commit: c0ba9c1
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -51,7 +51,6 @@
 |   |   |-- Features.lua
 |   |   |-- Strings.lua
 |   |   |-- Time.lua
-|   |   |-- Utils.LegacyGlobals.lua
 |   |   \\-- Utils.lua
 |   |-- Services
 |   |   |-- Chat.lua
