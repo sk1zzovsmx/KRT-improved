@@ -1555,7 +1555,7 @@ do
             _G[n .. "CurrentBtn"]:SetText(L.StrSetCurrent)
             _G[n .. "ExportBtn"]:SetText(L.BtnExport)
             local del = _G[n .. "DeleteBtn"]; if del then del:SetText(L.BtnDelete) end
-            addon:SetTooltip(_G[n .. "CurrentBtn"], L.StrRaidsCurrentHelp, nil, L.StrRaidCurrentTitle)
+            Frames.setTooltip(_G[n .. "CurrentBtn"], L.StrRaidsCurrentHelp, nil, L.StrRaidCurrentTitle)
             _G[n .. "ExportBtn"]:Disable() -- Not implemented.
         end,
 
@@ -2671,9 +2671,9 @@ do
 
     function Box:UpdateUIFrame()
         if not localized then
-            addon:SetTooltip(_G[frameName .. "Name"], L.StrBossNameHelp, "ANCHOR_LEFT")
-            addon:SetTooltip(_G[frameName .. "Difficulty"], L.StrBossDifficultyHelp, "ANCHOR_LEFT")
-            addon:SetTooltip(_G[frameName .. "Time"], L.StrBossTimeHelp, "ANCHOR_RIGHT")
+            Frames.setTooltip(_G[frameName .. "Name"], L.StrBossNameHelp, "ANCHOR_LEFT")
+            Frames.setTooltip(_G[frameName .. "Difficulty"], L.StrBossDifficultyHelp, "ANCHOR_LEFT")
+            Frames.setTooltip(_G[frameName .. "Time"], L.StrBossTimeHelp, "ANCHOR_RIGHT")
             localized = true
         end
         UIPrimitives.setText(_G[frameName .. "Title"], L.StrEditBoss, L.StrAddBoss, isEdit)

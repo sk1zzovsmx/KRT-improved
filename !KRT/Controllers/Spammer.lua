@@ -430,11 +430,11 @@ do
 
         local durationBox = _G[frameName .. "Duration"]
         durationBox.tooltip_title = AUCTION_DURATION
-        addon:SetTooltip(durationBox, L.StrSpammerDurationHelp)
+        Frames.setTooltip(durationBox, L.StrSpammerDurationHelp)
 
         local messageBox = _G[frameName .. "Message"]
         messageBox.tooltip_title = L.StrMessage
-        addon:SetTooltip(messageBox, {
+        Frames.setTooltip(messageBox, {
             L.StrSpammerMessageHelp1,
             L.StrSpammerMessageHelp2,
             L.StrSpammerMessageHelp3,

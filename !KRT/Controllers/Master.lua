@@ -750,7 +750,7 @@ do
         local options = addon.options or KRT_Options or {}
         if options.showTooltips then
             currentItemBtn.tooltip_item = itemLink
-            addon:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
+            Frames.setTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
         end
         return true
     end
