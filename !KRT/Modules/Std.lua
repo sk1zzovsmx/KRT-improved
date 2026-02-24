@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local type, tostring, tonumber = type, tostring, tonumber
 local select = select
@@ -26,7 +26,7 @@ local BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012
 addon.Colors = addon.Colors or {}
 local Colors = addon.Colors
 
-function Colors.normalizeHexColor(color)
+function Colors.NormalizeHexColor(color)
     if type(color) == "string" then
         local hex = color:gsub("^|c", ""):gsub("|r$", ""):gsub("^#", "")
         if #hex == 6 then
@@ -46,7 +46,7 @@ function Colors.normalizeHexColor(color)
     return "ffffffff"
 end
 
-function Colors.getClassColor(className)
+function Colors.GetClassColor(className)
     local r, g, b = addon.GetClassColor(className)
     return (r or 1), (g or 1), (b or 1)
 end
@@ -61,7 +61,7 @@ local function trimRaw(value)
     return gsub(tostring(value), "^%s*(.-)%s*$", "%1")
 end
 
-function Strings.ucfirst(value)
+function Strings.UpperFirst(value)
     if type(value) ~= "string" then
         value = tostring(value or "")
     end
@@ -69,30 +69,30 @@ function Strings.ucfirst(value)
     return gsub(value, "%a", upper, 1)
 end
 
-function Strings.trimText(value, allowNil)
+function Strings.TrimText(value, allowNil)
     if value == nil then
         return allowNil and nil or ""
     end
     return trimRaw(value)
 end
 
-function Strings.normalizeName(value, allowNil)
-    local text = Strings.trimText(value, allowNil)
+function Strings.NormalizeName(value, allowNil)
+    local text = Strings.TrimText(value, allowNil)
     if text == nil then
         return nil
     end
-    return Strings.ucfirst(text)
+    return Strings.UpperFirst(text)
 end
 
-function Strings.normalizeLower(value, allowNil)
-    local text = Strings.trimText(value, allowNil)
+function Strings.NormalizeLower(value, allowNil)
+    local text = Strings.TrimText(value, allowNil)
     if text == nil then
         return nil
     end
     return lower(text)
 end
 
-function Strings.findAchievement(inp)
+function Strings.FindAchievement(inp)
     local out = trimRaw(inp)
     if out ~= "" and find(out, "%{%d*%}") then
         local b, e = find(out, "%{%d*%}")
@@ -103,25 +103,25 @@ function Strings.findAchievement(inp)
     return out
 end
 
-function Strings.formatChatMessage(text, prefix, outputFormat, prefixHex)
+function Strings.FormatChatMessage(text, prefix, outputFormat, prefixHex)
     local msgPrefix = prefix or ""
     if prefixHex then
-        local normalized = Colors.normalizeHexColor and Colors.normalizeHexColor(prefixHex) or "ffffffff"
+        local normalized = Colors.NormalizeHexColor and Colors.NormalizeHexColor(prefixHex) or "ffffffff"
         msgPrefix = addon.WrapTextInColorCode(msgPrefix, normalized)
     end
     return format(outputFormat or "%s%s", msgPrefix, tostring(text))
 end
 
-function Strings.splitArgs(msg)
-    msg = Strings.trimText(msg)
+function Strings.SplitArgs(msg)
+    msg = Strings.TrimText(msg)
     if msg == "" then
         return "", ""
     end
     local cmd, rest = msg:match("^(%S+)%s*(.-)$")
-    return Strings.normalizeLower(cmd), Strings.trimText(rest)
+    return Strings.NormalizeLower(cmd), Strings.TrimText(rest)
 end
 
-function Strings.getItemIdFromLink(itemLink)
+function Strings.GetItemIdFromLink(itemLink)
     if not itemLink then
         return nil
     end
@@ -129,7 +129,7 @@ function Strings.getItemIdFromLink(itemLink)
     return itemId
 end
 
-function Strings.getItemStringFromLink(itemLink)
+function Strings.GetItemStringFromLink(itemLink)
     if type(itemLink) ~= "string" or itemLink == "" then
         return nil
     end
@@ -153,7 +153,7 @@ end
 addon.Time = addon.Time or {}
 local Time = addon.Time
 
-function Time.sec2clock(seconds)
+function Time.SecondsToClock(seconds)
     local sec = tonumber(seconds)
     if sec <= 0 then
         return "00:00:00"
@@ -165,12 +165,12 @@ function Time.sec2clock(seconds)
     return format("%02d:%02d:%02d", hours, minutes, secondsPart)
 end
 
-function Time.isRaidInstance()
+function Time.IsRaidInstance()
     local inInstance, instanceType = IsInInstance()
     return ((inInstance) and (instanceType == "raid"))
 end
 
-function Time.getDifficulty()
+function Time.GetDifficulty()
     local difficulty = nil
     local inInstance, instanceType = IsInInstance()
     if inInstance and instanceType == "raid" then
@@ -179,7 +179,7 @@ function Time.getDifficulty()
     return difficulty
 end
 
-function Time.getCurrentTime(server)
+function Time.GetCurrentTime(server)
     if server == nil then
         server = true
     end
@@ -192,7 +192,7 @@ function Time.getCurrentTime(server)
     return ts
 end
 
-function Time.getServerOffset()
+function Time.GetServerOffset()
     local sH, sM = GetGameTime()
     local lH, lM = tonumber(date("%H")), tonumber(date("%M"))
     local sT = sH + sM / 60
@@ -209,7 +209,7 @@ end
 addon.Base64 = addon.Base64 or {}
 local Base64 = addon.Base64
 
-function Base64.encode(data)
+function Base64.Encode(data)
     return ((gsub(data, ".", function(x)
         local out, bits = "", byte(x)
         for i = 8, 1, -1 do
@@ -228,7 +228,7 @@ function Base64.encode(data)
     end) .. ({ "", "==", "=" })[#data % 3 + 1])
 end
 
-function Base64.decode(data)
+function Base64.Decode(data)
     data = gsub(data, "[^" .. BASE64_ALPHABET .. "=]", "")
     return (gsub(data, ".", function(x)
         if x == "=" then
@@ -254,7 +254,7 @@ end
 addon.Comms = addon.Comms or {}
 local Comms = addon.Comms
 
-function Comms.sync(prefix, msg)
+function Comms.Sync(prefix, msg)
     local zone = select(2, IsInInstance())
     if zone == "pvp" or zone == "arena" then
         SendAddonMessage(prefix, msg, "BATTLEGROUND")
@@ -265,16 +265,21 @@ function Comms.sync(prefix, msg)
     end
 end
 
-function Comms.chat(msg, channel, language, target, bypass)
+function Comms.Chat(msg, channel, language, target, bypass)
     if not msg then
         return
     end
     SendChatMessage(tostring(msg), channel, language, target)
 end
 
-function Comms.whisper(target, msg)
+function Comms.Whisper(target, msg)
     if type(target) == "string" and msg then
         SendChatMessage(msg, "WHISPER", nil, target)
         return true
     end
 end
+
+
+
+
+

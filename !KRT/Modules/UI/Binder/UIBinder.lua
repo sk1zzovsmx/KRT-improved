@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local _G = _G
 local tostring, type, tonumber, pairs, next = tostring, type, tonumber, pairs, next
@@ -250,15 +250,16 @@ local function compileHandler(frameName, scriptName, body)
     return fn
 end
 
-Compiler.trimBinderToken = trimBinderToken
-Compiler.splitCommaArgs = splitCommaArgs
-Compiler.parseBodyToHandler = parseBodyToHandler
-Compiler.compileHandler = compileHandler
-Compiler.resolveArgToken = resolveArgToken
+Compiler.TrimBinderToken = trimBinderToken
+Compiler.SplitCommaArgs = splitCommaArgs
+Compiler.ParseBodyToHandler = parseBodyToHandler
+Compiler.CompileHandler = compileHandler
+Compiler.ResolveArgToken = resolveArgToken
 Compiler._compiled = compiled
 
+
 local function getFrameWidgetId(frameName)
-    local resolver = Map.getFrameWidgetId
+    local resolver = Map.GetFrameWidgetId
     if type(resolver) == "function" then
         return resolver(frameName)
     end
@@ -324,7 +325,7 @@ local function compileScript(frameName, scriptName, body)
         return body
     end
 
-    local compile = Compiler.compileHandler
+    local compile = Compiler.CompileHandler
     if type(compile) ~= "function" then
         return nil
     end

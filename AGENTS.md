@@ -27,7 +27,12 @@ Durable preferences learned from recent conversations:
 - Prefer PascalCase for addon module table names.
 - Prefer PascalCase for public exported methods on feature modules (`module:*`, `Store:*`, `View:*`, `Actions:*`,
   `Box:*`); keep WoW-required event names unchanged (UPPERCASE handlers).
+- Prefer PascalCase for public/cross-module APIs in infrastructure namespaces too
+  (`Core`, `Bus`, `Frames`, `UI*`, `Strings`, `Time`, `Comms`, `Base64`, `Colors`, `ItemProbe`).
 - Prefer camelCase for utility functions and local variables; avoid snake_case for new naming.
+- Keep file-local/private helpers in camelCase; keep Lua metamethods (`__index`, `__call`, etc.) unchanged.
+- For naming migrations, use phased rollout: add PascalCase API + temporary alias, migrate call-sites
+  (including XML/Binder/string references), then remove alias after zero legacy hits.
 - In feature files under `Controllers/`, `Services/`, `Widgets/`, `EntryPoints/`, prefer canonical top-level
   section headers in order:
   `-- ----- Internal state ----- --`, `-- ----- Private helpers ----- --`,
@@ -53,9 +58,9 @@ Durable preferences learned from recent conversations:
 - Keep bootstrap ownership centralized in `Core/Init.lua` for `addon.Core`, `addon.L`, `addon.Diagnose`,
   `addon.State`, `addon.C`, and `addon.Events`; do not re-bootstrap them in feature files.
 - Prefer a uniform Lua file contract header with:
-  `local addon = select(2, ...)` and `local feature = addon.Core.getFeatureShared()`.
+  `local addon = select(2, ...)` and `local feature = addon.Core.GetFeatureShared()`.
 - Prefer bus-only architecture from `KRT.lua`: no direct calls from Core to `addon.Master`/`addon.Logger`/other
-  Parents; wire WoW events into `Utils.triggerEvent("wow.EVENT", ...)` and let modules subscribe.
+  Parents; wire WoW events into `Bus.TriggerEvent("wow.EVENT", ...)` and let modules subscribe.
 - Keep Logger-owned roster UI refresh logic inside `Controllers/Logger.lua` (subscribed via `RaidRosterDelta`),
   not in `KRT.lua`.
 - Prefer a widget facade/port via `addon.UI` (`Modules/UI/Facade.lua`) for Controller/EntryPoint -> Widget calls.
@@ -131,7 +136,7 @@ Rules:
    `Widgets/`,
    `EntryPoints/`, unless there is a strong reason to keep them in `KRT.lua`.
 2) `KRT.lua` should stay focused on bootstrap/glue and shared infrastructure that must exist before features.
-3) Prefer `addon.Core.getFeatureShared()` in feature file headers for shared locals/runtime state bootstrap.
+3) Prefer `addon.Core.GetFeatureShared()` in feature file headers for shared locals/runtime state bootstrap.
 4) Public exports go on `addon.*`; avoid extra globals.
 5) Any user-visible behavior changes or migration notes MUST be documented in `CHANGELOG.md`.
 
@@ -147,7 +152,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 4) LibDeformat-3.0
 5) LibCompat-1.0
 6) LibLogger-1.0
-7) Core/Init.lua (single bootstrap for `addon.Core/L/Diagnose/State/C/Events` + `Core.getFeatureShared()`)
+7) Core/Init.lua (single bootstrap for `addon.Core/L/Diagnose/State/C/Events` + `Core.GetFeatureShared()`)
 8) Localization/localization.en.lua (fills `addon.L`)
 9) Localization/DiagnoseLog.en.lua (fills `addon.Diagnose`)
 10) Templates.xml
@@ -398,7 +403,7 @@ Top-level feature modules on `addon.*`:
 - `addon.Logger.Actions` - mutations + commit/refresh boundaries
 
 Implementation placement (current wave):
-- `Core/Init.lua`: single bootstrap for shared addon tables + `Core.getFeatureShared()`
+- `Core/Init.lua`: single bootstrap for shared addon tables + `Core.GetFeatureShared()`
 - `KRT.lua`: runtime core + main gameplay/logger logic
 - `Controllers/*.lua`, `Services/*.lua`, `Widgets/*.lua`, `EntryPoints/*.lua`
 
@@ -518,7 +523,7 @@ Don't:
 - Parent owner files live under `!KRT/Controllers/` (folder naming), while "Parent" remains the architecture term.
 - Services MUST NOT call Parents or touch Parent frames.
 - Services MUST NOT reference Widgets or delegate UI (`addon.*UI`, `module.UI`, `Get*UI` patterns).
-- Upward communication uses internal bus (`Utils.registerCallback` / `Utils.triggerEvent`).
+- Upward communication uses internal bus (`Bus.RegisterCallback` / `Bus.TriggerEvent`).
 - EntryPoint toggle exception: `EntryPoints/SlashEvents.lua` and `EntryPoints/Minimap.lua` may call
   `Parent:Toggle()`.
 - Prefer existing events (`SetItem`, `RaidRosterDelta`) over new UI micro-events.

@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-24 23:34:08 +01:00
-- Commit: d75856f
+- Generated: 2026-02-25 00:44:25 +01:00
+- Commit: 3f19dcf
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -89,6 +89,8 @@
 |   |-- FUNCTION_REGISTRY.md
 |   |-- LAYER_MAP.md
 |   |-- MODULES_UI_OWNERSHIP_MAP.md
+|   |-- NAMING_CONVENTIONS.md
+|   |-- NAMING_RENAME_MAP.md
 |   |-- REFACTOR_RULES.md
 |   |-- TREE.md
 |   \\-- UTILS_DEPRECATION_MAP.md

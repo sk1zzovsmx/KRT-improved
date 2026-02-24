@@ -1,6 +1,6 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
@@ -155,7 +155,7 @@ local function installLegacyAliasProxy()
     end
 end
 
-function Core.registerLegacyAlias(aliasKey, cfg)
+function Core.RegisterLegacyAlias(aliasKey, cfg)
     if type(aliasKey) ~= "string" or aliasKey == "" then
         return
     end
@@ -179,7 +179,7 @@ function Core.registerLegacyAlias(aliasKey, cfg)
     rawset(addon, aliasKey, nil)
 end
 
-function Core.registerLegacyAliasPath(aliasKey, namespaceKey, moduleKey)
+function Core.RegisterLegacyAliasPath(aliasKey, namespaceKey, moduleKey)
     if type(aliasKey) ~= "string" or aliasKey == "" then
         return
     end
@@ -190,7 +190,7 @@ function Core.registerLegacyAliasPath(aliasKey, namespaceKey, moduleKey)
         return
     end
 
-    Core.registerLegacyAlias(aliasKey, {
+    Core.RegisterLegacyAlias(aliasKey, {
         targetPath = namespaceKey .. "." .. moduleKey,
         get = function()
             local ns = rawget(addon, namespaceKey)
@@ -230,7 +230,7 @@ local LEGACY_ALIAS_PATHS = {
 
 for i = 1, #LEGACY_ALIAS_PATHS do
     local entry = LEGACY_ALIAS_PATHS[i]
-    Core.registerLegacyAliasPath(entry[1], entry[2], entry[3])
+    Core.RegisterLegacyAliasPath(entry[1], entry[2], entry[3])
 end
 
 local function installCompatGlobalFunctions()
@@ -304,7 +304,7 @@ end
 
 installCompatGlobalFunctions()
 
-function Core.getController(name)
+function Core.GetController(name)
     if type(name) ~= "string" or name == "" then
         return nil
     end
@@ -312,7 +312,7 @@ function Core.getController(name)
     return controllers and controllers[name] or nil
 end
 
-function Core.getPlayerName()
+function Core.GetPlayerName()
     local state = addon.State
     state.player = state.player or {}
     local name = state.player.name or addon.UnitFullName("player")
@@ -320,7 +320,7 @@ function Core.getPlayerName()
     return name
 end
 
-function Core.getRealmName()
+function Core.GetRealmName()
     local realm = GetRealmName and GetRealmName() or ""
     if type(realm) ~= "string" then
         return ""
@@ -328,7 +328,7 @@ function Core.getRealmName()
     return realm
 end
 
-function Core.getUnitRank(unit, fallback)
+function Core.GetUnitRank(unit, fallback)
     local groupLeader = addon.UnitIsGroupLeader or UnitIsGroupLeader
     local groupAssistant = addon.UnitIsGroupAssistant or UnitIsGroupAssistant
 
@@ -370,15 +370,15 @@ local function copyFlat(dst, src)
     return dst
 end
 
-function Options.newOptions()
+function Options.NewOptions()
     return copyFlat({}, Options.defaultValues)
 end
 
-function Options.isDebugEnabled()
+function Options.IsDebugEnabled()
     return addon and addon.State and addon.State.debugEnabled == true
 end
 
-function Options.applyDebugSetting(enabled)
+function Options.ApplyDebugSetting(enabled)
     local state = addon.State
     state.debugEnabled = enabled and true or false
 
@@ -389,7 +389,7 @@ function Options.applyDebugSetting(enabled)
     end
 end
 
-function Options.setOption(key, value)
+function Options.SetOption(key, value)
     if type(key) ~= "string" or key == "" then
         return false
     end
@@ -414,8 +414,8 @@ function Options.setOption(key, value)
     return true
 end
 
-function Options.loadOptions()
-    local options = Options.newOptions()
+function Options.LoadOptions()
+    local options = Options.NewOptions()
     if type(KRT_Options) == "table" then
         copyFlat(options, KRT_Options)
     end
@@ -424,19 +424,20 @@ function Options.loadOptions()
     KRT_Options = options
     addon.options = options
 
-    Options.applyDebugSetting(false)
+    Options.ApplyDebugSetting(false)
     return options
 end
 
-function Options.restoreDefaults()
-    local options = Options.newOptions()
+function Options.RestoreDefaults()
+    local options = Options.NewOptions()
     KRT_Options = options
     addon.options = options
-    Options.applyDebugSetting(false)
+    Options.ApplyDebugSetting(false)
     return options
 end
 
-addon.LoadOptions = Options.loadOptions
+addon.LoadOptions = Options.LoadOptions
+
 
 do
     local Events = addon.Events
@@ -471,19 +472,20 @@ do
     Wow.TRADE_REQUEST_CANCEL = "wow.TRADE_REQUEST_CANCEL"
     Wow.TRADE_CLOSED = "wow.TRADE_CLOSED"
 
-    function Events.configOptionChanged(optionName)
+    function Events.ConfigOptionChanged(optionName)
         if type(optionName) ~= "string" or optionName == "" then
             return nil
         end
         return "Config" .. optionName
     end
 
-    function Events.wowForwarded(eventName)
+    function Events.WowForwarded(eventName)
         if type(eventName) ~= "string" or eventName == "" then
             return nil
         end
         return Wow[eventName] or ("wow." .. tostring(eventName))
     end
+
 end
 
 do
@@ -567,7 +569,7 @@ do
     end
 end
 
-function Core.ensureLootRuntimeState()
+function Core.EnsureLootRuntimeState()
     local state = addon.State
     state.loot = state.loot or {}
 
@@ -608,14 +610,14 @@ function Core.ensureLootRuntimeState()
 end
 
 function Core.GetItemIndex()
-    local _, lootState = Core.ensureLootRuntimeState()
+    local _, lootState = Core.EnsureLootRuntimeState()
     return tonumber(lootState.currentItemIndex) or 0
 end
 
-function Core.getFeatureShared()
+function Core.GetFeatureShared()
     local constants = addon.C or {}
     local core = addon.Core
-    local state, lootState, itemInfo = core.ensureLootRuntimeState()
+    local state, lootState, itemInfo = core.EnsureLootRuntimeState()
 
     return {
         L = addon.L,
@@ -646,9 +648,9 @@ function Core.getFeatureShared()
         Controllers = addon.Controllers,
         Widgets = addon.Widgets,
 
-        bindModuleRequestRefresh = core.bindModuleRequestRefresh,
-        bindModuleToggleHide = core.bindModuleToggleHide,
-        makeModuleFrameGetter = core.makeModuleFrameGetter,
+        BindModuleRequestRefresh = core.BindModuleRequestRefresh,
+        BindModuleToggleHide = core.BindModuleToggleHide,
+        MakeModuleFrameGetter = core.MakeModuleFrameGetter,
 
         UnitIsGroupLeader = addon.UnitIsGroupLeader,
         UnitIsGroupAssistant = addon.UnitIsGroupAssistant,

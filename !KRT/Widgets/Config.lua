@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 
@@ -14,9 +14,9 @@ local UIScaffold = addon.UIScaffold
 local Events = feature.Events or addon.Events or {}
 local Bus = feature.Bus or addon.Bus
 
-local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
-local bindModuleToggleHide = feature.bindModuleToggleHide
-local makeModuleFrameGetter = feature.makeModuleFrameGetter
+local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
+local bindModuleToggleHide = feature.BindModuleToggleHide
+local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
 
@@ -62,8 +62,8 @@ do
 
     -- Loads the default options into the settings table.
     local function LoadDefaultOptions()
-        if Options and Options.restoreDefaults then
-            Options.restoreDefaults()
+        if Options and Options.RestoreDefaults then
+            Options.RestoreDefaults()
         end
         configDirty = true
         module:RequestRefresh()
@@ -72,8 +72,8 @@ do
 
     -- Loads addon options from saved variables, filling in defaults.
     local function LoadOptions()
-        if Options and Options.loadOptions then
-            Options.loadOptions()
+        if Options and Options.LoadOptions then
+            Options.LoadOptions()
         end
         configDirty = true
         module:RequestRefresh()
@@ -81,9 +81,9 @@ do
         if KRT_MINIMAP_GUI then
             addon.Minimap:SetPos(addon.options.minimapPos or 325)
             if addon.options.minimapButton then
-                Frames.setShown(KRT_MINIMAP_GUI, true)
+                Frames.SetShown(KRT_MINIMAP_GUI, true)
             else
-                Frames.setShown(KRT_MINIMAP_GUI, false)
+                Frames.SetShown(KRT_MINIMAP_GUI, false)
             end
         end
     end
@@ -96,7 +96,7 @@ do
 
     -- OnLoad handler for the configuration frame.
     function module:OnLoad(frame)
-        frameName = Frames.initModuleFrame(module, frame, {
+        frameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 configDirty = true
@@ -123,7 +123,7 @@ do
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    UIScaffold.bootstrapModuleUi(module, getFrame, function()
+    UIScaffold.BootstrapModuleUi(module, getFrame, function()
         configDirty = true
         module:RequestRefresh()
     end, {
@@ -149,12 +149,12 @@ do
         end
 
         name = strsub(name, strlen(frameName) + 1)
-        if Options and Options.setOption then
-            Options.setOption(name, value)
+        if Options and Options.SetOption then
+            Options.SetOption(name, value)
         end
-        local eventName = Events.configOptionChanged and Events.configOptionChanged(name)
+        local eventName = Events.ConfigOptionChanged and Events.ConfigOptionChanged(name)
         if eventName then
-            Bus.triggerEvent(eventName, value)
+            Bus.TriggerEvent(eventName, value)
         end
 
         configDirty = true
@@ -184,7 +184,7 @@ do
         _G[frameName .. "countdownDurationStr"]:SetText(L.StrConfigCountdownDuration)
         _G[frameName .. "countdownSimpleRaidMsgStr"]:SetText(L.StrConfigCountdownSimpleRaidMsg)
 
-        Frames.setFrameTitle(frameName, SETTINGS)
+        Frames.SetFrameTitle(frameName, SETTINGS)
         _G[frameName .. "AboutStr"]:SetText(L.StrConfigAbout)
         _G[frameName .. "DefaultsBtn"]:SetText(L.BtnDefaults)
         _G[frameName .. "CloseBtn"]:SetText(L.BtnClose)

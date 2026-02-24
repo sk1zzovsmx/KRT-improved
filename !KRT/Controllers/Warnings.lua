@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 
@@ -14,9 +14,9 @@ local Strings = feature.Strings or addon.Strings
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
-local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
-local bindModuleToggleHide = feature.bindModuleToggleHide
-local makeModuleFrameGetter = feature.makeModuleFrameGetter
+local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
+local bindModuleToggleHide = feature.BindModuleToggleHide
+local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
 local tinsert, twipe = table.insert, table.wipe
@@ -53,7 +53,7 @@ do
 
     -- ----- Public methods ----- --
 
-    local controller = ListController.makeListController {
+    local controller = ListController.MakeListController {
         keyName = "WarningsList",
         poolTag = "warnings",
         _rowParts = { "ID", "Name" },
@@ -68,7 +68,7 @@ do
         rowName = function(n, _, i) return n .. "WarningBtn" .. i end,
         rowTmpl = "KRTWarningButtonTemplate",
 
-        drawRow = ListController.createRowDrawer(function(row, it)
+        drawRow = ListController.CreateRowDrawer(function(row, it)
             local ui = row._p
             ui.ID:SetText(it.id)
             ui.Name:SetText(it.name)
@@ -77,7 +77,7 @@ do
         highlightId = function() return selectedID end,
     }
 
-    local panelScaffold = UIScaffold.createListPanelScaffold({
+    local panelScaffold = UIScaffold.CreateListPanelScaffold({
         module = module,
         getFrame = getFrame,
         controller = controller,
@@ -179,8 +179,8 @@ do
 
     -- Cancel editing/adding:
     function module:Cancel()
-        Frames.resetEditBox(_G[frameName .. "Name"])
-        Frames.resetEditBox(_G[frameName .. "Content"])
+        Frames.ResetEditBox(_G[frameName .. "Name"])
+        Frames.ResetEditBox(_G[frameName .. "Content"])
         selectedID = nil
         tempSelectedID = nil
         isEdit = false
@@ -196,8 +196,8 @@ do
         _G[frameName .. "DeleteBtn"]:SetText(L.BtnDelete)
         _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
         _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
-        Frames.setFrameTitle(frameName, RAID_WARNING)
-        Frames.bindEditBoxHandlers(frameName, {
+        Frames.SetFrameTitle(frameName, RAID_WARNING)
+        Frames.BindEditBoxHandlers(frameName, {
             { suffix = "Name", onEscape = module.Cancel, onEnter = module.Edit },
             { suffix = "Content", onEscape = module.Cancel, onEnter = module.Edit },
         }, function()
@@ -232,11 +232,11 @@ do
         end
         tempName    = _G[frameName .. "Name"]:GetText()
         tempContent = _G[frameName .. "Content"]:GetText()
-        UIPrimitives.enableDisableNamedPart(frameName, "EditBtn", (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
-        UIPrimitives.enableDisableNamedPart(frameName, "DeleteBtn", selectedID ~= nil)
-        UIPrimitives.enableDisableNamedPart(frameName, "AnnounceBtn", selectedID ~= nil)
+        UIPrimitives.EnableDisableNamedPart(frameName, "EditBtn", (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
+        UIPrimitives.EnableDisableNamedPart(frameName, "DeleteBtn", selectedID ~= nil)
+        UIPrimitives.EnableDisableNamedPart(frameName, "AnnounceBtn", selectedID ~= nil)
         local editBtnMode = (tempName ~= "" or tempContent ~= "") or selectedID == nil
-        lastEditBtnMode = UIPrimitives.updateModeTextNamedPart(
+        lastEditBtnMode = UIPrimitives.UpdateModeTextNamedPart(
             frameName,
             "EditBtn",
             L.BtnSave,
@@ -253,8 +253,8 @@ do
     -- Saving a Warning:
     function SaveWarning(wContent, wName, wID)
         wID = wID and tonumber(wID) or 0
-        wName = Strings.trimText(wName)
-        wContent = Strings.trimText(wContent)
+        wName = Strings.TrimText(wName)
+        wContent = Strings.TrimText(wContent)
         if wName == "" then
             wName = (isEdit and wID > 0) and wID or (#KRT_Warnings + 1)
         end

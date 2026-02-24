@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
@@ -17,9 +17,9 @@ local C = feature.C
 local Options = feature.Options or addon.Options
 local Bus = feature.Bus or addon.Bus
 
-local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
-local bindModuleToggleHide = feature.bindModuleToggleHide
-local makeModuleFrameGetter = feature.makeModuleFrameGetter
+local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
+local bindModuleToggleHide = feature.BindModuleToggleHide
+local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
 local tinsert, twipe = table.insert, table.wipe
@@ -53,7 +53,7 @@ do
 
     local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
     local frameName
-    local getFrame = Frames.makeFrameGetter("KRTReserveListFrame")
+    local getFrame = Frames.MakeFrameGetter("KRTReserveListFrame")
     local scrollFrame, scrollChild
     local reserveHeaders = {}
     local reserveItemRows = {}
@@ -65,7 +65,7 @@ do
         separator = { 1.0, 1.0, 1.0, 0.10 },
     }
 
-    UIScaffold.bootstrapModuleUi(module, getFrame, function()
+    UIScaffold.BootstrapModuleUi(module, getFrame, function()
         module:RequestRefresh()
     end, {
         bindToggleHide = bindModuleToggleHide,
@@ -308,7 +308,7 @@ do
             return
         end
         if frameName then
-            Frames.setFrameTitle(frameName, L.StrRaidReserves)
+            Frames.SetFrameTitle(frameName, L.StrRaidReserves)
             addon:debug(Diag.D.LogReservesUILocalized:format(L.StrRaidReserves))
         end
         local clearButton = frameName and _G[frameName .. "ClearButton"]
@@ -333,14 +333,14 @@ do
         if clearButton then
             if hasData then
                 clearButton:Show()
-                UIPrimitives.enableDisable(clearButton, true)
+                UIPrimitives.EnableDisable(clearButton, true)
             else
                 clearButton:Hide()
             end
         end
         local queryButton = _G[frameName .. "QueryButton"]
         if queryButton then
-            UIPrimitives.enableDisable(queryButton, hasData)
+            UIPrimitives.EnableDisable(queryButton, hasData)
         end
     end
 
@@ -543,7 +543,7 @@ do
 
     function UI:OnLoad(frame)
         addon:debug(Diag.D.LogReservesFrameLoaded)
-        frameName = Frames.initModuleFrame(module, frame, {
+        frameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 addon:debug(Diag.D.LogReservesShowWindow)
@@ -610,7 +610,7 @@ do
     local importLocalized = false
     local MODE_MULTI, MODE_PLUS = 0, 1
 
-    UIScaffold.bootstrapModuleUi(Import, getImportFrame, function()
+    UIScaffold.BootstrapModuleUi(Import, getImportFrame, function()
         if Import.RequestRefresh then
             Import:RequestRefresh()
         end
@@ -708,7 +708,7 @@ do
             return
         end
 
-        Frames.setFrameTitle(frame, L.StrImportReservesTitle)
+        Frames.SetFrameTitle(frame, L.StrImportReservesTitle)
 
         local hint = _G["KRTImportWindowHint"]
         if hint then hint:SetText(L.StrImportReservesHint) end
@@ -727,7 +727,7 @@ do
         if Service and Service.SetImportMode then
             Service:SetImportMode(mode, true)
         else
-            Options.setOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
+            Options.SetOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
         end
 
         if suppressSlider then return end
@@ -782,10 +782,10 @@ do
     end
 
     function Import:OnLoad(frame)
-        Frames.initModuleFrame(Import, frame, {
+        Frames.InitModuleFrame(Import, frame, {
             enableDrag = true,
             hookOnShow = function()
-                Frames.resetEditBox(_G["KRTImportEditBox"])
+                Frames.ResetEditBox(_G["KRTImportEditBox"])
                 local editBox = _G["KRTImportEditBox"]
                 if editBox then
                     editBox:SetFocus()
@@ -882,7 +882,7 @@ do
         })
     end
 
-    Bus.registerCallback(InternalEvents.ReservesDataChanged, function()
+    Bus.RegisterCallback(InternalEvents.ReservesDataChanged, function()
         UI:RequestRefresh()
     end)
 end

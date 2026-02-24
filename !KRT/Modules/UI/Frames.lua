@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local type = type
 local format = string.format
@@ -23,7 +23,7 @@ addon.UIScaffold = addon.UIScaffold or {}
 local UIScaffold = addon.UIScaffold
 local tooltipColor = HIGHLIGHT_FONT_COLOR
 
-function Frames.enableDrag(frame, dragButton)
+function Frames.EnableDrag(frame, dragButton)
     if not frame or not frame.RegisterForDrag then
         return
     end
@@ -57,7 +57,7 @@ function Frames.enableDrag(frame, dragButton)
     frame:RegisterForDrag(dragButton or "LeftButton")
 end
 
-function Frames.makeConfirmPopup(key, text, onAccept, cancels)
+function Frames.MakeConfirmPopup(key, text, onAccept, cancels)
     StaticPopupDialogs[key] = {
         text = text,
         button1 = OKAY,
@@ -70,7 +70,7 @@ function Frames.makeConfirmPopup(key, text, onAccept, cancels)
     }
 end
 
-function Frames.makeEditBoxPopup(key, text, onAccept, onShow, validate)
+function Frames.MakeEditBoxPopup(key, text, onAccept, onShow, validate)
     StaticPopupDialogs[key] = {
         text = text,
         button1 = SAVE,
@@ -91,7 +91,7 @@ function Frames.makeEditBoxPopup(key, text, onAccept, onShow, validate)
         end,
         OnAccept = function(self)
             local Strings = addon.Strings
-            local trimText = Strings and Strings.trimText
+            local trimText = Strings and Strings.TrimText
             local value = trimText and trimText(self.editBox:GetText(), true) or self.editBox:GetText()
             if validate then
                 local ok, cleanValue = validate(self, value)
@@ -107,7 +107,7 @@ function Frames.makeEditBoxPopup(key, text, onAccept, onShow, validate)
     }
 end
 
-function Frames.setFrameTitle(frameOrName, titleText, titleFormat)
+function Frames.SetFrameTitle(frameOrName, titleText, titleFormat)
     local frameName = frameOrName
     if type(frameOrName) ~= "string" then
         frameName = frameOrName and frameOrName.GetName and frameOrName:GetName() or nil
@@ -123,7 +123,7 @@ function Frames.setFrameTitle(frameOrName, titleText, titleFormat)
     titleFrame:SetText(format(fmt, titleText))
 end
 
-function Frames.resetEditBox(editBox, hide)
+function Frames.ResetEditBox(editBox, hide)
     if not editBox then
         return
     end
@@ -134,7 +134,7 @@ function Frames.resetEditBox(editBox, hide)
     end
 end
 
-function Frames.setEditBoxValue(editBox, value, focus)
+function Frames.SetEditBoxValue(editBox, value, focus)
     if not editBox then
         return
     end
@@ -145,7 +145,7 @@ function Frames.setEditBoxValue(editBox, value, focus)
     end
 end
 
-function Frames.setShown(frame, show)
+function Frames.SetShown(frame, show)
     if not frame then
         return
     end
@@ -190,7 +190,7 @@ local function hideTooltip()
     GameTooltip:Hide()
 end
 
-function Frames.setTooltip(frame, text, anchor, title)
+function Frames.SetTooltip(frame, text, anchor, title)
     if not frame then
         return
     end
@@ -204,9 +204,9 @@ function Frames.setTooltip(frame, text, anchor, title)
     frame:SetScript("OnLeave", hideTooltip)
 end
 
-function Frames.makeEventDrivenRefresher(targetOrGetter, updateFn)
+function Frames.MakeEventDrivenRefresher(targetOrGetter, updateFn)
     if type(updateFn) ~= "function" then
-        error("Frames.makeEventDrivenRefresher: updateFn must be a function")
+        error("Frames.MakeEventDrivenRefresher: updateFn must be a function")
     end
 
     local driver = CreateFrame("Frame")
@@ -272,7 +272,7 @@ function Frames.makeEventDrivenRefresher(targetOrGetter, updateFn)
     end
 end
 
-function Frames.makeFrameGetter(globalFrameName)
+function Frames.MakeFrameGetter(globalFrameName)
     local cached = nil
     return function()
         if cached then
@@ -286,7 +286,7 @@ function Frames.makeFrameGetter(globalFrameName)
     end
 end
 
-function Frames.initModuleFrame(module, frame, opts)
+function Frames.InitModuleFrame(module, frame, opts)
     if not frame then
         return nil
     end
@@ -298,7 +298,7 @@ function Frames.initModuleFrame(module, frame, opts)
     opts = opts or {}
 
     if opts.enableDrag then
-        Frames.enableDrag(frame, opts.dragButton)
+        Frames.EnableDrag(frame, opts.dragButton)
     end
 
     if opts.hookOnShow then
@@ -317,7 +317,7 @@ function Frames.initModuleFrame(module, frame, opts)
     return frameName
 end
 
-function UIScaffold.makeUIFrameController(getFrame, requestRefreshFn)
+function UIScaffold.MakeUIFrameController(getFrame, requestRefreshFn)
     return {
         Toggle = function(self)
             local frame = getFrame()
@@ -325,18 +325,18 @@ function UIScaffold.makeUIFrameController(getFrame, requestRefreshFn)
                 return
             end
             if frame:IsShown() then
-                Frames.setShown(frame, false)
+                Frames.SetShown(frame, false)
             else
                 if requestRefreshFn then
                     requestRefreshFn()
                 end
-                Frames.setShown(frame, true)
+                Frames.SetShown(frame, true)
             end
         end,
         Hide = function(self)
             local frame = getFrame()
             if frame then
-                Frames.setShown(frame, false)
+                Frames.SetShown(frame, false)
             end
         end,
         Show = function(self)
@@ -345,14 +345,14 @@ function UIScaffold.makeUIFrameController(getFrame, requestRefreshFn)
                 if requestRefreshFn then
                     requestRefreshFn()
                 end
-                Frames.setShown(frame, true)
+                Frames.SetShown(frame, true)
             end
         end,
     }
 end
 
-function UIScaffold.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
-    local uiController = UIScaffold.makeUIFrameController(getFrame, requestRefreshFn)
+function UIScaffold.BootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
+    local uiController = UIScaffold.MakeUIFrameController(getFrame, requestRefreshFn)
     if opts then
         if opts.bindToggleHide then
             opts.bindToggleHide(module, uiController)
@@ -364,20 +364,20 @@ function UIScaffold.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
     return uiController
 end
 
-function UIScaffold.createListPanelScaffold(cfg)
+function UIScaffold.CreateListPanelScaffold(cfg)
     cfg = cfg or {}
     local module = cfg.module
     local getFrame = cfg.getFrame
     local controller = cfg.controller
 
     if type(module) ~= "table" then
-        error("UIScaffold.createListPanelScaffold: cfg.module must be a table")
+        error("UIScaffold.CreateListPanelScaffold: cfg.module must be a table")
     end
     if type(getFrame) ~= "function" then
-        error("UIScaffold.createListPanelScaffold: cfg.getFrame must be a function")
+        error("UIScaffold.CreateListPanelScaffold: cfg.getFrame must be a function")
     end
     if type(controller) ~= "table" then
-        error("UIScaffold.createListPanelScaffold: cfg.controller must be a table")
+        error("UIScaffold.CreateListPanelScaffold: cfg.controller must be a table")
     end
 
     local frameName
@@ -415,13 +415,13 @@ function UIScaffold.createListPanelScaffold(cfg)
         end,
     }
 
-    UIScaffold.bootstrapModuleUi(module, getFrame, requestRefresh, {
+    UIScaffold.BootstrapModuleUi(module, getFrame, requestRefresh, {
         bindToggleHide = cfg.bindToggleHide,
         bindRequestRefresh = cfg.bindRequestRefresh,
     })
 
     function scaffold:OnLoad(frame)
-        frameName = Frames.initModuleFrame(module, frame, frameInitOpts)
+        frameName = Frames.InitModuleFrame(module, frame, frameInitOpts)
         if not frameName then
             return nil
         end
@@ -457,33 +457,33 @@ function UIScaffold.createListPanelScaffold(cfg)
 end
 
 -- @compat
--- @deprecated use addon.UIScaffold.makeUIFrameController
-function Frames.makeUIFrameController(getFrame, requestRefreshFn)
+-- @deprecated use addon.UIScaffold.MakeUIFrameController
+function Frames.MakeUIFrameController(getFrame, requestRefreshFn)
     local UIScaffold = addon.UIScaffold
-    if UIScaffold and UIScaffold.makeUIFrameController then
-        return UIScaffold.makeUIFrameController(getFrame, requestRefreshFn)
+    if UIScaffold and UIScaffold.MakeUIFrameController then
+        return UIScaffold.MakeUIFrameController(getFrame, requestRefreshFn)
     end
 end
 
 -- @compat
--- @deprecated use addon.UIScaffold.bootstrapModuleUi
-function Frames.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
+-- @deprecated use addon.UIScaffold.BootstrapModuleUi
+function Frames.BootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
     local UIScaffold = addon.UIScaffold
-    if UIScaffold and UIScaffold.bootstrapModuleUi then
-        return UIScaffold.bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
+    if UIScaffold and UIScaffold.BootstrapModuleUi then
+        return UIScaffold.BootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
     end
 end
 
 -- @compat
--- @deprecated use addon.UIScaffold.createListPanelScaffold
-function Frames.createListPanelScaffold(cfg)
+-- @deprecated use addon.UIScaffold.CreateListPanelScaffold
+function Frames.CreateListPanelScaffold(cfg)
     local UIScaffold = addon.UIScaffold
-    if UIScaffold and UIScaffold.createListPanelScaffold then
-        return UIScaffold.createListPanelScaffold(cfg)
+    if UIScaffold and UIScaffold.CreateListPanelScaffold then
+        return UIScaffold.CreateListPanelScaffold(cfg)
     end
 end
 
-function Frames.bindEditBoxHandlers(frameName, specs, requestRefreshFn)
+function Frames.BindEditBoxHandlers(frameName, specs, requestRefreshFn)
     if type(frameName) ~= "string" or type(specs) ~= "table" then
         return
     end
@@ -509,3 +509,5 @@ function Frames.bindEditBoxHandlers(frameName, specs, requestRefreshFn)
         end
     end
 end
+
+

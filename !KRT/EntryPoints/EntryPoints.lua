@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 
@@ -36,8 +36,8 @@ do
     local module = addon.Minimap
 
     local function getController(name)
-        if Core and Core.getController then
-            return Core.getController(name)
+        if Core and Core.GetController then
+            return Core.GetController(name)
         end
         local controllers = addon.Controllers
         return controllers and controllers[name] or nil
@@ -172,13 +172,13 @@ do
     end
 
     local function SetMinimapShown(show)
-        Frames.setShown(KRT_MINIMAP_GUI, show)
+        Frames.SetShown(KRT_MINIMAP_GUI, show)
     end
 
     -- ----- Public methods ----- --
     function module:SetPos(angle)
         angle = angle % 360
-        Options.setOption("minimapPos", angle)
+        Options.SetOption("minimapPos", angle)
         local r = rad(angle)
         KRT_MINIMAP_GUI:ClearAllPoints()
         KRT_MINIMAP_GUI:SetPoint("CENTER", cos(r) * 80, sin(r) * 80)
@@ -222,9 +222,9 @@ do
         KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
             GameTooltip_SetDefaultAnchor(GameTooltip, self)
             GameTooltip:SetText(
-                addon.WrapTextInColorCode("Kader", Colors.normalizeHexColor(K_COLOR))
+                addon.WrapTextInColorCode("Kader", Colors.NormalizeHexColor(K_COLOR))
                 .. " "
-                .. addon.WrapTextInColorCode("Raid Tools", Colors.normalizeHexColor("aad4af37"))
+                .. addon.WrapTextInColorCode("Raid Tools", Colors.NormalizeHexColor("aad4af37"))
             )
             GameTooltip:AddLine(L.StrMinimapLClick, 1, 1, 1)
             GameTooltip:AddLine(L.StrMinimapRClick, 1, 1, 1)
@@ -241,13 +241,13 @@ do
     function module:ToggleMinimapButton()
         local options = addon.options or KRT_Options or {}
         local nextValue = not options.minimapButton
-        Options.setOption("minimapButton", nextValue)
+        Options.SetOption("minimapButton", nextValue)
         SetMinimapShown(nextValue)
     end
 
     -- Hides the minimap button.
     function module:HideMinimapButton()
-        return Frames.setShown(KRT_MINIMAP_GUI, false)
+        return Frames.SetShown(KRT_MINIMAP_GUI, false)
     end
 end
 
@@ -257,8 +257,8 @@ do
     local module = addon.Slash
 
     local function getController(name)
-        if Core and Core.getController then
-            return Core.getController(name)
+        if Core and Core.GetController then
+            return Core.GetController(name)
         end
         local controllers = addon.Controllers
         return controllers and controllers[name] or nil
@@ -287,7 +287,7 @@ do
     -- ----- Private helpers ----- --
     local helpString = "%s: %s"
     local function printHelp(cmd, desc)
-        addon:info("%s", helpString:format(addon.WrapTextInColorCode(cmd, Colors.normalizeHexColor(RT_COLOR)), desc))
+        addon:info("%s", helpString:format(addon.WrapTextInColorCode(cmd, Colors.NormalizeHexColor(RT_COLOR)), desc))
     end
 
     local function showHelp()
@@ -316,7 +316,7 @@ do
 
     function module:Handle(msg)
         if not msg or msg == "" then return end
-        local cmd, rest = Strings.splitArgs(msg)
+        local cmd, rest = Strings.SplitArgs(msg)
         if cmd == "show" or cmd == "toggle" then
             local moduleRef = getController("Master")
             if moduleRef and moduleRef.Toggle then
@@ -332,7 +332,7 @@ do
     end
 
     registerAliases(cmdDebug, function(rest)
-        local subCmd, arg = Strings.splitArgs(rest)
+        local subCmd, arg = Strings.SplitArgs(rest)
         if subCmd == "" then subCmd = nil end
 
         if subCmd == "levels" then
@@ -370,13 +370,13 @@ do
 
         if subCmd == "callbacks" or subCmd == "cb" or subCmd == "bus" then
             if arg == "reset" then
-                if Bus.resetInternalCallbackStats then
-                    Bus.resetInternalCallbackStats()
+                if Bus.ResetInternalCallbackStats then
+                    Bus.ResetInternalCallbackStats()
                 end
                 addon:info("Internal callback stats reset.")
             else
-                if Bus.dumpInternalCallbackStats then
-                    Bus.dumpInternalCallbackStats(arg)
+                if Bus.DumpInternalCallbackStats then
+                    Bus.DumpInternalCallbackStats(arg)
                 else
                     addon:warn("Callback stats not available in this build.")
                 end
@@ -402,14 +402,14 @@ do
 
 
         if subCmd == "on" then
-            Options.applyDebugSetting(true)
+            Options.ApplyDebugSetting(true)
         elseif subCmd == "off" then
-            Options.applyDebugSetting(false)
+            Options.ApplyDebugSetting(false)
         else
-            Options.applyDebugSetting(not Options.isDebugEnabled())
+            Options.ApplyDebugSetting(not Options.IsDebugEnabled())
         end
 
-        if Options.isDebugEnabled() then
+        if Options.IsDebugEnabled() then
             addon:info(L.MsgDebugOn)
         else
             addon:info(L.MsgDebugOff)
@@ -417,13 +417,13 @@ do
     end)
 
     registerAliases(cmdMinimap, function(rest)
-        local sub, arg = Strings.splitArgs(rest)
+        local sub, arg = Strings.SplitArgs(rest)
         if sub == "on" then
-            Options.setOption("minimapButton", true)
-            Frames.setShown(KRT_MINIMAP_GUI, true)
+            Options.SetOption("minimapButton", true)
+            Frames.SetShown(KRT_MINIMAP_GUI, true)
         elseif sub == "off" then
-            Options.setOption("minimapButton", false)
-            Frames.setShown(KRT_MINIMAP_GUI, false)
+            Options.SetOption("minimapButton", false)
+            Frames.SetShown(KRT_MINIMAP_GUI, false)
         elseif sub == "pos" and arg ~= "" then
             local angle = tonumber(arg)
             if angle then
@@ -455,7 +455,7 @@ do
     end)
 
     registerAliases(cmdConfig, function(rest)
-        local sub = Strings.splitArgs(rest)
+        local sub = Strings.SplitArgs(rest)
         if sub == "reset" then
             UI:Call("Config", "Default")
         else
@@ -464,7 +464,7 @@ do
     end)
 
     registerAliases(cmdWarnings, function(rest)
-        local sub = Strings.splitArgs(rest)
+        local sub = Strings.SplitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             local moduleRef = getController("Warnings")
             if moduleRef and moduleRef.Toggle then
@@ -483,7 +483,7 @@ do
     end)
 
     registerAliases(cmdChanges, function(rest)
-        local sub = Strings.splitArgs(rest)
+        local sub = Strings.SplitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             local moduleRef = getController("Changes")
             if moduleRef and moduleRef.Toggle then
@@ -508,20 +508,20 @@ do
     end)
 
     registerAliases(cmdLogger, function(rest)
-        local sub, arg = Strings.splitArgs(rest)
+        local sub, arg = Strings.SplitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             local moduleRef = getController("Logger")
             if moduleRef and moduleRef.Toggle then
                 moduleRef:Toggle()
             end
         elseif sub == "req" then
-            local raidRefArg, targetArg = Strings.splitArgs(arg)
+            local raidRefArg, targetArg = Strings.SplitArgs(arg)
             local syncer = getSyncerService()
             if syncer and syncer.RequestLoggerReq then
                 syncer:RequestLoggerReq(tonumber(raidRefArg), targetArg)
             end
         elseif sub == "push" then
-            local raidRefArg, targetArg = Strings.splitArgs(arg)
+            local raidRefArg, targetArg = Strings.SplitArgs(arg)
             local syncer = getSyncerService()
             if syncer and syncer.BroadcastLoggerPush then
                 syncer:BroadcastLoggerPush(tonumber(raidRefArg), targetArg)
@@ -541,7 +541,7 @@ do
     end)
 
     registerAliases(cmdLoot, function(rest)
-        local sub = Strings.splitArgs(rest)
+        local sub = Strings.SplitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             local moduleRef = getController("Master")
             if moduleRef and moduleRef.Toggle then
@@ -551,14 +551,14 @@ do
     end)
 
     registerAliases(cmdCounter, function(rest)
-        local sub = Strings.splitArgs(rest)
+        local sub = Strings.SplitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             UI:Call("LootCounter", "Toggle")
         end
     end)
 
     registerAliases(cmdReserves, function(rest)
-        local sub = Strings.splitArgs(rest)
+        local sub = Strings.SplitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             UI:Call("Reserves", "Toggle")
         elseif sub == "import" then
@@ -571,7 +571,7 @@ do
     end)
 
     registerAliases(cmdLFM, function(rest)
-        local sub = Strings.splitArgs(rest)
+        local sub = Strings.SplitArgs(rest)
         if not sub or sub == "" or sub == "toggle" or sub == "show" then
             local moduleRef = getController("Spammer")
             if moduleRef and moduleRef.Toggle then

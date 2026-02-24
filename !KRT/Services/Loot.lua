@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local Diag = feature.Diag
 
@@ -70,7 +70,7 @@ do
             return
         end
 
-        local key = Strings.getItemStringFromLink(itemLink) or itemLink
+        local key = Strings.GetItemStringFromLink(itemLink) or itemLink
         local existing = indexByItemKey[key]
         if existing then
             lootTable[existing].count = (lootTable[existing].count or 1) + 1
@@ -239,11 +239,11 @@ do
     -- Sets the main item display in the UI.
     function module:SetItem(i)
         if not i then
-            Bus.triggerEvent(InternalEvents.SetItem, nil, nil)
+            Bus.TriggerEvent(InternalEvents.SetItem, nil, nil)
             return
         end
         if not (i.itemName and i.itemLink and i.itemTexture and i.itemColor) then return end
-        Bus.triggerEvent(InternalEvents.SetItem, i.itemLink, i)
+        Bus.TriggerEvent(InternalEvents.SetItem, i.itemLink, i)
     end
 
     -- Selects an item from the loot list by its index.
@@ -258,7 +258,7 @@ do
     function module:ClearLoot()
         lootTable = twipe(lootTable)
         lootState.lootCount = 0
-        Bus.triggerEvent(InternalEvents.SetItem, nil, nil)
+        Bus.TriggerEvent(InternalEvents.SetItem, nil, nil)
     end
 
     -- Returns the table for the currently selected item.
@@ -309,12 +309,13 @@ do
     end
 
     -- Cross-module bridge for split files (Rolls/Master).
-    module.warmItemCache = warmItemCache
-    module.isBagItemSoulbound = isBagItemSoulbound
+    module.WarmItemCache = warmItemCache
+    module.IsBagItemSoulbound = isBagItemSoulbound
     module.GetItem = GetItem
     module.GetItemName = GetItemName
     module.GetItemLink = GetItemLink
     module.GetItemTexture = GetItemTexture
     module.ItemExists = ItemExists
     module.ItemIsSoulbound = ItemIsSoulbound
+
 end
