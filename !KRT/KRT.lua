@@ -11,7 +11,7 @@ local addonName = addon.name
 
 local L = feature.L
 local Diag = feature.Diag
-local Utils = feature.Utils
+
 local Bus = feature.Bus or addon.Bus
 local Frames = feature.Frames or addon.Frames
 local Time = feature.Time or addon.Time

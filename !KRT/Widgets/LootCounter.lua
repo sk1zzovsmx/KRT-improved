@@ -7,7 +7,7 @@ local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
-local Utils = feature.Utils
+
 local Frames = feature.Frames or addon.Frames
 local Colors = feature.Colors or addon.Colors
 local UIScaffold = addon.UIScaffold

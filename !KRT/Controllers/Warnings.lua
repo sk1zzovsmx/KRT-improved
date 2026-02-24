@@ -7,7 +7,7 @@ local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
-local Utils = feature.Utils
+
 local ListController = feature.ListController or addon.ListController
 local Frames = feature.Frames or addon.Frames
 local Strings = feature.Strings or addon.Strings

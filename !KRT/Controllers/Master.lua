@@ -8,7 +8,7 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
-local Utils = feature.Utils
+
 local Frames = feature.Frames or addon.Frames
 local Strings = feature.Strings or addon.Strings
 local Colors = feature.Colors or addon.Colors

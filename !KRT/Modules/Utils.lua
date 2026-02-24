@@ -8,7 +8,7 @@ local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 addon.Utils = addon.Utils or {}
-local Utils = addon.Utils
+local LegacyUtils = addon.Utils
 
 local L = feature.L
 
@@ -26,7 +26,7 @@ local function getBus()
 end
 
 local function getUI()
-    return Utils.UI
+    return LegacyUtils.UI
 end
 
 local function warnDeprecatedCompat(legacyName, ownerPath)
@@ -42,13 +42,13 @@ local function warnDeprecatedCompat(legacyName, ownerPath)
     state.utilsCompatWarned[legacyName] = true
 
     if addon.warn then
-        addon:warn("[Compat] Utils.%s is deprecated; use %s", tostring(legacyName), tostring(ownerPath))
+        addon:warn("[Compat] LegacyUtils.%s is deprecated; use %s", tostring(legacyName), tostring(ownerPath))
     end
 end
 
 -- =========== String helpers  =========== --
 
-function Utils.ucfirst(value)
+function LegacyUtils.ucfirst(value)
     local Strings = getStrings()
     if Strings and Strings.ucfirst then
         return Strings.ucfirst(value)
@@ -58,7 +58,7 @@ end
 
 -- @compat facade for legacy call-sites.
 -- @deprecated use addon.Strings.trimText
-function Utils.trimText(value, allowNil)
+function LegacyUtils.trimText(value, allowNil)
     warnDeprecatedCompat("trimText", "addon.Strings.trimText")
     local Strings = getStrings()
     if Strings and Strings.trimText then
@@ -72,31 +72,31 @@ end
 
 -- @compat facade for legacy call-sites.
 -- @deprecated use addon.Strings.normalizeName
-function Utils.normalizeName(value, allowNil)
+function LegacyUtils.normalizeName(value, allowNil)
     warnDeprecatedCompat("normalizeName", "addon.Strings.normalizeName")
     local Strings = getStrings()
     if Strings and Strings.normalizeName then
         return Strings.normalizeName(value, allowNil)
     end
-    return Utils.trimText(value, allowNil)
+    return LegacyUtils.trimText(value, allowNil)
 end
 
 -- @compat facade for legacy call-sites.
 -- @deprecated use addon.Strings.normalizeLower
-function Utils.normalizeLower(value, allowNil)
+function LegacyUtils.normalizeLower(value, allowNil)
     warnDeprecatedCompat("normalizeLower", "addon.Strings.normalizeLower")
     local Strings = getStrings()
     if Strings and Strings.normalizeLower then
         return Strings.normalizeLower(value, allowNil)
     end
-    local text = Utils.trimText(value, allowNil)
+    local text = LegacyUtils.trimText(value, allowNil)
     if text == nil then
         return nil
     end
     return lower(text)
 end
 
-function Utils.findAchievement(inp)
+function LegacyUtils.findAchievement(inp)
     local Strings = getStrings()
     if Strings and Strings.findAchievement then
         return Strings.findAchievement(inp)
@@ -104,7 +104,7 @@ function Utils.findAchievement(inp)
     return inp and tostring(inp) or ""
 end
 
-function Utils.formatChatMessage(text, prefix, outputFormat, prefixHex)
+function LegacyUtils.formatChatMessage(text, prefix, outputFormat, prefixHex)
     local Strings = getStrings()
     if Strings and Strings.formatChatMessage then
         return Strings.formatChatMessage(text, prefix, outputFormat, prefixHex)
@@ -115,21 +115,21 @@ end
 
 -- @compat facade for legacy call-sites.
 -- @deprecated use addon.Strings.splitArgs
-function Utils.splitArgs(msg)
+function LegacyUtils.splitArgs(msg)
     warnDeprecatedCompat("splitArgs", "addon.Strings.splitArgs")
     local Strings = getStrings()
     if Strings and Strings.splitArgs then
         return Strings.splitArgs(msg)
     end
-    msg = Utils.trimText(msg)
+    msg = LegacyUtils.trimText(msg)
     if msg == "" then
         return "", ""
     end
     local cmd, rest = msg:match("^(%S+)%s*(.-)$")
-    return lower(cmd or ""), Utils.trimText(rest)
+    return lower(cmd or ""), LegacyUtils.trimText(rest)
 end
 
-function Utils.getItemIdFromLink(itemLink)
+function LegacyUtils.getItemIdFromLink(itemLink)
     local Strings = getStrings()
     if Strings and Strings.getItemIdFromLink then
         return Strings.getItemIdFromLink(itemLink)
@@ -137,7 +137,7 @@ function Utils.getItemIdFromLink(itemLink)
     return nil
 end
 
-function Utils.getItemStringFromLink(itemLink)
+function LegacyUtils.getItemStringFromLink(itemLink)
     local Strings = getStrings()
     if Strings and Strings.getItemStringFromLink then
         return Strings.getItemStringFromLink(itemLink)
@@ -147,14 +147,14 @@ end
 
 -- =========== Event bus facade  =========== --
 
-function Utils.resetInternalCallbackStats()
+function LegacyUtils.resetInternalCallbackStats()
     local Bus = getBus()
     if Bus and Bus.resetInternalCallbackStats then
         return Bus.resetInternalCallbackStats()
     end
 end
 
-function Utils.dumpInternalCallbackStats(sortBy)
+function LegacyUtils.dumpInternalCallbackStats(sortBy)
     local Bus = getBus()
     if Bus and Bus.dumpInternalCallbackStats then
         return Bus.dumpInternalCallbackStats(sortBy)
@@ -163,14 +163,14 @@ end
 
 -- =========== UI facade  =========== --
 
-function Utils.enableDrag(frame, dragButton)
+function LegacyUtils.enableDrag(frame, dragButton)
     local UI = getUI()
     if UI and UI.enableDrag then
         return UI.enableDrag(frame, dragButton)
     end
 end
 
-function Utils.createRowDrawer(fn)
+function LegacyUtils.createRowDrawer(fn)
     local UI = getUI()
     if UI and UI.createRowDrawer then
         return UI.createRowDrawer(fn)
@@ -182,49 +182,49 @@ function Utils.createRowDrawer(fn)
     end
 end
 
-function Utils.makeConfirmPopup(key, text, onAccept, cancels)
+function LegacyUtils.makeConfirmPopup(key, text, onAccept, cancels)
     local UI = getUI()
     if UI and UI.makeConfirmPopup then
         return UI.makeConfirmPopup(key, text, onAccept, cancels)
     end
 end
 
-function Utils.makeEditBoxPopup(key, text, onAccept, onShow, validate)
+function LegacyUtils.makeEditBoxPopup(key, text, onAccept, onShow, validate)
     local UI = getUI()
     if UI and UI.makeEditBoxPopup then
         return UI.makeEditBoxPopup(key, text, onAccept, onShow, validate)
     end
 end
 
-function Utils.setFrameTitle(frameOrName, titleText, titleFormat)
+function LegacyUtils.setFrameTitle(frameOrName, titleText, titleFormat)
     local UI = getUI()
     if UI and UI.setFrameTitle then
         return UI.setFrameTitle(frameOrName, titleText, titleFormat)
     end
 end
 
-function Utils.resetEditBox(editBox, hide)
+function LegacyUtils.resetEditBox(editBox, hide)
     local UI = getUI()
     if UI and UI.resetEditBox then
         return UI.resetEditBox(editBox, hide)
     end
 end
 
-function Utils.setEditBoxValue(editBox, value, focus)
+function LegacyUtils.setEditBoxValue(editBox, value, focus)
     local UI = getUI()
     if UI and UI.setEditBoxValue then
         return UI.setEditBoxValue(editBox, value, focus)
     end
 end
 
-function Utils.setShown(frame, show)
+function LegacyUtils.setShown(frame, show)
     local UI = getUI()
     if UI and UI.setShown then
         return UI.setShown(frame, show)
     end
 end
 
-function Utils.makeEventDrivenRefresher(targetOrGetter, updateFn)
+function LegacyUtils.makeEventDrivenRefresher(targetOrGetter, updateFn)
     local UI = getUI()
     if UI and UI.makeEventDrivenRefresher then
         return UI.makeEventDrivenRefresher(targetOrGetter, updateFn)
@@ -233,7 +233,7 @@ function Utils.makeEventDrivenRefresher(targetOrGetter, updateFn)
     end
 end
 
-function Utils.makeFrameGetter(globalFrameName)
+function LegacyUtils.makeFrameGetter(globalFrameName)
     local UI = getUI()
     if UI and UI.makeFrameGetter then
         return UI.makeFrameGetter(globalFrameName)
@@ -243,14 +243,14 @@ function Utils.makeFrameGetter(globalFrameName)
     end
 end
 
-function Utils.bindEditBoxHandlers(frameName, specs, requestRefreshFn)
+function LegacyUtils.bindEditBoxHandlers(frameName, specs, requestRefreshFn)
     local UI = getUI()
     if UI and UI.bindEditBoxHandlers then
         return UI.bindEditBoxHandlers(frameName, specs, requestRefreshFn)
     end
 end
 
-function Utils.makeUIFrameController(getFrame, requestRefreshFn)
+function LegacyUtils.makeUIFrameController(getFrame, requestRefreshFn)
     local UI = getUI()
     if UI and UI.makeUIFrameController then
         return UI.makeUIFrameController(getFrame, requestRefreshFn)
@@ -288,49 +288,49 @@ function Utils.makeUIFrameController(getFrame, requestRefreshFn)
     }
 end
 
-function Utils.toggle(frame)
+function LegacyUtils.toggle(frame)
     local UI = getUI()
     if UI and UI.toggle then
         return UI.toggle(frame)
     end
 end
 
-function Utils.hideFrame(frame, onHide)
+function LegacyUtils.hideFrame(frame, onHide)
     local UI = getUI()
     if UI and UI.hideFrame then
         return UI.hideFrame(frame, onHide)
     end
 end
 
-function Utils.toggleHighlight(frame, cond)
+function LegacyUtils.toggleHighlight(frame, cond)
     local UI = getUI()
     if UI and UI.toggleHighlight then
         return UI.toggleHighlight(frame, cond)
     end
 end
 
-function Utils.setRowFocused(row, cond)
+function LegacyUtils.setRowFocused(row, cond)
     local UI = getUI()
     if UI and UI.setRowFocused then
         return UI.setRowFocused(row, cond)
     end
 end
 
-function Utils.setButtonCount(btn, baseText, n)
+function LegacyUtils.setButtonCount(btn, baseText, n)
     local UI = getUI()
     if UI and UI.setButtonCount then
         return UI.setButtonCount(btn, baseText, n)
     end
 end
 
-function Utils.setText(frame, str1, str2, cond)
+function LegacyUtils.setText(frame, str1, str2, cond)
     local UI = getUI()
     if UI and UI.setText then
         return UI.setText(frame, str1, str2, cond)
     end
 end
 
-function Utils.getNamedFramePart(frameName, suffix)
+function LegacyUtils.getNamedFramePart(frameName, suffix)
     local UI = getUI()
     if UI and UI.getNamedFramePart then
         return UI.getNamedFramePart(frameName, suffix)
@@ -338,7 +338,7 @@ function Utils.getNamedFramePart(frameName, suffix)
     return nil
 end
 
-function Utils.enableDisableNamedPart(frameName, suffix, cond)
+function LegacyUtils.enableDisableNamedPart(frameName, suffix, cond)
     local UI = getUI()
     if UI and UI.enableDisableNamedPart then
         return UI.enableDisableNamedPart(frameName, suffix, cond)
@@ -346,7 +346,7 @@ function Utils.enableDisableNamedPart(frameName, suffix, cond)
     return nil
 end
 
-function Utils.showHideNamedPart(frameName, suffix, cond)
+function LegacyUtils.showHideNamedPart(frameName, suffix, cond)
     local UI = getUI()
     if UI and UI.showHideNamedPart then
         return UI.showHideNamedPart(frameName, suffix, cond)
@@ -354,7 +354,7 @@ function Utils.showHideNamedPart(frameName, suffix, cond)
     return nil
 end
 
-function Utils.setTextNamedPart(frameName, suffix, str1, str2, cond)
+function LegacyUtils.setTextNamedPart(frameName, suffix, str1, str2, cond)
     local UI = getUI()
     if UI and UI.setTextNamedPart then
         return UI.setTextNamedPart(frameName, suffix, str1, str2, cond)
@@ -362,7 +362,7 @@ function Utils.setTextNamedPart(frameName, suffix, str1, str2, cond)
     return nil
 end
 
-function Utils.updateModeTextNamedPart(frameName, suffix, str1, str2, mode, lastMode)
+function LegacyUtils.updateModeTextNamedPart(frameName, suffix, str1, str2, mode, lastMode)
     local UI = getUI()
     if UI and UI.updateModeTextNamedPart then
         return UI.updateModeTextNamedPart(frameName, suffix, str1, str2, mode, lastMode)
@@ -381,7 +381,7 @@ end
 
 -- =========== Color utilities  =========== --
 
-function Utils.normalizeHexColor(color)
+function LegacyUtils.normalizeHexColor(color)
     local Colors = addon.Colors
     if Colors and Colors.normalizeHexColor then
         return Colors.normalizeHexColor(color)
@@ -389,7 +389,7 @@ function Utils.normalizeHexColor(color)
     return "ffffffff"
 end
 
-function Utils.getClassColor(className)
+function LegacyUtils.getClassColor(className)
     local Colors = addon.Colors
     if Colors and Colors.getClassColor then
         return Colors.getClassColor(className)
@@ -399,21 +399,21 @@ end
 
 -- =========== Chat + comms helpers  =========== --
 
-function Utils.sync(prefix, msg)
+function LegacyUtils.sync(prefix, msg)
     local Comms = addon.Comms
     if Comms and Comms.sync then
         return Comms.sync(prefix, msg)
     end
 end
 
-function Utils.chat(msg, channel, language, target, bypass)
+function LegacyUtils.chat(msg, channel, language, target, bypass)
     local Comms = addon.Comms
     if Comms and Comms.chat then
         return Comms.chat(msg, channel, language, target, bypass)
     end
 end
 
-function Utils.whisper(target, msg)
+function LegacyUtils.whisper(target, msg)
     local Comms = addon.Comms
     if Comms and Comms.whisper then
         return Comms.whisper(target, msg)
@@ -422,7 +422,7 @@ end
 
 -- =========== Time helpers  =========== --
 
-function Utils.sec2clock(seconds)
+function LegacyUtils.sec2clock(seconds)
     local Time = addon.Time
     if Time and Time.sec2clock then
         return Time.sec2clock(seconds)
@@ -430,7 +430,7 @@ function Utils.sec2clock(seconds)
     return "00:00:00"
 end
 
-function Utils.isRaidInstance()
+function LegacyUtils.isRaidInstance()
     local Time = addon.Time
     if Time and Time.isRaidInstance then
         return Time.isRaidInstance()
@@ -438,7 +438,7 @@ function Utils.isRaidInstance()
     return false
 end
 
-function Utils.getDifficulty()
+function LegacyUtils.getDifficulty()
     local Time = addon.Time
     if Time and Time.getDifficulty then
         return Time.getDifficulty()
@@ -446,7 +446,7 @@ function Utils.getDifficulty()
     return nil
 end
 
-function Utils.getCurrentTime(server)
+function LegacyUtils.getCurrentTime(server)
     local Time = addon.Time
     if Time and Time.getCurrentTime then
         return Time.getCurrentTime(server)
@@ -454,7 +454,7 @@ function Utils.getCurrentTime(server)
     return time()
 end
 
-function Utils.getServerOffset()
+function LegacyUtils.getServerOffset()
     local Time = addon.Time
     if Time and Time.getServerOffset then
         return Time.getServerOffset()
@@ -464,7 +464,7 @@ end
 
 -- =========== Base64 encode/decode  =========== --
 
-function Utils.encode(data)
+function LegacyUtils.encode(data)
     local Base64 = addon.Base64
     if Base64 and Base64.encode then
         return Base64.encode(data)
@@ -472,7 +472,7 @@ function Utils.encode(data)
     return data
 end
 
-function Utils.decode(data)
+function LegacyUtils.decode(data)
     local Base64 = addon.Base64
     if Base64 and Base64.decode then
         return Base64.decode(data)

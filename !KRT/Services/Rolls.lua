@@ -8,7 +8,7 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
-local Utils = feature.Utils
+
 local Events = feature.Events or addon.Events or {}
 local Core = feature.Core
 local Bus = feature.Bus or addon.Bus

@@ -620,7 +620,6 @@ function Core.getFeatureShared()
     return {
         L = addon.L,
         Diag = Diag,
-        Utils = addon.Utils,
         Options = addon.Options,
         Events = addon.Events,
         Features = addon.Features,
