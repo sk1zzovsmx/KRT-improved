@@ -54,46 +54,6 @@ local frameBindings = {
 KRT.Minimap:OnLoad(self)
 ]],
     },
-    ["KRTChanges"] = {
-        OnLoad = [[
-KRT.Changes:OnLoad(self)
-]],
-    },
-    ["KRTChangesAddBtn"] = {
-        OnClick = [[
-KRT.Changes:Add(self, button)
-]],
-    },
-    ["KRTChangesAnnounceBtn"] = {
-        OnClick = [[
-KRT.Changes:Announce()
-]],
-    },
-    ["KRTChangesClearBtn"] = {
-        OnClick = [[
-KRT.Changes:Clear()
-]],
-    },
-    ["KRTChangesDemandBtn"] = {
-        OnClick = [[
-KRT.Changes:Demand()
-]],
-    },
-    ["KRTChangesEditBtn"] = {
-        OnClick = [[
-KRT.Changes:Edit(self, button)
-]],
-    },
-    ["KRTChangesName"] = {
-        OnTabPressed = [[
-_G[self:GetParent():GetName().."Spec"]:SetFocus()
-]],
-    },
-    ["KRTChangesSpec"] = {
-        OnTabPressed = [[
-_G[self:GetParent():GetName().."Name"]:SetFocus()
-]],
-    },
     ["KRTConfig"] = {
         OnLoad = [[
 KRT.Config:OnLoad(self)
@@ -546,17 +506,6 @@ KRT.Spammer:Tab("Healer", "Tank")
 
 local frameTemplateMap = {
     ["KRTButtonTemplate"] = "UIPanelButtonDisabledTexture",
-    ["KRTChanges"] = "KRTFrameTemplate",
-    ["KRTChangesAddBtn"] = "KRTButtonTemplate",
-    ["KRTChangesAnnounceBtn"] = "KRTButtonTemplate",
-    ["KRTChangesButtonTemplateName"] = "GameFontHighlightSmall",
-    ["KRTChangesButtonTemplateSpec"] = "GameFontHighlightSmall",
-    ["KRTChangesClearBtn"] = "KRTButtonTemplate",
-    ["KRTChangesDemandBtn"] = "KRTButtonTemplate",
-    ["KRTChangesEditBtn"] = "KRTButtonTemplate",
-    ["KRTChangesName"] = "GameFontHighlightSmall",
-    ["KRTChangesScrollFrame"] = "KRTScrollFrameTemplate",
-    ["KRTChangesSpec"] = "GameFontHighlightSmall",
     ["KRTConfig"] = "KRTFrameTemplate",
     ["KRTConfigAboutStr"] = "GameFontNormalSmall",
     ["KRTConfigannounceOnBank"] = "KRTConfigCheckButtonTemplate",
@@ -792,18 +741,6 @@ local templateBindings = {
         root = {
             OnLoad = [[
 self:RegisterForClicks("AnyUp")
-]],
-        },
-        children = {
-        },
-    },
-    ["KRTChangesButtonTemplate"] = {
-        root = {
-            OnClick = [[
-KRT.Changes:Select(self, button)
-]],
-            OnDoubleClick = [[
-KRT.Changes:Edit(self)
 ]],
         },
         children = {

@@ -56,6 +56,10 @@ do
     local lastAddBtnMode
     local isAdd = false
     local isEdit = false
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
+    local AcquireRefs
+    local BindChangeRow
 
     local controller = ListController.MakeListController {
         keyName = "ChangesList",
@@ -85,6 +89,7 @@ do
         rowTmpl = "KRTChangesButtonTemplate",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
+            BindChangeRow(row)
             local ui = row._p
             ui.Name:SetText(it.name)
             local class = addon.Raid:GetPlayerClass(it.name)
@@ -125,12 +130,112 @@ do
     })
 
     -- ----- Private helpers ----- --
+    function AcquireRefs(frame)
+        return {
+            addBtn = Frames.Ref(frame, "AddBtn"),
+            announceBtn = Frames.Ref(frame, "AnnounceBtn"),
+            clearBtn = Frames.Ref(frame, "ClearBtn"),
+            demandBtn = Frames.Ref(frame, "DemandBtn"),
+            editBtn = Frames.Ref(frame, "EditBtn"),
+            name = Frames.Ref(frame, "Name"),
+            spec = Frames.Ref(frame, "Spec"),
+        }
+    end
+
+    function BindChangeRow(row)
+        if not row or row._krtChangeBound then
+            return
+        end
+        Frames.SafeSetScript(row, "OnClick", function(self, button)
+            module:Select(self, button)
+        end)
+        Frames.SafeSetScript(row, "OnDoubleClick", function(self)
+            module:Edit(self)
+        end)
+        row._krtChangeBound = true
+    end
 
     -- ----- Public methods ----- --
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
+    function addon.Controllers.Changes:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            frameName = panelScaffold:OnLoad(frame) or frame:GetName()
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        Frames.SafeSetScript(refs.addBtn, "OnClick", function(self, button)
+            module:Add(self, button)
+        end)
+        Frames.SafeSetScript(refs.announceBtn, "OnClick", function()
+            module:Announce()
+        end)
+        Frames.SafeSetScript(refs.clearBtn, "OnClick", function()
+            module:Clear()
+        end)
+        Frames.SafeSetScript(refs.demandBtn, "OnClick", function()
+            module:Demand()
+        end)
+        Frames.SafeSetScript(refs.editBtn, "OnClick", function(self, button)
+            module:Edit(self, button)
+        end)
+        Frames.SafeSetScript(refs.name, "OnTabPressed", function(self)
+            local spec = Frames.Ref(self:GetParent(), "Spec")
+            if spec and spec.SetFocus then
+                spec:SetFocus()
+            end
+        end)
+        Frames.SafeSetScript(refs.spec, "OnTabPressed", function(self)
+            local name = Frames.Ref(self:GetParent(), "Name")
+            if name and name.SetFocus then
+                name:SetFocus()
+            end
+        end)
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Controllers.Changes:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
 
     -- OnLoad frame:
     function module:OnLoad(frame)
-        frameName = panelScaffold:OnLoad(frame)
+        frameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or frameName)
     end
 
     -- Clear module:
