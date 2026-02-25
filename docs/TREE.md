@@ -18,8 +18,9 @@
 |   |-- Core
 |   |   \\-- Init.lua
 |   |-- EntryPoints
-|   |   |-- EntryPoints.lua
-|   |   \\-- README.md
+|   |   |-- Minimap.lua
+|   |   |-- README.md
+|   |   \\-- SlashEvents.lua
 |   |-- Libs
 |   |   |-- CallbackHandler-1.0
 |   |   |   \\-- ...

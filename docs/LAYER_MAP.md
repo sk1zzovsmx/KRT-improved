@@ -49,8 +49,8 @@ Legend:
 | Widgets/LootCounter.lua | L6 Features | L6 Features | addon.LootCounter | Keep | Loot counter widget owner |
 | Widgets/ReservesUI.lua | L6 Features | L6 Features | addon.ReservesUI | Keep | Reserve list/import widgets |
 | Widgets/Config.lua | L6 Features | L6 Features | addon.Config | Keep | Config widget owner |
-| EntryPoints/Minimap.lua | L6 Features | L6 Features | addon.Minimap | Merge | Merge into EntryPoints/EntryPoints.lua |
-| EntryPoints/SlashEvents.lua | L6 Features | L6 Features | addon.SlashEvents | Merge | Merge into EntryPoints/EntryPoints.lua |
+| EntryPoints/Minimap.lua | L6 Features | L6 Features | addon.Minimap | Keep | Minimap button and menu entrypoint |
+| EntryPoints/SlashEvents.lua | L6 Features | L6 Features | addon.Slash | Keep | Slash command router entrypoint |
 
 Target end-state notes:
 - Keep public `addon.*` APIs stable where practical.
