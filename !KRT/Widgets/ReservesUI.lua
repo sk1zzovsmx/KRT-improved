@@ -59,6 +59,8 @@ do
     local reserveItemRows = {}
     local rowsByItemID = {}
     local localized = false
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
     local reserveRowStyle = {
         odd = { 0.04, 0.06, 0.09, 0.30 },
         even = { 0.08, 0.10, 0.14, 0.36 },
@@ -72,7 +74,20 @@ do
         bindRequestRefresh = bindModuleRequestRefresh,
     })
 
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
     -- ----- Private helpers ----- --
+
+    local function AcquireRefs(frame)
+        return {
+            closeButton = Frames.Ref(frame, "CloseButton"),
+            clearButton = Frames.Ref(frame, "ClearButton"),
+            queryButton = Frames.Ref(frame, "QueryButton"),
+            scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"],
+            scrollChild = (frame.ScrollFrame and frame.ScrollFrame.ScrollChild) or _G["KRTReserveListFrameScrollChild"],
+        }
+    end
 
     local function getReservesModule()
         local services = addon.Services
@@ -541,6 +556,54 @@ do
         RenderReserveListUI()
     end
 
+    function addon.Widgets.ReservesUI:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            self:OnLoad(frame)
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+        scrollFrame = refs.scrollFrame or scrollFrame
+        scrollChild = refs.scrollChild or scrollChild
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Widgets.ReservesUI:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
+
     function UI:OnLoad(frame)
         addon:debug(Diag.D.LogReservesFrameLoaded)
         frameName = Frames.InitModuleFrame(module, frame, {
@@ -608,6 +671,8 @@ do
     local Import = UI.Import
     local getImportFrame = makeModuleFrameGetter(Import, "KRTImportWindow")
     local importLocalized = false
+    local importUiBound = false
+    local importScaffoldToggle, importScaffoldHide
     local MODE_MULTI, MODE_PLUS = 0, 1
 
     UIScaffold.BootstrapModuleUi(Import, getImportFrame, function()
@@ -618,6 +683,20 @@ do
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
+
+    importScaffoldToggle = Import.Toggle
+    importScaffoldHide = Import.Hide
+
+    local function AcquireImportRefs(frame)
+        return {
+            cancelButton = _G["KRTImportCancelButton"],
+            confirmButton = _G["KRTImportConfirmButton"],
+            editBox = _G["KRTImportEditBox"],
+            modeSlider = _G["KRTImportWindowModeSlider"] or _G["KRTImportModeSlider"],
+            status = _G["KRTImportWindowStatus"],
+            frame = frame,
+        }
+    end
 
     local function GetImportModeString()
         if Service and Service.GetImportMode then
@@ -720,6 +799,70 @@ do
         if cancelButton then cancelButton:SetText(L.BtnClose) end
 
         importLocalized = true
+    end
+
+    function Import:BindUI()
+        if importUiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getImportFrame()
+        if not frame then
+            return nil
+        end
+        if not self.frame then
+            self:OnLoad(frame)
+        end
+
+        local refs = AcquireImportRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        Frames.SafeSetScript(refs.cancelButton, "OnClick", function()
+            if Import.Hide then
+                Import:Hide()
+            end
+        end)
+        Frames.SafeSetScript(refs.confirmButton, "OnClick", function()
+            Import:ImportFromEditBox()
+        end)
+        Frames.SafeSetScript(refs.editBox, "OnEscapePressed", function()
+            if Import.Hide then
+                Import:Hide()
+            end
+        end)
+        Frames.SafeSetScript(refs.modeSlider, "OnValueChanged", function(self, value)
+            Import:OnModeSliderChanged(self, value)
+        end)
+        Import:OnModeSliderLoad(refs.modeSlider)
+
+        importUiBound = true
+        return frame, refs
+    end
+
+    function Import:EnsureUI()
+        if importUiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function Import:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if importScaffoldToggle then
+            return importScaffoldToggle(self)
+        end
+    end
+
+    function Import:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if importScaffoldHide then
+            return importScaffoldHide(self)
+        end
     end
 
     function Import:SetImportMode(modeValue, suppressSlider)

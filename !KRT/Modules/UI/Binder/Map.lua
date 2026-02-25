@@ -21,8 +21,6 @@ local widgetFrameExact = {
 }
 
 local widgetFramePrefixes = {
-    { "KRTReserve", "Reserves" },
-    { "KRTImport", "Reserves" },
 }
 
 local function getFrameWidgetId(frameName)
@@ -49,34 +47,6 @@ local frameBindings = {
     ["KRT_MINIMAP_GUI"] = {
         OnLoad = [[
 KRT.Minimap:OnLoad(self)
-]],
-    },
-    ["KRTImportCancelButton"] = {
-        OnClick = [[
-KRT.ReservesUI.Import:Hide()
-]],
-    },
-    ["KRTImportConfirmButton"] = {
-        OnClick = [[
-KRT.ReservesUI.Import:ImportFromEditBox()
-]],
-    },
-    ["KRTImportEditBox"] = {
-        OnEscapePressed = [[
-self:ClearFocus()
-]],
-    },
-    ["KRTImportWindow"] = {
-        OnLoad = [[
-KRT.ReservesUI.Import:OnLoad(self)
-]],
-    },
-    ["KRTImportWindowModeSlider"] = {
-        OnLoad = [[
-KRT.ReservesUI.Import:OnModeSliderLoad(self)
-]],
-        OnValueChanged = [[
-KRT.ReservesUI.Import:OnModeSliderChanged(self, value)
 ]],
     },
     ["KRTLogger"] = {
@@ -396,25 +366,12 @@ KRT.Master:BtnSpamLoot(self, button)
 KRT.Master:BtnSR(self, button)
 ]],
     },
-    ["KRTReserveListFrame"] = {
-        OnLoad = [[
-KRT.ReservesUI:OnLoad(self)
-]],
-    },
 }
 
 local frameTemplateMap = {
     ["KRTButtonTemplate"] = "UIPanelButtonDisabledTexture",
     ["KRTEditBoxTemplate"] = "GameFontHighlight",
     ["KRTFrameTemplateTitle"] = "GameFontNormalSmall",
-    ["KRTImportCancelButton"] = "KRTButtonTemplate",
-    ["KRTImportConfirmButton"] = "KRTButtonTemplate",
-    ["KRTImportEditBox"] = "InputBoxTemplate",
-    ["KRTImportScrollFrame"] = "KRTScrollFrameTemplate",
-    ["KRTImportWindow"] = "KRTFrameTemplate",
-    ["KRTImportWindowHint"] = "GameFontNormalSmall",
-    ["KRTImportWindowModeSlider"] = "OptionsSliderTemplate",
-    ["KRTImportWindowStatus"] = "GameFontHighlightSmall",
     ["KRTItemSelectionButtonName"] = "GameFontNormalSmall",
     ["KRTLogger"] = "KRTFrameTemplate",
     ["KRTLoggerBossAttendees"] = "KRTLoggerFrameTemplate",
@@ -519,17 +476,6 @@ local frameTemplateMap = {
     ["KRTMasterSelectItemBtn"] = "KRTButtonTemplate",
     ["KRTMasterSpamLootBtn"] = "KRTButtonTemplate",
     ["KRTMasterSRBtn"] = "KRTButtonTemplate",
-    ["KRTReserveHeaderTemplateLabel"] = "GameFontNormal",
-    ["KRTReserveListFrame"] = "KRTFrameTemplate",
-    ["KRTReserveListFrameClearButton"] = "KRTButtonTemplate",
-    ["KRTReserveListFrameCloseButton"] = "KRTButtonTemplate",
-    ["KRTReserveListFrameQueryButton"] = "KRTButtonTemplate",
-    ["KRTReserveListFrameScrollFrame"] = "KRTScrollFrameTemplate",
-    ["KRTReserveRowTemplateIconBtn"] = "KRTItemButtonTemplate",
-    ["KRTReserveRowTemplateQuantity"] = "GameFontNormalSmall",
-    ["KRTReserveRowTemplateTextBlockName"] = "KRTFontString",
-    ["KRTReserveRowTemplateTextBlockPlayers"] = "GameFontHighlightSmall",
-    ["KRTReserveRowTemplateTextBlockSource"] = "GameFontHighlightSmall",
     ["KRTSelectPlayerTemplateCounter"] = "GameFontNormalSmall",
     ["KRTSelectPlayerTemplateName"] = "GameFontNormal",
     ["KRTSelectPlayerTemplateRoll"] = "GameFontNormalSmall",
