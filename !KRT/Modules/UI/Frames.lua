@@ -10,6 +10,7 @@ local feature = addon.Core.GetFeatureShared()
 local type = type
 local format = string.format
 local ipairs = ipairs
+local strsub = string.sub
 
 local _G = _G
 local function CreateFrame(...)
@@ -156,6 +157,55 @@ function Frames.SetShown(frame, show)
     elseif frame:IsShown() then
         frame:Hide()
     end
+end
+
+function Frames.Get(frameName)
+    if type(frameName) ~= "string" or frameName == "" then
+        return nil
+    end
+    return _G[frameName]
+end
+
+function Frames.Ref(frameOrName, childName)
+    local frameName = frameOrName
+    if type(frameOrName) ~= "string" then
+        frameName = frameOrName and frameOrName.GetName and frameOrName:GetName() or nil
+    end
+    if type(frameName) ~= "string" or frameName == "" then
+        return nil
+    end
+    if type(childName) ~= "string" or childName == "" then
+        return nil
+    end
+
+    if strsub(childName, 1, #frameName) == frameName then
+        return _G[childName]
+    end
+
+    local exact = _G[childName]
+    if exact then
+        return exact
+    end
+
+    return _G[frameName .. childName]
+end
+
+function Frames.SafeSetScript(widget, scriptType, handler)
+    if not widget or not widget.SetScript then
+        return false
+    end
+    if type(scriptType) ~= "string" or scriptType == "" then
+        return false
+    end
+    if handler ~= nil and type(handler) ~= "function" then
+        if addon.State and addon.State.debugEnabled then
+            error("Frames.SafeSetScript: handler must be a function or nil")
+        end
+        return false
+    end
+
+    widget:SetScript(scriptType, handler)
+    return true
 end
 
 local function showTooltip(frame)
@@ -509,5 +559,4 @@ function Frames.BindEditBoxHandlers(frameName, specs, requestRefreshFn)
         end
     end
 end
-
 
