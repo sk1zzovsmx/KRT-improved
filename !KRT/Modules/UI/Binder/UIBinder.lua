@@ -3,6 +3,7 @@
 -- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
+-- @legacy transitional: scheduled for removal; use XML-first layout with explicit Lua wiring.
 
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
