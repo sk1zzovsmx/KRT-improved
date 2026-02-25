@@ -21,7 +21,6 @@ local widgetFrameExact = {
 }
 
 local widgetFramePrefixes = {
-    { "KRTLootCounter", "LootCounter" },
     { "KRTReserve", "Reserves" },
     { "KRTImport", "Reserves" },
 }
@@ -307,11 +306,6 @@ KRT.Logger.Raids:Sort("size")
 KRT.Logger.Raids:Sort("zone")
 ]],
     },
-    ["KRTLootCounterFrame"] = {
-        OnLoad = [[
-KRT.LootCounter:OnLoad(self)
-]],
-    },
     ["KRTMaster"] = {
         OnLoad = [[
 KRT.Master:OnLoad(self)
@@ -500,8 +494,6 @@ local frameTemplateMap = {
     ["KRTLoggerRollTypePickerFrameMS"] = "UIPanelButtonTemplate",
     ["KRTLoggerRollTypePickerFrameOS"] = "UIPanelButtonTemplate",
     ["KRTLoggerRollTypePickerFrameSR"] = "UIPanelButtonTemplate",
-    ["KRTLootCounterFrame"] = "KRTFrameTemplate",
-    ["KRTLootCounterFrameScrollFrame"] = "KRTScrollFrameTemplate",
     ["KRTMaster"] = "KRTFrameTemplate",
     ["KRTMasterAwardBtn"] = "KRTButtonTemplate",
     ["KRTMasterBankBtn"] = "KRTButtonTemplate",

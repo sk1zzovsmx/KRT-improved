@@ -51,6 +51,8 @@ do
     local rows, raidPlayers = {}, {}
     local scrollFrame, scrollChild, header
     local getFrame = makeModuleFrameGetter(module, "KRTLootCounterFrame")
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
 
     -- Single-line column header.
     local HEADER_HEIGHT = 18
@@ -63,6 +65,17 @@ do
     local COUNT_COL_W = 40
 
     -- ----- Private helpers ----- --
+    local function AcquireRefs(frame)
+        local refs = {
+            scrollFrame = frame
+                and (frame.ScrollFrame or _G[(frame.GetName and frame:GetName() or "KRTLootCounterFrame") .. "ScrollFrame"])
+                or nil,
+        }
+        refs.scrollChild = (refs.scrollFrame and refs.scrollFrame.ScrollChild)
+            or _G["KRTLootCounterFrameScrollFrameScrollChild"]
+        return refs
+    end
+
     local function ensureFrames()
         local frame = getFrame()
         if not frame then
@@ -297,6 +310,58 @@ do
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
+
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
+    function addon.Widgets.LootCounter:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            self:OnLoad(frame)
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        scrollFrame = refs.scrollFrame or scrollFrame
+        scrollChild = refs.scrollChild or scrollChild
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Widgets.LootCounter:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
 
     local function requestRefresh()
         -- Coalesced, event-driven refresh (safe even if frame is hidden/not yet created).
