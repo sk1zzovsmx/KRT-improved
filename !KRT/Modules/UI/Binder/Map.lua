@@ -542,42 +542,6 @@ KRT.Spammer:Tab("TankClass", "Duration")
 KRT.Spammer:Tab("Healer", "Tank")
 ]],
     },
-    ["KRTWarnings"] = {
-        OnHide = [[
-KRT.Warnings:Cancel()
-]],
-        OnLoad = [[
-KRT.Warnings:OnLoad(self)
-]],
-        OnShow = [[
-KRT.Warnings:Cancel()
-]],
-    },
-    ["KRTWarningsAnnounceBtn"] = {
-        OnClick = [[
-KRT.Warnings:Announce()
-]],
-    },
-    ["KRTWarningsContent"] = {
-        OnTabPressed = [[
-_G[self:GetParent():GetName().."Name"]:SetFocus()
-]],
-    },
-    ["KRTWarningsDeleteBtn"] = {
-        OnClick = [[
-KRT.Warnings:Delete(self, button)
-]],
-    },
-    ["KRTWarningsEditBtn"] = {
-        OnClick = [[
-KRT.Warnings:Edit(self, button)
-]],
-    },
-    ["KRTWarningsName"] = {
-        OnTabPressed = [[
-_G[self:GetParent():GetName().."Content"]:SetFocus()
-]],
-    },
 }
 
 local frameTemplateMap = {
@@ -810,17 +774,6 @@ local frameTemplateMap = {
     ["KRTSpammerTick"] = "KRTFontStringGray",
     ["KRTWarningButtonTemplateID"] = "KRTFontStringGray",
     ["KRTWarningButtonTemplateName"] = "GameFontNormalSmall",
-    ["KRTWarnings"] = "KRTFrameTemplate",
-    ["KRTWarningsAnnounceBtn"] = "KRTButtonTemplate",
-    ["KRTWarningsContent"] = "KRTEditBoxTemplate",
-    ["KRTWarningsDeleteBtn"] = "KRTButtonTemplate",
-    ["KRTWarningsEditBtn"] = "KRTButtonTemplate",
-    ["KRTWarningsMessageStr"] = "GameFontNormal",
-    ["KRTWarningsName"] = "GameFontHighlight",
-    ["KRTWarningsNameStr"] = "GameFontNormal",
-    ["KRTWarningsOutputContent"] = "KRTFontStringGray",
-    ["KRTWarningsOutputName"] = "GameFontNormal",
-    ["KRTWarningsScrollFrame"] = "KRTScrollFrameTemplate",
 }
 
 local templateInheritsMap = {
@@ -978,18 +931,6 @@ KRT.Spammer:Pause()
         children = {
         },
     },
-    ["KRTWarningButtonTemplate"] = {
-        root = {
-            OnClick = [[
-KRT.Warnings:Select(self, button)
-]],
-            OnLoad = [[
-self:RegisterForClicks("LeftButtonUp")
-]],
-        },
-        children = {
-        },
-    },
 }
 
 Map.widgetFrameExact = widgetFrameExact
@@ -999,4 +940,3 @@ Map.frameBindings = frameBindings
 Map.frameTemplateMap = frameTemplateMap
 Map.templateInheritsMap = templateInheritsMap
 Map.templateBindings = templateBindings
-

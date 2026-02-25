@@ -48,8 +48,32 @@ do
     local tempName, tempContent
     local SaveWarning
     local isEdit = false
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
 
     -- ----- Private helpers ----- --
+    local function AcquireRefs(frame)
+        return {
+            name = Frames.Ref(frame, "Name"),
+            content = Frames.Ref(frame, "Content"),
+            editBtn = Frames.Ref(frame, "EditBtn"),
+            deleteBtn = Frames.Ref(frame, "DeleteBtn"),
+            announceBtn = Frames.Ref(frame, "AnnounceBtn"),
+        }
+    end
+
+    local function BindWarningRow(row)
+        if not row or row._krtWarningBound then
+            return
+        end
+        if row.RegisterForClicks then
+            row:RegisterForClicks("LeftButtonUp")
+        end
+        Frames.SafeSetScript(row, "OnClick", function(self, button)
+            module:Select(self, button)
+        end)
+        row._krtWarningBound = true
+    end
 
     -- ----- Public methods ----- --
 
@@ -69,6 +93,7 @@ do
         rowTmpl = "KRTWarningButtonTemplate",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
+            BindWarningRow(row)
             local ui = row._p
             ui.ID:SetText(it.id)
             ui.Name:SetText(it.name)
@@ -99,9 +124,86 @@ do
         end,
     })
 
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
+    function addon.Controllers.Warnings:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            frameName = panelScaffold:OnLoad(frame) or frame:GetName()
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        Frames.SafeSetScript(frame, "OnShow", function()
+            module:Cancel()
+        end)
+        Frames.SafeSetScript(frame, "OnHide", function()
+            module:Cancel()
+        end)
+        Frames.SafeSetScript(refs.announceBtn, "OnClick", function()
+            module:Announce()
+        end)
+        Frames.SafeSetScript(refs.deleteBtn, "OnClick", function(self, button)
+            module:Delete(self, button)
+        end)
+        Frames.SafeSetScript(refs.editBtn, "OnClick", function(self, button)
+            module:Edit(self, button)
+        end)
+        Frames.SafeSetScript(refs.name, "OnTabPressed", function(self)
+            local content = Frames.Ref(self:GetParent(), "Content")
+            if content and content.SetFocus then
+                content:SetFocus()
+            end
+        end)
+        Frames.SafeSetScript(refs.content, "OnTabPressed", function(self)
+            local name = Frames.Ref(self:GetParent(), "Name")
+            if name and name.SetFocus then
+                name:SetFocus()
+            end
+        end)
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Controllers.Warnings:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
+
     -- OnLoad frame:
     function module:OnLoad(frame)
-        frameName = panelScaffold:OnLoad(frame)
+        frameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or frameName)
     end
 
     -- Warning selection:
