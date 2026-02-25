@@ -18,11 +18,9 @@ UIBinder.Map = UIBinder.Map or {}
 local Map = UIBinder.Map
 
 local widgetFrameExact = {
-    ["KRTMasterConfigBtn"] = "Config",
 }
 
 local widgetFramePrefixes = {
-    { "KRTConfig", "Config" },
     { "KRTLootCounter", "LootCounter" },
     { "KRTReserve", "Reserves" },
     { "KRTImport", "Reserves" },
@@ -52,34 +50,6 @@ local frameBindings = {
     ["KRT_MINIMAP_GUI"] = {
         OnLoad = [[
 KRT.Minimap:OnLoad(self)
-]],
-    },
-    ["KRTConfig"] = {
-        OnLoad = [[
-KRT.Config:OnLoad(self)
-]],
-    },
-    ["KRTConfigCloseBtn"] = {
-        OnClick = [[
-self:GetParent():Hide()
-]],
-    },
-    ["KRTConfigcountdownDuration"] = {
-        OnLoad = [[
-KRT.Config:InitCountdownSlider(self)
-]],
-        OnValueChanged = [[
-KRT.Config:OnClick(self)
-]],
-    },
-    ["KRTConfigcountdownSimpleRaidMsg"] = {
-        OnClick = [[
-KRT.Config:OnClick(self, button)
-]],
-    },
-    ["KRTConfiguseRaidWarning"] = {
-        OnClick = [[
-KRT.Config:OnClick(self, button)
 ]],
     },
     ["KRTImportCancelButton"] = {
@@ -441,40 +411,6 @@ KRT.ReservesUI:OnLoad(self)
 
 local frameTemplateMap = {
     ["KRTButtonTemplate"] = "UIPanelButtonDisabledTexture",
-    ["KRTConfig"] = "KRTFrameTemplate",
-    ["KRTConfigAboutStr"] = "GameFontNormalSmall",
-    ["KRTConfigannounceOnBank"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfigannounceOnBankStr"] = "KRTConfigFontStringTemplate",
-    ["KRTConfigannounceOnDisenchant"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfigannounceOnDisenchantStr"] = "KRTConfigFontStringTemplate",
-    ["KRTConfigannounceOnHold"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfigannounceOnHoldStr"] = "KRTConfigFontStringTemplate",
-    ["KRTConfigannounceOnWin"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfigannounceOnWinStr"] = "KRTConfigFontStringTemplate",
-    ["KRTConfigCloseBtn"] = "KRTButtonTemplate",
-    ["KRTConfigcountdownDuration"] = "OptionsSliderTemplate",
-    ["KRTConfigcountdownDurationStr"] = "GameFontNormalSmall",
-    ["KRTConfigcountdownRollsBlock"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfigcountdownRollsBlockStr"] = "KRTConfigFontStringTemplate",
-    ["KRTConfigcountdownSimpleRaidMsg"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfigcountdownSimpleRaidMsgStr"] = "KRTConfigFontStringTemplate",
-    ["KRTConfigDefaultsBtn"] = "KRTButtonTemplate",
-    ["KRTConfigignoreStacks"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfigignoreStacksStr"] = "KRTConfigFontStringTemplate",
-    ["KRTConfiglootWhispers"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfiglootWhispersStr"] = "KRTConfigFontStringTemplate",
-    ["KRTConfigminimapButton"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfigminimapButtonStr"] = "KRTConfigFontStringTemplate",
-    ["KRTConfigscreenReminder"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfigscreenReminderStr"] = "KRTConfigFontStringTemplate",
-    ["KRTConfigshowLootCounterDuringMSRoll"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfigshowLootCounterDuringMSRollStr"] = "KRTConfigFontStringTemplate",
-    ["KRTConfigshowTooltips"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfigshowTooltipsStr"] = "KRTConfigFontStringTemplate",
-    ["KRTConfigsortAscending"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfigsortAscendingStr"] = "KRTConfigFontStringTemplate",
-    ["KRTConfiguseRaidWarning"] = "KRTConfigCheckButtonTemplate",
-    ["KRTConfiguseRaidWarningStr"] = "KRTConfigFontStringTemplate",
     ["KRTEditBoxTemplate"] = "GameFontHighlight",
     ["KRTFrameTemplateTitle"] = "GameFontNormalSmall",
     ["KRTImportCancelButton"] = "KRTButtonTemplate",
@@ -571,7 +507,6 @@ local frameTemplateMap = {
     ["KRTMasterBankBtn"] = "KRTButtonTemplate",
     ["KRTMasterBankDropDown"] = "UIDropDownMenuTemplate",
     ["KRTMasterClearBtn"] = "KRTButtonTemplate",
-    ["KRTMasterConfigBtn"] = "KRTButtonTemplate",
     ["KRTMasterCountdownBtn"] = "KRTButtonTemplate",
     ["KRTMasterDisenchantBtn"] = "KRTButtonTemplate",
     ["KRTMasterDisenchantDropDown"] = "UIDropDownMenuTemplate",
@@ -611,8 +546,6 @@ local frameTemplateMap = {
 }
 
 local templateInheritsMap = {
-    ["KRTConfigCheckButtonTemplate"] = "InterfaceOptionsCheckButtonTemplate",
-    ["KRTConfigFontStringTemplate"] = "GameFontHighlightSmall",
     ["KRTEditBoxTemplate"] = "InputBoxTemplate",
     ["KRTFontStringGray"] = "GameFontNormalSmall",
     ["KRTFrameTemplate"] = "UIPanelDialogTemplate",
@@ -624,15 +557,6 @@ local templateBindings = {
         root = {
             OnLoad = [[
 self:RegisterForClicks("AnyUp")
-]],
-        },
-        children = {
-        },
-    },
-    ["KRTConfigCheckButtonTemplate"] = {
-        root = {
-            OnClick = [[
-KRT.Config:OnClick(self, button)
 ]],
         },
         children = {

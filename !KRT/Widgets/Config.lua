@@ -49,14 +49,45 @@ do
     -- ----- Internal state ----- --
     local localized = false
     local configDirty = false
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
 
     -- Frame update
     local UpdateUIFrame
     local MIN_COUNTDOWN = 5
     local MAX_COUNTDOWN = 60
+    local optionSuffixes = {
+        "sortAscending",
+        "useRaidWarning",
+        "countdownSimpleRaidMsg",
+        "announceOnWin",
+        "announceOnHold",
+        "announceOnBank",
+        "announceOnDisenchant",
+        "lootWhispers",
+        "countdownRollsBlock",
+        "screenReminder",
+        "ignoreStacks",
+        "showTooltips",
+        "showLootCounterDuringMSRoll",
+        "minimapButton",
+    }
 
     -- ----- Private helpers ----- --
     local LocalizeUIFrame
+    local function AcquireRefs(frame)
+        local refs = {
+            closeBtn = Frames.Ref(frame, "CloseBtn"),
+            defaultsBtn = Frames.Ref(frame, "DefaultsBtn"),
+            countdownDuration = Frames.Ref(frame, "countdownDuration"),
+            options = {},
+        }
+        for i = 1, #optionSuffixes do
+            local suffix = optionSuffixes[i]
+            refs.options[suffix] = Frames.Ref(frame, suffix)
+        end
+        return refs
+    end
 
     -- ----- Public methods ----- --
 
@@ -131,6 +162,74 @@ do
         bindRequestRefresh = bindModuleRequestRefresh,
     })
 
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
+    function addon.Widgets.Config:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            self:OnLoad(frame)
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        Frames.SafeSetScript(refs.closeBtn, "OnClick", function()
+            frame:Hide()
+        end)
+        Frames.SafeSetScript(refs.defaultsBtn, "OnClick", function()
+            LoadDefaultOptions()
+        end)
+        Frames.SafeSetScript(refs.countdownDuration, "OnValueChanged", function(self)
+            module:OnClick(self)
+        end)
+        module:InitCountdownSlider(refs.countdownDuration)
+
+        for i = 1, #optionSuffixes do
+            local suffix = optionSuffixes[i]
+            local optionBtn = refs.options[suffix]
+            Frames.SafeSetScript(optionBtn, "OnClick", function(self, button)
+                module:OnClick(self, button)
+            end)
+        end
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Widgets.Config:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
+
     -- OnClick handler for option controls.
     function module:OnClick(btn)
         if not btn then return end
@@ -188,7 +287,6 @@ do
         _G[frameName .. "AboutStr"]:SetText(L.StrConfigAbout)
         _G[frameName .. "DefaultsBtn"]:SetText(L.BtnDefaults)
         _G[frameName .. "CloseBtn"]:SetText(L.BtnClose)
-        _G[frameName .. "DefaultsBtn"]:SetScript("OnClick", LoadDefaultOptions)
 
         localized = true
     end
