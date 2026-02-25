@@ -51,7 +51,8 @@ KRT.lua
 # Services + entrypoint + parents + child UI controllers
 Services\Raid.lua
 Services\Chat.lua
-EntryPoints\EntryPoints.lua
+EntryPoints\Minimap.lua
+EntryPoints\SlashEvents.lua
 Services\Rolls.lua
 Services\Loot.lua
 Controllers\Master.lua
