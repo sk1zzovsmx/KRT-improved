@@ -437,71 +437,6 @@ KRT.Master:BtnSR(self, button)
 KRT.ReservesUI:OnLoad(self)
 ]],
     },
-    ["KRTSpammer"] = {
-        OnLoad = [[
-KRT.Spammer:OnLoad(self)
-]],
-    },
-    ["KRTSpammerClearBtn"] = {
-        OnClick = [[
-KRT.Spammer:Clear()
-]],
-    },
-    ["KRTSpammerDuration"] = {
-        OnTabPressed = [[
-KRT.Spammer:Tab("Tank", "Name")
-]],
-    },
-    ["KRTSpammerHealer"] = {
-        OnTabPressed = [[
-KRT.Spammer:Tab("HealerClass", "TankClass")
-]],
-    },
-    ["KRTSpammerHealerClass"] = {
-        OnTabPressed = [[
-KRT.Spammer:Tab("Melee", "Healer")
-]],
-    },
-    ["KRTSpammerMelee"] = {
-        OnTabPressed = [[
-KRT.Spammer:Tab("MeleeClass", "HealerClass")
-]],
-    },
-    ["KRTSpammerMeleeClass"] = {
-        OnTabPressed = [[
-KRT.Spammer:Tab("Ranged", "Melee")
-]],
-    },
-    ["KRTSpammerMessage"] = {
-        OnTabPressed = [[
-KRT.Spammer:Tab("Name", "RangedClass")
-]],
-    },
-    ["KRTSpammerName"] = {
-        OnTabPressed = [[
-KRT.Spammer:Tab("Duration", "Message")
-]],
-    },
-    ["KRTSpammerRanged"] = {
-        OnTabPressed = [[
-KRT.Spammer:Tab("RangedClass", "MeleeClass")
-]],
-    },
-    ["KRTSpammerRangedClass"] = {
-        OnTabPressed = [[
-KRT.Spammer:Tab("Message", "Ranged")
-]],
-    },
-    ["KRTSpammerTank"] = {
-        OnTabPressed = [[
-KRT.Spammer:Tab("TankClass", "Duration")
-]],
-    },
-    ["KRTSpammerTankClass"] = {
-        OnTabPressed = [[
-KRT.Spammer:Tab("Healer", "Tank")
-]],
-    },
 }
 
 local frameTemplateMap = {
@@ -671,56 +606,6 @@ local frameTemplateMap = {
     ["KRTSelectPlayerTemplateCounter"] = "GameFontNormalSmall",
     ["KRTSelectPlayerTemplateName"] = "GameFontNormal",
     ["KRTSelectPlayerTemplateRoll"] = "GameFontNormalSmall",
-    ["KRTSpammer"] = "KRTFrameTemplate",
-    ["KRTSpammerChannel1Str"] = "GameFontHighlightSmall",
-    ["KRTSpammerChannel2Str"] = "GameFontHighlightSmall",
-    ["KRTSpammerChannel3Str"] = "GameFontHighlightSmall",
-    ["KRTSpammerChannel4Str"] = "GameFontHighlightSmall",
-    ["KRTSpammerChannel5Str"] = "GameFontHighlightSmall",
-    ["KRTSpammerChannel6Str"] = "GameFontHighlightSmall",
-    ["KRTSpammerChannel7Str"] = "GameFontHighlightSmall",
-    ["KRTSpammerChannel8Str"] = "GameFontHighlightSmall",
-    ["KRTSpammerChannelGuildStr"] = "GameFontHighlightSmall",
-    ["KRTSpammerChannelsStr"] = "GameFontNormalSmall",
-    ["KRTSpammerChannelYellStr"] = "GameFontHighlightSmall",
-    ["KRTSpammerChat1"] = "KRTSpammerCheckButton",
-    ["KRTSpammerChat2"] = "KRTSpammerCheckButton",
-    ["KRTSpammerChat3"] = "KRTSpammerCheckButton",
-    ["KRTSpammerChat4"] = "KRTSpammerCheckButton",
-    ["KRTSpammerChat5"] = "KRTSpammerCheckButton",
-    ["KRTSpammerChat6"] = "KRTSpammerCheckButton",
-    ["KRTSpammerChat7"] = "KRTSpammerCheckButton",
-    ["KRTSpammerChat8"] = "KRTSpammerCheckButton",
-    ["KRTSpammerChatGuild"] = "KRTSpammerCheckButton",
-    ["KRTSpammerChatYell"] = "KRTSpammerCheckButton",
-    ["KRTSpammerClassStr"] = "KRTFontStringGray",
-    ["KRTSpammerClearBtn"] = "KRTButtonTemplate",
-    ["KRTSpammerCompStr"] = "GameFontNormalSmall",
-    ["KRTSpammerDuration"] = "GameFontHighlightSmall",
-    ["KRTSpammerDurationStr"] = "GameFontNormalSmall",
-    ["KRTSpammerEditBox"] = "GameFontHighlightSmall",
-    ["KRTSpammerHealer"] = "KRTSpammerEditBox",
-    ["KRTSpammerHealerClass"] = "KRTSpammerEditBox",
-    ["KRTSpammerHealersStr"] = "GameFontNormalSmall",
-    ["KRTSpammerLength"] = "KRTFontStringGray",
-    ["KRTSpammerMelee"] = "KRTSpammerEditBox",
-    ["KRTSpammerMeleeClass"] = "KRTSpammerEditBox",
-    ["KRTSpammerMeleesStr"] = "GameFontNormalSmall",
-    ["KRTSpammerMessage"] = "KRTSpammerEditBox",
-    ["KRTSpammerMessageStr"] = "GameFontNormalSmall",
-    ["KRTSpammerName"] = "KRTSpammerEditBox",
-    ["KRTSpammerNameStr"] = "GameFontNormalSmall",
-    ["KRTSpammerNeedStr"] = "KRTFontStringGray",
-    ["KRTSpammerOutput"] = "GameFontHighlightSmall",
-    ["KRTSpammerPreviewStr"] = "GameFontNormal",
-    ["KRTSpammerRanged"] = "KRTSpammerEditBox",
-    ["KRTSpammerRangedClass"] = "KRTSpammerEditBox",
-    ["KRTSpammerRangedStr"] = "GameFontNormalSmall",
-    ["KRTSpammerStartBtn"] = "KRTButtonTemplate",
-    ["KRTSpammerTank"] = "KRTSpammerEditBox",
-    ["KRTSpammerTankClass"] = "KRTSpammerEditBox",
-    ["KRTSpammerTanksStr"] = "GameFontNormalSmall",
-    ["KRTSpammerTick"] = "KRTFontStringGray",
     ["KRTWarningButtonTemplateID"] = "KRTFontStringGray",
     ["KRTWarningButtonTemplateName"] = "GameFontNormalSmall",
 }
@@ -732,8 +617,6 @@ local templateInheritsMap = {
     ["KRTFontStringGray"] = "GameFontNormalSmall",
     ["KRTFrameTemplate"] = "UIPanelDialogTemplate",
     ["KRTScrollFrameTemplate"] = "UIPanelScrollFrameTemplate",
-    ["KRTSpammerCheckButton"] = "SendMailRadioButtonTemplate",
-    ["KRTSpammerEditBox"] = "KRTEditBoxTemplate",
 }
 
 local templateBindings = {
@@ -839,30 +722,6 @@ KRT.Logger:SelectPlayer(self, button)
         root = {
             OnClick = [[
 KRT.Logger:SelectRaid(self, button)
-]],
-        },
-        children = {
-        },
-    },
-    ["KRTSpammerCheckButton"] = {
-        root = {
-            OnClick = [[
-KRT.Spammer:Save(self, button)
-]],
-        },
-        children = {
-        },
-    },
-    ["KRTSpammerEditBox"] = {
-        root = {
-            OnEditFocusLost = [[
-KRT.Spammer:Save(self)
-]],
-            OnEnterPressed = [[
-KRT.Spammer:Save(self)
-]],
-            OnTextChanged = [[
-KRT.Spammer:Pause()
 ]],
         },
         children = {

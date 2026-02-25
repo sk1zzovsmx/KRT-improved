@@ -46,6 +46,8 @@ do
 
     -- Runtime state
     local loaded = false
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
 
     -- Duration kept as string for coherence with EditBox/SV
     local duration = DEFAULT_DURATION_STR
@@ -129,8 +131,34 @@ do
     local UpdateTickDisplay
     local SetInputsLocked
     local GetValidDuration
+    local AcquireRefs
 
     -- ----- Private helpers ----- --
+    function AcquireRefs(frame)
+        local refs = {
+            clearBtn = Frames.Ref(frame, "ClearBtn"),
+            startBtn = Frames.Ref(frame, "StartBtn"),
+            duration = Frames.Ref(frame, "Duration"),
+            healer = Frames.Ref(frame, "Healer"),
+            healerClass = Frames.Ref(frame, "HealerClass"),
+            melee = Frames.Ref(frame, "Melee"),
+            meleeClass = Frames.Ref(frame, "MeleeClass"),
+            message = Frames.Ref(frame, "Message"),
+            name = Frames.Ref(frame, "Name"),
+            ranged = Frames.Ref(frame, "Ranged"),
+            rangedClass = Frames.Ref(frame, "RangedClass"),
+            tank = Frames.Ref(frame, "Tank"),
+            tankClass = Frames.Ref(frame, "TankClass"),
+            chatGuild = Frames.Ref(frame, "ChatGuild"),
+            chatYell = Frames.Ref(frame, "ChatYell"),
+            channels = {},
+        }
+        for i = 1, 8 do
+            refs.channels[i] = Frames.Ref(frame, "Chat" .. i)
+        end
+        return refs
+    end
+
     -- Small helpers
     local function ResetLastState()
         lastState.name = nil
@@ -246,6 +274,109 @@ do
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
+
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
+    function addon.Controllers.Spammer:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            self:OnLoad(frame)
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        Frames.SafeSetScript(refs.clearBtn, "OnClick", function()
+            module:Clear()
+        end)
+        Frames.SafeSetScript(refs.startBtn, "OnClick", function()
+            module:Start()
+        end)
+
+        Frames.SafeSetScript(refs.duration, "OnTabPressed", function()
+            module:Tab("Tank", "Name")
+        end)
+        Frames.SafeSetScript(refs.healer, "OnTabPressed", function()
+            module:Tab("HealerClass", "TankClass")
+        end)
+        Frames.SafeSetScript(refs.healerClass, "OnTabPressed", function()
+            module:Tab("Melee", "Healer")
+        end)
+        Frames.SafeSetScript(refs.melee, "OnTabPressed", function()
+            module:Tab("MeleeClass", "HealerClass")
+        end)
+        Frames.SafeSetScript(refs.meleeClass, "OnTabPressed", function()
+            module:Tab("Ranged", "Melee")
+        end)
+        Frames.SafeSetScript(refs.message, "OnTabPressed", function()
+            module:Tab("Name", "RangedClass")
+        end)
+        Frames.SafeSetScript(refs.name, "OnTabPressed", function()
+            module:Tab("Duration", "Message")
+        end)
+        Frames.SafeSetScript(refs.ranged, "OnTabPressed", function()
+            module:Tab("RangedClass", "MeleeClass")
+        end)
+        Frames.SafeSetScript(refs.rangedClass, "OnTabPressed", function()
+            module:Tab("Message", "Ranged")
+        end)
+        Frames.SafeSetScript(refs.tank, "OnTabPressed", function()
+            module:Tab("TankClass", "Duration")
+        end)
+        Frames.SafeSetScript(refs.tankClass, "OnTabPressed", function()
+            module:Tab("Healer", "Tank")
+        end)
+
+        for i = 1, #refs.channels do
+            local channelBox = refs.channels[i]
+            Frames.SafeSetScript(channelBox, "OnClick", function(self, button)
+                module:Save(self, button)
+            end)
+        end
+        Frames.SafeSetScript(refs.chatGuild, "OnClick", function(self, button)
+            module:Save(self, button)
+        end)
+        Frames.SafeSetScript(refs.chatYell, "OnClick", function(self, button)
+            module:Save(self, button)
+        end)
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Controllers.Spammer:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
 
     -- Save (EditBox / Checkbox)
     function module:Save(box)
@@ -426,7 +557,6 @@ do
         _G[frameName .. "StartBtn"]:SetText(L.BtnStart)
 
         Frames.SetFrameTitle(frameName, L.StrSpammer)
-        _G[frameName .. "StartBtn"]:SetScript("OnClick", module.Start)
 
         local durationBox = _G[frameName .. "Duration"]
         durationBox.tooltip_title = AUCTION_DURATION
