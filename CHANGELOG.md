@@ -54,6 +54,8 @@ Dates are in YYYY-MM-DD.
   preventing rare divide-by-zero errors while Shift-dragging on the ring.
 - **Behavior:** Minimap menu now disables the `LootCounter` entry when the optional widget is disabled
   by feature flags or not registered in the UI facade.
+- **Behavior:** Minimap menu now disables `Demand` and `Announce` entries when the player is not in a
+  raid group (`addon.IsInRaid() == false`).
 - **Bugfix:** `Controllers/Changes.lua` now hardens frame-part lookups and raid-table access, avoiding nil
   index errors on early callbacks and raid-leave cleanup paths.
 - **Refactor:** Scoped `InitChangesTable` as file-local in `Controllers/Changes.lua`; also removed

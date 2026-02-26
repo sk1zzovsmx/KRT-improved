@@ -60,6 +60,9 @@ local cos, sin = math.cos, math.sin
 local rad, atan2, deg = math.rad, math.atan2, math.deg
 local MINIMAP_RING_RADIUS = 80
 local MIN_DRAG_DISTANCE = 0.001
+local MENU_INDEX_LOOT_COUNTER = 2
+local MENU_INDEX_DEMAND = 10
+local MENU_INDEX_ANNOUNCE = 11
 
 -- ----- Private helpers ----- --
 local function AcquireRefs(frame)
@@ -157,11 +160,21 @@ local minimapMenu = {
 }
 
 local function RefreshMenuState()
-    local lootCounterEntry = minimapMenu[2]
+    local lootCounterEntry = minimapMenu[MENU_INDEX_LOOT_COUNTER]
     if not lootCounterEntry then
         return
     end
     lootCounterEntry.disabled = IsWidgetAvailable("LootCounter") and nil or 1
+
+    local hasRaidGroup = (type(addon.IsInRaid) == "function") and addon.IsInRaid() or false
+    local demandEntry = minimapMenu[MENU_INDEX_DEMAND]
+    if demandEntry then
+        demandEntry.disabled = hasRaidGroup and nil or 1
+    end
+    local announceEntry = minimapMenu[MENU_INDEX_ANNOUNCE]
+    if announceEntry then
+        announceEntry.disabled = hasRaidGroup and nil or 1
+    end
 end
 
 -- Initializes and opens the menu for the minimap button.
