@@ -10,7 +10,7 @@ local L = feature.L
 local Diag = feature.Diag
 
 local Frames = feature.Frames or addon.Frames
-local Strings = feature.Strings or addon.Strings
+local Item = feature.Item or addon.Item
 local Colors = feature.Colors or addon.Colors
 local Comms = feature.Comms or addon.Comms
 local UIScaffold = addon.UIScaffold
@@ -100,6 +100,8 @@ do
     local UpdateUIFrame
 
     local getFrame = Frames.MakeFrameGetter("KRTMaster")
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
 
     local InitializeDropDowns, PrepareDropDowns, UpdateDropDowns
     local dropDownData, dropDownGroupData = {}, {}
@@ -158,6 +160,91 @@ do
     }
 
     -- ----- Private helpers ----- --
+    local function AcquireRefs(frame)
+        return {
+            configBtn = Frames.Ref(frame, "ConfigBtn"),
+            selectItemBtn = Frames.Ref(frame, "SelectItemBtn"),
+            spamLootBtn = Frames.Ref(frame, "SpamLootBtn"),
+            msBtn = Frames.Ref(frame, "MSBtn"),
+            osBtn = Frames.Ref(frame, "OSBtn"),
+            srBtn = Frames.Ref(frame, "SRBtn"),
+            freeBtn = Frames.Ref(frame, "FreeBtn"),
+            countdownBtn = Frames.Ref(frame, "CountdownBtn"),
+            awardBtn = Frames.Ref(frame, "AwardBtn"),
+            rollBtn = Frames.Ref(frame, "RollBtn"),
+            clearBtn = Frames.Ref(frame, "ClearBtn"),
+            holdBtn = Frames.Ref(frame, "HoldBtn"),
+            bankBtn = Frames.Ref(frame, "BankBtn"),
+            disenchantBtn = Frames.Ref(frame, "DisenchantBtn"),
+            reserveListBtn = Frames.Ref(frame, "ReserveListBtn"),
+            lootCounterBtn = Frames.Ref(frame, "LootCounterBtn"),
+            itemCountBox = Frames.Ref(frame, "ItemCount"),
+            holdDropDown = Frames.Ref(frame, "HoldDropDown"),
+            bankDropDown = Frames.Ref(frame, "BankDropDown"),
+            disenchantDropDown = Frames.Ref(frame, "DisenchantDropDown"),
+        }
+    end
+
+    local function BindMainControlScripts(frame, refs)
+        if not (frame and refs) then
+            return
+        end
+        if frame._krtBoundUi then
+            return
+        end
+
+        Frames.SafeSetScript(refs.configBtn, "OnClick", function()
+            UI:Call("Config", "Toggle")
+        end)
+        Frames.SafeSetScript(refs.selectItemBtn, "OnClick", function(self, button)
+            module:BtnSelectItem(self, button)
+        end)
+        Frames.SafeSetScript(refs.spamLootBtn, "OnClick", function(self, button)
+            module:BtnSpamLoot(self, button)
+        end)
+        Frames.SafeSetScript(refs.msBtn, "OnClick", function(self, button)
+            module:BtnMS(self, button)
+        end)
+        Frames.SafeSetScript(refs.osBtn, "OnClick", function(self, button)
+            module:BtnOS(self, button)
+        end)
+        Frames.SafeSetScript(refs.srBtn, "OnClick", function(self, button)
+            module:BtnSR(self, button)
+        end)
+        Frames.SafeSetScript(refs.freeBtn, "OnClick", function(self, button)
+            module:BtnFree(self, button)
+        end)
+        Frames.SafeSetScript(refs.countdownBtn, "OnClick", function(self, button)
+            module:BtnCountdown(self, button)
+        end)
+        Frames.SafeSetScript(refs.awardBtn, "OnClick", function(self, button)
+            module:BtnAward(self, button)
+        end)
+        Frames.SafeSetScript(refs.rollBtn, "OnClick", function(self, button)
+            addon.Rolls:Roll(self, button)
+        end)
+        Frames.SafeSetScript(refs.clearBtn, "OnClick", function(self, button)
+            module:BtnClear(self, button)
+        end)
+        Frames.SafeSetScript(refs.holdBtn, "OnClick", function(self, button)
+            module:BtnHold(self, button)
+        end)
+        Frames.SafeSetScript(refs.bankBtn, "OnClick", function(self, button)
+            module:BtnBank(self, button)
+        end)
+        Frames.SafeSetScript(refs.disenchantBtn, "OnClick", function(self, button)
+            module:BtnDisenchant(self, button)
+        end)
+        Frames.SafeSetScript(refs.reserveListBtn, "OnClick", function(self, button)
+            module:BtnReserveList(self, button)
+        end)
+        Frames.SafeSetScript(refs.lootCounterBtn, "OnClick", function(self, button)
+            module:BtnLootCounter(self, button)
+        end)
+
+        frame._krtBoundUi = true
+    end
+
     local function SetItemCountValue(count, focus)
         local frame = getFrame()
         if not frame then return end
@@ -378,14 +465,14 @@ do
     end
 
     local function FindLootSlotIndex(itemLink)
-        local wantedKey = Strings.GetItemStringFromLink(itemLink) or itemLink
+        local wantedKey = Item.GetItemStringFromLink(itemLink) or itemLink
         for i = 1, GetNumLootItems() do
             local tempItemLink = GetLootSlotLink(i)
             if tempItemLink == itemLink then
                 return i
             end
             if wantedKey and tempItemLink then
-                local tempKey = Strings.GetItemStringFromLink(tempItemLink) or tempItemLink
+                local tempKey = Item.GetItemStringFromLink(tempItemLink) or tempItemLink
                 if tempKey == wantedKey then
                     return i
                 end
@@ -517,7 +604,7 @@ do
         lootState.multiAward = {
             active    = true,
             itemLink  = itemLink,
-            itemKey   = Strings.GetItemStringFromLink(itemLink) or itemLink,
+            itemKey   = Item.GetItemStringFromLink(itemLink) or itemLink,
             lastCount = available,
             rollType  = lootState.currentRollType,
             winners   = winners,
@@ -834,6 +921,58 @@ do
         bindRequestRefresh = bindModuleRequestRefresh,
     })
 
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
+    function addon.Controllers.Master:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            self:OnLoad(frame)
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        LocalizeUIFrame()
+        BindMainControlScripts(frame, refs)
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Controllers.Master:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
+
     -- Button: Select/Remove Item
     function module:BtnSelectItem(btn)
         if btn == nil or lootState.lootCount <= 0 then return end
@@ -902,7 +1041,7 @@ do
             lootState.itemTraded = 0
 
             local itemLink = GetItemLink()
-            local itemID = Strings.GetItemIdFromLink(itemLink)
+            local itemID = Item.GetItemIdFromLink(itemLink)
             local message
 
             if rollType == rollTypes.RESERVED then
@@ -1266,7 +1405,7 @@ do
 
         local itemId
         if hasItem then
-            itemId = Strings.GetItemIdFromLink(GetItemLink())
+            itemId = Item.GetItemIdFromLink(GetItemLink())
         end
         local hasItemReserves = itemId and reserves and reserves.HasItemReserves and reserves:HasItemReserves(itemId)
             or false
@@ -1476,6 +1615,15 @@ do
             local btn = _G[btnName] or CreateFrame("Button", btnName, selectionFrame, "KRTItemSelectionButton")
             btn:SetID(i)
             btn:Show()
+            if not btn._krtBoundUi then
+                if btn.RegisterForClicks then
+                    btn:RegisterForClicks("AnyUp")
+                end
+                Frames.SafeSetScript(btn, "OnClick", function(self, button)
+                    module:BtnSelectedItem(self, button)
+                end)
+                btn._krtBoundUi = true
+            end
             local itemName = GetItemName(i)
             local itemNameBtn = _G[btnName .. "Name"]
             local item = GetItem(i)
@@ -1501,8 +1649,8 @@ do
 
     local function ScanTradeableInventory(itemLink, itemId)
         if not itemLink and not itemId then return nil end
-        local wantedKey = itemLink and (Strings.GetItemStringFromLink(itemLink) or itemLink) or nil
-        local wantedId = tonumber(itemId) or (itemLink and Strings.GetItemIdFromLink(itemLink)) or nil
+        local wantedKey = itemLink and (Item.GetItemStringFromLink(itemLink) or itemLink) or nil
+        local wantedId = tonumber(itemId) or (itemLink and Item.GetItemIdFromLink(itemLink)) or nil
         local totalCount = 0
         local firstBag, firstSlot, firstSlotCount
         local hasMatch = false
@@ -1512,8 +1660,8 @@ do
             for slot = 1, n do
                 local link = GetContainerItemLink(bag, slot)
                 if link then
-                    local key = Strings.GetItemStringFromLink(link) or link
-                    local linkId = Strings.GetItemIdFromLink(link)
+                    local key = Item.GetItemStringFromLink(link) or link
+                    local linkId = Item.GetItemIdFromLink(link)
                     local matches = (wantedKey and key == wantedKey) or (wantedId and linkId == wantedId)
                     if matches then
                         hasMatch = true
@@ -1843,8 +1991,8 @@ do
     local function ResolveTradeableInventoryItem(itemLink)
         local totalCount, bag, slot, slotCount
         local usedFastPath = false
-        local wantedKey = Strings.GetItemStringFromLink(itemLink) or itemLink
-        local wantedId = Strings.GetItemIdFromLink(itemLink)
+        local wantedKey = Item.GetItemStringFromLink(itemLink) or itemLink
+        local wantedId = Item.GetItemIdFromLink(itemLink)
 
         -- Fast-path: reuse the previously selected bag slot when still valid.
         local cachedBag = tonumber(itemInfo.bagID)
@@ -1852,8 +2000,8 @@ do
         if cachedBag and cachedSlot then
             local cachedLink = GetContainerItemLink(cachedBag, cachedSlot)
             if cachedLink then
-                local cachedKey = Strings.GetItemStringFromLink(cachedLink) or cachedLink
-                local cachedId = Strings.GetItemIdFromLink(cachedLink)
+                local cachedKey = Item.GetItemStringFromLink(cachedLink) or cachedLink
+                local cachedId = Item.GetItemIdFromLink(cachedLink)
                 local sameItem = (wantedKey and cachedKey == wantedKey)
                     or (wantedId and cachedId == wantedId)
                 if sameItem and not ItemIsSoulbound(cachedBag, cachedSlot) then

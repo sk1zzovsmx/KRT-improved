@@ -49,96 +49,6 @@ local frameBindings = {
 KRT.Minimap:OnLoad(self)
 ]],
     },
-    ["KRTMaster"] = {
-        OnLoad = [[
-KRT.Master:OnLoad(self)
-]],
-    },
-    ["KRTMasterAwardBtn"] = {
-        OnClick = [[
-KRT.Master:BtnAward(self, button)
-]],
-    },
-    ["KRTMasterBankBtn"] = {
-        OnClick = [[
-KRT.Master:BtnBank(self, button)
-]],
-    },
-    ["KRTMasterClearBtn"] = {
-        OnClick = [[
-KRT.Master:BtnClear(self, button)
-]],
-    },
-    ["KRTMasterConfigBtn"] = {
-        OnClick = [[
-KRT.UI:Call("Config", "Toggle")
-]],
-    },
-    ["KRTMasterCountdownBtn"] = {
-        OnClick = [[
-KRT.Master:BtnCountdown(self, button)
-]],
-    },
-    ["KRTMasterDisenchantBtn"] = {
-        OnClick = [[
-KRT.Master:BtnDisenchant(self, button)
-]],
-    },
-    ["KRTMasterFreeBtn"] = {
-        OnClick = [[
-KRT.Master:BtnFree(self, button)
-]],
-    },
-    ["KRTMasterHoldBtn"] = {
-        OnClick = [[
-KRT.Master:BtnHold(self, button)
-]],
-    },
-    ["KRTMasterItemCount"] = {
-        OnEnterPressed = [[
-self:ClearFocus()
-]],
-    },
-    ["KRTMasterLootCounterBtn"] = {
-        OnClick = [[
-KRT.Master:BtnLootCounter(self, button)
-]],
-    },
-    ["KRTMasterMSBtn"] = {
-        OnClick = [[
-KRT.Master:BtnMS(self, button)
-]],
-    },
-    ["KRTMasterOSBtn"] = {
-        OnClick = [[
-KRT.Master:BtnOS(self, button)
-]],
-    },
-    ["KRTMasterReserveListBtn"] = {
-        OnClick = [[
-KRT.Master:BtnReserveList(self, button)
-]],
-    },
-    ["KRTMasterRollBtn"] = {
-        OnClick = [[
-KRT.Rolls:Roll(self, button)
-]],
-    },
-    ["KRTMasterSelectItemBtn"] = {
-        OnClick = [[
-KRT.Master:BtnSelectItem(self, button)
-]],
-    },
-    ["KRTMasterSpamLootBtn"] = {
-        OnClick = [[
-KRT.Master:BtnSpamLoot(self, button)
-]],
-    },
-    ["KRTMasterSRBtn"] = {
-        OnClick = [[
-KRT.Master:BtnSR(self, button)
-]],
-    },
 }
 
 local frameTemplateMap = {
@@ -146,31 +56,6 @@ local frameTemplateMap = {
     ["KRTEditBoxTemplate"] = "GameFontHighlight",
     ["KRTFrameTemplateTitle"] = "GameFontNormalSmall",
     ["KRTItemSelectionButtonName"] = "GameFontNormalSmall",
-    ["KRTMaster"] = "KRTFrameTemplate",
-    ["KRTMasterAwardBtn"] = "KRTButtonTemplate",
-    ["KRTMasterBankBtn"] = "KRTButtonTemplate",
-    ["KRTMasterBankDropDown"] = "UIDropDownMenuTemplate",
-    ["KRTMasterClearBtn"] = "KRTButtonTemplate",
-    ["KRTMasterCountdownBtn"] = "KRTButtonTemplate",
-    ["KRTMasterDisenchantBtn"] = "KRTButtonTemplate",
-    ["KRTMasterDisenchantDropDown"] = "UIDropDownMenuTemplate",
-    ["KRTMasterFreeBtn"] = "KRTButtonTemplate",
-    ["KRTMasterHoldBtn"] = "KRTButtonTemplate",
-    ["KRTMasterHoldDropDown"] = "UIDropDownMenuTemplate",
-    ["KRTMasterItemBtn"] = "KRTItemButtonTemplate",
-    ["KRTMasterItemCount"] = "GameFontHighlightSmall",
-    ["KRTMasterLootCounterBtn"] = "KRTButtonTemplate",
-    ["KRTMasterMSBtn"] = "KRTButtonTemplate",
-    ["KRTMasterName"] = "KRTFontStringGray",
-    ["KRTMasterOSBtn"] = "KRTButtonTemplate",
-    ["KRTMasterReserveListBtn"] = "KRTButtonTemplate",
-    ["KRTMasterRollBtn"] = "KRTButtonTemplate",
-    ["KRTMasterRollsHeaderPlayer"] = "KRTFontStringGray",
-    ["KRTMasterRollsHeaderRoll"] = "KRTFontStringGray",
-    ["KRTMasterScrollFrame"] = "KRTScrollFrameTemplate",
-    ["KRTMasterSelectItemBtn"] = "KRTButtonTemplate",
-    ["KRTMasterSpamLootBtn"] = "KRTButtonTemplate",
-    ["KRTMasterSRBtn"] = "KRTButtonTemplate",
     ["KRTSelectPlayerTemplateCounter"] = "GameFontNormalSmall",
     ["KRTSelectPlayerTemplateName"] = "GameFontNormal",
     ["KRTSelectPlayerTemplateRoll"] = "GameFontNormalSmall",
@@ -208,15 +93,6 @@ self:ClearFocus()
         root = {
             OnEscapePressed = [[
 self:ClearFocus()
-]],
-        },
-        children = {
-        },
-    },
-    ["KRTItemSelectionButton"] = {
-        root = {
-            OnClick = [[
-KRT.Master:BtnSelectedItem(self, button)
 ]],
         },
         children = {
