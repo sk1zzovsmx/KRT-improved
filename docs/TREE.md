@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-26 20:38:50 +01:00
-- Commit: 034a048
+- Generated: 2026-02-26 21:09:23 +01:00
+- Commit: 6fc14ce
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -24,6 +24,7 @@
 |   |   |-- DBRaidStore.lua
 |   |   |-- DBRaidValidator.lua
 |   |   |-- DBSchema.lua
+|   |   |-- DBSyncer.lua
 |   |   \\-- Init.lua
 |   |-- EntryPoints
 |   |   |-- Minimap.lua
@@ -65,8 +66,7 @@
 |   |   |-- Raid.lua
 |   |   |-- README.md
 |   |   |-- Reserves.lua
-|   |   |-- Rolls.lua
-|   |   \\-- Syncer.lua
+|   |   \\-- Rolls.lua
 |   |-- UI
 |   |   |-- Templates
 |   |   |   \\-- ...

@@ -1860,11 +1860,7 @@ do
 
     Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function(_, raidId, reason)
         local raidIdType = type(raidId)
-        if raidId == nil then
-            addon:warn(Diag.W.LogLoggerSelectRaidPayloadInvalid:format(tostring(raidId), tostring(reason)))
-            return
-        end
-        if raidIdType ~= "number" and raidIdType ~= "string" then
+        if raidId ~= nil and raidIdType ~= "number" and raidIdType ~= "string" then
             addon:warn(Diag.W.LogLoggerSelectRaidPayloadInvalid:format(tostring(raidId), tostring(reason)))
             return
         end
