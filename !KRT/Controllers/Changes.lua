@@ -143,7 +143,7 @@ do
     end
 
     function BindChangeRow(row)
-        if not row or row._krtChangeBound then
+        if not row or row._krtBound then
             return
         end
         Frames.SafeSetScript(row, "OnClick", function(self, button)
@@ -152,7 +152,7 @@ do
         Frames.SafeSetScript(row, "OnDoubleClick", function(self)
             module:Edit(self)
         end)
-        row._krtChangeBound = true
+        row._krtBound = true
     end
 
     -- ----- Public methods ----- --

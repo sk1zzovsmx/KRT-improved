@@ -63,7 +63,7 @@ do
     end
 
     local function BindWarningRow(row)
-        if not row or row._krtWarningBound then
+        if not row or row._krtBound then
             return
         end
         if row.RegisterForClicks then
@@ -72,7 +72,7 @@ do
         Frames.SafeSetScript(row, "OnClick", function(self, button)
             module:Select(self, button)
         end)
-        row._krtWarningBound = true
+        row._krtBound = true
     end
 
     -- ----- Public methods ----- --

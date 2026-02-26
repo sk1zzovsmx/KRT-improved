@@ -92,9 +92,9 @@ do
             or (scrollFrame and scrollFrame.ScrollChild)
             or _G["KRTLootCounterFrameScrollFrameScrollChild"]
 
-        if not frame._krtCounterInit then
+        if not frame._krtInitialized then
             Frames.SetFrameTitle(frameName, L.StrLootCounter)
-            frame._krtCounterInit = true
+            frame._krtInitialized = true
         end
 
         return true
@@ -224,11 +224,11 @@ do
 
     function module:AttachToMaster(masterFrame)
         local frame = masterFrame
-        if not frame or frame._krtCounterAttached then
+        if not frame or frame._krtAttached then
             return
         end
 
-        frame._krtCounterAttached = true
+        frame._krtAttached = true
         frame:HookScript("OnHide", function()
             module:Hide()
         end)

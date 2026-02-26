@@ -189,7 +189,7 @@ do
         if not (frame and refs) then
             return
         end
-        if frame._krtBoundUi then
+        if frame._krtBound then
             return
         end
 
@@ -242,7 +242,7 @@ do
             module:BtnLootCounter(self, button)
         end)
 
-        frame._krtBoundUi = true
+        frame._krtBound = true
     end
 
     local function SetItemCountValue(count, focus)
@@ -444,9 +444,9 @@ do
     local function HookDropDownOpen(frame)
         if not frame then return end
         local button = _G[frame:GetName() .. "Button"]
-        if button and not button._krtDropDownHook then
+        if button and not button._krtHooked then
             button:HookScript("OnClick", function() RefreshDropDowns(true) end)
-            button._krtDropDownHook = true
+            button._krtHooked = true
         end
     end
 
@@ -891,8 +891,8 @@ do
 
         -- Initialize ItemBtn scripts once (clean inventory drop support: click-to-drop).
         local itemBtn = _G[frameName .. "ItemBtn"]
-        if itemBtn and not itemBtn.__krtMLInvDropInit then
-            itemBtn.__krtMLInvDropInit = true
+        if itemBtn and not itemBtn._krtMlInvDropInit then
+            itemBtn._krtMlInvDropInit = true
             itemBtn:RegisterForClicks("AnyUp")
             itemBtn:RegisterForDrag("LeftButton")
 
@@ -1187,8 +1187,8 @@ do
         Frames.SetFrameTitle(frameName, MASTER_LOOTER)
 
         local itemCountBox = _G[frameName .. "ItemCount"]
-        if itemCountBox and not itemCountBox.__krtMLHooked then
-            itemCountBox.__krtMLHooked = true
+        if itemCountBox and not itemCountBox._krtItemCountHooked then
+            itemCountBox._krtItemCountHooked = true
             itemCountBox:SetScript("OnTextChanged", function(self, isUserInput)
                 if not isUserInput then return end
                 announced = false
@@ -1615,14 +1615,14 @@ do
             local btn = _G[btnName] or CreateFrame("Button", btnName, selectionFrame, "KRTItemSelectionButton")
             btn:SetID(i)
             btn:Show()
-            if not btn._krtBoundUi then
+            if not btn._krtBound then
                 if btn.RegisterForClicks then
                     btn:RegisterForClicks("AnyUp")
                 end
                 Frames.SafeSetScript(btn, "OnClick", function(self, button)
                     module:BtnSelectedItem(self, button)
                 end)
-                btn._krtBoundUi = true
+                btn._krtBound = true
             end
             local itemName = GetItemName(i)
             local itemNameBtn = _G[btnName .. "Name"]

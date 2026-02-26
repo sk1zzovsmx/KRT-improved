@@ -104,11 +104,11 @@ do
         if not (moduleRef and moduleRef.OnLoad and frame) then
             return
         end
-        if frame._krtLoggerOnLoadBound then
+        if frame._krtOnLoadBound then
             return
         end
         moduleRef:OnLoad(frame)
-        frame._krtLoggerOnLoadBound = true
+        frame._krtOnLoadBound = true
     end
 
     local function clearSelection(target, key, multiSelectCtx)
@@ -1609,7 +1609,7 @@ do
             _G[n .. "ExportBtn"]:Disable() -- Not implemented.
 
             local frame = _G[n]
-            if frame and not frame._krtBoundUi then
+            if frame and not frame._krtBound then
                 Frames.SafeSetScript(_G[n .. "CurrentBtn"], "OnClick", function(self, button)
                     Raids:SetCurrent(self, button)
                 end)
@@ -1628,7 +1628,7 @@ do
                 Frames.SafeSetScript(_G[n .. "HeaderSize"], "OnClick", function()
                     Raids:Sort("size")
                 end)
-                frame._krtBoundUi = true
+                frame._krtBound = true
             end
         end,
 
@@ -1655,11 +1655,11 @@ do
         rowTmpl = "KRTLoggerRaidButton",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
-            if not row._krtBoundUi then
+            if not row._krtBound then
                 Frames.SafeSetScript(row, "OnClick", function(self, button)
                     addon.Logger:SelectRaid(self, button)
                 end)
-                row._krtBoundUi = true
+                row._krtBound = true
             end
             local ui = row._p
             ui.ID:SetText(it.seq or it.id)
@@ -1909,7 +1909,7 @@ do
             _G[n .. "DeleteBtn"]:SetText(L.BtnDelete)
 
             local frame = _G[n]
-            if frame and not frame._krtBoundUi then
+            if frame and not frame._krtBound then
                 Frames.SafeSetScript(_G[n .. "AddBtn"], "OnClick", function()
                     Boss:Add()
                 end)
@@ -1931,7 +1931,7 @@ do
                 Frames.SafeSetScript(_G[n .. "HeaderMode"], "OnClick", function()
                     Boss:Sort("mode")
                 end)
-                frame._krtBoundUi = true
+                frame._krtBound = true
             end
         end,
 
@@ -1945,11 +1945,11 @@ do
         rowTmpl = "KRTLoggerBossButton",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
-            if not row._krtBoundUi then
+            if not row._krtBound then
                 Frames.SafeSetScript(row, "OnClick", function(self, button)
                     addon.Logger:SelectBoss(self, button)
                 end)
-                row._krtBoundUi = true
+                row._krtBound = true
             end
             local ui = row._p
             -- Display a sequential number that rescales after deletions.
@@ -2069,7 +2069,7 @@ do
             _G[n .. "HeaderName"]:SetText(L.StrName)
 
             local frame = _G[n]
-            if frame and not frame._krtBoundUi then
+            if frame and not frame._krtBound then
                 Frames.SafeSetScript(_G[n .. "AddBtn"], "OnClick", function()
                     BossAtt:Add()
                 end)
@@ -2079,7 +2079,7 @@ do
                 Frames.SafeSetScript(_G[n .. "HeaderName"], "OnClick", function()
                     BossAtt:Sort("name")
                 end)
-                frame._krtBoundUi = true
+                frame._krtBound = true
             end
         end,
 
@@ -2095,11 +2095,11 @@ do
         rowTmpl = "KRTLoggerBossAttendeeButton",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
-            if not row._krtBoundUi then
+            if not row._krtBound then
                 Frames.SafeSetScript(row, "OnClick", function(self, button)
                     addon.Logger:SelectBossPlayer(self, button)
                 end)
-                row._krtBoundUi = true
+                row._krtBound = true
             end
             local ui = row._p
             local r, g, b = Colors.GetClassColor(it.class)
@@ -2205,7 +2205,7 @@ do
             end
 
             local frame = _G[n]
-            if frame and not frame._krtBoundUi then
+            if frame and not frame._krtBound then
                 Frames.SafeSetScript(_G[n .. "AddBtn"], "OnClick", function()
                     RaidAtt:Add()
                 end)
@@ -2221,7 +2221,7 @@ do
                 Frames.SafeSetScript(_G[n .. "HeaderLeave"], "OnClick", function()
                     RaidAtt:Sort("leave")
                 end)
-                frame._krtBoundUi = true
+                frame._krtBound = true
             end
         end,
 
@@ -2235,11 +2235,11 @@ do
         rowTmpl = "KRTLoggerRaidAttendeeButton",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
-            if not row._krtBoundUi then
+            if not row._krtBound then
                 Frames.SafeSetScript(row, "OnClick", function(self, button)
                     addon.Logger:SelectPlayer(self, button)
                 end)
-                row._krtBoundUi = true
+                row._krtBound = true
             end
             local ui = row._p
             ui.Name:SetText(it.name)
@@ -2407,7 +2407,7 @@ do
             updateSourceHeaderState(n)
 
             local frame = _G[n]
-            if frame and not frame._krtBoundUi then
+            if frame and not frame._krtBound then
                 Frames.SafeSetScript(_G[n .. "DeleteBtn"], "OnClick", function(self, button)
                     Loot:Delete(self, button)
                 end)
@@ -2429,7 +2429,7 @@ do
                 Frames.SafeSetScript(_G[n .. "HeaderTime"], "OnClick", function()
                     Loot:Sort("time")
                 end)
-                frame._krtBoundUi = true
+                frame._krtBound = true
             end
         end,
 
@@ -2449,7 +2449,7 @@ do
         rowTmpl = "KRTLoggerLootButton",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
-            if not row._krtBoundUi then
+            if not row._krtBound then
                 if row.RegisterForClicks then
                     row:RegisterForClicks("AnyUp")
                 end
@@ -2469,7 +2469,7 @@ do
                 Frames.SafeSetScript(itemButton, "OnLeave", function()
                     GameTooltip:Hide()
                 end)
-                row._krtBoundUi = true
+                row._krtBound = true
             end
             local ui = row._p
             -- Preserve the original item link on the row for tooltips.
@@ -2777,7 +2777,7 @@ do
         end
 
         local boxFrame = _G[frameName]
-        if boxFrame and not boxFrame._krtBoundUi then
+        if boxFrame and not boxFrame._krtBound then
             Frames.SafeSetScript(saveBtn, "OnClick", function()
                 Box:Save()
             end)
@@ -2793,7 +2793,7 @@ do
             Frames.SafeSetScript(_G[frameName .. "Time"], "OnEnterPressed", function()
                 Box:Save()
             end)
-            boxFrame._krtBoundUi = true
+            boxFrame._krtBound = true
         end
     end
 
@@ -2948,7 +2948,7 @@ do
         end
 
         local boxFrame = _G[frameName]
-        if boxFrame and not boxFrame._krtBoundUi then
+        if boxFrame and not boxFrame._krtBound then
             Frames.SafeSetScript(addBtn, "OnClick", function()
                 Box:Save()
             end)
@@ -2958,7 +2958,7 @@ do
             Frames.SafeSetScript(_G[frameName .. "Name"], "OnEnterPressed", function()
                 Box:Save()
             end)
-            boxFrame._krtBoundUi = true
+            boxFrame._krtBound = true
         end
     end
 
