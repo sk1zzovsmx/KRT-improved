@@ -65,6 +65,10 @@ function Get-PatternMatches {
         [string[]]$ExtraArgs = @()
     )
 
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return @()
+    }
+
     if ($useRipgrep) {
         $args = @("--line-number", "--no-heading", "--color", "never")
         $args += $ExtraArgs
@@ -216,15 +220,15 @@ Add-RgCheck `
     -ExtraArgs @("--glob", "*.lua")
 
 Add-RgCheck `
-    -Name "ItemProbe tooltip hack leakage outside adapter" `
-    -Pattern 'KRT_ItemProbeTooltip|Set(Bag|Inventory|Loot)Item' `
+    -Name "Item tooltip hack leakage outside module" `
+    -Pattern 'KRT_ItemTooltip|Set(Bag|Inventory|Loot)Item' `
     -Path "!KRT" `
-    -ExtraArgs @("--glob", "*.lua", "--glob", "!**/Modules/ItemProbe.lua")
+    -ExtraArgs @("--glob", "*.lua", "--glob", "!**/Modules/Item.lua")
 
 Add-RgRequireMatch `
-    -Name "ItemProbe adapter tooltip implementation missing" `
-    -Pattern 'KRT_ItemProbeTooltip|GameTooltipTemplate|SetBagItem|SetHyperlink' `
-    -Path "!KRT/Modules/ItemProbe.lua"
+    -Name "Item module tooltip implementation missing" `
+    -Pattern 'KRT_ItemTooltip|GameTooltipTemplate|SetBagItem|SetHyperlink' `
+    -Path "!KRT/Modules/Item.lua"
 
 Add-RgCheck `
     -Name "Core parent frame leak" `
@@ -253,11 +257,6 @@ Add-RgCheck `
     -ExtraArgs @("--glob", "*.lua")
 
 Add-RgCheck `
-    -Name "UIBinder splitArgs local helper name collision" `
-    -Pattern 'local\s+function\s+splitArgs\s*\(' `
-    -Path "!KRT/Modules/UI/Binder/UIBinder.lua"
-
-Add-RgCheck `
     -Name "UI back-edge: Frames -> Utils" `
     -Pattern '\b(addon\.Utils|Utils\.)' `
     -Path "!KRT/Modules/UI/Frames.lua"
@@ -266,11 +265,6 @@ Add-RgCheck `
     -Name "UI back-edge: ListController -> Utils" `
     -Pattern '\b(addon\.Utils|Utils\.)' `
     -Path "!KRT/Modules/UI/ListController.lua"
-
-Add-RgCheck `
-    -Name "UI back-edge: UIBinder -> Utils" `
-    -Pattern '\b(addon\.Utils|Utils\.)' `
-    -Path "!KRT/Modules/UI/Binder/UIBinder.lua"
 
 Add-ControllerOwnershipCheck -FilePath "!KRT/Controllers/Changes.lua" -Owner "Changes"
 Add-ControllerOwnershipCheck -FilePath "!KRT/Controllers/Master.lua" -Owner "Master"
@@ -292,8 +286,8 @@ Write-Host "  Services -> Parents/frame refs"
 Write-Host "  Services -> hooksecurefunc(addon.Parent, ...)"
 Write-Host "  Services -> direct UI APIs"
 Write-Host "  Services -> tooltip probe APIs (GameTooltip/CreateFrame/Set*Item/SetHyperlink)"
-Write-Host "  ItemProbe tooltip-hack confinement (Modules/ItemProbe.lua)"
+Write-Host "  Item tooltip-hack confinement (Modules/Item.lua)"
 Write-Host "  KRT.lua -> parent frame refs"
-Write-Host "  Quick-win duplicate regressions (Core/Reserves/EntryPoints/UIBinder)"
-Write-Host "  UI module back-edges (Frames/ListController/UIBinder -> Utils)"
+Write-Host "  Quick-win duplicate regressions (Core/Reserves/EntryPoints)"
+Write-Host "  UI module back-edges (Frames/ListController -> Utils)"
 Write-Host "  Controllers -> own parent only (addon.Parent and KRTParent* ownership)"

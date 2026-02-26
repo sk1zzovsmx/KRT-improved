@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-25 00:44:25 +01:00
-- Commit: 3f19dcf
+- Generated: 2026-02-26 02:48:57 +01:00
+- Commit: 9f8d3d6
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -38,13 +38,19 @@
 |   |   |-- DiagnoseLog.en.lua
 |   |   \\-- localization.en.lua
 |   |-- Modules
-|   |   |-- Compat
 |   |   |-- UI
 |   |   |   \\-- ...
+|   |   |-- Base64.lua
 |   |   |-- Bus.lua
 |   |   |-- C.lua
-|   |   |-- ItemProbe.lua
-|   |   \\-- Std.lua
+|   |   |-- Colors.lua
+|   |   |-- Comms.lua
+|   |   |-- Events.lua
+|   |   |-- Features.lua
+|   |   |-- Item.lua
+|   |   |-- Sort.lua
+|   |   |-- Strings.lua
+|   |   \\-- Time.lua
 |   |-- Services
 |   |   |-- Chat.lua
 |   |   |-- Loot.lua
@@ -94,9 +100,12 @@
 |   |-- NAMING_RENAME_MAP.md
 |   |-- REFACTOR_RULES.md
 |   |-- TREE.md
-|   \\-- UTILS_DEPRECATION_MAP.md
+|   |-- UI_BINDING_RULES.md
+|   |-- UTILS_DEPRECATION_MAP.md
+|   \\-- WOW_ADDON_TEMPLATE.md
 |-- tools
 |   |-- check-layering.ps1
+|   |-- check-ui-binding.ps1
 |   |-- fnmap-classify.ps1
 |   |-- fnmap-inventory.ps1
 |   |-- install-hooks.ps1

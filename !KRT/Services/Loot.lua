@@ -11,8 +11,7 @@ local Diag = feature.Diag
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Bus = feature.Bus or addon.Bus
-local Strings = feature.Strings or addon.Strings
-local ItemProbe = feature.ItemProbe or addon.ItemProbe
+local Item = feature.Item or addon.Item
 
 local itemColors = feature.itemColors
 
@@ -46,14 +45,14 @@ do
     end
 
     local function warmItemCache(itemLink)
-        local probe = ItemProbe or addon.ItemProbe
+        local probe = Item or addon.Item
         if probe and probe.WarmItemCache then
             probe.WarmItemCache(itemLink)
         end
     end
 
     local function isBagItemSoulbound(bag, slot)
-        local probe = ItemProbe or addon.ItemProbe
+        local probe = Item or addon.Item
         if probe and probe.IsBagItemSoulbound then
             return probe.IsBagItemSoulbound(bag, slot)
         end
@@ -70,7 +69,7 @@ do
             return
         end
 
-        local key = Strings.GetItemStringFromLink(itemLink) or itemLink
+        local key = Item.GetItemStringFromLink(itemLink) or itemLink
         local existing = indexByItemKey[key]
         if existing then
             lootTable[existing].count = (lootTable[existing].count or 1) + 1

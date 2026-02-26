@@ -34,7 +34,6 @@ local UnitIsGroupLeader = _G.UnitIsGroupLeader
 local random = math.random
 local gsub = string.gsub
 local strsub, strlen = string.sub, string.len
-local lower = string.lower
 
 local Core = addon.Core
 local Diagnose = addon.Diagnose
@@ -438,137 +437,6 @@ end
 
 addon.LoadOptions = Options.LoadOptions
 
-
-do
-    local Events = addon.Events
-    Events.Internal = Events.Internal or {}
-    Events.Wow = Events.Wow or {}
-
-    local Internal = Events.Internal
-    local Wow = Events.Wow
-
-    Internal.AddRoll = "AddRoll"
-    Internal.LoggerLootLogRequest = "LoggerLootLogRequest"
-    Internal.LoggerSelectRaid = "LoggerSelectRaid"
-    Internal.LoggerSelectBoss = "LoggerSelectBoss"
-    Internal.LoggerSelectPlayer = "LoggerSelectPlayer"
-    Internal.LoggerSelectBossPlayer = "LoggerSelectBossPlayer"
-    Internal.LoggerSelectItem = "LoggerSelectItem"
-    Internal.PlayerCountChanged = "PlayerCountChanged"
-    Internal.RaidCreate = "RaidCreate"
-    Internal.RaidLeave = "RaidLeave"
-    Internal.RaidLootUpdate = "RaidLootUpdate"
-    Internal.RaidRosterDelta = "RaidRosterDelta"
-    Internal.ReservesDataChanged = "ReservesDataChanged"
-    Internal.SetItem = "SetItem"
-
-    Internal.ConfigSortAscending = "ConfigsortAscending"
-    Internal.ConfigShowLootCounterDuringMSRoll = "ConfigshowLootCounterDuringMSRoll"
-
-    Wow.LOOT_OPENED = "wow.LOOT_OPENED"
-    Wow.LOOT_CLOSED = "wow.LOOT_CLOSED"
-    Wow.LOOT_SLOT_CLEARED = "wow.LOOT_SLOT_CLEARED"
-    Wow.TRADE_ACCEPT_UPDATE = "wow.TRADE_ACCEPT_UPDATE"
-    Wow.TRADE_REQUEST_CANCEL = "wow.TRADE_REQUEST_CANCEL"
-    Wow.TRADE_CLOSED = "wow.TRADE_CLOSED"
-
-    function Events.ConfigOptionChanged(optionName)
-        if type(optionName) ~= "string" or optionName == "" then
-            return nil
-        end
-        return "Config" .. optionName
-    end
-
-    function Events.WowForwarded(eventName)
-        if type(eventName) ~= "string" or eventName == "" then
-            return nil
-        end
-        return Wow[eventName] or ("wow." .. tostring(eventName))
-    end
-
-end
-
-do
-    local Features = addon.Features
-    Features.WidgetFlags = Features.WidgetFlags or {}
-    Features.Profiles = Features.Profiles or {
-        full = {
-            Config = true,
-            LootCounter = true,
-            Reserves = true,
-        },
-        core = {
-            Config = false,
-            LootCounter = false,
-            Reserves = false,
-        },
-    }
-
-    local function normalizeProfile(profileName)
-        if type(profileName) ~= "string" or profileName == "" then
-            return "full"
-        end
-        return lower(profileName)
-    end
-
-    local function applyProfileFlags(profileName)
-        local profileKey = normalizeProfile(profileName)
-        local profileFlags = Features.Profiles[profileKey] or Features.Profiles.full
-        local flags = Features.WidgetFlags
-
-        for widgetId in pairs(flags) do
-            flags[widgetId] = nil
-        end
-        for widgetId, enabled in pairs(profileFlags or {}) do
-            flags[widgetId] = enabled == true
-        end
-
-        Features.Profile = profileKey
-        return profileKey
-    end
-
-    function Features:SetProfile(profileName)
-        return applyProfileFlags(profileName)
-    end
-
-    function Features:Set(widgetId, enabled)
-        if type(widgetId) ~= "string" or widgetId == "" then
-            return false
-        end
-        self.WidgetFlags[widgetId] = enabled == true
-        return true
-    end
-
-    function Features:IsEnabled(widgetId)
-        if type(widgetId) ~= "string" or widgetId == "" then
-            return false
-        end
-
-        local flag = self.WidgetFlags[widgetId]
-        if flag == nil then
-            return true
-        end
-        return flag == true
-    end
-
-    function Features:GetProfile()
-        return self.Profile or "full"
-    end
-
-    local requestedProfile = _G.KRT_FEATURE_PROFILE
-    if type(requestedProfile) ~= "string" or requestedProfile == "" then
-        requestedProfile = Features.Profile or "full"
-    end
-    applyProfileFlags(requestedProfile)
-
-    local overrides = _G.KRT_FEATURE_FLAGS
-    if type(overrides) == "table" then
-        for widgetId, enabled in pairs(overrides) do
-            Features:Set(widgetId, enabled)
-        end
-    end
-end
-
 function Core.EnsureLootRuntimeState()
     local state = addon.State
     state.loot = state.loot or {}
@@ -634,7 +502,8 @@ function Core.GetFeatureShared()
         Time = addon.Time,
         Base64 = addon.Base64,
         Comms = addon.Comms,
-        ItemProbe = addon.ItemProbe,
+        Sort = addon.Sort,
+        Item = addon.Item,
 
         UI = addon.UI,
         Frames = addon.Frames,

@@ -1,18 +1,21 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- notes: infra adapter for tooltip-based item metadata probing
+-- notes: consolidated item helpers + tooltip-based item metadata probing
 
 local addon = select(2, ...)
+local feature = addon.Core.GetFeatureShared()
 
-addon.ItemProbe = addon.ItemProbe or {}
-local ItemProbe = addon.ItemProbe
+addon.Item = addon.Item or feature.Item or {}
+local Item = addon.Item
 
 local _G = _G
-local type = type
+local type, tostring = type, tostring
 local pcall = pcall
 
-local TOOLTIP_NAME = "KRT_ItemProbeTooltip"
+local ITEM_LINK_FORMAT = "|c%s|Hitem:%d:%s|h[%s]|h|r"
+local TOOLTIP_NAME = "KRT_ItemTooltip"
 local tooltip
 
 local function ensureTooltip()
@@ -50,7 +53,36 @@ local function scanSoulboundFlag(tip)
     return false
 end
 
-function ItemProbe.WarmItemCache(itemLink)
+function Item.GetItemIdFromLink(itemLink)
+    if not itemLink then
+        return nil
+    end
+    local _, itemId = addon.Deformat(itemLink, ITEM_LINK_FORMAT)
+    return itemId
+end
+
+function Item.GetItemStringFromLink(itemLink)
+    if type(itemLink) ~= "string" or itemLink == "" then
+        return nil
+    end
+
+    local itemString = itemLink:match("|H(item:[%-%d:]+)|h")
+    if itemString then
+        return itemString
+    end
+
+    local _, itemId, rest = addon.Deformat(itemLink, ITEM_LINK_FORMAT)
+    if itemId then
+        if rest and rest ~= "" then
+            return "item:" .. tostring(itemId) .. ":" .. tostring(rest)
+        end
+        return "item:" .. tostring(itemId)
+    end
+
+    return nil
+end
+
+function Item.WarmItemCache(itemLink)
     if type(itemLink) ~= "string" or itemLink == "" then
         return false
     end
@@ -66,7 +98,7 @@ function ItemProbe.WarmItemCache(itemLink)
     return ok == true
 end
 
-function ItemProbe.IsBagItemSoulbound(bag, slot)
+function Item.IsBagItemSoulbound(bag, slot)
     if bag == nil or slot == nil then
         return false
     end

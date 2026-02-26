@@ -13,7 +13,7 @@ local Events = feature.Events or addon.Events or {}
 local Core = feature.Core
 local Bus = feature.Bus or addon.Bus
 local MultiSelect = feature.MultiSelect or addon.MultiSelect
-local Strings = feature.Strings or addon.Strings
+local Item = feature.Item or addon.Item
 local Comms = feature.Comms or addon.Comms
 
 local tContains = feature.tContains
@@ -549,7 +549,7 @@ do
         local item = GetItem and GetItem(index)
         local itemLink = item and item.itemLink
         if not itemLink then return nil end
-        local itemId = Strings.GetItemIdFromLink(itemLink)
+        local itemId = Item.GetItemIdFromLink(itemLink)
         addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(itemId)))
         return itemId
     end
