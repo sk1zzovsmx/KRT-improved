@@ -5,7 +5,7 @@ This document defines folder responsibilities and allowed dependencies.
 ## Layer map
 
 1. `Modules/`, `Localization/`, `Templates.xml`: shared primitives.
-2. `KRT.lua`: bootstrap and global event wiring.
+2. `Init.lua`: bootstrap and global event wiring.
 3. `Services/`: runtime data/model modules, no parent-frame ownership.
 4. `Controllers/`: parent owners (`Master`, `Logger`, `Warnings`, `Changes`, `Spammer`).
 5. `Widgets/`: child frame controllers owned by a parent/feature.
@@ -16,10 +16,10 @@ This document defines folder responsibilities and allowed dependencies.
 
 `Y` = allowed, `N` = disallowed, `Bus` = via `StdFacade.triggerEvent/registerCallback`, `Toggle` = exception.
 
-| From \ To | Modules/Loc | KRT.lua | Services | Controllers | Widgets | EntryPoints | UI/XML |
+| From \ To | Modules/Loc | Init.lua | Services | Controllers | Widgets | EntryPoints | UI/XML |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Modules/Loc | Y | N | N | N | N | N | N |
-| KRT.lua | Y | Y | Y | Y | N | N | N |
+| Init.lua | Y | Y | Y | Y | N | N | N |
 | Services | Y | N | Y | N | N | N | N |
 | Controllers | Y | Y | Y | Bus | Y | N | Y |
 | Widgets | Y | N | Y | Y (owner only) | Y | N | Y |

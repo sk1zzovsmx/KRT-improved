@@ -8,7 +8,7 @@ Legend:
 
 | File | Layer attuale | Layer target | Owner | Azione | Note |
 | --- | --- | --- | --- | --- | --- |
-| Core/Init.lua | L1 Core | L1 Core | addon.Core | Keep | Bootstrap shared tables and contracts |
+| Init.lua | L1 Core | L1 Core | addon.Core | Keep | Bootstrap shared tables and contracts |
 | Localization/localization.en.lua | L2 Loc | L2 Loc | addon.L | Keep | User-facing localization |
 | Localization/DiagnoseLog.en.lua | L2 Loc | L2 Loc | addon.Diagnose | Keep | Diagnose templates |
 | Modules/C.lua | L4 Modules | L4 Modules | addon.C | Keep | Constants and enums |
@@ -18,8 +18,8 @@ Legend:
 | Modules/Time.lua | L4 Modules | L4 Modules | addon.Time via Std | Merge | Merge into Modules/Std.lua |
 | Modules/Base64.lua | L4 Modules | L4 Modules | addon.Base64 via Std | Merge | Merge into Modules/Std.lua |
 | Modules/Comms.lua | L4 Modules | L4 Modules | addon.Comms via Std | Merge | Merge into Modules/Std.lua |
-| Modules/Events.lua | L4 Modules | L1 Core | addon.Events | Inline | Inline in Core/Init.lua |
-| Modules/Features.lua | L4 Modules | L1 Core | addon.Features | Inline | Inline in Core/Init.lua |
+| Modules/Events.lua | L4 Modules | L1 Core | addon.Events | Inline | Inline in Init.lua |
+| Modules/Features.lua | L4 Modules | L1 Core | addon.Features | Inline | Inline in Init.lua |
 | Modules/ignoredItems.lua | L8 Late data | L6 Features | addon.Raid | Move | Move ignored list into Services/Raid.lua |
 | Modules/StdFacade.RaidState.lua | L4 Modules | L1+L6 split | addon.Core + addon.Raid | Move | Split helpers between Core and Raid service |
 | Modules/StdFacade.Tooltip.lua | L4 Modules | L4+L6 split | addon.Frames + addon.Loot | Move | Split tooltip UI and loot item probes |
@@ -34,7 +34,7 @@ Legend:
 | Modules/UI/MultiSelect.lua | L4 Modules | L4 Modules | addon.MultiSelect | Keep | Multi-select state helpers |
 | Modules/UI/Binder/Map.lua | L4 Modules | L4 Modules | addon.UIBinder.Map | Keep | Binding datasets |
 | Modules/UI/Binder/UIBinder.lua | L4 Modules | L4 Modules | addon.UIBinder | Keep | XML script binder |
-| KRT.lua | L5 Runtime | L5 Runtime | addon | Keep | Runtime bootstrap and WoW event wiring |
+| Init.lua | L5 Runtime | L5 Runtime | addon | Keep | Runtime bootstrap and WoW event wiring |
 | Services/Raid.lua | L6 Features | L6 Features | addon.Raid | Keep | Raid/session model and ignored item owner |
 | Services/Chat.lua | L6 Features | L6 Features | addon.Chat | Keep | Chat output helpers |
 | Services/Rolls.lua | L6 Features | L6 Features | addon.Rolls | Keep | Rolls tracking |

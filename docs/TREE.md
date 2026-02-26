@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-26 21:35:41 +01:00
-- Commit: 1515c26
+- Generated: 2026-02-26 23:03:35 +01:00
+- Commit: 1d36ef8
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -24,8 +24,7 @@
 |   |   |-- DBRaidStore.lua
 |   |   |-- DBRaidValidator.lua
 |   |   |-- DBSchema.lua
-|   |   |-- DBSyncer.lua
-|   |   \\-- Init.lua
+|   |   \\-- DBSyncer.lua
 |   |-- EntryPoints
 |   |   |-- Minimap.lua
 |   |   |-- README.md
@@ -86,9 +85,7 @@
 |   |   |-- README.md
 |   |   \\-- ReservesUI.lua
 |   |-- !KRT.toc
-|   |-- KRT.Core.xml
-|   |-- KRT.Full.xml
-|   |-- KRT.lua
+|   |-- Init.lua
 |   \\-- KRT.xml
 |-- .devcontainer
 |   \\-- devcontainer.json

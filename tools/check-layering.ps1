@@ -233,17 +233,19 @@ Add-RgRequireMatch `
 Add-RgCheck `
     -Name "Core parent frame leak" `
     -Pattern 'addon\.Master\.frame|KRTMaster' `
-    -Path "!KRT/KRT.lua"
+    -Path "!KRT/Init.lua"
 
 Add-RgCheck `
-    -Name "Core.getFeatureShared duplicate in KRT.lua" `
-    -Pattern 'function\s+Core\.getFeatureShared' `
-    -Path "!KRT/KRT.lua"
+    -Name "Core.GetFeatureShared outside Init.lua" `
+    -Pattern 'function\s+Core\.(GetFeatureShared|getFeatureShared)' `
+    -Path "!KRT" `
+    -ExtraArgs @("--glob", "*.lua", "--glob", "!**/Init.lua")
 
 Add-RgCheck `
-    -Name "ensureLootRuntimeState duplicate in KRT.lua" `
-    -Pattern 'local\s+function\s+ensureLootRuntimeState|function\s+Core\.ensureLootRuntimeState' `
-    -Path "!KRT/KRT.lua"
+    -Name "Core.EnsureLootRuntimeState outside Init.lua" `
+    -Pattern 'function\s+Core\.(EnsureLootRuntimeState|ensureLootRuntimeState)' `
+    -Path "!KRT" `
+    -ExtraArgs @("--glob", "*.lua", "--glob", "!**/Init.lua")
 
 Add-RgCheck `
     -Name "Reserves formatter duplicate in widget" `
@@ -260,7 +262,7 @@ Add-RgCheck `
     -Name "Legacy parent alias usage (addon.Parent)" `
     -Pattern '\baddon\.(Master|Logger|Warnings|Changes|Spammer)\b' `
     -Path "!KRT" `
-    -ExtraArgs @("--glob", "*.lua", "--glob", "!**/Core/Init.lua")
+    -ExtraArgs @("--glob", "*.lua", "--glob", "!**/Init.lua")
 
 Add-RgCheck `
     -Name "UI back-edge: Frames -> Utils" `
@@ -293,8 +295,8 @@ Write-Host "  Services -> hooksecurefunc(addon.Parent, ...)"
 Write-Host "  Services -> direct UI APIs"
 Write-Host "  Services -> tooltip probe APIs (GameTooltip/CreateFrame/Set*Item/SetHyperlink)"
 Write-Host "  Item tooltip-hack confinement (Modules/Item.lua)"
-Write-Host "  KRT.lua -> parent frame refs"
+Write-Host "  Init.lua -> parent frame refs"
 Write-Host "  Quick-win duplicate regressions (Core/Reserves/EntryPoints)"
-Write-Host "  Legacy parent alias usage (addon.Parent) outside Core/Init"
+Write-Host "  Legacy parent alias usage (addon.Parent) outside Init"
 Write-Host "  UI module back-edges (Frames/ListController -> Utils)"
 Write-Host "  Controllers -> own parent only (addon.Parent and KRTParent* ownership)"

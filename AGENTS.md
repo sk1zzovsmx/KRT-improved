@@ -37,7 +37,7 @@ Durable preferences learned from recent conversations:
   section headers in order:
   `-- ----- Internal state ----- --`, `-- ----- Private helpers ----- --`,
   `-- ----- Public methods ----- --`.
-- UI refactors: centralize shared UI glue/patterns in `KRT.lua`; keep feature-specific UI logic in each module.
+- UI refactors: centralize shared UI glue/patterns in `Init.lua`; keep feature-specific UI logic in each module.
 - Move helpers to `Modules/Utils.lua` only when they are generic and reused, not for KRT-specific glue.
 - Keep diagnostic templates in `addon.Diagnose`; use severity buckets `I/W/E/D` (`DiagnoseLog.en.lua`).
 - Prefer local `Diag` wrapper aliases over direct `Diagnose.*` chains in implementation files.
@@ -51,18 +51,20 @@ Durable preferences learned from recent conversations:
 - Treat fresh SavedVariables as strict mode: avoid legacy/migration cleanups and avoid fallback to
   volatile array indices when stable NIDs (`playerNid`, `bossNid`, `lootNid`) are available.
 - Keep `EntryPoints/SlashEvents.lua` focused on `/cmd` handling only.
-- Keep main WoW event handlers centralized in `KRT.lua`; modules should expose callable APIs used by those handlers.
+- Keep main WoW event handlers centralized in `Init.lua`; modules should expose callable APIs used by those handlers.
 - Prefer storing runtime-only addon state under `addon.State` (or feature state tables) over global runtime vars.
 - Prefer deterministic sorting with explicit tie-breakers; when primary values are equal, use stable secondary keys
   (for Logger Loot, prefer loot name, then IDs) to avoid random reordering between sorts.
-- Keep bootstrap ownership centralized in `Core/Init.lua` for `addon.Core`, `addon.L`, `addon.Diagnose`,
+- Keep bootstrap ownership centralized in `Init.lua` for `addon.Core`, `addon.L`, `addon.Diagnose`,
   `addon.State`, `addon.C`, and `addon.Events`; do not re-bootstrap them in feature files.
 - Prefer a uniform Lua file contract header with:
   `local addon = select(2, ...)` and `local feature = addon.Core.GetFeatureShared()`.
-- Prefer bus-only architecture from `KRT.lua`: no direct calls from Core to `addon.Master`/`addon.Logger`/other
+- Prefer bus-only architecture from `Init.lua`: no direct calls from Core to `addon.Master`/`addon.Logger`/other
   Parents; wire WoW events into `Bus.TriggerEvent("wow.EVENT", ...)` and let modules subscribe.
 - Keep Logger-owned roster UI refresh logic inside `Controllers/Logger.lua` (subscribed via `RaidRosterDelta`),
-  not in `KRT.lua`.
+  not in `Init.lua`.
+- Prefer a unified root bootstrap/runtime entry file `!KRT/Init.lua`; do not split ownership between
+  `Core/Init.lua` and `KRT.lua`.
 - Prefer a widget facade/port via `addon.UI` (`Modules/UI/Facade.lua`) for Controller/EntryPoint -> Widget calls.
 - Avoid direct references to `addon.LootCounter`, `addon.ReservesUI`, and `addon.Config` in
   `Controllers/*.lua` and `EntryPoints/*.lua`; use `addon.UI:Call(...)` instead.
@@ -121,8 +123,8 @@ UI is XML + Lua (no Ace3 GUI). Libraries are vendored via LibStub.
 ## 3) Modular feature policy (**BINDING**)
 
 KRT is now modular by design:
-- Early bootstrap for shared addon tables and header contract wiring lives in `!KRT/Core/Init.lua`.
-- Core runtime bootstrap, shared runtime state, and global event wiring live in `!KRT/KRT.lua`.
+- Unified bootstrap/runtime ownership for shared addon tables, runtime state, and global event wiring lives in
+  `!KRT/Init.lua`.
 - Feature implementations live in:
   - `!KRT/Controllers/*.lua` (top-level parent owners),
   - `!KRT/Services/*.lua` (runtime service/model modules),
@@ -135,8 +137,8 @@ KRT is now modular by design:
 Rules:
 1) New feature modules SHOULD be placed in the appropriate folder among `Controllers/`, `Services/`,
    `Widgets/`,
-   `EntryPoints/`, unless there is a strong reason to keep them in `KRT.lua`.
-2) `KRT.lua` should stay focused on bootstrap/glue and shared infrastructure that must exist before features.
+   `EntryPoints/`, unless there is a strong reason to keep them in `Init.lua`.
+2) `Init.lua` should stay focused on bootstrap/glue and shared infrastructure that must exist before features.
 3) Prefer `addon.Core.GetFeatureShared()` in feature file headers for shared locals/runtime state bootstrap.
 4) Public exports go on `addon.*`; avoid extra globals.
 5) Any user-visible behavior changes or migration notes MUST be documented in `CHANGELOG.md`.
@@ -153,7 +155,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 4) LibDeformat-3.0
 5) LibCompat-1.0
 6) LibLogger-1.0
-7) Core/Init.lua (single bootstrap for `addon.Core/L/Diagnose/State/C/Events` + `Core.GetFeatureShared()`)
+7) Init.lua (single bootstrap + runtime glue/event wiring + `Core.GetFeatureShared()`)
 8) Localization/localization.en.lua (fills `addon.L`)
 9) Localization/DiagnoseLog.en.lua (fills `addon.Diagnose`)
 10) Templates.xml
@@ -181,25 +183,24 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 32) Modules/Utils.Tooltip.lua
 33) Modules/Compat/Utils.UI.lua
 34) Modules/Utils.lua
-35) KRT.lua (runtime bootstrap + event wiring + shared runtime glue)
-36) Services/Raid.lua
-37) Services/Chat.lua
-38) EntryPoints/Minimap.lua
-39) Services/Rolls.lua
-40) Services/Loot.lua
-41) Controllers/Master.lua
-42) Widgets/LootCounter.lua
-43) Services/Reserves.lua
-44) Widgets/ReservesUI.lua
-45) Controllers/Logger.lua
-46) Core/DBSyncer.lua
-47) Widgets/Config.lua
-48) Controllers/Warnings.lua
-49) Controllers/Changes.lua
-50) Controllers/Spammer.lua
-51) EntryPoints/SlashEvents.lua
-52) KRT.xml (UI include manifest; default profile forwards to `KRT.Full.xml`)
-53) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
+35) Services/Raid.lua
+36) Services/Chat.lua
+37) EntryPoints/Minimap.lua
+38) Services/Rolls.lua
+39) Services/Loot.lua
+40) Controllers/Master.lua
+41) Widgets/LootCounter.lua
+42) Services/Reserves.lua
+43) Widgets/ReservesUI.lua
+44) Controllers/Logger.lua
+45) Core/DBSyncer.lua
+46) Widgets/Config.lua
+47) Controllers/Warnings.lua
+48) Controllers/Changes.lua
+49) Controllers/Spammer.lua
+50) EntryPoints/SlashEvents.lua
+51) KRT.xml (UI include manifest/orchestrator)
+52) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
 
 ---
 
@@ -208,13 +209,10 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 ```
 !KRT/
   !KRT.toc
+  Init.lua                 # unified bootstrap + shared runtime glue + main event wiring
   Core/
-    Init.lua               # single bootstrap for addon root tables + shared contract helper
     DBSyncer.lua           # logger synchronization store/protocol backend
-  KRT.lua                  # runtime bootstrap + shared runtime glue + main event wiring
-  KRT.xml                  # UI include manifest/orchestrator
-  KRT.Core.xml             # core UI include manifest (without optional widgets)
-  KRT.Full.xml             # full UI include manifest (core + optional widgets)
+  KRT.xml                  # unified UI include manifest/orchestrator
   Templates.xml            # reusable XML templates
 
   Controllers/
@@ -301,7 +299,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 
 ### 6.1 Intentional globals (allowed)
 
-- `_G["KRT"] = addon` is set by `KRT.lua` for debugging/interop.
+- `_G["KRT"] = addon` is set by `Init.lua` for debugging/interop.
 - Named XML frames become globals (normal WoW UI behavior). Examples:
   - `KRTConfig`, `KRTWarnings`, `KRTMaster`, `KRTLogger`, `KRTChanges`, `KRTSpammer`
   - `KRTLootCounterFrame`, `KRTReserveListFrame`, `KRTImportWindow`, `KRTItemSelectionFrame`
@@ -408,8 +406,7 @@ Top-level feature modules on `addon.*`:
 - `addon.Logger.Actions` - mutations + commit/refresh boundaries
 
 Implementation placement (current wave):
-- `Core/Init.lua`: single bootstrap for shared addon tables + `Core.GetFeatureShared()`
-- `KRT.lua`: runtime core + main gameplay/logger logic
+- `Init.lua`: unified bootstrap/runtime core + main gameplay/logger logic + `Core.GetFeatureShared()`
 - `Controllers/*.lua`, `Services/*.lua`, `Widgets/*.lua`, `EntryPoints/*.lua`
 
 External modules:
@@ -505,7 +502,7 @@ Do:
 - reuse templates and Utils controllers,
 - keep state local to module blocks,
 - keep feature logic in `Controllers/*.lua` / `Services/*.lua` / `Widgets/*.lua` / `EntryPoints/*.lua`,
-  and shared infra in `KRT.lua`,
+  and shared infra in `Init.lua`,
 - document user-visible changes in CHANGELOG.md.
 
 Don't:

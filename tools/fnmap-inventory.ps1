@@ -6,7 +6,7 @@ Set-Location $repoRoot
 
 $scanRoots = @(
     "!KRT/Core",
-    "!KRT/KRT.lua",
+    "!KRT/Init.lua",
     "!KRT/Modules",
     "!KRT/Services",
     "!KRT/Controllers",
@@ -20,7 +20,7 @@ function Get-Layer([string]$filePath) {
     if ($normalized -match "^!KRT/([^/]+)/") {
         return $Matches[1]
     }
-    if ($normalized -eq "!KRT/KRT.lua") {
+    if ($normalized -eq "!KRT/Init.lua") {
         return "Root"
     }
     return "Other"

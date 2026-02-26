@@ -28,9 +28,9 @@ Permanent guardrails for function mapping and unification work.
 
 ## Canonical Ownership (Quick Wins)
 
-- `Core.getFeatureShared`: `!KRT/Core/Init.lua`
-- `Core.ensureLootRuntimeState`: `!KRT/Core/Init.lua`
-- `Core.getController`: `!KRT/Core/Init.lua`
+- `Core.getFeatureShared`: `!KRT/Init.lua`
+- `Core.ensureLootRuntimeState`: `!KRT/Init.lua`
+- `Core.getController`: `!KRT/Init.lua`
 - Reserves formatters: `!KRT/Services/Reserves.lua`
 - EntryPoint controller lookup: `Core.getController(name)`
 - UI primitives: `!KRT/Modules/UI/Visuals.lua`

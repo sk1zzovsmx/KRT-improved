@@ -17,7 +17,7 @@ Process and invariants belong in `AGENTS.md`.
 
 - Runtime target: WoW 3.3.5a (Interface 30300), Lua 5.1.
 - Addon folder name is intentionally `!KRT`.
-- Core bootstrap/event wiring lives in `!KRT/KRT.lua`.
+- Core bootstrap/event wiring lives in `!KRT/Init.lua`.
 - Runtime modules are split by layer: `Controllers/`, `Services/`, `Widgets/`, `EntryPoints/`.
 - UI is XML-driven (`!KRT/KRT.xml`, `!KRT/Templates.xml`) with thin script glue.
 - Shared helpers/constants live in `!KRT/Modules/Utils.lua` and `!KRT/Modules/C.lua`.
@@ -32,7 +32,7 @@ Process and invariants belong in `AGENTS.md`.
 ```text
 !KRT/
   !KRT.toc                 # load order + SavedVariables declaration
-  KRT.lua                  # core bootstrap + shared event wiring
+  Init.lua                 # core bootstrap + shared event wiring
   KRT.xml                  # UI include manifest
   Templates.xml            # shared XML templates
 
@@ -69,7 +69,7 @@ flowchart LR
     TMR["LibCompat timers"]
   end
 
-  subgraph CORE["Core bootstrap (KRT.lua)"]
+  subgraph CORE["Core bootstrap (Init.lua)"]
     EVT["addon event dispatcher"]
     Slash["addon.Slash"]
     Raid["addon.Raid"]
@@ -139,7 +139,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  W["WoW event"] --> EVT["addon dispatcher in KRT.lua"]
+  W["WoW event"] --> EVT["addon dispatcher in Init.lua"]
   UI["XML OnClick/OnShow"] --> M["module methods in runtime modules"]
   SL["/krt ..."] --> SC["addon.Slash:Handle(msg)"] --> M
 
@@ -153,7 +153,7 @@ flowchart LR
 ```
 
 Key contracts:
-- WoW event handlers are registered in `KRT.lua` and dispatched to runtime modules.
+- WoW event handlers are registered in `Init.lua` and dispatched to runtime modules.
 - XML handlers should delegate to module methods; avoid embedding feature logic in XML.
 - UI updates should be event-driven (`RequestRefresh`/`Refresh`), not polling loops.
 - Lists should use `Utils.makeListController(...):Dirty()` when possible.
@@ -246,7 +246,7 @@ Load order matters (`!KRT/!KRT.toc`):
 2. `Localization/*.lua`
 3. `Templates.xml`
 4. `Modules/Utils.lua`, `Modules/C.lua`
-5. `KRT.lua`
+5. `Init.lua`
 6. Runtime modules in dependency order:
    `Services/Raid.lua`, `Services/Chat.lua`, `EntryPoints/Minimap.lua`, `Services/Rolls.lua`,
    `Services/Loot.lua`, `Controllers/Master.lua`, `Widgets/LootCounter.lua`,
@@ -271,7 +271,7 @@ Add or change a feature window/list:
 - Prefer `Utils.makeEventDrivenRefresher` and `Utils.makeListController`.
 
 Add or change option behavior:
-- Defaults/load path in `addon.Config` (`!KRT/Widgets/Config.lua` + `!KRT/KRT.lua` load).
+- Defaults/load path in `addon.Config` (`!KRT/Widgets/Config.lua` + `!KRT/Init.lua` load).
 - Keep `KRT_Options` and `addon.options` in sync on writes.
 
 Add or change displayed text/log templates:

@@ -9,28 +9,28 @@ Tracking table for naming normalization. Status legend:
 
 | OldName | NewName | File | Public? | Alias temp? | Status |
 | --- | --- | --- | --- | --- | --- |
-| `Core.registerLegacyAlias` | `Core.RegisterLegacyAlias` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Core.registerLegacyAliasPath` | `Core.RegisterLegacyAliasPath` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Core.getController` | `Core.GetController` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Core.getPlayerName` | `Core.GetPlayerName` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Core.getRealmName` | `Core.GetRealmName` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Core.getUnitRank` | `Core.GetUnitRank` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Core.ensureLootRuntimeState` | `Core.EnsureLootRuntimeState` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Core.getFeatureShared` | `Core.GetFeatureShared` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Core.getCurrentRaid` | `Core.GetCurrentRaid` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.setCurrentRaid` | `Core.SetCurrentRaid` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.getLastBoss` | `Core.GetLastBoss` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.setLastBoss` | `Core.SetLastBoss` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.getNextReset` | `Core.GetNextReset` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.setNextReset` | `Core.SetNextReset` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.getRaidSchemaVersion` | `Core.GetRaidSchemaVersion` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.ensureRaidSchema` | `Core.EnsureRaidSchema` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.ensureRaidById` | `Core.EnsureRaidById` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.ensureRaidByNid` | `Core.EnsureRaidByNid` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.getRaidNidById` | `Core.GetRaidNidById` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.getRaidIdByNid` | `Core.GetRaidIdByNid` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.createRaidRecord` | `Core.CreateRaidRecord` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.stripRuntimeRaidCaches` | `Core.StripRuntimeRaidCaches` | `!KRT/KRT.lua` | yes | no | done-m56 |
+| `Core.registerLegacyAlias` | `Core.RegisterLegacyAlias` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.registerLegacyAliasPath` | `Core.RegisterLegacyAliasPath` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.getController` | `Core.GetController` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.getPlayerName` | `Core.GetPlayerName` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.getRealmName` | `Core.GetRealmName` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.getUnitRank` | `Core.GetUnitRank` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.ensureLootRuntimeState` | `Core.EnsureLootRuntimeState` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.getFeatureShared` | `Core.GetFeatureShared` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.getCurrentRaid` | `Core.GetCurrentRaid` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.setCurrentRaid` | `Core.SetCurrentRaid` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.getLastBoss` | `Core.GetLastBoss` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.setLastBoss` | `Core.SetLastBoss` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.getNextReset` | `Core.GetNextReset` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.setNextReset` | `Core.SetNextReset` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.getRaidSchemaVersion` | `Core.GetRaidSchemaVersion` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.ensureRaidSchema` | `Core.EnsureRaidSchema` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.ensureRaidById` | `Core.EnsureRaidById` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.ensureRaidByNid` | `Core.EnsureRaidByNid` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.getRaidNidById` | `Core.GetRaidNidById` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.getRaidIdByNid` | `Core.GetRaidIdByNid` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.createRaidRecord` | `Core.CreateRaidRecord` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.stripRuntimeRaidCaches` | `Core.StripRuntimeRaidCaches` | `!KRT/Init.lua` | yes | no | done-m56 |
 
 ## Bus (M56 done)
 
@@ -131,17 +131,17 @@ Tracking table for naming normalization. Status legend:
 
 | OldName | NewName | File | Public? | Alias temp? | Status |
 | --- | --- | --- | --- | --- | --- |
-| `Options.newOptions` | `Options.NewOptions` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Options.isDebugEnabled` | `Options.IsDebugEnabled` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Options.applyDebugSetting` | `Options.ApplyDebugSetting` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Options.setOption` | `Options.SetOption` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Options.loadOptions` | `Options.LoadOptions` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Options.restoreDefaults` | `Options.RestoreDefaults` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Events.configOptionChanged` | `Events.ConfigOptionChanged` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Events.wowForwarded` | `Events.WowForwarded` | `!KRT/Core/Init.lua` | yes | no | done-m56 |
-| `Core.bindModuleRequestRefresh` | `Core.BindModuleRequestRefresh` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.bindModuleToggleHide` | `Core.BindModuleToggleHide` | `!KRT/KRT.lua` | yes | no | done-m56 |
-| `Core.makeModuleFrameGetter` | `Core.MakeModuleFrameGetter` | `!KRT/KRT.lua` | yes | no | done-m56 |
+| `Options.newOptions` | `Options.NewOptions` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Options.isDebugEnabled` | `Options.IsDebugEnabled` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Options.applyDebugSetting` | `Options.ApplyDebugSetting` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Options.setOption` | `Options.SetOption` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Options.loadOptions` | `Options.LoadOptions` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Options.restoreDefaults` | `Options.RestoreDefaults` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Events.configOptionChanged` | `Events.ConfigOptionChanged` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Events.wowForwarded` | `Events.WowForwarded` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.bindModuleRequestRefresh` | `Core.BindModuleRequestRefresh` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.bindModuleToggleHide` | `Core.BindModuleToggleHide` | `!KRT/Init.lua` | yes | no | done-m56 |
+| `Core.makeModuleFrameGetter` | `Core.MakeModuleFrameGetter` | `!KRT/Init.lua` | yes | no | done-m56 |
 | `Loot.warmItemCache` | `Loot.WarmItemCache` | `!KRT/Services/Loot.lua` | yes | no | done-m56 |
 | `Loot.isBagItemSoulbound` | `Loot.IsBagItemSoulbound` | `!KRT/Services/Loot.lua` | yes | no | done-m56 |
 
@@ -151,3 +151,4 @@ Tracking table for naming normalization. Status legend:
 | --- | --- | --- |
 | `ItemProbe.WarmItemCache` | `!KRT/Modules/ItemProbe.lua` | compliant |
 | `ItemProbe.IsBagItemSoulbound` | `!KRT/Modules/ItemProbe.lua` | compliant |
+

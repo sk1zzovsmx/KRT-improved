@@ -4,6 +4,8 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Unified core bootstrap and runtime event wiring into
+  `!KRT/Init.lua`; removed `Core/Init.lua` and `KRT.lua`, and updated toc/tooling paths.
 - **Refactor:** Introduced DB-ready raid data layers:
   `Core/DB.lua`, `Core/DBRaidMigrations.lua`, `Core/DBRaidStore.lua`, and
   `Core/DBRaidQueries.lua`. Core raid APIs now delegate to the raid store.
@@ -73,6 +75,8 @@ Dates are in YYYY-MM-DD.
   registered (or feature-disabled), and `KRTMasterConfigBtn` routes through `KRT.UI:Call(...)`.
 - **Refactor:** Split UI include manifests into `KRT.Core.xml` and `KRT.Full.xml`
   (default `KRT.xml` now includes `KRT.Full.xml`) to support core/full build profiles.
+- **Refactor:** Removed `KRT.Core.xml` and `KRT.Full.xml`; `KRT.xml` is now the
+  single UI include manifest with direct feature XML includes.
 - **Behavior:** Added baseline options bootstrap in `Modules/Utils.Options.lua`
   (`addon.LoadOptions` fallback) so core boot does not depend on `Widgets/Config.lua`.
 - **Refactor:** `Modules/UIBinder.lua` no longer uses `loadstring` for UI script binding.
