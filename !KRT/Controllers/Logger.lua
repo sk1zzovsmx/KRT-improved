@@ -23,6 +23,13 @@ local Frames = feature.Frames or addon.Frames
 local Strings = feature.Strings or addon.Strings
 local Colors = feature.Colors or addon.Colors
 local Base64 = feature.Base64 or addon.Base64
+local Sort = feature.Sort or addon.Sort
+
+local CompareValues = Sort.CompareValues
+local CompareNumbers = Sort.CompareNumbers
+local CompareStrings = Sort.CompareStrings
+local GetLootSortName = Sort.GetLootSortName
+local CompareLootTie = Sort.CompareLootTie
 
 local InternalEvents = Events.Internal
 
@@ -40,45 +47,6 @@ local pairs, ipairs, type, select = pairs, ipairs, type, select
 
 local tostring, tonumber = tostring, tonumber
 local strlower = string.lower
-
-local function compareValues(aValue, bValue, asc)
-    if asc then
-        return aValue < bValue
-    end
-    return aValue > bValue
-end
-
-local function compareNumbers(aValue, bValue, asc, fallback)
-    local defaultValue = (fallback ~= nil) and fallback or 0
-    local aNum = tonumber(aValue)
-    if aNum == nil then
-        aNum = defaultValue
-    end
-    local bNum = tonumber(bValue)
-    if bNum == nil then
-        bNum = defaultValue
-    end
-    return compareValues(aNum, bNum, asc)
-end
-
-local function compareStrings(aValue, bValue, asc)
-    return compareValues(tostring(aValue or ""), tostring(bValue or ""), asc)
-end
-
-local function getLootSortName(itemName, itemLink, itemId)
-    local name = itemName
-    if (not name or name == "") and type(itemLink) == "string" then
-        name = itemLink:match("|h%[(.-)%]|h")
-    end
-    if name and name ~= "" then
-        return tostring(name)
-    end
-    local id = tonumber(itemId)
-    if id then
-        return ("Item %d"):format(id)
-    end
-    return "Item ?"
-end
 
 local SetSelectedRaid
 
@@ -108,6 +76,8 @@ do
     -- ----- Internal state ----- --
     local frameName
     local getFrame = makeModuleFrameGetter(module, "KRTLogger")
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
     -- Stable-ID data helpers (fresh SavedVariables only; no legacy migration).
     module.Store   = module.Store or {}
     module.View    = module.View or {}
@@ -118,6 +88,29 @@ do
     local Actions  = module.Actions
 
     -- ----- Private helpers ----- --
+    local function AcquireRefs(frame)
+        return {
+            raids = Frames.Ref(frame, "Raids"),
+            bosses = Frames.Ref(frame, "Bosses"),
+            loot = Frames.Ref(frame, "Loot"),
+            raidAttendees = Frames.Ref(frame, "RaidAttendees"),
+            bossAttendees = Frames.Ref(frame, "BossAttendees"),
+            bossBox = Frames.Get("KRTLoggerBossBox"),
+            attendeesBox = Frames.Ref(frame, "PlayerBox"),
+        }
+    end
+
+    local function EnsureSubmoduleOnLoad(moduleRef, frame)
+        if not (moduleRef and moduleRef.OnLoad and frame) then
+            return
+        end
+        if frame._krtLoggerOnLoadBound then
+            return
+        end
+        moduleRef:OnLoad(frame)
+        frame._krtLoggerOnLoadBound = true
+    end
+
     local function clearSelection(target, key, multiSelectCtx)
         target[key] = nil
         if multiSelectCtx then
@@ -395,7 +388,7 @@ do
                 it.itemTexture = v.itemTexture
                 it.itemLink = v.itemLink
                 it.bossNid = v.bossNid
-                it.sortName = getLootSortName(v.itemName, v.itemLink, v.itemId)
+                it.sortName = GetLootSortName(v.itemName, v.itemLink, v.itemId)
                 local boss = Store:GetBoss(raid, v.bossNid)
                 it.sourceName = (boss and boss.name) or ""
                 it.looter = v.looter
@@ -994,6 +987,63 @@ do
         bindRequestRefresh = bindModuleRequestRefresh,
     })
 
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
+    function addon.Controllers.Logger:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            self:OnLoad(frame)
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        EnsureSubmoduleOnLoad(addon.Logger.Raids, refs.raids)
+        EnsureSubmoduleOnLoad(addon.Logger.Boss, refs.bosses)
+        EnsureSubmoduleOnLoad(addon.Logger.Loot, refs.loot)
+        EnsureSubmoduleOnLoad(addon.Logger.RaidAttendees, refs.raidAttendees)
+        EnsureSubmoduleOnLoad(addon.Logger.BossAttendees, refs.bossAttendees)
+        EnsureSubmoduleOnLoad(addon.Logger.BossBox, refs.bossBox)
+        EnsureSubmoduleOnLoad(addon.Logger.AttendeesBox, refs.attendeesBox)
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Controllers.Logger:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
+
     function module:Refresh()
         local frame = getFrame()
         if not frame then return end
@@ -1557,6 +1607,29 @@ do
             local del = _G[n .. "DeleteBtn"]; if del then del:SetText(L.BtnDelete) end
             Frames.SetTooltip(_G[n .. "CurrentBtn"], L.StrRaidsCurrentHelp, nil, L.StrRaidCurrentTitle)
             _G[n .. "ExportBtn"]:Disable() -- Not implemented.
+
+            local frame = _G[n]
+            if frame and not frame._krtBoundUi then
+                Frames.SafeSetScript(_G[n .. "CurrentBtn"], "OnClick", function(self, button)
+                    Raids:SetCurrent(self, button)
+                end)
+                Frames.SafeSetScript(_G[n .. "DeleteBtn"], "OnClick", function(self, button)
+                    Raids:Delete(self, button)
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderNum"], "OnClick", function()
+                    Raids:Sort("id")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderDate"], "OnClick", function()
+                    Raids:Sort("date")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderZone"], "OnClick", function()
+                    Raids:Sort("zone")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderSize"], "OnClick", function()
+                    Raids:Sort("size")
+                end)
+                frame._krtBoundUi = true
+            end
         end,
 
         getData = function(out)
@@ -1582,6 +1655,12 @@ do
         rowTmpl = "KRTLoggerRaidButton",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
+            if not row._krtBoundUi then
+                Frames.SafeSetScript(row, "OnClick", function(self, button)
+                    addon.Logger:SelectRaid(self, button)
+                end)
+                row._krtBoundUi = true
+            end
             local ui = row._p
             ui.ID:SetText(it.seq or it.id)
             ui.Date:SetText(it.dateFmt)
@@ -1656,11 +1735,11 @@ do
 
         sorters = {
             id = function(a, b, asc)
-                return compareNumbers(a.seq or a.id, b.seq or b.id, asc, 0)
+                return CompareNumbers(a.seq or a.id, b.seq or b.id, asc, 0)
             end,
-            date = function(a, b, asc) return compareNumbers(a.date, b.date, asc, 0) end,
-            zone = function(a, b, asc) return compareStrings(a.zone, b.zone, asc) end,
-            size = function(a, b, asc) return compareNumbers(a.size, b.size, asc, 0) end,
+            date = function(a, b, asc) return CompareNumbers(a.date, b.date, asc, 0) end,
+            zone = function(a, b, asc) return CompareStrings(a.zone, b.zone, asc) end,
+            size = function(a, b, asc) return CompareNumbers(a.size, b.size, asc, 0) end,
         },
     }
 
@@ -1828,6 +1907,32 @@ do
             _G[n .. "EditBtn"]:SetText(L.BtnEdit)
             local del = _G[n .. "DeleteBtn"]; if del then del:SetText(L.BtnDelete) end
             _G[n .. "DeleteBtn"]:SetText(L.BtnDelete)
+
+            local frame = _G[n]
+            if frame and not frame._krtBoundUi then
+                Frames.SafeSetScript(_G[n .. "AddBtn"], "OnClick", function()
+                    Boss:Add()
+                end)
+                Frames.SafeSetScript(_G[n .. "EditBtn"], "OnClick", function()
+                    Boss:Edit()
+                end)
+                Frames.SafeSetScript(_G[n .. "DeleteBtn"], "OnClick", function(self, button)
+                    Boss:Delete(self, button)
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderNum"], "OnClick", function()
+                    Boss:Sort("id")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderName"], "OnClick", function()
+                    Boss:Sort("name")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderTime"], "OnClick", function()
+                    Boss:Sort("time")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderMode"], "OnClick", function()
+                    Boss:Sort("mode")
+                end)
+                frame._krtBoundUi = true
+            end
         end,
 
         getData = function(out)
@@ -1840,6 +1945,12 @@ do
         rowTmpl = "KRTLoggerBossButton",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
+            if not row._krtBoundUi then
+                Frames.SafeSetScript(row, "OnClick", function(self, button)
+                    addon.Logger:SelectBoss(self, button)
+                end)
+                row._krtBoundUi = true
+            end
             local ui = row._p
             -- Display a sequential number that rescales after deletions.
             -- Keep it.id as the stable bossNid for selection/highlight.
@@ -1872,10 +1983,10 @@ do
 
         sorters = {
             -- Sort by the displayed sequential number, not the stable nid.
-            id = function(a, b, asc) return compareNumbers(a.seq, b.seq, asc, 0) end,
-            name = function(a, b, asc) return compareStrings(a.name, b.name, asc) end,
-            time = function(a, b, asc) return compareNumbers(a.time, b.time, asc, 0) end,
-            mode = function(a, b, asc) return compareStrings(a.mode, b.mode, asc) end,
+            id = function(a, b, asc) return CompareNumbers(a.seq, b.seq, asc, 0) end,
+            name = function(a, b, asc) return CompareStrings(a.name, b.name, asc) end,
+            time = function(a, b, asc) return CompareNumbers(a.time, b.time, asc, 0) end,
+            mode = function(a, b, asc) return CompareStrings(a.mode, b.mode, asc) end,
         },
     }
 
@@ -1956,6 +2067,20 @@ do
             local add = _G[n .. "AddBtn"]; if add then add:SetText(L.BtnAdd) end
             local rm = _G[n .. "RemoveBtn"]; if rm then rm:SetText(L.BtnRemove) end
             _G[n .. "HeaderName"]:SetText(L.StrName)
+
+            local frame = _G[n]
+            if frame and not frame._krtBoundUi then
+                Frames.SafeSetScript(_G[n .. "AddBtn"], "OnClick", function()
+                    BossAtt:Add()
+                end)
+                Frames.SafeSetScript(_G[n .. "RemoveBtn"], "OnClick", function(self, button)
+                    BossAtt:Delete(self, button)
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderName"], "OnClick", function()
+                    BossAtt:Sort("name")
+                end)
+                frame._krtBoundUi = true
+            end
         end,
 
         getData = function(out)
@@ -1970,6 +2095,12 @@ do
         rowTmpl = "KRTLoggerBossAttendeeButton",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
+            if not row._krtBoundUi then
+                Frames.SafeSetScript(row, "OnClick", function(self, button)
+                    addon.Logger:SelectBossPlayer(self, button)
+                end)
+                row._krtBoundUi = true
+            end
             local ui = row._p
             local r, g, b = Colors.GetClassColor(it.class)
             ui.Name:SetText(it.name)
@@ -2001,7 +2132,7 @@ do
         end,
 
         sorters = {
-            name = function(a, b, asc) return compareStrings(a.name, b.name, asc) end,
+            name = function(a, b, asc) return CompareStrings(a.name, b.name, asc) end,
         },
     }
 
@@ -2072,6 +2203,26 @@ do
                 local del = _G[n .. "DeleteBtn"]; if del then del:SetText(L.BtnDelete) end
                 addBtn:Disable() -- enabled in postUpdate when applicable
             end
+
+            local frame = _G[n]
+            if frame and not frame._krtBoundUi then
+                Frames.SafeSetScript(_G[n .. "AddBtn"], "OnClick", function()
+                    RaidAtt:Add()
+                end)
+                Frames.SafeSetScript(_G[n .. "DeleteBtn"], "OnClick", function(self, button)
+                    RaidAtt:Delete(self, button)
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderName"], "OnClick", function()
+                    RaidAtt:Sort("name")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderJoin"], "OnClick", function()
+                    RaidAtt:Sort("join")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderLeave"], "OnClick", function()
+                    RaidAtt:Sort("leave")
+                end)
+                frame._krtBoundUi = true
+            end
         end,
 
         getData = function(out)
@@ -2084,6 +2235,12 @@ do
         rowTmpl = "KRTLoggerRaidAttendeeButton",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
+            if not row._krtBoundUi then
+                Frames.SafeSetScript(row, "OnClick", function(self, button)
+                    addon.Logger:SelectPlayer(self, button)
+                end)
+                row._krtBoundUi = true
+            end
             local ui = row._p
             ui.Name:SetText(it.name)
             local r, g, b = Colors.GetClassColor(it.class)
@@ -2120,11 +2277,11 @@ do
         end,
 
         sorters = {
-            name = function(a, b, asc) return compareStrings(a.name, b.name, asc) end,
-            join = function(a, b, asc) return compareNumbers(a.join, b.join, asc, 0) end,
+            name = function(a, b, asc) return CompareStrings(a.name, b.name, asc) end,
+            join = function(a, b, asc) return CompareNumbers(a.join, b.join, asc, 0) end,
             leave = function(a, b, asc)
                 local missing = asc and math.huge or -math.huge
-                return compareNumbers(a.leave, b.leave, asc, missing)
+                return CompareNumbers(a.leave, b.leave, asc, missing)
             end,
         },
     }
@@ -2222,22 +2379,6 @@ do
         end
     end
 
-    local function compareLootTie(a, b, asc)
-        local aName = strlower(tostring((a and a.sortName) or ""))
-        local bName = strlower(tostring((b and b.sortName) or ""))
-        if aName ~= bName then
-            return compareValues(aName, bName, asc)
-        end
-
-        local aItemId = tonumber(a and a.itemId) or 0
-        local bItemId = tonumber(b and b.itemId) or 0
-        if aItemId ~= bItemId then
-            return compareValues(aItemId, bItemId, asc)
-        end
-
-        return compareNumbers(a and a.id, b and b.id, asc, 0)
-    end
-
     local controller = ListController.MakeListController {
         keyName = "LootList",
         poolTag = "logger-loot",
@@ -2264,6 +2405,32 @@ do
             local del = _G[n .. "DeleteBtn"]; if del then del:SetText(L.BtnDelete) end
             _G[n .. "EditBtn"]:Disable()
             updateSourceHeaderState(n)
+
+            local frame = _G[n]
+            if frame and not frame._krtBoundUi then
+                Frames.SafeSetScript(_G[n .. "DeleteBtn"], "OnClick", function(self, button)
+                    Loot:Delete(self, button)
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderItem"], "OnClick", function()
+                    Loot:Sort("id")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderSource"], "OnClick", function()
+                    Loot:Sort("source")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderWinner"], "OnClick", function()
+                    Loot:Sort("winner")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderType"], "OnClick", function()
+                    Loot:Sort("type")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderRoll"], "OnClick", function()
+                    Loot:Sort("roll")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderTime"], "OnClick", function()
+                    Loot:Sort("time")
+                end)
+                frame._krtBoundUi = true
+            end
         end,
 
         getData = function(out)
@@ -2282,6 +2449,28 @@ do
         rowTmpl = "KRTLoggerLootButton",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
+            if not row._krtBoundUi then
+                if row.RegisterForClicks then
+                    row:RegisterForClicks("AnyUp")
+                end
+                Frames.SafeSetScript(row, "OnClick", function(self, button)
+                    addon.Logger:SelectItem(self, button)
+                end)
+                Frames.SafeSetScript(row, "OnEnter", function(self)
+                    addon.Logger:OnLootRowEnter(self)
+                end)
+                Frames.SafeSetScript(row, "OnLeave", function(self)
+                    addon.Logger:OnLootRowLeave(self)
+                end)
+                local itemButton = row.GetName and _G[row:GetName() .. "Item"] or nil
+                Frames.SafeSetScript(itemButton, "OnEnter", function(self)
+                    Loot:OnEnter(self)
+                end)
+                Frames.SafeSetScript(itemButton, "OnLeave", function()
+                    GameTooltip:Hide()
+                end)
+                row._krtBoundUi = true
+            end
             local ui = row._p
             -- Preserve the original item link on the row for tooltips.
             row._itemLink = it.itemLink
@@ -2342,46 +2531,46 @@ do
         end,
 
         sorters = {
-            id = function(a, b, asc) return compareLootTie(a, b, asc) end,
+            id = function(a, b, asc) return CompareLootTie(a, b, asc) end,
             source = function(a, b, asc)
                 local aSource = strlower(tostring((a and a.sourceName) or ""))
                 local bSource = strlower(tostring((b and b.sourceName) or ""))
                 if aSource ~= bSource then
-                    return compareValues(aSource, bSource, asc)
+                    return CompareValues(aSource, bSource, asc)
                 end
-                return compareLootTie(a, b, asc)
+                return CompareLootTie(a, b, asc)
             end,
             winner = function(a, b, asc)
                 local aWinner = strlower(tostring((a and a.looter) or ""))
                 local bWinner = strlower(tostring((b and b.looter) or ""))
                 if aWinner ~= bWinner then
-                    return compareValues(aWinner, bWinner, asc)
+                    return CompareValues(aWinner, bWinner, asc)
                 end
-                return compareLootTie(a, b, asc)
+                return CompareLootTie(a, b, asc)
             end,
             type = function(a, b, asc)
                 local aType = tonumber(a and a.rollType) or 0
                 local bType = tonumber(b and b.rollType) or 0
                 if aType ~= bType then
-                    return compareValues(aType, bType, asc)
+                    return CompareValues(aType, bType, asc)
                 end
-                return compareLootTie(a, b, asc)
+                return CompareLootTie(a, b, asc)
             end,
             roll = function(a, b, asc)
                 local aRoll = tonumber(a and a.rollValue) or 0
                 local bRoll = tonumber(b and b.rollValue) or 0
                 if aRoll ~= bRoll then
-                    return compareValues(aRoll, bRoll, asc)
+                    return CompareValues(aRoll, bRoll, asc)
                 end
-                return compareLootTie(a, b, asc)
+                return CompareLootTie(a, b, asc)
             end,
             time = function(a, b, asc)
                 local aTime = tonumber(a and a.time) or 0
                 local bTime = tonumber(b and b.time) or 0
                 if aTime ~= bTime then
-                    return compareValues(aTime, bTime, asc)
+                    return CompareValues(aTime, bTime, asc)
                 end
-                return compareLootTie(a, b, asc)
+                return CompareLootTie(a, b, asc)
             end,
         },
     }
@@ -2586,15 +2775,56 @@ do
         if cancelBtn then
             cancelBtn:SetText(L.BtnCancel)
         end
+
+        local boxFrame = _G[frameName]
+        if boxFrame and not boxFrame._krtBoundUi then
+            Frames.SafeSetScript(saveBtn, "OnClick", function()
+                Box:Save()
+            end)
+            Frames.SafeSetScript(cancelBtn, "OnClick", function()
+                Box:Hide()
+            end)
+            Frames.SafeSetScript(_G[frameName .. "Name"], "OnEnterPressed", function()
+                Box:Save()
+            end)
+            Frames.SafeSetScript(_G[frameName .. "Difficulty"], "OnEnterPressed", function()
+                Box:Save()
+            end)
+            Frames.SafeSetScript(_G[frameName .. "Time"], "OnEnterPressed", function()
+                Box:Save()
+            end)
+            boxFrame._krtBoundUi = true
+        end
     end
 
     local uiController = UIScaffold.BootstrapModuleUi(Box, getFrame, function()
         Box:UpdateUIFrame()
     end)
 
-    function Box:Toggle() return uiController:Toggle() end
+    function Box:EnsureUI()
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            self:OnLoad(frame)
+        end
+        return frame
+    end
 
-    function Box:Hide() return uiController:Hide() end
+    function Box:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        return uiController:Toggle()
+    end
+
+    function Box:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        return uiController:Hide()
+    end
 
     -- Campi uniformi:
     --   bossData.time : timestamp
@@ -2686,7 +2916,7 @@ do
     local Box = addon.Logger.AttendeesBox
 
     local frameName
-    local getFrame = Frames.MakeFrameGetter("KRTLoggerAttendeesBox")
+    local getFrame = Frames.MakeFrameGetter("KRTLoggerPlayerBox")
 
     function Box:OnLoad(frame)
         frameName = Frames.InitModuleFrame(Box, frame, {
@@ -2716,11 +2946,48 @@ do
         if cancelBtn then
             cancelBtn:SetText(L.BtnCancel)
         end
+
+        local boxFrame = _G[frameName]
+        if boxFrame and not boxFrame._krtBoundUi then
+            Frames.SafeSetScript(addBtn, "OnClick", function()
+                Box:Save()
+            end)
+            Frames.SafeSetScript(cancelBtn, "OnClick", function()
+                Box:Hide()
+            end)
+            Frames.SafeSetScript(_G[frameName .. "Name"], "OnEnterPressed", function()
+                Box:Save()
+            end)
+            boxFrame._krtBoundUi = true
+        end
     end
 
     local uiController = UIScaffold.BootstrapModuleUi(Box, getFrame)
 
-    function Box:Toggle() return uiController:Toggle() end
+    function Box:EnsureUI()
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            self:OnLoad(frame)
+        end
+        return frame
+    end
+
+    function Box:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        return uiController:Toggle()
+    end
+
+    function Box:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        return uiController:Hide()
+    end
 
     function Box:Save()
         local rID, bID = addon.Logger.selectedRaid, addon.Logger.selectedBoss
