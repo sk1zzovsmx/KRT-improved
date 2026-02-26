@@ -257,6 +257,12 @@ Add-RgCheck `
     -ExtraArgs @("--glob", "*.lua")
 
 Add-RgCheck `
+    -Name "Legacy parent alias usage (addon.Parent)" `
+    -Pattern '\baddon\.(Master|Logger|Warnings|Changes|Spammer)\b' `
+    -Path "!KRT" `
+    -ExtraArgs @("--glob", "*.lua", "--glob", "!**/Core/Init.lua")
+
+Add-RgCheck `
     -Name "UI back-edge: Frames -> Utils" `
     -Pattern '\b(addon\.Utils|Utils\.)' `
     -Path "!KRT/Modules/UI/Frames.lua"
@@ -289,5 +295,6 @@ Write-Host "  Services -> tooltip probe APIs (GameTooltip/CreateFrame/Set*Item/S
 Write-Host "  Item tooltip-hack confinement (Modules/Item.lua)"
 Write-Host "  KRT.lua -> parent frame refs"
 Write-Host "  Quick-win duplicate regressions (Core/Reserves/EntryPoints)"
+Write-Host "  Legacy parent alias usage (addon.Parent) outside Core/Init"
 Write-Host "  UI module back-edges (Frames/ListController -> Utils)"
 Write-Host "  Controllers -> own parent only (addon.Parent and KRTParent* ownership)"

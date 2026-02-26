@@ -69,8 +69,7 @@ end
 -- Logger frame module.
 do
     addon.Controllers = addon.Controllers or {}
-    addon.Controllers.Logger = addon.Controllers.Logger or addon.Logger or {}
-    addon.Logger   = addon.Controllers.Logger -- Legacy alias during namespacing migration.
+    addon.Controllers.Logger = addon.Controllers.Logger or {}
     local module   = addon.Controllers.Logger
 
     -- ----- Internal state ----- --
@@ -421,7 +420,7 @@ do
             Store:InvalidateIndexes(raid)
         end
 
-        local log = addon.Logger
+        local log = module
         if not log then return end
 
         local changedBoss, changedPlayer, changedBossPlayer, changedItem = false, false, false, false
@@ -1007,13 +1006,13 @@ do
         self.frame = frame
         self.refs = refs
 
-        EnsureSubmoduleOnLoad(addon.Logger.Raids, refs.raids)
-        EnsureSubmoduleOnLoad(addon.Logger.Boss, refs.bosses)
-        EnsureSubmoduleOnLoad(addon.Logger.Loot, refs.loot)
-        EnsureSubmoduleOnLoad(addon.Logger.RaidAttendees, refs.raidAttendees)
-        EnsureSubmoduleOnLoad(addon.Logger.BossAttendees, refs.bossAttendees)
-        EnsureSubmoduleOnLoad(addon.Logger.BossBox, refs.bossBox)
-        EnsureSubmoduleOnLoad(addon.Logger.AttendeesBox, refs.attendeesBox)
+        EnsureSubmoduleOnLoad(module.Raids, refs.raids)
+        EnsureSubmoduleOnLoad(module.Boss, refs.bosses)
+        EnsureSubmoduleOnLoad(module.Loot, refs.loot)
+        EnsureSubmoduleOnLoad(module.RaidAttendees, refs.raidAttendees)
+        EnsureSubmoduleOnLoad(module.BossAttendees, refs.bossAttendees)
+        EnsureSubmoduleOnLoad(module.BossBox, refs.bossBox)
+        EnsureSubmoduleOnLoad(module.AttendeesBox, refs.attendeesBox)
 
         uiBound = true
         return frame, refs
@@ -1066,7 +1065,7 @@ do
         local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
         local prevFocus = module.selectedRaid
 
-        local ordered = addon.Logger.Raids and addon.Logger.Raids._ctrl and addon.Logger.Raids._ctrl.data or nil
+        local ordered = module.Raids and module.Raids._ctrl and module.Raids._ctrl.data or nil
         local action, count = applyFocusedMultiSelect({
             id = raidNid,
             context = MS_CTX_RAID,
@@ -1105,7 +1104,7 @@ do
         local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
         local prevFocus = module.selectedBoss
 
-        local ordered = addon.Logger.Boss and addon.Logger.Boss._ctrl and addon.Logger.Boss._ctrl.data or nil
+        local ordered = module.Boss and module.Boss._ctrl and module.Boss._ctrl.data or nil
         local action, count = applyFocusedMultiSelect({
             id = id,
             context = MS_CTX_BOSS,
@@ -1152,8 +1151,8 @@ do
         -- Mutual exclusion: selecting a boss-attendee filter clears the raid-attendee filter (and its multi-select).
         clearSelection(module, "selectedPlayer", MS_CTX_RAIDATT)
 
-        local ordered = addon.Logger.BossAttendees and addon.Logger.BossAttendees._ctrl and
-            addon.Logger.BossAttendees._ctrl.data or nil
+        local ordered = module.BossAttendees and module.BossAttendees._ctrl and
+            module.BossAttendees._ctrl.data or nil
         local action, count = applyFocusedMultiSelect({
             id = id,
             context = MS_CTX_BOSSATT,
@@ -1198,8 +1197,8 @@ do
         -- Mutual exclusion: selecting a raid-attendee filter clears the boss-attendee filter (and its multi-select).
         clearSelection(module, "selectedBossPlayer", MS_CTX_BOSSATT)
 
-        local ordered = addon.Logger.RaidAttendees and addon.Logger.RaidAttendees._ctrl and
-            addon.Logger.RaidAttendees._ctrl.data or nil
+        local ordered = module.RaidAttendees and module.RaidAttendees._ctrl and
+            module.RaidAttendees._ctrl.data or nil
         local action, count = applyFocusedMultiSelect({
             id = id,
             context = MS_CTX_RAIDATT,
@@ -1258,7 +1257,7 @@ do
                 addon:error(L.ErrLoggerInvalidItem)
                 return
             end
-            addon.Logger.Loot:Log(itemId, nil, rollType, nil, "LOGGER_EDIT_ROLLTYPE")
+            module.Loot:Log(itemId, nil, rollType, nil, "LOGGER_EDIT_ROLLTYPE")
         end
 
         local function getItemMenuFrame()
@@ -1362,7 +1361,7 @@ do
                 wide = 1,
                 preferredIndex = 3,
                 OnShow = function(self, data)
-                    local itemId = data and data.itemId or addon.Logger.selectedItem
+                    local itemId = data and data.itemId or module.selectedItem
                     local picker = ensureRollTypeInsertedFrame()
                     if not picker then
                         return
@@ -1416,7 +1415,7 @@ do
         end
 
         local function openItemRollTypePopup()
-            local itemId = addon.Logger.selectedItem
+            local itemId = module.selectedItem
             if not itemId then
                 addon:error(L.ErrLoggerInvalidItem)
                 return
@@ -1463,7 +1462,7 @@ do
                 local isMulti = IsControlKeyDown and IsControlKeyDown() or false
                 local isRange = IsShiftKeyDown and IsShiftKeyDown() or false
 
-                local ordered = addon.Logger.Loot and addon.Logger.Loot._ctrl and addon.Logger.Loot._ctrl.data or nil
+                local ordered = module.Loot and module.Loot._ctrl and module.Loot._ctrl.data or nil
                 local action, count = applyFocusedMultiSelect({
                     id = id,
                     context = MS_CTX_LOOT,
@@ -1567,19 +1566,19 @@ do
                     return
                 end
 
-                addon.Logger.Loot:Log(self.itemId, winner, nil, nil, "LOGGER_EDIT_WINNER")
+                module.Loot:Log(self.itemId, winner, nil, nil, "LOGGER_EDIT_WINNER")
             end,
             function(self)
-                self.raidId = addon.Logger.selectedRaid
-                self.itemId = addon.Logger.selectedItem
+                self.raidId = module.selectedRaid
+                self.itemId = module.selectedItem
             end
         )
 
         Frames.MakeEditBoxPopup("KRTLOGGER_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp,
             function(self, text)
-                addon.Logger.Loot:Log(self.itemId, nil, nil, text, "LOGGER_EDIT_ROLLVALUE")
+                module.Loot:Log(self.itemId, nil, nil, text, "LOGGER_EDIT_ROLLVALUE")
             end,
-            function(self) self.itemId = addon.Logger.selectedItem end,
+            function(self) self.itemId = module.selectedItem end,
             validateRollValue
         )
     end
@@ -1587,9 +1586,9 @@ end
 
 -- Raids list.
 do
-    addon.Logger.Raids = addon.Logger.Raids or {}
-    local Raids = addon.Logger.Raids
-    local Store = addon.Logger.Store
+    module.Raids = module.Raids or {}
+    local Raids = module.Raids
+    local Store = module.Store
     local controller = ListController.MakeListController {
         keyName = "RaidsList",
         poolTag = "logger-raids",
@@ -1657,7 +1656,7 @@ do
         drawRow = ListController.CreateRowDrawer(function(row, it)
             if not row._krtBound then
                 Frames.SafeSetScript(row, "OnClick", function(self, button)
-                    addon.Logger:SelectRaid(self, button)
+                    module:SelectRaid(self, button)
                 end)
                 row._krtBound = true
             end
@@ -1668,25 +1667,25 @@ do
             ui.Size:SetText(it.sizeLabel or it.size)
         end),
 
-        highlightFn = function(id) return MultiSelect.MultiSelectIsSelected(addon.Logger._msRaidCtx, id) end,
+        highlightFn = function(id) return MultiSelect.MultiSelectIsSelected(module._msRaidCtx, id) end,
         focusId = function()
-            local selected = addon.Logger.selectedRaid
+            local selected = module.selectedRaid
             return selected and Core.GetRaidNidById(selected) or nil
         end,
         focusKey = function()
-            local selected = addon.Logger.selectedRaid
+            local selected = module.selectedRaid
             local raidNid = selected and Core.GetRaidNidById(selected) or nil
             return tostring(raidNid or "nil")
         end,
-        highlightKey = function() return MultiSelect.MultiSelectGetVersion(addon.Logger._msRaidCtx) end,
+        highlightKey = function() return MultiSelect.MultiSelectGetVersion(module._msRaidCtx) end,
         highlightDebugTag = "LoggerSelect",
         highlightDebugInfo = function()
-            return ("ctx=%s selectedCount=%d"):format(tostring(addon.Logger._msRaidCtx),
-                MultiSelect.MultiSelectCount(addon.Logger._msRaidCtx))
+            return ("ctx=%s selectedCount=%d"):format(tostring(module._msRaidCtx),
+                MultiSelect.MultiSelectCount(module._msRaidCtx))
         end,
 
         postUpdate = function(n)
-            local sel = addon.Logger.selectedRaid
+            local sel = module.selectedRaid
             local raid = sel and Core.EnsureRaidById(sel) or nil
 
             local canSetCurrent = false
@@ -1715,7 +1714,7 @@ do
 
             UIPrimitives.EnableDisable(_G[n .. "CurrentBtn"], canSetCurrent)
 
-            local ctx = addon.Logger._msRaidCtx
+            local ctx = module._msRaidCtx
             local selCount = MultiSelect.MultiSelectCount(ctx)
             local canDelete = (selCount and selCount > 0) or false
             if canDelete and Core.GetCurrentRaid() then
@@ -1748,19 +1747,19 @@ do
 
     function Raids:SetCurrent(btn)
         if not btn then return end
-        local sel = addon.Logger.selectedRaid
+        local sel = module.selectedRaid
         if not sel then return end
-        if addon.Logger.Actions:SetCurrentRaid(sel) then
+        if module.Actions:SetCurrentRaid(sel) then
             -- Context change: clear dependent selections and redraw all module panels.
             SetSelectedRaid(sel)
-            addon.Logger:ResetSelections()
-            triggerSelectionEvent(addon.Logger, "selectedRaid", "ui")
+            module:ResetSelections()
+            triggerSelectionEvent(module, "selectedRaid", "ui")
         end
     end
 
     do
         local function DeleteRaids()
-            local ctx = addon.Logger._msRaidCtx
+            local ctx = module._msRaidCtx
             local ids = MultiSelect.MultiSelectGetSelected(ctx)
             if not (ids and #ids > 0) then return end
 
@@ -1785,10 +1784,10 @@ do
                 end
             end
 
-            local prevFocus = addon.Logger.selectedRaid
+            local prevFocus = module.selectedRaid
             local prevFocusNid = prevFocus and Core.GetRaidNidById(prevFocus) or nil
             for i = 1, #raidNids do
-                addon.Logger.Actions:DeleteRaidByNid(raidNids[i])
+                module.Actions:DeleteRaidByNid(raidNids[i])
             end
 
             MultiSelect.MultiSelectClear(ctx)
@@ -1806,13 +1805,13 @@ do
             end
 
             SetSelectedRaid(newFocus)
-            addon.Logger:ResetSelections()
+            module:ResetSelections()
             controller:Dirty()
-            triggerSelectionEvent(addon.Logger, "selectedRaid", "ui")
+            triggerSelectionEvent(module, "selectedRaid", "ui")
         end
 
         function Raids:Delete(btn)
-            local ctx = addon.Logger._msRaidCtx
+            local ctx = module._msRaidCtx
             if btn and MultiSelect.MultiSelectCount(ctx) > 0 then
                 StaticPopup_Show("KRTLOGGER_DELETE_RAID")
             end
@@ -1824,9 +1823,9 @@ do
     Bus.RegisterCallback(InternalEvents.RaidCreate, function(_, num)
         -- Context change: selecting a different raid must clear dependent selections.
         SetSelectedRaid(tonumber(num))
-        addon.Logger:ResetSelections()
+        module:ResetSelections()
         controller:Dirty()
-        triggerSelectionEvent(addon.Logger, "selectedRaid", "ui")
+        triggerSelectionEvent(module, "selectedRaid", "ui")
     end)
 
     Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function(_, raidId, reason)
@@ -1844,15 +1843,15 @@ do
             return
         end
 
-        local prevRaid = addon.Logger.selectedRaid
+        local prevRaid = module.selectedRaid
         SetSelectedRaid(raidId)
 
-        if prevRaid ~= addon.Logger.selectedRaid then
-            addon.Logger:ResetSelections()
+        if prevRaid ~= module.selectedRaid then
+            module:ResetSelections()
         end
 
         if reason == "sync" then
-            local raid = addon.Logger.selectedRaid and Store:GetRaid(addon.Logger.selectedRaid) or nil
+            local raid = module.selectedRaid and Store:GetRaid(module.selectedRaid) or nil
             if raid and Store.InvalidateIndexes then
                 Store:InvalidateIndexes(raid)
             end
@@ -1885,11 +1884,11 @@ end
 
 -- Boss list.
 do
-    addon.Logger.Boss = addon.Logger.Boss or {}
-    local Boss = addon.Logger.Boss
-    local Store = addon.Logger.Store
-    local View = addon.Logger.View
-    local Actions = addon.Logger.Actions
+    module.Boss = module.Boss or {}
+    local Boss = module.Boss
+    local Store = module.Store
+    local View = module.View
+    local Actions = module.Actions
 
     local controller = ListController.MakeListController {
         keyName = "BossList",
@@ -1936,7 +1935,7 @@ do
         end,
 
         getData = function(out)
-            local raid = addon.Logger:NeedRaid()
+            local raid = module:NeedRaid()
             if not raid then return end
             View:FillBossList(out, raid)
         end,
@@ -1947,7 +1946,7 @@ do
         drawRow = ListController.CreateRowDrawer(function(row, it)
             if not row._krtBound then
                 Frames.SafeSetScript(row, "OnClick", function(self, button)
-                    addon.Logger:SelectBoss(self, button)
+                    module:SelectBoss(self, button)
                 end)
                 row._krtBound = true
             end
@@ -1960,22 +1959,22 @@ do
             ui.Mode:SetText(it.mode)
         end),
 
-        highlightFn = function(id) return MultiSelect.MultiSelectIsSelected(addon.Logger._msBossCtx, id) end,
-        focusId = function() return addon.Logger.selectedBoss end,
-        focusKey = function() return tostring(addon.Logger.selectedBoss or "nil") end,
-        highlightKey = function() return MultiSelect.MultiSelectGetVersion(addon.Logger._msBossCtx) end,
+        highlightFn = function(id) return MultiSelect.MultiSelectIsSelected(module._msBossCtx, id) end,
+        focusId = function() return module.selectedBoss end,
+        focusKey = function() return tostring(module.selectedBoss or "nil") end,
+        highlightKey = function() return MultiSelect.MultiSelectGetVersion(module._msBossCtx) end,
         highlightDebugTag = "LoggerSelect",
         highlightDebugInfo = function()
-            return ("ctx=%s selectedCount=%d"):format(tostring(addon.Logger._msBossCtx),
-                MultiSelect.MultiSelectCount(addon.Logger._msBossCtx))
+            return ("ctx=%s selectedCount=%d"):format(tostring(module._msBossCtx),
+                MultiSelect.MultiSelectCount(module._msBossCtx))
         end,
 
         postUpdate = function(n)
-            local hasRaid = addon.Logger.selectedRaid
-            local hasBoss = addon.Logger.selectedBoss
+            local hasRaid = module.selectedRaid
+            local hasBoss = module.selectedBoss
             UIPrimitives.EnableDisable(_G[n .. "AddBtn"], hasRaid ~= nil)
             UIPrimitives.EnableDisable(_G[n .. "EditBtn"], hasBoss ~= nil)
-            local bossSelCount = MultiSelect.MultiSelectCount(addon.Logger._msBossCtx)
+            local bossSelCount = MultiSelect.MultiSelectCount(module._msBossCtx)
             local delBtn = _G[n .. "DeleteBtn"]
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, bossSelCount)
             UIPrimitives.EnableDisable(delBtn, (bossSelCount and bossSelCount > 0) or false)
@@ -1993,14 +1992,14 @@ do
     Boss._ctrl = controller
     ListController.BindListController(Boss, controller)
 
-    function Boss:Add() addon.Logger.BossBox:Toggle() end
+    function Boss:Add() module.BossBox:Toggle() end
 
-    function Boss:Edit() if addon.Logger.selectedBoss then addon.Logger.BossBox:Fill() end end
+    function Boss:Edit() if module.selectedBoss then module.BossBox:Fill() end end
 
     do
         local function DeleteBosses()
-            addon.Logger:Run(function(_, rID)
-                local ctx = addon.Logger._msBossCtx
+            module:Run(function(_, rID)
+                local ctx = module._msBossCtx
                 local ids = MultiSelect.MultiSelectGetSelected(ctx)
                 if not (ids and #ids > 0) then return end
 
@@ -2012,18 +2011,18 @@ do
 
                 -- Clear boss-related selections (filters changed / deleted)
                 MultiSelect.MultiSelectClear(ctx)
-                addon.Logger.selectedBoss = nil
+                module.selectedBoss = nil
 
-                addon.Logger.selectedBossPlayer = nil
-                MultiSelect.MultiSelectClear(addon.Logger._msBossAttCtx)
+                module.selectedBossPlayer = nil
+                MultiSelect.MultiSelectClear(module._msBossAttCtx)
 
-                addon.Logger.selectedItem = nil
-                MultiSelect.MultiSelectClear(addon.Logger._msLootCtx)
+                module.selectedItem = nil
+                MultiSelect.MultiSelectClear(module._msLootCtx)
             end)
         end
 
         function Boss:Delete()
-            local ctx = addon.Logger._msBossCtx
+            local ctx = module._msBossCtx
             if MultiSelect.MultiSelectCount(ctx) > 0 then
                 StaticPopup_Show("KRTLOGGER_DELETE_BOSS")
             end
@@ -2033,9 +2032,9 @@ do
     end
 
     function Boss:GetName(bossNid, raidId)
-        local rID = raidId or addon.Logger.selectedRaid
+        local rID = raidId or module.selectedRaid
         if not rID then return "" end
-        bossNid = bossNid or addon.Logger.selectedBoss
+        bossNid = bossNid or module.selectedBoss
         if not bossNid then return "" end
 
         local raid = Store:GetRaid(rID)
@@ -2050,11 +2049,11 @@ end
 
 -- Boss attendees list.
 do
-    addon.Logger.BossAttendees = addon.Logger.BossAttendees or {}
-    local BossAtt = addon.Logger.BossAttendees
-    local Store = addon.Logger.Store
-    local View = addon.Logger.View
-    local Actions = addon.Logger.Actions
+    module.BossAttendees = module.BossAttendees or {}
+    local BossAtt = module.BossAttendees
+    local Store = module.Store
+    local View = module.View
+    local Actions = module.Actions
 
     local controller = ListController.MakeListController {
         keyName = "BossAttendeesList",
@@ -2084,8 +2083,8 @@ do
         end,
 
         getData = function(out)
-            local rID = addon.Logger.selectedRaid
-            local bID = addon.Logger.selectedBoss
+            local rID = module.selectedRaid
+            local bID = module.selectedBoss
             local raid = (rID and bID) and Store:GetRaid(rID) or nil
             if not (raid and bID) then return end
             View:FillBossAttendeesList(out, raid, bID)
@@ -2097,7 +2096,7 @@ do
         drawRow = ListController.CreateRowDrawer(function(row, it)
             if not row._krtBound then
                 Frames.SafeSetScript(row, "OnClick", function(self, button)
-                    addon.Logger:SelectBossPlayer(self, button)
+                    module:SelectBossPlayer(self, button)
                 end)
                 row._krtBound = true
             end
@@ -2107,21 +2106,21 @@ do
             ui.Name:SetVertexColor(r, g, b)
         end),
 
-        highlightFn = function(id) return MultiSelect.MultiSelectIsSelected(addon.Logger._msBossAttCtx, id) end,
-        focusId = function() return addon.Logger.selectedBossPlayer end,
-        focusKey = function() return tostring(addon.Logger.selectedBossPlayer or "nil") end,
-        highlightKey = function() return MultiSelect.MultiSelectGetVersion(addon.Logger._msBossAttCtx) end,
+        highlightFn = function(id) return MultiSelect.MultiSelectIsSelected(module._msBossAttCtx, id) end,
+        focusId = function() return module.selectedBossPlayer end,
+        focusKey = function() return tostring(module.selectedBossPlayer or "nil") end,
+        highlightKey = function() return MultiSelect.MultiSelectGetVersion(module._msBossAttCtx) end,
         highlightDebugTag = "LoggerSelect",
         highlightDebugInfo = function()
-            return ("ctx=%s selectedCount=%d"):format(tostring(addon.Logger._msBossAttCtx),
-                MultiSelect.MultiSelectCount(addon.Logger._msBossAttCtx))
+            return ("ctx=%s selectedCount=%d"):format(tostring(module._msBossAttCtx),
+                MultiSelect.MultiSelectCount(module._msBossAttCtx))
         end,
 
         postUpdate = function(n)
-            local bSel = addon.Logger.selectedBoss
+            local bSel = module.selectedBoss
             local addBtn = _G[n .. "AddBtn"]
             local removeBtn = _G[n .. "RemoveBtn"]
-            local attSelCount = MultiSelect.MultiSelectCount(addon.Logger._msBossAttCtx)
+            local attSelCount = MultiSelect.MultiSelectCount(module._msBossAttCtx)
             if addBtn then
                 UIPrimitives.EnableDisable(addBtn, bSel and ((attSelCount or 0) == 0))
             end
@@ -2139,13 +2138,13 @@ do
     BossAtt._ctrl = controller
     ListController.BindListController(BossAtt, controller)
 
-    function BossAtt:Add() addon.Logger.AttendeesBox:Toggle() end
+    function BossAtt:Add() module.AttendeesBox:Toggle() end
 
     do
         local function DeleteAttendees()
-            addon.Logger:Run(function(_, rID)
-                local bNid = addon.Logger.selectedBoss
-                local ctx = addon.Logger._msBossAttCtx
+            module:Run(function(_, rID)
+                local bNid = module.selectedBoss
+                local ctx = module._msBossAttCtx
                 local ids = MultiSelect.MultiSelectGetSelected(ctx)
                 if not (bNid and ids and #ids > 0) then return end
 
@@ -2154,12 +2153,12 @@ do
                 end
 
                 MultiSelect.MultiSelectClear(ctx)
-                addon.Logger.selectedBossPlayer = nil
+                module.selectedBossPlayer = nil
             end)
         end
 
         function BossAtt:Delete()
-            local ctx = addon.Logger._msBossAttCtx
+            local ctx = module._msBossAttCtx
             if MultiSelect.MultiSelectCount(ctx) > 0 then
                 StaticPopup_Show("KRTLOGGER_DELETE_ATTENDEE")
             end
@@ -2181,10 +2180,10 @@ end
 
 -- Raid attendees list.
 do
-    addon.Logger.RaidAttendees = addon.Logger.RaidAttendees or {}
-    local RaidAtt = addon.Logger.RaidAttendees
-    local View = addon.Logger.View
-    local Actions = addon.Logger.Actions
+    module.RaidAttendees = module.RaidAttendees or {}
+    local RaidAtt = module.RaidAttendees
+    local View = module.View
+    local Actions = module.Actions
 
     local controller = ListController.MakeListController {
         keyName = "RaidAttendeesList",
@@ -2226,7 +2225,7 @@ do
         end,
 
         getData = function(out)
-            local raid = addon.Logger:NeedRaid()
+            local raid = module:NeedRaid()
             if not raid then return end
             View:FillRaidAttendeesList(out, raid)
         end,
@@ -2237,7 +2236,7 @@ do
         drawRow = ListController.CreateRowDrawer(function(row, it)
             if not row._krtBound then
                 Frames.SafeSetScript(row, "OnClick", function(self, button)
-                    addon.Logger:SelectPlayer(self, button)
+                    module:SelectPlayer(self, button)
                 end)
                 row._krtBound = true
             end
@@ -2249,20 +2248,20 @@ do
             ui.Leave:SetText(it.leaveFmt)
         end),
 
-        highlightFn = function(id) return MultiSelect.MultiSelectIsSelected(addon.Logger._msRaidAttCtx, id) end,
-        focusId = function() return addon.Logger.selectedPlayer end,
-        focusKey = function() return tostring(addon.Logger.selectedPlayer or "nil") end,
-        highlightKey = function() return MultiSelect.MultiSelectGetVersion(addon.Logger._msRaidAttCtx) end,
+        highlightFn = function(id) return MultiSelect.MultiSelectIsSelected(module._msRaidAttCtx, id) end,
+        focusId = function() return module.selectedPlayer end,
+        focusKey = function() return tostring(module.selectedPlayer or "nil") end,
+        highlightKey = function() return MultiSelect.MultiSelectGetVersion(module._msRaidAttCtx) end,
         highlightDebugTag = "LoggerSelect",
         highlightDebugInfo = function()
-            return ("ctx=%s selectedCount=%d"):format(tostring(addon.Logger._msRaidAttCtx),
-                MultiSelect.MultiSelectCount(addon.Logger._msRaidAttCtx))
+            return ("ctx=%s selectedCount=%d"):format(tostring(module._msRaidAttCtx),
+                MultiSelect.MultiSelectCount(module._msRaidAttCtx))
         end,
 
         postUpdate = function(n)
             local deleteBtn = _G[n .. "DeleteBtn"]
             if deleteBtn then
-                local attSelCount = MultiSelect.MultiSelectCount(addon.Logger._msRaidAttCtx)
+                local attSelCount = MultiSelect.MultiSelectCount(module._msRaidAttCtx)
                 UIPrimitives.SetButtonCount(deleteBtn, L.BtnDelete, attSelCount)
                 UIPrimitives.EnableDisable(deleteBtn, (attSelCount and attSelCount > 0) or false)
             end
@@ -2270,8 +2269,8 @@ do
             local addBtn = _G[n .. "AddBtn"]
             if addBtn then
                 -- Update is only meaningful for the current raid session while actively raiding.
-                local can = addon.IsInRaid() and Core.GetCurrentRaid() and addon.Logger.selectedRaid
-                    and (tonumber(Core.GetCurrentRaid()) == tonumber(addon.Logger.selectedRaid))
+                local can = addon.IsInRaid() and Core.GetCurrentRaid() and module.selectedRaid
+                    and (tonumber(Core.GetCurrentRaid()) == tonumber(module.selectedRaid))
                 UIPrimitives.EnableDisable(addBtn, can)
             end
         end,
@@ -2292,7 +2291,7 @@ do
     -- Update raid roster from the live in-game raid roster (current raid only).
     -- Bound to the "Add" button in the RaidAttendees frame (repurposed as Update).
     function RaidAtt:Add()
-        addon.Logger:Run(function(_, rID)
+        module:Run(function(_, rID)
             local sel = tonumber(rID)
             if not sel then return end
 
@@ -2310,12 +2309,12 @@ do
             addon.Raid:UpdateRaidRoster()
 
             -- Clear dependent selections after roster sync.
-            MultiSelect.MultiSelectClear(addon.Logger._msRaidAttCtx)
-            MultiSelect.MultiSelectClear(addon.Logger._msBossAttCtx)
-            MultiSelect.MultiSelectClear(addon.Logger._msLootCtx)
-            addon.Logger.selectedPlayer = nil
-            addon.Logger.selectedBossPlayer = nil
-            addon.Logger.selectedItem = nil
+            MultiSelect.MultiSelectClear(module._msRaidAttCtx)
+            MultiSelect.MultiSelectClear(module._msBossAttCtx)
+            MultiSelect.MultiSelectClear(module._msLootCtx)
+            module.selectedPlayer = nil
+            module.selectedBossPlayer = nil
+            module.selectedItem = nil
 
             controller:Dirty()
         end)
@@ -2323,29 +2322,29 @@ do
 
     do
         local function DeleteAttendees()
-            addon.Logger:Run(function(_, rID)
-                local ctx = addon.Logger._msRaidAttCtx
+            module:Run(function(_, rID)
+                local ctx = module._msRaidAttCtx
                 local ids = MultiSelect.MultiSelectGetSelected(ctx)
                 if not (ids and #ids > 0) then return end
 
                 local removed = Actions:DeleteRaidAttendeeMany(rID, ids)
                 if removed and removed > 0 then
                     MultiSelect.MultiSelectClear(ctx)
-                    addon.Logger.selectedPlayer = nil
+                    module.selectedPlayer = nil
 
                     -- Player filters changed: clear boss-attendees selection too.
-                    addon.Logger.selectedBossPlayer = nil
-                    MultiSelect.MultiSelectClear(addon.Logger._msBossAttCtx)
+                    module.selectedBossPlayer = nil
+                    MultiSelect.MultiSelectClear(module._msBossAttCtx)
 
                     -- Filters changed: reset loot selection.
-                    addon.Logger.selectedItem = nil
-                    MultiSelect.MultiSelectClear(addon.Logger._msLootCtx)
+                    module.selectedItem = nil
+                    MultiSelect.MultiSelectClear(module._msLootCtx)
                 end
             end)
         end
 
         function RaidAtt:Delete()
-            local ctx = addon.Logger._msRaidAttCtx
+            local ctx = module._msRaidAttCtx
             if MultiSelect.MultiSelectCount(ctx) > 0 then
                 StaticPopup_Show("KRTLOGGER_DELETE_RAIDATTENDEE")
             end
@@ -2360,17 +2359,17 @@ end
 
 -- Loot list (filters by selected boss and player).
 do
-    addon.Logger.Loot = addon.Logger.Loot or {}
-    local Loot = addon.Logger.Loot
-    local Store = addon.Logger.Store
-    local View = addon.Logger.View
-    local Actions = addon.Logger.Actions
+    module.Loot = module.Loot or {}
+    local Loot = module.Loot
+    local Store = module.Store
+    local View = module.View
+    local Actions = module.Actions
 
     local function updateSourceHeaderState(frameName)
         local header = frameName and _G[frameName .. "HeaderSource"]
         if not header then return end
 
-        local canSortSource = addon.Logger.selectedBoss == nil
+        local canSortSource = module.selectedBoss == nil
         if header.EnableMouse then
             header:EnableMouse(canSortSource)
         end
@@ -2434,11 +2433,11 @@ do
         end,
 
         getData = function(out)
-            local raid = addon.Logger:NeedRaid()
+            local raid = module:NeedRaid()
             if not raid then return end
 
-            local bID = addon.Logger.selectedBoss
-            local pID = addon.Logger.selectedBossPlayer or addon.Logger.selectedPlayer
+            local bID = module.selectedBoss
+            local pID = module.selectedBossPlayer or module.selectedPlayer
             local p = pID and Store:GetPlayer(raid, pID) or nil
             local pName = p and p.name or nil
 
@@ -2454,13 +2453,13 @@ do
                     row:RegisterForClicks("AnyUp")
                 end
                 Frames.SafeSetScript(row, "OnClick", function(self, button)
-                    addon.Logger:SelectItem(self, button)
+                    module:SelectItem(self, button)
                 end)
                 Frames.SafeSetScript(row, "OnEnter", function(self)
-                    addon.Logger:OnLootRowEnter(self)
+                    module:OnLootRowEnter(self)
                 end)
                 Frames.SafeSetScript(row, "OnLeave", function(self)
-                    addon.Logger:OnLootRowLeave(self)
+                    module:OnLootRowLeave(self)
                 end)
                 local itemButton = row.GetName and _G[row:GetName() .. "Item"] or nil
                 Frames.SafeSetScript(itemButton, "OnEnter", function(self)
@@ -2484,7 +2483,7 @@ do
                 ))
             end
 
-            local selectedBoss = addon.Logger.selectedBoss
+            local selectedBoss = module.selectedBoss
             if selectedBoss and tonumber(it.bossNid) == tonumber(selectedBoss) then
                 ui.Source:SetText("")
             else
@@ -2511,20 +2510,20 @@ do
             ui.ItemIconTexture:SetTexture(icon)
         end),
 
-        highlightFn = function(id) return MultiSelect.MultiSelectIsSelected(addon.Logger._msLootCtx, id) end,
-        focusId = function() return addon.Logger.selectedItem end,
-        focusKey = function() return tostring(addon.Logger.selectedItem or "nil") end,
-        highlightKey = function() return MultiSelect.MultiSelectGetVersion(addon.Logger._msLootCtx) end,
+        highlightFn = function(id) return MultiSelect.MultiSelectIsSelected(module._msLootCtx, id) end,
+        focusId = function() return module.selectedItem end,
+        focusKey = function() return tostring(module.selectedItem or "nil") end,
+        highlightKey = function() return MultiSelect.MultiSelectGetVersion(module._msLootCtx) end,
         highlightDebugTag = "LoggerSelect",
         highlightDebugInfo = function()
-            return ("ctx=%s selectedCount=%d"):format(tostring(addon.Logger._msLootCtx),
-                MultiSelect.MultiSelectCount(addon.Logger._msLootCtx))
+            return ("ctx=%s selectedCount=%d"):format(tostring(module._msLootCtx),
+                MultiSelect.MultiSelectCount(module._msLootCtx))
         end,
 
         postUpdate = function(n)
             updateSourceHeaderState(n)
 
-            local lootSelCount = MultiSelect.MultiSelectCount(addon.Logger._msLootCtx)
+            local lootSelCount = MultiSelect.MultiSelectCount(module._msLootCtx)
             local delBtn = _G[n .. "DeleteBtn"]
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, lootSelCount)
             UIPrimitives.EnableDisable(delBtn, (lootSelCount or 0) > 0)
@@ -2579,7 +2578,7 @@ do
     ListController.BindListController(Loot, controller)
 
     function Loot:Sort(key)
-        if key == "source" and addon.Logger.selectedBoss then
+        if key == "source" and module.selectedBoss then
             return
         end
         controller:Sort(key)
@@ -2600,16 +2599,16 @@ do
 
     do
         local function DeleteItem()
-            addon.Logger:Run(function(_, rID)
-                local ctx = addon.Logger._msLootCtx
+            module:Run(function(_, rID)
+                local ctx = module._msLootCtx
                 local selected = MultiSelect.MultiSelectGetSelected(ctx)
                 if not selected or #selected == 0 then return end
 
                 local removed = Actions:DeleteLootMany(rID, selected)
                 if removed > 0 then
                     MultiSelect.MultiSelectClear(ctx)
-                    addon.Logger.selectedItem = nil
-                    triggerSelectionEvent(addon.Logger, "selectedItem")
+                    module.selectedItem = nil
+                    triggerSelectionEvent(module, "selectedItem")
 
                     if Options.IsDebugEnabled() and addon.debug then
                         addon:debug((Diag.D.LogLoggerSelectDeleteItems):format(removed))
@@ -2619,7 +2618,7 @@ do
         end
 
         function Loot:Delete()
-            if MultiSelect.MultiSelectCount(addon.Logger._msLootCtx) > 0 then
+            if MultiSelect.MultiSelectCount(module._msLootCtx) > 0 then
                 StaticPopup_Show("KRTLOGGER_DELETE_ITEM")
             end
         end
@@ -2637,9 +2636,9 @@ do
             -- Logger UI edits target selectedRaid.
             local isLoggerSource = (type(source) == "string") and (source:find("^LOGGER_") ~= nil)
             if isLoggerSource then
-                raidID = addon.Logger.selectedRaid or Core.GetCurrentRaid()
+                raidID = module.selectedRaid or Core.GetCurrentRaid()
             else
-                raidID = Core.GetCurrentRaid() or addon.Logger.selectedRaid
+                raidID = Core.GetCurrentRaid() or module.selectedRaid
             end
         end
         addon:trace(Diag.D.LogLoggerLootLogAttempt:format(tostring(source), tostring(raidID), tostring(itemID),
@@ -2735,9 +2734,9 @@ end
 
 -- Add/edit boss popup (time/mode normalization).
 do
-    addon.Logger.BossBox = addon.Logger.BossBox or {}
-    local Box = addon.Logger.BossBox
-    local Store = addon.Logger.Store
+    module.BossBox = module.BossBox or {}
+    local Box = module.BossBox
+    local Store = module.Store
 
     local frameName, localized, isEdit = nil, false, false
     local raidData, bossData, tempDate = {}, {}, {}
@@ -2830,7 +2829,7 @@ do
     --   bossData.time : timestamp
     --   bossData.mode : "h" | "n"
     function Box:Fill()
-        local rID, bID = addon.Logger.selectedRaid, addon.Logger.selectedBoss
+        local rID, bID = module.selectedRaid, module.selectedBoss
         if not (rID and bID) then return end
 
         raidData = Store:GetRaid(rID)
@@ -2858,7 +2857,7 @@ do
     end
 
     function Box:Save()
-        local rID = addon.Logger.selectedRaid
+        local rID = module.selectedRaid
         if not rID then return end
 
         local name = Strings.TrimText(_G[frameName .. "Name"]:GetText())
@@ -2883,12 +2882,12 @@ do
         local mode = (modeT == "h") and "h" or "n"
 
         local bossNid = isEdit and editBossNid or nil
-        local savedNid = addon.Logger.Actions:UpsertBossKill(rID, bossNid, name, time(killDate), mode)
+        local savedNid = module.Actions:UpsertBossKill(rID, bossNid, name, time(killDate), mode)
         if not savedNid then return end
 
         self:Hide()
-        addon.Logger:ResetSelections()
-        triggerSelectionEvent(addon.Logger, "selectedRaid", "ui")
+        module:ResetSelections()
+        triggerSelectionEvent(module, "selectedRaid", "ui")
     end
 
     function Box:CancelAddEdit()
@@ -2912,8 +2911,8 @@ end
 
 -- Add attendee popup.
 do
-    addon.Logger.AttendeesBox = addon.Logger.AttendeesBox or {}
-    local Box = addon.Logger.AttendeesBox
+    module.AttendeesBox = module.AttendeesBox or {}
+    local Box = module.AttendeesBox
 
     local frameName
     local getFrame = Frames.MakeFrameGetter("KRTLoggerPlayerBox")
@@ -2990,11 +2989,11 @@ do
     end
 
     function Box:Save()
-        local rID, bID = addon.Logger.selectedRaid, addon.Logger.selectedBoss
+        local rID, bID = module.selectedRaid, module.selectedBoss
         local name = Strings.TrimText(_G[frameName .. "Name"]:GetText())
-        if addon.Logger.Actions:AddBossAttendee(rID, bID, name) then
+        if module.Actions:AddBossAttendee(rID, bID, name) then
             self:Toggle()
-            triggerSelectionEvent(addon.Logger, "selectedBoss")
+            triggerSelectionEvent(module, "selectedBoss")
         end
     end
 end

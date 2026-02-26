@@ -35,7 +35,6 @@ local InternalEvents = Events.Internal
 do
     addon.Controllers = addon.Controllers or {}
     addon.Controllers.Changes = addon.Controllers.Changes or {}
-    addon.Changes = addon.Controllers.Changes -- Legacy alias during namespacing migration.
     local module = addon.Controllers.Changes
     local frameName
 

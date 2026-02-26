@@ -88,8 +88,7 @@ end
 -- =========== Master Looter Frame Module  =========== --
 do
     addon.Controllers = addon.Controllers or {}
-    addon.Controllers.Master = addon.Controllers.Master or addon.Master or {}
-    addon.Master = addon.Controllers.Master -- Legacy alias during namespacing migration.
+    addon.Controllers.Master = addon.Controllers.Master or {}
     local module = addon.Controllers.Master
     local frameName
 

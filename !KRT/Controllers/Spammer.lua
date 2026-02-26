@@ -29,7 +29,6 @@ local tostring, tonumber = tostring, tonumber
 do
     addon.Controllers = addon.Controllers or {}
     addon.Controllers.Spammer = addon.Controllers.Spammer or {}
-    addon.Spammer = addon.Controllers.Spammer -- Legacy alias during namespacing migration.
     local module = addon.Controllers.Spammer
     -- ----- Internal state ----- --
     local frameName

@@ -28,7 +28,6 @@ local tonumber = tonumber
 do
     addon.Controllers = addon.Controllers or {}
     addon.Controllers.Warnings = addon.Controllers.Warnings or {}
-    addon.Warnings = addon.Controllers.Warnings -- Legacy alias during namespacing migration.
     local module = addon.Controllers.Warnings
     local frameName
 
