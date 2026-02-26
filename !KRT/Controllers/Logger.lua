@@ -19,7 +19,6 @@ local Options = feature.Options or addon.Options
 local Bus = feature.Bus or addon.Bus
 local ListController = feature.ListController or addon.ListController
 local MultiSelect = feature.MultiSelect or addon.MultiSelect
-local Frames = feature.Frames or addon.Frames
 local Strings = feature.Strings or addon.Strings
 local Colors = feature.Colors or addon.Colors
 local Base64 = feature.Base64 or addon.Base64
@@ -880,7 +879,7 @@ do
 
     local rosterUiRefreshDebounceSeconds = 0.25
 
-    local function isLoggerViewingCurrentRaid()
+    module._isLoggerViewingCurrentRaid = function()
         local frame = module.frame or getFrame()
         if not (frame and frame.IsShown and frame:IsShown()) then
             return false
@@ -906,11 +905,11 @@ do
         end
     end
 
-    local function requestRosterBoundListsRefresh()
+    module._requestRosterBoundListsRefresh = function()
         addon.CancelTimer(module._rosterUiHandle, true)
         module._rosterUiHandle = addon.NewTimer(rosterUiRefreshDebounceSeconds, function()
             module._rosterUiHandle = nil
-            if not isLoggerViewingCurrentRaid() then
+            if not module._isLoggerViewingCurrentRaid() then
                 return
             end
             refreshRosterBoundLists()
@@ -1874,11 +1873,11 @@ do
         if raidIdType ~= "number" and raidIdType ~= "string" then
             return
         end
-        if not isLoggerViewingCurrentRaid() then
+        if not module._isLoggerViewingCurrentRaid() then
             return
         end
 
-        requestRosterBoundListsRefresh()
+        module._requestRosterBoundListsRefresh()
     end)
 end
 

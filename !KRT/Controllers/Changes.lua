@@ -46,7 +46,7 @@ do
     local UpdateUIFrame
     local changesTable = {}
     local tmpNames = {}
-    local SaveChanges, CancelChanges
+    local SaveChanges, CancelChanges, InitChangesTable
     local fetched = false
     local changesDirty = false
     local selectedID, tempSelectedID
@@ -154,6 +154,29 @@ do
         row._krtBound = true
     end
 
+    local partToRefKey = {
+        AddBtn = "addBtn",
+        AnnounceBtn = "announceBtn",
+        ClearBtn = "clearBtn",
+        DemandBtn = "demandBtn",
+        EditBtn = "editBtn",
+        Name = "name",
+        Spec = "spec",
+    }
+
+    local function GetNamedPart(partName)
+        local refs = module.refs
+        local refKey = partToRefKey[partName]
+        local ref = refs and refKey and refs[refKey] or nil
+        if ref then
+            return ref
+        end
+        if not frameName then
+            return nil
+        end
+        return _G[frameName .. partName]
+    end
+
     -- ----- Public methods ----- --
     scaffoldToggle = module.Toggle
     scaffoldHide = module.Hide
@@ -255,7 +278,14 @@ do
         -- No selection.
         if not btn then return end
         local btnName = btn:GetName()
-        local name = _G[btnName .. "Name"]:GetText()
+        if not btnName or btnName == "" then
+            return
+        end
+        local nameLabel = _G[btnName .. "Name"]
+        if not (nameLabel and nameLabel.GetText) then
+            return
+        end
+        local name = nameLabel:GetText()
         -- No ID set.
         if not name then return end
         -- Make sure the player exists in the raid:
@@ -286,9 +316,15 @@ do
     function module:Add(btn)
         if not addon.Core.GetCurrentRaid() or not btn then return end
         if not selectedID then
+            local nameBox = GetNamedPart("Name")
+            if not nameBox then
+                return
+            end
             btn:Hide()
-            _G[frameName .. "Name"]:Show()
-            _G[frameName .. "Name"]:SetFocus()
+            nameBox:Show()
+            if nameBox.SetFocus then
+                nameBox:SetFocus()
+            end
             isAdd = true
             module:RequestRefresh()
         elseif changesTable[selectedID] then
@@ -304,15 +340,22 @@ do
     -- Edit / Save
     function module:Edit()
         if not addon.Core.GetCurrentRaid() then return end
+        local nameBox = GetNamedPart("Name")
+        local specBox = GetNamedPart("Spec")
+        if not (nameBox and specBox) then
+            return
+        end
         if not selectedID or isEdit then
-            local name = _G[frameName .. "Name"]:GetText()
-            local spec = _G[frameName .. "Spec"]:GetText()
+            local name = nameBox:GetText()
+            local spec = specBox:GetText()
             SaveChanges(name, spec)
         elseif changesTable[selectedID] then
-            _G[frameName .. "Name"]:SetText(selectedID)
-            _G[frameName .. "Spec"]:SetText(changesTable[selectedID])
-            _G[frameName .. "Spec"]:Show()
-            _G[frameName .. "Spec"]:SetFocus()
+            nameBox:SetText(selectedID)
+            specBox:SetText(changesTable[selectedID])
+            specBox:Show()
+            if specBox.SetFocus then
+                specBox:SetFocus()
+            end
             isAdd = false
             isEdit = true
             module:RequestRefresh()
@@ -321,8 +364,13 @@ do
 
     -- Remove player's change:
     function module:Delete(name)
-        if not addon.Core.GetCurrentRaid() or not name then return end
-        KRT_Raids[addon.Core.GetCurrentRaid()].changes[name] = nil
+        local currentRaid = addon.Core.GetCurrentRaid()
+        if not currentRaid or not name then return end
+        local raid = KRT_Raids and KRT_Raids[currentRaid]
+        if type(raid) ~= "table" or type(raid.changes) ~= "table" then
+            return
+        end
+        raid.changes[name] = nil
         changesDirty = true
         controller:Dirty()
         module:RequestRefresh()
@@ -385,11 +433,19 @@ do
     -- Localize UI Frame:
     function LocalizeUIFrame()
         if localized then return end
-        _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
-        _G[frameName .. "AddBtn"]:SetText(L.BtnAdd)
-        _G[frameName .. "EditBtn"]:SetText(L.BtnEdit)
-        _G[frameName .. "DemandBtn"]:SetText(L.BtnDemand)
-        _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
+        if not frameName then
+            return
+        end
+        local clearBtn = GetNamedPart("ClearBtn")
+        if clearBtn then clearBtn:SetText(L.BtnClear) end
+        local addBtn = GetNamedPart("AddBtn")
+        if addBtn then addBtn:SetText(L.BtnAdd) end
+        local editBtn = GetNamedPart("EditBtn")
+        if editBtn then editBtn:SetText(L.BtnEdit) end
+        local demandBtn = GetNamedPart("DemandBtn")
+        if demandBtn then demandBtn:SetText(L.BtnDemand) end
+        local announceBtn = GetNamedPart("AnnounceBtn")
+        if announceBtn then announceBtn:SetText(L.BtnAnnounce) end
         Frames.SetFrameTitle(frameName, L.StrChanges)
         Frames.BindEditBoxHandlers(frameName, {
             { suffix = "Name", onEscape = CancelChanges, onEnter = module.Edit },
@@ -402,6 +458,9 @@ do
 
     -- UI refresh.
     function UpdateUIFrame()
+        if not frameName then
+            return
+        end
         if changesDirty or not fetched then
             InitChangesTable()
             controller:Dirty()
@@ -453,11 +512,16 @@ do
     -- Initialize changes table:
     function InitChangesTable()
         addon:debug(Diag.D.LogChangesInitTable)
-        if not addon.Core.GetCurrentRaid() then
+        local currentRaid = addon.Core.GetCurrentRaid()
+        if not currentRaid then
             changesTable = {}
             return
         end
-        local raid = KRT_Raids[addon.Core.GetCurrentRaid()]
+        local raid = KRT_Raids[currentRaid]
+        if type(raid) ~= "table" then
+            raid = {}
+            KRT_Raids[currentRaid] = raid
+        end
         raid.changes = raid.changes or {}
         changesTable = raid.changes
     end
@@ -488,8 +552,14 @@ do
         isEdit = false
         selectedID = nil
         tempSelectedID = nil
-        Frames.ResetEditBox(_G[frameName .. "Name"])
-        Frames.ResetEditBox(_G[frameName .. "Spec"])
+        local nameBox = GetNamedPart("Name")
+        if nameBox then
+            Frames.ResetEditBox(nameBox)
+        end
+        local specBox = GetNamedPart("Spec")
+        if specBox then
+            Frames.ResetEditBox(specBox)
+        end
         module:RequestRefresh()
     end
 end

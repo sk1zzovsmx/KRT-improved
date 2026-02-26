@@ -4,6 +4,14 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Bugfix:** Minimap drag now guards invalid cursor/minimap coordinates and zero-distance normalization,
+  preventing rare divide-by-zero errors while Shift-dragging on the ring.
+- **Behavior:** Minimap menu now disables the `LootCounter` entry when the optional widget is disabled
+  by feature flags or not registered in the UI facade.
+- **Bugfix:** `Controllers/Changes.lua` now hardens frame-part lookups and raid-table access, avoiding nil
+  index errors on early callbacks and raid-leave cleanup paths.
+- **Refactor:** Scoped `InitChangesTable` as file-local in `Controllers/Changes.lua`; also removed
+  Logger scope warnings (duplicate `Frames` local and module-scoped roster refresh helpers).
 - **Bugfix:** Logger raid-selection callbacks now use a shared file-scoped
   `triggerSelectionEvent(...)` helper, fixing nil-global errors during `RaidCreate`
   and related raid-selection refresh flows.
@@ -215,11 +223,11 @@ Dates are in YYYY-MM-DD.
   - Consolidated duplicated `GetPlus()` helper via `MakePlusGetter()` factory (8 lines)
   - Consolidated `GetMasterFrameName()` duplicate handling (10 lines)
   - Created `Utils.makeFrameGetter()` factory consolidating 3x identical frame getter patterns (15 lines)
-  
+
 - **Phase 2 (Medium risk, Significant impact):** 75-90 lines
   - Added `addon:makeUIFrameController()` factory consolidating Toggle/Hide/Show patterns across 9 UI modules
   - Applied to: Master Looter, LootCounter, Reserves, ReserveImport, Config, Warnings, Changes, Spammer, Logger
-  
+
 - **Phase 3 (Low priority, Optional):** Analysis completed; no additional consolidations identified
   - Verified CheckPlayer pattern already centralized in addon.Raid
   - Verified dropdown logic already parameterized via FindDropDownField
