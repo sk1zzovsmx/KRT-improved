@@ -757,6 +757,12 @@ function addon:ADDON_LOADED(name)
     addon:info(Diag.I.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
         tostring(lvl), tostring(true)))
     addon.LoadOptions()
+    local minimap = addon.Minimap
+    if minimap and minimap.EnsureUI then
+        minimap:EnsureUI()
+    elseif minimap and minimap.OnLoad then
+        minimap:OnLoad()
+    end
     local reservesService = addon.Services and addon.Services.Reserves
     if reservesService and reservesService.Load then
         reservesService:Load()

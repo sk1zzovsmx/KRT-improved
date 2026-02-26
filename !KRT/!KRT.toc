@@ -33,15 +33,20 @@ UI\Templates\Common.xml
 
 # Layer 4 - Shared modules (helpers/constants)
 Modules\C.lua
-Modules\Std.lua
-Modules\ItemProbe.lua
+Modules\Events.lua
+Modules\Colors.lua
+Modules\Strings.lua
+Modules\Item.lua
+Modules\Comms.lua
+Modules\Time.lua
+Modules\Base64.lua
+Modules\Sort.lua
+Modules\Features.lua
 Modules\UI\Facade.lua
 Modules\UI\Visuals.lua
 Modules\UI\Frames.lua
 Modules\UI\ListController.lua
 Modules\UI\MultiSelect.lua
-Modules\UI\Binder\Map.lua
-Modules\UI\Binder\UIBinder.lua
 Modules\Bus.lua
 
 # Layer 5 - Core bootstrap and event wiring

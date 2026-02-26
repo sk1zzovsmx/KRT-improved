@@ -37,6 +37,7 @@ end
 -- ----- Internal state ----- --
 local addonMenu
 local dragMode
+local uiBound = false
 
 -- Cached math functions
 local sqrt = math.sqrt
@@ -44,6 +45,12 @@ local cos, sin = math.cos, math.sin
 local rad, atan2, deg = math.rad, math.atan2, math.deg
 
 -- ----- Private helpers ----- --
+local function AcquireRefs(frame)
+    return {
+        button = frame,
+    }
+end
+
 -- Menu definition for EasyMenu (built once).
 local minimapMenu = {
     {
@@ -168,20 +175,30 @@ end
 
 -- ----- Public methods ----- --
 function module:SetPos(angle)
+    local frame = self.frame or Frames.Get("KRT_MINIMAP_GUI") or KRT_MINIMAP_GUI
+    if not frame then
+        return
+    end
     angle = angle % 360
     Options.SetOption("minimapPos", angle)
     local r = rad(angle)
-    KRT_MINIMAP_GUI:ClearAllPoints()
-    KRT_MINIMAP_GUI:SetPoint("CENTER", cos(r) * 80, sin(r) * 80)
+    frame:ClearAllPoints()
+    frame:SetPoint("CENTER", cos(r) * 80, sin(r) * 80)
 end
 
-function module:OnLoad()
+function module:OnLoad(frame)
+    frame = frame or Frames.Get("KRT_MINIMAP_GUI") or KRT_MINIMAP_GUI
+    if not frame then
+        return nil
+    end
+
+    self.frame = frame
     local options = addon.options or KRT_Options or {}
-    KRT_MINIMAP_GUI:SetUserPlaced(true)
+    frame:SetUserPlaced(true)
     self:SetPos(options.minimapPos or 325)
     SetMinimapShown(options.minimapButton ~= false)
-    KRT_MINIMAP_GUI:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    KRT_MINIMAP_GUI:SetScript("OnMouseDown", function(self, button)
+    frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    frame:SetScript("OnMouseDown", function(self, button)
         if IsAltKeyDown() then
             dragMode = "free"
             self:SetScript("OnUpdate", moveButton)
@@ -190,7 +207,7 @@ function module:OnLoad()
             self:SetScript("OnUpdate", moveButton)
         end
     end)
-    KRT_MINIMAP_GUI:SetScript("OnMouseUp", function(self)
+    frame:SetScript("OnMouseUp", function(self)
         self:SetScript("OnUpdate", nil)
         if dragMode == "free" then
             dragMode = nil
@@ -201,7 +218,7 @@ function module:OnLoad()
         module:SetPos(deg(atan2(by - my, bx - mx)))
         dragMode = nil
     end)
-    KRT_MINIMAP_GUI:SetScript("OnClick", function(self, button, down)
+    frame:SetScript("OnClick", function(self, button, down)
         -- Ignore clicks if Shift or Alt keys are held:
         if IsShiftKeyDown() or IsAltKeyDown() then return end
         if button == "RightButton" then
@@ -210,7 +227,7 @@ function module:OnLoad()
             ToggleMenu()
         end
     end)
-    KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
+    frame:SetScript("OnEnter", function(self)
         GameTooltip_SetDefaultAnchor(GameTooltip, self)
         GameTooltip:SetText(
             addon.WrapTextInColorCode("Kader", Colors.NormalizeHexColor(K_COLOR))
@@ -223,13 +240,43 @@ function module:OnLoad()
         GameTooltip:AddLine(L.StrMinimapAClick, 1, 1, 1)
         GameTooltip:Show()
     end)
-    KRT_MINIMAP_GUI:SetScript("OnLeave", function(self)
+    frame:SetScript("OnLeave", function(self)
         GameTooltip:Hide()
     end)
+    return frame
+end
+
+function module:BindUI()
+    if uiBound and self.frame and self.refs then
+        return self.frame, self.refs
+    end
+
+    local frame = Frames.Get("KRT_MINIMAP_GUI") or KRT_MINIMAP_GUI
+    if not frame then
+        return nil
+    end
+
+    local refs = AcquireRefs(frame)
+    self.refs = refs
+
+    self:OnLoad(frame)
+
+    uiBound = true
+    return frame, refs
+end
+
+function module:EnsureUI()
+    if uiBound and self.frame and self.refs then
+        return self.frame
+    end
+    return self:BindUI()
 end
 
 -- Toggles the visibility of the minimap button.
 function module:ToggleMinimapButton()
+    if not self:EnsureUI() then
+        return
+    end
     local options = addon.options or KRT_Options or {}
     local nextValue = not options.minimapButton
     Options.SetOption("minimapButton", nextValue)
@@ -238,5 +285,8 @@ end
 
 -- Hides the minimap button.
 function module:HideMinimapButton()
+    if not self:EnsureUI() then
+        return
+    end
     return Frames.SetShown(KRT_MINIMAP_GUI, false)
 end
