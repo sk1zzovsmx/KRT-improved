@@ -1626,10 +1626,8 @@ do
             _G[n .. "HeaderZone"]:SetText(L.StrZone)
             _G[n .. "HeaderSize"]:SetText(L.StrSize)
             _G[n .. "CurrentBtn"]:SetText(L.StrSetCurrent)
-            _G[n .. "ExportBtn"]:SetText(L.BtnExport)
             local del = _G[n .. "DeleteBtn"]; if del then del:SetText(L.BtnDelete) end
             Frames.SetTooltip(_G[n .. "CurrentBtn"], L.StrRaidsCurrentHelp, nil, L.StrRaidCurrentTitle)
-            _G[n .. "ExportBtn"]:Disable() -- Not implemented.
 
             local frame = _G[n]
             if frame and not frame._krtBound then

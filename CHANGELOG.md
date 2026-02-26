@@ -4,6 +4,8 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **UI:** Removed the disabled `Export` button from the Logger Raids list footer.
+- **UI:** Logger Raids list footer buttons (`Set Current`, `Delete`) are now centered.
 - **Refactor:** Unified core bootstrap and runtime event wiring into
   `!KRT/Init.lua`; removed `Core/Init.lua` and `KRT.lua`, and updated toc/tooling paths.
 - **Refactor:** Introduced DB-ready raid data layers:

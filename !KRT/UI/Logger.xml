@@ -620,33 +620,21 @@
 							<AbsDimension x="75" y="25" />
 						</Size>
 						<Anchors>
-							<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMLEFT">
+							<Anchor point="BOTTOM" relativePoint="BOTTOM">
 								<Offset>
-									<AbsDimension x="3" y="0" />
+									<AbsDimension x="-34" y="0" />
 								</Offset>
 							</Anchor>
 						</Anchors>
 </Button>
-					<Button name="$parentExportBtn" inherits="KRTButtonTemplate">
-						<Size>
-							<AbsDimension x="65" y="25" />
-						</Size>
-						<Anchors>
-							<Anchor point="BOTTOM" relativePoint="BOTTOM">
-								<Offset>
-									<AbsDimension x="-35" y="0" />
-								</Offset>
-							</Anchor>
-						</Anchors>
-					</Button>
 					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
 						<Anchors>
-							<Anchor point="BOTTOM" relativePoint="BOTTOM">
+							<Anchor point="LEFT" relativeTo="$parentCurrentBtn" relativePoint="RIGHT">
 								<Offset>
-									<AbsDimension x="35" y="0" />
+									<AbsDimension x="3" y="0" />
 								</Offset>
 							</Anchor>
 						</Anchors>
