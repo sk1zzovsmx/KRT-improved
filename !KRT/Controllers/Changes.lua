@@ -17,6 +17,7 @@ local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
 local Bus = feature.Bus or addon.Bus
+local Core = feature.Core or addon.Core
 
 local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
 local bindModuleToggleHide = feature.BindModuleToggleHide
@@ -364,9 +365,10 @@ do
 
     -- Remove player's change:
     function module:Delete(name)
-        local currentRaid = addon.Core.GetCurrentRaid()
+        local currentRaid = Core.GetCurrentRaid()
         if not currentRaid or not name then return end
-        local raid = KRT_Raids and KRT_Raids[currentRaid]
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        local raid = raidStore and raidStore.GetRaidByIndex and raidStore:GetRaidByIndex(currentRaid) or nil
         if type(raid) ~= "table" or type(raid.changes) ~= "table" then
             return
         end
@@ -512,15 +514,16 @@ do
     -- Initialize changes table:
     function InitChangesTable()
         addon:debug(Diag.D.LogChangesInitTable)
-        local currentRaid = addon.Core.GetCurrentRaid()
+        local currentRaid = Core.GetCurrentRaid()
         if not currentRaid then
             changesTable = {}
             return
         end
-        local raid = KRT_Raids[currentRaid]
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        local raid = raidStore and raidStore.GetRaidByIndex and raidStore:GetRaidByIndex(currentRaid) or nil
         if type(raid) ~= "table" then
-            raid = {}
-            KRT_Raids[currentRaid] = raid
+            changesTable = {}
+            return
         end
         raid.changes = raid.changes or {}
         changesTable = raid.changes

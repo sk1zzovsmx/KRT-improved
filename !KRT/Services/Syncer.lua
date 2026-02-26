@@ -732,10 +732,11 @@ do
             return nil, nil
         end
 
-        tinsert(KRT_Raids, raid)
-        local raidId = #KRT_Raids
-        local outRaid = Core.EnsureRaidById(raidId)
-        return outRaid, raidId
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        if raidStore and raidStore.InsertRaid then
+            return raidStore:InsertRaid(raid)
+        end
+        return nil, nil
     end
 
     local function sendRequest(mode, requestId, raidRef, signature, target)

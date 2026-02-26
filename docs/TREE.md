@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-26 03:52:23 +01:00
-- Commit: 77f1c65
+- Generated: 2026-02-26 20:38:50 +01:00
+- Commit: 034a048
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -16,6 +16,14 @@
 |   |   |-- Spammer.lua
 |   |   \\-- Warnings.lua
 |   |-- Core
+|   |   |-- DB.lua
+|   |   |-- DBManager.lua
+|   |   |-- DBManager.Mock.lua
+|   |   |-- DBRaidMigrations.lua
+|   |   |-- DBRaidQueries.lua
+|   |   |-- DBRaidStore.lua
+|   |   |-- DBRaidValidator.lua
+|   |   |-- DBSchema.lua
 |   |   \\-- Init.lua
 |   |-- EntryPoints
 |   |   |-- Minimap.lua
@@ -98,6 +106,7 @@
 |   |-- MODULES_UI_OWNERSHIP_MAP.md
 |   |-- NAMING_CONVENTIONS.md
 |   |-- NAMING_RENAME_MAP.md
+|   |-- RAID_SCHEMA.md
 |   |-- REFACTOR_RULES.md
 |   |-- TREE.md
 |   |-- UI_BINDING_RULES.md
@@ -105,12 +114,15 @@
 |   \\-- WOW_ADDON_TEMPLATE.md
 |-- tools
 |   |-- check-layering.ps1
+|   |-- check-raid-hardening.ps1
 |   |-- check-ui-binding.ps1
 |   |-- fnmap-classify.ps1
 |   |-- fnmap-inventory.ps1
 |   |-- install-hooks.ps1
 |   |-- pre-commit.ps1
-|   \\-- update-tree.ps1
+|   |-- run-raid-validator.ps1
+|   |-- update-tree.ps1
+|   \\-- validate-raid-schema.lua
 |-- .editorconfig
 |-- .gitattributes
 |-- .gitignore

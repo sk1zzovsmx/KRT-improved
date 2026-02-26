@@ -46,6 +46,77 @@ local function getSyncerService()
     return services and services.Syncer or nil
 end
 
+local function getRaidValidatorService()
+    if Core.GetRaidValidator then
+        return Core.GetRaidValidator()
+    end
+    return nil
+end
+
+local function formatValidateRaidDetail(entry)
+    local data = entry and entry.data or {}
+    local index = tonumber(entry and entry.index) or 0
+    local raidNid = tostring((entry and entry.raidNid) or "?")
+    local code = entry and entry.code
+
+    if code == "RAID_NOT_TABLE" then
+        return L.MsgValidateDetailRaidNotTable:format(index, raidNid)
+    end
+    if code == "NORMALIZE_FAILED" then
+        return L.MsgValidateDetailNormalizeFailed:format(index, raidNid)
+    end
+    if code == "SCHEMA_MISSING" then
+        return L.MsgValidateDetailSchemaMissing:format(index, raidNid)
+    end
+    if code == "SCHEMA_NEWER" then
+        return L.MsgValidateDetailSchemaNewer:format(
+            index,
+            raidNid,
+            tonumber(data.schemaVersion) or 0,
+            tonumber(data.currentVersion) or 0
+        )
+    end
+    if code == "COUNTER_TOO_LOW" then
+        return L.MsgValidateDetailCounterTooLow:format(
+            index,
+            raidNid,
+            tostring(data.field or "?"),
+            tonumber(data.actual) or 0,
+            tonumber(data.required) or 0
+        )
+    end
+    if code == "PLAYER_COUNT_TYPE" then
+        return L.MsgValidateDetailPlayerCountType:format(index, raidNid, tonumber(data.playerIndex) or 0)
+    end
+    if code == "PLAYER_COUNT_NEGATIVE" then
+        return L.MsgValidateDetailPlayerCountNegative:format(
+            index,
+            raidNid,
+            tonumber(data.playerIndex) or 0,
+            tonumber(data.value) or 0
+        )
+    end
+    if code == "LOOT_MISSING_BOSS" then
+        return L.MsgValidateDetailLootMissingBoss:format(
+            index,
+            raidNid,
+            tonumber(data.lootIndex) or 0,
+            tonumber(data.bossNid) or 0
+        )
+    end
+    if code == "LOOT_UNKNOWN_BOSS_WITHOUT_TRASH" then
+        return L.MsgValidateDetailLootNoBossTrash:format(index, raidNid, tonumber(data.lootIndex) or 0)
+    end
+    if code == "RUNTIME_OUTSIDE" then
+        return L.MsgValidateDetailRuntimeOutside:format(index, raidNid, tostring(data.key or "?"))
+    end
+    if code == "LEGACY_RUNTIME" then
+        return L.MsgValidateDetailLegacyRuntime:format(index, raidNid, tostring(data.key or "?"))
+    end
+
+    return L.MsgValidateDetailUnknown:format(index, raidNid, tostring(code or "UNKNOWN"))
+end
+
 -- ----- Internal state ----- --
 module.sub = module.sub or {}
 
@@ -60,6 +131,7 @@ local cmdLoot = { "loot", "ml", "master" }
 local cmdCounter = { "counter", "counters", "counts" }
 local cmdReserves = { "res", "reserves", "reserve" }
 local cmdMinimap = { "minimap", "mm" }
+local cmdValidate = { "validate" }
 
 -- ----- Private helpers ----- --
 local helpString = "%s: %s"
@@ -78,6 +150,7 @@ local function showHelp()
     printHelp("debug", L.StrCmdDebug)
     printHelp("counter", L.StrCmdCounter)
     printHelp("reserves", L.StrCmdReserves)
+    printHelp("validate", L.StrCmdValidate)
 end
 
 local function registerAliases(list, fn)
@@ -343,6 +416,69 @@ registerAliases(cmdReserves, function(rest)
         addon:info(format(L.StrCmdCommands, "krt res"), "KRT")
         printHelp("toggle", L.StrCmdToggle)
         printHelp("import", L.StrCmdReservesImport)
+    end
+end)
+
+registerAliases(cmdValidate, function(rest)
+    local sub, arg = Strings.SplitArgs(rest)
+    if sub == "raids" then
+        local verboseArg = Strings.SplitArgs(arg)
+        local validator = getRaidValidatorService()
+        if not (validator and validator.ValidateAllRaids) then
+            addon:warn(L.MsgValidateUnavailable)
+            return
+        end
+
+        local report = validator:ValidateAllRaids({
+            includeInfo = (verboseArg == "verbose" or verboseArg == "all"),
+            maxDetails = 60,
+        })
+        if not report then
+            addon:warn(L.MsgValidateUnavailable)
+            return
+        end
+
+        local raidsCount = tonumber(report.raids) or 0
+        if raidsCount <= 0 then
+            addon:info(L.MsgValidateRaidsNoData)
+            return
+        end
+
+        local summary = L.MsgValidateRaidsSummary:format(
+            raidsCount,
+            tonumber(report.ok) or 0,
+            tonumber(report.warn) or 0,
+            tonumber(report.err) or 0,
+            tonumber(report.currentSchemaVersion) or 0
+        )
+
+        if tonumber(report.err) and report.err > 0 then
+            addon:error(summary)
+        elseif tonumber(report.warn) and report.warn > 0 then
+            addon:warn(summary)
+        else
+            addon:info(summary)
+        end
+
+        local details = report.details or {}
+        for i = 1, #details do
+            local entry = details[i]
+            local line = formatValidateRaidDetail(entry)
+            if entry.level == "E" then
+                addon:error(line)
+            elseif entry.level == "W" then
+                addon:warn(line)
+            else
+                addon:info(line)
+            end
+        end
+
+        if tonumber(report.truncatedCount) and report.truncatedCount > 0 then
+            addon:warn(L.MsgValidateRaidsDetailsTruncated:format(report.truncatedCount))
+        end
+    else
+        addon:info(format(L.StrCmdCommands, "krt validate"), "KRT")
+        printHelp("raids [verbose]", L.StrCmdValidateRaids)
     end
 end)
 

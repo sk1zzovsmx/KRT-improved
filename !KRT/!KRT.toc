@@ -23,6 +23,10 @@ Libs\LibLogger-1.0\lib.xml
 
 # Layer 1 - Core init (must load before all addon Lua files)
 Core\Init.lua
+Core\DB.lua
+Core\DBSchema.lua
+Core\DBManager.lua
+Core\DBManager.Mock.lua
 
 # Layer 2 - Localization (must load before runtime modules)
 Localization\localization.en.lua
@@ -54,6 +58,10 @@ KRT.lua
 
 # Layer 6 - Runtime modules (ordered by dependency)
 # Services + entrypoint + parents + child UI controllers
+Core\DBRaidMigrations.lua
+Core\DBRaidStore.lua
+Core\DBRaidQueries.lua
+Core\DBRaidValidator.lua
 Services\Raid.lua
 Services\Chat.lua
 EntryPoints\Minimap.lua

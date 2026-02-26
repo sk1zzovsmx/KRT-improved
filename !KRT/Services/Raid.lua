@@ -281,9 +281,11 @@ do
             return nil, nil
         end
 
-        local raids = KRT_Raids
-        local raid = raids and raids[raidNum] or nil
-        return raid, raidNum
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        if raidStore and raidStore.GetRaidByIndex then
+            return raidStore:GetRaidByIndex(raidNum)
+        end
+        return nil, raidNum
     end
 
     function module:ResolveRaid(raidNum)
@@ -359,7 +361,9 @@ do
 
         local realm = Core.GetRealmName()
         local realmPlayers = ensureRealmPlayerMeta(realm)
-        local playersByName = raid._playersByName
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        local runtime = raidStore and raidStore.EnsureRaidRuntime and raidStore:EnsureRaidRuntime(raid) or nil
+        local playersByName = runtime and runtime.playersByName or {}
 
         local prevNumRaid = numRaid
         local n = GetNumRaidMembers()
@@ -562,8 +566,16 @@ do
             end
         end
 
-        tinsert(KRT_Raids, raidInfo)
-        Core.SetCurrentRaid(#KRT_Raids)
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        local raidId
+        if raidStore and raidStore.InsertRaid then
+            local _, insertedRaidId = raidStore:InsertRaid(raidInfo)
+            raidId = insertedRaidId
+        end
+        if not raidId then
+            return false
+        end
+        Core.SetCurrentRaid(raidId)
         -- New session context: force version-gated roster consumers (e.g. Master dropdowns) to rebuild.
         rosterVersion = rosterVersion + 1
         resetPendingUnitRetry()

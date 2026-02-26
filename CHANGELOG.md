@@ -4,6 +4,49 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Introduced DB-ready raid data layers:
+  `Core/DB.lua`, `Core/DBRaidMigrations.lua`, `Core/DBRaidStore.lua`, and
+  `Core/DBRaidQueries.lua`. Core raid APIs now delegate to the raid store.
+- **Refactor:** Centralized raid-history access behind `RaidStore`; direct
+  `KRT_Raids` reads/writes were removed from Services/Controllers and kept in
+  DB/bootstrap layers only.
+- **Behavior:** Runtime raid caches are now standardized under `raid._runtime`
+  and stripped before SavedVariables persistence.
+- **Refactor:** Logger read projections now consume the raid query layer for
+  boss/attendance/loot datasets.
+- **Docs:** Added `docs/RAID_SCHEMA.md` with explicit versioned raid schema
+  contract and runtime-cache persistence rules.
+- **Tooling:** Added `tools/validate-raid-schema.lua` for offline raid schema
+  validation and invariant reporting.
+- **Tooling:** Added `tools/check-raid-hardening.ps1` (static hardening gate)
+  and `tools/run-raid-validator.ps1` (SV validator runner via `lua`/`luajit`).
+- **Refactor:** Added `Core/DBSchema.lua` as the single source of truth for
+  `RAID_SCHEMA_VERSION`; core/store/migrations now read schema version from
+  the DB schema module.
+- **Behavior:** Added slash validation command `/krt validate raids
+  [verbose]` backed by `Core/DBRaidValidator.lua` for in-game invariant
+  checks with summary and detailed diagnostics.
+- **Refactor:** Added `Core/DBManager.lua` and manager wiring in `Core/DB.lua`
+  (`SetManager`/`GetManager`) so `DB.Get*Store()` now delegates through a
+  pluggable manager with default SavedVariables-backed behavior.
+- **Refactor:** Added `Core/DBManager.Mock.lua` with
+  `DBManager.CreateInMemoryManager(...)` for tests/smoke scenarios that need a
+  non-SavedVariables raid store.
+- **Bugfix:** RaidStore consumers now resolve the store only through
+  `DB.GetRaidStore()` (no direct module-table fallback), so custom
+  DB managers and in-memory mock managers are consistently honored.
+- **Refactor:** Added `Core.GetRaidStore()` as a shared accessor and removed
+  duplicated local `getRaidStore` helpers across runtime modules; static
+  hardening checks now enforce this.
+- **Refactor:** Extended DB facade/manager with `GetRaidQueries()` and
+  `GetRaidMigrations()` plus `Core.GetRaidQueries()`/
+  `Core.GetRaidMigrations()`, and moved consumers to those accessors.
+- **Refactor:** Added `GetRaidValidator()` to DB facade/manager
+  (`DB.GetRaidValidator()` / `Core.GetRaidValidator()`) and moved slash
+  validator lookup behind DB access.
+- **Refactor:** `DBManager` now ships an explicit SavedVariables-backed default
+  manager (`DBManager.SavedVariables`) and supports query/migration stores for
+  custom managers and in-memory manager scenarios.
 - **Bugfix:** Minimap drag now guards invalid cursor/minimap coordinates and zero-distance normalization,
   preventing rare divide-by-zero errors while Shift-dragging on the ring.
 - **Behavior:** Minimap menu now disables the `LootCounter` entry when the optional widget is disabled

@@ -49,6 +49,13 @@ local strlower = string.lower
 
 local SetSelectedRaid
 
+local function getRaidQueries()
+    if Core.GetRaidQueries then
+        return Core.GetRaidQueries()
+    end
+    return nil
+end
+
 local selectionEvents = {
     selectedRaid = InternalEvents.LoggerSelectRaid,
     selectedBoss = InternalEvents.LoggerSelectBoss,
@@ -169,64 +176,25 @@ do
         return action, count
     end
 
-    local function normalizeNid(v)
-        return tonumber(v) or v
-    end
-
-    local function buildIndex(raid, listField, idField, cacheField)
-        local list = raid[listField]
-        if type(list) ~= "table" then
-            list = {}
-        end
-        local m = {}
-        for i = 1, #list do
-            local e = list[i]
-            local id = e and e[idField]
-            if id ~= nil then
-                m[normalizeNid(id)] = i
-            end
-        end
-        raid[cacheField] = m
-    end
-
-    local function isIndexedMatch(raid, idx, listField, idField, normalizedNid)
-        if not idx then return false end
-        local list = raid[listField]
-        if type(list) ~= "table" then return false end
-        local e = list[idx]
-        if not e then return false end
-        local id = e[idField]
-        if id == nil then return false end
-        return normalizeNid(id) == normalizedNid
-    end
-
-    local function getIndexedPositionByNid(raid, queryNid, listField, idField, cacheField)
-        if not (raid and queryNid) then return nil end
-
-        local normalizedNid = normalizeNid(queryNid)
-        if type(raid[cacheField]) ~= "table" then
-            buildIndex(raid, listField, idField, cacheField)
-        end
-
-        local idx = raid[cacheField][normalizedNid]
-        if not isIndexedMatch(raid, idx, listField, idField, normalizedNid) then
-            -- Raid changed since last build (new entry added / list changed / shifted indices)
-            buildIndex(raid, listField, idField, cacheField)
-            idx = raid[cacheField][normalizedNid]
-            if not isIndexedMatch(raid, idx, listField, idField, normalizedNid) then
-                return nil
-            end
-        end
-        return idx
-    end
-
     -- ----- Public methods ----- --
     -- Ensure the raid table follows the canonical fresh-SV schema.
     function Store:EnsureRaid(raid)
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        if raidStore and raidStore.NormalizeRaidRecord then
+            return raidStore:NormalizeRaidRecord(raid)
+        end
         return Core.EnsureRaidSchema(raid)
     end
 
     function Store:GetRaid(rID)
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        if raidStore and raidStore.GetRaidByIndex then
+            local raid = rID and raidStore:GetRaidByIndex(rID) or nil
+            if raid then
+                self:EnsureRaid(raid)
+            end
+            return raid
+        end
         local raid = rID and Core.EnsureRaidById(rID) or nil
         if raid then
             self:EnsureRaid(raid)
@@ -235,6 +203,14 @@ do
     end
 
     function Store:GetRaidByNid(raidNid)
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        if raidStore and raidStore.GetRaidByNid then
+            local raid = raidNid and raidStore:GetRaidByNid(raidNid) or nil
+            if raid then
+                self:EnsureRaid(raid)
+            end
+            return raid
+        end
         local raid = raidNid and Core.EnsureRaidByNid(raidNid) or nil
         if raid then
             self:EnsureRaid(raid)
@@ -243,18 +219,26 @@ do
     end
 
     function Store:InvalidateIndexes(raid)
-        if not raid then return end
-        raid._bossIdxByNid = nil
-        raid._lootIdxByNid = nil
-        raid._playerIdxByNid = nil
+        if type(raid) ~= "table" then return end
+        raid._runtime = nil
     end
 
     function Store:BossIdx(raid, bossNid)
-        return getIndexedPositionByNid(raid, bossNid, "bossKills", "bossNid", "_bossIdxByNid")
+        local queryNid = tonumber(bossNid)
+        if not (raid and queryNid) then return nil end
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        local runtime = raidStore and raidStore.EnsureRaidRuntime and raidStore:EnsureRaidRuntime(raid) or nil
+        local idxByNid = runtime and runtime.bossIdxByNid or nil
+        return idxByNid and idxByNid[queryNid] or nil
     end
 
     function Store:LootIdx(raid, lootNid)
-        return getIndexedPositionByNid(raid, lootNid, "loot", "lootNid", "_lootIdxByNid")
+        local queryNid = tonumber(lootNid)
+        if not (raid and queryNid) then return nil end
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        local runtime = raidStore and raidStore.EnsureRaidRuntime and raidStore:EnsureRaidRuntime(raid) or nil
+        local idxByNid = runtime and runtime.lootIdxByNid or nil
+        return idxByNid and idxByNid[queryNid] or nil
     end
 
     function Store:GetBoss(raid, bossNid)
@@ -268,7 +252,12 @@ do
     end
 
     function Store:PlayerIdx(raid, playerNid)
-        return getIndexedPositionByNid(raid, playerNid, "players", "playerNid", "_playerIdxByNid")
+        local queryNid = tonumber(playerNid)
+        if not (raid and queryNid) then return nil end
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        local runtime = raidStore and raidStore.EnsureRaidRuntime and raidStore:EnsureRaidRuntime(raid) or nil
+        local idxByNid = runtime and runtime.playerIdxByNid or nil
+        return idxByNid and idxByNid[queryNid] or nil
     end
 
     function Store:GetPlayer(raid, playerNid)
@@ -312,6 +301,10 @@ do
     end
 
     function View:FillBossList(out, raid)
+        local queries = getRaidQueries()
+        if queries and queries.GetBossKills then
+            return queries:GetBossKills(raid, out)
+        end
         self:BuildRows(out, raid and raid.bossKills, nil, function(boss, i)
             local it = {}
             -- Stable NID used for highlight/selection.
@@ -327,6 +320,10 @@ do
     end
 
     function View:FillRaidAttendeesList(out, raid)
+        local queries = getRaidQueries()
+        if queries and queries.GetRaidAttendance then
+            return queries:GetRaidAttendance(raid, out)
+        end
         self:BuildRows(out, raid and raid.players, nil, function(p, i)
             local it = {}
             it.id = tonumber(p and p.playerNid)
@@ -341,6 +338,10 @@ do
     end
 
     function View:FillBossAttendeesList(out, raid, bossNid)
+        local queries = getRaidQueries()
+        if queries and queries.GetBossAttendance then
+            return queries:GetBossAttendance(raid, bossNid, out)
+        end
         if not out then return end
         twipe(out)
         if not (raid and bossNid) then return end
@@ -369,6 +370,10 @@ do
     end
 
     function View:FillLootList(out, raid, bossNid, playerName)
+        local queries = getRaidQueries()
+        if queries and queries.GetLoot then
+            return queries:GetLoot(raid, bossNid, playerName, out)
+        end
         local bossFilter = tonumber(bossNid) or bossNid
         self:BuildRows(out, raid and raid.loot,
             function(v)
@@ -672,9 +677,19 @@ do
             return false
         end
 
-        tremove(KRT_Raids, sel)
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        local removedIdx = sel
+        if raidStore and raidStore.DeleteRaid then
+            local deleted, idx = raidStore:DeleteRaid(raid.raidNid)
+            if not deleted then
+                return false
+            end
+            removedIdx = idx or removedIdx
+        else
+            return false
+        end
 
-        if Core.GetCurrentRaid() and Core.GetCurrentRaid() > sel then
+        if Core.GetCurrentRaid() and Core.GetCurrentRaid() > removedIdx then
             Core.SetCurrentRaid(Core.GetCurrentRaid() - 1)
         end
 
@@ -693,9 +708,19 @@ do
             return false
         end
 
-        tremove(KRT_Raids, sel)
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        local removedIdx = sel
+        if raidStore and raidStore.DeleteRaid then
+            local deleted, idx = raidStore:DeleteRaid(nid)
+            if not deleted then
+                return false
+            end
+            removedIdx = idx or removedIdx
+        else
+            return false
+        end
 
-        if Core.GetCurrentRaid() and Core.GetCurrentRaid() > sel then
+        if Core.GetCurrentRaid() and Core.GetCurrentRaid() > removedIdx then
             Core.SetCurrentRaid(Core.GetCurrentRaid() - 1)
         end
 
@@ -1631,19 +1656,23 @@ do
         end,
 
         getData = function(out)
-            for i = 1, #KRT_Raids do
-                local r = Core.EnsureRaidById(i)
+            local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+            local raids = raidStore and raidStore.GetAllRaids and raidStore:GetAllRaids() or {}
+            local queries = getRaidQueries()
+            for i = 1, #raids do
+                local r = raidStore and raidStore.GetRaidByIndex and raidStore:GetRaidByIndex(i) or Core.EnsureRaidById(i)
                 if r then
+                    local summary = queries and queries.GetRaidSummary and queries:GetRaidSummary(r) or nil
                     local it = {}
                     it.id = tonumber(r.raidNid)
                     it.seq = i
                     it.zone = r.zone
-                    it.size = r.size
-                    it.difficulty = tonumber(r.difficulty)
+                    it.size = (summary and summary.size) or r.size
+                    it.difficulty = tonumber((summary and summary.difficulty) or r.difficulty)
                     local mode = it.difficulty and ((it.difficulty == 3 or it.difficulty == 4) and "H" or "N") or "?"
                     it.sizeLabel = tostring(it.size or "") .. mode
-                    it.date = r.startTime
-                    it.dateFmt = date("%d/%m/%Y %H:%M", r.startTime)
+                    it.date = (summary and summary.startTime) or r.startTime
+                    it.dateFmt = date("%d/%m/%Y %H:%M", it.date)
                     out[i] = it
                 end
             end
@@ -1791,7 +1820,9 @@ do
 
             MultiSelect.MultiSelectClear(ctx)
 
-            local n = KRT_Raids and #KRT_Raids or 0
+            local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+            local raids = raidStore and raidStore.GetAllRaids and raidStore:GetAllRaids() or {}
+            local n = #raids
             local newFocus = nil
             if n > 0 then
                 newFocus = prevFocusNid and Core.GetRaidIdByNid(prevFocusNid) or nil

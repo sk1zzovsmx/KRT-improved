@@ -1551,8 +1551,13 @@ do
 
         local field = FindDropDownField(owner:GetName())
         if field then
-            KRT_Raids[addon.Core.GetCurrentRaid()][field.raidKey] = value
-            lootState[field.stateKey] = value
+            local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+            local raid = raidStore and raidStore.GetRaidByIndex and raidStore:GetRaidByIndex(addon.Core.GetCurrentRaid())
+                or nil
+            if raid then
+                raid[field.raidKey] = value
+                lootState[field.stateKey] = value
+            end
         end
 
         dropDownDirty = true
@@ -1570,11 +1575,15 @@ do
         if not field then return end
 
         -- Sync state from raid data
-        lootState[field.stateKey] = KRT_Raids[addon.Core.GetCurrentRaid()][field.raidKey]
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        local raid = raidStore and raidStore.GetRaidByIndex and raidStore:GetRaidByIndex(addon.Core.GetCurrentRaid())
+            or nil
+        if not raid then return end
+        lootState[field.stateKey] = raid[field.raidKey]
 
         -- Clear if unit is no longer in raid
         if lootState[field.stateKey] and addon.Raid:GetUnitID(lootState[field.stateKey]) == "none" then
-            KRT_Raids[addon.Core.GetCurrentRaid()][field.raidKey] = nil
+            raid[field.raidKey] = nil
             lootState[field.stateKey] = nil
         end
 

@@ -18,6 +18,7 @@ addon.Diagnose = addon.Diagnose or {}
 addon.State = addon.State or {}
 addon.C = addon.C or {}
 addon.Events = addon.Events or {}
+addon.DB = addon.DB or {}
 addon.Features = addon.Features or {}
 addon.Controllers = addon.Controllers or {}
 addon.Services = addon.Services or {}
@@ -495,6 +496,7 @@ function Core.GetFeatureShared()
         Features = addon.Features,
         C = constants,
         Core = core,
+        DB = addon.DB,
         Bus = addon.Bus,
 
         Strings = addon.Strings,
