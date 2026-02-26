@@ -429,6 +429,7 @@ function DBManager.CreateInMemoryManager(seed)
     local raidQueries = seedData.raidQueries or seedData.RaidQueries or db.RaidQueries or nil
     local raidMigrations = seedData.raidMigrations or seedData.RaidMigrations or db.RaidMigrations or nil
     local raidValidator = seedData.raidValidator or seedData.RaidValidator or db.RaidValidator or nil
+    local syncer = seedData.syncer or seedData.Syncer or db.Syncer or nil
 
     local managerFactory = DBManager.CreateManager
     if type(managerFactory) == "function" then
@@ -437,6 +438,7 @@ function DBManager.CreateInMemoryManager(seed)
             raidQueries = raidQueries,
             raidMigrations = raidMigrations,
             raidValidator = raidValidator,
+            syncer = syncer,
             charStore = seedData.charStore or seedData.CharStore,
             configStore = seedData.configStore or seedData.ConfigStore,
         })
@@ -447,6 +449,7 @@ function DBManager.CreateInMemoryManager(seed)
     function manager:GetRaidQueries() return raidQueries end
     function manager:GetRaidMigrations() return raidMigrations end
     function manager:GetRaidValidator() return raidValidator end
+    function manager:GetSyncer() return syncer end
     function manager:GetCharStore() return seedData.charStore end
     function manager:GetConfigStore() return seedData.configStore end
     return manager

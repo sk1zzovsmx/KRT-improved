@@ -22,6 +22,7 @@ function DBManager.CreateManager(stores)
         raidQueries = stores.raidQueries or stores.RaidQueries or nil,
         raidMigrations = stores.raidMigrations or stores.RaidMigrations or nil,
         raidValidator = stores.raidValidator or stores.RaidValidator or nil,
+        syncer = stores.syncer or stores.Syncer or nil,
         charStore = stores.charStore or stores.CharStore or nil,
         configStore = stores.configStore or stores.ConfigStore or nil,
     }
@@ -40,6 +41,10 @@ function DBManager.CreateManager(stores)
 
     function manager:GetRaidValidator()
         return state.raidValidator
+    end
+
+    function manager:GetSyncer()
+        return state.syncer
     end
 
     function manager:GetCharStore()
@@ -68,6 +73,11 @@ function DBManager.CreateManager(stores)
     function manager:SetRaidValidator(store)
         state.raidValidator = store
         return state.raidValidator
+    end
+
+    function manager:SetSyncer(store)
+        state.syncer = store
+        return state.syncer
     end
 
     function manager:SetCharStore(store)
@@ -101,6 +111,11 @@ end
 function SavedVariablesManager:GetRaidValidator()
     local db = addon.DB
     return db and db.RaidValidator or nil
+end
+
+function SavedVariablesManager:GetSyncer()
+    local db = addon.DB
+    return db and db.Syncer or nil
 end
 
 function SavedVariablesManager:GetCharStore()

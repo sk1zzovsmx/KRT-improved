@@ -119,21 +119,22 @@ Add-MatchesOutsideAllowed `
     -Lines $directStoreMatches `
     -AllowedPaths @("!KRT\Core\DBManager.lua", "!KRT\Core\DBRaidStore.lua")
 
-Write-Host "Check 5/7: query/migration/validator access goes through DB facade..."
+Write-Host "Check 5/7: query/migration/validator/syncer access goes through DB facade..."
 $directQueryMigrationMatches = @(Invoke-Rg `
-    -Pattern "addon\\.Services\\.RaidQueries|services and services\\.RaidQueries|addon\\.Services\\.RaidMigrations|services and services\\.RaidMigrations|addon\\.Services\\.RaidValidator|services and services\\.RaidValidator|addon\\.DB\\.RaidQueries|db and db\\.RaidQueries|addon\\.DB\\.RaidMigrations|db and db\\.RaidMigrations|addon\\.DB\\.RaidValidator|db and db\\.RaidValidator" `
+    -Pattern "addon\\.Services\\.RaidQueries|services and services\\.RaidQueries|addon\\.Services\\.RaidMigrations|services and services\\.RaidMigrations|addon\\.Services\\.RaidValidator|services and services\\.RaidValidator|addon\\.Services\\.Syncer|services and services\\.Syncer|addon\\.DB\\.RaidQueries|db and db\\.RaidQueries|addon\\.DB\\.RaidMigrations|db and db\\.RaidMigrations|addon\\.DB\\.RaidValidator|db and db\\.RaidValidator|addon\\.DB\\.Syncer|db and db\\.Syncer" `
     -Target "!KRT" `
     -ExtraArgs @("-g", "*.lua", "-g", "!Libs/**"))
 
 Add-MatchesOutsideAllowed `
-    -Header "[Direct RaidQueries/RaidMigrations/RaidValidator access outside DB layer]" `
+    -Header "[Direct RaidQueries/RaidMigrations/RaidValidator/Syncer access outside DB layer]" `
     -Lines $directQueryMigrationMatches `
     -AllowedPaths @(
         "!KRT\Core\DBManager.lua",
         "!KRT\Core\DBManager.Mock.lua",
         "!KRT\Core\DBRaidQueries.lua",
         "!KRT\Core\DBRaidMigrations.lua",
-        "!KRT\Core\DBRaidValidator.lua"
+        "!KRT\Core\DBRaidValidator.lua",
+        "!KRT\Core\DBSyncer.lua"
     )
 
 Write-Host "Check 6/7: no local getRaidStore helpers remain..."
@@ -176,6 +177,6 @@ Write-Host "  1) KRT_Raids confined to KRT.lua + Core/DBRaidStore.lua"
 Write-Host "  2) Legacy runtime cache keys only in cleanup layer"
 Write-Host "  3) !KRT/UI XML has no <Scripts>/<On...> blocks"
 Write-Host "  4) RaidStore access routed through DB facade (except DB layer)"
-Write-Host "  5) RaidQueries/RaidMigrations/RaidValidator access routed through DB facade"
+Write-Host "  5) RaidQueries/RaidMigrations/RaidValidator/Syncer access routed through DB facade"
 Write-Host "  6) No local getRaidStore helpers in modules"
 Write-Host "  7) tools/validate-raid-schema.lua passes luacheck"

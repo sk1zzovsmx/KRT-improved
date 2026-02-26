@@ -702,7 +702,7 @@ end
 
 -- CHAT_MSG_ADDON: Forwards addon communication messages to the Syncer module.
 function addon:CHAT_MSG_ADDON(prefix, msg, channel, sender)
-    local syncer = addon.Services and addon.Services.Syncer
+    local syncer = Core.GetSyncer and Core.GetSyncer() or nil
     if syncer and syncer.OnAddonMessage then
         syncer:OnAddonMessage(prefix, msg, channel, sender)
     end

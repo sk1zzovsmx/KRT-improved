@@ -42,8 +42,10 @@ local function getController(name)
 end
 
 local function getSyncerService()
-    local services = addon.Services
-    return services and services.Syncer or nil
+    if Core.GetSyncer then
+        return Core.GetSyncer()
+    end
+    return nil
 end
 
 local function getRaidValidatorService()

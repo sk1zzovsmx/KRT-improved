@@ -62,6 +62,7 @@ Core\DBRaidMigrations.lua
 Core\DBRaidStore.lua
 Core\DBRaidQueries.lua
 Core\DBRaidValidator.lua
+Core\DBSyncer.lua
 Services\Raid.lua
 Services\Chat.lua
 EntryPoints\Minimap.lua
@@ -73,7 +74,6 @@ Widgets\LootCounter.lua
 Services\Reserves.lua
 Widgets\ReservesUI.lua
 Controllers\Logger.lua
-Services\Syncer.lua
 Widgets\Config.lua
 Controllers\Warnings.lua
 Controllers\Changes.lua

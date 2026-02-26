@@ -33,10 +33,10 @@ local InternalEvents = Events.Internal
 
 -- Logger synchronization module.
 do
-    addon.Services = addon.Services or {}
-    addon.Services.Syncer = addon.Services.Syncer or {}
-    addon.Syncer = addon.Services.Syncer -- Legacy alias during namespacing migration.
-    local module = addon.Services.Syncer
+    addon.DB = addon.DB or {}
+    addon.DB.Syncer = addon.DB.Syncer or {}
+    addon.Syncer = addon.DB.Syncer -- Legacy alias during namespacing migration.
+    local module = addon.DB.Syncer
 
     -- ----- Internal state ----- --
     local COMM_PREFIX = "KRTLogSync"

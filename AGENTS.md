@@ -192,7 +192,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 43) Services/Reserves.lua
 44) Widgets/ReservesUI.lua
 45) Controllers/Logger.lua
-46) Services/Syncer.lua
+46) Core/DBSyncer.lua
 47) Widgets/Config.lua
 48) Controllers/Warnings.lua
 49) Controllers/Changes.lua
@@ -210,6 +210,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
   !KRT.toc
   Core/
     Init.lua               # single bootstrap for addon root tables + shared contract helper
+    DBSyncer.lua           # logger synchronization store/protocol backend
   KRT.lua                  # runtime bootstrap + shared runtime glue + main event wiring
   KRT.xml                  # UI include manifest/orchestrator
   KRT.Core.xml             # core UI include manifest (without optional widgets)
@@ -229,7 +230,6 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Rolls.lua              # roll tracking, sorting, winner logic
     Loot.lua               # loot parsing, item selection, export strings
     Reserves.lua           # soft reserves service/model + import parsing + reserve lookups
-    Syncer.lua             # logger synchronization (addon comms)
 
   Widgets/
     LootCounter.lua        # loot counter UI + data

@@ -90,6 +90,14 @@ function Core.GetRaidValidator()
     return DB.GetRaidValidator()
 end
 
+function DB.GetSyncer()
+    return getManagerStore("GetSyncer")
+end
+
+function Core.GetSyncer()
+    return DB.GetSyncer()
+end
+
 function DB.GetCharStore()
     return getManagerStore("GetCharStore")
 end

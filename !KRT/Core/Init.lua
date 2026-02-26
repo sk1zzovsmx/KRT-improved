@@ -220,7 +220,7 @@ local LEGACY_ALIAS_PATHS = {
     { "Loot", "Services", "Loot" },
     { "Rolls", "Services", "Rolls" },
     { "Chat", "Services", "Chat" },
-    { "Syncer", "Services", "Syncer" },
+    { "Syncer", "DB", "Syncer" },
     { "Reserves", "Services", "Reserves" },
 
     { "LootCounter", "Widgets", "LootCounter" },

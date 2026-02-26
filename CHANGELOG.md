@@ -44,6 +44,9 @@ Dates are in YYYY-MM-DD.
 - **Refactor:** Added `GetRaidValidator()` to DB facade/manager
   (`DB.GetRaidValidator()` / `Core.GetRaidValidator()`) and moved slash
   validator lookup behind DB access.
+- **Refactor:** Moved logger sync backend from `Services/Syncer.lua` to
+  `Core/DBSyncer.lua` and routed Syncer resolution through DB facade
+  (`DB.GetSyncer()` / `Core.GetSyncer()`).
 - **Refactor:** `DBManager` now ships an explicit SavedVariables-backed default
   manager (`DBManager.SavedVariables`) and supports query/migration stores for
   custom managers and in-memory manager scenarios.
@@ -105,7 +108,7 @@ Dates are in YYYY-MM-DD.
   title/row/cancel vertical rhythm while keeping all controls inside the popup bounds.
 - **Bugfix:** Logger UI now refreshes immediately after incoming Sync snapshots (`req`, `push`, `sync`),
   including the Raids list update without requiring manual reopen or reselection.
-- **Behavior:** Added Logger Sync feature (`Services/Syncer.lua`) using addon-message request/response
+- **Behavior:** Added Logger Sync feature (`Core/DBSyncer.lua`) using addon-message request/response
   chunking with three commands:
   `/krt logger req <raidId|raidNid> <player>` requests a specific raid snapshot from one target player
   and imports it as a new raid, `/krt logger push <raidId|raidNid> <player>` pushes a selected raid
