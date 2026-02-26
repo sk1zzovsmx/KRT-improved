@@ -66,12 +66,12 @@ local function triggerSelectionEvent(target, key, ...)
     Bus.TriggerEvent(eventName, target[key], ...)
 end
 
+addon.Controllers = addon.Controllers or {}
+addon.Controllers.Logger = addon.Controllers.Logger or {}
+local module = addon.Controllers.Logger
+
 -- Logger frame module.
 do
-    addon.Controllers = addon.Controllers or {}
-    addon.Controllers.Logger = addon.Controllers.Logger or {}
-    local module   = addon.Controllers.Logger
-
     -- ----- Internal state ----- --
     local frameName
     local getFrame = makeModuleFrameGetter(module, "KRTLogger")
