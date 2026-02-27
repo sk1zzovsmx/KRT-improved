@@ -4,6 +4,10 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Standardized `Controllers/*` and `Widgets/*` UI owner method declarations to
+  `module:*` style (`BindUI`/`EnsureUI`) and aligned `ReservesUI` methods away from `UI=module` aliasing.
+- **Bugfix:** Reserves Import window now runs its `OnLoad` initialization on first UI bind,
+  restoring drag behavior and first-show setup when the frame is pre-cached.
 - **Bugfix:** Fixed Reserves list refresh recursion in `Widgets/ReservesUI.lua` by
   removing a self-referential `UI:RequestRefresh` override that caused stack overflow.
 - **UI:** Removed the disabled `Export` button from the Logger Raids list footer.

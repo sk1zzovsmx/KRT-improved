@@ -277,7 +277,7 @@ do
     scaffoldToggle = module.Toggle
     scaffoldHide = module.Hide
 
-    function addon.Controllers.Spammer:BindUI()
+    function module:BindUI()
         if uiBound and self.frame and self.refs then
             return self.frame, self.refs
         end
@@ -352,7 +352,7 @@ do
         return frame, refs
     end
 
-    function addon.Controllers.Spammer:EnsureUI()
+    function module:EnsureUI()
         if uiBound and self.frame and self.refs then
             return self.frame
         end
