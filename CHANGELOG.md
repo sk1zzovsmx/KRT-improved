@@ -4,6 +4,8 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Bugfix:** Fixed Reserves list refresh recursion in `Widgets/ReservesUI.lua` by
+  removing a self-referential `UI:RequestRefresh` override that caused stack overflow.
 - **UI:** Removed the disabled `Export` button from the Logger Raids list footer.
 - **UI:** Logger Raids list footer buttons (`Set Current`, `Delete`) are now centered.
 - **Refactor:** Unified core bootstrap and runtime event wiring into

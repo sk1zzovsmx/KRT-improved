@@ -537,18 +537,12 @@ do
             out = Service:ResetSaved()
         end
         if module.Hide then
-            module.Hide(module)
+            module:Hide()
         end
         if module.RequestRefresh then
-            module.RequestRefresh(module)
+            module:RequestRefresh()
         end
         return out
-    end
-
-    function UI:RequestRefresh()
-        if module.RequestRefresh then
-            module.RequestRefresh(module)
-        end
     end
 
     function UI:Refresh()
