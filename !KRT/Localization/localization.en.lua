@@ -244,6 +244,9 @@ L.StrWinner                            = "Winner"
 L.StrType                              = "Type"
 L.StrLoading                           = "Loading..."
 L.BtnExport                            = "Export"
+L.StrHistoryTab                        = "History"
+L.StrExportTab                         = "Export"
+L.StrRaidCsvTitle                      = "Raid CSV"
 
 -- Raids List:
 L.StrRaidsList                         = "Raids List"

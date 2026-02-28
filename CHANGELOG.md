@@ -10,6 +10,8 @@ Dates are in YYYY-MM-DD.
   restoring drag behavior and first-show setup when the frame is pre-cached.
 - **Bugfix:** Fixed Reserves list refresh recursion in `Widgets/ReservesUI.lua` by
   removing a self-referential `UI:RequestRefresh` override that caused stack overflow.
+- **UI:** Logger now has two tabs: `History` (existing full logger view) and
+  `Export` (separate empty panel scaffold, ready for future export UI work).
 - **UI:** Removed the disabled `Export` button from the Logger Raids list footer.
 - **UI:** Logger Raids list footer buttons (`Set Current`, `Delete`) are now centered.
 - **Refactor:** Unified core bootstrap and runtime event wiring into

@@ -42,6 +42,7 @@ local itemColors = feature.itemColors
 
 local _G = _G
 local tinsert, tremove, twipe = table.insert, table.remove, table.wipe
+local tconcat = table.concat
 local pairs, ipairs, type, select = pairs, ipairs, type, select
 
 local tostring, tonumber = tostring, tonumber
@@ -94,14 +95,30 @@ do
 
     -- ----- Private helpers ----- --
     local function AcquireRefs(frame)
+        local framePrefix = "KRTLogger"
+        if frame and frame.GetName then
+            framePrefix = frame:GetName() or framePrefix
+        end
+        local function resolve(suffix)
+            return _G[framePrefix .. suffix]
+        end
+
         return {
-            raids = Frames.Ref(frame, "Raids"),
-            bosses = Frames.Ref(frame, "Bosses"),
-            loot = Frames.Ref(frame, "Loot"),
-            raidAttendees = Frames.Ref(frame, "RaidAttendees"),
-            bossAttendees = Frames.Ref(frame, "BossAttendees"),
+            historyTabBtn = resolve("Tab1"),
+            exportTabBtn = resolve("Tab2"),
+            history = resolve("History"),
+            raids = resolve("Raids"),
+            bosses = resolve("Bosses"),
+            loot = resolve("Loot"),
+            raidAttendees = resolve("RaidAttendees"),
+            bossAttendees = resolve("BossAttendees"),
+            export = resolve("Export"),
+            exportRaids = resolve("ExportRaids"),
+            exportCsv = resolve("ExportCsv"),
+            exportCsvScrollFrame = resolve("ExportCsvScrollFrame"),
+            exportCsvText = resolve("ExportCsvText"),
             bossBox = Frames.Get("KRTLoggerBossBox"),
-            attendeesBox = Frames.Ref(frame, "PlayerBox"),
+            attendeesBox = resolve("PlayerBox"),
         }
     end
 
@@ -284,6 +301,159 @@ do
             mode = (bossData.difficulty == 3 or bossData.difficulty == 4) and "h" or "n"
         end
         return (mode == "h") and "H" or "N"
+    end
+
+    function View:GetLootRollTypeLabel(rollType)
+        local rt = tonumber(rollType) or 0
+        if rt == rollTypes.MAINSPEC then
+            return "MS"
+        elseif rt == rollTypes.OFFSPEC then
+            return "OS"
+        elseif rt == rollTypes.RESERVED then
+            return "SR"
+        elseif rt == rollTypes.FREE then
+            return "Free"
+        elseif rt == rollTypes.BANK then
+            return "Bank"
+        elseif rt == rollTypes.DISENCHANT then
+            return "DE"
+        elseif rt == rollTypes.HOLD then
+            return "Hold"
+        end
+        return tostring(rt)
+    end
+
+    function View:GetRaidDifficultyLabel(raid)
+        local diff = tonumber(raid and raid.difficulty)
+        local size = tonumber(raid and raid.size)
+        if diff == 1 then
+            return "10N"
+        elseif diff == 2 then
+            return "25N"
+        elseif diff == 3 then
+            return "10H"
+        elseif diff == 4 then
+            return "25H"
+        end
+        if size then
+            return tostring(size) .. "?"
+        end
+        return ""
+    end
+
+    function View:EscapeCsvField(value)
+        local text = tostring(value or "")
+        text = text:gsub("\"", "\"\"")
+        local hasComma = text:find(",", 1, true) ~= nil
+        local hasQuote = text:find("\"", 1, true) ~= nil
+        local hasNewLine = text:find("\n", 1, true) ~= nil
+        local hasCarriageReturn = text:find("\r", 1, true) ~= nil
+        if hasComma or hasQuote or hasNewLine or hasCarriageReturn then
+            return "\"" .. text .. "\""
+        end
+        return text
+    end
+
+    function View:BuildRaidCsv(raid, raidIndex)
+        local rows = {}
+
+        rows[1] = tconcat({
+            "RaidIndex",
+            "RaidNID",
+            "RaidDate",
+            "Zone",
+            "Size",
+            "Difficulty",
+            "BossNID",
+            "BossName",
+            "BossTime",
+            "BossMode",
+            "LootNID",
+            "ItemID",
+            "ItemName",
+            "Winner",
+            "Type",
+            "Roll",
+            "LootTime",
+        }, ",")
+
+        if not raid then
+            return rows[1]
+        end
+
+        local bossByNid = {}
+        local bosses = raid.bossKills or {}
+        for i = 1, #bosses do
+            local boss = bosses[i]
+            local bossNid = tonumber(boss and boss.bossNid)
+            if bossNid then
+                bossByNid[bossNid] = boss
+            end
+        end
+
+        local raidDate = raid.startTime and date("%Y-%m-%d %H:%M:%S", raid.startTime) or ""
+        local lootEntries = raid.loot or {}
+
+        local function appendRow(fields)
+            for i = 1, #fields do
+                fields[i] = View:EscapeCsvField(fields[i])
+            end
+            rows[#rows + 1] = tconcat(fields, ",")
+        end
+
+        if #lootEntries == 0 then
+            appendRow({
+                raidIndex or "",
+                raid.raidNid or "",
+                raidDate,
+                raid.zone or "",
+                raid.size or "",
+                View:GetRaidDifficultyLabel(raid),
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+            })
+            return tconcat(rows, "\n")
+        end
+
+        for i = 1, #lootEntries do
+            local loot = lootEntries[i]
+            if loot then
+                local boss = bossByNid[tonumber(loot.bossNid)]
+                local bossTime = boss and boss.time and date("%Y-%m-%d %H:%M:%S", boss.time) or ""
+                local lootTime = loot.time and date("%Y-%m-%d %H:%M:%S", loot.time) or ""
+
+                appendRow({
+                    raidIndex or "",
+                    raid.raidNid or "",
+                    raidDate,
+                    raid.zone or "",
+                    raid.size or "",
+                    View:GetRaidDifficultyLabel(raid),
+                    loot.bossNid or "",
+                    (boss and boss.name) or "",
+                    bossTime,
+                    View:GetBossModeLabel(boss),
+                    loot.lootNid or "",
+                    loot.itemId or "",
+                    loot.itemName or loot.itemLink or "",
+                    loot.looter or "",
+                    View:GetLootRollTypeLabel(loot.rollType),
+                    loot.rollValue or "",
+                    lootTime,
+                })
+            end
+        end
+
+        return tconcat(rows, "\n")
     end
 
     function View:BuildRows(out, list, pred, map)
@@ -867,6 +1037,7 @@ do
     module.selectedPlayer = nil
     module.selectedBossPlayer = nil
     module.selectedItem = nil
+    module.activeTab = module.activeTab or "history"
 
     SetSelectedRaid = function(raidId)
         if raidId == nil then
@@ -892,6 +1063,72 @@ do
     local MS_CTX_BOSSATT = module._msBossAttCtx
     local MS_CTX_RAIDATT = module._msRaidAttCtx
     local MS_CTX_LOOT = module._msLootCtx
+
+    local function normalizeTabName(tabName)
+        if tabName == "export" then
+            return "export"
+        end
+        return "history"
+    end
+
+    local function updateTabUi()
+        local refs = module.refs
+        if not refs then
+            return
+        end
+
+        local isHistory = (module.activeTab ~= "export")
+        local activeTabId = isHistory and 1 or 2
+
+        local historyFrames = {
+            refs.history,
+        }
+        local exportFrames = {
+            refs.export,
+        }
+
+        -- Hard switch on concrete frames to avoid any residual visual overlap.
+        for i = 1, #historyFrames do
+            Frames.SetShown(historyFrames[i], false)
+        end
+        for i = 1, #exportFrames do
+            Frames.SetShown(exportFrames[i], false)
+        end
+
+        local visibleGroup = isHistory and historyFrames or exportFrames
+        for i = 1, #visibleGroup do
+            Frames.SetShown(visibleGroup[i], true)
+        end
+
+        local frame = module.frame or getFrame()
+        if frame and PanelTemplates_SetTab then
+            PanelTemplates_SetTab(frame, activeTabId)
+        else
+            if refs.historyTabBtn and refs.historyTabBtn.UnlockHighlight then
+                refs.historyTabBtn:UnlockHighlight()
+            end
+            if refs.exportTabBtn and refs.exportTabBtn.UnlockHighlight then
+                refs.exportTabBtn:UnlockHighlight()
+            end
+            if isHistory and refs.historyTabBtn and refs.historyTabBtn.LockHighlight then
+                refs.historyTabBtn:LockHighlight()
+            elseif refs.exportTabBtn and refs.exportTabBtn.LockHighlight then
+                refs.exportTabBtn:LockHighlight()
+            end
+        end
+
+        if not isHistory then
+            if refs.bossBox and refs.bossBox.IsShown and refs.bossBox:IsShown() then
+                refs.bossBox:Hide()
+            end
+            if refs.attendeesBox and refs.attendeesBox.IsShown and refs.attendeesBox:IsShown() then
+                refs.attendeesBox:Hide()
+            end
+            if module.Export and module.Export.RefreshCsv then
+                module.Export:RefreshCsv()
+            end
+        end
+    end
 
     -- Clears selections that depend on the currently focused raid (boss/player/loot panels).
     -- Intentionally does NOT clear the raid selection itself.
@@ -985,6 +1222,11 @@ do
         clearSelections()
     end
 
+    function module:SetTab(tabName)
+        module.activeTab = normalizeTabName(tabName)
+        updateTabUi()
+    end
+
     function module:OnLoad(frame)
         frameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
@@ -994,6 +1236,7 @@ do
                 end
                 clearSelections()
                 triggerSelectionEvent(module, "selectedRaid", "ui")
+                module:SetTab(module.activeTab)
             end,
             hookOnHide = function()
                 SetSelectedRaid(Core.GetCurrentRaid())
@@ -1030,13 +1273,45 @@ do
         self.frame = frame
         self.refs = refs
 
+        if refs.historyTabBtn and not refs.historyTabBtn._krtBound then
+            Frames.SafeSetScript(refs.historyTabBtn, "OnClick", function()
+                module:SetTab("history")
+            end)
+            refs.historyTabBtn._krtBound = true
+            if refs.historyTabBtn.SetID then
+                refs.historyTabBtn:SetID(1)
+            end
+        end
+        if refs.exportTabBtn and not refs.exportTabBtn._krtBound then
+            Frames.SafeSetScript(refs.exportTabBtn, "OnClick", function()
+                module:SetTab("export")
+            end)
+            refs.exportTabBtn._krtBound = true
+            if refs.exportTabBtn.SetID then
+                refs.exportTabBtn:SetID(2)
+            end
+        end
+        if refs.historyTabBtn then
+            refs.historyTabBtn:SetText(L.StrHistoryTab)
+        end
+        if refs.exportTabBtn then
+            refs.exportTabBtn:SetText(L.StrExportTab)
+        end
+        if PanelTemplates_SetNumTabs then
+            PanelTemplates_SetNumTabs(frame, 2)
+        end
+
         EnsureSubmoduleOnLoad(module.Raids, refs.raids)
+        EnsureSubmoduleOnLoad(module.ExportRaids, refs.exportRaids)
         EnsureSubmoduleOnLoad(module.Boss, refs.bosses)
         EnsureSubmoduleOnLoad(module.Loot, refs.loot)
         EnsureSubmoduleOnLoad(module.RaidAttendees, refs.raidAttendees)
         EnsureSubmoduleOnLoad(module.BossAttendees, refs.bossAttendees)
+        EnsureSubmoduleOnLoad(module.Export, refs.export)
         EnsureSubmoduleOnLoad(module.BossBox, refs.bossBox)
         EnsureSubmoduleOnLoad(module.AttendeesBox, refs.attendeesBox)
+
+        module:SetTab(module.activeTab)
 
         uiBound = true
         return frame, refs
@@ -1075,10 +1350,11 @@ do
         end
         clearSelections()
         triggerSelectionEvent(module, "selectedRaid", "ui")
+        module:SetTab(module.activeTab)
     end
 
     -- Selectors
-    function module:SelectRaid(btn, button)
+    function module:SelectRaid(btn, button, opts)
         if button and button ~= "LeftButton" then return end
         local raidNid = btn and btn.GetID and btn:GetID()
         if not raidNid then return end
@@ -1089,7 +1365,10 @@ do
         local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
         local prevFocus = module.selectedRaid
 
-        local ordered = module.Raids and module.Raids._ctrl and module.Raids._ctrl.data or nil
+        local ordered = opts and opts.ordered or nil
+        if not ordered then
+            ordered = module.Raids and module.Raids._ctrl and module.Raids._ctrl.data or nil
+        end
         local action, count = applyFocusedMultiSelect({
             id = raidNid,
             context = MS_CTX_RAID,
@@ -1903,6 +2182,201 @@ do
         end
 
         module._requestRosterBoundListsRefresh()
+    end)
+end
+
+-- Export raids list.
+do
+    module.ExportRaids = module.ExportRaids or {}
+    local ExportRaids = module.ExportRaids
+
+    local controller
+    controller = ListController.MakeListController {
+        keyName = "ExportRaidsList",
+        poolTag = "logger-export-raids",
+        _rowParts = { "ID", "Date", "Zone", "Size" },
+
+        localize = function(n)
+            local title = _G[n .. "Title"]
+            if title then title:SetText(L.StrRaidsList) end
+            _G[n .. "HeaderNum"]:SetText(L.StrNumber)
+            _G[n .. "HeaderDate"]:SetText(L.StrDate)
+            _G[n .. "HeaderZone"]:SetText(L.StrZone)
+            _G[n .. "HeaderSize"]:SetText(L.StrSize)
+
+            local frame = _G[n]
+            if frame and not frame._krtBound then
+                Frames.SafeSetScript(_G[n .. "HeaderNum"], "OnClick", function()
+                    ExportRaids:Sort("id")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderDate"], "OnClick", function()
+                    ExportRaids:Sort("date")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderZone"], "OnClick", function()
+                    ExportRaids:Sort("zone")
+                end)
+                Frames.SafeSetScript(_G[n .. "HeaderSize"], "OnClick", function()
+                    ExportRaids:Sort("size")
+                end)
+                frame._krtBound = true
+            end
+        end,
+
+        getData = function(out)
+            local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+            local raids = raidStore and raidStore.GetAllRaids and raidStore:GetAllRaids() or {}
+            local queries = getRaidQueries()
+            for i = 1, #raids do
+                local raid = raidStore and raidStore.GetRaidByIndex and raidStore:GetRaidByIndex(i) or
+                    Core.EnsureRaidById(i)
+                if raid then
+                    local summary = queries and queries.GetRaidSummary and queries:GetRaidSummary(raid) or nil
+                    local it = {}
+                    it.id = tonumber(raid.raidNid)
+                    it.seq = i
+                    it.zone = raid.zone
+                    it.size = (summary and summary.size) or raid.size
+                    it.difficulty = tonumber((summary and summary.difficulty) or raid.difficulty)
+                    local mode = it.difficulty and ((it.difficulty == 3 or it.difficulty == 4) and "H" or "N") or
+                        "?"
+                    it.sizeLabel = tostring(it.size or "") .. mode
+                    it.date = (summary and summary.startTime) or raid.startTime
+                    it.dateFmt = date("%d/%m/%Y %H:%M", it.date)
+                    out[i] = it
+                end
+            end
+        end,
+
+        rowName = function(n, _, i) return n .. "RaidBtn" .. i end,
+        rowTmpl = "KRTLoggerRaidButton",
+
+        drawRow = ListController.CreateRowDrawer(function(row, it)
+            if not row._krtBound then
+                Frames.SafeSetScript(row, "OnClick", function(self, button)
+                    module:SelectRaid(self, button, { ordered = controller.data })
+                end)
+                row._krtBound = true
+            end
+            local ui = row._p
+            ui.ID:SetText(it.seq or it.id)
+            ui.Date:SetText(it.dateFmt)
+            ui.Zone:SetText(it.zone)
+            ui.Size:SetText(it.sizeLabel or it.size)
+        end),
+
+        highlightFn = function(id) return MultiSelect.MultiSelectIsSelected(module._msRaidCtx, id) end,
+        focusId = function()
+            local selected = module.selectedRaid
+            return selected and Core.GetRaidNidById(selected) or nil
+        end,
+        focusKey = function()
+            local selected = module.selectedRaid
+            local raidNid = selected and Core.GetRaidNidById(selected) or nil
+            return tostring(raidNid or "nil")
+        end,
+        highlightKey = function() return MultiSelect.MultiSelectGetVersion(module._msRaidCtx) end,
+        highlightDebugTag = "LoggerExportSelect",
+        highlightDebugInfo = function()
+            return ("ctx=%s selectedCount=%d"):format(tostring(module._msRaidCtx),
+                MultiSelect.MultiSelectCount(module._msRaidCtx))
+        end,
+
+        sorters = {
+            id = function(a, b, asc)
+                return CompareNumbers(a.seq or a.id, b.seq or b.id, asc, 0)
+            end,
+            date = function(a, b, asc) return CompareNumbers(a.date, b.date, asc, 0) end,
+            zone = function(a, b, asc) return CompareStrings(a.zone, b.zone, asc) end,
+            size = function(a, b, asc) return CompareNumbers(a.size, b.size, asc, 0) end,
+        },
+    }
+
+    ExportRaids._ctrl = controller
+    ListController.BindListController(ExportRaids, controller)
+
+    Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function() controller:Touch() end)
+    Bus.RegisterCallback(InternalEvents.RaidCreate, function() controller:Dirty() end)
+end
+
+-- Export panel (CSV preview).
+do
+    module.Export = module.Export or {}
+    local Export = module.Export
+    local Store = module.Store
+    local View = module.View
+
+    local function setCsvEditBoxHeight(editBox, scrollFrame)
+        if not editBox then
+            return
+        end
+        local minHeight = 200
+        if scrollFrame and scrollFrame.GetHeight then
+            minHeight = scrollFrame:GetHeight() or minHeight
+        end
+        if minHeight < 120 then
+            minHeight = 120
+        end
+        local textHeight = editBox.GetStringHeight and editBox:GetStringHeight() or 0
+        local desiredHeight = textHeight + 24
+        if desiredHeight < minHeight then
+            desiredHeight = minHeight
+        end
+        editBox:SetHeight(desiredHeight)
+    end
+
+    function Export:OnLoad(frame)
+        if not frame then
+            return
+        end
+
+        local frameName = frame.GetName and frame:GetName() or nil
+        if not frameName then
+            return
+        end
+
+        local csvTitle = _G[frameName .. "CsvTitle"]
+        if csvTitle then
+            csvTitle:SetText(L.StrRaidCsvTitle)
+        end
+
+        local csvText = _G[frameName .. "CsvText"]
+        if csvText and not csvText._krtBound then
+            csvText:SetAutoFocus(false)
+            csvText:SetMultiLine(true)
+            if ChatFontNormal then
+                csvText:SetFontObject(ChatFontNormal)
+            end
+            Frames.SafeSetScript(csvText, "OnEscapePressed", function(self)
+                self:ClearFocus()
+            end)
+            csvText._krtBound = true
+        end
+    end
+
+    function Export:RefreshCsv()
+        local refs = module.refs
+        local csvText = refs and refs.exportCsvText or nil
+        if not csvText then
+            return
+        end
+
+        local raidId = module.selectedRaid
+        local raid = raidId and Store:GetRaid(raidId) or nil
+        local csv = View:BuildRaidCsv(raid, raidId)
+        csvText:SetText(csv or "")
+        setCsvEditBoxHeight(csvText, refs and refs.exportCsvScrollFrame or nil)
+        csvText:SetCursorPosition(0)
+        csvText:ClearFocus()
+    end
+
+    Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function()
+        Export:RefreshCsv()
+    end)
+    Bus.RegisterCallback(InternalEvents.RaidLootUpdate, function()
+        Export:RefreshCsv()
+    end)
+    Bus.RegisterCallback(InternalEvents.RaidCreate, function()
+        Export:RefreshCsv()
     end)
 end
 
