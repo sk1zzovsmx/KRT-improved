@@ -17,6 +17,46 @@ local MultiSelect = addon.MultiSelect
 local stateByContext = MultiSelect._stateByContext or {}
 MultiSelect._stateByContext = stateByContext
 
+local modifierPolicyByScope = MultiSelect._modifierPolicyByScope or {}
+MultiSelect._modifierPolicyByScope = modifierPolicyByScope
+
+local function normalizeScopeKey(scopeKey)
+    if not scopeKey or scopeKey == "" then
+        return "_default"
+    end
+    return scopeKey
+end
+
+local function normalizeModifierPolicy(policy)
+    local normalized = {
+        allowMulti = true,
+        allowRange = true,
+    }
+
+    if policy == false then
+        normalized.allowMulti = false
+        normalized.allowRange = false
+        return normalized
+    end
+
+    if type(policy) ~= "table" then
+        return normalized
+    end
+
+    if policy.allowMulti ~= nil then
+        normalized.allowMulti = policy.allowMulti and true or false
+    end
+    if policy.allowRange ~= nil then
+        normalized.allowRange = policy.allowRange and true or false
+    end
+
+    return normalized
+end
+
+if not modifierPolicyByScope._default then
+    modifierPolicyByScope._default = normalizeModifierPolicy(nil)
+end
+
 local function isDebugEnabled()
     return addon and addon.State and addon.State.debugEnabled == true
 end
@@ -36,9 +76,7 @@ local function msKey(id)
 end
 
 local function ensureContext(contextKey)
-    if not contextKey or contextKey == "" then
-        contextKey = "_default"
-    end
+    contextKey = normalizeScopeKey(contextKey)
     local st = stateByContext[contextKey]
     if not st then
         st = { set = {}, count = 0, ver = 0 }
@@ -78,6 +116,59 @@ end
 
 function MultiSelect.MultiSelectClear(contextKey)
     return MultiSelect.MultiSelectInit(contextKey)
+end
+
+function MultiSelect.MultiSelectSetModifierPolicy(scopeKey, policy)
+    local key = normalizeScopeKey(scopeKey)
+
+    if policy == nil then
+        if key == "_default" then
+            modifierPolicyByScope[key] = normalizeModifierPolicy(nil)
+        else
+            modifierPolicyByScope[key] = nil
+        end
+        return
+    end
+
+    modifierPolicyByScope[key] = normalizeModifierPolicy(policy)
+end
+
+function MultiSelect.MultiSelectGetModifierPolicy(scopeKey)
+    local key = normalizeScopeKey(scopeKey)
+    local policy = modifierPolicyByScope[key] or modifierPolicyByScope._default or normalizeModifierPolicy(nil)
+    return policy.allowMulti ~= false, policy.allowRange ~= false
+end
+
+function MultiSelect.MultiSelectResolveModifiers(scopeKey, opts)
+    local policyAllowMulti, policyAllowRange = MultiSelect.MultiSelectGetModifierPolicy(scopeKey)
+    local allowMulti = policyAllowMulti
+    local allowRange = policyAllowRange
+
+    if type(opts) == "table" then
+        if opts.singleOnly == true or opts.forceSingle == true then
+            allowMulti = false
+            allowRange = false
+        end
+
+        -- Per-call overrides can only narrow the policy (never re-enable a disabled modifier).
+        if opts.allowMulti == false then
+            allowMulti = false
+        end
+        if opts.allowRange == false then
+            allowRange = false
+        end
+    end
+
+    if not policyAllowMulti then
+        allowMulti = false
+    end
+    if not policyAllowRange then
+        allowRange = false
+    end
+
+    local isMulti = allowMulti and ((IsControlKeyDown and IsControlKeyDown()) or false) or false
+    local isRange = allowRange and ((IsShiftKeyDown and IsShiftKeyDown()) or false) or false
+    return isMulti, isRange
 end
 
 function MultiSelect.MultiSelectToggle(contextKey, id, isMulti, allowDeselect)

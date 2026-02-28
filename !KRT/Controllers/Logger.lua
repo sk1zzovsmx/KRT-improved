@@ -165,7 +165,12 @@ do
             return action, count
         end
 
-        local action, count = MultiSelect.MultiSelectToggle(ctx, id, opts.isMulti, true)
+        local allowDeselect = opts.allowDeselect
+        if allowDeselect == nil then
+            allowDeselect = true
+        end
+
+        local action, count = MultiSelect.MultiSelectToggle(ctx, id, opts.isMulti, allowDeselect)
         if action == "SINGLE_DESELECT" then
             opts.setFocus(nil)
         elseif action == "TOGGLE_OFF" then
@@ -1064,6 +1069,27 @@ do
     local MS_CTX_RAIDATT = module._msRaidAttCtx
     local MS_CTX_LOOT = module._msLootCtx
 
+    -- Multi-select modifier scopes (input policy by panel/list)
+    module._msRaidScopeHistory = module._msRaidScopeHistory or "LoggerRaidsHistory"
+    module._msRaidScopeExport = module._msRaidScopeExport or "LoggerExportRaids"
+    module._msBossScope = module._msBossScope or "LoggerBosses"
+    module._msBossAttScope = module._msBossAttScope or "LoggerBossAttendees"
+    module._msRaidAttScope = module._msRaidAttScope or "LoggerRaidAttendees"
+    module._msLootScope = module._msLootScope or "LoggerLoot"
+
+    local MS_SCOPE_RAID_HISTORY = module._msRaidScopeHistory
+    local MS_SCOPE_RAID_EXPORT = module._msRaidScopeExport
+    local MS_SCOPE_BOSS = module._msBossScope
+    local MS_SCOPE_BOSSATT = module._msBossAttScope
+    local MS_SCOPE_RAIDATT = module._msRaidAttScope
+    local MS_SCOPE_LOOT = module._msLootScope
+
+    MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_RAID_HISTORY, { allowMulti = true, allowRange = true })
+    MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_RAID_EXPORT, { allowMulti = false, allowRange = false })
+    MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_BOSS, { allowMulti = true, allowRange = true })
+    MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_BOSSATT, { allowMulti = true, allowRange = true })
+    MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_RAIDATT, { allowMulti = true, allowRange = true })
+    MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_LOOT, { allowMulti = true, allowRange = true })
     local function normalizeTabName(tabName)
         if tabName == "export" then
             return "export"
@@ -1361,8 +1387,10 @@ do
         local raidIndex = getRaidIndexByNid(raidNid)
         if not raidIndex then return end
 
-        local isMulti = (IsControlKeyDown and IsControlKeyDown()) or false
-        local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
+        local modifierScope = (opts and opts.modifierScope)
+            or module._msRaidScopeHistory
+            or MS_SCOPE_RAID_HISTORY
+        local isMulti, isRange = MultiSelect.MultiSelectResolveModifiers(modifierScope, opts)
         local prevFocus = module.selectedRaid
 
         local ordered = opts and opts.ordered or nil
@@ -1371,10 +1399,11 @@ do
         end
         local action, count = applyFocusedMultiSelect({
             id = raidNid,
-            context = MS_CTX_RAID,
+            context = (opts and opts.context) or MS_CTX_RAID,
             ordered = ordered,
             isMulti = isMulti,
             isRange = isRange,
+            allowDeselect = opts and opts.allowDeselect,
             setFocus = SetSelectedRaid,
             mapSelectedToFocus = getRaidIndexByNid,
             isClickedFocused = function(clickedNid)
@@ -1403,8 +1432,7 @@ do
         local id = btn and btn.GetID and btn:GetID()
         if not id then return end
 
-        local isMulti = (IsControlKeyDown and IsControlKeyDown()) or false
-        local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
+        local isMulti, isRange = MultiSelect.MultiSelectResolveModifiers(MS_SCOPE_BOSS)
         local prevFocus = module.selectedBoss
 
         local ordered = module.Boss and module.Boss._ctrl and module.Boss._ctrl.data or nil
@@ -1447,8 +1475,7 @@ do
         local id = btn and btn.GetID and btn:GetID()
         if not id then return end
 
-        local isMulti = (IsControlKeyDown and IsControlKeyDown()) or false
-        local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
+        local isMulti, isRange = MultiSelect.MultiSelectResolveModifiers(MS_SCOPE_BOSSATT)
         local prevFocus = module.selectedBossPlayer
 
         -- Mutual exclusion: selecting a boss-attendee filter clears the raid-attendee filter (and its multi-select).
@@ -1493,8 +1520,7 @@ do
         local id = btn and btn.GetID and btn:GetID()
         if not id then return end
 
-        local isMulti = (IsControlKeyDown and IsControlKeyDown()) or false
-        local isRange = (IsShiftKeyDown and IsShiftKeyDown()) or false
+        local isMulti, isRange = MultiSelect.MultiSelectResolveModifiers(MS_SCOPE_RAIDATT)
         local prevFocus = module.selectedPlayer
 
         -- Mutual exclusion: selecting a raid-attendee filter clears the boss-attendee filter (and its multi-select).
@@ -1762,8 +1788,7 @@ do
 
             -- NOTE: Multi-select is maintained in MultiSelect module (context = MS_CTX_LOOT).
             if button == "LeftButton" then
-                local isMulti = IsControlKeyDown and IsControlKeyDown() or false
-                local isRange = IsShiftKeyDown and IsShiftKeyDown() or false
+                local isMulti, isRange = MultiSelect.MultiSelectResolveModifiers(MS_SCOPE_LOOT)
 
                 local ordered = module.Loot and module.Loot._ctrl and module.Loot._ctrl.data or nil
                 local action, count = applyFocusedMultiSelect({
@@ -2253,7 +2278,12 @@ do
         drawRow = ListController.CreateRowDrawer(function(row, it)
             if not row._krtBound then
                 Frames.SafeSetScript(row, "OnClick", function(self, button)
-                    module:SelectRaid(self, button, { ordered = controller.data })
+                    module:SelectRaid(self, button, {
+                        ordered = controller.data,
+                        modifierScope = module._msRaidScopeExport,
+                        forceSingle = true,
+                        allowDeselect = false,
+                    })
                 end)
                 row._krtBound = true
             end
@@ -2264,7 +2294,10 @@ do
             ui.Size:SetText(it.sizeLabel or it.size)
         end),
 
-        highlightFn = function(id) return MultiSelect.MultiSelectIsSelected(module._msRaidCtx, id) end,
+        highlightId = function()
+            local selected = module.selectedRaid
+            return selected and Core.GetRaidNidById(selected) or nil
+        end,
         focusId = function()
             local selected = module.selectedRaid
             return selected and Core.GetRaidNidById(selected) or nil
@@ -2274,11 +2307,11 @@ do
             local raidNid = selected and Core.GetRaidNidById(selected) or nil
             return tostring(raidNid or "nil")
         end,
-        highlightKey = function() return MultiSelect.MultiSelectGetVersion(module._msRaidCtx) end,
         highlightDebugTag = "LoggerExportSelect",
         highlightDebugInfo = function()
-            return ("ctx=%s selectedCount=%d"):format(tostring(module._msRaidCtx),
-                MultiSelect.MultiSelectCount(module._msRaidCtx))
+            local selected = module.selectedRaid
+            local raidNid = selected and Core.GetRaidNidById(selected) or nil
+            return ("selectedRaidNid=%s"):format(tostring(raidNid))
         end,
 
         sorters = {
@@ -2305,10 +2338,47 @@ do
     local Store = module.Store
     local View = module.View
 
-    local function setCsvEditBoxHeight(editBox, scrollFrame)
+    local function getScrollBarInset(scrollFrame)
+        if not scrollFrame then
+            return 4
+        end
+
+        local scrollBar
+        if scrollFrame.GetName then
+            scrollBar = _G[(scrollFrame:GetName() or "") .. "ScrollBar"]
+        end
+        if not scrollBar then
+            scrollBar = scrollFrame.ScrollBar
+        end
+        if not (scrollBar and scrollBar.GetWidth) then
+            return 4
+        end
+
+        local width = scrollBar:GetWidth() or 0
+        if width < 0 then
+            width = 0
+        end
+        return width + 4
+    end
+
+    local function setCsvEditBoxLayout(editBox, scrollFrame)
         if not editBox then
             return
         end
+
+        local minWidth = 180
+        local rightInset = getScrollBarInset(scrollFrame)
+        if scrollFrame and scrollFrame.GetWidth then
+            local frameWidth = scrollFrame:GetWidth() or 0
+            local desiredWidth = frameWidth - rightInset
+            if desiredWidth > minWidth then
+                minWidth = desiredWidth
+            end
+        end
+        if editBox.SetWidth then
+            editBox:SetWidth(minWidth)
+        end
+
         local minHeight = 200
         if scrollFrame and scrollFrame.GetHeight then
             minHeight = scrollFrame:GetHeight() or minHeight
@@ -2321,9 +2391,142 @@ do
         if desiredHeight < minHeight then
             desiredHeight = minHeight
         end
-        editBox:SetHeight(desiredHeight)
+        if editBox.SetHeight then
+            editBox:SetHeight(desiredHeight)
+        end
+        if scrollFrame and scrollFrame.UpdateScrollChildRect then
+            scrollFrame:UpdateScrollChildRect()
+        end
     end
 
+    local function setCsvSelectionState(editBox, csvValue)
+        if not editBox then
+            return
+        end
+
+        addon.CancelTimer(module._exportCsvSelectHandle, true)
+        module._exportCsvSelectHandle = nil
+
+        local refs = module.refs
+        local exportFrame = refs and refs.export or nil
+        local isVisible = module.activeTab == "export" and
+            exportFrame and exportFrame.IsShown and exportFrame:IsShown()
+        if not isVisible then
+            if editBox.ClearFocus then
+                editBox:ClearFocus()
+            end
+            return
+        end
+
+        if editBox.EnableKeyboard then
+            editBox:EnableKeyboard(true)
+        end
+
+        local selectEnd = string.len(csvValue or "")
+        local attempts = 0
+        local maxAttempts = 4
+        local delaySeconds = 0.05
+
+        local function applySelection()
+            local nowRefs = module.refs
+            local nowExport = nowRefs and nowRefs.export or nil
+            local stillVisible = module.activeTab == "export" and
+                nowExport and nowExport.IsShown and nowExport:IsShown()
+            if not stillVisible then
+                module._exportCsvSelectHandle = nil
+                return
+            end
+
+            attempts = attempts + 1
+
+            if editBox.SetFocus then
+                editBox:SetFocus()
+            end
+            if editBox.SetCursorPosition then
+                editBox:SetCursorPosition(0)
+            end
+            if editBox.HighlightText then
+                editBox:HighlightText(0, selectEnd)
+            end
+
+            if attempts < maxAttempts then
+                module._exportCsvSelectHandle = addon.NewTimer(delaySeconds, applySelection)
+            else
+                module._exportCsvSelectHandle = nil
+            end
+        end
+
+        applySelection()
+    end
+
+    local function hideCsvEditBoxChrome(editBox)
+        if not (editBox and editBox.GetName) then
+            return
+        end
+
+        local name = editBox:GetName()
+        if not name then
+            return
+        end
+
+        local left = _G[name .. "Left"]
+        if left and left.Hide then
+            left:Hide()
+            if left.SetAlpha then
+                left:SetAlpha(0)
+            end
+        end
+
+        local middle = _G[name .. "Middle"]
+        if middle and middle.Hide then
+            middle:Hide()
+            if middle.SetAlpha then
+                middle:SetAlpha(0)
+            end
+        end
+
+        local right = _G[name .. "Right"]
+        if right and right.Hide then
+            right:Hide()
+            if right.SetAlpha then
+                right:SetAlpha(0)
+            end
+        end
+
+        if editBox.GetRegions then
+            local regionCount = editBox:GetNumRegions() or 0
+            for i = 1, regionCount do
+                local region = select(i, editBox:GetRegions())
+                if region and region.GetObjectType and region:GetObjectType() == "Texture" then
+                    if region.Hide then
+                        region:Hide()
+                    end
+                    if region.SetAlpha then
+                        region:SetAlpha(0)
+                    end
+                end
+            end
+        end
+    end
+
+    local function hideCsvScrollFrameChrome(scrollFrame)
+        if not (scrollFrame and scrollFrame.GetRegions) then
+            return
+        end
+
+        local regionCount = scrollFrame:GetNumRegions() or 0
+        for i = 1, regionCount do
+            local region = select(i, scrollFrame:GetRegions())
+            if region and region.GetObjectType and region:GetObjectType() == "Texture" then
+                if region.Hide then
+                    region:Hide()
+                end
+                if region.SetAlpha then
+                    region:SetAlpha(0)
+                end
+            end
+        end
+    end
     function Export:OnLoad(frame)
         if not frame then
             return
@@ -2339,16 +2542,38 @@ do
             csvTitle:SetText(L.StrRaidCsvTitle)
         end
 
+        local csvScrollFrame = _G[frameName .. "CsvScrollFrame"]
+        hideCsvScrollFrameChrome(csvScrollFrame)
+
         local csvText = _G[frameName .. "CsvText"]
         if csvText and not csvText._krtBound then
             csvText:SetAutoFocus(false)
             csvText:SetMultiLine(true)
+            csvText:SetTextInsets(6, 6, 6, 6)
+            csvText:SetJustifyH("LEFT")
+            csvText:SetJustifyV("TOP")
             if ChatFontNormal then
                 csvText:SetFontObject(ChatFontNormal)
             end
             Frames.SafeSetScript(csvText, "OnEscapePressed", function(self)
                 self:ClearFocus()
             end)
+            Frames.SafeSetScript(csvText, "OnTextChanged", function(self, userInput)
+                if not userInput then
+                    return
+                end
+                self:SetText(self._krtCsvText or "")
+                if self.HighlightText then
+                    self:HighlightText(0, string.len(self._krtCsvText or ""))
+                end
+            end)
+            Frames.SafeSetScript(csvText, "OnEditFocusGained", function(self)
+                hideCsvEditBoxChrome(self)
+                if self.HighlightText then
+                    self:HighlightText(0, string.len(self._krtCsvText or ""))
+                end
+            end)
+            hideCsvEditBoxChrome(csvText)
             csvText._krtBound = true
         end
     end
@@ -2362,11 +2587,13 @@ do
 
         local raidId = module.selectedRaid
         local raid = raidId and Store:GetRaid(raidId) or nil
-        local csv = View:BuildRaidCsv(raid, raidId)
-        csvText:SetText(csv or "")
-        setCsvEditBoxHeight(csvText, refs and refs.exportCsvScrollFrame or nil)
-        csvText:SetCursorPosition(0)
-        csvText:ClearFocus()
+        local csvValue = View:BuildRaidCsv(raid, raidId) or ""
+        csvText._krtCsvText = csvValue
+        csvText:SetText(csvValue)
+        hideCsvEditBoxChrome(csvText)
+        hideCsvScrollFrameChrome(refs and refs.exportCsvScrollFrame or nil)
+        setCsvEditBoxLayout(csvText, refs and refs.exportCsvScrollFrame or nil)
+        setCsvSelectionState(csvText, csvValue)
     end
 
     Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function()

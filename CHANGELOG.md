@@ -12,6 +12,33 @@ Dates are in YYYY-MM-DD.
   removing a self-referential `UI:RequestRefresh` override that caused stack overflow.
 - **UI:** Logger now has two tabs: `History` (existing full logger view) and
   `Export` (separate empty panel scaffold, ready for future export UI work).
+- **UI:** Logger `Export` tab now renders two live panes: raid history list on
+  the left and the selected raid CSV preview on the right.
+- **Bugfix:** Logger Export pane frame naming now matches controller lookups,
+  so the raid list and CSV preview populate correctly.
+- **Bugfix:** Logger Export CSV editbox now uses the expected global frame name
+  (`KRTLoggerExportCsvText`), restoring CSV preview rendering on raid selection.
+- **UI:** Logger Export CSV preview is now view-only, auto-selects all text
+  while visible, and keeps text layout constrained to the panel bounds.
+- **Bugfix:** Logger Export CSV auto-select now uses deferred retry passes
+  after content/layout refresh, making full-text selection reliable after raid-row clicks.
+- **Bugfix:** Logger Export CSV editbox anchoring now clamps to the scrollframe
+  inner bounds (including scrollbar inset), preventing text from rendering
+  outside the panel background.
+- **UI:** Logger Export CSV input frame chrome is now hidden (no visible input box border)
+  while keeping copy/select behavior.
+- **Bugfix:** Logger Export CSV now force-hides all InputBox template texture regions
+  (including focus redraw) to avoid residual border artifacts on some clients.
+- **Bugfix:** Logger Export CSV scrollframe geometry now aligns with panel backdrop insets,
+  and CSV layout no longer forces editbox anchors outside the scroll content area.
+- **Behavior:** Logger Export raid list now enforces single selection; CTRL/SHIFT
+  multi-select and range-select are ignored in that panel.
+- **Refactor:** Multi-select input handling now uses centralized scope policies in
+  `Modules/UI/MultiSelect.lua`, so each panel can opt-in/out without ad-hoc key checks.
+- **Bugfix:** Multi-select scope policies now have strict precedence; when a scope disables multi/range,
+  CTRL/SHIFT are ignored even if per-call overrides are passed.
+- **Bugfix:** Logger Export raid selection now forces single semantics and keeps one row focused;
+  CTRL-click cannot toggle back to a previously selected raid.
 - **UI:** Removed the disabled `Export` button from the Logger Raids list footer.
 - **UI:** Logger Raids list footer buttons (`Set Current`, `Delete`) are now centered.
 - **Refactor:** Unified core bootstrap and runtime event wiring into

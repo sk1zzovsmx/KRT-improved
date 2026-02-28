@@ -84,6 +84,8 @@ Durable preferences learned from recent conversations:
 - Prefer cross-code extraction from `Modules/Utils.lua` into dedicated reusable modules (`Bus`, `ListController`,
   `MultiSelect`, `Frames`, `Strings`, `Colors`, `Comms`, `Base64`, `Time`, `Sort`);
   keep `Utils.lua` as facade/re-export.
+- Prefer centralized MultiSelect modifier policies in `Modules/UI/MultiSelect.lua`
+  with per-list scope keys; avoid per-controller CTRL/SHIFT gating flags.
 - Prefer incremental thematic split of `Modules/Utils.lua` into `Modules/Utils.*.lua` files
   (`UI`, `Tooltip`, `Options`, `RaidState`, `LegacyGlobals`), while keeping `Utils.lua`
   as compatibility facade/aggregator.
