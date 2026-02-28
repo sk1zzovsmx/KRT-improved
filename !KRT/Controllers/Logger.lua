@@ -1042,7 +1042,10 @@ do
     module.selectedPlayer = nil
     module.selectedBossPlayer = nil
     module.selectedItem = nil
-    module.activeTab = module.activeTab or "history"
+    local TAB_HISTORY = "history"
+    local TAB_EXPORT = "export"
+
+    module.activeTab = module.activeTab or TAB_HISTORY
 
     SetSelectedRaid = function(raidId)
         if raidId == nil then
@@ -1091,10 +1094,10 @@ do
     MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_RAIDATT, { allowMulti = true, allowRange = true })
     MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_LOOT, { allowMulti = true, allowRange = true })
     local function normalizeTabName(tabName)
-        if tabName == "export" then
-            return "export"
+        if tabName == TAB_EXPORT then
+            return TAB_EXPORT
         end
-        return "history"
+        return TAB_HISTORY
     end
 
     local function updateTabUi()
@@ -1103,7 +1106,7 @@ do
             return
         end
 
-        local isHistory = (module.activeTab ~= "export")
+        local isHistory = (module.activeTab ~= TAB_EXPORT)
         local activeTabId = isHistory and 1 or 2
 
         local historyFrames = {
@@ -1301,7 +1304,7 @@ do
 
         if refs.historyTabBtn and not refs.historyTabBtn._krtBound then
             Frames.SafeSetScript(refs.historyTabBtn, "OnClick", function()
-                module:SetTab("history")
+                module:SetTab(TAB_HISTORY)
             end)
             refs.historyTabBtn._krtBound = true
             if refs.historyTabBtn.SetID then
@@ -1310,7 +1313,7 @@ do
         end
         if refs.exportTabBtn and not refs.exportTabBtn._krtBound then
             Frames.SafeSetScript(refs.exportTabBtn, "OnClick", function()
-                module:SetTab("export")
+                module:SetTab(TAB_EXPORT)
             end)
             refs.exportTabBtn._krtBound = true
             if refs.exportTabBtn.SetID then
