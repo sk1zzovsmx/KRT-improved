@@ -99,9 +99,6 @@ local format, match, find, strlen       = string.format, string.match, string.fi
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 local deformat                          = LibStub("LibDeformat-3.0")
-local LibCompat                         = LibStub("LibCompat-1.0")
-local AceBucket                         = LibStub("AceBucket-3.0")
-AceBucket:Embed(addon)
 
 -- Returns the used frame's name:
 function addon:GetFrameName()
@@ -351,7 +348,7 @@ do
 	end
 
 	-- Register some events and frame-related functions:
-        addon:RegisterEvent("ADDON_LOADED")
+	addon:RegisterEvents("ADDON_LOADED")
 	mainFrame:SetScript("OnEvent", HandleEvent)
 	mainFrame:SetScript("OnUpdate", Utils.run)
 end
@@ -379,46 +376,45 @@ do
 			Raid:End()
 			return
 		end
-               local realm = GetRealmName() or UNKNOWN
-               KRT_Players[realm] = KRT_Players[realm] or {}
-               local players = {}
-               local index = 0
-               for unit in LibCompat.UnitIterator(false) do
-                       index = index + 1
-                       local name, rank, subgroup, level, classL, class, _, online = GetRaidRosterInfo(index)
-                       if name then
-                               tinsert(players, name)
-                               inRaid = false
-                               for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
-                                       if v.name == name and v.leave == nil then
-                                               inRaid = true
-                                       end
-                               end
-                               local raceL, race = UnitRace(unit)
-                               if not inRaid then
-                                       local toRaid = {
-                                               name = name,
-                                               rank = rank,
-                                               subgroup = subgroup,
-                                               class = class or "UNKNOWN",
-                                               join = Utils.GetCurrentTime(),
-                                               leave = nil
-                                       }
-                                       Raid:AddPlayer(toRaid)
-                               end
-                               if not KRT_Players[realm][name] then
-                                       KRT_Players[realm][name] = {
-                                               name = name,
-                                               level = level,
-                                               race = race,
-                                               raceL = raceL,
-                                               class = class or "UNKNOWN",
-                                               classL = classL,
-                                               sex = UnitSex(unit)
-                                       }
-                               end
-                       end
-               end
+		local realm = GetRealmName() or UNKNOWN
+		KRT_Players[realm] = KRT_Players[realm] or {}
+		local players = {}
+		for i = 1, numRaid do
+			local name, rank, subgroup, level, classL, class, _, online = GetRaidRosterInfo(i)
+			if name then
+				tinsert(players, name)
+				inRaid = false
+				for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
+					if v.name == name and v.leave == nil then
+						inRaid = true
+					end
+				end
+				local unitID = "raid" .. tostring(i)
+				local raceL, race = UnitRace(unitID)
+				if not inRaid then
+					local toRaid = {
+						name = name,
+						rank = rank,
+						subgroup = subgroup,
+						class = class or "UNKNOWN",
+						join = Utils.GetCurrentTime(),
+						leave = nil
+					}
+					Raid:AddPlayer(toRaid)
+				end
+				if not KRT_Players[realm][name] then
+					KRT_Players[realm][name] = {
+						name = name,
+						level = level,
+						race = race,
+						raceL = raceL,
+						class = class or "UNKNOWN",
+						classL = classL,
+						sex = UnitSex(unitID)
+					}
+				end
+			end
+		end
 		for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
 			local found = nil
 			for _, p in ipairs(players) do
@@ -441,44 +437,43 @@ do
 		end
 		numRaid = GetNumRaidMembers()
 		if numRaid == 0 then return end
-               local realm = GetRealmName() or UNKNOWN
-               KRT_Players[realm] = KRT_Players[realm] or {}
-               local currentTime = Utils.GetCurrentTime()
-               local raidInfo = {
-                       realm = realm,
-                       zone = zoneName,
-                       size = raidSize,
-                       players = {},
-                       bossKills = {},
-                       loot = {},
-                       startTime = currentTime,
-                       changes = {},
-               }
-               local index = 0
-               for unit in LibCompat.UnitIterator(false) do
-                       index = index + 1
-                       local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(index)
-                       if name then
-                               local raceL, race = UnitRace(unit)
-                               tinsert(raidInfo.players, {
-                                       name     = name,
-                                       rank     = rank,
-                                       subgroup = subgroup,
-                                       class    = class or "UNKNOWN",
-                                       join     = Utils.GetCurrentTime(),
-                                       leave    = nil,
-                               })
-                               KRT_Players[realm][name] = {
-                                       name   = name,
-                                       level  = level,
-                                       race   = race,
-                                       raceL  = raceL,
-                                       class  = class or "UNKNOWN",
-                                       classL = classL,
-                                       sex    = UnitSex(unit),
-                               }
-                       end
-               end
+		local realm = GetRealmName() or UNKNOWN
+		KRT_Players[realm] = KRT_Players[realm] or {}
+		local currentTime = Utils.GetCurrentTime()
+		local raidInfo = {
+			realm = realm,
+			zone = zoneName,
+			size = raidSize,
+			players = {},
+			bossKills = {},
+			loot = {},
+			startTime = currentTime,
+			changes = {},
+		}
+		for i = 1, numRaid do
+			local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
+			if name then
+				local unitID = "raid" .. tostring(i)
+				local raceL, race = UnitRace(unitID)
+				tinsert(raidInfo.players, {
+					name     = name,
+					rank     = rank,
+					subgroup = subgroup,
+					class    = class or "UNKNOWN",
+					join     = Utils.GetCurrentTime(),
+					leave    = nil,
+				})
+				KRT_Players[realm][name] = {
+					name   = name,
+					level  = level,
+					race   = race,
+					raceL  = raceL,
+					class  = class or "UNKNOWN",
+					classL = classL,
+					sex    = UnitSex(unitID),
+				}
+			end
+		end
 		tinsert(KRT_Raids, raidInfo)
 		KRT_CurrentRaid = #KRT_Raids
 		TriggerEvent("RaidCreate", KRT_CurrentRaid)
@@ -575,14 +570,13 @@ do
 		elseif isDyn then
 			instanceDiff = instanceDiff + (2 * dynDiff)
 		end
-               local players = {}
-               if GetNumRaidMembers() > 0 then
-                       for unit in LibCompat.UnitIterator(false) do
-                               if UnitIsConnected(unit) then -- track only online players:
-                                       tinsert(players, UnitName(unit))
-                               end
-                       end
-               end
+		local players = {}
+		for i = 1, GetNumRaidMembers() do
+			local name, _, _, _, _, _, _, online = GetRaidRosterInfo(i)
+			if online == 1 then -- track only online players:
+				tinsert(players, name)
+			end
+		end
 		local currentTime = Utils.GetCurrentTime()
 		local killInfo = {
 			name = bossName,
@@ -630,7 +624,7 @@ do
 		local lootThreshold = GetLootThreshold()
 		if itemRarity and itemRarity < lootThreshold then return end
 		if itemId and addon.ignoredItems[itemId] then return end
-		if not KRT_LastBoss then self:AddBoss("_TrashMob_")	end
+		if not KRT_LastBoss then self:AddBoss("_TrashMob_") end
 		if not rollType then rollType = currentRollType end
 		if not rollValue then rollValue = addon:HighestRoll() end
 		local lootInfo = {
@@ -870,28 +864,27 @@ do
 		local rank = 0
 		local originalName = name
 		name = name or unitName or UnitName("player")
-               if next(players) == nil then
-                       if GetNumRaidMembers() > 0 then
-                               local index = 0
-                               for unit in LibCompat.UnitIterator(false) do
-                                       index = index + 1
-                                       local pname, prank = GetRaidRosterInfo(index)
-                                       if pname == name then
-                                               rank = prank
-                                               break
-                                       end
-                               end
-                       end
-               else
-                       for i, p in ipairs(players) do
-                               if p.name == name then
-                                       rank = p.rank or 0
-                                       break
-                               end
-                       end
-               end
-               return rank
-       end
+		if next(players) == nil then
+			if GetNumRaidMembers() > 0 then
+				numRaid = GetNumRaidMembers()
+				for i = 1, numRaid do
+					local pname, prank, _, _, _, _, _, _, _, _, _ = GetRaidRosterInfo(i)
+					if pname == name then
+						rank = prank
+						break
+					end
+				end
+			end
+		else
+			for i, p in ipairs(players) do
+				if p.name == name then
+					rank = p.rank or 0
+					break
+				end
+			end
+		end
+		return rank
+	end
 
 	-- Get player class:
 	function addon:GetPlayerClass(name)
@@ -2344,43 +2337,24 @@ do
 			if GetMasterLootCandidate(p) == playerName then
 				GiveMasterLoot(itemIndex, p)
 				local output, whisper
-				local function announceWin()
-					if addon.options.announceOnWin then
-						output = L.ChatAward:format(playerName, itemLink)
+				if rollType <= 4 and addon.options.announceOnWin then
+					output = L.ChatAward:format(playerName, itemLink)
+				elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
+					output = L.ChatHold:format(playerName, itemLink)
+					if addon.options.lootWhispers then
+						whisper = L.WhisperHoldAssign:format(itemLink)
+					end
+				elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
+					output = L.ChatBank:format(playerName, itemLink)
+					if addon.options.lootWhispers then
+						whisper = L.WhisperBankAssign:format(itemLink)
+					end
+				elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
+					output = L.ChatDisenchant:format(itemLink, playerName)
+					if addon.options.lootWhispers then
+						whisper = L.WhisperDisenchantAssign:format(itemLink)
 					end
 				end
-				local HandleRoll = {
-					[rollTypes.MAINSPEC] = announceWin,
-					[rollTypes.OFFSPEC] = announceWin,
-					[rollTypes.RESERVED] = announceWin,
-					[rollTypes.FREE] = announceWin,
-					[rollTypes.HOLD] = function()
-						if addon.options.announceOnHold then
-							output = L.ChatHold:format(playerName, itemLink)
-							if addon.options.lootWhispers then
-								whisper = L.WhisperHoldAssign:format(itemLink)
-							end
-						end
-					end,
-					[rollTypes.BANK] = function()
-						if addon.options.announceOnBank then
-							output = L.ChatBank:format(playerName, itemLink)
-							if addon.options.lootWhispers then
-								whisper = L.WhisperBankAssign:format(itemLink)
-							end
-						end
-					end,
-					[rollTypes.DISENCHANT] = function()
-						if addon.options.announceOnDisenchant then
-							output = L.ChatDisenchant:format(itemLink, playerName)
-							if addon.options.lootWhispers then
-								whisper = L.WhisperDisenchantAssign:format(itemLink)
-							end
-						end
-					end,
-				}
-				local f = HandleRoll[rollType]
-				if f then f() end
 				if output and not announced then
 					addon:Announce(output)
 					announced = true
@@ -2402,59 +2376,34 @@ do
 		trader = unitName
 
 		-- Prepare initial output and whisper:
-				local output, whisper
-				local keep = true
-				local function announceWin()
-					if addon.options.announceOnWin then
-						output = L.ChatAward:format(playerName, itemLink)
-						keep = false
-					end
-				end
-				local HandleRoll = {
-					[rollTypes.MAINSPEC] = announceWin,
-					[rollTypes.OFFSPEC] = announceWin,
-					[rollTypes.RESERVED] = announceWin,
-					[rollTypes.FREE] = announceWin,
-					[rollTypes.HOLD] = function()
-						if addon.options.announceOnHold then
-							output = L.ChatNoneRolledHold:format(itemLink, playerName)
-						end
-					end,
-					[rollTypes.BANK] = function()
-						if addon.options.announceOnBank then
-							output = L.ChatNoneRolledBank:format(itemLink, playerName)
-						end
-					end,
-					[rollTypes.DISENCHANT] = function()
-						if addon.options.announceOnDisenchant then
-							output = L.ChatNoneRolledDisenchant:format(itemLink, playerName)
-						end
-					end,
-				}
-				local f = HandleRoll[rollType]
-				if f then f() end
+		local output, whisper
+		local keep = true
+		if rollType <= 4 and addon.options.announceOnWin then
+			output = L.ChatAward:format(playerName, itemLink)
+			keep = false
+		elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
+			output = L.ChatNoneRolledHold:format(itemLink, playerName)
+		elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
+			output = L.ChatNoneRolledBank:format(itemLink, playerName)
+		elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
+			output = L.ChatNoneRolledDisenchant:format(itemLink, playerName)
+		end
 
-				-- Keeping the item:
-				if keep then
-					local Whisper = {
-						[rollTypes.HOLD] = function()
-							whisper = L.WhisperHoldTrade:format(itemLink)
-						end,
-						[rollTypes.BANK] = function()
-							whisper = L.WhisperBankTrade:format(itemLink)
-						end,
-						[rollTypes.DISENCHANT] = function()
-							whisper = L.WhisperDisenchantTrade:format(itemLink)
-						end,
-					}
-					local w = Whisper[rollType]
-					if w then w() end
-				-- Multiple winners:
-				elseif itemCount > 1 then
-				addon:ClearRaidIcons()
-				SetRaidTarget(trader, 1)
-				local rolls = addon:GetRolls()
-				local winners = {}
+		-- Keeping the item:
+		if keep then
+			if rollType == rollTypes.HOLD then
+				whisper = L.WhisperHoldTrade:format(itemLink)
+			elseif rollType == rollTypes.BANK then
+				whisper = L.WhisperBankTrade:format(itemLink)
+			elseif rollType == rollTypes.DISENCHANT then
+				whisper = L.WhisperDisenchantTrade:format(itemLink)
+			end
+			-- Multiple winners:
+		elseif itemCount > 1 then
+			addon:ClearRaidIcons()
+			SetRaidTarget(trader, 1)
+			local rolls = addon:GetRolls()
+			local winners = {}
 			for i = 1, itemCount do
 				if rolls[i] then
 					if rolls[i].name == trader then
@@ -5868,28 +5817,25 @@ end
 -- On ADDON_LOADED:
 function addon:ADDON_LOADED(name)
 	if name ~= addonName then return end
-        mainFrame:UnregisterEvent("ADDON_LOADED")
-        LoadOptions()
-        local events = {
-                CHAT_MSG_ADDON = "CHAT_MSG_ADDON",
-                CHAT_MSG_SYSTEM = "CHAT_MSG_SYSTEM",
-                CHAT_MSG_MONSTER_YELL = "CHAT_MSG_MONSTER_YELL",
-                RAID_ROSTER_UPDATE = "RAID_ROSTER_UPDATE",
-                PLAYER_ENTERING_WORLD = "PLAYER_ENTERING_WORLD",
-                COMBAT_LOG_EVENT_UNFILTERED = "COMBAT_LOG_EVENT_UNFILTERED",
-                RAID_INSTANCE_WELCOME = "RAID_INSTANCE_WELCOME",
-                -- Master frame events:
-                ITEM_LOCKED = "ITEM_LOCKED",
-                LOOT_CLOSED = "LOOT_CLOSED",
-                LOOT_OPENED = "LOOT_OPENED",
-                LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
-                TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
-        }
-        for evt, handler in pairs(events) do
-                self:RegisterEvent(evt, handler)
-        end
-       self:RegisterBucketEvent("CHAT_MSG_LOOT", 0.2, "OnLootBucket")
-        self:RAID_ROSTER_UPDATE()
+	mainFrame:UnregisterEvent("ADDON_LOADED")
+	LoadOptions()
+	self:RegisterEvents(
+		"CHAT_MSG_ADDON",
+		"CHAT_MSG_SYSTEM",
+		"CHAT_MSG_LOOT",
+		"CHAT_MSG_MONSTER_YELL",
+		"RAID_ROSTER_UPDATE",
+		"PLAYER_ENTERING_WORLD",
+		"COMBAT_LOG_EVENT_UNFILTERED",
+		"RAID_INSTANCE_WELCOME",
+		-- Master frame events:
+		"ITEM_LOCKED",
+		"LOOT_CLOSED",
+		"LOOT_OPENED",
+		"LOOT_SLOT_CLEARED",
+		"TRADE_ACCEPT_UPDATE"
+	)
+	self:RAID_ROSTER_UPDATE()
 end
 
 function addon:RAID_ROSTER_UPDATE()
@@ -5911,12 +5857,10 @@ function addon:PLAYER_ENTERING_WORLD()
 	Utils.schedule(3, self.Raid.FirstCheck)
 end
 
-function addon:OnLootBucket(messages)
-       for _, msg in ipairs(messages) do
-               if KRT_CurrentRaid then
-                       self.Raid:AddLoot(msg)
-               end
-       end
+function addon:CHAT_MSG_LOOT(msg)
+	if KRT_CurrentRaid then
+		self.Raid:AddLoot(msg)
+	end
 end
 
 function addon:CHAT_MSG_MONSTER_YELL(...)
