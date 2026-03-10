@@ -18,6 +18,7 @@ KRT_CurrentRaid                         = KRT_CurrentRaid or nil
 KRT_LastBoss                            = KRT_LastBoss or nil
 KRT_NextReset                           = KRT_NextReset or 0
 KRT_SavedReserves                       = KRT_SavedReserves or {}
+KRT_PlayerCounts                        = KRT_PlayerCounts or {}
 
 -- AddOn main frames:
 local mainFrame                         = CreateFrame("Frame")
@@ -32,7 +33,7 @@ local unitName                          = UnitName("player")
 local trader, winner
 local holder, banker, disenchanter
 local lootOpened                        = false
-local rollTypes                         = { MAINSPEC = 1, OFFSPEC = 2, RESERVED = 3, FREE = 4, BANK = 5, DISENCHANT = 6, HOLD = 7, DKP = 8 }
+local rollTypes                         = { mainspec = 1, offspec = 2, reserved = 3, free = 4, bank = 5, disenchant = 6, hold = 7, dkp = 8 }
 local currentRollType                   = 4
 local currentRollItem                   = 0
 local fromInventory                     = false
@@ -393,24 +394,25 @@ do
 				local raceL, race = UnitRace(unitID)
 				if not inRaid then
 					local toRaid = {
-						name = name,
-						rank = rank,
+						name     = name,
+						rank     = rank,
 						subgroup = subgroup,
-						class = class or "UNKNOWN",
-						join = Utils.GetCurrentTime(),
-						leave = nil
+						class    = class or "UNKNOWN",
+						join     = Utils.GetCurrentTime(),
+						leave    = nil,
+						count    = 0, -- <--- Inizializza count!
 					}
 					Raid:AddPlayer(toRaid)
 				end
 				if not KRT_Players[realm][name] then
 					KRT_Players[realm][name] = {
-						name = name,
-						level = level,
-						race = race,
-						raceL = raceL,
-						class = class or "UNKNOWN",
+						name   = name,
+						level  = level,
+						race   = race,
+						raceL  = raceL,
+						class  = class or "UNKNOWN",
 						classL = classL,
-						sex = UnitSex(unitID)
+						sex    = UnitSex(unitID)
 					}
 				end
 			end
@@ -441,14 +443,14 @@ do
 		KRT_Players[realm] = KRT_Players[realm] or {}
 		local currentTime = Utils.GetCurrentTime()
 		local raidInfo = {
-			realm = realm,
-			zone = zoneName,
-			size = raidSize,
-			players = {},
+			realm     = realm,
+			zone      = zoneName,
+			size      = raidSize,
+			players   = {},
 			bossKills = {},
-			loot = {},
+			loot      = {},
 			startTime = currentTime,
-			changes = {},
+			changes   = {},
 		}
 		for i = 1, numRaid do
 			local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
@@ -462,6 +464,7 @@ do
 					class    = class or "UNKNOWN",
 					join     = Utils.GetCurrentTime(),
 					leave    = nil,
+					count    = 0, -- <--- Inizializza count!
 				})
 				KRT_Players[realm][name] = {
 					name   = name,
@@ -500,7 +503,6 @@ do
 		end
 
 		local current = KRT_Raids[KRT_CurrentRaid]
-
 		if current then
 			if current.zone == instanceName then
 				if current.size == 10 and (instanceDiff % 2 == 0) then
@@ -525,7 +527,6 @@ do
 		Utils.unschedule(addon.Raid.FirstCheck)
 		if GetNumRaidMembers() == 0 then return end
 
-		-- We are in a raid? We update roster
 		if KRT_CurrentRaid and Raid:CheckPlayer(unitName, KRT_CurrentRaid) then
 			Utils.schedule(2, addon.UpdateRaidRoster)
 			return
@@ -541,20 +542,20 @@ do
 	-- Add a player to the raid:
 	function Raid:AddPlayer(t, raidNum)
 		raidNum = raidNum or KRT_CurrentRaid
-		-- We must check if the players existed or not
 		if not raidNum or not t or not t.name then return end
 		local players = Raid:GetPlayers(raidNum)
 		local found = false
 		for i, p in ipairs(players) do
-			-- If found, we simply updated the table:
 			if t.name == p.name then
+				-- Preserve count if present
+				t.count = t.count or p.count or 0
 				KRT_Raids[raidNum].players[i] = t
 				found = true
 				break
 			end
 		end
-		-- If the players wasn't in the raid, we add him/her:
 		if not found then
+			t.count = t.count or 0
 			tinsert(KRT_Raids[raidNum].players, t)
 		end
 	end
@@ -643,6 +644,64 @@ do
 		}
 		tinsert(KRT_Raids[KRT_CurrentRaid].loot, lootInfo)
 	end
+
+	----------------------
+	-- Player Count API  --
+	----------------------
+
+	function Raid:GetPlayerCount(name, raidNum)
+		raidNum = raidNum or KRT_CurrentRaid
+		local players = Raid:GetPlayers(raidNum)
+		for i, p in ipairs(players) do
+			if p.name == name then
+				return p.count or 0
+			end
+		end
+		return 0
+	end
+
+        function Raid:SetPlayerCount(name, value, raidNum)
+                raidNum = raidNum or KRT_CurrentRaid
+
+                -- Prevent setting a negative count
+                if value < 0 then
+                        addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
+                        return
+                end
+
+                local players = KRT_Raids[raidNum] and KRT_Raids[raidNum].players
+                if not players then return end
+                for i, p in ipairs(players) do
+                        if p.name == name then
+                                p.count = value
+                                return
+                        end
+                end
+        end
+
+        function Raid:IncrementPlayerCount(name, raidNum)
+                if Raid:GetPlayerID(name, raidNum) == 0 then
+                        addon:PrintError(L.ErrCannotFindPlayer:format(name))
+                        return
+                end
+
+                local c = Raid:GetPlayerCount(name, raidNum)
+                Raid:SetPlayerCount(name, c + 1, raidNum)
+        end
+
+        function Raid:DecrementPlayerCount(name, raidNum)
+                if Raid:GetPlayerID(name, raidNum) == 0 then
+                        addon:PrintError(L.ErrCannotFindPlayer:format(name))
+                        return
+                end
+
+                local c = Raid:GetPlayerCount(name, raidNum)
+                if c <= 0 then
+                        addon:PrintError(L.ErrPlayerCountBelowZero:format(name))
+                        return
+                end
+                Raid:SetPlayerCount(name, c - 1, raidNum)
+        end
 
 	--------------------
 	-- Raid Functions --
@@ -1254,7 +1313,7 @@ do
 		SortRolls()
 		if not selectedPlayer then
 			local resolvedItemId = itemId or addon:GetCurrentRollItemID()
-			if currentRollType == rollTypes.RESERVED then
+			if currentRollType == rollTypes.reserved then
 				local topRoll = -1
 				for _, entry in ipairs(rollsTable) do
 					if addon:IsReserved(resolvedItemId, entry.name) and entry.roll > topRoll then
@@ -1280,7 +1339,7 @@ do
 		local name = UnitName("player")
 		local allowed = 1
 
-		if currentRollType == rollTypes.RESERVED then
+		if currentRollType == rollTypes.reserved then
 			allowed = addon.Reserves:GetReserveCountForItem(itemId, name)
 		end
 
@@ -1331,7 +1390,7 @@ do
 			end
 
 			local allowed = 1
-			if currentRollType == rollTypes.RESERVED then
+			if currentRollType == rollTypes.reserved then
 				local playerReserves = addon.Reserves:GetReserveCountForItem(itemId, player)
 				allowed = playerReserves > 0 and playerReserves or 1
 			end
@@ -1379,7 +1438,7 @@ do
 		end
 		itemRollTracker[itemId] = itemRollTracker[itemId] or {}
 		local used = itemRollTracker[itemId][name] or 0
-		local allowed = (currentRollType == rollTypes.RESERVED and addon.Reserves:GetReserveCountForItem(itemId, name) > 0)
+		local allowed = (currentRollType == rollTypes.reserved and addon.Reserves:GetReserveCountForItem(itemId, name) > 0)
 			and addon.Reserves:GetReserveCountForItem(itemId, name) or 1
 		local result = used >= allowed
 		addon:Debug("DEBUG", "DidRoll: name=%s, itemId=%d, used=%d, allowed=%d, result=%s", name, itemId, used, allowed,
@@ -1436,7 +1495,7 @@ do
 	function addon:IsValidRoll(itemId, name)
 		itemRollTracker[itemId] = itemRollTracker[itemId] or {}
 		local used = itemRollTracker[itemId][name] or 0
-		local allowed = (currentRollType == rollTypes.RESERVED)
+		local allowed = (currentRollType == rollTypes.reserved)
 			and addon.Reserves:GetReserveCountForItem(itemId, name)
 			or 1
 		local result = used < allowed
@@ -1477,7 +1536,7 @@ do
 		scrollChild:SetWidth(scrollFrame:GetWidth())
 
 		local itemId = self:GetCurrentRollItemID()
-		local isSR = currentRollType == rollTypes.RESERVED
+		local isSR = currentRollType == rollTypes.reserved
 		addon:Debug("DEBUG", "Current itemId: %s, SR mode: %s", tostring(itemId), tostring(isSR))
 
 		local starTarget = selectedPlayer
@@ -1845,7 +1904,7 @@ do
 			local itemID = tonumber(string.match(itemLink or "", "item:(%d+)"))
 			local message = ""
 
-			if rollType == rollTypes.RESERVED and addon.Reserves and addon.Reserves.FormatReservedPlayersLine then
+			if rollType == rollTypes.reserved and addon.Reserves and addon.Reserves.FormatReservedPlayersLine then
 				local srList = addon.Reserves:FormatReservedPlayersLine(itemID)
 				local suff = addon.options.sortAscending and "Low" or "High"
 				message = itemCount > 1
@@ -1920,11 +1979,11 @@ do
 		countdownRun = false
 		local itemLink = GetItemLink()
 		if itemLink == nil then return end
-		currentRollType = rollTypes.HOLD
+		currentRollType = rollTypes.hold
 		if fromInventory == true then
-			return TradeItem(itemLink, holder, rollTypes.HOLD, 0)
+			return TradeItem(itemLink, holder, rollTypes.hold, 0)
 		end
-		return AssignItem(itemLink, holder, rollTypes.HOLD, 0)
+		return AssignItem(itemLink, holder, rollTypes.hold, 0)
 	end
 
 	-- Button: Bank item
@@ -1933,11 +1992,11 @@ do
 		countdownRun = false
 		local itemLink = GetItemLink()
 		if itemLink == nil then return end
-		currentRollType = rollTypes.BANK
+		currentRollType = rollTypes.bank
 		if fromInventory == true then
-			return TradeItem(itemLink, banker, rollTypes.BANK, 0)
+			return TradeItem(itemLink, banker, rollTypes.bank, 0)
 		end
-		return AssignItem(itemLink, banker, rollTypes.BANK, 0)
+		return AssignItem(itemLink, banker, rollTypes.bank, 0)
 	end
 
 	-- Button: Disenchant item
@@ -1946,11 +2005,11 @@ do
 		countdownRun = false
 		local itemLink = GetItemLink()
 		if itemLink == nil then return end
-		currentRollType = rollTypes.DISENCHANT
+		currentRollType = rollTypes.disenchant
 		if fromInventory == true then
-			return TradeItem(itemLink, disenchanter, rollTypes.DISENCHANT, 0)
+			return TradeItem(itemLink, disenchanter, rollTypes.disenchant, 0)
 		end
-		return AssignItem(itemLink, disenchanter, rollTypes.DISENCHANT, 0)
+		return AssignItem(itemLink, disenchanter, rollTypes.disenchant, 0)
 	end
 
 	-- Select winner:
@@ -2339,17 +2398,17 @@ do
 				local output, whisper
 				if rollType <= 4 and addon.options.announceOnWin then
 					output = L.ChatAward:format(playerName, itemLink)
-				elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
+				elseif rollType == rollTypes.hold and addon.options.announceOnHold then
 					output = L.ChatHold:format(playerName, itemLink)
 					if addon.options.lootWhispers then
 						whisper = L.WhisperHoldAssign:format(itemLink)
 					end
-				elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
+				elseif rollType == rollTypes.bank and addon.options.announceOnBank then
 					output = L.ChatBank:format(playerName, itemLink)
 					if addon.options.lootWhispers then
 						whisper = L.WhisperBankAssign:format(itemLink)
 					end
-				elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
+				elseif rollType == rollTypes.disenchant and addon.options.announceOnDisenchant then
 					output = L.ChatDisenchant:format(itemLink, playerName)
 					if addon.options.lootWhispers then
 						whisper = L.WhisperDisenchantAssign:format(itemLink)
@@ -2381,21 +2440,21 @@ do
 		if rollType <= 4 and addon.options.announceOnWin then
 			output = L.ChatAward:format(playerName, itemLink)
 			keep = false
-		elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
+		elseif rollType == rollTypes.hold and addon.options.announceOnHold then
 			output = L.ChatNoneRolledHold:format(itemLink, playerName)
-		elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
+		elseif rollType == rollTypes.bank and addon.options.announceOnBank then
 			output = L.ChatNoneRolledBank:format(itemLink, playerName)
-		elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
+		elseif rollType == rollTypes.disenchant and addon.options.announceOnDisenchant then
 			output = L.ChatNoneRolledDisenchant:format(itemLink, playerName)
 		end
 
 		-- Keeping the item:
 		if keep then
-			if rollType == rollTypes.HOLD then
+			if rollType == rollTypes.hold then
 				whisper = L.WhisperHoldTrade:format(itemLink)
-			elseif rollType == rollTypes.BANK then
+			elseif rollType == rollTypes.bank then
 				whisper = L.WhisperBankTrade:format(itemLink)
-			elseif rollType == rollTypes.DISENCHANT then
+			elseif rollType == rollTypes.disenchant then
 				whisper = L.WhisperDisenchantTrade:format(itemLink)
 			end
 			-- Multiple winners:
@@ -2454,7 +2513,7 @@ do
 					Utils.whisper(playerName, whisper)
 				end
 			end
-			if rollType <= rollTypes.FREE and playerName == trader then
+			if rollType <= rollTypes.free and playerName == trader then
 				addon:Log(currentRollItem, trader, rollType, rollValue)
 			end
 			announced = true
@@ -2469,6 +2528,122 @@ do
 			announced = false
 		end
 	end)
+end
+
+-- ==================== Loot Counter ==================== --
+do
+    local rows = {}
+    local countsFrame, scrollChild
+
+    local function EnsureFrames()
+        countsFrame = countsFrame or _G["KRTLootCounterFrame"]
+        scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
+    end
+
+    local function GetCurrentRaidPlayers()
+        local players = {}
+        for i = 1, GetNumRaidMembers() do
+            local name = GetRaidRosterInfo(i)
+            if name then
+                tinsert(players, name)
+                if KRT_PlayerCounts[name] == nil then
+                    KRT_PlayerCounts[name] = 0
+                end
+            end
+        end
+        return players
+    end
+
+    function addon:ToggleCountsFrame()
+        EnsureFrames()
+        if not countsFrame then return end
+        if countsFrame:IsShown() then
+            countsFrame:Hide()
+        else
+            countsFrame:Show()
+        end
+    end
+
+    function addon:UpdateCountsFrame()
+        EnsureFrames()
+        if not countsFrame then return end
+
+        local players = GetCurrentRaidPlayers()
+        table.sort(players)
+        local num = #players
+
+        local rowH = 25
+        scrollChild:SetHeight(num * rowH)
+
+        for i = 1, num do
+            local name = players[i]
+            local row = rows[i]
+            if not row then
+                row = CreateFrame("Frame", nil, scrollChild)
+                row:SetSize(160, 24)
+                row:SetPoint("TOPLEFT", 0, -(i - 1) * rowH)
+
+                row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
+
+                row.count = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                row.count:SetPoint("LEFT", row.name, "RIGHT", 10, 0)
+
+                row.plus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
+                row.plus:SetSize(22, 22)
+                row.plus:SetText("+")
+                row.plus:SetPoint("LEFT", row.count, "RIGHT", 5, 0)
+
+                row.minus = CreateFrame("Button", nil, row, "KRTButtonTemplate")
+                row.minus:SetSize(22, 22)
+                row.minus:SetText("-")
+                row.minus:SetPoint("LEFT", row.plus, "RIGHT", 2, 0)
+
+                row.plus:SetScript("OnClick", function()
+                    local n = row._playerName
+                    KRT_PlayerCounts[n] = (KRT_PlayerCounts[n] or 0) + 1
+                    addon:UpdateCountsFrame()
+                end)
+                row.minus:SetScript("OnClick", function()
+                    local n = row._playerName
+                    local c = (KRT_PlayerCounts[n] or 0) - 1
+                    if c < 0 then c = 0 end
+                    KRT_PlayerCounts[n] = c
+                    addon:UpdateCountsFrame()
+                end)
+
+                rows[i] = row
+            end
+
+            row._playerName = name
+            row.name:SetText(name)
+            row.count:SetText(tostring(KRT_PlayerCounts[name] or 0))
+            row:Show()
+        end
+
+        for i = num + 1, #rows do
+            rows[i]:Hide()
+        end
+    end
+
+    local function SetupMasterLootFrameHooks()
+        local f = _G["KRTMasterLootFrame"]
+        if f and not f.KRT_LootCounterBtn then
+            local btn = CreateFrame("Button", nil, f, "KRTButtonTemplate")
+            btn:SetSize(100, 24)
+            btn:SetText("Loot Counter")
+            btn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -20, -20)
+            btn:SetScript("OnClick", function()
+                addon:ToggleCountsFrame()
+            end)
+            f.KRT_LootCounterBtn = btn
+
+            f:HookScript("OnHide", function()
+                if countsFrame and countsFrame:IsShown() then countsFrame:Hide() end
+            end)
+        end
+    end
+    hooksecurefunc(addon.Master, "OnLoad", SetupMasterLootFrameHooks)
 end
 
 -- ==================== Raid Helper Reserves ==================== --
@@ -5807,8 +5982,13 @@ do
 	end
 
 	-- Register slash commands
-	SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
-	SlashCmdList["KRT"] = HandleSlashCmd
+        SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
+        SlashCmdList["KRT"] = HandleSlashCmd
+
+        SLASH_KRTCOUNTS1 = "/krtcounts"
+        SlashCmdList["KRTCOUNTS"] = function()
+                addon:ToggleCountsFrame()
+        end
 end
 
 -- ==================== What else to do? ==================== --

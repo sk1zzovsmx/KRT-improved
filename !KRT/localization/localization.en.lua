@@ -93,6 +93,7 @@ L.ErrScreenReminder        = "Please take a screenshot before trading, you never
 L.ErrItemStack             = "You have a stack of %s, you may want to split it first"
 L.ErrCannotFindItem        = "Cannot find item: %s"
 L.ErrCannotFindPlayer      = "Cannot find player: %s"
+L.ErrPlayerCountBelowZero  = "Cannot decrement player count below zero for %s"
 
 -- ==================== Configuration Frame ==================== --
 L.StrConfigSortAscending        = "Sort rolls ascending"
