@@ -32,20 +32,6 @@ local UnitIsRaidOfficer    = UnitIsRaidOfficer
 local UnitLevel            = UnitLevel
 local UnitName             = UnitName
 
----============================================================================
--- Addon binding helpers
----============================================================================
-
-function addon:GetLib(name)
-	if not LibStub then
-		error("LibStub missing while loading " .. tostring(name))
-	end
-	if not name or name == "" then
-		error("GetLib requires a library name")
-	end
-	return LibStub(name)
-end
-
 function Utils.applyDebugSetting(enabled)
 	if addon and addon.options then
 		addon.options.debug = enabled and true or false
@@ -435,13 +421,9 @@ function Utils.normalizeHexColor(color)
 	return "ffffffff"
 end
 
-function addon.GetClassColor(name)
-	name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
-	local c = addon.Compat.GetClassColorObj(name)
-	if not c then
-		return 1, 1, 1
-	end
-	return c.r, c.g, c.b
+function Utils.getClassColor(className)
+	local c = addon.Compat.GetClassColorObj(className)
+	return (c and c.r or 1), (c and c.g or 1), (c and c.b or 1)
 end
 
 ---============================================================================
@@ -495,10 +477,6 @@ function Utils.showHide(frame, cond)
 	elseif not cond and frame:IsShown() then
 		frame:Hide()
 	end
-end
-
-function Utils.createPool(frameType, parent, template, resetter)
-	return addon.CreateFramePool(frameType, parent, template, resetter)
 end
 
 -- Lock/Unlock Highlight:
@@ -682,13 +660,6 @@ do
 	local date        = _G.date
 	local math_max    = math.max
 
-	if Utils and not Utils.Table then
-		Utils.Table = {}
-		function Utils.Table.get(_) return {} end
-
-		function Utils.Table.free(_, _) end
-	end
-
 	function Utils.makeListController(cfg)
 		local self = {
 			frameName  = nil,
@@ -766,7 +737,7 @@ do
 			if not self._active or not self.frameName then return end
 
 			if self._dirty then
-				local tableFree = (addon.Table and addon.Table.free) or (Utils.Table and Utils.Table.free)
+				local tableFree = addon.Table and addon.Table.free
 				if cfg.poolTag and tableFree then
 					for i = 1, #self.data do
 						tableFree(cfg.poolTag, self.data[i])
