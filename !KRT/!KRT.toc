@@ -15,8 +15,7 @@
 ## X-Localizations: Kader (frFR)
 
 # Libraries:
-Libs\LibStub.lua
-Libs\LibDeformat-3.0.lua
+Libs\\libs.xml
 
 # Localization (moved to the top for 'L' to be available):
 Localization\localization.en.lua
@@ -25,10 +24,9 @@ Localization\localization.en.lua
 Templates.xml
 
 # Utilities & Core Files:
-modules\Utils.lua
+Modules\Utils.lua
 KRT.lua
 KRT.xml
 
 # Modules
-modules\ignoredItems.lua
-modules\bossList.lua
+Modules\ignoredItems.lua

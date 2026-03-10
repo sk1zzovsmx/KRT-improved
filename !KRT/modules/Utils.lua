@@ -1,17 +1,57 @@
 local addonName, addon = ...
-addon.Utils = {}
+addon.Utils = addon.Utils or {}
 
-local Utils = addon.Utils
+local Utils   = addon.Utils
+local L       = addon.L
+local Compat  = addon.Compat
+
 local type, ipairs, pairs = type, ipairs, pairs
-local floor, random = math.floor, math.random
+local floor, random, round = math.floor, math.random, math.round
 local setmetatable, getmetatable = setmetatable, getmetatable
 local tinsert, tremove, twipe = table.insert, table.remove, table.wipe
 local find, match = string.find, string.match
 local format, gsub = string.format, string.gsub
 local strsub, strlen = string.sub, string.len
 local lower, upper = string.lower, string.upper
-local select = select
+local select, unpack = select, unpack
 local GetLocale = GetLocale
+
+-- ============================================================================
+-- Callback utilities
+-- ============================================================================
+
+local callbacks = {}
+
+function Utils.RegisterCallback(e, func)
+        if not e or type(func) ~= "function" then
+                error(L.StrCbErrUsage)
+        end
+        callbacks[e] = callbacks[e] or {}
+        tinsert(callbacks[e], func)
+        return #callbacks
+end
+
+function Utils.TriggerEvent(e, ...)
+        if not callbacks[e] then return end
+        for i, v in ipairs(callbacks[e]) do
+                local ok, err = pcall(v, e, ...)
+                if not ok then
+                        addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
+                end
+        end
+end
+
+-- ============================================================================
+-- Frame helpers
+-- ============================================================================
+
+function Utils.GetFrameName()
+        local name
+        if addon.UIMaster ~= nil then
+                name = addon.UIMaster:GetName()
+        end
+        return name
+end
 
 -- Shuffle a table:
 _G.table.shuffle = function(t)
@@ -37,16 +77,16 @@ end
 -- DeepCopy:
 _G.table.deepCopy = function(t)
 	if type(t) ~= "table" then return t end
-    local mt = getmetatable(t)
-    local res = {}
-    for k, v in pairs(t) do
-        if type(v) == "table" then
-            v = _G.table.deepCopy(v)
-        end
-        res[k] = v
-    end
-    setmetatable(res, mt)
-    return res
+	local mt = getmetatable(t)
+	local res = {}
+	for k, v in pairs(t) do
+		if type(v) == "table" then
+			v = _G.table.deepCopy(v)
+		end
+		res[k] = v
+	end
+	setmetatable(res, mt)
+	return res
 end
 
 -- Reverse table:
@@ -76,15 +116,45 @@ end
 
 -- Uppercase first:
 _G.string.ucfirst = function(str)
-	str = lower(str)
-	return gsub(str, "%a", upper, 1)
+        str = lower(str)
+        return gsub(str, "%a", upper, 1)
+end
+
+-- ============================================================================
+-- Color utilities
+-- ============================================================================
+
+function Utils.RGBToHex(r, g, b)
+        if r and g and b and r <= 1 and g <= 1 and b <= 1 then
+                r, g, b = r * 255, g * 255, b * 255
+        end
+        if Compat and Compat.RGBToHex then
+                return Compat.RGBToHex(r, g, b)
+        end
+        return format("%02x%02x%02x", r, g, b)
+end
+
+function Utils.WrapTextInColorCode(text, colorHexString)
+        if Compat and Compat.WrapTextInColorCode then
+                return Compat.WrapTextInColorCode(text, colorHexString)
+        end
+        return ("|c%s%s|r"):format(colorHexString, text)
+end
+
+function Utils.GetClassColor(name)
+        name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
+        local c = Compat and Compat.GetClassColorObj and Compat.GetClassColorObj(name)
+        if not c then
+                return 1, 1, 1
+        end
+        return c.r, c.g, c.b
 end
 
 -- Determines if a given string is a number
 function Utils.isNumber(str)
-	local valid = false
-	if str then
-		valid = find(str, "^(%d+%.?%d*)$")
+        local valid = false
+        if str then
+                valid = find(str, "^(%d+%.?%d*)$")
 	end
 	return valid
 end
@@ -92,30 +162,6 @@ end
 -- Determines if the given string is non-empty:
 function Utils.isString(str)
 	return (str and strlen(str) > 0)
-end
-
--- Math Clamp
-_G.math.clamp = function(val, min, max)
-	if val and val <= min then
-		return min
-	elseif val and val >= max then
-		return max
-	end
-	return val
-end
-
--- math.round
-_G.math.round = function(num, idp)
-	if idp and idp > 0 then
-		local mult = 10^idp
-		return floor(num * mult + 0.5) / mult
-	end
-	return floor(num + 0.5)
-end
-
--- RBG to Hex:
-function Utils.rgb2hex(r, g, b)
-	return format("%02x%02x%02x", r * 255, g * 255, b * 255)
 end
 
 -- Enable/Disable Frame:
@@ -142,13 +188,19 @@ end
 
 -- Conditional Show/Hide Frame:
 function Utils.showHide(frame, cond)
-	if frame == nil then
-		return
-	elseif cond and not frame:IsShown() then
-		frame:Show()
-	elseif not cond and frame:IsShown() then
-		frame:Hide()
-	end
+        if frame == nil then
+                return
+        elseif cond and not frame:IsShown() then
+                frame:Show()
+        elseif not cond and frame:IsShown() then
+                frame:Hide()
+        end
+end
+
+function Utils.CreatePool(frameType, parent, template, resetter)
+        if Compat and Compat.CreateFramePool then
+                return Compat.CreateFramePool(frameType, parent, template, resetter)
+        end
 end
 
 -- Lock/Unlock Highlight:
@@ -182,51 +234,58 @@ end
 -- Tasks Manager --
 -------------------
 do
-	-- Table of scheduled tasks:
-	local tasks = {}
+    local scheduled = {}
 
-	-- Schedule a task:
-	function Utils.schedule(sec, func, ...)
-		local task = {}
-		task.time = time() + sec
-		task.func = func
-		for i = 1, select("#", ...) do
-			task[i] = select(i, ...)
-		end
-		tasks[#tasks+1] = task
-		tinsert(tasks, task)
-	end
+    function Utils.schedule(sec, func, ...)
+        if type(func) ~= "function" then return end
+        local args = { ... }
+        if addon.After then
+            local handle
+            handle = addon.After(sec, function()
+                scheduled[func] = nil
+                func(unpack(args))
+            end)
+            scheduled[func] = handle
+            return handle
+        else
+            func(unpack(args))
+        end
+    end
 
-	-- Unschedule a task:
-	function Utils.unschedule(func)
-		for i, v in pairs(tasks) do
-			if func == v.func then
-				tremove(tasks, i)
-				break
-			end
-		end
-	end
+    function Utils.periodic(sec, func, ...)
+        if type(func) ~= "function" then return end
+        local args = { ... }
+        local function wrapper()
+            func(unpack(args))
+            if addon.After then
+                scheduled[func] = addon.After(sec, wrapper)
+            end
+        end
+        return Utils.schedule(sec, wrapper)
+    end
 
-	-- Run all scheduled tasks:
-	function Utils.run()
-		local now = time()
-		for i = 1, #tasks do
-			local task = tasks[i]
-			if task and type(task.func) == "function" and task.time <= now then
-				task.func(unpack(task))
-				tremove(tasks, i) -- Only once!
-			end
-		end
-	end
+    function Utils.unschedule(func)
+        local handle = scheduled[func]
+        if handle and handle.Cancel then
+            handle:Cancel()
+        elseif handle and addon.CancelTimer then
+            addon.CancelTimer(handle, true)
+        end
+        scheduled[func] = nil
+    end
+
+    function Utils.run(func, ...)
+        return Utils.schedule(0, func, ...)
+    end
 end
 
--- Periodic frame update:
-function Utils.periodic(frame, name, period, elapsed)
-	local t = frame[name] or 0
-	t = t + elapsed
-	if t > period then
-		frame[name] = 0
-		return true
+-- Throttle frame OnUpdate:
+function Utils.throttle(frame, name, period, elapsed)
+        local t = frame[name] or 0
+        t = t + elapsed
+        if t > period then
+                frame[name] = 0
+                return true
 	end
 	frame[name] = t
 	return false
@@ -272,6 +331,7 @@ end
 function Utils.bool2str(bool)
 	return bool and "true" or "false"
 end
+
 function Utils.str2bool(str)
 	return (str ~= "false")
 end
@@ -280,6 +340,7 @@ end
 function Utils.bool2num(bool)
 	return bool and 1 or 0
 end
+
 function Utils.num2bool(num)
 	return (num ~= 0)
 end
@@ -294,95 +355,24 @@ function Utils.sec2clock(seconds)
 	hours = format("%02.f", floor(sec / 3600))
 	mins  = format("%02.f", floor(sec / 60 - (hours * 60)))
 	secs  = format("%02.f", floor(sec - hours * 3600 - mins * 60))
-	return hours..":"..mins..":"..secs
-end
-
--- Messages functions:
-do
-	local CHAT_FRAME = DEFAULT_CHAT_FRAME
-	function Utils._print(opt, ...)
-		if not CHAT_FRAME then return end
-		local msg, num = "", select("#", ...)
-		for i = 1, num do
-			local m
-			local v = select(i, ...)
-			if type(v) == "boolean" then
-				m = Utils.bool2str(v)
-			elseif type(v) == "table" then
-				m ="<table>"
-			elseif type(v) == "function" then
-				m ="<function>"
-			elseif v == nil then
-				m ="<nil>"
-			else
-				m = v
-			end
-			msg = msg.." "..m
-		end
-		if opt.str then
-			return msg
-		elseif opt.r ~= nil then
-			CHAT_FRAME:AddMessage(msg, opt.r, opt.g, opt.b)
-		else
-			CHAT_FRAME:AddMessage(msg)
-		end
-	end
-
-	function Utils.print(...)
-		local opt = {}
-		return Utils._print(opt, ...)
-	end
-
-	function Utils.print_str(...)
-		local opt = {}
-		opt.str = true
-		return Utils._print(opt, ...)
-	end
-
-	function Utils.print_color(r, g, b, ...)
-		local opt = { r = r, g = g, b = b }
-		return print(opt, ...)
-	end
-
-	function Utils.print_gold(...)
-		return Utils.print_color(1.00, 0.82, 0.00, ...)
-	end
-	function Utils.print_gray(...)
-		return Utils.print_color(0.50, 0.50, 0.50, ...)
-	end
-	function Utils.print_orange(...)
-		return Utils.print_color(1.00, 0.49, 0.24, ...)
-	end
-	function Utils.print_red(...)
-		return Utils.print_color(1.00, 0.12, 0.12, ...)
-	end
-	function Utils.print_yellow(...)
-		return Utils.print_color(1.00, 1.00, 0.00, ...)
-	end
-	function Utils.print_white(...)
-		return Utils.print_color(1.00, 1.00, 1.00, ...)
-	end
-	function Utils.print_green(...)
-		return Utils.print_color(0.12, 1.00, 0.12, ...)
-	end
-	function Utils.print_blue(...)
-		return Utils.print_color(0.00, 0.44, 0.87, ...)
-	end
-	function Utils.print_purple(...)
-		return Utils.print_color(0.64, 0.21, 0.93, ...)
-	end
+	return hours .. ":" .. mins .. ":" .. secs
 end
 
 -- Sends an addOn message to the appropriate channel:
 function Utils.sync(prefix, msg)
-	local zone = select(2, IsInInstance())
-	if zone == "pvp" or zone == "arena" then
-		SendAddonMessage(prefix, msg, "BATTLEGROUND")
-	elseif GetRealNumRaidMembers() > 0 then
-		SendAddonMessage(prefix, msg, "RAID")
-	elseif GetRealNumPartyMembers() > 0 then
-		SendAddonMessage(prefix, msg, "PARTY")
-	end
+        local zone = select(2, IsInInstance())
+        if zone == "pvp" or zone == "arena" then
+                SendAddonMessage(prefix, msg, "BATTLEGROUND")
+        elseif GetRealNumRaidMembers() > 0 then
+                SendAddonMessage(prefix, msg, "RAID")
+        elseif GetRealNumPartyMembers() > 0 then
+                SendAddonMessage(prefix, msg, "PARTY")
+        end
+end
+
+function Utils.chat(msg, channel, language, target)
+        if not msg then return end
+        SendChatMessage(tostring(msg), channel, language, target)
 end
 
 -- Send a whisper to a player by his/her character name or BNet ID
@@ -400,6 +390,7 @@ function Utils.whisper(target, msg)
 		return true
 	end
 end
+
 -- local BNSendWhisper = Utils.whisper --
 
 -- Returns the current UTC date and time in seconds:
@@ -407,6 +398,7 @@ function Utils.getUTCTimestamp()
 	local utcDateTime = date("!*t")
 	return time(utcDateTime)
 end
+
 function Utils.getSecondsAsString(t)
 	local str = "00:00:00"
 	local sec
@@ -438,10 +430,10 @@ end
 
 -- Returns the NPCID or nil:
 function Utils.GetNPCID(GUID)
-	local first3 = tonumber("0x"..strsub(GUID, 3, 5))
+	local first3 = tonumber("0x" .. strsub(GUID, 3, 5))
 	local unitType = bit.band(first3, 0x007)
 	if ((unitType == 0x003) or (unitType == 0x005)) then
-		return tonumber("0x"..strsub(GUID, 9, 12))
+		return tonumber("0x" .. strsub(GUID, 9, 12))
 	end
 	return nil
 end
@@ -453,7 +445,7 @@ function Utils.GetCurrentTime(server)
 	if server == true then
 		local _, month, day, year = CalendarGetDate()
 		local hour, minute = GetGameTime()
-		t = time({year = year, month = month, day = day, hour = hour, min = minute})
+		t = time({ year = year, month = month, day = day, hour = hour, min = minute })
 	end
 	return t
 end
@@ -473,7 +465,7 @@ function Utils.GetServerOffset()
 	return offset
 end
 
---[==[ Base64 encode/decode ]==]--
+--[==[ Base64 encode/decode ]==] --
 do
 	-- Characters table string:
 	local char, byte = string.char, string.byte
@@ -481,39 +473,39 @@ do
 
 	-- Encoding:
 	function Utils.encode(data)
-	    return ((gsub(data, ".", function(x)
-	        local r, b = "", byte(x)
-	        for i = 8, 1, -1 do
-			r = r..(b%2^i-b%2^(i-1)>0 and "1" or "0")
-	        end
-	        return r
-	    end).."0000"):gsub("%d%d%d?%d?%d?%d?", function(x)
-	        if #x < 6 then return "" end
-	        local c = 0
-	        for i = 1, 6 do
-				c = c + (strsub(x, i, i) == "1" and 2^(6-i) or 0)
-	        end
-	        return strsub(b, c+1, c+1)
-	    end)..({"", "==", "="})[#data%3+1])
+		return ((gsub(data, ".", function(x)
+			local r, b = "", byte(x)
+			for i = 8, 1, -1 do
+				r = r .. (b % 2 ^ i - b % 2 ^ (i - 1) > 0 and "1" or "0")
+			end
+			return r
+		end) .. "0000"):gsub("%d%d%d?%d?%d?%d?", function(x)
+			if #x < 6 then return "" end
+			local c = 0
+			for i = 1, 6 do
+				c = c + (strsub(x, i, i) == "1" and 2 ^ (6 - i) or 0)
+			end
+			return strsub(b, c + 1, c + 1)
+		end) .. ({ "", "==", "=" })[#data % 3 + 1])
 	end
 
 	-- Decoding:
 	function Utils.decode(data)
-	    data = gsub(data, "[^"..b.."=]", '')
-	    return (gsub(data, ".", function(x)
-	        if x == "=" then return "" end
-	        local r, f = "", (find(b, x) - 1)
-	        for i = 6, 1, -1 do
-				r = r..(f%2^i-f%2^(i-1) > 0 and "1" or "0")
-	        end
-	        return r
-	    end):gsub("%d%d%d?%d?%d?%d?%d?%d?", function(x)
-	        if #x ~= 8 then return "" end
-	        local c = 0
-	        for i = 1, 8 do
-				c = c + (strsub(x, i, i) == "1" and 2^(8-i) or 0)
-	        end
-	        return char(c)
-	    end))
+		data = gsub(data, "[^" .. b .. "=]", '')
+		return (gsub(data, ".", function(x)
+			if x == "=" then return "" end
+			local r, f = "", (find(b, x) - 1)
+			for i = 6, 1, -1 do
+				r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and "1" or "0")
+			end
+			return r
+		end):gsub("%d%d%d?%d?%d?%d?%d?%d?", function(x)
+			if #x ~= 8 then return "" end
+			local c = 0
+			for i = 1, 8 do
+				c = c + (strsub(x, i, i) == "1" and 2 ^ (8 - i) or 0)
+			end
+			return char(c)
+		end))
 	end
 end

@@ -1,0 +1,40 @@
+2010-11-18  Humbedooh  <Humbedooh>
+
+[bdc96939cdbf] [tip]
+* LibMath.lua:
+
+adding missing type conversion to math.real
+
+
+[87870bc40fc5]
+* LibMath.lua:
+
+Added math.real
+
+
+[e36d841625b0]
+* LibMath.lua:
+
+Just some finishing touches.
+
+
+[c0ec9ddeebca]
+* .hgignore, LibMath.lua:
+
+Updating documentation
+
+
+[2a39f7e6fa26]
+* LibMath.lua:
+
+Updating documentation.
+
+
+2010-11-17  Humbedooh  <Humbedooh>
+
+[000eca5cdc94]
+* .docmeta, .pkgmeta, LibMath.lua, LibMath.toc:
+
+Initial commit - here's hoping the documentor works.
+
+
