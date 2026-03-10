@@ -7,10 +7,10 @@ local rawset                           = rawset
 -- Define L *once* with the metatable and assign it directly to addon.L
 addon.L                                = addon.L or {} -- Ensure addon.L exists before setting metatable
 addon.L                                = setmetatable(addon.L, {
-	__index = function(self, k)
-		if k ~= nil then rawset(self, k, tostring(k)) end
-		return tostring(k)
-	end
+    __index = function(self, k)
+        if k ~= nil then rawset(self, k, tostring(k)) end
+        return tostring(k)
+    end
 })
 local L                                = addon.L -- Make a local reference for convenience within this file
 
@@ -359,63 +359,63 @@ L.LFM_TEMPLATE                         = "[KRT] LFM: {raid} {roles} {time}"
 
 -- ==================== Raid & Loot Locales ==================== --
 L.ItemValues                           = {
-	[1] = "Poor",
-	[2] = "Common",
-	[3] = "Uncommon",
-	[4] = "Rare",
-	[5] = "Epic",
-	[6] = "Legendary",
-	[7] = "Artifact",
+    [1] = "Poor",
+    [2] = "Common",
+    [3] = "Uncommon",
+    [4] = "Rare",
+    [5] = "Epic",
+    [6] = "Legendary",
+    [7] = "Artifact",
 }
 L.RaidZones                            = {
-	-- The Burning Crusade
-	["Karazhan"] = "Karazhan",
-	["Gruul's Lair"] = "Gruul's Lair",
-	["Magtheridon's Lair"] = "Magtheridon's Lair",
-	["Serpentshrine Cavern"] = "Serpentshrine Cavern",
-	["The Eye"] = "The Eye", -- Tempest Keep: The Eye
-	["Battle for Mount Hyjal"] = "Battle for Mount Hyjal",
-	["Black Temple"] = "Black Temple",
-	["Sunwell Plateau"] = "Sunwell Plateau",
-	["Zul'Aman"] = "Zul'Aman",
+    -- The Burning Crusade
+    ["Karazhan"] = "Karazhan",
+    ["Gruul's Lair"] = "Gruul's Lair",
+    ["Magtheridon's Lair"] = "Magtheridon's Lair",
+    ["Serpentshrine Cavern"] = "Serpentshrine Cavern",
+    ["The Eye"] = "The Eye", -- Tempest Keep: The Eye
+    ["Battle for Mount Hyjal"] = "Battle for Mount Hyjal",
+    ["Black Temple"] = "Black Temple",
+    ["Sunwell Plateau"] = "Sunwell Plateau",
+    ["Zul'Aman"] = "Zul'Aman",
 
-	-- Wrath of the Lich King
-	["Naxxramas"] = "Naxxramas",
-	["The Obsidian Sanctum"] = "The Obsidian Sanctum",
-	["The Eye of Eternity"] = "The Eye of Eternity",
-	["Vault of Archavon"] = "Vault of Archavon",
-	["Ulduar"] = "Ulduar",
-	["Onyxia's Lair"] = "Onyxia's Lair",                          -- Note: Onyxia is also present in Classic
-	["Trial of the Crusader"] = "Trial of the Crusader",
-	["Trial of the Grand Crusader"] = "Trial of the Grand Crusader", -- Already present, keeping it
-	["Icecrown Citadel"] = "Icecrown Citadel",
-	["The Ruby Sanctum"] = "The Ruby Sanctum",                    -- Already present, keeping it
+    -- Wrath of the Lich King
+    ["Naxxramas"] = "Naxxramas",
+    ["The Obsidian Sanctum"] = "The Obsidian Sanctum",
+    ["The Eye of Eternity"] = "The Eye of Eternity",
+    ["Vault of Archavon"] = "Vault of Archavon",
+    ["Ulduar"] = "Ulduar",
+    ["Onyxia's Lair"] = "Onyxia's Lair",                          -- Note: Onyxia is also present in Classic
+    ["Trial of the Crusader"] = "Trial of the Crusader",
+    ["Trial of the Grand Crusader"] = "Trial of the Grand Crusader", -- Already present, keeping it
+    ["Icecrown Citadel"] = "Icecrown Citadel",
+    ["The Ruby Sanctum"] = "The Ruby Sanctum",                    -- Already present, keeping it
 }
 -- The reason we are using these is because of the missing
 -- UNIT_DIED event once these bosses are dealt with.
 L.BossYells                            = {
-	-- Naxxramas
-	["I grow tired of these games. Proceed, and I will banish your souls to oblivion!"] = "Four Horsemen",
-	-- Ulduar
-	["You rush headlong into the maw of madness!"] = "Iron Council",                         -- Normalmode - Stormcaller Brundir last
-	["What have you gained from my defeat? You are no less doomed, mortals!"] = "Iron Council", -- Semi-Hardmode - Runemaster Molgeim last
-	-- ["Impossible..."] = MRT_IsInstanceUlduar("Iron Council"),  -- Hardmode - Steelbreaker last  // also yelled by Lich King -> instance check necessary
-	["I... I am released from his grasp... at last."] = "Hodir",
-	["Stay your arms! I yield!"] = "Thorim",
-	["His hold on me dissipates. I can see clearly once more. Thank you, heroes."] = "Freya",
-	["It would appear that I've made a slight miscalculation. I allowed my mind to be corrupted by the fiend in the prison, overriding my primary directive. All systems seem to be functional now. Clear."] =
-	"Mimiron",
-	["I've rearranged the reply code. Your planet will be spared. I cannot be certain of my own calculations anymore."] =
-	"Algalon",
-	-- Trial of the Crusader
-	["A shallow and tragic victory. We are weaker as a whole from the losses suffered today. Who but the Lich King could benefit from such foolishness? Great warriors have lost their lives. And for what? The true threat looms ahead - the Lich King awaits us all in death."] =
-	"Faction Champions",
-	["The Scourge cannot be stopped..."] = "Val'kyr Twins",
-	-- Icecrown Citadel
-	["Don't say I didn't warn ya, scoundrels! Onward, brothers and sisters!"] = "Gunship Battle",                       -- Muradin
-	["The Alliance falter. Onward to the Lich King!"] = "Gunship Battle",                                               -- Saurfang
-	["My queen, they... come."] = "Blood Prince Council",                                                               -- Prince Keleseth
-	["I AM RENEWED! Ysera grant me the favor to lay these foul creatures to rest!"] = "Valithria Dreamwalker",          -- Dreamwalker
-	-- Ruby Sanctum
-	["Relish this victory, mortals, for it will be your last. This world will burn with the master's return!"] = "Halion", -- Halion
+    -- Naxxramas
+    ["I grow tired of these games. Proceed, and I will banish your souls to oblivion!"] = "Four Horsemen",
+    -- Ulduar
+    ["You rush headlong into the maw of madness!"] = "Iron Council",                         -- Normalmode - Stormcaller Brundir last
+    ["What have you gained from my defeat? You are no less doomed, mortals!"] = "Iron Council", -- Semi-Hardmode - Runemaster Molgeim last
+    -- ["Impossible..."] = MRT_IsInstanceUlduar("Iron Council"),  -- Hardmode - Steelbreaker last  // also yelled by Lich King -> instance check necessary
+    ["I... I am released from his grasp... at last."] = "Hodir",
+    ["Stay your arms! I yield!"] = "Thorim",
+    ["His hold on me dissipates. I can see clearly once more. Thank you, heroes."] = "Freya",
+    ["It would appear that I've made a slight miscalculation. I allowed my mind to be corrupted by the fiend in the prison, overriding my primary directive. All systems seem to be functional now. Clear."] =
+    "Mimiron",
+    ["I've rearranged the reply code. Your planet will be spared. I cannot be certain of my own calculations anymore."] =
+    "Algalon",
+    -- Trial of the Crusader
+    ["A shallow and tragic victory. We are weaker as a whole from the losses suffered today. Who but the Lich King could benefit from such foolishness? Great warriors have lost their lives. And for what? The true threat looms ahead - the Lich King awaits us all in death."] =
+    "Faction Champions",
+    ["The Scourge cannot be stopped..."] = "Val'kyr Twins",
+    -- Icecrown Citadel
+    ["Don't say I didn't warn ya, scoundrels! Onward, brothers and sisters!"] = "Gunship Battle",                       -- Muradin
+    ["The Alliance falter. Onward to the Lich King!"] = "Gunship Battle",                                               -- Saurfang
+    ["My queen, they... come."] = "Blood Prince Council",                                                               -- Prince Keleseth
+    ["I AM RENEWED! Ysera grant me the favor to lay these foul creatures to rest!"] = "Valithria Dreamwalker",          -- Dreamwalker
+    -- Ruby Sanctum
+    ["Relish this victory, mortals, for it will be your last. This world will burn with the master's return!"] = "Halion", -- Halion
 }

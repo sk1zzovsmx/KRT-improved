@@ -796,7 +796,7 @@ do
                     if addon.options.showLootCounterDuringMSRoll == true
                         and lootState.currentRollType == rollTypes.MAINSPEC
                     then
-                        local c = addon.Raid:GetPlayerCount(name, KRT_CurrentRaid) or 0
+                        local c = addon.Raid:GetPlayerCount(name, addon.Core.getCurrentRaid()) or 0
                         if c > 0 then
                             counterStr:SetText("+" .. c)
                         else
@@ -860,6 +860,12 @@ do
     end
 
     Utils.registerCallback("ConfigsortAscending", function(_, value)
+        addon.Rolls:FetchRolls()
+    end)
+
+    -- Refresh Master Looter roll list immediately when toggling the MS loot counter column.
+    -- Without this, the user would need to close/reopen the Master frame to see the change.
+    Utils.registerCallback("ConfigshowLootCounterDuringMSRoll", function(_, value)
         addon.Rolls:FetchRolls()
     end)
 end
