@@ -264,24 +264,36 @@ do
 
     -- ----- Logger Functions ----- --
 
+    function module:GetRosterVersion()
+        return rosterVersion
+    end
+
     -- Updates the current raid roster, adding new players and marking those who left.
+    -- Returns true only when roster data actually changed.
     function module:UpdateRaidRoster()
-        rosterVersion = rosterVersion + 1
-        if not KRT_CurrentRaid then return end
+        if not KRT_CurrentRaid then return false end
         -- Cancel any pending roster update timer and clear the handle
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
 
+        local changed = false
+
         if not addon.IsInRaid() then
+            changed = true
             numRaid = 0
             addon:debug(Diag.D.LogRaidLeftGroupEndSession)
             module:End()
-            addon.Master:PrepareDropDowns()
-            return
+            if changed then
+                rosterVersion = rosterVersion + 1
+            end
+            if changed and addon.Master and addon.Master.PrepareDropDowns then
+                addon.Master:PrepareDropDowns()
+            end
+            return changed
         end
 
         local raid = KRT_Raids[KRT_CurrentRaid]
-        if not raid then return end
+        if not raid then return false end
 
         local realm = Utils.getRealmName()
         KRT_Players[realm] = KRT_Players[realm] or {}
@@ -291,17 +303,27 @@ do
         raid.playersByName = raid.playersByName or {}
         local playersByName = raid.playersByName
 
+        local prevNumRaid = numRaid
         local n = GetNumRaidMembers()
 
         -- Keep internal state consistent immediately
         numRaid = n
+        if n ~= prevNumRaid then
+            changed = true
+        end
 
         if n == 0 then
+            changed = true
             module:End()
-            return
+            rosterVersion = rosterVersion + 1
+            if addon.Master and addon.Master.PrepareDropDowns then
+                addon.Master:PrepareDropDowns()
+            end
+            return changed
         end
 
         local seen = {}
+        local now = Utils.getCurrentTime()
 
         for i = 1, n do
             local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
@@ -313,19 +335,30 @@ do
                 local active = player and player.leave == nil
 
                 if not active then
+                    changed = true
                     player = {
                         name     = name,
                         rank     = rank or 0,
                         subgroup = subgroup or 1,
                         class    = class or "UNKNOWN",
-                        join     = Utils.getCurrentTime(),
+                        join     = now,
                         leave    = nil,
                         count    = (player and player.count) or 0,
                     }
                 else
-                    player.rank     = rank or player.rank or 0
-                    player.subgroup = subgroup or player.subgroup or 1
-                    player.class    = class or player.class or "UNKNOWN"
+                    local newRank = rank or player.rank or 0
+                    local newSubgroup = subgroup or player.subgroup or 1
+                    local newClass = class or player.class or "UNKNOWN"
+
+                    if player.rank ~= newRank
+                        or player.subgroup ~= newSubgroup
+                        or player.class ~= newClass then
+                        changed = true
+                    end
+
+                    player.rank = newRank
+                    player.subgroup = newSubgroup
+                    player.class = newClass
                 end
 
                 -- IMPORTANT: ensure raid.players stays consistent even if the array was cleared/edited.
@@ -333,28 +366,51 @@ do
 
                 seen[name] = true
 
-                -- IMPORTANT: overwrite always
-                KRT_Players[realm][name] = {
-                    name   = name,
-                    level  = level or 0,
-                    race   = race,
-                    raceL  = raceL,
-                    class  = class or "UNKNOWN",
-                    classL = classL,
-                    sex    = UnitSex(unitID) or 0,
-                }
+                local known = KRT_Players[realm][name]
+                local newLevel = level or 0
+                local newClass = class or "UNKNOWN"
+                local newSex = UnitSex(unitID) or 0
+                if not known
+                    or known.level ~= newLevel
+                    or known.race ~= race
+                    or known.raceL ~= raceL
+                    or known.class ~= newClass
+                    or known.classL ~= classL
+                    or known.sex ~= newSex then
+                    changed = true
+                end
+
+                -- Keep identity stable to avoid per-update table churn on roster bursts.
+                if not known then
+                    known = {}
+                    KRT_Players[realm][name] = known
+                end
+                known.name = name
+                known.level = newLevel
+                known.race = race
+                known.raceL = raceL
+                known.class = newClass
+                known.classL = classL
+                known.sex = newSex
             end
         end
 
         -- Mark leavers
         for pname, p in pairs(playersByName) do
             if p.leave == nil and not seen[pname] then
-                p.leave = Utils.getCurrentTime()
+                p.leave = now
+                changed = true
             end
         end
 
-        addon:debug(Diag.D.LogRaidRosterUpdate:format(rosterVersion, n))
-        addon.Master:PrepareDropDowns()
+        if changed then
+            rosterVersion = rosterVersion + 1
+            addon:debug(Diag.D.LogRaidRosterUpdate:format(rosterVersion, n))
+            if addon.Master and addon.Master.PrepareDropDowns then
+                addon.Master:PrepareDropDowns()
+            end
+        end
+        return changed
     end
 
     -- Creates a new raid log entry.
@@ -427,6 +483,8 @@ do
 
         tinsert(KRT_Raids, raidInfo)
         KRT_CurrentRaid = #KRT_Raids
+        -- New session context: force version-gated roster consumers (e.g. Master dropdowns) to rebuild.
+        rosterVersion = rosterVersion + 1
 
         addon:info(Diag.I.LogRaidCreated:format(
             KRT_CurrentRaid or -1,
@@ -1449,6 +1507,18 @@ do
     end
     state.itemCounts = newItemCounts and newItemCounts() or {}
 
+    local function getMasterFrame()
+        return (addon.Master and addon.Master.frame) or _G["KRTMaster"]
+    end
+
+    local requestRollsUiRefresh = Utils.makeEventDrivenRefresher(getMasterFrame, function()
+        module:FetchRolls()
+    end)
+
+    local function requestRollsRefresh()
+        requestRollsUiRefresh()
+    end
+
     -- ----- Private helpers ----- --
     local function GetAllowedRolls(itemId, name)
         if not itemId or not name then return 1 end
@@ -1692,7 +1762,7 @@ do
 
         Utils.triggerEvent("AddRoll", name, roll)
         sortRolls(itemId)
-        module:FetchRolls()
+        requestRollsRefresh()
     end
 
     local function resetRolls(rec)
@@ -2536,17 +2606,24 @@ do
         tip:Show()
 
         local num = tip:NumLines()
+        local isSoulbound = false
         for i = num, 1, -1 do
-            local t = _G["KRT_FakeTooltipTextLeft" .. i]:GetText()
-            if addon.Deformat(t, BIND_TRADE_TIME_REMAINING) ~= nil then
-                return false
-            elseif t == ITEM_SOULBOUND then
-                return true
+            local fs = _G["KRT_FakeTooltipTextLeft" .. i]
+            local t = fs and fs:GetText() or nil
+            if t and t ~= "" then
+                -- Fast check first: exact global string compare.
+                if t == ITEM_SOULBOUND then
+                    isSoulbound = true
+                end
+                if addon.Deformat(t, BIND_TRADE_TIME_REMAINING) ~= nil then
+                    tip:Hide()
+                    return false
+                end
             end
         end
 
         tip:Hide()
-        return false
+        return isSoulbound
     end
 end
 
@@ -4020,13 +4097,45 @@ do
             local unit = addon.Raid:GetUnitID(playerName)
             if unit ~= "none" and CheckInteractDistance(unit, 2) == 1 then
                 -- Player is in range for trade
-                local totalCount, bag, slot, slotCount = ScanTradeableInventory(itemLink,
-                    Utils.getItemIdFromLink(itemLink))
+                local totalCount, bag, slot, slotCount
+                local usedFastPath = false
+                local wantedKey = Utils.getItemStringFromLink(itemLink) or itemLink
+                local wantedId = Utils.getItemIdFromLink(itemLink)
+
+                -- Fast-path: reuse the previously selected bag slot when still valid.
+                local cachedBag = tonumber(itemInfo.bagID)
+                local cachedSlot = tonumber(itemInfo.slotID)
+                if cachedBag and cachedSlot then
+                    local cachedLink = GetContainerItemLink(cachedBag, cachedSlot)
+                    if cachedLink then
+                        local cachedKey = Utils.getItemStringFromLink(cachedLink) or cachedLink
+                        local cachedId = Utils.getItemIdFromLink(cachedLink)
+                        local sameItem = (wantedKey and cachedKey == wantedKey)
+                            or (wantedId and cachedId == wantedId)
+                        if sameItem and not ItemIsSoulbound(cachedBag, cachedSlot) then
+                            local _, count = GetContainerItemInfo(cachedBag, cachedSlot)
+                            bag = cachedBag
+                            slot = cachedSlot
+                            slotCount = tonumber(count) or 1
+                            usedFastPath = true
+                        end
+                    end
+                end
+
+                if not (bag and slot) then
+                    totalCount, bag, slot, slotCount = ScanTradeableInventory(itemLink, wantedId)
+                elseif usedFastPath then
+                    if (tonumber(lootState.itemCount) or 1) > 1 then
+                        totalCount = ScanTradeableInventory(itemLink, wantedId)
+                    else
+                        totalCount = tonumber(slotCount) or 1
+                    end
+                end
                 if bag and slot then
                     itemInfo.bagID = bag
                     itemInfo.slotID = slot
                     itemInfo.isStack = (tonumber(slotCount) or 1) > 1
-                    itemInfo.count = totalCount or itemInfo.count
+                    itemInfo.count = tonumber(totalCount) or tonumber(slotCount) or 1
                 else
                     addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemLink)))
                     return false
@@ -4438,6 +4547,30 @@ do
     -- ----- Private helpers ----- --
 
     local playerTextTemp = {}
+
+    local function NormalizeImportMode(mode)
+        return (mode == "plus") and "plus" or "multi"
+    end
+
+    local function ImportModeToOptionValue(mode)
+        return (NormalizeImportMode(mode) == "plus") and 1 or 0
+    end
+
+    local function SetImportMode(mode, syncOptions)
+        local resolved = NormalizeImportMode(mode)
+        importMode = resolved
+
+        if syncOptions ~= false then
+            local value = ImportModeToOptionValue(resolved)
+            addon.options = addon.options or KRT_Options or {}
+            addon.options.srImportMode = value
+            if type(KRT_Options) == "table" then
+                KRT_Options.srImportMode = value
+            end
+        end
+
+        return importMode
+    end
 
     local function MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
         if not itemId then return nil end
@@ -5199,7 +5332,7 @@ do
             local v = addon.options and addon.options.srImportMode
             inferred = (v == 1) and "plus" or "multi"
         end
-        importMode = inferred
+        SetImportMode(inferred, true)
 
         RebuildIndex()
     end
@@ -5400,9 +5533,13 @@ do
     function module:GetImportMode()
         if importMode == nil then
             local v = addon.options and addon.options.srImportMode
-            importMode = (v == 1) and "plus" or "multi"
+            SetImportMode((v == 1) and "plus" or "multi", false)
         end
         return importMode
+    end
+
+    function module:SetImportMode(mode, syncOptions)
+        return SetImportMode(mode, syncOptions)
     end
 
     function module:IsPlusSystem()
@@ -5669,7 +5806,7 @@ do
 
         -- Commit
         reservesData = newReservesData
-        importMode = mode
+        SetImportMode(mode, true)
         self:Save()
 
         local nPlayers = addon.tLength(reservesData)
@@ -6108,9 +6245,16 @@ do
     local MODE_MULTI, MODE_PLUS = 0, 1
 
     local function GetImportModeString()
+        if addon.Reserves and addon.Reserves.GetImportMode then
+            return addon.Reserves:GetImportMode()
+        end
         local v = addon.options and addon.options.srImportMode
         if v == MODE_PLUS then return "plus" end
         return "multi"
+    end
+
+    local function GetImportModeValue()
+        return (GetImportModeString() == "plus") and MODE_PLUS or MODE_MULTI
     end
 
     local function GetModeSlider()
@@ -6118,12 +6262,21 @@ do
     end
 
     function module:SetImportMode(modeValue, suppressSlider)
-        addon.options = addon.options or KRT_Options or {}
-        addon.options.srImportMode = (modeValue == MODE_PLUS) and MODE_PLUS or MODE_MULTI
+        local mode = (modeValue == MODE_PLUS) and "plus" or "multi"
+        if addon.Reserves and addon.Reserves.SetImportMode then
+            addon.Reserves:SetImportMode(mode, true)
+        else
+            addon.options = addon.options or KRT_Options or {}
+            addon.options.srImportMode = (mode == "plus") and MODE_PLUS or MODE_MULTI
+            if type(KRT_Options) == "table" then
+                KRT_Options.srImportMode = addon.options.srImportMode
+            end
+        end
+
         if not suppressSlider then
             local s = GetModeSlider()
             if s and s.SetValue then
-                s:SetValue(addon.options.srImportMode)
+                s:SetValue(GetImportModeValue())
             end
         end
     end
@@ -6141,10 +6294,7 @@ do
         if high then high:SetText(L.StrImportModePlus or "Plus System") end
         if text then text:SetText(L.StrImportModeLabel or "") end
 
-        addon.options = addon.options or KRT_Options or {}
-        local v = addon.options.srImportMode
-        if v ~= MODE_MULTI and v ~= MODE_PLUS then v = MODE_MULTI end
-        slider:SetValue(v)
+        slider:SetValue(GetImportModeValue())
     end
 
     function module:OnModeSliderChanged(slider, value)
@@ -6227,10 +6377,7 @@ do
         LocalizeUIFrame()
         local slider = GetModeSlider()
         if slider and slider.SetValue then
-            addon.options = addon.options or KRT_Options or {}
-            local v = addon.options.srImportMode
-            if v ~= MODE_MULTI and v ~= MODE_PLUS then v = MODE_MULTI end
-            slider:SetValue(v)
+            slider:SetValue(GetImportModeValue())
         end
         local status = _G["KRTImportWindowStatus"]
         if status and (status:GetText() == nil or status:GetText() == "") then
@@ -10417,12 +10564,17 @@ function addon:ADDON_LOADED(name)
         self:RegisterEvent(event)
     end
     addon:debug(Diag.D.LogCoreEventsRegistered:format(addon.tLength(addonEvents)))
-    self:RAID_ROSTER_UPDATE()
+    self:RAID_ROSTER_UPDATE(true)
 end
 
--- RAID_ROSTER_UPDATE: Updates the raid roster when it changes.
-function addon:RAID_ROSTER_UPDATE()
-    addon.Raid:UpdateRaidRoster()
+local rosterUpdateDebounceSeconds = 0.2
+
+local function processRaidRosterUpdate()
+    local changed = addon.Raid:UpdateRaidRoster()
+    if not changed then
+        return
+    end
+
     -- Broadcast a normalized roster-change event for UI modules.
     Utils.triggerEvent("RaidRosterUpdate")
     -- Keep Master Looter UI in sync (event-driven; no polling).
@@ -10456,6 +10608,22 @@ function addon:RAID_ROSTER_UPDATE()
         if log.Loot and log.Loot._ctrl and log.Loot._ctrl.Dirty then
             log.Loot._ctrl:Dirty()
         end
+    end)
+end
+
+-- RAID_ROSTER_UPDATE: Updates the raid roster when it changes.
+function addon:RAID_ROSTER_UPDATE(forceImmediate)
+    addon.CancelTimer(self._raidRosterUpdateHandle, true)
+    self._raidRosterUpdateHandle = nil
+
+    if forceImmediate then
+        processRaidRosterUpdate()
+        return
+    end
+
+    self._raidRosterUpdateHandle = addon.NewTimer(rosterUpdateDebounceSeconds, function()
+        self._raidRosterUpdateHandle = nil
+        processRaidRosterUpdate()
     end)
 end
 
@@ -10503,7 +10671,7 @@ end
 
 -- CHAT_MSG_MONSTER_YELL: Logs a boss kill based on specific boss yells.
 function addon:CHAT_MSG_MONSTER_YELL(...)
-    local text, boss = ...
+    local text = ...
     if L.BossYells[text] and KRT_CurrentRaid then
         addon:trace(Diag.D.LogBossYellMatched:format(tostring(text), tostring(L.BossYells[text])))
         self.Raid:AddBoss(L.BossYells[text])
@@ -10514,10 +10682,13 @@ end
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
     if not KRT_CurrentRaid then return end
 
+    -- Hot-path fast check: inspect the event type before unpacking extra args.
+    local subEvent = select(2, ...)
+    if subEvent ~= "UNIT_DIED" then return end
+
     -- 3.3.5a base params (8):
     -- timestamp, event, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags
-    local _, subEvent, _, _, _, destGUID, destName, destFlags = ...
-    if subEvent ~= "UNIT_DIED" then return end
+    local destGUID, destName, destFlags = select(6, ...)
     if bit.band(destFlags or 0, COMBATLOG_OBJECT_TYPE_PLAYER) ~= 0 then return end
 
     -- LibCompat embeds GetCreatureId with the 3.3.5a GUID parsing rules.
