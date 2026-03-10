@@ -3,20 +3,18 @@ root = true
 [*]
 charset = utf-8
 end_of_line = lf
-trim_trailing_whitespace = true
 insert_final_newline = true
-max_line_length = 120
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+max_line_length = 180
 
-[*.{lua,xml,toc,luacheckrc}]
-indent_style = tab
-tab_width = 4
+[*.yml]
+indent_size = 2
 
-# Librerie vendorizzate: evita di “ripulire” whitespace
+[*.yaml]
+indent_size = 2
+
+# Librerie vendorizzate: evita modifiche inutili
 [Libs/**]
 trim_trailing_whitespace = false
-# (opzionale) se vuoi evitare anche newline aggiunte:
-# insert_final_newline = false
-
-[*.{md,yml,gitattributes,gitignore}]
-indent_style = space
-indent_size = 2
