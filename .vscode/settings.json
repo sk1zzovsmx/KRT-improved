@@ -69,5 +69,19 @@
         "GameTooltip",
         "Minimap",
         "ReloadUI"
-    ]
+    ],
+    "editor.rulers": [
+        80,
+        120
+    ],
+    "editor.wordWrap": "wordWrapColumn",
+    "editor.wordWrapColumn": 120,
+    "editor.renderWhitespace": "boundary",
+    "editor.renderControlCharacters": true,
+    "editor.bracketPairColorization.enabled": true,
+    "editor.guides.bracketPairs": "active",
+    "editor.formatOnSave": true,
+    "files.trimTrailingWhitespace": true,
+    "editor.minimap.enabled": true,
+    "editor.lineNumbers": "on"
 }

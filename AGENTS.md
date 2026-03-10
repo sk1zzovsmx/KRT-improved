@@ -13,7 +13,7 @@ No Ace3 GUI; UI is XML + Lua only. Vendored libs via **LibStub**.
 ---
 
 ## 2) Hard constraints (please keep stable unless explicitly changed)
-- **Client/API:** Wrath of the Lich King **3.3.5a** (Interface **30300**), **Lua 5.1** runtime.
+- **Client/API:** Wrath of the Lich King **3.3.5a** (Interface **30300**) with Blizzard's proprietary WoW API, **Lua 5.1** runtime.
 - **Addon folder name:** `!KRT` (the leading `!` is intentional).
 - **SavedVariables (account):**
   `KRT_Options, KRT_Raids, KRT_Players, KRT_Warnings, KRT_ExportString, KRT_Spammer, KRT_CurrentRaid,`
@@ -243,3 +243,4 @@ https://github.com/gakeez/agents_md_collection/blob/main/examples/lua-programmin
 - _2025-09-07_: Clarified monolithic structure and updated CLI command list.
 - _2025-09-08_: Renamed Logger module to History to avoid conflict with debugging logger.
 - _2025-09-09_: Integrate new template. Removed unused Libs.
+- _2025-09-10_: Clarified proprietary WoW API requirement.

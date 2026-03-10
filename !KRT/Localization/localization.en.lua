@@ -215,9 +215,9 @@ L.StrConfirmDeleteItem            = "Are you sure you want to delete this item f
 L.StrEditItemLooter               = "Change winner"
 L.StrEditItemLooterHelp           = "Enter the name of the winner:"
 L.StrEditItemRollType             = "Change roll type"
-L.StrEditItemRollTypeHelp         = "1=MS, 2=OS, 3=Free, 4=Bank, 5=DE, 6=Hold, 7=DKP"
+L.StrEditItemRollTypeHelp         = "1=MS, 2=OS, 3=Free, 4=Bank, 5=DE, 6=Hold"
 L.StrEditItemRollValue            = "Change roll value"
-L.StrEditItemRollValueHelp        = "Enter the value of the roll or DKP:"
+L.StrEditItemRollValueHelp        = "Enter the value of the roll:"
 
 -- Add/Edit Boss:
 L.StrAddBoss                      = "Add Boss"

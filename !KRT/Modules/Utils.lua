@@ -1,21 +1,20 @@
 local addonName, addon = ...
-addon.Utils = addon.Utils or {}
+addon.Utils            = addon.Utils or {}
 
-local Utils   = addon.Utils
-local L       = addon.L
-local Compat  = addon.Compat
+local Utils            = addon.Utils
+local L                = addon.L
+local LibStub          = _G.LibStub
 
--- Embed LibCompat mixins onto Utils for convenience
-if Compat and Compat.Embed then
-       Compat:Embed(Utils) -- Utils.After, Utils.UnitIterator, Utils.Table, etc.
-end
-
--- Back-compat/lightweight aliases
-Utils.getNpcId = Utils.GetCreatureId -- use LibCompat's creature id extractor
-
--- Uniform color helper
-function Utils.colorText(text, r, g, b)
-       return Utils.WrapTextInColorCode(text, "ff" .. Utils.RGBPercToHex(r or 1, g or 0.82, b or 0))
+-- Library helper: caches LibStub lookups
+function addon:GetLib(name, silent)
+        self.libs = self.libs or {}
+        local cached = self.libs[name]
+        if cached ~= nil then
+                return cached or nil
+        end
+        local lib = LibStub and LibStub(name, silent)
+        self.libs[name] = lib or false
+        return lib
 end
 
 -- Practical helper aliases
@@ -23,10 +22,10 @@ function Utils.after(sec, fn) return Utils.After(sec, fn) end
 
 -- Group/pet iteration in one call
 function Utils.forEachGroupUnit(cb, includePets)
-       local iter, state, index = Utils.UnitIterator(not includePets and true or nil)
-       for unit, owner in iter, state, index do
-               cb(unit, owner)
-       end
+	local iter, state, index = Utils.UnitIterator(not includePets and true or nil)
+	for unit, owner in iter, state, index do
+		cb(unit, owner)
+	end
 end
 
 local type, ipairs, pairs = type, ipairs, pairs
@@ -48,12 +47,12 @@ local GetTime = GetTime
 -- Lightweight throttle (keyed)
 local last = {}
 function Utils.throttleKey(key, sec)
-        local now = GetTime()
-        sec = sec or 1
-        if not last[key] or (now - last[key]) >= sec then
-                last[key] = now
-                return true
-        end
+	local now = GetTime()
+	sec = sec or 1
+	if not last[key] or (now - last[key]) >= sec then
+		last[key] = now
+		return true
+	end
 end
 
 -- ============================================================================
@@ -63,22 +62,22 @@ end
 local callbacks = {}
 
 function Utils.registerCallback(e, func)
-        if not e or type(func) ~= "function" then
-                error(L.StrCbErrUsage)
-        end
-        callbacks[e] = callbacks[e] or {}
-        tinsert(callbacks[e], func)
-        return #callbacks
+	if not e or type(func) ~= "function" then
+		error(L.StrCbErrUsage)
+	end
+	callbacks[e] = callbacks[e] or {}
+	tinsert(callbacks[e], func)
+	return #callbacks
 end
 
 function Utils.triggerEvent(e, ...)
-        if not callbacks[e] then return end
-        for i, v in ipairs(callbacks[e]) do
-                local ok, err = pcall(v, e, ...)
-                if not ok then
-                        addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
-                end
-        end
+	if not callbacks[e] then return end
+	for i, v in ipairs(callbacks[e]) do
+		local ok, err = pcall(v, e, ...)
+		if not ok then
+			addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
+		end
+	end
 end
 
 -- ============================================================================
@@ -86,11 +85,11 @@ end
 -- ============================================================================
 
 function Utils.getFrameName()
-        local name
-        if addon.UIMaster ~= nil then
-                name = addon.UIMaster:GetName()
-        end
-        return name
+	local name
+	if addon.UIMaster ~= nil then
+		name = addon.UIMaster:GetName()
+	end
+	return name
 end
 
 -- Shuffle a table:
@@ -101,32 +100,6 @@ _G.table.shuffle = function(t)
 		t[n], t[k] = t[k], t[n]
 		n = n - 1
 	end
-end
-
--- Fills a table (t1) with missing values from another (t2):
-function Utils.fillTable(t1, t2)
-	for i, v in pairs(t2) do
-		if t1[i] == nil then
-			t1[i] = v
-		elseif type(v) == "table" then
-			Utils.fillTable(v, t2[i])
-		end
-	end
-end
-
--- DeepCopy:
-_G.table.deepCopy = function(t)
-	if type(t) ~= "table" then return t end
-	local mt = getmetatable(t)
-	local res = {}
-	for k, v in pairs(t) do
-		if type(v) == "table" then
-			v = _G.table.deepCopy(v)
-		end
-		res[k] = v
-	end
-	setmetatable(res, mt)
-	return res
 end
 
 -- Reverse table:
@@ -156,8 +129,8 @@ end
 
 -- Uppercase first:
 _G.string.ucfirst = function(str)
-        str = lower(str)
-        return gsub(str, "%a", upper, 1)
+	str = lower(str)
+	return gsub(str, "%a", upper, 1)
 end
 
 -- ============================================================================
@@ -165,29 +138,26 @@ end
 -- ============================================================================
 
 function Utils.rgbToHex(r, g, b)
-        if r and g and b and r <= 1 and g <= 1 and b <= 1 then
-                r, g, b = r * 255, g * 255, b * 255
-        end
-        if Compat and Compat.RGBToHex then
-                return Compat.RGBToHex(r, g, b)
-        end
-        return format("%02x%02x%02x", r, g, b)
+	if r and g and b and r <= 1 and g <= 1 and b <= 1 then
+		r, g, b = r * 255, g * 255, b * 255
+	end
+        return addon.Compat.RGBToHex(r, g, b)
 end
 
-function Utils.getClassColor(name)
-        name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
-        local c = Compat and Compat.GetClassColorObj and Compat.GetClassColorObj(name)
-        if not c then
-                return 1, 1, 1
-        end
-        return c.r, c.g, c.b
+function addon.GetClassColor(name)
+	name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
+        local c = addon.Compat.GetClassColorObj(name)
+	if not c then
+		return 1, 1, 1
+	end
+	return c.r, c.g, c.b
 end
 
 -- Determines if a given string is a number
 function Utils.isNumber(str)
-        local valid = false
-        if str then
-                valid = find(str, "^(%d+%.?%d*)$")
+	local valid = false
+	if str then
+		valid = find(str, "^(%d+%.?%d*)$")
 	end
 	return valid
 end
@@ -221,19 +191,17 @@ end
 
 -- Conditional Show/Hide Frame:
 function Utils.showHide(frame, cond)
-        if frame == nil then
-                return
-        elseif cond and not frame:IsShown() then
-                frame:Show()
-        elseif not cond and frame:IsShown() then
-                frame:Hide()
-        end
+	if frame == nil then
+		return
+	elseif cond and not frame:IsShown() then
+		frame:Show()
+	elseif not cond and frame:IsShown() then
+		frame:Hide()
+	end
 end
 
 function Utils.createPool(frameType, parent, template, resetter)
-        if Compat and Compat.CreateFramePool then
-                return Compat.CreateFramePool(frameType, parent, template, resetter)
-        end
+        return addon.Compat.CreateFramePool(frameType, parent, template, resetter)
 end
 
 -- Lock/Unlock Highlight:
@@ -263,143 +231,16 @@ function Utils.returnIf(cond, a, b)
 	return (cond ~= nil and cond ~= false) and a or b
 end
 
--------------------
--- Tasks Manager --
--------------------
-do
-    local queue, driver = {}, nil
-    local scheduled = {}
-
-    local function step(_, elapsed)
-        for i = #queue, 1, -1 do
-            local job = queue[i]
-            job.t = job.t - elapsed
-            if job.t <= 0 or job.cancelled then
-                tremove(queue, i)
-                if not job.cancelled then
-                    job.func()
-                end
-            end
-        end
-        if #queue == 0 and driver then
-            driver:SetScript("OnUpdate", nil)
-        end
-    end
-
-    function Utils.Schedule(sec, func)
-        if type(func) ~= "function" then return end
-        driver = driver or CreateFrame("Frame")
-        local job = { t = sec or 0, func = func }
-        function job:Cancel()
-            self.cancelled = true
-        end
-        tinsert(queue, job)
-        driver:SetScript("OnUpdate", step)
-        return job
-    end
-
-    function Utils.schedule(sec, func, ...)
-        if type(func) ~= "function" then return end
-        local args = { ... }
-        local function call()
-            scheduled[func] = nil
-            func(unpack(args))
-        end
-        local handle
-        if addon.After then
-            handle = addon.After(sec or 0, call)
-        else
-            handle = Utils.Schedule(sec or 0, call)
-        end
-        scheduled[func] = handle
-        return handle
-    end
-    Utils.scheduleDelay = Utils.schedule
-
-    function Utils.periodic(sec, func, ...)
-        if type(func) ~= "function" then return end
-        local args, alive = { ... }, true
-        local function tick()
-            if not alive then return end
-            func(unpack(args))
-            if addon.After then
-                scheduled[tick] = addon.After(sec, tick)
-            else
-                scheduled[tick] = Utils.Schedule(sec, tick)
-            end
-        end
-        scheduled[tick] = Utils.schedule(sec, tick)
-        return function()
-            alive = false
-            Utils.unschedule(tick)
-        end
-    end
-
-    function Utils.unschedule(func)
-        local handle = scheduled[func] or func
-        if handle and handle.Cancel then
-            handle:Cancel()
-        elseif handle and addon.CancelTimer then
-            addon.CancelTimer(handle, true)
-        end
-        for f, h in pairs(scheduled) do
-            if h == handle or f == func then
-                scheduled[f] = nil
-            end
-        end
-    end
-
-    function Utils.run(func, ...)
-        return Utils.schedule(0, func, ...)
-    end
-end
-
 -- Throttle frame OnUpdate:
 function Utils.throttle(frame, name, period, elapsed)
-        local t = frame[name] or 0
-        t = t + elapsed
-        if t > period then
-                frame[name] = 0
-                return true
+	local t = frame[name] or 0
+	t = t + elapsed
+	if t > period then
+		frame[name] = 0
+		return true
 	end
 	frame[name] = t
 	return false
-end
-
--- Check entry in a table:
-function Utils.checkEntry(t, val)
-	for i, v in ipairs(t) do
-		if v == val then
-			return true
-		end
-	end
-	return false
-end
-
--- Remove all val occurrences from a table:
-function Utils.removeEntry(t, val)
-	local removed = false
-	for i = #t, 1, -1 do
-		if t[i] == val then
-			tremove(t, i)
-			removed = true
-		end
-	end
-	return removed
-end
-
--- Returns the "real" table's length:
-function Utils.tableLen(t)
-	local len = 0
-	for _, _ in pairs(t) do
-		len = len + 1
-	end
-	return len
-end
-
--- Checks if a table is empty
-function Utils.isEmpty(t)
-	return (Utils.tableLen(t) == 0)
 end
 
 -- Boolean <> String conversion:
@@ -422,57 +263,48 @@ end
 
 -- Convert seconds to readable clock string:
 function Utils.sec2clock(seconds)
-        local sec = tonumber(seconds)
-        if sec <= 0 then
-                return "00:00:00"
-        end
-        local h = floor(sec, 3600)
-        local m = floor(sec - h, 60)
-        local s = floor(sec - h - m)
-        return format("%02d:%02d:%02d", h / 3600, m / 60, s)
+	local sec = tonumber(seconds)
+	if sec <= 0 then
+		return "00:00:00"
+	end
+	local h = floor(sec, 3600)
+	local m = floor(sec - h, 60)
+	local s = floor(sec - h - m)
+	return format("%02d:%02d:%02d", h / 3600, m / 60, s)
 end
 
 -- Sends an addOn message to the appropriate channel:
 function Utils.sync(prefix, msg)
-        local zone = select(2, IsInInstance())
-        if zone == "pvp" or zone == "arena" then
-                SendAddonMessage(prefix, msg, "BATTLEGROUND")
-        elseif GetRealNumRaidMembers() > 0 then
-                SendAddonMessage(prefix, msg, "RAID")
-        elseif GetRealNumPartyMembers() > 0 then
-                SendAddonMessage(prefix, msg, "PARTY")
-        end
+	local zone = select(2, IsInInstance())
+	if zone == "pvp" or zone == "arena" then
+		SendAddonMessage(prefix, msg, "BATTLEGROUND")
+	elseif GetRealNumRaidMembers() > 0 then
+		SendAddonMessage(prefix, msg, "RAID")
+	elseif GetRealNumPartyMembers() > 0 then
+		SendAddonMessage(prefix, msg, "PARTY")
+	end
 end
 
 local lastChat = 0
 function Utils.chat(msg, channel, language, target, bypass)
-        if not msg then return end
-        if not bypass then
-                local throttle = addon.options and addon.options.chatThrottle or 0
-                local now = GetTime()
-                if throttle > 0 and (now - lastChat) < throttle then return end
-                lastChat = now
-        end
-        SendChatMessage(tostring(msg), channel, language, target)
+	if not msg then return end
+	if not bypass then
+		local throttle = addon.options and addon.options.chatThrottle or 0
+		local now = GetTime()
+		if throttle > 0 and (now - lastChat) < throttle then return end
+		lastChat = now
+	end
+	SendChatMessage(tostring(msg), channel, language, target)
 end
 
--- Send a whisper to a player by his/her character name or BNet ID
+-- Send a whisper to a player by his/her character name
 -- Returns true if the message was sent, nil otherwise
 function Utils.whisper(target, msg)
-	if type(target) == "number" then
-		-- Make sure to never send BNet whispers to ourselves.
-		if not BNIsSelf(target) then
-			BNSendWhisper(target, msg)
-			return true
-		end
-	elseif type(target) == "string" then
-		-- Unlike above, it is sometimes useful to whisper ourselves.
-		SendChatMessage(msg, "WHISPER", nil, target)
-		return true
-	end
+        if type(target) == "string" and msg then
+                SendChatMessage(msg, "WHISPER", nil, target)
+                return true
+        end
 end
-
--- local BNSendWhisper = Utils.whisper --
 
 -- Returns the current UTC date and time in seconds:
 function Utils.getUTCTimestamp()
@@ -481,7 +313,7 @@ function Utils.getUTCTimestamp()
 end
 
 function Utils.getSecondsAsString(t)
-        return Utils.sec2clock(t)
+	return Utils.sec2clock(t)
 end
 
 -- Determines if the player is in a raid instance
@@ -516,9 +348,9 @@ end
 function Utils.getServerOffset()
 	local sH, sM = GetGameTime()
 	local lH, lM = tonumber(date("%H")), tonumber(date("%M"))
-        local sT = sH + sM / 60
-        local lT = lH + lM / 60
-        local offset = round(sT - lT, 0.5)
+	local sT = sH + sM / 60
+	local lT = lH + lM / 60
+	local offset = round(sT - lT, 0.5)
 	if offset >= 12 then
 		offset = offset - 24
 	elseif offset < -12 then

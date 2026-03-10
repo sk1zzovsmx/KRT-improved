@@ -4,91 +4,103 @@
     - Handles core logic, event registration, and module initialization.
 ]]
 
-local addonName, addon                  = ...
-local L                                 = addon.L
-local Utils                             = addon.Utils
+local addonName, addon  = ...
+local L                 = addon.L
+local Utils             = addon.Utils
+local C                 = addon.C
+local ITEM_LINK_PATTERN = C.ITEM_LINK_PATTERN
+local rollTypes         = C.rollTypes
+local lootTypesText     = C.lootTypesText
+local lootTypesColored  = C.lootTypesColored
+local itemColors        = C.itemColors
+local RAID_TARGET_MARKERS = C.RAID_TARGET_MARKERS
+local K_COLOR           = C.K_COLOR
+local RT_COLOR          = C.RT_COLOR
+local titleString       = C.titleString
 
-local ITEM_LINK_PATTERN =
-    "|?c?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?" ..
-    "(%-?%d*):?(%-?%d*):?(%d*)|?h?%[?([^%[%]]*)%]?|?h?|?r?"
-
-local _G                                = _G
-_G["KRT"]                               = addon
+local _G                = _G
+_G["KRT"]               = addon
 
 ---============================================================================
 -- Saved Variables
 -- These variables are persisted across sessions for the addon.
 ---============================================================================
 
-KRT_Options                             = KRT_Options or {}
-KRT_Raids                               = KRT_Raids or {}
-KRT_Players                             = KRT_Players or {}
-KRT_Warnings                            = KRT_Warnings or {}
-KRT_ExportString                        = KRT_ExportString or "$I,$N,$S,$W,$T,$R,$H:$M,$d/$m/$y"
-KRT_Spammer                             = KRT_Spammer or {}
-KRT_CurrentRaid                         = KRT_CurrentRaid or nil
-KRT_LastBoss                            = KRT_LastBoss or nil
-KRT_NextReset                           = KRT_NextReset or 0
-KRT_SavedReserves                       = KRT_SavedReserves or {}
-KRT_PlayerCounts                        = KRT_PlayerCounts or {}
+KRT_Options             = KRT_Options or {}
+KRT_Raids               = KRT_Raids or {}
+KRT_Players             = KRT_Players or {}
+KRT_Warnings            = KRT_Warnings or {}
+KRT_ExportString        = KRT_ExportString or "$I,$N,$S,$W,$T,$R,$H:$M,$d/$m/$y"
+KRT_Spammer             = KRT_Spammer or {}
+KRT_CurrentRaid         = KRT_CurrentRaid or nil
+KRT_LastBoss            = KRT_LastBoss or nil
+KRT_NextReset           = KRT_NextReset or 0
+KRT_SavedReserves       = KRT_SavedReserves or {}
+KRT_PlayerCounts        = KRT_PlayerCounts or {}
 
 ---============================================================================
 -- External Libraries / Bootstrap
 ---============================================================================
-local LibStub = _G.LibStub
-if LibStub then
-    addon.Compat   = LibStub("LibCompat-1.0",   true)
-    addon.BossIDs  = LibStub("LibBossIDs-1.0",  true)
-    addon.Logger   = LibStub("LibLogger-1.0",   true)
-    addon.Deformat = LibStub("LibDeformat-3.0", true)
-    addon.CallbackHandler = LibStub("CallbackHandler-1.0", true)
+local Compat            = addon:GetLib("LibCompat-1.0")
+addon.Compat            = Compat
+addon.BossIDs           = addon:GetLib("LibBossIDs-1.0", true)
+addon.Logger            = addon:GetLib("LibLogger-1.0", true)
+addon.Deformat          = addon:GetLib("LibDeformat-3.0", true)
+addon.CallbackHandler   = addon:GetLib("CallbackHandler-1.0", true)
 
-    if addon.Compat and addon.Compat.Embed then
-        addon.Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
+if Compat and Compat.Embed then
+    Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
+    if addon.Utils then
+        addon.Utils.After       = addon.After
+        addon.Utils.NewTicker   = addon.NewTicker
+        addon.Utils.CancelTimer = addon.CancelTimer
+        addon.Utils.UnitIterator = addon.UnitIterator
+        addon.Utils.tCopy       = addon.tCopy
+        addon.Utils.tLength     = addon.tLength
+        addon.Utils.tContains   = addon.tContains
+        addon.Utils.tIndexOf    = addon.tIndexOf
     end
-    if addon.Logger and addon.Logger.Embed then
-        addon.Logger:Embed(addon)
-    end
+end
+if addon.Logger and addon.Logger.Embed then
+    addon.Logger:Embed(addon)
 end
 
 -- Alias locali (safe e veloci)
-local IsInRaid      = addon.IsInRaid
-local UnitIterator  = addon.UnitIterator
-local After         = addon.After
-local GetCreatureId = addon.GetCreatureId
+local IsInRaid             = addon.IsInRaid
+local IsInGroup            = addon.IsInGroup
+local UnitIterator         = addon.UnitIterator
+local After                = addon.After
+local NewTicker            = addon.NewTicker
+local CancelTimer          = addon.CancelTimer
+local tLength              = addon.tLength
+local UnitIsGroupLeader    = addon.UnitIsGroupLeader
+local UnitIsGroupAssistant = addon.UnitIsGroupAssistant
 
 function addon:Debug(level, fmt, ...)
-    if not self.Logger then return end
-    local lv = type(level) == "string" and level:upper()
+    local lv = level:upper()
     local fn = (lv == "ERROR" and self.error)
-              or (lv == "WARN" and self.warn)
-              or (lv == "DEBUG" and self.debug)
-              or self.info
-    if fn then fn(self, fmt, ...) end
-    if self.Debugger and self.Debugger.AddMessage and self.logLevels and self.logLevel then
-        local lvl = self.logLevels[lv] or self.logLevels.INFO
-        if lvl <= self.logLevel then
-            local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
-            self.Debugger:AddMessage(msg)
-        end
+        or (lv == "WARN" and self.warn)
+        or (lv == "DEBUG" and self.debug)
+        or self.info
+    fn(self, fmt, ...)
+    local lvl = self.logLevels[lv]
+    if lvl <= self.logLevel then
+        local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
+        self.Debugger:AddMessage(msg)
     end
 end
 
 -- SavedVariables for log level (fallback INFO)
 KRT_Debug = KRT_Debug or {}
 do
-    local INFO = (addon.Logger and addon.Logger.logLevels and addon.Logger.logLevels.INFO) or 2
+    local INFO = addon.Logger.logLevels.INFO
     KRT_Debug.level = KRT_Debug.level or INFO
-    if addon.SetLogLevel then
-        local lv = KRT_Debug.level
-        if KRT_Options and KRT_Options.debug and addon.Logger and addon.Logger.logLevels then
-            lv = addon.Logger.logLevels.DEBUG or lv
-        end
-        addon:SetLogLevel(lv)
+    local lv = KRT_Debug.level
+    if KRT_Options and KRT_Options.debug then
+        lv = addon.Logger.logLevels.DEBUG
     end
-    if addon.SetPerformanceMode then
-        addon:SetPerformanceMode(true)
-    end
+    addon:SetLogLevel(lv)
+    addon:SetPerformanceMode(true)
 end
 
 ---============================================================================
@@ -98,7 +110,7 @@ do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
     -------------------------------------------------------
-    addon.Debugger = addon.Debugger or {}
+    addon.Debugger = {}
     local module = addon.Debugger
 
     -------------------------------------------------------
@@ -110,23 +122,19 @@ do
     -- Public methods
     -------------------------------------------------------
     function module:OnLoad(frame)
-        if not frame then return end
         debugFrame = frame
         msgFrame = _G[frame:GetName() .. "ScrollFrame"]
     end
 
     function module:AddMessage(msg, r, g, b)
-        if msgFrame then
-            msgFrame:AddMessage(tostring(msg), r or 1, g or 1, b or 1)
-        end
+        msgFrame:AddMessage(msg, r, g, b)
     end
 
     function module:Clear()
-        if msgFrame then msgFrame:Clear() end
+        msgFrame:Clear()
     end
 
     function module:Toggle()
-        if not debugFrame then return end
         if debugFrame:IsShown() then
             debugFrame:Hide()
         else
@@ -141,10 +149,7 @@ end
 
 -- Addon UI Frames
 local mainFrame                         = CreateFrame("Frame")
-local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings
-local UIHistory, UIHistoryItemBox
--- local UIHistoryBossBox, UIHistoryPlayerBox
-local _
+local UIMaster, UIConfig, UISpammer, UIChanges, UIWarnings, UIHistory, UIHistoryItemBox
 
 -- Local Variables
 local unitName                          = UnitName("player")
@@ -168,88 +173,6 @@ local ItemExists, ItemIsSoulbound, GetItem
 local GetItemIndex, GetItemName, GetItemLink, GetItemTexture
 
 ---============================================================================
--- Constants & Static Data
----============================================================================
-
--- Roll Types Enum
-local rollTypes                         = {
-    MAINSPEC   = 1,
-    OFFSPEC    = 2,
-    RESERVED   = 3,
-    FREE       = 4,
-    BANK       = 5,
-    DISENCHANT = 6,
-    HOLD       = 7,
-    DKP        = 8
-}
-
--- Roll Type Display Text
-local lootTypesText                     = {
-    L.BtnMS,
-    L.BtnOS,
-    L.BtnSR,
-    L.BtnFree,
-    L.BtnBank,
-    L.BtnDisenchant,
-    L.BtnHold
-}
-
--- Roll Type Colored Display Text
-local lootTypesColored                  = {
-    Utils.wrapTextInColorCode(L.BtnMS, GREEN_FONT_COLOR_CODE:sub(3)),
-    Utils.wrapTextInColorCode(L.BtnOS, LIGHTYELLOW_FONT_COLOR_CODE:sub(3)),
-    Utils.wrapTextInColorCode(L.BtnSR, "ffa335ee"),
-    Utils.wrapTextInColorCode(L.BtnFree, NORMAL_FONT_COLOR_CODE:sub(3)),
-    Utils.wrapTextInColorCode(L.BtnBank, ORANGE_FONT_COLOR_CODE:sub(3)),
-    Utils.wrapTextInColorCode(L.BtnDisenchant, RED_FONT_COLOR_CODE:sub(3)),
-    Utils.wrapTextInColorCode(L.BtnHold, HIGHLIGHT_FONT_COLOR_CODE:sub(3)),
-    Utils.wrapTextInColorCode("DKP", GREEN_FONT_COLOR_CODE:sub(3)),
-}
-
--- Item Quality Colors
-local itemColors                        = {
-    [1] = "ff9d9d9d", -- Poor
-    [2] = "ffffffff", -- Common
-    [3] = "ff1eff00", -- Uncommon
-    [4] = "ff0070dd", -- Rare
-    [5] = "ffa335ee", -- Epic
-    [6] = "ffff8000", -- Legendary
-    [7] = "ffe6cc80", -- Artifact / Heirloom
-}
-
--- Class Colors
-local CLASS_COLORS                      = {
-    ["UNKNOWN"]     = "ffffffff",
-    ["DEATHKNIGHT"] = "ffc41f3b",
-    ["DRUID"]       = "ffff7d0a",
-    ["HUNTER"]      = "ffabd473",
-    ["MAGE"]        = "ff40c7eb",
-    ["PALADIN"]     = "fff58cba",
-    ["PRIEST"]      = "ffffffff",
-    ["ROGUE"]       = "fffff569",
-    ["SHAMAN"]      = "ff0070de",
-    ["WARLOCK"]     = "ff8787ed",
-    ["WARRIOR"]     = "ffc79c6e",
-}
-
--- Raid Target Markers
-local RAID_TARGET_MARKERS               = {
-    "{circle}",
-    "{diamond}",
-    "{triangle}",
-    "{moon}",
-    "{square}",
-    "{cross}",
-    "{skull}"
-}
-
-local K_COLOR                           = "fff58cba"
-local RT_COLOR                          = "aaf49141"
-local titleString                       = Utils.wrapTextInColorCode("K", K_COLOR)
-                                        .. Utils.wrapTextInColorCode("RT", RT_COLOR)
-                                        .. " : %s"
-
----============================================================================
 -- Cached Functions & Libraries
 ---============================================================================
 
@@ -259,7 +182,6 @@ local format, match, find, strlen       = string.format, string.match, string.fi
 local strsub, gsub, lower, upper        = string.sub, string.gsub, string.lower, string.upper
 local tostring, tonumber, ucfirst       = tostring, tonumber, _G.string.ucfirst
 local UnitRace, UnitSex, GetRealmName   = UnitRace, UnitSex, GetRealmName
-local GetNumRaidMembers, GetNumPartyMembers = GetNumRaidMembers, GetNumPartyMembers
 
 ---============================================================================
 -- Event System
@@ -288,9 +210,11 @@ do
         function addon:RegisterEvent(e)
             mainFrame:RegisterEvent(e)
         end
+
         function addon:UnregisterEvent(e)
             mainFrame:UnregisterEvent(e)
         end
+
         function addon:UnregisterAllEvents()
             mainFrame:UnregisterAllEvents()
         end
@@ -316,17 +240,18 @@ do
     -------------------------------------------------------
     -- 1. Create/retrieve the module table
     -------------------------------------------------------
-    addon.Raid = addon.Raid or {}
-    local module = addon.Raid
-    local L = addon.L
+    addon.Raid              = addon.Raid or {}
+    local module            = addon.Raid
+    local L                 = addon.L
 
     -------------------------------------------------------
     -- Internal state
     -------------------------------------------------------
-    local inRaid             = false
-    local numRaid            = 0
-    local GetLootMethod      = GetLootMethod
-    local GetRaidRosterInfo  = GetRaidRosterInfo
+    local inRaid            = false
+    local numRaid           = 0
+    local GetLootMethod     = GetLootMethod
+    local GetRaidRosterInfo = GetRaidRosterInfo
+    local UnitIsUnit        = UnitIsUnit
 
     -------------------------------------------------------
     -- Private helpers
@@ -345,10 +270,14 @@ do
     --
     function module:UpdateRaidRoster()
         if not KRT_CurrentRaid then return end
-        local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
-        numRaid = count
-        if numRaid == 0 then
+        CancelTimer(module.updateRosterHandle, true)
+        module.updateRosterHandle = nil
+        if not IsInGroup() then
+            numRaid = 0
             module:End()
+            if addon.Master and addon.Master.PrepareDropDowns then
+                addon.Master:PrepareDropDowns()
+            end
             return
         end
 
@@ -365,9 +294,9 @@ do
                 if index then
                     _, rank, subgroup = GetRaidRosterInfo(index)
                 end
-                if addon.UnitIsGroupLeader and addon.UnitIsGroupLeader(unit) then
+                if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
                     rank = 2
-                elseif addon.UnitIsGroupAssistant and addon.UnitIsGroupAssistant(unit) then
+                elseif UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
                     rank = 1
                 end
                 rank = rank or 0
@@ -407,6 +336,12 @@ do
             end
         end
 
+        numRaid = tLength(playersByName)
+        if numRaid == 0 then
+            module:End()
+            return
+        end
+
         -- Mark players who have left
         for name, v in pairs(playersByName) do
             if not v.seen and v.leave == nil then
@@ -414,7 +349,9 @@ do
             end
             v.seen = nil
         end
-        Utils.unschedule(module.UpdateRaidRoster)
+        if addon.Master and addon.Master.PrepareDropDowns then
+            addon.Master:PrepareDropDowns()
+        end
     end
 
     --
@@ -425,8 +362,6 @@ do
             self:End()
         end
         if not IsInRaid() then return end
-        local numRaid = GetNumRaidMembers()
-        if numRaid == 0 then return end
 
         local realm = GetRealmName() or UNKNOWN
         KRT_Players[realm] = KRT_Players[realm] or {}
@@ -444,12 +379,26 @@ do
             changes       = {},
         }
 
-        for i = 1, numRaid do
-            local name, rank, subgroup, level, classL, class = GetRaidRosterInfo(i)
+        for unit in UnitIterator(true) do
+            local name = UnitName(unit)
             if name then
-                local unitID = "raid" .. tostring(i)
-                local raceL, race = UnitRace(unitID)
-                local p = {
+                local index = UnitInRaid(unit)
+                local rank, subgroup, level, classL, class
+                if index then
+                    _, rank, subgroup, level, classL, class = GetRaidRosterInfo(index)
+                end
+                if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
+                    rank = 2
+                elseif UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
+                    rank = 1
+                end
+                rank              = rank or 0
+                subgroup          = subgroup or 1
+                level             = level or UnitLevel(unit)
+                classL            = classL or select(1, UnitClass(unit))
+                class             = class or select(2, UnitClass(unit))
+                local raceL, race = UnitRace(unit)
+                local p           = {
                     name     = name,
                     rank     = rank,
                     subgroup = subgroup,
@@ -467,7 +416,7 @@ do
                     raceL  = raceL,
                     class  = class or "UNKNOWN",
                     classL = classL,
-                    sex    = UnitSex(unitID),
+                    sex    = UnitSex(unit),
                 }
             end
         end
@@ -475,7 +424,8 @@ do
         tinsert(KRT_Raids, raidInfo)
         KRT_CurrentRaid = #KRT_Raids
         Utils.triggerEvent("RaidCreate", KRT_CurrentRaid)
-        Utils.schedule(3, module.UpdateRaidRoster)
+        CancelTimer(module.updateRosterHandle, true)
+        module.updateRosterHandle = After(3, function() module:UpdateRaidRoster() end)
     end
 
     --
@@ -483,7 +433,8 @@ do
     --
     function module:End()
         if not KRT_CurrentRaid then return end
-        Utils.unschedule(module.UpdateRaidRoster)
+        CancelTimer(module.updateRosterHandle, true)
+        module.updateRosterHandle = nil
         local currentTime = Utils.getCurrentTime()
         for _, v in pairs(KRT_Raids[KRT_CurrentRaid].players) do
             if not v.leave then v.leave = currentTime end
@@ -526,14 +477,14 @@ do
     --
     function module:FirstCheck()
         if module.firstCheckHandle then
-            Utils.unschedule(module.firstCheckHandle)
+            CancelTimer(module.firstCheckHandle, true)
             module.firstCheckHandle = nil
         end
-        local count = IsInRaid() and GetNumRaidMembers() or GetNumPartyMembers()
-        if count == 0 then return end
+        if not IsInGroup() then return end
 
         if KRT_CurrentRaid and module:CheckPlayer(unitName, KRT_CurrentRaid) then
-            Utils.schedule(2, module.UpdateRaidRoster)
+            CancelTimer(module.updateRosterHandle, true)
+            module.updateRosterHandle = After(2, function() module:UpdateRaidRoster() end)
             return
         end
 
@@ -618,7 +569,7 @@ do
         end
         if not player then
             player = unitName
-            itemLink, itemCount = addon.Deformat(msg, msg, LOOT_ITEM_SELF_MULTIPLE)
+            itemLink, itemCount = addon.Deformat(msg, LOOT_ITEM_SELF_MULTIPLE)
         end
         if not itemLink then
             itemCount = 1
@@ -628,11 +579,8 @@ do
         -- Other Loot Rolls
         if not player or not itemLink then
             itemCount = 1
-            player, itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
-            if not itemLink then
-                player = unitName
-                itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
-            end
+            itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
+            player = unitName
         end
         if not itemLink then return end
         local _, _, itemString = string.find(itemLink, "^|c%x+|H(.+)|h%[.*%]")
@@ -742,19 +690,17 @@ do
     -- Returns raid size: 10 or 25.
     --
     function module:GetRaidSize()
-        local size = 0
-        if IsInRaid() then
-            local diff = GetRaidDifficulty()
-            size = (diff == 1 or diff == 3) and 10 or 25
-        end
-        return size
+        if not IsInRaid() then return 0 end
+        local diff = GetRaidDifficulty and GetRaidDifficulty() or (GetRaidDifficultyID and GetRaidDifficultyID())
+        if not diff then return (GetNumGroupMembers() > 10) and 25 or 10 end
+        return (diff == 1 or diff == 3) and 10 or 25
     end
 
     --
     -- Returns the RGB color values for a given class name.
     --
     function module:GetClassColor(name)
-        return Utils.getClassColor(name)
+        return addon.GetClassColor(name)
     end
 
     --
@@ -762,16 +708,20 @@ do
     --
     function module:Expired(rID)
         rID = rID or KRT_CurrentRaid
-        if not rID or not KRT_Raids[rID] then
+        local raid = rID and KRT_Raids[rID]
+        if not raid then
             return true
         end
 
+        local startTime = raid.startTime
         local currentTime = Utils.getCurrentTime()
-        local startTime = KRT_Raids[rID].startTime
-        local validDuration = (currentTime + KRT_NextReset) - startTime
+        local week = 604800 -- 7 days in seconds
 
-        local isExpired = validDuration >= 604800 -- 7 days in seconds
-        return isExpired
+        if KRT_NextReset and KRT_NextReset > currentTime then
+            return startTime < (KRT_NextReset - week)
+        end
+
+        return currentTime >= startTime + week
     end
 
     --
@@ -873,7 +823,7 @@ do
             if bossNum and KRT_Raids[raidNum].bossKills[bossNum] then
                 local _players = {}
                 for i, p in ipairs(players) do
-                    if Utils.checkEntry(KRT_Raids[raidNum]["bossKills"][bossNum]["players"], p.name) then
+                    if addon.tContains(KRT_Raids[raidNum]["bossKills"][bossNum]["players"], p.name) then
                         tinsert(_players, p)
                     end
                 end
@@ -968,13 +918,16 @@ do
         local rank = 0
         local originalName = name
         name = name or unitName or UnitName("player")
-        if next(players) == nil then
-            if IsInRaid() then
-                numRaid = GetNumRaidMembers()
-                for i = 1, numRaid do
-                    local pname, prank = GetRaidRosterInfo(i)
+        if tLength(players) == 0 then
+            if IsInGroup() then
+                for unit in UnitIterator(true) do
+                    local pname = UnitName(unit)
                     if pname == name then
-                        rank = prank
+                        if UnitIsGroupLeader and UnitIsGroupLeader(unit) then
+                            rank = 2
+                        elseif UnitIsGroupAssistant and UnitIsGroupAssistant(unit) then
+                            rank = 1
+                        end
                         break
                     end
                 end
@@ -1007,15 +960,14 @@ do
     -- Gets a player's unit ID (e.g., "raid1").
     --
     function module:GetUnitID(name)
-        local players = module:GetPlayers()
         local id = "none"
-        local resolvedName = name
-        if players then
-            for i, p in ipairs(players) do
-                if p.name == name then
-                    id = "raid" .. tostring(i)
-                    break
-                end
+        if not IsInGroup() or not name then
+            return id
+        end
+        for unit in UnitIterator(true) do
+            if UnitName(unit) == name then
+                id = unit
+                break
             end
         end
         return id
@@ -1037,9 +989,21 @@ do
     -- Checks if the player is the Master Looter.
     --
     function module:IsMasterLooter()
-        local method, partyID = GetLootMethod()
-        local isML = (partyID and partyID == 0)
-        return isML
+        local method, partyMaster, raidMaster = GetLootMethod()
+        if method ~= "master" then
+            return false
+        end
+        if partyMaster then
+            if partyMaster == 0 or UnitIsUnit("party" .. tostring(partyMaster), "player") then
+                return true
+            end
+        end
+        if raidMaster then
+            if raidMaster == 0 or UnitIsUnit("raid" .. tostring(raidMaster), "player") then
+                return true
+            end
+        end
+        return false
     end
 
     --
@@ -1061,7 +1025,7 @@ do
     local output          = "%s: %s"
     local chatPrefix      = "Kader Raid Tools"
     local chatPrefixShort = "KRT"
-    local prefixHex       = Utils.rgbToHex(245/255, 140/255, 186/255)
+    local prefixHex       = "ff" .. Utils.rgbToHex(245 / 255, 140 / 255, 186 / 255)
 
     --
     -- Prepares the final output string with a prefix.
@@ -1069,7 +1033,7 @@ do
     local function PreparePrint(text, prefix)
         prefix = prefix or chatPrefixShort
         if prefixHex then
-            prefix = Utils.wrapTextInColorCode(prefix, prefixHex)
+            prefix = addon:WrapTextInColorCode(prefix, prefixHex)
         end
         return format(output, prefix, tostring(text))
     end
@@ -1101,13 +1065,19 @@ do
                     if addon.options.countdownSimpleRaidMsg then
                         channel = "RAID" -- Force RAID if countdownSimpleRaidMsg is true
                         -- Use RAID_WARNING if leader/officer AND useRaidWarning is true
-                    elseif addon.options.useRaidWarning and (IsRaidLeader() or IsRaidOfficer()) then
+                    elseif addon.options.useRaidWarning and (
+                            (UnitIsGroupLeader and UnitIsGroupLeader("player")) or
+                            (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
+                        ) then
                         channel = "RAID_WARNING"
                     else
                         channel = "RAID" -- Fallback
                     end
                 else
-                    if addon.options.useRaidWarning and (IsRaidLeader() or IsRaidOfficer()) then
+                    if addon.options.useRaidWarning and (
+                            (UnitIsGroupLeader and UnitIsGroupLeader("player")) or
+                            (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
+                        ) then
                         channel = "RAID_WARNING"
                     else
                         channel = "RAID" -- Fallback
@@ -1246,14 +1216,12 @@ do
             self:ClearAllPoints()
             self:SetPoint("CENTER", x, y)
         else
-            -- Circular drag mode
-            centerX, centerY = abs(x), abs(y)
-            centerX = (centerX / sqrt(centerX ^ 2 + centerY ^ 2)) * 80
-            centerY = (centerY / sqrt(centerX ^ 2 + centerY ^ 2)) * 80
-            centerX = x < 0 and -centerX or centerX
-            centerY = y < 0 and -centerY or centerY
+            -- Circular drag mode (snap to ring radius ~80)
+            local dist = sqrt(x * x + y * y)
+            if dist == 0 then dist = 1 end
+            local px, py = (x / dist) * 80, (y / dist) * 80
             self:ClearAllPoints()
-            self:SetPoint("CENTER", centerX, centerY)
+            self:SetPoint("CENTER", px, py)
         end
     end
 
@@ -1286,9 +1254,14 @@ do
         end)
         KRT_MINIMAP_GUI:SetScript("OnMouseUp", function(self)
             self:SetScript("OnUpdate", nil)
+            if dragMode == "free" then
+                dragMode = nil
+                return
+            end
             local mx, my = Minimap:GetCenter()
             local bx, by = self:GetCenter()
             module:SetPos(deg(atan2(by - my, bx - mx)))
+            dragMode = nil
         end)
         KRT_MINIMAP_GUI:SetScript("OnClick", function(self, button, down)
             -- Ignore clicks if Shift or Alt keys are held:
@@ -1302,9 +1275,9 @@ do
         KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
             GameTooltip_SetDefaultAnchor(GameTooltip, self)
             GameTooltip:SetText(
-                Utils.wrapTextInColorCode("Kader", K_COLOR)
+                addon:WrapTextInColorCode("Kader", K_COLOR)
                 .. " "
-                .. Utils.wrapTextInColorCode("Raid Tools", "aad4af37")
+                .. addon:WrapTextInColorCode("Raid Tools", "aad4af37")
             )
             GameTooltip:AddLine(L.StrMinimapLClick, 1, 1, 1)
             GameTooltip:AddLine(L.StrMinimapRClick, 1, 1, 1)
@@ -1331,7 +1304,6 @@ do
     function module:HideMinimapButton()
         return KRT_MINIMAP_GUI:Hide()
     end
-
 end
 
 ---============================================================================
@@ -1350,7 +1322,7 @@ do
     -------------------------------------------------------
     -- Internal state
     -------------------------------------------------------
-    local record, canRoll, warned = false, true, false
+    local record, canRoll, warned, rolled = false, true, false, false
     local playerRollTracker, rollsTable, rerolled, itemRollTracker = {}, {}, {}, {}
     local selectedPlayer = nil
 
@@ -1366,8 +1338,13 @@ do
                 end
                 return a.roll > b.roll
             end)
-            winner = rollsTable[1].name
-            addon:Debug("DEBUG", "Sorted rolls; current winner: %s with roll: %d", winner, rollsTable[1].roll)
+            if rollsTable[1] then
+                winner = rollsTable[1].name
+                addon:Debug("DEBUG", "Sorted rolls; current winner: %s with roll: %d", winner, rollsTable[1].roll)
+            else
+                winner = nil
+                addon:Debug("DEBUG", "Sorted rolls; no winner")
+            end
         end
     end
 
@@ -1485,7 +1462,7 @@ do
             local used = itemRollTracker[itemId][player] or 0
 
             if used >= allowed then
-                if not Utils.checkEntry(rerolled, player) then
+                if not addon.tContains(rerolled, player) then
                     Utils.whisper(player, L.ChatOnlyRollOnce)
                     tinsert(rerolled, player)
                     addon:Debug("DEBUG", "Roll denied: %s exceeded allowed rolls for item %d", player, itemId)
@@ -1543,6 +1520,10 @@ do
     -- Returns the highest roll value from the current winner.
     --
     function module:HighestRoll()
+        if not winner then
+            addon:Debug("DEBUG", "HighestRoll: winner is nil")
+            return 0
+        end
         for i = 1, rollsCount do
             if rollsTable[i].name == winner then
                 addon:Debug("DEBUG", "HighestRoll: %s rolled %d", winner, rollsTable[i].roll)
@@ -1556,22 +1537,23 @@ do
     -- Clears all roll-related state and UI elements.
     --
     function module:ClearRolls(rec)
-        frameName = frameName or Utils.getFrameName()
-        if not frameName then return end
+        local frameName = Utils.getFrameName()
         rollsTable, rerolled, itemRollTracker = {}, {}, {}
         playerRollTracker, rolled, warned, rollsCount = {}, false, false, 0
         selectedPlayer = nil
         if rec == false then record = false end
 
-        local i = 1
-        local btn = _G[frameName .. "PlayerBtn" .. i]
-        while btn do
-            btn:Hide()
-            i = i + 1
-            btn = _G[frameName .. "PlayerBtn" .. i]
-        end
+        if frameName then
+            local i = 1
+            local btn = _G[frameName .. "PlayerBtn" .. i]
+            while btn do
+                btn:Hide()
+                i = i + 1
+                btn = _G[frameName .. "PlayerBtn" .. i]
+            end
 
-        addon.Raid:ClearRaidIcons()
+            addon.Raid:ClearRaidIcons()
+        end
     end
 
     --
@@ -1659,6 +1641,9 @@ do
                         starTarget = name
                     end
                 end
+                if isSR and not starTarget then
+                    starTarget = winner
+                end
                 addon:Debug("DEBUG", "Top SR roll by: %s", tostring(starTarget))
             else
                 starTarget = winner
@@ -1676,6 +1661,7 @@ do
 
             btn:SetID(i)
             btn:Show()
+            btn.playerName = name
 
             if not btn.selectedBackground then
                 btn.selectedBackground = btn:CreateTexture("KRTSelectedHighlight", "ARTWORK")
@@ -1687,7 +1673,7 @@ do
             local nameStr, rollStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"], _G[btnName .. "Star"]
 
             if nameStr and nameStr.SetVertexColor then
-                local _, class = UnitClass(name)
+                local class = addon.Raid:GetPlayerClass(name)
                 class = class and class:upper() or "UNKNOWN"
                 if isSR and self:IsReserved(itemId, name) then
                     nameStr:SetVertexColor(0.4, 0.6, 1.0)
@@ -1731,7 +1717,6 @@ do
         end
         addon:Debug("DEBUG", "FetchRolls completed. Total entries: %d", rollsCount)
     end
-
 end
 
 ---============================================================================
@@ -1799,7 +1784,7 @@ do
     --
     function module:AddItem(itemLink)
         local itemName, _, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType,
-            itemStackCount, itemEquipLoc, itemTexture = GetItemInfo(itemLink)
+        itemStackCount, itemEquipLoc, itemTexture = GetItemInfo(itemLink)
 
         if not itemName or not itemRarity then
             GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
@@ -1843,7 +1828,7 @@ do
             if frameName == nil then return end
 
             local currentItemLink = _G[frameName .. "Name"]
-            currentItemLink:SetText(Utils.wrapTextInColorCode(i.itemName, i.itemColor))
+            currentItemLink:SetText(addon:WrapTextInColorCode(i.itemName, i.itemColor))
 
             local currentItemBtn = _G[frameName .. "ItemBtn"]
             currentItemBtn:SetNormalTexture(i.itemTexture)
@@ -1984,6 +1969,7 @@ do
 
     local countdownRun = false
     local countdownStart, countdownPos = 0, 0
+    local ceil = math.ceil
 
     local AssignItem, TradeItem
     local screenshotWarn = false
@@ -2176,11 +2162,11 @@ do
         countdownRun = false
         local itemLink = GetItemLink()
         if itemLink == nil then return end
-        currentRollType = rollTypes.hold
+        currentRollType = rollTypes.HOLD
         if fromInventory == true then
-            return TradeItem(itemLink, holder, rollTypes.hold, 0)
+            return TradeItem(itemLink, holder, rollTypes.HOLD, 0)
         end
-        return AssignItem(itemLink, holder, rollTypes.hold, 0)
+        return AssignItem(itemLink, holder, rollTypes.HOLD, 0)
     end
 
     --
@@ -2191,11 +2177,11 @@ do
         countdownRun = false
         local itemLink = GetItemLink()
         if itemLink == nil then return end
-        currentRollType = rollTypes.bank
+        currentRollType = rollTypes.BANK
         if fromInventory == true then
-            return TradeItem(itemLink, banker, rollTypes.bank, 0)
+            return TradeItem(itemLink, banker, rollTypes.BANK, 0)
         end
-        return AssignItem(itemLink, banker, rollTypes.bank, 0)
+        return AssignItem(itemLink, banker, rollTypes.BANK, 0)
     end
 
     --
@@ -2206,11 +2192,11 @@ do
         countdownRun = false
         local itemLink = GetItemLink()
         if itemLink == nil then return end
-        currentRollType = rollTypes.disenchant
+        currentRollType = rollTypes.DISENCHANT
         if fromInventory == true then
-            return TradeItem(itemLink, disenchanter, rollTypes.disenchant, 0)
+            return TradeItem(itemLink, disenchanter, rollTypes.DISENCHANT, 0)
         end
-        return AssignItem(itemLink, disenchanter, rollTypes.disenchant, 0)
+        return AssignItem(itemLink, disenchanter, rollTypes.DISENCHANT, 0)
     end
 
     --
@@ -2219,14 +2205,15 @@ do
     function module:SelectWinner(btn)
         if not btn then return end
         local btnName = btn:GetName()
-        local player = _G[btnName .. "Name"]:GetText()
-        if player ~= nil then
+        local raw = btn.playerName or _G[btnName .. "Name"]:GetText() or ""
+        local player = raw:gsub("^%s*>%s*(.-)%s*<%s*$", "%1"):trim()
+        if player ~= "" then
             if IsControlKeyDown() then
                 local roll = _G[btnName .. "Roll"]:GetText()
                 addon:Announce(format(L.ChatPlayerRolled, player, roll))
                 return
             end
-            winner = player:trim()
+            winner = player
             addon.Rolls:FetchRolls()
             Utils.sync("KRT-RollWinner", player)
         end
@@ -2322,10 +2309,10 @@ do
                             addon:Announce(L.ChatCountdownTic:format(i))
                         end
                     elseif (
-                        (i > 0 and i < 10 and i % 7 == 0) or
-                        (i > 0 and i >= 5 and i % 5 == 0) or
-                        (i > 0 and i <= 3)
-                    ) then
+                            (i > 0 and i < 10 and i % 7 == 0) or
+                            (i > 0 and i >= 5 and i % 5 == 0) or
+                            (i > 0 and i <= 3)
+                        ) then
                         addon:Announce(L.ChatCountdownTic:format(i))
                     end
                     i = i - 1
@@ -2406,14 +2393,17 @@ do
             dropDownData[i] = twipe(dropDownData[i])
         end
         dropDownGroupData = twipe(dropDownGroupData)
-        for p = 1, GetRealNumRaidMembers() do
-            local name, _, subgroup = GetRaidRosterInfo(p)
+        for unit in UnitIterator() do
+            local name = UnitName(unit)
+            local subgroup = select(2, GetRaidRosterInfo(UnitInRaid(unit)))
             if name then
                 dropDownData[subgroup][name] = name
                 dropDownGroupData[subgroup] = true
             end
         end
     end
+
+    module.PrepareDropDowns = PrepareDropDowns
 
     --
     -- OnClick handler for dropdown menu items.
@@ -2580,10 +2570,10 @@ do
     function module:LOOT_CLOSED()
         if addon.Raid:IsMasterLooter() then
             if lootCloseTimer then
-                Utils.CancelTimer(lootCloseTimer)
+                CancelTimer(lootCloseTimer)
                 lootCloseTimer = nil
             end
-            lootCloseTimer = Utils.after(0.1, function()
+            lootCloseTimer = After(0.1, function()
                 lootCloseTimer = nil
                 lootOpened = false
                 UIMaster:Hide()
@@ -2643,23 +2633,23 @@ do
             return false
         end
 
-        for p = 1, 40 do
+        for p = 1, addon.Raid:GetNumRaid() do
             if GetMasterLootCandidate(p) == playerName then
                 GiveMasterLoot(itemIndex, p)
                 local output, whisper
                 if rollType <= 4 and addon.options.announceOnWin then
                     output = L.ChatAward:format(playerName, itemLink)
-                elseif rollType == rollTypes.hold and addon.options.announceOnHold then
+                elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
                     output = L.ChatHold:format(playerName, itemLink)
                     if addon.options.lootWhispers then
                         whisper = L.WhisperHoldAssign:format(itemLink)
                     end
-                elseif rollType == rollTypes.bank and addon.options.announceOnBank then
+                elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
                     output = L.ChatBank:format(playerName, itemLink)
                     if addon.options.lootWhispers then
                         whisper = L.WhisperBankAssign:format(itemLink)
                     end
-                elseif rollType == rollTypes.disenchant and addon.options.announceOnDisenchant then
+                elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
                     output = L.ChatDisenchant:format(itemLink, playerName)
                     if addon.options.lootWhispers then
                         whisper = L.WhisperDisenchantAssign:format(itemLink)
@@ -2694,21 +2684,21 @@ do
         if rollType <= 4 and addon.options.announceOnWin then
             output = L.ChatAward:format(playerName, itemLink)
             keep = false
-        elseif rollType == rollTypes.hold and addon.options.announceOnHold then
+        elseif rollType == rollTypes.HOLD and addon.options.announceOnHold then
             output = L.ChatNoneRolledHold:format(itemLink, playerName)
-        elseif rollType == rollTypes.bank and addon.options.announceOnBank then
+        elseif rollType == rollTypes.BANK and addon.options.announceOnBank then
             output = L.ChatNoneRolledBank:format(itemLink, playerName)
-        elseif rollType == rollTypes.disenchant and addon.options.announceOnDisenchant then
+        elseif rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
             output = L.ChatNoneRolledDisenchant:format(itemLink, playerName)
         end
 
         -- Keeping the item:
         if keep then
-            if rollType == rollTypes.hold then
+            if rollType == rollTypes.HOLD then
                 whisper = L.WhisperHoldTrade:format(itemLink)
-            elseif rollType == rollTypes.bank then
+            elseif rollType == rollTypes.BANK then
                 whisper = L.WhisperBankTrade:format(itemLink)
-            elseif rollType == rollTypes.disenchant then
+            elseif rollType == rollTypes.DISENCHANT then
                 whisper = L.WhisperDisenchantTrade:format(itemLink)
             end
             -- Multiple winners:
@@ -2735,28 +2725,31 @@ do
             addon.Loot:ClearLoot()
             addon.Rolls:ClearRolls(false)
             addon.Raid:ClearRaidIcons()
-        elseif CheckInteractDistance(playerName, 2) == 1 then
-            -- Player is in range for trade
-            if itemInfo.isStack and not addon.options.ignoreStacks then
-                addon:warn(L.ErrItemStack:format(itemLink))
-                return false
-            end
-            ClearCursor()
-            PickupContainerItem(itemInfo.bagID, itemInfo.slotID)
-            if CursorHasItem() then
-                InitiateTrade(playerName)
-                if addon.options.screenReminder and not screenshotWarn then
-                    addon:warn(L.ErrScreenReminder)
-                    screenshotWarn = true
+        else
+            local unit = addon.Raid:GetUnitID(playerName)
+            if unit ~= "none" and CheckInteractDistance(unit, 2) == 1 then
+                -- Player is in range for trade
+                if itemInfo.isStack and not addon.options.ignoreStacks then
+                    addon:warn(L.ErrItemStack:format(itemLink))
+                    return false
                 end
+                ClearCursor()
+                PickupContainerItem(itemInfo.bagID, itemInfo.slotID)
+                if CursorHasItem() then
+                    InitiateTrade(playerName)
+                    if addon.options.screenReminder and not screenshotWarn then
+                        addon:warn(L.ErrScreenReminder)
+                        screenshotWarn = true
+                    end
+                end
+                -- Cannot trade the player?
+            elseif unit ~= "none" then
+                -- Player is out of range
+                addon.Raid:ClearRaidIcons()
+                SetRaidTarget(trader, 1)
+                if winner then SetRaidTarget(winner, 4) end
+                output = L.ChatTrade:format(playerName, itemLink)
             end
-            -- Cannot trade the player?
-        elseif addon.Raid:GetUnitID(playerName) ~= "none" then
-            -- Player is out of range
-            addon.Raid:ClearRaidIcons()
-            SetRaidTarget(trader, 1)
-            SetRaidTarget(winner, 4)
-            output = L.ChatTrade:format(playerName, itemLink)
         end
 
         if not announced then
@@ -2770,7 +2763,7 @@ do
                     Utils.whisper(playerName, whisper)
                 end
             end
-            if rollType <= rollTypes.free and playerName == trader then
+            if rollType <= rollTypes.FREE and playerName == trader then
                 addon.History.Loot:Log(currentRollItem, trader, rollType, rollValue)
             end
             announced = true
@@ -2792,11 +2785,31 @@ do
     local module = addon.Master
 
     local rows, raidPlayers = {}, {}
-    local wipe = wipe or table.wipe
-    local countsFrame, scrollChild, needsUpdate = nil, nil, false
-    
+    local twipe = twipe
+    local countsFrame, scrollChild, needsUpdate, countsTicker = nil, nil, false, nil
+
     local function RequestCountsUpdate()
         needsUpdate = true
+    end
+
+    local function TickCounts()
+        if needsUpdate then
+            needsUpdate = false
+            addon.Master:UpdateCountsFrame()
+        end
+    end
+
+    local function StartCountsTicker()
+        if not countsTicker then
+            countsTicker = NewTicker(0.1, TickCounts)
+        end
+    end
+
+    local function StopCountsTicker()
+        if countsTicker then
+            CancelTimer(countsTicker, true)
+            countsTicker = nil
+        end
     end
 
     -- Helper to ensure frames exist
@@ -2804,25 +2817,20 @@ do
         countsFrame = countsFrame or _G["KRTLootCounterFrame"]
         scrollChild = scrollChild or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         if countsFrame and not countsFrame._krtCounterHook then
-            countsFrame:SetScript("OnUpdate", function()
-                if needsUpdate and Utils.throttleKey("LootCounter", 0.1) then
-                    needsUpdate = false
-                    addon.Master:UpdateCountsFrame()
-                end
-            end)
+            countsFrame:SetScript("OnShow", StartCountsTicker)
+            countsFrame:SetScript("OnHide", StopCountsTicker)
             countsFrame._krtCounterHook = true
         end
     end
 
     -- Return sorted array of player names currently in the raid.
     local function GetCurrentRaidPlayers()
-        wipe(raidPlayers)
-        if not IsInRaid() then
+        twipe(raidPlayers)
+        if not IsInGroup() then
             return raidPlayers
         end
-        local count = GetNumRaidMembers()
-        for i = 1, count do
-            local name = GetRaidRosterInfo(i)
+        for unit in UnitIterator(true) do
+            local name = UnitName(unit)
             if name and name ~= "" then
                 raidPlayers[#raidPlayers + 1] = name
                 if KRT_PlayerCounts[name] == nil then
@@ -2989,16 +2997,16 @@ do
     --------------------------------------------------------------------------
 
     function module:Save()
-        addon:Debug("DEBUG", "Saving reserves data. Entries: %d", Utils.tableLen(reservesData))
-        KRT_SavedReserves = table.deepCopy(reservesData)
-        KRT_SavedReserves.reservesByItemID = table.deepCopy(reservesByItemID)
+        addon:Debug("DEBUG", "Saving reserves data. Entries: %d", addon.tLength(reservesData))
+        KRT_SavedReserves = addon.tCopy({}, reservesData)
+        KRT_SavedReserves.reservesByItemID = addon.tCopy({}, reservesByItemID)
     end
 
     function module:Load()
         addon:Debug("DEBUG", "Loading reserves. Data exists: %s", tostring(KRT_SavedReserves ~= nil))
         if KRT_SavedReserves then
-            reservesData = table.deepCopy(KRT_SavedReserves)
-            reservesByItemID = table.deepCopy(KRT_SavedReserves.reservesByItemID or {})
+            reservesData = addon.tCopy({}, KRT_SavedReserves)
+            reservesByItemID = addon.tCopy({}, KRT_SavedReserves.reservesByItemID or {})
         else
             reservesData = {}
             reservesByItemID = {}
@@ -3154,7 +3162,7 @@ do
 
     -- Get all reserves:
     function module:GetAllReserves()
-        addon:Debug("DEBUG", "Fetching all reserves. Total players with reserves: %d", Utils.tableLen(reservesData))
+        addon:Debug("DEBUG", "Fetching all reserves. Total players with reserves: %d", addon.tLength(reservesData))
         return reservesData
     end
 
@@ -3231,7 +3239,7 @@ do
             end
         end
         -- Log when the CSV parsing is completed
-        addon:Debug("DEBUG", "Finished parsing CSV data. Total reserves processed: %d", Utils.tableLen(reservesData))
+        addon:Debug("DEBUG", "Finished parsing CSV data. Total reserves processed: %d", addon.tLength(reservesData))
         self:RefreshWindow()
         self:Save()
     end
@@ -3252,6 +3260,7 @@ do
             GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
             GameTooltip:SetHyperlink("item:" .. itemId)
             GameTooltip:Hide()
+            pendingItemInfo[itemId] = true
             addon:Debug("DEBUG", "Failed to query info for itemId: %d", itemId)
             return false
         end
@@ -3611,9 +3620,8 @@ do
     -- Loads the default options into the settings table.
     --
     local function LoadDefaultOptions()
-        for k, v in pairs(defaultOptions) do
-            KRT_Options[k] = v
-        end
+        KRT_Options = addon.tCopy({}, defaultOptions)
+        addon.options = KRT_Options
         addon:info("Default options have been restored.")
     end
 
@@ -3621,8 +3629,9 @@ do
     -- Loads addon options from saved variables, filling in defaults.
     --
     local function LoadOptions()
-        addon.options = KRT_Options
-        Utils.fillTable(addon.options, defaultOptions)
+        addon.options = addon.tCopy({}, defaultOptions)
+        addon.tCopy(addon.options, KRT_Options)
+        KRT_Options = addon.options
 
         -- Ensure dependent options are consistent
         if not addon.options.useRaidWarning then
@@ -4171,7 +4180,7 @@ do
             InitChangesTable()
             FetchChanges()
         end
-        local count = Utils.tableLen(changesTable)
+        local count = addon.tLength(changesTable)
         local msg
         if count == 0 then
             if tempSelectedID then
@@ -4222,7 +4231,7 @@ do
                 InitChangesTable()
                 FetchChanges()
             end
-            local count = Utils.tableLen(changesTable)
+            local count = addon.tLength(changesTable)
             if count > 0 then
                 for n, s in pairs(changesTable) do
                     if selectedID == n and _G[frameName .. "PlayerBtn" .. n] then
@@ -4323,7 +4332,6 @@ do
     -------------------------------------------------------
     -- Internal state
     -------------------------------------------------------
-    local spamFrame = CreateFrame("Frame")
     local frameName
 
     local LocalizeUIFrame
@@ -4331,6 +4339,7 @@ do
 
     local UpdateUIFrame
     local updateInterval = 0.05
+    local updateTicker
 
     -------------------------------------------------------
     -- Private helpers
@@ -4367,7 +4376,12 @@ do
         UISpammer = frame
         frameName = frame:GetName()
         frame:RegisterForDrag("LeftButton")
-        frame:SetScript("OnUpdate", UpdateUIFrame)
+        if updateTicker then
+            CancelTimer(updateTicker, true)
+        end
+        updateTicker = NewTicker(updateInterval, function()
+            if UISpammer then UpdateUIFrame(UISpammer, updateInterval) end
+        end)
     end
 
     -- Toggle frame visibility:
@@ -4390,12 +4404,18 @@ do
         if find(target, "Chat") then
             KRT_Spammer.Channels = KRT_Spammer.Channels or {}
             local channel = gsub(target, "Chat", "")
+            local id = tonumber(channel) or select(1, GetChannelName(channel))
+            channel = (id and id > 0) and id or channel
             local checked = (box:GetChecked() == 1)
-            local existed = Utils.checkEntry(KRT_Spammer.Channels, channel)
+            local existed = addon.tContains(KRT_Spammer.Channels, channel)
             if checked and not existed then
                 tinsert(KRT_Spammer.Channels, channel)
             elseif not checked and existed then
-                Utils.removeEntry(KRT_Spammer.Channels, channel)
+                local i = addon.tIndexOf(KRT_Spammer.Channels, channel)
+                while i do
+                    tremove(KRT_Spammer.Channels, i)
+                    i = addon.tIndexOf(KRT_Spammer.Channels, channel)
+                end
             end
         else
             local value = box:GetText():trim()
@@ -4448,10 +4468,10 @@ do
             return
         end
         for i, c in ipairs(channels) do
-            if c == "Guild" or c == "Yell" then
-                Utils.chat(tostring(finalOutput), upper(c), nil, nil, true)
-            else
+            if type(c) == "number" then
                 Utils.chat(tostring(finalOutput), "CHANNEL", nil, c, true)
+            else
+                Utils.chat(tostring(finalOutput), upper(c), nil, nil, true)
             end
         end
     end
@@ -4524,7 +4544,10 @@ do
                 for k, v in pairs(KRT_Spammer) do
                     if k == "Channels" then
                         for i, c in ipairs(v) do
-                            _G[frameName .. "Chat" .. c]:SetChecked()
+                            local id = tonumber(c) or select(1, GetChannelName(c))
+                            id = (id and id > 0) and id or c
+                            v[i] = id
+                            _G[frameName .. "Chat" .. id]:SetChecked()
                         end
                     elseif _G[frameName .. k] then
                         _G[frameName .. k]:SetText(v)
@@ -4648,55 +4671,6 @@ do
         end
         return out
     end
-
-    -- To spam even if the frame is closed:
-    spamFrame:SetScript("OnUpdate", function(self, elapsed)
-        if UISpammer then UpdateUIFrame(UISpammer, elapsed) end
-    end)
-end
-
--- Lightweight LFM scheduler
-do
-    local U = addon.Utils
-    local S = addon.Spammer
-    local running
-
-    local function Send(msg)
-        if U.throttleKey("lfm_msg", _G.KRT_Options.chatThrottle or 2.0) then
-            SendChatMessage(msg, IsInRaid() and "RAID" or "GUILD")
-        end
-    end
-
-    local function Tick()
-        if not running then return end
-        local msg = addon.L.LFM_TEMPLATE or "[KRT] LFM: {raid} {roles} {time}"
-        local raidName = GetRealZoneText() or "Raid"
-        local text = msg:gsub("{raid}", raidName):gsub("{roles}", "T/H/D"):gsub("{time}", date("%H:%M"))
-        Send(text)
-        U.scheduleDelay(_G.KRT_Options.lfmPeriod or 45, Tick)
-    end
-
-    function S:Init() end
-
-    function S:Start()
-        if running then return end
-        running = true
-        Tick()
-        addon.History.Loot:Log("LFM started")
-    end
-
-    function S:Stop()
-        running = false
-        addon.History.Loot:Log("LFM stopped")
-    end
-
-    function S:Toggle()
-        if running then
-            S:Stop()
-        else
-            S:Start()
-        end
-    end
 end
 
 -- ==================== Tooltips ==================== --
@@ -4801,147 +4775,147 @@ end
 
 -- Controller liste con pooling righe e highlight differito
 local function MakeListController(cfg)
-        -- cfg: keyName, updateInterval, localize(frameName), getData()->array
-        --      rowName(frameName,item,index)->"PrefixBtn"..index, rowTmpl, drawRow(btnName,item,scrollChild,scrollW)
-        --      highlightId()->id|nil, postUpdate(frameName)
-        --      sorters = { key = function(a,b,asc) return cond end, ... }
-        local self = {
-            frameName  = nil,
-            fetched    = false,
-            localized  = false,
-            data       = {},
-            _asc       = false,
-            _rows      = {},   -- pool ordinato per indice
-            _rowByName = {},   -- cache name->frame
-            _lastHL    = nil,  -- ultimo id evidenziato
-            _active    = true, -- aggiorna solo se visibile
-            _lastWidth = nil,
-        }
+    -- cfg: keyName, updateInterval, localize(frameName), getData()->array
+    --      rowName(frameName,item,index)->"PrefixBtn"..index, rowTmpl, drawRow(btnName,item,scrollChild,scrollW)
+    --      highlightId()->id|nil, postUpdate(frameName)
+    --      sorters = { key = function(a,b,asc) return cond end, ... }
+    local self = {
+        frameName  = nil,
+        fetched    = false,
+        localized  = false,
+        data       = {},
+        _asc       = false,
+        _rows      = {},   -- pool ordinato per indice
+        _rowByName = {},   -- cache name->frame
+        _lastHL    = nil,  -- ultimo id evidenziato
+        _active    = true, -- aggiorna solo se visibile
+        _lastWidth = nil,
+    }
 
-        local function acquireRow(name, parent, tmpl)
-            local row = self._rowByName[name]
-            if row then
-                row:Show()
-                return row
-            end
-            row = CreateFrame("Button", name, parent, tmpl)
-            self._rowByName[name] = row
+    local function acquireRow(name, parent, tmpl)
+        local row = self._rowByName[name]
+        if row then
+            row:Show()
             return row
         end
+        row = CreateFrame("Button", name, parent, tmpl)
+        self._rowByName[name] = row
+        return row
+    end
 
-        local function hideExtraRows(fromIndex)
-            for i = fromIndex, #self._rows do
-                local r = self._rows[i]
-                if r then r:Hide() end
-            end
+    local function hideExtraRows(fromIndex)
+        for i = fromIndex, #self._rows do
+            local r = self._rows[i]
+            if r then r:Hide() end
+        end
+    end
+
+    function self:OnLoad(frame)
+        if not frame then return end
+        self.frameName = frame:GetName()
+
+        frame:SetScript("OnShow", function() self._active = true end)
+        frame:SetScript("OnHide", function() self._active = false end)
+
+        frame:SetScript("OnUpdate", function(f, elapsed) self:UpdateUIFrame(f, elapsed) end)
+    end
+
+    function self:UpdateUIFrame(frame, elapsed)
+        if not self.frameName or not self._active then return end
+
+        if not self.localized and cfg.localize then
+            cfg.localize(self.frameName)
+            self.localized = true
         end
 
-        function self:OnLoad(frame)
-            if not frame then return end
-            self.frameName = frame:GetName()
-
-            frame:SetScript("OnShow", function() self._active = true end)
-            frame:SetScript("OnHide", function() self._active = false end)
-
-            frame:SetScript("OnUpdate", function(f, elapsed) self:UpdateUIFrame(f, elapsed) end)
+        if not Utils.throttle(frame, self.frameName .. (cfg.keyName or ""), cfg.updateInterval, elapsed) then
+            return
         end
 
-        function self:UpdateUIFrame(frame, elapsed)
-            if not self.frameName or not self._active then return end
-
-            if not self.localized and cfg.localize then
-                cfg.localize(self.frameName)
-                self.localized = true
-            end
-
-            if not Utils.throttle(frame, self.frameName .. (cfg.keyName or ""), cfg.updateInterval, elapsed) then
-                return
-            end
-
-            if not self.fetched then
-                if cfg.getData then cfg.getData(self.data) end
-                self:Fetch()
-            end
-
-            -- Highlight solo se cambia il selezionato
-            if cfg.highlightId then
-                local sel = cfg.highlightId()
-                if sel ~= self._lastHL then
-                    self._lastHL = sel
-                    for i = 1, #self.data do
-                        local it  = self.data[i]
-                        local row = self._rows[i]
-                        if row then
-                            Utils.toggleHighlight(row, sel ~= nil and it.id == sel)
-                        end
-                    end
-                end
-            end
-
-            if cfg.postUpdate then cfg.postUpdate(self.frameName) end
-        end
-
-        function self:Fetch()
-            local n = self.frameName
-            if not n then return end
-
-            local sf = _G[n .. "ScrollFrame"]
-            local sc = _G[n .. "ScrollFrameScrollChild"]
-            if not (sf and sc) then return end
-
-            local scrollW = sf:GetWidth()
-            self._lastWidth = scrollW
-
-            local totalH = 0
-            sc:SetHeight(sf:GetHeight())
-
-            local count = #self.data
-            for i = 1, count do
-                local it      = self.data[i]
-                local btnName = cfg.rowName(n, it, i)
-                local row     = self._rows[i]
-
-                if not row or row:GetName() ~= btnName then
-                    row = acquireRow(btnName, sc, cfg.rowTmpl)
-                    self._rows[i] = row
-                end
-
-                row:SetID(it.id)
-                row:ClearAllPoints()
-                row:SetPoint("TOPLEFT", 0, -totalH)
-                row:SetWidth(scrollW - 20)
-
-                local rH = cfg.drawRow(btnName, it, sc, scrollW, CacheParts, row)
-                local usedH = rH or row:GetHeight() or 20
-                totalH = totalH + usedH
-
-                row:Show()
-            end
-
-            hideExtraRows(count + 1)
-            sc:SetHeight(math_max(totalH, sf:GetHeight()))
-
-            self._lastHL = nil
-            self.fetched = true
-        end
-
-        function self:Dirty() self.fetched = false end
-
-        function self:Sort(key)
-            local cmp = cfg.sorters and cfg.sorters[key]
-            if not cmp or #self.data <= 1 then return end
-            self._asc = not self._asc
-            table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
-            self.fetched = true
+        if not self.fetched then
+            if cfg.getData then cfg.getData(self.data) end
             self:Fetch()
         end
 
-        -- Esponi tool locali
-        self._selectAndTrigger = selectAndTrigger
-        self._makeConfirmPopup = makeConfirmPopup
+        -- Highlight solo se cambia il selezionato
+        if cfg.highlightId then
+            local sel = cfg.highlightId()
+            if sel ~= self._lastHL then
+                self._lastHL = sel
+                for i = 1, #self.data do
+                    local it  = self.data[i]
+                    local row = self._rows[i]
+                    if row then
+                        Utils.toggleHighlight(row, sel ~= nil and it.id == sel)
+                    end
+                end
+            end
+        end
 
-        return self
+        if cfg.postUpdate then cfg.postUpdate(self.frameName) end
     end
+
+    function self:Fetch()
+        local n = self.frameName
+        if not n then return end
+
+        local sf = _G[n .. "ScrollFrame"]
+        local sc = _G[n .. "ScrollFrameScrollChild"]
+        if not (sf and sc) then return end
+
+        local scrollW = sf:GetWidth()
+        self._lastWidth = scrollW
+
+        local totalH = 0
+        sc:SetHeight(sf:GetHeight())
+
+        local count = #self.data
+        for i = 1, count do
+            local it      = self.data[i]
+            local btnName = cfg.rowName(n, it, i)
+            local row     = self._rows[i]
+
+            if not row or row:GetName() ~= btnName then
+                row = acquireRow(btnName, sc, cfg.rowTmpl)
+                self._rows[i] = row
+            end
+
+            row:SetID(it.id)
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", 0, -totalH)
+            row:SetWidth(scrollW - 20)
+
+            local rH = cfg.drawRow(btnName, it, sc, scrollW, CacheParts, row)
+            local usedH = rH or row:GetHeight() or 20
+            totalH = totalH + usedH
+
+            row:Show()
+        end
+
+        hideExtraRows(count + 1)
+        sc:SetHeight(math_max(totalH, sf:GetHeight()))
+
+        self._lastHL = nil
+        self.fetched = true
+    end
+
+    function self:Dirty() self.fetched = false end
+
+    function self:Sort(key)
+        local cmp = cfg.sorters and cfg.sorters[key]
+        if not cmp or #self.data <= 1 then return end
+        self._asc = not self._asc
+        table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
+        self.fetched = true
+        self:Fetch()
+    end
+
+    -- Esponi tool locali
+    self._selectAndTrigger = selectAndTrigger
+    self._makeConfirmPopup = makeConfirmPopup
+
+    return self
+end
 
 -- ============================================================================
 -- Loot History Frame (Main)
@@ -5142,7 +5116,7 @@ do
     addon.History.Raids = addon.History.Raids or {}
     local Raids = addon.History.Raids
 
-    local controller = MakeListController{
+    local controller = MakeListController {
         keyName        = "RaidsList",
         updateInterval = 0.075,
 
@@ -5162,14 +5136,14 @@ do
         getData        = function(out)
             local count = #KRT_Raids
             for i = 1, count do
-                local r = KRT_Raids[i]
-                local it = out[i] or Utils.Table.get("history-raids")
+                local r    = KRT_Raids[i]
+                local it   = out[i] or Utils.Table.get("history-raids")
                 it.id      = i
                 it.zone    = r.zone
                 it.size    = r.size
                 it.date    = r.startTime
                 it.dateFmt = date("%d/%m/%Y %H:%M", r.startTime)
-                out[i] = it
+                out[i]     = it
             end
             for i = count + 1, #out do
                 Utils.Table.free(out[i])
@@ -5267,7 +5241,7 @@ do
     addon.History.Boss = addon.History.Boss or {}
     local Boss = addon.History.Boss
 
-    local controller = MakeListController{
+    local controller = MakeListController {
         keyName        = "BossList",
         updateInterval = 0.075,
 
@@ -5280,14 +5254,14 @@ do
         getData        = function(out)
             local src = addon.Raid:GetBosses(addon.History.selectedRaid) or {}
             for i = 1, #src do
-                local b = src[i]
-                local it = out[i] or Utils.Table.get("history-bosses")
+                local b    = src[i]
+                local it   = out[i] or Utils.Table.get("history-bosses")
                 it.id      = b.id
                 it.name    = b.name
                 it.time    = b.time
                 it.mode    = b.mode
                 it.timeFmt = date("%H:%M", b.time)
-                out[i] = it
+                out[i]     = it
             end
             for i = #src + 1, #out do
                 Utils.Table.free(out[i])
@@ -5375,7 +5349,7 @@ do
     addon.History.BossAttendees = addon.History.BossAttendees or {}
     local M = addon.History.BossAttendees
 
-    local controller = MakeListController{
+    local controller = MakeListController {
         keyName        = "BossAttendees",
         updateInterval = 0.075,
 
@@ -5383,17 +5357,19 @@ do
 
         getData        = function(out)
             if not addon.History.selectedBoss then
-                for i = #out, 1, -1 do Utils.Table.free(out[i]); out[i] = nil end
+                for i = #out, 1, -1 do
+                    Utils.Table.free(out[i]); out[i] = nil
+                end
                 return
             end
             local src = addon.Raid:GetPlayers(addon.History.selectedRaid, addon.History.selectedBoss) or {}
             for i = 1, #src do
-                local p = src[i]
+                local p  = src[i]
                 local it = out[i] or Utils.Table.get("history-boss-attendees")
                 it.id    = p.id
                 it.name  = p.name
                 it.class = p.class
-                out[i] = it
+                out[i]   = it
             end
             for i = #src + 1, #out do
                 Utils.Table.free(out[i])
@@ -5459,7 +5435,12 @@ do
             if not (rID and bID and pID) then return end
             local raid = KRT_Raids[rID]; if not (raid and raid.bossKills[bID]) then return end
             local name = addon.Raid:GetPlayerName(pID, rID)
-            Utils.removeEntry(raid.bossKills[bID].players, name)
+            local list = raid.bossKills[bID].players
+            local i = addon.tIndexOf(list, name)
+            while i do
+                tremove(list, i)
+                i = addon.tIndexOf(list, name)
+            end
             controller:Dirty()
         end
         -- ask for confirmation before deleting an attendee
@@ -5484,7 +5465,7 @@ do
     addon.History.RaidAttendees = addon.History.RaidAttendees or {}
     local M = addon.History.RaidAttendees
 
-    local controller = MakeListController{
+    local controller = MakeListController {
         keyName        = "RaidAttendees",
         updateInterval = 0.075,
 
@@ -5500,8 +5481,8 @@ do
         getData        = function(out)
             local src = addon.Raid:GetPlayers(addon.History.selectedRaid) or {}
             for i = 1, #src do
-                local p = src[i]
-                local it = out[i] or Utils.Table.get("history-raid-attendees")
+                local p     = src[i]
+                local it    = out[i] or Utils.Table.get("history-raid-attendees")
                 it.id       = p.id
                 it.name     = p.name
                 it.class    = p.class
@@ -5509,7 +5490,7 @@ do
                 it.leave    = p.leave
                 it.joinFmt  = date("%H:%M", p.join)
                 it.leaveFmt = p.leave and date("%H:%M", p.leave) or ""
-                out[i] = it
+                out[i]      = it
             end
             for i = #src + 1, #out do
                 Utils.Table.free(out[i])
@@ -5560,7 +5541,13 @@ do
             local raid = KRT_Raids[rID]; if not (raid and raid.players[pID]) then return end
             local name = raid.players[pID].name
             tremove(raid.players, pID)
-            for _, boss in ipairs(raid.bossKills) do Utils.removeEntry(boss.players, name) end
+            for _, boss in ipairs(raid.bossKills) do
+                local i = addon.tIndexOf(boss.players, name)
+                while i do
+                    tremove(boss.players, i)
+                    i = addon.tIndexOf(boss.players, name)
+                end
+            end
             for i = #raid.loot, 1, -1 do if raid.loot[i].looter == name then tremove(raid.loot, i) end end
             controller:Dirty()
         end
@@ -5585,7 +5572,7 @@ do
 
     local raidLoot = {} -- cache per tooltip OnEnter (lista completa del raid)
 
-    local controller = MakeListController{
+    local controller = MakeListController {
         keyName        = "LootList",
         updateInterval = 0.075,
 
@@ -5618,8 +5605,8 @@ do
             end
 
             for i = 1, #data do
-                local v = data[i]
-                local it = out[i] or Utils.Table.get("history-loot")
+                local v        = data[i]
+                local it       = out[i] or Utils.Table.get("history-loot")
                 it.id          = v.id
                 it.itemId      = v.itemId
                 it.itemName    = v.itemName
@@ -5632,7 +5619,7 @@ do
                 it.rollValue   = v.rollValue
                 it.time        = v.time
                 it.timeFmt     = date("%H:%M", v.time)
-                out[i] = it
+                out[i]         = it
             end
             for i = #data + 1, #out do
                 Utils.Table.free(out[i])
@@ -5650,7 +5637,7 @@ do
                 if not ROW_H then ROW_H = (row and row:GetHeight()) or 20 end
                 local ui = CacheParts(row, btn, parts)
 
-                ui.Name:SetText(Utils.wrapTextInColorCode(v.itemName, itemColors[v.itemRarity + 1]))
+                ui.Name:SetText(addon:WrapTextInColorCode(v.itemName, itemColors[v.itemRarity + 1]))
                 ui.Source:SetText(addon.History.Boss:GetName(v.bossNum, addon.History.selectedRaid))
 
                 local r, g, b = addon.Raid:GetClassColor(addon.Raid:GetPlayerClass(v.looter))
@@ -5896,7 +5883,7 @@ do
 
     local helpString  = "%s: %s"
     local function printHelp(cmd, desc)
-        print(helpString:format(Utils.wrapTextInColorCode(cmd, RT_COLOR), desc))
+        print(helpString:format(addon:WrapTextInColorCode(cmd, RT_COLOR), desc))
     end
 
     local function HandleSlashCmd(cmd)
@@ -5910,7 +5897,7 @@ do
         local cmd1, cmd2, cmd3 = strsplit(" ", cmd, 3)
 
         -- ==== Debug ====
-        if Utils.checkEntry(cmdDebug, cmd1) then
+        if addon.tContains(cmdDebug, cmd1) then
             local subCmd = cmd2 and cmd2:lower()
 
             if subCmd == "level" or subCmd == "lvl" then
@@ -5955,7 +5942,7 @@ do
             end
 
             -- ==== Chat Throttle ====
-        elseif Utils.checkEntry(cmdChat, cmd1) then
+        elseif addon.tContains(cmdChat, cmd1) then
             local val = tonumber(cmd2)
             if val then
                 addon.options.chatThrottle = val
@@ -5965,7 +5952,7 @@ do
             end
 
             -- ==== Minimap ====
-        elseif Utils.checkEntry(cmdMinimap, cmd1) then
+        elseif addon.tContains(cmdMinimap, cmd1) then
             local sub = cmd2 and cmd2:lower()
             if sub == "on" then
                 addon.options.minimapButton = true
@@ -5989,7 +5976,7 @@ do
             end
 
             -- ==== Achievement Link ====
-        elseif Utils.checkEntry(cmdAchiev, cmd1) and find(cmd, "achievement:%d*:") then
+        elseif addon.tContains(cmdAchiev, cmd1) and find(cmd, "achievement:%d*:") then
             local from, to = string.find(cmd, "achievement%:%d*%:")
             local id = string.sub(cmd, from + 12, to - 1)
             from, to = string.find(cmd, "%|cffffff00%|Hachievement%:.*%]%|h%|r")
@@ -5997,7 +5984,7 @@ do
             printHelp("KRT", name .. " - ID#" .. id)
 
             -- ==== Config ====
-        elseif Utils.checkEntry(cmdConfig, cmd1) then
+        elseif addon.tContains(cmdConfig, cmd1) then
             if cmd2 == "reset" then
                 addon.Config:Default()
             else
@@ -6005,7 +5992,7 @@ do
             end
 
             -- ==== Warnings ====
-        elseif Utils.checkEntry(cmdWarnings, cmd1) then
+        elseif addon.tContains(cmdWarnings, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.Warnings:Toggle()
             elseif cmd2 == "help" then
@@ -6017,7 +6004,7 @@ do
             end
 
             -- ==== MS Changes ====
-        elseif Utils.checkEntry(cmdChanges, cmd1) then
+        elseif addon.tContains(cmdChanges, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.Changes:Toggle()
             elseif cmd2 == "demand" or cmd2 == "ask" then
@@ -6032,19 +6019,19 @@ do
             end
 
             -- ==== Loot History ====
-        elseif Utils.checkEntry(cmdHistory, cmd1) then
+        elseif addon.tContains(cmdHistory, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.History:Toggle()
             end
 
             -- ==== Master Looter ====
-        elseif Utils.checkEntry(cmdLoot, cmd1) then
+        elseif addon.tContains(cmdLoot, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.Master:Toggle()
             end
 
             -- ==== Reserves ====
-        elseif Utils.checkEntry(cmdReserves, cmd1) then
+        elseif addon.tContains(cmdReserves, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" then
                 addon.Reserves:ShowWindow()
             elseif cmd2 == "import" then
@@ -6056,7 +6043,7 @@ do
             end
 
             -- ==== LFM (Spammer) ====
-        elseif Utils.checkEntry(cmdLFM, cmd1) then
+        elseif addon.tContains(cmdLFM, cmd1) then
             if not cmd2 or cmd2 == "" or cmd2 == "toggle" or cmd2 == "show" then
                 addon.Spammer:Toggle()
             elseif cmd2 == "start" then
@@ -6146,7 +6133,7 @@ function addon:RAID_INSTANCE_WELCOME(...)
     local instanceName, instanceType, instanceDiff = GetInstanceInfo()
     _, KRT_NextReset = ...
     if L.RaidZones[instanceName] ~= nil then
-        Utils.schedule(3, function()
+        After(3, function()
             addon.Raid:Check(instanceName, instanceDiff)
         end)
     end
@@ -6158,7 +6145,8 @@ end
 function addon:PLAYER_ENTERING_WORLD()
     mainFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
     local module = self.Raid
-    module.firstCheckHandle = Utils.schedule(3, module.FirstCheck, module)
+    CancelTimer(module.firstCheckHandle, true)
+    module.firstCheckHandle = After(3, function() module:FirstCheck() end)
 end
 
 --
@@ -6226,12 +6214,14 @@ end
 -- COMBAT_LOG_EVENT_UNFILTERED: Logs a boss kill when a boss unit dies.
 --
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
-    local _, event, _, _, _, destGUID, destName = ...
+    local _, event, _, _, _, destGUID = ...
     if not KRT_CurrentRaid then return end
     if event == "UNIT_DIED" then
-        local npcID = Utils.getNpcId(destGUID)
-        if addon.BossIDs.BossIDs[npcID] then
-            self.Raid:AddBoss(destName)
+        if addon.GetUnitIdFromGUID(destGUID, "player") then return end
+        local npcId = addon.GetCreatureId(destGUID)
+        local boss = addon.BossIDs:GetBossName(npcId)
+        if boss then
+            self.Raid:AddBoss(boss)
         end
     end
 end
