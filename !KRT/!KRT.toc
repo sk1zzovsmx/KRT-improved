@@ -21,8 +21,12 @@ Libs\LibDeformat-3.0\lib.xml
 Libs\LibCompat-1.0\lib.xml
 Libs\LibLogger-1.0\lib.xml
 
-# Layer 1 - Core init (must load before all addon Lua files)
-Core\Init.lua
+# Layer 1 - Unified init/bootstrap/runtime (must load before all addon Lua files)
+Init.lua
+Core\DB.lua
+Core\DBSchema.lua
+Core\DBManager.lua
+Core\DBManager.Mock.lua
 
 # Layer 2 - Localization (must load before runtime modules)
 Localization\localization.en.lua
@@ -49,11 +53,13 @@ Modules\UI\ListController.lua
 Modules\UI\MultiSelect.lua
 Modules\Bus.lua
 
-# Layer 5 - Core bootstrap and event wiring
-KRT.lua
-
-# Layer 6 - Runtime modules (ordered by dependency)
+# Layer 5 - Runtime modules (ordered by dependency)
 # Services + entrypoint + parents + child UI controllers
+Core\DBRaidMigrations.lua
+Core\DBRaidStore.lua
+Core\DBRaidQueries.lua
+Core\DBRaidValidator.lua
+Core\DBSyncer.lua
 Services\Raid.lua
 Services\Chat.lua
 EntryPoints\Minimap.lua
@@ -65,12 +71,11 @@ Widgets\LootCounter.lua
 Services\Reserves.lua
 Widgets\ReservesUI.lua
 Controllers\Logger.lua
-Services\Syncer.lua
 Widgets\Config.lua
 Controllers\Warnings.lua
 Controllers\Changes.lua
 Controllers\Spammer.lua
 
-# Layer 7 - UI include manifest
-# Default profile: full (KRT.xml -> KRT.Full.xml). Core build can swap KRT.xml -> KRT.Core.xml.
+# Layer 6 - UI include manifest
+# Unified UI include manifest (single profile).
 KRT.xml

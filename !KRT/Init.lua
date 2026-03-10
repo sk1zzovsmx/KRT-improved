@@ -5,6 +5,568 @@
 -- events: document inbound/outbound events in module body
 
 local addon = select(2, ...)
+local addonName = select(1, ...)
+
+if not addon then
+    error("KRT addon table not found in Init.lua")
+end
+
+addon.name = addon.name or addonName
+addon.Core = addon.Core or {}
+addon.L = addon.L or {}
+addon.Diagnose = addon.Diagnose or {}
+addon.State = addon.State or {}
+addon.C = addon.C or {}
+addon.Events = addon.Events or {}
+addon.Events.Internal = addon.Events.Internal or {}
+addon.Events.Wow = addon.Events.Wow or {}
+addon.DB = addon.DB or {}
+addon.Features = addon.Features or {}
+addon.Controllers = addon.Controllers or {}
+addon.Services = addon.Services or {}
+addon.Widgets = addon.Widgets or {}
+addon.Bus = addon.Bus or {}
+addon.Frames = addon.Frames or {}
+addon.Time = addon.Time or {}
+
+addon.Events.Internal.RaidRosterDelta = addon.Events.Internal.RaidRosterDelta or "RaidRosterDelta"
+
+-- Canonical forwarded WoW-event names are PascalCase.
+addon.Events.Wow.LootOpened = addon.Events.Wow.LootOpened or "wow.LOOT_OPENED"
+addon.Events.Wow.LootClosed = addon.Events.Wow.LootClosed or "wow.LOOT_CLOSED"
+addon.Events.Wow.LootSlotCleared = addon.Events.Wow.LootSlotCleared or "wow.LOOT_SLOT_CLEARED"
+addon.Events.Wow.TradeAcceptUpdate = addon.Events.Wow.TradeAcceptUpdate or "wow.TRADE_ACCEPT_UPDATE"
+addon.Events.Wow.TradeRequestCancel = addon.Events.Wow.TradeRequestCancel or "wow.TRADE_REQUEST_CANCEL"
+addon.Events.Wow.TradeClosed = addon.Events.Wow.TradeClosed or "wow.TRADE_CLOSED"
+
+local _G = _G
+local pairs, type = pairs, type
+local rawget, rawset = rawget, rawset
+local getmetatable, setmetatable = getmetatable, setmetatable
+local tostring, tonumber = tostring, tonumber
+local GetRealmName = _G.GetRealmName
+local UnitIsGroupAssistant = _G.UnitIsGroupAssistant
+local UnitIsGroupLeader = _G.UnitIsGroupLeader
+local random = math.random
+local gsub = string.gsub
+local strsub, strlen = string.sub, string.len
+
+local Core = addon.Core
+local Diagnose = addon.Diagnose
+
+local Diag = setmetatable({}, {
+    __index = Diagnose,
+    __newindex = function(_, key, value)
+        Diagnose[key] = value
+    end,
+})
+
+local legacyAliasMap = addon.LegacyAliases or {}
+addon.LegacyAliases = legacyAliasMap
+
+local function isDebugEnabled()
+    local state = addon.State
+    return state and state.debugEnabled == true
+end
+
+local function getLegacyAliasWarnCache()
+    local state = addon.State
+    state.legacyAliasWarned = state.legacyAliasWarned or {}
+    return state.legacyAliasWarned
+end
+
+local function getLegacyAliasWarnSite()
+    local stackFn = _G.debugstack
+    if type(stackFn) ~= "function" then
+        return "unknown"
+    end
+
+    local stack = stackFn(4, 1, 0)
+    if type(stack) ~= "string" then
+        return tostring(stack or "unknown")
+    end
+
+    return stack:match("^[^\n]+") or stack
+end
+
+local function warnLegacyAliasAccess(aliasKey, targetPath)
+    if not isDebugEnabled() then
+        return
+    end
+
+    local site = getLegacyAliasWarnSite()
+    local cacheKey = tostring(aliasKey) .. "|" .. tostring(site)
+    local warned = getLegacyAliasWarnCache()
+    if warned[cacheKey] then
+        return
+    end
+    warned[cacheKey] = true
+
+    if addon.warn then
+        local template = (Diag.W and Diag.W.LogLegacyAliasAccess)
+            or "[Compat] Legacy alias used alias=%s target=%s site=%s"
+        addon:warn(template:format(tostring(aliasKey), tostring(targetPath or "?"), tostring(site)))
+    end
+end
+
+local function callMetaIndex(indexMeta, tbl, key)
+    if indexMeta == nil then
+        return nil
+    end
+    if type(indexMeta) == "function" then
+        return indexMeta(tbl, key)
+    end
+    return indexMeta[key]
+end
+
+local function callMetaNewIndex(newIndexMeta, tbl, key, value)
+    if newIndexMeta == nil then
+        rawset(tbl, key, value)
+        return
+    end
+    if type(newIndexMeta) == "function" then
+        newIndexMeta(tbl, key, value)
+        return
+    end
+    newIndexMeta[key] = value
+end
+
+local function installLegacyAliasProxy()
+    if addon._legacyAliasProxyInstalled then
+        return
+    end
+
+    local existingMeta = getmetatable(addon)
+    local meta = type(existingMeta) == "table" and existingMeta or {}
+    local oldIndex = meta.__index
+    local oldNewIndex = meta.__newindex
+
+    meta.__index = function(tbl, key)
+        local aliasEntry = legacyAliasMap[key]
+        if aliasEntry and type(aliasEntry.get) == "function" then
+            local value = aliasEntry.get()
+            warnLegacyAliasAccess(key, aliasEntry.targetPath)
+            if value ~= nil then
+                return value
+            end
+        end
+        return callMetaIndex(oldIndex, tbl, key)
+    end
+
+    meta.__newindex = function(tbl, key, value)
+        local aliasEntry = legacyAliasMap[key]
+        if aliasEntry and type(aliasEntry.set) == "function" then
+            aliasEntry.set(value)
+            -- Keep legacy aliases virtual so reads pass through __index and can be warned.
+            rawset(tbl, key, nil)
+            return
+        end
+        callMetaNewIndex(oldNewIndex, tbl, key, value)
+    end
+
+    local ok = pcall(setmetatable, addon, meta)
+    if ok then
+        addon._legacyAliasProxyInstalled = true
+    end
+end
+
+function Core.RegisterLegacyAlias(aliasKey, cfg)
+    if type(aliasKey) ~= "string" or aliasKey == "" then
+        return
+    end
+
+    local entry = legacyAliasMap[aliasKey]
+    if not entry then
+        entry = {}
+        legacyAliasMap[aliasKey] = entry
+    end
+
+    if type(cfg) == "table" then
+        if type(cfg.get) == "function" then
+            entry.get = cfg.get
+        end
+        if type(cfg.set) == "function" then
+            entry.set = cfg.set
+        end
+        entry.targetPath = cfg.targetPath or entry.targetPath
+    end
+
+    rawset(addon, aliasKey, nil)
+end
+
+function Core.RegisterLegacyAliasPath(aliasKey, namespaceKey, moduleKey)
+    if type(aliasKey) ~= "string" or aliasKey == "" then
+        return
+    end
+    if type(namespaceKey) ~= "string" or namespaceKey == "" then
+        return
+    end
+    if type(moduleKey) ~= "string" or moduleKey == "" then
+        return
+    end
+
+    Core.RegisterLegacyAlias(aliasKey, {
+        targetPath = namespaceKey .. "." .. moduleKey,
+        get = function()
+            local ns = rawget(addon, namespaceKey)
+            return ns and ns[moduleKey] or nil
+        end,
+        set = function(value)
+            local ns = rawget(addon, namespaceKey)
+            if type(ns) ~= "table" then
+                ns = {}
+                rawset(addon, namespaceKey, ns)
+            end
+            ns[moduleKey] = value
+        end,
+    })
+end
+
+installLegacyAliasProxy()
+
+local LEGACY_ALIAS_PATHS = {
+    { "Master", "Controllers", "Master" },
+    { "Logger", "Controllers", "Logger" },
+    { "Warnings", "Controllers", "Warnings" },
+    { "Changes", "Controllers", "Changes" },
+    { "Spammer", "Controllers", "Spammer" },
+
+    { "Raid", "Services", "Raid" },
+    { "Loot", "Services", "Loot" },
+    { "Rolls", "Services", "Rolls" },
+    { "Chat", "Services", "Chat" },
+    { "Syncer", "DB", "Syncer" },
+    { "Reserves", "Services", "Reserves" },
+
+    { "LootCounter", "Widgets", "LootCounter" },
+    { "ReservesUI", "Widgets", "ReservesUI" },
+    { "Config", "Widgets", "Config" },
+}
+
+for i = 1, #LEGACY_ALIAS_PATHS do
+    local entry = LEGACY_ALIAS_PATHS[i]
+    Core.RegisterLegacyAliasPath(entry[1], entry[2], entry[3])
+end
+
+local function installCompatGlobalFunctions()
+    if addon._globalCompatInstalled then
+        return
+    end
+
+    _G.table.shuffle = function(t)
+        if type(t) ~= "table" then
+            return t
+        end
+
+        local n = #t
+        while n > 1 do
+            local k = random(1, n)
+            t[n], t[k] = t[k], t[n]
+            n = n - 1
+        end
+        return t
+    end
+
+    _G.table.reverse = function(t, count)
+        if type(t) ~= "table" then
+            return t
+        end
+
+        local maxIndex = tonumber(count) or #t
+        if maxIndex < 2 then
+            return t
+        end
+        if maxIndex > #t then
+            maxIndex = #t
+        end
+
+        local i, j = 1, maxIndex
+        while i < j do
+            t[i], t[j] = t[j], t[i]
+            i = i + 1
+            j = j - 1
+        end
+        return t
+    end
+
+    _G.string.trim = function(str)
+        if str == nil then
+            return ""
+        end
+        return gsub(tostring(str), "^%s*(.-)%s*$", "%1")
+    end
+
+    _G.string.startsWith = function(str, piece)
+        if type(str) ~= "string" or type(piece) ~= "string" then
+            return false
+        end
+        return strsub(str, 1, strlen(piece)) == piece
+    end
+
+    _G.string.endsWith = function(str, piece)
+        if type(str) ~= "string" or type(piece) ~= "string" then
+            return false
+        end
+        local lenPiece = strlen(piece)
+        if #str < lenPiece then
+            return false
+        end
+        return strsub(str, -lenPiece) == piece
+    end
+
+    addon._globalCompatInstalled = true
+end
+
+installCompatGlobalFunctions()
+
+function Core.GetController(name)
+    if type(name) ~= "string" or name == "" then
+        return nil
+    end
+    local controllers = addon.Controllers
+    return controllers and controllers[name] or nil
+end
+
+function Core.GetPlayerName()
+    local state = addon.State
+    state.player = state.player or {}
+    local name = state.player.name or addon.UnitFullName("player")
+    state.player.name = name
+    return name
+end
+
+function Core.GetRealmName()
+    local realm = GetRealmName and GetRealmName() or ""
+    if type(realm) ~= "string" then
+        return ""
+    end
+    return realm
+end
+
+function Core.GetUnitRank(unit, fallback)
+    local groupLeader = addon.UnitIsGroupLeader or UnitIsGroupLeader
+    local groupAssistant = addon.UnitIsGroupAssistant or UnitIsGroupAssistant
+
+    if groupLeader and groupLeader(unit) then
+        return 2
+    end
+    if groupAssistant and groupAssistant(unit) then
+        return 1
+    end
+    return fallback or 0
+end
+
+addon.Options = addon.Options or {}
+local Options = addon.Options
+
+Options.defaultValues = Options.defaultValues or {
+    sortAscending = false,
+    useRaidWarning = true,
+    announceOnWin = true,
+    announceOnHold = true,
+    announceOnBank = false,
+    announceOnDisenchant = false,
+    lootWhispers = false,
+    screenReminder = true,
+    ignoreStacks = false,
+    showTooltips = true,
+    showLootCounterDuringMSRoll = false,
+    minimapButton = true,
+    countdownSimpleRaidMsg = false,
+    countdownDuration = 5,
+    countdownRollsBlock = true,
+    srImportMode = 0,
+}
+
+local function copyFlat(dst, src)
+    for key, value in pairs(src or {}) do
+        dst[key] = value
+    end
+    return dst
+end
+
+function Options.NewOptions()
+    return copyFlat({}, Options.defaultValues)
+end
+
+function Options.IsDebugEnabled()
+    return addon and addon.State and addon.State.debugEnabled == true
+end
+
+function Options.ApplyDebugSetting(enabled)
+    local state = addon.State
+    state.debugEnabled = enabled and true or false
+
+    local levels = addon and addon.Debugger and addon.Debugger.logLevels
+    local level = enabled and (levels and levels.DEBUG) or (levels and levels.INFO)
+    if level and addon and addon.SetLogLevel then
+        addon:SetLogLevel(level)
+    end
+end
+
+function Options.SetOption(key, value)
+    if type(key) ~= "string" or key == "" then
+        return false
+    end
+
+    local options = addon and addon.options
+    if type(options) ~= "table" then
+        if type(KRT_Options) == "table" then
+            options = KRT_Options
+        else
+            options = {}
+            KRT_Options = options
+        end
+        addon.options = options
+    end
+
+    options[key] = value
+
+    if type(KRT_Options) == "table" and KRT_Options ~= options then
+        KRT_Options[key] = value
+    end
+
+    return true
+end
+
+function Options.LoadOptions()
+    local options = Options.NewOptions()
+    if type(KRT_Options) == "table" then
+        copyFlat(options, KRT_Options)
+    end
+
+    options.debug = nil
+    KRT_Options = options
+    addon.options = options
+
+    Options.ApplyDebugSetting(false)
+    return options
+end
+
+function Options.RestoreDefaults()
+    local options = Options.NewOptions()
+    KRT_Options = options
+    addon.options = options
+    Options.ApplyDebugSetting(false)
+    return options
+end
+
+addon.LoadOptions = Options.LoadOptions
+
+function Core.EnsureLootRuntimeState()
+    local state = addon.State
+    state.loot = state.loot or {}
+
+    local lootState = state.loot
+    lootState.itemInfo = lootState.itemInfo or {}
+    lootState.currentRollType = tonumber(lootState.currentRollType) or 4
+    lootState.currentRollItem = tonumber(lootState.currentRollItem) or 0
+    lootState.currentItemIndex = tonumber(lootState.currentItemIndex) or 0
+
+    lootState.itemCount = tonumber(lootState.itemCount) or 1
+    if lootState.itemCount < 1 then
+        lootState.itemCount = 1
+    end
+    lootState.lootCount = tonumber(lootState.lootCount) or 0
+    if lootState.lootCount < 0 then
+        lootState.lootCount = 0
+    end
+    lootState.rollsCount = tonumber(lootState.rollsCount) or 0
+    if lootState.rollsCount < 0 then
+        lootState.rollsCount = 0
+    end
+    lootState.itemTraded = tonumber(lootState.itemTraded) or 0
+    if lootState.itemTraded < 0 then
+        lootState.itemTraded = 0
+    end
+
+    lootState.rollStarted = lootState.rollStarted == true
+
+    if lootState.opened == nil then
+        lootState.opened = false
+    end
+    if lootState.fromInventory == nil then
+        lootState.fromInventory = false
+    end
+    lootState.pendingAwards = lootState.pendingAwards or {}
+
+    return state, lootState, lootState.itemInfo
+end
+
+function Core.GetItemIndex()
+    local _, lootState = Core.EnsureLootRuntimeState()
+    return tonumber(lootState.currentItemIndex) or 0
+end
+
+function Core.GetFeatureShared()
+    local constants = addon.C or {}
+    local core = addon.Core
+    local state, lootState, itemInfo = core.EnsureLootRuntimeState()
+
+    return {
+        L = addon.L,
+        Diag = Diag,
+        Options = addon.Options,
+        Events = addon.Events,
+        Features = addon.Features,
+        C = constants,
+        Core = core,
+        DB = addon.DB,
+        Bus = addon.Bus,
+
+        Strings = addon.Strings,
+        Colors = addon.Colors,
+        Time = addon.Time,
+        Base64 = addon.Base64,
+        Comms = addon.Comms,
+        Sort = addon.Sort,
+        Item = addon.Item,
+
+        UI = addon.UI,
+        Frames = addon.Frames,
+        UIScaffold = addon.UIScaffold,
+        UIPrimitives = addon.UIPrimitives,
+        UIRowVisuals = addon.UIRowVisuals,
+        ListController = addon.ListController,
+        MultiSelect = addon.MultiSelect,
+
+        Services = addon.Services,
+        Controllers = addon.Controllers,
+        Widgets = addon.Widgets,
+
+        BindModuleRequestRefresh = core.BindModuleRequestRefresh,
+        BindModuleToggleHide = core.BindModuleToggleHide,
+        MakeModuleFrameGetter = core.MakeModuleFrameGetter,
+
+        UnitIsGroupLeader = addon.UnitIsGroupLeader,
+        UnitIsGroupAssistant = addon.UnitIsGroupAssistant,
+        tContains = _G.tContains,
+
+        ITEM_LINK_PATTERN = constants.ITEM_LINK_PATTERN,
+        rollTypes = constants.rollTypes,
+        lootTypesColored = constants.lootTypesColored,
+        itemColors = constants.itemColors,
+        RAID_TARGET_MARKERS = constants.RAID_TARGET_MARKERS,
+        K_COLOR = constants.K_COLOR,
+        RT_COLOR = constants.RT_COLOR,
+
+        coreState = state,
+        lootState = lootState,
+        itemInfo = itemInfo,
+        GetItemIndex = core.GetItemIndex or function()
+            return 0
+        end,
+    }
+end
+
+do
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.GetFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
+
+local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local addonName = addon.name
@@ -265,8 +827,6 @@ local mainFrame = frames.main
 
 local Core = addon.Core
 
-local RAID_SCHEMA_VERSION = 1
-
 function Core.GetCurrentRaid()
     return coreState.currentRaid
 end
@@ -421,205 +981,35 @@ Core.BindModuleToggleHide = bindModuleToggleHide
 Core.MakeModuleFrameGetter = makeModuleFrameGetter
 
 
-local function ensureRaidSchema(raid)
-    if type(raid) ~= "table" then
+local function ensureDBManager()
+    local db = addon.DB
+    if not (db and type(db.SetManager) == "function" and type(db.GetManager) == "function") then
         return nil
     end
 
-    local assignedByRef = {}
-    local usedPlayerNids = {}
-    local nextPlayerNid = tonumber(raid.nextPlayerNid) or 1
-    if nextPlayerNid < 1 then
-        nextPlayerNid = 1
+    local manager = db.GetManager()
+    if manager then
+        return manager
     end
 
-    local usedBossNids = {}
-    local nextBossNid = tonumber(raid.nextBossNid) or 1
-    if nextBossNid < 1 then
-        nextBossNid = 1
+    local dbManager = addon.DBManager
+    local defaultManager = dbManager and dbManager.GetDefaultManager and dbManager.GetDefaultManager() or nil
+    if defaultManager then
+        db.SetManager(defaultManager)
+        return defaultManager
     end
 
-    local usedLootNids = {}
-    local nextLootNid = tonumber(raid.nextLootNid) or 1
-    if nextLootNid < 1 then
-        nextLootNid = 1
-    end
-
-    local function allocatePlayerNid(preferred)
-        local pid = tonumber(preferred)
-        if pid and pid > 0 and not usedPlayerNids[pid] then
-            usedPlayerNids[pid] = true
-            return pid
-        end
-
-        while usedPlayerNids[nextPlayerNid] do
-            nextPlayerNid = nextPlayerNid + 1
-        end
-
-        local out = nextPlayerNid
-        usedPlayerNids[out] = true
-        nextPlayerNid = out + 1
-        return out
-    end
-
-    local function allocateBossNid(preferred)
-        local bid = tonumber(preferred)
-        if bid and bid > 0 and not usedBossNids[bid] then
-            usedBossNids[bid] = true
-            return bid
-        end
-
-        while usedBossNids[nextBossNid] do
-            nextBossNid = nextBossNid + 1
-        end
-
-        local out = nextBossNid
-        usedBossNids[out] = true
-        nextBossNid = out + 1
-        return out
-    end
-
-    local function allocateLootNid(preferred)
-        local lid = tonumber(preferred)
-        if lid and lid > 0 and not usedLootNids[lid] then
-            usedLootNids[lid] = true
-            return lid
-        end
-
-        while usedLootNids[nextLootNid] do
-            nextLootNid = nextLootNid + 1
-        end
-
-        local out = nextLootNid
-        usedLootNids[out] = true
-        nextLootNid = out + 1
-        return out
-    end
-
-    local function normalizePlayerCount(player)
-        if type(player) ~= "table" then
-            return
-        end
-
-        local already = assignedByRef[player]
-        if already then
-            player.playerNid = already
-        else
-            local pid = allocatePlayerNid(player.playerNid)
-            player.playerNid = pid
-            assignedByRef[player] = pid
-        end
-
-        local count = tonumber(player.count) or 0
-        if count < 0 then
-            count = 0
-        end
-        player.count = count
-    end
-
-    local function normalizeBossNid(bossKill)
-        if type(bossKill) ~= "table" then
-            return
-        end
-        bossKill.bossNid = allocateBossNid(bossKill.bossNid)
-    end
-
-    local function normalizeLootNid(lootEntry)
-        if type(lootEntry) ~= "table" then
-            return
-        end
-        lootEntry.lootNid = allocateLootNid(lootEntry.lootNid)
-    end
-
-    raid.schemaVersion = tonumber(raid.schemaVersion) or RAID_SCHEMA_VERSION
-    raid.raidNid = tonumber(raid.raidNid)
-    raid.players = raid.players or {}
-    local playersByName = raid._playersByName
-    if type(playersByName) ~= "table" then
-        playersByName = {}
-        raid._playersByName = playersByName
-    else
-        for name in pairs(playersByName) do
-            playersByName[name] = nil
-        end
-    end
-    raid.bossKills = raid.bossKills or {}
-    raid.loot = raid.loot or {}
-    raid.changes = raid.changes or {}
-
-    for i = 1, #raid.players do
-        local player = raid.players[i]
-        normalizePlayerCount(player)
-        if player and player.name then
-            playersByName[player.name] = player
-        end
-    end
-
-    for i = 1, #raid.bossKills do
-        normalizeBossNid(raid.bossKills[i])
-    end
-
-    for i = 1, #raid.loot do
-        normalizeLootNid(raid.loot[i])
-    end
-
-    raid.nextPlayerNid = nextPlayerNid
-    raid.nextBossNid = nextBossNid
-    raid.nextLootNid = nextLootNid
-
-    return raid
+    return nil
 end
 
-function Core.GetRaidSchemaVersion()
-    return RAID_SCHEMA_VERSION
-end
+ensureDBManager()
 
 function Core.EnsureRaidSchema(raid)
-    return ensureRaidSchema(raid)
-end
-
-local function ensureRaidsSchema()
-    if type(KRT_Raids) ~= "table" then
-        coreState.raidIdxByNid = nil
-        coreState.nextRaidNid = 1
-        return
+    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+    if raidStore and raidStore.NormalizeRaidRecord then
+        return raidStore:NormalizeRaidRecord(raid)
     end
-
-    local usedRaidNids = {}
-    local raidIdxByNid = {}
-    local nextRaidNid = 1
-
-    local function allocateRaidNid(preferred)
-        local rid = tonumber(preferred)
-        if rid and rid > 0 and not usedRaidNids[rid] then
-            usedRaidNids[rid] = true
-            if rid >= nextRaidNid then
-                nextRaidNid = rid + 1
-            end
-            return rid
-        end
-
-        while usedRaidNids[nextRaidNid] do
-            nextRaidNid = nextRaidNid + 1
-        end
-
-        local out = nextRaidNid
-        usedRaidNids[out] = true
-        nextRaidNid = out + 1
-        return out
-    end
-
-    for i = 1, #KRT_Raids do
-        local raid = ensureRaidSchema(KRT_Raids[i])
-        if raid then
-            local raidNid = allocateRaidNid(raid.raidNid)
-            raid.raidNid = raidNid
-            raidIdxByNid[raidNid] = i
-        end
-    end
-
-    coreState.raidIdxByNid = raidIdxByNid
-    coreState.nextRaidNid = nextRaidNid
+    return raid
 end
 
 function Core.EnsureRaidById(raidNum)
@@ -628,13 +1018,11 @@ function Core.EnsureRaidById(raidNum)
         return nil, nil
     end
 
-    ensureRaidsSchema()
-
-    local raid = KRT_Raids and KRT_Raids[id] or nil
-    if raid then
-        ensureRaidSchema(raid)
+    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+    if raidStore and raidStore.GetRaidByIndex then
+        return raidStore:GetRaidByIndex(id)
     end
-    return raid, id
+    return nil, id
 end
 
 function Core.EnsureRaidByNid(raidNid)
@@ -643,44 +1031,46 @@ function Core.EnsureRaidByNid(raidNid)
         return nil, nil, nil
     end
 
-    ensureRaidsSchema()
-
-    local raidIdxByNid = coreState.raidIdxByNid
-    local idx = raidIdxByNid and raidIdxByNid[nid] or nil
-    if not idx then
-        return nil, nil, nid
+    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+    if raidStore and raidStore.GetRaidByNid then
+        return raidStore:GetRaidByNid(nid)
     end
-
-    local raid = KRT_Raids and KRT_Raids[idx] or nil
-    if raid then
-        ensureRaidSchema(raid)
-    end
-    return raid, idx, nid
+    return nil, nil, nid
 end
 
 function Core.GetRaidNidById(raidNum)
+    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+    if raidStore and raidStore.GetRaidNidByIndex then
+        return raidStore:GetRaidNidByIndex(raidNum)
+    end
     local raid = Core.EnsureRaidById(raidNum)
     return raid and tonumber(raid.raidNid) or nil
 end
 
 function Core.GetRaidIdByNid(raidNid)
+    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+    if raidStore and raidStore.GetRaidIndexByNid then
+        return raidStore:GetRaidIndexByNid(raidNid)
+    end
     local _, idx = Core.EnsureRaidByNid(raidNid)
     return idx
 end
 
 function Core.CreateRaidRecord(args)
+    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+    if raidStore and raidStore.CreateRaidRecord then
+        return raidStore:CreateRaidRecord(args)
+    end
     args = args or {}
-
-    ensureRaidsSchema()
-    local raidNid = tonumber(args.raidNid)
-    if not raidNid or raidNid <= 0 then
-        raidNid = tonumber(coreState.nextRaidNid) or 1
-        coreState.nextRaidNid = raidNid + 1
+    local schemaVersion = Core.GetRaidSchemaVersion and Core.GetRaidSchemaVersion() or 1
+    schemaVersion = tonumber(schemaVersion) or 1
+    if schemaVersion < 1 then
+        schemaVersion = 1
     end
 
     local raid = {
-        schemaVersion = RAID_SCHEMA_VERSION,
-        raidNid = raidNid,
+        schemaVersion = schemaVersion,
+        raidNid = tonumber(args and args.raidNid),
         realm = args.realm,
         zone = args.zone,
         size = args.size,
@@ -696,13 +1086,17 @@ function Core.CreateRaidRecord(args)
         nextPlayerNid = 1,
     }
 
-    return ensureRaidSchema(raid)
+    return Core.EnsureRaidSchema(raid)
 end
 
 function Core.StripRuntimeRaidCaches(raid)
-    if type(raid) ~= "table" then
+    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+    if raidStore and raidStore.StripRuntime then
+        raidStore:StripRuntime(raid)
         return
     end
+    if type(raid) ~= "table" then return end
+    raid._runtime = nil
     raid._playersByName = nil
     raid._playerIdxByNid = nil
     raid._bossIdxByNid = nil
@@ -733,12 +1127,12 @@ local addonEvents = {
 
 do
     local wowBusEvents = {
-        LOOT_OPENED = WowEvents.LOOT_OPENED,
-        LOOT_CLOSED = WowEvents.LOOT_CLOSED,
-        LOOT_SLOT_CLEARED = WowEvents.LOOT_SLOT_CLEARED,
-        TRADE_ACCEPT_UPDATE = WowEvents.TRADE_ACCEPT_UPDATE,
-        TRADE_REQUEST_CANCEL = WowEvents.TRADE_REQUEST_CANCEL,
-        TRADE_CLOSED = WowEvents.TRADE_CLOSED,
+        LOOT_OPENED = WowEvents.LootOpened,
+        LOOT_CLOSED = WowEvents.LootClosed,
+        LOOT_SLOT_CLEARED = WowEvents.LootSlotCleared,
+        TRADE_ACCEPT_UPDATE = WowEvents.TradeAcceptUpdate,
+        TRADE_REQUEST_CANCEL = WowEvents.TradeRequestCancel,
+        TRADE_CLOSED = WowEvents.TradeClosed,
     }
 
     for eventName, busEventName in pairs(wowBusEvents) do
@@ -753,6 +1147,7 @@ end
 function addon:ADDON_LOADED(name)
     if name ~= addonName then return end
     self:UnregisterEvent("ADDON_LOADED")
+    ensureDBManager()
     local lvl = addon.GetLogLevel and addon:GetLogLevel()
     addon:info(Diag.I.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
         tostring(lvl), tostring(true)))
@@ -869,7 +1264,7 @@ end
 
 -- CHAT_MSG_ADDON: Forwards addon communication messages to the Syncer module.
 function addon:CHAT_MSG_ADDON(prefix, msg, channel, sender)
-    local syncer = addon.Services and addon.Services.Syncer
+    local syncer = Core.GetSyncer and Core.GetSyncer() or nil
     if syncer and syncer.OnAddonMessage then
         syncer:OnAddonMessage(prefix, msg, channel, sender)
     end
@@ -912,8 +1307,16 @@ end
 
 -- PLAYER_LOGOUT: Strip runtime-only raid caches before SavedVariables are written.
 function addon:PLAYER_LOGOUT()
+    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+    if raidStore and raidStore.StripAllRuntime then
+        raidStore:StripAllRuntime()
+        return
+    end
     if type(KRT_Raids) ~= "table" then return end
     for i = 1, #KRT_Raids do
         addon.Core.StripRuntimeRaidCaches(KRT_Raids[i])
     end
 end
+
+end
+

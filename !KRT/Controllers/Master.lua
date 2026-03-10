@@ -88,8 +88,7 @@ end
 -- =========== Master Looter Frame Module  =========== --
 do
     addon.Controllers = addon.Controllers or {}
-    addon.Controllers.Master = addon.Controllers.Master or addon.Master or {}
-    addon.Master = addon.Controllers.Master -- Legacy alias during namespacing migration.
+    addon.Controllers.Master = addon.Controllers.Master or {}
     local module = addon.Controllers.Master
     local frameName
 
@@ -189,7 +188,7 @@ do
         if not (frame and refs) then
             return
         end
-        if frame._krtBoundUi then
+        if frame._krtBound then
             return
         end
 
@@ -242,7 +241,7 @@ do
             module:BtnLootCounter(self, button)
         end)
 
-        frame._krtBoundUi = true
+        frame._krtBound = true
     end
 
     local function SetItemCountValue(count, focus)
@@ -444,9 +443,9 @@ do
     local function HookDropDownOpen(frame)
         if not frame then return end
         local button = _G[frame:GetName() .. "Button"]
-        if button and not button._krtDropDownHook then
+        if button and not button._krtHooked then
             button:HookScript("OnClick", function() RefreshDropDowns(true) end)
-            button._krtDropDownHook = true
+            button._krtHooked = true
         end
     end
 
@@ -891,8 +890,8 @@ do
 
         -- Initialize ItemBtn scripts once (clean inventory drop support: click-to-drop).
         local itemBtn = _G[frameName .. "ItemBtn"]
-        if itemBtn and not itemBtn.__krtMLInvDropInit then
-            itemBtn.__krtMLInvDropInit = true
+        if itemBtn and not itemBtn._krtMlInvDropInit then
+            itemBtn._krtMlInvDropInit = true
             itemBtn:RegisterForClicks("AnyUp")
             itemBtn:RegisterForDrag("LeftButton")
 
@@ -924,7 +923,7 @@ do
     scaffoldToggle = module.Toggle
     scaffoldHide = module.Hide
 
-    function addon.Controllers.Master:BindUI()
+    function module:BindUI()
         if uiBound and self.frame and self.refs then
             return self.frame, self.refs
         end
@@ -948,7 +947,7 @@ do
         return frame, refs
     end
 
-    function addon.Controllers.Master:EnsureUI()
+    function module:EnsureUI()
         if uiBound and self.frame and self.refs then
             return self.frame
         end
@@ -1187,8 +1186,8 @@ do
         Frames.SetFrameTitle(frameName, MASTER_LOOTER)
 
         local itemCountBox = _G[frameName .. "ItemCount"]
-        if itemCountBox and not itemCountBox.__krtMLHooked then
-            itemCountBox.__krtMLHooked = true
+        if itemCountBox and not itemCountBox._krtItemCountHooked then
+            itemCountBox._krtItemCountHooked = true
             itemCountBox:SetScript("OnTextChanged", function(self, isUserInput)
                 if not isUserInput then return end
                 announced = false
@@ -1552,8 +1551,13 @@ do
 
         local field = FindDropDownField(owner:GetName())
         if field then
-            KRT_Raids[addon.Core.GetCurrentRaid()][field.raidKey] = value
-            lootState[field.stateKey] = value
+            local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+            local raid = raidStore and raidStore.GetRaidByIndex and raidStore:GetRaidByIndex(addon.Core.GetCurrentRaid())
+                or nil
+            if raid then
+                raid[field.raidKey] = value
+                lootState[field.stateKey] = value
+            end
         end
 
         dropDownDirty = true
@@ -1571,11 +1575,15 @@ do
         if not field then return end
 
         -- Sync state from raid data
-        lootState[field.stateKey] = KRT_Raids[addon.Core.GetCurrentRaid()][field.raidKey]
+        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        local raid = raidStore and raidStore.GetRaidByIndex and raidStore:GetRaidByIndex(addon.Core.GetCurrentRaid())
+            or nil
+        if not raid then return end
+        lootState[field.stateKey] = raid[field.raidKey]
 
         -- Clear if unit is no longer in raid
         if lootState[field.stateKey] and addon.Raid:GetUnitID(lootState[field.stateKey]) == "none" then
-            KRT_Raids[addon.Core.GetCurrentRaid()][field.raidKey] = nil
+            raid[field.raidKey] = nil
             lootState[field.stateKey] = nil
         end
 
@@ -1615,14 +1623,14 @@ do
             local btn = _G[btnName] or CreateFrame("Button", btnName, selectionFrame, "KRTItemSelectionButton")
             btn:SetID(i)
             btn:Show()
-            if not btn._krtBoundUi then
+            if not btn._krtBound then
                 if btn.RegisterForClicks then
                     btn:RegisterForClicks("AnyUp")
                 end
                 Frames.SafeSetScript(btn, "OnClick", function(self, button)
                     module:BtnSelectedItem(self, button)
                 end)
-                btn._krtBoundUi = true
+                btn._krtBound = true
             end
             local itemName = GetItemName(i)
             local itemNameBtn = _G[btnName .. "Name"]

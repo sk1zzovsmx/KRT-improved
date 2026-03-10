@@ -46,7 +46,6 @@ do
     addon.Widgets.ReservesUI = addon.Widgets.ReservesUI or addon.ReservesUI or {}
     addon.ReservesUI = addon.Widgets.ReservesUI -- Legacy alias during namespacing migration.
     local module = addon.Widgets.ReservesUI
-    local UI = module
     local Service = addon.Services and addon.Services.Reserves and addon.Services.Reserves.Service
 
     -- ----- Internal state ----- --
@@ -314,7 +313,7 @@ do
         if Service and Service.ToggleSourceCollapsed then
             Service:ToggleSourceCollapsed(source)
         end
-        UI:RequestRefresh()
+        module:RequestRefresh()
     end
 
     local function LocalizeUIFrame()
@@ -390,7 +389,7 @@ do
 
     -- ----- Public methods ----- --
 
-    function UI:CreateReserveHeader(parent, source, yOffset, index)
+    function module:CreateReserveHeader(parent, source, yOffset, index)
         local headerName = frameName .. "ReserveHeader" .. index
         local header = _G[headerName] or CreateFrame("Button", headerName, parent, "KRTReserveHeaderTemplate")
         header:ClearAllPoints()
@@ -413,7 +412,7 @@ do
         return header
     end
 
-    function UI:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
+    function module:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
         local rowName = frameName .. "ReserveRow" .. index
         local row = _G[rowName] or CreateFrame("Frame", rowName, parent, "KRTReserveRowTemplate")
         row:ClearAllPoints()
@@ -479,7 +478,7 @@ do
             if not seenSources[source] then
                 seenSources[source] = true
                 headerIndex = headerIndex + 1
-                local header = UI:CreateReserveHeader(scrollChild, source, yOffset, headerIndex)
+                local header = module:CreateReserveHeader(scrollChild, source, yOffset, headerIndex)
                 reserveHeaders[#reserveHeaders + 1] = header
                 yOffset = yOffset + C.RESERVE_HEADER_HEIGHT
             end
@@ -488,7 +487,7 @@ do
             if not collapsed then
                 rowIndex = rowIndex + 1
                 local isFirstInGroup = not firstRenderedRowBySource[source]
-                local row = UI:CreateReserveRow(scrollChild, entry, yOffset, rowIndex, isFirstInGroup)
+                local row = module:CreateReserveRow(scrollChild, entry, yOffset, rowIndex, isFirstInGroup)
                 firstRenderedRowBySource[source] = true
                 reserveItemRows[#reserveItemRows + 1] = row
                 yOffset = yOffset + rowHeight
@@ -501,31 +500,31 @@ do
         end
     end
 
-    function UI:PrimeItemInfoQuery(itemId)
+    function module:PrimeItemInfoQuery(itemId)
         if not itemId then return end
         GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
         GameTooltip:SetHyperlink("item:" .. itemId)
         GameTooltip:Hide()
     end
 
-    function UI:QueryItemInfo(itemId)
+    function module:QueryItemInfo(itemId)
         if not (Service and Service.QueryItemInfo) then
             return false
         end
         return Service:QueryItemInfo(itemId)
     end
 
-    function UI:QueryMissingItems(silent)
+    function module:QueryMissingItems(silent)
         if not (Service and Service.QueryMissingItems) then
             return false, 0
         end
 
         local updated, count = Service:QueryMissingItems(silent, function(itemId)
-            UI:PrimeItemInfoQuery(itemId)
+            module:PrimeItemInfoQuery(itemId)
         end)
 
         if updated then
-            UI:RequestRefresh()
+            module:RequestRefresh()
         end
 
         return updated, count
@@ -537,26 +536,20 @@ do
             out = Service:ResetSaved()
         end
         if module.Hide then
-            module.Hide(module)
+            module:Hide()
         end
         if module.RequestRefresh then
-            module.RequestRefresh(module)
+            module:RequestRefresh()
         end
         return out
     end
 
-    function UI:RequestRefresh()
-        if module.RequestRefresh then
-            module.RequestRefresh(module)
-        end
-    end
-
-    function UI:Refresh()
+    function module:Refresh()
         UpdateUIFrame()
         RenderReserveListUI()
     end
 
-    function addon.Widgets.ReservesUI:BindUI()
+    function module:BindUI()
         if uiBound and self.frame and self.refs then
             return self.frame, self.refs
         end
@@ -579,7 +572,7 @@ do
         return frame, refs
     end
 
-    function addon.Widgets.ReservesUI:EnsureUI()
+    function module:EnsureUI()
         if uiBound and self.frame and self.refs then
             return self.frame
         end
@@ -604,7 +597,7 @@ do
         end
     end
 
-    function UI:OnLoad(frame)
+    function module:OnLoad(frame)
         addon:debug(Diag.D.LogReservesFrameLoaded)
         frameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
@@ -624,7 +617,7 @@ do
         if closeButton then
             closeButton:SetScript("OnClick", function()
                 if module.Hide then
-                    module.Hide(module)
+                    module:Hide()
                 end
             end)
             addon:debug(Diag.D.LogReservesBindButton:format("CloseButton", "Hide"))
@@ -641,7 +634,7 @@ do
         local queryButton = _G["KRTReserveListFrameQueryButton"]
         if queryButton then
             queryButton:SetScript("OnClick", function()
-                UI:QueryMissingItems(false)
+                module:QueryMissingItems(false)
             end)
             addon:debug(Diag.D.LogReservesBindButton:format("QueryButton", "QueryMissingItems"))
         end
@@ -656,22 +649,23 @@ do
                 return
             end
 
-            local resolved = UI:QueryItemInfo(itemId)
+            local resolved = module:QueryItemInfo(itemId)
             if resolved then
-                UI:RequestRefresh()
+                module:RequestRefresh()
             else
-                UI:PrimeItemInfoQuery(itemId)
+                module:PrimeItemInfoQuery(itemId)
             end
         end)
     end
 
     -- ----- Import widget controller ----- --
 
-    UI.Import = UI.Import or {}
-    local Import = UI.Import
+    module.Import = module.Import or {}
+    local Import = module.Import
     local getImportFrame = makeModuleFrameGetter(Import, "KRTImportWindow")
     local importLocalized = false
     local importUiBound = false
+    local importFrameName
     local importScaffoldToggle, importScaffoldHide
     local MODE_MULTI, MODE_PLUS = 0, 1
 
@@ -810,7 +804,7 @@ do
         if not frame then
             return nil
         end
-        if not self.frame then
+        if not importFrameName then
             self:OnLoad(frame)
         end
 
@@ -925,7 +919,7 @@ do
     end
 
     function Import:OnLoad(frame)
-        Frames.InitModuleFrame(Import, frame, {
+        importFrameName = Frames.InitModuleFrame(Import, frame, {
             enableDrag = true,
             hookOnShow = function()
                 Frames.ResetEditBox(_G["KRTImportEditBox"])
@@ -940,6 +934,7 @@ do
                 end
             end,
         })
+        if not importFrameName then return end
 
         if Import.RequestRefresh then
             Import:RequestRefresh()
@@ -1026,7 +1021,7 @@ do
     end
 
     Bus.RegisterCallback(InternalEvents.ReservesDataChanged, function()
-        UI:RequestRefresh()
+        module:RequestRefresh()
     end)
 end
 

@@ -36,12 +36,13 @@ Internal.SetItem = "SetItem"
 Internal.ConfigSortAscending = "ConfigsortAscending"
 Internal.ConfigShowLootCounterDuringMSRoll = "ConfigshowLootCounterDuringMSRoll"
 
-Wow.LOOT_OPENED = "wow.LOOT_OPENED"
-Wow.LOOT_CLOSED = "wow.LOOT_CLOSED"
-Wow.LOOT_SLOT_CLEARED = "wow.LOOT_SLOT_CLEARED"
-Wow.TRADE_ACCEPT_UPDATE = "wow.TRADE_ACCEPT_UPDATE"
-Wow.TRADE_REQUEST_CANCEL = "wow.TRADE_REQUEST_CANCEL"
-Wow.TRADE_CLOSED = "wow.TRADE_CLOSED"
+-- Canonical forwarded WoW-event names.
+Wow.LootOpened = Wow.LootOpened or "wow.LOOT_OPENED"
+Wow.LootClosed = Wow.LootClosed or "wow.LOOT_CLOSED"
+Wow.LootSlotCleared = Wow.LootSlotCleared or "wow.LOOT_SLOT_CLEARED"
+Wow.TradeAcceptUpdate = Wow.TradeAcceptUpdate or "wow.TRADE_ACCEPT_UPDATE"
+Wow.TradeRequestCancel = Wow.TradeRequestCancel or "wow.TRADE_REQUEST_CANCEL"
+Wow.TradeClosed = Wow.TradeClosed or "wow.TRADE_CLOSED"
 
 function Events.ConfigOptionChanged(optionName)
     if type(optionName) ~= "string" or optionName == "" then

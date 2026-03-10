@@ -28,7 +28,6 @@ local tonumber = tonumber
 do
     addon.Controllers = addon.Controllers or {}
     addon.Controllers.Warnings = addon.Controllers.Warnings or {}
-    addon.Warnings = addon.Controllers.Warnings -- Legacy alias during namespacing migration.
     local module = addon.Controllers.Warnings
     local frameName
 
@@ -63,7 +62,7 @@ do
     end
 
     local function BindWarningRow(row)
-        if not row or row._krtWarningBound then
+        if not row or row._krtBound then
             return
         end
         if row.RegisterForClicks then
@@ -72,7 +71,7 @@ do
         Frames.SafeSetScript(row, "OnClick", function(self, button)
             module:Select(self, button)
         end)
-        row._krtWarningBound = true
+        row._krtBound = true
     end
 
     -- ----- Public methods ----- --
@@ -127,7 +126,7 @@ do
     scaffoldToggle = module.Toggle
     scaffoldHide = module.Hide
 
-    function addon.Controllers.Warnings:BindUI()
+    function module:BindUI()
         if uiBound and self.frame and self.refs then
             return self.frame, self.refs
         end
@@ -176,7 +175,7 @@ do
         return frame, refs
     end
 
-    function addon.Controllers.Warnings:EnsureUI()
+    function module:EnsureUI()
         if uiBound and self.frame and self.refs then
             return self.frame
         end

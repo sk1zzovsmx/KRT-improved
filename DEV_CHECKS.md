@@ -25,14 +25,14 @@ Expected: `0 match`
 
 4. Core must not reference Master frame ownership internals:
 ```powershell
-rg "addon\\.Master\\.frame|_G\\[\"KRTMaster\"\\]" -n !KRT/KRT.lua
+rg "addon\\.Master\\.frame|_G\\[\"KRTMaster\"\\]" -n !KRT/Init.lua
 ```
 Expected: `0 match`
 
 5. Core must not touch any Parent frame internals:
 ```powershell
-rg "_G\\[\"KRT(Master|Logger|Warnings|Changes|Spammer)\"\\]" -n !KRT/KRT.lua
-rg "addon\\.(Master|Logger|Warnings|Changes|Spammer)\\.frame" -n !KRT/KRT.lua
+rg "_G\\[\"KRT(Master|Logger|Warnings|Changes|Spammer)\"\\]" -n !KRT/Init.lua
+rg "addon\\.(Master|Logger|Warnings|Changes|Spammer)\\.frame" -n !KRT/Init.lua
 ```
 Expected: `0 match`
 
@@ -62,17 +62,17 @@ Expected: review manually; parent toggles should not be introduced in Services.
 
 ## Function unification regression checks
 
-10. `Core.getFeatureShared` must not be redefined in `KRT.lua`:
+10. `Core.GetFeatureShared` canonical owner is `Init.lua` only:
 ```powershell
-rg "function\\s+Core\\.getFeatureShared" -n !KRT/KRT.lua
+rg "function\\s+Core\\.(GetFeatureShared|getFeatureShared)" -n !KRT -g "*.lua"
 ```
-Expected: `0 match`
+Expected: one hit in `!KRT/Init.lua`
 
-11. `ensureLootRuntimeState` canonical owner is `Core/Init.lua` only:
+11. `EnsureLootRuntimeState` canonical owner is `Init.lua` only:
 ```powershell
-rg "local\\s+function\\s+ensureLootRuntimeState|function\\s+Core\\.ensureLootRuntimeState" -n !KRT/KRT.lua
+rg "function\\s+Core\\.(EnsureLootRuntimeState|ensureLootRuntimeState)" -n !KRT -g "*.lua"
 ```
-Expected: `0 match`
+Expected: one hit in `!KRT/Init.lua`
 
 12. Reserves formatter helpers should not be duplicated in widget locals:
 ```powershell

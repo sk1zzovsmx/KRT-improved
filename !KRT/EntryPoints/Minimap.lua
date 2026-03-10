@@ -21,6 +21,16 @@ if type(UI.Call) ~= "function" then
         return nil
     end
 end
+if type(UI.IsEnabled) ~= "function" then
+    UI.IsEnabled = function()
+        return true
+    end
+end
+if type(UI.IsRegistered) ~= "function" then
+    UI.IsRegistered = function()
+        return true
+    end
+end
 
 -- =========== Minimap Button Module  =========== --
 addon.Minimap = addon.Minimap or {}
@@ -34,15 +44,25 @@ local function getController(name)
     return controllers and controllers[name] or nil
 end
 
+local function IsWidgetAvailable(widgetId)
+    return UI:IsEnabled(widgetId) and UI:IsRegistered(widgetId)
+end
+
 -- ----- Internal state ----- --
 local addonMenu
 local dragMode
+local dragActive = false
 local uiBound = false
 
 -- Cached math functions
 local sqrt = math.sqrt
 local cos, sin = math.cos, math.sin
 local rad, atan2, deg = math.rad, math.atan2, math.deg
+local MINIMAP_RING_RADIUS = 80
+local MIN_DRAG_DISTANCE = 0.001
+local MENU_INDEX_LOOT_COUNTER = 2
+local MENU_INDEX_DEMAND = 10
+local MENU_INDEX_ANNOUNCE = 11
 
 -- ----- Private helpers ----- --
 local function AcquireRefs(frame)
@@ -63,7 +83,15 @@ local minimapMenu = {
             end
         end
     },
-    { text = L.StrLootCounter, notCheckable = 1, func = function() UI:Call("LootCounter", "Toggle") end },
+    {
+        text = L.StrLootCounter,
+        notCheckable = 1,
+        func = function()
+            if IsWidgetAvailable("LootCounter") then
+                UI:Call("LootCounter", "Toggle")
+            end
+        end
+    },
     {
         text = L.StrLootLogger,
         notCheckable = 1,
@@ -131,9 +159,28 @@ local minimapMenu = {
     },
 }
 
+local function RefreshMenuState()
+    local lootCounterEntry = minimapMenu[MENU_INDEX_LOOT_COUNTER]
+    if not lootCounterEntry then
+        return
+    end
+    lootCounterEntry.disabled = IsWidgetAvailable("LootCounter") and nil or 1
+
+    local hasRaidGroup = (type(addon.IsInRaid) == "function") and addon.IsInRaid() or false
+    local demandEntry = minimapMenu[MENU_INDEX_DEMAND]
+    if demandEntry then
+        demandEntry.disabled = hasRaidGroup and nil or 1
+    end
+    local announceEntry = minimapMenu[MENU_INDEX_ANNOUNCE]
+    if announceEntry then
+        announceEntry.disabled = hasRaidGroup and nil or 1
+    end
+end
+
 -- Initializes and opens the menu for the minimap button.
 local function OpenMenu()
     addonMenu = addonMenu or CreateFrame("Frame", "KRTMenu", UIParent, "UIDropDownMenuTemplate")
+    RefreshMenuState()
     -- EasyMenu handles UIDropDownMenu initialization and opening.
     EasyMenu(minimapMenu, addonMenu, KRT_MINIMAP_GUI, 0, 0, "MENU")
 end
@@ -152,9 +199,26 @@ end
 
 -- Moves the minimap button while dragging.
 local function moveButton(self)
+    if not dragActive then
+        return
+    end
+
+    local scale = self and self.GetEffectiveScale and self:GetEffectiveScale()
+    if not scale or scale == 0 then
+        return
+    end
+
     local centerX, centerY = Minimap:GetCenter()
-    local x, y = GetCursorPosition()
-    x, y = x / self:GetEffectiveScale() - centerX, y / self:GetEffectiveScale() - centerY
+    if not centerX or not centerY then
+        return
+    end
+
+    local cursorX, cursorY = GetCursorPosition()
+    if not cursorX or not cursorY then
+        return
+    end
+
+    local x, y = cursorX / scale - centerX, cursorY / scale - centerY
 
     if dragMode == "free" then
         -- Free drag mode
@@ -163,7 +227,10 @@ local function moveButton(self)
     else
         -- Circular drag mode (snap to ring radius ~80)
         local dist = sqrt(x * x + y * y)
-        local px, py = (x / dist) * 80, (y / dist) * 80
+        if dist <= MIN_DRAG_DISTANCE then
+            return
+        end
+        local px, py = (x / dist) * MINIMAP_RING_RADIUS, (y / dist) * MINIMAP_RING_RADIUS
         self:ClearAllPoints()
         self:SetPoint("CENTER", px, py)
     end
@@ -183,7 +250,7 @@ function module:SetPos(angle)
     Options.SetOption("minimapPos", angle)
     local r = rad(angle)
     frame:ClearAllPoints()
-    frame:SetPoint("CENTER", cos(r) * 80, sin(r) * 80)
+    frame:SetPoint("CENTER", cos(r) * MINIMAP_RING_RADIUS, sin(r) * MINIMAP_RING_RADIUS)
 end
 
 function module:OnLoad(frame)
@@ -199,26 +266,38 @@ function module:OnLoad(frame)
     SetMinimapShown(options.minimapButton ~= false)
     frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     frame:SetScript("OnMouseDown", function(self, button)
+        if button ~= "LeftButton" then
+            return
+        end
         if IsAltKeyDown() then
             dragMode = "free"
-            self:SetScript("OnUpdate", moveButton)
         elseif IsShiftKeyDown() then
-            dragMode = nil
-            self:SetScript("OnUpdate", moveButton)
+            dragMode = "ring"
+        else
+            return
         end
+        dragActive = true
+        self:SetScript("OnUpdate", moveButton)
     end)
-    frame:SetScript("OnMouseUp", function(self)
+    frame:SetScript("OnMouseUp", function(self, button)
         self:SetScript("OnUpdate", nil)
-        if dragMode == "free" then
-            dragMode = nil
+        if not dragActive then
+            return
+        end
+        local wasFreeDrag = (dragMode == "free")
+        dragActive = false
+        dragMode = nil
+        if wasFreeDrag then
             return
         end
         local mx, my = Minimap:GetCenter()
         local bx, by = self:GetCenter()
+        if not (mx and my and bx and by) then
+            return
+        end
         module:SetPos(deg(atan2(by - my, bx - mx)))
-        dragMode = nil
     end)
-    frame:SetScript("OnClick", function(self, button, down)
+    frame:SetScript("OnClick", function(self, button)
         -- Ignore clicks if Shift or Alt keys are held:
         if IsShiftKeyDown() or IsAltKeyDown() then return end
         if button == "RightButton" then

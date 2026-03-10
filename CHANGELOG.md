@@ -4,6 +4,101 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Standardized `Controllers/*` and `Widgets/*` UI owner method declarations to
+  `module:*` style (`BindUI`/`EnsureUI`) and aligned `ReservesUI` methods away from `UI=module` aliasing.
+- **Bugfix:** Reserves Import window now runs its `OnLoad` initialization on first UI bind,
+  restoring drag behavior and first-show setup when the frame is pre-cached.
+- **Bugfix:** Fixed Reserves list refresh recursion in `Widgets/ReservesUI.lua` by
+  removing a self-referential `UI:RequestRefresh` override that caused stack overflow.
+- **UI:** Logger now has two tabs: `History` (existing full logger view) and
+  `Export` (separate empty panel scaffold, ready for future export UI work).
+- **UI:** Logger `Export` tab now renders two live panes: raid history list on
+  the left and the selected raid CSV preview on the right.
+- **Bugfix:** Logger Export pane frame naming now matches controller lookups,
+  so the raid list and CSV preview populate correctly.
+- **Bugfix:** Logger Export CSV editbox now uses the expected global frame name
+  (`KRTLoggerExportCsvText`), restoring CSV preview rendering on raid selection.
+- **UI:** Logger Export CSV preview is now view-only, auto-selects all text
+  while visible, and keeps text layout constrained to the panel bounds.
+- **Bugfix:** Logger Export CSV auto-select now uses deferred retry passes
+  after content/layout refresh, making full-text selection reliable after raid-row clicks.
+- **Bugfix:** Logger Export CSV editbox anchoring now clamps to the scrollframe
+  inner bounds (including scrollbar inset), preventing text from rendering
+  outside the panel background.
+- **UI:** Logger Export CSV input frame chrome is now hidden (no visible input box border)
+  while keeping copy/select behavior.
+- **Bugfix:** Logger Export CSV now force-hides all InputBox template texture regions
+  (including focus redraw) to avoid residual border artifacts on some clients.
+- **Bugfix:** Logger Export CSV scrollframe geometry now aligns with panel backdrop insets,
+  and CSV layout no longer forces editbox anchors outside the scroll content area.
+- **Behavior:** Logger Export raid list now enforces single selection; CTRL/SHIFT
+  multi-select and range-select are ignored in that panel.
+- **Refactor:** Multi-select input handling now uses centralized scope policies in
+  `Modules/UI/MultiSelect.lua`, so each panel can opt-in/out without ad-hoc key checks.
+- **Bugfix:** Multi-select scope policies now have strict precedence; when a scope disables multi/range,
+  CTRL/SHIFT are ignored even if per-call overrides are passed.
+- **Bugfix:** Logger Export raid selection now forces single semantics and keeps one row focused;
+  CTRL-click cannot toggle back to a previously selected raid.
+- **UI:** Removed the disabled `Export` button from the Logger Raids list footer.
+- **UI:** Logger Raids list footer buttons (`Set Current`, `Delete`) are now centered.
+- **Refactor:** Unified core bootstrap and runtime event wiring into
+  `!KRT/Init.lua`; removed `Core/Init.lua` and `KRT.lua`, and updated toc/tooling paths.
+- **Refactor:** Introduced DB-ready raid data layers:
+  `Core/DB.lua`, `Core/DBRaidMigrations.lua`, `Core/DBRaidStore.lua`, and
+  `Core/DBRaidQueries.lua`. Core raid APIs now delegate to the raid store.
+- **Refactor:** Centralized raid-history access behind `RaidStore`; direct
+  `KRT_Raids` reads/writes were removed from Services/Controllers and kept in
+  DB/bootstrap layers only.
+- **Behavior:** Runtime raid caches are now standardized under `raid._runtime`
+  and stripped before SavedVariables persistence.
+- **Refactor:** Logger read projections now consume the raid query layer for
+  boss/attendance/loot datasets.
+- **Docs:** Added `docs/RAID_SCHEMA.md` with explicit versioned raid schema
+  contract and runtime-cache persistence rules.
+- **Tooling:** Added `tools/validate-raid-schema.lua` for offline raid schema
+  validation and invariant reporting.
+- **Tooling:** Added `tools/check-raid-hardening.ps1` (static hardening gate)
+  and `tools/run-raid-validator.ps1` (SV validator runner via `lua`/`luajit`).
+- **Refactor:** Added `Core/DBSchema.lua` as the single source of truth for
+  `RAID_SCHEMA_VERSION`; core/store/migrations now read schema version from
+  the DB schema module.
+- **Behavior:** Added slash validation command `/krt validate raids
+  [verbose]` backed by `Core/DBRaidValidator.lua` for in-game invariant
+  checks with summary and detailed diagnostics.
+- **Refactor:** Added `Core/DBManager.lua` and manager wiring in `Core/DB.lua`
+  (`SetManager`/`GetManager`) so `DB.Get*Store()` now delegates through a
+  pluggable manager with default SavedVariables-backed behavior.
+- **Refactor:** Added `Core/DBManager.Mock.lua` with
+  `DBManager.CreateInMemoryManager(...)` for tests/smoke scenarios that need a
+  non-SavedVariables raid store.
+- **Bugfix:** RaidStore consumers now resolve the store only through
+  `DB.GetRaidStore()` (no direct module-table fallback), so custom
+  DB managers and in-memory mock managers are consistently honored.
+- **Refactor:** Added `Core.GetRaidStore()` as a shared accessor and removed
+  duplicated local `getRaidStore` helpers across runtime modules; static
+  hardening checks now enforce this.
+- **Refactor:** Extended DB facade/manager with `GetRaidQueries()` and
+  `GetRaidMigrations()` plus `Core.GetRaidQueries()`/
+  `Core.GetRaidMigrations()`, and moved consumers to those accessors.
+- **Refactor:** Added `GetRaidValidator()` to DB facade/manager
+  (`DB.GetRaidValidator()` / `Core.GetRaidValidator()`) and moved slash
+  validator lookup behind DB access.
+- **Refactor:** Moved logger sync backend from `Services/Syncer.lua` to
+  `Core/DBSyncer.lua` and routed Syncer resolution through DB facade
+  (`DB.GetSyncer()` / `Core.GetSyncer()`).
+- **Refactor:** `DBManager` now ships an explicit SavedVariables-backed default
+  manager (`DBManager.SavedVariables`) and supports query/migration stores for
+  custom managers and in-memory manager scenarios.
+- **Bugfix:** Minimap drag now guards invalid cursor/minimap coordinates and zero-distance normalization,
+  preventing rare divide-by-zero errors while Shift-dragging on the ring.
+- **Behavior:** Minimap menu now disables the `LootCounter` entry when the optional widget is disabled
+  by feature flags or not registered in the UI facade.
+- **Behavior:** Minimap menu now disables `Demand` and `Announce` entries when the player is not in a
+  raid group (`addon.IsInRaid() == false`).
+- **Bugfix:** `Controllers/Changes.lua` now hardens frame-part lookups and raid-table access, avoiding nil
+  index errors on early callbacks and raid-leave cleanup paths.
+- **Refactor:** Scoped `InitChangesTable` as file-local in `Controllers/Changes.lua`; also removed
+  Logger scope warnings (duplicate `Frames` local and module-scoped roster refresh helpers).
 - **Bugfix:** Logger raid-selection callbacks now use a shared file-scoped
   `triggerSelectionEvent(...)` helper, fixing nil-global errors during `RaidCreate`
   and related raid-selection refresh flows.
@@ -17,6 +112,8 @@ Dates are in YYYY-MM-DD.
   registered (or feature-disabled), and `KRTMasterConfigBtn` routes through `KRT.UI:Call(...)`.
 - **Refactor:** Split UI include manifests into `KRT.Core.xml` and `KRT.Full.xml`
   (default `KRT.xml` now includes `KRT.Full.xml`) to support core/full build profiles.
+- **Refactor:** Removed `KRT.Core.xml` and `KRT.Full.xml`; `KRT.xml` is now the
+  single UI include manifest with direct feature XML includes.
 - **Behavior:** Added baseline options bootstrap in `Modules/Utils.Options.lua`
   (`addon.LoadOptions` fallback) so core boot does not depend on `Widgets/Config.lua`.
 - **Refactor:** `Modules/UIBinder.lua` no longer uses `loadstring` for UI script binding.
@@ -54,7 +151,7 @@ Dates are in YYYY-MM-DD.
   title/row/cancel vertical rhythm while keeping all controls inside the popup bounds.
 - **Bugfix:** Logger UI now refreshes immediately after incoming Sync snapshots (`req`, `push`, `sync`),
   including the Raids list update without requiring manual reopen or reselection.
-- **Behavior:** Added Logger Sync feature (`Services/Syncer.lua`) using addon-message request/response
+- **Behavior:** Added Logger Sync feature (`Core/DBSyncer.lua`) using addon-message request/response
   chunking with three commands:
   `/krt logger req <raidId|raidNid> <player>` requests a specific raid snapshot from one target player
   and imports it as a new raid, `/krt logger push <raidId|raidNid> <player>` pushes a selected raid
@@ -215,11 +312,11 @@ Dates are in YYYY-MM-DD.
   - Consolidated duplicated `GetPlus()` helper via `MakePlusGetter()` factory (8 lines)
   - Consolidated `GetMasterFrameName()` duplicate handling (10 lines)
   - Created `Utils.makeFrameGetter()` factory consolidating 3x identical frame getter patterns (15 lines)
-  
+
 - **Phase 2 (Medium risk, Significant impact):** 75-90 lines
   - Added `addon:makeUIFrameController()` factory consolidating Toggle/Hide/Show patterns across 9 UI modules
   - Applied to: Master Looter, LootCounter, Reserves, ReserveImport, Config, Warnings, Changes, Spammer, Logger
-  
+
 - **Phase 3 (Low priority, Optional):** Analysis completed; no additional consolidations identified
   - Verified CheckPlayer pattern already centralized in addon.Raid
   - Verified dropdown logic already parameterized via FindDropDownField

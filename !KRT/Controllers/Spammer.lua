@@ -29,7 +29,6 @@ local tostring, tonumber = tostring, tonumber
 do
     addon.Controllers = addon.Controllers or {}
     addon.Controllers.Spammer = addon.Controllers.Spammer or {}
-    addon.Spammer = addon.Controllers.Spammer -- Legacy alias during namespacing migration.
     local module = addon.Controllers.Spammer
     -- ----- Internal state ----- --
     local frameName
@@ -278,7 +277,7 @@ do
     scaffoldToggle = module.Toggle
     scaffoldHide = module.Hide
 
-    function addon.Controllers.Spammer:BindUI()
+    function module:BindUI()
         if uiBound and self.frame and self.refs then
             return self.frame, self.refs
         end
@@ -353,7 +352,7 @@ do
         return frame, refs
     end
 
-    function addon.Controllers.Spammer:EnsureUI()
+    function module:EnsureUI()
         if uiBound and self.frame and self.refs then
             return self.frame
         end
