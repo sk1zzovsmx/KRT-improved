@@ -14,7 +14,12 @@
 ## X-Localizations: Kader (enUS)
 
 # Libraries:
-Libs\libs.xml
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\LibBossIDs-1.0\lib.xml
+Libs\LibDeformat-3.0\lib.xml
+Libs\LibCompat-1.0\lib.xml
+Libs\LibLogger-1.0\lib.xml
 
 # Localization (moved to the top for 'L' to be available):
 Localization\localization.en.lua

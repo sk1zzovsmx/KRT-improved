@@ -9,10 +9,11 @@ function addon:GetLib(name, silent)
 	-- Try common places for LibStub. In some load orders LibStub may not be available
 	-- as a global yet; try _G.LibStub first, then rawget on _G, then fallback to
 	-- a compat implementation (addon.Compat) if present.
-	local LibStub = _G and _G.LibStub
+	local globalEnv = _G or (getfenv and getfenv(0)) or {}
+	local LibStub = globalEnv.LibStub
 	if not LibStub and rawget then
-		-- rawget(_G, "LibStub") could be nil; guard it
-		local ok, val = pcall(function() return rawget(_G, "LibStub") end)
+		-- rawget(globalEnv, "LibStub") could be nil; guard it
+		local ok, val = pcall(function() return rawget(globalEnv, "LibStub") end)
 		if ok and val then LibStub = val end
 	end
 
@@ -100,6 +101,38 @@ end
 
 function Utils.getFrameName()
 	return addon.UIMaster:GetName()
+end
+
+function Utils.makeConfirmPopup(key, text, onAccept, cancels)
+	StaticPopupDialogs[key] = {
+		text         = text,
+		button1      = OKAY,
+		button2      = CANCEL,
+		OnAccept     = onAccept,
+		cancels      = cancels or key,
+		timeout      = 0,
+		whileDead    = 1,
+		hideOnEscape = 1,
+	}
+end
+
+function Utils.makeEditBoxPopup(key, text, onAccept, onShow)
+	StaticPopupDialogs[key] = {
+		text         = text,
+		button1      = SAVE,
+		button2      = CANCEL,
+		timeout      = 0,
+		whileDead    = 1,
+		hideOnEscape = 1,
+		hasEditBox   = 1,
+		cancels      = key,
+		OnShow       = function(self) if onShow then onShow(self) end end,
+		OnHide       = function(self)
+			self.editBox:SetText("")
+			self.editBox:ClearFocus()
+		end,
+		OnAccept     = function(self) onAccept(self, self.editBox:GetText()) end,
+	}
 end
 
 -- Shuffle a table:
