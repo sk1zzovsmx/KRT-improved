@@ -1,10 +1,8 @@
 local addonName, addon = ...
 addon.Utils = addon.Utils or {}
-addon.Diagnose = addon.Diagnose or {}
 
 local Utils = addon.Utils
 local L = addon.L
-local Diag = addon.Diagnose
 
 local type, ipairs = type, ipairs
 local floor, random = math.floor, math.random
@@ -20,8 +18,8 @@ local CreateFrame = CreateFrame
 local GetTime = GetTime
 local GetRealmName = GetRealmName
 local GetAchievementLink = GetAchievementLink
-local UnitIsGroupAssistant = _G.UnitIsGroupAssistant
-local UnitIsGroupLeader = _G.UnitIsGroupLeader
+local UnitIsGroupAssistant = UnitIsGroupAssistant
+local UnitIsGroupLeader = UnitIsGroupLeader
 
 local ITEM_LINK_FORMAT = "|c%s|Hitem:%d:%s|h[%s]|h|r"
 
@@ -472,9 +470,7 @@ function Utils.makeListController(cfg)
 		if cfg.highlightDebugTag and addon and addon.options and addon.options.debug and addon.debug then
 			local info = (cfg.highlightDebugInfo and cfg.highlightDebugInfo(self)) or ""
 			if info ~= "" then info = " " .. info end
-			addon:debug((Diag.D.LogListHighlightRefresh):format(
-				tostring(cfg.highlightDebugTag), tostring(selKey), info
-			))
+			addon:debug(("[%s] refresh key=%s%s"):format(tostring(cfg.highlightDebugTag), tostring(selKey), info))
 		end
 	end
 
@@ -516,7 +512,7 @@ function Utils.makeListController(cfg)
 			-- If the user has script errors disabled, this still surfaces the problem in chat.
 			if err ~= self._lastErr then
 				self._lastErr = err
-				addon:error((Diag.E.LogLoggerUIError):format(tostring(cfg.keyName or "?"), tostring(err)))
+				addon:error(L.LogLoggerUIError:format(tostring(cfg.keyName or "?"), tostring(err)))
 			end
 		end
 	end)
@@ -528,7 +524,7 @@ function Utils.makeListController(cfg)
 		frame:HookScript("OnShow", function()
 			if not self._shownOnce then
 				self._shownOnce = true
-				addon:debug((Diag.D.LogLoggerUIShow):format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
+				addon:debug(L.LogLoggerUIShow:format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
 			end
 			setActive(true)
 			if not self._loggedWidgets then
@@ -536,7 +532,7 @@ function Utils.makeListController(cfg)
 				local n = self.frameName
 				local sf = n and _G[n .. "ScrollFrame"]
 				local sc = n and _G[n .. "ScrollFrameScrollChild"]
-				addon:debug((Diag.D.LogLoggerUIWidgets):format(
+				addon:debug(L.LogLoggerUIWidgets:format(
 					tostring(cfg.keyName or "?"),
 					tostring(sf), tostring(sc),
 					sf and (sf:GetWidth() or 0) or 0,
@@ -565,7 +561,7 @@ function Utils.makeListController(cfg)
 		if not (sf and sc) then
 			if not self._missingScroll then
 				self._missingScroll = true
-				addon:warn((Diag.W.LogLoggerUIMissingWidgets):format(tostring(cfg.keyName or "?"), tostring(n)))
+				addon:warn(L.LogLoggerUIMissingWidgets:format(tostring(cfg.keyName or "?"), tostring(n)))
 			end
 			return
 		end
@@ -577,7 +573,7 @@ function Utils.makeListController(cfg)
 		if scrollW < 10 then
 			if not self._warnW0 then
 				self._warnW0 = true
-				addon:debug((Diag.D.LogLoggerUIDeferLayout):format(tostring(cfg.keyName or "?"), scrollW))
+				addon:debug(L.LogLoggerUIDeferLayout:format(tostring(cfg.keyName or "?"), scrollW))
 			end
 			defer:Show()
 			return false
@@ -589,7 +585,7 @@ function Utils.makeListController(cfg)
 		-- One-time diagnostics per list to help debug "empty/blank" frames.
 		if not self._loggedFetch then
 			self._loggedFetch = true
-			addon:debug((Diag.D.LogLoggerUIFetch):format(
+			addon:debug(L.LogLoggerUIFetch:format(
 				tostring(cfg.keyName or "?"),
 				#self.data,
 				sf:GetWidth() or 0, sf:GetHeight() or 0,
@@ -672,6 +668,274 @@ function Utils.makeListController(cfg)
 	return self
 end
 
+
+function Utils.makeHybridListController(cfg)
+    local self = {
+        frameName = nil,
+        data = {},
+        _asc = false,
+        _sortKey = nil,
+        _lastHL = nil,
+        _active = false,
+        _localized = false,
+        _dirty = true,
+        _buttonsCreated = false,
+        _rowHeight = tonumber(cfg.rowHeight) or 20,
+        _createdRowCount = 0,
+    }
+
+    local defer = CreateFrame("Frame")
+    defer:Hide()
+
+    local function releaseData()
+        for i = 1, #self.data do
+            twipe(self.data[i])
+        end
+        twipe(self.data)
+    end
+
+    local function refreshData()
+        releaseData()
+        if cfg.getData then
+            cfg.getData(self.data)
+        end
+    end
+
+    local function ensureLocalized()
+        if not self._localized and cfg.localize then
+            cfg.localize(self.frameName)
+            self._localized = true
+        end
+    end
+
+    local function postUpdate()
+        if cfg.postUpdate then
+            cfg.postUpdate(self.frameName)
+        end
+    end
+
+    local function applyHighlight()
+        local selectedId = cfg.highlightId and cfg.highlightId() or nil
+        local focusId = (cfg.focusId and cfg.focusId()) or selectedId
+
+        local selKey
+        if cfg.highlightId then
+            selKey = selectedId and ("id:" .. tostring(selectedId)) or "id:nil"
+        elseif cfg.highlightFn then
+            selKey = (cfg.highlightKey and cfg.highlightKey()) or false
+        else
+            selKey = false
+        end
+
+        local focusKey = (cfg.focusKey and cfg.focusKey()) or
+            (focusId ~= nil and ("f:" .. tostring(focusId)) or "f:nil")
+        local combo = tostring(selKey) .. "|" .. tostring(focusKey)
+        if combo == self._lastHL then return end
+        self._lastHL = combo
+
+        local n = self.frameName
+        local sf = n and _G[n .. "ScrollFrame"]
+        local buttons = sf and sf.buttons
+        if not buttons then return end
+
+        local offset = HybridScrollFrame_GetOffset(sf)
+        for i = 1, #buttons do
+            local row = buttons[i]
+            local dataIndex = offset + i
+            local it = self.data[dataIndex]
+            if row and it then
+                local isSel = false
+                if cfg.highlightId then
+                    isSel = (selectedId ~= nil and it.id == selectedId)
+                elseif cfg.highlightFn then
+                    isSel = cfg.highlightFn(it.id, it, dataIndex, row) and true or false
+                end
+
+                if Utils and Utils.setRowSelected then
+                    Utils.setRowSelected(row, isSel)
+                else
+                    Utils.toggleHighlight(row, isSel)
+                end
+
+                if Utils and Utils.setRowFocused then
+                    Utils.setRowFocused(row, focusId ~= nil and it.id == focusId)
+                end
+            end
+        end
+
+        if cfg.highlightDebugTag and addon and addon.options and addon.options.debug and addon.debug then
+            local info = (cfg.highlightDebugInfo and cfg.highlightDebugInfo(self)) or ""
+            if info ~= "" then info = " " .. info end
+            addon:debug(("[%s] refresh key=%s%s"):format(tostring(cfg.highlightDebugTag), tostring(selKey), info))
+        end
+    end
+
+    local function ensureButtons(sf)
+        if self._buttonsCreated then return true end
+        if not (sf and HybridScrollFrame_CreateButtons) then
+            return false
+        end
+
+        HybridScrollFrame_CreateButtons(sf, cfg.rowTmpl, 0, 0)
+        self._buttonsCreated = true
+
+        local buttons = sf.buttons
+        self._createdRowCount = buttons and #buttons or 0
+        if buttons and buttons[1] and buttons[1].GetHeight then
+            local h = buttons[1]:GetHeight()
+            if h and h > 0 then
+                self._rowHeight = h
+            end
+        end
+
+        sf.update = function()
+            self:Fetch()
+        end
+
+        sf:SetScript("OnVerticalScroll", function(frame, offset)
+            HybridScrollFrame_OnVerticalScroll(frame, offset, self._rowHeight, frame.update)
+        end)
+
+        if addon and addon.options and addon.options.debug and addon.debug then
+            addon:debug(("[Hybrid:%s] rowsCreated=%d"):format(tostring(cfg.keyName or "?"), self._createdRowCount))
+        end
+
+        return true
+    end
+
+    local function setActive(active)
+        self._active = active
+        if self._active then
+            ensureLocalized()
+            self:Dirty()
+            return
+        end
+        releaseData()
+        self._lastHL = nil
+    end
+
+    function self:Touch()
+        defer:Show()
+    end
+
+    function self:Dirty()
+        self._dirty = true
+        defer:Show()
+    end
+
+    local function runUpdate()
+        if not self._active or not self.frameName then return end
+
+        if self._dirty then
+            refreshData()
+            local okFetch = self:Fetch()
+            if okFetch ~= false then
+                self._dirty = false
+            end
+        else
+            self:Fetch()
+        end
+
+        applyHighlight()
+        postUpdate()
+    end
+
+    defer:SetScript("OnUpdate", function(f)
+        f:Hide()
+        local ok, err = pcall(runUpdate)
+        if not ok and err ~= self._lastErr then
+            self._lastErr = err
+            addon:error(L.LogLoggerUIError:format(tostring(cfg.keyName or "?"), tostring(err)))
+        end
+    end)
+
+    function self:OnLoad(frame)
+        if not frame then return end
+        self.frameName = frame:GetName()
+
+        frame:HookScript("OnShow", function()
+            setActive(true)
+        end)
+
+        frame:HookScript("OnHide", function()
+            setActive(false)
+        end)
+
+        if frame:IsShown() then
+            setActive(true)
+        end
+    end
+
+    function self:Fetch()
+        local n = self.frameName
+        if not n then return end
+
+        local sf = _G[n .. "ScrollFrame"]
+        if not sf then return end
+
+        local scrollH = sf:GetHeight() or 0
+        if scrollH < 10 then
+            defer:Show()
+            return false
+        end
+
+        if not ensureButtons(sf) then
+            return false
+        end
+
+        local buttons = sf.buttons
+        if not buttons then return end
+
+        local totalCount = #self.data
+        local totalHeight = totalCount * self._rowHeight
+        HybridScrollFrame_Update(sf, totalHeight, scrollH)
+
+        local offset = HybridScrollFrame_GetOffset(sf)
+        for i = 1, #buttons do
+            local row = buttons[i]
+            local dataIndex = offset + i
+            local it = self.data[dataIndex]
+            if it then
+                row:SetID(it.id)
+                cfg.drawRow(row, it)
+                row:Show()
+            else
+                row:Hide()
+            end
+        end
+
+        if cfg.debugVirtualization and addon and addon.options and addon.options.debug and addon.debug then
+            addon:debug(("[Hybrid:%s] total=%d visible=%d created=%d offset=%d"):format(
+                tostring(cfg.keyName or "?"),
+                totalCount,
+                #buttons,
+                self._createdRowCount,
+                offset
+            ))
+        end
+
+        self._lastHL = nil
+    end
+
+    function self:Sort(key)
+        local cmp = cfg.sorters and cfg.sorters[key]
+        if not cmp or #self.data <= 1 then return end
+        if self._sortKey ~= key then
+            self._sortKey = key
+            self._asc = false
+        end
+        self._asc = not self._asc
+        table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
+        self:Fetch()
+        applyHighlight()
+        postUpdate()
+    end
+
+    self._makeConfirmPopup = Utils.makeConfirmPopup
+
+    return self
+end
+
 function Utils.bindListController(module, controller)
 	module.OnLoad = function(_, frame) controller:OnLoad(frame) end
 	module.Fetch = function() controller:Fetch() end
@@ -730,7 +994,7 @@ do
 		local wrapped = function(eventName, ...)
 			local ok, err = pcall(func, eventName, ...)
 			if not ok then
-				addon:error((Diag.E.LogUtilsCallbackExec):format(tostring(func), tostring(eventName), err))
+				addon:error(L.StrCbErrExec:format(tostring(func), tostring(eventName), err))
 			end
 		end
 
@@ -913,49 +1177,6 @@ function Utils.makeEventDrivenRefresher(targetOrGetter, updateFn)
 	end
 end
 
--- =========== Frame Getter Factory  =========== --
--- Creates a lazy-caching getter for global UI frames.
--- Usage: local getFrame = Utils.makeFrameGetter("KRTMaster")
-function Utils.makeFrameGetter(globalFrameName)
-	local cached = nil
-	return function()
-		if cached then return cached end
-		local frame = _G[globalFrameName]
-		if frame then cached = frame end
-		return frame
-	end
-end
-
--- =========== UI Frame Controller Factory  =========== --
--- Consolidates recurring Toggle/Hide/Show patterns across UI modules.
-function Utils.makeUIFrameController(getFrame, requestRefreshFn)
-	return {
-		Toggle = function(self)
-			local frame = getFrame()
-			if not frame then return end
-			if frame:IsShown() then
-				Utils.setShown(frame, false)
-			else
-				if requestRefreshFn then requestRefreshFn() end
-				Utils.setShown(frame, true)
-			end
-		end,
-		Hide = function(self)
-			local frame = getFrame()
-			if frame then
-				Utils.setShown(frame, false)
-			end
-		end,
-		Show = function(self)
-			local frame = getFrame()
-			if frame then
-				if requestRefreshFn then requestRefreshFn() end
-				Utils.setShown(frame, true)
-			end
-		end,
-	}
-end
-
 -- =========== Tooltip helpers  =========== --
 
 do
@@ -1081,7 +1302,7 @@ end
 -- These helpers avoid using LockHighlight() for persistent selection, so hover highlight remains native.
 -- Safe for 3.3.5a and works with any UI skin (pure texture overlays).
 
-local function ensureRowVisuals(row)
+local function _ensureRowVisuals(row)
 	if not row or row._krtSelTex then return end
 
 	-- Persistent selection fill (soft)
@@ -1113,17 +1334,17 @@ local function ensureRowVisuals(row)
 end
 
 function Utils.ensureRowVisuals(row)
-	ensureRowVisuals(row)
+	_ensureRowVisuals(row)
 end
 
 function Utils.setRowSelected(row, cond)
-	ensureRowVisuals(row)
+	_ensureRowVisuals(row)
 	if not row or not row._krtSelTex then return end
 	if cond then row._krtSelTex:Show() else row._krtSelTex:Hide() end
 end
 
 function Utils.setRowFocused(row, cond)
-	ensureRowVisuals(row)
+	_ensureRowVisuals(row)
 	local t = row and row._krtFocusTex
 	if not t then return end
 	if cond then t:Show() else t:Hide() end
@@ -1185,7 +1406,7 @@ do
 		st.set = {}
 		st.count = 0
 		st.ver = (st.ver or 0) + 1
-		debugLog((Diag.D.LogLoggerSelectInit):format(tostring(key), st.ver))
+		debugLog(("[LoggerSelect] init ctx=%s ver=%d"):format(tostring(key), st.ver))
 		return st
 	end
 
@@ -1241,7 +1462,7 @@ do
 
 		st.ver = (st.ver or 0) + 1
 
-		debugLog((Diag.D.LogLoggerSelectToggle):format(
+		debugLog(("[LoggerSelect] toggle ctx=%s id=%s multi=%s action=%s count %d->%d ver=%d"):format(
 			tostring(key), tostring(id), isMulti and "1" or "0", tostring(action), before, st.count or 0, st.ver
 		))
 
@@ -1257,7 +1478,7 @@ do
 		st.anchor = k
 		-- Anchor changes do not affect highlight rendering directly, so we do not bump st.ver here.
 		local ver = st.ver or 0
-		debugLog((Diag.D.LogLoggerSelectAnchor):format(
+		debugLog(("[LoggerSelect] anchor ctx=%s from=%s to=%s ver=%d"):format(
 			tostring(key), tostring(before), tostring(st.anchor), ver
 		))
 		return st.anchor
@@ -1333,7 +1554,7 @@ do
 		end
 
 		st.ver = (st.ver or 0) + 1
-		debugLog((Diag.D.LogLoggerSelectRange):format(
+		debugLog(("[LoggerSelect] range ctx=%s id=%s add=%s action=%s count %d->%d ver=%d anchor=%s"):format(
 			tostring(key), tostring(id), isAdd and "1" or "0", tostring(action), before, st.count or 0, st.ver,
 			tostring(st.anchor)
 		))

@@ -6,12 +6,9 @@ local addonName, addon    = ...
 addon                     = addon or {}
 addon.name                = addon.name or addonName
 addon.L                   = addon.L or {}
-addon.Diagnose            = addon.Diagnose or {}
+addon.E                   = addon.E or {}
 local L                   = addon.L
-local Diagnose            = addon.Diagnose
-local Diag                = setmetatable({}, {
-    __index = Diagnose,
-})
+local E                   = addon.E
 local Utils               = addon.Utils
 local C                   = addon.C
 
@@ -53,11 +50,6 @@ addon.CallbackHandler     = LibStub("CallbackHandler-1.0")
 
 Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
 addon.Debugger:Embed(addon)
-
--- Keep LibCompat chat output behavior, but without prepending tostring(addon) ("table: ...").
-function addon:Print(...)
-    return Compat.Print(Compat, ...)
-end
 
 -- Local aliases (safe and fast)
 local UnitIsGroupLeader    = addon.UnitIsGroupLeader
@@ -137,7 +129,7 @@ do
             if type(fn) == "function" then
                 local ok, err = pcall(fn, obj, ...)
                 if not ok then
-                    addon:error(Diag.E.LogCoreEventHandlerFailed:format(tostring(e), tostring(err)))
+                    addon:error(E.LogCoreEventHandlerFailed:format(tostring(e), tostring(err)))
                 end
             end
         end
@@ -212,43 +204,6 @@ do
     addon:RegisterEvent("ADDON_LOADED")
 end
 
--- Alias: redirect to Utils for backwards compatibility
--- (function moved to Utils.lua; this wrapper allows existing code to use addon:makeUIFrameController(...))
-function addon:makeUIFrameController(getFrame, requestRefreshFn)
-    return Utils.makeUIFrameController(getFrame, requestRefreshFn)
-end
-
-local function bindModuleRequestRefresh(module, getFrame)
-    local requestRefresh = Utils.makeEventDrivenRefresher(getFrame, function()
-        module:Refresh()
-    end)
-
-    function module:RequestRefresh()
-        requestRefresh()
-    end
-end
-
-local function bindModuleToggleHide(module, uiController)
-    function module:Toggle()
-        return uiController:Toggle()
-    end
-
-    function module:Hide()
-        return uiController:Hide()
-    end
-end
-
-local function makeModuleFrameGetter(module, globalFrameName)
-    local getGlobalFrame = Utils.makeFrameGetter(globalFrameName)
-    return function()
-        local frame = module.frame or getGlobalFrame()
-        if frame and not module.frame then
-            module.frame = frame
-        end
-        return frame
-    end
-end
-
 -- =========== Raid Helpers Module  =========== --
 -- Manages raid state, roster, boss kills, and loot logging.
 do
@@ -274,7 +229,7 @@ do
 
         if not addon.IsInRaid() then
             numRaid = 0
-            addon:debug(Diag.D.LogRaidLeftGroupEndSession)
+            addon:info(E.LogRaidLeftGroupEndSession)
             module:End()
             addon.Master:PrepareDropDowns()
             return
@@ -353,7 +308,7 @@ do
             end
         end
 
-        addon:debug(Diag.D.LogRaidRosterUpdate:format(rosterVersion, n))
+        addon:debug(E.LogRaidRosterUpdate:format(rosterVersion, n))
         addon.Master:PrepareDropDowns()
     end
 
@@ -428,7 +383,7 @@ do
         tinsert(KRT_Raids, raidInfo)
         KRT_CurrentRaid = #KRT_Raids
 
-        addon:info(Diag.I.LogRaidCreated:format(
+        addon:info(E.LogRaidCreated:format(
             KRT_CurrentRaid or -1,
             tostring(zoneName),
             tonumber(raidSize) or -1,
@@ -511,7 +466,7 @@ do
         local raid = KRT_Raids[KRT_CurrentRaid]
         if raid then
             local duration = currentTime - (raid.startTime or currentTime)
-            addon:info(Diag.I.LogRaidEnded:format(KRT_CurrentRaid or -1, tostring(raid.zone),
+            addon:info(E.LogRaidEnded:format(KRT_CurrentRaid or -1, tostring(raid.zone),
                 tonumber(raid.size) or -1, raid.bossKills and #raid.bossKills or 0,
                 raid.loot and #raid.loot or 0, duration))
         end
@@ -525,7 +480,7 @@ do
 
     -- Checks the current raid status and creates a new session if needed.
     function module:Check(instanceName, instanceDiff)
-        addon:debug(Diag.D.LogRaidCheck:format(tostring(instanceName), tostring(instanceDiff),
+        addon:debug(E.LogRaidCheck:format(tostring(instanceName), tostring(instanceDiff),
             tostring(KRT_CurrentRaid)))
         if not KRT_CurrentRaid then
             module:Create(instanceName, (instanceDiff % 2 == 0 and 25 or 10))
@@ -536,31 +491,24 @@ do
             if current.zone == instanceName then
                 if current.size == 10 and (instanceDiff % 2 == 0) then
                     addon:info(L.StrNewRaidSessionChange)
-                    addon:debug(Diag.D.LogRaidSessionChange:format(tostring(instanceName), 25,
+                    addon:info(E.LogRaidSessionChange:format(tostring(instanceName), 25,
                         tonumber(instanceDiff) or -1))
                     module:Create(instanceName, 25)
                 elseif current.size == 25 and (instanceDiff % 2 ~= 0) then
                     addon:info(L.StrNewRaidSessionChange)
-                    addon:debug(Diag.D.LogRaidSessionChange:format(tostring(instanceName), 10,
+                    addon:info(E.LogRaidSessionChange:format(tostring(instanceName), 10,
                         tonumber(instanceDiff) or -1))
                     module:Create(instanceName, 10)
                 end
-            else
-                -- Zone changed: start a new raid session
-                addon:info(L.StrNewRaidSessionChange)
-                local newSize = (instanceDiff % 2 == 0 and 25 or 10)
-                addon:debug(Diag.D.LogRaidSessionChange:format(tostring(instanceName), newSize,
-                    tonumber(instanceDiff) or -1))
-                module:Create(instanceName, newSize)
             end
         elseif (instanceDiff % 2 == 0) then
             addon:info(L.StrNewRaidSessionChange)
-            addon:debug(Diag.D.LogRaidSessionCreate:format(tostring(instanceName), 25,
+            addon:info(E.LogRaidSessionCreate:format(tostring(instanceName), 25,
                 tonumber(instanceDiff) or -1))
             module:Create(instanceName, 25)
         elseif (instanceDiff % 2 ~= 0) then
             addon:info(L.StrNewRaidSessionChange)
-            addon:debug(Diag.D.LogRaidSessionCreate:format(tostring(instanceName), 10,
+            addon:info(E.LogRaidSessionCreate:format(tostring(instanceName), 10,
                 tonumber(instanceDiff) or -1))
             module:Create(instanceName, 10)
         end
@@ -582,7 +530,7 @@ do
         end
 
         local instanceName, instanceType, instanceDiff = GetInstanceInfo()
-        addon:debug(Diag.D.LogRaidFirstCheck:format(tostring(addon.IsInGroup()), tostring(KRT_CurrentRaid ~= nil),
+        addon:debug(E.LogRaidFirstCheck:format(tostring(addon.IsInGroup()), tostring(KRT_CurrentRaid ~= nil),
             tostring(instanceName), tostring(instanceType), tostring(instanceDiff)))
         if instanceType == "raid" then
             module:Check(instanceName, instanceDiff)
@@ -612,9 +560,9 @@ do
             t.count = t.count or 0
             tinsert(raid.players, t)
             raid.playersByName[t.name] = t
-            addon:trace(Diag.D.LogRaidPlayerJoin:format(tostring(t.name), tonumber(raidNum) or -1))
+            addon:trace(E.LogRaidPlayerJoin:format(tostring(t.name), tonumber(raidNum) or -1))
         else
-            addon:trace(Diag.D.LogRaidPlayerRefresh:format(tostring(t.name), tonumber(raidNum) or -1))
+            addon:trace(E.LogRaidPlayerRefresh:format(tostring(t.name), tonumber(raidNum) or -1))
         end
     end
 
@@ -622,7 +570,7 @@ do
     function module:AddBoss(bossName, manDiff, raidNum)
         raidNum = raidNum or KRT_CurrentRaid
         if not raidNum or not bossName then
-            addon:debug(Diag.D.LogBossAddSkipped:format(tostring(raidNum), tostring(bossName)))
+            addon:warn(E.LogBossAddSkipped:format(tostring(raidNum), tostring(bossName)))
             return
         end
 
@@ -664,9 +612,9 @@ do
 
         tinsert(raid.bossKills, killInfo)
         KRT_LastBoss = bossNid
-        addon:info(Diag.I.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1,
+        addon:info(E.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1,
             tonumber(raidNum) or -1, #players))
-        addon:debug(Diag.D.LogBossLastBossHash:format(tonumber(KRT_LastBoss) or -1, tostring(killInfo.hash)))
+        addon:debug(E.LogBossLastBossHash:format(tonumber(KRT_LastBoss) or -1, tostring(killInfo.hash)))
     end
 
     -- Adds a loot item to the active raid log.
@@ -708,7 +656,7 @@ do
             itemCount = 1
         end
         if not itemLink then
-            addon:debug(Diag.D.LogLootParseFailed:format(tostring(msg)))
+            addon:warn(E.LogLootParseFailed:format(tostring(msg)))
             return
         end
 
@@ -719,22 +667,22 @@ do
         local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
         local _, _, _, _, itemId = string.find(itemLink, ITEM_LINK_PATTERN)
         itemId = tonumber(itemId)
-        addon:trace(Diag.D.LogLootParsed:format(tostring(player), tostring(itemLink), itemCount))
+        addon:trace(E.LogLootParsed:format(tostring(player), tostring(itemLink), itemCount))
 
         -- We don't proceed if lower than threshold or ignored.
         local lootThreshold = GetLootThreshold()
         if itemRarity and itemRarity < lootThreshold then
-            addon:debug(Diag.D.LogLootIgnoredBelowThreshold:format(tostring(itemRarity),
+            addon:debug(E.LogLootIgnoredBelowThreshold:format(tostring(itemRarity),
                 tonumber(lootThreshold) or -1, tostring(itemLink)))
             return
         end
         if itemId and addon.ignoredItems[itemId] then
-            addon:debug(Diag.D.LogLootIgnoredItemId:format(tostring(itemId), tostring(itemLink)))
+            addon:debug(E.LogLootIgnoredItemId:format(tostring(itemId), tostring(itemLink)))
             return
         end
 
         if not KRT_LastBoss then
-            addon:debug(Diag.D.LogBossNoContextTrash)
+            addon:info(E.LogBossNoContextTrash)
             self:AddBoss("_TrashMob_")
         end
         -- Award source detection:
@@ -753,7 +701,8 @@ do
 
                 -- Debug-only marker: helps verify why this loot was tagged as MANUAL.
                 -- Only runs for Master Looter clients (by condition above).
-                addon:debug(Diag.D.LogLootTaggedManual,
+                addon:debug(
+                    "Loot: tagged MANUAL (no matching pending award) item=%s -> %s (lastRollType=%s).",
                     tostring(itemLink), tostring(player), tostring(lootState.currentRollType))
             else
                 rollType = lootState.currentRollType
@@ -794,7 +743,7 @@ do
 
         tinsert(raid.loot, lootInfo)
         Utils.triggerEvent("RaidLootUpdate", KRT_CurrentRaid, lootInfo)
-        addon:debug(Diag.D.LogLootLogged:format(tonumber(KRT_CurrentRaid) or -1, tostring(itemId),
+        addon:debug(E.LogLootLogged:format(tonumber(KRT_CurrentRaid) or -1, tostring(itemId),
             tostring(lootInfo.bossNid), tostring(player)))
     end
 
@@ -1305,18 +1254,6 @@ do
         EasyMenu(minimapMenu, addonMenu, KRT_MINIMAP_GUI, 0, 0, "MENU")
     end
 
-    local function IsMenuOpen()
-        return addonMenu and UIDROPDOWNMENU_OPEN_MENU == addonMenu and DropDownList1 and DropDownList1:IsShown()
-    end
-
-    local function ToggleMenu()
-        if IsMenuOpen() then
-            CloseDropDownMenus()
-            return
-        end
-        OpenMenu()
-    end
-
     -- Moves the minimap button while dragging.
     local function moveButton(self)
         local centerX, centerY = Minimap:GetCenter()
@@ -1382,7 +1319,7 @@ do
             if button == "RightButton" then
                 addon.Config:Toggle()
             elseif button == "LeftButton" then
-                ToggleMenu()
+                OpenMenu()
             end
         end)
         KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
@@ -1443,11 +1380,14 @@ do
         displayNames = nil,   -- array of names in display order
         msPrefilled  = false, -- true after first Top-N prefill in multi-pick mode
     }
-    local newItemCounts, delItemCounts
-    if addon.TablePool then
-        newItemCounts, delItemCounts = addon.TablePool("k")
-    end
+    local newItemCounts, delItemCounts = addon.TablePool and addon.TablePool("k")
     state.itemCounts = newItemCounts and newItemCounts() or {}
+
+    local function GetMasterFrameName()
+        local mf = (addon.Master and addon.Master.frame) or _G["KRTMaster"]
+        if mf and addon.Master and not addon.Master.frame then addon.Master.frame = mf end
+        return mf and mf:GetName() or nil
+    end
 
     -- ----- Private helpers ----- --
     local function GetAllowedRolls(itemId, name)
@@ -1520,28 +1460,13 @@ do
         return bestName, bestRoll
     end
 
-    -- Factory to create a GetPlus function with its own cache for a specific itemId.
-    local function MakePlusGetter(itemId)
-        local plusCache = {}
-        return function(name)
-            local v = plusCache[name]
-            if v == nil then
-                v = (addon.Reserves and addon.Reserves.GetPlusForItem)
-                    and (addon.Reserves:GetPlusForItem(itemId, name) or 0)
-                    or 0
-                plusCache[name] = v
-            end
-            return v
-        end
-    end
-
     -- Sorts rolls table + updates lootState.winner (top entry after sort).
     local function sortRolls(itemId)
         local rolls = state.rolls
         if #rolls == 0 then
             lootState.winner = nil
             lootState.rollWinner = nil
-            addon:debug(Diag.D.LogRollsSortNoEntries)
+            addon:debug(E.LogRollsSortNoEntries)
             return
         end
 
@@ -1554,7 +1479,17 @@ do
             and addon.Reserves.GetImportMode
             and (addon.Reserves:IsPlusSystem())
 
-        local GetPlus      = MakePlusGetter(itemId)
+        local plusCache    = {}
+        local function GetPlus(name)
+            local v = plusCache[name]
+            if v == nil then
+                v = (addon.Reserves and addon.Reserves.GetPlusForItem)
+                    and (addon.Reserves:GetPlusForItem(itemId, name) or 0)
+                    or 0
+                plusCache[name] = v
+            end
+            return v
+        end
 
         table.sort(rolls, function(a, b)
             -- SR: reserved first (session itemId)
@@ -1604,7 +1539,7 @@ do
 
         -- Lock selection while a multi-award sequence is running
         if lootState.multiAward and lootState.multiAward.active then
-            addon:warn(Diag.W.ErrMLMultiAwardInProgress)
+            addon:warn(E.ErrMLMultiAwardInProgress)
             return
         end
 
@@ -1642,7 +1577,7 @@ do
                     Utils.multiSelectClear(MS_CTX_ROLLS)
                     Utils.multiSelectToggle(MS_CTX_ROLLS, name, true)
                 else
-                    addon:warn(Diag.W.ErrMLMultiSelectTooMany:format(maxSel))
+                    addon:warn(E.ErrMLMultiSelectTooMany:format(maxSel))
                     return
                 end
             else
@@ -1684,7 +1619,7 @@ do
         state.rolls[state.count] = entry
         -- Roll entries are released via resetRolls().
 
-        addon:debug(Diag.D.LogRollsAddEntry:format(name, roll, tostring(itemId)))
+        addon:debug(E.LogRollsAddEntry:format(name, roll, tostring(itemId)))
         if itemId then
             local tracker = AcquireItemTracker(itemId)
             tracker[name] = (tracker[name] or 0) + 1
@@ -1744,14 +1679,14 @@ do
         state.playerCounts[itemId] = state.playerCounts[itemId] or 0
         if state.playerCounts[itemId] >= allowed then
             addon:info(L.ChatOnlyRollOnce)
-            addon:debug(Diag.D.LogRollsBlockedPlayer:format(name, state.playerCounts[itemId], allowed))
+            addon:debug(E.LogRollsBlockedPlayer:format(name, state.playerCounts[itemId], allowed))
             return
         end
 
         RandomRoll(1, 100)
         state.playerCounts[itemId] = state.playerCounts[itemId] + 1
         UpdateLocalRollState(itemId, name)
-        addon:debug(Diag.D.LogRollsPlayerRolled:format(name, itemId))
+        addon:debug(E.LogRollsPlayerRolled:format(name, itemId))
     end
 
     -- Returns the current roll session state.
@@ -1780,7 +1715,7 @@ do
             end
         end
 
-        addon:debug(Diag.D.LogRollsRecordState:format(tostring(bool)))
+        addon:debug(E.LogRollsRecordState:format(tostring(bool)))
     end
 
     -- Intercepts system messages to detect player rolls.
@@ -1794,13 +1729,13 @@ do
                 addon:Announce(L.ChatCountdownBlock)
                 state.warned = true
             end
-            addon:debug(Diag.D.LogRollsCountdownBlocked)
+            addon:debug(E.LogRollsCountdownBlocked)
             return
         end
 
         local itemId = self:GetCurrentRollItemID()
         if not itemId or lootState.lootCount == 0 then
-            addon:warn(Diag.W.LogRollsMissingItem)
+            addon:error(E.LogRollsMissingItem)
             return
         end
 
@@ -1817,11 +1752,11 @@ do
                 Utils.whisper(player, L.ChatOnlyRollOnce)
                 tinsert(state.rerolled, player)
             end
-            addon:debug(Diag.D.LogRollsDeniedPlayer:format(player, used, allowed))
+            addon:debug(E.LogRollsDeniedPlayer:format(player, used, allowed))
             return
         end
 
-        addon:debug(Diag.D.LogRollsAcceptedPlayer:format(player, used + 1, allowed))
+        addon:debug(E.LogRollsAcceptedPlayer:format(player, used + 1, allowed))
         addRoll(player, roll, itemId)
     end
 
@@ -1883,8 +1818,7 @@ do
 
     -- Clears all roll-related state and UI elements.
     function module:ClearRolls(rec)
-        local mf = (addon.Master and addon.Master.frame) or _G["KRTMaster"]
-        local frameName = mf and mf:GetName() or nil
+        local frameName = GetMasterFrameName()
         resetRolls(rec)
         if frameName then
             local i, btn = 1, _G[frameName .. "PlayerBtn1"]
@@ -1904,7 +1838,7 @@ do
         local itemLink = item and item.itemLink
         if not itemLink then return nil end
         local itemId = Utils.getItemIdFromLink(itemLink)
-        addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(itemId)))
+        addon:debug(E.LogRollsCurrentItemId:format(tostring(itemId)))
         return itemId
     end
 
@@ -1936,8 +1870,7 @@ do
 
     -- Rebuilds the roll list UI and marks the top roller or selected winner.
     function module:FetchRolls()
-        local mf = (addon.Master and addon.Master.frame) or _G["KRTMaster"]
-        local frameName = mf and mf:GetName() or nil
+        local frameName = GetMasterFrameName()
         if not frameName then return end
         local scrollFrame = _G[frameName .. "ScrollFrame"]
         local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
@@ -1953,7 +1886,17 @@ do
             and addon.Reserves.GetImportMode
             and (addon.Reserves:IsPlusSystem())
 
-        local GetPlus = MakePlusGetter(itemId)
+        local plusCache = {}
+        local function GetPlus(name)
+            local v = plusCache[name]
+            if v == nil then
+                v = (addon.Reserves and addon.Reserves.GetPlusForItem)
+                    and (addon.Reserves:GetPlusForItem(itemId, name) or 0)
+                    or 0
+                plusCache[name] = v
+            end
+            return v
+        end
 
         local wantAsc = addon.options.sortAscending == true
         if state.lastSortAsc ~= wantAsc or state.lastSortType ~= lootState.currentRollType then
@@ -2315,7 +2258,7 @@ do
         if lootState.lootCount >= 1 then
             oldItem = GetItemLink(lootState.currentItemIndex)
         end
-        addon:trace(Diag.D.LogLootFetchStart:format(GetNumLootItems() or 0, lootState.currentItemIndex or 0))
+        addon:trace(E.LogLootFetchStart:format(GetNumLootItems() or 0, lootState.currentItemIndex or 0))
         lootState.opened = true
         lootState.fromInventory = false
         self:ClearLoot()
@@ -2361,7 +2304,7 @@ do
         if addon.Master and addon.Master.ResetItemCount then
             addon.Master:ResetItemCount()
         end
-        addon:trace(Diag.D.LogLootFetchDone:format(lootState.lootCount or 0, lootState.currentItemIndex or 0))
+        addon:trace(E.LogLootFetchDone:format(lootState.lootCount or 0, lootState.currentItemIndex or 0))
     end
 
     -- Adds an item to the loot table.
@@ -2403,7 +2346,7 @@ do
         end
 
         if not itemName then
-            addon:debug(Diag.D.LogLootItemInfoMissing:format(tostring(itemLink)))
+            addon:warn(E.LogLootItemInfoMissing:format(tostring(itemLink)))
             itemName = tostring(itemLink)
         end
 
@@ -2562,9 +2505,17 @@ do
 
     local UpdateUIFrame
 
-    local getFrame = Utils.makeFrameGetter("KRTMaster")
+    local function getFrame()
+        local frame = module.frame or _G["KRTMaster"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
 
-    bindModuleRequestRefresh(module, getFrame)
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame, function() module:Refresh() end)
+
+    function module:RequestRefresh()
+        RequestRefresh()
+    end
 
     function module:Refresh()
         if UpdateUIFrame then UpdateUIFrame() end
@@ -2766,7 +2717,7 @@ do
                 candidateCache.indexByName[candidate] = p
             end
         end
-        addon:debug(Diag.D.LogMLCandidateCacheBuilt:format(tostring(itemLink),
+        addon:debug(E.LogMLCandidateCacheBuilt:format(tostring(itemLink),
             addon.tLength(candidateCache.indexByName)))
     end
 
@@ -2830,9 +2781,26 @@ do
         end)
     end
 
-    -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-    bindModuleToggleHide(module, uiController)
+    -- Toggles the visibility of the Master Looter frame.
+    function module:Toggle()
+        local frame = getFrame()
+        if not frame then return end
+        if frame:IsShown() then
+            Utils.setShown(frame, false)
+        else
+            -- Request while hidden to avoid an extra refresh (dirty-while-hidden will refresh on OnShow).
+            module:RequestRefresh()
+            Utils.setShown(frame, true)
+        end
+    end
+
+    -- Hides the Master Looter frame.
+    function module:Hide()
+        local frame = getFrame()
+        if frame then
+            Utils.hideFrame(frame)
+        end
+    end
 
     -- Button: Select/Remove Item
     function module:BtnSelectItem(btn)
@@ -2906,7 +2874,7 @@ do
 
             if rollType == rollTypes.RESERVED then
                 -- Chat-safe: keep UI colors in the Reserve Frame, but do not send class color codes in chat.
-                local srList = addon.Reserves:FormatReservedPlayersLine(itemID, false, false, false)
+                local srList = addon.Reserves:FormatReservedPlayersLine(itemID, false)
                 local suff = addon.options.sortAscending and "Low" or "High"
                 message = lootState.itemCount > 1
                     and L[chatMsg .. "Multiple" .. suff]:format(srList, itemLink, lootState.itemCount)
@@ -2937,10 +2905,6 @@ do
             ok = TradeItem(itemLink, target, rollType, 0)
         else
             ok = AssignItem(itemLink, target, rollType, 0)
-        end
-        if ok and not lootState.fromInventory then
-            announced = false
-            addon.Rolls:ClearRolls()
         end
         module:RequestRefresh()
         return ok
@@ -2989,15 +2953,15 @@ do
     -- Button: Award/Trade
     function module:BtnAward(btn)
         if countdownRun then
-            addon:warn(Diag.W.LogMLCountdownActive)
+            addon:warn(E.LogMLCountdownActive)
             return
         end
         if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
-            addon:warn(Diag.W.ErrMLMultiAwardInProgress)
+            addon:warn(E.ErrMLMultiAwardInProgress)
             return
         end
         if lootState.lootCount <= 0 or lootState.rollsCount <= 0 then
-            addon:debug(Diag.D.LogMLAwardBlocked:format(lootState.lootCount or 0, lootState.rollsCount or 0))
+            addon:debug(E.LogMLAwardBlocked:format(lootState.lootCount or 0, lootState.rollsCount or 0))
             return
         end
         if not lootState.winner then
@@ -3006,7 +2970,7 @@ do
         end
         countdownRun = false
         local itemLink = GetItemLink()
-        addon:debug(Diag.D.LogMLAwardRequested:format(tostring(lootState.winner),
+        addon:info(E.LogMLAwardRequested:format(tostring(lootState.winner),
             tonumber(lootState.currentRollType) or -1, addon.Rolls:HighestRoll() or 0, tostring(itemLink)))
         local result
         if lootState.fromInventory == true then
@@ -3044,7 +3008,7 @@ do
 
             local picked = addon.Rolls.GetSelectedWinnersOrdered and addon.Rolls:GetSelectedWinnersOrdered() or {}
             if (not picked) or (#picked < awardCount) then
-                addon:warn(Diag.W.ErrMLMultiSelectNotEnough:format(awardCount, picked and #picked or 0))
+                addon:warn(E.ErrMLMultiSelectNotEnough:format(awardCount, picked and #picked or 0))
                 module:ResetItemCount()
                 return false
             end
@@ -3434,33 +3398,22 @@ do
 
     module.PrepareDropDowns = PrepareDropDowns
 
-    -- Dropdown field metadata: maps frame name suffixes to state keys (lazily bound at runtime).
-    local function FindDropDownField(frameNameFull)
-        if not frameNameFull then return nil end
-
-        -- Match dropdown frame name to find the field type
-        if frameNameFull == dropDownFrameHolder:GetName() then
-            return { stateKey = "holder", raidKey = "holder", frame = dropDownFrameHolder }
-        elseif frameNameFull == dropDownFrameBanker:GetName() then
-            return { stateKey = "banker", raidKey = "banker", frame = dropDownFrameBanker }
-        elseif frameNameFull == dropDownFrameDisenchanter:GetName() then
-            return { stateKey = "disenchanter", raidKey = "disenchanter", frame = dropDownFrameDisenchanter }
-        end
-        return nil
-    end
-
-    -- OnClick handler for dropdown menu items (consolidated from 3 similar branches).
+    -- OnClick handler for dropdown menu items.
     function module:OnClickDropDown(owner, value)
         if not KRT_CurrentRaid then return end
         UIDropDownMenu_SetText(owner, value)
         UIDropDownMenu_SetSelectedValue(owner, value)
-
-        local field = FindDropDownField(owner:GetName())
-        if field then
-            KRT_Raids[KRT_CurrentRaid][field.raidKey] = value
-            lootState[field.stateKey] = value
+        local name = owner:GetName()
+        if name == dropDownFrameHolder:GetName() then
+            KRT_Raids[KRT_CurrentRaid].holder = value
+            lootState.holder = value
+        elseif name == dropDownFrameBanker:GetName() then
+            KRT_Raids[KRT_CurrentRaid].banker = value
+            lootState.banker = value
+        elseif name == dropDownFrameDisenchanter:GetName() then
+            KRT_Raids[KRT_CurrentRaid].disenchanter = value
+            lootState.disenchanter = value
         end
-
         dropDownDirty = true
         dirtyFlags.dropdowns = true
         dirtyFlags.buttons = true
@@ -3468,27 +3421,46 @@ do
         module:RequestRefresh()
     end
 
-    -- Updates the text of the dropdowns to reflect the current selection (consolidated from 3 similar branches).
+    -- Updates the text of the dropdowns to reflect the current selection.
     function UpdateDropDowns(frame)
         if not frame or not KRT_CurrentRaid then return end
-
-        local field = FindDropDownField(frame:GetName())
-        if not field then return end
-
-        -- Sync state from raid data
-        lootState[field.stateKey] = KRT_Raids[KRT_CurrentRaid][field.raidKey]
-
-        -- Clear if unit is no longer in raid
-        if lootState[field.stateKey] and addon.Raid:GetUnitID(lootState[field.stateKey]) == "none" then
-            KRT_Raids[KRT_CurrentRaid][field.raidKey] = nil
-            lootState[field.stateKey] = nil
-        end
-
-        -- Update UI if value is valid
-        if lootState[field.stateKey] then
-            UIDropDownMenu_SetText(field.frame, lootState[field.stateKey])
-            UIDropDownMenu_SetSelectedValue(field.frame, lootState[field.stateKey])
-            dirtyFlags.buttons = true
+        local name = frame:GetName()
+        -- Update loot holder:
+        if name == dropDownFrameHolder:GetName() then
+            lootState.holder = KRT_Raids[KRT_CurrentRaid].holder
+            if lootState.holder and addon.Raid:GetUnitID(lootState.holder) == "none" then
+                KRT_Raids[KRT_CurrentRaid].holder = nil
+                lootState.holder = nil
+            end
+            if lootState.holder then
+                UIDropDownMenu_SetText(dropDownFrameHolder, lootState.holder)
+                UIDropDownMenu_SetSelectedValue(dropDownFrameHolder, lootState.holder)
+                dirtyFlags.buttons = true
+            end
+            -- Update loot banker:
+        elseif name == dropDownFrameBanker:GetName() then
+            lootState.banker = KRT_Raids[KRT_CurrentRaid].banker
+            if lootState.banker and addon.Raid:GetUnitID(lootState.banker) == "none" then
+                KRT_Raids[KRT_CurrentRaid].banker = nil
+                lootState.banker = nil
+            end
+            if lootState.banker then
+                UIDropDownMenu_SetText(dropDownFrameBanker, lootState.banker)
+                UIDropDownMenu_SetSelectedValue(dropDownFrameBanker, lootState.banker)
+                dirtyFlags.buttons = true
+            end
+            -- Update loot disenchanter:
+        elseif name == dropDownFrameDisenchanter:GetName() then
+            lootState.disenchanter = KRT_Raids[KRT_CurrentRaid].disenchanter
+            if lootState.disenchanter and addon.Raid:GetUnitID(lootState.disenchanter) == "none" then
+                KRT_Raids[KRT_CurrentRaid].disenchanter = nil
+                lootState.disenchanter = nil
+            end
+            if lootState.disenchanter then
+                UIDropDownMenu_SetText(dropDownFrameDisenchanter, lootState.disenchanter)
+                UIDropDownMenu_SetSelectedValue(dropDownFrameDisenchanter, lootState.disenchanter)
+                dirtyFlags.buttons = true
+            end
         end
     end
 
@@ -3617,7 +3589,7 @@ do
             local itemRef = tostring(itemLink or itemId or "unknown")
             if hasMatch then
                 addon:warn(L.ErrMLInventorySoulbound:format(itemRef))
-                addon:debug(Diag.D.LogMLInventorySoulbound:format(itemRef))
+                addon:debug(E.LogMLInventorySoulbound:format(itemRef))
             else
                 addon:warn(L.ErrMLInventoryItemMissing:format(itemRef))
             end
@@ -3643,13 +3615,13 @@ do
             lootState.opened = true
             announced = false
             addon.Loot:FetchLoot()
-            addon:trace(Diag.D.LogMLLootOpenedTrace:format(lootState.lootCount or 0,
+            addon:trace(E.LogMLLootOpenedTrace:format(lootState.lootCount or 0,
                 tostring(lootState.fromInventory)))
             UpdateSelectionFrame()
             if not addon.Logger.container then
                 addon.Logger.source = UnitName("target")
             end
-            addon:debug(Diag.D.LogMLLootOpenedInfo:format(lootState.lootCount or 0,
+            addon:info(E.LogMLLootOpenedInfo:format(lootState.lootCount or 0,
                 tostring(lootState.fromInventory), tostring(UnitName("target"))))
 
             local shouldShow = (lootState.lootCount or 0) >= 1
@@ -3668,8 +3640,8 @@ do
     -- LOOT_CLOSED: Triggered when the loot window closes.
     function module:LOOT_CLOSED()
         if addon.Raid:IsMasterLooter() then
-            addon:trace(Diag.D.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
-            addon:trace(Diag.D.LogMLLootClosedCleanup)
+            addon:trace(E.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
+            addon:trace(E.LogMLLootClosedCleanup)
             lootState.multiAward = nil
             announced = false
             -- Cancel any scheduled close timer and schedule a new one
@@ -3695,13 +3667,13 @@ do
     function module:LOOT_SLOT_CLEARED()
         if addon.Raid:IsMasterLooter() then
             addon.Loot:FetchLoot()
-            addon:trace(Diag.D.LogMLLootSlotCleared:format(lootState.lootCount or 0))
+            addon:trace(E.LogMLLootSlotCleared:format(lootState.lootCount or 0))
             UpdateSelectionFrame()
             module:ResetItemCount()
 
-            local frame = getFrame()
             local shouldShow = (lootState.lootCount or 0) >= 1
             if shouldShow then
+                local frame = getFrame()
                 local wasShown = frame and frame:IsShown()
                 if not wasShown then
                     -- Request while hidden to refresh immediately on OnShow (avoid an extra refresh).
@@ -3712,7 +3684,7 @@ do
                 end
             else
                 if frame then frame:Hide() end
-                addon:debug(Diag.D.LogMLLootWindowEmptied)
+                addon:info(E.LogMLLootWindowEmptied)
             end
 
             -- Continue a multi-award sequence (loot window only). We award one copy per LOOT_SLOT_CLEARED
@@ -3726,7 +3698,7 @@ do
                 -- Gate: proceed only when the number of copies for this itemKey has decreased since last award.
                 local currentCount = 0
                 for i = 1, (lootState.lootCount or 0) do
-                    local it = GetItem and GetItem(i)
+                    local it = lootTable and lootTable[i]
                     if it and it.itemKey == ma.itemKey then
                         currentCount = tonumber(it.count) or 1
                         break
@@ -3811,11 +3783,11 @@ do
     end
 
     function module:TRADE_ACCEPT_UPDATE(tAccepted, pAccepted)
-        addon:trace(Diag.D.LogTradeAcceptUpdate:format(tostring(lootState.trader), tostring(lootState.winner),
+        addon:trace(E.LogTradeAcceptUpdate:format(tostring(lootState.trader), tostring(lootState.winner),
             tostring(tAccepted), tostring(pAccepted)))
         if lootState.trader and lootState.winner and lootState.trader ~= lootState.winner then
             if tAccepted == 1 and pAccepted == 1 then
-                addon:debug(Diag.D.LogTradeCompleted:format(tostring(lootState.currentRollItem),
+                addon:info(E.LogTradeCompleted:format(tostring(lootState.currentRollItem),
                     tostring(lootState.winner), tonumber(lootState.currentRollType) or -1,
                     addon.Rolls:HighestRoll()))
                 if lootState.currentRollItem and lootState.currentRollItem > 0 then
@@ -3823,11 +3795,11 @@ do
                         lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT", KRT_CurrentRaid)
 
                     if not ok then
-                        addon:error(Diag.E.LogTradeLoggerLogFailed:format(tostring(KRT_CurrentRaid),
+                        addon:error(E.LogTradeLoggerLogFailed:format(tostring(KRT_CurrentRaid),
                             tostring(lootState.currentRollItem), tostring(GetItemLink())))
                     end
                 else
-                    addon:warn(Diag.W.LogTradeCurrentRollItemMissing)
+                    addon:warn(E.LogTradeCurrentRollItemMissing)
                 end
 
                 -- LootCounter (MS only): trade awards don't emit LOOT_ITEM for the winner.
@@ -3869,7 +3841,7 @@ do
                 itemIndex = i
                 break
             end
-            if wantedKey and tempItemLink then
+            if not itemIndex and wantedKey and tempItemLink then
                 local tempKey = Utils.getItemStringFromLink(tempItemLink) or tempItemLink
                 if tempKey == wantedKey then
                     itemIndex = i
@@ -3887,7 +3859,7 @@ do
         end
         local candidateIndex = candidateCache.indexByName[playerName]
         if not candidateIndex then
-            addon:debug(Diag.D.LogMLCandidateCacheMiss:format(tostring(itemLink), tostring(playerName)))
+            addon:debug(E.LogMLCandidateCacheMiss:format(tostring(itemLink), tostring(playerName)))
             BuildCandidateCache(itemLink)
             candidateIndex = candidateCache.indexByName[playerName]
         end
@@ -3895,7 +3867,7 @@ do
             -- Mark this award as addon-driven so AddLoot() won't classify it as MANUAL
             addon.Loot:QueuePendingAward(itemLink, playerName, rollType, rollValue)
             GiveMasterLoot(itemIndex, candidateIndex)
-            addon:debug(Diag.D.LogMLAwarded:format(tostring(itemLink), tostring(playerName),
+            addon:info(E.LogMLAwarded:format(tostring(itemLink), tostring(playerName),
                 tonumber(rollType) or -1, tonumber(rollValue) or 0, tonumber(itemIndex) or -1,
                 tonumber(candidateIndex) or -1))
             local output, whisper
@@ -3950,7 +3922,7 @@ do
         lootState.trader = Utils.getPlayerName()
         lootState.winner = isAwardRoll and playerName or nil
 
-        addon:debug(Diag.D.LogTradeStart:format(tostring(itemLink), tostring(lootState.trader),
+        addon:info(E.LogTradeStart:format(tostring(itemLink), tostring(lootState.trader),
             tostring(playerName), tonumber(rollType) or -1, tonumber(rollValue) or 0,
             lootState.itemCount or 1))
 
@@ -4004,7 +3976,7 @@ do
             -- Trader is the winner:
         elseif lootState.trader == lootState.winner then
             -- Trader won, clear state
-            addon:debug(Diag.D.LogTradeTraderKeeps:format(tostring(itemLink), tostring(playerName)))
+            addon:info(E.LogTradeTraderKeeps:format(tostring(itemLink), tostring(playerName)))
 
             -- LootCounter (MS only): award is immediate (no trade window completion event).
             if tonumber(rollType) == rollTypes.MAINSPEC then
@@ -4032,7 +4004,7 @@ do
                     return false
                 end
                 if itemInfo.isStack and not addon.options.ignoreStacks then
-                    addon:debug(Diag.D.LogTradeStackBlocked:format(tostring(addon.options.ignoreStacks),
+                    addon:warn(E.LogTradeStackBlocked:format(tostring(addon.options.ignoreStacks),
                         tostring(itemLink)))
                     addon:warn(L.ErrItemStack:format(itemLink))
                     return false
@@ -4041,7 +4013,7 @@ do
                 PickupContainerItem(itemInfo.bagID, itemInfo.slotID)
                 if CursorHasItem() then
                     InitiateTrade(playerName)
-                    addon:debug(Diag.D.LogTradeInitiated:format(tostring(itemLink), tostring(playerName)))
+                    addon:info(E.LogTradeInitiated:format(tostring(itemLink), tostring(playerName)))
                     if addon.options.screenReminder and not screenshotWarn then
                         addon:warn(L.ErrScreenReminder)
                         screenshotWarn = true
@@ -4050,7 +4022,7 @@ do
                 -- Cannot trade the player?
             elseif unit ~= "none" then
                 -- Player is out of range
-                addon:warn(Diag.W.LogTradeDelayedOutOfRange:format(tostring(playerName), tostring(itemLink)))
+                addon:warn(E.LogTradeDelayedOutOfRange:format(tostring(playerName), tostring(itemLink)))
                 addon.Raid:ClearRaidIcons()
                 SetRaidTarget(lootState.trader, 1)
                 if isAwardRoll then SetRaidTarget(playerName, 4) end
@@ -4074,7 +4046,7 @@ do
                 local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.trader, rollType, rollValue,
                     "TRADE_KEEP", KRT_CurrentRaid)
                 if not ok then
-                    addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(KRT_CurrentRaid),
+                    addon:error(E.LogTradeKeepLoggerFailed:format(tostring(KRT_CurrentRaid),
                         tostring(lootState.currentRollItem), tostring(itemLink)))
                 end
             end
@@ -4090,11 +4062,6 @@ do
             announced = false
         end
     end)
-
-    -- Keep Master UI in sync when SoftRes data changes (import/clear), event-driven.
-    Utils.registerCallback("ReservesDataChanged", function()
-        module:RequestRefresh()
-    end)
 end
 
 -- =========== Loot Counter Module  =========== --
@@ -4108,9 +4075,17 @@ do
     local rows, raidPlayers = {}, {}
     local twipe = twipe
     local scrollFrame, scrollChild, header
-    local getFrame = Utils.makeFrameGetter("KRTLootCounterFrame")
+    local function getFrame()
+        local frame = module.frame or _G["KRTLootCounterFrame"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
 
-    bindModuleRequestRefresh(module, getFrame)
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame, function() module:Refresh() end)
+
+    function module:RequestRefresh()
+        RequestRefresh()
+    end
 
     -- Single-line column header.
     local HEADER_HEIGHT = 18
@@ -4181,6 +4156,11 @@ do
         twipe(raidPlayers)
         if not addon.IsInGroup() then
             return raidPlayers
+        end
+
+        -- Keep the internal roster aligned with the live raid for stable counts.
+        if addon.Raid and addon.Raid.UpdateRaidRoster then
+            addon.Raid:UpdateRaidRoster()
         end
 
         for unit in addon.UnitIterator(true) do
@@ -4362,9 +4342,35 @@ do
 
     -- ----- UI Window Management ----- --
 
-    -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-    bindModuleToggleHide(module, uiController)
+    local function ShowLootCounter()
+        local frame = getFrame()
+        if not frame then
+            addon:error("LootCounter frame missing")
+            return
+        end
+        Utils.setShown(frame, true)
+        module:RequestRefresh()
+    end
+
+    function module:Hide()
+        local frame = getFrame()
+        if frame then
+            Utils.setShown(frame, false)
+        end
+    end
+
+    function module:Toggle()
+        local frame = getFrame()
+        if not frame then
+            addon:error("LootCounter frame missing")
+            return
+        end
+        if frame:IsShown() then
+            module:Hide()
+        else
+            ShowLootCounter()
+        end
+    end
 
     -- Add a button to the master loot frame to open the loot counter UI.
     local function SetupMasterLootFrameHooks()
@@ -4391,14 +4397,18 @@ do
         module:RequestRefresh()
     end
 
-    -- Refresh on roster updates (to keep list aligned).
-    Utils.registerCallback("RaidRosterUpdate", Request)
+    -- Auto-refresh when loot is logged (MS-only counting happens in Raid:AddLoot).
+    Utils.registerCallback("RaidLootUpdate", Request)
 
-    -- Refresh when counts actually change (MS loot award or manual +/-/reset).
-    Utils.registerCallback("PlayerCountChanged", Request)
+    -- Refresh on roster updates (to keep list aligned).
+    if addon.Raid and addon.Raid.UpdateRaidRoster then
+        hooksecurefunc(addon.Raid, "UpdateRaidRoster", Request)
+    end
 
     -- New raid session: reset view.
     Utils.registerCallback("RaidCreate", Request)
+
+    Utils.registerCallback("PlayerCountChanged", Request)
 end
 
 -- =========== Reserves Module  =========== --
@@ -4411,7 +4421,7 @@ do
     -- ----- Internal state ----- --
     -- UI Elements
     local frameName
-    local getFrame = Utils.makeFrameGetter("KRTReserveListFrame")
+    local getFrame
     local scrollFrame, scrollChild
     local reserveHeaders = {}
     local reserveItemRows, rowsByItemID = {}, {}
@@ -4429,11 +4439,6 @@ do
     local pendingItemCount = 0
     local collapsedBossGroups = {}
     local grouped = {}
-    local reserveRowStyle = {
-        odd = { 0.04, 0.06, 0.09, 0.30 },
-        even = { 0.08, 0.10, 0.14, 0.36 },
-        separator = { 1.0, 1.0, 1.0, 0.10 },
-    }
 
     -- ----- Private helpers ----- --
 
@@ -4452,7 +4457,7 @@ do
             }
             pendingItemInfo[itemId] = pending
             pendingItemCount = pendingItemCount + 1
-            addon:debug(Diag.D.LogReservesTrackPending:format(itemId, pendingItemCount))
+            addon:debug(E.LogReservesTrackPending:format(itemId, pendingItemCount))
         end
         if type(name) == "string" and name ~= "" then
             pending.name = name
@@ -4483,10 +4488,13 @@ do
         if pendingItemCount > 0 then
             pendingItemCount = pendingItemCount - 1
         end
-        addon:debug(Diag.D.LogReservesItemReady:format(itemId, pendingItemCount))
+        addon:debug(E.LogReservesItemReady:format(itemId, pendingItemCount))
         if pendingItemCount == 0 then
-            addon:debug(Diag.D.LogReservesPendingComplete)
-            module:RequestRefresh()
+            addon:debug(E.LogReservesPendingComplete)
+            local frame = getFrame()
+            if frame and frame:IsShown() then
+                module:Refresh()
+            end
         end
     end
 
@@ -4594,7 +4602,7 @@ do
     -- useColor:
     --   true/nil -> UI rendering (class colors enabled)
     --   false    -> chat-safe rendering (no class color codes)
-    local function FormatReservePlayerName(itemId, name, count, metaByName, useColor, showPlus, showMulti)
+    local function FormatReservePlayerName(itemId, name, count, metaByName, useColor)
         local meta = GetMetaForPlayer(metaByName, itemId, name)
         local out
         if useColor == false then
@@ -4603,11 +4611,11 @@ do
             out = ColorizeReserveName(itemId, name, meta and meta.class)
         end
 
-        if showMulti ~= false and module:IsMultiReserve() and count and count > 1 then
+        if module:IsMultiReserve() and count and count > 1 then
             out = out .. format(L.StrReserveCountSuffix, count)
         end
 
-        if showPlus ~= false and module:IsPlusSystem() and itemId then
+        if module:IsPlusSystem() and itemId then
             local p = (meta and tonumber(meta.plus)) or module:GetPlusForItem(itemId, name) or 0
             if p and p > 0 then
                 out = out .. format(" (P+%d)", p)
@@ -4640,22 +4648,13 @@ do
         end
     end
 
-    local function BuildPlayerTokens(itemId, players, counts, metaByName, useColor, showPlus, showMulti)
+    local function BuildPlayerTokens(itemId, players, counts, metaByName, useColor)
         if not players then return {} end
         SortPlayersForDisplay(itemId, players, counts, metaByName)
         twipe(playerTextTemp)
         for i = 1, #players do
             local name = players[i]
-            playerTextTemp[#playerTextTemp + 1] =
-                FormatReservePlayerName(
-                    itemId,
-                    name,
-                    counts and counts[name] or 1,
-                    metaByName,
-                    useColor,
-                    showPlus,
-                    showMulti
-                )
+            playerTextTemp[#playerTextTemp + 1] = FormatReservePlayerName(itemId, name, counts and counts[name] or 1, metaByName, useColor)
         end
         return playerTextTemp
     end
@@ -4672,9 +4671,9 @@ do
     local function BuildPlayersTooltipLines(itemId, players, counts, metaByName, shownCount, hiddenCount)
         local lines = {}
         local total = players and #players or 0
-        lines[#lines + 1] = format(L.StrReservesTooltipTotal, total)
+        lines[#lines + 1] = "Total: " .. tostring(total)
         if hiddenCount and hiddenCount > 0 and shownCount and shownCount > 0 then
-            lines[#lines + 1] = format(L.StrReservesTooltipShownHidden, shownCount, hiddenCount)
+            lines[#lines + 1] = "Shown: " .. tostring(shownCount) .. " | Hidden: +" .. tostring(hiddenCount)
         end
 
         if not players or total == 0 then
@@ -4697,7 +4696,7 @@ do
             table.sort(keys, function(a, b) return a > b end)
             for i = 1, #keys do
                 local p = keys[i]
-                lines[#lines + 1] = format(L.StrReservesTooltipPlus, p, tconcat(groups[p], ", "))
+                lines[#lines + 1] = string.format("P+%d: %s", p, tconcat(groups[p], ", "))
             end
         elseif module:IsMultiReserve() and counts then
             -- Group by quantity (desc)
@@ -4714,7 +4713,7 @@ do
             table.sort(keys, function(a, b) return a > b end)
             for i = 1, #keys do
                 local q = keys[i]
-                lines[#lines + 1] = format(L.StrReservesTooltipQuantity, q, tconcat(groups[q], ", "))
+                lines[#lines + 1] = string.format("x%d: %s", q, tconcat(groups[q], ", "))
             end
         else
             -- Fallback: just list names
@@ -4739,32 +4738,11 @@ do
         local hidden = total - shown
         local shortText = tconcat(playerTextTemp, ", ", 1, shown)
         if hidden > 0 then
-            shortText = shortText .. format(L.StrReservesPlayersHiddenSuffix, hidden)
+            shortText = shortText .. string.format(" ... +%d", hidden)
         end
         local fullText = tconcat(playerTextTemp, ", ")
         local tooltipLines = BuildPlayersTooltipLines(itemId, players, counts, metaByName, shown, hidden)
         return shortText, tooltipLines, fullText
-    end
-
-    local function GetReserveSource(source)
-        if source and source ~= "" then
-            return source
-        end
-        return L.StrUnknown
-    end
-
-    local function FormatReserveItemIdLabel(itemId)
-        return format(L.StrReservesItemIdLabel, tostring(itemId or "?"))
-    end
-
-    -- Kept for potential future tooltip/source variants.
-    local function FormatReserveDroppedBy(source)
-        if not source or source == "" then return nil end
-        return format(L.StrReservesTooltipDroppedBy, source)
-    end
-
-    local function FormatReserveItemFallback(itemId)
-        return format(L.StrReservesItemFallback, tostring(itemId or "?"))
     end
 
     local function UpdateDisplayEntryForItem(itemId)
@@ -4777,7 +4755,7 @@ do
             for i = 1, #list do
                 local r = list[i]
                 if type(r) == "table" then
-                    local source = GetReserveSource(r.source)
+                    local source = r.source or "Unknown"
                     local bySource = groupedBySource[source]
                     if not bySource then
                         bySource = {}
@@ -4914,7 +4892,7 @@ do
                 for i = 1, #list do
                     local r = list[i]
                     if type(r) == "table" then
-                        local source = GetReserveSource(r.source)
+                        local source = r.source or "Unknown"
 
                         local bySource = grouped[source]
                         if not bySource then
@@ -4975,12 +4953,18 @@ do
             elseif row._tooltipTitle then
                 GameTooltip:SetText(row._tooltipTitle, 1, 1, 1)
             end
+            if row._tooltipSource then
+                GameTooltip:AddLine(row._tooltipSource, 0.8, 0.8, 0.8)
+            end
             GameTooltip:Show()
         end
 
         local function ShowPlayersTooltip(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText(row._tooltipTitle or L.StrReservesTooltipTitle, 1, 1, 1)
+            GameTooltip:SetText(row._tooltipTitle or "Reserves", 1, 1, 1)
+            if row._tooltipSource then
+                GameTooltip:AddLine(row._tooltipSource, 0.8, 0.8, 0.8)
+            end
             local lines = row._playersTooltipLines
             if type(lines) == "table" then
                 for i = 1, #lines do
@@ -5071,44 +5055,19 @@ do
         end
     end
 
-    local function ApplyReserveRowData(row, info, index, isFirstInGroup)
+    local function ApplyReserveRowData(row, info, index)
         if not row or not info then return end
         row._itemId = info.itemId
         row._itemLink = info.itemLink
         row._itemName = info.itemName
         row._source = info.source
-        row._tooltipTitle = info.itemLink or info.itemName or FormatReserveItemIdLabel(info.itemId)
-        row._tooltipSource = FormatReserveDroppedBy(info.source)
+        row._tooltipTitle = info.itemLink or info.itemName or ("Item ID: " .. (info.itemId or "?"))
+        row._tooltipSource = info.source and ("Dropped by: " .. info.source) or nil
         row._playersTooltipLines = info.playersTooltipLines
         row._playersTextFull = info.playersTextFull or info.playersText
 
-        local isEvenRow = (index % 2 == 0)
         if row.background then
-            local bg = isEvenRow and reserveRowStyle.even or reserveRowStyle.odd
-            row.background:SetVertexColor(bg[1], bg[2], bg[3], bg[4])
-        end
-        if row.separator then
-            local sepAlpha = isEvenRow and 0.1 or reserveRowStyle.separator[4]
-            row.separator:SetVertexColor(
-                reserveRowStyle.separator[1],
-                reserveRowStyle.separator[2],
-                reserveRowStyle.separator[3],
-                sepAlpha
-            )
-            row.separator:Show()
-        end
-        if row.topSeparator then
-            row.topSeparator:SetVertexColor(
-                reserveRowStyle.separator[1],
-                reserveRowStyle.separator[2],
-                reserveRowStyle.separator[3],
-                reserveRowStyle.separator[4]
-            )
-            if isFirstInGroup then
-                row.topSeparator:Show()
-            else
-                row.topSeparator:Hide()
-            end
+            row.background:SetVertexColor(index % 2 == 0 and 0.1 or 0, 0.1, 0.1, 0.3)
         end
 
         if row.iconTexture then
@@ -5129,7 +5088,7 @@ do
         end
 
         if row.nameText then
-            row.nameText:SetText(info.itemLink or info.itemName or FormatReserveItemFallback(info.itemId))
+            row.nameText:SetText(info.itemLink or info.itemName or ("[Item " .. info.itemId .. "]"))
         end
 
         if row.playerText then
@@ -5146,8 +5105,8 @@ do
         local source = self and self._source
         if not source then return end
         collapsedBossGroups[source] = not collapsedBossGroups[source]
-        addon:debug(Diag.D.LogReservesToggleCollapse:format(source, tostring(collapsedBossGroups[source])))
-        module:RequestRefresh()
+        addon:debug(E.LogReservesToggleCollapse:format(source, tostring(collapsedBossGroups[source])))
+        module:Refresh()
     end
 
     -- ----- Public methods ----- --
@@ -5156,19 +5115,18 @@ do
     local LocalizeUIFrame
     local UpdateUIFrame
     local RenderReserveListUI
-
     -- ----- Saved Data Management ----- --
 
     function module:Save()
         RebuildIndex()
-        addon:debug(Diag.D.LogReservesSaveEntries:format(addon.tLength(reservesData)))
+        addon:debug(E.LogReservesSaveEntries:format(addon.tLength(reservesData)))
         local saved = {}
         addon.tCopy(saved, reservesData)
         KRT_SavedReserves = saved
     end
 
     function module:Load()
-        addon:debug(Diag.D.LogReservesLoadData:format(tostring(KRT_SavedReserves ~= nil)))
+        addon:debug(E.LogReservesLoadData:format(tostring(KRT_SavedReserves ~= nil)))
         twipe(reservesData)
         if KRT_SavedReserves then
             addon.tCopy(reservesData, KRT_SavedReserves)
@@ -5205,13 +5163,15 @@ do
     end
 
     function module:ResetSaved()
-        addon:debug(Diag.D.LogReservesResetSaved)
+        addon:debug(E.LogReservesResetSaved)
         KRT_SavedReserves = nil
         twipe(reservesData)
-        RebuildIndex()
+        twipe(reservesByItemID)
+        twipe(reservesDisplayList)
+        reservesDirty = true
+        self:Refresh()
         self:Hide()
         self:RequestRefresh()
-        Utils.triggerEvent("ReservesDataChanged", "clear")
         addon:info(L.StrReserveListCleared)
     end
 
@@ -5227,20 +5187,41 @@ do
 
     -- ----- UI Window Management ----- --
 
-    -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function()
-        addon:debug(Diag.D.LogReservesShowWindow)
+    local function ShowReserveList()
+        local frame = getFrame()
+        if not frame then
+            addon:error(E.LogReservesFrameMissing)
+            return
+        end
+        addon:debug(E.LogReservesShowWindow)
+        module:Refresh()
         module:RequestRefresh()
-    end)
-    bindModuleToggleHide(module, uiController)
+        Utils.setShown(frame, true)
+    end
 
     function module:Hide()
-        addon:debug(Diag.D.LogReservesHideWindow)
-        return uiController:Hide()
+        local frame = getFrame()
+        if frame then
+            addon:debug(E.LogReservesHideWindow)
+            Utils.setShown(frame, false)
+        end
+    end
+
+    function module:Toggle()
+        local frame = getFrame()
+        if not frame then
+            addon:error(E.LogReservesFrameMissing)
+            return
+        end
+        if frame:IsShown() then
+            module:Hide()
+        else
+            ShowReserveList()
+        end
     end
 
     function module:OnLoad(frame)
-        addon:debug(Diag.D.LogReservesFrameLoaded)
+        addon:debug(E.LogReservesFrameLoaded)
         frameName = frame:GetName()
 
         -- Drag registration kept in Lua (avoid template logic in XML).
@@ -5258,7 +5239,7 @@ do
             local btn = _G["KRTReserveListFrame" .. suff]
             if btn and self[method] then
                 btn:SetScript("OnClick", function() self[method](self) end)
-                addon:debug(Diag.D.LogReservesBindButton:format(suff, method))
+                addon:debug(E.LogReservesBindButton:format(suff, method))
             end
         end
 
@@ -5267,7 +5248,7 @@ do
         local refreshFrame = CreateFrame("Frame")
         refreshFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
         refreshFrame:SetScript("OnEvent", function(_, _, itemId)
-            addon:debug(Diag.D.LogReservesItemInfoReceived:format(itemId))
+            addon:debug(E.LogReservesItemInfoReceived:format(itemId))
             local pending = pendingItemInfo[itemId]
             if not pending then return end
 
@@ -5301,17 +5282,17 @@ do
             hasIcon = type(icon) == "string" and icon ~= ""
 
             if hasName then
-                addon:debug(Diag.D.LogReservesUpdateItemData:format(link))
+                addon:debug(E.LogReservesUpdateItemData:format(link))
                 self:UpdateReserveItemData(itemId, name, link, icon)
             else
-                addon:debug(Diag.D.LogReservesItemInfoMissing:format(itemId))
+                addon:debug(E.LogReservesItemInfoMissing:format(itemId))
             end
             MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
             if hasName and hasIcon then
-                addon:debug(Diag.D.LogSRItemInfoResolved:format(itemId, tostring(link)))
+                addon:info(E.LogSRItemInfoResolved:format(itemId, tostring(link)))
                 CompletePendingItem(itemId)
             else
-                addon:debug(Diag.D.LogReservesItemInfoPending:format(itemId))
+                addon:debug(E.LogReservesItemInfoPending:format(itemId))
                 self:QueryItemInfo(itemId)
             end
         end)
@@ -5321,12 +5302,12 @@ do
 
     function LocalizeUIFrame()
         if localized then
-            addon:debug(Diag.D.LogReservesUIAlreadyLocalized)
+            addon:debug(E.LogReservesUIAlreadyLocalized)
             return
         end
         if frameName then
             Utils.setFrameTitle(frameName, L.StrRaidReserves)
-            addon:debug(Diag.D.LogReservesUILocalized:format(L.StrRaidReserves))
+            addon:debug(E.LogReservesUILocalized:format(L.StrRaidReserves))
         end
         local clearButton = frameName and _G[frameName .. "ClearButton"]
         if clearButton then
@@ -5370,7 +5351,18 @@ do
         end
     end
 
-    bindModuleRequestRefresh(module, getFrame)
+    getFrame = function()
+        local frame = module.frame or _G["KRTReserveListFrame"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
+        function() module:Refresh() end)
+
+    function module:RequestRefresh()
+        RequestRefresh()
+    end
 
     -- ----- Reserve Data Handling ----- --
 
@@ -5381,9 +5373,9 @@ do
 
         -- Log when the function is called and show the reserve for the player
         if reserve then
-            addon:debug(Diag.D.LogReservesPlayerFound:format(playerName, tostring(reserve)))
+            addon:debug(E.LogReservesPlayerFound:format(playerName, tostring(reserve)))
         else
-            addon:debug(Diag.D.LogReservesPlayerNotFound:format(playerName))
+            addon:debug(E.LogReservesPlayerNotFound:format(playerName))
         end
 
         return reserve
@@ -5391,7 +5383,7 @@ do
 
     -- Get all reserves:
     function module:GetAllReserves()
-        addon:debug(Diag.D.LogReservesFetchAll:format(addon.tLength(reservesData)))
+        addon:debug(E.LogReservesFetchAll:format(addon.tLength(reservesData)))
         return reservesData
     end
 
@@ -5535,7 +5527,7 @@ do
                         plus = tonumber(plus) or 0,
                     }
                 else
-                    addon:debug(Diag.D.LogSRParseSkippedLine:format(tostring(line)))
+                    addon:warn(E.LogSRParseSkippedLine:format(tostring(line)))
                 end
             end
         end
@@ -5641,26 +5633,26 @@ do
 
     function module:ParseCSV(csv, mode)
         if type(csv) ~= "string" or not csv:match("%S") then
-            addon:warn(Diag.W.LogReservesImportFailedEmpty)
+            addon:error(E.LogReservesImportFailedEmpty)
             return false, 0, "EMPTY"
         end
 
         mode = (mode == "plus" or mode == "multi") and mode or self:GetImportMode()
         local strat = self:GetImportStrategy(mode)
 
-        addon:debug(Diag.D.LogReservesParseStart)
+        addon:debug(E.LogReservesParseStart)
 
         -- Transactional parse: parse → validate → aggregate → commit.
         local rows = parseCSVRows(csv)
         if not rows or #rows == 0 then
-            addon:warn(L.WarnNoValidRows)
+            addon:warn(L.WarnNoValidRows or "No valid rows found in CSV.")
             return false, 0, "NO_ROWS"
         end
 
         local ok, errCode, errData = strat.Validate(rows)
         if not ok then
-            addon:debug(Diag.D.LogReservesImportWrongModePlus
-                and Diag.D.LogReservesImportWrongModePlus:format(tostring(errData and errData.player))
+            addon:warn(E.LogReservesImportWrongModePlus
+                and E.LogReservesImportWrongModePlus:format(tostring(errData and errData.player))
                 or ("Wrong CSV for Plus System: " .. tostring(errData and errData.player)))
             return false, 0, errCode or "CSV_INVALID", errData
         end
@@ -5670,20 +5662,27 @@ do
         -- Commit
         reservesData = newReservesData
         importMode = mode
-        self:Save()
+        twipe(reservesByItemID)
+        twipe(reservesByItemPlayer)
+        twipe(reservesDisplayList)
+        twipe(playerItemsByName)
+        reservesDirty = true
+
+        RebuildIndex()
 
         local nPlayers = addon.tLength(reservesData)
-        addon:debug(Diag.D.LogReservesParseComplete:format(nPlayers))
+        addon:debug(E.LogReservesParseComplete:format(nPlayers))
         addon:info(format(L.SuccessReservesParsed, tostring(nPlayers)))
+        self:Refresh()
         self:RequestRefresh()
-        Utils.triggerEvent("ReservesDataChanged", "import", nPlayers, mode)
+        self:Save()
         return true, nPlayers
     end
 
     -- ----- Item Info Querying ----- --
     function module:QueryItemInfo(itemId)
         if not itemId then return end
-        addon:debug(Diag.D.LogReservesQueryItemInfo:format(itemId))
+        addon:debug(E.LogReservesQueryItemInfo:format(itemId))
         local pending = pendingItemInfo[itemId]
         local name, link, icon = GetPendingItemInfo(pending)
         local hasName = type(name) == "string" and name ~= ""
@@ -5718,7 +5717,7 @@ do
         end
         MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
         if hasName and hasIcon then
-            addon:debug(Diag.D.LogReservesItemInfoReady:format(itemId, name))
+            addon:debug(E.LogReservesItemInfoReady:format(itemId, name))
             CompletePendingItem(itemId)
             return true
         end
@@ -5726,7 +5725,7 @@ do
         GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
         GameTooltip:SetHyperlink("item:" .. itemId)
         GameTooltip:Hide()
-        addon:debug(Diag.D.LogReservesItemInfoPendingQuery:format(itemId))
+        addon:debug(E.LogReservesItemInfoPendingQuery:format(itemId))
         return false
     end
 
@@ -5735,7 +5734,7 @@ do
         local seen = {}
         local count = 0
         local updated = false
-        addon:debug(Diag.D.LogReservesQueryMissingItems)
+        addon:debug(E.LogReservesQueryMissingItems)
         for _, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
                 for _, r in ipairs(player.reserves) do
@@ -5751,7 +5750,9 @@ do
                 end
             end
         end
-        if updated then
+        local frame = getFrame()
+        if updated and frame and frame:IsShown() then
+            self:Refresh()
             self:RequestRefresh()
         end
         if not silent then
@@ -5761,8 +5762,8 @@ do
                 addon:info(L.MsgReserveItemsReady)
             end
         end
-        addon:debug(Diag.D.LogReservesMissingItems:format(count))
-        addon:debug(Diag.D.LogSRQueryMissingItems:format(tostring(updated), count))
+        addon:debug(E.LogReservesMissingItems:format(count))
+        addon:debug(E.LogSRQueryMissingItems:format(tostring(updated), count))
     end
 
     -- Update reserve item data
@@ -5809,8 +5810,8 @@ do
             row._itemId = itemId
             row._itemLink = itemLink
             row._itemName = itemName
-            row._tooltipTitle = itemLink or itemName or FormatReserveItemIdLabel(itemId)
-            row._tooltipSource = FormatReserveDroppedBy(row._source)
+            row._tooltipTitle = itemLink or itemName or ("Item ID: " .. itemId)
+            row._tooltipSource = row._source and ("Dropped by: " .. row._source) or nil
             if row.iconTexture then
                 local resolvedIcon = icon
                 if type(resolvedIcon) ~= "string" or resolvedIcon == "" then
@@ -5820,7 +5821,7 @@ do
                 row.iconTexture:Show()
             end
             if row.nameText then
-                row.nameText:SetText(itemLink or itemName or FormatReserveItemFallback(itemId))
+                row.nameText:SetText(itemLink or itemName or ("Item ID: " .. itemId))
             end
         end
     end
@@ -5928,7 +5929,6 @@ do
 
         local rowHeight, yOffset = C.RESERVES_ROW_HEIGHT, 0
         local seenSources = {}
-        local firstRenderedRowBySource = {}
         local rowIndex = 0
         local headerIndex = 0
 
@@ -5946,9 +5946,7 @@ do
 
             if not collapsedBossGroups[source] then
                 rowIndex = rowIndex + 1
-                local isFirstInGroup = not firstRenderedRowBySource[source]
-                local row = module:CreateReserveRow(scrollChild, entry, yOffset, rowIndex, isFirstInGroup)
-                firstRenderedRowBySource[source] = true
+                local row = module:CreateReserveRow(scrollChild, entry, yOffset, rowIndex)
                 reserveItemRows[#reserveItemRows + 1] = row
                 yOffset = yOffset + rowHeight
             end
@@ -5989,27 +5987,8 @@ do
         row.iconTexture:SetDrawLayer("OVERLAY")
     end
 
-    local function SetupReserveRowDecor(row)
-        if not row or row._decorInitialized then return end
-        local topSeparator = row:CreateTexture(nil, "BORDER")
-        topSeparator:SetTexture("Interface\\Buttons\\WHITE8x8")
-        topSeparator:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
-        topSeparator:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, 0)
-        topSeparator:SetHeight(1)
-        topSeparator:Hide()
-        row.topSeparator = topSeparator
-
-        local separator = row:CreateTexture(nil, "BORDER")
-        separator:SetTexture("Interface\\Buttons\\WHITE8x8")
-        separator:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
-        separator:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 0)
-        separator:SetHeight(1)
-        row.separator = separator
-        row._decorInitialized = true
-    end
-
     -- Create a new row for displaying a reserve
-    function module:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
+    function module:CreateReserveRow(parent, info, yOffset, index)
         local rowName = frameName .. "ReserveRow" .. index
         local row = _G[rowName] or CreateFrame("Frame", rowName, parent, "KRTReserveRowTemplate")
         row:ClearAllPoints()
@@ -6021,7 +6000,6 @@ do
             row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
             row.textBlock = _G[rowName .. "TextBlock"]
             SetupReserveIcon(row)
-            SetupReserveRowDecor(row)
             if row.textBlock and row.iconBtn then
                 row.textBlock:SetFrameLevel(row.iconBtn:GetFrameLevel() + 1)
             end
@@ -6036,7 +6014,7 @@ do
             end
             row._initialized = true
         end
-        ApplyReserveRowData(row, info, index, isFirstInGroup)
+        ApplyReserveRowData(row, info, index)
         row:Show()
         rowsByItemID[info.itemId] = rowsByItemID[info.itemId] or {}
         tinsert(rowsByItemID[info.itemId], row)
@@ -6050,13 +6028,7 @@ do
     -- useColor:
     --   true/nil -> UI rendering (class colors)
     --   false    -> chat-safe rendering (no class color codes)
-    -- showPlus:
-    --   true/nil -> include "(P+N)" when Plus System is enabled
-    --   false    -> hide Plus suffixes from formatted player tokens
-    -- showMulti:
-    --   true/nil -> include "(xN)" when Multi-reserve is enabled
-    --   false    -> hide multi-reserve count suffixes from player tokens
-    function module:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
+    function module:GetPlayersForItem(itemId, useColor)
         if not itemId then return {} end
         local list = reservesByItemID[itemId]
         if type(list) ~= "table" then return {} end
@@ -6070,15 +6042,7 @@ do
             end
         end
 
-        local tokens = BuildPlayerTokens(
-            itemId,
-            data.players,
-            data.playerCounts,
-            data.playerMeta,
-            useColor,
-            showPlus,
-            showMulti
-        )
+        local tokens = BuildPlayerTokens(itemId, data.players, data.playerCounts, data.playerMeta, useColor)
         local out = {}
         for i = 1, #tokens do
             out[i] = tokens[i]
@@ -6087,12 +6051,12 @@ do
     end
 
     -- Returns the formatted player list for an item (comma-separated).
-    -- useColor, showPlus, and showMulti follow the same rules as GetPlayersForItem.
-    function module:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti)
-        addon:debug(Diag.D.LogReservesFormatPlayers:format(itemId))
-        local list = self:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
+    -- useColor follows the same rules as GetPlayersForItem.
+    function module:FormatReservedPlayersLine(itemId, useColor)
+        addon:debug(E.LogReservesFormatPlayers:format(itemId))
+        local list = self:GetPlayersForItem(itemId, useColor)
         -- Log the list of players found for the item
-        addon:debug(Diag.D.LogReservesPlayersList:format(itemId, tconcat(list, ", ")))
+        addon:debug(E.LogReservesPlayersList:format(itemId, tconcat(list, ", ")))
         return #list > 0 and tconcat(list, ", ") or ""
     end
 end
@@ -6102,7 +6066,7 @@ end
 do
     addon.ReserveImport = addon.ReserveImport or {}
     local module = addon.ReserveImport
-    local getFrame = makeModuleFrameGetter(module, "KRTImportWindow")
+    local frameName
     local localized = false
     -- Import mode slider: 0 = Multi-reserve, 1 = Plus System (priority)
     local MODE_MULTI, MODE_PLUS = 0, 1
@@ -6197,8 +6161,9 @@ do
 
     local function LocalizeUIFrame()
         if localized then return end
-        local frame = getFrame()
+        local frame = module.frame or _G["KRTImportWindow"]
         if not frame then return end
+        frameName = frame:GetName() or "KRTImportWindow"
 
         local confirmButton = _G["KRTImportConfirmButton"]
         if confirmButton then confirmButton:SetText(L.BtnImport) end
@@ -6215,6 +6180,8 @@ do
     function module:OnLoad(frame)
         module.frame = frame
         if frame then
+            frameName = frame:GetName()
+
             -- Drag registration kept in Lua (avoid template logic in XML).
             Utils.enableDrag(frame)
 
@@ -6238,25 +6205,40 @@ do
         end
     end
 
-    bindModuleRequestRefresh(module, getFrame)
+    local function getFrame()
+        local frame = module.frame or _G["KRTImportWindow"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
 
-    -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-    bindModuleToggleHide(module, uiController)
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
+        function() module:Refresh() end)
+
+    function module:RequestRefresh()
+        RequestRefresh()
+    end
+
+    function module:Hide()
+        local frame = getFrame()
+        if frame then
+            Utils.setShown(frame, false)
+        end
+    end
 
     function module:Toggle()
         local frame = getFrame()
         if not frame then
-            addon:error(Diag.E.LogReservesImportWindowMissing)
+            addon:error(E.LogReservesImportWindowMissing)
             return
         end
 
         if frame:IsShown() then
-            uiController:Hide()
+            module:Hide()
             return
         end
 
-        uiController:Show()
+        module:RequestRefresh()
+        Utils.setShown(frame, true)
 
         Utils.resetEditBox(_G["KRTImportEditBox"])
         local editBox = _G["KRTImportEditBox"]
@@ -6280,11 +6262,11 @@ do
                 status:SetText(L.ErrImportReservesEmpty or "Import failed: empty or invalid data.")
                 status:SetTextColor(1, 0.2, 0.2)
             end
-            addon:warn(Diag.W.LogReservesImportFailedEmpty)
+            addon:error(E.LogReservesImportFailedEmpty)
             return false, 0
         end
 
-        addon:debug(Diag.D.LogSRImportRequested:format(#csv))
+        addon:info(E.LogSRImportRequested:format(#csv))
         EnsureWrongCSVPopup()
         local mode = GetImportModeString()
         local ok, nPlayers, errCode, errData = addon.Reserves:ParseCSV(csv, mode)
@@ -6331,7 +6313,7 @@ do
     local module = addon.Config
     local frameName
 
-    local getFrame = makeModuleFrameGetter(module, "KRTConfig")
+    local getFrame
     -- ----- Internal state ----- --
     local localized = false
     local configDirty = false
@@ -6445,12 +6427,27 @@ do
         end
     end
 
-    -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function()
-        configDirty = true
-        module:RequestRefresh()
-    end)
-    bindModuleToggleHide(module, uiController)
+    -- Toggles the visibility of the configuration frame.
+    function module:Toggle()
+        local frame = getFrame()
+        if not frame then return end
+        if frame:IsShown() then
+            Utils.setShown(frame, false)
+        else
+            configDirty = true
+            -- Request while hidden to refresh immediately on OnShow (no extra refresh).
+            module:RequestRefresh()
+            Utils.setShown(frame, true)
+        end
+    end
+
+    -- Hides the configuration frame.
+    function module:Hide()
+        local frame = getFrame()
+        if frame then
+            Utils.hideFrame(frame)
+        end
+    end
 
     -- OnClick handler for option controls.
     function module:OnClick(btn)
@@ -6559,7 +6556,18 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 
-    bindModuleRequestRefresh(module, getFrame)
+    getFrame = function()
+        local frame = module.frame or _G["KRTConfig"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
+        function() module:Refresh() end)
+
+    function module:RequestRefresh()
+        RequestRefresh()
+    end
 end
 
 -- =========== Warnings Frame Module  =========== --
@@ -6568,7 +6576,7 @@ do
     local module = addon.Warnings
     local frameName
 
-    local getFrame = makeModuleFrameGetter(module, "KRTWarnings")
+    local getFrame
     -- ----- Internal state ----- --
     local LocalizeUIFrame
     local localized = false
@@ -6634,13 +6642,28 @@ do
         module:RequestRefresh()
     end
 
-    -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function()
-        warningsDirty = true
-        lastSelectedID = false
-        module:RequestRefresh()
-    end)
-    bindModuleToggleHide(module, uiController)
+    -- Toggle frame visibility:
+    function module:Toggle()
+        local frame = getFrame()
+        if not frame then return end
+        if frame:IsShown() then
+            Utils.setShown(frame, false)
+        else
+            warningsDirty = true
+            lastSelectedID = false
+            -- Request while hidden to refresh immediately on OnShow (no extra refresh).
+            module:RequestRefresh()
+            Utils.setShown(frame, true)
+        end
+    end
+
+    -- Hide frame:
+    function module:Hide()
+        local frame = getFrame()
+        if frame then
+            Utils.hideFrame(frame)
+        end
+    end
 
     -- Warning selection:
     function module:Select(btn)
@@ -6793,7 +6816,18 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 
-    bindModuleRequestRefresh(module, getFrame)
+    getFrame = function()
+        local frame = module.frame or _G["KRTWarnings"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
+        function() module:Refresh() end)
+
+    function module:RequestRefresh()
+        RequestRefresh()
+    end
 
     -- Saving a Warning:
     function SaveWarning(wContent, wName, wID)
@@ -6825,7 +6859,7 @@ do
     local module = addon.Changes
     local frameName
 
-    local getFrame = makeModuleFrameGetter(module, "KRTChanges")
+    local getFrame
     -- ----- Internal state ----- --
     local LocalizeUIFrame
     local localized = false
@@ -6900,23 +6934,28 @@ do
         controller:OnLoad(frame)
     end
 
-    -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function()
-        changesDirty = true
-        lastSelectedID = false
-        module:RequestRefresh()
-    end)
-
     -- Toggle frame visibility:
     function module:Toggle()
         CancelChanges()
-        return uiController:Toggle()
+        local frame = getFrame()
+        if not frame then return end
+        if frame:IsShown() then
+            Utils.setShown(frame, false)
+        else
+            changesDirty = true
+            lastSelectedID = false
+            -- Request while hidden to refresh immediately on OnShow (no extra refresh).
+            module:RequestRefresh()
+            Utils.setShown(frame, true)
+        end
     end
 
     -- Hide frame:
     function module:Hide()
-        CancelChanges()
-        return uiController:Hide()
+        local frame = getFrame()
+        if frame then
+            Utils.hideFrame(frame, CancelChanges)
+        end
     end
 
     -- Clear module:
@@ -6948,7 +6987,6 @@ do
             fetched = false
             changesDirty = true
             controller:Dirty()
-            module:RequestRefresh()
             return
         end
         -- Quick announce?
@@ -7132,11 +7170,22 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 
-    bindModuleRequestRefresh(module, getFrame)
+    getFrame = function()
+        local frame = module.frame or _G["KRTChanges"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
+        function() module:Refresh() end)
+
+    function module:RequestRefresh()
+        RequestRefresh()
+    end
 
     -- Initialize changes table:
     function InitChangesTable()
-        addon:debug(Diag.D.LogChangesInitTable)
+        addon:debug(E.LogChangesInitTable)
         if not KRT_CurrentRaid then
             changesTable = {}
             return
@@ -7185,7 +7234,7 @@ do
     -- ----- Internal state ----- --
     local frameName
 
-    local getFrame = makeModuleFrameGetter(module, "KRTSpammer")
+    local getFrame
     local LocalizeUIFrame
     local localized = false
 
@@ -7394,9 +7443,24 @@ do
         end
     end
 
-    -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-    bindModuleToggleHide(module, uiController)
+    -- Toggle/Hide
+    function module:Toggle()
+        local frame = getFrame()
+        if not frame then return end
+        if frame:IsShown() then
+            Utils.setShown(frame, false)
+        else
+            module:RequestRefresh()
+            Utils.setShown(frame, true)
+        end
+    end
+
+    function module:Hide()
+        local frame = getFrame()
+        if frame then
+            Utils.hideFrame(frame)
+        end
+    end
 
     -- Save (EditBox / Checkbox)
     function module:Save(box)
@@ -7918,7 +7982,18 @@ do
         if UpdateUIFrame then UpdateUIFrame() end
     end
 
-    bindModuleRequestRefresh(module, getFrame)
+    getFrame = function()
+        local frame = module.frame or _G["KRTSpammer"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
+        function() module:Refresh() end)
+
+    function module:RequestRefresh()
+        RequestRefresh()
+    end
 end
 
 -- =========== Logger Frame =========== --
@@ -7928,7 +8003,7 @@ do
     local module   = addon.Logger
     local frameName
 
-    local getFrame = Utils.makeFrameGetter("KRTLogger")
+    local getFrame
     -- module: stable-ID data helpers (fresh SavedVariables only; no legacy migration)
     module.Store   = module.Store or {}
     module.View    = module.View or {}
@@ -7965,46 +8040,51 @@ do
         raid._lootIdxByNid = nil
     end
 
-    local function normalizeNid(v)
+    local function _nid(v)
         return tonumber(v) or v
     end
 
-    local function buildIndex(raid, listField, idField, cacheField)
+    function Store:_BuildIndex(raid, listField, idField, cacheField)
         local list = raid[listField] or {}
         local m = {}
         for i = 1, #list do
             local e = list[i]
             local id = e and e[idField]
             if id ~= nil then
-                m[normalizeNid(id)] = i
+                m[_nid(id)] = i
             end
         end
         raid[cacheField] = m
     end
 
-    local function getIndexedPositionByNid(raid, queryNid, listField, idField, cacheField)
-        if not (raid and queryNid) then return nil end
-
-        local normalizedNid = normalizeNid(queryNid)
-        if not raid[cacheField] then
-            buildIndex(raid, listField, idField, cacheField)
+    function Store:BossIdx(raid, bossNid)
+        if not (raid and bossNid) then return nil end
+        bossNid = _nid(bossNid)
+        if not raid._bossIdxByNid then
+            self:_BuildIndex(raid, "bossKills", "bossNid", "_bossIdxByNid")
         end
-
-        local idx = raid[cacheField][normalizedNid]
+        local idx = raid._bossIdxByNid[bossNid]
         if not idx then
-            -- Raid changed since last build (new entry added / list changed)
-            buildIndex(raid, listField, idField, cacheField)
-            idx = raid[cacheField][normalizedNid]
+            -- Raid changed since last build (new boss added / list changed)
+            self:_BuildIndex(raid, "bossKills", "bossNid", "_bossIdxByNid")
+            idx = raid._bossIdxByNid[bossNid]
         end
         return idx
     end
 
-    function Store:BossIdx(raid, bossNid)
-        return getIndexedPositionByNid(raid, bossNid, "bossKills", "bossNid", "_bossIdxByNid")
-    end
-
     function Store:LootIdx(raid, lootNid)
-        return getIndexedPositionByNid(raid, lootNid, "loot", "lootNid", "_lootIdxByNid")
+        if not (raid and lootNid) then return nil end
+        lootNid = _nid(lootNid)
+        if not raid._lootIdxByNid then
+            self:_BuildIndex(raid, "loot", "lootNid", "_lootIdxByNid")
+        end
+        local idx = raid._lootIdxByNid[lootNid]
+        if not idx then
+            -- Raid changed since last build (new loot added / list changed)
+            self:_BuildIndex(raid, "loot", "lootNid", "_lootIdxByNid")
+            idx = raid._lootIdxByNid[lootNid]
+        end
+        return idx
     end
 
     function Store:GetBoss(raid, bossNid)
@@ -8653,14 +8733,24 @@ do
         end)
     end
 
-    -- Initialize UI controller for Toggle/Hide.
-    local uiController = addon:makeUIFrameController(getFrame, function() module:RequestRefresh() end)
-    bindModuleToggleHide(module, uiController)
+    function module:Toggle()
+        local frame = getFrame()
+        if not frame then return end
+        if frame:IsShown() then
+            module:Hide()
+        else
+            module:RequestRefresh()
+            Utils.setShown(frame, true)
+        end
+    end
 
     function module:Hide()
         module.selectedRaid = KRT_CurrentRaid
         clearSelections()
-        return uiController:Hide()
+        local frame = getFrame()
+        if frame then
+            Utils.setShown(frame, false)
+        end
     end
 
     function module:Refresh()
@@ -8673,7 +8763,18 @@ do
         Utils.triggerEvent("LoggerSelectRaid", module.selectedRaid)
     end
 
-    bindModuleRequestRefresh(module, getFrame)
+    getFrame = function()
+        local frame = module.frame or _G["KRTLogger"]
+        if frame and not module.frame then module.frame = frame end
+        return frame
+    end
+
+    local RequestRefresh = Utils.makeEventDrivenRefresher(getFrame,
+        function() module:Refresh() end)
+
+    function module:RequestRefresh()
+        RequestRefresh()
+    end
 
     -- Selectors
     function module:SelectRaid(btn, button)
@@ -8715,7 +8816,7 @@ do
         end
 
         if addon and addon.options and addon.options.debug and addon.debug then
-            addon:debug((Diag.D.LogLoggerSelectClickRaid)
+            addon:debug(("[LoggerSelect] click list=Raid id=%s ctrl=%d shift=%d action=%s selectedCount=%d focus=%s")
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
                     tostring(module.selectedRaid)
@@ -8767,7 +8868,7 @@ do
         end
 
         if addon and addon.options and addon.options.debug and addon.debug then
-            addon:debug((Diag.D.LogLoggerSelectClickBoss)
+            addon:debug(("[LoggerSelect] click list=Boss id=%s ctrl=%d shift=%d action=%s selectedCount=%d focus=%s")
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
                     tostring(module.selectedBoss)
@@ -8832,7 +8933,7 @@ do
         end
 
         if addon and addon.options and addon.options.debug and addon.debug then
-            addon:debug((Diag.D.LogLoggerSelectClickBossAttendees)
+            addon:debug(("[LoggerSelect] click list=BossAttendees id=%s ctrl=%d shift=%d action=%s selectedCount=%d focus=%s")
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
                     tostring(module.selectedBossPlayer)
@@ -8892,7 +8993,7 @@ do
         end
 
         if addon and addon.options and addon.options.debug and addon.debug then
-            addon:debug((Diag.D.LogLoggerSelectClickRaidAttendees)
+            addon:debug(("[LoggerSelect] click list=RaidAttendees id=%s ctrl=%d shift=%d action=%s selectedCount=%d focus=%s")
                 :format(
                     tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
                     tostring(module.selectedPlayer)
@@ -8961,7 +9062,7 @@ do
                 end
 
                 if addon and addon.options and addon.options.debug and addon.debug then
-                    addon:debug((Diag.D.LogLoggerSelectClickLoot)
+                    addon:debug(("[LoggerSelect] click list=Loot id=%s ctrl=%d shift=%d action=%s selectedCount=%d focus=%s")
                         :format(
                             tostring(id), isMulti and 1 or 0, isRange and 1 or 0, tostring(action), tonumber(count) or 0,
                             tostring(module.selectedItem)
@@ -8975,7 +9076,7 @@ do
                 module.selectedItem = id
 
                 if addon and addon.options and addon.options.debug and addon.debug then
-                    addon:debug((Diag.D.LogLoggerSelectClickContextMenu):format(
+                    addon:debug(("[LoggerSelect] click id=%s ctrl=0 action=CONTEXT_MENU(%s) selectedCount=%d"):format(
                         tostring(id), tostring(action), tonumber(count) or 0
                     ))
                 end
@@ -9381,7 +9482,7 @@ do
                 for i = 1, #ids do
                     local bNid = ids[i]
                     local lootRemoved = Actions:DeleteBoss(rID, bNid)
-                    addon:debug(Diag.D.LogLoggerBossLootRemoved, rID, tonumber(bNid) or -1, lootRemoved)
+                    addon:info(E.LogLoggerBossLootRemoved, rID, tonumber(bNid) or -1, lootRemoved)
                 end
 
                 -- Clear boss-related selections (filters changed / deleted)
@@ -9475,8 +9576,8 @@ do
             local pSel = addon.Logger.selectedBossPlayer
             local addBtn = _G[n .. "AddBtn"]
             local removeBtn = _G[n .. "RemoveBtn"]
-            local attSelCount = Utils.multiSelectCount(addon.Logger._msBossAttCtx)
             if addBtn then
+                local attSelCount = Utils.multiSelectCount(addon.Logger._msBossAttCtx)
                 Utils.enableDisable(addBtn, bSel and ((attSelCount or 0) == 0))
             end
             if removeBtn then
@@ -9620,12 +9721,12 @@ do
             if not sel then return end
 
             if not addon.IsInRaid() then
-                addon:warn(Diag.W.ErrLoggerUpdateRosterNotInRaid)
+                addon:error(E.ErrLoggerUpdateRosterNotInRaid)
                 return
             end
 
             if not (KRT_CurrentRaid and tonumber(KRT_CurrentRaid) == sel) then
-                addon:warn(Diag.W.ErrLoggerUpdateRosterNotCurrent)
+                addon:error(E.ErrLoggerUpdateRosterNotCurrent)
                 return
             end
 
@@ -9689,7 +9790,7 @@ do
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
 
-    local controller = Utils.makeListController {
+    local controller = Utils.makeHybridListController {
         keyName = "LootList",
         poolTag = "logger-loot",
         _rowParts = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
@@ -9727,8 +9828,9 @@ do
             View:FillLootList(out, raid, bID, pName)
         end,
 
-        rowName = function(n, _, i) return n .. "ItemBtn" .. i end,
         rowTmpl = "KRTLoggerLootButton",
+        rowHeight = 26,
+        debugVirtualization = true,
 
         drawRow = Utils.createRowDrawer(function(row, it)
             local ui = row._p
@@ -9835,7 +9937,7 @@ do
                     Utils.triggerEvent("LoggerSelectItem", addon.Logger.selectedItem)
 
                     if addon and addon.options and addon.options.debug and addon.debug then
-                        addon:debug((Diag.D.LogLoggerSelectDeleteItems):format(removed))
+                        addon:debug(("[LoggerSelect] delete items removed=%d"):format(removed))
                     end
                 end
             end)
@@ -9864,10 +9966,10 @@ do
                 raidID = KRT_CurrentRaid or addon.Logger.selectedRaid
             end
         end
-        addon:trace(Diag.D.LogLoggerLootLogAttempt:format(tostring(source), tostring(raidID), tostring(itemID),
+        addon:trace(E.LogLoggerLootLogAttempt:format(tostring(source), tostring(raidID), tostring(itemID),
             tostring(looter), tostring(rollType), tostring(rollValue), tostring(KRT_LastBoss)))
         if not raidID or not KRT_Raids[raidID] then
-            addon:error(Diag.E.LogLoggerNoRaidSession:format(tostring(raidID), tostring(itemID)))
+            addon:error(E.LogLoggerNoRaidSession:format(tostring(raidID), tostring(itemID)))
             return false
         end
 
@@ -9876,21 +9978,21 @@ do
         local lootCount = raid.loot and #raid.loot or 0
         local it = Store:GetLoot(raid, itemID)
         if not it then
-            addon:error(Diag.E.LogLoggerItemNotFound:format(raidID, tostring(itemID), lootCount))
+            addon:error(E.LogLoggerItemNotFound:format(raidID, tostring(itemID), lootCount))
             return false
         end
 
         if not looter or looter == "" then
-            addon:warn(Diag.W.LogLoggerLooterEmpty:format(raidID, tostring(itemID), tostring(it.itemLink)))
+            addon:warn(E.LogLoggerLooterEmpty:format(raidID, tostring(itemID), tostring(it.itemLink)))
         end
         if rollType == nil then
-            addon:warn(Diag.W.LogLoggerRollTypeNil:format(raidID, tostring(itemID), tostring(looter)))
+            addon:warn(E.LogLoggerRollTypeNil:format(raidID, tostring(itemID), tostring(looter)))
         end
 
-        addon:debug(Diag.D.LogLoggerLootBefore:format(raidID, tostring(itemID), tostring(it.itemLink),
+        addon:debug(E.LogLoggerLootBefore:format(raidID, tostring(itemID), tostring(it.itemLink),
             tostring(it.looter), tostring(it.rollType), tostring(it.rollValue)))
         if it.looter and it.looter ~= "" and looter and looter ~= "" and it.looter ~= looter then
-            addon:warn(Diag.W.LogLoggerLootOverwrite:format(raidID, tostring(itemID), tostring(it.itemLink),
+            addon:warn(E.LogLoggerLootOverwrite:format(raidID, tostring(itemID), tostring(it.itemLink),
                 tostring(it.looter), tostring(looter)))
         end
 
@@ -9911,7 +10013,7 @@ do
         end
 
         controller:Dirty()
-        addon:debug(Diag.D.LogLoggerLootRecorded:format(tostring(source), raidID, tostring(itemID),
+        addon:info(E.LogLoggerLootRecorded:format(tostring(source), raidID, tostring(itemID),
             tostring(it.itemLink), tostring(it.looter), tostring(it.rollType), tostring(it.rollValue)))
 
         local ok = true
@@ -9919,14 +10021,14 @@ do
         if expectedRollType and it.rollType ~= expectedRollType then ok = false end
         if expectedRollValue and it.rollValue ~= expectedRollValue then ok = false end
         if not ok then
-            addon:error(Diag.E.LogLoggerVerifyFailed:format(raidID, tostring(itemID), tostring(it.looter),
+            addon:error(E.LogLoggerVerifyFailed:format(raidID, tostring(itemID), tostring(it.looter),
                 tostring(it.rollType), tostring(it.rollValue)))
             return false
         end
 
-        addon:debug(Diag.D.LogLoggerVerified:format(raidID, tostring(itemID)))
+        addon:debug(E.LogLoggerVerified:format(raidID, tostring(itemID)))
         if not KRT_LastBoss then
-            addon:debug(Diag.D.LogLoggerRecordedNoBossContext:format(raidID, tostring(itemID), tostring(it.itemLink)))
+            addon:info(E.LogLoggerRecordedNoBossContext:format(raidID, tostring(itemID), tostring(it.itemLink)))
         end
         return true
     end
@@ -10138,7 +10240,6 @@ do
     local cmdLogger = { "logger", "history", "log" }
     local cmdDebug = { "debug", "dbg", "debugger" }
     local cmdLoot = { "loot", "ml", "master" }
-    local cmdCounter = { "counter", "counters", "counts" }
     local cmdReserves = { "res", "reserves", "reserve" }
     local cmdMinimap = { "minimap", "mm" }
 
@@ -10156,7 +10257,6 @@ do
         printHelp("warnings", L.StrCmdWarnings)
         printHelp("logger", L.StrCmdLogger)
         printHelp("debug", L.StrCmdDebug)
-        printHelp("counter", L.StrCmdCounter)
         printHelp("reserves", L.StrCmdReserves)
     end
 
@@ -10326,13 +10426,6 @@ do
         end
     end)
 
-    registerAliases(cmdCounter, function(rest)
-        local sub = Utils.splitArgs(rest)
-        if not sub or sub == "" or sub == "toggle" then
-            if addon.LootCounter and addon.LootCounter.Toggle then addon.LootCounter:Toggle() end
-        end
-    end)
-
     registerAliases(cmdReserves, function(rest)
         local sub = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
@@ -10366,6 +10459,11 @@ do
     SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
     SlashCmdList["KRT"] = function(msg)
         module:Handle(msg)
+    end
+
+    SLASH_KRTCOUNTS1 = "/krtcounts"
+    SlashCmdList["KRTCOUNTS"] = function()
+        if addon.LootCounter and addon.LootCounter.Toggle then addon.LootCounter:Toggle() end
     end
 end
 
@@ -10409,22 +10507,21 @@ function addon:ADDON_LOADED(name)
     if name ~= addonName then return end
     self:UnregisterEvent("ADDON_LOADED")
     local lvl = addon.GetLogLevel and addon:GetLogLevel()
-    addon:info(Diag.I.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
+    addon:info(E.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
         tostring(lvl), tostring(true)))
     addon.LoadOptions()
     addon.Reserves:Load()
     for event in pairs(addonEvents) do
         self:RegisterEvent(event)
     end
-    addon:debug(Diag.D.LogCoreEventsRegistered:format(addon.tLength(addonEvents)))
+    addon:debug(E.LogCoreEventsRegistered:format(addon.tLength(addonEvents)))
     self:RAID_ROSTER_UPDATE()
 end
 
 -- RAID_ROSTER_UPDATE: Updates the raid roster when it changes.
 function addon:RAID_ROSTER_UPDATE()
     addon.Raid:UpdateRaidRoster()
-    -- Broadcast a normalized roster-change event for UI modules.
-    Utils.triggerEvent("RaidRosterUpdate")
+
     -- Keep Master Looter UI in sync (event-driven; no polling).
     local mf = addon.Master and addon.Master.frame
     if addon.Master and addon.Master.RequestRefresh and mf and mf.IsShown and mf:IsShown() then
@@ -10462,15 +10559,14 @@ end
 -- RAID_INSTANCE_WELCOME: Triggered when entering a raid instance.
 function addon:RAID_INSTANCE_WELCOME(...)
     local instanceName, instanceType, instanceDiff = GetInstanceInfo()
-    local _, nextReset = ...
-    KRT_NextReset = nextReset
-    addon:trace(Diag.D.LogRaidInstanceWelcome:format(tostring(instanceName), tostring(instanceType),
+    _, KRT_NextReset = ...
+    addon:trace(E.LogRaidInstanceWelcome:format(tostring(instanceName), tostring(instanceType),
         tostring(instanceDiff), tostring(KRT_NextReset)))
     if instanceType == "raid" and not L.RaidZones[instanceName] then
-        addon:warn(Diag.W.LogRaidUnmappedZone:format(tostring(instanceName), tostring(instanceDiff)))
+        addon:warn(E.LogRaidUnmappedZone:format(tostring(instanceName), tostring(instanceDiff)))
     end
     if L.RaidZones[instanceName] ~= nil then
-        addon:debug(Diag.D.LogRaidInstanceRecognized:format(tostring(instanceName), tostring(instanceDiff)))
+        addon:info(E.LogRaidInstanceRecognized:format(tostring(instanceName), tostring(instanceDiff)))
         addon.After(3, function()
             addon.Raid:Check(instanceName, instanceDiff)
         end)
@@ -10481,7 +10577,7 @@ end
 function addon:PLAYER_ENTERING_WORLD()
     self:UnregisterEvent("PLAYER_ENTERING_WORLD")
     local module = self.Raid
-    addon:trace(Diag.D.LogCorePlayerEnteringWorld)
+    addon:trace(E.LogCorePlayerEnteringWorld)
     -- Restart the first-check timer on login
     addon.CancelTimer(module.firstCheckHandle, true)
     module.firstCheckHandle = nil
@@ -10490,7 +10586,7 @@ end
 
 -- CHAT_MSG_LOOT: Adds looted items to the raid log.
 function addon:CHAT_MSG_LOOT(msg)
-    addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
+    addon:trace(E.LogLootChatMsgLootRaw:format(tostring(msg)))
     if KRT_CurrentRaid then
         self.Raid:AddLoot(msg)
     end
@@ -10505,7 +10601,7 @@ end
 function addon:CHAT_MSG_MONSTER_YELL(...)
     local text, boss = ...
     if L.BossYells[text] and KRT_CurrentRaid then
-        addon:trace(Diag.D.LogBossYellMatched:format(tostring(text), tostring(L.BossYells[text])))
+        addon:trace(E.LogBossYellMatched:format(tostring(text), tostring(L.BossYells[text])))
         self.Raid:AddBoss(L.BossYells[text])
     end
 end
@@ -10528,7 +10624,7 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
 
     local boss = destName or bossLib:GetBossName(npcId)
     if boss then
-        addon:trace(Diag.D.LogBossUnitDiedMatched:format(tonumber(npcId) or -1, tostring(boss)))
+        addon:trace(E.LogBossUnitDiedMatched:format(tonumber(npcId) or -1, tostring(boss)))
         self.Raid:AddBoss(boss)
     end
 end

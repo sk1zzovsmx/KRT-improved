@@ -16,6 +16,15 @@ local L                                = addon.L -- Make a local reference for c
 
 -- ==================== Callbacks ==================== --
 L.StrCbErrUsage                        = "Usage: KRT:registerCallback(event, callbacks)"
+L.StrCbErrExec                         = "Error while executing callback %s for event %s: %s"
+
+-- ==================== Logger UI Diagnostics ==================== --
+L.LogLoggerUIShow                      = "[LoggerUI] show %s -> %s"
+L.LogLoggerUIWidgets                   = "[LoggerUI:%s] widgets sf=%s sc=%s sfW=%.1f sfH=%.1f scW=%.1f scH=%.1f"
+L.LogLoggerUIMissingWidgets            = "[LoggerUI:%s] Missing ScrollFrame widgets for %s"
+L.LogLoggerUIDeferLayout               = "[LoggerUI:%s] defer (layout not ready): sfW=%.1f"
+L.LogLoggerUIFetch                     = "[LoggerUI:%s] fetch count=%d sfW=%.1f sfH=%.1f scW=%.1f scH=%.1f frameW=%.1f frameH=%.1f"
+L.LogLoggerUIError                     = "[LoggerUI:%s] %s"
 
 -- ==================== General Buttons ==================== --
 L.BtnConfig                            = "Config"
@@ -166,15 +175,6 @@ L.StrReserveListTitle                  = "Reserve List"
 L.BtnClose                             = "Close"
 L.BtnClearReserves                     = "Clear Reserves"
 L.StrReserveCountSuffix                = " (x%d)"
-L.StrReservesTooltipTitle              = "Reserves"
-L.StrReservesTooltipTotal              = "Total: %d"
-L.StrReservesTooltipShownHidden        = "Shown: %d | Hidden: +%d"
-L.StrReservesTooltipPlus               = "P+%d: %s"
-L.StrReservesTooltipQuantity           = "x%d: %s"
-L.StrReservesPlayersHiddenSuffix       = " ... +%d"
-L.StrReservesItemIdLabel               = "Item ID: %s"
-L.StrReservesTooltipDroppedBy          = "Dropped by: %s"
-L.StrReservesItemFallback              = "[Item %s]"
 
 -- ==================== Raid Warnings Frame ==================== --
 L.StrMessage                           = "Message"
@@ -333,7 +333,6 @@ L.StrCmdChanges                        = "access ms changes related commands"
 L.StrCmdWarnings                       = "access warnings related commands"
 L.StrCmdLogger                         = "access loot logger related commands"
 L.StrCmdDebug                          = "toggle debugger or set level: debug on|off|level <name|num>"
-L.StrCmdCounter                        = "shows or hides loot counter window"
 L.StrCmdLFMStart                       = "starts LFM spam"
 L.StrCmdLFMStop                        = "stops LFM spam"
 L.StrCmdChangesDemand                  = "ask raid members to whisper you their ms changes"
