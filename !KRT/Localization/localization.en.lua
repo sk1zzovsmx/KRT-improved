@@ -34,6 +34,7 @@ L.StrMinimapRClick                = "|cffffd700Right-Click|r to access settings"
 L.StrMinimapSClick                = "|cffffd700Shift+Click|r to move"
 L.StrMinimapAClick                = "|cffffd700Alt+Click|r for free drag and drop"
 L.StrLootHistory                  = "Loot History"
+L.StrLootCounter                  = "Loot Counter"
 L.StrRaidWarnings                 = "Raid Warnings"
 L.StrLFMSpam                      = "LFM Spam"
 L.StrMSChanges                    = "MS Changes"
@@ -42,6 +43,8 @@ L.StrSpamBans                     = "Spam Bans"
 L.StrClearIcons                   = "Clear Raid Icons"
 
 -- ==================== Loot Master Frame ==================== --
+L.BtnLootCounter                 = "Loot Counter"
+L.BtnRaidList                    = "Raid List"
 L.BtnSelectItem                   = "Select Item"
 L.BtnRemoveItem                   = "Remove Item"
 L.BtnSpamLoot                     = "Spam Loot"
@@ -95,6 +98,7 @@ L.ErrScreenReminder               = "Please take a screenshot before trading, yo
 L.ErrItemStack                    = "You have a stack of %s, you may want to split it first"
 L.ErrCannotFindItem               = "Cannot find item: %s"
 L.ErrCannotFindPlayer             = "Cannot find player: %s"
+L.ErrNoWinnerSelected             = "No winner selected. Use Roll or Select Winner first."
 L.ErrPlayerCountBelowZero         = "Cannot decrement player count below zero for %s"
 
 -- ==================== Configuration Frame ==================== --
