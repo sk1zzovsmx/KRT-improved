@@ -1362,7 +1362,7 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<ScrollFrame name="$parentScrollFrame" inherits="KRT_HybridScrollFrameTemplate">
+			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT">
 						<Offset>
@@ -2127,7 +2127,7 @@
 					<OnClick>KRT.Changes:Announce()</OnClick>
 				</Scripts>
 			</Button>
-			<ScrollFrame name="$parentScrollFrame" inherits="KRT_HybridScrollFrameTemplate">
+			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT">
 						<Offset>
@@ -2298,8 +2298,8 @@
 					<OnValueChanged>KRT.ReserveImport:OnModeSliderChanged(self, value)</OnValueChanged>
 				</Scripts>
 			</Slider>
-			<!-- Multiline EditBox for CSV -->
-			<ScrollFrame name="KRTImportScrollFrame" inherits="KRTScrollFrameTemplate">
+			<!-- Multiline EditBox for CSV (no internal scrolling; paste + import) -->
+			<EditBox name="KRTImportEditBox" multiline="true" autoFocus="false" inherits="InputBoxTemplate">
 				<Size>
 					<AbsDimension x="340" y="160" />
 				</Size>
@@ -2310,17 +2310,10 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<ScrollChild>
-					<EditBox name="KRTImportEditBox" multiline="true" autoFocus="false" inherits="InputBoxTemplate">
-						<Size>
-							<AbsDimension x="320" y="160" />
-						</Size>
-						<Scripts>
-							<OnEscapePressed>self:ClearFocus()</OnEscapePressed>
-						</Scripts>
-					</EditBox>
-				</ScrollChild>
-			</ScrollFrame>
+				<Scripts>
+					<OnEscapePressed>self:ClearFocus()</OnEscapePressed>
+				</Scripts>
+			</EditBox>
 			<!-- Import Button -->
 			<Button name="KRTImportConfirmButton" inherits="KRTButtonTemplate">
 				<Size>
@@ -3101,7 +3094,7 @@
 							<OnClick>KRT.Logger.Raids:Sort("size")</OnClick>
 						</Scripts>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRT_HybridScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -3259,7 +3252,7 @@
 							<OnClick>KRT.Logger.Boss:Sort("mode")</OnClick>
 						</Scripts>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRT_HybridScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -3357,7 +3350,7 @@
 							<OnClick>KRT.Logger.BossAttendees:Sort("name")</OnClick>
 						</Scripts>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRT_HybridScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -3485,7 +3478,7 @@
 							<OnClick>KRT.Logger.RaidAttendees:Sort("leave")</OnClick>
 						</Scripts>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRT_HybridScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -3691,7 +3684,7 @@
 							<OnClick>KRT.Logger.Loot:Sort("time")</OnClick>
 						</Scripts>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRT_HybridScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>

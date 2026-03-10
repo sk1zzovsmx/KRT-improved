@@ -4,6 +4,7 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- Logger: fixed Loot row icon texture naming so hybrid row-part lookup resolves ItemIconTexture correctly.
 - UI: switched migrated Warnings, Changes, and Logger scroll frames to KRT_HybridScrollFrameTemplate.
 - UI: Hybrid list highlight/focus overlays now refresh during scroll-driven updates.
 - Utils: makeHybridListController now binds row parts into row._p during button creation with nil-safe lookups.
