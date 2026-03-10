@@ -45,27 +45,31 @@ do
     local importMode = nil -- 'multi' or 'plus'
     local pendingItemInfo = {}
     local pendingItemCount = 0
+    local pendingDisplayRefreshHandle = nil
+    local pendingDisplayRefreshQueued = false
+    local pendingDisplayRefreshDelaySeconds = 0.05
     local collapsedBossGroups = {}
     local grouped = {}
+    local RebuildIndex
 
     -- ----- Private helpers ----- --
 
     local playerTextTemp = {}
 
-    local function NormalizeImportMode(mode)
+    local function normalizeImportMode(mode)
         return (mode == "plus") and "plus" or "multi"
     end
 
-    local function ImportModeToOptionValue(mode)
-        return (NormalizeImportMode(mode) == "plus") and 1 or 0
+    local function importModeToOptionValue(mode)
+        return (normalizeImportMode(mode) == "plus") and 1 or 0
     end
 
-    local function SetImportMode(mode, syncOptions)
-        local resolved = NormalizeImportMode(mode)
+    local function setImportMode(mode, syncOptions)
+        local resolved = normalizeImportMode(mode)
         importMode = resolved
 
         if syncOptions ~= false then
-            local value = ImportModeToOptionValue(resolved)
+            local value = importModeToOptionValue(resolved)
             Options.SetOption("srImportMode", value)
         end
 
@@ -85,7 +89,7 @@ do
         "source",
     }
 
-    local function ResolvePlayerNameDisplay(playerKey, player, fallbackName)
+    local function resolvePlayerNameDisplay(playerKey, player, fallbackName)
         local candidate = fallbackName
         if type(player) == "table" then
             candidate = player.playerNameDisplay or player.original or candidate
@@ -106,7 +110,7 @@ do
         return candidate
     end
 
-    local function CopyReserveEntryForSave(src)
+    local function copyReserveEntryForSave(src)
         if type(src) ~= "table" or not src.rawID then
             return nil
         end
@@ -139,22 +143,22 @@ do
 
         local template = Diag.W and Diag.W.LogReservesLegacyFieldsDetected
         if type(template) == "string" then
-            addon:warn(template:format(
+            addon:warn(template:format(tostring(phaseTag or "?"), originalCount, rowPlayerCount, droppedRows, mergedPlayers))
+            return
+        end
+
+        addon:warn(
+            ("[Reserves] Legacy fields phase=%s original=%d rowPlayer=%d dropped=%d merged=%d"):format(
                 tostring(phaseTag or "?"),
                 originalCount,
                 rowPlayerCount,
                 droppedRows,
                 mergedPlayers
-            ))
-            return
-        end
-
-        addon:warn((
-            "[Reserves] Legacy fields phase=%s original=%d rowPlayer=%d dropped=%d merged=%d"
-        ):format(tostring(phaseTag or "?"), originalCount, rowPlayerCount, droppedRows, mergedPlayers))
+            )
+        )
     end
 
-    local function BuildRuntimeReservesData(sourceData, phaseTag)
+    local function buildRuntimeReservesData(sourceData, phaseTag)
         local normalized = {}
         local stats = {
             playersWithLegacyOriginal = 0,
@@ -165,10 +169,8 @@ do
 
         for rawPlayerKey, player in pairs(sourceData or {}) do
             if type(player) == "table" then
-                local displayName = ResolvePlayerNameDisplay(rawPlayerKey, player, rawPlayerKey)
-                local playerKey = Strings.NormalizeLower(displayName, true)
-                    or Strings.NormalizeLower(rawPlayerKey, true)
-                    or rawPlayerKey
+                local displayName = resolvePlayerNameDisplay(rawPlayerKey, player, rawPlayerKey)
+                local playerKey = Strings.NormalizeLower(displayName, true) or Strings.NormalizeLower(rawPlayerKey, true) or rawPlayerKey
                 if type(playerKey) ~= "string" then
                     playerKey = tostring(rawPlayerKey or "")
                 end
@@ -203,7 +205,7 @@ do
                             stats.rowsWithLegacyPlayerField = stats.rowsWithLegacyPlayerField + 1
                         end
 
-                        local copied = CopyReserveEntryForSave(row)
+                        local copied = copyReserveEntryForSave(row)
                         if copied then
                             container.reserves[#container.reserves + 1] = copied
                         else
@@ -221,8 +223,8 @@ do
         return normalized
     end
 
-    local function ApplyRuntimeReservesData(sourceData, phaseTag)
-        local normalized = BuildRuntimeReservesData(sourceData, phaseTag)
+    local function applyRuntimeReservesData(sourceData, phaseTag)
+        local normalized = buildRuntimeReservesData(sourceData, phaseTag)
         twipe(reservesData)
         for playerKey, player in pairs(normalized) do
             reservesData[playerKey] = player
@@ -230,12 +232,12 @@ do
         return normalized
     end
 
-    local function BuildSavedReservesData(sourceData)
+    local function buildSavedReservesData(sourceData)
         local normalized = {}
 
         for playerKey, player in pairs(sourceData or {}) do
             if type(player) == "table" then
-                local persistedPlayerName = ResolvePlayerNameDisplay(playerKey, player, playerKey)
+                local persistedPlayerName = resolvePlayerNameDisplay(playerKey, player, playerKey)
                 local container = normalized[persistedPlayerName]
                 if not container then
                     container = { reserves = {} }
@@ -245,7 +247,7 @@ do
                 local rows = player.reserves
                 if type(rows) == "table" then
                     for i = 1, #rows do
-                        local copied = CopyReserveEntryForSave(rows[i])
+                        local copied = copyReserveEntryForSave(rows[i])
                         if copied then
                             container.reserves[#container.reserves + 1] = copied
                         end
@@ -257,8 +259,10 @@ do
         return normalized
     end
 
-    local function MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
-        if not itemId then return nil end
+    local function markPendingItem(itemId, hasName, hasIcon, name, link, icon)
+        if not itemId then
+            return nil
+        end
         local pending = pendingItemInfo[itemId]
         if not pending then
             pending = {
@@ -290,13 +294,54 @@ do
         return pending
     end
 
-    local function GetPendingItemInfo(pending)
-        if not pending then return nil end
+    local function getPendingItemInfo(pending)
+        if not pending then
+            return nil
+        end
         return pending.name, pending.link, pending.icon
     end
 
-    local function CompletePendingItem(itemId)
-        if not itemId or not pendingItemInfo[itemId] then return end
+    local function clearDisplayRefreshQueue()
+        if pendingDisplayRefreshHandle then
+            addon.CancelTimer(pendingDisplayRefreshHandle, true)
+            pendingDisplayRefreshHandle = nil
+        end
+        pendingDisplayRefreshQueued = false
+    end
+
+    local function flushDisplayRefresh()
+        if pendingDisplayRefreshHandle then
+            addon.CancelTimer(pendingDisplayRefreshHandle, true)
+            pendingDisplayRefreshHandle = nil
+        end
+        if pendingDisplayRefreshQueued ~= true or not RebuildIndex then
+            return false
+        end
+        pendingDisplayRefreshQueued = false
+        RebuildIndex()
+        Bus.TriggerEvent(InternalEvents.ReservesDataChanged, "iteminfo-batch")
+        return true
+    end
+
+    local function scheduleDisplayRefresh(forceImmediate)
+        pendingDisplayRefreshQueued = true
+        if forceImmediate then
+            return flushDisplayRefresh()
+        end
+        if pendingDisplayRefreshHandle then
+            return false
+        end
+        pendingDisplayRefreshHandle = addon.NewTimer(pendingDisplayRefreshDelaySeconds, function()
+            pendingDisplayRefreshHandle = nil
+            flushDisplayRefresh()
+        end)
+        return false
+    end
+
+    local function completePendingItem(itemId)
+        if not itemId or not pendingItemInfo[itemId] then
+            return
+        end
         pendingItemInfo[itemId] = nil
         if pendingItemCount > 0 then
             pendingItemCount = pendingItemCount - 1
@@ -304,23 +349,31 @@ do
         addon:debug(Diag.D.LogReservesItemReady:format(itemId, pendingItemCount))
         if pendingItemCount == 0 then
             addon:debug(Diag.D.LogReservesPendingComplete)
-            Bus.TriggerEvent(InternalEvents.ReservesDataChanged, "iteminfo", itemId)
+            scheduleDisplayRefresh(true)
+            return
         end
+        scheduleDisplayRefresh(false)
     end
 
     -- SoftRes exports class names like "Warrior", "Death Knight", etc.
     -- Normalize them to WoW class tokens (e.g. "WARRIOR", "DEATHKNIGHT") so we can use C.CLASS_COLORS.
-    local function NormalizeClassToken(className)
-        if not className then return nil end
+    local function normalizeClassToken(className)
+        if not className then
+            return nil
+        end
         local token = tostring(className):upper()
         token = token:gsub("%s+", ""):gsub("%-", "")
-        if C and C.CLASS_COLORS and C.CLASS_COLORS[token] then return token end
-        if RAID_CLASS_COLORS and RAID_CLASS_COLORS[token] then return token end
+        if C and C.CLASS_COLORS and C.CLASS_COLORS[token] then
+            return token
+        end
+        if RAID_CLASS_COLORS and RAID_CLASS_COLORS[token] then
+            return token
+        end
         return nil
     end
 
-    local function GetClassColorStr(className)
-        local token = NormalizeClassToken(className) or "UNKNOWN"
+    local function getClassColorStr(className)
+        local token = normalizeClassToken(className) or "UNKNOWN"
         if C and C.CLASS_COLORS and C.CLASS_COLORS[token] then
             return token, C.CLASS_COLORS[token]
         end
@@ -328,8 +381,10 @@ do
         return token, colorStr
     end
 
-    local function ColorizeReserveName(itemId, playerName, className)
-        if not playerName then return playerName end
+    local function colorizeReserveName(itemId, playerName, className)
+        if not playerName then
+            return playerName
+        end
 
         local cls = className
         if (not cls or cls == "") and itemId then
@@ -340,19 +395,27 @@ do
         if (not cls or cls == "") and raidService and raidService.GetPlayerClass then
             cls = raidService:GetPlayerClass(playerName)
         end
-        if not cls or cls == "" then return playerName end
+        if not cls or cls == "" then
+            return playerName
+        end
 
-        local _, colorStr = GetClassColorStr(cls)
+        local _, colorStr = getClassColorStr(cls)
         if colorStr and colorStr ~= "ffffffff" then
             return "|c" .. colorStr .. playerName .. "|r"
         end
         return playerName
     end
 
-    local function AddReservePlayer(data, rOrName, countOverride, fallbackName)
-        if not data.players then data.players = {} end
-        if not data.playerCounts then data.playerCounts = {} end
-        if not data.playerMeta then data.playerMeta = {} end
+    local function addReservePlayer(data, rOrName, countOverride, fallbackName)
+        if not data.players then
+            data.players = {}
+        end
+        if not data.playerCounts then
+            data.playerCounts = {}
+        end
+        if not data.playerMeta then
+            data.playerMeta = {}
+        end
 
         local name, count, cls, plus
         if type(rOrName) == "table" then
@@ -387,12 +450,16 @@ do
         end
     end
 
-    local function GetMetaForPlayer(metaByName, itemId, playerName)
+    local function getMetaForPlayer(metaByName, itemId, playerName)
         local meta = metaByName and metaByName[playerName]
-        if meta and (meta.class or meta.plus) then return meta end
+        if meta and (meta.class or meta.plus) then
+            return meta
+        end
 
         -- Fallback: resolve from index (keeps compatibility even if meta isn't passed).
-        if not meta then meta = { plus = 0, class = nil } end
+        if not meta then
+            meta = { plus = 0, class = nil }
+        end
         if itemId and playerName then
             local r = Service:GetReserveEntryForItem(itemId, playerName)
             if r then
@@ -400,7 +467,9 @@ do
                     meta.class = r.class
                 end
                 local p = tonumber(r.plus) or 0
-                if p > (meta.plus or 0) then meta.plus = p end
+                if p > (meta.plus or 0) then
+                    meta.plus = p
+                end
             end
             local raidService = Services.Raid
             if (not meta.class or meta.class == "") and raidService and raidService.GetPlayerClass then
@@ -414,13 +483,13 @@ do
     -- useColor:
     --   true/nil -> UI rendering (class colors enabled)
     --   false    -> chat-safe rendering (no class color codes)
-    local function FormatReservePlayerName(itemId, name, count, metaByName, useColor, showPlus, showMulti)
-        local meta = GetMetaForPlayer(metaByName, itemId, name)
+    local function formatReservePlayerName(itemId, name, count, metaByName, useColor, showPlus, showMulti)
+        local meta = getMetaForPlayer(metaByName, itemId, name)
         local out
         if useColor == false then
             out = name
         else
-            out = ColorizeReserveName(itemId, name, meta and meta.class)
+            out = colorizeReserveName(itemId, name, meta and meta.class)
         end
 
         if showMulti ~= false and Service:IsMultiReserve() and count and count > 1 then
@@ -437,16 +506,20 @@ do
         return out
     end
 
-    local function SortPlayersForDisplay(itemId, players, counts, metaByName)
-        if not players then return end
+    local function sortPlayersForDisplay(itemId, players, counts, metaByName)
+        if not players then
+            return
+        end
 
         if Service:IsPlusSystem() and itemId then
             table.sort(players, function(a, b)
-                local am = GetMetaForPlayer(metaByName, itemId, a)
-                local bm = GetMetaForPlayer(metaByName, itemId, b)
+                local am = getMetaForPlayer(metaByName, itemId, a)
+                local bm = getMetaForPlayer(metaByName, itemId, b)
                 local ap = (am and tonumber(am.plus)) or 0
                 local bp = (bm and tonumber(bm.plus)) or 0
-                if ap ~= bp then return ap > bp end
+                if ap ~= bp then
+                    return ap > bp
+                end
                 return tostring(a) < tostring(b)
             end)
         elseif Service:IsMultiReserve() and counts then
@@ -454,28 +527,23 @@ do
             table.sort(players, function(a, b)
                 local aq = counts[a] or 1
                 local bq = counts[b] or 1
-                if aq ~= bq then return aq > bq end
+                if aq ~= bq then
+                    return aq > bq
+                end
                 return tostring(a) < tostring(b)
             end)
         end
     end
 
-    local function BuildPlayerTokens(itemId, players, counts, metaByName, useColor, showPlus, showMulti)
-        if not players then return {} end
-        SortPlayersForDisplay(itemId, players, counts, metaByName)
+    local function buildPlayerTokens(itemId, players, counts, metaByName, useColor, showPlus, showMulti)
+        if not players then
+            return {}
+        end
+        sortPlayersForDisplay(itemId, players, counts, metaByName)
         twipe(playerTextTemp)
         for i = 1, #players do
             local name = players[i]
-            playerTextTemp[#playerTextTemp + 1] =
-                FormatReservePlayerName(
-                    itemId,
-                    name,
-                    counts and counts[name] or 1,
-                    metaByName,
-                    useColor,
-                    showPlus,
-                    showMulti
-                )
+            playerTextTemp[#playerTextTemp + 1] = formatReservePlayerName(itemId, name, counts and counts[name] or 1, metaByName, useColor, showPlus, showMulti)
         end
         return playerTextTemp
     end
@@ -484,12 +552,12 @@ do
     -- Long lists are rendered in a dedicated tooltip on the players line.
     local RESERVE_ROW_MAX_PLAYERS_INLINE = 6
 
-    local function FormatReservePlayerNameBase(itemId, name, metaByName)
-        local meta = GetMetaForPlayer(metaByName, itemId, name)
-        return ColorizeReserveName(itemId, name, meta and meta.class)
+    local function formatReservePlayerNameBase(itemId, name, metaByName)
+        local meta = getMetaForPlayer(metaByName, itemId, name)
+        return colorizeReserveName(itemId, name, meta and meta.class)
     end
 
-    local function BuildPlayersTooltipLines(itemId, players, counts, metaByName, shownCount, hiddenCount)
+    local function buildPlayersTooltipLines(itemId, players, counts, metaByName, shownCount, hiddenCount)
         local lines = {}
         local total = players and #players or 0
         lines[#lines + 1] = format(L.StrReservesTooltipTotal, total)
@@ -506,15 +574,17 @@ do
             local groups, keys = {}, {}
             for i = 1, #players do
                 local name = players[i]
-                local meta = GetMetaForPlayer(metaByName, itemId, name)
+                local meta = getMetaForPlayer(metaByName, itemId, name)
                 local p = (meta and tonumber(meta.plus)) or 0
                 if groups[p] == nil then
                     groups[p] = {}
                     keys[#keys + 1] = p
                 end
-                groups[p][#groups[p] + 1] = FormatReservePlayerNameBase(itemId, name, metaByName)
+                groups[p][#groups[p] + 1] = formatReservePlayerNameBase(itemId, name, metaByName)
             end
-            table.sort(keys, function(a, b) return a > b end)
+            table.sort(keys, function(a, b)
+                return a > b
+            end)
             for i = 1, #keys do
                 local p = keys[i]
                 lines[#lines + 1] = format(L.StrReservesTooltipPlus, p, tconcat(groups[p], ", "))
@@ -529,9 +599,11 @@ do
                     groups[q] = {}
                     keys[#keys + 1] = q
                 end
-                groups[q][#groups[q] + 1] = FormatReservePlayerNameBase(itemId, name, metaByName)
+                groups[q][#groups[q] + 1] = formatReservePlayerNameBase(itemId, name, metaByName)
             end
-            table.sort(keys, function(a, b) return a > b end)
+            table.sort(keys, function(a, b)
+                return a > b
+            end)
             for i = 1, #keys do
                 local q = keys[i]
                 lines[#lines + 1] = format(L.StrReservesTooltipQuantity, q, tconcat(groups[q], ", "))
@@ -540,7 +612,7 @@ do
             -- Fallback: just list names
             local names = {}
             for i = 1, #players do
-                names[i] = FormatReservePlayerNameBase(itemId, players[i], metaByName)
+                names[i] = formatReservePlayerNameBase(itemId, players[i], metaByName)
             end
             lines[#lines + 1] = tconcat(names, ", ")
         end
@@ -548,9 +620,11 @@ do
         return lines
     end
 
-    local function BuildPlayersText(itemId, players, counts, metaByName)
-        if not players then return "", {}, "" end
-        BuildPlayerTokens(itemId, players, counts, metaByName)
+    local function buildPlayersText(itemId, players, counts, metaByName)
+        if not players then
+            return "", {}, ""
+        end
+        buildPlayerTokens(itemId, players, counts, metaByName)
         local total = #playerTextTemp
         local shown = total
         if RESERVE_ROW_MAX_PLAYERS_INLINE and RESERVE_ROW_MAX_PLAYERS_INLINE > 0 then
@@ -562,11 +636,11 @@ do
             shortText = shortText .. format(L.StrReservesPlayersHiddenSuffix, hidden)
         end
         local fullText = tconcat(playerTextTemp, ", ")
-        local tooltipLines = BuildPlayersTooltipLines(itemId, players, counts, metaByName, shown, hidden)
+        local tooltipLines = buildPlayersTooltipLines(itemId, players, counts, metaByName, shown, hidden)
         return shortText, tooltipLines, fullText
     end
 
-    local function GetReserveSource(source)
+    local function getReserveSource(source)
         if source and source ~= "" then
             return source
         end
@@ -589,121 +663,7 @@ do
         return format(L.StrReservesItemFallback, tostring(itemId or "?"))
     end
 
-    local function UpdateDisplayEntryForItem(itemId)
-        if not itemId then return end
-        reservesDirty = true
-
-        local groupedBySource = {}
-        local list = reservesByItemID[itemId]
-        if type(list) == "table" then
-            for i = 1, #list do
-                local r = list[i]
-                if type(r) == "table" then
-                    local source = GetReserveSource(r.source)
-                    local bySource = groupedBySource[source]
-                    if not bySource then
-                        bySource = {}
-                        groupedBySource[source] = bySource
-                        if collapsedBossGroups[source] == nil then
-                            collapsedBossGroups[source] = false
-                        end
-                    end
-                    local data = bySource[itemId]
-                    if not data then
-                        data = {
-                            itemId = itemId,
-                            itemLink = r.itemLink,
-                            itemName = r.itemName,
-                            itemIcon = r.itemIcon,
-                            source = source,
-                            players = {},
-                            playerCounts = {},
-                            playerMeta = {},
-                        }
-                        bySource[itemId] = data
-                    end
-                    AddReservePlayer(data, r)
-                end
-            end
-        end
-
-        local existing = {}
-        local remaining = {}
-        for i = 1, #reservesDisplayList do
-            local data = reservesDisplayList[i]
-            if data and data.itemId == itemId then
-                existing[#existing + 1] = data
-            else
-                remaining[#remaining + 1] = data
-            end
-        end
-
-        local reused = 0
-        for source, byQty in pairs(groupedBySource) do
-            for _, data in pairs(byQty) do
-                reused = reused + 1
-                local target = existing[reused]
-                if target then
-                    target.itemId = itemId
-                    target.itemLink = data.itemLink
-                    target.itemName = data.itemName
-                    target.itemIcon = data.itemIcon
-                    target.source = source
-                    target.players = target.players or {}
-                    target.playerCounts = target.playerCounts or {}
-                    target.playerMeta = target.playerMeta or {}
-                    twipe(target.players)
-                    twipe(target.playerCounts)
-                    twipe(target.playerMeta)
-                    for i = 1, #data.players do
-                        local name = data.players[i]
-                        target.players[i] = name
-                        target.playerCounts[name] = data.playerCounts[name]
-                    end
-                    if data.playerMeta then
-                        for n, m in pairs(data.playerMeta) do
-                            local tm = target.playerMeta[n]
-                            if not tm then
-                                tm = {}; target.playerMeta[n] = tm
-                            end
-                            tm.plus = (m and tonumber(m.plus)) or 0
-                            tm.class = m and m.class or tm.class
-                        end
-                    end
-                    target.playersText, target.playersTooltipLines, target.playersTextFull =
-                        BuildPlayersText(
-                            itemId,
-                            target.players,
-                            target.playerCounts,
-                            target.playerMeta
-                        )
-                    target.players = nil
-                    target.playerCounts = nil
-                    target.playerMeta = nil
-                    remaining[#remaining + 1] = target
-                else
-                    data.playersText, data.playersTooltipLines, data.playersTextFull =
-                        BuildPlayersText(
-                            data.itemId,
-                            data.players,
-                            data.playerCounts,
-                            data.playerMeta
-                        )
-                    data.players = nil
-                    data.playerCounts = nil
-                    data.playerMeta = nil
-                    remaining[#remaining + 1] = data
-                end
-            end
-        end
-
-        twipe(reservesDisplayList)
-        for i = 1, #remaining do
-            reservesDisplayList[i] = remaining[i]
-        end
-    end
-
-    local function RebuildIndex()
+    RebuildIndex = function()
         twipe(reservesByItemID)
         twipe(reservesByItemPlayer)
         twipe(playerItemsByName)
@@ -712,7 +672,7 @@ do
         -- Build fast lookup indices
         for playerKey, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
-                local playerName = ResolvePlayerNameDisplay(playerKey, player)
+                local playerName = resolvePlayerNameDisplay(playerKey, player)
                 player.playerNameDisplay = playerName
                 player.original = nil
                 local normalizedPlayer = Strings.NormalizeLower(playerName, true) or playerKey
@@ -751,7 +711,7 @@ do
                 for i = 1, #list do
                     local r = list[i]
                     if type(r) == "table" then
-                        local source = GetReserveSource(r.source)
+                        local source = getReserveSource(r.source)
 
                         local bySource = grouped[source]
                         if not bySource then
@@ -777,7 +737,7 @@ do
                             bySource[itemId] = data
                         end
 
-                        AddReservePlayer(data, r)
+                        addReservePlayer(data, r)
                     end
                 end
             end
@@ -785,13 +745,7 @@ do
 
         for _, byItem in pairs(grouped) do
             for _, data in pairs(byItem) do
-                data.playersText, data.playersTooltipLines, data.playersTextFull =
-                    BuildPlayersText(
-                        data.itemId,
-                        data.players,
-                        data.playerCounts,
-                        data.playerMeta
-                    )
+                data.playersText, data.playersTooltipLines, data.playersTextFull = buildPlayersText(data.itemId, data.players, data.playerCounts, data.playerMeta)
                 data.players = nil
                 data.playerCounts = nil
                 data.playerMeta = nil
@@ -805,16 +759,17 @@ do
     -- ----- Saved Data Management ----- --
 
     function Service:Save(contextTag)
-        local canonical = ApplyRuntimeReservesData(reservesData, contextTag or "save")
+        local canonical = applyRuntimeReservesData(reservesData, contextTag or "save")
         RebuildIndex()
         addon:debug(Diag.D.LogReservesSaveEntries:format(addon.tLength(reservesData)))
-        KRT_Reserves = BuildSavedReservesData(canonical)
+        KRT_Reserves = buildSavedReservesData(canonical)
     end
 
     function Service:Load()
         addon:debug(Diag.D.LogReservesLoadData:format(tostring(KRT_Reserves ~= nil)))
+        clearDisplayRefreshQueue()
         local savedReserves = (type(KRT_Reserves) == "table") and KRT_Reserves or {}
-        ApplyRuntimeReservesData(savedReserves, "load")
+        applyRuntimeReservesData(savedReserves, "load")
 
         -- Infer import mode from saved data when possible.
         -- If we detect any multi-item or quantity>1 entries, treat it as Multi-reserve.
@@ -835,19 +790,22 @@ do
                     end
                 end
             end
-            if inferred == "multi" then break end
+            if inferred == "multi" then
+                break
+            end
         end
         if not inferred then
             local v = addon.options and addon.options.srImportMode
             inferred = (v == 1) and "plus" or "multi"
         end
-        SetImportMode(inferred, true)
+        setImportMode(inferred, true)
 
         RebuildIndex()
     end
 
     function Service:ResetSaved()
         addon:debug(Diag.D.LogReservesResetSaved)
+        clearDisplayRefreshQueue()
         KRT_Reserves = nil
         twipe(reservesData)
         RebuildIndex()
@@ -863,7 +821,9 @@ do
     end
 
     function Service:HasItemReserves(itemId)
-        if not itemId then return false end
+        if not itemId then
+            return false
+        end
         local list = reservesByItemID[itemId]
         return type(list) == "table" and #list > 0
     end
@@ -871,7 +831,9 @@ do
     -- ----- Reserve Data Handling ----- --
 
     function Service:GetReserve(playerName)
-        if type(playerName) ~= "string" then return nil end
+        if type(playerName) ~= "string" then
+            return nil
+        end
         local player = Strings.NormalizeLower(playerName)
         local reserve = reservesData[player]
 
@@ -896,13 +858,13 @@ do
     function Service:GetImportMode()
         if importMode == nil then
             local v = addon.options and addon.options.srImportMode
-            SetImportMode((v == 1) and "plus" or "multi", false)
+            setImportMode((v == 1) and "plus" or "multi", false)
         end
         return importMode
     end
 
     function Service:SetImportMode(mode, syncOptions)
-        return SetImportMode(mode, syncOptions)
+        return setImportMode(mode, syncOptions)
     end
 
     function Service:IsPlusSystem()
@@ -917,8 +879,10 @@ do
     local importStrategies = {}
 
     local function cleanCSVField(field)
-        if not field then return nil end
-        return Strings.TrimText(field:gsub('^"(.-)"$', '%1'), true)
+        if not field then
+            return nil
+        end
+        return Strings.TrimText(field:gsub('^"(.-)"$', "%1"), true)
     end
 
     local function splitCSVLine(line)
@@ -935,7 +899,7 @@ do
                 else
                     inQuotes = not inQuotes
                 end
-            elseif ch == ',' and not inQuotes then
+            elseif ch == "," and not inQuotes then
                 out[#out + 1] = field
                 field = ""
             else
@@ -1075,20 +1039,24 @@ do
             else
                 rec.count = (rec.count or 1) + 1
                 if rec.itemId ~= row.itemId then
-                    return false, "CSV_WRONG_FOR_PLUS", {
+                    return false,
+                        "CSV_WRONG_FOR_PLUS",
+                        {
+                            player = row.player,
+                            reason = "multi_item",
+                            first = rec.itemId,
+                            second = row.itemId,
+                            count = rec.count,
+                        }
+                end
+                return false,
+                    "CSV_WRONG_FOR_PLUS",
+                    {
                         player = row.player,
-                        reason = "multi_item",
-                        first = rec.itemId,
-                        second = row.itemId,
+                        reason = "duplicate",
+                        itemId = row.itemId,
                         count = rec.count,
                     }
-                end
-                return false, "CSV_WRONG_FOR_PLUS", {
-                    player = row.player,
-                    reason = "duplicate",
-                    itemId = row.itemId,
-                    count = rec.count,
-                }
             end
         end
         return true
@@ -1147,14 +1115,20 @@ do
 
     importStrategies.multi = {
         id = "multi",
-        Validate = function(rows) return true end,
-        Aggregate = function(rows) return aggregateRows(rows, true) end,
+        Validate = function(rows)
+            return true
+        end,
+        Aggregate = function(rows)
+            return aggregateRows(rows, true)
+        end,
     }
 
     importStrategies.plus = {
         id = "plus",
         Validate = validatePlusRows,
-        Aggregate = function(rows) return aggregateRows(rows, false) end,
+        Aggregate = function(rows)
+            return aggregateRows(rows, false)
+        end,
     }
 
     function Service:GetImportStrategy(mode)
@@ -1180,21 +1154,24 @@ do
         end
 
         importStats = importStats or {}
-        addon:debug(Diag.D.LogReservesImportRows:format(
-            tonumber(importStats.validRows) or #rows,
-            tonumber(importStats.skippedRows) or 0,
-            tostring(importStats.headerDetected),
-            tonumber(importStats.dataLines) or 0
-        ))
+        addon:debug(
+            Diag.D.LogReservesImportRows:format(
+                tonumber(importStats.validRows) or #rows,
+                tonumber(importStats.skippedRows) or 0,
+                tostring(importStats.headerDetected),
+                tonumber(importStats.dataLines) or 0
+            )
+        )
         if importStats.headerDetected ~= true and (tonumber(importStats.skippedRows) or 0) > 0 then
             addon:warn(L.WarnReservesHeaderHint)
         end
 
         local ok, errCode, errData = strategy.Validate(rows)
         if not ok then
-            addon:debug(Diag.D.LogReservesImportWrongModePlus
-                and Diag.D.LogReservesImportWrongModePlus:format(tostring(errData and errData.player))
-                or ("Wrong CSV for Plus System: " .. tostring(errData and errData.player)))
+            addon:debug(
+                Diag.D.LogReservesImportWrongModePlus and Diag.D.LogReservesImportWrongModePlus:format(tostring(errData and errData.player))
+                    or ("Wrong CSV for Plus System: " .. tostring(errData and errData.player))
+            )
             return nil, errCode or "CSV_INVALID", errData
         end
 
@@ -1214,9 +1191,10 @@ do
             return false, "INVALID_PARSED"
         end
 
+        clearDisplayRefreshQueue()
         local mode = (parsed.mode == "plus" or parsed.mode == "multi") and parsed.mode or self:GetImportMode()
         reservesData = parsed.reservesData
-        SetImportMode(mode, true)
+        setImportMode(mode, true)
         self:Save()
 
         local nPlayers = tonumber(parsed.nPlayers) or addon.tLength(reservesData)
@@ -1224,15 +1202,11 @@ do
         if not (opts and opts.silentInfo) then
             addon:info(format(L.SuccessReservesParsed, tostring(nPlayers)))
             local stats = parsed.importStats or {}
-            addon:info(L.MsgReservesImportRows:format(
-                tonumber(stats.validRows) or 0,
-                tonumber(stats.skippedRows) or 0
-            ))
+            addon:info(L.MsgReservesImportRows:format(tonumber(stats.validRows) or 0, tonumber(stats.skippedRows) or 0))
         end
 
         local reason = (opts and opts.reason) or "import"
-        Bus.TriggerEvent(InternalEvents.ReservesDataChanged,
-            reason, raidId, mode, nPlayers)
+        Bus.TriggerEvent(InternalEvents.ReservesDataChanged, reason, raidId, mode, nPlayers)
         return true, nPlayers
     end
 
@@ -1252,12 +1226,13 @@ do
 
     -- ----- Item Info Querying ----- --
     function Service:QueryItemInfo(itemId)
-        if not itemId then return end
+        if not itemId then
+            return
+        end
         addon:debug(Diag.D.LogReservesQueryItemInfo:format(itemId))
         local pending = pendingItemInfo[itemId]
-        local name, link, icon = GetPendingItemInfo(pending)
-        local hasName = type(name) == "string" and name ~= ""
-            and type(link) == "string" and link ~= ""
+        local name, link, icon = getPendingItemInfo(pending)
+        local hasName = type(name) == "string" and name ~= "" and type(link) == "string" and link ~= ""
         local hasIcon = type(icon) == "string" and icon ~= ""
 
         if not hasName then
@@ -1280,16 +1255,15 @@ do
             end
         end
 
-        hasName = type(name) == "string" and name ~= ""
-            and type(link) == "string" and link ~= ""
+        hasName = type(name) == "string" and name ~= "" and type(link) == "string" and link ~= ""
         hasIcon = type(icon) == "string" and icon ~= ""
         if hasName then
             self:UpdateReserveItemData(itemId, name, link, icon)
         end
-        MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
+        markPendingItem(itemId, hasName, hasIcon, name, link, icon)
         if hasName and hasIcon then
             addon:debug(Diag.D.LogReservesItemInfoReady:format(itemId, name))
-            CompletePendingItem(itemId)
+            completePendingItem(itemId)
             return true
         end
 
@@ -1335,7 +1309,9 @@ do
 
     -- Update reserve item data
     function Service:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
-        if not itemId then return end
+        if not itemId then
+            return
+        end
         local icon = itemIcon
         if (type(icon) ~= "string" or icon == "") and itemName then
             icon = fallbackIcon
@@ -1368,7 +1344,7 @@ do
             end
         end
 
-        UpdateDisplayEntryForItem(itemId)
+        scheduleDisplayRefresh(false)
 
         return icon
     end
@@ -1376,25 +1352,35 @@ do
     -- Get reserve count for a specific item for a player
     function Service:GetReserveCountForItem(itemId, playerName)
         local r = self:GetReserveEntryForItem(itemId, playerName)
-        if not r then return 0 end
+        if not r then
+            return 0
+        end
         return tonumber(r.quantity) or 1
     end
 
     -- Gets the reserve entry table for a specific item for a player (or nil).
     function Service:GetReserveEntryForItem(itemId, playerName)
-        if not itemId or not playerName then return nil end
+        if not itemId or not playerName then
+            return nil
+        end
         local playerKey = Strings.NormalizeLower(playerName, true)
-        if not playerKey then return nil end
+        if not playerKey then
+            return nil
+        end
 
         local byP = reservesByItemPlayer[itemId]
         if type(byP) == "table" then
             local r = byP[playerKey]
-            if r then return r end
+            if r then
+                return r
+            end
         end
 
         -- Fallback (should be rare if indices are up to date)
         local entry = reservesData[playerKey]
-        if not entry then return nil end
+        if not entry then
+            return nil
+        end
         for _, r in ipairs(entry.reserves or {}) do
             if r and r.rawID == itemId then
                 return r
@@ -1406,7 +1392,9 @@ do
     -- Gets the "Plus" value for a reserved item for a player (0 if missing).
     function Service:GetPlusForItem(itemId, playerName)
         -- Plus values are meaningful only in Plus System mode.
-        if self:GetImportMode() ~= "plus" then return 0 end
+        if self:GetImportMode() ~= "plus" then
+            return 0
+        end
         local r = self:GetReserveEntryForItem(itemId, playerName)
         return (r and tonumber(r.plus)) or 0
     end
@@ -1414,8 +1402,12 @@ do
     -- Returns true if the item has any multi-reserve entry (quantity > 1).
     -- When true, SR "Plus priority" should be disabled for this item.
     function Service:HasMultiReserveForItem(itemId)
-        if self:GetImportMode() ~= "multi" then return false end
-        if not itemId then return false end
+        if self:GetImportMode() ~= "multi" then
+            return false
+        end
+        if not itemId then
+            return false
+        end
         local list = reservesByItemID[itemId]
         if type(list) == "table" then
             for i = 1, #list do
@@ -1458,28 +1450,24 @@ do
     --   true/nil -> include "(xN)" when Multi-reserve is enabled
     --   false    -> hide multi-reserve count suffixes from player tokens
     function Service:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
-        if not itemId then return {} end
+        if not itemId then
+            return {}
+        end
         local list = reservesByItemID[itemId]
-        if type(list) ~= "table" then return {} end
+        if type(list) ~= "table" then
+            return {}
+        end
 
         -- Aggregate per player so we can apply sorting and reuse meta (class/plus).
         local data = { players = {}, playerCounts = {}, playerMeta = {} }
         for i = 1, #list do
             local r = list[i]
             if type(r) == "table" then
-                AddReservePlayer(data, r)
+                addReservePlayer(data, r)
             end
         end
 
-        local tokens = BuildPlayerTokens(
-            itemId,
-            data.players,
-            data.playerCounts,
-            data.playerMeta,
-            useColor,
-            showPlus,
-            showMulti
-        )
+        local tokens = buildPlayerTokens(itemId, data.players, data.playerCounts, data.playerMeta, useColor, showPlus, showMulti)
         local out = {}
         for i = 1, #tokens do
             out[i] = tokens[i]
@@ -1500,8 +1488,12 @@ do
     function Service:GetDisplayList()
         if reservesDirty then
             table.sort(reservesDisplayList, function(a, b)
-                if a.source ~= b.source then return a.source < b.source end
-                if a.itemId ~= b.itemId then return a.itemId < b.itemId end
+                if a.source ~= b.source then
+                    return a.source < b.source
+                end
+                if a.itemId ~= b.itemId then
+                    return a.itemId < b.itemId
+                end
                 return false
             end)
             reservesDirty = false
@@ -1510,12 +1502,16 @@ do
     end
 
     function Service:IsSourceCollapsed(source)
-        if not source then return false end
+        if not source then
+            return false
+        end
         return collapsedBossGroups[source] == true
     end
 
     function Service:ToggleSourceCollapsed(source)
-        if not source then return false end
+        if not source then
+            return false
+        end
         local nextState = not (collapsedBossGroups[source] == true)
         collapsedBossGroups[source] = nextState
         addon:debug(Diag.D.LogReservesToggleCollapse:format(source, tostring(nextState)))
@@ -1523,7 +1519,9 @@ do
     end
 
     function Service:HasPendingItem(itemId)
-        if not itemId then return false end
+        if not itemId then
+            return false
+        end
         return pendingItemInfo[itemId] ~= nil
     end
 

@@ -71,61 +71,26 @@ do
         }
     end
 
-    local function getReservesModule()
-        local services = addon.Services
-        return services and services.Reserves or nil
-    end
-
-    local function formatReserveItemIdLabel(itemId)
-        local reserves = getReservesModule()
-        if reserves and reserves.FormatReserveItemIdLabel then
-            return reserves:FormatReserveItemIdLabel(itemId)
+    local function clamp(v, lo, hi)
+        if v < lo then
+            return lo
         end
-        if Service and Service.FormatReserveItemIdLabel then
-            return Service:FormatReserveItemIdLabel(itemId)
+        if v > hi then
+            return hi
         end
-        return format(L.StrReservesItemIdLabel, tostring(itemId or "?"))
-    end
-
-    local function formatReserveItemFallback(itemId)
-        local reserves = getReservesModule()
-        if reserves and reserves.FormatReserveItemFallback then
-            return reserves:FormatReserveItemFallback(itemId)
-        end
-        if Service and Service.FormatReserveItemFallback then
-            return Service:FormatReserveItemFallback(itemId)
-        end
-        return format(L.StrReservesItemFallback, tostring(itemId or "?"))
-    end
-
-    local function formatReserveDroppedBy(source)
-        local reserves = getReservesModule()
-        if reserves and reserves.FormatReserveDroppedBy then
-            return reserves:FormatReserveDroppedBy(source)
-        end
-        if Service and Service.FormatReserveDroppedBy then
-            return Service:FormatReserveDroppedBy(source)
-        end
-        if not source or source == "" then
-            return nil
-        end
-        return format(L.StrReservesTooltipDroppedBy, source)
-    end
-
-    local function Clamp(v, lo, hi)
-        if v < lo then return lo end
-        if v > hi then return hi end
         return v
     end
 
-    local function HideTooltip()
+    local function hideTooltip()
         GameTooltip:Hide()
     end
 
-    local function SetupReserveRowTooltip(row)
-        if not row then return end
+    local function setupReserveRowTooltip(row)
+        if not row then
+            return
+        end
 
-        local function ShowItemTooltip(self)
+        local function showItemTooltip(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             local link = row._itemLink
             if (not link or link == "") and row._itemId then
@@ -139,7 +104,7 @@ do
             GameTooltip:Show()
         end
 
-        local function ShowPlayersTooltip(self)
+        local function showPlayersTooltip(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetText(row._tooltipTitle or L.StrReservesTooltipTitle, 1, 1, 1)
             local lines = row._playersTooltipLines
@@ -154,8 +119,8 @@ do
         end
 
         if row.iconBtn then
-            row.iconBtn:SetScript("OnEnter", ShowItemTooltip)
-            row.iconBtn:SetScript("OnLeave", HideTooltip)
+            row.iconBtn:SetScript("OnEnter", showItemTooltip)
+            row.iconBtn:SetScript("OnLeave", hideTooltip)
         end
 
         if row.textBlock then
@@ -169,8 +134,8 @@ do
                 hs:SetWidth(row.textBlock:GetWidth() > 0 and row.textBlock:GetWidth() or 200)
                 hs:SetFrameLevel(row.textBlock:GetFrameLevel() + 2)
                 hs:EnableMouse(true)
-                hs:SetScript("OnEnter", ShowItemTooltip)
-                hs:SetScript("OnLeave", HideTooltip)
+                hs:SetScript("OnEnter", showItemTooltip)
+                hs:SetScript("OnLeave", hideTooltip)
                 row._nameHotspot = hs
             end
 
@@ -182,24 +147,28 @@ do
                 hs:SetWidth(row.textBlock:GetWidth() > 0 and row.textBlock:GetWidth() or 200)
                 hs:SetFrameLevel(row.textBlock:GetFrameLevel() + 2)
                 hs:EnableMouse(true)
-                hs:SetScript("OnEnter", ShowPlayersTooltip)
-                hs:SetScript("OnLeave", HideTooltip)
+                hs:SetScript("OnEnter", showPlayersTooltip)
+                hs:SetScript("OnLeave", hideTooltip)
                 row._playersHotspot = hs
             end
         end
     end
 
-    local function UpdateReserveRowHotspots(row)
-        if not row or not row.textBlock then return end
+    local function updateReserveRowHotspots(row)
+        if not row or not row.textBlock then
+            return
+        end
         local maxW = row.textBlock:GetWidth() or 0
-        if maxW <= 0 then maxW = 200 end
+        if maxW <= 0 then
+            maxW = 200
+        end
         local pad = 8
 
         if row._nameHotspot and row.nameText then
             local text = row.nameText:GetText() or ""
             if text ~= "" then
                 local width = row.nameText.GetStringWidth and row.nameText:GetStringWidth() or 0
-                row._nameHotspot:SetWidth(Clamp(width + pad, 2, maxW))
+                row._nameHotspot:SetWidth(clamp(width + pad, 2, maxW))
                 row._nameHotspot:EnableMouse(true)
             else
                 row._nameHotspot:SetWidth(2)
@@ -211,7 +180,7 @@ do
             local text = row.playerText:GetText() or ""
             if text ~= "" then
                 local width = row.playerText.GetStringWidth and row.playerText:GetStringWidth() or 0
-                row._playersHotspot:SetWidth(Clamp(width + pad, 2, maxW))
+                row._playersHotspot:SetWidth(clamp(width + pad, 2, maxW))
                 row._playersHotspot:EnableMouse(true)
             else
                 row._playersHotspot:SetWidth(2)
@@ -220,14 +189,23 @@ do
         end
     end
 
-    local function ApplyReserveRowData(row, info, index, isFirstInGroup)
-        if not row or not info then return end
+    local function applyReserveRowData(row, info, index, isFirstInGroup)
+        if not row or not info then
+            return
+        end
+        local itemIdLabel = Service and Service.FormatReserveItemIdLabel and Service:FormatReserveItemIdLabel(info.itemId)
+            or format(L.StrReservesItemIdLabel, tostring(info.itemId or "?"))
+        local itemFallback = Service and Service.FormatReserveItemFallback and Service:FormatReserveItemFallback(info.itemId)
+            or format(L.StrReservesItemFallback, tostring(info.itemId or "?"))
+        local droppedBy = Service and Service.FormatReserveDroppedBy and Service:FormatReserveDroppedBy(info.source)
+            or ((info.source and info.source ~= "") and format(L.StrReservesTooltipDroppedBy, info.source) or nil)
+
         row._itemId = info.itemId
         row._itemLink = info.itemLink
         row._itemName = info.itemName
         row._source = info.source
-        row._tooltipTitle = info.itemLink or info.itemName or formatReserveItemIdLabel(info.itemId)
-        row._tooltipSource = formatReserveDroppedBy(info.source)
+        row._tooltipTitle = info.itemLink or info.itemName or itemIdLabel
+        row._tooltipSource = droppedBy
         row._playersTooltipLines = info.playersTooltipLines
         row._playersTextFull = info.playersTextFull or info.playersText
 
@@ -238,21 +216,11 @@ do
         end
         if row.separator then
             local sepAlpha = isEvenRow and 0.1 or reserveRowStyle.separator[4]
-            row.separator:SetVertexColor(
-                reserveRowStyle.separator[1],
-                reserveRowStyle.separator[2],
-                reserveRowStyle.separator[3],
-                sepAlpha
-            )
+            row.separator:SetVertexColor(reserveRowStyle.separator[1], reserveRowStyle.separator[2], reserveRowStyle.separator[3], sepAlpha)
             row.separator:Show()
         end
         if row.topSeparator then
-            row.topSeparator:SetVertexColor(
-                reserveRowStyle.separator[1],
-                reserveRowStyle.separator[2],
-                reserveRowStyle.separator[3],
-                reserveRowStyle.separator[4]
-            )
+            row.topSeparator:SetVertexColor(reserveRowStyle.separator[1], reserveRowStyle.separator[2], reserveRowStyle.separator[3], reserveRowStyle.separator[4])
             if isFirstInGroup then
                 row.topSeparator:Show()
             else
@@ -278,7 +246,7 @@ do
         end
 
         if row.nameText then
-            row.nameText:SetText(info.itemLink or info.itemName or formatReserveItemFallback(info.itemId))
+            row.nameText:SetText(info.itemLink or info.itemName or itemFallback)
         end
         if row.playerText then
             row.playerText:SetText(info.playersText or "")
@@ -287,12 +255,14 @@ do
             row.quantityText:Hide()
         end
 
-        UpdateReserveRowHotspots(row)
+        updateReserveRowHotspots(row)
     end
 
-    local function ReserveHeaderOnClick(self)
+    local function reserveHeaderOnClick(self)
         local source = self and self._source
-        if not source then return end
+        if not source then
+            return
+        end
         if Service and Service.ToggleSourceCollapsed then
             Service:ToggleSourceCollapsed(source)
         end
@@ -341,8 +311,10 @@ do
         end
     end
 
-    local function SetupReserveIcon(row)
-        if not row or not row.iconTexture or not row.iconBtn then return end
+    local function setupReserveIcon(row)
+        if not row or not row.iconTexture or not row.iconBtn then
+            return
+        end
         row.iconTexture:ClearAllPoints()
         row.iconTexture:SetPoint("TOPLEFT", row.iconBtn, "TOPLEFT", 2, -2)
         row.iconTexture:SetPoint("BOTTOMRIGHT", row.iconBtn, "BOTTOMRIGHT", -2, 2)
@@ -350,8 +322,10 @@ do
         row.iconTexture:SetDrawLayer("OVERLAY")
     end
 
-    local function SetupReserveRowDecor(row)
-        if not row or row._decorInitialized then return end
+    local function setupReserveRowDecor(row)
+        if not row or row._decorInitialized then
+            return
+        end
 
         local topSeparator = row:CreateTexture(nil, "BORDER")
         topSeparator:SetTexture("Interface\\Buttons\\WHITE8x8")
@@ -380,14 +354,13 @@ do
         header._source = source
         if not header._initialized then
             header.label = _G[headerName .. "Label"]
-            header:SetScript("OnClick", ReserveHeaderOnClick)
+            header:SetScript("OnClick", reserveHeaderOnClick)
             header._initialized = true
         end
 
         if header.label then
             local collapsed = Service and Service.IsSourceCollapsed and Service:IsSourceCollapsed(source)
-            local prefix = collapsed and "|TInterface\\Buttons\\UI-PlusButton-Up:12|t " or
-                "|TInterface\\Buttons\\UI-MinusButton-Up:12|t "
+            local prefix = collapsed and "|TInterface\\Buttons\\UI-PlusButton-Up:12|t " or "|TInterface\\Buttons\\UI-MinusButton-Up:12|t "
             header.label:SetText(prefix .. source)
         end
 
@@ -407,8 +380,8 @@ do
             row.iconBtn = _G[rowName .. "IconBtn"]
             row.iconTexture = _G[rowName .. "IconBtnIconTexture"]
             row.textBlock = _G[rowName .. "TextBlock"]
-            SetupReserveIcon(row)
-            SetupReserveRowDecor(row)
+            setupReserveIcon(row)
+            setupReserveRowDecor(row)
             if row.textBlock and row.iconBtn then
                 row.textBlock:SetFrameLevel(row.iconBtn:GetFrameLevel() + 1)
             end
@@ -416,7 +389,7 @@ do
             row.sourceText = _G[rowName .. "TextBlockSource"]
             row.playerText = _G[rowName .. "TextBlockPlayers"]
             row.quantityText = _G[rowName .. "Quantity"]
-            SetupReserveRowTooltip(row)
+            setupReserveRowTooltip(row)
             if row.sourceText then
                 row.sourceText:SetText("")
                 row.sourceText:Hide()
@@ -424,16 +397,18 @@ do
             row._initialized = true
         end
 
-        ApplyReserveRowData(row, info, index, isFirstInGroup)
+        applyReserveRowData(row, info, index, isFirstInGroup)
         row:Show()
         rowsByItemID[info.itemId] = rowsByItemID[info.itemId] or {}
         tinsert(rowsByItemID[info.itemId], row)
         return row
     end
 
-    local function RenderReserveListUI()
+    local function renderReserveListUI()
         local frame = getFrame()
-        if not frame or not scrollChild then return end
+        if not frame or not scrollChild then
+            return
+        end
 
         for i = 1, #reserveItemRows do
             reserveItemRows[i]:Hide()
@@ -484,7 +459,9 @@ do
     end
 
     function module:PrimeItemInfoQuery(itemId)
-        if not itemId then return end
+        if not itemId then
+            return
+        end
         GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
         GameTooltip:SetHyperlink("item:" .. itemId)
         GameTooltip:Hide()
@@ -513,7 +490,7 @@ do
         return updated, count
     end
 
-    local function ShouldThrottleQueryMissingItems()
+    local function shouldThrottleQueryMissingItems()
         local now = GetTime and GetTime() or nil
         if type(now) ~= "number" then
             return false
@@ -525,7 +502,7 @@ do
         return false
     end
 
-    local function ResetSavedFromUI()
+    local function resetSavedFromUI()
         local out
         if Service and Service.ResetSaved then
             out = Service:ResetSaved()
@@ -537,7 +514,7 @@ do
 
     function module:Refresh()
         UI.Refresh()
-        RenderReserveListUI()
+        renderReserveListUI()
     end
 
     local function BindHandlers(_, _, refs)
@@ -553,14 +530,14 @@ do
 
         if refs.clearButton then
             refs.clearButton:SetScript("OnClick", function()
-                ResetSavedFromUI()
+                resetSavedFromUI()
             end)
             addon:debug(Diag.D.LogReservesBindButton:format("ClearButton", "ResetSaved"))
         end
 
         if refs.queryButton then
             refs.queryButton:SetScript("OnClick", function()
-                if ShouldThrottleQueryMissingItems() then
+                if shouldThrottleQueryMissingItems() then
                     addon:info(L.MsgReserveItemsQueryCooldown, queryCooldownSeconds)
                     return
                 end
@@ -582,7 +559,9 @@ do
             end,
         })
         UI.Loaded = frameName ~= nil
-        if not UI.Loaded then return end
+        if not UI.Loaded then
+            return
+        end
 
         scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"]
         scrollChild = scrollFrame and scrollFrame.ScrollChild or _G["KRTReserveListFrameScrollChild"]
@@ -596,9 +575,7 @@ do
             end
 
             local resolved = module:QueryItemInfo(itemId)
-            if resolved then
-                module:RequestRefresh()
-            else
+            if not resolved then
                 module:PrimeItemInfoQuery(itemId)
             end
         end)
@@ -643,33 +620,37 @@ do
         }
     end
 
-    local function GetImportModeString()
+    local function getImportModeString()
         if Service and Service.GetImportMode then
             return Service:GetImportMode()
         end
         local value = addon.options and addon.options.srImportMode
-        if value == MODE_PLUS then return "plus" end
+        if value == MODE_PLUS then
+            return "plus"
+        end
         return "multi"
     end
 
-    local function GetImportModeValue()
-        return (GetImportModeString() == "plus") and MODE_PLUS or MODE_MULTI
+    local function getImportModeValue()
+        return (getImportModeString() == "plus") and MODE_PLUS or MODE_MULTI
     end
 
-    local function GetModeSlider()
+    local function getModeSlider()
         return _G["KRTImportWindowModeSlider"] or _G["KRTImportModeSlider"]
     end
 
-    local function SetImportStatus(text, r, g, b)
+    local function setImportStatus(text, r, g, b)
         local status = _G["KRTImportWindowStatus"]
-        if not status then return end
+        if not status then
+            return
+        end
         status:SetText(text or "")
         if r and g and b then
             status:SetTextColor(r, g, b)
         end
     end
 
-    local function ShowReservesListAfterImport()
+    local function showReservesListAfterImport()
         Import:Hide()
         local reserveFrame = getFrame()
         if not (reserveFrame and reserveFrame.IsShown and reserveFrame:IsShown()) then
@@ -679,9 +660,13 @@ do
         end
     end
 
-    local function EnsureWrongCSVPopup()
-        if not StaticPopupDialogs then return end
-        if StaticPopupDialogs["KRT_WRONG_CSV_FOR_PLUS"] then return end
+    local function ensureWrongCSVPopup()
+        if not StaticPopupDialogs then
+            return
+        end
+        if StaticPopupDialogs["KRT_WRONG_CSV_FOR_PLUS"] then
+            return
+        end
 
         StaticPopupDialogs["KRT_WRONG_CSV_FOR_PLUS"] = {
             text = L.ErrCSVWrongForPlus,
@@ -692,7 +677,9 @@ do
             hideOnEscape = 1,
             preferredIndex = 3,
             OnShow = function(self, data)
-                if not self or not self.text then return end
+                if not self or not self.text then
+                    return
+                end
                 local text = L.ErrCSVWrongForPlus
                 if type(data) == "table" and data.player then
                     text = L.ErrCSVWrongForPlusWithPlayer:format(tostring(data.player))
@@ -700,28 +687,32 @@ do
                 self.text:SetText(text)
             end,
             OnAccept = function(_, data)
-                if type(data) ~= "table" or type(data.csv) ~= "string" then return end
+                if type(data) ~= "table" or type(data.csv) ~= "string" then
+                    return
+                end
                 Import:SetImportMode(MODE_MULTI)
                 local parsed = Service and Service.ParseImport and Service:ParseImport(data.csv, "multi")
                 if not parsed then
-                    SetImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
+                    setImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
                     return
                 end
 
                 local ok, nPlayers = Service:ApplyImport(parsed, nil, { reason = "import" })
                 if not ok then
-                    SetImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
+                    setImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
                     return
                 end
 
-                SetImportStatus(format(L.SuccessReservesParsed, tostring(nPlayers)), 0.2, 1, 0.2)
-                ShowReservesListAfterImport()
+                setImportStatus(format(L.SuccessReservesParsed, tostring(nPlayers)), 0.2, 1, 0.2)
+                showReservesListAfterImport()
             end,
         }
     end
 
     function ImportUI.Localize()
-        if ImportUI.Localized then return end
+        if ImportUI.Localized then
+            return
+        end
         local frame = getImportFrame()
         if not frame then
             addon:error(Diag.E.LogReservesImportWindowMissing)
@@ -731,18 +722,24 @@ do
         Frames.SetFrameTitle(frame, L.StrImportReservesTitle)
 
         local hint = _G["KRTImportWindowHint"]
-        if hint then hint:SetText(L.StrImportReservesHint) end
+        if hint then
+            hint:SetText(L.StrImportReservesHint)
+        end
 
         local confirmButton = _G["KRTImportConfirmButton"]
-        if confirmButton then confirmButton:SetText(L.BtnImport) end
+        if confirmButton then
+            confirmButton:SetText(L.BtnImport)
+        end
 
         local cancelButton = _G["KRTImportCancelButton"]
-        if cancelButton then cancelButton:SetText(L.BtnClose) end
+        if cancelButton then
+            cancelButton:SetText(L.BtnClose)
+        end
 
         ImportUI.Localized = true
     end
 
-    local function BindImportHandlers(_, _, refs)
+    local function bindImportHandlers(_, _, refs)
         Frames.SafeSetScript(refs.cancelButton, "OnClick", function()
             Import:Hide()
         end)
@@ -766,16 +763,20 @@ do
             Options.SetOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
         end
 
-        if suppressSlider then return end
+        if suppressSlider then
+            return
+        end
 
-        local slider = GetModeSlider()
+        local slider = getModeSlider()
         if slider and slider.SetValue then
-            slider:SetValue(GetImportModeValue())
+            slider:SetValue(getImportModeValue())
         end
     end
 
     function Import:OnModeSliderLoad(slider)
-        if not slider then return end
+        if not slider then
+            return
+        end
         slider:SetMinMaxValues(MODE_MULTI, MODE_PLUS)
         slider:SetValueStep(1)
         if slider.SetObeyStepOnDrag then
@@ -785,15 +786,23 @@ do
         local low = _G[slider:GetName() .. "Low"]
         local high = _G[slider:GetName() .. "High"]
         local text = _G[slider:GetName() .. "Text"]
-        if low then low:SetText(L.StrImportModeMulti or "Multi-reserve") end
-        if high then high:SetText(L.StrImportModePlus or "Plus System") end
-        if text then text:SetText(L.StrImportModeLabel or "") end
+        if low then
+            low:SetText(L.StrImportModeMulti or "Multi-reserve")
+        end
+        if high then
+            high:SetText(L.StrImportModePlus or "Plus System")
+        end
+        if text then
+            text:SetText(L.StrImportModeLabel or "")
+        end
 
-        slider:SetValue(GetImportModeValue())
+        slider:SetValue(getImportModeValue())
     end
 
     function Import:OnModeSliderChanged(slider, value)
-        if not slider then return end
+        if not slider then
+            return
+        end
         local modeValue = tonumber(value) or MODE_MULTI
         if modeValue >= 0.5 then
             modeValue = MODE_PLUS
@@ -806,9 +815,9 @@ do
     function Import:Refresh()
         ImportUI.Localize()
 
-        local slider = GetModeSlider()
+        local slider = getModeSlider()
         if slider and slider.SetValue then
-            slider:SetValue(GetImportModeValue())
+            slider:SetValue(getImportModeValue())
         end
 
         local status = _G["KRTImportWindowStatus"]
@@ -827,17 +836,19 @@ do
                     editBox:SetFocus()
                     editBox:HighlightText()
                 end
-                SetImportStatus("")
+                setImportStatus("")
                 Import:RequestRefresh()
             end,
         })
         ImportUI.Loaded = importFrameName ~= nil
-        if not ImportUI.Loaded then return end
+        if not ImportUI.Loaded then
+            return
+        end
 
         Import:RequestRefresh()
     end
 
-    local function OnLoadImportFrame(frame)
+    local function onLoadImportFrame(frame)
         Import:OnLoad(frame)
         return importFrameName
     end
@@ -846,16 +857,16 @@ do
         module = Import,
         getFrame = getImportFrame,
         acquireRefs = ImportUI.AcquireRefs,
-        bind = BindImportHandlers,
+        bind = bindImportHandlers,
         localize = function()
             ImportUI.Localize()
         end,
-        onLoad = OnLoadImportFrame,
+        onLoad = onLoadImportFrame,
     })
 
     function Import:ImportFromEditBox()
         local editBox = _G["KRTImportEditBox"]
-        SetImportStatus("")
+        setImportStatus("")
         if not editBox then
             addon:error(Diag.E.LogReservesImportWindowMissing)
             return false, 0
@@ -863,19 +874,19 @@ do
 
         local csv = editBox:GetText()
         if type(csv) ~= "string" or not csv:match("%S") then
-            SetImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
+            setImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
             addon:warn(Diag.W.LogReservesImportFailedEmpty)
             return false, 0, "EMPTY"
         end
 
         addon:debug(Diag.D.LogSRImportRequested:format(#csv))
-        EnsureWrongCSVPopup()
+        ensureWrongCSVPopup()
 
-        local mode = GetImportModeString()
+        local mode = getImportModeString()
         local parsed, errCode, errData = Service:ParseImport(csv, mode, { source = "import_window" })
         if not parsed then
             if errCode == "CSV_WRONG_FOR_PLUS" then
-                SetImportStatus(L.ErrCSVWrongForPlusShort, 1, 0.2, 0.2)
+                setImportStatus(L.ErrCSVWrongForPlusShort, 1, 0.2, 0.2)
                 local popupData = { csv = csv }
                 if type(errData) == "table" then
                     for key, value in pairs(errData) do
@@ -887,30 +898,33 @@ do
             end
 
             local errorText = (errCode == "NO_ROWS") and L.WarnNoValidRows or L.ErrImportReservesEmpty
-            SetImportStatus(errorText, 1, 0.2, 0.2)
+            setImportStatus(errorText, 1, 0.2, 0.2)
             return false, 0, errCode, errData
         end
 
         local ok, nPlayersOrErr, applyErrData = Service:ApplyImport(parsed, nil, { reason = "import" })
         if not ok then
-            SetImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
+            setImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
             return false, 0, nPlayersOrErr, applyErrData
         end
 
-        SetImportStatus(format(L.SuccessReservesParsed, tostring(nPlayersOrErr)), 0.2, 1, 0.2)
-        ShowReservesListAfterImport()
+        setImportStatus(format(L.SuccessReservesParsed, tostring(nPlayersOrErr)), 0.2, 1, 0.2)
+        showReservesListAfterImport()
         return true, nPlayersOrErr
     end
 
     if UIFacade and UIFacade.Register then
-        UIFacade:Register("Reserves", UIScaffold.MakeStandardWidgetApi(module, {
-            ToggleImport = function()
-                Import:Toggle()
-            end,
-            HideImport = function()
-                Import:Hide()
-            end,
-        }))
+        UIFacade:Register(
+            "Reserves",
+            UIScaffold.MakeStandardWidgetApi(module, {
+                ToggleImport = function()
+                    Import:Toggle()
+                end,
+                HideImport = function()
+                    Import:Hide()
+                end,
+            })
+        )
     end
 
     Bus.RegisterCallback(InternalEvents.ReservesDataChanged, function()

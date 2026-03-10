@@ -20,8 +20,8 @@ local InternalEvents = Events.Internal
 local lootState = feature.lootState
 local itemInfo = feature.itemInfo
 
-local ItemExists, ItemIsSoulbound, GetItem
-local GetItemName, GetItemLink, GetItemTexture
+local itemExists, itemIsSoulbound, getItem
+local getItemName, getItemLink, getItemTexture
 
 local tremove, twipe = table.remove, table.wipe
 local type, pairs = type, pairs
@@ -40,7 +40,7 @@ do
     local lootTable = {}
 
     -- ----- Private helpers ----- --
-    local function NormalizePendingAwardItemKey(itemLink)
+    local function normalizePendingAwardItemKey(itemLink)
         local itemKey = Item.GetItemStringFromLink(itemLink)
         if itemKey and itemKey ~= "" then
             return itemKey
@@ -48,8 +48,8 @@ do
         return itemLink
     end
 
-    local function BuildPendingAwardKey(itemLink, looter, useRawItemLink)
-        local itemKey = useRawItemLink and itemLink or NormalizePendingAwardItemKey(itemLink)
+    local function buildPendingAwardKey(itemLink, looter, useRawItemLink)
+        local itemKey = useRawItemLink and itemLink or normalizePendingAwardItemKey(itemLink)
         return tostring(itemKey) .. "\001" .. tostring(looter)
     end
 
@@ -68,7 +68,7 @@ do
         return false
     end
 
-    local function AddLootWindowSlot(indexByItemKey, slot)
+    local function addLootWindowSlot(indexByItemKey, slot)
         if not LootSlotIsItem(slot) then
             return
         end
@@ -103,10 +103,10 @@ do
         if not itemLink or not looter then
             return
         end
-        local key = BuildPendingAwardKey(itemLink, looter)
+        local key = buildPendingAwardKey(itemLink, looter)
         local list = lootState.pendingAwards[key]
         if not list then
-            local rawLinkKey = BuildPendingAwardKey(itemLink, looter, true)
+            local rawLinkKey = buildPendingAwardKey(itemLink, looter, true)
             if rawLinkKey ~= key and lootState.pendingAwards[rawLinkKey] then
                 list = lootState.pendingAwards[rawLinkKey]
                 lootState.pendingAwards[key] = list
@@ -118,12 +118,12 @@ do
             lootState.pendingAwards[key] = list
         end
         list[#list + 1] = {
-            itemLink  = itemLink,
-            looter    = looter,
-            rollType  = rollType,
+            itemLink = itemLink,
+            looter = looter,
+            rollType = rollType,
             rollValue = rollValue,
             rollSessionId = rollSessionId and tostring(rollSessionId) or nil,
-            ts        = GetTime(),
+            ts = GetTime(),
         }
     end
 
@@ -132,10 +132,10 @@ do
         if ttl < 0 then
             ttl = 0
         end
-        local key = BuildPendingAwardKey(itemLink, looter)
+        local key = buildPendingAwardKey(itemLink, looter)
         local list = lootState.pendingAwards[key]
         if not list then
-            local rawLinkKey = BuildPendingAwardKey(itemLink, looter, true)
+            local rawLinkKey = buildPendingAwardKey(itemLink, looter, true)
             if rawLinkKey ~= key then
                 key = rawLinkKey
                 list = lootState.pendingAwards[key]
@@ -153,9 +153,7 @@ do
                 if #list == 0 then
                     lootState.pendingAwards[key] = nil
                 end
-                addon:debug(Diag.D.LogLootPendingAwardConsumed:format(
-                    tostring(itemLink), tostring(looter), remaining, ttl
-                ))
+                addon:debug(Diag.D.LogLootPendingAwardConsumed:format(tostring(itemLink), tostring(looter), remaining, ttl))
                 return p
             end
         end
@@ -198,7 +196,7 @@ do
     function module:FetchLoot()
         local oldItem
         if lootState.lootCount >= 1 then
-            oldItem = GetItemLink(lootState.currentItemIndex)
+            oldItem = getItemLink(lootState.currentItemIndex)
         end
         addon:trace(Diag.D.LogLootFetchStart:format(GetNumLootItems() or 0, lootState.currentItemIndex or 0))
         lootState.opened = true
@@ -208,13 +206,13 @@ do
         local indexByItemKey = {}
         for i = 1, GetNumLootItems() do
             -- In loot window we treat each slot as one awardable copy (even if quantity > 1).
-            AddLootWindowSlot(indexByItemKey, i)
+            addLootWindowSlot(indexByItemKey, i)
         end
 
         lootState.currentItemIndex = 1
         if oldItem ~= nil then
             for t = 1, lootState.lootCount do
-                if oldItem == GetItemLink(t) then
+                if oldItem == getItemLink(t) then
                     lootState.currentItemIndex = t
                     break
                 end
@@ -270,23 +268,25 @@ do
         if lootState.fromInventory == false then
             local lootThreshold = GetLootThreshold() or 2
             local rarity = tonumber(itemRarity) or 1
-            if rarity < lootThreshold then return end
+            if rarity < lootThreshold then
+                return
+            end
             lootState.lootCount = lootState.lootCount + 1
         else
             lootState.lootCount = 1
             lootState.currentItemIndex = 1
         end
-        lootTable[lootState.lootCount]             = {}
-        lootTable[lootState.lootCount].itemName    = itemName
-        lootTable[lootState.lootCount].itemColor   = itemColor
-        lootTable[lootState.lootCount].itemLink    = itemLink
+        lootTable[lootState.lootCount] = {}
+        lootTable[lootState.lootCount].itemName = itemName
+        lootTable[lootState.lootCount].itemColor = itemColor
+        lootTable[lootState.lootCount].itemLink = itemLink
         lootTable[lootState.lootCount].itemTexture = itemTexture
-        lootTable[lootState.lootCount].count       = itemCount or 1
+        lootTable[lootState.lootCount].count = itemCount or 1
     end
 
     -- Prepares the currently selected item for display.
     function module:PrepareItem()
-        if ItemExists(lootState.currentItemIndex) then
+        if itemExists(lootState.currentItemIndex) then
             self:SetItem(lootTable[lootState.currentItemIndex])
         end
     end
@@ -297,13 +297,15 @@ do
             Bus.TriggerEvent(InternalEvents.SetItem, nil, nil)
             return
         end
-        if not (i.itemName and i.itemLink and i.itemTexture and i.itemColor) then return end
+        if not (i.itemName and i.itemLink and i.itemTexture and i.itemColor) then
+            return
+        end
         Bus.TriggerEvent(InternalEvents.SetItem, i.itemLink, i)
     end
 
     -- Selects an item from the loot list by its index.
     function module:SelectItem(i)
-        if ItemExists(i) then
+        if itemExists(i) then
             lootState.currentItemIndex = i
             self:PrepareItem()
         end
@@ -317,25 +319,25 @@ do
     end
 
     -- Returns the table for the currently selected item.
-    function GetItem(i)
+    function getItem(i)
         i = i or lootState.currentItemIndex
         return lootTable[i]
     end
 
     -- Returns the name of the currently selected item.
-    function GetItemName(i)
+    function getItemName(i)
         i = i or lootState.currentItemIndex
         return lootTable[i] and lootTable[i].itemName or nil
     end
 
     -- Returns the link of the currently selected item.
-    function GetItemLink(i)
+    function getItemLink(i)
         i = i or lootState.currentItemIndex
         return lootTable[i] and lootTable[i].itemLink or nil
     end
 
     -- Returns the texture of the currently selected item.
-    function GetItemTexture(i)
+    function getItemTexture(i)
         i = i or lootState.currentItemIndex
         return lootTable[i] and lootTable[i].itemTexture or nil
     end
@@ -344,7 +346,7 @@ do
         if lootState.fromInventory then
             return itemInfo.count or lootState.selectedItemCount or 1
         end
-        local item = GetItem()
+        local item = getItem()
         local count = item and item.count
         if count and count > 0 then
             return count
@@ -353,24 +355,23 @@ do
     end
 
     -- Checks if a loot item exists at the given index.
-    function ItemExists(i)
+    function itemExists(i)
         i = i or lootState.currentItemIndex
         return (lootTable[i] ~= nil)
     end
 
     -- Checks if an item in the player's bags is soulbound.
-    function ItemIsSoulbound(bag, slot)
+    function itemIsSoulbound(bag, slot)
         return isBagItemSoulbound(bag, slot)
     end
 
     -- Cross-module bridge for split files (Rolls/Master).
     module.WarmItemCache = warmItemCache
     module.IsBagItemSoulbound = isBagItemSoulbound
-    module.GetItem = GetItem
-    module.GetItemName = GetItemName
-    module.GetItemLink = GetItemLink
-    module.GetItemTexture = GetItemTexture
-    module.ItemExists = ItemExists
-    module.ItemIsSoulbound = ItemIsSoulbound
-
+    module.GetItem = getItem
+    module.GetItemName = getItemName
+    module.GetItemLink = getItemLink
+    module.GetItemTexture = getItemTexture
+    module.ItemExists = itemExists
+    module.ItemIsSoulbound = itemIsSoulbound
 end

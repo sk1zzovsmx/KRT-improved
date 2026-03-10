@@ -245,10 +245,19 @@ function Mock.CreateInMemoryRaidStore(seedRaids)
             end
         end
 
-        runtime.signature = tostring(#(raid.players or {})) .. "|" .. tostring(#(raid.bossKills or {}))
-            .. "|" .. tostring(#(raid.loot or {}))
+        runtime.signature = tostring(#(raid.players or {})) .. "|" .. tostring(#(raid.bossKills or {})) .. "|" .. tostring(#(raid.loot or {}))
 
         return runtime
+    end
+
+    local function isRuntimeReady(runtime)
+        return type(runtime) == "table"
+            and type(runtime.playersByName) == "table"
+            and type(runtime.playerIdxByNid) == "table"
+            and type(runtime.bossIdxByNid) == "table"
+            and type(runtime.bossByNid) == "table"
+            and type(runtime.lootIdxByNid) == "table"
+            and type(runtime.lootByNid) == "table"
     end
 
     function store:GetAllRaids()
@@ -320,6 +329,13 @@ function Mock.CreateInMemoryRaidStore(seedRaids)
     end
 
     function store:EnsureRaidRuntime(raid)
+        raid = normalizeRaidRecord(raid)
+        if not raid then
+            return nil
+        end
+        if isRuntimeReady(raid._runtime) then
+            return raid._runtime
+        end
         return self:BuildRuntimeIndexes(raid)
     end
 
@@ -468,12 +484,26 @@ function DBManager.CreateInMemoryManager(seed)
     end
 
     local manager = {}
-    function manager:GetRaidStore() return raidStore end
-    function manager:GetRaidQueries() return raidQueries end
-    function manager:GetRaidMigrations() return raidMigrations end
-    function manager:GetRaidValidator() return raidValidator end
-    function manager:GetSyncer() return syncer end
-    function manager:GetCharStore() return seedData.charStore end
-    function manager:GetConfigStore() return seedData.configStore end
+    function manager:GetRaidStore()
+        return raidStore
+    end
+    function manager:GetRaidQueries()
+        return raidQueries
+    end
+    function manager:GetRaidMigrations()
+        return raidMigrations
+    end
+    function manager:GetRaidValidator()
+        return raidValidator
+    end
+    function manager:GetSyncer()
+        return syncer
+    end
+    function manager:GetCharStore()
+        return seedData.charStore
+    end
+    function manager:GetConfigStore()
+        return seedData.configStore
+    end
     return manager
 end

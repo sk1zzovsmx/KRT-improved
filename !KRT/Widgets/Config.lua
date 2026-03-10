@@ -80,7 +80,7 @@ do
     -- ----- Public methods ----- --
 
     -- Loads the default options into the settings table.
-    local function LoadDefaultOptions()
+    local function loadDefaultOptions()
         if Options and Options.RestoreDefaults then
             Options.RestoreDefaults()
         end
@@ -90,7 +90,7 @@ do
     end
 
     -- Loads addon options from saved variables, filling in defaults.
-    local function LoadOptions()
+    local function loadOptions()
         if Options and Options.LoadOptions then
             Options.LoadOptions()
         end
@@ -106,11 +106,11 @@ do
             end
         end
     end
-    addon.LoadOptions = LoadOptions
+    addon.LoadOptions = loadOptions
 
     -- Public method to reset options to default.
     function module:Default()
-        return LoadDefaultOptions()
+        return loadDefaultOptions()
     end
 
     -- OnLoad handler for the configuration frame.
@@ -122,13 +122,19 @@ do
             end,
         })
         UI.Loaded = frameName ~= nil
-        if not UI.Loaded then return end
+        if not UI.Loaded then
+            return
+        end
     end
 
     function module:InitCountdownSlider(slider)
-        if not slider then return end
+        if not slider then
+            return
+        end
         local sliderName = slider:GetName()
-        if not sliderName then return end
+        if not sliderName then
+            return
+        end
         local low = _G[sliderName .. "Low"]
         if low then
             low:SetText(tostring(MIN_COUNTDOWN))
@@ -144,7 +150,7 @@ do
             module:Hide()
         end)
         Frames.SafeSetScript(refs.defaultsBtn, "OnClick", function()
-            LoadDefaultOptions()
+            loadDefaultOptions()
         end)
         Frames.SafeSetScript(refs.countdownDuration, "OnValueChanged", function(self)
             module:OnClick(self)
@@ -178,7 +184,9 @@ do
 
     -- OnClick handler for option controls.
     function module:OnClick(btn)
-        if not btn then return end
+        if not btn then
+            return
+        end
         frameName = frameName or btn:GetParent():GetName()
         local value
         local name = btn:GetName()
@@ -239,7 +247,9 @@ do
 
     -- UI refresh handler for the configuration frame.
     function UI.Refresh()
-        if not UI.isDirty then return end
+        if not UI.isDirty then
+            return
+        end
         _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)
         _G[frameName .. "useRaidWarning"]:SetChecked(addon.options.useRaidWarning == true)
         _G[frameName .. "announceOnWin"]:SetChecked(addon.options.announceOnWin == true)
@@ -269,11 +279,7 @@ do
             if countdownSimpleRaidMsgBtn and countdownSimpleRaidMsgStr then
                 if useRaidWarning then
                     countdownSimpleRaidMsgBtn:Enable()
-                    countdownSimpleRaidMsgStr:SetTextColor(
-                        HIGHLIGHT_FONT_COLOR.r,
-                        HIGHLIGHT_FONT_COLOR.g,
-                        HIGHLIGHT_FONT_COLOR.b
-                    )
+                    countdownSimpleRaidMsgStr:SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
                 else
                     countdownSimpleRaidMsgBtn:Disable()
                     countdownSimpleRaidMsgStr:SetTextColor(0.5, 0.5, 0.5)
@@ -289,10 +295,13 @@ do
     end
 
     if UIFacade and UIFacade.Register then
-        UIFacade:Register("Config", UIScaffold.MakeStandardWidgetApi(module, {
-            Default = function()
-                module:Default()
-            end,
-        }))
+        UIFacade:Register(
+            "Config",
+            UIScaffold.MakeStandardWidgetApi(module, {
+                Default = function()
+                    module:Default()
+                end,
+            })
+        )
     end
 end

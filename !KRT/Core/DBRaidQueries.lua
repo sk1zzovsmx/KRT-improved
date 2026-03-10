@@ -23,8 +23,7 @@ do
 
     -- ----- Private helpers ----- --
     local function normalizeRaid(raid)
-        local raidStore = Core.GetRaidStoreOrNil and
-            Core.GetRaidStoreOrNil("DBRaidQueries.NormalizeRaid", { "NormalizeRaidRecord" }) or nil
+        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("DBRaidQueries.NormalizeRaid", { "NormalizeRaidRecord" }) or nil
         if raidStore then
             return raidStore:NormalizeRaidRecord(raid)
         end
@@ -32,8 +31,7 @@ do
     end
 
     local function ensureRuntime(raid)
-        local raidStore = Core.GetRaidStoreOrNil and
-            Core.GetRaidStoreOrNil("DBRaidQueries.EnsureRuntime", { "EnsureRaidRuntime" }) or nil
+        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("DBRaidQueries.EnsureRuntime", { "EnsureRaidRuntime" }) or nil
         if raidStore then
             return raidStore:EnsureRaidRuntime(raid)
         end
@@ -266,7 +264,7 @@ do
                 local looterName = nil
                 looterName, looterNid = resolveLootLooterName(raid, runtime, loot)
                 local okBoss = (not bossFilter) or (bossFilter <= 0) or (tonumber(loot.bossNid) == bossFilter)
-                local okPlayer = (not playerName)
+                local okPlayer = not playerName
                     or (playerFilterNid and looterNid and playerFilterNid == looterNid)
                     or ((not playerFilterNid) and looterName and looterName == playerName)
                 if okBoss and okPlayer then
@@ -287,9 +285,7 @@ do
                         looterClass = looterPlayer and looterPlayer.class or nil,
                         rollType = tonumber(loot.rollType) or 0,
                         rollValue = tonumber(loot.rollValue) or 0,
-                        sortName = (GetLootSortName and GetLootSortName(
-                            loot.itemName, loot.itemLink, loot.itemId
-                        )) or tostring(loot.itemName or ""),
+                        sortName = (GetLootSortName and GetLootSortName(loot.itemName, loot.itemLink, loot.itemId)) or tostring(loot.itemName or ""),
                         time = lootTime,
                         timeFmt = (lootTime > 0) and date("%H:%M", lootTime) or "",
                     }

@@ -75,14 +75,18 @@ function Get-BodyHash([object]$row, [hashtable]$cache) {
         return ""
     }
     if (-not $cache.ContainsKey($row.File)) {
-        $cache[$row.File] = Get-Content -LiteralPath $filePath
+        $cache[$row.File] = @(Get-Content -LiteralPath $filePath)
     }
 
     $lines = $cache[$row.File]
+    if (-not $lines -or $lines.Count -eq 0) {
+        return ""
+    }
+
     $start = [Math]::Max(1, [int]$row.LineStart)
     $end = [Math]::Min([int]$row.LineEnd, $lines.Count)
     if ($end -lt $start) {
-        $end = $start
+        $end = $lines.Count
     }
 
     $buffer = New-Object System.Collections.Generic.List[string]
@@ -146,12 +150,6 @@ foreach ($group in $groups) {
 
         if ($allowPoly -contains $functionKey) {
             $row.Class = "api-polymorphic"
-            $row.Action = "keep"
-            continue
-        }
-
-        if ($row.Function -match "^Utils\." -and $row.File -eq "!KRT/Modules/Utils.lua") {
-            $row.Class = "compat-facade"
             $row.Action = "keep"
             continue
         }

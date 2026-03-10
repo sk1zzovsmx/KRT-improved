@@ -1,7 +1,8 @@
 # SavedVariables Schema Inventory
 
 This file inventories the SavedVariables keys and args currently read/written by runtime code.
-Scope: data persisted in `!KRT/!KRT.toc` (`KRT_*` globals).
+Scope: `KRT_*` SavedVariables declared in `!KRT/!KRT.toc` and persisted in the
+WoW SavedVariables file for the addon.
 Current raid schema version: `3`.
 
 ## Canonical Name Terms

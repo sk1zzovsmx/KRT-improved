@@ -56,6 +56,11 @@ local function getRaidValidatorService()
     return nil
 end
 
+local function getDebugService()
+    local services = addon.Services
+    return services and services.Debug or nil
+end
+
 local function formatValidateRaidDetail(entry)
     local data = entry and entry.data or {}
     local index = tonumber(entry and entry.index) or 0
@@ -72,70 +77,33 @@ local function formatValidateRaidDetail(entry)
         return L.MsgValidateDetailSchemaMissing:format(index, raidNid)
     end
     if code == "SCHEMA_NEWER" then
-        return L.MsgValidateDetailSchemaNewer:format(
-            index,
-            raidNid,
-            tonumber(data.schemaVersion) or 0,
-            tonumber(data.currentVersion) or 0
-        )
+        return L.MsgValidateDetailSchemaNewer:format(index, raidNid, tonumber(data.schemaVersion) or 0, tonumber(data.currentVersion) or 0)
     end
     if code == "COUNTER_TOO_LOW" then
-        return L.MsgValidateDetailCounterTooLow:format(
-            index,
-            raidNid,
-            tostring(data.field or "?"),
-            tonumber(data.actual) or 0,
-            tonumber(data.required) or 0
-        )
+        return L.MsgValidateDetailCounterTooLow:format(index, raidNid, tostring(data.field or "?"), tonumber(data.actual) or 0, tonumber(data.required) or 0)
     end
     if code == "PLAYER_COUNT_TYPE" then
         return L.MsgValidateDetailPlayerCountType:format(index, raidNid, tonumber(data.playerIndex) or 0)
     end
     if code == "PLAYER_COUNT_NEGATIVE" then
-        return L.MsgValidateDetailPlayerCountNegative:format(
-            index,
-            raidNid,
-            tonumber(data.playerIndex) or 0,
-            tonumber(data.value) or 0
-        )
+        return L.MsgValidateDetailPlayerCountNegative:format(index, raidNid, tonumber(data.playerIndex) or 0, tonumber(data.value) or 0)
     end
     if code == "LOOT_MISSING_BOSS" then
-        return L.MsgValidateDetailLootMissingBoss:format(
-            index,
-            raidNid,
-            tonumber(data.lootIndex) or 0,
-            tonumber(data.bossNid) or 0
-        )
+        return L.MsgValidateDetailLootMissingBoss:format(index, raidNid, tonumber(data.lootIndex) or 0, tonumber(data.bossNid) or 0)
     end
     if code == "LOOT_UNKNOWN_BOSS_WITHOUT_TRASH" then
         return L.MsgValidateDetailLootNoBossTrash:format(index, raidNid, tonumber(data.lootIndex) or 0)
     end
     if code == "BOSS_ATTENDEE_INVALID" then
-        return L.MsgValidateDetailBossAttendeeInvalid:format(
-            index,
-            raidNid,
-            tonumber(data.bossIndex) or 0,
-            tonumber(data.attendeeIndex) or 0
-        )
+        return L.MsgValidateDetailBossAttendeeInvalid:format(index, raidNid, tonumber(data.bossIndex) or 0, tonumber(data.attendeeIndex) or 0)
     end
     if code == "BOSS_ATTENDEE_MISSING_PLAYER" then
-        return L.MsgValidateDetailBossAttendeeMissingPlayer:format(
-            index,
-            raidNid,
-            tonumber(data.bossIndex) or 0,
-            tonumber(data.attendeeIndex) or 0,
-            tonumber(data.playerNid) or 0
-        )
+        return L.MsgValidateDetailBossAttendeeMissingPlayer:format(index, raidNid, tonumber(data.bossIndex) or 0, tonumber(data.attendeeIndex) or 0, tonumber(data.playerNid) or 0)
     end
     if code == "LOOT_MISSING_LOOTER" then
         local looterNid = tonumber(data.looterNid)
         if looterNid and looterNid > 0 then
-            return L.MsgValidateDetailLootMissingLooterNid:format(
-                index,
-                raidNid,
-                tonumber(data.lootIndex) or 0,
-                looterNid
-            )
+            return L.MsgValidateDetailLootMissingLooterNid:format(index, raidNid, tonumber(data.lootIndex) or 0, looterNid)
         end
         return L.MsgValidateDetailLootMissingLooter:format(index, raidNid, tonumber(data.lootIndex) or 0)
     end
@@ -183,6 +151,46 @@ local function showHelp()
     printHelp("counter", L.StrCmdCounter)
     printHelp("reserves", L.StrCmdReserves)
     printHelp("validate", L.StrCmdValidate)
+end
+
+local function showDebugRaidHelp()
+    addon:info(format(L.StrCmdCommands, "krt debug raid"), "KRT")
+    printHelp("seed", L.StrCmdDebugRaidSeed)
+    printHelp("clear", L.StrCmdDebugRaidClear)
+    printHelp("rolls", L.StrCmdDebugRaidRolls)
+    printHelp("roll <1-4|name> [1-100]", L.StrCmdDebugRaidRoll)
+end
+
+local function reportDebugRaidError(reason, playerRef)
+    if reason == "no_current_raid" then
+        addon:warn(L.MsgDebugRaidNoCurrent)
+        return
+    end
+    if reason == "invalid_player" then
+        addon:warn(L.MsgDebugRaidUnknownPlayer, tostring(playerRef or "?"))
+        return
+    end
+    if reason == "invalid_roll" then
+        addon:warn(L.MsgDebugRaidInvalidRoll)
+        return
+    end
+    if reason == "unknown_player" then
+        addon:warn(L.MsgDebugRaidUnknownPlayer, tostring(playerRef or "?"))
+        return
+    end
+    if reason == "raid_service_unavailable" then
+        addon:warn(L.MsgFeatureUnavailable, "Debug", "raid")
+        return
+    end
+    if reason == "rolls_service_unavailable" then
+        addon:warn(L.MsgFeatureUnavailable, "Debug", "rolls")
+        return
+    end
+    if reason == "record_inactive" or reason == "missing_item" or reason == "session_inactive" then
+        addon:warn(L.MsgDebugRaidNoActiveRoll)
+        return
+    end
+    addon:warn(L.MsgDebugRaidRollRejected, tostring(playerRef or "?"), tostring(reason or "unknown"))
 end
 
 local function getFeatureProfile()
@@ -254,7 +262,10 @@ end
 
 registerAliases(cmdDebug, function(rest)
     local subCmd, arg = Strings.SplitArgs(rest)
-    if subCmd == "" then subCmd = nil end
+    local debugService
+    if subCmd == "" then
+        subCmd = nil
+    end
 
     if subCmd == "levels" then
         addon:info(L.MsgLogLevelList)
@@ -321,6 +332,97 @@ registerAliases(cmdDebug, function(rest)
         return
     end
 
+    if subCmd == "raid" or subCmd == "players" then
+        local raidCmd, raidArg = Strings.SplitArgs(arg)
+        local result
+        local err
+        local playerRef
+        local rollArg
+
+        debugService = getDebugService()
+        if not debugService then
+            addon:warn(L.MsgFeatureUnavailable, "Debug", "raid")
+            return
+        end
+
+        if raidCmd == "" then
+            raidCmd = nil
+        end
+        if not raidCmd or raidCmd == "help" then
+            showDebugRaidHelp()
+            return
+        end
+
+        if raidCmd == "seed" or raidCmd == "add" then
+            result, err = debugService:SeedRaidPlayers()
+            if not result then
+                reportDebugRaidError(err)
+                return
+            end
+            addon:info(L.MsgDebugRaidSeeded, result.total, result.added, result.refreshed)
+            return
+        end
+
+        if raidCmd == "clear" or raidCmd == "reset" then
+            result, err = debugService:ClearRaidPlayers()
+            if not result then
+                reportDebugRaidError(err)
+                return
+            end
+            addon:info(L.MsgDebugRaidCleared, result.removed, result.blocked)
+            if result.clearedRolls then
+                addon:info(L.MsgDebugRaidClearResetRolls)
+            end
+            return
+        end
+
+        if raidCmd == "rolls" or raidCmd == "all" then
+            result, err = debugService:RollRaidPlayers()
+            if not result then
+                reportDebugRaidError(err)
+                return
+            end
+            if result.submitted <= 0 and result.firstFailure then
+                if result.firstFailure == "record_inactive" or result.firstFailure == "missing_item" or result.firstFailure == "session_inactive" then
+                    reportDebugRaidError(result.firstFailure)
+                else
+                    addon:warn(L.MsgDebugRaidRollsPartial, result.submitted, result.total, tostring(result.firstFailure))
+                end
+                return
+            end
+            if result.failed > 0 and result.firstFailure then
+                addon:warn(L.MsgDebugRaidRollsPartial, result.submitted, result.total, tostring(result.firstFailure))
+                return
+            end
+            addon:info(L.MsgDebugRaidRolls, result.submitted, result.total)
+            return
+        end
+
+        if raidCmd == "roll" then
+            playerRef, rollArg = Strings.SplitArgs(raidArg)
+            if not playerRef or playerRef == "" then
+                showDebugRaidHelp()
+                return
+            end
+
+            result, err = debugService:RollRaidPlayer(playerRef, rollArg)
+            if not result then
+                reportDebugRaidError(err, playerRef)
+                return
+            end
+            if not result.ok then
+                reportDebugRaidError(result.reason, result.name)
+                return
+            end
+
+            addon:info(L.MsgDebugRaidRollSingle, result.name, result.roll)
+            return
+        end
+
+        showDebugRaidHelp()
+        return
+    end
+
     if subCmd == "on" then
         Options.ApplyDebugSetting(true)
     elseif subCmd == "off" then
@@ -367,7 +469,9 @@ registerAliases(cmdAchiev, function(_, _, raw)
     end
 
     local from, to = raw:find("achievement%:%d*%:")
-    if not (from and to) then return end
+    if not (from and to) then
+        return
+    end
     local id = raw:sub(from + 12, to - 1)
     from, to = raw:find("%|cffffff00%|Hachievement%:.*%]%|h%|r")
     local name = (from and to) and raw:sub(from, to) or ""

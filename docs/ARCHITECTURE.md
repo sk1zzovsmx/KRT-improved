@@ -4,7 +4,7 @@ This document defines folder responsibilities and allowed dependencies.
 
 ## Layer map
 
-1. `Modules/`, `Localization/`, `Templates.xml`: shared primitives.
+1. `Modules/`, `Localization/`, `UI/Templates/*.xml`: shared primitives.
 2. `Init.lua`: bootstrap and global WoW event wiring.
 3. `Services/`: runtime data/model modules, no parent-frame ownership.
 4. `Controllers/`: parent owners (`Master`, `Logger`, `Warnings`, `Changes`, `Spammer`).
@@ -36,7 +36,52 @@ This document defines folder responsibilities and allowed dependencies.
 - Do not introduce new UI micro-events when existing events already model the flow.
 - XML stays layout-only: no inline `<Scripts>`/`<On...>` handlers.
 
+## UI Binding
+
+- Do not reintroduce `Modules/UI/Binder/*` or binder-like mapping tables.
+- Do not introduce binder registries, parser layers, or `CreateFrame` patching
+  as a generic wiring mechanism.
+- Bind scripts in module code with explicit `SetScript` calls.
+- Prefer `UIScaffold.BootstrapModuleUi(...)` and
+  `Frames.MakeFrameGetter(...)` for frame lifecycle wiring.
+- Keep optional widgets behind `addon.UI:IsEnabled(widgetId)` and register
+  exports with `addon.UI:Register`.
+- Keep UI wiring local to the owning module and make it idempotent.
+- `tools/check-ui-binding.ps1` enforces binder absence and blocks inline XML
+  script handlers.
+
+## Template Alignment
+
+KRT follows the common WoW addon split, with repo-specific ownership choices:
+
+- generic addon templates often use `Core/Init.lua`, but KRT keeps bootstrap
+  ownership in root `Init.lua`
+- `EntryPoints/Minimap.lua` owns minimap interactions
+- `EntryPoints/SlashEvents.lua` owns slash command routing
+- `!KRT/!KRT.toc` declares load order and SavedVariables, and `!KRT/KRT.xml`
+  remains the UI include manifest
+
+This keeps module ownership explicit without splitting bootstrap logic across
+multiple entry files.
+
 ## Automation
 
 - Install repository hooks with `tools/install-hooks.ps1`.
-- Pre-commit runs `tools/check-layering.ps1`, `tools/check-ui-binding.ps1`, and `tools/update-tree.ps1`.
+- Pre-commit runs `tools/check-toc-files.ps1`, `tools/check-layering.ps1`,
+  `tools/check-ui-binding.ps1`, and `tools/update-tree.ps1`.
+- When staged `.lua` files exist, pre-commit also runs the local Lua gates in
+  check mode:
+  - `tools/check-lua-syntax.ps1`
+  - `luacheck --codes --no-color !KRT tools tests`
+  - `tools/check-lua-uniformity.ps1`
+  - `stylua --check !KRT tools tests`
+
+## Related Docs
+
+- `docs/LUA_WRITING_RULES.md`: canonical Lua syntax, naming, formatting, and
+  local gate policy
+- `docs/SV_SCHEMA.md`: SavedVariables inventory and ownership notes
+- `docs/RAID_SCHEMA.md`: canonical persisted raid schema
+- `docs/REFACTOR_RULES.md`: function ownership and deduplication workflow
+- `docs/AGENT_SKILLS.md`: repo-local skill sync and Mechanic workflow
+- `docs/KRT_MCP.md`: repo-local MCP server and tool inventory

@@ -39,7 +39,7 @@ Durable preferences learned from recent conversations:
   `-- ----- Internal state ----- --`, `-- ----- Private helpers ----- --`,
   `-- ----- Public methods ----- --`.
 - UI refactors: centralize shared UI glue/patterns in `Init.lua`; keep feature-specific UI logic in each module.
-- Move helpers to `Modules/Utils.lua` only when they are generic and reused, not for KRT-specific glue.
+- Move helpers to dedicated `Modules/*` files only when they are generic and reused; avoid catch-all utility files.
 - Keep diagnostic templates in `addon.Diagnose`; use severity buckets `I/W/E/D` (`DiagnoseLog.en.lua`).
 - Prefer local `Diag` wrapper aliases over direct `Diagnose.*` chains in implementation files.
 - For naming/API uniformization, choose the most repeated in-repo pattern and apply it consistently and robustly.
@@ -90,26 +90,17 @@ Durable preferences learned from recent conversations:
 - Avoid direct references to `addon.LootCounter`, `addon.ReservesUI`, and `addon.Config` in
   `Controllers/*.lua` and `EntryPoints/*.lua`; use `addon.UI:Call(...)` instead.
 - Prefer optional widget architecture with `addon.Features` flags and profile-aware toggles (`core` vs `full`).
-- Keep `Modules/UI/Binder/UIBinder.lua` resilient for optional widgets: skip bindings when a widget is disabled
-  by feature flags or not registered in `addon.UI`.
-- Keep XML layout-only: do not use `<Scripts>`/`<On...>` in `UI/*.xml` and `Templates.xml`.
-- Prefer centralized UI script wiring in `Modules/UI/Binder/UIBinder.lua`
-  (single binding table/source of truth).
-- Prefer `Modules/UI/Binder/UIBinder.lua` bindings as direct Lua functions
-  (`frameName + scriptType -> function`)
-  and avoid `loadstring`-based script compilation.
+- Keep XML layout-only: do not use `<Scripts>`/`<On...>` in `UI/*.xml` and `UI/Templates/*.xml`.
+- Keep optional-widget behavior inside `addon.UI`, `UIScaffold`, and feature-local Lua wiring;
+  there is no `Modules/UI/Binder` layer in the current tree.
 - Keep Services pure: no frame lifecycle (`OnLoad`/`Refresh`) or UI delegation in `Services/*`;
   widgets consume `addon.<Feature>.Service` and refresh via bus events (e.g. `ReservesDataChanged`).
 - Keep item helpers consolidated in a dedicated infra module (for example `Modules/Item.lua`);
   expose item-link parsing and tooltip probes via `feature.Item`/`addon.Item`.
-- Prefer cross-code extraction from `Modules/Utils.lua` into dedicated reusable modules (`Bus`, `ListController`,
-  `MultiSelect`, `Frames`, `Strings`, `Colors`, `Comms`, `Base64`, `Time`, `Sort`);
-  keep `Utils.lua` as facade/re-export.
+- Prefer dedicated reusable modules (`Bus`, `ListController`, `MultiSelect`, `Frames`, `Strings`,
+  `Colors`, `Comms`, `Base64`, `Time`, `Sort`) over reviving `Modules/Utils.lua`.
 - Prefer centralized MultiSelect modifier policies in `Modules/UI/MultiSelect.lua`
   with per-list scope keys; avoid per-controller CTRL/SHIFT gating flags.
-- Prefer incremental thematic split of `Modules/Utils.lua` into `Modules/Utils.*.lua` files
-  (`UI`, `Tooltip`, `Options`, `RaidState`, `LegacyGlobals`), while keeping `Utils.lua`
-  as compatibility facade/aggregator.
 - Prefer centralized event-name registry in `Modules/Events.lua` for internal bus events and
   wow-forwarded events (avoid ad-hoc string literals in modules).
 - Prefer namespaced module ownership under `addon.Controllers.*`, `addon.Services.*`, `addon.Widgets.*`;
@@ -130,6 +121,18 @@ Durable preferences learned from recent conversations:
   `tools/mech-krt.ps1` for Mechanic commands.
 - Keep skill/tooling configuration stored in-repo (`tools/agent-skills.manifest.json`)
   with docs under `docs/AGENT_SKILLS.md` for deterministic setup.
+- Prefer canonical repo-wide Lua writing rules in `docs/LUA_WRITING_RULES.md`;
+  keep `.stylua.toml`, `.luacheckrc`, and `tools/check-lua-uniformity.ps1`
+  aligned with that document.
+- For roll-response lifecycle hardening, prefer this canonical policy:
+  `PASS` reversible, `CANCELLED` reversible, `TIMED_OUT` terminal for the session,
+  `INELIGIBLE` recoverable only through eligibility refresh, and only eligible `ROLL`
+  responses may enter the resolver.
+- Treat `Rolls:GetDisplayModel().resolution` as an explicit public service contract;
+  keep its stable fields documented (`autoWinners`, `tiedNames`, `topRollName`,
+  `requiresManualResolution`, `cutoff`) instead of treating them as incidental internals.
+- Treat `tests/release_stabilization_spec.lua` as the regression gate for changes in
+  `Services/Rolls.lua` and `Controllers/Master.lua`; run it whenever those modules change.
 
 ---
 
@@ -190,51 +193,53 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 4) LibDeformat-3.0
 5) LibCompat-1.0
 6) LibLogger-1.0
-7) Init.lua (single bootstrap + runtime glue/event wiring + `Core.GetFeatureShared()`)
-8) Localization/localization.en.lua (fills `addon.L`)
-9) Localization/DiagnoseLog.en.lua (fills `addon.Diagnose`)
-10) Templates.xml
-11) Modules/C.lua
-12) Modules/Events.lua
-13) Modules/Colors.lua
-14) Modules/Strings.lua
-15) Modules/Item.lua
-16) Modules/Comms.lua
-17) Modules/Time.lua
-18) Modules/Base64.lua
-19) Modules/Sort.lua
-20) Modules/Features.lua
-21) Modules/UI/Facade.lua
-22) Modules/UI/Visuals.lua
-23) Modules/UI/Frames.lua
-24) Modules/UI/ListController.lua
-25) Modules/UI/MultiSelect.lua
-26) Modules/UI/Binder/Map.lua
-27) Modules/UI/Binder/UIBinder.lua
-28) Modules/Bus.lua
-29) Modules/Utils.LegacyGlobals.lua
-30) Modules/Utils.Options.lua
-31) Modules/Utils.RaidState.lua
-32) Modules/Utils.Tooltip.lua
-33) Modules/Compat/Utils.UI.lua
-34) Modules/Utils.lua
-35) Services/Raid.lua
-36) Services/Chat.lua
-37) EntryPoints/Minimap.lua
-38) Services/Rolls.lua
-39) Services/Loot.lua
-40) Controllers/Master.lua
-41) Widgets/LootCounter.lua
-42) Services/Reserves.lua
-43) Widgets/ReservesUI.lua
-44) Controllers/Logger.lua
-45) Core/DBSyncer.lua
-46) Widgets/Config.lua
-47) Controllers/Warnings.lua
-48) Controllers/Changes.lua
-49) Controllers/Spammer.lua
-50) EntryPoints/SlashEvents.lua
-51) KRT.xml (UI include manifest/orchestrator)
+7) Init.lua
+8) Core/DB.lua
+9) Core/DBSchema.lua
+10) Core/DBManager.lua
+11) Localization/localization.en.lua
+12) Localization/DiagnoseLog.en.lua
+13) UI/Templates/Common.xml
+14) Modules/C.lua
+15) Modules/Events.lua
+16) Modules/Colors.lua
+17) Modules/Strings.lua
+18) Modules/Item.lua
+19) Modules/IgnoredItems.lua
+20) Modules/IgnoredMobs.lua
+21) Modules/Comms.lua
+22) Modules/Time.lua
+23) Modules/Base64.lua
+24) Modules/Sort.lua
+25) Modules/Features.lua
+26) Modules/UI/Facade.lua
+27) Modules/UI/Visuals.lua
+28) Modules/UI/Frames.lua
+29) Modules/UI/ListController.lua
+30) Modules/UI/MultiSelect.lua
+31) Modules/Bus.lua
+32) Core/DBRaidMigrations.lua
+33) Core/DBRaidStore.lua
+34) Core/DBRaidQueries.lua
+35) Core/DBRaidValidator.lua
+36) Core/DBSyncer.lua
+37) Services/Raid.lua
+38) Services/Chat.lua
+39) EntryPoints/Minimap.lua
+40) EntryPoints/SlashEvents.lua
+41) Services/Rolls.lua
+42) Services/Loot.lua
+43) Services/Debug.lua
+44) Controllers/Master.lua
+45) Widgets/LootCounter.lua
+46) Services/Reserves.lua
+47) Widgets/ReservesUI.lua
+48) Controllers/Logger.lua
+49) Widgets/Config.lua
+50) Controllers/Warnings.lua
+51) Controllers/Changes.lua
+52) Controllers/Spammer.lua
+53) KRT.xml
 
 ---
 
@@ -244,10 +249,17 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 !KRT/
   !KRT.toc
   Init.lua                 # unified bootstrap + shared runtime glue + main event wiring
-  Core/
-    DBSyncer.lua           # logger synchronization store/protocol backend
   KRT.xml                  # unified UI include manifest/orchestrator
-  Templates.xml            # reusable XML templates
+
+  Core/
+    DB.lua                 # DB facade/bootstrap
+    DBSchema.lua           # canonical raid schema
+    DBManager.lua          # DB manager/factory
+    DBRaidMigrations.lua   # raid SV migrations
+    DBRaidStore.lua        # canonical raid store + runtime indexes
+    DBRaidQueries.lua      # raid read/query helpers
+    DBRaidValidator.lua    # raid schema validation helpers
+    DBSyncer.lua           # logger synchronization store/protocol backend
 
   Controllers/
     Master.lua             # master-loot parent owner
@@ -261,6 +273,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Chat.lua               # output helpers (Print/Announce)
     Rolls.lua              # roll tracking, sorting, winner logic
     Loot.lua               # loot parsing, item selection, export strings
+    Debug.lua              # synthetic raid/roll test helpers for local addon testing
     Reserves.lua           # soft reserves service/model + import parsing + reserve lookups
 
   Widgets/
@@ -273,6 +286,8 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     SlashEvents.lua        # slash command router
 
   UI/
+    Templates/
+      Common.xml           # shared XML templates
     Minimap.xml            # minimap button frame
     ReservesTemplates.xml  # reserve list templates
     Reserves.xml           # reserve list UI + reserve import window UI
@@ -307,17 +322,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
       Frames.lua           # frame helpers + UI scaffold/orchestration (addon.Frames/addon.UIScaffold)
       ListController.lua   # reusable scroll-list controller (addon.ListController)
       MultiSelect.lua      # reusable multiselect state helpers (addon.MultiSelect)
-      Binder/
-        Map.lua            # XML binding datasets/maps (addon.UIBinder.Map)
-        UIBinder.lua       # XML binder runtime/facade + compiler (addon.UIBinder/addon.UIBinder.Compiler)
     Bus.lua                # internal callback bus + metrics (addon.Bus)
-    Utils.LegacyGlobals.lua # legacy global monkeypatches (`table.*` / `string.*`)
-    Utils.Options.lua      # debug/options helpers (addon.Utils.Options)
-    Utils.RaidState.lua    # raid/player state helpers (addon.Utils.RaidState)
-    Utils.Tooltip.lua      # tooltip/soulbound helpers (addon.Utils.Tooltip)
-    Compat/
-      Utils.UI.lua         # UI compat facade wrappers (addon.Utils.UI)
-    Utils.lua              # compatibility facade/re-exports (addon.Utils)
 
   Libs/
     LibStub/
@@ -339,7 +344,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
   - `KRTConfig`, `KRTWarnings`, `KRTMaster`, `KRTLogger`, `KRTChanges`, `KRTSpammer`
   - `KRTLootCounterFrame`, `KRTReserveListFrame`, `KRTImportWindow`, `KRTItemSelectionFrame`
   - `KRTLoggerBossBox`, `KRT_MINIMAP_GUI`
-- `Modules/Utils.LegacyGlobals.lua` intentionally defines a few global convenience helpers:
+- `Init.lua` intentionally defines a few global convenience helpers:
   - `table.shuffle`, `table.reverse`, `string.trim`, `string.startsWith`, `string.endsWith`
 
 Do not introduce additional non-frame globals (tables/vars/functions) unless explicitly required and documented.
@@ -435,6 +440,9 @@ Top-level feature modules on `addon.*`:
 - `addon.Logger`        - loot logger UI + raid editor
 - `addon.Syncer`        - logger synchronization protocol (request/push + merge)
 
+Namespaced service-only module:
+- `addon.Services.Debug` - synthetic raid/roll test helpers for current-raid testing
+
 `addon.Logger` internal structure (pattern for complex modules):
 - `addon.Logger.Store`   - data access helpers + stable-ID indexing
 - `addon.Logger.View`    - view-model row builders (UI-friendly data)
@@ -445,12 +453,6 @@ Implementation placement (current wave):
 - `Controllers/*.lua`, `Services/*.lua`, `Widgets/*.lua`, `EntryPoints/*.lua`
 
 External modules:
-- `addon.Utils` (Modules/Utils.lua)
-  - `addon.Utils.LegacyGlobals` (Modules/Utils.LegacyGlobals.lua)
-  - `addon.Utils.Options` (Modules/Utils.Options.lua)
-  - `addon.Utils.RaidState` (Modules/Utils.RaidState.lua)
-  - `addon.Utils.Tooltip` (Modules/Utils.Tooltip.lua)
-  - `addon.Utils.UI` (Modules/Compat/Utils.UI.lua)
 - `addon.C`     (Modules/C.lua)
 - `addon.Events` (Modules/Events.lua)
 - `addon.Colors` (Modules/Colors.lua)
@@ -471,9 +473,6 @@ External modules:
 - `addon.Bus` (Modules/Bus.lua)
 - `addon.Features` (Modules/Features.lua)
 - `addon.UI`    (Modules/UI/Facade.lua)
-- `addon.UIBinder.Map` (Modules/UI/Binder/Map.lua)
-- `addon.UIBinder.Compiler` (Modules/UI/Binder/UIBinder.lua)
-- `addon.UIBinder` (Modules/UI/Binder/UIBinder.lua)
 
 ---
 

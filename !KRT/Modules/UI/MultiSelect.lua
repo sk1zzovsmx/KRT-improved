@@ -214,9 +214,7 @@ function MultiSelect.MultiSelectToggle(contextKey, id, isMulti, allowDeselect)
 
     st.ver = (st.ver or 0) + 1
 
-    debugLog((Diag.D.LogLoggerSelectToggle):format(
-        tostring(key), tostring(id), isMulti and "1" or "0", tostring(action), before, st.count or 0, st.ver
-    ))
+    debugLog((Diag.D.LogLoggerSelectToggle):format(tostring(key), tostring(id), isMulti and "1" or "0", tostring(action), before, st.count or 0, st.ver))
 
     return action, st.count or 0
 end
@@ -227,9 +225,7 @@ function MultiSelect.MultiSelectSetAnchor(contextKey, id)
     local k = msKey(id)
     st.anchor = k
     local ver = st.ver or 0
-    debugLog((Diag.D.LogLoggerSelectAnchor):format(
-        tostring(key), tostring(before), tostring(st.anchor), ver
-    ))
+    debugLog((Diag.D.LogLoggerSelectAnchor):format(tostring(key), tostring(before), tostring(st.anchor), ver))
     return st.anchor
 end
 
@@ -283,10 +279,7 @@ function MultiSelect.MultiSelectRange(contextKey, ordered, id, isAdd)
     end
 
     st.ver = (st.ver or 0) + 1
-    debugLog((Diag.D.LogLoggerSelectRange):format(
-        tostring(key), tostring(id), isAdd and "1" or "0", tostring(action), before, st.count or 0, st.ver,
-        tostring(st.anchor)
-    ))
+    debugLog((Diag.D.LogLoggerSelectRange):format(tostring(key), tostring(id), isAdd and "1" or "0", tostring(action), before, st.count or 0, st.ver, tostring(st.anchor)))
     return action, st.count or 0
 end
 
@@ -331,4 +324,3 @@ function MultiSelect.MultiSelectGetSelected(contextKey)
     end)
     return out
 end
-

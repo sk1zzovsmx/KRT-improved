@@ -76,6 +76,16 @@ do
         end
     end
 
+    local function isRuntimeIndexReady(runtime)
+        return type(runtime) == "table"
+            and type(runtime.playersByName) == "table"
+            and type(runtime.playerIdxByNid) == "table"
+            and type(runtime.bossIdxByNid) == "table"
+            and type(runtime.bossByNid) == "table"
+            and type(runtime.lootIdxByNid) == "table"
+            and type(runtime.lootByNid) == "table"
+    end
+
     local function normalizeChangeName(value)
         local out = nil
         if Strings and Strings.NormalizeName then
@@ -174,8 +184,16 @@ do
             return
         end
 
-        addon:warn(("[RaidStore] Legacy fields detected phase=%s raidNid=%s idx=%s runtime=%s looter=%d mask=%d")
-            :format(tostring(contextTag or "?"), raidNid, idxText, runtimeText, lootLooterCount, attendanceMaskCount))
+        addon:warn(
+            ("[RaidStore] Legacy fields detected phase=%s raidNid=%s idx=%s runtime=%s looter=%d mask=%d"):format(
+                tostring(contextTag or "?"),
+                raidNid,
+                idxText,
+                runtimeText,
+                lootLooterCount,
+                attendanceMaskCount
+            )
+        )
     end
 
     local function rebuildRaidNidIndex()
@@ -629,15 +647,31 @@ do
             end
         end
 
-        runtime.signature = tostring(#players) .. "|" .. tostring(#bosses) .. "|" .. tostring(#lootRows)
-            .. "|" .. tostring(tonumber(raid.nextPlayerNid) or 1)
-            .. "|" .. tostring(tonumber(raid.nextBossNid) or 1)
-            .. "|" .. tostring(tonumber(raid.nextLootNid) or 1)
+        runtime.signature = tostring(#players)
+            .. "|"
+            .. tostring(#bosses)
+            .. "|"
+            .. tostring(#lootRows)
+            .. "|"
+            .. tostring(tonumber(raid.nextPlayerNid) or 1)
+            .. "|"
+            .. tostring(tonumber(raid.nextBossNid) or 1)
+            .. "|"
+            .. tostring(tonumber(raid.nextLootNid) or 1)
 
         return runtime
     end
 
     function module:EnsureRaidRuntime(raid)
+        raid = self:NormalizeRaidRecord(raid)
+        if not raid then
+            return nil
+        end
+
+        local runtime = raid._runtime
+        if isRuntimeIndexReady(runtime) then
+            return runtime
+        end
         return self:BuildRuntimeIndexes(raid)
     end
 

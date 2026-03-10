@@ -192,4 +192,3 @@ function UIRowVisuals.SetRowFocused(row, cond)
         texture:Hide()
     end
 end
-

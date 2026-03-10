@@ -14,8 +14,8 @@ so there is a single execution path for humans and agents.
 - `skills_sync`
   - Sync vendored skills and optionally install them into a local Codex skills folder.
 - `repo_quality_check`
-  - Run repo-local checks such as `lua_syntax`, `ui_binding`, `layering`, `raid_hardening`,
-    and `lua_uniformity`.
+  - Run repo-local checks such as `toc_files`, `lua_syntax`, `ui_binding`, `layering`,
+    `raid_hardening`, and `lua_uniformity`.
 - `mechanic_call`
   - Call the existing `tools/mech-krt.ps1` wrapper for `env.status`, addon validation,
     dead-code scans, lint, formatting, output, and similar Mechanic-backed flows.

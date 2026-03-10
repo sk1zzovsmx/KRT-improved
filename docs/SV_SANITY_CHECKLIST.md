@@ -29,6 +29,9 @@ Use this before releases and before/after schema refactors.
 
 ## Tooling
 
+Use the real SavedVariables file path, for example
+`WTF\\Account\\<Account>\\SavedVariables\\!KRT.lua`.
+
 - Validator:
   `powershell -ExecutionPolicy Bypass -File tools/run-raid-validator.ps1 "<path>\\!KRT.lua"`
 - Inspector (table + baseline metrics):
@@ -41,3 +44,5 @@ Use this before releases and before/after schema refactors.
   `lua tools/sv-roundtrip.lua "<path>\\!KRT.lua"`
 - Round-trip compatibility suite on legacy/mixed fixtures:
   `powershell -ExecutionPolicy Bypass -File tools/run-sv-roundtrip.ps1 -Fixtures`
+- Composite hardening check (DB boundary + XML layout + validator + fixtures):
+  `powershell -ExecutionPolicy Bypass -File tools/check-raid-hardening.ps1`

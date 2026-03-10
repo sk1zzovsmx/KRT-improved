@@ -15,18 +15,19 @@ addon.Features = addon.Features or feature.Features or {}
 local Features = addon.Features
 
 Features.WidgetFlags = Features.WidgetFlags or {}
-Features.Profiles = Features.Profiles or {
-    full = {
-        Config = true,
-        LootCounter = true,
-        Reserves = true,
-    },
-    core = {
-        Config = false,
-        LootCounter = false,
-        Reserves = false,
-    },
-}
+Features.Profiles = Features.Profiles
+    or {
+        full = {
+            Config = true,
+            LootCounter = true,
+            Reserves = true,
+        },
+        core = {
+            Config = false,
+            LootCounter = false,
+            Reserves = false,
+        },
+    }
 
 local function normalizeProfile(profileName)
     if type(profileName) ~= "string" or profileName == "" then

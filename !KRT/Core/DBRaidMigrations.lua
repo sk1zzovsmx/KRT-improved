@@ -227,7 +227,6 @@ do
         return raid
     end
 
-
     -- ----- Public methods ----- --
     function module:GetMigrations()
         return MIGRATIONS

@@ -58,7 +58,7 @@ local function getRaidService()
     return Services.Raid
 end
 
-local function IsWidgetAvailable(widgetId)
+local function isWidgetAvailable(widgetId)
     if UIFacade:IsEnabled(widgetId) and UIFacade:IsRegistered(widgetId) then
         return true
     end
@@ -90,7 +90,7 @@ function UI.AcquireRefs(frame)
     }
 end
 
-local function BuildMenu()
+local function buildMenu()
     local raid = getRaidService()
     local hasRaidGroup = raid:IsPlayerInRaid()
     local disableRaidActions = 1
@@ -107,7 +107,7 @@ local function BuildMenu()
                 if moduleRef and moduleRef.Toggle then
                     moduleRef:Toggle()
                 end
-            end
+            end,
         },
         {
             text = L.StrLootCounter,
@@ -117,7 +117,7 @@ local function BuildMenu()
                 if not raid:IsPlayerInRaid() then
                     return
                 end
-                if not IsWidgetAvailable("LootCounter") then
+                if not isWidgetAvailable("LootCounter") then
                     return
                 end
                 if UIFacade:IsEnabled("LootCounter") and UIFacade:IsRegistered("LootCounter") then
@@ -128,7 +128,7 @@ local function BuildMenu()
                 if widget and widget.Toggle then
                     widget:Toggle()
                 end
-            end
+            end,
         },
         {
             text = L.StrLootLogger,
@@ -138,10 +138,16 @@ local function BuildMenu()
                 if moduleRef and moduleRef.Toggle then
                     moduleRef:Toggle()
                 end
-            end
+            end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
-        { text = L.StrClearIcons, notCheckable = 1, func = function() raid:ClearRaidIcons() end },
+        {
+            text = L.StrClearIcons,
+            notCheckable = 1,
+            func = function()
+                raid:ClearRaidIcons()
+            end,
+        },
         { text = " ", disabled = 1, notCheckable = 1 },
         {
             text = RAID_WARNING,
@@ -151,7 +157,7 @@ local function BuildMenu()
                 if moduleRef and moduleRef.Toggle then
                     moduleRef:Toggle()
                 end
-            end
+            end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
         {
@@ -162,7 +168,7 @@ local function BuildMenu()
                 if moduleRef and moduleRef.Toggle then
                     moduleRef:Toggle()
                 end
-            end
+            end,
         },
         {
             text = L.BtnDemand,
@@ -176,7 +182,7 @@ local function BuildMenu()
                 if moduleRef and moduleRef.Demand then
                     moduleRef:Demand()
                 end
-            end
+            end,
         },
         {
             text = CHAT_ANNOUNCE,
@@ -190,7 +196,7 @@ local function BuildMenu()
                 if moduleRef and moduleRef.Announce then
                     moduleRef:Announce()
                 end
-            end
+            end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
         {
@@ -201,29 +207,29 @@ local function BuildMenu()
                 if moduleRef and moduleRef.Toggle then
                     moduleRef:Toggle()
                 end
-            end
+            end,
         },
     }
 end
 
 -- Initializes and opens the menu for the minimap button.
-local function OpenMenu()
+local function openMenu()
     addonMenu = addonMenu or CreateFrame("Frame", "KRTMenu", UIParent, "UIDropDownMenuTemplate")
-    local menu = BuildMenu()
+    local menu = buildMenu()
     -- EasyMenu handles UIDropDownMenu initialization and opening.
     EasyMenu(menu, addonMenu, KRT_MINIMAP_GUI, 0, 0, "MENU")
 end
 
-local function IsMenuOpen()
+local function isMenuOpen()
     return addonMenu and UIDROPDOWNMENU_OPEN_MENU == addonMenu and DropDownList1 and DropDownList1:IsShown()
 end
 
-local function ToggleMenu()
-    if IsMenuOpen() then
+local function toggleMenu()
+    if isMenuOpen() then
         CloseDropDownMenus()
         return
     end
-    OpenMenu()
+    openMenu()
 end
 
 -- Moves the minimap button while dragging.
@@ -265,7 +271,7 @@ local function moveButton(self)
     end
 end
 
-local function SetMinimapShown(show)
+local function setMinimapShown(show)
     Frames.SetShown(KRT_MINIMAP_GUI, show)
 end
 
@@ -292,7 +298,7 @@ function module:OnLoad(frame)
     local options = addon.options or KRT_Options or {}
     frame:SetUserPlaced(true)
     self:SetPos(options.minimapPos or 325)
-    SetMinimapShown(options.minimapButton ~= false)
+    setMinimapShown(options.minimapButton ~= false)
     frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     frame:SetScript("OnMouseDown", function(self, button)
         if button ~= "LeftButton" then
@@ -328,19 +334,19 @@ function module:OnLoad(frame)
     end)
     frame:SetScript("OnClick", function(self, button)
         -- Ignore clicks if Shift or Alt keys are held:
-        if IsShiftKeyDown() or IsAltKeyDown() then return end
+        if IsShiftKeyDown() or IsAltKeyDown() then
+            return
+        end
         if button == "RightButton" then
             UIFacade:Call("Config", "Toggle")
         elseif button == "LeftButton" then
-            ToggleMenu()
+            toggleMenu()
         end
     end)
     frame:SetScript("OnEnter", function(self)
         GameTooltip_SetDefaultAnchor(GameTooltip, self)
         GameTooltip:SetText(
-            addon.WrapTextInColorCode("Kader", Colors.NormalizeHexColor(K_COLOR))
-            .. " "
-            .. addon.WrapTextInColorCode("Raid Tools", Colors.NormalizeHexColor("aad4af37"))
+            addon.WrapTextInColorCode("Kader", Colors.NormalizeHexColor(K_COLOR)) .. " " .. addon.WrapTextInColorCode("Raid Tools", Colors.NormalizeHexColor("aad4af37"))
         )
         GameTooltip:AddLine(L.StrMinimapLClick, 1, 1, 1)
         GameTooltip:AddLine(L.StrMinimapRClick, 1, 1, 1)
@@ -388,7 +394,7 @@ function module:ToggleMinimapButton()
     local options = addon.options or KRT_Options or {}
     local nextValue = not options.minimapButton
     Options.SetOption("minimapButton", nextValue)
-    SetMinimapShown(nextValue)
+    setMinimapShown(nextValue)
 end
 
 -- Hides the minimap button.

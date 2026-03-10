@@ -1,12 +1,13 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-Set-Location $repoRoot
-
-if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
-    $PSNativeCommandUseErrorActionPreference = $false
+$toolingCommonPath = Join-Path $PSScriptRoot "tooling-common.ps1"
+if (-not (Test-Path -LiteralPath $toolingCommonPath)) {
+    $toolingCommonPath = Join-Path (Split-Path -Parent $PSScriptRoot) "tooling-common.ps1"
 }
+. $toolingCommonPath
+$repoRoot = Enter-KrtRepoRoot -ScriptRoot $PSScriptRoot
+Disable-KrtNativeCommandErrors
 
 $luacheckCmd = Get-Command luacheck -ErrorAction SilentlyContinue
 if (-not $luacheckCmd) {

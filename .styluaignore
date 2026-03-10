@@ -1,0 +1,12 @@
+# --- Addon vendored libs ---
+**/Libs/**
+
+# --- Repo / tooling ---
+.vscode/**
+.devcontainer/**
+
+# --- Generati / minificati / backup (se mai li avessi) ---
+**/*.min.lua
+**/*_generated.lua
+**/*.bak.lua
+**/*.old.lua

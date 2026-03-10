@@ -20,6 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 TOOLS_DIR = REPO_ROOT / "tools"
 
 REPO_CHECKS = {
+    "toc_files": "check-toc-files.ps1",
     "lua_syntax": "check-lua-syntax.ps1",
     "ui_binding": "check-ui-binding.ps1",
     "layering": "check-layering.ps1",

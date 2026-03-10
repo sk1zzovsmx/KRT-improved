@@ -2,22 +2,115 @@
 
 Quick, copy-paste checks for layering and ownership rules.
 If `rg` is missing on Windows, run `tools/check-layering.ps1` (it falls back to `Select-String`).
+See `tools/README.md` for the current tool-family index.
 
 ## Lua syntax + uniformity (local gate)
 
 These checks are local-only. No CI blocking gate is configured.
 
-1. Syntax check for all Lua files (including vendored libs):
+1. TOC naming and file-list check:
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-toc-files.ps1
+```
+Expected: `TOC file checks passed.`
+
+2. Syntax check for all Lua files (including vendored libs):
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-syntax.ps1
 ```
 Expected: `Lua syntax check passed.`
 
-2. Uniformity check for KRT-owned Lua (`!KRT` + `tools`, excluding `!KRT/Libs`):
+3. Lint check for KRT-owned Lua:
+```powershell
+luacheck --codes --no-color !KRT tools tests
+```
+Expected: `0 warnings / 0 errors`
+
+4. Uniformity check for KRT-owned Lua (`!KRT`, `tools`, `tests`,
+excluding `!KRT/Libs`):
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-uniformity.ps1
 ```
 Expected: `Lua uniformity checks passed.`
+This includes canonical public naming and private helper naming checks.
+
+5. Formatter check for KRT-owned Lua:
+```powershell
+stylua --check !KRT tools tests
+```
+Expected: no diff output
+
+6. Install the repo-local hook once per clone:
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/install-hooks.ps1
+```
+Expected: `Configured core.hooksPath=.githooks`
+
+7. Targeted stabilization gate for `Services/Rolls.lua` and
+`Controllers/Master.lua` changes:
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-release-targeted-tests.ps1
+```
+Expected: tests pass, or an explicit runtime-missing skip message when
+`lua`/`luajit` is not installed.
+
+## WoW-specific audit greps (manual review)
+
+1. Secure templates, `SetAttribute`, and combat guard coverage:
+```powershell
+rg ":SetAttribute\\(" -n !KRT -g "*.lua" -g "*.xml"
+rg "Secure(Action|Handler|State)|SecureTemplates" -n !KRT -g "*.lua" -g "*.xml"
+rg "\\bInCombatLockdown\\b|\\bPLAYER_REGEN_(DISABLED|ENABLED)\\b" -n !KRT -g "*.lua"
+```
+Expected: review manually; secure mutations should be guarded or deferred.
+
+2. `OnUpdate` hotspots and high-frequency UI work:
+```powershell
+rg "SetScript\\(\"OnUpdate\"|\\bOnUpdate\\b" -n !KRT -g "*.lua" -g "*.xml"
+```
+Expected: review manually; recurring updates should be throttled or event-driven.
+
+3. Hooking vs direct overrides:
+```powershell
+rg "hooksecurefunc|:HookScript\\(" -n !KRT -g "*.lua"
+rg "^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*function\\s*\\(" -n !KRT -g "*.lua"
+```
+Expected: review manually; prefer safe hooks, scrutinize global direct overrides.
+
+4. Global-env and named-frame scan:
+```powershell
+rg "CreateFrame\\([^,]+,\\s*\"[A-Za-z0-9_]+\"" -n !KRT -g "*.lua"
+rg "\\b_G\\b|\\bgetglobal\\b|\\brawset\\(_G\\b" -n !KRT -g "*.lua"
+```
+Expected: review manually; named globals should stay addon-prefixed and intentional.
+
+## Lua audit greps (manual review)
+
+1. Private helper naming audit:
+```powershell
+rg "^\s*local\s+function\s+[A-Z]" -n !KRT tools tests -g "*.lua"
+rg "^\s*function\s+[A-Z][A-Za-z0-9_]*\s*\(" -n !KRT tools tests -g "*.lua"
+```
+Expected: `0 match` outside allowed UI hook exceptions and vendored code.
+
+2. Suspicious dot-call with explicit `self`:
+```powershell
+rg "\b[A-Za-z0-9_]+\.[A-Za-z0-9_]+\(\s*self\b" -n !KRT -g "*.lua"
+```
+Expected: review manually; often indicates a method still called with dot+self.
+
+3. Suspicious colon-call on infra namespaces that should stay plain-function APIs:
+```powershell
+rg "\b(Core|Bus|Frames|UIScaffold|ListController|MultiSelect|UI|Strings|Time|Comms|Base64|Colors|Item|Sort):[A-Z][A-Za-z0-9_]*\(" -n !KRT -g "*.lua"
+```
+Expected: review manually; infra namespaces normally use `.` not `:`.
+
+4. Bare function declarations:
+```powershell
+rg "^\s*function\s+[A-Za-z_][A-Za-z0-9_]*\s*\(" -n !KRT -g "*.lua"
+```
+Expected: review manually; these should normally be local forward-declared helpers,
+not accidental globals.
 
 ## Layering checks
 
@@ -99,11 +192,5 @@ Expected: `0 match`
 13. EntryPoints should not re-introduce per-controller getter duplicates:
 ```powershell
 rg "local\\s+function\\s+get(Master|Logger|Warnings|Changes|Spammer)Controller" -n !KRT/EntryPoints -g "*.lua"
-```
-Expected: `0 match`
-
-14. UIBinder should not reintroduce `splitArgs` local helper naming collision:
-```powershell
-rg "local\\s+function\\s+splitArgs\\s*\\(" -n !KRT/Modules/UIBinder.lua
 ```
 Expected: `0 match`

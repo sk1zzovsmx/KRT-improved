@@ -446,14 +446,15 @@ function UIScaffold.DefineModuleUi(cfg)
         error("UIScaffold.DefineModuleUi: cfg.refresh must be a function")
     end
 
-    module._ui = module._ui or {
-        Loaded = false,
-        Bound = false,
-        Localized = false,
-        Dirty = true,
-        Reason = nil,
-        FrameName = nil,
-    }
+    module._ui = module._ui
+        or {
+            Loaded = false,
+            Bound = false,
+            Localized = false,
+            Dirty = true,
+            Reason = nil,
+            FrameName = nil,
+        }
     local UI = module._ui
 
     local function doRefresh()

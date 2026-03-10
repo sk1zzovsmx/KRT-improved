@@ -98,13 +98,7 @@ function Core.GetRaidStoreOrNil(contextTag, requiredMethods)
             if type(method) == "string" and method ~= "" and type(raidStore[method]) ~= "function" then
                 local warnKey = "method:" .. ctx .. ":" .. method
                 local template = Diag.W and Diag.W.LogRaidStoreMethodMissing
-                warnMissingRaidStoreOnce(
-                    warnKey,
-                    template,
-                    "[Core] RaidStore missing method %s (context=%s)",
-                    method,
-                    ctx
-                )
+                warnMissingRaidStoreOnce(warnKey, template, "[Core] RaidStore missing method %s (context=%s)", method, ctx)
                 return nil
             end
         end

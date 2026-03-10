@@ -59,12 +59,9 @@ do
     -- ----- Private helpers ----- --
     function UI.AcquireRefs(frame)
         local refs = {
-            scrollFrame = frame
-                and (frame.ScrollFrame or _G[(frame.GetName and frame:GetName() or "KRTLootCounterFrame") .. "ScrollFrame"])
-                or nil,
+            scrollFrame = frame and (frame.ScrollFrame or _G[(frame.GetName and frame:GetName() or "KRTLootCounterFrame") .. "ScrollFrame"]) or nil,
         }
-        refs.scrollChild = (refs.scrollFrame and refs.scrollFrame.ScrollChild)
-            or _G["KRTLootCounterFrameScrollFrameScrollChild"]
+        refs.scrollChild = (refs.scrollFrame and refs.scrollFrame.ScrollChild) or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         return refs
     end
 
@@ -75,14 +72,9 @@ do
         end
 
         frameName = frameName or (frame.GetName and frame:GetName()) or "KRTLootCounterFrame"
-        scrollFrame = scrollFrame
-            or frame.ScrollFrame
-            or _G[frameName .. "ScrollFrame"]
-            or _G["KRTLootCounterFrameScrollFrame"]
+        scrollFrame = scrollFrame or frame.ScrollFrame or _G[frameName .. "ScrollFrame"] or _G["KRTLootCounterFrameScrollFrame"]
 
-        scrollChild = scrollChild
-            or (scrollFrame and scrollFrame.ScrollChild)
-            or _G["KRTLootCounterFrameScrollFrameScrollChild"]
+        scrollChild = scrollChild or (scrollFrame and scrollFrame.ScrollChild) or _G["KRTLootCounterFrameScrollFrameScrollChild"]
 
         if not frame._krtInitialized then
             Frames.SetFrameTitle(frameName, L.StrLootCounter)
@@ -93,7 +85,9 @@ do
     end
 
     local function ensureHeader()
-        if header or not scrollChild then return end
+        if header or not scrollChild then
+            return
+        end
 
         header = CreateFrame("Frame", nil, scrollChild)
         header:SetHeight(HEADER_HEIGHT)
@@ -153,7 +147,9 @@ do
             row.name:SetJustifyH("LEFT")
 
             local function setupTooltip(btn, text)
-                if not text or text == "" then return end
+                if not text or text == "" then
+                    return
+                end
                 btn:HookScript("OnEnter", function(self)
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                     GameTooltip:SetText(text, 1, 1, 1, true)
@@ -174,7 +170,7 @@ do
 
             row.reset = makeBtn("R", L.TipLootCounterReset)
             row.minus = makeBtn("-", L.TipLootCounterMinus)
-            row.plus  = makeBtn("+", L.TipLootCounterPlus)
+            row.plus = makeBtn("+", L.TipLootCounterPlus)
 
             row.reset:SetPoint("RIGHT", row.actions, "RIGHT", 0, 0)
             row.minus:SetPoint("RIGHT", row.reset, "LEFT", -BTN_GAP, 0)
@@ -212,7 +208,9 @@ do
         local f = frame or getFrame()
         frameName = Frames.InitModuleFrame(module, f, { enableDrag = true }) or frameName
         UI.Loaded = frameName ~= nil
-        if not ensureFrames() then return end
+        if not ensureFrames() then
+            return
+        end
     end
 
     function module:AttachToMaster(masterFrame)
@@ -228,9 +226,13 @@ do
     end
 
     function module:Refresh()
-        if not ensureFrames() then return end
+        if not ensureFrames() then
+            return
+        end
         local frame = getFrame()
-        if not frame or not scrollFrame or not scrollChild then return end
+        if not frame or not scrollFrame or not scrollChild then
+            return
+        end
 
         ensureHeader()
 
@@ -245,17 +247,23 @@ do
         local contentW = scrollFrame:GetWidth() or 0
         local sb = scrollFrame.ScrollBar or (scrollFrame.GetName and _G[scrollFrame:GetName() .. "ScrollBar"]) or nil
         local sbw = (sb and sb.GetWidth and sb:GetWidth()) or 16
-        if sbw <= 0 then sbw = 16 end
+        if sbw <= 0 then
+            sbw = 16
+        end
         contentW = math.max(1, contentW - sbw - 6)
         scrollChild:SetWidth(contentW)
         scrollChild:SetHeight(math.max(contentHeight, scrollFrame:GetHeight()))
         local maxScroll = contentHeight - scrollFrame:GetHeight()
-        if maxScroll < 0 then maxScroll = 0 end
+        if maxScroll < 0 then
+            maxScroll = 0
+        end
         if priorScroll > maxScroll then
             priorScroll = maxScroll
         end
         scrollFrame:SetVerticalScroll(priorScroll)
-        if header then header:Show() end
+        if header then
+            header:Show()
+        end
 
         for i = 1, numPlayers do
             local data = players[i]
@@ -281,9 +289,7 @@ do
                 row._lastClass = class
             end
 
-            local cnt = (data and tonumber(data.count))
-                or (playerNid and Services.Raid:GetPlayerCountByNid(playerNid, addon.Core.GetCurrentRaid()))
-                or 0
+            local cnt = (data and tonumber(data.count)) or (playerNid and Services.Raid:GetPlayerCountByNid(playerNid, addon.Core.GetCurrentRaid())) or 0
             if row._lastCount ~= cnt then
                 row.count:SetText(tostring(cnt))
                 row._lastCount = cnt
@@ -292,7 +298,9 @@ do
         end
 
         for i = numPlayers + 1, #rows do
-            if rows[i] then rows[i]:Hide() end
+            if rows[i] then
+                rows[i]:Hide()
+            end
         end
     end
 
@@ -329,10 +337,13 @@ do
     Bus.RegisterCallback(InternalEvents.RaidCreate, requestRefresh)
 
     if UIFacade and UIFacade.Register then
-        UIFacade:Register("LootCounter", UIScaffold.MakeStandardWidgetApi(module, {
-            AttachToMaster = function(masterFrame)
-                module:AttachToMaster(masterFrame)
-            end,
-        }))
+        UIFacade:Register(
+            "LootCounter",
+            UIScaffold.MakeStandardWidgetApi(module, {
+                AttachToMaster = function(masterFrame)
+                    module:AttachToMaster(masterFrame)
+                end,
+            })
+        )
     end
 end

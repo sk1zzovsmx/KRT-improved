@@ -4,6 +4,60 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Behavior:** The Master Loot window is back to a `250x480` footprint, with its
+  roll-table headers, scroll area, paired top/bottom action buttons, mode row,
+  left-side action column, and inner control alignment retuned for the narrower
+  layout; the `MS | OS | SR | Free | Countdown` row now shares the same left
+  start as `Select Item` and `Open SoftRes`, the `Roll` button expands while
+  `Clear` keeps its width, and the Hold/Bank/DE dropdowns now keep the same
+  right-side gap as `Loot Counter`. The rolls table uses a fixed
+  `Player | Info | Count | Rolls` grid,
+  and shortens info tags to compact `TIE / OOT / OUT / BLK` codes.
+- **Bugfix:** Synthetic `/krt debug raid` players now pass roll intake without
+  live-unit checks, and rejected debug submissions no longer whisper fake names.
+- **Behavior:** Added `/krt debug raid seed|clear|rolls|roll <1-4|name> [1-100]`
+  to seed four synthetic players into the current raid and submit synthetic
+  rolls against the active roll session for addon testing.
+- **Behavior:** Rolls now use a response-first resolver with centralized eligibility checks,
+  explicit tie-at-cutoff handling, runtime participant states, explicit `PASS` / `CANCELLED`
+  player responses, and award-time revalidation.
+- **Behavior:** Roll response transitions are now explicitly hardened: `PASS` and
+  `CANCELLED` stay reversible while the session is open, `TIMED_OUT` stays terminal
+  for the current session, and only eligible `ROLL` responses may enter the resolver.
+- **Bugfix:** Master Loot now consumes per-row `selectionAllowed` directly from the
+  rolls service contract, so controller-side selection and award flows no longer
+  reinterpret row pickability from local `status/isEligible` checks.
+- **Bugfix:** Final winner validation for award/trade now lives in the rolls service,
+  and `Master.lua` consumes the service result directly instead of remapping local
+  winner reason codes.
+- **Bugfix:** Accepted roll responses now stay candidate-eligible after consuming their
+  last allowed roll; extra `/roll` attempts are still denied, but valid winners no longer
+  disappear from resolution or award-time validation.
+- **Bugfix:** Trade and loot-window multi-award execution now track their active winner
+  outside the global compatibility mirror, reducing stale winner state during chained awards
+  and inventory trade progress.
+- **Behavior:** Rolls eligibility now supports opt-in `manual exclusion`
+  checks through the service API, so future loot-ban rules can reuse the same
+  intake/display/award validation path.
+- **Behavior:** Roll winner selection now uses one unified selection flow for auto winners,
+  inventory single-pick, and multi-pick, removing the old `selectedAuto` / `msPrefilled`
+  state split inside `Services/Rolls.lua`.
+- **Behavior:** The Master Loot rolls frame now defaults to `showRollsOnly`, so non-rolling
+  materialized candidates stay in the full runtime model but are hidden from the visible roll table
+  until they actually submit a `/roll`.
+- **Behavior:** Roll-row state tags such as `TIE`, `OUT`, `TIME`, and `BLOCK` now render in a
+  dedicated `Info` column, leaving the `Counter` column for loot-count, reserve-count, and plus-priority
+  values only; the Master Loot rolls table now reads left-to-right as `Player | Info | Counter | Rolls`.
+- **Behavior:** Single-winner ties now switch the `Award` button to `Reroll`, which clears the
+  current roll set, restricts the next intake to the tied players only, and reopens the session
+  for a targeted reroll instead of silently blocking on manual resolution.
+- **Bugfix:** Master Loot winner selection realigns single-award pick mode with the
+  `MLRollWinners` multiselect state, restoring the original `CTRL+click` deselect/swap flow.
+- **Behavior:** Inventory/trade winner rows now reuse the same selected-row marker (`> name <`)
+  and selection visuals as the loot-window boss roll flow, including multi-copy winner selection.
+- **Bugfix:** Inventory/trade multi-awards now execute one winner at a time from the selected
+  winner queue, so `self-keep` and real trades both consume one copy, advance to the next
+  selected winner, and keep `itemCount` progression symmetric.
 - **Refactor:** Centralized loot/item and boss-add ignore lookups into `Modules/IgnoredItems.lua`
   and `Modules/IgnoredMobs.lua`, removing large hardcoded filter tables from `Services/Raid.lua`.
 - **Behavior:** Boss filtering now uses the curated raid-only `IgnoredMobs` module to suppress

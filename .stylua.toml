@@ -1,0 +1,16 @@
+# WoW 3.3.5a = Lua 5.1
+syntax = "Lua51"
+
+column_width = 180
+
+line_endings = "Unix"
+indent_type = "Spaces"
+indent_width = 4
+
+quote_style = "AutoPreferDouble"
+call_parentheses = "Always"
+
+collapse_simple_statement = "Never"
+sort_requires = { enabled = false }
+
+space_after_function_names = "Never"

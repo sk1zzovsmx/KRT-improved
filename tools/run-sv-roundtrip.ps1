@@ -7,32 +7,15 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-Set-Location $repoRoot
+$toolingCommonPath = Join-Path $PSScriptRoot "tooling-common.ps1"
+if (-not (Test-Path -LiteralPath $toolingCommonPath)) {
+    $toolingCommonPath = Join-Path (Split-Path -Parent $PSScriptRoot) "tooling-common.ps1"
+}
+. $toolingCommonPath
+$repoRoot = Enter-KrtRepoRoot -ScriptRoot $PSScriptRoot
 
 if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
     $PSNativeCommandUseErrorActionPreference = $false
-}
-
-function Resolve-LuaRuntime {
-    param([string]$Preferred)
-
-    if ($Preferred -and $Preferred.Trim() -ne "") {
-        $command = Get-Command $Preferred -ErrorAction SilentlyContinue
-        if ($command) {
-            return $command.Source
-        }
-        throw "Requested runtime '$Preferred' not found in PATH."
-    }
-
-    foreach ($name in @("lua", "luajit")) {
-        $command = Get-Command $name -ErrorAction SilentlyContinue
-        if ($command) {
-            return $command.Source
-        }
-    }
-
-    return $null
 }
 
 if ($Fixtures -and [string]::IsNullOrWhiteSpace($TargetPath)) {
@@ -44,7 +27,7 @@ if ([string]::IsNullOrWhiteSpace($TargetPath)) {
 }
 
 $validatorPath = Resolve-Path (Join-Path $repoRoot "tools/sv-roundtrip.lua")
-$luaRuntime = Resolve-LuaRuntime -Preferred $Runtime
+$luaRuntime = Resolve-KrtLuaRuntime -Preferred $Runtime
 if (-not $luaRuntime) {
     Write-Host "Lua runtime not found. Install 'lua' or 'luajit' and retry." -ForegroundColor Red
     exit 1

@@ -37,8 +37,9 @@
 |   |   |   \\-- ...
 |   |   |-- LibLogger-1.0
 |   |   |   \\-- ...
-|   |   \\-- LibStub
-|   |       \\-- ...
+|   |   |-- LibStub
+|   |   |   \\-- ...
+|   |   \\-- libs.json
 |   |-- Localization
 |   |   |-- DiagnoseLog.en.lua
 |   |   \\-- localization.en.lua
@@ -60,6 +61,7 @@
 |   |   \\-- Time.lua
 |   |-- Services
 |   |   |-- Chat.lua
+|   |   |-- Debug.lua
 |   |   |-- Loot.lua
 |   |   |-- Raid.lua
 |   |   |-- README.md
@@ -84,6 +86,7 @@
 |   |   |-- README.md
 |   |   \\-- ReservesUI.lua
 |   |-- !KRT.toc
+|   |-- CHANGELOG.md
 |   |-- Init.lua
 |   \\-- KRT.xml
 |-- .agents
@@ -116,28 +119,27 @@
 |   |-- ARCHITECTURE.md
 |   |-- FN_CLUSTERS.md
 |   |-- FUNCTION_REGISTRY.csv
-|   |-- FUNCTION_REGISTRY.md
 |   |-- KRT_MCP.md
-|   |-- NAMING_CONVENTIONS.md
+|   |-- LUA_WRITING_RULES.md
 |   |-- RAID_SCHEMA.md
 |   |-- REFACTOR_RULES.md
 |   |-- SV_SANITY_CHECKLIST.md
 |   |-- SV_SCHEMA.md
-|   |-- TREE.md
-|   |-- UI_BINDING_RULES.md
-|   \\-- WOW_ADDON_TEMPLATE.md
+|   \\-- TREE.md
 |-- tests
 |   |-- fixtures
 |   |   \\-- sv
 |   |       \\-- ...
-|   \\-- mocks
-|       \\-- DBManager.Mock.lua
+|   |-- mocks
+|   |   \\-- DBManager.Mock.lua
+|   \\-- release_stabilization_spec.lua
 |-- tools
 |   |-- agent-skills.manifest.json
 |   |-- check-layering.ps1
 |   |-- check-lua-syntax.ps1
 |   |-- check-lua-uniformity.ps1
 |   |-- check-raid-hardening.ps1
+|   |-- check-toc-files.ps1
 |   |-- check-ui-binding.ps1
 |   |-- fnmap-classify.ps1
 |   |-- fnmap-inventory.ps1
@@ -146,21 +148,26 @@
 |   |-- mech-bootstrap.ps1
 |   |-- mech-krt.ps1
 |   |-- pre-commit.ps1
+|   |-- README.md
 |   |-- run-krt-mcp.ps1
 |   |-- run-raid-validator.ps1
+|   |-- run-release-targeted-tests.ps1
 |   |-- run-sv-inspector.ps1
 |   |-- run-sv-roundtrip.ps1
 |   |-- sv-inspector.lua
 |   |-- sv-roundtrip.lua
 |   |-- sync-agent-skills.ps1
+|   |-- tooling-common.ps1
 |   |-- update-tree.ps1
 |   \\-- validate-raid-schema.lua
+|-- !KRT.zip
 |-- .editorconfig
 |-- .gitattributes
 |-- .gitignore
 |-- .luacheckrc
+|-- .stylua.toml
+|-- .styluaignore
 |-- AGENTS.md
-|-- ARCHITECTURE.md
 |-- CHANGELOG.md
 |-- DEV_CHECKS.md
 |-- OVERVIEW.md

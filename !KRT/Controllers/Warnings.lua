@@ -45,7 +45,7 @@ do
     local lastEditBtnMode
 
     local tempName, tempContent
-    local SaveWarning
+    local saveWarning
     local isEdit = false
 
     -- ----- Private helpers ----- --
@@ -59,7 +59,7 @@ do
         }
     end
 
-    local function BindWarningRow(row)
+    local function bindWarningRow(row)
         if not row or row._krtBound then
             return
         end
@@ -74,7 +74,7 @@ do
 
     -- ----- Public methods ----- --
 
-    local controller = ListController.MakeListController {
+    local controller = ListController.MakeListController({
         keyName = "WarningsList",
         poolTag = "warnings",
         _rowParts = { "ID", "Name" },
@@ -86,18 +86,22 @@ do
             end
         end,
 
-        rowName = function(n, _, i) return n .. "WarningBtn" .. i end,
+        rowName = function(n, _, i)
+            return n .. "WarningBtn" .. i
+        end,
         rowTmpl = "KRTWarningButtonTemplate",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
-            BindWarningRow(row)
+            bindWarningRow(row)
             local ui = row._p
             ui.ID:SetText(it.id)
             ui.Name:SetText(it.name)
         end),
 
-        highlightId = function() return selectedID end,
-    }
+        highlightId = function()
+            return selectedID
+        end,
+    })
 
     local panelScaffold = UIScaffold.CreateListPanelScaffold({
         module = module,
@@ -193,10 +197,14 @@ do
 
     -- Warning selection:
     function module:Select(btn)
-        if btn == nil or isEdit == true then return end
+        if btn == nil or isEdit == true then
+            return
+        end
         local bName = btn:GetName()
         local wID = tonumber(_G[bName .. "ID"]:GetText())
-        if KRT_Warnings[wID] == nil then return end
+        if KRT_Warnings[wID] == nil then
+            return
+        end
         if IsControlKeyDown() then
             selectedID = nil
             tempSelectedID = wID
@@ -234,12 +242,14 @@ do
         end
         wName = nameBox:GetText()
         wContent = contentBox:GetText()
-        return SaveWarning(wContent, wName, selectedID)
+        return saveWarning(wContent, wName, selectedID)
     end
 
     -- Delete Warning:
     function module:Delete(btn)
-        if btn == nil or selectedID == nil then return end
+        if btn == nil or selectedID == nil then
+            return
+        end
         local oldWarnings = {}
         for i, w in ipairs(KRT_Warnings) do
             if i ~= selectedID then
@@ -262,13 +272,17 @@ do
 
     -- Announce Warning:
     function module:Announce(wID)
-        if KRT_Warnings == nil then return end
+        if KRT_Warnings == nil then
+            return
+        end
         if wID == nil then
             wID = (selectedID ~= nil) and selectedID or tempSelectedID
         end
 
         wID = tonumber(wID)
-        if not wID or wID <= 0 or KRT_Warnings[wID] == nil then return end
+        if not wID or wID <= 0 or KRT_Warnings[wID] == nil then
+            return
+        end
 
         if addon.IsInRaid and addon.IsInRaid() and addon.options and addon.options.useRaidWarning then
             local isLeader = UnitIsGroupLeader and UnitIsGroupLeader("player")
@@ -294,7 +308,9 @@ do
 
     -- Localizing UI frame:
     function UI.Localize()
-        if UI.Localized then return end
+        if UI.Localized then
+            return
+        end
         _G[frameName .. "NameStr"]:SetText(L.StrName)
         _G[frameName .. "MessageStr"]:SetText(L.StrMessage)
         _G[frameName .. "EditBtn"]:SetText(L.BtnSave)
@@ -311,7 +327,7 @@ do
         UI.Localized = true
     end
 
-    local function UpdateSelectionUI()
+    local function updateSelectionUI()
         if selectedID and KRT_Warnings[selectedID] then
             _G[frameName .. "OutputName"]:SetText(KRT_Warnings[selectedID].name)
             _G[frameName .. "OutputContent"]:SetText(KRT_Warnings[selectedID].content)
@@ -332,23 +348,16 @@ do
             fetched = true
         end
         if selectedID ~= lastSelectedID then
-            UpdateSelectionUI()
+            updateSelectionUI()
             controller:Touch()
         end
-        tempName    = _G[frameName .. "Name"]:GetText()
+        tempName = _G[frameName .. "Name"]:GetText()
         tempContent = _G[frameName .. "Content"]:GetText()
         UIPrimitives.EnableDisableNamedPart(frameName, "EditBtn", (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
         UIPrimitives.EnableDisableNamedPart(frameName, "DeleteBtn", selectedID ~= nil)
         UIPrimitives.EnableDisableNamedPart(frameName, "AnnounceBtn", selectedID ~= nil)
         local editBtnMode = (tempName ~= "" or tempContent ~= "") or selectedID == nil
-        lastEditBtnMode = UIPrimitives.UpdateModeTextNamedPart(
-            frameName,
-            "EditBtn",
-            L.BtnSave,
-            L.BtnEdit,
-            editBtnMode,
-            lastEditBtnMode
-        )
+        lastEditBtnMode = UIPrimitives.UpdateModeTextNamedPart(frameName, "EditBtn", L.BtnSave, L.BtnEdit, editBtnMode, lastEditBtnMode)
     end
 
     function module:Refresh()
@@ -356,7 +365,7 @@ do
     end
 
     -- Saving a Warning:
-    function SaveWarning(wContent, wName, wID)
+    function saveWarning(wContent, wName, wID)
         local savedID
         if type(KRT_Warnings) ~= "table" then
             KRT_Warnings = {}

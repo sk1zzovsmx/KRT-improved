@@ -1,22 +1,14 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-Set-Location $repoRoot
+$toolingCommonPath = Join-Path $PSScriptRoot "tooling-common.ps1"
+if (-not (Test-Path -LiteralPath $toolingCommonPath)) {
+    $toolingCommonPath = Join-Path (Split-Path -Parent $PSScriptRoot) "tooling-common.ps1"
+}
+. $toolingCommonPath
+$repoRoot = Enter-KrtRepoRoot -ScriptRoot $PSScriptRoot
 
 $violations = New-Object System.Collections.Generic.List[string]
-
-function To-RepoRelativePath {
-    param([string]$Path)
-
-    $full = [System.IO.Path]::GetFullPath($Path)
-    $root = [System.IO.Path]::GetFullPath($repoRoot.Path)
-    if ($full.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) {
-        return $full.Substring($root.Length).TrimStart('\', '/')
-    }
-
-    return $Path
-}
 
 $binderPath = Join-Path $repoRoot "!KRT/Modules/UI/Binder"
 if (Test-Path -LiteralPath $binderPath) {
@@ -24,54 +16,32 @@ if (Test-Path -LiteralPath $binderPath) {
     if ($binderFiles.Count -gt 0) {
         $violations.Add("[Binder files present]")
         foreach ($file in $binderFiles) {
-            $violations.Add("  $(To-RepoRelativePath -Path $file.FullName)")
+            $relative = ConvertTo-KrtRepoRelativePath -RepoRoot $repoRoot -Path $file.FullName -UseForwardSlashes
+            $violations.Add("  $relative")
         }
     }
 }
 
 $tocPath = Join-Path $repoRoot "!KRT/!KRT.toc"
 if (Test-Path -LiteralPath $tocPath) {
-    $tocMatches = @(Select-String -Path $tocPath -Pattern 'Modules\\UI\\Binder')
+    $tocMatches = @(Get-KrtPatternMatches -RepoRoot $repoRoot -Pattern 'Modules\\UI\\Binder' -Path $tocPath)
     if ($tocMatches.Count -gt 0) {
         $violations.Add("[TOC includes Binder]")
-        foreach ($m in $tocMatches) {
-            $violations.Add("  !KRT/!KRT.toc:$($m.LineNumber):$($m.Line.TrimEnd())")
+        foreach ($line in $tocMatches) {
+            $violations.Add("  $line")
         }
     }
 }
 
-$xmlTargets = New-Object System.Collections.Generic.List[string]
-$xmlTargets.Add((Join-Path $repoRoot "!KRT/UI"))
-$xmlTargets.Add((Join-Path $repoRoot "!KRT/Templates.xml"))
-
-$xmlPattern = '<Scripts>|<On[A-Za-z]+>'
-$xmlHeaderAdded = $false
-foreach ($target in $xmlTargets) {
-    if (-not (Test-Path -LiteralPath $target)) {
-        continue
-    }
-
-    $item = Get-Item -LiteralPath $target
-    if ($item.PSIsContainer) {
-        $files = @(Get-ChildItem -LiteralPath $target -Recurse -File -Filter "*.xml")
-    } else {
-        $files = @($item)
-    }
-
-    foreach ($file in $files) {
-        $matches = @(Select-String -Path $file.FullName -Pattern $xmlPattern)
-        if ($matches.Count -eq 0) {
-            continue
-        }
-
-        if (-not $xmlHeaderAdded) {
-            $violations.Add("[XML inline scripts]")
-            $xmlHeaderAdded = $true
-        }
-        $relative = To-RepoRelativePath -Path $file.FullName
-        foreach ($m in $matches) {
-            $violations.Add("  ${relative}:$($m.LineNumber):$($m.Line.TrimEnd())")
-        }
+$xmlMatches = @(Get-KrtPatternMatches `
+    -RepoRoot $repoRoot `
+    -Pattern '<Scripts>|<On[A-Za-z]+>' `
+    -Path "!KRT/UI" `
+    -ExtraArgs @("--glob", "*.xml"))
+if ($xmlMatches.Count -gt 0) {
+    $violations.Add("[XML inline scripts]")
+    foreach ($line in $xmlMatches) {
+        $violations.Add("  $line")
     }
 }
 
@@ -87,4 +57,4 @@ Write-Host "UI binding checks passed." -ForegroundColor Green
 Write-Host "Checked:"
 Write-Host "  Binder files absent under !KRT/Modules/UI/Binder"
 Write-Host "  !KRT/!KRT.toc has no Modules\\UI\\Binder entries"
-Write-Host "  No <Scripts> / <On...> in !KRT/UI/*.xml and !KRT/Templates.xml"
+Write-Host "  No <Scripts> / <On...> in !KRT/UI/**/*.xml"
