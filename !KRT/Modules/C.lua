@@ -20,18 +20,6 @@ C.rollTypes                   = {
     HOLD       = 7,
 }
 
--- Roll Type Display Text
-C.lootTypesText               = {
-    [0] = L.BtnManual,
-    [1] = L.BtnMS,
-    [2] = L.BtnOS,
-    [3] = L.BtnSR,
-    [4] = L.BtnFree,
-    [5] = L.BtnBank,
-    [6] = L.BtnDisenchant,
-    [7] = L.BtnHold,
-}
-
 -- Roll Type Colored Display Text
 C.lootTypesColored            = {
     [0] = "|cffc0c0c0" .. L.BtnManual .. "|r",
@@ -98,6 +86,9 @@ C.UPDATE_INTERVAL_CHANGES     = 0.1
 C.UPDATE_INTERVAL_SPAMMER     = 0.1
 C.UPDATE_INTERVAL_LOGGER      = 0.1
 C.LOOT_COUNTER_TICK_INTERVAL  = 0.1
+
+-- Multi-award pacing (seconds) to avoid spamming GiveMasterLoot on laggy servers.
+C.ML_MULTI_AWARD_DELAY        = 0.2
 
 C.LOOT_COUNTER_ROW_HEIGHT     = 25
 C.RESERVES_ROW_HEIGHT         = 42

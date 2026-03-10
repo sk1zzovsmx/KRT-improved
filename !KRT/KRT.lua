@@ -20,7 +20,6 @@ _G["KRT"]              = addon
 
 local ITEM_LINK_PATTERN   = C.ITEM_LINK_PATTERN
 local rollTypes           = C.rollTypes
-local lootTypesText       = C.lootTypesText
 local lootTypesColored    = C.lootTypesColored
 local itemColors          = C.itemColors
 local RAID_TARGET_MARKERS = C.RAID_TARGET_MARKERS
@@ -132,7 +131,7 @@ do
             if type(fn) == "function" then
                 local ok, err = pcall(fn, obj, ...)
                 if not ok then
-                    addon:error("Event handler failed event=%s err=%s", tostring(e), tostring(err))
+                    addon:error(E.LogCoreEventHandlerFailed:format(tostring(e), tostring(err)))
                 end
             end
         end
@@ -1320,7 +1319,7 @@ do
         if #rolls == 0 then
             lootState.winner = nil
             lootState.rollWinner = nil
-            addon:debug("Rolls: sort no entries.")
+            addon:debug(E.LogRollsSortNoEntries)
             return
         end
 
@@ -1388,7 +1387,7 @@ do
         state.rolls[state.count] = entry
         -- Roll entries are released via resetRolls().
 
-        addon:debug("Rolls: add name=%s roll=%d item=%s.", name, roll, tostring(itemId))
+        addon:debug(E.LogRollsAddEntry:format(name, roll, tostring(itemId)))
         if itemId then
             local tracker = AcquireItemTracker(itemId)
             tracker[name] = (tracker[name] or 0) + 1
@@ -1447,14 +1446,14 @@ do
         state.playerCounts[itemId] = state.playerCounts[itemId] or 0
         if state.playerCounts[itemId] >= allowed then
             addon:info(L.ChatOnlyRollOnce)
-            addon:debug("Rolls: blocked player=%s (%d/%d).", name, state.playerCounts[itemId], allowed)
+            addon:debug(E.LogRollsBlockedPlayer:format(name, state.playerCounts[itemId], allowed))
             return
         end
 
         RandomRoll(1, 100)
         state.rolled = true
         state.playerCounts[itemId] = state.playerCounts[itemId] + 1
-        addon:debug("Rolls: player=%s item=%d.", name, itemId)
+        addon:debug(E.LogRollsPlayerRolled:format(name, itemId))
     end
 
     -- Returns the current roll session state.
@@ -1480,7 +1479,7 @@ do
             end
         end
 
-        addon:debug("Rolls: record=%s.", tostring(bool))
+        addon:debug(E.LogRollsRecordState:format(tostring(bool)))
     end
 
     -- Intercepts system messages to detect player rolls.
@@ -1494,13 +1493,13 @@ do
                 addon:Announce(L.ChatCountdownBlock)
                 state.warned = true
             end
-            addon:debug("Rolls: blocked countdown active.")
+            addon:debug(E.LogRollsCountdownBlocked)
             return
         end
 
         local itemId = self:GetCurrentRollItemID()
         if not itemId or lootState.lootCount == 0 then
-            addon:error("Item ID missing or loot table not ready - roll ignored.")
+            addon:error(E.LogRollsMissingItem)
             return
         end
 
@@ -1517,11 +1516,11 @@ do
                 Utils.whisper(player, L.ChatOnlyRollOnce)
                 tinsert(state.rerolled, player)
             end
-            addon:debug("Rolls: denied player=%s (%d/%d).", player, used, allowed)
+            addon:debug(E.LogRollsDeniedPlayer:format(player, used, allowed))
             return
         end
 
-        addon:debug("Rolls: accepted player=%s (%d/%d).", player, used + 1, allowed)
+        addon:debug(E.LogRollsAcceptedPlayer:format(player, used + 1, allowed))
         addRoll(player, roll, itemId)
     end
 
@@ -1553,11 +1552,30 @@ do
     -- Returns the highest roll value from the current winner.
     function module:HighestRoll()
         if not lootState.winner then return 0 end
+
+        local winner = lootState.winner
+        local wantLow = (addon.options.sortAscending == true)
+        local best = nil
+
+        -- Prefer rolls tied to the current session item when available.
+        local sessionItemId = self:GetCurrentRollItemID()
+
         for i = 1, state.count do
             local entry = state.rolls[i]
-            if entry.name == lootState.winner then return entry.roll end
+            if entry and entry.name == winner then
+                if (not sessionItemId) or (not entry.itemId) or (entry.itemId == sessionItemId) then
+                    if best == nil then
+                        best = entry.roll
+                    elseif wantLow then
+                        if entry.roll < best then best = entry.roll end
+                    else
+                        if entry.roll > best then best = entry.roll end
+                    end
+                end
+            end
         end
-        return 0
+
+        return best or 0
     end
 
     -- Clears all roll-related state and UI elements.
@@ -1582,7 +1600,7 @@ do
         local itemLink = item and item.itemLink
         if not itemLink then return nil end
         local itemId = Utils.getItemIdFromLink(itemLink)
-        addon:debug("Rolls: current itemId=%s.", tostring(itemId))
+        addon:debug(E.LogRollsCurrentItemId:format(tostring(itemId)))
         return itemId
     end
 
@@ -1628,10 +1646,51 @@ do
             sortRolls(itemId)
         end
 
-        -- top roll
-        local starTarget = lootState.rollWinner
+        -- Build a compact display list: one row per player.
+        -- If the player rolled multiple times (multi-reserve), keep only the best roll according to sort order.
+        local wantLow = wantAsc
+        local bestByName = {}
+        local display = {}
+        for i = 1, state.count do
+            local entry = state.rolls[i]
+            if entry then
+                local name, roll = entry.name, entry.roll
+                local best = bestByName[name]
+                if not best then
+                    best = { name = name, roll = roll }
+                    bestByName[name] = best
+                    display[#display + 1] = best
+                else
+                    if wantLow then
+                        if roll < best.roll then best.roll = roll end
+                    else
+                        if roll > best.roll then best.roll = roll end
+                    end
+                end
+            end
+        end
 
-        -- fallback (if for some reason it has not been set yet)
+        table.sort(display, function(a, b)
+            -- SR: reserved first (session itemId)
+            if isSR and itemId then
+                local ar = module:IsReserved(itemId, a.name)
+                local br = module:IsReserved(itemId, b.name)
+                if ar ~= br then
+                    return ar
+                end
+            end
+
+            if a.roll ~= b.roll then
+                return wantLow and (a.roll < b.roll) or (a.roll > b.roll)
+            end
+
+            return tostring(a.name) < tostring(b.name)
+        end)
+
+        -- Top roll for UI star (compact list).
+        local starTarget = display[1] and display[1].name or lootState.rollWinner
+
+        -- Fallback (if for some reason it has not been set yet)
         if not starTarget then
             if isSR then
                 local bestName = PickBestReserved(itemId)
@@ -1647,9 +1706,31 @@ do
         -- highlight: durante CD = top roll; post-CD = pick (se esiste) altrimenti top roll
         local highlightTarget = selectionAllowed and (pickName or starTarget) or starTarget
 
+        local starWinners
+        if not lootState.fromInventory then
+            local ma = lootState.multiAward
+            if ma and ma.active and ma.winners then
+                starWinners = {}
+                for i = 1, #ma.winners do
+                    local w = ma.winners[i]
+                    if w and w.name then starWinners[w.name] = true end
+                end
+            else
+                local n = tonumber(lootState.itemCount) or 1
+                if n and n > 1 then
+                    if n > #display then n = #display end
+                    starWinners = {}
+                    for i = 1, n do
+                        local e = display[i]
+                        if e and e.name then starWinners[e.name] = true end
+                    end
+                end
+            end
+        end
+
         local starShown, totalHeight = false, 0
-        for i = 1, state.count do
-            local entry = state.rolls[i]
+        for i = 1, #display do
+            local entry = display[i]
             local name, roll = entry.name, entry.roll
             local btnName = frameName .. "PlayerBtn" .. i
             local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTSelectPlayerTemplate")
@@ -1668,12 +1749,13 @@ do
                 btn.selectedBackground:Hide()
             end
 
-            local nameStr, rollStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"], _G[btnName .. "Star"]
+            local nameStr, rollStr, counterStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"],
+                _G[btnName .. "Counter"], _G[btnName .. "Star"]
 
             if nameStr and nameStr.SetVertexColor then
                 local class = addon.Raid:GetPlayerClass(name)
                 class = class and class:upper() or "UNKNOWN"
-                if isSR and self:IsReserved(itemId, name) then
+                if isSR and itemId and self:IsReserved(itemId, name) then
                     nameStr:SetVertexColor(0.4, 0.6, 1.0)
                 else
                     local r, g, b = Utils.getClassColor(class)
@@ -1695,18 +1777,35 @@ do
                 btn.selectedBackground:Hide()
             end
 
-            if isSR and self:IsReserved(itemId, name) then
-                local count = self:GetAllowedReserves(itemId, name)
-                local used = self:GetUsedReserveCount(itemId, name)
-                rollStr:SetText(count > 1 and format("%d (%d/%d)", roll, used, count) or tostring(roll))
-            else
-                rollStr:SetText(roll)
+            -- Roll value always in its own column
+            if rollStr then
+                rollStr:SetText(tostring(roll))
             end
 
-            -- Star always marks the top roll (rollWinner)
-            local showStar = (not starShown) and (starTarget ~= nil) and (name == starTarget)
+            -- SR roll counter: show only (used/allowed) on the single compact row
+            if counterStr then
+                if isSR and itemId and self:IsReserved(itemId, name) then
+                    local allowed = self:GetAllowedReserves(itemId, name)
+                    if allowed and allowed > 1 then
+                        local used = self:GetUsedReserveCount(itemId, name)
+                        counterStr:SetText(format("(%d/%d)", used or 0, allowed))
+                    else
+                        counterStr:SetText("")
+                    end
+                else
+                    counterStr:SetText("")
+                end
+            end
+
+            local showStar
+            if starWinners then
+                showStar = (starWinners[name] == true)
+            else
+                -- Default: star marks only the top roll (compact list)
+                showStar = (not starShown) and (starTarget ~= nil) and (name == starTarget)
+            end
             Utils.showHide(star, showStar)
-            if showStar then starShown = true end
+            if (not starWinners) and showStar then starShown = true end
 
             if not btn.krtHasOnClick then
                 btn:SetScript("OnClick", onRollButtonClick)
@@ -1716,6 +1815,15 @@ do
             btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
             btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
             totalHeight = totalHeight + btn:GetHeight()
+        end
+
+        -- Hide leftover buttons from previous renders.
+        local j = #display + 1
+        local btn = _G[frameName .. "PlayerBtn" .. j]
+        while btn do
+            btn:Hide()
+            j = j + 1
+            btn = _G[frameName .. "PlayerBtn" .. j]
         end
     end
 
@@ -1802,13 +1910,29 @@ do
         lootState.fromInventory = false
         self:ClearLoot()
 
+        local indexByItemKey = {}
         for i = 1, GetNumLootItems() do
             if LootSlotIsItem(i) then
                 local itemLink = GetLootSlotLink(i)
                 if itemLink then
                     local icon, name, quantity, quality = GetLootSlotInfo(i)
                     if GetItemFamily(itemLink) ~= 64 then
-                        self:AddItem(itemLink, quantity, name, quality, icon)
+                        local key = Utils.getItemStringFromLink(itemLink) or itemLink
+                        local existing = indexByItemKey[key]
+                        if existing then
+                            lootTable[existing].count = (lootTable[existing].count or 1) + 1
+                        else
+                            local before = lootState.lootCount
+                            -- In loot window we treat each slot as one awardable copy (even if quantity > 1).
+                            self:AddItem(itemLink, 1, name, quality, icon)
+                            if lootState.lootCount > before then
+                                indexByItemKey[key] = lootState.lootCount
+                                local it = lootTable[lootState.lootCount]
+                                if it then
+                                    it.itemKey = key
+                                end
+                            end
+                        end
                     end
                 end
             end
@@ -2077,6 +2201,11 @@ do
     end
 
     function module:ResetItemCount(focus)
+        -- During multi-award from loot window we keep ItemCount stable (target N) to avoid
+        -- mid-sequence clamping to the remaining copies.
+        if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
+            return
+        end
         SetItemCountValue(addon.Loot:GetCurrentItemCount(), focus)
     end
 
@@ -2131,6 +2260,7 @@ do
             addon.Rolls:FetchRolls()
         end)
     end
+
     local function UpdateMasterButtonsIfChanged(state)
         local buttons = lastUIState.buttons
         local texts = lastUIState.texts
@@ -2237,8 +2367,6 @@ do
         return false
     end
 
-
-
     -- ----- Public methods ----- --
 
     -- OnLoad frame:
@@ -2268,12 +2396,17 @@ do
     function module:BtnSelectItem(btn)
         if btn == nil or lootState.lootCount <= 0 then return end
         if countdownRun then return end
+        lootState.multiAward = nil
         if lootState.fromInventory == true then
             addon.Loot:ClearLoot()
             addon.Rolls:ClearRolls()
             addon.Rolls:RecordRolls(false)
             announced = false
             lootState.fromInventory = false
+            itemInfo.count = 0
+            itemInfo.isStack = nil
+            itemInfo.bagID = nil
+            itemInfo.slotID = nil
             if lootState.opened == true then addon.Loot:FetchLoot() end
         elseif selectionFrame then
             Utils.toggle(selectionFrame)
@@ -2291,7 +2424,10 @@ do
             for i = 1, lootState.lootCount do
                 local itemLink = GetItemLink(i)
                 if itemLink then
-                    addon:Announce(i .. ". " .. itemLink, "RAID")
+                    local item = GetItem(i)
+                    local count = item and item.count or 1
+                    local suffix = (count and count > 1) and (" x" .. count) or ""
+                    addon:Announce(i .. ". " .. itemLink .. suffix, "RAID")
                 end
             end
         end
@@ -2393,12 +2529,15 @@ do
     -- Button: Award/Trade
     function module:BtnAward(btn)
         if countdownRun then
-            addon:warn("Countdown ancora attivo: attendi la fine (0) prima di assegnare.")
+            addon:warn(E.LogMLCountdownActive)
+            return
+        end
+        if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
+            addon:warn(E.ErrMLMultiAwardInProgress)
             return
         end
         if lootState.lootCount <= 0 or lootState.rollsCount <= 0 then
-            addon:debug("Award: blocked lootCount=%d rollsCount=%d.", lootState.lootCount or 0,
-                lootState.rollsCount or 0)
+            addon:debug(E.LogMLAwardBlocked:format(lootState.lootCount or 0, lootState.rollsCount or 0))
             return
         end
         if not lootState.winner then
@@ -2412,11 +2551,95 @@ do
         local result
         if lootState.fromInventory == true then
             result = TradeItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
-        else
-            result = AssignItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
-            if result then
-                RegisterAwardedItem()
+            module:ResetItemCount()
+            return result
+        end
+
+        -- Loot window: support multi-award when ItemCount > 1 by consuming multiple identical copies
+        -- (same itemString) sequentially on LOOT_SLOT_CLEARED.
+        local target = tonumber(lootState.itemCount) or 1
+        if target < 1 then target = 1 end
+        local available = tonumber(addon.Loot:GetCurrentItemCount()) or 1
+        if available < 1 then available = 1 end
+        if target > available then target = available end
+        if lootState.rollsCount and target > lootState.rollsCount then
+            target = lootState.rollsCount
+        end
+        if target and target > 1 then
+            local rolls = addon.Rolls:GetRolls()
+            local winners = {}
+            for i = 1, target do
+                local r = rolls and rolls[i]
+                if r and r.name then
+                    winners[#winners + 1] = { name = r.name, roll = tonumber(r.roll) or 0 }
+                end
             end
+            if #winners <= 0 then
+                addon:warn(L.ErrNoWinnerSelected)
+                module:ResetItemCount()
+                return false
+            end
+
+            -- Stabilize target count for the whole sequence and reflect the clamp in the UI.
+            SetItemCountValue(#winners, false)
+
+            lootState.multiAward = {
+                active   = true,
+                itemLink = itemLink,
+                itemKey  = Utils.getItemStringFromLink(itemLink) or itemLink,
+                lastCount = available,
+                rollType = lootState.currentRollType,
+                winners  = winners,
+                pos      = 2, -- first award is immediate; the rest continues on LOOT_SLOT_CLEARED
+                total    = #winners,
+            }
+
+            lootState.multiAward.announceOnWin = addon.options.announceOnWin and true or false
+            lootState.multiAward.congratsSent = false
+
+            -- Suppress per-copy ChatAward spam during multi-award; announce once on completion.
+            announced = true
+            -- First award immediately.
+            lootState.winner = winners[1].name
+            result = AssignItem(itemLink, winners[1].name, lootState.currentRollType, winners[1].roll)
+            if result then
+                RegisterAwardedItem(1)
+                -- If this was the last copy for any reason, close the sequence now.
+                if lootState.multiAward and lootState.multiAward.pos > lootState.multiAward.total then
+                    local ma = lootState.multiAward
+                    if ma and ma.announceOnWin and not ma.congratsSent then
+                        local names = {}
+                        for i = 1, (ma.total or (ma.winners and #ma.winners) or 0) do
+                            local w = ma.winners and ma.winners[i]
+                            if w and w.name then names[#names + 1] = w.name end
+                        end
+                        if #names > 0 then
+                            if #names == 1 then
+                                addon:Announce(L.ChatAward:format(names[1], ma.itemLink))
+                            else
+                                addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), ma.itemLink))
+                            end
+
+                        end
+                        ma.congratsSent = true
+                    end
+                    lootState.multiAward = nil
+                    announced = false
+                    module:ResetItemCount()
+                end
+                return true
+            end
+
+            lootState.multiAward = nil
+            announced = false
+            module:ResetItemCount()
+            return false
+        end
+
+        -- Single award (existing behavior): uses the currently selected winner.
+        result = AssignItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
+        if result then
+            RegisterAwardedItem(1)
         end
         module:ResetItemCount()
         return result
@@ -2516,6 +2739,11 @@ do
     end
 
     local function UpdateItemCountFromBox(itemCountBox)
+        -- While a multi-award sequence is running from the loot window, ItemCount represents
+        -- the target number of copies to distribute (not the remaining copies). Ignore edits.
+        if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
+            return
+        end
         if not itemCountBox or not itemCountBox:IsVisible() then return end
         local rawCount = itemCountBox:GetText()
         if rawCount ~= lastUIState.itemCountText then
@@ -2526,7 +2754,7 @@ do
             local count = tonumber(rawCount)
             if count and count > 0 then
                 lootState.itemCount = count
-                if itemInfo.count and itemInfo.count ~= lootState.itemCount then
+                if lootState.fromInventory and itemInfo.count and itemInfo.count ~= lootState.itemCount then
                     if itemInfo.count < lootState.itemCount then
                         lootState.itemCount = itemInfo.count
                         itemCountBox:SetNumber(itemInfo.count)
@@ -2806,7 +3034,13 @@ do
             btn:Show()
             local itemName = GetItemName(i)
             local itemNameBtn = _G[btnName .. "Name"]
-            itemNameBtn:SetText(itemName)
+            local item = GetItem(i)
+            local count = item and item.count or 1
+            if count and count > 1 then
+                itemNameBtn:SetText(itemName .. " x" .. count)
+            else
+                itemNameBtn:SetText(itemName)
+            end
             local itemTexture = GetItemTexture(i)
             local itemTextureBtn = _G[btnName .. "Icon"]
             itemTextureBtn:SetTexture(itemTexture)
@@ -2824,7 +3058,8 @@ do
     -- ITEM_LOCKED: Triggered when an item is picked up from inventory.
     function module:ITEM_LOCKED(inBag, inSlot)
         if not inBag or not inSlot then return end
-        local itemTexture, count, locked, quality, _, _, itemLink = GetContainerItemInfo(inBag, inSlot)
+        local itemTexture, count = GetContainerItemInfo(inBag, inSlot)
+        local itemLink = GetContainerItemLink(inBag, inSlot)
         if not itemLink or not itemTexture then return end
         addon:trace(E.LogMLItemLocked:format(tostring(inBag), tostring(inSlot), tostring(itemLink),
             tostring(count), tostring(ItemIsSoulbound(inBag, inSlot))))
@@ -2877,6 +3112,8 @@ do
         if addon.Raid:IsMasterLooter() then
             addon:trace(E.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
             addon:trace(E.LogMLLootClosedCleanup)
+            lootState.multiAward = nil
+            announced = false
             -- Cancel any scheduled close timer and schedule a new one
             if lootState.closeTimer then
                 addon.CancelTimer(lootState.closeTimer)
@@ -2907,6 +3144,95 @@ do
                 addon:info(E.LogMLLootWindowEmptied)
             end
             module:ResetItemCount()
+
+            -- Continue a multi-award sequence (loot window only). We award one copy per LOOT_SLOT_CLEARED
+            -- with a small delay to stay in sync with server/loot window refresh (and avoid lag spikes).
+            local ma = lootState.multiAward
+            if ma and ma.active and not lootState.fromInventory then
+                -- Prevent double-scheduling if the loot window fires multiple clear events quickly.
+                if ma.scheduled then
+                    return
+                end
+                -- Gate: proceed only when the number of copies for this itemKey has decreased since last award.
+                local currentCount = 0
+                for i = 1, (lootState.lootCount or 0) do
+                    local it = lootTable and lootTable[i]
+                    if it and it.itemKey == ma.itemKey then
+                        currentCount = tonumber(it.count) or 1
+                        break
+                    end
+                end
+                if ma.lastCount and currentCount >= ma.lastCount then
+                    return
+                end
+                ma.lastCount = currentCount
+                local idx = tonumber(ma.pos) or 1
+                local entry = ma.winners and ma.winners[idx]
+                if not entry then
+                    lootState.multiAward = nil
+                    announced = false
+                    module:ResetItemCount()
+                    return
+                end
+
+                ma.scheduled = true
+                local delay = tonumber(C.ML_MULTI_AWARD_DELAY) or 0
+                if delay < 0 then delay = 0 end
+
+                addon.After(delay, function()
+                    local ma2 = lootState.multiAward
+                    if not (ma2 and ma2.active and ma2.scheduled and not lootState.fromInventory) then
+                        return
+                    end
+                    ma2.scheduled = false
+
+                    local idx2 = tonumber(ma2.pos) or 1
+                    local e2 = ma2.winners and ma2.winners[idx2]
+                    if not e2 then
+                        lootState.multiAward = nil
+                        announced = false
+                        module:ResetItemCount()
+                        return
+                    end
+
+                    -- Suppress per-copy ChatAward spam during multi-award; announce once on completion.
+                    announced = true
+                    lootState.winner = e2.name
+                    lootState.currentRollType = ma2.rollType
+
+                    local ok = AssignItem(ma2.itemLink, e2.name, ma2.rollType, e2.roll)
+                    if ok then
+                        RegisterAwardedItem(1)
+                        ma2.pos = idx2 + 1
+                        if ma2.pos > (ma2.total or #ma2.winners) then
+                            local ma = lootState.multiAward
+                            if ma and ma.announceOnWin and not ma.congratsSent then
+                                local names = {}
+                                for i = 1, (ma.total or (ma.winners and #ma.winners) or 0) do
+                                    local w = ma.winners and ma.winners[i]
+                                    if w and w.name then names[#names + 1] = w.name end
+                                end
+                                if #names > 0 then
+                                    if #names == 1 then
+                                        addon:Announce(L.ChatAward:format(names[1], ma.itemLink))
+                                    else
+                                        addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), ma.itemLink))
+                                    end
+
+                                end
+                                ma.congratsSent = true
+                            end
+                            lootState.multiAward = nil
+                            announced = false
+                            module:ResetItemCount()
+                        end
+                    else
+                        lootState.multiAward = nil
+                        announced = false
+                        module:ResetItemCount()
+                    end
+                end)
+            end
         end
     end
 
@@ -2927,7 +3253,7 @@ do
                             tostring(lootState.currentRollItem), tostring(GetItemLink())))
                     end
                 else
-                    addon:warn("Trade: currentRollItem missing; cannot update loot entry.")
+                    addon:warn(E.LogTradeCurrentRollItemMissing)
                 end
                 local done = RegisterAwardedItem()
                 ResetTradeState()
@@ -2953,11 +3279,19 @@ do
     -- Assigns an item from the loot window to a player.
     function AssignItem(itemLink, playerName, rollType, rollValue)
         local itemIndex, tempItemLink
+        local wantedKey = Utils.getItemStringFromLink(itemLink) or itemLink
         for i = 1, GetNumLootItems() do
             tempItemLink = GetLootSlotLink(i)
             if tempItemLink == itemLink then
                 itemIndex = i
                 break
+            end
+            if not itemIndex and wantedKey and tempItemLink then
+                local tempKey = Utils.getItemStringFromLink(tempItemLink) or tempItemLink
+                if tempKey == wantedKey then
+                    itemIndex = i
+                    break
+                end
             end
         end
         if itemIndex == nil then
@@ -3036,7 +3370,6 @@ do
         addon:info(E.LogTradeStart:format(tostring(itemLink), tostring(lootState.trader),
             tostring(playerName), tonumber(rollType) or -1, tonumber(rollValue) or 0,
             lootState.itemCount or 1))
-
 
         -- Prepare initial output and whisper:
         local output, whisper
@@ -3359,17 +3692,29 @@ do
 
     local playerTextTemp = {}
 
-    local function MarkPendingItem(itemId, hasName, hasIcon)
+    local function MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
         if not itemId then return nil end
         local pending = pendingItemInfo[itemId]
         if not pending then
             pending = {
                 nameReady = false,
-                iconReady = false
+                iconReady = false,
+                name = nil,
+                link = nil,
+                icon = nil,
             }
             pendingItemInfo[itemId] = pending
             pendingItemCount = pendingItemCount + 1
-            addon:debug("Reserves: track pending itemId=%d pending=%d.", itemId, pendingItemCount)
+            addon:debug(E.LogReservesTrackPending:format(itemId, pendingItemCount))
+        end
+        if type(name) == "string" and name ~= "" then
+            pending.name = name
+        end
+        if type(link) == "string" and link ~= "" then
+            pending.link = link
+        end
+        if type(icon) == "string" and icon ~= "" then
+            pending.icon = icon
         end
         if hasName then
             pending.nameReady = true
@@ -3380,15 +3725,20 @@ do
         return pending
     end
 
+    local function GetPendingItemInfo(pending)
+        if not pending then return nil end
+        return pending.name, pending.link, pending.icon
+    end
+
     local function CompletePendingItem(itemId)
         if not itemId or not pendingItemInfo[itemId] then return end
         pendingItemInfo[itemId] = nil
         if pendingItemCount > 0 then
             pendingItemCount = pendingItemCount - 1
         end
-        addon:debug("Reserves: item ready itemId=%d pending=%d.", itemId, pendingItemCount)
+        addon:debug(E.LogReservesItemReady:format(itemId, pendingItemCount))
         if pendingItemCount == 0 then
-            addon:debug("Reserves: pending item info complete.")
+            addon:debug(E.LogReservesPendingComplete)
             if reserveListFrame and reserveListFrame:IsShown() then
                 module:RefreshWindow()
             end
@@ -3645,8 +3995,7 @@ do
         local source = self and self._source
         if not source then return end
         collapsedBossGroups[source] = not collapsedBossGroups[source]
-        addon:debug("Reserves: toggle collapse source=%s state=%s.", source,
-            tostring(collapsedBossGroups[source]))
+        addon:debug(E.LogReservesToggleCollapse:format(source, tostring(collapsedBossGroups[source])))
         module:RefreshWindow()
     end
 
@@ -3660,14 +4009,14 @@ do
 
     function module:Save()
         RebuildIndex()
-        addon:debug("Reserves: save entries=%d.", addon.tLength(reservesData))
+        addon:debug(E.LogReservesSaveEntries:format(addon.tLength(reservesData)))
         local saved = {}
         addon.tCopy(saved, reservesData)
         KRT_SavedReserves = saved
     end
 
     function module:Load()
-        addon:debug("Reserves: load data=%s.", tostring(KRT_SavedReserves ~= nil))
+        addon:debug(E.LogReservesLoadData:format(tostring(KRT_SavedReserves ~= nil)))
         twipe(reservesData)
         if KRT_SavedReserves then
             addon.tCopy(reservesData, KRT_SavedReserves)
@@ -3676,7 +4025,7 @@ do
     end
 
     function module:ResetSaved()
-        addon:debug("Reserves: reset saved data.")
+        addon:debug(E.LogReservesResetSaved)
         KRT_SavedReserves = nil
         twipe(reservesData)
         twipe(reservesByItemID)
@@ -3701,24 +4050,24 @@ do
 
     function module:ShowWindow()
         if not reserveListFrame then
-            addon:error("Reserve List frame not available.")
+            addon:error(E.LogReservesFrameMissing)
             return
         end
-        addon:debug("Reserves: show list window.")
+        addon:debug(E.LogReservesShowWindow)
         reserveListFrame:Show()
         self:RefreshWindow()
     end
 
     function module:CloseWindow()
-        addon:debug("Reserves: hide list window.")
+        addon:debug(E.LogReservesHideWindow)
         if reserveListFrame then reserveListFrame:Hide() end
     end
 
     function module:ShowImportBox()
-        addon:debug("Reserves: open import window.")
+        addon:debug(E.LogReservesOpenImportWindow)
         local frame = _G["KRTImportWindow"]
         if not frame then
-            addon:error("KRTImportWindow not found.")
+            addon:error(E.LogReservesImportWindowMissing)
             return
         end
         frame:Show()
@@ -3745,7 +4094,7 @@ do
     end
 
     function module:OnLoad(frame)
-        addon:debug("Reserves: frame loaded.")
+        addon:debug(E.LogReservesFrameLoaded)
         reserveListFrame = frame
         frameName = frame:GetName()
 
@@ -3766,7 +4115,7 @@ do
             local btn = _G["KRTReserveListFrame" .. suff]
             if btn and self[method] then
                 btn:SetScript("OnClick", function() self[method](self) end)
-                addon:debug("Reserves: bind button=%s action=%s.", suff, method)
+                addon:debug(E.LogReservesBindButton:format(suff, method))
             end
         end
 
@@ -3775,30 +4124,52 @@ do
         local refreshFrame = CreateFrame("Frame")
         refreshFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
         refreshFrame:SetScript("OnEvent", function(_, _, itemId)
-            addon:debug("Reserves: item info received itemId=%d.", itemId)
-            if pendingItemInfo[itemId] then
-                local name, link, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
-                local icon = tex
-                if type(icon) ~= "string" or icon == "" then
-                    icon = GetItemIcon(itemId)
+            addon:debug(E.LogReservesItemInfoReceived:format(itemId))
+            local pending = pendingItemInfo[itemId]
+            if not pending then return end
+
+            local name, link, icon = GetPendingItemInfo(pending)
+            local hasName = type(name) == "string" and name ~= ""
+                and type(link) == "string" and link ~= ""
+            local hasIcon = type(icon) == "string" and icon ~= ""
+
+            if not hasName then
+                local fetchedName, fetchedLink, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
+                if type(fetchedName) == "string" and fetchedName ~= "" then
+                    name = fetchedName
                 end
-                local hasName = type(name) == "string" and name ~= ""
-                    and type(link) == "string" and link ~= ""
-                local hasIcon = type(icon) == "string" and icon ~= ""
-                if hasName then
-                    addon:debug("Reserves: update item data %s.", link)
-                    self:UpdateReserveItemData(itemId, name, link, icon)
-                else
-                    addon:debug("Reserves: item info missing itemId=%d.", itemId)
+                if type(fetchedLink) == "string" and fetchedLink ~= "" then
+                    link = fetchedLink
                 end
-                MarkPendingItem(itemId, hasName, hasIcon)
-                if hasName and hasIcon then
-                    addon:info(E.LogSRItemInfoResolved:format(itemId, tostring(link)))
-                    CompletePendingItem(itemId)
-                else
-                    addon:debug("Reserves: item info still pending itemId=%d.", itemId)
-                    self:QueryItemInfo(itemId)
+                if type(tex) == "string" and tex ~= "" then
+                    icon = icon or tex
                 end
+            end
+
+            if not hasIcon then
+                local fetchedIcon = GetItemIcon(itemId)
+                if type(fetchedIcon) == "string" and fetchedIcon ~= "" then
+                    icon = fetchedIcon
+                end
+            end
+
+            hasName = type(name) == "string" and name ~= ""
+                and type(link) == "string" and link ~= ""
+            hasIcon = type(icon) == "string" and icon ~= ""
+
+            if hasName then
+                addon:debug(E.LogReservesUpdateItemData:format(link))
+                self:UpdateReserveItemData(itemId, name, link, icon)
+            else
+                addon:debug(E.LogReservesItemInfoMissing:format(itemId))
+            end
+            MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
+            if hasName and hasIcon then
+                addon:info(E.LogSRItemInfoResolved:format(itemId, tostring(link)))
+                CompletePendingItem(itemId)
+            else
+                addon:debug(E.LogReservesItemInfoPending:format(itemId))
+                self:QueryItemInfo(itemId)
             end
         end)
     end
@@ -3807,12 +4178,12 @@ do
 
     function LocalizeUIFrame()
         if localized then
-            addon:debug("Reserves: UI already localized.")
+            addon:debug(E.LogReservesUIAlreadyLocalized)
             return
         end
         if frameName then
             Utils.setFrameTitle(frameName, L.StrRaidReserves)
-            addon:debug("Reserves: UI localized %s.", L.StrRaidReserves)
+            addon:debug(E.LogReservesUILocalized:format(L.StrRaidReserves))
         end
         localized = true
     end
@@ -3842,9 +4213,9 @@ do
 
         -- Log when the function is called and show the reserve for the player
         if reserve then
-            addon:debug("Reserves: player found %s data=%s.", playerName, tostring(reserve))
+            addon:debug(E.LogReservesPlayerFound:format(playerName, tostring(reserve)))
         else
-            addon:debug("Reserves: player not found %s.", playerName)
+            addon:debug(E.LogReservesPlayerNotFound:format(playerName))
         end
 
         return reserve
@@ -3852,18 +4223,18 @@ do
 
     -- Get all reserves:
     function module:GetAllReserves()
-        addon:debug("Reserves: fetch all players=%d.", addon.tLength(reservesData))
+        addon:debug(E.LogReservesFetchAll:format(addon.tLength(reservesData)))
         return reservesData
     end
 
     -- Parse imported text
     function module:ParseCSV(csv)
         if type(csv) ~= "string" or not csv:match("%S") then
-            addon:error("Import failed: empty or invalid data.")
+            addon:error(E.LogReservesImportFailedEmpty)
             return
         end
 
-        addon:debug("Reserves: parse CSV start.")
+        addon:debug(E.LogReservesParseStart)
         twipe(reservesData)
         twipe(reservesByItemID)
         reservesDirty = true
@@ -3931,7 +4302,7 @@ do
         end
 
         RebuildIndex()
-        addon:debug("Reserves: parse CSV complete players=%d.", addon.tLength(reservesData))
+        addon:debug(E.LogReservesParseComplete:format(addon.tLength(reservesData)))
         addon:info(E.LogSRImportComplete:format(addon.tLength(reservesData)))
         self:RefreshWindow()
         self:Save()
@@ -3941,21 +4312,42 @@ do
 
     function module:QueryItemInfo(itemId)
         if not itemId then return end
-        addon:debug("Reserves: query item info itemId=%d.", itemId)
-        local name, link, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
-        local icon = tex
-        if type(icon) ~= "string" or icon == "" then
-            icon = GetItemIcon(itemId)
-        end
+        addon:debug(E.LogReservesQueryItemInfo:format(itemId))
+        local pending = pendingItemInfo[itemId]
+        local name, link, icon = GetPendingItemInfo(pending)
         local hasName = type(name) == "string" and name ~= ""
             and type(link) == "string" and link ~= ""
         local hasIcon = type(icon) == "string" and icon ~= ""
+
+        if not hasName then
+            local fetchedName, fetchedLink, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
+            if type(fetchedName) == "string" and fetchedName ~= "" then
+                name = fetchedName
+            end
+            if type(fetchedLink) == "string" and fetchedLink ~= "" then
+                link = fetchedLink
+            end
+            if type(tex) == "string" and tex ~= "" then
+                icon = icon or tex
+            end
+        end
+
+        if not hasIcon then
+            local fetchedIcon = GetItemIcon(itemId)
+            if type(fetchedIcon) == "string" and fetchedIcon ~= "" then
+                icon = fetchedIcon
+            end
+        end
+
+        hasName = type(name) == "string" and name ~= ""
+            and type(link) == "string" and link ~= ""
+        hasIcon = type(icon) == "string" and icon ~= ""
         if hasName then
             self:UpdateReserveItemData(itemId, name, link, icon)
         end
-        MarkPendingItem(itemId, hasName, hasIcon)
+        MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
         if hasName and hasIcon then
-            addon:debug("Reserves: item info ready itemId=%d name=%s.", itemId, name)
+            addon:debug(E.LogReservesItemInfoReady:format(itemId, name))
             CompletePendingItem(itemId)
             return true
         end
@@ -3963,7 +4355,7 @@ do
         GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
         GameTooltip:SetHyperlink("item:" .. itemId)
         GameTooltip:Hide()
-        addon:debug("Reserves: item info pending itemId=%d.", itemId)
+        addon:debug(E.LogReservesItemInfoPendingQuery:format(itemId))
         return false
     end
 
@@ -3972,7 +4364,7 @@ do
         local seen = {}
         local count = 0
         local updated = false
-        addon:debug("Reserves: query missing items.")
+        addon:debug(E.LogReservesQueryMissingItems)
         for _, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
                 for _, r in ipairs(player.reserves) do
@@ -3998,7 +4390,7 @@ do
                 addon:info(L.MsgReserveItemsReady)
             end
         end
-        addon:debug("Reserves: missing items requested=%d.", count)
+        addon:debug(E.LogReservesMissingItems:format(count))
         addon:debug(E.LogSRQueryMissingItems:format(tostring(updated), count))
     end
 
@@ -4067,15 +4459,14 @@ do
         local normalized = Utils.normalizeLower(playerName, true)
         local entry = reservesData[normalized]
         if not entry then return 0 end
-        addon:debug("Reserves: check count itemId=%d player=%s.", itemId, playerName)
+        addon:debug(E.LogReservesCheckCount:format(itemId, playerName))
         for _, r in ipairs(entry.reserves or {}) do
             if r.rawID == itemId then
-                addon:debug("Reserves: found itemId=%d player=%s qty=%d.", itemId, playerName,
-                    r.quantity)
+                addon:debug(E.LogReservesFoundCount:format(itemId, playerName, r.quantity))
                 return r.quantity or 1
             end
         end
-        addon:debug("Reserves: none itemId=%d player=%s.", itemId, playerName)
+        addon:debug(E.LogReservesNoCount:format(itemId, playerName))
         return 0
     end
 
@@ -4220,10 +4611,10 @@ do
     end
 
     function module:FormatReservedPlayersLine(itemId)
-        addon:debug("Reserves: format players itemId=%d.", itemId)
+        addon:debug(E.LogReservesFormatPlayers:format(itemId))
         local list = self:GetPlayersForItem(itemId)
         -- Log the list of players found for the item
-        addon:debug("Reserves: players itemId=%d list=%s.", itemId, tconcat(list, ", "))
+        addon:debug(E.LogReservesPlayersList:format(itemId, tconcat(list, ", ")))
         return #list > 0 and tconcat(list, ", ") or ""
     end
 end
@@ -4939,13 +5330,13 @@ do
 
     -- Initialize changes table:
     function InitChangesTable()
-        addon:debug("Changes: init table.")
+        addon:debug(E.LogChangesInitTable)
         changesTable = KRT_CurrentRaid and KRT_Raids[KRT_CurrentRaid].changes or {}
     end
 
     -- Fetch All module:
     function FetchChanges()
-        addon:debug("Changes: fetch all.")
+        addon:debug(E.LogChangesFetchAll)
         if not KRT_CurrentRaid then return end
         local scrollFrame = _G[frameName .. "ScrollFrame"]
         local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
