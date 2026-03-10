@@ -4,6 +4,46 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Bugfix:** Raid session switching no longer drops the previous current raid when roster data is
+  temporarily unavailable (`GetNumRaidMembers()==0`); `Raid:Create(...)` now validates readiness
+  before ending the previous session.
+- **Behavior:** Added `UPDATE_INSTANCE_INFO` re-checks (plus `RequestRaidInfo()` on raid welcome)
+  to catch delayed server-side raid difficulty/instance state updates.
+- **Bugfix:** Raid session detection now self-heals on `RAID_ROSTER_UPDATE`: if no current raid
+  exists while grouped in a recognized raid instance, KRT runs a live `Raid:Check(...)` and creates
+  the session as soon as roster data is available.
+- **Bugfix:** Added `PLAYER_DIFFICULTY_CHANGED` handling in `KRT.lua` to re-run raid session checks
+  when raid difficulty changes or is adjusted by server fallback.
+- **Refactor:** Main WoW event handlers moved back to `KRT.lua`; `Features/SlashEvents.lua`
+  now contains slash-command routing only.
+- **Bugfix:** Raid enter checks now re-read live instance data with short staged retries
+  (0.3/0.8/1.5/2.5/3.5s) instead of relying on stale event payloads, so automatic unsupported-mode fallback
+  (for example Naxx 25H -> 25N) correctly triggers a new raid session without long waits.
+- **Bugfix:** Raid session auto-detection now correctly starts a new session on any raid difficulty
+  switch (10/25 and Normal/Heroic), using normalized live raid difficulty (dynamic + heroic mode).
+- **Refactor:** Fresh-SV canonical raid model finalized: `players[]` is canonical, `_playersByName`
+  is derived runtime-only, legacy `playersByName` cleanup paths were removed, and runtime raid caches
+  (`_playersByName`, `_playerIdxByNid`, `_bossIdxByNid`, `_lootIdxByNid`) are stripped on logout.
+- **Refactor:** Raid schema normalization now enforces stable/unique `playerNid` / `bossNid` /
+  `lootNid` and realigns `nextPlayerNid` / `nextBossNid` / `nextLootNid` to canonical data.
+- **Refactor:** Added canonical stable `raidNid` for raid records; Logger raid selection/delete
+  now resolves by `raidNid` instead of volatile array indices.
+- **Refactor:** Raid read APIs are now side-effect free (`GetPlayers`, `GetLoot`) and stable-ID based
+  (`GetPlayerID`, `GetPlayerName`).
+- **Refactor:** Logger attendee selection/filter/delete flows are now fully stable-ID based
+  (`playerNid`), with no fallback to volatile array indices in view-model IDs.
+- **Bugfix:** Logger NID index lookups now validate cached index targets and rebuild stale maps after
+  list mutations, preventing wrong-row resolutions.
+- **Behavior:** Loot Counter now reads canonical raid rows (unique by player name), preserving
+  historical `count` values when switching current raid.
+- **Refactor:** Loot Counter mutations (`+/-/reset`) now target canonical `playerNid`
+  (`Add/Get/SetPlayerCountByNid`) instead of volatile row/index assumptions.
+- **Behavior:** Raid roster sync now publishes incremental `RaidRosterDelta` payloads and
+  stabilizes transient unknown `raidN` slots with bounded retries to avoid false leave/join churn.
+- **Refactor:** Removed legacy internal `RaidRosterUpdate` callback emission; roster listeners now
+  consume `RaidRosterDelta` directly.
+- **Refactor:** `addon.Raid:GetUnitID()` now uses a live name<->unit cache from roster scans with
+  iterator fallback, reducing repeated full-group scans in Master Looter flows.
 - **Refactor:** Strict UI controller uniformization for `Changes`, `Reserves`, `ReservesImport`,
   and `Logger`: removed manual `Toggle/Hide` overrides and kept side effects in `hookOnShow/OnHide`.
 - **Refactor:** Standardized top-level feature frame getters for `Logger` and `LootCounter` to
@@ -95,7 +135,7 @@ Dates are in YYYY-MM-DD.
   after SoftRes import and list clear operations.
 - **Refactor:** Loot Counter and Reserve List windows now use only coalesced event-driven refresh
   (`RequestRefresh`) and no longer perform redundant immediate redraw calls.
-- **Behavior:** Loot Counter refresh is now driven by `RaidRosterUpdate` and
+- **Behavior:** Loot Counter refresh is now driven by `RaidRosterDelta` and
   `PlayerCountChanged`; removed in-refresh `UpdateRaidRoster()` calls to prevent loop spam.
 - **Behavior:** Removed standalone `/krtcounts`; Loot Counter is now toggled via `/krt counter`.
 

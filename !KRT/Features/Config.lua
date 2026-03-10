@@ -165,8 +165,8 @@ do
         end
 
         name = strsub(name, strlen(frameName) + 1)
-        Utils.triggerEvent("Config" .. name, value)
         Utils.setOption(name, value)
+        Utils.triggerEvent("Config" .. name, value)
 
         configDirty = true
         module:RequestRefresh()

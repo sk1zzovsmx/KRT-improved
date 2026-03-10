@@ -19,9 +19,6 @@ local RAID_TARGET_MARKERS = feature.RAID_TARGET_MARKERS
 local lootState = feature.lootState
 local itemInfo = feature.itemInfo
 
-local ItemExists, ItemIsSoulbound, GetItem
-local GetItemName, GetItemLink, GetItemTexture
-
 local _G = _G
 local tinsert, tconcat, twipe = table.insert, table.concat, table.wipe
 local pairs, select, next = pairs, select, next
@@ -32,32 +29,32 @@ local function GetLootModule()
     return addon.Loot
 end
 
-GetItem = function(i)
+local function GetItem(i)
     local loot = GetLootModule()
     return loot and loot.GetItem and loot.GetItem(i) or nil
 end
 
-GetItemName = function(i)
+local function GetItemName(i)
     local loot = GetLootModule()
     return loot and loot.GetItemName and loot.GetItemName(i) or nil
 end
 
-GetItemLink = function(i)
+local function GetItemLink(i)
     local loot = GetLootModule()
     return loot and loot.GetItemLink and loot.GetItemLink(i) or nil
 end
 
-GetItemTexture = function(i)
+local function GetItemTexture(i)
     local loot = GetLootModule()
     return loot and loot.GetItemTexture and loot.GetItemTexture(i) or nil
 end
 
-ItemExists = function(i)
+local function ItemExists(i)
     local loot = GetLootModule()
     return loot and loot.ItemExists and loot.ItemExists(i) or false
 end
 
-ItemIsSoulbound = function(bag, slot)
+local function ItemIsSoulbound(bag, slot)
     local loot = GetLootModule()
     return loot and loot.ItemIsSoulbound and loot.ItemIsSoulbound(bag, slot) or false
 end
@@ -1271,13 +1268,13 @@ do
 
     -- OnClick handler for dropdown menu items (consolidated from 3 similar branches).
     function module:OnClickDropDown(owner, value)
-        if not KRT_CurrentRaid then return end
+        if not addon.Core.getCurrentRaid() then return end
         UIDropDownMenu_SetText(owner, value)
         UIDropDownMenu_SetSelectedValue(owner, value)
 
         local field = FindDropDownField(owner:GetName())
         if field then
-            KRT_Raids[KRT_CurrentRaid][field.raidKey] = value
+            KRT_Raids[addon.Core.getCurrentRaid()][field.raidKey] = value
             lootState[field.stateKey] = value
         end
 
@@ -1290,17 +1287,17 @@ do
 
     -- Updates the text of the dropdowns to reflect the current selection (consolidated from 3 similar branches).
     function UpdateDropDowns(frame)
-        if not frame or not KRT_CurrentRaid then return end
+        if not frame or not addon.Core.getCurrentRaid() then return end
 
         local field = FindDropDownField(frame:GetName())
         if not field then return end
 
         -- Sync state from raid data
-        lootState[field.stateKey] = KRT_Raids[KRT_CurrentRaid][field.raidKey]
+        lootState[field.stateKey] = KRT_Raids[addon.Core.getCurrentRaid()][field.raidKey]
 
         -- Clear if unit is no longer in raid
         if lootState[field.stateKey] and addon.Raid:GetUnitID(lootState[field.stateKey]) == "none" then
-            KRT_Raids[KRT_CurrentRaid][field.raidKey] = nil
+            KRT_Raids[addon.Core.getCurrentRaid()][field.raidKey] = nil
             lootState[field.stateKey] = nil
         end
 
@@ -1571,10 +1568,10 @@ do
                     addon.Rolls:HighestRoll()))
                 if lootState.currentRollItem and lootState.currentRollItem > 0 then
                     local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.winner,
-                        lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT", KRT_CurrentRaid)
+                        lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT", addon.Core.getCurrentRaid())
 
                     if not ok then
-                        addon:error(Diag.E.LogTradeLoggerLogFailed:format(tostring(KRT_CurrentRaid),
+                        addon:error(Diag.E.LogTradeLoggerLogFailed:format(tostring(addon.Core.getCurrentRaid()),
                             tostring(lootState.currentRollItem), tostring(GetItemLink())))
                     end
                 else
@@ -1583,7 +1580,7 @@ do
 
                 -- LootCounter (MS only): trade awards don't emit LOOT_ITEM for the winner.
                 if tonumber(lootState.currentRollType) == rollTypes.MAINSPEC then
-                    addon.Raid:AddPlayerCount(lootState.winner, 1, KRT_CurrentRaid)
+                    addon.Raid:AddPlayerCount(lootState.winner, 1, addon.Core.getCurrentRaid())
                 end
 
                 local done = RegisterAwardedItem()
@@ -1829,9 +1826,9 @@ do
         if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE
             and playerName == lootState.trader then
             local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.trader, rollType, rollValue,
-                "TRADE_KEEP", KRT_CurrentRaid)
+                "TRADE_KEEP", addon.Core.getCurrentRaid())
             if not ok then
-                addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(KRT_CurrentRaid),
+                addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Core.getCurrentRaid()),
                     tostring(lootState.currentRollItem), tostring(itemLink)))
             end
         end
@@ -1871,7 +1868,7 @@ do
 
             -- LootCounter (MS only): award is immediate (no trade window completion event).
             if tonumber(rollType) == rollTypes.MAINSPEC then
-                addon.Raid:AddPlayerCount(playerName, 1, KRT_CurrentRaid)
+                addon.Raid:AddPlayerCount(playerName, 1, addon.Core.getCurrentRaid())
             end
 
             local done = RegisterAwardedItem(lootState.itemCount)
@@ -1900,7 +1897,7 @@ do
         end
     end)
 
-    Utils.registerCallback("RaidRosterUpdate", function()
+    Utils.registerCallback("RaidRosterDelta", function()
         cachedRosterVersion = nil
         InvalidateCandidateCache()
         dropDownDirty = true

@@ -21,6 +21,9 @@ Do NOT record:
 - temporary exceptions.
 
 Durable preferences learned from recent conversations:
+- Do not introduce Ace dependencies (Ace2/Ace3); prefer native KRT + LibCompat patterns.
+- Avoid runtime backward-compat shims when refactoring; target the fresh-SV model directly.
+- Prefer LuaRocks Lua Style Guide for formatting/layout when it does not conflict with KRT binding conventions.
 - Prefer PascalCase for addon module table names.
 - Prefer PascalCase for public exported methods on feature modules (`module:*`, `Store:*`, `View:*`, `Actions:*`,
   `Box:*`); keep WoW-required event names unchanged (UPPERCASE handlers).
@@ -35,6 +38,15 @@ Durable preferences learned from recent conversations:
 - For naming/API uniformization, choose the most repeated in-repo pattern and apply it consistently and robustly.
 - For XML and Lua analysis/reference, use Townlong-Yak FrameXML 3.3.5:
   `https://www.townlong-yak.com/framexml/3.3.5`.
+- Treat raid `players[].count` (LootCounter) as canonical persisted raid data; restoring/selecting an old current raid
+  must preserve and reuse historical counts.
+- Prefer a clean persisted raid schema: keep `players[]` as the canonical persisted player store; treat
+  `_playersByName` as a derived runtime index/cache.
+- Treat fresh SavedVariables as strict mode: avoid legacy/migration cleanups and avoid fallback to
+  volatile array indices when stable NIDs (`playerNid`, `bossNid`, `lootNid`) are available.
+- Keep `Features/SlashEvents.lua` focused on `/cmd` handling only.
+- Keep main WoW event handlers centralized in `KRT.lua`; modules should expose callable APIs used by those handlers.
+- Prefer storing runtime-only addon state under `addon.State` (or feature state tables) over global runtime vars.
 
 ---
 

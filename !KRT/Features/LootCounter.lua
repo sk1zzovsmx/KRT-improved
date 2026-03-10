@@ -18,8 +18,8 @@ local twipe = table.wipe
 
 local tostring = tostring
 
--- =========== Loot Counter Module  =========== --
--- Counter and display item distribution (MS wins).
+-- Loot counter module.
+-- Tracks and edits item distribution counts (MS wins).
 do
     addon.LootCounter = addon.LootCounter or {}
     local module = addon.LootCounter
@@ -27,7 +27,6 @@ do
     -- ----- Internal state ----- --
     local frameName
     local rows, raidPlayers = {}, {}
-    local twipe = twipe
     local scrollFrame, scrollChild, header
     local getFrame = makeModuleFrameGetter(module, "KRTLootCounterFrame")
 
@@ -42,7 +41,7 @@ do
     local COUNT_COL_W = 40
 
     -- ----- Private helpers ----- --
-    local function EnsureFrames()
+    local function ensureFrames()
         local frame = getFrame()
         if not frame then
             return false
@@ -66,7 +65,7 @@ do
         return true
     end
 
-    local function EnsureHeader()
+    local function ensureHeader()
         if header or not scrollChild then return end
 
         header = CreateFrame("Frame", nil, scrollChild)
@@ -97,23 +96,15 @@ do
         header.name:SetTextColor(0.5, 0.5, 0.5)
     end
 
-    local function GetCurrentRaidPlayers()
+    local function getCurrentRaidPlayers()
         twipe(raidPlayers)
-        if not addon.IsInGroup() then
+        if not addon.Core.getCurrentRaid() then
             return raidPlayers
         end
-
-        for unit in addon.UnitIterator(true) do
-            local name = UnitName(unit)
-            if name and name ~= "" then
-                raidPlayers[#raidPlayers + 1] = name
-            end
-        end
-        table.sort(raidPlayers)
-        return raidPlayers
+        return addon.Raid:GetLootCounterRows(addon.Core.getCurrentRaid(), raidPlayers)
     end
 
-    local function EnsureRow(i, rowHeight)
+    local function ensureRow(i, rowHeight)
         local row = rows[i]
         if not row then
             row = CreateFrame("Frame", nil, scrollChild)
@@ -134,7 +125,7 @@ do
             row.name:SetPoint("RIGHT", row.count, "LEFT", -COL_GAP, 0)
             row.name:SetJustifyH("LEFT")
 
-            local function SetupTooltip(btn, text)
+            local function setupTooltip(btn, text)
                 if not text or text == "" then return end
                 btn:HookScript("OnEnter", function(self)
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -146,40 +137,40 @@ do
                 end)
             end
 
-            local function MakeBtn(label, tip)
+            local function makeBtn(label, tip)
                 local b = CreateFrame("Button", nil, row.actions, "KRTButtonTemplate")
                 b:SetSize(BTN_W, BTN_H)
                 b:SetText(label)
-                SetupTooltip(b, tip)
+                setupTooltip(b, tip)
                 return b
             end
 
-            row.reset = MakeBtn("R", L.TipLootCounterReset)
-            row.minus = MakeBtn("-", L.TipLootCounterMinus)
-            row.plus  = MakeBtn("+", L.TipLootCounterPlus)
+            row.reset = makeBtn("R", L.TipLootCounterReset)
+            row.minus = makeBtn("-", L.TipLootCounterMinus)
+            row.plus  = makeBtn("+", L.TipLootCounterPlus)
 
             row.reset:SetPoint("RIGHT", row.actions, "RIGHT", 0, 0)
             row.minus:SetPoint("RIGHT", row.reset, "LEFT", -BTN_GAP, 0)
             row.plus:SetPoint("RIGHT", row.minus, "LEFT", -BTN_GAP, 0)
 
             row.plus:SetScript("OnClick", function()
-                local n = row._playerName
-                if n then
-                    addon.Raid:AddPlayerCount(n, 1, KRT_CurrentRaid)
+                local playerNid = row._playerNid
+                if playerNid then
+                    addon.Raid:AddPlayerCountByNid(playerNid, 1, addon.Core.getCurrentRaid())
                     module:RequestRefresh()
                 end
             end)
             row.minus:SetScript("OnClick", function()
-                local n = row._playerName
-                if n then
-                    addon.Raid:AddPlayerCount(n, -1, KRT_CurrentRaid)
+                local playerNid = row._playerNid
+                if playerNid then
+                    addon.Raid:AddPlayerCountByNid(playerNid, -1, addon.Core.getCurrentRaid())
                     module:RequestRefresh()
                 end
             end)
             row.reset:SetScript("OnClick", function()
-                local n = row._playerName
-                if n then
-                    addon.Raid:SetPlayerCount(n, 0, KRT_CurrentRaid)
+                local playerNid = row._playerNid
+                if playerNid then
+                    addon.Raid:SetPlayerCountByNid(playerNid, 0, addon.Core.getCurrentRaid())
                     module:RequestRefresh()
                 end
             end)
@@ -193,17 +184,17 @@ do
     function module:OnLoad(frame)
         local f = frame or getFrame()
         frameName = Utils.initModuleFrame(module, f, { enableDrag = true }) or frameName
-        if not EnsureFrames() then return end
+        if not ensureFrames() then return end
     end
 
     function module:Refresh()
-        if not EnsureFrames() then return end
+        if not ensureFrames() then return end
         local frame = getFrame()
         if not frame or not scrollFrame or not scrollChild then return end
 
-        EnsureHeader()
+        ensureHeader()
 
-        local players = GetCurrentRaidPlayers()
+        local players = getCurrentRaidPlayers()
         local numPlayers = #players
         local rowHeight = C.LOOT_COUNTER_ROW_HEIGHT
 
@@ -227,41 +218,32 @@ do
         if header then header:Show() end
 
         for i = 1, numPlayers do
-            local name = players[i]
+            local data = players[i]
+            local name = data and data.name
+            local playerNid = data and tonumber(data.playerNid)
 
-            -- Defensive: ensure the player exists in the active raid log.
-            if addon.Raid:GetPlayerID(name, KRT_CurrentRaid) == 0 then
-                addon.Raid:AddPlayer({
-                    name     = name,
-                    rank     = 0,
-                    subgroup = 1,
-                    class    = "UNKNOWN",
-                    join     = Utils.getCurrentTime(),
-                    leave    = nil,
-                    count    = 0,
-                }, KRT_CurrentRaid)
-            end
-
-            local row = EnsureRow(i, rowHeight)
+            local row = ensureRow(i, rowHeight)
             row:ClearAllPoints()
             local y = -(HEADER_HEIGHT + (i - 1) * rowHeight)
             row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, y)
             row:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, y)
-            row._playerName = name
+            row._playerNid = playerNid
 
             if row._lastName ~= name then
                 row.name:SetText(name)
                 row._lastName = name
             end
 
-            local class = addon.Raid:GetPlayerClass(name)
+            local class = data and data.class or addon.Raid:GetPlayerClass(name)
             if row._lastClass ~= class then
                 local r, g, b = Utils.getClassColor(class)
                 row.name:SetTextColor(r, g, b)
                 row._lastClass = class
             end
 
-            local cnt = addon.Raid:GetPlayerCount(name, KRT_CurrentRaid) or 0
+            local cnt = (data and tonumber(data.count))
+                or (playerNid and addon.Raid:GetPlayerCountByNid(playerNid, addon.Core.getCurrentRaid()))
+                or 0
             if row._lastCount ~= cnt then
                 row.count:SetText(tostring(cnt))
                 row._lastCount = cnt
@@ -274,7 +256,7 @@ do
         end
     end
 
-    -- ----- UI Window Management ----- --
+    -- UI window management.
 
     -- Initialize UI controller for Toggle/Hide.
     Utils.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
@@ -283,7 +265,7 @@ do
     })
 
     -- Add a button to the master loot frame to open the loot counter UI.
-    local function SetupMasterLootFrameHooks()
+    local function setupMasterLootFrameHooks()
         local f = _G["KRTMasterLootFrame"]
         if f and not f.KRT_LootCounterBtn then
             local btn = CreateFrame("Button", nil, f, "KRTButtonTemplate")
@@ -300,19 +282,19 @@ do
             end)
         end
     end
-    hooksecurefunc(addon.Master, "OnLoad", SetupMasterLootFrameHooks)
+    hooksecurefunc(addon.Master, "OnLoad", setupMasterLootFrameHooks)
 
-    local function Request()
+    local function requestRefresh()
         -- Coalesced, event-driven refresh (safe even if frame is hidden/not yet created).
         module:RequestRefresh()
     end
 
     -- Refresh on roster updates (to keep list aligned).
-    Utils.registerCallback("RaidRosterUpdate", Request)
+    Utils.registerCallback("RaidRosterDelta", requestRefresh)
 
     -- Refresh when counts actually change (MS loot award or manual +/-/reset).
-    Utils.registerCallback("PlayerCountChanged", Request)
+    Utils.registerCallback("PlayerCountChanged", requestRefresh)
 
     -- New raid session: reset view.
-    Utils.registerCallback("RaidCreate", Request)
+    Utils.registerCallback("RaidCreate", requestRefresh)
 end
