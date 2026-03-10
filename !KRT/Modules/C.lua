@@ -1,8 +1,14 @@
-local addonName, addon        = ...
-addon.C                       = addon.C or {}
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 
-local C                       = addon.C
-local L                       = addon.L
+local addon = select(2, ...)
+local feature = addon.Core.getFeatureShared()
+
+local C = feature.C
+local L = feature.L
 
 C.ITEM_LINK_PATTERN           =
     "|?c?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?" ..

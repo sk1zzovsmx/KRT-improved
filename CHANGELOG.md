@@ -4,11 +4,34 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Added `Modules/Features.lua` with widget feature profiles (`full`/`core`) and
+  `addon.Features` runtime flags (`Config`, `LootCounter`, `Reserves`).
+- **Behavior:** `Modules/UIFacade.lua` is now feature-aware (`IsEnabled`, `IsRegistered`) and
+  keeps widget calls/registers as no-op when a widget feature is disabled.
+- **Behavior:** `Modules/UIBinder.lua` now skips widget script binding when widget APIs are not
+  registered (or feature-disabled), and `KRTMasterConfigBtn` routes through `KRT.UI:Call(...)`.
+- **Refactor:** Split UI include manifests into `KRT.Core.xml` and `KRT.Full.xml`
+  (default `KRT.xml` now includes `KRT.Full.xml`) to support core/full build profiles.
+- **Behavior:** Added baseline options bootstrap in `Modules/Utils.Options.lua`
+  (`addon.LoadOptions` fallback) so core boot does not depend on `Widgets/Config.lua`.
+- **Refactor:** `Modules/UIBinder.lua` no longer uses `loadstring` for UI script binding.
+  Binder handlers are now parsed into direct Lua functions and normalized up front.
+- **Refactor:** Added centralized event registry in `Modules/Events.lua` for internal bus event names
+  and wow-forwarded events (`wow.*`), and migrated core call sites to use `addon.Events`.
+- **Refactor:** Split `Modules/Utils.lua` into themed modules:
+  `Modules/Utils.LegacyGlobals.lua`, `Modules/Utils.Options.lua`, `Modules/Utils.RaidState.lua`,
+  `Modules/Utils.EventBusCompat.lua`, `Modules/Utils.Tooltip.lua`, and `Modules/Utils.UI.lua`.
+  `Utils.lua` now acts as a compatibility facade/aggregator.
+- **Behavior:** Added legacy alias lockdown in `Core/Init.lua`. Legacy reads like `addon.Raid`/
+  `addon.Logger` now resolve through namespaced targets (`addon.Services.*` / `addon.Controllers.*` /
+  `addon.Widgets.*`) and emit a debug-mode warning once per alias+callsite to prevent new regressions.
+- **Docs:** Import window ownership is documented as `addon.ReservesUI.Import`.
+  Legacy `ReservesImport` module was removed and XML now points to the Reserves Import widget.
 - **UI:** Logger item context menu now opens a standard `StaticPopup` window with an
   inserted custom button row for direct roll-type selection (`MS/OS/SR/Free/Bank/DE/Hold`)
   plus standard `Cancel`.
 - **Refactor:** Logger roll-type picker row was moved from runtime `CreateFrame(...)` construction
-  to `UI/Logger.xml`, while keeping popup behavior/layout wiring in `Features/Logger.lua`.
+  to `UI/Logger.xml`, while keeping popup behavior/layout wiring in `Controllers/Logger.lua`.
 - **Bugfix:** Logger roll-type inserted button row is now explicitly attached/anchored to the
   popup on show, preventing hidden or behind-popup button rendering.
 - **UI:** Logger roll-type popup layout was polished: improved vertical spacing and centered
@@ -26,7 +49,7 @@ Dates are in YYYY-MM-DD.
   title/row/cancel vertical rhythm while keeping all controls inside the popup bounds.
 - **Bugfix:** Logger UI now refreshes immediately after incoming Sync snapshots (`req`, `push`, `sync`),
   including the Raids list update without requiring manual reopen or reselection.
-- **Behavior:** Added Logger Sync feature (`Features/Syncer.lua`) using addon-message request/response
+- **Behavior:** Added Logger Sync feature (`Services/Syncer.lua`) using addon-message request/response
   chunking with three commands:
   `/krt logger req <raidId|raidNid> <player>` requests a specific raid snapshot from one target player
   and imports it as a new raid, `/krt logger push <raidId|raidNid> <player>` pushes a selected raid
@@ -35,7 +58,7 @@ Dates are in YYYY-MM-DD.
 - **Behavior:** `req/push` now require an explicit raid reference and no longer fallback to selected/current
   raid; current-raid flows should use `/krt logger sync`.
 - **Behavior:** Main event wiring now handles `CHAT_MSG_ADDON` in `KRT.lua` and forwards Sync protocol
-  traffic to `addon.Syncer`, keeping slash handling isolated in `Features/SlashEvents.lua`.
+  traffic to `addon.Syncer`, keeping slash handling isolated in `EntryPoints/SlashEvents.lua`.
 - **Behavior:** Logger Loot sorting is now deterministic across all sortable headers; when primary values
   are equal, ordering falls back to loot name, then item ID, then loot NID to prevent random reshuffles.
 - **Behavior:** Logger Loot `Item` header sorting now uses the displayed loot name text
@@ -54,7 +77,7 @@ Dates are in YYYY-MM-DD.
   the session as soon as roster data is available.
 - **Bugfix:** Added `PLAYER_DIFFICULTY_CHANGED` handling in `KRT.lua` to re-run raid session checks
   when raid difficulty changes or is adjusted by server fallback.
-- **Refactor:** Main WoW event handlers moved back to `KRT.lua`; `Features/SlashEvents.lua`
+- **Refactor:** Main WoW event handlers moved back to `KRT.lua`; `EntryPoints/SlashEvents.lua`
   now contains slash-command routing only.
 - **Bugfix:** Raid enter checks now re-read live instance data with short staged retries
   (0.3/0.8/1.5/2.5/3.5s) instead of relying on stale event payloads, so automatic unsupported-mode fallback
@@ -84,7 +107,7 @@ Dates are in YYYY-MM-DD.
   consume `RaidRosterDelta` directly.
 - **Refactor:** `addon.Raid:GetUnitID()` now uses a live name<->unit cache from roster scans with
   iterator fallback, reducing repeated full-group scans in Master Looter flows.
-- **Refactor:** Strict UI controller uniformization for `Changes`, `Reserves`, `ReservesImport`,
+- **Refactor:** Strict UI controller uniformization for `Changes`, `Reserves`, and Reserves Import widget,
   and `Logger`: removed manual `Toggle/Hide` overrides and kept side effects in `hookOnShow/OnHide`.
 - **Refactor:** Standardized top-level feature frame getters for `Logger` and `LootCounter` to
   `makeModuleFrameGetter(...)` (module-cached + global fallback pattern).
@@ -95,25 +118,25 @@ Dates are in YYYY-MM-DD.
   the Warnings-only `Update()` public method in favor of the common `RequestRefresh()` path.
 - **Bugfix:** `/krt minimap on|off` now writes `minimapButton` via `Utils.setOption(...)`, keeping
   runtime options (`addon.options`) and SavedVariables (`KRT_Options`) synchronized.
-- **Localization:** Removed hardcoded fallback texts in `ReservesImport` popup/status paths and now
+- **Localization:** Removed hardcoded fallback texts in Reserves Import widget popup/status paths and now
   always source those messages from `addon.L`.
 - **Localization:** LFM preview output in `Spammer` now uses localized role labels and localized
   `Need` token (`L.StrSpammerNeedStr`).
-- **Refactor:** Standardized `Features/*.lua` top-level module scaffolding around canonical section headers
+- **Refactor:** Standardized runtime module file scaffolding around canonical section headers
   (`Internal state`, `Private helpers`, `Public methods`) and kept public module APIs in PascalCase
   (no mass rename/breaking API changes).
 - **Refactor:** Added `Utils.setOption(key, value)` and migrated option writes in
-  `Config`, `Minimap`, `Reserves`, and `ReservesImport` to keep runtime options and SV in sync centrally.
+  `Config`, `Minimap`, `Reserves`, and Reserves Import widget to keep runtime options and SV in sync centrally.
 - **Refactor:** Added shared UI bootstrap helpers `Utils.initModuleFrame(...)` and
-  `Utils.bootstrapModuleUi(...)`; migrated `Config`, `Warnings`, `Changes`, `Spammer`, `ReservesImport`,
+  `Utils.bootstrapModuleUi(...)`; migrated `Config`, `Warnings`, `Changes`, `Spammer`, Reserves Import widget,
   `Logger`, `Master`, `LootCounter`, and `Reserves` to reduce repeated OnLoad/controller wiring without
   behavior changes; same pattern also applied to Logger internal popups (`BossBox`, `AttendeesBox`).
 - **Refactor:** Removed feature bootstrap migration fallbacks and standardized all
-  `Features/*.lua` modules on direct `addon.Core.getFeatureShared()` usage.
+  runtime module files on direct `addon.Core.getFeatureShared()` usage.
 - **Refactor:** Removed deprecated placeholder files `Features/CoreGameplay.lua` and
   `Features/LootStack.lua` (both were not loaded by TOC).
 - **Refactor:** Renamed feature file paths `Features/ReserveImport.lua` -> `Features/ReservesImport.lua`
-  and `UI/ReserveImport.xml` -> `UI/ReservesImport.xml`; runtime module is now `addon.ReservesImport`.
+  and `UI/ReserveImport.xml` -> `UI/ReservesImport.xml`; import owner is now `addon.ReservesUI.Import`.
 - **Behavior:** Simplified account SavedVariables to feature-scoped keys:
   `KRT_Raids`, `KRT_Players`, `KRT_Reserves`, `KRT_Warnings`, `KRT_Spammer`, and `KRT_Options`.
   Runtime session keys (`KRT_CurrentRaid`, `KRT_LastBoss`, `KRT_NextReset`) are no longer persisted.

@@ -27,9 +27,7 @@
 				</Anchors>
 			</ScrollFrame>
 		</Frames>
-		<Scripts>
-			<OnLoad>KRT.LootCounter:OnLoad(self)</OnLoad>
-		</Scripts>
-	</Frame>
+</Frame>
 	<!-- ====== End of Loot Counter Frame ====== -->
 </Ui>
+

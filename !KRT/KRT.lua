@@ -1,20 +1,22 @@
---[[
-    KRT.lua
-]]
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 
-local addonName, addon = ...
-addon = addon or {}
-addon.name = addon.name or addonName
-addon.L = addon.L or {}
-addon.Diagnose = addon.Diagnose or {}
+local addon = select(2, ...)
+local feature = addon.Core.getFeatureShared()
 
-local Diagnose = addon.Diagnose
-local Diag = setmetatable({}, {
-    __index = Diagnose,
-})
-local Utils = addon.Utils
-local C = addon.C
-local L = addon.L
+local addonName = addon.name
+
+local L = feature.L
+local Diag = feature.Diag
+local Utils = feature.Utils
+local Events = feature.Events or addon.Events or {}
+local C = feature.C
+
+local InternalEvents = Events.Internal
+local WowEvents = Events.Wow
 
 local _G = _G
 local tremove = table.remove
@@ -246,7 +248,6 @@ end
 -- =========== Core Addon Frames & Locals  =========== --
 
 -- Centralized addon state
-addon.State = addon.State or {}
 local coreState = addon.State
 if coreState.nextReset == nil then
     coreState.nextReset = 0
@@ -259,7 +260,6 @@ frames.main = frames.main or CreateFrame("Frame")
 -- Addon UI frame used by event dispatcher
 local mainFrame = frames.main
 
-addon.Core = addon.Core or {}
 local Core = addon.Core
 
 local RAID_SCHEMA_VERSION = 1
@@ -380,12 +380,6 @@ do
 
     -- bootstrap
     addon:RegisterEvent("ADDON_LOADED")
-end
-
--- Alias: redirect to Utils for backwards compatibility
--- (function moved to Utils.lua; this wrapper allows existing code to use addon:makeUIFrameController(...))
-function addon:makeUIFrameController(getFrame, requestRefreshFn)
-    return Utils.makeUIFrameController(getFrame, requestRefreshFn)
 end
 
 local function bindModuleRequestRefresh(module, getFrame)
@@ -711,116 +705,6 @@ function Core.stripRuntimeRaidCaches(raid)
     raid._lootIdxByNid = nil
 end
 
--- Shared feature header context for extracted runtime modules.
-local function ensureLootRuntimeState()
-    addon.State = addon.State or {}
-    local state = addon.State
-    state.loot = state.loot or {}
-
-    local lootState = state.loot
-    lootState.itemInfo = lootState.itemInfo or {}
-    lootState.currentRollType = lootState.currentRollType or 4
-    lootState.currentRollItem = lootState.currentRollItem or 0
-    lootState.currentItemIndex = lootState.currentItemIndex or 0
-    lootState.itemCount = lootState.itemCount or 1
-    lootState.lootCount = lootState.lootCount or 0
-    lootState.rollsCount = lootState.rollsCount or 0
-    lootState.itemTraded = lootState.itemTraded or 0
-    lootState.rollStarted = lootState.rollStarted or false
-    if lootState.opened == nil then lootState.opened = false end
-    if lootState.fromInventory == nil then lootState.fromInventory = false end
-    lootState.pendingAwards = lootState.pendingAwards or {}
-
-    return state, lootState, lootState.itemInfo
-end
-
-local function getCurrentItemIndex()
-    local _, lootState = ensureLootRuntimeState()
-    return lootState.currentItemIndex
-end
-
-function Core.getFeatureShared()
-    local constants = C or addon.C or {}
-    local state, lootState, itemInfo = ensureLootRuntimeState()
-
-    return {
-        L = addon.L,
-        Diag = Diag,
-        Utils = Utils,
-        C = constants,
-        Core = Core,
-
-        bindModuleRequestRefresh = bindModuleRequestRefresh,
-        bindModuleToggleHide = bindModuleToggleHide,
-        makeModuleFrameGetter = makeModuleFrameGetter,
-
-        UnitIsGroupLeader = addon.UnitIsGroupLeader,
-        UnitIsGroupAssistant = addon.UnitIsGroupAssistant,
-        tContains = _G.tContains,
-
-        ITEM_LINK_PATTERN = constants.ITEM_LINK_PATTERN,
-        rollTypes = constants.rollTypes,
-        lootTypesColored = constants.lootTypesColored,
-        itemColors = constants.itemColors,
-        RAID_TARGET_MARKERS = constants.RAID_TARGET_MARKERS,
-        K_COLOR = constants.K_COLOR,
-        RT_COLOR = constants.RT_COLOR,
-
-        coreState = state,
-        lootState = lootState,
-        itemInfo = itemInfo,
-        GetItemIndex = getCurrentItemIndex,
-    }
-end
-
--- =========== Raid Helpers Module  =========== --
--- [MIGRATED] See Features/Raid.lua
-
--- =========== Chat Output Helpers  =========== --
--- [MIGRATED] See Features/Chat.lua
-
--- =========== Minimap Button Module  =========== --
--- [MIGRATED] See Features/Minimap.lua
-
--- =========== Rolls Helpers Module  =========== --
--- [MIGRATED] See Features/Rolls.lua
-
--- =========== Loot Helpers Module  =========== --
--- [MIGRATED] See Features/Loot.lua
-
--- =========== Master Looter Frame Module  =========== --
--- [MIGRATED] See Features/Master.lua
-
--- =========== Loot Counter Module  =========== --
--- [MIGRATED] See Features/LootCounter.lua
-
--- =========== Reserves Module  =========== --
--- [MIGRATED] See Features/Reserves.lua
-
--- =========== Reserve Import Window Module  =========== --
--- [MIGRATED] See Features/ReservesImport.lua
-
--- =========== Configuration Frame Module  =========== --
--- [MIGRATED] See Features/Config.lua
-
--- =========== Warnings Frame Module  =========== --
--- [MIGRATED] See Features/Warnings.lua
-
--- =========== MS Changes Module  =========== --
--- [MIGRATED] See Features/Changes.lua
-
--- =========== LFM Spam Module  =========== --
--- [MIGRATED] See Features/Spammer.lua
-
--- =========== Logger Frame =========== --
--- [MIGRATED] See Features/Logger.lua
-
--- =========== Syncer Module  =========== --
--- [MIGRATED] See Features/Syncer.lua
-
--- =========== Slash Commands  =========== --
--- [MIGRATED] See Features/SlashEvents.lua
-
 -- =========== Main Event Handlers  =========== --
 local addonEvents = {
     CHAT_MSG_SYSTEM = "CHAT_MSG_SYSTEM",
@@ -843,18 +727,19 @@ local addonEvents = {
 }
 
 do
-    local forward = {
-        LOOT_OPENED = "LOOT_OPENED",
-        LOOT_CLOSED = "LOOT_CLOSED",
-        LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
-        TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
-        TRADE_REQUEST_CANCEL = "TRADE_REQUEST_CANCEL",
-        TRADE_CLOSED = "TRADE_CLOSED",
+    local wowBusEvents = {
+        LOOT_OPENED = WowEvents.LOOT_OPENED,
+        LOOT_CLOSED = WowEvents.LOOT_CLOSED,
+        LOOT_SLOT_CLEARED = WowEvents.LOOT_SLOT_CLEARED,
+        TRADE_ACCEPT_UPDATE = WowEvents.TRADE_ACCEPT_UPDATE,
+        TRADE_REQUEST_CANCEL = WowEvents.TRADE_REQUEST_CANCEL,
+        TRADE_CLOSED = WowEvents.TRADE_CLOSED,
     }
-    for e, m in pairs(forward) do
-        local method = m
-        addon[e] = function(_, ...)
-            addon.Master[method](addon.Master, ...)
+
+    for eventName, busEventName in pairs(wowBusEvents) do
+        local eventKey = busEventName
+        addon[eventName] = function(_, ...)
+            Utils.triggerEvent(eventKey, ...)
         end
     end
 end
@@ -867,7 +752,10 @@ function addon:ADDON_LOADED(name)
     addon:info(Diag.I.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
         tostring(lvl), tostring(true)))
     addon.LoadOptions()
-    addon.Reserves:Load()
+    local reservesService = addon.Services and addon.Services.Reserves
+    if reservesService and reservesService.Load then
+        reservesService:Load()
+    end
     for event in pairs(addonEvents) do
         self:RegisterEvent(event)
     end
@@ -876,14 +764,6 @@ function addon:ADDON_LOADED(name)
 end
 
 local rosterUpdateDebounceSeconds = 0.2
-
-local function isLoggerViewingCurrentRaid(log, logFrame)
-    if not (log and logFrame and logFrame.IsShown and logFrame:IsShown()) then
-        return false
-    end
-    local currentRaid = Core.getCurrentRaid()
-    return currentRaid and log.selectedRaid and tonumber(log.selectedRaid) == tonumber(currentRaid)
-end
 
 local function scheduleRaidInstanceChecksIfRecognized(instanceName, instanceType, instanceDiff, emitRecognizedLog)
     if instanceType ~= "raid" or L.RaidZones[instanceName] == nil then
@@ -903,32 +783,8 @@ local function processRaidRosterUpdate()
     end
 
     -- Single source of truth for roster change notifications (join/update/leave delta).
-    Utils.triggerEvent("RaidRosterDelta", delta, addon.Raid:GetRosterVersion(), Core.getCurrentRaid())
-
-    -- If the Logger is open on the *current* raid, keep the visible lists in sync automatically.
-    -- (Throttled to avoid multiple redraws during bursty roster updates.)
-    local log = addon.Logger
-    local logFrame = log and log.frame
-    if not isLoggerViewingCurrentRaid(log, logFrame) then
-        return
-    end
-
-    addon.CancelTimer(log._rosterUiHandle, true)
-    log._rosterUiHandle = addon.NewTimer(0.25, function()
-        if not isLoggerViewingCurrentRaid(log, logFrame) then
-            return
-        end
-
-        if log.RaidAttendees and log.RaidAttendees._ctrl and log.RaidAttendees._ctrl.Dirty then
-            log.RaidAttendees._ctrl:Dirty()
-        end
-        if log.BossAttendees and log.BossAttendees._ctrl and log.BossAttendees._ctrl.Dirty then
-            log.BossAttendees._ctrl:Dirty()
-        end
-        if log.Loot and log.Loot._ctrl and log.Loot._ctrl.Dirty then
-            log.Loot._ctrl:Dirty()
-        end
-    end)
+    Utils.triggerEvent(InternalEvents.RaidRosterDelta,
+        delta, addon.Raid:GetRosterVersion(), Core.getCurrentRaid())
 end
 
 -- RAID_ROSTER_UPDATE: Updates the raid roster when it changes.
@@ -1002,7 +858,7 @@ end
 
 -- CHAT_MSG_ADDON: Forwards addon communication messages to the Syncer module.
 function addon:CHAT_MSG_ADDON(prefix, msg, channel, sender)
-    local syncer = addon.Syncer
+    local syncer = addon.Services and addon.Services.Syncer
     if syncer and syncer.OnAddonMessage then
         syncer:OnAddonMessage(prefix, msg, channel, sender)
     end

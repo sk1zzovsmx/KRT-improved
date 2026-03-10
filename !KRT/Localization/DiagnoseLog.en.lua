@@ -1,13 +1,13 @@
-local _, addon = ...
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.getFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
 
-addon.Diagnose = addon.Diagnose or {}
-local Diagnose = addon.Diagnose
-local Diag = setmetatable({}, {
-    __index = Diagnose,
-    __newindex = function(_, key, value)
-        Diagnose[key] = value
-    end,
-})
+local addon = select(2, ...)
+local feature = addon.Core.getFeatureShared()
+
+local Diag = feature.Diag
 
 Diag.I = Diag.I or {}
 Diag.W = Diag.W or {}
@@ -25,6 +25,7 @@ Diag.E.LogCoreEventHandlerFailed = "[Core] Event handler failed event=%s err=%s"
 -- Utils --
 Diag.E.LogUtilsCallbackExec = "Error while executing callback %s for event %s: %s"
 Diag.D.LogListHighlightRefresh = "[%s] refresh key=%s%s"
+Diag.W.LogLegacyAliasAccess = "[Compat] Legacy alias used alias=%s target=%s site=%s"
 
 -- Raid --
 Diag.D.LogRaidLeftGroupEndSession = "[Raid] Left group -> ending current raid session"

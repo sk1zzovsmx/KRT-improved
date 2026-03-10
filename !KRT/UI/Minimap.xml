@@ -39,9 +39,7 @@
 			</Layer>
 		</Layers>
 		<HighlightTexture file="Interface\Minimap\UI-Minimap-ZoomButton-Highlight" alphaMode="ADD" />
-		<Scripts>
-			<OnLoad>KRT.Minimap:OnLoad(self)</OnLoad>
-		</Scripts>
-	</Button>
+</Button>
 <!-- ====== End of Minimap Button ====== -->
 </Ui>
+

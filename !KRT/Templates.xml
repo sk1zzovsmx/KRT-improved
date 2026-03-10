@@ -109,10 +109,7 @@
 		<HighlightTexture inherits="UIPanelButtonHighlightTexture" mod="ADD" />
 		<PushedTexture inherits="UIPanelButtonPushedTexture" mod="ADD" />
 		<DisabledTexture inherits="UIPanelButtonDisabledTexture" />
-		<Scripts>
-			<OnLoad>self:RegisterForClicks("AnyUp")</OnLoad>
-		</Scripts>
-	</Button>
+</Button>
 	<!-- Item icon button template -->
 	<Button name="KRTItemButtonTemplate" virtual="true">
 		<Size>
@@ -159,10 +156,7 @@
 	<!-- EditBox Template -->
 	<EditBox name="KRTEditBoxTemplate" inherits="InputBoxTemplate" autoFocus="false" virtual="true">
 		<FontString inherits="GameFontHighlight" />
-		<Scripts>
-			<OnEscapePressed>self:ClearFocus()</OnEscapePressed>
-		</Scripts>
-	</EditBox>
+</EditBox>
 	<!-- Simple Border-less EdtiBox Template -->
 	<EditBox name="KRTEditBoxSimpleTemplate" font="GameFontHighlightSmall" autoFocus="false" virtual="true">
 		<Layers>
@@ -186,10 +180,7 @@
 				</Texture>
 			</Layer>
 		</Layers>
-		<Scripts>
-			<OnEscapePressed>self:ClearFocus()</OnEscapePressed>
-		</Scripts>
-	</EditBox>
+</EditBox>
 	<!-- Player Selection Button -->
 	<Button name="KRTSelectPlayerTemplate" virtual="true">
 		<Size>

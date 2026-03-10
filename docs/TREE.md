@@ -1,0 +1,126 @@
+﻿# Repository Tree
+
+- Generated: 2026-02-24 03:10:20 +01:00
+- Commit: 26fb6d9
+- Worktree: dirty
+- MaxDepth: 3
+
+```text
+.
+|-- !KRT
+|   |-- Controllers
+|   |   |-- Changes.lua
+|   |   |-- Logger.lua
+|   |   |-- Master.lua
+|   |   |-- README.md
+|   |   |-- Spammer.lua
+|   |   \\-- Warnings.lua
+|   |-- Core
+|   |   \\-- Init.lua
+|   |-- EntryPoints
+|   |   |-- Minimap.lua
+|   |   |-- README.md
+|   |   \\-- SlashEvents.lua
+|   |-- Libs
+|   |   |-- CallbackHandler-1.0
+|   |   |   \\-- ...
+|   |   |-- LibBossIDs-1.0
+|   |   |   \\-- ...
+|   |   |-- LibCompat-1.0
+|   |   |   \\-- ...
+|   |   |-- LibDeformat-3.0
+|   |   |   \\-- ...
+|   |   |-- LibLogger-1.0
+|   |   |   \\-- ...
+|   |   \\-- LibStub
+|   |       \\-- ...
+|   |-- Localization
+|   |   |-- DiagnoseLog.en.lua
+|   |   \\-- localization.en.lua
+|   |-- Modules
+|   |   |-- Compat
+|   |   |   \\-- ...
+|   |   |-- UI
+|   |   |   \\-- ...
+|   |   |-- Base64.lua
+|   |   |-- Bus.lua
+|   |   |-- C.lua
+|   |   |-- Colors.lua
+|   |   |-- Comms.lua
+|   |   |-- Events.lua
+|   |   |-- Features.lua
+|   |   |-- ignoredItems.lua
+|   |   |-- Strings.lua
+|   |   |-- Time.lua
+|   |   |-- Utils.LegacyGlobals.lua
+|   |   |-- Utils.lua
+|   |   |-- Utils.Options.lua
+|   |   |-- Utils.RaidState.lua
+|   |   \\-- Utils.Tooltip.lua
+|   |-- Services
+|   |   |-- Chat.lua
+|   |   |-- Loot.lua
+|   |   |-- Raid.lua
+|   |   |-- README.md
+|   |   |-- Reserves.lua
+|   |   |-- Rolls.lua
+|   |   \\-- Syncer.lua
+|   |-- UI
+|   |   |-- Changes.xml
+|   |   |-- Config.xml
+|   |   |-- Logger.xml
+|   |   |-- LootCounter.xml
+|   |   |-- Master.xml
+|   |   |-- Minimap.xml
+|   |   |-- Reserves.xml
+|   |   |-- ReservesTemplates.xml
+|   |   |-- Spammer.xml
+|   |   \\-- Warnings.xml
+|   |-- Widgets
+|   |   |-- Config.lua
+|   |   |-- LootCounter.lua
+|   |   |-- README.md
+|   |   \\-- ReservesUI.lua
+|   |-- !KRT.toc
+|   |-- KRT.Core.xml
+|   |-- KRT.Full.xml
+|   |-- KRT.lua
+|   |-- KRT.xml
+|   \\-- Templates.xml
+|-- .devcontainer
+|   \\-- devcontainer.json
+|-- .githooks
+|   |-- pre-commit
+|   \\-- README.md
+|-- .vscode
+|   \\-- settings.json
+|-- docs
+|   |-- ARCHITECTURE.md
+|   |-- FN_CLUSTERS.md
+|   |-- FUNCTION_REGISTRY.csv
+|   |-- FUNCTION_REGISTRY.md
+|   |-- MODULES_UI_OWNERSHIP_MAP.md
+|   |-- REFACTOR_RULES.md
+|   |-- TREE.md
+|   \\-- UTILS_DEPRECATION_MAP.md
+|-- tools
+|   |-- check-layering.ps1
+|   |-- fnmap-classify.ps1
+|   |-- fnmap-inventory.ps1
+|   |-- install-hooks.ps1
+|   |-- pre-commit.ps1
+|   \\-- update-tree.ps1
+|-- .editorconfig
+|-- .gitattributes
+|-- .gitignore
+|-- .luacheckrc
+|-- AGENTS.md
+|-- ARCHITECTURE.md
+|-- CHANGELOG.md
+|-- DEV_CHECKS.md
+|-- OVERVIEW.md
+|-- README.md
+\\-- screenshot.jpg
+```
+
+_Regenerate with `tools/update-tree.ps1`._
