@@ -56,8 +56,9 @@ do
             migrations:ApplyRaidMigrations(clone, currentSchemaVersion)
         end
 
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        if raidStore and raidStore.NormalizeRaidRecord then
+        local raidStore = Core.GetRaidStoreOrNil and
+            Core.GetRaidStoreOrNil("DBRaidValidator.EnsureNormalizedClone", { "NormalizeRaidRecord" }) or nil
+        if raidStore then
             clone = raidStore:NormalizeRaidRecord(clone)
         end
 
@@ -108,12 +109,13 @@ do
         end
 
         -- Validate source keys directly (without normalization side effects).
+        local raidStore = Core.GetRaidStoreOrNil and
+            Core.GetRaidStoreOrNil("DBRaidValidator.ValidateRaid", { "IsLegacyRuntimeKey" }) or nil
         for key in pairs(raid) do
             if type(key) == "string" and key:sub(1, 1) == "_" and key ~= "_runtime" then
                 pushDetail(result, "E", "RUNTIME_OUTSIDE", { key = key })
             end
-            local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-            local isLegacyRuntime = raidStore and raidStore.IsLegacyRuntimeKey and raidStore:IsLegacyRuntimeKey(key)
+            local isLegacyRuntime = raidStore and raidStore:IsLegacyRuntimeKey(key)
             if isLegacyRuntime then
                 pushDetail(result, "E", "LEGACY_RUNTIME", { key = key })
             end
@@ -142,12 +144,16 @@ do
         local lootRows = normalized.loot
 
         local maxPlayerNid = 0
+        local playerByNid = {}
         for i = 1, #players do
             local player = players[i]
             if type(player) == "table" then
                 local playerNid = tonumber(player.playerNid) or 0
                 if playerNid > maxPlayerNid then
                     maxPlayerNid = playerNid
+                end
+                if playerNid > 0 then
+                    playerByNid[playerNid] = true
                 end
 
                 local count = tonumber(player.count)
@@ -180,6 +186,27 @@ do
                 if boss.name == "_TrashMob_" then
                     hasTrashBoss = true
                 end
+
+                local attendees = boss.players
+                if type(attendees) == "table" then
+                    for j = 1, #attendees do
+                        local attendeeNid = tonumber(attendees[j]) or 0
+                        if attendeeNid <= 0 then
+                            pushDetail(result, "E", "BOSS_ATTENDEE_INVALID", {
+                                bossIndex = i,
+                                attendeeIndex = j,
+                            })
+                        elseif not playerByNid[attendeeNid] then
+                            pushDetail(result, "E", "BOSS_ATTENDEE_MISSING_PLAYER", {
+                                bossIndex = i,
+                                attendeeIndex = j,
+                                playerNid = attendeeNid,
+                            })
+                        else
+                            result.ok = result.ok + 1
+                        end
+                    end
+                end
             end
         end
 
@@ -200,6 +227,20 @@ do
                     })
                 elseif lootBossNid <= 0 and not hasTrashBoss then
                     pushDetail(result, "W", "LOOT_UNKNOWN_BOSS_WITHOUT_TRASH", {
+                        lootIndex = i,
+                    })
+                else
+                    result.ok = result.ok + 1
+                end
+
+                local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter) or 0
+                if looterNid > 0 and not playerByNid[looterNid] then
+                    pushDetail(result, "E", "LOOT_MISSING_LOOTER", {
+                        lootIndex = i,
+                        looterNid = looterNid,
+                    })
+                elseif looterNid <= 0 then
+                    pushDetail(result, "W", "LOOT_MISSING_LOOTER", {
                         lootIndex = i,
                     })
                 else
@@ -245,8 +286,9 @@ do
             currentSchemaVersion = 1
         end
 
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        local raids = raidStore and raidStore.GetRawRaids and raidStore:GetRawRaids() or {}
+        local raidStore = Core.GetRaidStoreOrNil and
+            Core.GetRaidStoreOrNil("DBRaidValidator.ValidateAllRaids", { "GetRawRaids" }) or nil
+        local raids = raidStore and raidStore:GetRawRaids() or {}
         raids = (type(raids) == "table") and raids or {}
         local report = {
             raids = #raids,

@@ -15,20 +15,20 @@ local Core = feature.Core or addon.Core
 
 local K_COLOR = feature.K_COLOR
 
-local UI = addon.UI or {}
-if type(UI.Call) ~= "function" then
-    UI.Call = function()
+local UIFacade = addon.UI or {}
+if type(UIFacade.Call) ~= "function" then
+    UIFacade.Call = function()
         return nil
     end
 end
-if type(UI.IsEnabled) ~= "function" then
-    UI.IsEnabled = function()
+if type(UIFacade.IsEnabled) ~= "function" then
+    UIFacade.IsEnabled = function()
         return true
     end
 end
-if type(UI.IsRegistered) ~= "function" then
-    UI.IsRegistered = function()
-        return true
+if type(UIFacade.IsRegistered) ~= "function" then
+    UIFacade.IsRegistered = function()
+        return false
     end
 end
 
@@ -44,15 +44,44 @@ local function getController(name)
     return controllers and controllers[name] or nil
 end
 
+local function getChangesController()
+    local controller = getController("Changes")
+    if type(controller) == "table" then
+        return controller
+    end
+    local legacy = addon.Changes
+    if type(legacy) == "table" then
+        return legacy
+    end
+    return nil
+end
+
+local function getLootCounterWidget()
+    local widgets = addon.Widgets
+    local legacy = (widgets and widgets.LootCounter) or addon.LootCounter
+    if type(legacy) == "table" and type(legacy.Toggle) == "function" then
+        return legacy
+    end
+    return nil
+end
+
 local function IsWidgetAvailable(widgetId)
-    return UI:IsEnabled(widgetId) and UI:IsRegistered(widgetId)
+    if UIFacade:IsEnabled(widgetId) and UIFacade:IsRegistered(widgetId) then
+        return true
+    end
+    if widgetId == "LootCounter" and getLootCounterWidget() then
+        return true
+    end
+    return false
 end
 
 -- ----- Internal state ----- --
 local addonMenu
 local dragMode
 local dragActive = false
-local uiBound = false
+local UI = {
+    Bound = false,
+}
 
 -- Cached math functions
 local sqrt = math.sqrt
@@ -60,129 +89,135 @@ local cos, sin = math.cos, math.sin
 local rad, atan2, deg = math.rad, math.atan2, math.deg
 local MINIMAP_RING_RADIUS = 80
 local MIN_DRAG_DISTANCE = 0.001
-local MENU_INDEX_LOOT_COUNTER = 2
-local MENU_INDEX_DEMAND = 10
-local MENU_INDEX_ANNOUNCE = 11
 
 -- ----- Private helpers ----- --
-local function AcquireRefs(frame)
+function UI.AcquireRefs(frame)
     return {
         button = frame,
     }
 end
 
--- Menu definition for EasyMenu (built once).
-local minimapMenu = {
-    {
-        text = MASTER_LOOTER,
-        notCheckable = 1,
-        func = function()
-            local moduleRef = getController("Master")
-            if moduleRef and moduleRef.Toggle then
-                moduleRef:Toggle()
-            end
-        end
-    },
-    {
-        text = L.StrLootCounter,
-        notCheckable = 1,
-        func = function()
-            if IsWidgetAvailable("LootCounter") then
-                UI:Call("LootCounter", "Toggle")
-            end
-        end
-    },
-    {
-        text = L.StrLootLogger,
-        notCheckable = 1,
-        func = function()
-            local moduleRef = getController("Logger")
-            if moduleRef and moduleRef.Toggle then
-                moduleRef:Toggle()
-            end
-        end
-    },
-    { text = " ", disabled = 1, notCheckable = 1 },
-    { text = L.StrClearIcons, notCheckable = 1, func = function() addon.Raid:ClearRaidIcons() end },
-    { text = " ", disabled = 1, notCheckable = 1 },
-    {
-        text = RAID_WARNING,
-        notCheckable = 1,
-        func = function()
-            local moduleRef = getController("Warnings")
-            if moduleRef and moduleRef.Toggle then
-                moduleRef:Toggle()
-            end
-        end
-    },
-    { text = " ", disabled = 1, notCheckable = 1 },
-    {
-        text = L.StrMSChanges,
-        notCheckable = 1,
-        func = function()
-            local moduleRef = getController("Changes")
-            if moduleRef and moduleRef.Toggle then
-                moduleRef:Toggle()
-            end
-        end
-    },
-    {
-        text = L.BtnDemand,
-        notCheckable = 1,
-        func = function()
-            local moduleRef = getController("Changes")
-            if moduleRef and moduleRef.Demand then
-                moduleRef:Demand()
-            end
-        end
-    },
-    {
-        text = CHAT_ANNOUNCE,
-        notCheckable = 1,
-        func = function()
-            local moduleRef = getController("Changes")
-            if moduleRef and moduleRef.Announce then
-                moduleRef:Announce()
-            end
-        end
-    },
-    { text = " ", disabled = 1, notCheckable = 1 },
-    {
-        text = L.StrLFMSpam,
-        notCheckable = 1,
-        func = function()
-            local moduleRef = getController("Spammer")
-            if moduleRef and moduleRef.Toggle then
-                moduleRef:Toggle()
-            end
-        end
-    },
-}
+local function BuildMenu()
+    local hasRaidGroup = addon.Raid:IsPlayerInRaid()
+    local disableRaidActions = 1
+    if hasRaidGroup then
+        disableRaidActions = nil
+    end
 
-local function RefreshMenuState()
-    local lootCounterEntry = minimapMenu[MENU_INDEX_LOOT_COUNTER]
-    if not lootCounterEntry then
-        return
-    end
-    lootCounterEntry.disabled = IsWidgetAvailable("LootCounter") and nil or 1
-
-    local hasRaidGroup = (type(addon.IsInRaid) == "function") and addon.IsInRaid() or false
-    local demandEntry = minimapMenu[MENU_INDEX_DEMAND]
-    if demandEntry then
-        demandEntry.disabled = hasRaidGroup and nil or 1
-    end
-    local announceEntry = minimapMenu[MENU_INDEX_ANNOUNCE]
-    if announceEntry then
-        announceEntry.disabled = hasRaidGroup and nil or 1
-    end
+    return {
+        {
+            text = MASTER_LOOTER,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getController("Master")
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
+        {
+            text = L.StrLootCounter,
+            notCheckable = 1,
+            disabled = disableRaidActions,
+            func = function()
+                if not addon.Raid:IsPlayerInRaid() then
+                    return
+                end
+                if not IsWidgetAvailable("LootCounter") then
+                    return
+                end
+                if UIFacade:IsEnabled("LootCounter") and UIFacade:IsRegistered("LootCounter") then
+                    UIFacade:Call("LootCounter", "Toggle")
+                    return
+                end
+                local legacy = getLootCounterWidget()
+                if legacy and legacy.Toggle then
+                    legacy:Toggle()
+                end
+            end
+        },
+        {
+            text = L.StrLootLogger,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getController("Logger")
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
+        { text = " ", disabled = 1, notCheckable = 1 },
+        { text = L.StrClearIcons, notCheckable = 1, func = function() addon.Raid:ClearRaidIcons() end },
+        { text = " ", disabled = 1, notCheckable = 1 },
+        {
+            text = RAID_WARNING,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getController("Warnings")
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
+        { text = " ", disabled = 1, notCheckable = 1 },
+        {
+            text = L.StrMSChanges,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getChangesController()
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
+        {
+            text = L.BtnDemand,
+            notCheckable = 1,
+            disabled = disableRaidActions,
+            func = function()
+                if not addon.Raid:IsPlayerInRaid() then
+                    return
+                end
+                local moduleRef = getChangesController()
+                if moduleRef and moduleRef.Demand then
+                    moduleRef:Demand()
+                end
+            end
+        },
+        {
+            text = CHAT_ANNOUNCE,
+            notCheckable = 1,
+            disabled = disableRaidActions,
+            func = function()
+                if not addon.Raid:IsPlayerInRaid() then
+                    return
+                end
+                local moduleRef = getChangesController()
+                if moduleRef and moduleRef.Announce then
+                    moduleRef:Announce()
+                end
+            end
+        },
+        { text = " ", disabled = 1, notCheckable = 1 },
+        {
+            text = L.StrLFMSpam,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getController("Spammer")
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
+    }
 end
 
 -- Initializes and opens the menu for the minimap button.
 local function OpenMenu()
     addonMenu = addonMenu or CreateFrame("Frame", "KRTMenu", UIParent, "UIDropDownMenuTemplate")
-    RefreshMenuState()
+    local menu = BuildMenu()
     -- EasyMenu handles UIDropDownMenu initialization and opening.
-    EasyMenu(minimapMenu, addonMenu, KRT_MINIMAP_GUI, 0, 0, "MENU")
+    EasyMenu(menu, addonMenu, KRT_MINIMAP_GUI, 0, 0, "MENU")
 end
 
 local function IsMenuOpen()
@@ -301,7 +336,7 @@ function module:OnLoad(frame)
         -- Ignore clicks if Shift or Alt keys are held:
         if IsShiftKeyDown() or IsAltKeyDown() then return end
         if button == "RightButton" then
-            UI:Call("Config", "Toggle")
+            UIFacade:Call("Config", "Toggle")
         elseif button == "LeftButton" then
             ToggleMenu()
         end
@@ -326,7 +361,7 @@ function module:OnLoad(frame)
 end
 
 function module:BindUI()
-    if uiBound and self.frame and self.refs then
+    if UI.Bound and self.frame and self.refs then
         return self.frame, self.refs
     end
 
@@ -335,17 +370,17 @@ function module:BindUI()
         return nil
     end
 
-    local refs = AcquireRefs(frame)
+    local refs = UI.AcquireRefs(frame)
     self.refs = refs
 
     self:OnLoad(frame)
 
-    uiBound = true
+    UI.Bound = true
     return frame, refs
 end
 
 function module:EnsureUI()
-    if uiBound and self.frame and self.refs then
+    if UI.Bound and self.frame and self.refs then
         return self.frame
     end
     return self:BindUI()

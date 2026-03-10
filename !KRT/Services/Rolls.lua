@@ -108,9 +108,59 @@ do
     state.itemCounts = newItemCounts and newItemCounts() or {}
 
     -- ----- Private helpers ----- --
+    local function getRollSession()
+        local session = lootState.rollSession
+        if type(session) ~= "table" then
+            return nil
+        end
+        if not session.id or session.id == "" then
+            return nil
+        end
+        return session
+    end
+
+    local function getActiveRollType()
+        local session = getRollSession()
+        local rollType = session and tonumber(session.rollType) or tonumber(lootState.currentRollType)
+        return rollType or rollTypes.FREE
+    end
+
+    local function syncLegacyRollStateFromSession(session)
+        if not session then
+            return
+        end
+        if tonumber(session.rollType) then
+            lootState.currentRollType = tonumber(session.rollType)
+        end
+        if tonumber(session.lootNid) then
+            lootState.currentRollItem = tonumber(session.lootNid)
+        end
+    end
+
+    local function updateSessionRollWindow(opened)
+        local session = getRollSession()
+        if not session then
+            return
+        end
+        if opened then
+            session.endsAt = nil
+        elseif session.endsAt == nil then
+            session.endsAt = GetTime()
+        end
+        syncLegacyRollStateFromSession(session)
+    end
+
+    local function closeRollSession()
+        local session = getRollSession()
+        if session and session.endsAt == nil then
+            session.endsAt = GetTime()
+        end
+        lootState.rollSession = nil
+    end
+
     local function GetAllowedRolls(itemId, name)
         if not itemId or not name then return 1 end
-        if lootState.currentRollType ~= rollTypes.RESERVED then
+        if getActiveRollType() ~= rollTypes.RESERVED then
             return 1
         end
         local reserves = getReserveCountForItem(itemId, name)
@@ -198,7 +248,8 @@ do
             return
         end
 
-        local isSR         = (lootState.currentRollType == rollTypes.RESERVED)
+        local currentRollType = getActiveRollType()
+        local isSR         = (currentRollType == rollTypes.RESERVED)
         local wantLow      = (addon.options.sortAscending == true)
 
         local plusPriority = isSR and itemId and isPlusSystemEnabled()
@@ -242,7 +293,7 @@ do
         end
 
         state.lastSortAsc  = wantLow
-        state.lastSortType = lootState.currentRollType
+        state.lastSortType = currentRollType
     end
 
     local function selectWinner(name, isShift, isControl)
@@ -261,7 +312,7 @@ do
             return false
         end
 
-        local itemCount = tonumber(lootState.itemCount) or 1
+        local itemCount = tonumber(lootState.selectedItemCount) or 1
         if itemCount < 1 then itemCount = 1 end
 
         local ctrl = (isControl == true)
@@ -372,6 +423,7 @@ do
         lootState.rollWinner = nil
         lootState.itemTraded = 0
         lootState.rollStarted = false
+        closeRollSession()
 
         -- Clear any manual multi-winner selection (Master Loot window)
         state.msPrefilled = false
@@ -408,7 +460,7 @@ do
         local itemId = self:GetCurrentRollItemID()
         local name = Core.GetPlayerName()
         UpdateLocalRollState(itemId, name)
-        return lootState.currentRollType, state.record, state.canRoll, state.rolled
+        return getActiveRollType(), state.record, state.canRoll, state.rolled
     end
 
     -- Enables or disables the recording of rolls.
@@ -428,6 +480,7 @@ do
                 lootState.rollWinner = nil
             end
         end
+        updateSessionRollWindow(on)
 
         addon:debug(Diag.D.LogRollsRecordState:format(tostring(bool)))
     end
@@ -458,7 +511,7 @@ do
         end
 
         local allowed = 1
-        if lootState.currentRollType == rollTypes.RESERVED then
+        if getActiveRollType() == rollTypes.RESERVED then
             local reserves = getReserveCountForItem(itemId, player)
             allowed = reserves > 0 and reserves or 1
         end
@@ -501,7 +554,7 @@ do
         local tracker = AcquireItemTracker(itemId)
         local used = tracker[name] or 0
         local reserve = getReserveCountForItem(itemId, name)
-        local allowed = (lootState.currentRollType == rollTypes.RESERVED and reserve > 0) and reserve or 1
+        local allowed = (getActiveRollType() == rollTypes.RESERVED and reserve > 0) and reserve or 1
         return used >= allowed
     end
 
@@ -545,11 +598,23 @@ do
 
     -- Gets the item ID of the item currently being rolled for.
     function module:GetCurrentRollItemID()
+        local session = getRollSession()
+        local sessionItemId = session and tonumber(session.itemId) or nil
+        if sessionItemId and sessionItemId > 0 then
+            addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(sessionItemId)))
+            return sessionItemId
+        end
+
         local index = GetItemIndex()
         local item = GetItem and GetItem(index)
         local itemLink = item and item.itemLink
         if not itemLink then return nil end
         local itemId = Item.GetItemIdFromLink(itemLink)
+        if itemId and session then
+            session.itemId = itemId
+            session.itemLink = itemLink
+            session.itemKey = Item.GetItemStringFromLink(itemLink) or itemLink
+        end
         addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(itemId)))
         return itemId
     end
@@ -558,7 +623,7 @@ do
     function module:IsValidRoll(itemId, name)
         local tracker = AcquireItemTracker(itemId)
         local used = tracker[name] or 0
-        local allowed = (lootState.currentRollType == rollTypes.RESERVED)
+        local allowed = (getActiveRollType() == rollTypes.RESERVED)
             and getReserveCountForItem(itemId, name)
             or 1
         return used < allowed
@@ -583,14 +648,15 @@ do
     -- Rebuilds the roll model consumed by Master UI.
     function module:FetchRolls()
         local itemId = self:GetCurrentRollItemID()
-        local isSR = lootState.currentRollType == rollTypes.RESERVED
+        local currentRollType = getActiveRollType()
+        local isSR = currentRollType == rollTypes.RESERVED
 
         local plusPriority = isSR and itemId and isPlusSystemEnabled()
 
         local GetPlus = MakePlusGetter(itemId)
 
         local wantAsc = addon.options.sortAscending == true
-        if state.lastSortAsc ~= wantAsc or state.lastSortType ~= lootState.currentRollType then
+        if state.lastSortAsc ~= wantAsc or state.lastSortType ~= currentRollType then
             sortRolls(itemId)
         end
 
@@ -684,7 +750,7 @@ do
         -- Prefill MultiSelect with top-N winners (Top-N = ItemCount) in pick mode.
         -- This keeps the UI identical for single- and multi-copy loot: the addon always starts with an auto-selection.
         if pickMode then
-            local n = tonumber(lootState.itemCount) or 1
+            local n = tonumber(lootState.selectedItemCount) or 1
             if n and n >= 1 and #display > 0 then
                 if n > #display then n = #display end
                 if (not state.msPrefilled) and (MultiSelect.MultiSelectCount(MS_CTX_ROLLS) or 0) == 0 then
@@ -708,7 +774,7 @@ do
         -- Star is a pure "top roll" indicator (UI hint), independent from manual MultiSelect winners.
         local starWinners = {}
         do
-            local n = tonumber(lootState.itemCount) or 1
+            local n = tonumber(lootState.selectedItemCount) or 1
             if n < 1 then n = 1 end
 
             if display and #display > 0 then
@@ -748,7 +814,7 @@ do
                     end
                 end
             elseif addon.options.showLootCounterDuringMSRoll == true
-                and lootState.currentRollType == rollTypes.MAINSPEC
+                and currentRollType == rollTypes.MAINSPEC
             then
                 local c = addon.Raid:GetPlayerCount(name, addon.Core.GetCurrentRaid()) or 0
                 if c > 0 then
@@ -804,6 +870,14 @@ do
             end
         end
         return selected
+    end
+
+    function module:GetRollSession()
+        return getRollSession()
+    end
+
+    function module:SyncLegacyState(session)
+        syncLegacyRollStateFromSession(session or getRollSession())
     end
 
 end

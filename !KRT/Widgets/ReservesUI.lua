@@ -17,8 +17,6 @@ local C = feature.C
 local Options = feature.Options or addon.Options
 local Bus = feature.Bus or addon.Bus
 
-local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
-local bindModuleToggleHide = feature.BindModuleToggleHide
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
@@ -30,15 +28,8 @@ local tostring, tonumber = tostring, tonumber
 local InternalEvents = Events.Internal
 local UIFacade = addon.UI
 
-local function isWidgetEnabled(widgetId)
-    if UIFacade and type(UIFacade.IsEnabled) == "function" then
-        return UIFacade:IsEnabled(widgetId)
-    end
-    return true
-end
-
 do
-    if not isWidgetEnabled("Reserves") then
+    if not UIFacade:IsEnabled("Reserves") then
         return
     end
 
@@ -57,28 +48,21 @@ do
     local reserveHeaders = {}
     local reserveItemRows = {}
     local rowsByItemID = {}
-    local localized = false
-    local uiBound = false
-    local scaffoldToggle, scaffoldHide
+    local UI = {
+        Localized = false,
+        Loaded = false,
+    }
+    local lastQueryAttemptAt = 0
     local reserveRowStyle = {
         odd = { 0.04, 0.06, 0.09, 0.30 },
         even = { 0.08, 0.10, 0.14, 0.36 },
         separator = { 1.0, 1.0, 1.0, 0.10 },
     }
-
-    UIScaffold.BootstrapModuleUi(module, getFrame, function()
-        module:RequestRefresh()
-    end, {
-        bindToggleHide = bindModuleToggleHide,
-        bindRequestRefresh = bindModuleRequestRefresh,
-    })
-
-    scaffoldToggle = module.Toggle
-    scaffoldHide = module.Hide
+    local queryCooldownSeconds = tonumber(C.RESERVES_QUERY_COOLDOWN_SECONDS) or 2
 
     -- ----- Private helpers ----- --
 
-    local function AcquireRefs(frame)
+    function UI.AcquireRefs(frame)
         return {
             closeButton = Frames.Ref(frame, "CloseButton"),
             clearButton = Frames.Ref(frame, "ClearButton"),
@@ -316,8 +300,8 @@ do
         module:RequestRefresh()
     end
 
-    local function LocalizeUIFrame()
-        if localized then
+    function UI.Localize()
+        if UI.Localized then
             addon:debug(Diag.D.LogReservesUIAlreadyLocalized)
             return
         end
@@ -337,11 +321,11 @@ do
         if closeButton then
             closeButton:SetText(L.BtnClose)
         end
-        localized = true
+        UI.Localized = true
     end
 
-    local function UpdateUIFrame()
-        LocalizeUIFrame()
+    function UI.Refresh()
+        UI.Localize()
         local hasData = Service and Service.HasData and Service:HasData() or false
         local clearButton = _G[frameName .. "ClearButton"]
         if clearButton then
@@ -530,70 +514,60 @@ do
         return updated, count
     end
 
+    local function ShouldThrottleQueryMissingItems()
+        local now = GetTime and GetTime() or nil
+        if type(now) ~= "number" then
+            return false
+        end
+        if (now - lastQueryAttemptAt) < queryCooldownSeconds then
+            return true
+        end
+        lastQueryAttemptAt = now
+        return false
+    end
+
     local function ResetSavedFromUI()
         local out
         if Service and Service.ResetSaved then
             out = Service:ResetSaved()
         end
-        if module.Hide then
-            module:Hide()
-        end
-        if module.RequestRefresh then
-            module:RequestRefresh()
-        end
+        module:Hide()
+        module:RequestRefresh()
         return out
     end
 
     function module:Refresh()
-        UpdateUIFrame()
+        UI.Refresh()
         RenderReserveListUI()
     end
 
-    function module:BindUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame, self.refs
-        end
-
-        local frame = getFrame()
-        if not frame then
-            return nil
-        end
-        if not frameName then
-            self:OnLoad(frame)
-        end
-
-        local refs = AcquireRefs(frame)
-        self.frame = frame
-        self.refs = refs
+    local function BindHandlers(_, _, refs)
         scrollFrame = refs.scrollFrame or scrollFrame
         scrollChild = refs.scrollChild or scrollChild
 
-        uiBound = true
-        return frame, refs
-    end
+        if refs.closeButton then
+            refs.closeButton:SetScript("OnClick", function()
+                module:Hide()
+            end)
+            addon:debug(Diag.D.LogReservesBindButton:format("CloseButton", "Hide"))
+        end
 
-    function module:EnsureUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame
+        if refs.clearButton then
+            refs.clearButton:SetScript("OnClick", function()
+                ResetSavedFromUI()
+            end)
+            addon:debug(Diag.D.LogReservesBindButton:format("ClearButton", "ResetSaved"))
         end
-        return self:BindUI()
-    end
 
-    function module:Toggle()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldToggle then
-            return scaffoldToggle(self)
-        end
-    end
-
-    function module:Hide()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldHide then
-            return scaffoldHide(self)
+        if refs.queryButton then
+            refs.queryButton:SetScript("OnClick", function()
+                if ShouldThrottleQueryMissingItems() then
+                    addon:info(L.MsgReserveItemsQueryCooldown, queryCooldownSeconds)
+                    return
+                end
+                module:QueryMissingItems(false)
+            end)
+            addon:debug(Diag.D.LogReservesBindButton:format("QueryButton", "QueryMissingItems"))
         end
     end
 
@@ -608,38 +582,11 @@ do
                 addon:debug(Diag.D.LogReservesHideWindow)
             end,
         })
-        if not frameName then return end
+        UI.Loaded = frameName ~= nil
+        if not UI.Loaded then return end
 
         scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"]
         scrollChild = scrollFrame and scrollFrame.ScrollChild or _G["KRTReserveListFrameScrollChild"]
-
-        local closeButton = _G["KRTReserveListFrameCloseButton"]
-        if closeButton then
-            closeButton:SetScript("OnClick", function()
-                if module.Hide then
-                    module:Hide()
-                end
-            end)
-            addon:debug(Diag.D.LogReservesBindButton:format("CloseButton", "Hide"))
-        end
-
-        local clearButton = _G["KRTReserveListFrameClearButton"]
-        if clearButton then
-            clearButton:SetScript("OnClick", function()
-                ResetSavedFromUI()
-            end)
-            addon:debug(Diag.D.LogReservesBindButton:format("ClearButton", "ResetSaved"))
-        end
-
-        local queryButton = _G["KRTReserveListFrameQueryButton"]
-        if queryButton then
-            queryButton:SetScript("OnClick", function()
-                module:QueryMissingItems(false)
-            end)
-            addon:debug(Diag.D.LogReservesBindButton:format("QueryButton", "QueryMissingItems"))
-        end
-
-        LocalizeUIFrame()
 
         local refreshFrame = CreateFrame("Frame")
         refreshFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
@@ -658,30 +605,35 @@ do
         end)
     end
 
+    local function OnLoadFrame(frame)
+        module:OnLoad(frame)
+        return frameName
+    end
+
+    UIScaffold.DefineModuleUi({
+        module = module,
+        getFrame = getFrame,
+        acquireRefs = UI.AcquireRefs,
+        bind = BindHandlers,
+        localize = function()
+            UI.Localize()
+        end,
+        onLoad = OnLoadFrame,
+    })
+
     -- ----- Import widget controller ----- --
 
     module.Import = module.Import or {}
     local Import = module.Import
     local getImportFrame = makeModuleFrameGetter(Import, "KRTImportWindow")
-    local importLocalized = false
-    local importUiBound = false
+    local ImportUI = {
+        Localized = false,
+        Loaded = false,
+    }
     local importFrameName
-    local importScaffoldToggle, importScaffoldHide
     local MODE_MULTI, MODE_PLUS = 0, 1
 
-    UIScaffold.BootstrapModuleUi(Import, getImportFrame, function()
-        if Import.RequestRefresh then
-            Import:RequestRefresh()
-        end
-    end, {
-        bindToggleHide = bindModuleToggleHide,
-        bindRequestRefresh = bindModuleRequestRefresh,
-    })
-
-    importScaffoldToggle = Import.Toggle
-    importScaffoldHide = Import.Hide
-
-    local function AcquireImportRefs(frame)
+    function ImportUI.AcquireRefs(frame)
         return {
             cancelButton = _G["KRTImportCancelButton"],
             confirmButton = _G["KRTImportConfirmButton"],
@@ -719,14 +671,10 @@ do
     end
 
     local function ShowReservesListAfterImport()
-        if Import.Hide then
-            Import:Hide()
-        end
+        Import:Hide()
         local reserveFrame = getFrame()
         if not (reserveFrame and reserveFrame.IsShown and reserveFrame:IsShown()) then
-            if module.Toggle then
-                module:Toggle()
-            end
+            module:Toggle()
         else
             module:RequestRefresh()
         end
@@ -773,8 +721,8 @@ do
         }
     end
 
-    local function LocalizeImportFrame()
-        if importLocalized then return end
+    function ImportUI.Localize()
+        if ImportUI.Localized then return end
         local frame = getImportFrame()
         if not frame then
             addon:error(Diag.E.LogReservesImportWindowMissing)
@@ -792,71 +740,23 @@ do
         local cancelButton = _G["KRTImportCancelButton"]
         if cancelButton then cancelButton:SetText(L.BtnClose) end
 
-        importLocalized = true
+        ImportUI.Localized = true
     end
 
-    function Import:BindUI()
-        if importUiBound and self.frame and self.refs then
-            return self.frame, self.refs
-        end
-
-        local frame = getImportFrame()
-        if not frame then
-            return nil
-        end
-        if not importFrameName then
-            self:OnLoad(frame)
-        end
-
-        local refs = AcquireImportRefs(frame)
-        self.frame = frame
-        self.refs = refs
-
+    local function BindImportHandlers(_, _, refs)
         Frames.SafeSetScript(refs.cancelButton, "OnClick", function()
-            if Import.Hide then
-                Import:Hide()
-            end
+            Import:Hide()
         end)
         Frames.SafeSetScript(refs.confirmButton, "OnClick", function()
             Import:ImportFromEditBox()
         end)
         Frames.SafeSetScript(refs.editBox, "OnEscapePressed", function()
-            if Import.Hide then
-                Import:Hide()
-            end
+            Import:Hide()
         end)
         Frames.SafeSetScript(refs.modeSlider, "OnValueChanged", function(self, value)
             Import:OnModeSliderChanged(self, value)
         end)
         Import:OnModeSliderLoad(refs.modeSlider)
-
-        importUiBound = true
-        return frame, refs
-    end
-
-    function Import:EnsureUI()
-        if importUiBound and self.frame and self.refs then
-            return self.frame
-        end
-        return self:BindUI()
-    end
-
-    function Import:Toggle()
-        if not self:EnsureUI() then
-            return
-        end
-        if importScaffoldToggle then
-            return importScaffoldToggle(self)
-        end
-    end
-
-    function Import:Hide()
-        if not self:EnsureUI() then
-            return
-        end
-        if importScaffoldHide then
-            return importScaffoldHide(self)
-        end
     end
 
     function Import:SetImportMode(modeValue, suppressSlider)
@@ -905,7 +805,7 @@ do
     end
 
     function Import:Refresh()
-        LocalizeImportFrame()
+        ImportUI.Localize()
 
         local slider = GetModeSlider()
         if slider and slider.SetValue then
@@ -929,17 +829,30 @@ do
                     editBox:HighlightText()
                 end
                 SetImportStatus("")
-                if Import.RequestRefresh then
-                    Import:RequestRefresh()
-                end
+                Import:RequestRefresh()
             end,
         })
-        if not importFrameName then return end
+        ImportUI.Loaded = importFrameName ~= nil
+        if not ImportUI.Loaded then return end
 
-        if Import.RequestRefresh then
-            Import:RequestRefresh()
-        end
+        Import:RequestRefresh()
     end
+
+    local function OnLoadImportFrame(frame)
+        Import:OnLoad(frame)
+        return importFrameName
+    end
+
+    UIScaffold.DefineModuleUi({
+        module = Import,
+        getFrame = getImportFrame,
+        acquireRefs = ImportUI.AcquireRefs,
+        bind = BindImportHandlers,
+        localize = function()
+            ImportUI.Localize()
+        end,
+        onLoad = OnLoadImportFrame,
+    })
 
     function Import:ImportFromEditBox()
         local editBox = _G["KRTImportEditBox"]
@@ -990,38 +903,18 @@ do
         return true, nPlayersOrErr
     end
 
-    if addon.UI and addon.UI.Register then
-        addon.UI:Register("Reserves", {
-            Toggle = function()
-                if module.Toggle then
-                    module:Toggle()
-                end
-            end,
-            Hide = function()
-                if module.Hide then
-                    module:Hide()
-                end
-            end,
-            RequestRefresh = function()
-                if module.RequestRefresh then
-                    module:RequestRefresh()
-                end
-            end,
+    if UIFacade and UIFacade.Register then
+        UIFacade:Register("Reserves", UIScaffold.MakeStandardWidgetApi(module, {
             ToggleImport = function()
-                if Import.Toggle then
-                    Import:Toggle()
-                end
+                Import:Toggle()
             end,
             HideImport = function()
-                if Import.Hide then
-                    Import:Hide()
-                end
+                Import:Hide()
             end,
-        })
+        }))
     end
 
     Bus.RegisterCallback(InternalEvents.ReservesDataChanged, function()
         module:RequestRefresh()
     end)
 end
-

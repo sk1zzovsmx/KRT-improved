@@ -15,8 +15,6 @@ local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Bus = feature.Bus or addon.Bus
 
-local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
-local bindModuleToggleHide = feature.BindModuleToggleHide
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
@@ -25,19 +23,12 @@ local twipe = table.wipe
 local type, tostring = type, tostring
 
 local InternalEvents = Events.Internal
-local UI = addon.UI
-
-local function isWidgetEnabled(widgetId)
-    if UI and type(UI.IsEnabled) == "function" then
-        return UI:IsEnabled(widgetId)
-    end
-    return true
-end
+local UIFacade = addon.UI
 
 -- Loot counter module.
 -- Tracks and edits item distribution counts (MS wins).
 do
-    if not isWidgetEnabled("LootCounter") then
+    if not UIFacade:IsEnabled("LootCounter") then
         return
     end
 
@@ -51,8 +42,9 @@ do
     local rows, raidPlayers = {}, {}
     local scrollFrame, scrollChild, header
     local getFrame = makeModuleFrameGetter(module, "KRTLootCounterFrame")
-    local uiBound = false
-    local scaffoldToggle, scaffoldHide
+    local UI = {
+        Loaded = false,
+    }
 
     -- Single-line column header.
     local HEADER_HEIGHT = 18
@@ -65,7 +57,7 @@ do
     local COUNT_COL_W = 40
 
     -- ----- Private helpers ----- --
-    local function AcquireRefs(frame)
+    function UI.AcquireRefs(frame)
         local refs = {
             scrollFrame = frame
                 and (frame.ScrollFrame or _G[(frame.GetName and frame:GetName() or "KRTLootCounterFrame") .. "ScrollFrame"])
@@ -219,6 +211,7 @@ do
     function module:OnLoad(frame)
         local f = frame or getFrame()
         frameName = Frames.InitModuleFrame(module, f, { enableDrag = true }) or frameName
+        UI.Loaded = frameName ~= nil
         if not ensureFrames() then return end
     end
 
@@ -303,65 +296,23 @@ do
         end
     end
 
-    -- UI window management.
-
-    -- Initialize UI controller for Toggle/Hide.
-    UIScaffold.BootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
-        bindToggleHide = bindModuleToggleHide,
-        bindRequestRefresh = bindModuleRequestRefresh,
-    })
-
-    scaffoldToggle = module.Toggle
-    scaffoldHide = module.Hide
-
-    function module:BindUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame, self.refs
-        end
-
-        local frame = getFrame()
-        if not frame then
-            return nil
-        end
-        if not frameName then
-            self:OnLoad(frame)
-        end
-
-        local refs = AcquireRefs(frame)
-        self.frame = frame
-        self.refs = refs
-
+    local function BindHandlers(_, _, refs)
         scrollFrame = refs.scrollFrame or scrollFrame
         scrollChild = refs.scrollChild or scrollChild
-
-        uiBound = true
-        return frame, refs
     end
 
-    function module:EnsureUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame
-        end
-        return self:BindUI()
+    local function OnLoadFrame(frame)
+        module:OnLoad(frame)
+        return frameName
     end
 
-    function module:Toggle()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldToggle then
-            return scaffoldToggle(self)
-        end
-    end
-
-    function module:Hide()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldHide then
-            return scaffoldHide(self)
-        end
-    end
+    UIScaffold.DefineModuleUi({
+        module = module,
+        getFrame = getFrame,
+        acquireRefs = UI.AcquireRefs,
+        bind = BindHandlers,
+        onLoad = OnLoadFrame,
+    })
 
     local function requestRefresh()
         -- Coalesced, event-driven refresh (safe even if frame is hidden/not yet created).
@@ -377,22 +328,11 @@ do
     -- New raid session: reset view.
     Bus.RegisterCallback(InternalEvents.RaidCreate, requestRefresh)
 
-    if addon.UI and addon.UI.Register then
-        addon.UI:Register("LootCounter", {
-            Toggle = function()
-                if module.Toggle then
-                    module:Toggle()
-                end
-            end,
-            Hide = function()
-                if module.Hide then
-                    module:Hide()
-                end
-            end,
+    if UIFacade and UIFacade.Register then
+        UIFacade:Register("LootCounter", UIScaffold.MakeStandardWidgetApi(module, {
             AttachToMaster = function(masterFrame)
                 module:AttachToMaster(masterFrame)
             end,
-        })
+        }))
     end
 end
-

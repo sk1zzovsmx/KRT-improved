@@ -17,6 +17,8 @@ Diag.D = Diag.D or {}
 -- ==================== Log Messages ==================== --
 -- Core --
 Diag.W.LogCoreCallbackHandlerMissing = "[Core] CallbackHandler missing: using fallback event wiring"
+Diag.W.LogRaidStoreUnavailable = "[Core] RaidStore unavailable (context=%s)"
+Diag.W.LogRaidStoreMethodMissing = "[Core] RaidStore missing method %s (context=%s)"
 Diag.I.LogCoreLoaded = "[Core] Loaded version=%s logLevel=%s perfMode=%s"
 Diag.D.LogCoreEventsRegistered = "[Core] Events registered=%d"
 Diag.D.LogCorePlayerEnteringWorld = "[Core] PLAYER_ENTERING_WORLD -> scheduling FirstCheck"
@@ -61,6 +63,8 @@ Diag.D.LogLootFetchStart = "[Loot] FetchLoot numLootItems=%d oldIndex=%d"
 Diag.D.LogLootFetchDone = "[Loot] FetchLoot done lootCount=%d currentIndex=%d"
 Diag.D.LogLootItemInfoMissing = "[Loot] ItemInfo missing -> deferred link=%s"
 Diag.D.LogLootChatMsgLootRaw = "[Loot] CHAT_MSG_LOOT raw=%s"
+Diag.D.LogLootPendingAwardConsumed = "[Loot] Pending consumed item=%s looter=%s remaining=%d ttl=%d"
+Diag.D.LogLootTradeOnlyLogged = "[Loot] Trade-only logged raidId=%d itemId=%s lootNid=%s looter=%s count=%d source=%s"
 
 -- MasterLooter --
 Diag.D.LogMLCandidateCacheBuilt = "[ML] Candidate cache built item=%s candidates=%d"
@@ -85,18 +89,27 @@ Diag.W.LogMLAddRollPayloadInvalid = "[ML] AddRoll payload invalid name=%s roll=%
 Diag.W.ErrMLMultiAwardInProgress = "[ML] Multi-award in progress: wait until it finishes before awarding again."
 Diag.W.ErrMLMultiSelectTooMany = "[ML] Cannot select more than %d winner(s) for this item."
 Diag.W.ErrMLMultiSelectNotEnough = "[ML] Select %d winner(s) before awarding multiple copies (currently %d)."
+Diag.D.LogMLMultiAwardStarted = "[ML] Multi-award start item=%s total=%d available=%d slots=%s timeout=%ds"
+Diag.W.ErrMLMultiAwardInterruptedTimeout =
+    "[ML] Multi-award interrupted: loot window did not update as expected within %ds "
+    .. "item=%s expected<%d observed=%d slot=%s"
 
 -- Trade --
 Diag.D.LogTradeAcceptUpdate = "[Trade] ACCEPT_UPDATE trader=%s winner=%s t=%s p=%s"
 Diag.D.LogTradeCompleted = "[Trade] Completed item=%s winner=%s type=%d roll=%d"
 Diag.W.LogTradeCurrentRollItemMissing = "[Trade] currentRollItem missing; cannot update loot entry"
+Diag.D.LogTradeCurrentRollItemRecovered = "[Trade] Recovered currentRollItem itemId=%s lootNid=%s winner=%s"
+Diag.W.LogTradeCurrentRollItemMissingContext = "[Trade] currentRollItem missing winner=%s itemId=%s link=%s"
 Diag.E.LogTradeLoggerLogFailed = "[Trade] Logger log failed raidId=%s lootNid=%s link=%s"
 Diag.E.LogTradeKeepLoggerFailed = "[Trade] Keep logged but Logger failed raidId=%s lootNid=%s link=%s"
 Diag.D.LogTradeStart = "[Trade] TradeItem start item=%s trader=%s target=%s type=%d roll=%d count=%d"
 Diag.D.LogTradeTraderKeeps = "[Trade] Trader keeps item=%s winner=%s"
+Diag.D.LogTradeAwardedCountResolved = "[Trade] Awarded count=%d source=%s before=%s after=%s selected=%d"
 Diag.D.LogTradeStackBlocked = "[Trade] Stack trade blocked ignoreStacks=%s link=%s"
 Diag.D.LogTradeInitiated = "[Trade] Initiated item=%s -> %s"
 Diag.W.LogTradeDelayedOutOfRange = "[Trade] Delayed: %s out of range item=%s"
+Diag.W.LogTradeNoLootContextTradeOnly =
+    "[Trade] No lootNid context; created trade-only entry lootNid=%s winner=%s item=%s count=%d"
 
 -- SoftRes --
 Diag.D.LogSRImportRequested = "[SR] Import requested chars=%d"
@@ -144,6 +157,7 @@ Diag.D.LogReservesFetchAll = "[Reserves] Fetch all players=%d"
 Diag.W.LogReservesImportFailedEmpty = "[Reserves] Import failed: empty or invalid data"
 Diag.D.LogReservesParseStart = "[Reserves] Parse CSV start"
 Diag.D.LogReservesParseComplete = "[Reserves] Parse CSV complete players=%d"
+Diag.D.LogReservesImportRows = "[Reserves] Import rows valid=%d skipped=%d header=%s lines=%d"
 Diag.D.LogReservesImportWrongModePlus = "[Reserves] Wrong CSV for Plus System; player=%s has multiple entries"
 Diag.D.LogReservesQueryItemInfo = "[Reserves] Query item info itemId=%d"
 Diag.D.LogReservesItemInfoReady = "[Reserves] Item info ready itemId=%d name=%s"
@@ -206,6 +220,10 @@ Diag.D.LogSyncSnapshotSent = "[Sync] Snapshot sent to=%s req=%s raidNid=%s chunk
 Diag.D.LogSyncChunkReceived = "[Sync] Chunk received from=%s req=%s part=%d/%d"
 Diag.D.LogSyncChunkIgnored = "[Sync] Chunk ignored from=%s req=%s raidNid=%s"
 Diag.D.LogSyncVersionMismatch = "[Sync] Version mismatch from=%s got=%s expected=%s"
+Diag.D.LogSyncSyncSenderFailed = "[Sync] Sender failed from=%s req=%s reason=%s"
+Diag.W.LogSyncRequestRateLimited = "[Sync] Request rate-limited sender=%s count=%d window=%ds"
+Diag.W.LogSyncSenderNotOfficer = "[Sync] Ignored non-officer responder from=%s req=%s"
+Diag.W.LogSyncChunkPartCountChanged = "[Sync] Chunk total changed from=%s req=%s raidNid=%s old=%d new=%d"
 Diag.W.LogSyncChunkMalformed = "[Sync] Malformed chunk from=%s req=%s part=%s/%s"
 Diag.W.LogSyncDecodeFailed = "[Sync] Payload decode failed from=%s req=%s raidNid=%s"
 Diag.W.LogSyncParseFailed = "[Sync] Payload parse failed from=%s req=%s raidNid=%s"

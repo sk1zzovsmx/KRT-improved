@@ -17,6 +17,7 @@ local UnitIsGroupAssistant = feature.UnitIsGroupAssistant
 
 local find = string.find
 local tostring = tostring
+local tonumber = tonumber
 
 -- =========== Chat Output Helpers  =========== --
 do
@@ -40,12 +41,47 @@ do
         return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
     end
 
+    local function ResolveGroupType()
+        if type(addon.GetGroupTypeAndCount) == "function" then
+            local groupType = addon.GetGroupTypeAndCount()
+            if groupType == "raid" or groupType == "party" then
+                return groupType
+            end
+        end
+
+        if type(addon.IsInRaid) == "function" and addon.IsInRaid() then
+            return "raid"
+        end
+        if type(IsInRaid) == "function" and IsInRaid() then
+            return "raid"
+        end
+        if type(UnitInRaid) == "function" and UnitInRaid("player") then
+            return "raid"
+        end
+
+        local raidCount = (GetRealNumRaidMembers and GetRealNumRaidMembers())
+            or (GetNumRaidMembers and GetNumRaidMembers())
+            or 0
+        if (tonumber(raidCount) or 0) > 0 then
+            return "raid"
+        end
+
+        local partyCount = (GetRealNumPartyMembers and GetRealNumPartyMembers())
+            or (GetNumPartyMembers and GetNumPartyMembers())
+            or 0
+        if (tonumber(partyCount) or 0) > 0 then
+            return "party"
+        end
+
+        return nil
+    end
+
     local function ResolveAnnounceChannel(text, preferredChannel)
         if preferredChannel then
             return preferredChannel
         end
 
-        local groupType = addon.GetGroupTypeAndCount()
+        local groupType = ResolveGroupType()
         if groupType == "raid" then
             local options = addon.options or {}
             if IsCountdownMessage(text) and options.countdownSimpleRaidMsg then
@@ -59,7 +95,7 @@ do
         if groupType == "party" then
             return "PARTY"
         end
-        return "SAY"
+        return nil
     end
 
     -- ----- Public methods ----- --
@@ -71,6 +107,9 @@ do
     function module:Announce(text, channel)
         local msg = tostring(text)
         local selectedChannel = ResolveAnnounceChannel(msg, channel)
+        if not selectedChannel or selectedChannel == "" then
+            return module:Print(msg)
+        end
         Comms.Chat(msg, selectedChannel)
     end
 

@@ -1,9 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-28 15:54:01 +01:00
-- Commit: c72bd08
-- Worktree: dirty
 - MaxDepth: 3
+- Deterministic: true
 
 ```text
 .
@@ -18,7 +16,6 @@
 |   |-- Core
 |   |   |-- DB.lua
 |   |   |-- DBManager.lua
-|   |   |-- DBManager.Mock.lua
 |   |   |-- DBRaidMigrations.lua
 |   |   |-- DBRaidQueries.lua
 |   |   |-- DBRaidStore.lua
@@ -87,6 +84,10 @@
 |   |-- !KRT.toc
 |   |-- Init.lua
 |   \\-- KRT.xml
+|-- .agents
+|   \\-- skills
+|       \\-- s-working
+|           \\-- ...
 |-- .devcontainer
 |   \\-- devcontainer.json
 |-- .githooks
@@ -99,18 +100,19 @@
 |   |-- FN_CLUSTERS.md
 |   |-- FUNCTION_REGISTRY.csv
 |   |-- FUNCTION_REGISTRY.md
-|   |-- LAYER_MAP.md
-|   |-- MODULES_UI_OWNERSHIP_MAP.md
 |   |-- NAMING_CONVENTIONS.md
-|   |-- NAMING_RENAME_MAP.md
 |   |-- RAID_SCHEMA.md
 |   |-- REFACTOR_RULES.md
 |   |-- TREE.md
 |   |-- UI_BINDING_RULES.md
-|   |-- UTILS_DEPRECATION_MAP.md
 |   \\-- WOW_ADDON_TEMPLATE.md
+|-- tests
+|   \\-- mocks
+|       \\-- DBManager.Mock.lua
 |-- tools
 |   |-- check-layering.ps1
+|   |-- check-lua-syntax.ps1
+|   |-- check-lua-uniformity.ps1
 |   |-- check-raid-hardening.ps1
 |   |-- check-ui-binding.ps1
 |   |-- fnmap-classify.ps1

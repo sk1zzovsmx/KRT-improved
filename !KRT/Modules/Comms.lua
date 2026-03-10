@@ -15,11 +15,18 @@ local Comms = addon.Comms
 
 function Comms.Sync(prefix, msg)
     local zone = select(2, IsInInstance())
+    local raidCount = (GetRealNumRaidMembers and GetRealNumRaidMembers())
+        or (GetNumRaidMembers and GetNumRaidMembers())
+        or 0
+    local partyCount = (GetRealNumPartyMembers and GetRealNumPartyMembers())
+        or (GetNumPartyMembers and GetNumPartyMembers())
+        or 0
+
     if zone == "pvp" or zone == "arena" then
         SendAddonMessage(prefix, msg, "BATTLEGROUND")
-    elseif GetRealNumRaidMembers() > 0 then
+    elseif raidCount > 0 then
         SendAddonMessage(prefix, msg, "RAID")
-    elseif GetRealNumPartyMembers() > 0 then
+    elseif partyCount > 0 then
         SendAddonMessage(prefix, msg, "PARTY")
     end
 end

@@ -22,6 +22,7 @@ Do NOT record:
 
 Durable preferences learned from recent conversations:
 - Do not introduce Ace dependencies (Ace2/Ace3); prefer native KRT + LibCompat patterns.
+- Do not modify vendored libraries under `!KRT/Libs/*`; keep fixes in addon code.
 - Avoid runtime backward-compat shims when refactoring; target the fresh-SV model directly.
 - Prefer LuaRocks Lua Style Guide for formatting/layout when it does not conflict with KRT binding conventions.
 - Prefer PascalCase for addon module table names.
@@ -42,6 +43,23 @@ Durable preferences learned from recent conversations:
 - Keep diagnostic templates in `addon.Diagnose`; use severity buckets `I/W/E/D` (`DiagnoseLog.en.lua`).
 - Prefer local `Diag` wrapper aliases over direct `Diagnose.*` chains in implementation files.
 - For naming/API uniformization, choose the most repeated in-repo pattern and apply it consistently and robustly.
+- For UI function naming, keep explicit `UI` in method names when it improves clarity; prefer readable names
+  over ultra-short abbreviations.
+- For module-local UI readability, prefer a local `UI` state/helper table:
+  `UI.Bound`, `UI.Loaded`, `UI.isDirty`, `UI.AcquireRefs`, `UI.Localize`, `UI.Refresh`.
+- Prefer one canonical UI lifecycle vocabulary across modules; avoid mixed synonyms for the same concept
+  (for example `uiBound` vs `UI.Bound`, `UpdateUIFrame` vs `UI.Refresh`).
+- Prefer a canonical UI module contract when feasible:
+  `OnLoad`, `AcquireRefs`, `BindUI`, `EnsureUI`, `Toggle`, `Hide`, `RequestRefresh`, `Refresh`.
+- Prefer the definitive UI contract via `UIScaffold.DefineModuleUi(cfg)` for Controllers/Widgets.
+- Modules should implement only UI hooks (`AcquireRefs`, `BindHandlers`, `Localize`, `OnLoadFrame`,
+  `RefreshUI`/`Refresh`), while scaffold-generated methods own `BindUI`, `EnsureUI`, `Toggle`,
+  `Show`, `Hide`, `RequestRefresh`, `MarkDirty`, and cache fields (`frame`, `refs`, `_ui`).
+- Keep UI state schema uniform: `module._ui = { Loaded, Bound, Localized, Dirty, Reason, FrameName }`.
+- Prefer `Core.GetRaidStoreOrNil(contextTag, requiredMethods)` over ad-hoc
+  `Core.GetRaidStore` nil/method checks to keep diagnostics and guard behavior uniform.
+- Prefer homogeneous module structure/patterns across Lua modules; avoid one-off lifecycle variants
+  unless behavior requires them.
 - For XML and Lua analysis/reference, use Townlong-Yak FrameXML 3.3.5:
   `https://www.townlong-yak.com/framexml/3.3.5`.
 - Treat raid `players[].count` (LootCounter) as canonical persisted raid data; restoring/selecting an old current raid
@@ -50,11 +68,14 @@ Durable preferences learned from recent conversations:
   `_playersByName` as a derived runtime index/cache.
 - Treat fresh SavedVariables as strict mode: avoid legacy/migration cleanups and avoid fallback to
   volatile array indices when stable NIDs (`playerNid`, `bossNid`, `lootNid`) are available.
+- Prefer lean SavedVariables persistence: store only canonical restore-critical data; avoid persisting
+  duplicated, derived, or runtime-only fields that can be rebuilt at load time.
 - Keep `EntryPoints/SlashEvents.lua` focused on `/cmd` handling only.
 - Keep main WoW event handlers centralized in `Init.lua`; modules should expose callable APIs used by those handlers.
 - Prefer storing runtime-only addon state under `addon.State` (or feature state tables) over global runtime vars.
 - Prefer deterministic sorting with explicit tie-breakers; when primary values are equal, use stable secondary keys
   (for Logger Loot, prefer loot name, then IDs) to avoid random reordering between sorts.
+- Prefer deterministic bugfixes over timing-dependent or fragile workaround-style fixes.
 - Keep bootstrap ownership centralized in `Init.lua` for `addon.Core`, `addon.L`, `addon.Diagnose`,
   `addon.State`, `addon.C`, and `addon.Events`; do not re-bootstrap them in feature files.
 - Prefer a uniform Lua file contract header with:
@@ -97,6 +118,10 @@ Durable preferences learned from recent conversations:
   (`addon.Raid`, `addon.Logger`, etc.) to prevent new call sites from regressing.
 - Prefer fast architecture verification via focused `rg` checks (XML inline scripts, widget facade calls,
   namespacing coverage, and legacy top-level access scans) before closing refactor tasks.
+- Prefer gradual function/API deduplication: remove or consolidate similar helper functions to reduce drift,
+  while preserving behavior and module ownership boundaries.
+- Prefer centralized constants for shared timing windows/TTLs used across modules;
+  avoid repeating the same hardcoded seconds in multiple files.
 
 ---
 

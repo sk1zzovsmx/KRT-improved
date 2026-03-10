@@ -12,12 +12,10 @@ Rules:
 2. Do not introduce new binder-like registries, parsers, or `CreateFrame` patching.
 3. Keep XML layout-only: no `<Scripts>` or `<On...>` handler logic in UI XML files.
 4. Bind scripts in module code with explicit `SetScript` calls.
-5. Use this per-window pattern:
-   - `AcquireRefs(frame) -> refs`
-   - `BindUI()` (idempotent; stores `self.frame/self.refs`)
-   - `EnsureUI()` (bind once)
-   - `Open/Toggle` must call `EnsureUI()` before `Show()`
+5. Prefer `UIScaffold.BootstrapModuleUi(...)` + `Frames.MakeFrameGetter(...)` for frame lifecycle wiring.
+6. Keep optional widgets behind `addon.UI:IsEnabled(widgetId)` and register exports with `addon.UI:Register`.
+7. Keep services UI-free; only controllers/widgets should own frame script binding.
 
 Notes:
 - Binder files were removed from TOC/runtime.
-- Keep UI wiring local to each module via `BindUI/EnsureUI`.
+- Keep UI wiring local to each module and idempotent.

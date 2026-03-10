@@ -19,8 +19,6 @@ local Events = feature.Events or addon.Events or {}
 local Bus = feature.Bus or addon.Bus
 local Core = feature.Core or addon.Core
 
-local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
-local bindModuleToggleHide = feature.BindModuleToggleHide
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
@@ -41,10 +39,10 @@ do
 
     local getFrame = makeModuleFrameGetter(module, "KRTChanges")
     -- ----- Internal state ----- --
-    local LocalizeUIFrame
-    local localized = false
+    local UI = {
+        Localized = false,
+    }
 
-    local UpdateUIFrame
     local changesTable = {}
     local tmpNames = {}
     local SaveChanges, CancelChanges, InitChangesTable
@@ -56,12 +54,24 @@ do
     local lastAddBtnMode
     local isAdd = false
     local isEdit = false
-    local uiBound = false
-    local scaffoldToggle, scaffoldHide
-    local AcquireRefs
     local BindChangeRow
+    local controller
 
-    local controller = ListController.MakeListController {
+    local function MarkChangesDirty()
+        fetched = false
+        changesDirty = true
+        controller:Dirty()
+        module:RequestRefresh()
+    end
+
+    local function NotifyChangesUpdated(raidId, reason, playerName)
+        if not (Bus and Bus.TriggerEvent and InternalEvents.RaidChangesUpdated) then
+            return
+        end
+        Bus.TriggerEvent(InternalEvents.RaidChangesUpdated, raidId, reason, playerName)
+    end
+
+    controller = ListController.MakeListController {
         keyName = "ChangesList",
         poolTag = "changes",
         _rowParts = { "Name", "Spec" },
@@ -106,8 +116,6 @@ do
         module = module,
         getFrame = getFrame,
         controller = controller,
-        bindToggleHide = bindModuleToggleHide,
-        bindRequestRefresh = bindModuleRequestRefresh,
         onShow = function()
             changesDirty = true
             lastSelectedID = false
@@ -118,19 +126,15 @@ do
             end
         end,
         localize = function()
-            if LocalizeUIFrame then
-                LocalizeUIFrame()
-            end
+            UI.Localize()
         end,
         update = function()
-            if UpdateUIFrame then
-                UpdateUIFrame()
-            end
+            UI.Refresh()
         end,
     })
 
     -- ----- Private helpers ----- --
-    function AcquireRefs(frame)
+    function UI.AcquireRefs(frame)
         return {
             addBtn = Frames.Ref(frame, "AddBtn"),
             announceBtn = Frames.Ref(frame, "AnnounceBtn"),
@@ -178,27 +182,7 @@ do
         return _G[frameName .. partName]
     end
 
-    -- ----- Public methods ----- --
-    scaffoldToggle = module.Toggle
-    scaffoldHide = module.Hide
-
-    function module:BindUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame, self.refs
-        end
-
-        local frame = getFrame()
-        if not frame then
-            return nil
-        end
-        if not frameName then
-            frameName = panelScaffold:OnLoad(frame) or frame:GetName()
-        end
-
-        local refs = AcquireRefs(frame)
-        self.frame = frame
-        self.refs = refs
-
+    local function BindHandlers(_, _, refs)
         Frames.SafeSetScript(refs.addBtn, "OnClick", function(self, button)
             module:Add(self, button)
         end)
@@ -226,52 +210,51 @@ do
                 name:SetFocus()
             end
         end)
-
-        uiBound = true
-        return frame, refs
     end
 
-    function module:EnsureUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame
-        end
-        return self:BindUI()
+    local function OnLoadFrame(frame)
+        frameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or frameName)
+        return frameName
     end
 
-    function module:Toggle()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldToggle then
-            return scaffoldToggle(self)
-        end
-    end
-
-    function module:Hide()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldHide then
-            return scaffoldHide(self)
-        end
-    end
+    -- ----- Public methods ----- --
+    UIScaffold.DefineModuleUi({
+        module = module,
+        getFrame = getFrame,
+        acquireRefs = UI.AcquireRefs,
+        bind = BindHandlers,
+        localize = function()
+            UI.Localize()
+        end,
+        onLoad = OnLoadFrame,
+        refresh = function()
+            panelScaffold:Refresh()
+        end,
+    })
 
     -- OnLoad frame:
     function module:OnLoad(frame)
-        frameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or frameName)
+        return OnLoadFrame(frame)
     end
 
     -- Clear module:
     function module:Clear()
-        if not addon.Core.GetCurrentRaid() or changesTable == nil then return end
-        for n in pairs(changesTable) do
-            changesTable[n] = nil
+        local currentRaid = Core.GetCurrentRaid()
+        if not currentRaid then return end
+
+        local raidStore = Core.GetRaidStoreOrNil("Changes.Clear", { "ClearRaidChanges" })
+        if not raidStore then
+            return
         end
+
+        local ok = raidStore:ClearRaidChanges(currentRaid)
+        if not ok then
+            return
+        end
+
+        NotifyChangesUpdated(currentRaid, "clear")
         CancelChanges()
-        fetched = false
-        changesDirty = true
-        controller:Dirty()
-        module:RequestRefresh()
+        MarkChangesDirty()
     end
 
     -- Selecting Player:
@@ -329,12 +312,21 @@ do
             isAdd = true
             module:RequestRefresh()
         elseif changesTable[selectedID] then
-            changesTable[selectedID] = nil
+            local currentRaid = Core.GetCurrentRaid()
+            if not currentRaid then
+                return
+            end
+            local raidStore = Core.GetRaidStoreOrNil("Changes.Add.Delete", { "DeleteRaidChange" })
+            if not raidStore then
+                return
+            end
+            local ok = raidStore:DeleteRaidChange(currentRaid, selectedID)
+            if not ok then
+                return
+            end
+            NotifyChangesUpdated(currentRaid, "delete", selectedID)
             CancelChanges()
-            fetched = false
-            changesDirty = true
-            controller:Dirty()
-            module:RequestRefresh()
+            MarkChangesDirty()
         end
     end
 
@@ -367,31 +359,39 @@ do
     function module:Delete(name)
         local currentRaid = Core.GetCurrentRaid()
         if not currentRaid or not name then return end
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        local raid = raidStore and raidStore.GetRaidByIndex and raidStore:GetRaidByIndex(currentRaid) or nil
-        if type(raid) ~= "table" or type(raid.changes) ~= "table" then
+        local raidStore = Core.GetRaidStoreOrNil("Changes.Delete", { "DeleteRaidChange" })
+        if not raidStore then
             return
         end
-        raid.changes[name] = nil
-        changesDirty = true
-        controller:Dirty()
-        module:RequestRefresh()
+        local ok = raidStore:DeleteRaidChange(currentRaid, name)
+        if not ok then
+            return
+        end
+        NotifyChangesUpdated(currentRaid, "delete", name)
+        MarkChangesDirty()
     end
 
-    Bus.RegisterCallback(InternalEvents.RaidLeave, function(e, name)
+    Bus.RegisterCallback(InternalEvents.RaidLeave, function(_, name)
         module:Delete(name)
         CancelChanges()
     end)
 
+    Bus.RegisterCallback(InternalEvents.RaidChangesUpdated, function(_, raidId)
+        if tostring(raidId or "") ~= tostring(Core.GetCurrentRaid() or "") then
+            return
+        end
+        MarkChangesDirty()
+    end)
+
     -- Ask For module:
     function module:Demand()
-        if not addon.Core.GetCurrentRaid() then return end
+        if not addon.Raid:IsPlayerInRaid() then return end
         addon:Announce(L.StrChangesDemand)
     end
 
     -- Spam module:
     function module:Announce()
-        if not addon.Core.GetCurrentRaid() then return end
+        if not addon.Raid:IsPlayerInRaid() then return end
         -- In case of a reload/relog and the frame wasn't loaded
         if not fetched or not next(changesTable) then
             InitChangesTable()
@@ -433,8 +433,8 @@ do
     end
 
     -- Localize UI Frame:
-    function LocalizeUIFrame()
-        if localized then return end
+    function UI.Localize()
+        if UI.Localized then return end
         if not frameName then
             return
         end
@@ -455,11 +455,11 @@ do
         }, function()
             module:RequestRefresh()
         end)
-        localized = true
+        UI.Localized = true
     end
 
     -- UI refresh.
-    function UpdateUIFrame()
+    function UI.Refresh()
         if not frameName then
             return
         end
@@ -503,8 +503,9 @@ do
         UIPrimitives.EnableDisableNamedPart(frameName, "ClearBtn", count > 0)
         UIPrimitives.EnableDisableNamedPart(frameName, "AnnounceBtn", count > 0)
         local hasRaid = addon.Core.GetCurrentRaid()
+        local hasRaidGroup = addon.Raid:IsPlayerInRaid()
         UIPrimitives.EnableDisableNamedPart(frameName, "AddBtn", hasRaid)
-        UIPrimitives.EnableDisableNamedPart(frameName, "DemandBtn", hasRaid)
+        UIPrimitives.EnableDisableNamedPart(frameName, "DemandBtn", hasRaidGroup)
     end
 
     function module:Refresh()
@@ -519,19 +520,23 @@ do
             changesTable = {}
             return
         end
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        local raid = raidStore and raidStore.GetRaidByIndex and raidStore:GetRaidByIndex(currentRaid) or nil
-        if type(raid) ~= "table" then
+        local raidStore = Core.GetRaidStoreOrNil("Changes.InitChangesTable", { "GetRaidChanges" })
+        if not raidStore then
             changesTable = {}
             return
         end
-        raid.changes = raid.changes or {}
-        changesTable = raid.changes
+        local changes = raidStore:GetRaidChanges(currentRaid)
+        if type(changes) ~= "table" then
+            changesTable = {}
+            return
+        end
+        changesTable = changes
     end
 
     -- Save module:
     function SaveChanges(name, spec)
-        if not addon.Core.GetCurrentRaid() or not name then return end
+        local currentRaid = Core.GetCurrentRaid()
+        if not currentRaid or not name then return end
         name = Strings.NormalizeName(name)
         spec = Strings.NormalizeName(spec)
         -- Is the player in the raid?
@@ -541,12 +546,21 @@ do
             addon:error(format((name == "" and L.ErrChangesNoPlayer or L.ErrCannotFindPlayer), name))
             return
         end
-        changesTable[name] = (spec == "") and nil or spec
+
+        local raidStore = Core.GetRaidStoreOrNil("Changes.SaveChanges", { "UpsertRaidChange" })
+        if not raidStore then
+            return
+        end
+
+        local ok, savedName = raidStore:UpsertRaidChange(currentRaid, name, spec)
+        if not ok then
+            return
+        end
+
+        local reason = (spec == nil or spec == "") and "delete" or "save"
+        NotifyChangesUpdated(currentRaid, reason, savedName)
         CancelChanges()
-        fetched = false
-        changesDirty = true
-        controller:Dirty()
-        module:RequestRefresh()
+        MarkChangesDirty()
     end
 
     -- Cancel all actions:
@@ -566,4 +580,3 @@ do
         module:RequestRefresh()
     end
 end
-

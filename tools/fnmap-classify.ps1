@@ -32,33 +32,32 @@ function Get-SeedCluster([object]$row, [string]$functionKey) {
     $fn = $row.Function
     $file = $row.File
 
-    if ($fn -eq "Core.getFeatureShared") {
+    if ($fn -eq "Core.GetFeatureShared" -or $fn -eq "Core.getFeatureShared") {
         return "core.bootstrap.getFeatureShared"
     }
-    if ($fn -eq "Core.ensureLootRuntimeState" -or $functionKey -eq "ensureLootRuntimeState") {
+    if (
+        $fn -eq "Core.EnsureLootRuntimeState" -or
+        $fn -eq "Core.ensureLootRuntimeState" -or
+        $functionKey -eq "ensureLootRuntimeState"
+    ) {
         return "core.bootstrap.ensureLootRuntimeState"
     }
     if ($functionKey -match "^FormatReserve(ItemIdLabel|ItemFallback|DroppedBy)$") {
         return ("reserves.formatters.{0}" -f $functionKey)
     }
     if (
-        $functionKey -match "^get(Master|Logger|Warnings|Changes|Spammer)Controller$" -or
+        $functionKey -match "^[gG]et(Master|Logger|Warnings|Changes|Spammer)Controller$" -or
+        $fn -eq "Core.GetController" -or
         $fn -eq "Core.getController" -or
         $functionKey -eq "getController"
     ) {
         return "entrypoints.controllerGetters.core"
     }
     if (
-        $file -eq "!KRT/Modules/UI/Binder/UIBinder.lua" -and
-        ($functionKey -eq "splitCommaArgs" -or $functionKey -eq "trimBinderToken")
-    ) {
-        return "uibinder.trim/split*"
-    }
-    if (
-        ($file -eq "!KRT/Modules/Strings.lua" -or $file -eq "!KRT/Modules/Utils.lua") -and
+        $file -eq "!KRT/Modules/Strings.lua" -and
         ($functionKey -eq "splitArgs" -or $functionKey -eq "trimText")
     ) {
-        return "uibinder.trim/split*"
+        return "strings.trim/split*"
     }
     if (
         ($file -eq "!KRT/Controllers/Warnings.lua" -or $file -eq "!KRT/Controllers/Changes.lua") -and
@@ -167,6 +166,16 @@ foreach ($group in $groups) {
         }
 
         if (
+            $row.Function -eq "Core.GetFeatureShared" -or
+            $row.Function -eq "Core.EnsureLootRuntimeState" -or
+            $row.Function -eq "Core.GetController"
+        ) {
+            $row.Class = "structural-pattern"
+            $row.Action = "keep"
+            continue
+        }
+
+        if (
             ($row.Type -eq "field_closure" -or $row.Type -eq "local_closure") -and
             $dupCount -gt 1
         ) {
@@ -194,9 +203,7 @@ foreach ($group in $groups) {
             }
             if (
                 $functionKey -eq "splitArgs" -or
-                $functionKey -eq "trimText" -or
-                $functionKey -eq "splitCommaArgs" -or
-                $functionKey -eq "trimBinderToken"
+                $functionKey -eq "trimText"
             ) {
                 $row.Class = "name-collision"
                 $row.Action = "rename"

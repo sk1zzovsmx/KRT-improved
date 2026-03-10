@@ -13,9 +13,7 @@ local _G = _G
 local type, pairs, tostring = type, pairs, tostring
 local twipe = table.wipe
 
-local function CreateFrame(...)
-    return _G.CreateFrame(...)
-end
+local CreateFrame = _G.CreateFrame
 
 addon.ListController = addon.ListController or {}
 local ListController = addon.ListController
@@ -440,4 +438,3 @@ function ListController.BindListController(module, controller)
     module.Fetch = function() controller:Fetch() end
     module.Sort = function(_, key) controller:Sort(key) end
 end
-

@@ -3,6 +3,22 @@
 Quick, copy-paste checks for layering and ownership rules.
 If `rg` is missing on Windows, run `tools/check-layering.ps1` (it falls back to `Select-String`).
 
+## Lua syntax + uniformity (local gate)
+
+These checks are local-only. No CI blocking gate is configured.
+
+1. Syntax check for all Lua files (including vendored libs):
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-syntax.ps1
+```
+Expected: `Lua syntax check passed.`
+
+2. Uniformity check for KRT-owned Lua (`!KRT` + `tools`, excluding `!KRT/Libs`):
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-uniformity.ps1
+```
+Expected: `Lua uniformity checks passed.`
+
 ## Layering checks
 
 1. Services must not reference Parents directly:

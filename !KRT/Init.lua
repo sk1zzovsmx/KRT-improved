@@ -456,17 +456,31 @@ addon.LoadOptions = Options.LoadOptions
 function Core.EnsureLootRuntimeState()
     local state = addon.State
     state.loot = state.loot or {}
+    state.raid = state.raid or {}
 
     local lootState = state.loot
+    local raidState = state.raid
     lootState.itemInfo = lootState.itemInfo or {}
     lootState.currentRollType = tonumber(lootState.currentRollType) or 4
     lootState.currentRollItem = tonumber(lootState.currentRollItem) or 0
     lootState.currentItemIndex = tonumber(lootState.currentItemIndex) or 0
-
-    lootState.itemCount = tonumber(lootState.itemCount) or 1
-    if lootState.itemCount < 1 then
-        lootState.itemCount = 1
+    lootState.nextRollSessionId = tonumber(lootState.nextRollSessionId) or 1
+    if lootState.nextRollSessionId < 1 then
+        lootState.nextRollSessionId = 1
     end
+
+    local selectedItemCount = tonumber(lootState.selectedItemCount) or tonumber(lootState.itemCount) or 1
+    if selectedItemCount < 1 then
+        selectedItemCount = 1
+    end
+    lootState.selectedItemCount = selectedItemCount
+    lootState.itemCount = selectedItemCount -- Legacy alias for pre-migration call sites.
+
+    raidState.lastLootCount = tonumber(raidState.lastLootCount) or 1
+    if raidState.lastLootCount < 1 then
+        raidState.lastLootCount = 1
+    end
+
     lootState.lootCount = tonumber(lootState.lootCount) or 0
     if lootState.lootCount < 0 then
         lootState.lootCount = 0
@@ -481,6 +495,47 @@ function Core.EnsureLootRuntimeState()
     end
 
     lootState.rollStarted = lootState.rollStarted == true
+    if lootState.rollStarted and type(lootState.rollSession) ~= "table" then
+        local sid = "RS:" .. tostring(lootState.nextRollSessionId)
+        lootState.nextRollSessionId = lootState.nextRollSessionId + 1
+        lootState.rollSession = {
+            id = sid,
+            itemKey = nil,
+            itemId = nil,
+            itemLink = nil,
+            rollType = tonumber(lootState.currentRollType) or 4,
+            lootNid = tonumber(lootState.currentRollItem) or 0,
+            startedAt = GetTime(),
+            endsAt = nil,
+            source = "lootWindow",
+            expectedWinners = selectedItemCount,
+            active = true,
+        }
+    end
+    if type(lootState.rollSession) == "table" then
+        local session = lootState.rollSession
+        if session.id == nil or session.id == "" then
+            session.id = "RS:" .. tostring(lootState.nextRollSessionId)
+            lootState.nextRollSessionId = lootState.nextRollSessionId + 1
+        else
+            session.id = tostring(session.id)
+        end
+        session.itemKey = session.itemKey or nil
+        session.itemId = tonumber(session.itemId) or nil
+        session.itemLink = session.itemLink or nil
+        session.rollType = tonumber(session.rollType) or tonumber(lootState.currentRollType) or 4
+        session.lootNid = tonumber(session.lootNid) or tonumber(lootState.currentRollItem) or 0
+        session.startedAt = tonumber(session.startedAt) or GetTime()
+        session.endsAt = tonumber(session.endsAt) or nil
+        session.source = session.source or "lootWindow"
+        session.expectedWinners = tonumber(session.expectedWinners) or selectedItemCount
+        if session.expectedWinners < 1 then
+            session.expectedWinners = 1
+        end
+        session.active = session.active ~= false
+        lootState.currentRollType = session.rollType
+        lootState.currentRollItem = session.lootNid
+    end
 
     if lootState.opened == nil then
         lootState.opened = false
@@ -490,7 +545,7 @@ function Core.EnsureLootRuntimeState()
     end
     lootState.pendingAwards = lootState.pendingAwards or {}
 
-    return state, lootState, lootState.itemInfo
+    return state, lootState, lootState.itemInfo, raidState
 end
 
 function Core.GetItemIndex()
@@ -501,7 +556,7 @@ end
 function Core.GetFeatureShared()
     local constants = addon.C or {}
     local core = addon.Core
-    local state, lootState, itemInfo = core.EnsureLootRuntimeState()
+    local state, lootState, itemInfo, raidState = core.EnsureLootRuntimeState()
 
     return {
         L = addon.L,
@@ -551,6 +606,7 @@ function Core.GetFeatureShared()
         RT_COLOR = constants.RT_COLOR,
 
         coreState = state,
+        raidState = raidState,
         lootState = lootState,
         itemInfo = itemInfo,
         GetItemIndex = core.GetItemIndex or function()
@@ -1005,8 +1061,9 @@ end
 ensureDBManager()
 
 function Core.EnsureRaidSchema(raid)
-    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-    if raidStore and raidStore.NormalizeRaidRecord then
+    local raidStore = Core.GetRaidStoreOrNil and
+        Core.GetRaidStoreOrNil("Core.EnsureRaidSchema", { "NormalizeRaidRecord" }) or nil
+    if raidStore then
         return raidStore:NormalizeRaidRecord(raid)
     end
     return raid
@@ -1018,8 +1075,9 @@ function Core.EnsureRaidById(raidNum)
         return nil, nil
     end
 
-    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-    if raidStore and raidStore.GetRaidByIndex then
+    local raidStore = Core.GetRaidStoreOrNil and
+        Core.GetRaidStoreOrNil("Core.EnsureRaidById", { "GetRaidByIndex" }) or nil
+    if raidStore then
         return raidStore:GetRaidByIndex(id)
     end
     return nil, id
@@ -1031,16 +1089,18 @@ function Core.EnsureRaidByNid(raidNid)
         return nil, nil, nil
     end
 
-    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-    if raidStore and raidStore.GetRaidByNid then
+    local raidStore = Core.GetRaidStoreOrNil and
+        Core.GetRaidStoreOrNil("Core.EnsureRaidByNid", { "GetRaidByNid" }) or nil
+    if raidStore then
         return raidStore:GetRaidByNid(nid)
     end
     return nil, nil, nid
 end
 
 function Core.GetRaidNidById(raidNum)
-    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-    if raidStore and raidStore.GetRaidNidByIndex then
+    local raidStore = Core.GetRaidStoreOrNil and
+        Core.GetRaidStoreOrNil("Core.GetRaidNidById", { "GetRaidNidByIndex" }) or nil
+    if raidStore then
         return raidStore:GetRaidNidByIndex(raidNum)
     end
     local raid = Core.EnsureRaidById(raidNum)
@@ -1048,50 +1108,19 @@ function Core.GetRaidNidById(raidNum)
 end
 
 function Core.GetRaidIdByNid(raidNid)
-    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-    if raidStore and raidStore.GetRaidIndexByNid then
+    local raidStore = Core.GetRaidStoreOrNil and
+        Core.GetRaidStoreOrNil("Core.GetRaidIdByNid", { "GetRaidIndexByNid" }) or nil
+    if raidStore then
         return raidStore:GetRaidIndexByNid(raidNid)
     end
     local _, idx = Core.EnsureRaidByNid(raidNid)
     return idx
 end
 
-function Core.CreateRaidRecord(args)
-    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-    if raidStore and raidStore.CreateRaidRecord then
-        return raidStore:CreateRaidRecord(args)
-    end
-    args = args or {}
-    local schemaVersion = Core.GetRaidSchemaVersion and Core.GetRaidSchemaVersion() or 1
-    schemaVersion = tonumber(schemaVersion) or 1
-    if schemaVersion < 1 then
-        schemaVersion = 1
-    end
-
-    local raid = {
-        schemaVersion = schemaVersion,
-        raidNid = tonumber(args and args.raidNid),
-        realm = args.realm,
-        zone = args.zone,
-        size = args.size,
-        difficulty = args.difficulty,
-        startTime = args.startTime or Time.GetCurrentTime(),
-        endTime = args.endTime,
-        players = {},
-        bossKills = {},
-        loot = {},
-        changes = {},
-        nextBossNid = 1,
-        nextLootNid = 1,
-        nextPlayerNid = 1,
-    }
-
-    return Core.EnsureRaidSchema(raid)
-end
-
 function Core.StripRuntimeRaidCaches(raid)
-    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-    if raidStore and raidStore.StripRuntime then
+    local raidStore = Core.GetRaidStoreOrNil and
+        Core.GetRaidStoreOrNil("Core.StripRuntimeRaidCaches", { "StripRuntime" }) or nil
+    if raidStore then
         raidStore:StripRuntime(raid)
         return
     end
@@ -1307,8 +1336,9 @@ end
 
 -- PLAYER_LOGOUT: Strip runtime-only raid caches before SavedVariables are written.
 function addon:PLAYER_LOGOUT()
-    local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-    if raidStore and raidStore.StripAllRuntime then
+    local raidStore = Core.GetRaidStoreOrNil and
+        Core.GetRaidStoreOrNil("Core.PlayerLogout", { "StripAllRuntime" }) or nil
+    if raidStore then
         raidStore:StripAllRuntime()
         return
     end
@@ -1319,4 +1349,3 @@ function addon:PLAYER_LOGOUT()
 end
 
 end
-

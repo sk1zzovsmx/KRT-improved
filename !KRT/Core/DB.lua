@@ -7,12 +7,14 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local Core = feature.Core or addon.Core
+local Diag = feature.Diag or {}
 
 addon.DB = addon.DB or {}
 local DB = addon.DB
 
 -- ----- Internal state ----- --
 DB._manager = DB._manager or nil
+local missingRaidStoreWarned = {}
 
 -- ----- Private helpers ----- --
 local function getDefaultManager()
@@ -64,6 +66,46 @@ end
 
 function Core.GetRaidStore()
     return DB.GetRaidStore()
+end
+
+function Core.GetRaidStoreOrNil(contextTag, requiredMethods)
+    local raidStore = DB.GetRaidStore()
+    local ctx = tostring(contextTag or "?")
+
+    if type(raidStore) ~= "table" then
+        local warnKey = "store:" .. ctx
+        if not missingRaidStoreWarned[warnKey] then
+            missingRaidStoreWarned[warnKey] = true
+            local template = Diag.W and Diag.W.LogRaidStoreUnavailable
+            if type(template) == "string" then
+                addon:warn(template:format(ctx))
+            else
+                addon:warn("[Core] RaidStore unavailable (context=%s)", ctx)
+            end
+        end
+        return nil
+    end
+
+    if type(requiredMethods) == "table" then
+        for i = 1, #requiredMethods do
+            local method = requiredMethods[i]
+            if type(method) == "string" and method ~= "" and type(raidStore[method]) ~= "function" then
+                local warnKey = "method:" .. ctx .. ":" .. method
+                if not missingRaidStoreWarned[warnKey] then
+                    missingRaidStoreWarned[warnKey] = true
+                    local template = Diag.W and Diag.W.LogRaidStoreMethodMissing
+                    if type(template) == "string" then
+                        addon:warn(template:format(method, ctx))
+                    else
+                        addon:warn("[Core] RaidStore missing method %s (context=%s)", method, ctx)
+                    end
+                end
+                return nil
+            end
+        end
+    end
+
+    return raidStore
 end
 
 function DB.GetRaidQueries()

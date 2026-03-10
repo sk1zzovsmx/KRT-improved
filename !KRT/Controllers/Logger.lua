@@ -32,8 +32,6 @@ local CompareLootTie = Sort.CompareLootTie
 
 local InternalEvents = Events.Internal
 
-local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
-local bindModuleToggleHide = feature.BindModuleToggleHide
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local rollTypes = feature.rollTypes
@@ -82,8 +80,9 @@ do
     -- ----- Internal state ----- --
     local frameName
     local getFrame = makeModuleFrameGetter(module, "KRTLogger")
-    local uiBound = false
-    local scaffoldToggle, scaffoldHide
+    local UI = {
+        Loaded = false,
+    }
     -- Stable-ID data helpers (fresh SavedVariables only; no legacy migration).
     module.Store   = module.Store or {}
     module.View    = module.View or {}
@@ -93,8 +92,71 @@ do
     local View     = module.View
     local Actions  = module.Actions
 
+    function Store:ResolvePlayerNameByNid(raid, playerNid)
+        local player = self and self.GetPlayer and self:GetPlayer(raid, playerNid) or nil
+        return player and player.name or nil
+    end
+
+    function Store:ResolvePlayerClassByNid(raid, playerNid)
+        local player = self and self.GetPlayer and self:GetPlayer(raid, playerNid) or nil
+        return player and player.class or nil
+    end
+
+    function Store:ResolveLootLooterNid(raid, looter)
+        local looterNid = tonumber(looter)
+        if looterNid and looterNid > 0 then
+            return looterNid
+        end
+        local normalizedName = Strings.NormalizeName(looter, true)
+        if not normalizedName or normalizedName == "" then
+            return nil
+        end
+
+        if raid and raid.players then
+            for i = #raid.players, 1, -1 do
+                local player = raid.players[i]
+                if player and player.name == normalizedName then
+                    local nid = tonumber(player.playerNid)
+                    if nid and nid > 0 then
+                        return nid
+                    end
+                end
+            end
+        end
+        return nil
+    end
+
+    function Store:ResolveLootLooterName(raid, loot)
+        if type(loot) ~= "table" then
+            return nil
+        end
+        local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter)
+        if looterNid and looterNid > 0 then
+            local playerName = self:ResolvePlayerNameByNid(raid, looterNid)
+            if playerName and playerName ~= "" then
+                return playerName
+            end
+        end
+        return type(loot.looter) == "string" and loot.looter or nil
+    end
+
+    function Store:ResolveLootLooterClass(raid, loot)
+        if type(loot) ~= "table" then
+            return nil
+        end
+        local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter)
+        if looterNid and looterNid > 0 then
+            return self:ResolvePlayerClassByNid(raid, looterNid)
+        end
+        local looterName = type(loot.looter) == "string" and loot.looter or nil
+        if looterName and addon.Raid and addon.Raid.GetPlayerClass then
+            return addon.Raid:GetPlayerClass(looterName)
+        end
+        return nil
+    end
+
     -- ----- Private helpers ----- --
-    local function AcquireRefs(frame)
+    function UI.AcquireRefs(frame)
         local framePrefix = "KRTLogger"
         if frame and frame.GetName then
             framePrefix = frame:GetName() or framePrefix
@@ -201,16 +263,16 @@ do
     -- ----- Public methods ----- --
     -- Ensure the raid table follows the canonical fresh-SV schema.
     function Store:EnsureRaid(raid)
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        if raidStore and raidStore.NormalizeRaidRecord then
+        local raidStore = Core.GetRaidStoreOrNil("Logger.Store.EnsureRaid", { "NormalizeRaidRecord" })
+        if raidStore then
             return raidStore:NormalizeRaidRecord(raid)
         end
         return Core.EnsureRaidSchema(raid)
     end
 
     function Store:GetRaid(rID)
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        if raidStore and raidStore.GetRaidByIndex then
+        local raidStore = Core.GetRaidStoreOrNil("Logger.Store.GetRaid", { "GetRaidByIndex" })
+        if raidStore then
             local raid = rID and raidStore:GetRaidByIndex(rID) or nil
             if raid then
                 self:EnsureRaid(raid)
@@ -225,8 +287,8 @@ do
     end
 
     function Store:GetRaidByNid(raidNid)
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        if raidStore and raidStore.GetRaidByNid then
+        local raidStore = Core.GetRaidStoreOrNil("Logger.Store.GetRaidByNid", { "GetRaidByNid" })
+        if raidStore then
             local raid = raidNid and raidStore:GetRaidByNid(raidNid) or nil
             if raid then
                 self:EnsureRaid(raid)
@@ -248,8 +310,8 @@ do
     function Store:BossIdx(raid, bossNid)
         local queryNid = tonumber(bossNid)
         if not (raid and queryNid) then return nil end
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        local runtime = raidStore and raidStore.EnsureRaidRuntime and raidStore:EnsureRaidRuntime(raid) or nil
+        local raidStore = Core.GetRaidStoreOrNil("Logger.Store.BossIdx", { "EnsureRaidRuntime" })
+        local runtime = raidStore and raidStore:EnsureRaidRuntime(raid) or nil
         local idxByNid = runtime and runtime.bossIdxByNid or nil
         return idxByNid and idxByNid[queryNid] or nil
     end
@@ -257,8 +319,8 @@ do
     function Store:LootIdx(raid, lootNid)
         local queryNid = tonumber(lootNid)
         if not (raid and queryNid) then return nil end
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        local runtime = raidStore and raidStore.EnsureRaidRuntime and raidStore:EnsureRaidRuntime(raid) or nil
+        local raidStore = Core.GetRaidStoreOrNil("Logger.Store.LootIdx", { "EnsureRaidRuntime" })
+        local runtime = raidStore and raidStore:EnsureRaidRuntime(raid) or nil
         local idxByNid = runtime and runtime.lootIdxByNid or nil
         return idxByNid and idxByNid[queryNid] or nil
     end
@@ -276,8 +338,8 @@ do
     function Store:PlayerIdx(raid, playerNid)
         local queryNid = tonumber(playerNid)
         if not (raid and queryNid) then return nil end
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        local runtime = raidStore and raidStore.EnsureRaidRuntime and raidStore:EnsureRaidRuntime(raid) or nil
+        local raidStore = Core.GetRaidStoreOrNil("Logger.Store.PlayerIdx", { "EnsureRaidRuntime" })
+        local runtime = raidStore and raidStore:EnsureRaidRuntime(raid) or nil
         local idxByNid = runtime and runtime.playerIdxByNid or nil
         return idxByNid and idxByNid[queryNid] or nil
     end
@@ -435,6 +497,7 @@ do
                 local boss = bossByNid[tonumber(loot.bossNid)]
                 local bossTime = boss and boss.time and date("%Y-%m-%d %H:%M:%S", boss.time) or ""
                 local lootTime = loot.time and date("%Y-%m-%d %H:%M:%S", loot.time) or ""
+                local looterName = Store:ResolveLootLooterName(raid, loot) or ""
 
                 appendRow({
                     raidIndex or "",
@@ -450,7 +513,7 @@ do
                     loot.lootNid or "",
                     loot.itemId or "",
                     loot.itemName or loot.itemLink or "",
-                    loot.looter or "",
+                    looterName,
                     View:GetLootRollTypeLabel(loot.rollType),
                     loot.rollValue or "",
                     lootTime,
@@ -526,17 +589,20 @@ do
         -- Build a set for O(1) membership checks.
         local set = {}
         for i = 1, #bossKill.players do
-            local name = bossKill.players[i]
-            if name then set[name] = true end
+            local playerNid = tonumber(bossKill.players[i])
+            if playerNid and playerNid > 0 then
+                set[playerNid] = true
+            end
         end
 
         local n = 0
         for i = 1, #raid.players do
             local p = raid.players[i]
-            if p and p.name and set[p.name] then
+            local playerNid = p and tonumber(p.playerNid) or nil
+            if p and p.name and playerNid and set[playerNid] then
                 n = n + 1
                 local it = {}
-                it.id = tonumber(p.playerNid)
+                it.id = playerNid
                 it.name = p.name
                 it.class = p.class
                 out[n] = it
@@ -550,11 +616,16 @@ do
             return queries:GetLoot(raid, bossNid, playerName, out)
         end
         local bossFilter = tonumber(bossNid) or bossNid
+        local playerFilterNid = Store:ResolveLootLooterNid(raid, playerName)
         self:BuildRows(out, raid and raid.loot,
             function(v)
                 if not v then return false end
                 local okBoss = (not bossFilter) or (bossFilter <= 0) or (tonumber(v.bossNid) == bossFilter)
-                local okPlayer = (not playerName) or (v.looter == playerName)
+                local looterNid = tonumber(v.looterNid) or tonumber(v.looter)
+                local looterName = Store:ResolveLootLooterName(raid, v)
+                local okPlayer = (not playerName)
+                    or (playerFilterNid and looterNid and playerFilterNid == looterNid)
+                    or ((not playerFilterNid) and looterName and looterName == playerName)
                 return okBoss and okPlayer
             end,
             function(v)
@@ -569,7 +640,9 @@ do
                 it.sortName = GetLootSortName(v.itemName, v.itemLink, v.itemId)
                 local boss = Store:GetBoss(raid, v.bossNid)
                 it.sourceName = (boss and boss.name) or ""
-                it.looter = v.looter
+                it.looterNid = tonumber(v.looterNid) or tonumber(v.looter)
+                it.looter = Store:ResolveLootLooterName(raid, v) or ""
+                it.looterClass = Store:ResolveLootLooterClass(raid, v)
                 it.rollType = tonumber(v.rollType) or 0
                 it.rollValue = v.rollValue
                 it.time = v.time or time()
@@ -739,11 +812,9 @@ do
         if not (raid and bossNid and playerNid) then return false end
         local bossKill = Store:GetBoss(raid, bossNid)
         if not (bossKill and bossKill.players and raid.players) then return false end
-        local player = Store:GetPlayer(raid, playerNid)
-        if not player then return false end
-        local name = player.name
-        if not name then return false end
-        self:RemoveAll(bossKill.players, name)
+        local queryNid = tonumber(playerNid)
+        if not queryNid or queryNid <= 0 then return false end
+        self:RemoveAll(bossKill.players, queryNid)
         return true
     end
 
@@ -751,26 +822,29 @@ do
         local raid = Store:GetRaid(rID)
         if not (raid and raid.players and playerNid) then return false end
 
-        local _, playerIdx = Store:GetPlayer(raid, playerNid)
+        local queryNid = tonumber(playerNid)
+        if not queryNid or queryNid <= 0 then return false end
+
+        local _, playerIdx = Store:GetPlayer(raid, queryNid)
         if not playerIdx then return false end
-        local name = raid.players[playerIdx] and raid.players[playerIdx].name
-        if not name then return false end
 
         tremove(raid.players, playerIdx)
 
         -- Remove from all boss attendee lists.
-        if name and raid.bossKills then
+        if raid.bossKills then
             for _, boss in ipairs(raid.bossKills) do
                 if boss and boss.players then
-                    self:RemoveAll(boss.players, name)
+                    self:RemoveAll(boss.players, queryNid)
                 end
             end
         end
 
         -- Remove loot won by removed player.
-        if name and raid.loot then
+        if raid.loot then
             for i = #raid.loot, 1, -1 do
-                if raid.loot[i] and raid.loot[i].looter == name then
+                local loot = raid.loot[i]
+                local looterNid = loot and (tonumber(loot.looterNid) or tonumber(loot.looter)) or nil
+                if looterNid and looterNid == queryNid then
                     tremove(raid.loot, i)
                 end
             end
@@ -801,14 +875,15 @@ do
         end
         table.sort(ids, function(a, b) return a > b end)
 
-        -- Collect names + remove players from raid.players.
-        local removedNames = {}
+        -- Collect removed NIDs + remove players from raid.players.
+        local removedNids = {}
         local removed = 0
         for i = 1, #ids do
             local idx = ids[i]
             local p = raid.players[idx]
-            if p and p.name then
-                removedNames[p.name] = true
+            local playerNid = p and tonumber(p.playerNid)
+            if playerNid and playerNid > 0 then
+                removedNids[playerNid] = true
                 tremove(raid.players, idx)
                 removed = removed + 1
             end
@@ -821,7 +896,8 @@ do
             for _, boss in ipairs(raid.bossKills) do
                 if boss and boss.players then
                     for j = #boss.players, 1, -1 do
-                        if removedNames[boss.players[j]] then
+                        local attendeeNid = tonumber(boss.players[j])
+                        if attendeeNid and removedNids[attendeeNid] then
                             tremove(boss.players, j)
                         end
                     end
@@ -832,7 +908,9 @@ do
         -- Remove loot won by removed players.
         if raid.loot then
             for j = #raid.loot, 1, -1 do
-                if raid.loot[j] and removedNames[raid.loot[j].looter] then
+                local loot = raid.loot[j]
+                local looterNid = loot and (tonumber(loot.looterNid) or tonumber(loot.looter)) or nil
+                if looterNid and removedNids[looterNid] then
                     tremove(raid.loot, j)
                 end
             end
@@ -852,9 +930,9 @@ do
             return false
         end
 
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        local raidStore = Core.GetRaidStoreOrNil("Logger.Actions.DeleteRaid", { "DeleteRaid" })
         local removedIdx = sel
-        if raidStore and raidStore.DeleteRaid then
+        if raidStore then
             local deleted, idx = raidStore:DeleteRaid(raid.raidNid)
             if not deleted then
                 return false
@@ -883,9 +961,9 @@ do
             return false
         end
 
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
+        local raidStore = Core.GetRaidStoreOrNil("Logger.Actions.DeleteRaidByNid", { "DeleteRaid" })
         local removedIdx = sel
-        if raidStore and raidStore.DeleteRaid then
+        if raidStore then
             local deleted, idx = raidStore:DeleteRaid(nid)
             if not deleted then
                 return false
@@ -1018,23 +1096,24 @@ do
         end
 
         bossKill.players = bossKill.players or {}
-        for _, n in ipairs(bossKill.players) do
-            if Strings.NormalizeLower(n) == normalizedName then
+        local playerName, _, player = Store:FindRaidPlayerByNormName(raid, normalizedName)
+        local playerNid = tonumber(player and player.playerNid)
+        if not (playerName and playerNid and playerNid > 0) then
+            addon:error(L.ErrAttendeesInvalidName)
+            return false
+        end
+
+        for i = 1, #bossKill.players do
+            if tonumber(bossKill.players[i]) == playerNid then
                 addon:error(L.ErrAttendeesPlayerExists)
                 return false
             end
         end
 
-        local playerName = Store:FindRaidPlayerByNormName(raid, normalizedName)
-        if playerName then
-            tinsert(bossKill.players, playerName)
-            addon:info(L.StrAttendeesAddSuccess)
-            self:Commit(raid, { invalidate = false })
-            return true
-        end
-
-        addon:error(L.ErrAttendeesInvalidName)
-        return false
+        tinsert(bossKill.players, playerNid)
+        addon:info(L.StrAttendeesAddSuccess)
+        self:Commit(raid, { invalidate = false })
+        return true
     end
 
     module.selectedRaid = nil
@@ -1272,36 +1351,12 @@ do
                 clearSelections()
             end,
         })
-        if not frameName then return end
+        UI.Loaded = frameName ~= nil
+        if not UI.Loaded then return end
         Frames.SetFrameTitle(frameName, L.StrLootLogger)
     end
 
-    -- Initialize UI controller for Toggle/Hide.
-    UIScaffold.BootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
-        bindToggleHide = bindModuleToggleHide,
-        bindRequestRefresh = bindModuleRequestRefresh,
-    })
-
-    scaffoldToggle = module.Toggle
-    scaffoldHide = module.Hide
-
-    function module:BindUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame, self.refs
-        end
-
-        local frame = getFrame()
-        if not frame then
-            return nil
-        end
-        if not frameName then
-            self:OnLoad(frame)
-        end
-
-        local refs = AcquireRefs(frame)
-        self.frame = frame
-        self.refs = refs
-
+    local function BindHandlers(_, frame, refs)
         if refs.historyTabBtn and not refs.historyTabBtn._krtBound then
             Frames.SafeSetScript(refs.historyTabBtn, "OnClick", function()
                 module:SetTab(TAB_HISTORY)
@@ -1341,35 +1396,20 @@ do
         EnsureSubmoduleOnLoad(module.AttendeesBox, refs.attendeesBox)
 
         module:SetTab(module.activeTab)
-
-        uiBound = true
-        return frame, refs
     end
 
-    function module:EnsureUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame
-        end
-        return self:BindUI()
+    local function OnLoadFrame(frame)
+        module:OnLoad(frame)
+        return frameName
     end
 
-    function module:Toggle()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldToggle then
-            return scaffoldToggle(self)
-        end
-    end
-
-    function module:Hide()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldHide then
-            return scaffoldHide(self)
-        end
-    end
+    UIScaffold.DefineModuleUi({
+        module = module,
+        getFrame = getFrame,
+        acquireRefs = UI.AcquireRefs,
+        bind = BindHandlers,
+        onLoad = OnLoadFrame,
+    })
 
     function module:Refresh()
         local frame = getFrame()
@@ -1853,9 +1893,11 @@ do
                 end
             end
             if bossKill and bossKill.players then
-                for _, name in ipairs(bossKill.players) do
-                    if normalizedName == Strings.NormalizeLower(name) then
-                        return name
+                for i = 1, #bossKill.players do
+                    local playerNid = tonumber(bossKill.players[i])
+                    local playerName = playerNid and Store:ResolvePlayerNameByNid(raid, playerNid) or nil
+                    if playerName and normalizedName == Strings.NormalizeLower(playerName) then
+                        return playerName
                     end
                 end
             end
@@ -1961,11 +2003,11 @@ do
         end,
 
         getData = function(out)
-            local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-            local raids = raidStore and raidStore.GetAllRaids and raidStore:GetAllRaids() or {}
+            local raidStore = Core.GetRaidStoreOrNil("Logger.Raids.GetData", { "GetAllRaids", "GetRaidByIndex" })
+            local raids = raidStore and raidStore:GetAllRaids() or {}
             local queries = getRaidQueries()
             for i = 1, #raids do
-                local r = raidStore and raidStore.GetRaidByIndex and raidStore:GetRaidByIndex(i) or Core.EnsureRaidById(i)
+                local r = raidStore and raidStore:GetRaidByIndex(i) or Core.EnsureRaidById(i)
                 if r then
                     local summary = queries and queries.GetRaidSummary and queries:GetRaidSummary(r) or nil
                     local it = {}
@@ -2125,8 +2167,8 @@ do
 
             MultiSelect.MultiSelectClear(ctx)
 
-            local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-            local raids = raidStore and raidStore.GetAllRaids and raidStore:GetAllRaids() or {}
+            local raidStore = Core.GetRaidStoreOrNil("Logger.Raids.DeleteRaids", { "GetAllRaids" })
+            local raids = raidStore and raidStore:GetAllRaids() or {}
             local n = #raids
             local newFocus = nil
             if n > 0 then
@@ -2188,7 +2230,12 @@ do
             end
         end
 
-        controller:Touch()
+        if reason == "sync" then
+            -- Sync can change raid rows; force data refetch instead of highlight-only refresh.
+            controller:Dirty()
+        else
+            controller:Touch()
+        end
     end)
 
     Bus.RegisterCallback(InternalEvents.RaidRosterDelta, function(_, delta, rosterVersion, raidId)
@@ -2251,11 +2298,14 @@ do
         end,
 
         getData = function(out)
-            local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-            local raids = raidStore and raidStore.GetAllRaids and raidStore:GetAllRaids() or {}
+            local raidStore = Core.GetRaidStoreOrNil(
+                "Logger.ExportRaids.GetData",
+                { "GetAllRaids", "GetRaidByIndex" }
+            )
+            local raids = raidStore and raidStore:GetAllRaids() or {}
             local queries = getRaidQueries()
             for i = 1, #raids do
-                local raid = raidStore and raidStore.GetRaidByIndex and raidStore:GetRaidByIndex(i) or
+                local raid = raidStore and raidStore:GetRaidByIndex(i) or
                     Core.EnsureRaidById(i)
                 if raid then
                     local summary = queries and queries.GetRaidSummary and queries:GetRaidSummary(raid) or nil
@@ -2330,7 +2380,13 @@ do
     ExportRaids._ctrl = controller
     ListController.BindListController(ExportRaids, controller)
 
-    Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function() controller:Touch() end)
+    Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function(_, _, reason)
+        if reason == "sync" then
+            controller:Dirty()
+        else
+            controller:Touch()
+        end
+    end)
     Bus.RegisterCallback(InternalEvents.RaidCreate, function() controller:Dirty() end)
 end
 
@@ -3218,8 +3274,9 @@ do
                 ui.Source:SetText(it.sourceName or "")
             end
 
-            local r, g, b = Colors.GetClassColor(addon.Raid:GetPlayerClass(it.looter))
-            ui.Winner:SetText(it.looter)
+            local winnerClass = it.looterClass or addon.Raid:GetPlayerClass(it.looter)
+            local r, g, b = Colors.GetClassColor(winnerClass)
+            ui.Winner:SetText(it.looter or "")
             ui.Winner:SetVertexColor(r, g, b)
 
             local rt = tonumber(it.rollType) or 0
@@ -3392,19 +3449,27 @@ do
             addon:warn(Diag.W.LogLoggerRollTypeNil:format(raidID, tostring(itemID), tostring(looter)))
         end
 
+        local currentLooterName = Store:ResolveLootLooterName(raid, it)
         addon:debug(Diag.D.LogLoggerLootBefore:format(raidID, tostring(itemID), tostring(it.itemLink),
-            tostring(it.looter), tostring(it.rollType), tostring(it.rollValue)))
-        if it.looter and it.looter ~= "" and looter and looter ~= "" and it.looter ~= looter then
+            tostring(currentLooterName), tostring(it.rollType), tostring(it.rollValue)))
+        if currentLooterName and currentLooterName ~= "" and looter and looter ~= ""
+            and currentLooterName ~= looter then
             addon:warn(Diag.W.LogLoggerLootOverwrite:format(raidID, tostring(itemID), tostring(it.itemLink),
-                tostring(it.looter), tostring(looter)))
+                tostring(currentLooterName), tostring(looter)))
         end
 
-        local expectedLooter
+        local expectedLooterNid
         local expectedRollType
         local expectedRollValue
         if looter and looter ~= "" then
-            it.looter = looter
-            expectedLooter = looter
+            local looterNid = Store:ResolveLootLooterNid(raid, looter)
+            if not looterNid then
+                addon:warn(Diag.W.LogLoggerLooterEmpty:format(raidID, tostring(itemID), tostring(it.itemLink)))
+                return false
+            end
+            it.looterNid = looterNid
+            it.looter = nil
+            expectedLooterNid = looterNid
         end
         if tonumber(rollType) then
             it.rollType = tonumber(rollType)
@@ -3416,15 +3481,16 @@ do
         end
 
         controller:Dirty()
+        local recordedLooterName = Store:ResolveLootLooterName(raid, it)
         addon:debug(Diag.D.LogLoggerLootRecorded:format(tostring(source), raidID, tostring(itemID),
-            tostring(it.itemLink), tostring(it.looter), tostring(it.rollType), tostring(it.rollValue)))
+            tostring(it.itemLink), tostring(recordedLooterName), tostring(it.rollType), tostring(it.rollValue)))
 
         local ok = true
-        if expectedLooter and it.looter ~= expectedLooter then ok = false end
+        if expectedLooterNid and tonumber(it.looterNid) ~= expectedLooterNid then ok = false end
         if expectedRollType and it.rollType ~= expectedRollType then ok = false end
         if expectedRollValue and it.rollValue ~= expectedRollValue then ok = false end
         if not ok then
-            addon:error(Diag.E.LogLoggerVerifyFailed:format(raidID, tostring(itemID), tostring(it.looter),
+            addon:error(Diag.E.LogLoggerVerifyFailed:format(raidID, tostring(itemID), tostring(recordedLooterName),
                 tostring(it.rollType), tostring(it.rollValue)))
             return false
         end
@@ -3464,6 +3530,7 @@ end
 do
     module.BossBox = module.BossBox or {}
     local Box = module.BossBox
+    local BoxUI = {}
     local Store = module.Store
 
     local frameName, localized, isEdit = nil, false, false
@@ -3474,7 +3541,7 @@ do
         frameName = Frames.InitModuleFrame(Box, frame, {
             enableDrag = true,
             hookOnShow = function()
-                Box:UpdateUIFrame()
+                BoxUI.Refresh()
             end,
             hookOnHide = function()
                 Box:CancelAddEdit()
@@ -3524,34 +3591,19 @@ do
         end
     end
 
-    local uiController = UIScaffold.BootstrapModuleUi(Box, getFrame, function()
-        Box:UpdateUIFrame()
-    end)
-
-    function Box:EnsureUI()
-        local frame = getFrame()
-        if not frame then
-            return nil
-        end
-        if not frameName then
-            self:OnLoad(frame)
-        end
-        return frame
+    local function OnLoadBossBoxFrame(frame)
+        Box:OnLoad(frame)
+        return frameName
     end
 
-    function Box:Toggle()
-        if not self:EnsureUI() then
-            return
-        end
-        return uiController:Toggle()
-    end
-
-    function Box:Hide()
-        if not self:EnsureUI() then
-            return
-        end
-        return uiController:Hide()
-    end
+    UIScaffold.DefineModuleUi({
+        module = Box,
+        getFrame = getFrame,
+        onLoad = OnLoadBossBoxFrame,
+        refresh = function()
+            BoxUI.Refresh()
+        end,
+    })
 
     -- Campi uniformi:
     --   bossData.time : timestamp
@@ -3626,7 +3678,7 @@ do
         twipe(tempDate)
     end
 
-    function Box:UpdateUIFrame()
+    function BoxUI.Refresh()
         if not localized then
             Frames.SetTooltip(_G[frameName .. "Name"], L.StrBossNameHelp, "ANCHOR_LEFT")
             Frames.SetTooltip(_G[frameName .. "Difficulty"], L.StrBossDifficultyHelp, "ANCHOR_LEFT")
@@ -3689,32 +3741,16 @@ do
         end
     end
 
-    local uiController = UIScaffold.BootstrapModuleUi(Box, getFrame)
-
-    function Box:EnsureUI()
-        local frame = getFrame()
-        if not frame then
-            return nil
-        end
-        if not frameName then
-            self:OnLoad(frame)
-        end
-        return frame
+    local function OnLoadAttendeesBoxFrame(frame)
+        Box:OnLoad(frame)
+        return frameName
     end
 
-    function Box:Toggle()
-        if not self:EnsureUI() then
-            return
-        end
-        return uiController:Toggle()
-    end
-
-    function Box:Hide()
-        if not self:EnsureUI() then
-            return
-        end
-        return uiController:Hide()
-    end
+    UIScaffold.DefineModuleUi({
+        module = Box,
+        getFrame = getFrame,
+        onLoad = OnLoadAttendeesBoxFrame,
+    })
 
     function Box:Save()
         local rID, bID = module.selectedRaid, module.selectedBoss

@@ -11,11 +11,11 @@ local L = feature.L
 local ListController = feature.ListController or addon.ListController
 local Frames = feature.Frames or addon.Frames
 local Strings = feature.Strings or addon.Strings
+local UnitIsGroupLeader = feature.UnitIsGroupLeader
+local UnitIsGroupAssistant = feature.UnitIsGroupAssistant
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
-local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
-local bindModuleToggleHide = feature.BindModuleToggleHide
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
@@ -33,10 +33,10 @@ do
 
     local getFrame = makeModuleFrameGetter(module, "KRTWarnings")
     -- ----- Internal state ----- --
-    local LocalizeUIFrame
-    local localized = false
-
-    local UpdateUIFrame
+    local UI = {
+        Localized = false,
+        Loaded = false,
+    }
     local fetched = false
     local warningsDirty = false
 
@@ -47,11 +47,9 @@ do
     local tempName, tempContent
     local SaveWarning
     local isEdit = false
-    local uiBound = false
-    local scaffoldToggle, scaffoldHide
 
     -- ----- Private helpers ----- --
-    local function AcquireRefs(frame)
+    function UI.AcquireRefs(frame)
         return {
             name = Frames.Ref(frame, "Name"),
             content = Frames.Ref(frame, "Content"),
@@ -105,50 +103,46 @@ do
         module = module,
         getFrame = getFrame,
         controller = controller,
-        bindToggleHide = bindModuleToggleHide,
-        bindRequestRefresh = bindModuleRequestRefresh,
         onShow = function()
             warningsDirty = true
             lastSelectedID = false
         end,
         localize = function()
-            if LocalizeUIFrame then
-                LocalizeUIFrame()
-            end
+            UI.Localize()
         end,
         update = function()
-            if UpdateUIFrame then
-                UpdateUIFrame()
-            end
+            UI.Refresh()
         end,
     })
 
-    scaffoldToggle = module.Toggle
-    scaffoldHide = module.Hide
-
-    function module:BindUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame, self.refs
+    local function BindHandlers(_, frame, refs)
+        if not (refs and refs.name and refs.content and refs.editBtn and refs.deleteBtn and refs.announceBtn) then
+            return
         end
-
-        local frame = getFrame()
-        if not frame then
-            return nil
+        if refs.editBtn and refs.editBtn.RegisterForClicks then
+            refs.editBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         end
-        if not frameName then
-            frameName = panelScaffold:OnLoad(frame) or frame:GetName()
+        if refs.deleteBtn and refs.deleteBtn.RegisterForClicks then
+            refs.deleteBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         end
-
-        local refs = AcquireRefs(frame)
-        self.frame = frame
-        self.refs = refs
-
-        Frames.SafeSetScript(frame, "OnShow", function()
-            module:Cancel()
-        end)
-        Frames.SafeSetScript(frame, "OnHide", function()
-            module:Cancel()
-        end)
+        if refs.announceBtn and refs.announceBtn.RegisterForClicks then
+            refs.announceBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        end
+        if frame.HookScript then
+            frame:HookScript("OnShow", function()
+                module:Cancel()
+            end)
+            frame:HookScript("OnHide", function()
+                module:Cancel()
+            end)
+        else
+            Frames.SafeSetScript(frame, "OnShow", function()
+                module:Cancel()
+            end)
+            Frames.SafeSetScript(frame, "OnHide", function()
+                module:Cancel()
+            end)
+        end
         Frames.SafeSetScript(refs.announceBtn, "OnClick", function()
             module:Announce()
         end)
@@ -170,39 +164,31 @@ do
                 name:SetFocus()
             end
         end)
-
-        uiBound = true
-        return frame, refs
     end
 
-    function module:EnsureUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame
-        end
-        return self:BindUI()
+    local function OnLoadFrame(frame)
+        frameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or frameName)
+        UI.Loaded = frameName ~= nil
+        return frameName
     end
 
-    function module:Toggle()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldToggle then
-            return scaffoldToggle(self)
-        end
-    end
-
-    function module:Hide()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldHide then
-            return scaffoldHide(self)
-        end
-    end
+    UIScaffold.DefineModuleUi({
+        module = module,
+        getFrame = getFrame,
+        acquireRefs = UI.AcquireRefs,
+        bind = BindHandlers,
+        localize = function()
+            UI.Localize()
+        end,
+        onLoad = OnLoadFrame,
+        refresh = function()
+            panelScaffold:Refresh()
+        end,
+    })
 
     -- OnLoad frame:
     function module:OnLoad(frame)
-        frameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or frameName)
+        return OnLoadFrame(frame)
     end
 
     -- Warning selection:
@@ -223,23 +209,31 @@ do
     -- Edit/Save warning:
     function module:Edit()
         local wName, wContent
+        local nameBox = _G[frameName .. "Name"]
+        local contentBox = _G[frameName .. "Content"]
+        if not (nameBox and contentBox) then
+            return
+        end
+        local draftName = Strings.TrimText(nameBox:GetText())
+        local draftContent = Strings.TrimText(contentBox:GetText())
+
         if selectedID ~= nil then
             local w = KRT_Warnings[selectedID]
             if w == nil then
                 selectedID = nil
                 return
             end
-            if not isEdit and (tempName == "" and tempContent == "") then
-                _G[frameName .. "Name"]:SetText(w.name)
-                _G[frameName .. "Name"]:SetFocus()
-                _G[frameName .. "Content"]:SetText(w.content)
+            if not isEdit and draftName == "" and draftContent == "" then
+                nameBox:SetText(w.name)
+                nameBox:SetFocus()
+                contentBox:SetText(w.content)
                 isEdit = true
                 module:RequestRefresh()
                 return
             end
         end
-        wName    = _G[frameName .. "Name"]:GetText()
-        wContent = _G[frameName .. "Content"]:GetText()
+        wName = nameBox:GetText()
+        wContent = contentBox:GetText()
         return SaveWarning(wContent, wName, selectedID)
     end
 
@@ -248,7 +242,6 @@ do
         if btn == nil or selectedID == nil then return end
         local oldWarnings = {}
         for i, w in ipairs(KRT_Warnings) do
-            _G[frameName .. "WarningBtn" .. i]:Hide()
             if i ~= selectedID then
                 tinsert(oldWarnings, w)
             end
@@ -273,7 +266,18 @@ do
         if wID == nil then
             wID = (selectedID ~= nil) and selectedID or tempSelectedID
         end
-        if wID <= 0 or KRT_Warnings[wID] == nil then return end
+
+        wID = tonumber(wID)
+        if not wID or wID <= 0 or KRT_Warnings[wID] == nil then return end
+
+        if addon.IsInRaid and addon.IsInRaid() and addon.options and addon.options.useRaidWarning then
+            local isLeader = UnitIsGroupLeader and UnitIsGroupLeader("player")
+            local isAssistant = UnitIsGroupAssistant and UnitIsGroupAssistant("player")
+            if not (isLeader or isAssistant) then
+                addon:warn(L.WarnRaidWarningFallback)
+            end
+        end
+
         tempSelectedID = nil -- Always clear temporary selected id:
         return addon:Announce(KRT_Warnings[wID].content)
     end
@@ -289,8 +293,8 @@ do
     end
 
     -- Localizing UI frame:
-    function LocalizeUIFrame()
-        if localized then return end
+    function UI.Localize()
+        if UI.Localized then return end
         _G[frameName .. "NameStr"]:SetText(L.StrName)
         _G[frameName .. "MessageStr"]:SetText(L.StrMessage)
         _G[frameName .. "EditBtn"]:SetText(L.BtnSave)
@@ -304,7 +308,7 @@ do
         }, function()
             module:RequestRefresh()
         end)
-        localized = true
+        UI.Localized = true
     end
 
     local function UpdateSelectionUI()
@@ -321,7 +325,7 @@ do
     end
 
     -- UI refresh.
-    function UpdateUIFrame()
+    function UI.Refresh()
         if warningsDirty or not fetched then
             controller:Dirty()
             warningsDirty = false
@@ -353,6 +357,10 @@ do
 
     -- Saving a Warning:
     function SaveWarning(wContent, wName, wID)
+        local savedID
+        if type(KRT_Warnings) ~= "table" then
+            KRT_Warnings = {}
+        end
         wID = wID and tonumber(wID) or 0
         wName = Strings.TrimText(wName)
         wContent = Strings.TrimText(wContent)
@@ -366,13 +374,23 @@ do
         if isEdit and wID > 0 and KRT_Warnings[wID] ~= nil then
             KRT_Warnings[wID].name = wName
             KRT_Warnings[wID].content = wContent
+            savedID = wID
             isEdit = false
         else
             tinsert(KRT_Warnings, { name = wName, content = wContent })
+            savedID = #KRT_Warnings
         end
-        module:Cancel()
+
+        Frames.ResetEditBox(_G[frameName .. "Name"])
+        Frames.ResetEditBox(_G[frameName .. "Content"])
+        selectedID = savedID
+        tempSelectedID = nil
+        isEdit = false
+        lastSelectedID = false
+
         warningsDirty = true
+        fetched = false
+        controller:Dirty()
         module:RequestRefresh()
     end
 end
-

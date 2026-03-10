@@ -14,8 +14,6 @@ local UIScaffold = addon.UIScaffold
 local Events = feature.Events or addon.Events or {}
 local Bus = feature.Bus or addon.Bus
 
-local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
-local bindModuleToggleHide = feature.BindModuleToggleHide
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
@@ -26,16 +24,9 @@ local type, tostring = type, tostring
 
 local UIFacade = addon.UI
 
-local function isWidgetEnabled(widgetId)
-    if UIFacade and type(UIFacade.IsEnabled) == "function" then
-        return UIFacade:IsEnabled(widgetId)
-    end
-    return true
-end
-
 -- =========== Configuration Frame Module  =========== --
 do
-    if not isWidgetEnabled("Config") then
+    if not UIFacade:IsEnabled("Config") then
         return
     end
 
@@ -47,13 +38,12 @@ do
 
     local getFrame = makeModuleFrameGetter(module, "KRTConfig")
     -- ----- Internal state ----- --
-    local localized = false
-    local configDirty = false
-    local uiBound = false
-    local scaffoldToggle, scaffoldHide
+    local UI = {
+        Localized = false,
+        isDirty = false,
+        Loaded = false,
+    }
 
-    -- Frame update
-    local UpdateUIFrame
     local MIN_COUNTDOWN = 5
     local MAX_COUNTDOWN = 60
     local optionSuffixes = {
@@ -74,8 +64,7 @@ do
     }
 
     -- ----- Private helpers ----- --
-    local LocalizeUIFrame
-    local function AcquireRefs(frame)
+    function UI.AcquireRefs(frame)
         local refs = {
             closeBtn = Frames.Ref(frame, "CloseBtn"),
             defaultsBtn = Frames.Ref(frame, "DefaultsBtn"),
@@ -96,7 +85,7 @@ do
         if Options and Options.RestoreDefaults then
             Options.RestoreDefaults()
         end
-        configDirty = true
+        UI.isDirty = true
         module:RequestRefresh()
         addon:info(L.MsgDefaultsRestored)
     end
@@ -106,7 +95,7 @@ do
         if Options and Options.LoadOptions then
             Options.LoadOptions()
         end
-        configDirty = true
+        UI.isDirty = true
         module:RequestRefresh()
 
         if KRT_MINIMAP_GUI then
@@ -130,13 +119,11 @@ do
         frameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
-                configDirty = true
+                UI.isDirty = true
             end,
         })
-        if not frameName then return end
-
-        -- Localize once (no per-tick calls)
-        LocalizeUIFrame()
+        UI.Loaded = frameName ~= nil
+        if not UI.Loaded then return end
     end
 
     function module:InitCountdownSlider(slider)
@@ -153,37 +140,9 @@ do
         end
     end
 
-    -- Initialize UI controller for Toggle/Hide.
-    UIScaffold.BootstrapModuleUi(module, getFrame, function()
-        configDirty = true
-        module:RequestRefresh()
-    end, {
-        bindToggleHide = bindModuleToggleHide,
-        bindRequestRefresh = bindModuleRequestRefresh,
-    })
-
-    scaffoldToggle = module.Toggle
-    scaffoldHide = module.Hide
-
-    function module:BindUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame, self.refs
-        end
-
-        local frame = getFrame()
-        if not frame then
-            return nil
-        end
-        if not frameName then
-            self:OnLoad(frame)
-        end
-
-        local refs = AcquireRefs(frame)
-        self.frame = frame
-        self.refs = refs
-
+    local function BindHandlers(_, _, refs)
         Frames.SafeSetScript(refs.closeBtn, "OnClick", function()
-            frame:Hide()
+            module:Hide()
         end)
         Frames.SafeSetScript(refs.defaultsBtn, "OnClick", function()
             LoadDefaultOptions()
@@ -200,35 +159,23 @@ do
                 module:OnClick(self, button)
             end)
         end
-
-        uiBound = true
-        return frame, refs
     end
 
-    function module:EnsureUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame
-        end
-        return self:BindUI()
+    local function OnLoadFrame(frame)
+        module:OnLoad(frame)
+        return frameName
     end
 
-    function module:Toggle()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldToggle then
-            return scaffoldToggle(self)
-        end
-    end
-
-    function module:Hide()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldHide then
-            return scaffoldHide(self)
-        end
-    end
+    UIScaffold.DefineModuleUi({
+        module = module,
+        getFrame = getFrame,
+        acquireRefs = UI.AcquireRefs,
+        bind = BindHandlers,
+        localize = function()
+            UI.Localize()
+        end,
+        onLoad = OnLoadFrame,
+    })
 
     -- OnClick handler for option controls.
     function module:OnClick(btn)
@@ -256,13 +203,13 @@ do
             Bus.TriggerEvent(eventName, value)
         end
 
-        configDirty = true
+        UI.isDirty = true
         module:RequestRefresh()
     end
 
     -- Localizes UI elements.
-    function LocalizeUIFrame()
-        if localized then
+    function UI.Localize()
+        if UI.Localized then
             return
         end
 
@@ -288,12 +235,12 @@ do
         _G[frameName .. "DefaultsBtn"]:SetText(L.BtnDefaults)
         _G[frameName .. "CloseBtn"]:SetText(L.BtnClose)
 
-        localized = true
+        UI.Localized = true
     end
 
     -- UI refresh handler for the configuration frame.
-    function UpdateUIFrame()
-        if not configDirty then return end
+    function UI.Refresh()
+        if not UI.isDirty then return end
         _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)
         _G[frameName .. "useRaidWarning"]:SetChecked(addon.options.useRaidWarning == true)
         _G[frameName .. "announceOnWin"]:SetChecked(addon.options.announceOnWin == true)
@@ -335,29 +282,18 @@ do
             end
         end
 
-        configDirty = false
+        UI.isDirty = false
     end
 
     function module:Refresh()
-        if UpdateUIFrame then UpdateUIFrame() end
+        UI.Refresh()
     end
 
-    if addon.UI and addon.UI.Register then
-        addon.UI:Register("Config", {
-            Toggle = function()
-                if module.Toggle then
-                    module:Toggle()
-                end
-            end,
-            Hide = function()
-                if module.Hide then
-                    module:Hide()
-                end
-            end,
+    if UIFacade and UIFacade.Register then
+        UIFacade:Register("Config", UIScaffold.MakeStandardWidgetApi(module, {
             Default = function()
                 module:Default()
             end,
-        })
+        }))
     end
 end
-

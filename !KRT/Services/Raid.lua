@@ -10,13 +10,12 @@ local L = feature.L
 local Diag = feature.Diag
 
 local Events = feature.Events or addon.Events or {}
+local C = feature.C
 local Core = feature.Core
 local Bus = feature.Bus or addon.Bus
 local Strings = feature.Strings or addon.Strings
 local Time = feature.Time or addon.Time
 local Base64 = feature.Base64 or addon.Base64
-
-local tContains = feature.tContains
 
 local InternalEvents = Events.Internal
 
@@ -24,6 +23,7 @@ local ITEM_LINK_PATTERN = feature.ITEM_LINK_PATTERN
 local rollTypes = feature.rollTypes
 
 local lootState = feature.lootState
+local raidState = feature.raidState
 
 local tinsert, twipe = table.insert, table.wipe
 local pairs, ipairs, type, select = pairs, ipairs, type, select
@@ -51,11 +51,12 @@ do
     local pendingUnits      = {}
     local raidInstanceCheckHandles = {}
 
-    local UNKNOWN_OBJECT = UNKNOWNOBJECT
-    local UNKNOWN_BEING = UKNOWNBEING
+    local UNKNOWN_OBJECT = _G.UNKNOWNOBJECT
+    local UNKNOWN_BEING = _G.UNKNOWNBEING or _G.UKNOWNBEING
     local RETRY_DELAY_SECONDS = 1
     local RETRY_MAX_ATTEMPTS = 5
     local RAID_INSTANCE_CHECK_DELAYS = { 0.3, 0.8, 1.5, 2.5, 3.5 }
+    local PENDING_AWARD_TTL_SECONDS = C.PENDING_AWARD_TTL_SECONDS
     local IGNORED_ITEMS = {
         -- Emblems (Wrath of the Lich King)
         [40752] = true, -- Emblem of Heroism
@@ -122,6 +123,32 @@ do
     -- ----- Private helpers ----- --
     local function isUnknownName(name)
         return (not name) or name == "" or name == UNKNOWN_OBJECT or name == UNKNOWN_BEING
+    end
+
+    local function ResolveRollSessionIdForLoot(itemLink, itemString, itemId)
+        local session = lootState.rollSession
+        if type(session) ~= "table" then
+            return nil
+        end
+        local sessionId = session.id
+        if not sessionId or sessionId == "" then
+            return nil
+        end
+
+        local sessionItemId = tonumber(session.itemId)
+        local parsedItemId = tonumber(itemId)
+        if sessionItemId and parsedItemId and sessionItemId == parsedItemId then
+            return tostring(sessionId)
+        end
+
+        local sessionKey = session.itemKey
+        if sessionKey and itemString and sessionKey == itemString then
+            return tostring(sessionId)
+        end
+        if sessionKey and itemLink and sessionKey == itemLink then
+            return tostring(sessionId)
+        end
+        return nil
     end
 
     local function resetLiveUnitCaches()
@@ -209,6 +236,36 @@ do
         known.sex = UnitSex(unitID) or 0
     end
 
+    local function findRaidPlayerByNid(raid, playerNid)
+        local nid = tonumber(playerNid)
+        if not nid or nid <= 0 then
+            return nil
+        end
+
+        local players = raid and raid.players or {}
+        for i = #players, 1, -1 do
+            local player = players[i]
+            if player and tonumber(player.playerNid) == nid then
+                return player, i
+            end
+        end
+        return nil
+    end
+
+    local function resolveLootLooterName(raid, loot)
+        if type(loot) ~= "table" then
+            return nil
+        end
+        local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter)
+        if looterNid and looterNid > 0 then
+            local player = findRaidPlayerByNid(raid, looterNid)
+            if player and player.name then
+                return player.name
+            end
+        end
+        return type(loot.looter) == "string" and loot.looter or nil
+    end
+
     local function resolveRaidDifficulty(instanceDiff)
         local diff = tonumber(instanceDiff)
         local _, instanceType, liveDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
@@ -281,8 +338,8 @@ do
             return nil, nil
         end
 
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        if raidStore and raidStore.GetRaidByIndex then
+        local raidStore = Core.GetRaidStoreOrNil("Raid.GetRaid", { "GetRaidByIndex" })
+        if raidStore then
             return raidStore:GetRaidByIndex(raidNum)
         end
         return nil, raidNum
@@ -361,8 +418,8 @@ do
 
         local realm = Core.GetRealmName()
         local realmPlayers = ensureRealmPlayerMeta(realm)
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        local runtime = raidStore and raidStore.EnsureRaidRuntime and raidStore:EnsureRaidRuntime(raid) or nil
+        local raidStore = Core.GetRaidStoreOrNil("Raid.UpdateRaidRoster", { "EnsureRaidRuntime" })
+        local runtime = raidStore and raidStore:EnsureRaidRuntime(raid) or nil
         local playersByName = runtime and runtime.playersByName or {}
 
         local prevNumRaid = numRaid
@@ -534,7 +591,13 @@ do
             instanceDiff = resolveRaidDifficulty()
         end
 
-        local raidInfo = Core.CreateRaidRecord({
+        local raidStore = Core.GetRaidStoreOrNil and
+            Core.GetRaidStoreOrNil("Raid.Create", { "CreateRaidRecord", "InsertRaid" }) or nil
+        if not raidStore then
+            return false
+        end
+
+        local raidInfo = raidStore:CreateRaidRecord({
             realm = realm,
             zone = zoneName,
             size = raidSize,
@@ -566,12 +629,7 @@ do
             end
         end
 
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        local raidId
-        if raidStore and raidStore.InsertRaid then
-            local _, insertedRaidId = raidStore:InsertRaid(raidInfo)
-            raidId = insertedRaidId
-        end
+        local _, raidId = raidStore:InsertRaid(raidInfo)
         if not raidId then
             return false
         end
@@ -782,11 +840,29 @@ do
         end
 
         local players = {}
+        local seenPlayers = {}
         for unit in addon.UnitIterator(true) do
             if UnitIsConnected(unit) then
                 local name = UnitName(unit)
                 if name then
-                    tinsert(players, name)
+                    local resolvedName = Strings.NormalizeName(name, true) or name
+                    local playerNid = module:GetPlayerID(resolvedName, raidNum)
+                    if playerNid == 0 then
+                        module:AddPlayer({
+                            name = resolvedName,
+                            rank = 0,
+                            subgroup = 1,
+                            class = "UNKNOWN",
+                            join = Time.GetCurrentTime(),
+                            leave = nil,
+                            count = 0,
+                        }, raidNum)
+                        playerNid = module:GetPlayerID(resolvedName, raidNum)
+                    end
+                    if playerNid > 0 and not seenPlayers[playerNid] then
+                        seenPlayers[playerNid] = true
+                        tinsert(players, playerNid)
+                    end
                 end
             end
         end
@@ -854,8 +930,8 @@ do
             return
         end
 
+        player = Strings.NormalizeName(player, true) or player
         itemCount = tonumber(itemCount) or 1
-        lootState.itemCount = itemCount
 
         local _, _, itemString = string.find(itemLink, "^|c%x+|H(.+)|h%[.*%]")
         local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
@@ -874,17 +950,20 @@ do
             addon:debug(Diag.D.LogLootIgnoredItemId:format(tostring(itemId), tostring(itemLink)))
             return
         end
+        raidState.lastLootCount = itemCount
 
         if not Core.GetLastBoss() then
             addon:debug(Diag.D.LogBossNoContextTrash)
             self:AddBoss("_TrashMob_")
         end
+        local rollSessionId
         -- Resolve award source: pending award -> master-looter manual -> current roll type.
         if not rollType then
-            local p = addon.Loot:ConsumePendingAward(itemLink, player, 5)
+            local p = addon.Loot:ConsumePendingAward(itemLink, player, PENDING_AWARD_TTL_SECONDS)
             if p then
                 rollType = p.rollType
                 rollValue = p.rollValue
+                rollSessionId = p.rollSessionId and tostring(p.rollSessionId) or nil
             elseif self:IsMasterLooter() and not lootState.fromInventory then
                 rollType  = rollTypes.MANUAL
                 rollValue = 0
@@ -896,6 +975,9 @@ do
                 rollType = lootState.currentRollType
             end
         end
+        if not rollSessionId then
+            rollSessionId = ResolveRollSessionIdForLoot(itemLink, itemString, itemId)
+        end
 
         if not rollValue then
             rollValue = addon.Rolls:HighestRoll() or 0
@@ -904,6 +986,21 @@ do
         local raid = Core.EnsureRaidById(Core.GetCurrentRaid())
         if not raid then return end
         Core.EnsureRaidSchema(raid)
+
+        local looterNid = module:GetPlayerID(player, Core.GetCurrentRaid())
+        if looterNid == 0 then
+            module:AddPlayer({
+                name = player,
+                rank = 0,
+                subgroup = 1,
+                class = "UNKNOWN",
+                join = Time.GetCurrentTime(),
+                leave = nil,
+                count = 0,
+            }, Core.GetCurrentRaid())
+            looterNid = module:GetPlayerID(player, Core.GetCurrentRaid())
+        end
+
         local lootNid = tonumber(raid.nextLootNid) or 1
         raid.nextLootNid = lootNid + 1
 
@@ -915,9 +1012,10 @@ do
             itemRarity  = itemRarity,
             itemTexture = itemTexture,
             itemCount   = itemCount,
-            looter      = player,
+            looterNid   = (looterNid > 0) and looterNid or nil,
             rollType    = rollType,
             rollValue   = rollValue,
+            rollSessionId = rollSessionId,
             lootNid     = lootNid,
             bossNid     = tonumber(Core.GetLastBoss()) or 0,
             time        = Time.GetCurrentTime(),
@@ -935,23 +1033,77 @@ do
             tostring(lootInfo.bossNid), tostring(player)))
     end
 
-    -- Player count API.
+    -- Creates a local raid loot entry for inventory-trade awards when no reliable loot context exists.
+    function module:LogTradeOnlyLoot(itemLink, looter, rollType, rollValue, itemCount, source, raidNum, bossNid,
+            rollSessionId)
+        raidNum = raidNum or Core.GetCurrentRaid()
+        if not raidNum or not itemLink or not looter or looter == "" then
+            return 0
+        end
+        looter = Strings.NormalizeName(looter, true) or looter
 
-    local function findRaidPlayerByNid(raid, playerNid)
-        local nid = tonumber(playerNid)
-        if not nid or nid <= 0 then
-            return nil
+        local raid = Core.EnsureRaidById(raidNum)
+        if not raid then
+            return 0
+        end
+        Core.EnsureRaidSchema(raid)
+
+        local looterNid = module:GetPlayerID(looter, raidNum)
+        if looterNid == 0 then
+            module:AddPlayer({
+                name = looter,
+                rank = 0,
+                subgroup = 1,
+                class = "UNKNOWN",
+                join = Time.GetCurrentTime(),
+                leave = nil,
+                count = 0,
+            }, raidNum)
+            looterNid = module:GetPlayerID(looter, raidNum)
         end
 
-        local players = raid and raid.players or {}
-        for i = #players, 1, -1 do
-            local p = players[i]
-            if p and tonumber(p.playerNid) == nid then
-                return p
-            end
+        local count = tonumber(itemCount) or 1
+        if count < 1 then
+            count = 1
         end
-        return nil
+
+        local _, _, itemString = string.find(itemLink, "^|c%x+|H(.+)|h%[.*%]")
+        local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
+        local _, _, _, _, itemId = string.find(itemLink, ITEM_LINK_PATTERN)
+        itemId = tonumber(itemId)
+        if not itemName then
+            itemName = strmatch(itemLink, "%[(.-)%]") or tostring(itemLink)
+        end
+
+        local lootNid = tonumber(raid.nextLootNid) or 1
+        raid.nextLootNid = lootNid + 1
+
+        local lootInfo = {
+            itemId      = itemId,
+            itemName    = itemName,
+            itemString  = itemString,
+            itemLink    = itemLink,
+            itemRarity  = itemRarity,
+            itemTexture = itemTexture,
+            itemCount   = count,
+            looterNid   = (looterNid > 0) and looterNid or nil,
+            rollType    = tonumber(rollType),
+            rollValue   = tonumber(rollValue) or 0,
+            rollSessionId = rollSessionId and tostring(rollSessionId) or nil,
+            lootNid     = lootNid,
+            bossNid     = tonumber(bossNid) or tonumber(Core.GetLastBoss()) or 0,
+            time        = Time.GetCurrentTime(),
+            source      = source or "TRADE_ONLY",
+        }
+
+        tinsert(raid.loot, lootInfo)
+        Bus.TriggerEvent(InternalEvents.RaidLootUpdate, raidNum, lootInfo)
+        addon:debug(Diag.D.LogLootTradeOnlyLogged:format(tonumber(raidNum) or -1, tostring(itemId),
+            tostring(lootNid), tostring(looter), count, tostring(lootInfo.source)))
+        return lootNid
     end
+
+    -- Player count API.
 
     function module:GetPlayerCountByNid(playerNid, raidNum)
         raidNum = raidNum or Core.GetCurrentRaid()
@@ -1081,6 +1233,20 @@ do
 
     -- Raid functions.
 
+    function module:IsPlayerInRaid()
+        if addon.IsInRaid() then
+            return true
+        end
+        local groupType = addon.GetGroupTypeAndCount()
+        if groupType == "raid" then
+            return true
+        end
+        if UnitInRaid("player") then
+            return true
+        end
+        return (GetNumRaidMembers() or 0) > 0
+    end
+
     -- Returns the number of members in the raid.
     function module:GetNumRaid()
         return numRaid
@@ -1148,6 +1314,7 @@ do
         if not raid then return 0 end
 
         Core.EnsureRaidSchema(raid)
+        holderName = Strings.NormalizeName(holderName, true)
 
         itemID = tonumber(itemID)
         if not itemID then return 0 end
@@ -1158,7 +1325,8 @@ do
         for i = #loot, 1, -1 do
             local v = loot[i]
             if v and tonumber(v.itemId) == itemID then
-                if (not holderName or holderName == "" or v.looter == holderName) then
+                local winnerName = resolveLootLooterName(raid, v)
+                if (not holderName or holderName == "" or winnerName == holderName) then
                     if bossNid <= 0 or tonumber(v.bossNid) == bossNid then
                         return tonumber(v.lootNid) or 0
                     end
@@ -1211,9 +1379,16 @@ do
             if bossKill and bossKill.players then
                 local players = out or {}
                 if out then twipe(players) end
-                local bossPlayers = bossKill.players
+                local bossPlayers = {}
+                for i = 1, #bossKill.players do
+                    local playerNid = tonumber(bossKill.players[i])
+                    if playerNid and playerNid > 0 then
+                        bossPlayers[playerNid] = true
+                    end
+                end
                 for _, p in ipairs(raidPlayers) do
-                    if tContains(bossPlayers, p.name) then
+                    local playerNid = tonumber(p and p.playerNid)
+                    if playerNid and bossPlayers[playerNid] then
                         tinsert(players, p)
                     end
                 end
@@ -1284,7 +1459,7 @@ do
         raidNum = raidNum or Core.GetCurrentRaid()
         local raid = raidNum and Core.EnsureRaidById(raidNum)
         if raid then
-            name = name or Core.GetPlayerName()
+            name = Strings.NormalizeName(name or Core.GetPlayerName(), true)
             local players = raid.players or {}
             for i = #players, 1, -1 do
                 local p = players[i]
@@ -1321,9 +1496,18 @@ do
     function module:GetPlayerLoot(name, raidNum, bossNid)
         local items = {}
         local loot = module:GetLoot(raidNum, bossNid)
-        name = (type(name) == "number") and module:GetPlayerName(name, raidNum) or name
+        local playerNid
+        if type(name) == "number" then
+            playerNid = tonumber(name)
+        else
+            local resolvedName = Strings.NormalizeName(name, true)
+            playerNid = module:GetPlayerID(resolvedName, raidNum)
+        end
+        if not playerNid or playerNid <= 0 then
+            return items
+        end
         for _, v in ipairs(loot) do
-            if v.looter == name then
+            if tonumber(v.looterNid) == playerNid then
                 tinsert(items, v)
             end
         end

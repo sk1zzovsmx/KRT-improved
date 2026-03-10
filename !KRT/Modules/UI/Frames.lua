@@ -10,12 +10,11 @@ local feature = addon.Core.GetFeatureShared()
 local type = type
 local format = string.format
 local ipairs = ipairs
+local pairs = pairs
 local strsub = string.sub
 
 local _G = _G
-local function CreateFrame(...)
-    return _G.CreateFrame(...)
-end
+local CreateFrame = _G.CreateFrame
 
 addon.Frames = addon.Frames or {}
 local Frames = addon.Frames
@@ -367,7 +366,7 @@ function Frames.InitModuleFrame(module, frame, opts)
     return frameName
 end
 
-function UIScaffold.MakeUIFrameController(getFrame, requestRefreshFn)
+local function makeUIFrameController(getFrame, requestRefreshFn)
     return {
         Toggle = function(self)
             local frame = getFrame()
@@ -402,7 +401,7 @@ function UIScaffold.MakeUIFrameController(getFrame, requestRefreshFn)
 end
 
 function UIScaffold.BootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
-    local uiController = UIScaffold.MakeUIFrameController(getFrame, requestRefreshFn)
+    local uiController = makeUIFrameController(getFrame, requestRefreshFn)
     if opts then
         if opts.bindToggleHide then
             opts.bindToggleHide(module, uiController)
@@ -412,6 +411,191 @@ function UIScaffold.BootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
         end
     end
     return uiController
+end
+
+function UIScaffold.DefineModuleUi(cfg)
+    cfg = cfg or {}
+    local module = cfg.module
+    local getFrame = cfg.getFrame
+    local acquireRefs = cfg.acquireRefs
+    local bindHandlers = cfg.bind
+    local localize = cfg.localize
+    local onLoadFrame = cfg.onLoad
+    local initFrameOpts = cfg.initFrameOpts
+    local refreshFn = cfg.refresh
+
+    if type(module) ~= "table" then
+        error("UIScaffold.DefineModuleUi: cfg.module must be a table")
+    end
+    if type(getFrame) ~= "function" then
+        error("UIScaffold.DefineModuleUi: cfg.getFrame must be a function")
+    end
+    if acquireRefs and type(acquireRefs) ~= "function" then
+        error("UIScaffold.DefineModuleUi: cfg.acquireRefs must be a function")
+    end
+    if bindHandlers and type(bindHandlers) ~= "function" then
+        error("UIScaffold.DefineModuleUi: cfg.bind must be a function")
+    end
+    if localize and type(localize) ~= "function" then
+        error("UIScaffold.DefineModuleUi: cfg.localize must be a function")
+    end
+    if onLoadFrame and type(onLoadFrame) ~= "function" then
+        error("UIScaffold.DefineModuleUi: cfg.onLoad must be a function")
+    end
+    if refreshFn and type(refreshFn) ~= "function" then
+        error("UIScaffold.DefineModuleUi: cfg.refresh must be a function")
+    end
+
+    module._ui = module._ui or {
+        Loaded = false,
+        Bound = false,
+        Localized = false,
+        Dirty = true,
+        Reason = nil,
+        FrameName = nil,
+    }
+    local UI = module._ui
+
+    local function doRefresh()
+        local frame = getFrame()
+        if not frame then
+            return
+        end
+
+        local dirty = UI.Dirty
+        local reason = UI.Reason
+        UI.Dirty = false
+        UI.Reason = nil
+
+        local refs = module.refs
+        if refreshFn then
+            return refreshFn(UI.FrameName, frame, refs, dirty, reason)
+        end
+        if type(module.RefreshUI) == "function" then
+            return module:RefreshUI(UI.FrameName, frame, refs, dirty, reason)
+        end
+        if type(module.Refresh) == "function" then
+            return module:Refresh(dirty, reason)
+        end
+    end
+
+    local requestRefresh = Frames.MakeEventDrivenRefresher(getFrame, doRefresh)
+
+    function module:MarkDirty(reason)
+        UI.Dirty = true
+        if reason then
+            UI.Reason = reason
+        end
+    end
+
+    function module:RequestRefresh(reason)
+        self:MarkDirty(reason)
+        requestRefresh()
+    end
+
+    local uiController = makeUIFrameController(getFrame, function()
+        module:RequestRefresh("toggle")
+    end)
+
+    function module:BindUI()
+        if UI.Bound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+
+        if not UI.Loaded then
+            local frameName
+            if onLoadFrame then
+                frameName = onLoadFrame(frame)
+            else
+                frameName = Frames.InitModuleFrame(module, frame, initFrameOpts)
+            end
+            UI.FrameName = frameName or (frame.GetName and frame:GetName()) or UI.FrameName
+            UI.Loaded = UI.FrameName ~= nil
+        end
+
+        local refs = acquireRefs and acquireRefs(frame, UI.FrameName) or {}
+        self.frame = frame
+        self.refs = refs
+
+        if bindHandlers then
+            bindHandlers(UI.FrameName, frame, refs)
+        end
+
+        if (not UI.Localized) and localize then
+            localize(UI.FrameName, frame, refs)
+            UI.Localized = true
+        end
+
+        UI.Bound = true
+
+        if frame.IsShown and frame:IsShown() then
+            self:RequestRefresh("bind")
+        end
+
+        return frame, refs
+    end
+
+    function module:EnsureUI()
+        if UI.Bound and self.frame and self.refs then
+            return self.frame
+        end
+        local frame = self:BindUI()
+        return frame
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        return uiController:Toggle()
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        return uiController:Hide()
+    end
+
+    function module:Show()
+        if not self:EnsureUI() then
+            return
+        end
+        return uiController:Show()
+    end
+
+    return UI
+end
+
+function UIScaffold.MakeStandardWidgetApi(module, extraMethods)
+    if type(module) ~= "table" then
+        error("UIScaffold.MakeStandardWidgetApi: module must be a table")
+    end
+
+    local api = {
+        Toggle = function()
+            return module:Toggle()
+        end,
+        Hide = function()
+            return module:Hide()
+        end,
+        RequestRefresh = function()
+            return module:RequestRefresh()
+        end,
+    }
+
+    if type(extraMethods) == "table" then
+        for key, method in pairs(extraMethods) do
+            api[key] = method
+        end
+    end
+
+    return api
 end
 
 function UIScaffold.CreateListPanelScaffold(cfg)
@@ -506,33 +690,6 @@ function UIScaffold.CreateListPanelScaffold(cfg)
     return scaffold
 end
 
--- @compat
--- @deprecated use addon.UIScaffold.MakeUIFrameController
-function Frames.MakeUIFrameController(getFrame, requestRefreshFn)
-    local UIScaffold = addon.UIScaffold
-    if UIScaffold and UIScaffold.MakeUIFrameController then
-        return UIScaffold.MakeUIFrameController(getFrame, requestRefreshFn)
-    end
-end
-
--- @compat
--- @deprecated use addon.UIScaffold.BootstrapModuleUi
-function Frames.BootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
-    local UIScaffold = addon.UIScaffold
-    if UIScaffold and UIScaffold.BootstrapModuleUi then
-        return UIScaffold.BootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
-    end
-end
-
--- @compat
--- @deprecated use addon.UIScaffold.CreateListPanelScaffold
-function Frames.CreateListPanelScaffold(cfg)
-    local UIScaffold = addon.UIScaffold
-    if UIScaffold and UIScaffold.CreateListPanelScaffold then
-        return UIScaffold.CreateListPanelScaffold(cfg)
-    end
-end
-
 function Frames.BindEditBoxHandlers(frameName, specs, requestRefreshFn)
     if type(frameName) ~= "string" or type(specs) ~= "table" then
         return
@@ -559,4 +716,3 @@ function Frames.BindEditBoxHandlers(frameName, specs, requestRefreshFn)
         end
     end
 end
-

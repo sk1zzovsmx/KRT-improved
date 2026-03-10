@@ -14,8 +14,6 @@ local Comms = feature.Comms or addon.Comms
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
-local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
-local bindModuleToggleHide = feature.BindModuleToggleHide
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
@@ -34,19 +32,19 @@ do
     local frameName
 
     local getFrame = makeModuleFrameGetter(module, "KRTSpammer")
-    local LocalizeUIFrame
-    local localized = false
-
-    local UpdateUIFrame
+    local UI = {
+        Localized = false,
+        Loaded = false,
+    }
     -- Defaults / constants
     local DEFAULT_DURATION_STR = "60"
     local DEFAULT_DURATION_NUM = 60
     local DEFAULT_OUTPUT = "LFM"
+    local MAX_SPAM_RUNTIME_SECONDS = 1800
+    local MAX_SPAM_MESSAGES_PER_RUN = 30
 
     -- Runtime state
     local loaded = false
-    local uiBound = false
-    local scaffoldToggle, scaffoldHide
 
     -- Duration kept as string for coherence with EditBox/SV
     local duration = DEFAULT_DURATION_STR
@@ -57,6 +55,8 @@ do
     local paused = false
     local countdownTicker
     local countdownRemaining = 0
+    local runElapsedSeconds = 0
+    local messagesSent = 0
 
     local inputsLocked = false
     local previewDirty = true
@@ -130,10 +130,9 @@ do
     local UpdateTickDisplay
     local SetInputsLocked
     local GetValidDuration
-    local AcquireRefs
 
     -- ----- Private helpers ----- --
-    function AcquireRefs(frame)
+    function UI.AcquireRefs(frame)
         local refs = {
             clearBtn = Frames.Ref(frame, "ClearBtn"),
             startBtn = Frames.Ref(frame, "StartBtn"),
@@ -258,42 +257,18 @@ do
                 module:RequestRefresh()
             end,
         })
-        if not frameName then return end
+        UI.Loaded = frameName ~= nil
+        if not UI.Loaded then return end
 
         -- Localize once (not per tick)
-        LocalizeUIFrame()
+        UI.Localize()
 
         if frame:IsShown() then
             module:RequestRefresh()
         end
     end
 
-    -- Initialize UI controller for Toggle/Hide.
-    UIScaffold.BootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
-        bindToggleHide = bindModuleToggleHide,
-        bindRequestRefresh = bindModuleRequestRefresh,
-    })
-
-    scaffoldToggle = module.Toggle
-    scaffoldHide = module.Hide
-
-    function module:BindUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame, self.refs
-        end
-
-        local frame = getFrame()
-        if not frame then
-            return nil
-        end
-        if not frameName then
-            self:OnLoad(frame)
-        end
-
-        local refs = AcquireRefs(frame)
-        self.frame = frame
-        self.refs = refs
-
+    local function BindHandlers(_, _, refs)
         Frames.SafeSetScript(refs.clearBtn, "OnClick", function()
             module:Clear()
         end)
@@ -347,35 +322,23 @@ do
         Frames.SafeSetScript(refs.chatYell, "OnClick", function(self, button)
             module:Save(self, button)
         end)
-
-        uiBound = true
-        return frame, refs
     end
 
-    function module:EnsureUI()
-        if uiBound and self.frame and self.refs then
-            return self.frame
-        end
-        return self:BindUI()
+    local function OnLoadFrame(frame)
+        module:OnLoad(frame)
+        return frameName
     end
 
-    function module:Toggle()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldToggle then
-            return scaffoldToggle(self)
-        end
-    end
-
-    function module:Hide()
-        if not self:EnsureUI() then
-            return
-        end
-        if scaffoldHide then
-            return scaffoldHide(self)
-        end
-    end
+    UIScaffold.DefineModuleUi({
+        module = module,
+        getFrame = getFrame,
+        acquireRefs = UI.AcquireRefs,
+        bind = BindHandlers,
+        localize = function()
+            UI.Localize()
+        end,
+        onLoad = OnLoadFrame,
+    })
 
     -- Save (EditBox / Checkbox)
     function module:Save(box)
@@ -434,6 +397,8 @@ do
             else
                 ticking = true
                 paused = false
+                runElapsedSeconds = 0
+                messagesSent = 0
                 SetInputsLocked(true)
                 StartSpamCycle(true)
             end
@@ -444,6 +409,8 @@ do
     function module:Stop()
         ticking = false
         paused = false
+        runElapsedSeconds = 0
+        messagesSent = 0
         StopSpamCycle(true)
         SetInputsLocked(false)
         module:RequestRefresh()
@@ -461,16 +428,26 @@ do
     function module:Spam()
         if strlen(finalOutput) > 255 then
             addon:error(L.StrSpammerErrLength)
-            ticking = false
-            return
+            module:Stop()
+            return false
         end
 
         local chList = KRT_Spammer.Channels or {}
 
-        -- CHANGE: fallback SAY (not YELL)
         if #chList <= 0 then
-            Comms.Chat(tostring(finalOutput), "SAY", nil, nil, true)
-            return
+            local groupType = addon.GetGroupTypeAndCount()
+            if groupType == "raid" then
+                Comms.Chat(tostring(finalOutput), "RAID", nil, nil, true)
+            elseif groupType == "party" then
+                Comms.Chat(tostring(finalOutput), "PARTY", nil, nil, true)
+            else
+                if addon.Chat and addon.Chat.Print then
+                    addon.Chat:Print(tostring(finalOutput))
+                else
+                    addon:info("%s", tostring(finalOutput))
+                end
+            end
+            return true
         end
 
         for _, c in ipairs(chList) do
@@ -480,6 +457,8 @@ do
                 Comms.Chat(tostring(finalOutput), upper(c), nil, nil, true)
             end
         end
+
+        return true
     end
 
     -- Tab
@@ -528,8 +507,8 @@ do
     end
 
     -- Localize UI
-    function LocalizeUIFrame()
-        if localized then return end
+    function UI.Localize()
+        if UI.Localized then return end
 
         _G[frameName .. "NameStr"]:SetText(L.StrRaid)
         _G[frameName .. "DurationStr"]:SetText(L.StrDuration)
@@ -603,7 +582,7 @@ do
         -- Initialize default UI length once
         ResetLengthUI()
 
-        localized = true
+        UI.Localized = true
     end
 
     -- Tick display
@@ -686,9 +665,24 @@ do
         countdownTicker = addon.NewTicker(1, function()
             if not ticking or paused then return end
 
+            runElapsedSeconds = runElapsedSeconds + 1
+            if runElapsedSeconds >= MAX_SPAM_RUNTIME_SECONDS then
+                addon:warn(L.MsgSpammerAutoStopDuration:format(MAX_SPAM_RUNTIME_SECONDS))
+                module:Stop()
+                return
+            end
+
             countdownRemaining = countdownRemaining - 1
             if countdownRemaining <= 0 then
-                module:Spam()
+                if not module:Spam() then
+                    return
+                end
+                messagesSent = messagesSent + 1
+                if messagesSent >= MAX_SPAM_MESSAGES_PER_RUN then
+                    addon:warn(L.MsgSpammerAutoStopMessages:format(MAX_SPAM_MESSAGES_PER_RUN))
+                    module:Stop()
+                    return
+                end
                 countdownRemaining = GetValidDuration()
             end
 
@@ -851,7 +845,7 @@ do
     end
 
     -- UI update tick
-    function UpdateUIFrame()
+    function UI.Refresh()
         local frame = getFrame()
         if not (frame and frame:IsShown()) then
             return
@@ -895,7 +889,6 @@ do
     end
 
     function module:Refresh()
-        if UpdateUIFrame then UpdateUIFrame() end
+        UI.Refresh()
     end
 end
-

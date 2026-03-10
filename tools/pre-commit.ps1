@@ -18,9 +18,16 @@ Write-Host "Refreshing docs/TREE.md..."
 & (Join-Path $repoRoot "tools/update-tree.ps1")
 
 if (Get-Command git -ErrorAction SilentlyContinue) {
-    $null = & cmd /c "git add -- docs/TREE.md 2>nul"
-    if ($LASTEXITCODE -ne 0) {
-        throw "git add docs/TREE.md failed."
+    $null = & git diff --quiet -- docs/TREE.md
+    if ($LASTEXITCODE -gt 1) {
+        throw "git diff --quiet docs/TREE.md failed."
+    }
+
+    if ($LASTEXITCODE -eq 1) {
+        $null = & git add -- docs/TREE.md
+        if ($LASTEXITCODE -ne 0) {
+            throw "git add docs/TREE.md failed."
+        }
     }
 }
 

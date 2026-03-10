@@ -836,26 +836,45 @@ do
         local rows = {}
         local headerMap = nil
         local firstLine = true
+        local stats = {
+            headerDetected = false,
+            totalLines = 0,
+            dataLines = 0,
+            validRows = 0,
+            skippedRows = 0,
+        }
 
         for line in csv:gmatch("[^\n]+") do
+            stats.totalLines = stats.totalLines + 1
             line = line:gsub("\r$", "")
             if firstLine then
                 firstLine = false
                 local maybeHeader = splitCSVLine(line)
                 local map, isHeader = buildHeaderMap(maybeHeader)
                 if isHeader then
+                    stats.headerDetected = true
                     headerMap = map
                 else
                     -- No header detected: treat first line as data
-                    appendParsedCSVRow(rows, maybeHeader, headerMap, line, false)
+                    stats.dataLines = stats.dataLines + 1
+                    if appendParsedCSVRow(rows, maybeHeader, headerMap, line, false) then
+                        stats.validRows = stats.validRows + 1
+                    else
+                        stats.skippedRows = stats.skippedRows + 1
+                    end
                 end
             else
+                stats.dataLines = stats.dataLines + 1
                 local fields = splitCSVLine(line)
-                appendParsedCSVRow(rows, fields, headerMap, line, true)
+                if appendParsedCSVRow(rows, fields, headerMap, line, true) then
+                    stats.validRows = stats.validRows + 1
+                else
+                    stats.skippedRows = stats.skippedRows + 1
+                end
             end
         end
 
-        return rows
+        return rows, stats
     end
     local function validatePlusRows(rows)
         -- Plus System requires exactly 1 reserve entry per player (SoftRes set to 1 SR per player).
@@ -965,10 +984,21 @@ do
 
         addon:debug(Diag.D.LogReservesParseStart)
 
-        local rows = parseCSVRows(text)
+        local rows, importStats = parseCSVRows(text)
         if not rows or #rows == 0 then
             addon:warn(L.WarnNoValidRows)
             return nil, "NO_ROWS"
+        end
+
+        importStats = importStats or {}
+        addon:debug(Diag.D.LogReservesImportRows:format(
+            tonumber(importStats.validRows) or #rows,
+            tonumber(importStats.skippedRows) or 0,
+            tostring(importStats.headerDetected),
+            tonumber(importStats.dataLines) or 0
+        ))
+        if importStats.headerDetected ~= true and (tonumber(importStats.skippedRows) or 0) > 0 then
+            addon:warn(L.WarnReservesHeaderHint)
         end
 
         local ok, errCode, errData = strategy.Validate(rows)
@@ -985,6 +1015,7 @@ do
             reservesData = newReservesData,
             nPlayers = addon.tLength(newReservesData),
             opts = opts,
+            importStats = importStats,
         }
         return parsed
     end
@@ -1003,6 +1034,11 @@ do
         addon:debug(Diag.D.LogReservesParseComplete:format(nPlayers))
         if not (opts and opts.silentInfo) then
             addon:info(format(L.SuccessReservesParsed, tostring(nPlayers)))
+            local stats = parsed.importStats or {}
+            addon:info(L.MsgReservesImportRows:format(
+                tonumber(stats.validRows) or 0,
+                tonumber(stats.skippedRows) or 0
+            ))
         end
 
         local reason = (opts and opts.reason) or "import"

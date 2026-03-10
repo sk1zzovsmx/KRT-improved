@@ -8,6 +8,7 @@ local feature = addon.Core.GetFeatureShared()
 
 local Core = feature.Core or addon.Core
 local Time = feature.Time or addon.Time
+local Strings = feature.Strings or addon.Strings
 
 local tinsert, tremove = table.insert, table.remove
 local pairs, type = pairs, type
@@ -71,6 +72,45 @@ do
         for key in pairs(LEGACY_RUNTIME_KEYS) do
             raid[key] = nil
         end
+    end
+
+    local function normalizeChangeName(value)
+        local out = nil
+        if Strings and Strings.NormalizeName then
+            out = Strings.NormalizeName(value)
+        elseif value ~= nil then
+            out = tostring(value)
+        end
+        if type(out) ~= "string" or out == "" then
+            return nil
+        end
+        return out
+    end
+
+    local function normalizeChangeSpec(value)
+        if value == nil then
+            return nil
+        end
+        local out = nil
+        if Strings and Strings.NormalizeName then
+            out = Strings.NormalizeName(value)
+        else
+            out = tostring(value)
+        end
+        if type(out) ~= "string" or out == "" then
+            return nil
+        end
+        return out
+    end
+
+    local function normalizeNameLower(value)
+        if Strings and Strings.NormalizeLower then
+            return Strings.NormalizeLower(value, true)
+        end
+        if type(value) ~= "string" then
+            return nil
+        end
+        return string.lower(value)
     end
 
     local function rebuildRaidNidIndex()
@@ -195,6 +235,61 @@ do
         return idx
     end
 
+    function module:GetRaidChanges(index)
+        local raid, idx = self:GetRaidByIndex(index)
+        if not raid then
+            return nil, idx, nil
+        end
+        raid.changes = (type(raid.changes) == "table") and raid.changes or {}
+        return raid.changes, idx, raid
+    end
+
+    function module:UpsertRaidChange(index, playerName, spec)
+        local changes, idx = self:GetRaidChanges(index)
+        if type(changes) ~= "table" then
+            return false, nil, nil, idx
+        end
+
+        local normalizedName = normalizeChangeName(playerName)
+        if not normalizedName then
+            return false, nil, nil, idx
+        end
+
+        local normalizedSpec = normalizeChangeSpec(spec)
+        changes[normalizedName] = normalizedSpec
+        return true, normalizedName, normalizedSpec, idx
+    end
+
+    function module:DeleteRaidChange(index, playerName)
+        local changes, idx = self:GetRaidChanges(index)
+        if type(changes) ~= "table" then
+            return false, false, idx
+        end
+
+        local normalizedName = normalizeChangeName(playerName)
+        if not normalizedName then
+            return false, false, idx
+        end
+
+        local existed = changes[normalizedName] ~= nil
+        changes[normalizedName] = nil
+        return true, existed, idx
+    end
+
+    function module:ClearRaidChanges(index)
+        local changes, idx = self:GetRaidChanges(index)
+        if type(changes) ~= "table" then
+            return false, 0, idx
+        end
+
+        local removed = 0
+        for name in pairs(changes) do
+            changes[name] = nil
+            removed = removed + 1
+        end
+        return true, removed, idx
+    end
+
     function module:NormalizeRaidRecord(raid)
         if type(raid) ~= "table" then
             return nil
@@ -242,6 +337,8 @@ do
         end
 
         local players = raid.players
+        local playerNidByName = {}
+        local validPlayerNids = {}
         for i = 1, #players do
             local player = players[i]
             if type(player) == "table" then
@@ -259,6 +356,15 @@ do
                     count = 0
                 end
                 player.count = count
+
+                local playerNid = tonumber(player.playerNid)
+                if playerNid and playerNid > 0 then
+                    validPlayerNids[playerNid] = true
+                    local normalizedName = normalizeNameLower(player.name)
+                    if normalizedName and playerNidByName[normalizedName] == nil then
+                        playerNidByName[normalizedName] = playerNid
+                    end
+                end
             end
         end
 
@@ -289,6 +395,49 @@ do
             local boss = bosses[i]
             if type(boss) == "table" then
                 boss.bossNid = allocateBossNid(boss.bossNid)
+
+                local attendees = {}
+                local seen = {}
+                local rawPlayers = boss.players
+                if type(rawPlayers) == "table" then
+                    for j = 1, #rawPlayers do
+                        local rawPlayer = rawPlayers[j]
+                        local playerNid = tonumber(rawPlayer)
+                        if not playerNid and type(rawPlayer) == "string" then
+                            playerNid = playerNidByName[normalizeNameLower(rawPlayer)]
+                        end
+                        if playerNid and playerNid > 0 and validPlayerNids[playerNid] and not seen[playerNid] then
+                            seen[playerNid] = true
+                            attendees[#attendees + 1] = playerNid
+                        end
+                    end
+                end
+                if #attendees == 0 then
+                    local killTime = tonumber(boss.time) or 0
+                    for j = 1, #players do
+                        local player = players[j]
+                        local playerNid = player and tonumber(player.playerNid) or nil
+                        if playerNid and validPlayerNids[playerNid] and not seen[playerNid] then
+                            local include = true
+                            if killTime > 0 then
+                                local joinTime = tonumber(player.join)
+                                if joinTime and joinTime > killTime then
+                                    include = false
+                                end
+                                local leaveTime = tonumber(player.leave)
+                                if leaveTime and leaveTime > 0 and leaveTime < killTime then
+                                    include = false
+                                end
+                            end
+                            if include then
+                                seen[playerNid] = true
+                                attendees[#attendees + 1] = playerNid
+                            end
+                        end
+                    end
+                end
+                boss.players = attendees
+                boss.attendanceMask = nil
             end
         end
 
@@ -319,6 +468,17 @@ do
             local loot = lootRows[i]
             if type(loot) == "table" then
                 loot.lootNid = allocateLootNid(loot.lootNid)
+
+                local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter)
+                if not looterNid and type(loot.looter) == "string" then
+                    looterNid = playerNidByName[normalizeNameLower(loot.looter)]
+                end
+                if looterNid and looterNid > 0 and validPlayerNids[looterNid] then
+                    loot.looterNid = looterNid
+                else
+                    loot.looterNid = nil
+                end
+                loot.looter = nil
             end
         end
 

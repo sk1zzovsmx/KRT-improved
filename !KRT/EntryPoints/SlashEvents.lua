@@ -20,6 +20,7 @@ local RT_COLOR = feature.RT_COLOR
 local pairs, ipairs = pairs, ipairs
 local format = string.format
 local upper = string.upper
+local type = type
 local tostring, tonumber = tostring, tonumber
 
 local UI = addon.UI or {}
@@ -109,6 +110,35 @@ local function formatValidateRaidDetail(entry)
     if code == "LOOT_UNKNOWN_BOSS_WITHOUT_TRASH" then
         return L.MsgValidateDetailLootNoBossTrash:format(index, raidNid, tonumber(data.lootIndex) or 0)
     end
+    if code == "BOSS_ATTENDEE_INVALID" then
+        return L.MsgValidateDetailBossAttendeeInvalid:format(
+            index,
+            raidNid,
+            tonumber(data.bossIndex) or 0,
+            tonumber(data.attendeeIndex) or 0
+        )
+    end
+    if code == "BOSS_ATTENDEE_MISSING_PLAYER" then
+        return L.MsgValidateDetailBossAttendeeMissingPlayer:format(
+            index,
+            raidNid,
+            tonumber(data.bossIndex) or 0,
+            tonumber(data.attendeeIndex) or 0,
+            tonumber(data.playerNid) or 0
+        )
+    end
+    if code == "LOOT_MISSING_LOOTER" then
+        local looterNid = tonumber(data.looterNid)
+        if looterNid and looterNid > 0 then
+            return L.MsgValidateDetailLootMissingLooterNid:format(
+                index,
+                raidNid,
+                tonumber(data.lootIndex) or 0,
+                looterNid
+            )
+        end
+        return L.MsgValidateDetailLootMissingLooter:format(index, raidNid, tonumber(data.lootIndex) or 0)
+    end
     if code == "RUNTIME_OUTSIDE" then
         return L.MsgValidateDetailRuntimeOutside:format(index, raidNid, tostring(data.key or "?"))
     end
@@ -155,6 +185,36 @@ local function showHelp()
     printHelp("validate", L.StrCmdValidate)
 end
 
+local function getFeatureProfile()
+    local features = addon.Features
+    if type(features) == "table" and type(features.GetProfile) == "function" then
+        return features:GetProfile()
+    end
+    return "full"
+end
+
+local function notifyWidgetCallUnavailable(widgetId, methodName)
+    if type(UI.IsEnabled) == "function" and not UI:IsEnabled(widgetId) then
+        addon:warn(L.MsgFeatureDisabledByProfile, widgetId, getFeatureProfile())
+        return
+    end
+    addon:warn(L.MsgFeatureUnavailable, widgetId, methodName)
+end
+
+local function callWidget(widgetId, methodName, ...)
+    if type(UI.IsEnabled) == "function" and not UI:IsEnabled(widgetId) then
+        notifyWidgetCallUnavailable(widgetId, methodName)
+        return nil
+    end
+
+    if type(UI.IsRegistered) == "function" and not UI:IsRegistered(widgetId) then
+        notifyWidgetCallUnavailable(widgetId, methodName)
+        return nil
+    end
+
+    return UI:Call(widgetId, methodName, ...)
+end
+
 local function registerAliases(list, fn)
     for _, cmd in ipairs(list) do
         module.sub[cmd] = fn
@@ -167,8 +227,17 @@ function module:Register(cmd, fn)
 end
 
 function module:Handle(msg)
-    if not msg or msg == "" then return end
+    if not msg or msg == "" then
+        showHelp()
+        return
+    end
+
     local cmd, rest = Strings.SplitArgs(msg)
+    if not cmd or cmd == "" then
+        showHelp()
+        return
+    end
+
     if cmd == "show" or cmd == "toggle" then
         local moduleRef = getController("Master")
         if moduleRef and moduleRef.Toggle then
@@ -308,9 +377,9 @@ end)
 registerAliases(cmdConfig, function(rest)
     local sub = Strings.SplitArgs(rest)
     if sub == "reset" then
-        UI:Call("Config", "Default")
+        callWidget("Config", "Default")
     else
-        UI:Call("Config", "Toggle")
+        callWidget("Config", "Toggle")
     end
 end)
 
@@ -328,7 +397,7 @@ registerAliases(cmdWarnings, function(rest)
     else
         local moduleRef = getController("Warnings")
         if moduleRef and moduleRef.Announce then
-            moduleRef:Announce(tonumber(sub))
+            moduleRef:Announce(sub)
         end
     end
 end)
@@ -404,16 +473,16 @@ end)
 registerAliases(cmdCounter, function(rest)
     local sub = Strings.SplitArgs(rest)
     if not sub or sub == "" or sub == "toggle" then
-        UI:Call("LootCounter", "Toggle")
+        callWidget("LootCounter", "Toggle")
     end
 end)
 
 registerAliases(cmdReserves, function(rest)
     local sub = Strings.SplitArgs(rest)
     if not sub or sub == "" or sub == "toggle" then
-        UI:Call("Reserves", "Toggle")
+        callWidget("Reserves", "Toggle")
     elseif sub == "import" then
-        UI:Call("Reserves", "ToggleImport")
+        callWidget("Reserves", "ToggleImport")
     else
         addon:info(format(L.StrCmdCommands, "krt res"), "KRT")
         printHelp("toggle", L.StrCmdToggle)

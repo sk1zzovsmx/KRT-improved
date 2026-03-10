@@ -14,27 +14,28 @@ Permanent guardrails for function mapping and unification work.
 
 1. Compat wrappers must be marked `@compat`.
 2. Deprecated compat wrappers must be marked `@deprecated use addon.<Owner>.X`.
-3. New code should target owner modules directly, not deprecated `StdFacade.*` facades.
+3. New code should target owner modules directly, not legacy aliases/facades.
 
 ## PR Checklist
 
 1. Run `tools/check-layering.ps1`.
-2. Run quick duplicate checks from `DEV_CHECKS.md` (function unification section).
-3. If function ownership changed, regenerate:
+2. Run `tools/check-lua-uniformity.ps1`.
+3. Run quick duplicate checks from `DEV_CHECKS.md` (function unification section).
+4. If function ownership changed, regenerate:
    - `docs/FUNCTION_REGISTRY.csv`
    - `docs/FUNCTION_REGISTRY.md`
    - `docs/FN_CLUSTERS.md`
-4. Update this policy and deprecation map when introducing new compat wrappers.
+5. Update this policy when introducing new compat wrappers.
 
 ## Canonical Ownership (Quick Wins)
 
-- `Core.getFeatureShared`: `!KRT/Init.lua`
-- `Core.ensureLootRuntimeState`: `!KRT/Init.lua`
-- `Core.getController`: `!KRT/Init.lua`
+- `Core.GetFeatureShared`: `!KRT/Init.lua`
+- `Core.EnsureLootRuntimeState`: `!KRT/Init.lua`
+- `Core.GetController`: `!KRT/Init.lua`
 - Reserves formatters: `!KRT/Services/Reserves.lua`
-- EntryPoint controller lookup: `Core.getController(name)`
+- EntryPoint controller lookup: `Core.GetController(name)`
 - UI primitives: `!KRT/Modules/UI/Visuals.lua`
 - UI row visuals: `!KRT/Modules/UI/Visuals.lua`
 - UI scaffold orchestration: `!KRT/Modules/UI/Frames.lua` (`addon.UIScaffold.*`)
-- Binder map datasets: `!KRT/Modules/UI/Binder/Map.lua`
-- Binder arg-token helpers: `trimBinderToken` / `splitCommaArgs` in `!KRT/Modules/UI/Binder/UIBinder.lua`
+- Widget facade ownership: `!KRT/Modules/UI/Facade.lua` (`addon.UI.*`)
+- Item link/tooltip helpers: `!KRT/Modules/Item.lua` (`addon.Item.*`)

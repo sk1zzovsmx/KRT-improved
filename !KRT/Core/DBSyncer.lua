@@ -56,9 +56,14 @@ do
     local MAX_CHUNK_SIZE = 180
     local REQUEST_TTL_SECONDS = 30
     local INCOMING_TTL_SECONDS = 45
+    local REQUEST_RATE_WINDOW_SECONDS = 30
+    local REQUEST_RATE_MAX_PER_SENDER = 6
+    local REQUEST_RATE_PRUNE_SECONDS = REQUEST_RATE_WINDOW_SECONDS * 2
+    local SYNC_OFFICER_LOOKUP_GRACE_SECONDS = 2
 
     module._incoming = module._incoming or {}
     module._pendingRequests = module._pendingRequests or {}
+    module._requestRate = module._requestRate or {}
     module._nextRequestId = tonumber(module._nextRequestId) or 0
 
     -- ----- Private helpers ----- --
@@ -145,13 +150,54 @@ do
         return tconcat(out, FIELD_SEP)
     end
 
-    local function joinNameList(names)
-        if type(names) ~= "table" or #names == 0 then
+    local function buildPlayerNameMaps(players)
+        local byNid = {}
+        local byNameLower = {}
+        local validNids = {}
+        if type(players) ~= "table" then
+            return byNid, byNameLower, validNids
+        end
+
+        for i = 1, #players do
+            local player = players[i]
+            if type(player) == "table" then
+                local playerNid = tonumber(player.playerNid)
+                local playerName = player.name
+                if playerNid and playerNid > 0 then
+                    validNids[playerNid] = true
+                    if type(playerName) == "string" and playerName ~= "" then
+                        byNid[playerNid] = playerName
+                        local normalized = Strings.NormalizeLower(playerName, true)
+                        if normalized and normalized ~= "" and byNameLower[normalized] == nil then
+                            byNameLower[normalized] = playerNid
+                        end
+                    end
+                end
+            end
+        end
+
+        return byNid, byNameLower, validNids
+    end
+
+    local function joinBossAttendeeNameList(players, playerNameByNid)
+        if type(players) ~= "table" or #players == 0 then
             return ""
         end
         local out = {}
-        for i = 1, #names do
-            out[i] = tostring(names[i] or "")
+        local seen = {}
+        for i = 1, #players do
+            local raw = players[i]
+            local playerName = nil
+            local playerNid = tonumber(raw)
+            if playerNid and playerNid > 0 then
+                playerName = playerNameByNid and playerNameByNid[playerNid] or nil
+            elseif type(raw) == "string" then
+                playerName = Strings.NormalizeName(raw, true) or raw
+            end
+            if playerName and playerName ~= "" and not seen[playerName] then
+                seen[playerName] = true
+                out[#out + 1] = tostring(playerName)
+            end
         end
         return tconcat(out, LIST_SEP)
     end
@@ -165,6 +211,23 @@ do
             return names, 0
         end
         return splitFields(raw, LIST_SEP, names)
+    end
+
+    local function resolveLootLooterName(loot, playerNameByNid)
+        if type(loot) ~= "table" then
+            return ""
+        end
+        local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter)
+        if looterNid and looterNid > 0 then
+            local playerName = playerNameByNid and playerNameByNid[looterNid] or nil
+            if playerName and playerName ~= "" then
+                return playerName
+            end
+        end
+        if type(loot.looter) == "string" then
+            return loot.looter
+        end
+        return ""
     end
 
     local function cleanupExpiredState()
@@ -183,6 +246,67 @@ do
                 module._pendingRequests[reqId] = nil
             end
         end
+
+        for sender, st in pairs(module._requestRate) do
+            local stamp = tonumber(st and st.windowStart) or tonumber(st and st.lastSeen) or now
+            local age = now - stamp
+            if age > REQUEST_RATE_PRUNE_SECONDS then
+                module._requestRate[sender] = nil
+            end
+        end
+    end
+
+    local function cleanupIncomingByRequest(requestId, mode)
+        local requestKey = tostring(requestId or "")
+        local modeKey = tostring(mode or "")
+        if requestKey == "" or modeKey == "" then
+            return
+        end
+        for key, st in pairs(module._incoming) do
+            local incomingRequestId = tostring(st and st.requestId or "")
+            local incomingMode = tostring(st and st.mode or "")
+            if incomingRequestId == requestKey and incomingMode == modeKey then
+                module._incoming[key] = nil
+            end
+        end
+    end
+
+    local function allowIncomingRequest(rawSender)
+        local sender = normalizeSender(rawSender) or tostring(rawSender or "?")
+        local now = nowSec()
+        local rate = module._requestRate[sender]
+        if not rate then
+            module._requestRate[sender] = {
+                windowStart = now,
+                lastSeen = now,
+                count = 1,
+                warned = false,
+            }
+            return true, sender
+        end
+
+        local windowStart = tonumber(rate.windowStart) or now
+        if (now - windowStart) > REQUEST_RATE_WINDOW_SECONDS then
+            rate.windowStart = now
+            rate.lastSeen = now
+            rate.count = 1
+            rate.warned = false
+            return true, sender
+        end
+
+        rate.lastSeen = now
+        rate.count = (tonumber(rate.count) or 0) + 1
+        if rate.count > REQUEST_RATE_MAX_PER_SENDER then
+            if not rate.warned then
+                addon:warn((Diag.W.LogSyncRequestRateLimited):format(
+                    tostring(sender), rate.count, REQUEST_RATE_WINDOW_SECONDS
+                ))
+                rate.warned = true
+            end
+            return false, sender
+        end
+
+        return true, sender
     end
 
     local function canAnswerRequests(channel)
@@ -267,6 +391,14 @@ do
         )
 
         local players = sortedByNid(raid.players, "playerNid", "name")
+        local playerNameByNid = {}
+        for i = 1, #players do
+            local p = players[i]
+            local playerNid = tonumber(p and p.playerNid)
+            if playerNid and playerNid > 0 and p and p.name then
+                playerNameByNid[playerNid] = p.name
+            end
+        end
         for i = 1, #players do
             local p = players[i]
             lines[#lines + 1] = packFields(
@@ -293,7 +425,7 @@ do
                 tonumber(b.difficulty) or 0,
                 tonumber(b.time) or 0,
                 encodeText(b.hash),
-                encodeText(joinNameList(b.players))
+                encodeText(joinBossAttendeeNameList(b.players, playerNameByNid))
             )
         end
 
@@ -310,7 +442,7 @@ do
                 tonumber(loot.itemRarity) or 0,
                 encodeText(loot.itemTexture),
                 tonumber(loot.itemCount) or 1,
-                encodeText(loot.looter),
+                encodeText(resolveLootLooterName(loot, playerNameByNid)),
                 tonumber(loot.rollType) or 0,
                 tonumber(loot.rollValue) or 0,
                 tonumber(loot.bossNid) or 0,
@@ -428,6 +560,7 @@ do
                 local itemLink = decodeText(f[6])
                 local itemTexture = decodeText(f[8])
                 local looter = decodeText(f[10])
+                local looterNid = tonumber(looter)
                 if itemName == nil or itemString == nil or itemLink == nil then
                     return nil
                 end
@@ -444,6 +577,7 @@ do
                     itemTexture = itemTexture,
                     itemCount = parseNumber(f[9], 1),
                     looter = looter,
+                    looterNid = looterNid,
                     rollType = parseNumber(f[11], 0),
                     rollValue = parseNumber(f[12], 0),
                     bossNid = parseNumber(f[13], 0),
@@ -492,19 +626,25 @@ do
         return row, idx
     end
 
-    local function copyUniqueNames(names)
+    local function copyUniquePlayerNids(values, playerNidByName, validPlayerNids)
         local out = {}
         local seen = {}
-        if type(names) ~= "table" then
+        if type(values) ~= "table" then
             return out
         end
-        for i = 1, #names do
-            local raw = names[i]
-            local normalized = Strings.NormalizeName(raw, true)
-            local name = normalized or tostring(raw or "")
-            if name ~= "" and not seen[name] then
-                seen[name] = true
-                out[#out + 1] = name
+        for i = 1, #values do
+            local raw = values[i]
+            local playerNid = tonumber(raw)
+            if not playerNid and type(raw) == "string" then
+                playerNid = playerNidByName and playerNidByName[Strings.NormalizeLower(raw, true)] or nil
+            end
+            if playerNid and playerNid > 0 then
+                if (not validPlayerNids) or validPlayerNids[playerNid] then
+                    if not seen[playerNid] then
+                        seen[playerNid] = true
+                        out[#out + 1] = playerNid
+                    end
+                end
             end
         end
         return out
@@ -639,6 +779,8 @@ do
             end
         end
 
+        local _, playerNidByName, validPlayerNids = buildPlayerNameMaps(raid.players)
+
         raid.bossKills = raid.bossKills or {}
         local bossIdx = buildNidIndex(raid.bossKills, "bossNid")
         for i = 1, #snapshot.bosses do
@@ -654,7 +796,7 @@ do
                 if src.hash and src.hash ~= "" then
                     dst.hash = src.hash
                 end
-                dst.players = copyUniqueNames(src.players)
+                dst.players = copyUniquePlayerNids(src.players, playerNidByName, validPlayerNids)
             end
         end
 
@@ -677,7 +819,14 @@ do
                     dst.itemTexture = src.itemTexture
                 end
                 dst.itemCount = count
-                dst.looter = Strings.NormalizeName(src.looter, true) or src.looter or dst.looter
+                local looterNid = tonumber(src.looterNid) or tonumber(src.looter)
+                if not looterNid and type(src.looter) == "string" then
+                    looterNid = playerNidByName[Strings.NormalizeLower(src.looter, true)]
+                end
+                if looterNid and looterNid > 0 and validPlayerNids[looterNid] then
+                    dst.looterNid = looterNid
+                end
+                dst.looter = nil
                 dst.rollType = tonumber(src.rollType) or 0
                 dst.rollValue = tonumber(src.rollValue) or 0
                 dst.bossNid = tonumber(src.bossNid) or 0
@@ -718,7 +867,13 @@ do
             return nil, nil
         end
 
-        local raid = Core.CreateRaidRecord({
+        local raidStore = Core.GetRaidStoreOrNil and
+            Core.GetRaidStoreOrNil("DBSyncer.ImportSnapshotAsNewRaid", { "CreateRaidRecord", "InsertRaid" }) or nil
+        if not raidStore then
+            return nil, nil
+        end
+
+        local raid = raidStore:CreateRaidRecord({
             realm = header.realm,
             zone = header.zone,
             size = tonumber(header.size),
@@ -732,11 +887,7 @@ do
             return nil, nil
         end
 
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        if raidStore and raidStore.InsertRaid then
-            return raidStore:InsertRaid(raid)
-        end
-        return nil, nil
+        return raidStore:InsertRaid(raid)
     end
 
     local function sendRequest(mode, requestId, raidRef, signature, target)
@@ -808,8 +959,124 @@ do
         module._pendingRequests[requestId] = nil
     end
 
+    local function shouldAcceptResponseSender(pending, rawSender)
+        if type(pending) ~= "table" then
+            return false
+        end
+
+        local sender = normalizeSender(rawSender) or tostring(rawSender or "")
+        if sender == "" then
+            return false
+        end
+
+        local expectedTarget = normalizeSender(pending.target)
+        if expectedTarget and expectedTarget ~= "" then
+            if sender ~= expectedTarget then
+                return false
+            end
+            pending.sender = expectedTarget
+            return true
+        end
+
+        local expectedSender = normalizeSender(pending.sender)
+        if expectedSender and expectedSender ~= "" then
+            return sender == expectedSender
+        end
+
+        pending.sender = sender
+        return true
+    end
+
+    local function getSenderKey(rawSender)
+        local sender = normalizeSender(rawSender) or tostring(rawSender or "")
+        if sender == "" then
+            return nil
+        end
+        return sender
+    end
+
+    local function markSyncSenderFailed(pending, rawSender)
+        if type(pending) ~= "table" then
+            return nil
+        end
+        local sender = getSenderKey(rawSender)
+        if not sender then
+            return nil
+        end
+        pending.failedSenders = pending.failedSenders or {}
+        pending.failedSenders[sender] = true
+        return sender
+    end
+
+    local function isSyncSenderFailed(pending, rawSender)
+        if type(pending) ~= "table" then
+            return false
+        end
+        local sender = getSenderKey(rawSender)
+        if not sender then
+            return false
+        end
+        local failedSenders = pending.failedSenders
+        return type(failedSenders) == "table" and failedSenders[sender] == true
+    end
+
+    local function isAuthorizedSyncResponder(rawSender, pending)
+        if not addon.IsInRaid() then
+            return true
+        end
+        local sender = getSenderKey(rawSender)
+        if not sender then
+            return false
+        end
+
+        local count = tonumber(GetNumRaidMembers and GetNumRaidMembers()) or 0
+        for i = 1, count do
+            local name, rank = GetRaidRosterInfo(i)
+            local rosterName = getSenderKey(name)
+            if rosterName and rosterName == sender then
+                return (tonumber(rank) or 0) > 0
+            end
+        end
+
+        local createdAt = tonumber(type(pending) == "table" and pending.createdAt) or 0
+        if createdAt > 0 and (nowSec() - createdAt) <= SYNC_OFFICER_LOOKUP_GRACE_SECONDS then
+            return true
+        end
+        return false
+    end
+
+    local function warnSyncSenderNotOfficer(pending, requestId, rawSender)
+        if type(pending) ~= "table" then
+            return
+        end
+        local sender = getSenderKey(rawSender) or tostring(rawSender or "?")
+        pending.unauthorizedSenders = pending.unauthorizedSenders or {}
+        if pending.unauthorizedSenders[sender] then
+            return
+        end
+        pending.unauthorizedSenders[sender] = true
+        addon:warn((Diag.W.LogSyncSenderNotOfficer):format(tostring(sender), tostring(requestId)))
+    end
+
+    local function isSyncSenderUnauthorized(pending, rawSender)
+        if type(pending) ~= "table" then
+            return false
+        end
+        local sender = getSenderKey(rawSender)
+        if not sender then
+            return false
+        end
+        local unauthorizedSenders = pending.unauthorizedSenders
+        return type(unauthorizedSenders) == "table" and unauthorizedSenders[sender] == true
+    end
+
     local function handleIncomingRequest(rawSender, channel, requestId, mode, raidRef, signature)
         if not canAnswerRequests(channel) then
+            return
+        end
+
+        local allowed, sender = allowIncomingRequest(rawSender)
+        if not allowed then
             return
         end
 
@@ -827,7 +1094,6 @@ do
             return
         end
 
-        local sender = normalizeSender(rawSender) or tostring(rawSender)
         addon:debug((Diag.D.LogSyncRequestReceived):format(
             tostring(sender), tostring(requestId), tostring(raidRef)
         ))
@@ -844,14 +1110,17 @@ do
     local function onSnapshotReady(sender, requestId, mode, snapshot)
         if mode == MODE_SYNC then
             local currentRaid, currentId = getCurrentRaidRecord()
+            local pending = module._pendingRequests[requestId]
             if not currentRaid then
                 addon:warn(L.MsgLoggerSyncNoCurrent)
                 completeRequest(requestId)
                 return
             end
             if not raidMatchesSnapshotHeader(currentRaid, snapshot.header) then
-                addon:warn(L.MsgLoggerSyncRaidMismatch)
-                completeRequest(requestId)
+                addon:debug((Diag.D.LogSyncSyncSenderFailed):format(
+                    tostring(sender), tostring(requestId), "raid_mismatch"
+                ))
+                markSyncSenderFailed(pending, sender)
                 return
             end
 
@@ -860,7 +1129,10 @@ do
                 addon:error((Diag.E.LogSyncMergeFailed):format(
                     tostring(sender), tostring(requestId), tostring(snapshot.header.raidNid), tostring(raid)
                 ))
-                completeRequest(requestId)
+                markSyncSenderFailed(pending, sender)
+                addon:debug((Diag.D.LogSyncSyncSenderFailed):format(
+                    tostring(sender), tostring(requestId), "merge_failed"
+                ))
                 return
             end
 
@@ -873,6 +1145,7 @@ do
                 #(raid.loot or {})
             ))
 
+            cleanupIncomingByRequest(requestId, MODE_SYNC)
             completeRequest(requestId)
             refreshLoggerUi(currentId)
             return
@@ -908,9 +1181,24 @@ do
     local function handleIncomingSnapshot(sender, requestId, mode, raidNid, partIndex, partCount, chunkData)
         local pending = module._pendingRequests[requestId]
         local isPush = (mode == MODE_PUSH)
+        local isSync = (mode == MODE_SYNC)
 
         if not isPush then
             if not pending or pending.completed or pending.mode ~= mode then
+                addon:debug((Diag.D.LogSyncChunkIgnored):format(
+                    tostring(sender), tostring(requestId), tostring(raidNid)
+                ))
+                return
+            end
+
+            if isSync and isSyncSenderFailed(pending, sender) then
+                addon:debug((Diag.D.LogSyncChunkIgnored):format(
+                    tostring(sender), tostring(requestId), tostring(raidNid)
+                ))
+                return
+            end
+            local expectedTarget = normalizeSender(pending.target)
+            if expectedTarget and expectedTarget ~= "" and not shouldAcceptResponseSender(pending, sender) then
                 addon:debug((Diag.D.LogSyncChunkIgnored):format(
                     tostring(sender), tostring(requestId), tostring(raidNid)
                 ))
@@ -928,6 +1216,20 @@ do
         local key = tostring(sender) .. "|" .. tostring(requestId) .. "|" .. mode .. "|" .. tostring(raidNid)
         local state = module._incoming[key]
         if not state then
+            if isSync and isSyncSenderUnauthorized(pending, sender) then
+                addon:debug((Diag.D.LogSyncChunkIgnored):format(
+                    tostring(sender), tostring(requestId), tostring(raidNid)
+                ))
+                return
+            end
+            if isSync and not isAuthorizedSyncResponder(sender, pending) then
+                warnSyncSenderNotOfficer(pending, requestId, sender)
+                addon:debug((Diag.D.LogSyncChunkIgnored):format(
+                    tostring(sender), tostring(requestId), tostring(raidNid)
+                ))
+                return
+            end
+
             state = {
                 createdAt = nowSec(),
                 sender = sender,
@@ -942,6 +1244,10 @@ do
         end
 
         if state.total ~= partCount then
+            addon:warn((Diag.W.LogSyncChunkPartCountChanged):format(
+                tostring(sender), tostring(requestId), tostring(raidNid),
+                tonumber(state.total) or 0, tonumber(partCount) or 0
+            ))
             state.total = partCount
             state.got = 0
             state.parts = {}
@@ -978,6 +1284,13 @@ do
             addon:warn((Diag.W.LogSyncDecodeFailed):format(
                 tostring(sender), tostring(requestId), tostring(raidNid)
             ))
+            if isSync then
+                markSyncSenderFailed(pending, sender)
+                addon:debug((Diag.D.LogSyncSyncSenderFailed):format(
+                    tostring(sender), tostring(requestId), "decode_failed"
+                ))
+                return
+            end
             completeRequest(requestId)
             return
         end
@@ -987,6 +1300,13 @@ do
             addon:warn((Diag.W.LogSyncParseFailed):format(
                 tostring(sender), tostring(requestId), tostring(raidNid)
             ))
+            if isSync then
+                markSyncSenderFailed(pending, sender)
+                addon:debug((Diag.D.LogSyncSyncSenderFailed):format(
+                    tostring(sender), tostring(requestId), "parse_failed"
+                ))
+                return
+            end
             completeRequest(requestId)
             return
         end
@@ -995,6 +1315,13 @@ do
             addon:debug((Diag.D.LogSyncVersionMismatch):format(
                 tostring(sender), tostring(snapshot.header.protocolVersion), PROTOCOL_VERSION
             ))
+            if isSync then
+                markSyncSenderFailed(pending, sender)
+                addon:debug((Diag.D.LogSyncSyncSenderFailed):format(
+                    tostring(sender), tostring(requestId), "version_mismatch"
+                ))
+                return
+            end
             completeRequest(requestId)
             return
         end
@@ -1039,6 +1366,7 @@ do
             mode = MODE_REQ,
             raidRef = requestRef,
             target = target,
+            sender = target,
             completed = false,
         }
 
@@ -1107,6 +1435,9 @@ do
             createdAt = nowSec(),
             mode = MODE_SYNC,
             signature = signature,
+            sender = nil,
+            failedSenders = {},
+            unauthorizedSenders = {},
             completed = false,
         }
 

@@ -23,16 +23,18 @@ do
 
     -- ----- Private helpers ----- --
     local function normalizeRaid(raid)
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        if raidStore and raidStore.NormalizeRaidRecord then
+        local raidStore = Core.GetRaidStoreOrNil and
+            Core.GetRaidStoreOrNil("DBRaidQueries.NormalizeRaid", { "NormalizeRaidRecord" }) or nil
+        if raidStore then
             return raidStore:NormalizeRaidRecord(raid)
         end
         return raid
     end
 
     local function ensureRuntime(raid)
-        local raidStore = Core.GetRaidStore and Core.GetRaidStore() or nil
-        if raidStore and raidStore.EnsureRaidRuntime then
+        local raidStore = Core.GetRaidStoreOrNil and
+            Core.GetRaidStoreOrNil("DBRaidQueries.EnsureRuntime", { "EnsureRaidRuntime" }) or nil
+        if raidStore then
             return raidStore:EnsureRaidRuntime(raid)
         end
         return nil
@@ -48,6 +50,61 @@ do
         for i = 1, #rows do
             out[i] = rows[i]
         end
+    end
+
+    local function getPlayerByNid(raid, runtime, playerNid)
+        local queryNid = tonumber(playerNid)
+        if not (raid and queryNid and queryNid > 0) then
+            return nil
+        end
+
+        local idxByNid = runtime and runtime.playerIdxByNid or nil
+        local idx = idxByNid and idxByNid[queryNid] or nil
+        local players = raid.players or {}
+        if idx then
+            local player = players[idx]
+            if player and tonumber(player.playerNid) == queryNid then
+                return player
+            end
+        end
+
+        for i = 1, #players do
+            local player = players[i]
+            if player and tonumber(player.playerNid) == queryNid then
+                return player
+            end
+        end
+        return nil
+    end
+
+    local function resolveLootLooterNid(loot)
+        if type(loot) ~= "table" then
+            return nil
+        end
+        local looterNid = tonumber(loot.looterNid)
+        if looterNid and looterNid > 0 then
+            return looterNid
+        end
+        local legacyNid = tonumber(loot.looter)
+        if legacyNid and legacyNid > 0 then
+            return legacyNid
+        end
+        return nil
+    end
+
+    local function resolveLootLooterName(raid, runtime, loot)
+        local looterNid = resolveLootLooterNid(loot)
+        if looterNid then
+            local player = getPlayerByNid(raid, runtime, looterNid)
+            if player and player.name then
+                return player.name, looterNid
+            end
+            return nil, looterNid
+        end
+        if type(loot) == "table" and type(loot.looter) == "string" then
+            return loot.looter, nil
+        end
+        return nil, nil
     end
 
     -- ----- Public methods ----- --
@@ -162,18 +219,19 @@ do
 
         local set = {}
         for i = 1, #bossKill.players do
-            local playerName = bossKill.players[i]
-            if playerName then
-                set[playerName] = true
+            local playerNid = tonumber(bossKill.players[i])
+            if playerNid and playerNid > 0 then
+                set[playerNid] = true
             end
         end
 
         local players = raid.players or {}
         for i = 1, #players do
             local player = players[i]
-            if type(player) == "table" and player.name and set[player.name] then
+            local playerNid = player and tonumber(player.playerNid) or nil
+            if type(player) == "table" and player.name and playerNid and set[playerNid] then
                 rows[#rows + 1] = {
-                    id = tonumber(player.playerNid),
+                    id = playerNid,
                     name = player.name,
                     class = player.class,
                 }
@@ -191,6 +249,18 @@ do
         raid = normalizeRaid(raid)
         local rows = {}
         local bossFilter = tonumber(bossNid) or bossNid
+        local playerFilterNid = nil
+        if playerName and playerName ~= "" then
+            local queryName = tostring(playerName)
+            local players = raid and raid.players or {}
+            for i = #players, 1, -1 do
+                local player = players[i]
+                if player and player.name == queryName then
+                    playerFilterNid = tonumber(player.playerNid)
+                    break
+                end
+            end
+        end
 
         local runtime = raid and ensureRuntime(raid) or nil
         local bossByNid = runtime and runtime.bossByNid or nil
@@ -199,11 +269,17 @@ do
         for i = 1, #lootRows do
             local loot = lootRows[i]
             if type(loot) == "table" then
+                local looterNid = nil
+                local looterName = nil
+                looterName, looterNid = resolveLootLooterName(raid, runtime, loot)
                 local okBoss = (not bossFilter) or (bossFilter <= 0) or (tonumber(loot.bossNid) == bossFilter)
-                local okPlayer = (not playerName) or (loot.looter == playerName)
+                local okPlayer = (not playerName)
+                    or (playerFilterNid and looterNid and playerFilterNid == looterNid)
+                    or ((not playerFilterNid) and looterName and looterName == playerName)
                 if okBoss and okPlayer then
                     local lootTime = tonumber(loot.time) or 0
                     local sourceBoss = bossByNid and bossByNid[tonumber(loot.bossNid)] or nil
+                    local looterPlayer = looterNid and getPlayerByNid(raid, runtime, looterNid) or nil
                     rows[#rows + 1] = {
                         id = tonumber(loot.lootNid),
                         itemId = tonumber(loot.itemId),
@@ -213,7 +289,9 @@ do
                         itemLink = loot.itemLink,
                         bossNid = tonumber(loot.bossNid) or 0,
                         sourceName = (sourceBoss and sourceBoss.name) or "",
-                        looter = loot.looter,
+                        looterNid = looterNid,
+                        looter = looterName or "",
+                        looterClass = looterPlayer and looterPlayer.class or nil,
                         rollType = tonumber(loot.rollType) or 0,
                         rollValue = tonumber(loot.rollValue) or 0,
                         sortName = (GetLootSortName and GetLootSortName(

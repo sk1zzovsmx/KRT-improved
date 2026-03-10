@@ -86,8 +86,12 @@ C.CHAT_PREFIX_HEX             = C.K_COLOR
 
 -- Multi-award pacing (seconds) to avoid spamming GiveMasterLoot on laggy servers.
 C.ML_MULTI_AWARD_DELAY        = 0.2
+-- Safety timeout: abort multi-award if the loot window does not reflect expected decrements.
+C.ML_MULTI_AWARD_TIMEOUT_SECONDS = 4
+C.PENDING_AWARD_TTL_SECONDS   = 8
 
 C.LOOT_COUNTER_ROW_HEIGHT     = 25
 C.RESERVES_ROW_HEIGHT         = 42
 C.RESERVE_HEADER_HEIGHT       = 24
 C.RESERVES_ITEM_FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+C.RESERVES_QUERY_COOLDOWN_SECONDS = 2

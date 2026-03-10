@@ -24,9 +24,10 @@ local ItemExists, ItemIsSoulbound, GetItem
 local GetItemName, GetItemLink, GetItemTexture
 
 local tremove, twipe = table.remove, table.wipe
-local type = type
+local type, pairs = type, pairs
 
 local tostring, tonumber = tostring, tonumber
+local PENDING_AWARD_TTL_SECONDS = C.PENDING_AWARD_TTL_SECONDS
 
 -- =========== Loot Helpers Module  =========== --
 -- Manages the loot window items (fetching from loot/inventory).
@@ -40,8 +41,17 @@ do
     local lootTable = {}
 
     -- ----- Private helpers ----- --
-    local function BuildPendingAwardKey(itemLink, looter)
-        return tostring(itemLink) .. "\001" .. tostring(looter)
+    local function NormalizePendingAwardItemKey(itemLink)
+        local itemKey = Item.GetItemStringFromLink(itemLink)
+        if itemKey and itemKey ~= "" then
+            return itemKey
+        end
+        return itemLink
+    end
+
+    local function BuildPendingAwardKey(itemLink, looter, useRawItemLink)
+        local itemKey = useRawItemLink and itemLink or NormalizePendingAwardItemKey(itemLink)
+        return tostring(itemKey) .. "\001" .. tostring(looter)
     end
 
     local function warmItemCache(itemLink)
@@ -90,12 +100,20 @@ do
 
     -- ----- Public methods ----- --
     -- Pending award helpers (shared with Master/Raid flows).
-    function module:QueuePendingAward(itemLink, looter, rollType, rollValue)
+    function module:QueuePendingAward(itemLink, looter, rollType, rollValue, rollSessionId)
         if not itemLink or not looter then
             return
         end
         local key = BuildPendingAwardKey(itemLink, looter)
         local list = lootState.pendingAwards[key]
+        if not list then
+            local legacyKey = BuildPendingAwardKey(itemLink, looter, true)
+            if legacyKey ~= key and lootState.pendingAwards[legacyKey] then
+                list = lootState.pendingAwards[legacyKey]
+                lootState.pendingAwards[key] = list
+                lootState.pendingAwards[legacyKey] = nil
+            end
+        end
         if not list then
             list = {}
             lootState.pendingAwards[key] = list
@@ -105,30 +123,46 @@ do
             looter    = looter,
             rollType  = rollType,
             rollValue = rollValue,
+            rollSessionId = rollSessionId and tostring(rollSessionId) or nil,
             ts        = GetTime(),
         }
     end
 
     function module:ConsumePendingAward(itemLink, looter, maxAge)
+        local ttl = tonumber(maxAge) or PENDING_AWARD_TTL_SECONDS
+        if ttl < 0 then
+            ttl = 0
+        end
         local key = BuildPendingAwardKey(itemLink, looter)
         local list = lootState.pendingAwards[key]
+        if not list then
+            local legacyKey = BuildPendingAwardKey(itemLink, looter, true)
+            if legacyKey ~= key then
+                key = legacyKey
+                list = lootState.pendingAwards[key]
+            end
+        end
         if not list then
             return nil
         end
         local now = GetTime()
         for i = 1, #list do
             local p = list[i]
-            if p and (now - (p.ts or 0)) <= maxAge then
+            if p and (now - (p.ts or 0)) <= ttl then
                 tremove(list, i)
+                local remaining = #list
                 if #list == 0 then
                     lootState.pendingAwards[key] = nil
                 end
+                addon:debug(Diag.D.LogLootPendingAwardConsumed:format(
+                    tostring(itemLink), tostring(looter), remaining, ttl
+                ))
                 return p
             end
         end
         for i = #list, 1, -1 do
             local p = list[i]
-            if not p or (now - (p.ts or 0)) > maxAge then
+            if not p or (now - (p.ts or 0)) > ttl then
                 tremove(list, i)
             end
         end
@@ -136,6 +170,29 @@ do
             lootState.pendingAwards[key] = nil
         end
         return nil
+    end
+
+    function module:PurgePendingAwards(maxAge)
+        local ttl = tonumber(maxAge) or PENDING_AWARD_TTL_SECONDS
+        if ttl < 0 then
+            ttl = 0
+        end
+        local now = GetTime()
+        for key, list in pairs(lootState.pendingAwards) do
+            if type(list) ~= "table" then
+                lootState.pendingAwards[key] = nil
+            else
+                for i = #list, 1, -1 do
+                    local p = list[i]
+                    if not p or (now - (p.ts or 0)) > ttl then
+                        tremove(list, i)
+                    end
+                end
+                if #list == 0 then
+                    lootState.pendingAwards[key] = nil
+                end
+            end
+        end
     end
 
     -- Fetches items from the currently open loot window.
@@ -286,7 +343,7 @@ do
 
     function module:GetCurrentItemCount()
         if lootState.fromInventory then
-            return itemInfo.count or lootState.itemCount or 1
+            return itemInfo.count or lootState.selectedItemCount or 1
         end
         local item = GetItem()
         local count = item and item.count

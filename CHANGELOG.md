@@ -4,6 +4,71 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Behavior:** Raid schema bumped to `v2`; boss attendees are now stored as `playerNid` arrays
+  (`bossKills[].players`) and loot winners are stored as `looterNid` (`loot[].looterNid`) to
+  reduce SavedVariables duplication.
+- **Behavior:** Added automatic migration from legacy name-based attendee/winner fields to the
+  new `playerNid`-based schema, with Logger/queries/sync paths updated to resolve winner names
+  from raid player records.
+- **Bugfix:** Warnings save/edit now reads live edit-box text (not async cached draft state),
+  and save keeps the affected warning selected with immediate list/preview refresh.
+- **Bugfix:** Warnings delete no longer assumes all list row frames exist; removing a warning now
+  updates data/refresh without nil-frame Lua errors.
+- **Bugfix:** Warnings frame now hooks `OnShow/OnHide` without overriding scaffold/list-controller
+  handlers, restoring left preset-list activation and immediate row rendering.
+- **Bugfix:** Minimap menu raid actions now use robust raid-group detection and resilient module
+  resolution for `Loot Counter` and `MS Changes` actions (`Demand`/`Announce`).
+- **Bugfix:** Fixed Lua boolean-expression regression in minimap menu raid-action enabling
+  (`cond and false or 1`), which incorrectly kept raid actions disabled even while in raid.
+- **Behavior:** MS Changes `Demand`/`Announce` now run whenever the player is in a real raid group,
+  independent from `currentRaid` session availability.
+- **Bugfix:** `Chat:Announce(...)` now falls back to native raid/party detection when
+  `GetGroupTypeAndCount()` does not return a stable group type.
+- **Bugfix:** `/krt` with no arguments now shows command help instead of returning silently.
+- **Bugfix:** `/krt rw <value>` no longer risks a Lua error on non-numeric input when no warning is selected.
+- **Behavior:** `Chat:Announce(...)` now falls back to local `Print` when not in party/raid,
+  avoiding unintended solo `SAY` output.
+- **Behavior:** LFM spam fallback routing (when no channels are selected) now uses `RAID`/`PARTY`
+  in group and local `Print` when solo, instead of forced `SAY`.
+- **Bugfix:** Master `Spam Loot` now checks Ready Check permissions (leader/assistant) before calling
+  `DoReadyCheck()`.
+- **Bugfix:** `Comms.Sync(...)` now supports cores without `GetRealNumRaidMembers/GetRealNumPartyMembers`
+  by falling back to `GetNumRaidMembers/GetNumPartyMembers`.
+- **Behavior:** Reserve list `Query Item` button now has a short cooldown to avoid rapid repeated queries.
+- **Refactor:** Removed unused `LFM period` localization keys that no longer had a slash-command handler.
+- **Behavior:** Slash commands that target optional widgets now print a clear message when the widget is
+  disabled by feature profile or not available.
+- **Bugfix:** Master Loot awarding now verifies the selected winner is still in raid right before
+  `GiveMasterLoot(...)`, and refreshes candidate dropdowns when roster drift is detected.
+- **Bugfix:** Trade completion logging now attempts to recover missing `currentRollItem` from
+  stored trade item context (`itemId/link`) before failing.
+- **Behavior:** Reserves CSV import now warns with a format hint when no header is detected and rows
+  are skipped.
+- **Diagnostics:** Added actionable warnings for Sync chunk total-count changes mid-stream and
+  pending-award consume traces (including remaining queue depth).
+- **Refactor:** Pending-award TTL is now centralized as `C.PENDING_AWARD_TTL_SECONDS`
+  and reused across Master/Loot/Raid flows.
+- **Bugfix:** Logger Sync now binds incoming `req` snapshots to the explicit target sender
+  to avoid cross-officer request collisions.
+- **Bugfix:** Logger Sync `sync` requests now support responder failover: decode/parse/merge failures mark
+  only that sender as failed (request stays open), and in raid only leader/assistant responders are accepted
+  (officer check is evaluated once on first chunk, with a short roster-stabilization grace window); successful
+  `sync` apply now also clears same-request incoming chunk states immediately, and cached unauthorized senders
+  are fast-rejected without repeated roster scans.
+- **Bugfix:** Master Loot now cancels delayed `LOOT_CLOSED` cleanup when `LOOT_OPENED` fires again,
+  preventing stale close-timer cleanup from wiping a freshly opened loot session.
+- **Bugfix:** `LOOT_CLOSED` cleanup now TTL-prunes pending awards (5s) instead of hard-resetting them,
+  so delayed `CHAT_MSG_LOOT` events keep correct award source mapping.
+- **Behavior:** Logger Sync now rate-limits incoming `req/sync` requests per sender
+  (6 requests per 30 seconds) to prevent accidental request loops from flooding replies.
+- **Bugfix:** Raid unknown-name guards now use a safe fallback
+  (`UNKNOWNBEING` or `UKNOWNBEING`) across client variants.
+- **Behavior:** Reserves import now reports row diagnostics in chat after success
+  (`valid` and `skipped` rows) to make CSV cleanup easier.
+- **Behavior:** LFM spam now has hard safety caps and auto-stop
+  (max 30 messages or 1800 seconds per run).
+- **Refactor:** `Core/DBManager.Mock.lua` is no longer loaded from `!KRT.toc`
+  during normal runtime bootstrap.
 - **Refactor:** Standardized `Controllers/*` and `Widgets/*` UI owner method declarations to
   `module:*` style (`BindUI`/`EnsureUI`) and aligned `ReservesUI` methods away from `UI=module` aliasing.
 - **Bugfix:** Reserves Import window now runs its `OnLoad` initialization on first UI bind,

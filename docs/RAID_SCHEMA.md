@@ -1,13 +1,13 @@
 # Raid Schema Contract (`KRT_Raids`)
 
 This document defines the canonical persisted shape of raid history records.
-Current schema version: `1`.
+Current schema version: `2`.
 
 ## RaidRecord (`KRT_Raids[i]`)
 
 | Field | Type | Req | Default | Notes |
 | --- | --- | --- | --- | --- |
-| `schemaVersion` | number | yes | `1` | Record schema version for migrations. |
+| `schemaVersion` | number | yes | `2` | Record schema version for migrations. |
 | `raidNid` | number | yes | auto | Stable raid identifier (not array index). |
 | `realm` | string | no | `nil` | Realm name when the raid started. |
 | `zone` | string | no | `nil` | Raid zone name. |
@@ -44,7 +44,7 @@ Current schema version: `1`.
 | `name` | string | yes | `""` | Boss name (or `_TrashMob_`). |
 | `difficulty` | number | no | `0` | Difficulty captured for the kill. |
 | `mode` | string | no | `"n"` | Normal/heroic shorthand (`n`/`h`). |
-| `players` | table(array) | no | `{}` | Names present for that kill. |
+| `players` | table(array) | no | `{}` | `playerNid` values present for that kill. |
 | `time` | number | no | `nil` | Kill timestamp. |
 | `hash` | string | no | `nil` | Sync hash for the kill row. |
 
@@ -60,7 +60,7 @@ Current schema version: `1`.
 | `itemRarity` | number | no | `0` | Item rarity. |
 | `itemTexture` | string | no | `nil` | Icon texture path. |
 | `itemCount` | number | no | `1` | Stack count for the award. |
-| `looter` | string | no | `nil` | Winner/receiver name. |
+| `looterNid` | number | no | `nil` | Winner/receiver `playerNid`. |
 | `rollType` | number | no | `0` | Roll type enum value. |
 | `rollValue` | number | no | `0` | Roll value or manual marker value. |
 | `bossNid` | number | no | `0` | Source boss stable id (`0` allowed for unknown). |
@@ -90,4 +90,3 @@ Legacy top-level runtime keys must not be persisted and are removed on normalize
 - `raid._playerIdxByNid`
 - `raid._bossIdxByNid`
 - `raid._lootIdxByNid`
-

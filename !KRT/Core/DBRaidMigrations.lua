@@ -7,6 +7,7 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local Core = feature.Core or addon.Core
+local Strings = feature.Strings or addon.Strings
 
 -- Raid schema migrations service.
 do
@@ -37,6 +38,17 @@ do
             return
         end
     end
+
+    local function normalizeNameLower(name)
+        if Strings and Strings.NormalizeLower then
+            return Strings.NormalizeLower(name, true)
+        end
+        if type(name) ~= "string" then
+            return nil
+        end
+        return string.lower(name)
+    end
+
 
     -- ----- Public methods ----- --
     function module:GetMigrations()
@@ -116,6 +128,69 @@ do
                     count = 0
                 end
                 player.count = count
+            end
+        end
+    end
+
+    -- v2 canonicalization:
+    -- - raid.bossKills[].players stores playerNid numbers (not names)
+    -- - raid.loot[].looterNid stores winner playerNid (legacy loot.looter removed)
+    MIGRATIONS[1] = function(raid)
+        ensureTableField(raid, "players", false)
+        ensureTableField(raid, "bossKills", false)
+        ensureTableField(raid, "loot", false)
+
+        local playerNidByName = {}
+        local players = raid.players
+        for i = 1, #players do
+            local player = players[i]
+            if type(player) == "table" then
+                local playerNid = tonumber(player.playerNid)
+                local key = normalizeNameLower(player.name)
+                if key and playerNid and playerNid > 0 and playerNidByName[key] == nil then
+                    playerNidByName[key] = playerNid
+                end
+            end
+        end
+
+        local bosses = raid.bossKills
+        for i = 1, #bosses do
+            local boss = bosses[i]
+            if type(boss) == "table" then
+                local rawPlayers = boss.players
+                local attendees = {}
+                local seen = {}
+                if type(rawPlayers) == "table" then
+                    for j = 1, #rawPlayers do
+                        local rawPlayer = rawPlayers[j]
+                        local playerNid = tonumber(rawPlayer)
+                        if not playerNid and type(rawPlayer) == "string" then
+                            playerNid = playerNidByName[normalizeNameLower(rawPlayer)]
+                        end
+                        if playerNid and playerNid > 0 and not seen[playerNid] then
+                            seen[playerNid] = true
+                            attendees[#attendees + 1] = playerNid
+                        end
+                    end
+                end
+                boss.players = attendees
+            end
+        end
+
+        local lootRows = raid.loot
+        for i = 1, #lootRows do
+            local loot = lootRows[i]
+            if type(loot) == "table" then
+                local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter)
+                if not looterNid and type(loot.looter) == "string" then
+                    looterNid = playerNidByName[normalizeNameLower(loot.looter)]
+                end
+                if looterNid and looterNid > 0 then
+                    loot.looterNid = looterNid
+                else
+                    loot.looterNid = nil
+                end
+                loot.looter = nil
             end
         end
     end
