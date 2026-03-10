@@ -1,8 +1,10 @@
 local addonName, addon = ...
 addon.Utils = addon.Utils or {}
+addon.Diagnose = addon.Diagnose or {}
 
 local Utils = addon.Utils
 local L = addon.L
+local Diag = addon.Diagnose
 
 local type, ipairs = type, ipairs
 local floor, random = math.floor, math.random
@@ -470,7 +472,9 @@ function Utils.makeListController(cfg)
 		if cfg.highlightDebugTag and addon and addon.options and addon.options.debug and addon.debug then
 			local info = (cfg.highlightDebugInfo and cfg.highlightDebugInfo(self)) or ""
 			if info ~= "" then info = " " .. info end
-			addon:debug(("[%s] refresh key=%s%s"):format(tostring(cfg.highlightDebugTag), tostring(selKey), info))
+			addon:debug((Diag.D.LogListHighlightRefresh):format(
+				tostring(cfg.highlightDebugTag), tostring(selKey), info
+			))
 		end
 	end
 
@@ -512,7 +516,7 @@ function Utils.makeListController(cfg)
 			-- If the user has script errors disabled, this still surfaces the problem in chat.
 			if err ~= self._lastErr then
 				self._lastErr = err
-				addon:error(L.LogLoggerUIError:format(tostring(cfg.keyName or "?"), tostring(err)))
+				addon:error((Diag.E.LogLoggerUIError):format(tostring(cfg.keyName or "?"), tostring(err)))
 			end
 		end
 	end)
@@ -524,7 +528,7 @@ function Utils.makeListController(cfg)
 		frame:HookScript("OnShow", function()
 			if not self._shownOnce then
 				self._shownOnce = true
-				addon:debug(L.LogLoggerUIShow:format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
+				addon:debug((Diag.D.LogLoggerUIShow):format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
 			end
 			setActive(true)
 			if not self._loggedWidgets then
@@ -532,7 +536,7 @@ function Utils.makeListController(cfg)
 				local n = self.frameName
 				local sf = n and _G[n .. "ScrollFrame"]
 				local sc = n and _G[n .. "ScrollFrameScrollChild"]
-				addon:debug(L.LogLoggerUIWidgets:format(
+				addon:debug((Diag.D.LogLoggerUIWidgets):format(
 					tostring(cfg.keyName or "?"),
 					tostring(sf), tostring(sc),
 					sf and (sf:GetWidth() or 0) or 0,
@@ -561,7 +565,7 @@ function Utils.makeListController(cfg)
 		if not (sf and sc) then
 			if not self._missingScroll then
 				self._missingScroll = true
-				addon:warn(L.LogLoggerUIMissingWidgets:format(tostring(cfg.keyName or "?"), tostring(n)))
+				addon:warn((Diag.W.LogLoggerUIMissingWidgets):format(tostring(cfg.keyName or "?"), tostring(n)))
 			end
 			return
 		end
@@ -573,7 +577,7 @@ function Utils.makeListController(cfg)
 		if scrollW < 10 then
 			if not self._warnW0 then
 				self._warnW0 = true
-				addon:debug(L.LogLoggerUIDeferLayout:format(tostring(cfg.keyName or "?"), scrollW))
+				addon:debug((Diag.D.LogLoggerUIDeferLayout):format(tostring(cfg.keyName or "?"), scrollW))
 			end
 			defer:Show()
 			return false
@@ -585,7 +589,7 @@ function Utils.makeListController(cfg)
 		-- One-time diagnostics per list to help debug "empty/blank" frames.
 		if not self._loggedFetch then
 			self._loggedFetch = true
-			addon:debug(L.LogLoggerUIFetch:format(
+			addon:debug((Diag.D.LogLoggerUIFetch):format(
 				tostring(cfg.keyName or "?"),
 				#self.data,
 				sf:GetWidth() or 0, sf:GetHeight() or 0,
@@ -726,7 +730,7 @@ do
 		local wrapped = function(eventName, ...)
 			local ok, err = pcall(func, eventName, ...)
 			if not ok then
-				addon:error(L.StrCbErrExec:format(tostring(func), tostring(eventName), err))
+				addon:error((Diag.E.LogUtilsCallbackExec):format(tostring(func), tostring(eventName), err))
 			end
 		end
 
@@ -1181,7 +1185,7 @@ do
 		st.set = {}
 		st.count = 0
 		st.ver = (st.ver or 0) + 1
-		debugLog(("[LoggerSelect] init ctx=%s ver=%d"):format(tostring(key), st.ver))
+		debugLog((Diag.D.LogLoggerSelectInit):format(tostring(key), st.ver))
 		return st
 	end
 
@@ -1237,7 +1241,7 @@ do
 
 		st.ver = (st.ver or 0) + 1
 
-		debugLog(("[LoggerSelect] toggle ctx=%s id=%s multi=%s action=%s count %d->%d ver=%d"):format(
+		debugLog((Diag.D.LogLoggerSelectToggle):format(
 			tostring(key), tostring(id), isMulti and "1" or "0", tostring(action), before, st.count or 0, st.ver
 		))
 
@@ -1253,7 +1257,7 @@ do
 		st.anchor = k
 		-- Anchor changes do not affect highlight rendering directly, so we do not bump st.ver here.
 		local ver = st.ver or 0
-		debugLog(("[LoggerSelect] anchor ctx=%s from=%s to=%s ver=%d"):format(
+		debugLog((Diag.D.LogLoggerSelectAnchor):format(
 			tostring(key), tostring(before), tostring(st.anchor), ver
 		))
 		return st.anchor
@@ -1329,7 +1333,7 @@ do
 		end
 
 		st.ver = (st.ver or 0) + 1
-		debugLog(("[LoggerSelect] range ctx=%s id=%s add=%s action=%s count %d->%d ver=%d anchor=%s"):format(
+		debugLog((Diag.D.LogLoggerSelectRange):format(
 			tostring(key), tostring(id), isAdd and "1" or "0", tostring(action), before, st.count or 0, st.ver,
 			tostring(st.anchor)
 		))
