@@ -4,6 +4,13 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Tooling:** Added `tools/dev-stack-status.ps1` as a single readiness check
+  for vendored skills, local Codex installs, Mechanic, and the repo-local MCP
+  server.
+- **Tooling:** The repo-local MCP server now exposes `dev_stack_status` for
+  readiness inspection and `mechanic_bootstrap` for external Mechanic setup.
+- **Docs:** Documented the canonical local AFD workflow around
+  `dev-stack-status.ps1`, skill sync, Mechanic bootstrap, and MCP usage.
 - **Behavior:** The Master Loot window is back to a `250x480` footprint, with its
   roll-table headers, scroll area, paired top/bottom action buttons, mode row,
   left-side action column, and inner control alignment retuned for the narrower

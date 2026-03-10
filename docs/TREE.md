@@ -107,6 +107,7 @@
 |       |   \\-- ...
 |       \\-- s-working
 |           \\-- ...
+|-- .codex-temp
 |-- .devcontainer
 |   \\-- devcontainer.json
 |-- .githooks
@@ -134,6 +135,7 @@
 |   |   \\-- DBManager.Mock.lua
 |   \\-- release_stabilization_spec.lua
 |-- tools
+|   |-- __pycache__
 |   |-- agent-skills.manifest.json
 |   |-- check-layering.ps1
 |   |-- check-lua-syntax.ps1
@@ -141,6 +143,7 @@
 |   |-- check-raid-hardening.ps1
 |   |-- check-toc-files.ps1
 |   |-- check-ui-binding.ps1
+|   |-- dev-stack-status.ps1
 |   |-- fnmap-classify.ps1
 |   |-- fnmap-inventory.ps1
 |   |-- install-hooks.ps1
@@ -160,7 +163,6 @@
 |   |-- tooling-common.ps1
 |   |-- update-tree.ps1
 |   \\-- validate-raid-schema.lua
-|-- !KRT.zip
 |-- .editorconfig
 |-- .gitattributes
 |-- .gitignore

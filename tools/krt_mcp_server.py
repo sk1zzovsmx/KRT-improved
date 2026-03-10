@@ -298,6 +298,16 @@ def handle_skills_sync(arguments: dict[str, Any]) -> dict[str, Any]:
     return run_powershell("sync-agent-skills.ps1", args)
 
 
+def handle_dev_stack_status(arguments: dict[str, Any]) -> dict[str, Any]:
+    validate_keys(arguments, {"verifySkills"})
+    verify_skills = expect_bool(arguments, "verifySkills", default=False)
+
+    args = ["-Json"]
+    if verify_skills:
+        args.append("-VerifySkills")
+    return run_powershell("dev-stack-status.ps1", args)
+
+
 def handle_repo_quality_check(arguments: dict[str, Any]) -> dict[str, Any]:
     validate_keys(arguments, {"check"})
     check_name = expect_enum(arguments, "check", list(REPO_CHECKS))
@@ -359,6 +369,34 @@ def handle_mechanic_call(arguments: dict[str, Any]) -> dict[str, Any]:
     return run_powershell("mech-krt.ps1", args)
 
 
+def handle_mechanic_bootstrap(arguments: dict[str, Any]) -> dict[str, Any]:
+    validate_keys(
+        arguments,
+        {"mechanicRoot", "repoUrl", "ref", "pull", "skipPipUpgrade", "runSetupTools"},
+    )
+    mechanic_root = expect_string(arguments, "mechanicRoot")
+    repo_url = expect_string(arguments, "repoUrl")
+    ref = expect_string(arguments, "ref")
+    pull = expect_bool(arguments, "pull", default=False)
+    skip_pip_upgrade = expect_bool(arguments, "skipPipUpgrade", default=False)
+    run_setup_tools = expect_bool(arguments, "runSetupTools", default=False)
+
+    args = []
+    if mechanic_root:
+        args.extend(["-MechanicRoot", mechanic_root])
+    if repo_url:
+        args.extend(["-RepoUrl", repo_url])
+    if ref:
+        args.extend(["-Ref", ref])
+    if pull:
+        args.append("-Pull")
+    if skip_pip_upgrade:
+        args.append("-SkipPipUpgrade")
+    if run_setup_tools:
+        args.append("-RunSetupTools")
+    return run_powershell("mech-bootstrap.ps1", args)
+
+
 TOOLS = {
     spec.name: spec
     for spec in [
@@ -408,6 +446,22 @@ TOOLS = {
             annotations={"destructiveHint": True},
         ),
         ToolSpec(
+            name="dev_stack_status",
+            description=(
+                "Inspect repo-local AFD, skill sync, Mechanic, and MCP readiness. "
+                "Use this first to understand what is missing on the current machine."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "verifySkills": {"type": "boolean", "default": False},
+                },
+                "additionalProperties": False,
+            },
+            handler=handle_dev_stack_status,
+            annotations={"readOnlyHint": True},
+        ),
+        ToolSpec(
             name="repo_quality_check",
             description=(
                 "Run one of the repo-local addon quality checks from tools/. "
@@ -452,6 +506,27 @@ TOOLS = {
             },
             handler=handle_mechanic_call,
         ),
+        ToolSpec(
+            name="mechanic_bootstrap",
+            description=(
+                "Bootstrap or update the external Mechanic companion checkout used by "
+                "repo-local wrappers."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "mechanicRoot": {"type": "string"},
+                    "repoUrl": {"type": "string"},
+                    "ref": {"type": "string"},
+                    "pull": {"type": "boolean", "default": False},
+                    "skipPipUpgrade": {"type": "boolean", "default": False},
+                    "runSetupTools": {"type": "boolean", "default": False},
+                },
+                "additionalProperties": False,
+            },
+            handler=handle_mechanic_bootstrap,
+            annotations={"destructiveHint": True},
+        ),
     ]
 }
 
@@ -480,8 +555,8 @@ def handle_request(method: str, params: dict[str, Any]) -> dict[str, Any]:
                 "version": SERVER_VERSION,
             },
             "instructions": (
-                "Use skills_manifest or skills_verify first, then repo_quality_check or "
-                "mechanic_call depending on whether Mechanic is installed."
+                "Use dev_stack_status first, then skills_* or mechanic_bootstrap, "
+                "and finish with repo_quality_check or mechanic_call."
             ),
         }
 

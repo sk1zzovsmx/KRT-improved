@@ -7,6 +7,9 @@ so there is a single execution path for humans and agents.
 
 ## What it exposes
 
+- `dev_stack_status`
+  - Read unified readiness for vendored skills, local Codex installs, Mechanic,
+    and the repo-local MCP server.
 - `skills_manifest`
   - Read the pinned manifest behind `.agents/skills`.
 - `skills_verify`
@@ -19,6 +22,8 @@ so there is a single execution path for humans and agents.
 - `mechanic_call`
   - Call the existing `tools/mech-krt.ps1` wrapper for `env.status`, addon validation,
     dead-code scans, lint, formatting, output, and similar Mechanic-backed flows.
+- `mechanic_bootstrap`
+  - Bootstrap or update the external Mechanic checkout used by repo-local wrappers.
 
 ## Start command
 
@@ -47,17 +52,19 @@ The Python server lives at `tools/krt_mcp_server.py`.
 
 ## Suggested workflow
 
-1. Call `skills_manifest` to inspect the pinned skill sources.
-2. Call `skills_verify` before editing repo docs or local tooling.
-3. If the snapshots drifted, call `skills_sync`.
-4. Run `repo_quality_check` for fast local checks that do not need Mechanic.
-5. If Mechanic is installed, use `mechanic_call` for addon-aware validation and output.
+1. Call `dev_stack_status` first.
+2. Call `skills_manifest` to inspect the pinned skill sources.
+3. Call `skills_verify` before editing repo docs or local tooling.
+4. If vendored skills drift, call `skills_sync`.
+5. If Mechanic is missing, call `mechanic_bootstrap`.
+6. Run `repo_quality_check` for fast local checks that do not need Mechanic.
+7. If Mechanic is ready, use `mechanic_call` for addon-aware validation and output.
 
 ## Notes
 
 - The MCP server does not patch vendored skill content. It only reads the manifest or runs the existing sync
   script.
 - `mechanic_call` depends on a local Mechanic install. Bootstrap it first with
-  `tools/mech-bootstrap.ps1` if needed.
+  `mechanic_bootstrap` or `tools/mech-bootstrap.ps1` if needed.
 - The server auto-detects current newline-delimited stdio framing and legacy `Content-Length` framing,
   which keeps it usable across older and newer MCP clients.

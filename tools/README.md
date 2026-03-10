@@ -34,6 +34,8 @@ docs, AGENTS, and MCP wiring. Grouping is documented here first to keep cleanup 
 
 ## Agent Tooling
 
+- `dev-stack-status.ps1`: unified readiness check for vendored skills, local
+  Codex installs, Mechanic, and the repo-local MCP server
 - `sync-agent-skills.ps1`: syncs local Codex skills from the repo manifest
 - `agent-skills.manifest.json`: source of truth for repo-managed skill sync
 

@@ -61,6 +61,7 @@ It took a lot of time, effort for who isn't a code developer like ME. So please,
 - Lua writing rules and naming policy: `docs/LUA_WRITING_RULES.md`
 - Binding rules and coding policy: `AGENTS.md`
 - Quick layering checks: `DEV_CHECKS.md`
+- Mechanic + AFD readiness check: `tools/dev-stack-status.ps1`
 - Agent skills + Mechanic companion workflow: `docs/AGENT_SKILLS.md`
 - Repo-local MCP server for skill/addon workflows: `docs/KRT_MCP.md`
 - UI/XML binding and template policy: `docs/ARCHITECTURE.md`
