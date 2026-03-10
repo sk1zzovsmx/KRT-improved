@@ -1586,6 +1586,92 @@
 			<OnLoad>KRT.Logger:OnLoad(self)</OnLoad>
 		</Scripts>
 	</Frame>
+	<Frame name="KRTLoggerRollTypePickerFrame" parent="UIParent" frameStrata="DIALOG" hidden="true">
+		<Size>
+			<AbsDimension x="312" y="22" />
+		</Size>
+		<Frames>
+			<Button name="$parentMS" inherits="UIPanelButtonTemplate">
+				<Size>
+					<AbsDimension x="42" y="22" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" />
+				</Anchors>
+			</Button>
+			<Button name="$parentOS" inherits="UIPanelButtonTemplate">
+				<Size>
+					<AbsDimension x="42" y="22" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentMS" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="3" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parentSR" inherits="UIPanelButtonTemplate">
+				<Size>
+					<AbsDimension x="42" y="22" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentOS" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="3" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parentFree" inherits="UIPanelButtonTemplate">
+				<Size>
+					<AbsDimension x="42" y="22" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentSR" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="3" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parentBank" inherits="UIPanelButtonTemplate">
+				<Size>
+					<AbsDimension x="42" y="22" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentFree" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="3" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parentDE" inherits="UIPanelButtonTemplate">
+				<Size>
+					<AbsDimension x="42" y="22" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentBank" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="3" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parentHold" inherits="UIPanelButtonTemplate">
+				<Size>
+					<AbsDimension x="42" y="22" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentDE" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="3" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+		</Frames>
+	</Frame>
 	<!-- ====== End of Logger Loot ====== -->
 </Ui>
-

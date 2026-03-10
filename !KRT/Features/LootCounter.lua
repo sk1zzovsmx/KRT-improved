@@ -187,6 +187,18 @@ do
         if not ensureFrames() then return end
     end
 
+    function module:AttachToMaster(masterFrame)
+        local frame = masterFrame
+        if not frame or frame._krtCounterAttached then
+            return
+        end
+
+        frame._krtCounterAttached = true
+        frame:HookScript("OnHide", function()
+            module:Hide()
+        end)
+    end
+
     function module:Refresh()
         if not ensureFrames() then return end
         local frame = getFrame()
@@ -263,26 +275,6 @@ do
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
-
-    -- Add a button to the master loot frame to open the loot counter UI.
-    local function setupMasterLootFrameHooks()
-        local f = _G["KRTMasterLootFrame"]
-        if f and not f.KRT_LootCounterBtn then
-            local btn = CreateFrame("Button", nil, f, "KRTButtonTemplate")
-            btn:SetSize(100, 24)
-            btn:SetText(L.BtnLootCounter)
-            btn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -20, -20)
-            btn:SetScript("OnClick", function()
-                module:Toggle()
-            end)
-            f.KRT_LootCounterBtn = btn
-
-            f:HookScript("OnHide", function()
-                module:Hide()
-            end)
-        end
-    end
-    hooksecurefunc(addon.Master, "OnLoad", setupMasterLootFrameHooks)
 
     local function requestRefresh()
         -- Coalesced, event-driven refresh (safe even if frame is hidden/not yet created).

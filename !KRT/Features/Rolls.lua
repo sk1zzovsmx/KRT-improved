@@ -19,7 +19,6 @@ local GetItem
 
 local GetItemIndex = feature.GetItemIndex
 
-local _G = _G
 local tinsert, twipe = table.insert, table.wipe
 local ipairs = ipairs
 local format = string.format
@@ -67,18 +66,6 @@ do
         newItemCounts, delItemCounts = addon.TablePool("k")
     end
     state.itemCounts = newItemCounts and newItemCounts() or {}
-
-    local function getMasterFrame()
-        return (addon.Master and addon.Master.frame) or _G["KRTMaster"]
-    end
-
-    local requestRollsUiRefresh = Utils.makeEventDrivenRefresher(getMasterFrame, function()
-        module:FetchRolls()
-    end)
-
-    local function requestRollsRefresh()
-        requestRollsUiRefresh()
-    end
 
     -- ----- Private helpers ----- --
     local function GetAllowedRolls(itemId, name)
@@ -227,34 +214,36 @@ do
         state.lastSortType = lootState.currentRollType
     end
 
-    local function onRollButtonClick(self, button)
-        -- Selection allowed only after the countdown has finished
+    local function selectWinner(name, isShift, isControl)
+        -- Selection allowed only after the countdown has finished.
         if state.canRoll then
-            return
+            return false
         end
 
-        -- Lock selection while a multi-award sequence is running
+        -- Lock selection while a multi-award sequence is running.
         if lootState.multiAward and lootState.multiAward.active then
             addon:warn(Diag.W.ErrMLMultiAwardInProgress)
-            return
+            return false
         end
 
-        local name = self.playerName
-        if not name or name == "" then return end
+        if not name or name == "" then
+            return false
+        end
 
         local itemCount = tonumber(lootState.itemCount) or 1
         if itemCount < 1 then itemCount = 1 end
 
-        local ctrl = IsControlKeyDown()
-        local pickMode = (not lootState.fromInventory) -- loot window (single and multi): CTRL-only winner picking
+        local ctrl = (isControl == true)
+        local shift = (isShift == true)
+        local pickMode = (not lootState.fromInventory)
 
-        -- Loot window: CTRL+Click toggles winners; regular click is "focus" (no side-effects).
+        -- Loot window: CTRL toggles winners; plain click only focuses a row.
         if pickMode then
             if not ctrl then
                 state.selected = name
                 state.selectedAuto = false
                 module:FetchRolls()
-                return
+                return true
             end
 
             local maxSel = itemCount
@@ -265,42 +254,41 @@ do
             if maxSel < 1 then maxSel = 1 end
 
             local isSel = Utils.multiSelectIsSelected(MS_CTX_ROLLS, name)
-            local cur   = Utils.multiSelectCount(MS_CTX_ROLLS) or 0
-
-            -- If capacity is 1, CTRL+Click on another player replaces the current selection (swap).
+            local cur = Utils.multiSelectCount(MS_CTX_ROLLS) or 0
             if (not isSel) and cur >= maxSel then
                 if maxSel == 1 then
                     Utils.multiSelectClear(MS_CTX_ROLLS)
                     Utils.multiSelectToggle(MS_CTX_ROLLS, name, true)
                 else
                     addon:warn(Diag.W.ErrMLMultiSelectTooMany:format(maxSel))
-                    return
+                    return false
                 end
             else
                 Utils.multiSelectToggle(MS_CTX_ROLLS, name, true)
             end
 
-            -- Keep lootState.winner aligned with the current selection for single-award flows and UI state.
-            local picked = module.GetSelectedWinnersOrdered and module:GetSelectedWinnersOrdered() or {}
-            lootState.winner = (picked[1] and picked[1].name) or nil
+            if shift then
+                Utils.multiSelectSetAnchor(MS_CTX_ROLLS, name)
+            end
 
+            local picked = module:GetSelectedWinnersOrdered()
+            lootState.winner = (picked[1] and picked[1].name) or nil
             state.selected = name
             state.selectedAuto = false
 
             module:FetchRolls()
-            -- NOTE: do not sync per-click in pick mode (avoids RAID/PARTY addon message spam)
-            return
+            return true
         end
 
         -- Inventory/trade: legacy single selection behavior.
         Utils.multiSelectClear(MS_CTX_ROLLS)
-
         lootState.winner = name
         state.selected = name
         state.selectedAuto = false
 
         module:FetchRolls()
         Utils.sync("KRT-RollWinner", name)
+        return true
     end
 
     local function addRoll(name, roll, itemId)
@@ -323,7 +311,6 @@ do
 
         Utils.triggerEvent("AddRoll", name, roll)
         sortRolls(itemId)
-        requestRollsRefresh()
     end
 
     local function resetRolls(rec)
@@ -412,6 +399,10 @@ do
         end
 
         addon:debug(Diag.D.LogRollsRecordState:format(tostring(bool)))
+    end
+
+    function module:SelectWinner(name, isShift, isControl)
+        return selectWinner(name, isShift, isControl)
     end
 
     -- Intercepts system messages to detect player rolls.
@@ -512,20 +503,13 @@ do
         return best or 0
     end
 
-    -- Clears all roll-related state and UI elements.
+    -- Clears all roll-related state.
     function module:ClearRolls(rec)
-        local mf = (addon.Master and addon.Master.frame) or _G["KRTMaster"]
-        local frameName = mf and mf:GetName() or nil
         resetRolls(rec)
-        if frameName then
-            local i, btn = 1, _G[frameName .. "PlayerBtn1"]
-            while btn do
-                btn:Hide()
-                i = i + 1
-                btn = _G[frameName .. "PlayerBtn" .. i]
-            end
-            addon.Raid:ClearRaidIcons()
-        end
+        state.display = nil
+        state.displayNames = nil
+        state.lastModel = nil
+        addon.Raid:ClearRaidIcons()
     end
 
     -- Gets the item ID of the item currently being rolled for.
@@ -565,16 +549,8 @@ do
         return addon.Reserves:GetReserveCountForItem(itemId, name)
     end
 
-    -- Rebuilds the roll list UI and marks the top roller or selected winner.
+    -- Rebuilds the roll model consumed by Master UI.
     function module:FetchRolls()
-        local mf = (addon.Master and addon.Master.frame) or _G["KRTMaster"]
-        local frameName = mf and mf:GetName() or nil
-        if not frameName then return end
-        local scrollFrame = _G[frameName .. "ScrollFrame"]
-        local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
-        scrollChild:SetHeight(scrollFrame:GetHeight())
-        scrollChild:SetWidth(scrollFrame:GetWidth())
-
         local itemId = self:GetCurrentRollItemID()
         local isSR = lootState.currentRollType == rollTypes.RESERVED
 
@@ -722,124 +698,68 @@ do
             end
         end
 
-        local starShown, totalHeight = false, 0
+        local rows = {}
         for i = 1, #display do
             local entry = display[i]
             local name, roll = entry.name, entry.roll
-            local btnName = frameName .. "PlayerBtn" .. i
-            local btn = _G[btnName] or CreateFrame("Button", btnName, scrollChild, "KRTSelectPlayerTemplate")
-
-            btn:SetID(i)
-            btn:Show()
-            btn.playerName = name
-
-            -- enable click only after the countdown has finished
-            btn:EnableMouse(selectionAllowed)
-
-            Utils.ensureRowVisuals(btn)
-
-            local nameStr, rollStr, counterStr, star = _G[btnName .. "Name"], _G[btnName .. "Roll"],
-                _G[btnName .. "Counter"], _G[btnName .. "Star"]
-
-            if nameStr and nameStr.SetVertexColor then
-                local class = addon.Raid:GetPlayerClass(name)
-                class = class and class:upper() or "UNKNOWN"
-                if isSR and itemId and self:IsReserved(itemId, name) then
-                    nameStr:SetVertexColor(0.4, 0.6, 1.0)
-                else
-                    local r, g, b = Utils.getClassColor(class)
-                    nameStr:SetVertexColor(r, g, b)
-                end
-            end
-
-            -- Pick mode: show current winners (MultiSelect) with > < (single and multi-copy loot).
-            if pickMode and (msCount > 0) and Utils.multiSelectIsSelected(MS_CTX_ROLLS, name) then
-                nameStr:SetText("> " .. name .. " <")
-            else
-                nameStr:SetText(name)
-            end
-
-            local isFocus = (highlightTarget and highlightTarget == name)
+            local isReserved = isSR and itemId and self:IsReserved(itemId, name)
             local isSelected = (msCount > 0 and Utils.multiSelectIsSelected(MS_CTX_ROLLS, name))
+            local isFocused = (highlightTarget and highlightTarget == name) or false
+            local counterText = ""
 
-            Utils.setRowSelected(btn, isSelected)
-            Utils.setRowFocused(btn, isFocus)
-
-            -- Roll value always in its own column
-            if rollStr then
-                rollStr:SetText(tostring(roll))
-            end
-
-            -- SR roll counter: show only (used/allowed) on the single compact row
-            -- Optional: during MS rolls, show the player's positive MS loot count
-            -- in the same column ("+N"), if enabled in config.
-            if counterStr then
-                if isSR and itemId and self:IsReserved(itemId, name) then
-                    -- SR + Plus priority (only when no multi-reserve exists for this item)
-                    if plusPriority then
-                        local p = GetPlus(name)
-                        if p and p > 0 then
-                            counterStr:SetText(format("(P+%d)", p))
-                        else
-                            counterStr:SetText("")
-                        end
-                    else
-                        local allowed = self:GetAllowedReserves(itemId, name)
-                        if allowed and allowed > 1 then
-                            local used = self:GetUsedReserveCount(itemId, name)
-                            counterStr:SetText(format("(%d/%d)", used or 0, allowed))
-                        else
-                            counterStr:SetText("")
-                        end
+            if isReserved then
+                if plusPriority then
+                    local p = GetPlus(name)
+                    if p and p > 0 then
+                        counterText = format("(P+%d)", p)
                     end
                 else
-                    if addon.options.showLootCounterDuringMSRoll == true
-                        and lootState.currentRollType == rollTypes.MAINSPEC
-                    then
-                        local c = addon.Raid:GetPlayerCount(name, addon.Core.getCurrentRaid()) or 0
-                        if c > 0 then
-                            counterStr:SetText("+" .. c)
-                        else
-                            counterStr:SetText("")
-                        end
-                    else
-                        counterStr:SetText("")
+                    local allowed = self:GetAllowedReserves(itemId, name)
+                    if allowed and allowed > 1 then
+                        local used = self:GetUsedReserveCount(itemId, name)
+                        counterText = format("(%d/%d)", used or 0, allowed)
                     end
+                end
+            elseif addon.options.showLootCounterDuringMSRoll == true
+                and lootState.currentRollType == rollTypes.MAINSPEC
+            then
+                local c = addon.Raid:GetPlayerCount(name, addon.Core.getCurrentRaid()) or 0
+                if c > 0 then
+                    counterText = "+" .. c
                 end
             end
 
-            local showStar
-            if starWinners then
-                showStar = (starWinners[name] == true)
-            else
-                -- Default: star marks only the top roll (compact list)
-                showStar = (not starShown) and (starTarget ~= nil) and (name == starTarget)
-            end
-            Utils.showHide(star, showStar)
-            if (not starWinners) and showStar then starShown = true end
-
-            if not btn.krtHasOnClick then
-                btn:SetScript("OnClick", onRollButtonClick)
-                btn.krtHasOnClick = true
-            end
-
-            btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
-            btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
-            totalHeight = totalHeight + btn:GetHeight()
+            rows[i] = {
+                id = i,
+                name = name,
+                displayName = (pickMode and msCount > 0 and isSelected) and ("> " .. name .. " <") or name,
+                roll = roll,
+                class = (addon.Raid:GetPlayerClass(name) or "UNKNOWN"):upper(),
+                isReserved = isReserved and true or false,
+                isSelected = isSelected and true or false,
+                isFocused = isFocused and true or false,
+                showStar = (starWinners and starWinners[name]) and true or false,
+                canClick = selectionAllowed and true or false,
+                counterText = counterText,
+            }
         end
 
-        -- Hide leftover buttons from previous renders.
-        local j = #display + 1
-        local btn = _G[frameName .. "PlayerBtn" .. j]
-        while btn do
-            btn:Hide()
-            j = j + 1
-            btn = _G[frameName .. "PlayerBtn" .. j]
-        end
+        state.lastModel = {
+            itemId = itemId,
+            isSR = isSR and true or false,
+            rows = rows,
+            selectionAllowed = selectionAllowed and true or false,
+            pickMode = pickMode and true or false,
+            msCount = msCount,
+            highlightTarget = highlightTarget,
+            winner = lootState.winner,
+            rollWinner = lootState.rollWinner,
+        }
+        return state.lastModel
+    end
 
-        if addon.Master and addon.Master.RequestRefresh then
-            addon.Master:RequestRefresh()
-        end
+    function module:GetDisplayModel()
+        return module:FetchRolls()
     end
 
     -- Returns selected winners (manual multi-pick) in current display order.
@@ -859,13 +779,4 @@ do
         return selected
     end
 
-    Utils.registerCallback("ConfigsortAscending", function(_, value)
-        addon.Rolls:FetchRolls()
-    end)
-
-    -- Refresh Master Looter roll list immediately when toggling the MS loot counter column.
-    -- Without this, the user would need to close/reopen the Master frame to see the change.
-    Utils.registerCallback("ConfigshowLootCounterDuringMSRoll", function(_, value)
-        addon.Rolls:FetchRolls()
-    end)
 end

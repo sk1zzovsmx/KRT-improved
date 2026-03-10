@@ -4,6 +4,46 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **UI:** Logger item context menu now opens a standard `StaticPopup` window with an
+  inserted custom button row for direct roll-type selection (`MS/OS/SR/Free/Bank/DE/Hold`)
+  plus standard `Cancel`.
+- **Refactor:** Logger roll-type picker row was moved from runtime `CreateFrame(...)` construction
+  to `UI/Logger.xml`, while keeping popup behavior/layout wiring in `Features/Logger.lua`.
+- **Bugfix:** Logger roll-type inserted button row is now explicitly attached/anchored to the
+  popup on show, preventing hidden or behind-popup button rendering.
+- **UI:** Logger roll-type popup layout was polished: improved vertical spacing and centered
+  alignment, with uniform button sizing derived from popup width and plain Blizzard-style labels.
+- **Bugfix:** Logger roll-type popup now uses stricter side padding and tighter button sizing,
+  keeping all seven buttons visually inside popup borders across common UI scales.
+- **Bugfix:** Logger roll-type popup now follows a FrameXML-aligned resize path:
+  it applies extra height before `StaticPopup_Resize(...)`, then anchors the custom row under
+  popup text, keeping the row and standard `Cancel` inside the same window.
+- **UI:** Logger roll-type popup vertical spacing was tightened (smaller extra-height and
+  title-to-row offset) to reduce empty space while preserving containment.
+- **UI:** Logger roll-type popup horizontal side padding was slightly reduced to trim
+  left/right empty space around the 7-button row.
+- **UI:** Logger roll-type popup spacing was further fine-tuned (about 2px) to tighten
+  title/row/cancel vertical rhythm while keeping all controls inside the popup bounds.
+- **Bugfix:** Logger UI now refreshes immediately after incoming Sync snapshots (`req`, `push`, `sync`),
+  including the Raids list update without requiring manual reopen or reselection.
+- **Behavior:** Added Logger Sync feature (`Features/Syncer.lua`) using addon-message request/response
+  chunking with three commands:
+  `/krt logger req <raidId|raidNid> <player>` requests a specific raid snapshot from one target player
+  and imports it as a new raid, `/krt logger push <raidId|raidNid> <player>` pushes a selected raid
+  snapshot to one target player, and
+  `/krt logger sync` merges only into the current raid when zone/size/difficulty signature matches.
+- **Behavior:** `req/push` now require an explicit raid reference and no longer fallback to selected/current
+  raid; current-raid flows should use `/krt logger sync`.
+- **Behavior:** Main event wiring now handles `CHAT_MSG_ADDON` in `KRT.lua` and forwards Sync protocol
+  traffic to `addon.Syncer`, keeping slash handling isolated in `Features/SlashEvents.lua`.
+- **Behavior:** Logger Loot sorting is now deterministic across all sortable headers; when primary values
+  are equal, ordering falls back to loot name, then item ID, then loot NID to prevent random reshuffles.
+- **Behavior:** Logger Loot `Item` header sorting now uses the displayed loot name text
+  (item name/link label), with `itemId` as stable fallback tie-breaker.
+- **Behavior:** Logger Loot `Source` header is now non-sortable while a boss filter is active
+  (column rendered empty), and source sorting now follows the displayed boss name text.
+- **Bugfix:** Logger sortable headers now use strict Lua comparators (no `asc and ... or ...` ambiguity),
+  fixing broken/unstable ordering and sort-time errors when clicking list headers.
 - **Bugfix:** Raid session switching no longer drops the previous current raid when roster data is
   temporarily unavailable (`GetNumRaidMembers()==0`); `Raid:Create(...)` now validates readiness
   before ending the previous session.

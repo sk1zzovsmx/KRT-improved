@@ -82,6 +82,7 @@ do
     local dropDownDirty = true
 
     local selectionFrame, UpdateSelectionFrame
+    local rollRows = {}
 
     local lastUIState = {
         buttons = {},
@@ -192,6 +193,21 @@ do
     local function ResetItemCountAndRefresh(focus)
         module:ResetItemCount(focus)
         module:RequestRefresh()
+    end
+
+    local function RequestLoggerLootLog(itemID, looter, rollType, rollValue, source, raidId)
+        local request = {
+            itemID = itemID,
+            looter = looter,
+            rollType = rollType,
+            rollValue = rollValue,
+            source = source,
+            raidId = raidId,
+            raidID = raidId,
+            ok = false,
+        }
+        Utils.triggerEvent("LoggerLootLogRequest", request)
+        return request.ok == true
     end
 
     local function StopCountdown()
@@ -756,6 +772,9 @@ do
             end,
         })
         if not frameName then return end
+        if addon.LootCounter and addon.LootCounter.AttachToMaster then
+            addon.LootCounter:AttachToMaster(frame)
+        end
 
         -- Initialize ItemBtn scripts once (clean inventory drop support: click-to-drop).
         local itemBtn = _G[frameName .. "ItemBtn"]
@@ -1085,6 +1104,92 @@ do
         return record, canRoll, rolled
     end
 
+    local function EnsureRollRow(i, scrollChild)
+        local btnName = frameName .. "PlayerBtn" .. i
+        local btn = _G[btnName]
+        if not btn then
+            btn = CreateFrame("Button", btnName, scrollChild, "KRTSelectPlayerTemplate")
+        end
+        if not btn.krtHasOnClick then
+            btn:SetScript("OnClick", function(self)
+                local isShift = IsShiftKeyDown and IsShiftKeyDown() or false
+                local isControl = IsControlKeyDown and IsControlKeyDown() or false
+                if addon.Rolls:SelectWinner(self.playerName, isShift, isControl) then
+                    module:RequestRefresh()
+                end
+            end)
+            btn.krtHasOnClick = true
+        end
+        rollRows[i] = btn
+        return btn
+    end
+
+    local function RenderRollRows()
+        local scrollFrame = _G[frameName .. "ScrollFrame"]
+        local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
+        if not (scrollFrame and scrollChild) then
+            return
+        end
+
+        local model = addon.Rolls:GetDisplayModel() or {}
+        local rows = model.rows or {}
+        local count = #rows
+
+        scrollChild:SetHeight(scrollFrame:GetHeight())
+        scrollChild:SetWidth(scrollFrame:GetWidth())
+
+        local totalHeight = 0
+        for i = 1, count do
+            local data = rows[i]
+            local btn = EnsureRollRow(i, scrollChild)
+            btn:SetID(tonumber(data.id) or i)
+            btn.playerName = data.name
+            btn:EnableMouse(data.canClick == true)
+            btn:Show()
+
+            Utils.ensureRowVisuals(btn)
+
+            local nameStr = _G[btn:GetName() .. "Name"]
+            local rollStr = _G[btn:GetName() .. "Roll"]
+            local counterStr = _G[btn:GetName() .. "Counter"]
+            local star = _G[btn:GetName() .. "Star"]
+
+            if nameStr then
+                local class = data.class or "UNKNOWN"
+                if data.isReserved then
+                    nameStr:SetVertexColor(0.4, 0.6, 1.0)
+                else
+                    local r, g, b = Utils.getClassColor(class)
+                    nameStr:SetVertexColor(r, g, b)
+                end
+                nameStr:SetText(data.displayName or data.name or "")
+            end
+
+            if rollStr then
+                rollStr:SetText(tostring(data.roll or ""))
+            end
+            if counterStr then
+                counterStr:SetText(data.counterText or "")
+            end
+
+            Utils.setRowSelected(btn, data.isSelected == true)
+            Utils.setRowFocused(btn, data.isFocused == true)
+            Utils.showHide(star, data.showStar == true)
+
+            btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
+            btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
+            totalHeight = totalHeight + btn:GetHeight()
+        end
+
+        local i = count + 1
+        local btn = rollRows[i] or _G[frameName .. "PlayerBtn" .. i]
+        while btn do
+            btn:Hide()
+            i = i + 1
+            btn = rollRows[i] or _G[frameName .. "PlayerBtn" .. i]
+        end
+    end
+
     local function FlagButtonsOnChange(key, value)
         if lastUIState[key] ~= value then
             lastUIState[key] = value
@@ -1167,6 +1272,8 @@ do
             })
             dirtyFlags.buttons = false
         end
+
+        RenderRollRows()
 
         dirtyFlags.rolls = false
         dirtyFlags.winner = false
@@ -1525,9 +1632,6 @@ do
             addon:trace(Diag.D.LogMLLootOpenedTrace:format(lootState.lootCount or 0,
                 tostring(lootState.fromInventory)))
             UpdateSelectionFrame()
-            if not addon.Logger.container then
-                addon.Logger.source = UnitName("target")
-            end
             addon:debug(Diag.D.LogMLLootOpenedInfo:format(lootState.lootCount or 0,
                 tostring(lootState.fromInventory), tostring(UnitName("target"))))
             HandleLootOpenedVisibility()
@@ -1567,8 +1671,9 @@ do
                     tostring(lootState.winner), tonumber(lootState.currentRollType) or -1,
                     addon.Rolls:HighestRoll()))
                 if lootState.currentRollItem and lootState.currentRollItem > 0 then
-                    local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.winner,
-                        lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT", addon.Core.getCurrentRaid())
+                    local ok = RequestLoggerLootLog(lootState.currentRollItem, lootState.winner,
+                        lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT",
+                        addon.Core.getCurrentRaid())
 
                     if not ok then
                         addon:error(Diag.E.LogTradeLoggerLogFailed:format(tostring(addon.Core.getCurrentRaid()),
@@ -1825,7 +1930,7 @@ do
         end
         if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE
             and playerName == lootState.trader then
-            local ok = addon.Logger.Loot:Log(lootState.currentRollItem, lootState.trader, rollType, rollValue,
+            local ok = RequestLoggerLootLog(lootState.currentRollItem, lootState.trader, rollType, rollValue,
                 "TRADE_KEEP", addon.Core.getCurrentRaid())
             if not ok then
                 addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Core.getCurrentRaid()),
@@ -1890,23 +1995,83 @@ do
     end
 
     -- Register some callbacks:
-    Utils.registerCallback("SetItem", function(f, itemLink)
-        local oldItem = GetItemLink()
-        if oldItem ~= itemLink then
-            announced = false
+    Utils.registerCallback("SetItem", function(_, itemLink, itemData)
+        if itemLink ~= nil and type(itemLink) ~= "string" then
+            addon:warn(Diag.W.LogMLSetItemPayloadInvalid:format(tostring(itemLink), type(itemData)))
+            return
         end
+        if itemData ~= nil and type(itemData) ~= "table" then
+            addon:warn(Diag.W.LogMLSetItemPayloadInvalid:format(tostring(itemLink), type(itemData)))
+            return
+        end
+
+        if lastUIState.currentItemLink ~= itemLink then
+            announced = false
+            lastUIState.currentItemLink = itemLink
+        end
+
+        if itemData and itemData.itemName and itemData.itemTexture and itemData.itemColor and itemData.itemLink then
+            module:SetCurrentItemView(itemData.itemName, itemData.itemLink, itemData.itemTexture, itemData.itemColor)
+            module:ResetItemCount()
+        else
+            module:ClearCurrentItemView(true)
+        end
+
+        module:RequestRefresh()
     end)
 
-    Utils.registerCallback("RaidRosterDelta", function()
+    Utils.registerCallback("RaidRosterDelta", function(_, delta, rosterVersion, raidId)
+        local raidIdType = type(raidId)
+        if type(delta) ~= "table" then
+            addon:warn(Diag.W.LogMLRaidRosterDeltaPayloadInvalid:format(type(delta), tostring(rosterVersion),
+                tostring(raidId)))
+            return
+        end
+        if type(rosterVersion) ~= "number" then
+            addon:warn(Diag.W.LogMLRaidRosterDeltaPayloadInvalid:format(type(delta), tostring(rosterVersion),
+                tostring(raidId)))
+            return
+        end
+        if raidId == nil then
+            addon:warn(Diag.W.LogMLRaidRosterDeltaPayloadInvalid:format(type(delta), tostring(rosterVersion),
+                tostring(raidId)))
+            return
+        end
+        if raidIdType ~= "number" and raidIdType ~= "string" then
+            addon:warn(Diag.W.LogMLRaidRosterDeltaPayloadInvalid:format(type(delta), tostring(rosterVersion),
+                tostring(raidId)))
+            return
+        end
+
         cachedRosterVersion = nil
         InvalidateCandidateCache()
         dropDownDirty = true
         dirtyFlags.dropdowns = true
+        if PrepareDropDowns then
+            PrepareDropDowns()
+        end
         module:RequestRefresh()
     end)
 
     -- Keep Master UI in sync when SoftRes data changes (import/clear), event-driven.
     Utils.registerCallback("ReservesDataChanged", function()
+        module:RequestRefresh()
+    end)
+
+    Utils.registerCallback("AddRoll", function(_, name, roll)
+        if type(name) ~= "string" or name == "" or tonumber(roll) == nil then
+            addon:warn(Diag.W.LogMLAddRollPayloadInvalid:format(tostring(name), tostring(roll)))
+            return
+        end
+        module:RequestRefresh()
+    end)
+
+    Utils.registerCallback("ConfigsortAscending", function()
+        module:RequestRefresh()
+    end)
+
+    -- Immediate redraw when toggling the optional +N column in MS roll list.
+    Utils.registerCallback("ConfigshowLootCounterDuringMSRoll", function()
         module:RequestRefresh()
     end)
 end

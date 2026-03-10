@@ -258,9 +258,6 @@ do
             if rosterChanged then
                 rosterVersion = rosterVersion + 1
             end
-            if rosterChanged and addon.Master and addon.Master.PrepareDropDowns then
-                addon.Master:PrepareDropDowns()
-            end
             return rosterChanged
         end
 
@@ -286,9 +283,6 @@ do
             resetLiveUnitCaches()
             module:End()
             rosterVersion = rosterVersion + 1
-            if addon.Master and addon.Master.PrepareDropDowns then
-                addon.Master:PrepareDropDowns()
-            end
             return rosterChanged
         end
 
@@ -417,9 +411,6 @@ do
         if rosterChanged then
             rosterVersion = rosterVersion + 1
             addon:debug(Diag.D.LogRaidRosterUpdate:format(rosterVersion, n))
-            if addon.Master and addon.Master.PrepareDropDowns then
-                addon.Master:PrepareDropDowns()
-            end
         end
         return rosterChanged, delta
     end
@@ -1203,7 +1194,7 @@ do
     -- Gets a player's name by stable ID (playerNid).
     function module:GetPlayerName(id, raidNum)
         local name
-        raidNum = raidNum or addon.Logger.selectedRaid or Core.getCurrentRaid()
+        raidNum = raidNum or (addon.State and addon.State.selectedRaid) or Core.getCurrentRaid()
         local raid = raidNum and Core.ensureRaidById(raidNum)
         if raid then
             local qid = tonumber(id) or id
