@@ -1,44 +1,91 @@
-local addonName, addon     = ...
-addon.Utils                = addon.Utils or {}
+local addonName, addon = ...
+addon.Utils = addon.Utils or {}
 
-local Utils                = addon.Utils
-local L                    = addon.L
+local Utils = addon.Utils
+local L = addon.L
 
-local type, ipairs, pairs  = type, ipairs, pairs
-local floor, random        = math.floor, math.random
-local setmetatable         = setmetatable
-local getmetatable         = getmetatable
-local tinsert, tremove     = table.insert, table.remove
-local find, match          = string.find, string.match
-local format, gsub         = string.format, string.gsub
-local strsub, strlen       = string.sub, string.len
-local lower, upper         = string.lower, string.upper
-local ucfirst             = _G.string and _G.string.ucfirst
-local select, unpack       = select, unpack
-local LibStub              = LibStub
+local type, ipairs = type, ipairs
+local floor, random = math.floor, math.random
+local find = string.find
+local format, gsub = string.format, string.gsub
+local strsub, strlen = string.sub, string.len
+local lower, upper = string.lower, string.upper
+local select = select
+local LibStub = LibStub
 
-local GetLocale            = GetLocale
-local GetTime              = GetTime
-local GetRaidRosterInfo    = GetRaidRosterInfo
-local GetRealmName         = GetRealmName
-local GetAchievementLink   = GetAchievementLink
-local UnitClass            = UnitClass
-local UnitInRaid           = UnitInRaid
+local GetTime = GetTime
+local GetRealmName = GetRealmName
+local GetAchievementLink = GetAchievementLink
 local UnitIsGroupAssistant = UnitIsGroupAssistant
-local UnitIsGroupLeader    = UnitIsGroupLeader
-local UnitIsPartyLeader    = UnitIsPartyLeader
-local UnitIsRaidLeader     = UnitIsRaidLeader
-local UnitIsRaidOfficer    = UnitIsRaidOfficer
-local UnitLevel            = UnitLevel
-local UnitName             = UnitName
+local UnitIsGroupLeader = UnitIsGroupLeader
+
+local ITEM_LINK_FORMAT = "|c%s|Hitem:%d:%s|h[%s]|h|r"
+
+-- =========== Global convenience helpers (kept as-is)  =========== --
+
+-- Shuffle a table:
+_G.table.shuffle = function(t)
+	local n = #t
+	while n > 1 do
+		local k = random(1, n)
+		t[n], t[k] = t[k], t[n]
+		n = n - 1
+	end
+end
+
+-- Reverse table:
+_G.table.reverse = function(t, count)
+	local i, j = 1, #t
+	while i < j do
+		t[i], t[j] = t[j], t[i]
+		i = i + 1
+		j = j - 1
+	end
+end
+
+-- Trim a string:
+_G.string.trim = function(str)
+	return gsub(str, "^%s*(.-)%s*$", "%1")
+end
+
+-- String starts with:
+_G.string.startsWith = function(str, piece)
+	return strsub(str, 1, strlen(piece)) == piece
+end
+
+-- String ends with:
+_G.string.endsWith = function(str, piece)
+    -- Check whether a string ends with the provided piece. Fails gracefully if inputs are not strings.
+    if type(str) ~= "string" or type(piece) ~= "string" then
+        return false
+    end
+    local lenPiece = strlen(piece)
+    -- If the main string is shorter than the piece, it cannot end with it.
+    if #str < lenPiece then
+        return false
+    end
+    return strsub(str, -lenPiece) == piece
+end
+
+
+-- =========== Debug/state helpers  =========== --
 
 function Utils.applyDebugSetting(enabled)
-	if addon and addon.options then
-		addon.options.debug = enabled and true or false
+	local options = addon and addon.options
+	if options then
+		options.debug = enabled and true or false
 	end
-	local levels = addon and addon.Logger and addon.Logger.logLevels or {}
-	local level = enabled and levels.DEBUG or (KRT_Debug and KRT_Debug.level)
-	if addon and addon.SetLogLevel and level then
+
+	local level
+	if enabled then
+		local levels = addon and addon.Debugger and addon.Debugger.logLevels
+		level = levels and levels.DEBUG
+	else
+		local levels = addon and addon.Debugger and addon.Debugger.logLevels
+		level = levels and levels.INFO
+	end
+
+	if level and addon and addon.SetLogLevel then
 		addon:SetLogLevel(level)
 	end
 end
@@ -46,26 +93,21 @@ end
 function Utils.getPlayerName()
 	addon.State = addon.State or {}
 	addon.State.player = addon.State.player or {}
-	local name = addon.State.player.name or UnitName("player")
+	local name = addon.State.player.name
+		or addon.UnitFullName("player")
 	addon.State.player.name = name
 	return name
 end
 
----============================================================================
--- Small helpers / iteration
----============================================================================
+-- =========== String helpers  =========== --
 
--- Group/pet iteration in one call
-function Utils.forEachGroupUnit(cb, includePets)
-	local iter, state, index = addon.UnitIterator(not includePets and true or nil)
-	for unit, owner in iter, state, index do
-		cb(unit, owner)
+function Utils.ucfirst(value)
+	if type(value) ~= "string" then
+		value = tostring(value or "")
 	end
+	value = lower(value)
+	return gsub(value, "%a", upper, 1)
 end
-
----============================================================================
--- String helpers
----============================================================================
 
 function Utils.trimText(value, allowNil)
 	if value == nil then
@@ -79,7 +121,7 @@ function Utils.normalizeName(value, allowNil)
 	if text == nil then
 		return nil
 	end
-	return (ucfirst and ucfirst(text)) or text
+	return Utils.ucfirst(text)
 end
 
 function Utils.normalizeLower(value, allowNil)
@@ -118,9 +160,40 @@ function Utils.splitArgs(msg)
 	return Utils.normalizeLower(cmd), Utils.trimText(rest)
 end
 
----============================================================================
--- Roster helpers
----============================================================================
+function Utils.getItemIdFromLink(itemLink)
+	if not itemLink then return nil end
+	local _, itemId = addon.Deformat(itemLink, ITEM_LINK_FORMAT)
+	return itemId
+end
+
+-- =========== UI helpers  =========== --
+
+--
+-- createRowDrawer(fn)
+--
+-- Wraps a row drawing function with logic to cache and return the row height.
+-- Each invocation of this helper returns a new closure with its own cached
+-- height. The supplied callback should perform any per-row UI updates but
+-- MUST NOT return a value; the wrapper will return the cached height on
+-- each call.
+--
+-- Example:
+--   drawRow = Utils.createRowDrawer(function(row, it)
+--       local ui = row._p
+--       ui.ID:SetText(it.id)
+--   end)
+function Utils.createRowDrawer(fn)
+    local rowHeight
+    return function(row, it)
+        if not rowHeight then
+            rowHeight = (row and row:GetHeight()) or 20
+        end
+        fn(row, it)
+        return rowHeight
+    end
+end
+
+-- =========== Roster helpers  =========== --
 
 function Utils.getRealmName()
 	local realm = GetRealmName()
@@ -143,74 +216,63 @@ function Utils.getUnitRank(unit, fallback)
 	return fallback or 0
 end
 
-function Utils.getRaidRosterData(unit)
-	local index = UnitInRaid(unit)
-
-	local rank, subgroup, level, classL, class
-	if index then
-		_, rank, subgroup, level, classL, class = GetRaidRosterInfo(index)
-	end
-
-	rank = Utils.getUnitRank(unit, rank)
-	subgroup = subgroup or 1
-	level = level or UnitLevel(unit)
-
-	if not classL or not class then
-		classL = classL or select(1, UnitClass(unit))
-		class = class or select(2, UnitClass(unit))
-	end
-
-	return rank, subgroup, level, classL, class
-end
-
----============================================================================
--- Lightweight throttles
----============================================================================
-
--- Lightweight throttle (keyed)
-do
-	local last = {}
-
-	function Utils.throttleKey(key, sec)
-		local now = GetTime()
-		sec = sec or 1
-		if not last[key] or (now - last[key]) >= sec then
-			last[key] = now
-			return true
-		end
-	end
-end
-
----============================================================================
--- Callback utilities
----============================================================================
+-- =========== Callback utilities  =========== --
 
 do
-	local callbacks = {}
+	local CallbackHandler = LibStub("CallbackHandler-1.0") -- vendored (hard dependency)
 
+	-- Internal callback registry (not the WoW event registry)
+	addon.InternalCallbacksTarget = addon.InternalCallbacksTarget or {}
+	addon.InternalCallbacks = addon.InternalCallbacks
+		or CallbackHandler:New(addon.InternalCallbacksTarget, "RegisterCallback", "UnregisterCallback",
+			"UnregisterAllCallbacks")
+
+	local target = addon.InternalCallbacksTarget
+	local registry = addon.InternalCallbacks
+
+	-- Register a callback for an internal event.
+	-- Returns a handle you can use to unregister later (optional).
 	function Utils.registerCallback(e, func)
 		if not e or type(func) ~= "function" then
 			error(L.StrCbErrUsage)
 		end
-		callbacks[e] = callbacks[e] or {}
-		tinsert(callbacks[e], func)
-		return #callbacks
+
+		-- CallbackHandler uses "self" as the uniqueness key; use a unique token per registration
+		-- to allow multiple anonymous listeners on the same event (same behavior as the old table).
+		local token = {}
+
+		-- Preserve existing signature + safety: listener receives (eventName, ...)
+		local wrapped = function(eventName, ...)
+			local ok, err = pcall(func, eventName, ...)
+			if not ok then
+				addon:error(L.StrCbErrExec:format(tostring(func), tostring(eventName), err))
+			end
+		end
+
+		target.RegisterCallback(token, e, wrapped)
+		return { e = e, t = token }
 	end
 
+	-- Optional: unregister a previously registered callback handle.
+	-- (Non-breaking: if you never call it, nothing changes for current code.)
+	function Utils.unregisterCallback(handle)
+		if type(handle) ~= "table" or not handle.e or not handle.t then return end
+		target.UnregisterCallback(handle.t, handle.e)
+	end
+
+	-- Fire an internal event; callbacks receive (eventName, ...).
 	function Utils.triggerEvent(e, ...)
-		if not callbacks[e] then return end
-		for i, v in ipairs(callbacks[e]) do
-			local ok, err = pcall(v, e, ...)
-			if not ok then
-				addon:error(L.StrCbErrExec:format(tostring(v), tostring(e), err))
-			end
+		registry:Fire(e, ...)
+	end
+
+	function Utils.registerCallbacks(names, handler)
+		for i = 1, #names do
+			Utils.registerCallback(names[i], handler)
 		end
 	end
 end
 
----============================================================================
--- Frame helpers
----============================================================================
+-- =========== Frame helpers  =========== --
 
 function Utils.getFrameName()
 	return addon.UIMaster:GetName()
@@ -218,38 +280,48 @@ end
 
 function Utils.makeConfirmPopup(key, text, onAccept, cancels)
 	StaticPopupDialogs[key] = {
-		text         = text,
-		button1      = OKAY,
-		button2      = CANCEL,
-		OnAccept     = onAccept,
-		cancels      = cancels or key,
-		timeout      = 0,
-		whileDead    = 1,
+		text = text,
+		button1 = OKAY,
+		button2 = CANCEL,
+		OnAccept = onAccept,
+		cancels = cancels or key,
+		timeout = 0,
+		whileDead = 1,
 		hideOnEscape = 1,
 	}
 end
 
-function Utils.makeEditBoxPopup(key, text, onAccept, onShow)
+function Utils.makeEditBoxPopup(key, text, onAccept, onShow, validate)
 	StaticPopupDialogs[key] = {
-		text         = text,
-		button1      = SAVE,
-		button2      = CANCEL,
-		timeout      = 0,
-		whileDead    = 1,
+		text = text,
+		button1 = SAVE,
+		button2 = CANCEL,
+		timeout = 0,
+		whileDead = 1,
 		hideOnEscape = 1,
-		hasEditBox   = 1,
-		cancels      = key,
-		OnShow       = function(self)
+		hasEditBox = 1,
+		cancels = key,
+		OnShow = function(self)
 			if onShow then
 				onShow(self)
 			end
 		end,
-		OnHide       = function(self)
+		OnHide = function(self)
 			self.editBox:SetText("")
 			self.editBox:ClearFocus()
 		end,
-		OnAccept     = function(self)
-			onAccept(self, self.editBox:GetText())
+		OnAccept = function(self)
+			local value = Utils.trimText(self.editBox:GetText(), true)
+			if validate then
+				local ok, cleanValue = validate(self, value)
+				if not ok then
+					return
+				end
+				if cleanValue ~= nil then
+					value = cleanValue
+				end
+			end
+			onAccept(self, value)
 		end,
 	}
 end
@@ -295,9 +367,7 @@ function Utils.setShown(frame, show)
 	end
 end
 
----============================================================================
--- Tooltip helpers
----============================================================================
+-- =========== Tooltip helpers  =========== --
 
 do
 	local colors = HIGHLIGHT_FONT_COLOR
@@ -345,61 +415,7 @@ do
 	end
 end
 
----============================================================================
--- Global convenience helpers (kept as-is)
----============================================================================
-
--- Shuffle a table:
-_G.table.shuffle = function(t)
-	local n = #t
-	while n > 2 do
-		local k = random(1, n)
-		t[n], t[k] = t[k], t[n]
-		n = n - 1
-	end
-end
-
--- Reverse table:
-_G.table.reverse = function(t, count)
-	local i, j = 1, #t
-	while i < j do
-		t[i], t[j] = t[j], t[i]
-		i = i + 1
-		j = j - 1
-	end
-end
-
--- Trim a string:
-_G.string.trim = function(str)
-	return gsub(str, "^%s*(.-)%s*$", "%1")
-end
-
--- String starts with:
-_G.string.startsWith = function(str, piece)
-	return strsub(str, 1, strlen(piece)) == piece
-end
-
--- String ends with:
-_G.string.endsWith = function(str, piece)
-	return #str >= #piece and find(str, #str - #piece + 1, true) and true or false
-end
-
--- Uppercase first:
-_G.string.ucfirst = function(str)
-	str = lower(str)
-	return gsub(str, "%a", upper, 1)
-end
-
----============================================================================
--- Color utilities
----============================================================================
-
-function Utils.rgbToHex(r, g, b)
-	if r and g and b and r <= 1 and g <= 1 and b <= 1 then
-		r, g, b = r * 255, g * 255, b * 255
-	end
-	return addon.RGBToHex(r, g, b)
-end
+-- =========== Color utilities  =========== --
 
 function Utils.normalizeHexColor(color)
 	if type(color) == "string" then
@@ -422,27 +438,11 @@ function Utils.normalizeHexColor(color)
 end
 
 function Utils.getClassColor(className)
-	local c = addon.Compat.GetClassColorObj(className)
-	return (c and c.r or 1), (c and c.g or 1), (c and c.b or 1)
+	local r, g, b = addon.GetClassColor(className)
+	return (r or 1), (g or 1), (b or 1)
 end
 
----============================================================================
--- Generic utilities
----============================================================================
-
--- Determines if a given string is a number
-function Utils.isNumber(str)
-	local valid = false
-	if str then
-		valid = find(str, "^(%d+%.?%d*)$")
-	end
-	return valid
-end
-
--- Determines if the given string is non-empty:
-function Utils.isString(str)
-	return (str and strlen(str) > 0)
-end
+-- =========== UI helpers  =========== --
 
 -- Enable/Disable Frame:
 function Utils.enableDisable(frame, cond)
@@ -479,7 +479,7 @@ function Utils.showHide(frame, cond)
 	end
 end
 
--- Lock/Unlock Highlight:
+-- Lock or unlock highlight:
 function Utils.toggleHighlight(frame, cond)
 	if cond then
 		frame:LockHighlight()
@@ -488,7 +488,7 @@ function Utils.toggleHighlight(frame, cond)
 	end
 end
 
--- Set frameent text with condition:
+-- Set frame text based on condition:
 function Utils.setText(frame, str1, str2, cond)
 	if cond then
 		frame:SetText(str1)
@@ -497,10 +497,7 @@ function Utils.setText(frame, str1, str2, cond)
 	end
 end
 
--- Return with IF:
-function Utils.returnIf(cond, a, b)
-	return cond and a or b
-end
+-- =========== Throttles  =========== --
 
 -- Throttle frame OnUpdate:
 function Utils.throttle(frame, name, period, elapsed)
@@ -525,34 +522,21 @@ function Utils.throttledUIUpdate(frame, frameName, period, elapsed, fn)
 	return false
 end
 
--- Boolean <> String conversion:
-function Utils.bool2str(bool)
-	return bool and "true" or "false"
-end
-
-function Utils.str2bool(str)
-	return (str ~= "false")
-end
-
--- Number <> Boolean conversion:
-function Utils.bool2num(bool)
-	return bool and 1 or 0
-end
-
-function Utils.num2bool(num)
-	return (num ~= 0)
-end
+-- =========== Chat + comms helpers  =========== --
 
 -- Convert seconds to readable clock string:
 function Utils.sec2clock(seconds)
-	local sec = tonumber(seconds)
-	if sec <= 0 then
-		return "00:00:00"
-	end
-	local h = floor(sec, 3600)
-	local m = floor(sec - h, 60)
-	local s = floor(sec - h - m)
-	return format("%02d:%02d:%02d", h / 3600, m / 60, s)
+    local sec = tonumber(seconds)
+    if sec <= 0 then
+        return "00:00:00"
+    end
+    -- Compute hours, minutes and seconds properly based on total seconds.
+    -- Use the cached floor function to avoid extra allocations in hot paths.
+    local total = floor(sec)
+    local hours = floor(total / 3600)
+    local minutes = floor((total % 3600) / 60)
+    local secondsPart = floor(total % 60)
+    return format("%02d:%02d:%02d", hours, minutes, secondsPart)
 end
 
 -- Sends an addOn message to the appropriate channel:
@@ -567,19 +551,10 @@ function Utils.sync(prefix, msg)
 	end
 end
 
-do
-	local lastChat = 0
-
-	function Utils.chat(msg, channel, language, target, bypass)
-		if not msg then return end
-		if not bypass then
-			local throttle = addon.options and addon.options.chatThrottle or 0
-			local now = GetTime()
-			if throttle > 0 and (now - lastChat) < throttle then return end
-			lastChat = now
-		end
-		SendChatMessage(tostring(msg), channel, language, target)
-	end
+-- Send messages into chat
+function Utils.chat(msg, channel, language, target, bypass)
+	if not msg then return end
+	SendChatMessage(tostring(msg), channel, language, target)
 end
 
 -- Send a whisper to a player by his/her character name
@@ -591,15 +566,7 @@ function Utils.whisper(target, msg)
 	end
 end
 
--- Returns the current UTC date and time in seconds:
-function Utils.getUTCTimestamp()
-	local utcDateTime = date("!*t")
-	return time(utcDateTime)
-end
-
-function Utils.getSecondsAsString(t)
-	return Utils.sec2clock(t)
-end
+-- =========== Time helpers  =========== --
 
 -- Determines if the player is in a raid instance
 function Utils.isRaidInstance()
@@ -619,7 +586,7 @@ end
 
 -- Returns the current time:
 function Utils.getCurrentTime(server)
-	server = server or true
+	if server == nil then server = true end
 	local t = time()
 	if server == true then
 		local _, month, day, year = CalendarGetDate()
@@ -644,216 +611,7 @@ function Utils.getServerOffset()
 	return offset
 end
 
----============================================================================
--- List controller helpers
----============================================================================
-
-do
-	local _G          = _G
-	local CreateFrame = CreateFrame
-
-	local wipe        = _G.wipe or table.wipe
-	local tinsert     = _G.tinsert
-	local ipairs      = _G.ipairs
-	local pairs       = _G.pairs
-	local format      = _G.format
-	local date        = _G.date
-	local math_max    = math.max
-
-	function Utils.makeListController(cfg)
-		local self = {
-			frameName  = nil,
-			data       = {},
-			_rows      = {},
-			_rowByName = {},
-			_asc       = false,
-			_lastHL    = nil,
-			_active    = true,
-			_localized = false,
-			_lastWidth = nil,
-			_dirty     = true,
-		}
-
-		local defer = CreateFrame("Frame")
-		defer:Hide()
-
-		local function acquireRow(btnName, parent, tmpl)
-			local row = self._rowByName[btnName]
-			if row then
-				row:Show()
-				return row
-			end
-
-			row = CreateFrame("Button", btnName, parent, tmpl)
-			self._rowByName[btnName] = row
-
-			if cfg._rowParts and not row._p then
-				local p = {}
-				for i = 1, #cfg._rowParts do
-					local part = cfg._rowParts[i]
-					p[part] = _G[btnName .. part]
-				end
-				row._p = p
-			end
-
-			return row
-		end
-
-		local function hideExtraRows(fromIndex)
-			for i = fromIndex, #self._rows do
-				local r = self._rows[i]
-				if r then r:Hide() end
-			end
-		end
-
-		local function applyHighlightAndPost()
-			if cfg.highlightId then
-				local sel = cfg.highlightId()
-				if sel ~= self._lastHL then
-					self._lastHL = sel
-					for i = 1, #self.data do
-						local it  = self.data[i]
-						local row = self._rows[i]
-						if row then
-							Utils.toggleHighlight(row, sel ~= nil and it.id == sel)
-						end
-					end
-				end
-			end
-			if cfg.postUpdate then cfg.postUpdate(self.frameName) end
-		end
-
-		function self:Touch()
-			defer:Show()
-		end
-
-		function self:Dirty()
-			self._dirty = true
-			defer:Show()
-		end
-
-		defer:SetScript("OnUpdate", function(f)
-			f:Hide()
-			if not self._active or not self.frameName then return end
-
-			if self._dirty then
-				local tableFree = addon.Table and addon.Table.free
-				if cfg.poolTag and tableFree then
-					for i = 1, #self.data do
-						tableFree(cfg.poolTag, self.data[i])
-					end
-				end
-
-				wipe(self.data)
-				if cfg.getData then cfg.getData(self.data) end
-
-				self:Fetch()
-				self._dirty = false
-			end
-
-			applyHighlightAndPost()
-		end)
-
-		function self:OnLoad(frame)
-			if not frame then return end
-			self.frameName = frame:GetName()
-
-			frame:SetScript("OnShow", function()
-				self._active = true
-				if not self._localized and cfg.localize then
-					cfg.localize(self.frameName)
-					self._localized = true
-				end
-				self:Dirty()
-			end)
-
-			frame:SetScript("OnHide", function()
-				self._active = false
-			end)
-
-			if frame:IsShown() then
-				self._active = true
-				if not self._localized and cfg.localize then
-					cfg.localize(self.frameName)
-					self._localized = true
-				end
-				self:Dirty()
-			end
-		end
-
-		function self:Fetch()
-			local n = self.frameName
-			if not n then return end
-
-			local sf = _G[n .. "ScrollFrame"]
-			local sc = _G[n .. "ScrollFrameScrollChild"]
-			if not (sf and sc) then return end
-
-			local scrollW = sf:GetWidth() or 0
-			local widthChanged = (self._lastWidth ~= scrollW)
-			self._lastWidth = scrollW
-
-			local totalH = 0
-			local count = #self.data
-
-			for i = 1, count do
-				local it      = self.data[i]
-				local btnName = cfg.rowName(n, it, i)
-
-				local row     = self._rows[i]
-				if not row or row:GetName() ~= btnName then
-					row = acquireRow(btnName, sc, cfg.rowTmpl)
-					self._rows[i] = row
-				end
-
-				row:SetID(it.id)
-				row:ClearAllPoints()
-				row:SetPoint("TOPLEFT", 0, -totalH)
-				if widthChanged then row:SetWidth(scrollW - 20) end
-
-				local rH = cfg.drawRow(row, it)
-				local usedH = rH or row:GetHeight() or 20
-				totalH = totalH + usedH
-
-				row:Show()
-			end
-
-			hideExtraRows(count + 1)
-			sc:SetHeight(math_max(totalH, sf:GetHeight()))
-
-			self._lastHL = nil
-		end
-
-		function self:Sort(key)
-			local cmp = cfg.sorters and cfg.sorters[key]
-			if not cmp or #self.data <= 1 then return end
-			self._asc = not self._asc
-			table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
-			self:Fetch()
-			applyHighlightAndPost()
-		end
-
-		self._makeConfirmPopup = Utils.makeConfirmPopup
-
-		return self
-	end
-
-	function Utils.bindListController(module, controller)
-		module.OnLoad = function(_, frame) controller:OnLoad(frame) end
-		module.Fetch = function() controller:Fetch() end
-		module.Sort = function(_, t) controller:Sort(t) end
-	end
-
-	function Utils.registerCallbacks(names, handler)
-		for i = 1, #names do
-			Utils.registerCallback(names[i], handler)
-		end
-	end
-end
-
----============================================================================
--- Base64 encode/decode
----============================================================================
+-- =========== Base64 encode/decode  =========== --
 
 --[==[ Base64 encode/decode ]==] --
 do
@@ -881,7 +639,7 @@ do
 
 	-- Decoding:
 	function Utils.decode(data)
-		data = gsub(data, "[^" .. b .. "=]", '')
+		data = gsub(data, "[^" .. b .. "=]", "")
 		return (gsub(data, ".", function(x)
 			if x == "=" then return "" end
 			local r, f = "", (find(b, x) - 1)
