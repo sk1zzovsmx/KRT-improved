@@ -175,13 +175,7 @@ local function firstDiff(left, right, path, seenLeft, seenRight)
         if right[key] == nil then
             return formatPath(path, key), item, nil
         end
-        local diffPath, diffLeft, diffRight = firstDiff(
-            item,
-            right[key],
-            formatPath(path, key),
-            seenLeft,
-            seenRight
-        )
+        local diffPath, diffLeft, diffRight = firstDiff(item, right[key], formatPath(path, key), seenLeft, seenRight)
         if diffPath then
             return diffPath, diffLeft, diffRight
         end
@@ -527,9 +521,7 @@ local function normalizeReserves(rawReserves)
     for rawPlayerKey, player in pairs(reserves) do
         if type(player) == "table" then
             local displayName = resolvePlayerNameDisplay(rawPlayerKey, player)
-            local playerKey = normalizeLower(displayName)
-                or normalizeLower(rawPlayerKey)
-                or tostring(rawPlayerKey or "")
+            local playerKey = normalizeLower(displayName) or normalizeLower(rawPlayerKey) or tostring(rawPlayerKey or "")
             if playerKey == "" then
                 playerKey = "?"
             end
@@ -647,17 +639,11 @@ local function runRoundTrip(path, verbose)
     local pass2 = normalizeSnapshot(pass1)
 
     local raidDiffPath, raidLeft, raidRight = firstDiff(pass1.KRT_Raids, pass2.KRT_Raids, "KRT_Raids")
-    local reservesDiffPath, reservesLeft, reservesRight = firstDiff(
-        pass1.KRT_Reserves,
-        pass2.KRT_Reserves,
-        "KRT_Reserves"
-    )
+    local reservesDiffPath, reservesLeft, reservesRight = firstDiff(pass1.KRT_Reserves, pass2.KRT_Reserves, "KRT_Reserves")
 
     local reservePlayers, reserveEntries = countReserveEntries(pass1.KRT_Reserves)
     print(("[INFO] Input: %s"):format(path))
-    print((
-        "[INFO] Canonical snapshot: raids=%d reserves.players=%d reserves.entries=%d"
-    ):format(#pass1.KRT_Raids, reservePlayers, reserveEntries))
+    print(("[INFO] Canonical snapshot: raids=%d reserves.players=%d reserves.entries=%d"):format(#pass1.KRT_Raids, reservePlayers, reserveEntries))
 
     local failed = false
     if raidDiffPath then

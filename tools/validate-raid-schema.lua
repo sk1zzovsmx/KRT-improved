@@ -314,10 +314,7 @@ end
 local function run()
     local currentSchemaVersion = 3
     local addonRoot = rawget(_G, "KRT")
-    if type(addonRoot) == "table"
-        and type(addonRoot.Core) == "table"
-        and type(addonRoot.Core.GetRaidSchemaVersion) == "function"
-    then
+    if type(addonRoot) == "table" and type(addonRoot.Core) == "table" and type(addonRoot.Core.GetRaidSchemaVersion) == "function" then
         currentSchemaVersion = toNumber(addonRoot.Core.GetRaidSchemaVersion(), 1)
     end
 
