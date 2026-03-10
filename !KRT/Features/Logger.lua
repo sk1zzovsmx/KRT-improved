@@ -24,6 +24,46 @@ local tinsert, tremove, twipe = table.insert, table.remove, table.wipe
 local pairs, ipairs, type, select = pairs, ipairs, type, select
 
 local tostring, tonumber = tostring, tonumber
+local strlower = string.lower
+
+local function compareValues(aValue, bValue, asc)
+    if asc then
+        return aValue < bValue
+    end
+    return aValue > bValue
+end
+
+local function compareNumbers(aValue, bValue, asc, fallback)
+    local defaultValue = (fallback ~= nil) and fallback or 0
+    local aNum = tonumber(aValue)
+    if aNum == nil then
+        aNum = defaultValue
+    end
+    local bNum = tonumber(bValue)
+    if bNum == nil then
+        bNum = defaultValue
+    end
+    return compareValues(aNum, bNum, asc)
+end
+
+local function compareStrings(aValue, bValue, asc)
+    return compareValues(tostring(aValue or ""), tostring(bValue or ""), asc)
+end
+
+local function getLootSortName(itemName, itemLink, itemId)
+    local name = itemName
+    if (not name or name == "") and type(itemLink) == "string" then
+        name = itemLink:match("|h%[(.-)%]|h")
+    end
+    if name and name ~= "" then
+        return tostring(name)
+    end
+    local id = tonumber(itemId)
+    if id then
+        return ("Item %d"):format(id)
+    end
+    return "Item ?"
+end
 
 -- Logger frame module.
 do
@@ -260,6 +300,9 @@ do
                 it.itemTexture = v.itemTexture
                 it.itemLink = v.itemLink
                 it.bossNid = v.bossNid
+                it.sortName = getLootSortName(v.itemName, v.itemLink, v.itemId)
+                local boss = Store:GetBoss(raid, v.bossNid)
+                it.sourceName = (boss and boss.name) or ""
                 it.looter = v.looter
                 it.rollType = tonumber(v.rollType) or 0
                 it.rollValue = v.rollValue
@@ -1363,12 +1406,11 @@ do
 
         sorters = {
             id = function(a, b, asc)
-                return asc and ((a.seq or a.id) < (b.seq or b.id)) or
-                    ((a.seq or a.id) > (b.seq or b.id))
+                return compareNumbers(a.seq or a.id, b.seq or b.id, asc, 0)
             end,
-            date = function(a, b, asc) return asc and (a.date < b.date) or (a.date > b.date) end,
-            zone = function(a, b, asc) return asc and (a.zone < b.zone) or (a.zone > b.zone) end,
-            size = function(a, b, asc) return asc and (a.size < b.size) or (a.size > b.size) end,
+            date = function(a, b, asc) return compareNumbers(a.date, b.date, asc, 0) end,
+            zone = function(a, b, asc) return compareStrings(a.zone, b.zone, asc) end,
+            size = function(a, b, asc) return compareNumbers(a.size, b.size, asc, 0) end,
         },
     }
 
@@ -1529,10 +1571,10 @@ do
 
         sorters = {
             -- Sort by the displayed sequential number, not the stable nid.
-            id = function(a, b, asc) return asc and (a.seq < b.seq) or (a.seq > b.seq) end,
-            name = function(a, b, asc) return asc and (a.name < b.name) or (a.name > b.name) end,
-            time = function(a, b, asc) return asc and (a.time < b.time) or (a.time > b.time) end,
-            mode = function(a, b, asc) return asc and (a.mode < b.mode) or (a.mode > b.mode) end,
+            id = function(a, b, asc) return compareNumbers(a.seq, b.seq, asc, 0) end,
+            name = function(a, b, asc) return compareStrings(a.name, b.name, asc) end,
+            time = function(a, b, asc) return compareNumbers(a.time, b.time, asc, 0) end,
+            mode = function(a, b, asc) return compareStrings(a.mode, b.mode, asc) end,
         },
     }
 
@@ -1658,7 +1700,7 @@ do
         end,
 
         sorters = {
-            name = function(a, b, asc) return asc and (a.name < b.name) or (a.name > b.name) end,
+            name = function(a, b, asc) return compareStrings(a.name, b.name, asc) end,
         },
     }
 
@@ -1770,12 +1812,11 @@ do
         end,
 
         sorters = {
-            name = function(a, b, asc) return asc and (a.name < b.name) or (a.name > b.name) end,
-            join = function(a, b, asc) return asc and (a.join < b.join) or (a.join > b.join) end,
+            name = function(a, b, asc) return compareStrings(a.name, b.name, asc) end,
+            join = function(a, b, asc) return compareNumbers(a.join, b.join, asc, 0) end,
             leave = function(a, b, asc)
-                local A = a.leave or (asc and math.huge or -math.huge)
-                local B = b.leave or (asc and math.huge or -math.huge)
-                return asc and (A < B) or (A > B)
+                local missing = asc and math.huge or -math.huge
+                return compareNumbers(a.leave, b.leave, asc, missing)
             end,
         },
     }
@@ -1860,6 +1901,35 @@ do
     local View = addon.Logger.View
     local Actions = addon.Logger.Actions
 
+    local function updateSourceHeaderState(frameName)
+        local header = frameName and _G[frameName .. "HeaderSource"]
+        if not header then return end
+
+        local canSortSource = addon.Logger.selectedBoss == nil
+        if header.EnableMouse then
+            header:EnableMouse(canSortSource)
+        end
+        if header.SetAlpha then
+            header:SetAlpha(canSortSource and 1 or 0.6)
+        end
+    end
+
+    local function compareLootTie(a, b, asc)
+        local aName = strlower(tostring((a and a.sortName) or ""))
+        local bName = strlower(tostring((b and b.sortName) or ""))
+        if aName ~= bName then
+            return compareValues(aName, bName, asc)
+        end
+
+        local aItemId = tonumber(a and a.itemId) or 0
+        local bItemId = tonumber(b and b.itemId) or 0
+        if aItemId ~= bItemId then
+            return compareValues(aItemId, bItemId, asc)
+        end
+
+        return compareNumbers(a and a.id, b and b.id, asc, 0)
+    end
+
     local controller = Utils.makeListController {
         keyName = "LootList",
         poolTag = "logger-loot",
@@ -1885,6 +1955,7 @@ do
             _G[n .. "AddBtn"]:Disable()
             local del = _G[n .. "DeleteBtn"]; if del then del:SetText(L.BtnDelete) end
             _G[n .. "EditBtn"]:Disable()
+            updateSourceHeaderState(n)
         end,
 
         getData = function(out)
@@ -1920,7 +1991,7 @@ do
             if selectedBoss and tonumber(it.bossNid) == tonumber(selectedBoss) then
                 ui.Source:SetText("")
             else
-                ui.Source:SetText(addon.Logger.Boss:GetName(it.bossNid, addon.Logger.selectedRaid))
+                ui.Source:SetText(it.sourceName or "")
             end
 
             local r, g, b = Utils.getClassColor(addon.Raid:GetPlayerClass(it.looter))
@@ -1954,6 +2025,8 @@ do
         end,
 
         postUpdate = function(n)
+            updateSourceHeaderState(n)
+
             local lootSelCount = Utils.multiSelectCount(addon.Logger._msLootCtx)
             local delBtn = _G[n .. "DeleteBtn"]
             Utils.setButtonCount(delBtn, L.BtnDelete, lootSelCount)
@@ -1961,24 +2034,59 @@ do
         end,
 
         sorters = {
-            id = function(a, b, asc) return asc and (a.itemId < b.itemId) or (a.itemId > b.itemId) end,
+            id = function(a, b, asc) return compareLootTie(a, b, asc) end,
             source = function(a, b, asc)
-                return asc and ((tonumber(a.bossNid) or 0) < (tonumber(b.bossNid) or 0)) or
-                    ((tonumber(a.bossNid) or 0) > (tonumber(b.bossNid) or 0))
+                local aSource = strlower(tostring((a and a.sourceName) or ""))
+                local bSource = strlower(tostring((b and b.sourceName) or ""))
+                if aSource ~= bSource then
+                    return compareValues(aSource, bSource, asc)
+                end
+                return compareLootTie(a, b, asc)
             end,
-            winner = function(a, b, asc) return asc and (a.looter < b.looter) or (a.looter > b.looter) end,
-            type = function(a, b, asc) return asc and (a.rollType < b.rollType) or (a.rollType > b.rollType) end,
+            winner = function(a, b, asc)
+                local aWinner = strlower(tostring((a and a.looter) or ""))
+                local bWinner = strlower(tostring((b and b.looter) or ""))
+                if aWinner ~= bWinner then
+                    return compareValues(aWinner, bWinner, asc)
+                end
+                return compareLootTie(a, b, asc)
+            end,
+            type = function(a, b, asc)
+                local aType = tonumber(a and a.rollType) or 0
+                local bType = tonumber(b and b.rollType) or 0
+                if aType ~= bType then
+                    return compareValues(aType, bType, asc)
+                end
+                return compareLootTie(a, b, asc)
+            end,
             roll = function(a, b, asc)
-                local A = a.rollValue or 0
-                local B = b.rollValue or 0
-                return asc and (A < B) or (A > B)
+                local aRoll = tonumber(a and a.rollValue) or 0
+                local bRoll = tonumber(b and b.rollValue) or 0
+                if aRoll ~= bRoll then
+                    return compareValues(aRoll, bRoll, asc)
+                end
+                return compareLootTie(a, b, asc)
             end,
-            time = function(a, b, asc) return asc and (a.time < b.time) or (a.time > b.time) end,
+            time = function(a, b, asc)
+                local aTime = tonumber(a and a.time) or 0
+                local bTime = tonumber(b and b.time) or 0
+                if aTime ~= bTime then
+                    return compareValues(aTime, bTime, asc)
+                end
+                return compareLootTie(a, b, asc)
+            end,
         },
     }
 
     Loot._ctrl = controller
     Utils.bindListController(Loot, controller)
+
+    function Loot:Sort(key)
+        if key == "source" and addon.Logger.selectedBoss then
+            return
+        end
+        controller:Sort(key)
+    end
 
     function Loot:OnEnter(widget)
         if not widget then return end

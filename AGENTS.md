@@ -47,6 +47,8 @@ Durable preferences learned from recent conversations:
 - Keep `Features/SlashEvents.lua` focused on `/cmd` handling only.
 - Keep main WoW event handlers centralized in `KRT.lua`; modules should expose callable APIs used by those handlers.
 - Prefer storing runtime-only addon state under `addon.State` (or feature state tables) over global runtime vars.
+- Prefer deterministic sorting with explicit tie-breakers; when primary values are equal, use stable secondary keys
+  (for Logger Loot, prefer loot name, then IDs) to avoid random reordering between sorts.
 
 ---
 
@@ -116,13 +118,14 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 19) Features/Reserves.lua
 20) Features/ReservesImport.lua
 21) Features/Logger.lua
-22) Features/Config.lua
-23) Features/Warnings.lua
-24) Features/Changes.lua
-25) Features/Spammer.lua
-26) Features/SlashEvents.lua
-27) KRT.xml (UI include manifest)
-28) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
+22) Features/Syncer.lua
+23) Features/Config.lua
+24) Features/Warnings.lua
+25) Features/Changes.lua
+26) Features/Spammer.lua
+27) Features/SlashEvents.lua
+28) KRT.xml (UI include manifest)
+29) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
 
 ---
 
@@ -146,11 +149,12 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Reserves.lua           # soft reserves model + list UI
     ReservesImport.lua     # SR import window glue + validation
     Logger.lua             # loot logger module stack (store/view/actions/ui)
+    Syncer.lua             # logger synchronization (addon comms)
     Config.lua             # options UI logic
     Warnings.lua           # warnings list + announce helpers
     Changes.lua            # MS changes list + announce
     Spammer.lua            # LFM spam helper
-    SlashEvents.lua        # slash command router + addon event handlers
+    SlashEvents.lua        # slash command router
 
   UI/
     Minimap.xml            # minimap button frame
@@ -286,6 +290,7 @@ Top-level feature modules on `addon.*`:
 - `addon.Changes`       - MS changes list + announce
 - `addon.Spammer`       - LFM spam helper
 - `addon.Logger`        - loot logger UI + raid editor
+- `addon.Syncer`        - logger synchronization protocol (request/push + merge)
 
 `addon.Logger` internal structure (pattern for complex modules):
 - `addon.Logger.Store`   - data access helpers + stable-ID indexing
@@ -294,7 +299,7 @@ Top-level feature modules on `addon.*`:
 
 Implementation placement (current wave):
 - `KRT.lua`: core + most gameplay/logger logic
-- `Features/*.lua`: Reserves, ReservesImport, Logger, Config, Warnings, Changes, Spammer
+- `Features/*.lua`: Reserves, ReservesImport, Logger, Syncer, Config, Warnings, Changes, Spammer
 
 External modules:
 - `addon.Utils` (Modules/Utils.lua)

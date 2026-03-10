@@ -14,7 +14,6 @@ local strsub, strlen = string.sub, string.len
 local lower, upper = string.lower, string.upper
 local select = select
 local twipe = table.wipe
-local LibStub = LibStub
 local CreateFrame = CreateFrame
 
 local GetTime = GetTime
@@ -764,16 +763,21 @@ end
 -- =========== Callback utilities  =========== --
 
 do
-    local CallbackHandler = LibStub("CallbackHandler-1.0") -- vendored (hard dependency)
+    -- Internal event bus (lightweight, safe, addon-logged)
+    local events = {} -- events[eventName] = { [token]=func, ... }
 
-    -- Internal callback registry (not the WoW event registry)
-    addon.InternalCallbacksTarget = addon.InternalCallbacksTarget or {}
-    addon.InternalCallbacks = addon.InternalCallbacks
-        or CallbackHandler:New(addon.InternalCallbacksTarget, "RegisterCallback", "UnregisterCallback",
-            "UnregisterAllCallbacks")
+    -- Optional debug stats (fan-out + frequency + timing)
+    -- stats[eventName] = { listeners, fires, maxListeners, totalMs, lastMs, errors }
+    local stats = {}
 
-    local target = addon.InternalCallbacksTarget
-    local registry = addon.InternalCallbacks
+    local function ensureStats(e)
+        local s = stats[e]
+        if not s then
+            s = { listeners = 0, fires = 0, maxListeners = 0, totalMs = 0, lastMs = 0, errors = 0 }
+            stats[e] = s
+        end
+        return s
+    end
 
     -- Register a callback for an internal event.
     -- Returns a handle you can use to unregister later (optional).
@@ -782,38 +786,168 @@ do
             error(L.StrCbErrUsage)
         end
 
-        -- CallbackHandler uses "self" as the uniqueness key; use a unique token per registration
-        -- to allow multiple anonymous listeners on the same event (same behavior as the old table).
-        local token = {}
-
-        -- Preserve existing signature + safety: listener receives (eventName, ...)
-        local wrapped = function(eventName, ...)
-            local ok, err = pcall(func, eventName, ...)
-            if not ok then
-                addon:error((Diag.E.LogUtilsCallbackExec):format(tostring(func), tostring(eventName), err))
-            end
+        local t = events[e]
+        if not t then
+            t = {}
+            events[e] = t
         end
 
-        target.RegisterCallback(token, e, wrapped)
+        local token = {}
+        t[token] = func
+
+        local s = ensureStats(e)
+        s.listeners = s.listeners + 1
+        if s.listeners > s.maxListeners then
+            s.maxListeners = s.listeners
+        end
+
         return { e = e, t = token }
     end
 
     -- Optional: unregister a previously registered callback handle.
-    -- (Non-breaking: if you never call it, nothing changes for current code.)
     function Utils.unregisterCallback(handle)
         if type(handle) ~= "table" or not handle.e or not handle.t then return end
-        target.UnregisterCallback(handle.t, handle.e)
+
+        local e, token = handle.e, handle.t
+        local t = events[e]
+        if t and t[token] then
+            t[token] = nil
+
+            local s = ensureStats(e)
+            if s.listeners > 0 then
+                s.listeners = s.listeners - 1
+            end
+        end
     end
 
     -- Fire an internal event; callbacks receive (eventName, ...).
     function Utils.triggerEvent(e, ...)
-        registry:Fire(e, ...)
+        local t = events[e]
+        if not t then return end
+
+        local s = ensureStats(e)
+        s.fires = s.fires + 1
+
+        -- Only do timing when debug is enabled (keeps overhead minimal).
+        local prof = (Utils.isDebugEnabled and Utils.isDebugEnabled() and debugprofilestop) or nil
+        local t0 = prof and prof() or nil
+
+        -- Snapshot tokens to be safe if callbacks register/unregister while firing.
+        local tokens, n = {}, 0
+        for tok in pairs(t) do
+            n = n + 1
+            tokens[n] = tok
+        end
+
+        if n > s.maxListeners then
+            s.maxListeners = n
+        end
+
+        for i = 1, n do
+            local tok = tokens[i]
+            local fn = t[tok] -- may have been unregistered mid-fire
+            if fn then
+                local ok, err = pcall(fn, e, ...)
+                if not ok then
+                    s.errors = s.errors + 1
+                    addon:error((Diag.E.LogUtilsCallbackExec):format(tostring(fn), tostring(e), tostring(err)))
+                end
+            end
+        end
+
+        if prof and t0 then
+            local dt = prof() - t0
+            s.lastMs = dt
+            s.totalMs = s.totalMs + dt
+        end
     end
 
     function Utils.registerCallbacks(names, handler)
         for i = 1, #names do
             Utils.registerCallback(names[i], handler)
         end
+    end
+
+    -- ===== Debug helpers =====
+
+    -- Returns a COPY of the internal callback stats.
+    function Utils.getInternalCallbackStats()
+        local out = {}
+        for ev, s in pairs(stats) do
+            out[ev] = {
+                listeners = s.listeners or 0,
+                fires = s.fires or 0,
+                maxListeners = s.maxListeners or 0,
+                totalMs = s.totalMs or 0,
+                lastMs = s.lastMs or 0,
+                errors = s.errors or 0,
+            }
+        end
+        return out
+    end
+
+    function Utils.resetInternalCallbackStats()
+        for k in pairs(stats) do
+            stats[k] = nil
+        end
+    end
+
+    -- Print top events to chat. Sorting options: max|fires|listeners|time|avg|errors
+    function Utils.dumpInternalCallbackStats(sortBy)
+        if not addon or not addon.info then return end
+
+        local rows = {}
+        for ev, s in pairs(stats) do
+            local fires = s.fires or 0
+            local total = s.totalMs or 0
+            local avg = (fires > 0) and (total / fires) or 0
+            rows[#rows + 1] = {
+                ev = ev,
+                listeners = s.listeners or 0,
+                fires = fires,
+                max = s.maxListeners or 0,
+                total = total,
+                avg = avg,
+                last = s.lastMs or 0,
+                errors = s.errors or 0,
+            }
+        end
+
+        local key = "max"
+        local k = tostring(sortBy or ""):lower()
+        if k == "fires" or k == "fire" then
+            key = "fires"
+        elseif k == "listeners" or k == "l" then
+            key = "listeners"
+        elseif k == "time" or k == "total" then
+            key = "total"
+        elseif k == "avg" then
+            key = "avg"
+        elseif k == "errors" or k == "err" then
+            key = "errors"
+        else
+            key = "max"
+        end
+
+        table.sort(rows, function(a, b)
+            if a[key] == b[key] then
+                return tostring(a.ev) < tostring(b.ev)
+            end
+            return a[key] > b[key]
+        end)
+
+        local limit = 20
+        if #rows < limit then limit = #rows end
+
+        addon:info("Internal callbacks: top %d (sort=%s).", limit, key)
+        for i = 1, limit do
+            local r = rows[i]
+            addon:info(
+                "%2d) %s | now:%d max:%d | fires:%d | total:%.2fms avg:%.3fms last:%.3fms | errors:%d",
+                i, tostring(r.ev), r.listeners, r.max, r.fires, r.total, r.avg, r.last, r.errors
+            )
+        end
+        addon:info("Tip: /krt debug callbacks reset  |  /krt debug callbacks fires|max|time|avg|errors")
     end
 end
 

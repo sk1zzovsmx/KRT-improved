@@ -116,6 +116,39 @@ do
             return
         end
 
+        if subCmd == "callbacks" or subCmd == "cb" or subCmd == "bus" then
+            if arg == "reset" then
+                if Utils.resetInternalCallbackStats then
+                    Utils.resetInternalCallbackStats()
+                end
+                addon:info("Internal callback stats reset.")
+            else
+                if Utils.dumpInternalCallbackStats then
+                    Utils.dumpInternalCallbackStats(arg)
+                else
+                    addon:warn("Callback stats not available in this build.")
+                end
+            end
+            return
+        end
+
+        if subCmd == "timers" or subCmd == "timer" then
+            if arg == "reset" then
+                if addon.ResetTimerDebug then
+                    addon:ResetTimerDebug()
+                end
+                addon:info("Timer debug stats reset.")
+            else
+                if addon.DumpTimerDebug then
+                    addon:DumpTimerDebug(arg)
+                else
+                    addon:warn("Timer debug not available in this build.")
+                end
+            end
+            return
+        end
+
+
         if subCmd == "on" then
             Utils.applyDebugSetting(true)
         elseif subCmd == "off" then
@@ -208,9 +241,29 @@ do
     end)
 
     registerAliases(cmdLogger, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub, arg = Utils.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             addon.Logger:Toggle()
+        elseif sub == "req" then
+            local raidRefArg, targetArg = Utils.splitArgs(arg)
+            if addon.Syncer and addon.Syncer.RequestLoggerReq then
+                addon.Syncer:RequestLoggerReq(tonumber(raidRefArg), targetArg)
+            end
+        elseif sub == "push" then
+            local raidRefArg, targetArg = Utils.splitArgs(arg)
+            if addon.Syncer and addon.Syncer.BroadcastLoggerPush then
+                addon.Syncer:BroadcastLoggerPush(tonumber(raidRefArg), targetArg)
+            end
+        elseif sub == "sync" then
+            if addon.Syncer and addon.Syncer.RequestLoggerSync then
+                addon.Syncer:RequestLoggerSync()
+            end
+        else
+            addon:info(format(L.StrCmdCommands, "krt logger"), "KRT")
+            printHelp("toggle", L.StrCmdToggle)
+            printHelp("req <raidId|raidNid> <player>", L.StrCmdLoggerReq)
+            printHelp("push <raidId|raidNid> <player>", L.StrCmdLoggerPush)
+            printHelp("sync", L.StrCmdLoggerSync)
         end
     end)
 

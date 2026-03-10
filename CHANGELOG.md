@@ -4,6 +4,26 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Bugfix:** Logger UI now refreshes immediately after incoming Sync snapshots (`req`, `push`, `sync`),
+  including the Raids list update without requiring manual reopen or reselection.
+- **Behavior:** Added Logger Sync feature (`Features/Syncer.lua`) using addon-message request/response
+  chunking with three commands:
+  `/krt logger req <raidId|raidNid> <player>` requests a specific raid snapshot from one target player
+  and imports it as a new raid, `/krt logger push <raidId|raidNid> <player>` pushes a selected raid
+  snapshot to one target player, and
+  `/krt logger sync` merges only into the current raid when zone/size/difficulty signature matches.
+- **Behavior:** `req/push` now require an explicit raid reference and no longer fallback to selected/current
+  raid; current-raid flows should use `/krt logger sync`.
+- **Behavior:** Main event wiring now handles `CHAT_MSG_ADDON` in `KRT.lua` and forwards Sync protocol
+  traffic to `addon.Syncer`, keeping slash handling isolated in `Features/SlashEvents.lua`.
+- **Behavior:** Logger Loot sorting is now deterministic across all sortable headers; when primary values
+  are equal, ordering falls back to loot name, then item ID, then loot NID to prevent random reshuffles.
+- **Behavior:** Logger Loot `Item` header sorting now uses the displayed loot name text
+  (item name/link label), with `itemId` as stable fallback tie-breaker.
+- **Behavior:** Logger Loot `Source` header is now non-sortable while a boss filter is active
+  (column rendered empty), and source sorting now follows the displayed boss name text.
+- **Bugfix:** Logger sortable headers now use strict Lua comparators (no `asc and ... or ...` ambiguity),
+  fixing broken/unstable ordering and sort-time errors when clicking list headers.
 - **Bugfix:** Raid session switching no longer drops the previous current raid when roster data is
   temporarily unavailable (`GetNumRaidMembers()==0`); `Raid:Create(...)` now validates readiness
   before ending the previous session.
