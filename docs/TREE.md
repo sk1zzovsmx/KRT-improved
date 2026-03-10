@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-24 03:10:20 +01:00
-- Commit: 26fb6d9
+- Generated: 2026-02-24 03:41:57 +01:00
+- Commit: 7e16a9c
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -18,9 +18,8 @@
 |   |-- Core
 |   |   \\-- Init.lua
 |   |-- EntryPoints
-|   |   |-- Minimap.lua
-|   |   |-- README.md
-|   |   \\-- SlashEvents.lua
+|   |   |-- EntryPoints.lua
+|   |   \\-- README.md
 |   |-- Libs
 |   |   |-- CallbackHandler-1.0
 |   |   |   \\-- ...
@@ -39,24 +38,11 @@
 |   |   \\-- localization.en.lua
 |   |-- Modules
 |   |   |-- Compat
-|   |   |   \\-- ...
 |   |   |-- UI
 |   |   |   \\-- ...
-|   |   |-- Base64.lua
 |   |   |-- Bus.lua
 |   |   |-- C.lua
-|   |   |-- Colors.lua
-|   |   |-- Comms.lua
-|   |   |-- Events.lua
-|   |   |-- Features.lua
-|   |   |-- ignoredItems.lua
-|   |   |-- Strings.lua
-|   |   |-- Time.lua
-|   |   |-- Utils.LegacyGlobals.lua
-|   |   |-- Utils.lua
-|   |   |-- Utils.Options.lua
-|   |   |-- Utils.RaidState.lua
-|   |   \\-- Utils.Tooltip.lua
+|   |   \\-- Std.lua
 |   |-- Services
 |   |   |-- Chat.lua
 |   |   |-- Loot.lua
@@ -66,6 +52,8 @@
 |   |   |-- Rolls.lua
 |   |   \\-- Syncer.lua
 |   |-- UI
+|   |   |-- Templates
+|   |   |   \\-- ...
 |   |   |-- Changes.xml
 |   |   |-- Config.xml
 |   |   |-- Logger.xml
@@ -85,8 +73,7 @@
 |   |-- KRT.Core.xml
 |   |-- KRT.Full.xml
 |   |-- KRT.lua
-|   |-- KRT.xml
-|   \\-- Templates.xml
+|   \\-- KRT.xml
 |-- .devcontainer
 |   \\-- devcontainer.json
 |-- .githooks
@@ -99,6 +86,7 @@
 |   |-- FN_CLUSTERS.md
 |   |-- FUNCTION_REGISTRY.csv
 |   |-- FUNCTION_REGISTRY.md
+|   |-- LAYER_MAP.md
 |   |-- MODULES_UI_OWNERSHIP_MAP.md
 |   |-- REFACTOR_RULES.md
 |   |-- TREE.md

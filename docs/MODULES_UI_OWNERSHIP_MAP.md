@@ -5,7 +5,7 @@ and `!KRT/Modules/Compat`.
 
 ## Scope
 
-- `!KRT/Modules/Compat/Utils.UI.lua`
+- `!KRT/Modules/Compat/StdFacade.UI.lua`
 - `!KRT/Modules/UI/Frames.lua`
 - `!KRT/Modules/UI/ListController.lua`
 - `!KRT/Modules/UI/Binder/UIBinder.lua`
@@ -16,38 +16,38 @@ and `!KRT/Modules/Compat`.
 
 | Function | Current file | Category | Owner target | Action | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `UI.enableDrag` | `Utils.UI.lua` | compat | `addon.Frames.enableDrag` | wrap | `Utils.UI` is compat-only. |
-| `UI.createRowDrawer` | `Utils.UI.lua` | compat | `addon.ListController.createRowDrawer` | wrap | Direct forwarder. |
-| `UI.makeListController` | `Utils.UI.lua` | compat | `addon.ListController.makeListController` | wrap | Direct forwarder. |
-| `UI.bindListController` | `Utils.UI.lua` | compat | `addon.ListController.bindListController` | wrap | Direct forwarder. |
-| `UI.makeConfirmPopup` | `Utils.UI.lua` | compat | `addon.Frames.makeConfirmPopup` | wrap | Direct forwarder. |
-| `UI.makeEditBoxPopup` | `Utils.UI.lua` | compat | `addon.Frames.makeEditBoxPopup` | wrap | Direct forwarder. |
-| `UI.setFrameTitle` | `Utils.UI.lua` | compat | `addon.Frames.setFrameTitle` | wrap | Direct forwarder. |
-| `UI.resetEditBox` | `Utils.UI.lua` | compat | `addon.Frames.resetEditBox` | wrap | Direct forwarder. |
-| `UI.setEditBoxValue` | `Utils.UI.lua` | compat | `addon.Frames.setEditBoxValue` | wrap | Direct forwarder. |
-| `UI.setShown` | `Utils.UI.lua` | compat | `addon.Frames.setShown` | wrap | Direct forwarder. |
-| `UI.makeEventDrivenRefresher` | `Utils.UI.lua` | compat | `addon.Frames.makeEventDrivenRefresher` | wrap | Direct forwarder. |
-| `UI.makeFrameGetter` | `Utils.UI.lua` | compat | `addon.Frames.makeFrameGetter` | wrap | Direct forwarder. |
-| `UI.initModuleFrame` | `Utils.UI.lua` | compat | `addon.Frames.initModuleFrame` | wrap | Direct forwarder. |
-| `UI.bindEditBoxHandlers` | `Utils.UI.lua` | compat | `addon.Frames.bindEditBoxHandlers` | wrap | Direct forwarder. |
-| `UI.bootstrapModuleUi` | `Utils.UI.lua` | compat | `addon.UIScaffold.bootstrapModuleUi` | wrap | Scaffold API implemented in `Frames.lua`. |
-| `UI.makeUIFrameController` | `Utils.UI.lua` | compat | `addon.UIScaffold.makeUIFrameController` | wrap | Scaffold API implemented in `Frames.lua`. |
-| `UI.createListPanelScaffold` | `Utils.UI.lua` | compat | `addon.UIScaffold.createListPanelScaffold` | wrap | Scaffold API implemented in `Frames.lua`. |
-| `UI.enableDisable` | `Utils.UI.lua` | compat | `addon.UIPrimitives.enableDisable` | wrap | Primitive owner extracted. |
-| `UI.toggle` | `Utils.UI.lua` | compat | `addon.UIPrimitives.toggle` | wrap | Primitive owner extracted. |
-| `UI.hideFrame` | `Utils.UI.lua` | compat | `addon.UIPrimitives.hideFrame` | wrap | Primitive owner extracted. |
-| `UI.showHide` | `Utils.UI.lua` | compat | `addon.UIPrimitives.showHide` | wrap | Primitive owner extracted. |
-| `UI.toggleHighlight` | `Utils.UI.lua` | compat | `addon.UIPrimitives.toggleHighlight` | wrap | Primitive owner extracted. |
-| `UI.setButtonCount` | `Utils.UI.lua` | compat | `addon.UIPrimitives.setButtonCount` | wrap | Primitive owner extracted. |
-| `UI.setText` | `Utils.UI.lua` | compat | `addon.UIPrimitives.setText` | wrap | Primitive owner extracted. |
-| `UI.getNamedFramePart` | `Utils.UI.lua` | compat | `addon.UIPrimitives.getNamedFramePart` | wrap | Primitive owner extracted. |
-| `UI.enableDisableNamedPart` | `Utils.UI.lua` | compat | `addon.UIPrimitives.enableDisableNamedPart` | wrap | Primitive owner extracted. |
-| `UI.showHideNamedPart` | `Utils.UI.lua` | compat | `addon.UIPrimitives.showHideNamedPart` | wrap | Primitive owner extracted. |
-| `UI.setTextNamedPart` | `Utils.UI.lua` | compat | `addon.UIPrimitives.setTextNamedPart` | wrap | Primitive owner extracted. |
-| `UI.updateModeTextNamedPart` | `Utils.UI.lua` | compat | `addon.UIPrimitives.updateModeTextNamedPart` | wrap | Primitive owner extracted. |
-| `UI.ensureRowVisuals` | `Utils.UI.lua` | compat | `addon.UIRowVisuals.ensureRowVisuals` | wrap | Row visuals owner extracted. |
-| `UI.setRowSelected` | `Utils.UI.lua` | compat | `addon.UIRowVisuals.setRowSelected` | wrap | Row visuals owner extracted. |
-| `UI.setRowFocused` | `Utils.UI.lua` | compat | `addon.UIRowVisuals.setRowFocused` | wrap | Row visuals owner extracted. |
+| `UI.enableDrag` | `StdFacade.UI.lua` | compat | `addon.Frames.enableDrag` | wrap | `StdFacade.UI` is compat-only. |
+| `UI.createRowDrawer` | `StdFacade.UI.lua` | compat | `addon.ListController.createRowDrawer` | wrap | Direct forwarder. |
+| `UI.makeListController` | `StdFacade.UI.lua` | compat | `addon.ListController.makeListController` | wrap | Direct forwarder. |
+| `UI.bindListController` | `StdFacade.UI.lua` | compat | `addon.ListController.bindListController` | wrap | Direct forwarder. |
+| `UI.makeConfirmPopup` | `StdFacade.UI.lua` | compat | `addon.Frames.makeConfirmPopup` | wrap | Direct forwarder. |
+| `UI.makeEditBoxPopup` | `StdFacade.UI.lua` | compat | `addon.Frames.makeEditBoxPopup` | wrap | Direct forwarder. |
+| `UI.setFrameTitle` | `StdFacade.UI.lua` | compat | `addon.Frames.setFrameTitle` | wrap | Direct forwarder. |
+| `UI.resetEditBox` | `StdFacade.UI.lua` | compat | `addon.Frames.resetEditBox` | wrap | Direct forwarder. |
+| `UI.setEditBoxValue` | `StdFacade.UI.lua` | compat | `addon.Frames.setEditBoxValue` | wrap | Direct forwarder. |
+| `UI.setShown` | `StdFacade.UI.lua` | compat | `addon.Frames.setShown` | wrap | Direct forwarder. |
+| `UI.makeEventDrivenRefresher` | `StdFacade.UI.lua` | compat | `addon.Frames.makeEventDrivenRefresher` | wrap | Direct forwarder. |
+| `UI.makeFrameGetter` | `StdFacade.UI.lua` | compat | `addon.Frames.makeFrameGetter` | wrap | Direct forwarder. |
+| `UI.initModuleFrame` | `StdFacade.UI.lua` | compat | `addon.Frames.initModuleFrame` | wrap | Direct forwarder. |
+| `UI.bindEditBoxHandlers` | `StdFacade.UI.lua` | compat | `addon.Frames.bindEditBoxHandlers` | wrap | Direct forwarder. |
+| `UI.bootstrapModuleUi` | `StdFacade.UI.lua` | compat | `addon.UIScaffold.bootstrapModuleUi` | wrap | Scaffold API implemented in `Frames.lua`. |
+| `UI.makeUIFrameController` | `StdFacade.UI.lua` | compat | `addon.UIScaffold.makeUIFrameController` | wrap | Scaffold API implemented in `Frames.lua`. |
+| `UI.createListPanelScaffold` | `StdFacade.UI.lua` | compat | `addon.UIScaffold.createListPanelScaffold` | wrap | Scaffold API implemented in `Frames.lua`. |
+| `UI.enableDisable` | `StdFacade.UI.lua` | compat | `addon.UIPrimitives.enableDisable` | wrap | Primitive owner extracted. |
+| `UI.toggle` | `StdFacade.UI.lua` | compat | `addon.UIPrimitives.toggle` | wrap | Primitive owner extracted. |
+| `UI.hideFrame` | `StdFacade.UI.lua` | compat | `addon.UIPrimitives.hideFrame` | wrap | Primitive owner extracted. |
+| `UI.showHide` | `StdFacade.UI.lua` | compat | `addon.UIPrimitives.showHide` | wrap | Primitive owner extracted. |
+| `UI.toggleHighlight` | `StdFacade.UI.lua` | compat | `addon.UIPrimitives.toggleHighlight` | wrap | Primitive owner extracted. |
+| `UI.setButtonCount` | `StdFacade.UI.lua` | compat | `addon.UIPrimitives.setButtonCount` | wrap | Primitive owner extracted. |
+| `UI.setText` | `StdFacade.UI.lua` | compat | `addon.UIPrimitives.setText` | wrap | Primitive owner extracted. |
+| `UI.getNamedFramePart` | `StdFacade.UI.lua` | compat | `addon.UIPrimitives.getNamedFramePart` | wrap | Primitive owner extracted. |
+| `UI.enableDisableNamedPart` | `StdFacade.UI.lua` | compat | `addon.UIPrimitives.enableDisableNamedPart` | wrap | Primitive owner extracted. |
+| `UI.showHideNamedPart` | `StdFacade.UI.lua` | compat | `addon.UIPrimitives.showHideNamedPart` | wrap | Primitive owner extracted. |
+| `UI.setTextNamedPart` | `StdFacade.UI.lua` | compat | `addon.UIPrimitives.setTextNamedPart` | wrap | Primitive owner extracted. |
+| `UI.updateModeTextNamedPart` | `StdFacade.UI.lua` | compat | `addon.UIPrimitives.updateModeTextNamedPart` | wrap | Primitive owner extracted. |
+| `UI.ensureRowVisuals` | `StdFacade.UI.lua` | compat | `addon.UIRowVisuals.ensureRowVisuals` | wrap | Row visuals owner extracted. |
+| `UI.setRowSelected` | `StdFacade.UI.lua` | compat | `addon.UIRowVisuals.setRowSelected` | wrap | Row visuals owner extracted. |
+| `UI.setRowFocused` | `StdFacade.UI.lua` | compat | `addon.UIRowVisuals.setRowFocused` | wrap | Row visuals owner extracted. |
 | `Frames.enableDrag` | `Frames.lua` | frame helper | `addon.Frames.enableDrag` | keep | Canonical drag owner. |
 | `Frames.makeConfirmPopup` | `Frames.lua` | frame helper | `addon.Frames.makeConfirmPopup` | keep | Base helper. |
 | `Frames.makeEditBoxPopup` | `Frames.lua` | frame helper | `addon.Frames.makeEditBoxPopup` | keep | Base helper. |
@@ -89,8 +89,8 @@ and `!KRT/Modules/Compat`.
 
 ```powershell
 rg -n 'function (UIPrimitives\.|UIRowVisuals\.)' !KRT/Modules/UI/Visuals.lua
-rg -n '^function UI\.' !KRT/Modules/Compat/Utils.UI.lua
-rg -n 'CreateTexture|RegisterForDrag|SetPushedTexture|StartMoving|StopMovingOrSizing' !KRT/Modules/Compat/Utils.UI.lua
+rg -n '^function UI\.' !KRT/Modules/Compat/StdFacade.UI.lua
+rg -n 'CreateTexture|RegisterForDrag|SetPushedTexture|StartMoving|StopMovingOrSizing' !KRT/Modules/Compat/StdFacade.UI.lua
 ```
 
 ### M16 checks
@@ -111,6 +111,6 @@ rg -n 'BindAll|BindCreatedFrame|PatchCreateFrame' !KRT/Modules/UI/Binder/*.lua
 ### M18 checks
 
 ```powershell
-rg -n '\b(addon\.Utils|Utils\.)' !KRT/Modules/UI/Frames.lua !KRT/Modules/UI/ListController.lua !KRT/Modules/UI/Binder/UIBinder.lua
+rg -n '\b(addon\.StdFacade|StdFacade\.)' !KRT/Modules/UI/Frames.lua !KRT/Modules/UI/ListController.lua !KRT/Modules/UI/Binder/UIBinder.lua
 powershell -ExecutionPolicy Bypass -File tools/check-layering.ps1
 ```

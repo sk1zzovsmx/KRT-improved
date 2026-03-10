@@ -8,11 +8,14 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
-local Utils = feature.Utils
+
+local Frames = feature.Frames or addon.Frames
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
+local Options = feature.Options or addon.Options
+local Bus = feature.Bus or addon.Bus
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -50,7 +53,7 @@ do
 
     local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
     local frameName
-    local getFrame = Utils.makeFrameGetter("KRTReserveListFrame")
+    local getFrame = Frames.makeFrameGetter("KRTReserveListFrame")
     local scrollFrame, scrollChild
     local reserveHeaders = {}
     local reserveItemRows = {}
@@ -305,7 +308,7 @@ do
             return
         end
         if frameName then
-            Utils.setFrameTitle(frameName, L.StrRaidReserves)
+            Frames.setFrameTitle(frameName, L.StrRaidReserves)
             addon:debug(Diag.D.LogReservesUILocalized:format(L.StrRaidReserves))
         end
         local clearButton = frameName and _G[frameName .. "ClearButton"]
@@ -540,7 +543,7 @@ do
 
     function UI:OnLoad(frame)
         addon:debug(Diag.D.LogReservesFrameLoaded)
-        frameName = Utils.initModuleFrame(module, frame, {
+        frameName = Frames.initModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 addon:debug(Diag.D.LogReservesShowWindow)
@@ -705,7 +708,7 @@ do
             return
         end
 
-        Utils.setFrameTitle(frame, L.StrImportReservesTitle)
+        Frames.setFrameTitle(frame, L.StrImportReservesTitle)
 
         local hint = _G["KRTImportWindowHint"]
         if hint then hint:SetText(L.StrImportReservesHint) end
@@ -724,7 +727,7 @@ do
         if Service and Service.SetImportMode then
             Service:SetImportMode(mode, true)
         else
-            Utils.setOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
+            Options.setOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
         end
 
         if suppressSlider then return end
@@ -779,10 +782,10 @@ do
     end
 
     function Import:OnLoad(frame)
-        Utils.initModuleFrame(Import, frame, {
+        Frames.initModuleFrame(Import, frame, {
             enableDrag = true,
             hookOnShow = function()
-                Utils.resetEditBox(_G["KRTImportEditBox"])
+                Frames.resetEditBox(_G["KRTImportEditBox"])
                 local editBox = _G["KRTImportEditBox"]
                 if editBox then
                     editBox:SetFocus()
@@ -879,7 +882,7 @@ do
         })
     end
 
-    Utils.registerCallback(InternalEvents.ReservesDataChanged, function()
+    Bus.registerCallback(InternalEvents.ReservesDataChanged, function()
         UI:RequestRefresh()
     end)
 end

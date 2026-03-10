@@ -14,7 +14,7 @@ This document defines folder responsibilities and allowed dependencies.
 
 ## Dependency matrix
 
-`Y` = allowed, `N` = disallowed, `Bus` = via `Utils.triggerEvent/registerCallback`, `Toggle` = exception.
+`Y` = allowed, `N` = disallowed, `Bus` = via `StdFacade.triggerEvent/registerCallback`, `Toggle` = exception.
 
 | From \ To | Modules/Loc | KRT.lua | Services | Controllers | Widgets | EntryPoints | UI/XML |
 | --- | --- | --- | --- | --- | --- | --- | --- |

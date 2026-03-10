@@ -8,9 +8,14 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
-local Utils = feature.Utils
+
 local Events = feature.Events or addon.Events or {}
 local Core = feature.Core
+local Bus = feature.Bus or addon.Bus
+local Strings = feature.Strings or addon.Strings
+local Base64 = feature.Base64 or addon.Base64
+local Time = feature.Time or addon.Time
+local Comms = feature.Comms or addon.Comms
 
 local _G = _G
 local tinsert = table.insert
@@ -72,22 +77,22 @@ do
     local function normalizeSender(sender)
         if type(sender) ~= "string" then return nil end
         local short = sender:match("^([^%-]+)") or sender
-        return Utils.normalizeName(short, true) or short
+        return Strings.normalizeName(short, true) or short
     end
 
     local function isSelfSender(sender)
-        local selfName = Utils.getPlayerName()
+        local selfName = Core.getPlayerName()
         if not selfName then
             return false
         end
-        local a = Utils.normalizeLower(selfName, true)
-        local b = Utils.normalizeLower(normalizeSender(sender), true)
+        local a = Strings.normalizeLower(selfName, true)
+        local b = Strings.normalizeLower(normalizeSender(sender), true)
         return (a ~= nil and b ~= nil and a == b)
     end
 
     local function encodeText(value)
         local input = tostring(value or "")
-        local ok, out = pcall(Utils.encode, input)
+        local ok, out = pcall(Base64.encode, input)
         if ok and out then
             return out
         end
@@ -99,7 +104,7 @@ do
         if input == "" then
             return ""
         end
-        local ok, out = pcall(Utils.decode, input)
+        local ok, out = pcall(Base64.decode, input)
         if ok and out then
             return out
         end
@@ -199,11 +204,11 @@ do
     end
 
     local function normalizeTargetName(raw)
-        local text = Utils.trimText(raw or "")
+        local text = Strings.trimText(raw or "")
         if text == "" then
             return nil
         end
-        return Utils.normalizeName(text, true) or text
+        return Strings.normalizeName(text, true) or text
     end
 
     local function sortedByNid(list, nidKey, tieKey)
@@ -495,7 +500,7 @@ do
         end
         for i = 1, #names do
             local raw = names[i]
-            local normalized = Utils.normalizeName(raw, true)
+            local normalized = Strings.normalizeName(raw, true)
             local name = normalized or tostring(raw or "")
             if name ~= "" and not seen[name] then
                 seen[name] = true
@@ -623,7 +628,7 @@ do
                 local count = tonumber(src.count) or 0
                 if count < 0 then count = 0 end
                 dst.playerNid = nid
-                dst.name = Utils.normalizeName(src.name, true) or src.name or dst.name
+                dst.name = Strings.normalizeName(src.name, true) or src.name or dst.name
                 dst.rank = tonumber(src.rank) or 0
                 dst.subgroup = tonumber(src.subgroup) or 1
                 dst.class = (src.class and src.class ~= "") and src.class or "UNKNOWN"
@@ -672,7 +677,7 @@ do
                     dst.itemTexture = src.itemTexture
                 end
                 dst.itemCount = count
-                dst.looter = Utils.normalizeName(src.looter, true) or src.looter or dst.looter
+                dst.looter = Strings.normalizeName(src.looter, true) or src.looter or dst.looter
                 dst.rollType = tonumber(src.rollType) or 0
                 dst.rollValue = tonumber(src.rollValue) or 0
                 dst.bossNid = tonumber(src.bossNid) or 0
@@ -682,9 +687,9 @@ do
 
         raid.changes = raid.changes or {}
         for name, spec in pairs(snapshot.changes or {}) do
-            local normalizedName = Utils.normalizeName(name, true) or name
+            local normalizedName = Strings.normalizeName(name, true) or name
             if normalizedName and normalizedName ~= "" then
-                local normalizedSpec = Utils.normalizeName(spec, true)
+                local normalizedSpec = Strings.normalizeName(spec, true)
                 raid.changes[normalizedName] = (normalizedSpec and normalizedSpec ~= "") and normalizedSpec or nil
             end
         end
@@ -718,7 +723,7 @@ do
             zone = header.zone,
             size = tonumber(header.size),
             difficulty = tonumber(header.difficulty),
-            startTime = tonumber(header.startTime) or Utils.getCurrentTime(),
+            startTime = tonumber(header.startTime) or Time.getCurrentTime(),
             endTime = (tonumber(header.endTime) or 0) > 0 and tonumber(header.endTime) or nil,
         })
 
@@ -748,7 +753,7 @@ do
         if target and target ~= "" then
             SendAddonMessage(COMM_PREFIX, payload, "WHISPER", target)
         else
-            Utils.sync(COMM_PREFIX, payload)
+            Comms.sync(COMM_PREFIX, payload)
         end
         addon:debug((Diag.D.LogSyncRequestSent):format(tostring(requestId), tostring(raidRef)))
     end
@@ -784,7 +789,7 @@ do
             if target and target ~= "" then
                 SendAddonMessage(COMM_PREFIX, msg, "WHISPER", target)
             else
-                Utils.sync(COMM_PREFIX, msg)
+                Comms.sync(COMM_PREFIX, msg)
             end
         end
 
@@ -832,7 +837,7 @@ do
         local selectedRaid = tonumber(focusRaidId)
             or tonumber(addon.State and addon.State.selectedRaid)
             or tonumber(Core.getCurrentRaid())
-        Utils.triggerEvent(InternalEvents.LoggerSelectRaid, selectedRaid, "sync")
+        Bus.triggerEvent(InternalEvents.LoggerSelectRaid, selectedRaid, "sync")
     end
 
     local function onSnapshotReady(sender, requestId, mode, snapshot)

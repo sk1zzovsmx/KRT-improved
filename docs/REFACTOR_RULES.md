@@ -14,7 +14,7 @@ Permanent guardrails for function mapping and unification work.
 
 1. Compat wrappers must be marked `@compat`.
 2. Deprecated compat wrappers must be marked `@deprecated use addon.<Owner>.X`.
-3. New code should target owner modules directly, not deprecated `Utils.*` facades.
+3. New code should target owner modules directly, not deprecated `StdFacade.*` facades.
 
 ## PR Checklist
 

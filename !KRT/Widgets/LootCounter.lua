@@ -7,10 +7,13 @@ local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
-local Utils = feature.Utils
+
+local Frames = feature.Frames or addon.Frames
+local Colors = feature.Colors or addon.Colors
 local UIScaffold = addon.UIScaffold
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
+local Bus = feature.Bus or addon.Bus
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -77,7 +80,7 @@ do
             or _G["KRTLootCounterFrameScrollFrameScrollChild"]
 
         if not frame._krtCounterInit then
-            Utils.setFrameTitle(frameName, L.StrLootCounter)
+            Frames.setFrameTitle(frameName, L.StrLootCounter)
             frame._krtCounterInit = true
         end
 
@@ -202,7 +205,7 @@ do
     -- ----- Public methods ----- --
     function module:OnLoad(frame)
         local f = frame or getFrame()
-        frameName = Utils.initModuleFrame(module, f, { enableDrag = true }) or frameName
+        frameName = Frames.initModuleFrame(module, f, { enableDrag = true }) or frameName
         if not ensureFrames() then return end
     end
 
@@ -267,7 +270,7 @@ do
 
             local class = data and data.class or addon.Raid:GetPlayerClass(name)
             if row._lastClass ~= class then
-                local r, g, b = Utils.getClassColor(class)
+                local r, g, b = Colors.getClassColor(class)
                 row.name:SetTextColor(r, g, b)
                 row._lastClass = class
             end
@@ -301,13 +304,13 @@ do
     end
 
     -- Refresh on roster updates (to keep list aligned).
-    Utils.registerCallback(InternalEvents.RaidRosterDelta, requestRefresh)
+    Bus.registerCallback(InternalEvents.RaidRosterDelta, requestRefresh)
 
     -- Refresh when counts actually change (MS loot award or manual +/-/reset).
-    Utils.registerCallback(InternalEvents.PlayerCountChanged, requestRefresh)
+    Bus.registerCallback(InternalEvents.PlayerCountChanged, requestRefresh)
 
     -- New raid session: reset view.
-    Utils.registerCallback(InternalEvents.RaidCreate, requestRefresh)
+    Bus.registerCallback(InternalEvents.RaidCreate, requestRefresh)
 
     if addon.UI and addon.UI.Register then
         addon.UI:Register("LootCounter", {

@@ -7,9 +7,12 @@ local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
-local Utils = feature.Utils
+
+local Options = feature.Options or addon.Options
+local Frames = feature.Frames or addon.Frames
 local UIScaffold = addon.UIScaffold
 local Events = feature.Events or addon.Events or {}
+local Bus = feature.Bus or addon.Bus
 
 local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
 local bindModuleToggleHide = feature.bindModuleToggleHide
@@ -57,41 +60,11 @@ do
 
     -- ----- Public methods ----- --
 
-    -- Default options for the addon.
-    local defaultOptions = {
-        sortAscending               = false,
-        useRaidWarning              = true,
-        announceOnWin               = true,
-        announceOnHold              = true,
-        announceOnBank              = false,
-        announceOnDisenchant        = false,
-        lootWhispers                = false,
-        screenReminder              = true,
-        ignoreStacks                = false,
-        showTooltips                = true,
-        showLootCounterDuringMSRoll = false,
-        minimapButton               = true,
-        countdownSimpleRaidMsg      = false,
-        countdownDuration           = 5,
-        countdownRollsBlock         = true,
-        srImportMode                = 0,
-    }
-
-    -- Creates a fresh options table seeded with defaults.
-    -- Returns a new table populated with the values in defaultOptions. This helper
-    -- avoids duplication between LoadDefaultOptions and LoadOptions when
-    -- constructing the base options table.
-    local function NewOptions()
-        local options = {}
-        addon.tCopy(options, defaultOptions)
-        return options
-    end
-
     -- Loads the default options into the settings table.
     local function LoadDefaultOptions()
-        local options = NewOptions()
-        KRT_Options = options
-        addon.options = options
+        if Options and Options.restoreDefaults then
+            Options.restoreDefaults()
+        end
         configDirty = true
         module:RequestRefresh()
         addon:info(L.MsgDefaultsRestored)
@@ -99,25 +72,18 @@ do
 
     -- Loads addon options from saved variables, filling in defaults.
     local function LoadOptions()
-        local options = NewOptions()
-        if KRT_Options then
-            addon.tCopy(options, KRT_Options)
+        if Options and Options.loadOptions then
+            Options.loadOptions()
         end
-        -- Debug flag is runtime-only and must not persist in SavedVariables.
-        options.debug = nil
-        KRT_Options = options
-        addon.options = options
-
-        Utils.applyDebugSetting(false)
         configDirty = true
         module:RequestRefresh()
 
         if KRT_MINIMAP_GUI then
             addon.Minimap:SetPos(addon.options.minimapPos or 325)
             if addon.options.minimapButton then
-                Utils.setShown(KRT_MINIMAP_GUI, true)
+                Frames.setShown(KRT_MINIMAP_GUI, true)
             else
-                Utils.setShown(KRT_MINIMAP_GUI, false)
+                Frames.setShown(KRT_MINIMAP_GUI, false)
             end
         end
     end
@@ -130,7 +96,7 @@ do
 
     -- OnLoad handler for the configuration frame.
     function module:OnLoad(frame)
-        frameName = Utils.initModuleFrame(module, frame, {
+        frameName = Frames.initModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 configDirty = true
@@ -183,10 +149,12 @@ do
         end
 
         name = strsub(name, strlen(frameName) + 1)
-        Utils.setOption(name, value)
+        if Options and Options.setOption then
+            Options.setOption(name, value)
+        end
         local eventName = Events.configOptionChanged and Events.configOptionChanged(name)
         if eventName then
-            Utils.triggerEvent(eventName, value)
+            Bus.triggerEvent(eventName, value)
         end
 
         configDirty = true
@@ -216,7 +184,7 @@ do
         _G[frameName .. "countdownDurationStr"]:SetText(L.StrConfigCountdownDuration)
         _G[frameName .. "countdownSimpleRaidMsgStr"]:SetText(L.StrConfigCountdownSimpleRaidMsg)
 
-        Utils.setFrameTitle(frameName, SETTINGS)
+        Frames.setFrameTitle(frameName, SETTINGS)
         _G[frameName .. "AboutStr"]:SetText(L.StrConfigAbout)
         _G[frameName .. "DefaultsBtn"]:SetText(L.BtnDefaults)
         _G[frameName .. "CloseBtn"]:SetText(L.BtnClose)

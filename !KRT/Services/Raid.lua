@@ -8,9 +8,13 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
-local Utils = feature.Utils
+
 local Events = feature.Events or addon.Events or {}
 local Core = feature.Core
+local Bus = feature.Bus or addon.Bus
+local Strings = feature.Strings or addon.Strings
+local Time = feature.Time or addon.Time
+local Base64 = feature.Base64 or addon.Base64
 
 local tContains = feature.tContains
 
@@ -52,6 +56,68 @@ do
     local RETRY_DELAY_SECONDS = 1
     local RETRY_MAX_ATTEMPTS = 5
     local RAID_INSTANCE_CHECK_DELAYS = { 0.3, 0.8, 1.5, 2.5, 3.5 }
+    local IGNORED_ITEMS = {
+        -- Emblems (Wrath of the Lich King)
+        [40752] = true, -- Emblem of Heroism
+        [40753] = true, -- Emblem of Valor
+        [45624] = true, -- Emblem of Conquest
+        [47241] = true, -- Emblem of Triumph
+        [49426] = true, -- Emblem of Frost
+        -- Emblems and Tokens (The Burning Crusade)
+        [29434] = true, -- Badge of Justice
+        [29736] = true, -- Arcane Tome
+        [29737] = true, -- Firewing Signet
+        [29738] = true, -- Fel Armament
+        [29739] = true, -- Sunfury Signet
+        [29740] = true, -- Mark of Sargeras
+        [29741] = true, -- Fel Armament
+        -- High-end Gems
+        [36931] = true, -- Ametrine
+        [36919] = true, -- Cardinal Ruby
+        [36928] = true, -- Dreadstone
+        [36934] = true, -- Eye of Zul
+        [36922] = true, -- King's Amber
+        [36925] = true, -- Majestic Zircon
+        -- Enchanting Materials - Classic
+        [10940] = true, -- Strange Dust
+        [10938] = true, -- Lesser Magic Essence
+        [10939] = true, -- Greater Magic Essence
+        [10978] = true, -- Small Glimmering Shard
+        [10998] = true, -- Lesser Astral Essence
+        [11082] = true, -- Greater Astral Essence
+        [11083] = true, -- Soul Dust
+        [11084] = true, -- Large Glimmering Shard
+        [11134] = true, -- Lesser Mystic Essence
+        [11135] = true, -- Greater Mystic Essence
+        [11137] = true, -- Vision Dust
+        [11138] = true, -- Small Glowing Shard
+        [11139] = true, -- Large Glowing Shard
+        [11174] = true, -- Lesser Nether Essence
+        [11175] = true, -- Greater Nether Essence
+        [11176] = true, -- Dream Dust
+        [11177] = true, -- Small Radiant Shard
+        [11178] = true, -- Large Radiant Shard
+        [14343] = true, -- Small Brilliant Shard
+        [14344] = true, -- Large Brilliant Shard
+        [16202] = true, -- Lesser Eternal Essence
+        [16203] = true, -- Greater Eternal Essence
+        [16204] = true, -- Illusion Dust
+        [20725] = true, -- Nexus Crystal
+        -- Enchanting Materials - The Burning Crusade
+        [22445] = true, -- Arcane Dust
+        [22446] = true, -- Greater Planar Essence
+        [22447] = true, -- Lesser Planar Essence
+        [22448] = true, -- Small Prismatic Shard
+        [22449] = true, -- Large Prismatic Shard
+        [22450] = true, -- Void Crystal
+        -- Enchanting Materials - Wrath of the Lich King
+        [34052] = true, -- Dream Shard
+        [34053] = true, -- Small Dream Shard
+        [34054] = true, -- Infinite Dust
+        [34055] = true, -- Greater Cosmic Essence
+        [34056] = true, -- Lesser Cosmic Essence
+        [34057] = true, -- Abyss Crystal
+    }
 
     -- ----- Private helpers ----- --
     local function isUnknownName(name)
@@ -207,6 +273,23 @@ do
         return rosterVersion
     end
 
+    function module:GetRaid(raidNum)
+        if raidNum == nil then
+            raidNum = Core.getCurrentRaid and Core.getCurrentRaid() or nil
+        end
+        if not raidNum then
+            return nil, nil
+        end
+
+        local raids = KRT_Raids
+        local raid = raids and raids[raidNum] or nil
+        return raid, raidNum
+    end
+
+    function module:ResolveRaid(raidNum)
+        return module:GetRaid(raidNum)
+    end
+
     function module:CancelInstanceChecks()
         cancelRaidInstanceChecks()
     end
@@ -225,6 +308,10 @@ do
                 runLiveRaidInstanceCheck()
             end)
         end
+    end
+
+    function module:IsIgnoredItem(itemId)
+        return IGNORED_ITEMS[tonumber(itemId)] == true
     end
 
     -- Updates the current raid roster, adding new players and marking those who left.
@@ -270,7 +357,7 @@ do
         local raid = Core.ensureRaidById(Core.getCurrentRaid())
         if not raid then return false end
 
-        local realm = Utils.getRealmName()
+        local realm = Core.getRealmName()
         local realmPlayers = ensureRealmPlayerMeta(realm)
         local playersByName = raid._playersByName
 
@@ -297,7 +384,7 @@ do
         local nextUnitsByName = {}
         local nextNamesByUnit = {}
         local seen = {}
-        local now = Utils.getCurrentTime()
+        local now = Time.getCurrentTime()
         local hasUnknownUnits = false
 
         for i = 1, n do
@@ -434,9 +521,9 @@ do
 
         numRaid = num
 
-        local realm = Utils.getRealmName()
+        local realm = Core.getRealmName()
         local realmPlayers = ensureRealmPlayerMeta(realm)
-        local currentTime = Utils.getCurrentTime()
+        local currentTime = Time.getCurrentTime()
 
         local instanceDiff = tonumber(raidDiff)
         if not instanceDiff then
@@ -463,7 +550,7 @@ do
                     rank     = rank or 0,
                     subgroup = subgroup or 1,
                     class    = class or "UNKNOWN",
-                    join     = Utils.getCurrentTime(),
+                    join     = Time.getCurrentTime(),
                     leave    = nil,
                     count    = 0,
                 }
@@ -489,7 +576,7 @@ do
             #raidInfo.players
         ))
 
-        Utils.triggerEvent(InternalEvents.RaidCreate, Core.getCurrentRaid())
+        Bus.triggerEvent(InternalEvents.RaidCreate, Core.getCurrentRaid())
 
         -- Schedule one delayed roster refresh.
         addon.CancelTimer(module.updateRosterHandle, true)
@@ -556,7 +643,7 @@ do
         -- Stop any pending roster update when ending the raid
         addon.CancelTimer(module.updateRosterHandle, true)
         module.updateRosterHandle = nil
-        local currentTime = Utils.getCurrentTime()
+        local currentTime = Time.getCurrentTime()
         local raid = Core.ensureRaidById(Core.getCurrentRaid())
         if raid then
             local duration = currentTime - (raid.startTime or currentTime)
@@ -610,7 +697,7 @@ do
         module.firstCheckHandle = nil
         if not addon.IsInGroup() then return end
 
-        if Core.getCurrentRaid() and module:CheckPlayer(Utils.getPlayerName(), Core.getCurrentRaid()) then
+        if Core.getCurrentRaid() and module:CheckPlayer(Core.getPlayerName(), Core.getCurrentRaid()) then
             -- Restart the roster update timer: cancel the old one and schedule a new one
             addon.CancelTimer(module.updateRosterHandle, true)
             module.updateRosterHandle = nil
@@ -679,7 +766,7 @@ do
         local instanceDiff = resolveRaidDifficulty()
         if manDiff then
             instanceDiff = (raid.size == 10) and 1 or 2
-            if Utils.normalizeLower(manDiff, true) == "h" then instanceDiff = instanceDiff + 2 end
+            if Strings.normalizeLower(manDiff, true) == "h" then instanceDiff = instanceDiff + 2 end
         end
 
         local players = {}
@@ -692,7 +779,7 @@ do
             end
         end
 
-        local currentTime = Utils.getCurrentTime()
+        local currentTime = Time.getCurrentTime()
         local bossNid = tonumber(raid.nextBossNid) or 1
         raid.nextBossNid = bossNid + 1
 
@@ -703,7 +790,7 @@ do
             mode       = (instanceDiff == 3 or instanceDiff == 4) and "h" or "n",
             players    = players,
             time       = currentTime,
-            hash       = Utils.encode(raidNum .. "|" .. bossName .. "|" .. bossNid),
+            hash       = Base64.encode(raidNum .. "|" .. bossName .. "|" .. bossNid),
         }
 
         tinsert(raid.bossKills, killInfo)
@@ -731,7 +818,7 @@ do
             if link then
                 itemLink = link
                 itemCount = count or 1
-                player = Utils.getPlayerName()
+                player = Core.getPlayerName()
             end
         end
 
@@ -740,14 +827,14 @@ do
             if link then
                 itemLink = link
                 itemCount = 1
-                player = Utils.getPlayerName()
+                player = Core.getPlayerName()
             end
         end
 
         -- Fallback for alternate loot-roll chat formats.
         if not player or not itemLink then
             itemLink = addon.Deformat(msg, LOOT_ROLL_YOU_WON)
-            player = Utils.getPlayerName()
+            player = Core.getPlayerName()
             itemCount = 1
         end
         if not itemLink then
@@ -771,7 +858,7 @@ do
                 tonumber(lootThreshold) or -1, tostring(itemLink)))
             return
         end
-        if itemId and addon.ignoredItems[itemId] then
+        if itemId and module:IsIgnoredItem(itemId) then
             addon:debug(Diag.D.LogLootIgnoredItemId:format(tostring(itemId), tostring(itemLink)))
             return
         end
@@ -821,7 +908,7 @@ do
             rollValue   = rollValue,
             lootNid     = lootNid,
             bossNid     = tonumber(Core.getLastBoss()) or 0,
-            time        = Utils.getCurrentTime(),
+            time        = Time.getCurrentTime(),
         }
 
         -- LootCounter (MS only): increment the winner's count when the loot is actually awarded.
@@ -831,7 +918,7 @@ do
         end
 
         tinsert(raid.loot, lootInfo)
-        Utils.triggerEvent(InternalEvents.RaidLootUpdate, Core.getCurrentRaid(), lootInfo)
+        Bus.triggerEvent(InternalEvents.RaidLootUpdate, Core.getCurrentRaid(), lootInfo)
         addon:debug(Diag.D.LogLootLogged:format(tonumber(Core.getCurrentRaid()) or -1, tostring(itemId),
             tostring(lootInfo.bossNid), tostring(player)))
     end
@@ -882,7 +969,7 @@ do
         player.count = value
 
         if old ~= value then
-            Utils.triggerEvent(InternalEvents.PlayerCountChanged,
+            Bus.triggerEvent(InternalEvents.PlayerCountChanged,
                 player.name, value, old, raidNum)
         end
     end
@@ -925,7 +1012,7 @@ do
                 rank     = 0,
                 subgroup = 1,
                 class    = "UNKNOWN",
-                join     = Utils.getCurrentTime(),
+                join     = Time.getCurrentTime(),
                 leave    = nil,
                 count    = 0,
             }, raidNum)
@@ -992,7 +1079,7 @@ do
         local _, _, members = addon.GetGroupTypeAndCount()
         if members == 0 then return 0 end
 
-        local diff = addon.Utils.getDifficulty()
+        local diff = Time.getDifficulty()
         if diff then
             return (diff == 1 or diff == 3) and 10 or 25
         end
@@ -1008,7 +1095,7 @@ do
         end
 
         local startTime = raid.startTime
-        local currentTime = Utils.getCurrentTime()
+        local currentTime = Time.getCurrentTime()
         local week = 604800 -- 7 days in seconds
 
         if Core.getNextReset() and Core.getNextReset() > currentTime then
@@ -1164,7 +1251,7 @@ do
         local found = false
         local players = module:GetPlayers(raidNum)
         if players ~= nil then
-            name = Utils.normalizeName(name)
+            name = Strings.normalizeName(name)
             for _, p in ipairs(players) do
                 if name == p.name then
                     found = true
@@ -1185,7 +1272,7 @@ do
         raidNum = raidNum or Core.getCurrentRaid()
         local raid = raidNum and Core.ensureRaidById(raidNum)
         if raid then
-            name = name or Utils.getPlayerName()
+            name = name or Core.getPlayerName()
             local players = raid.players or {}
             for i = #players, 1, -1 do
                 local p = players[i]
@@ -1236,12 +1323,12 @@ do
         local raid = raidNum and Core.ensureRaidById(raidNum)
         local players = raid and raid.players or {}
         local rank = 0
-        name = name or Utils.getPlayerName() or UnitName("player")
+        name = name or Core.getPlayerName() or UnitName("player")
         if #players == 0 then
             if addon.IsInGroup() then
                 local unit = module:GetUnitID(name)
                 if unit and unit ~= "none" then
-                    rank = Utils.getUnitRank(unit) or 0
+                    rank = Core.getUnitRank(unit) or 0
                 end
             end
         else
@@ -1258,8 +1345,8 @@ do
     -- Gets a player's class from the saved players database.
     function module:GetPlayerClass(name)
         local class = "UNKNOWN"
-        local realm = Utils.getRealmName()
-        local resolvedName = name or Utils.getPlayerName()
+        local realm = Core.getRealmName()
+        local resolvedName = name or Core.getPlayerName()
         if KRT_Players[realm] and KRT_Players[realm][resolvedName] then
             class = KRT_Players[realm][resolvedName].class or "UNKNOWN"
         end
@@ -1272,7 +1359,7 @@ do
             return "none"
         end
 
-        name = Utils.normalizeName(name)
+        name = Strings.normalizeName(name)
         local cachedUnit = liveUnitsByName[name]
         if cachedUnit then
             if UnitExists(cachedUnit) and UnitName(cachedUnit) == name then
@@ -1287,7 +1374,7 @@ do
         for unit in addon.UnitIterator(true) do
             local unitName = UnitName(unit)
             if unitName then
-                unitName = Utils.normalizeName(unitName)
+                unitName = Strings.normalizeName(unitName)
                 liveUnitsByName[unitName] = unit
                 liveNamesByUnit[unit] = unitName
                 if unitName == name then

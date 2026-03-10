@@ -8,9 +8,12 @@ local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
-local Utils = feature.Utils
+
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
+local Options = feature.Options or addon.Options
+local Bus = feature.Bus or addon.Bus
+local Strings = feature.Strings or addon.Strings
 
 local tconcat, twipe = table.concat, table.wipe
 local pairs, ipairs, type, next = pairs, ipairs, type, next
@@ -63,7 +66,7 @@ do
 
         if syncOptions ~= false then
             local value = ImportModeToOptionValue(resolved)
-            Utils.setOption("srImportMode", value)
+            Options.setOption("srImportMode", value)
         end
 
         return importMode
@@ -116,7 +119,7 @@ do
         addon:debug(Diag.D.LogReservesItemReady:format(itemId, pendingItemCount))
         if pendingItemCount == 0 then
             addon:debug(Diag.D.LogReservesPendingComplete)
-            Utils.triggerEvent(InternalEvents.ReservesDataChanged, "iteminfo", itemId)
+            Bus.triggerEvent(InternalEvents.ReservesDataChanged, "iteminfo", itemId)
         end
     end
 
@@ -523,7 +526,7 @@ do
         for playerKey, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
                 local playerName = player.original or "?"
-                local normalizedPlayer = Utils.normalizeLower(playerName, true) or playerKey
+                local normalizedPlayer = Strings.normalizeLower(playerName, true) or playerKey
                 playerItemsByName[normalizedPlayer] = playerItemsByName[normalizedPlayer] or {}
 
                 for i = 1, #player.reserves do
@@ -661,7 +664,7 @@ do
         KRT_Reserves = nil
         twipe(reservesData)
         RebuildIndex()
-        Utils.triggerEvent(InternalEvents.ReservesDataChanged, "clear")
+        Bus.triggerEvent(InternalEvents.ReservesDataChanged, "clear")
         local clearMessage = L[reserveListClearedKey]
         if clearMessage then
             addon:info(clearMessage)
@@ -682,7 +685,7 @@ do
 
     function Service:GetReserve(playerName)
         if type(playerName) ~= "string" then return nil end
-        local player = Utils.normalizeLower(playerName)
+        local player = Strings.normalizeLower(playerName)
         local reserve = reservesData[player]
 
         -- Log when the function is called and show the reserve for the player
@@ -728,7 +731,7 @@ do
 
     local function cleanCSVField(field)
         if not field then return nil end
-        return Utils.trimText(field:gsub('^"(.-)"$', '%1'), true)
+        return Strings.trimText(field:gsub('^"(.-)"$', '%1'), true)
     end
 
     local function splitCSVLine(line)
@@ -762,7 +765,7 @@ do
         for i = 1, #fields do
             local key = cleanCSVField(fields[i])
             if key and key ~= "" then
-                map[Utils.normalizeLower(key)] = i
+                map[Strings.normalizeLower(key)] = i
             end
         end
         -- Consider it a header only if it includes key columns.
@@ -800,7 +803,7 @@ do
         local plus = readCSVField(fields, headerMap, "plus", 8)
 
         local itemId = tonumber(itemIdStr)
-        local playerKey = Utils.normalizeLower(playerName, true)
+        local playerKey = Strings.normalizeLower(playerName, true)
         if not itemId or not playerKey then
             return nil
         end
@@ -1003,7 +1006,7 @@ do
         end
 
         local reason = (opts and opts.reason) or "import"
-        Utils.triggerEvent(InternalEvents.ReservesDataChanged,
+        Bus.triggerEvent(InternalEvents.ReservesDataChanged,
             reason, raidId, mode, nPlayers)
         return true, nPlayers
     end
@@ -1155,7 +1158,7 @@ do
     -- Gets the reserve entry table for a specific item for a player (or nil).
     function Service:GetReserveEntryForItem(itemId, playerName)
         if not itemId or not playerName then return nil end
-        local playerKey = Utils.normalizeLower(playerName, true)
+        local playerKey = Strings.normalizeLower(playerName, true)
         if not playerKey then return nil end
 
         local byP = reservesByItemPlayer[itemId]

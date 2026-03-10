@@ -29,17 +29,11 @@ Localization\localization.en.lua
 Localization\DiagnoseLog.en.lua
 
 # Layer 3 - Shared templates
-Templates.xml
+UI\Templates\Common.xml
 
 # Layer 4 - Shared modules (helpers/constants)
 Modules\C.lua
-Modules\Events.lua
-Modules\Colors.lua
-Modules\Strings.lua
-Modules\Comms.lua
-Modules\Time.lua
-Modules\Base64.lua
-Modules\Features.lua
+Modules\Std.lua
 Modules\UI\Facade.lua
 Modules\UI\Visuals.lua
 Modules\UI\Frames.lua
@@ -48,12 +42,6 @@ Modules\UI\MultiSelect.lua
 Modules\UI\Binder\Map.lua
 Modules\UI\Binder\UIBinder.lua
 Modules\Bus.lua
-Modules\Utils.LegacyGlobals.lua
-Modules\Utils.Options.lua
-Modules\Utils.RaidState.lua
-Modules\Utils.Tooltip.lua
-Modules\Compat\Utils.UI.lua
-Modules\Utils.lua
 
 # Layer 5 - Core bootstrap and event wiring
 KRT.lua
@@ -62,7 +50,7 @@ KRT.lua
 # Services + entrypoint + parents + child UI controllers
 Services\Raid.lua
 Services\Chat.lua
-EntryPoints\Minimap.lua
+EntryPoints\EntryPoints.lua
 Services\Rolls.lua
 Services\Loot.lua
 Controllers\Master.lua
@@ -75,11 +63,7 @@ Widgets\Config.lua
 Controllers\Warnings.lua
 Controllers\Changes.lua
 Controllers\Spammer.lua
-EntryPoints\SlashEvents.lua
 
 # Layer 7 - UI include manifest
 # Default profile: full (KRT.xml -> KRT.Full.xml). Core build can swap KRT.xml -> KRT.Core.xml.
 KRT.xml
-
-# Layer 8 - Late data modules (intentional post-runtime load)
-Modules\ignoredItems.lua

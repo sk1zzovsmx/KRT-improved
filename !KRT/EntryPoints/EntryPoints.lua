@@ -7,8 +7,14 @@ local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
-local Utils = feature.Utils
 
+local Options = feature.Options or addon.Options
+local Frames = feature.Frames or addon.Frames
+local Colors = feature.Colors or addon.Colors
+local Strings = feature.Strings or addon.Strings
+local Bus = feature.Bus or addon.Bus
+
+local K_COLOR = feature.K_COLOR
 local RT_COLOR = feature.RT_COLOR
 local Core = feature.Core or addon.Core
 
@@ -23,6 +29,227 @@ local pairs, ipairs = pairs, ipairs
 local format = string.format
 local upper = string.upper
 local tostring, tonumber = tostring, tonumber
+
+-- =========== Minimap Button Module  =========== --
+do
+    addon.Minimap = addon.Minimap or {}
+    local module = addon.Minimap
+
+    local function getController(name)
+        if Core and Core.getController then
+            return Core.getController(name)
+        end
+        local controllers = addon.Controllers
+        return controllers and controllers[name] or nil
+    end
+
+    -- ----- Internal state ----- --
+    local addonMenu
+    local dragMode
+
+    -- Cached math functions
+    local sqrt = math.sqrt
+    local cos, sin = math.cos, math.sin
+    local rad, atan2, deg = math.rad, math.atan2, math.deg
+
+    -- ----- Private helpers ----- --
+    -- Menu definition for EasyMenu (built once).
+    local minimapMenu = {
+        {
+            text = MASTER_LOOTER,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getController("Master")
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
+        { text = L.StrLootCounter, notCheckable = 1, func = function() UI:Call("LootCounter", "Toggle") end },
+        {
+            text = L.StrLootLogger,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getController("Logger")
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
+        { text = " ",              disabled = 1,     notCheckable = 1 },
+        { text = L.StrClearIcons,  notCheckable = 1, func = function() addon.Raid:ClearRaidIcons() end },
+        { text = " ",              disabled = 1,     notCheckable = 1 },
+        {
+            text = RAID_WARNING,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getController("Warnings")
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
+        { text = " ",              disabled = 1,     notCheckable = 1 },
+        {
+            text = L.StrMSChanges,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getController("Changes")
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
+        {
+            text = L.BtnDemand,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getController("Changes")
+                if moduleRef and moduleRef.Demand then
+                    moduleRef:Demand()
+                end
+            end
+        },
+        {
+            text = CHAT_ANNOUNCE,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getController("Changes")
+                if moduleRef and moduleRef.Announce then
+                    moduleRef:Announce()
+                end
+            end
+        },
+        { text = " ",              disabled = 1,     notCheckable = 1 },
+        {
+            text = L.StrLFMSpam,
+            notCheckable = 1,
+            func = function()
+                local moduleRef = getController("Spammer")
+                if moduleRef and moduleRef.Toggle then
+                    moduleRef:Toggle()
+                end
+            end
+        },
+    }
+
+    -- Initializes and opens the menu for the minimap button.
+    local function OpenMenu()
+        addonMenu = addonMenu or CreateFrame("Frame", "KRTMenu", UIParent, "UIDropDownMenuTemplate")
+        -- EasyMenu handles UIDropDownMenu initialization and opening.
+        EasyMenu(minimapMenu, addonMenu, KRT_MINIMAP_GUI, 0, 0, "MENU")
+    end
+
+    local function IsMenuOpen()
+        return addonMenu and UIDROPDOWNMENU_OPEN_MENU == addonMenu and DropDownList1 and DropDownList1:IsShown()
+    end
+
+    local function ToggleMenu()
+        if IsMenuOpen() then
+            CloseDropDownMenus()
+            return
+        end
+        OpenMenu()
+    end
+
+    -- Moves the minimap button while dragging.
+    local function moveButton(self)
+        local centerX, centerY = Minimap:GetCenter()
+        local x, y = GetCursorPosition()
+        x, y = x / self:GetEffectiveScale() - centerX, y / self:GetEffectiveScale() - centerY
+
+        if dragMode == "free" then
+            -- Free drag mode
+            self:ClearAllPoints()
+            self:SetPoint("CENTER", x, y)
+        else
+            -- Circular drag mode (snap to ring radius ~80)
+            local dist = sqrt(x * x + y * y)
+            local px, py = (x / dist) * 80, (y / dist) * 80
+            self:ClearAllPoints()
+            self:SetPoint("CENTER", px, py)
+        end
+    end
+
+    local function SetMinimapShown(show)
+        Frames.setShown(KRT_MINIMAP_GUI, show)
+    end
+
+    -- ----- Public methods ----- --
+    function module:SetPos(angle)
+        angle = angle % 360
+        Options.setOption("minimapPos", angle)
+        local r = rad(angle)
+        KRT_MINIMAP_GUI:ClearAllPoints()
+        KRT_MINIMAP_GUI:SetPoint("CENTER", cos(r) * 80, sin(r) * 80)
+    end
+
+    function module:OnLoad()
+        local options = addon.options or KRT_Options or {}
+        KRT_MINIMAP_GUI:SetUserPlaced(true)
+        self:SetPos(options.minimapPos or 325)
+        SetMinimapShown(options.minimapButton ~= false)
+        KRT_MINIMAP_GUI:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        KRT_MINIMAP_GUI:SetScript("OnMouseDown", function(self, button)
+            if IsAltKeyDown() then
+                dragMode = "free"
+                self:SetScript("OnUpdate", moveButton)
+            elseif IsShiftKeyDown() then
+                dragMode = nil
+                self:SetScript("OnUpdate", moveButton)
+            end
+        end)
+        KRT_MINIMAP_GUI:SetScript("OnMouseUp", function(self)
+            self:SetScript("OnUpdate", nil)
+            if dragMode == "free" then
+                dragMode = nil
+                return
+            end
+            local mx, my = Minimap:GetCenter()
+            local bx, by = self:GetCenter()
+            module:SetPos(deg(atan2(by - my, bx - mx)))
+            dragMode = nil
+        end)
+        KRT_MINIMAP_GUI:SetScript("OnClick", function(self, button, down)
+            -- Ignore clicks if Shift or Alt keys are held:
+            if IsShiftKeyDown() or IsAltKeyDown() then return end
+            if button == "RightButton" then
+                UI:Call("Config", "Toggle")
+            elseif button == "LeftButton" then
+                ToggleMenu()
+            end
+        end)
+        KRT_MINIMAP_GUI:SetScript("OnEnter", function(self)
+            GameTooltip_SetDefaultAnchor(GameTooltip, self)
+            GameTooltip:SetText(
+                addon.WrapTextInColorCode("Kader", Colors.normalizeHexColor(K_COLOR))
+                .. " "
+                .. addon.WrapTextInColorCode("Raid Tools", Colors.normalizeHexColor("aad4af37"))
+            )
+            GameTooltip:AddLine(L.StrMinimapLClick, 1, 1, 1)
+            GameTooltip:AddLine(L.StrMinimapRClick, 1, 1, 1)
+            GameTooltip:AddLine(L.StrMinimapSClick, 1, 1, 1)
+            GameTooltip:AddLine(L.StrMinimapAClick, 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        KRT_MINIMAP_GUI:SetScript("OnLeave", function(self)
+            GameTooltip:Hide()
+        end)
+    end
+
+    -- Toggles the visibility of the minimap button.
+    function module:ToggleMinimapButton()
+        local options = addon.options or KRT_Options or {}
+        local nextValue = not options.minimapButton
+        Options.setOption("minimapButton", nextValue)
+        SetMinimapShown(nextValue)
+    end
+
+    -- Hides the minimap button.
+    function module:HideMinimapButton()
+        return Frames.setShown(KRT_MINIMAP_GUI, false)
+    end
+end
 
 -- =========== Slash Commands  =========== --
 do
@@ -60,7 +287,7 @@ do
     -- ----- Private helpers ----- --
     local helpString = "%s: %s"
     local function printHelp(cmd, desc)
-        addon:info("%s", helpString:format(addon.WrapTextInColorCode(cmd, Utils.normalizeHexColor(RT_COLOR)), desc))
+        addon:info("%s", helpString:format(addon.WrapTextInColorCode(cmd, Colors.normalizeHexColor(RT_COLOR)), desc))
     end
 
     local function showHelp()
@@ -89,7 +316,7 @@ do
 
     function module:Handle(msg)
         if not msg or msg == "" then return end
-        local cmd, rest = Utils.splitArgs(msg)
+        local cmd, rest = Strings.splitArgs(msg)
         if cmd == "show" or cmd == "toggle" then
             local moduleRef = getController("Master")
             if moduleRef and moduleRef.Toggle then
@@ -105,7 +332,7 @@ do
     end
 
     registerAliases(cmdDebug, function(rest)
-        local subCmd, arg = Utils.splitArgs(rest)
+        local subCmd, arg = Strings.splitArgs(rest)
         if subCmd == "" then subCmd = nil end
 
         if subCmd == "levels" then
@@ -143,13 +370,13 @@ do
 
         if subCmd == "callbacks" or subCmd == "cb" or subCmd == "bus" then
             if arg == "reset" then
-                if Utils.resetInternalCallbackStats then
-                    Utils.resetInternalCallbackStats()
+                if Bus.resetInternalCallbackStats then
+                    Bus.resetInternalCallbackStats()
                 end
                 addon:info("Internal callback stats reset.")
             else
-                if Utils.dumpInternalCallbackStats then
-                    Utils.dumpInternalCallbackStats(arg)
+                if Bus.dumpInternalCallbackStats then
+                    Bus.dumpInternalCallbackStats(arg)
                 else
                     addon:warn("Callback stats not available in this build.")
                 end
@@ -175,14 +402,14 @@ do
 
 
         if subCmd == "on" then
-            Utils.applyDebugSetting(true)
+            Options.applyDebugSetting(true)
         elseif subCmd == "off" then
-            Utils.applyDebugSetting(false)
+            Options.applyDebugSetting(false)
         else
-            Utils.applyDebugSetting(not Utils.isDebugEnabled())
+            Options.applyDebugSetting(not Options.isDebugEnabled())
         end
 
-        if Utils.isDebugEnabled() then
+        if Options.isDebugEnabled() then
             addon:info(L.MsgDebugOn)
         else
             addon:info(L.MsgDebugOff)
@@ -190,13 +417,13 @@ do
     end)
 
     registerAliases(cmdMinimap, function(rest)
-        local sub, arg = Utils.splitArgs(rest)
+        local sub, arg = Strings.splitArgs(rest)
         if sub == "on" then
-            Utils.setOption("minimapButton", true)
-            Utils.setShown(KRT_MINIMAP_GUI, true)
+            Options.setOption("minimapButton", true)
+            Frames.setShown(KRT_MINIMAP_GUI, true)
         elseif sub == "off" then
-            Utils.setOption("minimapButton", false)
-            Utils.setShown(KRT_MINIMAP_GUI, false)
+            Options.setOption("minimapButton", false)
+            Frames.setShown(KRT_MINIMAP_GUI, false)
         elseif sub == "pos" and arg ~= "" then
             local angle = tonumber(arg)
             if angle then
@@ -228,7 +455,7 @@ do
     end)
 
     registerAliases(cmdConfig, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if sub == "reset" then
             UI:Call("Config", "Default")
         else
@@ -237,7 +464,7 @@ do
     end)
 
     registerAliases(cmdWarnings, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             local moduleRef = getController("Warnings")
             if moduleRef and moduleRef.Toggle then
@@ -256,7 +483,7 @@ do
     end)
 
     registerAliases(cmdChanges, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             local moduleRef = getController("Changes")
             if moduleRef and moduleRef.Toggle then
@@ -281,20 +508,20 @@ do
     end)
 
     registerAliases(cmdLogger, function(rest)
-        local sub, arg = Utils.splitArgs(rest)
+        local sub, arg = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             local moduleRef = getController("Logger")
             if moduleRef and moduleRef.Toggle then
                 moduleRef:Toggle()
             end
         elseif sub == "req" then
-            local raidRefArg, targetArg = Utils.splitArgs(arg)
+            local raidRefArg, targetArg = Strings.splitArgs(arg)
             local syncer = getSyncerService()
             if syncer and syncer.RequestLoggerReq then
                 syncer:RequestLoggerReq(tonumber(raidRefArg), targetArg)
             end
         elseif sub == "push" then
-            local raidRefArg, targetArg = Utils.splitArgs(arg)
+            local raidRefArg, targetArg = Strings.splitArgs(arg)
             local syncer = getSyncerService()
             if syncer and syncer.BroadcastLoggerPush then
                 syncer:BroadcastLoggerPush(tonumber(raidRefArg), targetArg)
@@ -314,7 +541,7 @@ do
     end)
 
     registerAliases(cmdLoot, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             local moduleRef = getController("Master")
             if moduleRef and moduleRef.Toggle then
@@ -324,14 +551,14 @@ do
     end)
 
     registerAliases(cmdCounter, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             UI:Call("LootCounter", "Toggle")
         end
     end)
 
     registerAliases(cmdReserves, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" then
             UI:Call("Reserves", "Toggle")
         elseif sub == "import" then
@@ -344,7 +571,7 @@ do
     end)
 
     registerAliases(cmdLFM, function(rest)
-        local sub = Utils.splitArgs(rest)
+        local sub = Strings.splitArgs(rest)
         if not sub or sub == "" or sub == "toggle" or sub == "show" then
             local moduleRef = getController("Spammer")
             if moduleRef and moduleRef.Toggle then

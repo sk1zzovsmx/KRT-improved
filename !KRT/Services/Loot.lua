@@ -7,9 +7,11 @@ local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local Diag = feature.Diag
-local Utils = feature.Utils
+
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
+local Bus = feature.Bus or addon.Bus
+local Strings = feature.Strings or addon.Strings
 
 local itemColors = feature.itemColors
 
@@ -23,6 +25,7 @@ local GetItemName, GetItemLink, GetItemTexture
 
 local tremove, twipe = table.remove, table.wipe
 local type = type
+local pcall = pcall
 
 local tostring, tonumber = tostring, tonumber
 
@@ -36,10 +39,61 @@ do
 
     -- ----- Internal state ----- --
     local lootTable = {}
+    local fakeBagTooltip
+    local warmItemTooltip
 
     -- ----- Private helpers ----- --
     local function BuildPendingAwardKey(itemLink, looter)
         return tostring(itemLink) .. "\001" .. tostring(looter)
+    end
+
+    local function warmItemCache(itemLink)
+        if type(itemLink) ~= "string" or itemLink == "" then
+            return
+        end
+        if not itemLink:find("item:", 1, true) then
+            return
+        end
+
+        warmItemTooltip = warmItemTooltip or CreateFrame("GameTooltip", nil, UIParent, "GameTooltipTemplate")
+        warmItemTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+        local ok = pcall(warmItemTooltip.SetHyperlink, warmItemTooltip, itemLink)
+        if ok then
+            warmItemTooltip:Hide()
+        end
+    end
+
+    local function isBagItemSoulbound(bag, slot)
+        if bag == nil or slot == nil then
+            return false
+        end
+
+        fakeBagTooltip = fakeBagTooltip or KRT_FakeTooltip
+            or CreateFrame("GameTooltip", "KRT_FakeTooltip", nil, "GameTooltipTemplate")
+        KRT_FakeTooltip = fakeBagTooltip
+        fakeBagTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+        fakeBagTooltip:SetBagItem(bag, slot)
+        fakeBagTooltip:Show()
+
+        local linePrefix = "KRT_FakeTooltipTextLeft"
+        local isSoulbound = false
+        local numLines = fakeBagTooltip:NumLines() or 0
+        for i = numLines, 1, -1 do
+            local fs = _G[linePrefix .. i]
+            local text = fs and fs:GetText() or nil
+            if text and text ~= "" then
+                if text == ITEM_SOULBOUND then
+                    isSoulbound = true
+                end
+                if addon.Deformat(text, BIND_TRADE_TIME_REMAINING) ~= nil then
+                    fakeBagTooltip:Hide()
+                    return false
+                end
+            end
+        end
+
+        fakeBagTooltip:Hide()
+        return isSoulbound
     end
 
     local function AddLootWindowSlot(indexByItemKey, slot)
@@ -52,7 +106,7 @@ do
             return
         end
 
-        local key = Utils.getItemStringFromLink(itemLink) or itemLink
+        local key = Strings.getItemStringFromLink(itemLink) or itemLink
         local existing = indexByItemKey[key]
         if existing then
             lootTable[existing].count = (lootTable[existing].count or 1) + 1
@@ -159,7 +213,7 @@ do
 
         -- Try to warm the item cache (doesn't guarantee immediate GetItemInfo).
         if (not itemName or not itemRarity or not itemTexture) and type(itemLink) == "string" then
-            Utils.warmItemCache(itemLink)
+            warmItemCache(itemLink)
         end
 
         if not itemName then
@@ -221,11 +275,11 @@ do
     -- Sets the main item display in the UI.
     function module:SetItem(i)
         if not i then
-            Utils.triggerEvent(InternalEvents.SetItem, nil, nil)
+            Bus.triggerEvent(InternalEvents.SetItem, nil, nil)
             return
         end
         if not (i.itemName and i.itemLink and i.itemTexture and i.itemColor) then return end
-        Utils.triggerEvent(InternalEvents.SetItem, i.itemLink, i)
+        Bus.triggerEvent(InternalEvents.SetItem, i.itemLink, i)
     end
 
     -- Selects an item from the loot list by its index.
@@ -240,7 +294,7 @@ do
     function module:ClearLoot()
         lootTable = twipe(lootTable)
         lootState.lootCount = 0
-        Utils.triggerEvent(InternalEvents.SetItem, nil, nil)
+        Bus.triggerEvent(InternalEvents.SetItem, nil, nil)
     end
 
     -- Returns the table for the currently selected item.
@@ -287,13 +341,12 @@ do
 
     -- Checks if an item in the player's bags is soulbound.
     function ItemIsSoulbound(bag, slot)
-        if Utils.isBagItemSoulbound then
-            return Utils.isBagItemSoulbound(bag, slot)
-        end
-        return false
+        return isBagItemSoulbound(bag, slot)
     end
 
     -- Cross-module bridge for split files (Rolls/Master).
+    module.warmItemCache = warmItemCache
+    module.isBagItemSoulbound = isBagItemSoulbound
     module.GetItem = GetItem
     module.GetItemName = GetItemName
     module.GetItemLink = GetItemLink

@@ -7,8 +7,10 @@ local addon = select(2, ...)
 local feature = addon.Core.getFeatureShared()
 
 local L = feature.L
-local Utils = feature.Utils
+
 local C = feature.C
+local Strings = feature.Strings or addon.Strings
+local Comms = feature.Comms or addon.Comms
 
 local UnitIsGroupLeader = feature.UnitIsGroupLeader
 local UnitIsGroupAssistant = feature.UnitIsGroupAssistant
@@ -62,14 +64,14 @@ do
 
     -- ----- Public methods ----- --
     function module:Print(text, prefix)
-        local msg = Utils.formatChatMessage(text, prefix or chatPrefixShort, chatOutputFormat, chatPrefixHex)
+        local msg = Strings.formatChatMessage(text, prefix or chatPrefixShort, chatOutputFormat, chatPrefixHex)
         addon:info("%s", msg)
     end
 
     function module:Announce(text, channel)
         local msg = tostring(text)
         local selectedChannel = ResolveAnnounceChannel(msg, channel)
-        Utils.chat(msg, selectedChannel)
+        Comms.chat(msg, selectedChannel)
     end
 
     -- ----- Legacy helpers ----- --
