@@ -20,6 +20,7 @@ No Ace3 GUI; UI is XML + Lua only. Vendored libs via **LibStub**.
   `KRT_LastBoss, KRT_NextReset, KRT_SavedReserves, KRT_PlayerCounts, KRT_Debug`.
 - **Branching model:** work **only** on `dev`. `main` is release‑only. Maintainers handle merges/bumping.
 - **Backward compatibility:** avoid breaking SV keys and existing CLI without a note in **18) Change log**.
+- **Structure:** keep addon monolithic; integrate features within `!KRT/` instead of split addons.
 
 > If you need to change a hard constraint, edit this section and add a note in **18) Change log**.
 
@@ -35,7 +36,7 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 
 ---
 
-## 4) Repo layout
+## 4) Repo layout (monolithic)
 ```
 !KRT/
   !KRT.toc                 # metadata (Interface 30300, SavedVariables, links)
@@ -79,7 +80,7 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 
 ## 6) User‑visible commands
 - **`/krt`**, **`/kraidtools`** — main entry. Subcommands (see localized help):
-  - `config` (options), `warnings`, `log`, `reserves`, `changes`, `grouper`, `achiev`, `lfm start|stop`
+  - `config` (options), `warnings`, `log`, `reserves`, `changes`, `ach`, `lfm start|stop`
 
 *Guideline:* Keep CLI surface stable; document new subcommands via help output and localization.
 
@@ -93,7 +94,7 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 - `addon.Warnings`      — announcements (RW/RAID/PARTY), templates & throttling
 - `addon.Changes`       — main‑spec change collection/announce utilities
 - `addon.Spammer`       — LFM spam helper (start/stop)
-- `addon.UIMaster`      — frames for Master, Logger, Reserves, Changes, Warnings, Loot Counter (see `KRT.xml`)
+- `addon.UIMaster`      — frames for Master, History, Reserves, Changes, Warnings, Loot Counter (see `KRT.xml`)
 - `addon.Config`        — options window & persisted settings
 - `addon.Minimap`       — minimap button (toggle)
 - `Modules/Utils.lua`   — helpers (tables/strings/colors, `WrapTextInColorCode`, etc.)
@@ -107,7 +108,7 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 - No build step. Copy `!KRT/` into `<WoW>/Interface/AddOns/` and `/reload`.
 - Use a 3.3.5a client. Verify **Interface** matches 30300.
 - Developer helpers:
-  - Logging window **KRTLogger** (`KRT.xml`); LibLogger API is embedded onto `addon`.
+  - History window **KRTHistory** (`KRT.xml`); LibLogger API is embedded onto `addon`.
   - Event hooks live in `KRT.lua` (search `RegisterEvents(...)`).
   - Useful in‑game tools: `/etrace`, `/dump`, and `/krt log`.
 
@@ -129,7 +130,7 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 - **Load:** no errors on login; `/krt` opens.
 - **Raid events:** roll tracking works for MS/OS/SR; winners resolved deterministically.
 - **Reserves:** CSV import/export round‑trips; per‑item caps apply; SR logic respected on roll gating.
-- **Logger:** entries append correctly; filtering maintains order.
+- **History:** entries append correctly; filtering maintains order.
 - **Warnings/Spammer:** throttle behavior; correct channels (RW/RAID/PARTY/WHISPER) and locale.
 - **Persistency:** SavedVariables update; reload preserves settings/state.
 - **Performance:** no GC spikes in combat; no taint; zero spam in chat/combatlog.
@@ -159,7 +160,7 @@ These are guidelines, not rules. Prefer existing patterns in the codebase when u
 ---
 
 ## 14) Backlog (non‑binding, safe tasks)
-- Reduce UI churn in Loot Logger/Counter via row pools and batched updates.
+- Reduce UI churn in Loot History/Counter via row pools and batched updates.
 - Encapsulate recurring UI elements into small Lua factories (dropdowns, button rows, tooltips).
 - Declarative builders for options to cut XML duplication.
 - Improve SR CSV UX (empty‑state, error surfaces, success toast).
@@ -193,3 +194,5 @@ https://github.com/gakeez/agents_md_collection/blob/main/examples/lua-programmin
 
 ## 18) Change log (edit by hand)
 - _2025‑09‑05_: Initial lightweight version; removed binding “recipes”. Added `dev`‑only branching policy.
+- _2025-09-07_: Clarified monolithic structure and updated CLI command list.
+- _2025-09-10_: Renamed Logger module to History to avoid conflict with debugging logger.

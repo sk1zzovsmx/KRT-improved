@@ -104,7 +104,7 @@ Is a lightweight in-game logging tool that displays custom debug messages in a d
 
 ![image](https://github.com/user-attachments/assets/eabab5cc-e949-42fe-bb2c-23c2f75d861f)
 
-## Loot History (*Logger*) **{soft fix}**
+## Loot History (*History*) **{soft fix}**
 
 This module stores the list of all your raids, their rosters (players per raid and players per encounter), as well as the loot collected during raids.
 
