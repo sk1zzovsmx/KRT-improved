@@ -1,0 +1,35 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+<!-- ====== Start of Loot Counter Frame ====== -->
+	<Frame name="KRTLootCounterFrame" inherits="KRTFrameTemplate" hidden="true" enableMouse="true" registerForDrag="LeftButton">
+		<Size>
+			<AbsDimension x="260" y="360" />
+		</Size>
+		<Anchors>
+			<Anchor point="CENTER" />
+		</Anchors>
+		<Layers>
+			<Layer level="ARTWORK" />
+		</Layers>
+		<Frames>
+			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset>
+							<AbsDimension x="15" y="-32" />
+						</Offset>
+					</Anchor>
+					<Anchor point="BOTTOMRIGHT">
+						<Offset>
+							<AbsDimension x="-30" y="12" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</ScrollFrame>
+		</Frames>
+		<Scripts>
+			<OnLoad>KRT.LootCounter:OnLoad(self)</OnLoad>
+		</Scripts>
+	</Frame>
+	<!-- ====== End of Loot Counter Frame ====== -->
+</Ui>

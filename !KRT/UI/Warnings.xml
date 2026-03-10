@@ -1,0 +1,246 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<Button name="KRTWarningButtonTemplate" virtual="true">
+		<Size>
+			<AbsDimension y="20" />
+		</Size>
+		<NormalFont style="GameFontNormalSmall" />
+		<DisabledFont style="GameFontDisableSmall" />
+		<HighlightFont style="GameFontHighlightSmall" />
+		<Anchors>
+			<Anchor point="LEFT">
+				<Offset>
+					<AbsDimension x="5" y="0" />
+				</Offset>
+			</Anchor>
+			<Anchor point="RIGHT">
+				<Offset>
+					<AbsDimension x="-5" y="0" />
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
+					<Size>
+						<AbsDimension x="10" y="23" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset>
+								<AbsDimension x="0" y="2" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="0" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<TexCoords top="0" right="0.75" bottom="1.0" left="0.078125" />
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentID" inherits="KRTFontStringGray" justifyH="RIGHT">
+					<Size>
+						<AbsDimension x="50" y="5" />
+					</Size>
+					<Anchors>
+						<Anchor point="RIGHT">
+							<Offset>
+								<AbsDimension x="-8" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentName" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Size>
+						<AbsDimension x="265" y="10" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset>
+								<AbsDimension x="5" y="-5" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<HighlightTexture>
+			<Anchors>
+				<Anchor point="TOPLEFT" />
+				<Anchor point="BOTTOMRIGHT" />
+			</Anchors>
+			<Color r="1" g="0.8" b="0" a="0.1" />
+		</HighlightTexture>
+		<Scripts>
+			<OnLoad>self:RegisterForClicks("LeftButtonUp")</OnLoad>
+			<OnClick>KRT.Warnings:Select(self, button)</OnClick>
+		</Scripts>
+	</Button>
+	<!-- The Frame: Raid Warnings -->
+	<Frame name="KRTWarnings" inherits="KRTFrameTemplate">
+		<Size>
+			<AbsDimension x="595" y="245" />
+		</Size>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString name="$parentNameStr" inherits="GameFontNormal" justifyH="LEFT" justifyV="BOTTOM">
+					<Size>
+						<AbsDimension x="235" y="5" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPRIGHT">
+							<Offset>
+								<AbsDimension x="-15" y="-38" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentMessageStr" inherits="GameFontNormal" justifyH="LEFT" justifyV="BOTTOM">
+					<Size>
+						<AbsDimension x="235" y="5" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPRIGHT">
+							<Offset>
+								<AbsDimension x="-15" y="-80" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentOutputName" inherits="GameFontNormal" justifyH="LEFT" justifyV="BOTTOM">
+					<Size>
+						<AbsDimension x="235" y="5" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPRIGHT">
+							<Offset>
+								<AbsDimension x="-15" y="-160" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentOutputContent" inherits="KRTFontStringGray" justifyH="LEFT" justifyV="TOP">
+					<Size>
+						<AbsDimension x="235" y="5" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPRIGHT">
+							<Offset>
+								<AbsDimension x="-15" y="-170" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="-15" y="15" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset>
+							<AbsDimension x="15" y="-32" />
+						</Offset>
+					</Anchor>
+					<Anchor point="BOTTOMRIGHT">
+						<Offset>
+							<AbsDimension x="-280" y="12" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</ScrollFrame>
+			<EditBox name="$parentName" inherits="KRTEditBoxTemplate" letters="50">
+				<Size>
+					<AbsDimension x="225" y="20" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPRIGHT">
+						<Offset>
+							<AbsDimension x="-20" y="-48" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<FontString inherits="GameFontHighlight" />
+				<Scripts>
+					<OnTabPressed>_G[self:GetParent():GetName().."Content"]:SetFocus()</OnTabPressed>
+				</Scripts>
+			</EditBox>
+			<EditBox name="$parentContent" inherits="KRTEditBoxTemplate" letters="255">
+				<Size>
+					<AbsDimension x="225" y="20" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="0" y="-20" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnTabPressed>_G[self:GetParent():GetName().."Name"]:SetFocus()</OnTabPressed>
+				</Scripts>
+			</EditBox>
+			<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
+				<Size>
+					<AbsDimension x="65" y="25" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentContent" relativePoint="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="-5" y="-8" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>KRT.Warnings:Edit(self, button)</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
+				<Size>
+					<AbsDimension x="65" y="25" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentEditBtn" relativePoint="TOPRIGHT">
+						<Offset>
+							<AbsDimension x="0" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>KRT.Warnings:Delete(self, button)</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="$parentAnnounceBtn" inherits="KRTButtonTemplate">
+				<Size>
+					<AbsDimension x="85" y="25" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativeTo="$parentContent" relativePoint="BOTTOMRIGHT">
+						<Offset>
+							<AbsDimension x="5" y="-8" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>KRT.Warnings:Announce()</OnClick>
+				</Scripts>
+			</Button>
+		</Frames>
+		<Scripts>
+			<OnLoad>KRT.Warnings:OnLoad(self)</OnLoad>
+			<OnShow>KRT.Warnings:Cancel()</OnShow>
+			<OnHide>KRT.Warnings:Cancel()</OnHide>
+		</Scripts>
+	</Frame>
+	<!-- ====== End of Warnings ====== -->
+	<!-- ====== Start of Master Loot Frame ====== -->
+	<!-- Item Selection Frame -->
+</Ui>
+

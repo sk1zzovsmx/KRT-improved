@@ -4,6 +4,64 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Strict UI controller uniformization for `Changes`, `Reserves`, `ReservesImport`,
+  and `Logger`: removed manual `Toggle/Hide` overrides and kept side effects in `hookOnShow/OnHide`.
+- **Refactor:** Standardized top-level feature frame getters for `Logger` and `LootCounter` to
+  `makeModuleFrameGetter(...)` (module-cached + global fallback pattern).
+- **Behavior:** Debug mode is now runtime-only by policy. Debug state is tracked in runtime state
+  (`Utils.isDebugEnabled()`), not persisted in `KRT_Options`; legacy `debug` key is cleared on load.
+- **Refactor:** Continued UI API uniformization across feature modules by standardizing
+  `initModuleFrame` callbacks to `hookOnShow/hookOnHide` for additive wiring and by removing
+  the Warnings-only `Update()` public method in favor of the common `RequestRefresh()` path.
+- **Bugfix:** `/krt minimap on|off` now writes `minimapButton` via `Utils.setOption(...)`, keeping
+  runtime options (`addon.options`) and SavedVariables (`KRT_Options`) synchronized.
+- **Localization:** Removed hardcoded fallback texts in `ReservesImport` popup/status paths and now
+  always source those messages from `addon.L`.
+- **Localization:** LFM preview output in `Spammer` now uses localized role labels and localized
+  `Need` token (`L.StrSpammerNeedStr`).
+- **Refactor:** Standardized `Features/*.lua` top-level module scaffolding around canonical section headers
+  (`Internal state`, `Private helpers`, `Public methods`) and kept public module APIs in PascalCase
+  (no mass rename/breaking API changes).
+- **Refactor:** Added `Utils.setOption(key, value)` and migrated option writes in
+  `Config`, `Minimap`, `Reserves`, and `ReservesImport` to keep runtime options and SV in sync centrally.
+- **Refactor:** Added shared UI bootstrap helpers `Utils.initModuleFrame(...)` and
+  `Utils.bootstrapModuleUi(...)`; migrated `Config`, `Warnings`, `Changes`, `Spammer`, `ReservesImport`,
+  `Logger`, `Master`, `LootCounter`, and `Reserves` to reduce repeated OnLoad/controller wiring without
+  behavior changes; same pattern also applied to Logger internal popups (`BossBox`, `AttendeesBox`).
+- **Refactor:** Removed feature bootstrap migration fallbacks and standardized all
+  `Features/*.lua` modules on direct `addon.Core.getFeatureShared()` usage.
+- **Refactor:** Removed deprecated placeholder files `Features/CoreGameplay.lua` and
+  `Features/LootStack.lua` (both were not loaded by TOC).
+- **Refactor:** Renamed feature file paths `Features/ReserveImport.lua` -> `Features/ReservesImport.lua`
+  and `UI/ReserveImport.xml` -> `UI/ReservesImport.xml`; runtime module is now `addon.ReservesImport`.
+- **Behavior:** Simplified account SavedVariables to feature-scoped keys:
+  `KRT_Raids`, `KRT_Players`, `KRT_Reserves`, `KRT_Warnings`, `KRT_Spammer`, and `KRT_Options`.
+  Runtime session keys (`KRT_CurrentRaid`, `KRT_LastBoss`, `KRT_NextReset`) are no longer persisted.
+- **Behavior:** SavedVariables now assume a fresh model only (no legacy import path).
+- **Refactor:** Continued modular architecture migration (wave 4d). UI legacy XML was decomposed into
+  `UI/Minimap.xml`, `UI/ReservesTemplates.xml`, `UI/Master.xml`, and `UI/LootCounter.xml`; `KRT.xml`
+  now includes these feature files directly, with no behavior changes.
+- **Refactor:** Completed wave 4d cleanup by removing deprecated `UI/LegacyHead.xml`,
+  `UI/LegacyMid.xml`, and `UI/LegacyTail.xml` placeholders from the repository.
+- **Refactor:** Continued modular architecture migration (wave 4c.1). Core feature headers now consume
+  shared context from `addon.Core.getFeatureShared()` in `KRT.lua`, reducing repeated local/bootstrap blocks
+  in `Raid/Chat/Minimap/Rolls/Loot/Master/LootCounter` files without behavior changes.
+- **Refactor:** Continued modular architecture migration (wave 4c). `Features/LootStack.lua` was split into
+  `Features/Rolls.lua`, `Features/Loot.lua`, and `Features/Master.lua`; `LootStack.lua` remains as placeholder.
+- **Refactor:** Continued modular architecture migration (wave 4b). Runtime core split further into
+  `Features/Raid.lua`, `Features/Chat.lua`, `Features/Minimap.lua`, `Features/LootStack.lua`,
+  and `Features/LootCounter.lua`; `Features/CoreGameplay.lua` is now a migration placeholder.
+- **Refactor:** Continued modular architecture migration (wave 4). Core gameplay runtime modules
+  (`Raid/Chat/Minimap/Rolls/Loot/Master/LootCounter`) moved to `Features/CoreGameplay.lua`,
+  and slash/event wiring moved to `Features/SlashEvents.lua`, leaving `KRT.lua` as thin bootstrap/glue.
+- **Refactor:** Continued modular architecture migration (wave 3). Logger runtime stack
+  (Store/View/Actions/lists/popups) moved to `Features/Logger.lua`, and Logger UI moved to `UI/Logger.xml`,
+  with `KRT.lua`/`KRT.xml` keeping only migration placeholders and include orchestration.
+- **Refactor:** Continued modular architecture migration (wave 2). `Reserves` and `ReserveImport` were
+  extracted into `Features/Reserves.lua` and `Features/ReservesImport.lua` with matching `UI/Reserves.xml`
+  and `UI/ReservesImport.xml`, preserving existing behavior and public module APIs.
+- **Refactor:** Started modular architecture migration (wave 1). `KRT.lua`/`KRT.xml` are now split with
+  `Features/*.lua` and `UI/*.xml` include files, preserving existing runtime behavior and public module APIs.
 - **Bugfix:** SoftRes import mode is now synchronized between runtime reserves state and
   `addon.options/KRT_Options`, so ReserveImport slider/parsing always matches the active mode after load/import.
 - **Bugfix:** Reserve List window now relies on the inherited `KRTFrameTemplate` background to prevent
