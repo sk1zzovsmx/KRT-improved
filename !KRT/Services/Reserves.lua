@@ -14,6 +14,7 @@ local C = feature.C
 local Options = feature.Options or addon.Options
 local Bus = feature.Bus or addon.Bus
 local Strings = feature.Strings or addon.Strings
+local Services = feature.Services or addon.Services or {}
 
 local tconcat, twipe = table.concat, table.wipe
 local pairs, ipairs, type, next = pairs, ipairs, type, next
@@ -28,7 +29,6 @@ local InternalEvents = Events.Internal
 do
     addon.Services = addon.Services or {}
     addon.Services.Reserves = addon.Services.Reserves or {}
-    addon.Reserves = addon.Services.Reserves -- Legacy alias during namespacing migration.
     local module = addon.Services.Reserves
     module.Service = module.Service or {}
     local Service = module.Service
@@ -70,6 +70,191 @@ do
         end
 
         return importMode
+    end
+
+    local RESERVE_ENTRY_PERSISTED_FIELDS = {
+        "rawID",
+        "itemLink",
+        "itemName",
+        "itemIcon",
+        "quantity",
+        "class",
+        "spec",
+        "note",
+        "plus",
+        "source",
+    }
+
+    local function ResolvePlayerNameDisplay(playerKey, player, fallbackName)
+        local candidate = fallbackName
+        if type(player) == "table" then
+            candidate = player.playerNameDisplay or player.original or candidate
+        end
+        if candidate == nil or candidate == "" then
+            candidate = playerKey
+        end
+        if Strings and Strings.NormalizeName then
+            candidate = Strings.NormalizeName(candidate, true)
+        elseif Strings and Strings.TrimText then
+            candidate = Strings.TrimText(candidate, true)
+        else
+            candidate = tostring(candidate or "")
+        end
+        if candidate == nil or candidate == "" then
+            return "?"
+        end
+        return candidate
+    end
+
+    local function CopyReserveEntryForSave(src)
+        if type(src) ~= "table" or not src.rawID then
+            return nil
+        end
+
+        local dst = {}
+        for i = 1, #RESERVE_ENTRY_PERSISTED_FIELDS do
+            local key = RESERVE_ENTRY_PERSISTED_FIELDS[i]
+            local value = src[key]
+            if value ~= nil then
+                dst[key] = value
+            end
+        end
+
+        dst.quantity = tonumber(dst.quantity) or 1
+        if dst.quantity < 1 then
+            dst.quantity = 1
+        end
+        dst.plus = tonumber(dst.plus) or 0
+        return dst
+    end
+
+    local function warnLegacyReservesPayload(phaseTag, stats)
+        local originalCount = tonumber(stats.playersWithLegacyOriginal) or 0
+        local rowPlayerCount = tonumber(stats.rowsWithLegacyPlayerField) or 0
+        local droppedRows = tonumber(stats.droppedRows) or 0
+        local mergedPlayers = tonumber(stats.mergedPlayerKeys) or 0
+        if originalCount == 0 and rowPlayerCount == 0 and droppedRows == 0 and mergedPlayers == 0 then
+            return
+        end
+
+        local template = Diag.W and Diag.W.LogReservesLegacyFieldsDetected
+        if type(template) == "string" then
+            addon:warn(template:format(
+                tostring(phaseTag or "?"),
+                originalCount,
+                rowPlayerCount,
+                droppedRows,
+                mergedPlayers
+            ))
+            return
+        end
+
+        addon:warn((
+            "[Reserves] Legacy fields phase=%s original=%d rowPlayer=%d dropped=%d merged=%d"
+        ):format(tostring(phaseTag or "?"), originalCount, rowPlayerCount, droppedRows, mergedPlayers))
+    end
+
+    local function BuildRuntimeReservesData(sourceData, phaseTag)
+        local normalized = {}
+        local stats = {
+            playersWithLegacyOriginal = 0,
+            rowsWithLegacyPlayerField = 0,
+            droppedRows = 0,
+            mergedPlayerKeys = 0,
+        }
+
+        for rawPlayerKey, player in pairs(sourceData or {}) do
+            if type(player) == "table" then
+                local displayName = ResolvePlayerNameDisplay(rawPlayerKey, player, rawPlayerKey)
+                local playerKey = Strings.NormalizeLower(displayName, true)
+                    or Strings.NormalizeLower(rawPlayerKey, true)
+                    or rawPlayerKey
+                if type(playerKey) ~= "string" then
+                    playerKey = tostring(rawPlayerKey or "")
+                end
+                if playerKey == "" then
+                    playerKey = "?"
+                end
+
+                local container = normalized[playerKey]
+                local hadContainer = (container ~= nil)
+                if not container then
+                    container = {
+                        playerNameDisplay = displayName,
+                        reserves = {},
+                    }
+                    normalized[playerKey] = container
+                elseif not container.playerNameDisplay or container.playerNameDisplay == "?" then
+                    container.playerNameDisplay = displayName
+                end
+
+                if player.original ~= nil then
+                    stats.playersWithLegacyOriginal = stats.playersWithLegacyOriginal + 1
+                end
+                if hadContainer and rawPlayerKey ~= playerKey then
+                    stats.mergedPlayerKeys = stats.mergedPlayerKeys + 1
+                end
+
+                local rows = player.reserves
+                if type(rows) == "table" then
+                    for i = 1, #rows do
+                        local row = rows[i]
+                        if type(row) == "table" and row.player ~= nil then
+                            stats.rowsWithLegacyPlayerField = stats.rowsWithLegacyPlayerField + 1
+                        end
+
+                        local copied = CopyReserveEntryForSave(row)
+                        if copied then
+                            container.reserves[#container.reserves + 1] = copied
+                        else
+                            stats.droppedRows = stats.droppedRows + 1
+                        end
+                    end
+                end
+            end
+        end
+
+        if phaseTag == "load" or phaseTag == "save" then
+            warnLegacyReservesPayload(phaseTag, stats)
+        end
+
+        return normalized
+    end
+
+    local function ApplyRuntimeReservesData(sourceData, phaseTag)
+        local normalized = BuildRuntimeReservesData(sourceData, phaseTag)
+        twipe(reservesData)
+        for playerKey, player in pairs(normalized) do
+            reservesData[playerKey] = player
+        end
+        return normalized
+    end
+
+    local function BuildSavedReservesData(sourceData)
+        local normalized = {}
+
+        for playerKey, player in pairs(sourceData or {}) do
+            if type(player) == "table" then
+                local persistedPlayerName = ResolvePlayerNameDisplay(playerKey, player, playerKey)
+                local container = normalized[persistedPlayerName]
+                if not container then
+                    container = { reserves = {} }
+                    normalized[persistedPlayerName] = container
+                end
+
+                local rows = player.reserves
+                if type(rows) == "table" then
+                    for i = 1, #rows do
+                        local copied = CopyReserveEntryForSave(rows[i])
+                        if copied then
+                            container.reserves[#container.reserves + 1] = copied
+                        end
+                    end
+                end
+            end
+        end
+
+        return normalized
     end
 
     local function MarkPendingItem(itemId, hasName, hasIcon, name, link, icon)
@@ -151,8 +336,9 @@ do
             local r = Service:GetReserveEntryForItem(itemId, playerName)
             cls = r and r.class
         end
-        if (not cls or cls == "") and addon.Raid and addon.Raid.GetPlayerClass then
-            cls = addon.Raid:GetPlayerClass(playerName)
+        local raidService = Services.Raid
+        if (not cls or cls == "") and raidService and raidService.GetPlayerClass then
+            cls = raidService:GetPlayerClass(playerName)
         end
         if not cls or cls == "" then return playerName end
 
@@ -163,14 +349,14 @@ do
         return playerName
     end
 
-    local function AddReservePlayer(data, rOrName, countOverride)
+    local function AddReservePlayer(data, rOrName, countOverride, fallbackName)
         if not data.players then data.players = {} end
         if not data.playerCounts then data.playerCounts = {} end
         if not data.playerMeta then data.playerMeta = {} end
 
         local name, count, cls, plus
         if type(rOrName) == "table" then
-            name = rOrName.player or "?"
+            name = rOrName.playerNameDisplay or fallbackName or "?"
             count = tonumber(rOrName.quantity) or 1
             cls = rOrName.class
             plus = tonumber(rOrName.plus) or 0
@@ -216,8 +402,9 @@ do
                 local p = tonumber(r.plus) or 0
                 if p > (meta.plus or 0) then meta.plus = p end
             end
-            if (not meta.class or meta.class == "") and addon.Raid and addon.Raid.GetPlayerClass then
-                meta.class = addon.Raid:GetPlayerClass(playerName)
+            local raidService = Services.Raid
+            if (not meta.class or meta.class == "") and raidService and raidService.GetPlayerClass then
+                meta.class = raidService:GetPlayerClass(playerName)
             end
         end
         return meta
@@ -525,14 +712,17 @@ do
         -- Build fast lookup indices
         for playerKey, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
-                local playerName = player.original or "?"
+                local playerName = ResolvePlayerNameDisplay(playerKey, player)
+                player.playerNameDisplay = playerName
+                player.original = nil
                 local normalizedPlayer = Strings.NormalizeLower(playerName, true) or playerKey
                 playerItemsByName[normalizedPlayer] = playerItemsByName[normalizedPlayer] or {}
 
                 for i = 1, #player.reserves do
                     local r = player.reserves[i]
                     if type(r) == "table" and r.rawID then
-                        r.player = r.player or playerName
+                        r.player = nil
+                        r.playerNameDisplay = playerName
                         local itemId = r.rawID
 
                         local list = reservesByItemID[itemId]
@@ -614,20 +804,17 @@ do
 
     -- ----- Saved Data Management ----- --
 
-    function Service:Save()
+    function Service:Save(contextTag)
+        local canonical = ApplyRuntimeReservesData(reservesData, contextTag or "save")
         RebuildIndex()
         addon:debug(Diag.D.LogReservesSaveEntries:format(addon.tLength(reservesData)))
-        local saved = {}
-        addon.tCopy(saved, reservesData)
-        KRT_Reserves = saved
+        KRT_Reserves = BuildSavedReservesData(canonical)
     end
 
     function Service:Load()
         addon:debug(Diag.D.LogReservesLoadData:format(tostring(KRT_Reserves ~= nil)))
-        twipe(reservesData)
-        if KRT_Reserves then
-            addon.tCopy(reservesData, KRT_Reserves)
-        end
+        local savedReserves = (type(KRT_Reserves) == "table") and KRT_Reserves or {}
+        ApplyRuntimeReservesData(savedReserves, "load")
 
         -- Infer import mode from saved data when possible.
         -- If we detect any multi-item or quantity>1 entries, treat it as Multi-reserve.
@@ -917,7 +1104,10 @@ do
 
             local container = newReservesData[pKey]
             if not container then
-                container = { original = row.player, reserves = {} }
+                container = {
+                    playerNameDisplay = row.player,
+                    reserves = {},
+                }
                 newReservesData[pKey] = container
                 byItemPerPlayer[pKey] = {}
             end
@@ -946,7 +1136,6 @@ do
                     note = row.note,
                     plus = tonumber(row.plus) or 0,
                     source = row.source,
-                    player = row.player,
                 }
                 idx[row.itemId] = entry
                 container.reserves[#container.reserves + 1] = entry
@@ -1338,8 +1527,8 @@ do
         return pendingItemInfo[itemId] ~= nil
     end
 
-    function module:Save()
-        return Service:Save()
+    function module:Save(contextTag)
+        return Service:Save(contextTag)
     end
 
     function module:Load()

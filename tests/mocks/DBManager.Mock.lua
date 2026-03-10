@@ -336,6 +336,29 @@ function Mock.CreateInMemoryRaidStore(seedRaids)
         end
     end
 
+    function store:NormalizeAllRaids()
+        for i = 1, #state.raids do
+            normalizeRaidRecord(state.raids[i])
+        end
+        rebuildRaidIndex()
+        return state.raids
+    end
+
+    function store:PrepareRaidForSave(raid)
+        raid = normalizeRaidRecord(raid)
+        if not raid then
+            return nil
+        end
+        self:StripRuntime(raid)
+        return raid
+    end
+
+    function store:PrepareAllRaidsForSave()
+        for i = 1, #state.raids do
+            self:PrepareRaidForSave(state.raids[i])
+        end
+    end
+
     function store:CreateRaidRecord(args)
         args = args or {}
         rebuildRaidIndex()
@@ -425,11 +448,11 @@ end
 function DBManager.CreateInMemoryManager(seed)
     local seedData = (type(seed) == "table") and seed or {}
     local db = addon.DB or {}
-    local raidStore = Mock.CreateInMemoryRaidStore(seedData.raids or seedData.Raids)
-    local raidQueries = seedData.raidQueries or seedData.RaidQueries or db.RaidQueries or nil
-    local raidMigrations = seedData.raidMigrations or seedData.RaidMigrations or db.RaidMigrations or nil
-    local raidValidator = seedData.raidValidator or seedData.RaidValidator or db.RaidValidator or nil
-    local syncer = seedData.syncer or seedData.Syncer or db.Syncer or nil
+    local raidStore = Mock.CreateInMemoryRaidStore(seedData.raids)
+    local raidQueries = seedData.raidQueries or db.RaidQueries or nil
+    local raidMigrations = seedData.raidMigrations or db.RaidMigrations or nil
+    local raidValidator = seedData.raidValidator or db.RaidValidator or nil
+    local syncer = seedData.syncer or db.Syncer or nil
 
     local managerFactory = DBManager.CreateManager
     if type(managerFactory) == "function" then
@@ -439,8 +462,8 @@ function DBManager.CreateInMemoryManager(seed)
             raidMigrations = raidMigrations,
             raidValidator = raidValidator,
             syncer = syncer,
-            charStore = seedData.charStore or seedData.CharStore,
-            configStore = seedData.configStore or seedData.ConfigStore,
+            charStore = seedData.charStore,
+            configStore = seedData.configStore,
         })
     end
 

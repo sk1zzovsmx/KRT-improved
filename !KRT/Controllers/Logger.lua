@@ -23,6 +23,7 @@ local Strings = feature.Strings or addon.Strings
 local Colors = feature.Colors or addon.Colors
 local Base64 = feature.Base64 or addon.Base64
 local Sort = feature.Sort or addon.Sort
+local Services = feature.Services or addon.Services or {}
 
 local CompareValues = Sort.CompareValues
 local CompareNumbers = Sort.CompareNumbers
@@ -130,27 +131,23 @@ do
         if type(loot) ~= "table" then
             return nil
         end
-        local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter)
+        local looterNid = tonumber(loot.looterNid)
         if looterNid and looterNid > 0 then
             local playerName = self:ResolvePlayerNameByNid(raid, looterNid)
             if playerName and playerName ~= "" then
                 return playerName
             end
         end
-        return type(loot.looter) == "string" and loot.looter or nil
+        return nil
     end
 
     function Store:ResolveLootLooterClass(raid, loot)
         if type(loot) ~= "table" then
             return nil
         end
-        local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter)
+        local looterNid = tonumber(loot.looterNid)
         if looterNid and looterNid > 0 then
             return self:ResolvePlayerClassByNid(raid, looterNid)
-        end
-        local looterName = type(loot.looter) == "string" and loot.looter or nil
-        if looterName and addon.Raid and addon.Raid.GetPlayerClass then
-            return addon.Raid:GetPlayerClass(looterName)
         end
         return nil
     end
@@ -621,7 +618,7 @@ do
             function(v)
                 if not v then return false end
                 local okBoss = (not bossFilter) or (bossFilter <= 0) or (tonumber(v.bossNid) == bossFilter)
-                local looterNid = tonumber(v.looterNid) or tonumber(v.looter)
+                local looterNid = tonumber(v.looterNid)
                 local looterName = Store:ResolveLootLooterName(raid, v)
                 local okPlayer = (not playerName)
                     or (playerFilterNid and looterNid and playerFilterNid == looterNid)
@@ -640,7 +637,7 @@ do
                 it.sortName = GetLootSortName(v.itemName, v.itemLink, v.itemId)
                 local boss = Store:GetBoss(raid, v.bossNid)
                 it.sourceName = (boss and boss.name) or ""
-                it.looterNid = tonumber(v.looterNid) or tonumber(v.looter)
+                it.looterNid = tonumber(v.looterNid)
                 it.looter = Store:ResolveLootLooterName(raid, v) or ""
                 it.looterClass = Store:ResolveLootLooterClass(raid, v)
                 it.rollType = tonumber(v.rollType) or 0
@@ -843,7 +840,7 @@ do
         if raid.loot then
             for i = #raid.loot, 1, -1 do
                 local loot = raid.loot[i]
-                local looterNid = loot and (tonumber(loot.looterNid) or tonumber(loot.looter)) or nil
+                local looterNid = loot and tonumber(loot.looterNid) or nil
                 if looterNid and looterNid == queryNid then
                     tremove(raid.loot, i)
                 end
@@ -909,7 +906,7 @@ do
         if raid.loot then
             for j = #raid.loot, 1, -1 do
                 local loot = raid.loot[j]
-                local looterNid = loot and (tonumber(loot.looterNid) or tonumber(loot.looter)) or nil
+                local looterNid = loot and tonumber(loot.looterNid) or nil
                 if looterNid and removedNids[looterNid] then
                     tremove(raid.loot, j)
                 end
@@ -1012,13 +1009,13 @@ do
         end
 
         local raidSize = tonumber(raid.size)
-        local groupSize = addon.Raid:GetRaidSize()
+        local groupSize = Services.Raid:GetRaidSize()
         if not raidSize or raidSize ~= groupSize then
             addon:error(L.ErrCannotSetCurrentRaidSize)
             return false
         end
 
-        if addon.Raid:Expired(sel) then
+        if Services.Raid:Expired(sel) then
             addon:error(L.ErrCannotSetCurrentRaidReset)
             return false
         end
@@ -1027,7 +1024,7 @@ do
         Core.SetLastBoss(nil)
 
         -- Sync roster/dropdowns immediately so subsequent logging targets the selected raid.
-        addon.Raid:UpdateRaidRoster()
+        Services.Raid:UpdateRaidRoster()
 
         addon:info(L.LogRaidSetCurrent:format(sel, tostring(raid.zone), raidSize))
         return true
@@ -2068,7 +2065,7 @@ do
                 -- This button is intended to resolve duplicate raid creation while actively raiding.
                 if not addon.IsInRaid() then
                     canSetCurrent = false
-                elseif addon.Raid:Expired(sel) then
+                elseif Services.Raid:Expired(sel) then
                     canSetCurrent = false
                 else
                     local instanceName, instanceType, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
@@ -2077,7 +2074,7 @@ do
                     end
                     if instanceType == "raid" then
                         local raidSize = tonumber(raid.size)
-                        local groupSize = addon.Raid:GetRaidSize()
+                        local groupSize = Services.Raid:GetRaidSize()
                         local zoneOk = (not raid.zone) or (raid.zone == instanceName)
                         local raidDiff = tonumber(raid.difficulty)
                         local curDiff = tonumber(instanceDiff)
@@ -3090,7 +3087,7 @@ do
             end
 
             -- Update the roster from the live in-game raid roster.
-            addon.Raid:UpdateRaidRoster()
+            Services.Raid:UpdateRaidRoster()
 
             -- Clear dependent selections after roster sync.
             MultiSelect.MultiSelectClear(module._msRaidAttCtx)
@@ -3274,7 +3271,7 @@ do
                 ui.Source:SetText(it.sourceName or "")
             end
 
-            local winnerClass = it.looterClass or addon.Raid:GetPlayerClass(it.looter)
+            local winnerClass = it.looterClass or Services.Raid:GetPlayerClass(it.looter)
             local r, g, b = Colors.GetClassColor(winnerClass)
             ui.Winner:SetText(it.looter or "")
             ui.Winner:SetVertexColor(r, g, b)

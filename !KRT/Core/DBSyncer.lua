@@ -35,7 +35,6 @@ local InternalEvents = Events.Internal
 do
     addon.DB = addon.DB or {}
     addon.DB.Syncer = addon.DB.Syncer or {}
-    addon.Syncer = addon.DB.Syncer -- Legacy alias during namespacing migration.
     local module = addon.DB.Syncer
 
     -- ----- Internal state ----- --
@@ -217,15 +216,12 @@ do
         if type(loot) ~= "table" then
             return ""
         end
-        local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter)
+        local looterNid = tonumber(loot.looterNid)
         if looterNid and looterNid > 0 then
             local playerName = playerNameByNid and playerNameByNid[looterNid] or nil
             if playerName and playerName ~= "" then
                 return playerName
             end
-        end
-        if type(loot.looter) == "string" then
-            return loot.looter
         end
         return ""
     end
@@ -559,12 +555,12 @@ do
                 local itemString = decodeText(f[5])
                 local itemLink = decodeText(f[6])
                 local itemTexture = decodeText(f[8])
-                local looter = decodeText(f[10])
-                local looterNid = tonumber(looter)
+                local looterName = decodeText(f[10])
+                local looterNid = tonumber(looterName)
                 if itemName == nil or itemString == nil or itemLink == nil then
                     return nil
                 end
-                if itemTexture == nil or looter == nil then
+                if itemTexture == nil or looterName == nil then
                     return nil
                 end
                 tinsert(snapshot.loot, {
@@ -576,7 +572,7 @@ do
                     itemRarity = parseNumber(f[7], 0),
                     itemTexture = itemTexture,
                     itemCount = parseNumber(f[9], 1),
-                    looter = looter,
+                    looterName = looterName,
                     looterNid = looterNid,
                     rollType = parseNumber(f[11], 0),
                     rollValue = parseNumber(f[12], 0),
@@ -819,9 +815,9 @@ do
                     dst.itemTexture = src.itemTexture
                 end
                 dst.itemCount = count
-                local looterNid = tonumber(src.looterNid) or tonumber(src.looter)
-                if not looterNid and type(src.looter) == "string" then
-                    looterNid = playerNidByName[Strings.NormalizeLower(src.looter, true)]
+                local looterNid = tonumber(src.looterNid)
+                if not looterNid and type(src.looterName) == "string" then
+                    looterNid = playerNidByName[Strings.NormalizeLower(src.looterName, true)]
                 end
                 if looterNid and looterNid > 0 and validPlayerNids[looterNid] then
                     dst.looterNid = looterNid

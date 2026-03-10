@@ -18,6 +18,7 @@ local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
 local Bus = feature.Bus or addon.Bus
 local Core = feature.Core or addon.Core
+local Services = feature.Services or addon.Services or {}
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
@@ -102,7 +103,7 @@ do
             BindChangeRow(row)
             local ui = row._p
             ui.Name:SetText(it.name)
-            local class = addon.Raid:GetPlayerClass(it.name)
+            local class = Services.Raid:GetPlayerClass(it.name)
             local r, g, b = Colors.GetClassColor(class)
             ui.Name:SetVertexColor(r, g, b)
             ui.Spec:SetText(it.spec or L.StrNone)
@@ -274,7 +275,7 @@ do
         if not name then return end
         -- Make sure the player exists in the raid:
         local found = true
-        if not addon.Raid:CheckPlayer(name) then found = false end
+        if not Services.Raid:CheckPlayer(name) then found = false end
         if not changesTable[name] then found = false end
         if not found then
             fetched = false
@@ -385,13 +386,13 @@ do
 
     -- Ask For module:
     function module:Demand()
-        if not addon.Raid:IsPlayerInRaid() then return end
+        if not Services.Raid:IsPlayerInRaid() then return end
         addon:Announce(L.StrChangesDemand)
     end
 
     -- Spam module:
     function module:Announce()
-        if not addon.Raid:IsPlayerInRaid() then return end
+        if not Services.Raid:IsPlayerInRaid() then return end
         -- In case of a reload/relog and the frame wasn't loaded
         if not fetched or not next(changesTable) then
             InitChangesTable()
@@ -503,7 +504,7 @@ do
         UIPrimitives.EnableDisableNamedPart(frameName, "ClearBtn", count > 0)
         UIPrimitives.EnableDisableNamedPart(frameName, "AnnounceBtn", count > 0)
         local hasRaid = addon.Core.GetCurrentRaid()
-        local hasRaidGroup = addon.Raid:IsPlayerInRaid()
+        local hasRaidGroup = Services.Raid:IsPlayerInRaid()
         UIPrimitives.EnableDisableNamedPart(frameName, "AddBtn", hasRaid)
         UIPrimitives.EnableDisableNamedPart(frameName, "DemandBtn", hasRaidGroup)
     end
@@ -541,7 +542,7 @@ do
         spec = Strings.NormalizeName(spec)
         -- Is the player in the raid?
         local found
-        found, name = addon.Raid:CheckPlayer(name)
+        found, name = Services.Raid:CheckPlayer(name)
         if not found then
             addon:error(format((name == "" and L.ErrChangesNoPlayer or L.ErrCannotFindPlayer), name))
             return

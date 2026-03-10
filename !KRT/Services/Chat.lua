@@ -23,7 +23,6 @@ local tonumber = tonumber
 do
     addon.Services = addon.Services or {}
     addon.Services.Chat = addon.Services.Chat or {}
-    addon.Chat = addon.Services.Chat -- Legacy alias during namespacing migration.
     local module = addon.Services.Chat
 
     -- ----- Internal state ----- --
@@ -113,7 +112,7 @@ do
         Comms.Chat(msg, selectedChannel)
     end
 
-    -- ----- Legacy helpers ----- --
+    -- ----- Addon facade ----- --
     function addon:Announce(text, channel)
         module:Announce(text, channel)
     end

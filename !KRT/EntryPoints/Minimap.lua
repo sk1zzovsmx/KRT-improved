@@ -12,6 +12,8 @@ local Options = feature.Options or addon.Options
 local Frames = feature.Frames or addon.Frames
 local Colors = feature.Colors or addon.Colors
 local Core = feature.Core or addon.Core
+local Services = feature.Services or addon.Services or {}
+local Widgets = feature.Widgets or addon.Widgets or {}
 
 local K_COLOR = feature.K_COLOR
 
@@ -44,32 +46,23 @@ local function getController(name)
     return controllers and controllers[name] or nil
 end
 
-local function getChangesController()
-    local controller = getController("Changes")
-    if type(controller) == "table" then
-        return controller
-    end
-    local legacy = addon.Changes
-    if type(legacy) == "table" then
-        return legacy
+local function getLootCounterController()
+    local widget = Widgets.LootCounter
+    if type(widget) == "table" and type(widget.Toggle) == "function" then
+        return widget
     end
     return nil
 end
 
-local function getLootCounterWidget()
-    local widgets = addon.Widgets
-    local legacy = (widgets and widgets.LootCounter) or addon.LootCounter
-    if type(legacy) == "table" and type(legacy.Toggle) == "function" then
-        return legacy
-    end
-    return nil
+local function getRaidService()
+    return Services.Raid
 end
 
 local function IsWidgetAvailable(widgetId)
     if UIFacade:IsEnabled(widgetId) and UIFacade:IsRegistered(widgetId) then
         return true
     end
-    if widgetId == "LootCounter" and getLootCounterWidget() then
+    if widgetId == "LootCounter" and getLootCounterController() then
         return true
     end
     return false
@@ -98,7 +91,8 @@ function UI.AcquireRefs(frame)
 end
 
 local function BuildMenu()
-    local hasRaidGroup = addon.Raid:IsPlayerInRaid()
+    local raid = getRaidService()
+    local hasRaidGroup = raid:IsPlayerInRaid()
     local disableRaidActions = 1
     if hasRaidGroup then
         disableRaidActions = nil
@@ -120,7 +114,7 @@ local function BuildMenu()
             notCheckable = 1,
             disabled = disableRaidActions,
             func = function()
-                if not addon.Raid:IsPlayerInRaid() then
+                if not raid:IsPlayerInRaid() then
                     return
                 end
                 if not IsWidgetAvailable("LootCounter") then
@@ -130,9 +124,9 @@ local function BuildMenu()
                     UIFacade:Call("LootCounter", "Toggle")
                     return
                 end
-                local legacy = getLootCounterWidget()
-                if legacy and legacy.Toggle then
-                    legacy:Toggle()
+                local widget = getLootCounterController()
+                if widget and widget.Toggle then
+                    widget:Toggle()
                 end
             end
         },
@@ -147,7 +141,7 @@ local function BuildMenu()
             end
         },
         { text = " ", disabled = 1, notCheckable = 1 },
-        { text = L.StrClearIcons, notCheckable = 1, func = function() addon.Raid:ClearRaidIcons() end },
+        { text = L.StrClearIcons, notCheckable = 1, func = function() raid:ClearRaidIcons() end },
         { text = " ", disabled = 1, notCheckable = 1 },
         {
             text = RAID_WARNING,
@@ -164,7 +158,7 @@ local function BuildMenu()
             text = L.StrMSChanges,
             notCheckable = 1,
             func = function()
-                local moduleRef = getChangesController()
+                local moduleRef = getController("Changes")
                 if moduleRef and moduleRef.Toggle then
                     moduleRef:Toggle()
                 end
@@ -175,10 +169,10 @@ local function BuildMenu()
             notCheckable = 1,
             disabled = disableRaidActions,
             func = function()
-                if not addon.Raid:IsPlayerInRaid() then
+                if not raid:IsPlayerInRaid() then
                     return
                 end
-                local moduleRef = getChangesController()
+                local moduleRef = getController("Changes")
                 if moduleRef and moduleRef.Demand then
                     moduleRef:Demand()
                 end
@@ -189,10 +183,10 @@ local function BuildMenu()
             notCheckable = 1,
             disabled = disableRaidActions,
             func = function()
-                if not addon.Raid:IsPlayerInRaid() then
+                if not raid:IsPlayerInRaid() then
                     return
                 end
-                local moduleRef = getChangesController()
+                local moduleRef = getController("Changes")
                 if moduleRef and moduleRef.Announce then
                     moduleRef:Announce()
                 end

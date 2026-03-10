@@ -49,6 +49,184 @@ do
         return string.lower(name)
     end
 
+    local function normalizeName(name)
+        if Strings and Strings.NormalizeName then
+            return Strings.NormalizeName(name, true)
+        end
+        if name == nil then
+            return nil
+        end
+        local text = tostring(name)
+        if text == "" then
+            return nil
+        end
+        return text
+    end
+
+    local function normalizeTextOrNil(value)
+        if value == nil then
+            return nil
+        end
+        local text = nil
+        if Strings and Strings.TrimText then
+            text = Strings.TrimText(value, true)
+        else
+            text = tostring(value)
+        end
+        if type(text) ~= "string" or text == "" then
+            return nil
+        end
+        return text
+    end
+
+    local function normalizePositiveNumberOrNil(value)
+        local num = tonumber(value)
+        if not num or num <= 0 then
+            return nil
+        end
+        return num
+    end
+
+    local function compactChangesMap(changes)
+        local out = {}
+        if type(changes) ~= "table" then
+            return out
+        end
+
+        for rawName, rawSpec in pairs(changes) do
+            local playerName = normalizeName(rawName)
+            local spec = normalizeName(rawSpec)
+            if playerName and spec then
+                out[playerName] = spec
+            end
+        end
+
+        return out
+    end
+
+    local function compactRaidForPersistence(raid)
+        if type(raid) ~= "table" then
+            return nil
+        end
+
+        ensureTableField(raid, "players", false)
+        ensureTableField(raid, "bossKills", false)
+        ensureTableField(raid, "loot", false)
+        ensureTableField(raid, "changes", true)
+
+        local players = raid.players
+        for i = 1, #players do
+            local player = players[i]
+            if type(player) == "table" then
+                local count = tonumber(player.count) or 0
+                if count < 0 then
+                    count = 0
+                end
+                player.count = count
+
+                local rank = tonumber(player.rank) or 0
+                player.rank = (rank > 0) and rank or nil
+
+                local subgroup = tonumber(player.subgroup) or 1
+                player.subgroup = (subgroup > 1) and subgroup or nil
+
+                player.join = normalizePositiveNumberOrNil(player.join)
+                player.leave = normalizePositiveNumberOrNil(player.leave)
+
+                local playerName = normalizeName(player.name)
+                if playerName then
+                    player.name = playerName
+                end
+
+                local className = normalizeTextOrNil(player.class)
+                player.class = className or "UNKNOWN"
+            end
+        end
+
+        local bosses = raid.bossKills
+        for i = 1, #bosses do
+            local boss = bosses[i]
+            if type(boss) == "table" then
+                local difficulty = tonumber(boss.difficulty) or 0
+                boss.difficulty = (difficulty > 0) and difficulty or nil
+
+                local mode = normalizeNameLower(boss.mode)
+                local derivedMode = nil
+                if difficulty > 0 then
+                    derivedMode = (difficulty == 3 or difficulty == 4) and "h" or "n"
+                end
+                if mode == "h" or mode == "n" then
+                    boss.mode = (mode ~= derivedMode) and mode or nil
+                else
+                    boss.mode = nil
+                end
+
+                boss.time = normalizePositiveNumberOrNil(boss.time)
+                boss.hash = normalizeTextOrNil(boss.hash)
+                boss.attendanceMask = nil
+
+                local attendees = {}
+                local seen = {}
+                local rawPlayers = boss.players
+                if type(rawPlayers) == "table" then
+                    for j = 1, #rawPlayers do
+                        local playerNid = tonumber(rawPlayers[j])
+                        if playerNid and playerNid > 0 and not seen[playerNid] then
+                            seen[playerNid] = true
+                            attendees[#attendees + 1] = playerNid
+                        end
+                    end
+                end
+                boss.players = attendees
+            end
+        end
+
+        local lootRows = raid.loot
+        for i = 1, #lootRows do
+            local loot = lootRows[i]
+            if type(loot) == "table" then
+                loot.itemId = normalizePositiveNumberOrNil(loot.itemId)
+                loot.itemName = normalizeTextOrNil(loot.itemName)
+                loot.itemString = normalizeTextOrNil(loot.itemString)
+                loot.itemLink = normalizeTextOrNil(loot.itemLink)
+                loot.itemTexture = normalizeTextOrNil(loot.itemTexture)
+                loot.rollSessionId = normalizeTextOrNil(loot.rollSessionId)
+                loot.source = normalizeTextOrNil(loot.source)
+
+                local itemRarity = tonumber(loot.itemRarity) or 0
+                loot.itemRarity = (itemRarity > 0) and itemRarity or nil
+
+                local itemCount = tonumber(loot.itemCount) or 1
+                if itemCount < 1 then
+                    itemCount = 1
+                end
+                loot.itemCount = (itemCount > 1) and itemCount or nil
+
+                local looterNid = tonumber(loot.looterNid)
+                if looterNid and looterNid > 0 then
+                    loot.looterNid = looterNid
+                else
+                    loot.looterNid = nil
+                end
+                loot.looter = nil
+
+                local rollType = tonumber(loot.rollType) or 0
+                loot.rollType = (rollType ~= 0) and rollType or nil
+
+                local rollValue = tonumber(loot.rollValue) or 0
+                loot.rollValue = (rollValue ~= 0) and rollValue or nil
+
+                local bossNid = tonumber(loot.bossNid) or 0
+                loot.bossNid = (bossNid > 0) and bossNid or nil
+
+                loot.time = normalizePositiveNumberOrNil(loot.time)
+            end
+        end
+
+        raid.changes = compactChangesMap(raid.changes)
+        return raid
+    end
+
 
     -- ----- Public methods ----- --
     function module:GetMigrations()
@@ -96,6 +274,10 @@ do
         end
 
         return raid
+    end
+
+    function module:CompactRaidForPersistence(raid)
+        return compactRaidForPersistence(raid)
     end
 
     MIGRATIONS[0] = function(raid)
@@ -181,10 +363,7 @@ do
         for i = 1, #lootRows do
             local loot = lootRows[i]
             if type(loot) == "table" then
-                local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter)
-                if not looterNid and type(loot.looter) == "string" then
-                    looterNid = playerNidByName[normalizeNameLower(loot.looter)]
-                end
+                local looterNid = tonumber(loot.looterNid)
                 if looterNid and looterNid > 0 then
                     loot.looterNid = looterNid
                 else
@@ -193,5 +372,13 @@ do
                 loot.looter = nil
             end
         end
+    end
+
+    -- v3 canonicalization and lean persistence:
+    -- - compact default-only values from persisted rows
+    -- - trim empty optional fields
+    -- - canonicalize changes map keys/values
+    MIGRATIONS[2] = function(raid)
+        compactRaidForPersistence(raid)
     end
 end

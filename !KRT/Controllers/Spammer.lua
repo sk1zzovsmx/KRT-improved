@@ -11,6 +11,7 @@ local L = feature.L
 local Frames = feature.Frames or addon.Frames
 local Strings = feature.Strings or addon.Strings
 local Comms = feature.Comms or addon.Comms
+local Services = feature.Services or addon.Services or {}
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
@@ -441,8 +442,9 @@ do
             elseif groupType == "party" then
                 Comms.Chat(tostring(finalOutput), "PARTY", nil, nil, true)
             else
-                if addon.Chat and addon.Chat.Print then
-                    addon.Chat:Print(tostring(finalOutput))
+                local chatService = Services.Chat
+                if chatService and chatService.Print then
+                    chatService:Print(tostring(finalOutput))
                 else
                     addon:info("%s", tostring(finalOutput))
                 end

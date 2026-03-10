@@ -233,7 +233,7 @@ do
                     result.ok = result.ok + 1
                 end
 
-                local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter) or 0
+                local looterNid = tonumber(loot.looterNid) or 0
                 if looterNid > 0 and not playerByNid[looterNid] then
                     pushDetail(result, "E", "LOOT_MISSING_LOOTER", {
                         lootIndex = i,

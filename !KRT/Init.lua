@@ -469,12 +469,11 @@ function Core.EnsureLootRuntimeState()
         lootState.nextRollSessionId = 1
     end
 
-    local selectedItemCount = tonumber(lootState.selectedItemCount) or tonumber(lootState.itemCount) or 1
+    local selectedItemCount = tonumber(lootState.selectedItemCount) or 1
     if selectedItemCount < 1 then
         selectedItemCount = 1
     end
     lootState.selectedItemCount = selectedItemCount
-    lootState.itemCount = selectedItemCount -- Legacy alias for pre-migration call sites.
 
     raidState.lastLootCount = tonumber(raidState.lastLootCount) or 1
     if raidState.lastLootCount < 1 then
@@ -576,6 +575,8 @@ function Core.GetFeatureShared()
         Comms = addon.Comms,
         Sort = addon.Sort,
         Item = addon.Item,
+        IgnoredItems = addon.IgnoredItems,
+        IgnoredMobs = addon.IgnoredMobs,
 
         UI = addon.UI,
         Frames = addon.Frames,
@@ -1132,6 +1133,42 @@ function Core.StripRuntimeRaidCaches(raid)
     raid._lootIdxByNid = nil
 end
 
+function Core.NormalizeSavedVariablesAfterLoad()
+    local raidStore = Core.GetRaidStoreOrNil and
+        Core.GetRaidStoreOrNil("Core.NormalizeSavedVariablesAfterLoad", { "NormalizeAllRaids" }) or nil
+    if raidStore and type(raidStore.NormalizeAllRaids) == "function" then
+        raidStore:NormalizeAllRaids("load")
+        return
+    end
+    if type(KRT_Raids) ~= "table" then
+        return
+    end
+    for i = 1, #KRT_Raids do
+        Core.EnsureRaidSchema(KRT_Raids[i])
+    end
+end
+
+function Core.PrepareSavedVariablesForSave(contextTag)
+    local raidStore = Core.GetRaidStoreOrNil and
+        Core.GetRaidStoreOrNil("Core.PrepareSavedVariablesForSave", { "PrepareAllRaidsForSave" }) or nil
+    if raidStore then
+        if type(raidStore.PrepareAllRaidsForSave) == "function" then
+            raidStore:PrepareAllRaidsForSave()
+        elseif type(raidStore.StripAllRuntime) == "function" then
+            raidStore:StripAllRuntime()
+        end
+    elseif type(KRT_Raids) == "table" then
+        for i = 1, #KRT_Raids do
+            Core.StripRuntimeRaidCaches(KRT_Raids[i])
+        end
+    end
+
+    local reservesService = addon.Services and addon.Services.Reserves
+    if reservesService and type(reservesService.Save) == "function" then
+        reservesService:Save(contextTag or "save")
+    end
+end
+
 
 -- =========== Main Event Handlers  =========== --
 local addonEvents = {
@@ -1191,6 +1228,7 @@ function addon:ADDON_LOADED(name)
     if reservesService and reservesService.Load then
         reservesService:Load()
     end
+    Core.NormalizeSavedVariablesAfterLoad()
     for event in pairs(addonEvents) do
         self:RegisterEvent(event)
     end
@@ -1201,25 +1239,34 @@ end
 local rosterUpdateDebounceSeconds = 0.2
 
 local function scheduleRaidInstanceChecksIfRecognized(instanceName, instanceType, instanceDiff, emitRecognizedLog)
+    local raidService = addon.Services and addon.Services.Raid or nil
     if instanceType ~= "raid" or L.RaidZones[instanceName] == nil then
+        return false
+    end
+    if not raidService then
         return false
     end
     if emitRecognizedLog then
         addon:debug(Diag.D.LogRaidInstanceRecognized:format(tostring(instanceName), tostring(instanceDiff)))
     end
-    addon.Raid:ScheduleInstanceChecks()
+    raidService:ScheduleInstanceChecks()
     return true
 end
 
 local function processRaidRosterUpdate()
-    local changed, delta = addon.Raid:UpdateRaidRoster()
+    local raidService = addon.Services and addon.Services.Raid or nil
+    if not raidService then
+        return
+    end
+
+    local changed, delta = raidService:UpdateRaidRoster()
     if not changed then
         return
     end
 
     -- Single source of truth for roster change notifications (join/update/leave delta).
     Bus.TriggerEvent(InternalEvents.RaidRosterDelta,
-        delta, addon.Raid:GetRosterVersion(), Core.GetCurrentRaid())
+        delta, raidService:GetRosterVersion(), Core.GetCurrentRaid())
 end
 
 -- RAID_ROSTER_UPDATE: Updates the raid roster when it changes.
@@ -1269,7 +1316,10 @@ end
 -- PLAYER_ENTERING_WORLD: Performs initial checks when the player logs in.
 function addon:PLAYER_ENTERING_WORLD()
     self:UnregisterEvent("PLAYER_ENTERING_WORLD")
-    local module = self.Raid
+    local module = addon.Services and addon.Services.Raid or nil
+    if not module then
+        return
+    end
     addon:trace(Diag.D.LogCorePlayerEnteringWorld)
     module:CancelInstanceChecks()
     -- Restart the first-check timer on login
@@ -1281,14 +1331,18 @@ end
 -- CHAT_MSG_LOOT: Adds looted items to the raid log.
 function addon:CHAT_MSG_LOOT(msg)
     addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
-    if Core.GetCurrentRaid() then
-        self.Raid:AddLoot(msg)
+    local raidService = addon.Services and addon.Services.Raid or nil
+    if Core.GetCurrentRaid() and raidService then
+        raidService:AddLoot(msg)
     end
 end
 
 -- CHAT_MSG_SYSTEM: Forwards roll messages to the Rolls module.
 function addon:CHAT_MSG_SYSTEM(msg)
-    addon.Rolls:CHAT_MSG_SYSTEM(msg)
+    local rollsService = addon.Services and addon.Services.Rolls or nil
+    if rollsService and rollsService.CHAT_MSG_SYSTEM then
+        rollsService:CHAT_MSG_SYSTEM(msg)
+    end
 end
 
 -- CHAT_MSG_ADDON: Forwards addon communication messages to the Syncer module.
@@ -1327,25 +1381,19 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
     local bossIds = bossLib and bossLib.BossIDs
     if not (npcId and bossIds and bossIds[npcId]) then return end
 
-    local boss = destName or bossLib:GetBossName(npcId)
+    local boss = destName
+    if not boss and bossLib and bossLib.GetBossName then
+        boss = bossLib:GetBossName(npcId)
+    end
     if boss then
         addon:trace(Diag.D.LogBossUnitDiedMatched:format(tonumber(npcId) or -1, tostring(boss)))
-        self.Raid:AddBoss(boss)
+        self.Raid:AddBoss(boss, nil, nil, npcId)
     end
 end
 
--- PLAYER_LOGOUT: Strip runtime-only raid caches before SavedVariables are written.
+-- PLAYER_LOGOUT: Prepare canonical SavedVariables payloads before persistence.
 function addon:PLAYER_LOGOUT()
-    local raidStore = Core.GetRaidStoreOrNil and
-        Core.GetRaidStoreOrNil("Core.PlayerLogout", { "StripAllRuntime" }) or nil
-    if raidStore then
-        raidStore:StripAllRuntime()
-        return
-    end
-    if type(KRT_Raids) ~= "table" then return end
-    for i = 1, #KRT_Raids do
-        addon.Core.StripRuntimeRaidCaches(KRT_Raids[i])
-    end
+    Core.PrepareSavedVariablesForSave("logout")
 end
 
 end

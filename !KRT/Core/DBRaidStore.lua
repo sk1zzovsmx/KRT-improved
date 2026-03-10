@@ -9,10 +9,12 @@ local feature = addon.Core.GetFeatureShared()
 local Core = feature.Core or addon.Core
 local Time = feature.Time or addon.Time
 local Strings = feature.Strings or addon.Strings
+local Diag = feature.Diag or {}
 
 local tinsert, tremove = table.insert, table.remove
 local pairs, type = pairs, type
 local tostring, tonumber = tostring, tonumber
+local tconcat = table.concat
 
 -- Raid storage service.
 do
@@ -111,6 +113,69 @@ do
             return nil
         end
         return string.lower(value)
+    end
+
+    local function isLegacyDiagnosticPhase(contextTag)
+        return contextTag == "load" or contextTag == "save"
+    end
+
+    local function scanLegacyRaidPayload(raid)
+        local legacyRuntimeKeys = {}
+        for key in pairs(LEGACY_RUNTIME_KEYS) do
+            if raid[key] ~= nil then
+                legacyRuntimeKeys[#legacyRuntimeKeys + 1] = key
+            end
+        end
+
+        local legacyAttendanceMaskCount = 0
+        local bosses = (type(raid.bossKills) == "table") and raid.bossKills or nil
+        if bosses then
+            for i = 1, #bosses do
+                local boss = bosses[i]
+                if type(boss) == "table" and boss.attendanceMask ~= nil then
+                    legacyAttendanceMaskCount = legacyAttendanceMaskCount + 1
+                end
+            end
+        end
+
+        local legacyLootLooterCount = 0
+        local lootRows = (type(raid.loot) == "table") and raid.loot or nil
+        if lootRows then
+            for i = 1, #lootRows do
+                local loot = lootRows[i]
+                if type(loot) == "table" and loot.looter ~= nil then
+                    legacyLootLooterCount = legacyLootLooterCount + 1
+                end
+            end
+        end
+
+        return {
+            legacyRuntimeKeys = legacyRuntimeKeys,
+            legacyAttendanceMaskCount = legacyAttendanceMaskCount,
+            legacyLootLooterCount = legacyLootLooterCount,
+        }
+    end
+
+    local function warnLegacyRaidPayload(contextTag, raid, raidIndex, legacy)
+        local runtimeKeys = legacy.legacyRuntimeKeys or {}
+        local runtimeKeysCount = #runtimeKeys
+        local lootLooterCount = tonumber(legacy.legacyLootLooterCount) or 0
+        local attendanceMaskCount = tonumber(legacy.legacyAttendanceMaskCount) or 0
+        if runtimeKeysCount == 0 and lootLooterCount == 0 and attendanceMaskCount == 0 then
+            return
+        end
+
+        local runtimeText = (runtimeKeysCount > 0) and tconcat(runtimeKeys, ";") or "-"
+        local raidNid = tostring(tonumber(raid and raid.raidNid) or "?")
+        local idxText = tostring(tonumber(raidIndex) or "?")
+        local template = Diag.W and Diag.W.LogRaidLegacyFieldsDetected
+        if type(template) == "string" then
+            addon:warn(template:format(contextTag, raidNid, idxText, runtimeText, lootLooterCount, attendanceMaskCount))
+            return
+        end
+
+        addon:warn(("[RaidStore] Legacy fields detected phase=%s raidNid=%s idx=%s runtime=%s looter=%d mask=%d")
+            :format(tostring(contextTag or "?"), raidNid, idxText, runtimeText, lootLooterCount, attendanceMaskCount))
     end
 
     local function rebuildRaidNidIndex()
@@ -290,9 +355,14 @@ do
         return true, removed, idx
     end
 
-    function module:NormalizeRaidRecord(raid)
+    function module:NormalizeRaidRecord(raid, contextTag, raidIndex)
         if type(raid) ~= "table" then
             return nil
+        end
+
+        if isLegacyDiagnosticPhase(contextTag) then
+            local legacy = scanLegacyRaidPayload(raid)
+            warnLegacyRaidPayload(contextTag, raid, raidIndex, legacy)
         end
 
         local schemaVersion = getSchemaVersion()
@@ -469,10 +539,7 @@ do
             if type(loot) == "table" then
                 loot.lootNid = allocateLootNid(loot.lootNid)
 
-                local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter)
-                if not looterNid and type(loot.looter) == "string" then
-                    looterNid = playerNidByName[normalizeNameLower(loot.looter)]
-                end
+                local looterNid = tonumber(loot.looterNid)
                 if looterNid and looterNid > 0 and validPlayerNids[looterNid] then
                     loot.looterNid = looterNid
                 else
@@ -589,6 +656,38 @@ do
         end
     end
 
+    function module:NormalizeAllRaids(contextTag)
+        local raids = ensureRaidsTable()
+        for i = 1, #raids do
+            self:NormalizeRaidRecord(raids[i], contextTag, i)
+        end
+        rebuildRaidNidIndex()
+        return raids
+    end
+
+    function module:PrepareRaidForSave(raid, raidIndex)
+        raid = self:NormalizeRaidRecord(raid, "save", raidIndex)
+        if not raid then
+            return nil
+        end
+
+        self:StripRuntime(raid)
+
+        local migrations = getMigrations()
+        if migrations and migrations.CompactRaidForPersistence then
+            migrations:CompactRaidForPersistence(raid)
+        end
+
+        return raid
+    end
+
+    function module:PrepareAllRaidsForSave()
+        local raids = ensureRaidsTable()
+        for i = 1, #raids do
+            self:PrepareRaidForSave(raids[i], i)
+        end
+    end
+
     function module:CreateRaidRecord(args)
         args = args or {}
 
@@ -657,7 +756,7 @@ do
     end
 
     function module:SaveRaid(raid)
-        raid = self:NormalizeRaidRecord(raid)
+        raid = self:NormalizeRaidRecord(raid, "save")
         if not raid then
             return false, nil
         end

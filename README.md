@@ -60,6 +60,8 @@ It took a lot of time, effort for who isn't a code developer like ME. So please,
 - Runtime ownership and module map: `OVERVIEW.md`
 - Binding rules and coding policy: `AGENTS.md`
 - Quick layering checks: `DEV_CHECKS.md`
+- Agent skills + Mechanic companion workflow: `docs/AGENT_SKILLS.md`
+- Repo-local MCP server for skill/addon workflows: `docs/KRT_MCP.md`
 - WoW addon template reference: `docs/WOW_ADDON_TEMPLATE.md`
 
 ---

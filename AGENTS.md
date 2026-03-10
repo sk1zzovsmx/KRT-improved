@@ -122,6 +122,14 @@ Durable preferences learned from recent conversations:
   while preserving behavior and module ownership boundaries.
 - Prefer centralized constants for shared timing windows/TTLs used across modules;
   avoid repeating the same hardcoded seconds in multiple files.
+- Prefer AFD-oriented development workflow with pinned skills in `.agents/skills`;
+  sync via `tools/sync-agent-skills.ps1`.
+- Keep Mechanic as external companion tooling (not vendored in addon runtime);
+  bootstrap per-device via `tools/mech-bootstrap.ps1`.
+- Prefer multi-device workflow using repo scripts and explicit addon path wrapper
+  `tools/mech-krt.ps1` for Mechanic commands.
+- Keep skill/tooling configuration stored in-repo (`tools/agent-skills.manifest.json`)
+  with docs under `docs/AGENT_SKILLS.md` for deterministic setup.
 
 ---
 
@@ -158,7 +166,7 @@ KRT is now modular by design:
   - `!KRT/Widgets/*.lua` (feature-specific UI controllers/widgets),
   - `!KRT/EntryPoints/*.lua` (slash/minimap entrypoints).
 - `!KRT/Modules/` remains reserved for utilities/constants/static data (e.g., `Utils.lua`, `C.lua`,
-  `ignoredItems.lua`) and must not become a feature folder.
+  `IgnoredItems.lua`, `IgnoredMobs.lua`) and must not become a feature folder.
 - XML is split into feature-oriented files under `!KRT/UI/`, loaded via `!KRT/KRT.xml` include manifest.
 
 Rules:
@@ -227,7 +235,6 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 49) Controllers/Spammer.lua
 50) EntryPoints/SlashEvents.lua
 51) KRT.xml (UI include manifest/orchestrator)
-52) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
 
 ---
 
@@ -287,6 +294,8 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Colors.lua             # color normalization/class-color helpers (addon.Colors)
     Strings.lua            # text normalization and chat parsing helpers (addon.Strings)
     Item.lua               # item-link parsing + tooltip probe helpers (addon.Item)
+    IgnoredItems.lua       # canonical item-ignore lookup used by loot logging
+    IgnoredMobs.lua        # canonical raid add/phase-ignore lookup used by boss filtering
     Comms.lua              # addon chat/whisper/sync helpers (addon.Comms)
     Time.lua               # time/difficulty helpers (addon.Time)
     Base64.lua             # base64 codec helpers (addon.Base64)
@@ -309,7 +318,6 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Compat/
       Utils.UI.lua         # UI compat facade wrappers (addon.Utils.UI)
     Utils.lua              # compatibility facade/re-exports (addon.Utils)
-    ignoredItems.lua       # data lists / filters
 
   Libs/
     LibStub/
@@ -448,6 +456,8 @@ External modules:
 - `addon.Colors` (Modules/Colors.lua)
 - `addon.Strings` (Modules/Strings.lua)
 - `addon.Item` (Modules/Item.lua)
+- `addon.IgnoredItems` (Modules/IgnoredItems.lua)
+- `addon.IgnoredMobs` (Modules/IgnoredMobs.lua)
 - `addon.Comms` (Modules/Comms.lua)
 - `addon.Time` (Modules/Time.lua)
 - `addon.Base64` (Modules/Base64.lua)

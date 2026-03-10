@@ -15,6 +15,7 @@ local Bus = feature.Bus or addon.Bus
 local MultiSelect = feature.MultiSelect or addon.MultiSelect
 local Item = feature.Item or addon.Item
 local Comms = feature.Comms or addon.Comms
+local Services = feature.Services or addon.Services or {}
 
 local tContains = feature.tContains
 
@@ -35,12 +36,15 @@ local format = string.format
 local tostring, tonumber = tostring, tonumber
 
 local function getLootModule()
-    return addon.Loot
+    return Services.Loot
+end
+
+local function getRaidService()
+    return Services.Raid
 end
 
 local function getReservesService()
-    local services = addon.Services
-    return services and services.Reserves or nil
+    return Services.Reserves
 end
 
 local function getReserveCountForItem(itemId, name)
@@ -76,8 +80,7 @@ end
 -- Manages roll tracking, sorting, and winner determination.
 do
     addon.Services = addon.Services or {}
-    addon.Services.Rolls = addon.Services.Rolls or addon.Rolls or {}
-    addon.Rolls = addon.Services.Rolls -- Legacy alias during namespacing migration.
+    addon.Services.Rolls = addon.Services.Rolls or {}
     local module = addon.Services.Rolls
     -- Multi-selection context for manual multi-award winner picking (Master Loot window)
     local MS_CTX_ROLLS = "MLRollWinners"
@@ -125,7 +128,7 @@ do
         return rollType or rollTypes.FREE
     end
 
-    local function syncLegacyRollStateFromSession(session)
+    local function syncSessionStateFromRollSession(session)
         if not session then
             return
         end
@@ -147,7 +150,7 @@ do
         elseif session.endsAt == nil then
             session.endsAt = GetTime()
         end
-        syncLegacyRollStateFromSession(session)
+        syncSessionStateFromRollSession(session)
     end
 
     local function closeRollSession()
@@ -362,7 +365,7 @@ do
             return true
         end
 
-        -- Inventory/trade: legacy single selection behavior.
+        -- Inventory/trade keeps single-selection behavior.
         MultiSelect.MultiSelectClear(MS_CTX_ROLLS)
         lootState.winner = name
         state.selected = name
@@ -593,7 +596,7 @@ do
         state.display = nil
         state.displayNames = nil
         state.lastModel = nil
-        addon.Raid:ClearRaidIcons()
+        getRaidService():ClearRaidIcons()
     end
 
     -- Gets the item ID of the item currently being rolled for.
@@ -718,7 +721,7 @@ do
             state.displayNames[i] = e and e.name or nil
         end
 
-        -- Inventory/trade: keep legacy single-selection behavior.
+        -- Inventory/trade keeps single-selection behavior.
         -- In loot window (pick mode) we support the same MultiSelect flow for both single and multi-copy items.
         if lootState.fromInventory then
             MultiSelect.MultiSelectClear(MS_CTX_ROLLS)
@@ -816,7 +819,7 @@ do
             elseif addon.options.showLootCounterDuringMSRoll == true
                 and currentRollType == rollTypes.MAINSPEC
             then
-                local c = addon.Raid:GetPlayerCount(name, addon.Core.GetCurrentRaid()) or 0
+                local c = getRaidService():GetPlayerCount(name, addon.Core.GetCurrentRaid()) or 0
                 if c > 0 then
                     counterText = "+" .. c
                 end
@@ -827,7 +830,7 @@ do
                 name = name,
                 displayName = (pickMode and msCount > 0 and isSelected) and ("> " .. name .. " <") or name,
                 roll = roll,
-                class = (addon.Raid:GetPlayerClass(name) or "UNKNOWN"):upper(),
+                class = (getRaidService():GetPlayerClass(name) or "UNKNOWN"):upper(),
                 isReserved = isReserved and true or false,
                 isSelected = isSelected and true or false,
                 isFocused = isFocused and true or false,
@@ -876,8 +879,8 @@ do
         return getRollSession()
     end
 
-    function module:SyncLegacyState(session)
-        syncLegacyRollStateFromSession(session or getRollSession())
+    function module:SyncSessionState(session)
+        syncSessionStateFromRollSession(session or getRollSession())
     end
 
 end

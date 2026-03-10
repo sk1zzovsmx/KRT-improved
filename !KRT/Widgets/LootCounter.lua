@@ -14,6 +14,7 @@ local UIScaffold = addon.UIScaffold
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Bus = feature.Bus or addon.Bus
+local Services = feature.Services or addon.Services or {}
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
@@ -33,8 +34,7 @@ do
     end
 
     addon.Widgets = addon.Widgets or {}
-    addon.Widgets.LootCounter = addon.Widgets.LootCounter or addon.LootCounter or {}
-    addon.LootCounter = addon.Widgets.LootCounter -- Legacy alias during namespacing migration.
+    addon.Widgets.LootCounter = addon.Widgets.LootCounter or {}
     local module = addon.Widgets.LootCounter
 
     -- ----- Internal state ----- --
@@ -128,7 +128,7 @@ do
         if not addon.Core.GetCurrentRaid() then
             return raidPlayers
         end
-        return addon.Raid:GetLootCounterRows(addon.Core.GetCurrentRaid(), raidPlayers)
+        return Services.Raid:GetLootCounterRows(addon.Core.GetCurrentRaid(), raidPlayers)
     end
 
     local function ensureRow(i, rowHeight)
@@ -183,21 +183,21 @@ do
             row.plus:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:AddPlayerCountByNid(playerNid, 1, addon.Core.GetCurrentRaid())
+                    Services.Raid:AddPlayerCountByNid(playerNid, 1, addon.Core.GetCurrentRaid())
                     module:RequestRefresh()
                 end
             end)
             row.minus:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:AddPlayerCountByNid(playerNid, -1, addon.Core.GetCurrentRaid())
+                    Services.Raid:AddPlayerCountByNid(playerNid, -1, addon.Core.GetCurrentRaid())
                     module:RequestRefresh()
                 end
             end)
             row.reset:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:SetPlayerCountByNid(playerNid, 0, addon.Core.GetCurrentRaid())
+                    Services.Raid:SetPlayerCountByNid(playerNid, 0, addon.Core.GetCurrentRaid())
                     module:RequestRefresh()
                 end
             end)
@@ -274,7 +274,7 @@ do
                 row._lastName = name
             end
 
-            local class = data and data.class or addon.Raid:GetPlayerClass(name)
+            local class = data and data.class or Services.Raid:GetPlayerClass(name)
             if row._lastClass ~= class then
                 local r, g, b = Colors.GetClassColor(class)
                 row.name:SetTextColor(r, g, b)
@@ -282,7 +282,7 @@ do
             end
 
             local cnt = (data and tonumber(data.count))
-                or (playerNid and addon.Raid:GetPlayerCountByNid(playerNid, addon.Core.GetCurrentRaid()))
+                or (playerNid and Services.Raid:GetPlayerCountByNid(playerNid, addon.Core.GetCurrentRaid()))
                 or 0
             if row._lastCount ~= cnt then
                 row.count:SetText(tostring(cnt))

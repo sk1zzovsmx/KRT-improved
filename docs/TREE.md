@@ -52,6 +52,8 @@
 |   |   |-- Comms.lua
 |   |   |-- Events.lua
 |   |   |-- Features.lua
+|   |   |-- IgnoredItems.lua
+|   |   |-- IgnoredMobs.lua
 |   |   |-- Item.lua
 |   |   |-- Sort.lua
 |   |   |-- Strings.lua
@@ -86,6 +88,20 @@
 |   \\-- KRT.xml
 |-- .agents
 |   \\-- skills
+|       |-- afd
+|       |   \\-- ...
+|       |-- k-docs
+|       |   \\-- ...
+|       |-- s-audit
+|       |   \\-- ...
+|       |-- s-clean
+|       |   \\-- ...
+|       |-- s-debug
+|       |   \\-- ...
+|       |-- s-lint
+|       |   \\-- ...
+|       |-- s-release
+|       |   \\-- ...
 |       \\-- s-working
 |           \\-- ...
 |-- .devcontainer
@@ -96,20 +112,28 @@
 |-- .vscode
 |   \\-- settings.json
 |-- docs
+|   |-- AGENT_SKILLS.md
 |   |-- ARCHITECTURE.md
 |   |-- FN_CLUSTERS.md
 |   |-- FUNCTION_REGISTRY.csv
 |   |-- FUNCTION_REGISTRY.md
+|   |-- KRT_MCP.md
 |   |-- NAMING_CONVENTIONS.md
 |   |-- RAID_SCHEMA.md
 |   |-- REFACTOR_RULES.md
+|   |-- SV_SANITY_CHECKLIST.md
+|   |-- SV_SCHEMA.md
 |   |-- TREE.md
 |   |-- UI_BINDING_RULES.md
 |   \\-- WOW_ADDON_TEMPLATE.md
 |-- tests
+|   |-- fixtures
+|   |   \\-- sv
+|   |       \\-- ...
 |   \\-- mocks
 |       \\-- DBManager.Mock.lua
 |-- tools
+|   |-- agent-skills.manifest.json
 |   |-- check-layering.ps1
 |   |-- check-lua-syntax.ps1
 |   |-- check-lua-uniformity.ps1
@@ -118,8 +142,17 @@
 |   |-- fnmap-classify.ps1
 |   |-- fnmap-inventory.ps1
 |   |-- install-hooks.ps1
+|   |-- krt_mcp_server.py
+|   |-- mech-bootstrap.ps1
+|   |-- mech-krt.ps1
 |   |-- pre-commit.ps1
+|   |-- run-krt-mcp.ps1
 |   |-- run-raid-validator.ps1
+|   |-- run-sv-inspector.ps1
+|   |-- run-sv-roundtrip.ps1
+|   |-- sv-inspector.lua
+|   |-- sv-roundtrip.lua
+|   |-- sync-agent-skills.ps1
 |   |-- update-tree.ps1
 |   \\-- validate-raid-schema.lua
 |-- .editorconfig

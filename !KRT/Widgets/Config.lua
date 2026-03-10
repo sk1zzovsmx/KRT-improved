@@ -31,8 +31,7 @@ do
     end
 
     addon.Widgets = addon.Widgets or {}
-    addon.Widgets.Config = addon.Widgets.Config or addon.Config or {}
-    addon.Config = addon.Widgets.Config -- Legacy alias during namespacing migration.
+    addon.Widgets.Config = addon.Widgets.Config or {}
     local module = addon.Widgets.Config
     local frameName
 

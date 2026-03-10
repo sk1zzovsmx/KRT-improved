@@ -21,6 +21,10 @@ local C = feature.C
 local Core = feature.Core
 local Bus = feature.Bus or addon.Bus
 local MultiSelect = feature.MultiSelect or addon.MultiSelect
+local Services = feature.Services or addon.Services or {}
+local Loot = Services.Loot
+local Raid = Services.Raid
+local Rolls = Services.Rolls
 local UnitIsGroupLeader = feature.UnitIsGroupLeader
 local UnitIsGroupAssistant = feature.UnitIsGroupAssistant
 
@@ -54,42 +58,37 @@ local pairs, select, next = pairs, select, next
 
 local tostring, tonumber = tostring, tonumber
 
-local function GetLootModule()
-    return addon.Loot
-end
-
 local function GetReservesService()
-    local services = addon.Services
-    return services and services.Reserves or nil
+    return Services.Reserves
 end
 
 local function GetItem(i)
-    local loot = GetLootModule()
+    local loot = Loot
     return loot and loot.GetItem and loot.GetItem(i) or nil
 end
 
 local function GetItemName(i)
-    local loot = GetLootModule()
+    local loot = Loot
     return loot and loot.GetItemName and loot.GetItemName(i) or nil
 end
 
 local function GetItemLink(i)
-    local loot = GetLootModule()
+    local loot = Loot
     return loot and loot.GetItemLink and loot.GetItemLink(i) or nil
 end
 
 local function GetItemTexture(i)
-    local loot = GetLootModule()
+    local loot = Loot
     return loot and loot.GetItemTexture and loot.GetItemTexture(i) or nil
 end
 
 local function ItemExists(i)
-    local loot = GetLootModule()
+    local loot = Loot
     return loot and loot.ItemExists and loot.ItemExists(i) or false
 end
 
 local function ItemIsSoulbound(bag, slot)
-    local loot = GetLootModule()
+    local loot = Loot
     return loot and loot.ItemIsSoulbound and loot.ItemIsSoulbound(bag, slot) or false
 end
 
@@ -237,7 +236,7 @@ do
             module:BtnAward(self, button)
         end)
         Frames.SafeSetScript(refs.rollBtn, "OnClick", function(self, button)
-            addon.Rolls:Roll(self, button)
+            Rolls:Roll(self, button)
         end)
         Frames.SafeSetScript(refs.clearBtn, "OnClick", function(self, button)
             module:BtnClear(self, button)
@@ -271,7 +270,6 @@ do
         count = tonumber(count) or 1
         if count < 1 then count = 1 end
         lootState.selectedItemCount = count
-        lootState.itemCount = count -- Legacy alias for pre-migration call sites.
         UpdateRollSessionExpectedWinners()
         Frames.SetEditBoxValue(itemCountBox, count, focus)
         lastUIState.itemCountText = tostring(count)
@@ -279,9 +277,8 @@ do
     end
 
     local function GetRaidRosterVersion()
-        local raid = addon.Raid
-        if raid and raid.GetRosterVersion then
-            return raid:GetRosterVersion()
+        if Raid and Raid.GetRosterVersion then
+            return Raid:GetRosterVersion()
         end
         return nil
     end
@@ -338,7 +335,7 @@ do
     end
 
     UpdateRollSessionExpectedWinners = function()
-        local session = addon.Rolls:GetRollSession()
+        local session = Rolls:GetRollSession()
         if not session then
             return
         end
@@ -360,7 +357,7 @@ do
         local itemId = Item.GetItemIdFromLink(itemLink)
         local lootNid = 0
         if itemId then
-            lootNid = tonumber(addon.Raid:GetLootID(itemId)) or 0
+            lootNid = tonumber(Raid:GetLootID(itemId)) or 0
         end
 
         local session = {
@@ -379,12 +376,12 @@ do
 
         lootState.rollSession = session
         lootState.rollStarted = true
-        addon.Rolls:SyncLegacyState(session)
+        Rolls:SyncSessionState(session)
         return session
     end
 
     local function EnsureRollSession(itemLink, rollType, source)
-        local session = addon.Rolls:GetRollSession()
+        local session = Rolls:GetRollSession()
         if not session then
             return OpenRollSession(itemLink, rollType, source)
         end
@@ -395,7 +392,7 @@ do
             local itemId = Item.GetItemIdFromLink(itemLink)
             session.itemId = tonumber(itemId) or session.itemId
             if itemId then
-                session.lootNid = tonumber(addon.Raid:GetLootID(itemId)) or tonumber(session.lootNid) or 0
+                session.lootNid = tonumber(Raid:GetLootID(itemId)) or tonumber(session.lootNid) or 0
             end
         end
         if rollType ~= nil then
@@ -408,7 +405,7 @@ do
             session.startedAt = GetTime()
         end
         UpdateRollSessionExpectedWinners()
-        addon.Rolls:SyncLegacyState(session)
+        Rolls:SyncSessionState(session)
         return session
     end
 
@@ -474,16 +471,16 @@ do
             addon:Announce(L.ChatCountdownEnd)
 
             -- At zero: stop roll (enables selection in rolls) and refresh the UI
-            addon.Rolls:RecordRolls(false)
-            addon.Rolls:FetchRolls()
+            Rolls:RecordRolls(false)
+            Rolls:FetchRolls()
             module:RequestRefresh()
         end)
     end
 
     local function FinalizeRollSession()
-        addon.Rolls:RecordRolls(false)
+        Rolls:RecordRolls(false)
         StopCountdown()
-        addon.Rolls:FetchRolls()
+        Rolls:FetchRolls()
         module:RequestRefresh()
     end
 
@@ -609,7 +606,7 @@ do
         if not playerName or playerName == "" then
             return false, "winner_name_unresolved"
         end
-        local unitId = addon.Raid:GetUnitID(playerName)
+        local unitId = Raid:GetUnitID(playerName)
         if not unitId or unitId == "none" then
             return false, "winner_not_in_raid"
         end
@@ -782,7 +779,7 @@ do
         local awardCount = selCount
         if awardCount > target then awardCount = target end
 
-        local picked = addon.Rolls.GetSelectedWinnersOrdered and addon.Rolls:GetSelectedWinnersOrdered() or {}
+        local picked = Rolls and Rolls.GetSelectedWinnersOrdered and Rolls:GetSelectedWinnersOrdered() or {}
         if (not picked) or (#picked < awardCount) then
             return nil, "not_enough_selection", awardCount, picked and #picked or 0
         end
@@ -839,7 +836,7 @@ do
     local function ComputeAwardTargetAndAvailability()
         local target = tonumber(lootState.selectedItemCount) or 1
         if target < 1 then target = 1 end
-        local available = tonumber(addon.Loot:GetCurrentItemCount()) or 1
+        local available = tonumber(Loot:GetCurrentItemCount()) or 1
         if available < 1 then available = 1 end
         if target > available then target = available end
         if lootState.rollsCount and target > lootState.rollsCount then
@@ -883,7 +880,7 @@ do
     end
 
     local function TryAwardSingleCopy(itemLink)
-        local result = AssignItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
+        local result = AssignItem(itemLink, lootState.winner, lootState.currentRollType, Rolls:HighestRoll())
         if result then
             RegisterAwardedItem(1)
         end
@@ -989,10 +986,10 @@ do
         countdownRun = false
         local itemLink = GetItemLink()
         addon:debug(Diag.D.LogMLAwardRequested:format(tostring(lootState.winner),
-            tonumber(lootState.currentRollType) or -1, addon.Rolls:HighestRoll() or 0, tostring(itemLink)))
+            tonumber(lootState.currentRollType) or -1, Rolls:HighestRoll() or 0, tostring(itemLink)))
 
         if lootState.fromInventory == true then
-            local result = TradeItem(itemLink, lootState.winner, lootState.currentRollType, addon.Rolls:HighestRoll())
+            local result = TradeItem(itemLink, lootState.winner, lootState.currentRollType, Rolls:HighestRoll())
             ResetItemCountAndRefresh()
             return result
         end
@@ -1070,8 +1067,8 @@ do
         lootState.itemTraded = (lootState.itemTraded or 0) + increment
         if lootState.itemTraded >= targetCount then
             lootState.itemTraded = 0
-            addon.Rolls:ClearRolls()
-            addon.Rolls:RecordRolls(false)
+            Rolls:ClearRolls()
+            Rolls:RecordRolls(false)
             return true
         end
         return false
@@ -1150,7 +1147,7 @@ do
         if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
             return
         end
-        SetItemCountValue(addon.Loot:GetCurrentItemCount(), focus)
+        SetItemCountValue(Loot:GetCurrentItemCount(), focus)
     end
 
     -- OnLoad frame:
@@ -1222,16 +1219,16 @@ do
         if countdownRun then return end
         ClearMultiAwardState(false)
         if lootState.fromInventory == true then
-            addon.Loot:ClearLoot()
-            addon.Rolls:ClearRolls()
-            addon.Rolls:RecordRolls(false)
+            Loot:ClearLoot()
+            Rolls:ClearRolls()
+            Rolls:RecordRolls(false)
             announced = false
             lootState.fromInventory = false
             itemInfo.count = 0
             itemInfo.isStack = nil
             itemInfo.bagID = nil
             itemInfo.slotID = nil
-            if lootState.opened == true then addon.Loot:FetchLoot() end
+            if lootState.opened == true then Loot:FetchLoot() end
         elseif selectionFrame then
             UIPrimitives.Toggle(selectionFrame)
         end
@@ -1285,14 +1282,14 @@ do
         if lootState.lootCount >= 1 then
             announced = false
             lootState.currentRollType = rollType
-            addon.Rolls:ClearRolls()
-            addon.Rolls:RecordRolls(true)
+            Rolls:ClearRolls()
+            Rolls:RecordRolls(true)
             lootState.itemTraded = 0
 
             local itemLink = GetItemLink()
             local itemID = Item.GetItemIdFromLink(itemLink)
             EnsureRollSession(itemLink, rollType, lootState.fromInventory and "inventory" or "lootWindow")
-            if not addon.Rolls:GetRollSession() then
+            if not Rolls:GetRollSession() then
                 lootState.rollStarted = true
             end
             local message
@@ -1316,11 +1313,11 @@ do
 
             addon:Announce(message)
             _G[frameName .. "ItemCount"]:ClearFocus()
-            local session = addon.Rolls:GetRollSession()
+            local session = Rolls:GetRollSession()
             if session and tonumber(session.lootNid) then
                 lootState.currentRollItem = session.lootNid
             else
-                lootState.currentRollItem = addon.Raid:GetLootID(itemID)
+                lootState.currentRollItem = Raid:GetLootID(itemID)
             end
             module:RequestRefresh()
         end
@@ -1341,7 +1338,7 @@ do
         end
         if ok and not lootState.fromInventory then
             announced = false
-            addon.Rolls:ClearRolls()
+            Rolls:ClearRolls()
         end
         module:RequestRefresh()
         return ok
@@ -1377,7 +1374,7 @@ do
                 FinalizeRollSession()
                 return
             end
-            addon.Rolls:RecordRolls(true)
+            Rolls:RecordRolls(true)
             announced = false
             StartCountdown()
             module:RequestRefresh()
@@ -1387,7 +1384,7 @@ do
     -- Button: Clear Rolls
     function module:BtnClear(btn)
         announced = false
-        addon.Rolls:ClearRolls()
+        Rolls:ClearRolls()
         module:RequestRefresh()
     end
 
@@ -1418,7 +1415,7 @@ do
         if index ~= nil then
             announced = false
             selectionFrame:Hide()
-            addon.Loot:SelectItem(index)
+            Loot:SelectItem(index)
             ResetItemCountAndRefresh()
         end
     end
@@ -1506,12 +1503,10 @@ do
             local count = tonumber(rawCount)
             if count and count > 0 then
                 lootState.selectedItemCount = count
-                lootState.itemCount = lootState.selectedItemCount -- Legacy alias.
                 UpdateRollSessionExpectedWinners()
                 if lootState.fromInventory and itemInfo.count and itemInfo.count ~= lootState.selectedItemCount then
                     if itemInfo.count < lootState.selectedItemCount then
                         lootState.selectedItemCount = itemInfo.count
-                        lootState.itemCount = lootState.selectedItemCount -- Legacy alias.
                         UpdateRollSessionExpectedWinners()
                         itemCountBox:SetNumber(itemInfo.count)
                         lastUIState.itemCountText = tostring(itemInfo.count)
@@ -1523,7 +1518,7 @@ do
     end
 
     local function UpdateRollStatusState()
-        local rollType, record, canRoll, rolled = addon.Rolls:RollStatus()
+        local rollType, record, canRoll, rolled = Rolls:RollStatus()
         local rollStatus = lastUIState.rollStatus
         if rollStatus.record ~= record
             or rollStatus.canRoll ~= canRoll
@@ -1549,7 +1544,7 @@ do
             btn:SetScript("OnClick", function(self)
                 local isShift = IsShiftKeyDown and IsShiftKeyDown() or false
                 local isControl = IsControlKeyDown and IsControlKeyDown() or false
-                if addon.Rolls:SelectWinner(self.playerName, isShift, isControl) then
+                if Rolls:SelectWinner(self.playerName, isShift, isControl) then
                     module:RequestRefresh()
                 end
             end)
@@ -1566,7 +1561,7 @@ do
             return
         end
 
-        local model = addon.Rolls:GetDisplayModel() or {}
+        local model = Rolls:GetDisplayModel() or {}
         local rows = model.rows or {}
         local count = #rows
 
@@ -1847,7 +1842,7 @@ do
         lootState[field.stateKey] = raid[field.raidKey]
 
         -- Clear if unit is no longer in raid
-        if lootState[field.stateKey] and addon.Raid:GetUnitID(lootState[field.stateKey]) == "none" then
+        if lootState[field.stateKey] and Raid:GetUnitID(lootState[field.stateKey]) == "none" then
             raid[field.raidKey] = nil
             lootState[field.stateKey] = nil
         end
@@ -1965,8 +1960,8 @@ do
         Frames.ResetEditBox(_G[frameName .. "ItemCount"], true)
 
         lootState.fromInventory = true
-        addon.Loot:AddItem(itemLink, itemCount)
-        addon.Loot:PrepareItem()
+        Loot:AddItem(itemLink, itemCount)
+        Loot:PrepareItem()
         announced = false
 
         itemInfo.bagID = inBag
@@ -2061,14 +2056,14 @@ do
 
     local function CompleteLootClosedCleanup()
         lootState.opened = false
-        addon.Loot:PurgePendingAwards(PENDING_AWARD_TTL_SECONDS)
+        Loot:PurgePendingAwards(PENDING_AWARD_TTL_SECONDS)
         local frame = getFrame()
         if frame then
             frame:Hide()
         end
-        addon.Loot:ClearLoot()
-        addon.Rolls:ClearRolls()
-        addon.Rolls:RecordRolls(false)
+        Loot:ClearLoot()
+        Rolls:ClearRolls()
+        Rolls:RecordRolls(false)
         module:RequestRefresh()
     end
 
@@ -2092,10 +2087,10 @@ do
     -- LOOT_OPENED: Triggered when the loot window opens.
     function module:LOOT_OPENED()
         CancelLootClosedCleanup()
-        if addon.Raid:IsMasterLooter() then
+        if Raid:IsMasterLooter() then
             lootState.opened = true
             announced = false
-            addon.Loot:FetchLoot()
+            Loot:FetchLoot()
             addon:trace(Diag.D.LogMLLootOpenedTrace:format(lootState.lootCount or 0,
                 tostring(lootState.fromInventory)))
             UpdateSelectionFrame()
@@ -2107,7 +2102,7 @@ do
 
     -- LOOT_CLOSED: Triggered when the loot window closes.
     function module:LOOT_CLOSED()
-        if addon.Raid:IsMasterLooter() then
+        if Raid:IsMasterLooter() then
             addon:trace(Diag.D.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
             addon:trace(Diag.D.LogMLLootClosedCleanup)
             ClearMultiAwardState(false)
@@ -2117,8 +2112,8 @@ do
 
     -- LOOT_SLOT_CLEARED: Triggered when an item is looted.
     function module:LOOT_SLOT_CLEARED(clearedSlot)
-        if addon.Raid:IsMasterLooter() then
-            addon.Loot:FetchLoot()
+        if Raid:IsMasterLooter() then
+            Loot:FetchLoot()
             addon:trace(Diag.D.LogMLLootSlotCleared:format(lootState.lootCount or 0))
             UpdateSelectionFrame()
             module:ResetItemCount()
@@ -2135,11 +2130,10 @@ do
         if lootState.trader and lootState.winner and lootState.trader ~= lootState.winner then
             if tAccepted == 1 and pAccepted == 1 then
                 local awardedCount = ResolveTradeAwardedCount()
-                local rollValue = addon.Rolls:HighestRoll()
+                local rollValue = Rolls:HighestRoll()
                 local lootNid = tonumber(lootState.currentRollItem) or 0
                 if lootNid <= 0 and tonumber(lootState.tradeItemId) then
-                    local recovered = addon.Raid:GetLootID(lootState.tradeItemId, addon.Core.GetCurrentRaid(),
-                        lootState.winner)
+                    local recovered = Raid:GetLootID(lootState.tradeItemId, addon.Core.GetCurrentRaid(), lootState.winner)
                     recovered = tonumber(recovered) or 0
                     if recovered > 0 then
                         lootNid = recovered
@@ -2163,8 +2157,8 @@ do
                             tostring(lootNid), tostring(lootState.tradeItemLink or GetItemLink())))
                     end
                 else
-                    local rollSession = addon.Rolls:GetRollSession()
-                    local created = addon.Raid.LogTradeOnlyLoot and addon.Raid:LogTradeOnlyLoot(
+                    local rollSession = Rolls:GetRollSession()
+                    local created = Raid.LogTradeOnlyLoot and Raid:LogTradeOnlyLoot(
                         lootState.tradeItemLink or GetItemLink(),
                         lootState.winner,
                         lootState.currentRollType,
@@ -2192,14 +2186,14 @@ do
 
                 -- LootCounter (MS only): trade awards don't emit LOOT_ITEM for the winner.
                 if tonumber(lootState.currentRollType) == rollTypes.MAINSPEC then
-                    addon.Raid:AddPlayerCount(lootState.winner, awardedCount, addon.Core.GetCurrentRaid())
+                    Raid:AddPlayerCount(lootState.winner, awardedCount, addon.Core.GetCurrentRaid())
                 end
 
                 local done = RegisterAwardedItem(awardedCount)
                 ResetTradeState()
                 if done then
-                    addon.Loot:ClearLoot()
-                    addon.Raid:ClearRaidIcons()
+                    Loot:ClearLoot()
+                    Raid:ClearRaidIcons()
                 end
                 screenshotWarn = false
                 module:RequestRefresh()
@@ -2227,7 +2221,7 @@ do
             return false
         end
 
-        if not (addon.Raid and addon.Raid.IsMasterLooter and addon.Raid:IsMasterLooter()) then
+        if not (Raid and Raid.IsMasterLooter and Raid:IsMasterLooter()) then
             addon:warn(L.WarnMLNoPermission)
             RefreshCandidateUiState()
             module:RequestRefresh()
@@ -2251,7 +2245,7 @@ do
             -- Mark this award as addon-driven so AddLoot() won't classify it as MANUAL
             local session = EnsureRollSession(itemLink, rollType, lootState.fromInventory and "inventory" or
                 "lootWindow")
-            addon.Loot:QueuePendingAward(itemLink, playerName, rollType, rollValue, session and session.id or nil)
+            Loot:QueuePendingAward(itemLink, playerName, rollType, rollValue, session and session.id or nil)
             GiveMasterLoot(itemIndex, candidateIndex)
             addon:debug(Diag.D.LogMLAwarded:format(tostring(itemLink), tostring(playerName),
                 tonumber(rollType) or -1, tonumber(rollValue) or 0, tonumber(itemIndex) or -1,
@@ -2316,13 +2310,13 @@ do
     end
 
     local function BuildTradeMultiWinnersOutput()
-        addon.Raid:ClearRaidIcons()
+        Raid:ClearRaidIcons()
         if lootState.trader ~= lootState.winner then
             SetRaidTarget(lootState.trader, 1)
         end
 
         local winners = {}
-        local rolls = addon.Rolls:GetRolls()
+        local rolls = Rolls:GetRolls()
         local maxWinners = tonumber(lootState.selectedItemCount) or 0
         for i = 1, maxWinners do
             local roll = rolls[i]
@@ -2414,14 +2408,14 @@ do
     end
 
     local function TryInitiateTrade(itemLink, playerName, isAwardRoll)
-        local unit = addon.Raid:GetUnitID(playerName)
+        local unit = Raid:GetUnitID(playerName)
         if unit == "none" then
             return true, nil
         end
 
         if CheckInteractDistance(unit, 2) ~= 1 then
             addon:warn(Diag.W.LogTradeDelayedOutOfRange:format(tostring(playerName), tostring(itemLink)))
-            addon.Raid:ClearRaidIcons()
+            Raid:ClearRaidIcons()
             SetRaidTarget(lootState.trader, 1)
             if isAwardRoll then
                 SetRaidTarget(playerName, 4)
@@ -2463,9 +2457,9 @@ do
         end
         if whisper then
             if playerName == lootState.trader then
-                addon.Loot:ClearLoot()
-                addon.Rolls:ClearRolls()
-                addon.Rolls:RecordRolls(false)
+                Loot:ClearLoot()
+                Rolls:ClearRolls()
+                Rolls:RecordRolls(false)
             else
                 Comms.Whisper(playerName, whisper)
             end
@@ -2522,13 +2516,13 @@ do
 
             -- LootCounter (MS only): award is immediate (no trade window completion event).
             if tonumber(rollType) == rollTypes.MAINSPEC then
-                addon.Raid:AddPlayerCount(playerName, awardedCount, addon.Core.GetCurrentRaid())
+                Raid:AddPlayerCount(playerName, awardedCount, addon.Core.GetCurrentRaid())
             end
 
             local done = RegisterAwardedItem(awardedCount)
             if done then
-                addon.Loot:ClearLoot()
-                addon.Raid:ClearRaidIcons()
+                Loot:ClearLoot()
+                Raid:ClearRaidIcons()
             end
         else
             local ok, outputOverride = TryInitiateTrade(itemLink, playerName, isAwardRoll)

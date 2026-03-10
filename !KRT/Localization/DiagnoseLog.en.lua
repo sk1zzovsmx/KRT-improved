@@ -31,6 +31,8 @@ Diag.W.LogLegacyAliasAccess = "[Compat] Legacy alias used alias=%s target=%s sit
 
 -- Raid --
 Diag.D.LogRaidLeftGroupEndSession = "[Raid] Left group -> ending current raid session"
+Diag.W.LogRaidLegacyFieldsDetected = "[RaidStore] Legacy fields phase=%s raidNid=%s idx=%s runtime=%s "
+    .. "looter=%d mask=%d"
 Diag.D.LogRaidRosterUpdate = "[Raid] RosterUpdate v=%d num=%d"
 Diag.I.LogRaidCreated = "[Raid] Created id=%d zone=%s size=%d players=%d"
 Diag.I.LogRaidEnded = "[Raid] Ended id=%d zone=%s size=%d bosses=%d loot=%d duration=%d"
@@ -51,6 +53,9 @@ Diag.D.LogBossLastBossHash = "[Boss] lastBoss=%d hash=%s"
 Diag.D.LogBossNoContextTrash = "[Boss] No boss context -> creating _TrashMob_ bucket"
 Diag.D.LogBossYellMatched = "[Boss] Yell matched text=%s boss=%s"
 Diag.D.LogBossUnitDiedMatched = "[Boss] UNIT_DIED matched npcId=%d boss=%s"
+Diag.D.LogBossUnitDiedIgnored = "[Boss] UNIT_DIED ignored npcId=%d boss=%s"
+Diag.D.LogBossDuplicateSuppressed =
+    "[Boss] Duplicate suppressed boss=%s sourceNpcId=%d existingBossNid=%d delta=%d"
 
 -- Loot --
 Diag.D.LogLootParseFailed = "[Loot] Parse failed msg=%s"
@@ -131,6 +136,8 @@ Diag.D.LogRollsAcceptedPlayer = "[Rolls] Accepted player=%s (%d/%d)"
 Diag.D.LogRollsCurrentItemId = "[Rolls] Current itemId=%s"
 
 -- Reserves --
+Diag.W.LogReservesLegacyFieldsDetected =
+    "[Reserves] Legacy fields phase=%s original=%d rowPlayer=%d dropped=%d merged=%d"
 Diag.D.LogReservesTrackPending = "[Reserves] Track pending itemId=%d pending=%d"
 Diag.D.LogReservesItemReady = "[Reserves] Item ready itemId=%d pending=%d"
 Diag.D.LogReservesPendingComplete = "[Reserves] Pending item info complete"

@@ -9,22 +9,32 @@ local feature = addon.Core.GetFeatureShared()
 addon.DBManager = addon.DBManager or {}
 local DBManager = addon.DBManager
 
+-- ----- Internal state ----- --
 DBManager.SavedVariables = DBManager.SavedVariables or {}
 local SavedVariablesManager = DBManager.SavedVariables
 DBManager.Default = SavedVariablesManager
 
+local function getAddonDbStore(storeKey)
+    local db = addon.DB
+    if type(db) ~= "table" then
+        return nil
+    end
+    return db[storeKey]
+end
+
+-- ----- Public methods ----- --
 function DBManager.CreateManager(stores)
     stores = stores or {}
 
     local manager = {}
     local state = {
-        raidStore = stores.raidStore or stores.RaidStore or nil,
-        raidQueries = stores.raidQueries or stores.RaidQueries or nil,
-        raidMigrations = stores.raidMigrations or stores.RaidMigrations or nil,
-        raidValidator = stores.raidValidator or stores.RaidValidator or nil,
-        syncer = stores.syncer or stores.Syncer or nil,
-        charStore = stores.charStore or stores.CharStore or nil,
-        configStore = stores.configStore or stores.ConfigStore or nil,
+        raidStore = stores.raidStore,
+        raidQueries = stores.raidQueries,
+        raidMigrations = stores.raidMigrations,
+        raidValidator = stores.raidValidator,
+        syncer = stores.syncer,
+        charStore = stores.charStore,
+        configStore = stores.configStore,
     }
 
     function manager:GetRaidStore()
@@ -94,28 +104,23 @@ function DBManager.CreateManager(stores)
 end
 
 function SavedVariablesManager:GetRaidStore()
-    local db = addon.DB
-    return db and db.RaidStore or nil
+    return getAddonDbStore("RaidStore")
 end
 
 function SavedVariablesManager:GetRaidQueries()
-    local db = addon.DB
-    return db and db.RaidQueries or nil
+    return getAddonDbStore("RaidQueries")
 end
 
 function SavedVariablesManager:GetRaidMigrations()
-    local db = addon.DB
-    return db and db.RaidMigrations or nil
+    return getAddonDbStore("RaidMigrations")
 end
 
 function SavedVariablesManager:GetRaidValidator()
-    local db = addon.DB
-    return db and db.RaidValidator or nil
+    return getAddonDbStore("RaidValidator")
 end
 
 function SavedVariablesManager:GetSyncer()
-    local db = addon.DB
-    return db and db.Syncer or nil
+    return getAddonDbStore("Syncer")
 end
 
 function SavedVariablesManager:GetCharStore()

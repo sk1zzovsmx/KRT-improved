@@ -85,10 +85,6 @@ do
         if looterNid and looterNid > 0 then
             return looterNid
         end
-        local legacyNid = tonumber(loot.looter)
-        if legacyNid and legacyNid > 0 then
-            return legacyNid
-        end
         return nil
     end
 
@@ -100,9 +96,6 @@ do
                 return player.name, looterNid
             end
             return nil, looterNid
-        end
-        if type(loot) == "table" and type(loot.looter) == "string" then
-            return loot.looter, nil
         end
         return nil, nil
     end

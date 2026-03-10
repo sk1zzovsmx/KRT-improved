@@ -4,6 +4,41 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Refactor:** Centralized loot/item and boss-add ignore lookups into `Modules/IgnoredItems.lua`
+  and `Modules/IgnoredMobs.lua`, removing large hardcoded filter tables from `Services/Raid.lua`.
+- **Behavior:** Boss filtering now uses the curated raid-only `IgnoredMobs` module to suppress
+  LibBossIDs encounter adds, phase units, and support NPCs from Vanilla through Wrath.
+- **Bugfix:** Boss filtering now treats `LibBossIDs` as a first-pass allowlist and ignores known
+  encounter-helper false positives (for example `Death Knight Understudy`), while suppressing
+  near-duplicate boss logs so loot stays attached to the real boss context.
+- **Behavior:** `KRT_Reserves` now persists readable player-name keys and strips duplicated
+  `playerNameDisplay`; lowercase reserve-name lookup keys remain runtime-only and legacy reserve
+  name fields are normalized on load/save.
+- **Refactor:** Legacy fallback sunset for raid loot winner resolution: runtime/query paths now resolve
+  winners from `loot.looterNid` only; legacy `loot.looter` is diagnostics-only and stripped on normalize/save.
+- **Refactor:** Legacy fallback sunset for reserves: canonical display resolution now uses
+  `playerNameDisplay` only, and runtime reserve rows no longer use legacy `player` fallback fields.
+- **Tooling:** Updated `tools/sv-roundtrip.lua` and `tools/sv-inspector.lua` to enforce strict canonical
+  checks (no winner resolution fallback from legacy `loot.looter` and no reserve-name fallback from `original`).
+- **Docs:** Marked SV contract with explicit "legacy sunset" status in `docs/RAID_SCHEMA.md` and
+  `docs/SV_SANITY_CHECKLIST.md`, including the pre-release schema freeze gate.
+- **Behavior:** `schemaVersion` stays at `3`; `v4` is deferred until a net structural simplification is needed.
+- **Behavior:** Added a unified canonical SV save pipeline (`Core.PrepareSavedVariablesForSave`)
+  executed at `PLAYER_LOGOUT`, so both `KRT_Raids` and `KRT_Reserves` are normalized before persistence.
+- **Diagnostics:** Added explicit legacy-field warnings during SV load/save hardening:
+  raid warnings now cover legacy runtime caches + `loot[].looter` + `bossKills[].attendanceMask`,
+  and reserves warnings now cover legacy `original`/row `player` payload fields and dropped invalid rows.
+- **Tooling:** Added `tools/sv-roundtrip.lua` and `tools/run-sv-roundtrip.ps1` for
+  `load -> normalize -> save -> reload` no-drift validation on `KRT_Raids` + `KRT_Reserves`.
+- **Tooling:** Added mixed legacy fixtures under `tests/fixtures/sv/` for automated
+  compatibility validation against old/mixed SavedVariables payloads.
+- **Behavior:** Reserves SV naming/storage was canonicalized: player containers now
+  persist a single readable player-name key (replacing lowercase keys +
+  duplicated `playerNameDisplay`), and reserve rows no longer persist duplicated
+  `player` display-name fields; legacy data is migrated on load/save.
+- **Behavior:** Raid schema bumped to `v3` with lean persistence compaction at logout:
+  default-only/empty optional raid fields are omitted from SavedVariables while
+  runtime readers continue applying defaults for backward-compatible behavior.
 - **Behavior:** Raid schema bumped to `v2`; boss attendees are now stored as `playerNid` arrays
   (`bossKills[].players`) and loot winners are stored as `looterNid` (`loot[].looterNid`) to
   reduce SavedVariables duplication.

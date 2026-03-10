@@ -40,6 +40,8 @@ Modules\Events.lua
 Modules\Colors.lua
 Modules\Strings.lua
 Modules\Item.lua
+Modules\IgnoredItems.lua
+Modules\IgnoredMobs.lua
 Modules\Comms.lua
 Modules\Time.lua
 Modules\Base64.lua

@@ -16,6 +16,8 @@ local Bus = feature.Bus or addon.Bus
 local Strings = feature.Strings or addon.Strings
 local Time = feature.Time or addon.Time
 local Base64 = feature.Base64 or addon.Base64
+local IgnoredItems = feature.IgnoredItems or addon.IgnoredItems or {}
+local IgnoredMobs = feature.IgnoredMobs or addon.IgnoredMobs or {}
 
 local InternalEvents = Events.Internal
 
@@ -37,8 +39,7 @@ local UnitRace, UnitSex = UnitRace, UnitSex
 -- Manages raid state, roster, boss kills, and loot logging.
 do
     addon.Services = addon.Services or {}
-    addon.Services.Raid = addon.Services.Raid or addon.Raid or {}
-    addon.Raid              = addon.Services.Raid -- Legacy alias during namespacing migration.
+    addon.Services.Raid = addon.Services.Raid or {}
     local module            = addon.Services.Raid
     -- ----- Internal state ----- --
     local numRaid           = 0
@@ -56,69 +57,18 @@ do
     local RETRY_DELAY_SECONDS = 1
     local RETRY_MAX_ATTEMPTS = 5
     local RAID_INSTANCE_CHECK_DELAYS = { 0.3, 0.8, 1.5, 2.5, 3.5 }
+
+    local function getLootService()
+        local services = addon.Services
+        return services and services.Loot or nil
+    end
+
+    local function getRollsService()
+        local services = addon.Services
+        return services and services.Rolls or nil
+    end
+    local BOSS_KILL_DEDUPE_WINDOW_SECONDS = tonumber(C.BOSS_KILL_DEDUPE_WINDOW_SECONDS) or 30
     local PENDING_AWARD_TTL_SECONDS = C.PENDING_AWARD_TTL_SECONDS
-    local IGNORED_ITEMS = {
-        -- Emblems (Wrath of the Lich King)
-        [40752] = true, -- Emblem of Heroism
-        [40753] = true, -- Emblem of Valor
-        [45624] = true, -- Emblem of Conquest
-        [47241] = true, -- Emblem of Triumph
-        [49426] = true, -- Emblem of Frost
-        -- Emblems and Tokens (The Burning Crusade)
-        [29434] = true, -- Badge of Justice
-        [29736] = true, -- Arcane Tome
-        [29737] = true, -- Firewing Signet
-        [29738] = true, -- Fel Armament
-        [29739] = true, -- Sunfury Signet
-        [29740] = true, -- Mark of Sargeras
-        [29741] = true, -- Fel Armament
-        -- High-end Gems
-        [36931] = true, -- Ametrine
-        [36919] = true, -- Cardinal Ruby
-        [36928] = true, -- Dreadstone
-        [36934] = true, -- Eye of Zul
-        [36922] = true, -- King's Amber
-        [36925] = true, -- Majestic Zircon
-        -- Enchanting Materials - Classic
-        [10940] = true, -- Strange Dust
-        [10938] = true, -- Lesser Magic Essence
-        [10939] = true, -- Greater Magic Essence
-        [10978] = true, -- Small Glimmering Shard
-        [10998] = true, -- Lesser Astral Essence
-        [11082] = true, -- Greater Astral Essence
-        [11083] = true, -- Soul Dust
-        [11084] = true, -- Large Glimmering Shard
-        [11134] = true, -- Lesser Mystic Essence
-        [11135] = true, -- Greater Mystic Essence
-        [11137] = true, -- Vision Dust
-        [11138] = true, -- Small Glowing Shard
-        [11139] = true, -- Large Glowing Shard
-        [11174] = true, -- Lesser Nether Essence
-        [11175] = true, -- Greater Nether Essence
-        [11176] = true, -- Dream Dust
-        [11177] = true, -- Small Radiant Shard
-        [11178] = true, -- Large Radiant Shard
-        [14343] = true, -- Small Brilliant Shard
-        [14344] = true, -- Large Brilliant Shard
-        [16202] = true, -- Lesser Eternal Essence
-        [16203] = true, -- Greater Eternal Essence
-        [16204] = true, -- Illusion Dust
-        [20725] = true, -- Nexus Crystal
-        -- Enchanting Materials - The Burning Crusade
-        [22445] = true, -- Arcane Dust
-        [22446] = true, -- Greater Planar Essence
-        [22447] = true, -- Lesser Planar Essence
-        [22448] = true, -- Small Prismatic Shard
-        [22449] = true, -- Large Prismatic Shard
-        [22450] = true, -- Void Crystal
-        -- Enchanting Materials - Wrath of the Lich King
-        [34052] = true, -- Dream Shard
-        [34053] = true, -- Small Dream Shard
-        [34054] = true, -- Infinite Dust
-        [34055] = true, -- Greater Cosmic Essence
-        [34056] = true, -- Lesser Cosmic Essence
-        [34057] = true, -- Abyss Crystal
-    }
 
     -- ----- Private helpers ----- --
     local function isUnknownName(name)
@@ -256,14 +206,14 @@ do
         if type(loot) ~= "table" then
             return nil
         end
-        local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter)
+        local looterNid = tonumber(loot.looterNid)
         if looterNid and looterNid > 0 then
             local player = findRaidPlayerByNid(raid, looterNid)
             if player and player.name then
                 return player.name
             end
         end
-        return type(loot.looter) == "string" and loot.looter or nil
+        return nil
     end
 
     local function resolveRaidDifficulty(instanceDiff)
@@ -324,6 +274,33 @@ do
         return true
     end
 
+    local function shouldIgnoreBossKillNpcId(npcId)
+        if type(IgnoredMobs.Contains) ~= "function" then
+            return false
+        end
+        return IgnoredMobs.Contains(npcId)
+    end
+
+    local function findRecentBossKillByName(raid, bossName, now)
+        if not raid or not bossName then
+            return nil, nil
+        end
+
+        local bossKills = raid.bossKills or {}
+        for i = #bossKills, 1, -1 do
+            local bossKill = bossKills[i]
+            local killTime = tonumber(bossKill and bossKill.time) or 0
+            local delta = now - killTime
+            if delta > BOSS_KILL_DEDUPE_WINDOW_SECONDS then
+                return nil, nil
+            end
+            if delta >= 0 and bossKill and bossKill.name == bossName then
+                return bossKill, delta
+            end
+        end
+        return nil, nil
+    end
+
     -- ----- Public methods ----- --
 
     function module:GetRosterVersion()
@@ -370,7 +347,10 @@ do
     end
 
     function module:IsIgnoredItem(itemId)
-        return IGNORED_ITEMS[tonumber(itemId)] == true
+        if type(IgnoredItems.Contains) ~= "function" then
+            return false
+        end
+        return IgnoredItems.Contains(itemId)
     end
 
     -- Updates the current raid roster, adding new players and marking those who left.
@@ -822,21 +802,43 @@ do
     end
 
     -- Adds a boss kill to the active raid log.
-    function module:AddBoss(bossName, manDiff, raidNum)
+    function module:AddBoss(bossName, manDiff, raidNum, sourceNpcId)
+        sourceNpcId = tonumber(sourceNpcId)
+        if sourceNpcId and shouldIgnoreBossKillNpcId(sourceNpcId) then
+            addon:trace(Diag.D.LogBossUnitDiedIgnored:format(sourceNpcId, tostring(bossName)))
+            return 0
+        end
+
+        if isUnknownName(bossName) then
+            bossName = nil
+        end
+
         raidNum = raidNum or Core.GetCurrentRaid()
         if not raidNum or not bossName then
             addon:debug(Diag.D.LogBossAddSkipped:format(tostring(raidNum), tostring(bossName)))
-            return
+            return 0
         end
 
         local raid = Core.EnsureRaidById(raidNum)
-        if not raid then return end
+        if not raid then return 0 end
         Core.EnsureRaidSchema(raid)
 
         local instanceDiff = resolveRaidDifficulty()
         if manDiff then
             instanceDiff = (raid.size == 10) and 1 or 2
             if Strings.NormalizeLower(manDiff, true) == "h" then instanceDiff = instanceDiff + 2 end
+        end
+
+        local currentTime = Time.GetCurrentTime()
+        local existingBoss, delta = findRecentBossKillByName(raid, bossName, currentTime)
+        if existingBoss then
+            local existingBossNid = tonumber(existingBoss.bossNid) or 0
+            if existingBossNid > 0 then
+                Core.SetLastBoss(existingBossNid)
+            end
+            addon:trace(Diag.D.LogBossDuplicateSuppressed:format(tostring(bossName), sourceNpcId or -1,
+                existingBossNid, tonumber(delta) or -1))
+            return existingBossNid
         end
 
         local players = {}
@@ -867,7 +869,6 @@ do
             end
         end
 
-        local currentTime = Time.GetCurrentTime()
         local bossNid = tonumber(raid.nextBossNid) or 1
         raid.nextBossNid = bossNid + 1
 
@@ -886,6 +887,7 @@ do
         addon:info(Diag.I.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1,
             tonumber(raidNum) or -1, #players))
         addon:debug(Diag.D.LogBossLastBossHash:format(tonumber(Core.GetLastBoss()) or -1, tostring(killInfo.hash)))
+        return bossNid
     end
 
     -- Adds a loot item to the active raid log.
@@ -959,7 +961,8 @@ do
         local rollSessionId
         -- Resolve award source: pending award -> master-looter manual -> current roll type.
         if not rollType then
-            local p = addon.Loot:ConsumePendingAward(itemLink, player, PENDING_AWARD_TTL_SECONDS)
+            local lootService = getLootService()
+            local p = lootService and lootService:ConsumePendingAward(itemLink, player, PENDING_AWARD_TTL_SECONDS)
             if p then
                 rollType = p.rollType
                 rollValue = p.rollValue
@@ -980,7 +983,8 @@ do
         end
 
         if not rollValue then
-            rollValue = addon.Rolls:HighestRoll() or 0
+            local rollsService = getRollsService()
+            rollValue = rollsService and rollsService:HighestRoll() or 0
         end
 
         local raid = Core.EnsureRaidById(Core.GetCurrentRaid())

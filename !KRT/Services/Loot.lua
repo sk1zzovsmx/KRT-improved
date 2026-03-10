@@ -33,8 +33,7 @@ local PENDING_AWARD_TTL_SECONDS = C.PENDING_AWARD_TTL_SECONDS
 -- Manages the loot window items (fetching from loot/inventory).
 do
     addon.Services = addon.Services or {}
-    addon.Services.Loot = addon.Services.Loot or addon.Loot or {}
-    addon.Loot = addon.Services.Loot -- Legacy alias during namespacing migration.
+    addon.Services.Loot = addon.Services.Loot or {}
     local module = addon.Services.Loot
 
     -- ----- Internal state ----- --
@@ -107,11 +106,11 @@ do
         local key = BuildPendingAwardKey(itemLink, looter)
         local list = lootState.pendingAwards[key]
         if not list then
-            local legacyKey = BuildPendingAwardKey(itemLink, looter, true)
-            if legacyKey ~= key and lootState.pendingAwards[legacyKey] then
-                list = lootState.pendingAwards[legacyKey]
+            local rawLinkKey = BuildPendingAwardKey(itemLink, looter, true)
+            if rawLinkKey ~= key and lootState.pendingAwards[rawLinkKey] then
+                list = lootState.pendingAwards[rawLinkKey]
                 lootState.pendingAwards[key] = list
-                lootState.pendingAwards[legacyKey] = nil
+                lootState.pendingAwards[rawLinkKey] = nil
             end
         end
         if not list then
@@ -136,9 +135,9 @@ do
         local key = BuildPendingAwardKey(itemLink, looter)
         local list = lootState.pendingAwards[key]
         if not list then
-            local legacyKey = BuildPendingAwardKey(itemLink, looter, true)
-            if legacyKey ~= key then
-                key = legacyKey
+            local rawLinkKey = BuildPendingAwardKey(itemLink, looter, true)
+            if rawLinkKey ~= key then
+                key = rawLinkKey
                 list = lootState.pendingAwards[key]
             end
         end

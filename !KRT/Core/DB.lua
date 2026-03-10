@@ -47,6 +47,19 @@ local function getManagerStore(methodName)
     return getter(manager)
 end
 
+local function warnMissingRaidStoreOnce(warnKey, template, fallbackFmt, arg1, arg2)
+    if missingRaidStoreWarned[warnKey] then
+        return
+    end
+
+    missingRaidStoreWarned[warnKey] = true
+    if type(template) == "string" then
+        addon:warn(template:format(arg1, arg2))
+    else
+        addon:warn(fallbackFmt, arg1, arg2)
+    end
+end
+
 -- ----- Public methods ----- --
 function DB.SetManager(manager)
     if manager == nil or type(manager) == "table" then
@@ -74,15 +87,8 @@ function Core.GetRaidStoreOrNil(contextTag, requiredMethods)
 
     if type(raidStore) ~= "table" then
         local warnKey = "store:" .. ctx
-        if not missingRaidStoreWarned[warnKey] then
-            missingRaidStoreWarned[warnKey] = true
-            local template = Diag.W and Diag.W.LogRaidStoreUnavailable
-            if type(template) == "string" then
-                addon:warn(template:format(ctx))
-            else
-                addon:warn("[Core] RaidStore unavailable (context=%s)", ctx)
-            end
-        end
+        local template = Diag.W and Diag.W.LogRaidStoreUnavailable
+        warnMissingRaidStoreOnce(warnKey, template, "[Core] RaidStore unavailable (context=%s)", ctx)
         return nil
     end
 
@@ -91,15 +97,14 @@ function Core.GetRaidStoreOrNil(contextTag, requiredMethods)
             local method = requiredMethods[i]
             if type(method) == "string" and method ~= "" and type(raidStore[method]) ~= "function" then
                 local warnKey = "method:" .. ctx .. ":" .. method
-                if not missingRaidStoreWarned[warnKey] then
-                    missingRaidStoreWarned[warnKey] = true
-                    local template = Diag.W and Diag.W.LogRaidStoreMethodMissing
-                    if type(template) == "string" then
-                        addon:warn(template:format(method, ctx))
-                    else
-                        addon:warn("[Core] RaidStore missing method %s (context=%s)", method, ctx)
-                    end
-                end
+                local template = Diag.W and Diag.W.LogRaidStoreMethodMissing
+                warnMissingRaidStoreOnce(
+                    warnKey,
+                    template,
+                    "[Core] RaidStore missing method %s (context=%s)",
+                    method,
+                    ctx
+                )
                 return nil
             end
         end

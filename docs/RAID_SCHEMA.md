@@ -1,13 +1,14 @@
 # Raid Schema Contract (`KRT_Raids`)
 
 This document defines the canonical persisted shape of raid history records.
-Current schema version: `2`.
+Current schema version: `3`.
+Legacy sunset status: strict canonical reads are enabled; legacy payload keys are diagnostics-only and stripped.
 
 ## RaidRecord (`KRT_Raids[i]`)
 
 | Field | Type | Req | Default | Notes |
 | --- | --- | --- | --- | --- |
-| `schemaVersion` | number | yes | `2` | Record schema version for migrations. |
+| `schemaVersion` | number | yes | `3` | Record schema version for normalization/validation. |
 | `raidNid` | number | yes | auto | Stable raid identifier (not array index). |
 | `realm` | string | no | `nil` | Realm name when the raid started. |
 | `zone` | string | no | `nil` | Raid zone name. |
@@ -15,6 +16,9 @@ Current schema version: `2`.
 | `difficulty` | number | no | `nil` | 3.3.5a raid difficulty code. |
 | `startTime` | number | yes | `time()` | Session start (unix seconds). |
 | `endTime` | number | no | `nil` | Session end (unix seconds). |
+| `holder` | string | no | `nil` | Optional current loot holder (Master UI target). |
+| `banker` | string | no | `nil` | Optional current banker target (Master UI target). |
+| `disenchanter` | string | no | `nil` | Optional current disenchanter target (Master UI target). |
 | `players` | table(array) | yes | `{}` | Canonical persisted player records. |
 | `bossKills` | table(array) | yes | `{}` | Canonical boss kill records. |
 | `loot` | table(array) | yes | `{}` | Canonical loot records. |
@@ -57,25 +61,43 @@ Current schema version: `2`.
 | `itemName` | string | no | `nil` | Item display name. |
 | `itemString` | string | no | `nil` | Raw item string. |
 | `itemLink` | string | no | `nil` | Full item link. |
-| `itemRarity` | number | no | `0` | Item rarity. |
+| `itemRarity` | number | no | `nil` | Item rarity (`0` omitted in v3 compaction). |
 | `itemTexture` | string | no | `nil` | Icon texture path. |
-| `itemCount` | number | no | `1` | Stack count for the award. |
-| `looterNid` | number | no | `nil` | Winner/receiver `playerNid`. |
-| `rollType` | number | no | `0` | Roll type enum value. |
-| `rollValue` | number | no | `0` | Roll value or manual marker value. |
-| `bossNid` | number | no | `0` | Source boss stable id (`0` allowed for unknown). |
+| `itemCount` | number | no | `nil` | Stack count (`1` omitted in v3 compaction). |
+| `looterNid` | number | no | `nil` | Winner/receiver `playerNid` (canonical winner reference). |
+| `rollType` | number | no | `nil` | Roll type enum (`0` omitted in v3 compaction). |
+| `rollValue` | number | no | `nil` | Roll value (`0` omitted in v3 compaction). |
+| `rollSessionId` | string | no | `nil` | Optional roll-session identifier (`RS:*`). |
+| `bossNid` | number | no | `nil` | Source boss id (`0` omitted in v3 compaction). |
 | `time` | number | no | `nil` | Loot timestamp. |
+| `source` | string | no | `nil` | Optional loot origin marker (for example `TRADE_ONLY`). |
 
-## ChangeRecord (`raid.changes[name] = spec`)
+### v3 Persistence Compaction
+
+Schema v3 keeps runtime behavior unchanged but stores leaner SV payloads:
+- optional/default-only fields may be omitted from persisted rows,
+- readers must apply defaults at read time (already done by DB/query paths),
+- canonical IDs (`playerNid`, `bossNid`, `lootNid`) remain the source of truth.
+- optional role assignees (`holder`, `banker`, `disenchanter`) persist only when set.
+
+### Legacy Sunset (Strict Mode)
+
+- `loot[].looter` is legacy-only: it is no longer read for winner resolution and is stripped on normalize/save.
+- `bossKills[].attendanceMask` is legacy-only and stripped on normalize/save.
+- Schema remains `v3`; a bump to `v4` is deferred until a net structural simplification is required.
+
+## ChangeRecord (`raid.changes[playerName] = spec`)
 
 | Field | Type | Req | Default | Notes |
 | --- | --- | --- | --- | --- |
-| key `name` | string | yes | n/a | Player name key in map. |
+| key `playerName` | string | yes | n/a | Canonical player name key in map. |
 | value `spec` | string/nil | no | `nil` | Optional text annotation/spec. |
 
 ## Runtime caches (MUST NOT PERSIST)
 
 Runtime-only data must stay under `raid._runtime` and must be stripped before SV save.
+Save hardening runs through `Core.PrepareSavedVariablesForSave(...)`, which invokes raid normalization/compaction
+and strips runtime caches before persistence.
 
 Allowed runtime keys:
 - `raid._runtime.playersByName`

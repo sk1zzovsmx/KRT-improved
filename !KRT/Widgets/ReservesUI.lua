@@ -34,8 +34,7 @@ do
     end
 
     addon.Widgets = addon.Widgets or {}
-    addon.Widgets.ReservesUI = addon.Widgets.ReservesUI or addon.ReservesUI or {}
-    addon.ReservesUI = addon.Widgets.ReservesUI -- Legacy alias during namespacing migration.
+    addon.Widgets.ReservesUI = addon.Widgets.ReservesUI or {}
     local module = addon.Widgets.ReservesUI
     local Service = addon.Services and addon.Services.Reserves and addon.Services.Reserves.Service
 

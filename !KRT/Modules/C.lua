@@ -89,6 +89,7 @@ C.ML_MULTI_AWARD_DELAY        = 0.2
 -- Safety timeout: abort multi-award if the loot window does not reflect expected decrements.
 C.ML_MULTI_AWARD_TIMEOUT_SECONDS = 4
 C.PENDING_AWARD_TTL_SECONDS   = 8
+C.BOSS_KILL_DEDUPE_WINDOW_SECONDS = 30
 
 C.LOOT_COUNTER_ROW_HEIGHT     = 25
 C.RESERVES_ROW_HEIGHT         = 42

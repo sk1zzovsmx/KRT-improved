@@ -11,20 +11,25 @@ local Core = feature.Core or addon.Core
 addon.DBSchema = addon.DBSchema or {}
 local DBSchema = addon.DBSchema
 
-local DEFAULT_RAID_SCHEMA_VERSION = 2
-local version = tonumber(DBSchema.RAID_SCHEMA_VERSION)
-if not version or version < 1 then
-    version = DEFAULT_RAID_SCHEMA_VERSION
+-- ----- Internal state ----- --
+local DEFAULT_RAID_SCHEMA_VERSION = 3
+
+-- ----- Private helpers ----- --
+local function normalizeSchemaVersion(value)
+    local version = tonumber(value)
+    if not version or version < 1 then
+        return DEFAULT_RAID_SCHEMA_VERSION
+    end
+    return version
 end
-DBSchema.RAID_SCHEMA_VERSION = version
+
+-- ----- Public methods ----- --
+DBSchema.RAID_SCHEMA_VERSION = normalizeSchemaVersion(DBSchema.RAID_SCHEMA_VERSION)
 
 function DBSchema.GetRaidSchemaVersion()
-    local out = tonumber(DBSchema.RAID_SCHEMA_VERSION)
-    if not out or out < 1 then
-        out = DEFAULT_RAID_SCHEMA_VERSION
-        DBSchema.RAID_SCHEMA_VERSION = out
-    end
-    return out
+    local version = normalizeSchemaVersion(DBSchema.RAID_SCHEMA_VERSION)
+    DBSchema.RAID_SCHEMA_VERSION = version
+    return version
 end
 
 function Core.GetRaidSchemaVersion()
