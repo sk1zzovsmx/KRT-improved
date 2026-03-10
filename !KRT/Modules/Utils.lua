@@ -3,18 +3,32 @@ addon.Utils            = addon.Utils or {}
 
 local Utils            = addon.Utils
 local L                = addon.L
-local LibStub          = _G.LibStub
 
--- Library helper: caches LibStub lookups
+-- Library helper: direct LibStub lookup
 function addon:GetLib(name, silent)
-        self.libs = self.libs or {}
-        local cached = self.libs[name]
-        if cached ~= nil then
-                return cached or nil
-        end
-        local lib = LibStub and LibStub(name, silent)
-        self.libs[name] = lib or false
-        return lib
+	-- Try common places for LibStub. In some load orders LibStub may not be available
+	-- as a global yet; try _G.LibStub first, then rawget on _G, then fallback to
+	-- a compat implementation (addon.Compat) if present.
+	local LibStub = _G and _G.LibStub
+	if not LibStub and rawget then
+		-- rawget(_G, "LibStub") could be nil; guard it
+		local ok, val = pcall(function() return rawget(_G, "LibStub") end)
+		if ok and val then LibStub = val end
+	end
+
+	if not LibStub and addon and addon.Compat and type(addon.Compat.GetLibrary) == "function" then
+		-- LibCompat exposes a GetLibrary-like accessor; try it as a best-effort fallback
+		return addon.Compat:GetLibrary(name, silent)
+	end
+
+	if not LibStub then
+		if not silent then
+			error(("LibStub not found when requesting %q"):format(tostring(name)), 2)
+		end
+		return nil
+	end
+
+	return LibStub(name, silent)
 end
 
 -- Practical helper aliases
@@ -85,11 +99,7 @@ end
 -- ============================================================================
 
 function Utils.getFrameName()
-	local name
-	if addon.UIMaster ~= nil then
-		name = addon.UIMaster:GetName()
-	end
-	return name
+	return addon.UIMaster:GetName()
 end
 
 -- Shuffle a table:
@@ -141,12 +151,12 @@ function Utils.rgbToHex(r, g, b)
 	if r and g and b and r <= 1 and g <= 1 and b <= 1 then
 		r, g, b = r * 255, g * 255, b * 255
 	end
-        return addon.Compat.RGBToHex(r, g, b)
+	return addon.Compat.RGBToHex(r, g, b)
 end
 
 function addon.GetClassColor(name)
 	name = (name == "DEATH KNIGHT") and "DEATHKNIGHT" or name
-        local c = addon.Compat.GetClassColorObj(name)
+	local c = addon.Compat.GetClassColorObj(name)
 	if not c then
 		return 1, 1, 1
 	end
@@ -169,9 +179,7 @@ end
 
 -- Enable/Disable Frame:
 function Utils.enableDisable(frame, cond)
-	if frame == nil then
-		return
-	elseif cond and frame:IsEnabled() == 0 then
+	if cond and frame:IsEnabled() == 0 then
 		frame:Enable()
 	elseif not cond and frame:IsEnabled() == 1 then
 		frame:Disable()
@@ -180,9 +188,7 @@ end
 
 -- Unconditional show/hide frame:
 function Utils.toggle(frame)
-	if frame == nil then
-		return
-	elseif frame:IsVisible() then
+	if frame:IsVisible() then
 		frame:Hide()
 	else
 		frame:Show()
@@ -191,9 +197,7 @@ end
 
 -- Conditional Show/Hide Frame:
 function Utils.showHide(frame, cond)
-	if frame == nil then
-		return
-	elseif cond and not frame:IsShown() then
+	if cond and not frame:IsShown() then
 		frame:Show()
 	elseif not cond and frame:IsShown() then
 		frame:Hide()
@@ -201,14 +205,12 @@ function Utils.showHide(frame, cond)
 end
 
 function Utils.createPool(frameType, parent, template, resetter)
-        return addon.Compat.CreateFramePool(frameType, parent, template, resetter)
+	return addon.Compat.CreateFramePool(frameType, parent, template, resetter)
 end
 
 -- Lock/Unlock Highlight:
 function Utils.toggleHighlight(frame, cond)
-	if frame == nil then
-		return
-	elseif cond then
+	if cond then
 		frame:LockHighlight()
 	else
 		frame:UnlockHighlight()
@@ -217,9 +219,7 @@ end
 
 -- Set frameent text with condition:
 function Utils.setText(frame, str1, str2, cond)
-	if frame == nil then
-		return
-	elseif cond then
+	if cond then
 		frame:SetText(str1)
 	else
 		frame:SetText(str2)
@@ -228,7 +228,7 @@ end
 
 -- Return with IF:
 function Utils.returnIf(cond, a, b)
-	return (cond ~= nil and cond ~= false) and a or b
+	return cond and a or b
 end
 
 -- Throttle frame OnUpdate:
@@ -300,10 +300,10 @@ end
 -- Send a whisper to a player by his/her character name
 -- Returns true if the message was sent, nil otherwise
 function Utils.whisper(target, msg)
-        if type(target) == "string" and msg then
-                SendChatMessage(msg, "WHISPER", nil, target)
-                return true
-        end
+	if type(target) == "string" and msg then
+		SendChatMessage(msg, "WHISPER", nil, target)
+		return true
+	end
 end
 
 -- Returns the current UTC date and time in seconds:

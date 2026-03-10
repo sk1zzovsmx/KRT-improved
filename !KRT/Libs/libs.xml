@@ -4,5 +4,5 @@
     <Include file="LibBossIDs-1.0/lib.xml"/>
     <Include file="LibDeformat-3.0/lib.xml"/>
     <Include file="LibCompat-1.0/lib.xml"/>
-    <Include file="LibLogger-1.0/LibLogger-1.0/lib.xml"/>
+    <Include file="LibLogger-1.0/lib.xml"/>
 </Ui>
