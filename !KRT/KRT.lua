@@ -129,17 +129,18 @@ do
     local logLevelPriority = { DEBUG = 1, INFO = 2, WARN = 3, ERROR = 4 }
     local logLevelNames    = { [1] = "DEBUG", [2] = "INFO", [3] = "WARN", [4] = "ERROR" }
     local minLevel = "DEBUG" -- Default log level
+    local MAX_DEBUG_LOGS = 500 -- <--- Limite massimo log, modifica qui
 
     -- Called when the XML frame is loaded
     function Debugger:OnLoad(self)
         frame = self
         frameName = frame:GetName()
         scrollFrame = _G[frameName.."ScrollFrame"]
-		frame:SetMovable(true)
-		frame:EnableMouse(true)
-		frame:RegisterForDrag("LeftButton")
-		frame:SetScript("OnDragStart", frame.StartMoving)
-		frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+        frame:SetMovable(true)
+        frame:EnableMouse(true)
+        frame:RegisterForDrag("LeftButton")
+        frame:SetScript("OnDragStart", frame.StartMoving)
+        frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 
         if scrollFrame then
             print("[Debugger] scrollFrame found:", scrollFrame:GetName())
@@ -216,15 +217,27 @@ do
 
         if logLevelPriority[level] < logLevelPriority[minLevel] then return end
 
-        if ... then msg = string.format(msg, ...) end
+        if select('#', ...) > 0 then
+            local safeArgs = {}
+            for i = 1, select('#', ...) do
+                local v = select(i, ...)
+                table.insert(safeArgs, type(v) == "string" and v or tostring(v))
+            end
+            msg = string.format(msg, unpack(safeArgs))
+        end
         local line = string.format("[%s][%s] %s", date("%H:%M:%S"), level, msg)
 
+        -- Se la finestra non è pronta
         if not scrollFrame then
             tinsert(buffer, line)
+            -- Limita la lunghezza del buffer!
+            while #buffer > MAX_DEBUG_LOGS do
+                table.remove(buffer, 1)
+            end
             return
         end
 
-        -- Choose color by level
+        -- Scegli colore
         local r, g, b = 1, 1, 1 -- default white
         if level == "ERROR" then
             r, g, b = 1, 0.2, 0.2
@@ -237,6 +250,14 @@ do
         end
 
         scrollFrame:AddMessage(line, r, g, b)
+
+        -- [OPZIONALE] Se hai una tabella di log persistente, tronca anche quella
+        if KRT_Debug and KRT_Debug.Debugs then
+            table.insert(KRT_Debug.Debugs, line)
+            while #KRT_Debug.Debugs > MAX_DEBUG_LOGS do
+                table.remove(KRT_Debug.Debugs, 1)
+            end
+        end
     end
 
     -- Replay any buffered messages
@@ -370,8 +391,9 @@ do
 			Raid:End()
 			return
 		end
-		local realm = GetRealmName() or UNKNOWN
-		local players = {}
+               local realm = GetRealmName() or UNKNOWN
+               KRT_Players[realm] = KRT_Players[realm] or {}
+               local players = {}
 		for i = 1, numRaid do
 			local name, rank, subgroup, level, classL, class, _, online = GetRaidRosterInfo(i)
 			if name then
@@ -419,8 +441,9 @@ do
 		end
 		numRaid = GetNumRaidMembers()
 		if numRaid == 0 then return end
-		local realm = GetRealmName() or UNKNOWN
-		local currentTime = Utils.GetCurrentTime()
+               local realm = GetRealmName() or UNKNOWN
+               KRT_Players[realm] = KRT_Players[realm] or {}
+               local currentTime = Utils.GetCurrentTime()
 		addon:Debug("INFO", "Creating new raid: %s (%d-man)", zoneName, raidSize)
 		local raidInfo = {
 			realm = realm,
@@ -960,7 +983,7 @@ do
 
 	-- Whether the player is a party group:
 	function addon:IsInParty()
-		local inParty = (GetNumPartyMembers() > 0)
+		local inParty = (GetNumPartyMembers() > 0) and (GetNumRaidMembers() == 0)
 		addon:Debug("DEBUG", "IsInParty: %s", tostring(inParty))
 		return inParty
 	end
@@ -1049,12 +1072,8 @@ do
 	function addon:Announce(text, channel)
 		local originalChannel = channel
 		if not channel then
-			channel = "SAY"
-			-- Switch to party mode if we're in a party:
-			if self:IsInParty() then
-				channel = "PARTY"		
 			-- Switch to raid channel if we're in a raid:
-			elseif self:IsInRaid() then
+			if self:IsInRaid() then
 				-- Check for countdown messages
 				local countdownTicPattern = L.ChatCountdownTic:gsub("%%d", "%%d+")
 				local isCountdownMessage = text:find(countdownTicPattern) or text:find(L.ChatCountdownEnd)
@@ -1076,6 +1095,14 @@ do
 						channel = "RAID" -- Fallback to RAID
 					end
 				end
+
+			-- Switch to party mode if we're in a party:
+			elseif self:IsInParty() then
+				channel = "PARTY"
+				
+			-- Switch to alone mode
+			else
+				channel = "SAY"
 			end
 		end
 		-- Let's Go!
@@ -5248,11 +5275,11 @@ do
 				end
 			end
 			-- We delete all the loot from that player:
-			for i = #raid.loot, 1, -1 do
-				if l.bossNum == selectedPlayer then
-					tremove(raid.loot, i)
-				end
-			end
+                        for i = #raid.loot, 1, -1 do
+                                if raid.loot[i].bossNum == selectedPlayer then
+                                        tremove(raid.loot, i)
+                                end
+                        end
 			fetched = false
 		end
 
