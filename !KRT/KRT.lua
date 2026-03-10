@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local addonName = addon.name
 
@@ -267,29 +267,29 @@ local Core = addon.Core
 
 local RAID_SCHEMA_VERSION = 1
 
-function Core.getCurrentRaid()
+function Core.GetCurrentRaid()
     return coreState.currentRaid
 end
 
-function Core.setCurrentRaid(raidNum)
+function Core.SetCurrentRaid(raidNum)
     coreState.currentRaid = raidNum
     return coreState.currentRaid
 end
 
-function Core.getLastBoss()
+function Core.GetLastBoss()
     return coreState.lastBoss
 end
 
-function Core.setLastBoss(bossNid)
+function Core.SetLastBoss(bossNid)
     coreState.lastBoss = bossNid
     return coreState.lastBoss
 end
 
-function Core.getNextReset()
+function Core.GetNextReset()
     return tonumber(coreState.nextReset) or 0
 end
 
-function Core.setNextReset(nextReset)
+function Core.SetNextReset(nextReset)
     coreState.nextReset = tonumber(nextReset) or 0
     return coreState.nextReset
 end
@@ -386,7 +386,7 @@ do
 end
 
 local function bindModuleRequestRefresh(module, getFrame)
-    local requestRefresh = Frames.makeEventDrivenRefresher(getFrame, function()
+    local requestRefresh = Frames.MakeEventDrivenRefresher(getFrame, function()
         module:Refresh()
     end)
 
@@ -406,7 +406,7 @@ local function bindModuleToggleHide(module, uiController)
 end
 
 local function makeModuleFrameGetter(module, globalFrameName)
-    local getGlobalFrame = Frames.makeFrameGetter(globalFrameName)
+    local getGlobalFrame = Frames.MakeFrameGetter(globalFrameName)
     return function()
         local frame = module.frame or getGlobalFrame()
         if frame and not module.frame then
@@ -416,9 +416,10 @@ local function makeModuleFrameGetter(module, globalFrameName)
     end
 end
 
-Core.bindModuleRequestRefresh = bindModuleRequestRefresh
-Core.bindModuleToggleHide = bindModuleToggleHide
-Core.makeModuleFrameGetter = makeModuleFrameGetter
+Core.BindModuleRequestRefresh = bindModuleRequestRefresh
+Core.BindModuleToggleHide = bindModuleToggleHide
+Core.MakeModuleFrameGetter = makeModuleFrameGetter
+
 
 local function ensureRaidSchema(raid)
     if type(raid) ~= "table" then
@@ -569,11 +570,11 @@ local function ensureRaidSchema(raid)
     return raid
 end
 
-function Core.getRaidSchemaVersion()
+function Core.GetRaidSchemaVersion()
     return RAID_SCHEMA_VERSION
 end
 
-function Core.ensureRaidSchema(raid)
+function Core.EnsureRaidSchema(raid)
     return ensureRaidSchema(raid)
 end
 
@@ -621,7 +622,7 @@ local function ensureRaidsSchema()
     coreState.nextRaidNid = nextRaidNid
 end
 
-function Core.ensureRaidById(raidNum)
+function Core.EnsureRaidById(raidNum)
     local id = tonumber(raidNum)
     if not id then
         return nil, nil
@@ -636,7 +637,7 @@ function Core.ensureRaidById(raidNum)
     return raid, id
 end
 
-function Core.ensureRaidByNid(raidNid)
+function Core.EnsureRaidByNid(raidNid)
     local nid = tonumber(raidNid)
     if not nid then
         return nil, nil, nil
@@ -657,17 +658,17 @@ function Core.ensureRaidByNid(raidNid)
     return raid, idx, nid
 end
 
-function Core.getRaidNidById(raidNum)
-    local raid = Core.ensureRaidById(raidNum)
+function Core.GetRaidNidById(raidNum)
+    local raid = Core.EnsureRaidById(raidNum)
     return raid and tonumber(raid.raidNid) or nil
 end
 
-function Core.getRaidIdByNid(raidNid)
-    local _, idx = Core.ensureRaidByNid(raidNid)
+function Core.GetRaidIdByNid(raidNid)
+    local _, idx = Core.EnsureRaidByNid(raidNid)
     return idx
 end
 
-function Core.createRaidRecord(args)
+function Core.CreateRaidRecord(args)
     args = args or {}
 
     ensureRaidsSchema()
@@ -684,7 +685,7 @@ function Core.createRaidRecord(args)
         zone = args.zone,
         size = args.size,
         difficulty = args.difficulty,
-        startTime = args.startTime or Time.getCurrentTime(),
+        startTime = args.startTime or Time.GetCurrentTime(),
         endTime = args.endTime,
         players = {},
         bossKills = {},
@@ -698,7 +699,7 @@ function Core.createRaidRecord(args)
     return ensureRaidSchema(raid)
 end
 
-function Core.stripRuntimeRaidCaches(raid)
+function Core.StripRuntimeRaidCaches(raid)
     if type(raid) ~= "table" then
         return
     end
@@ -707,6 +708,7 @@ function Core.stripRuntimeRaidCaches(raid)
     raid._bossIdxByNid = nil
     raid._lootIdxByNid = nil
 end
+
 
 -- =========== Main Event Handlers  =========== --
 local addonEvents = {
@@ -742,7 +744,7 @@ do
     for eventName, busEventName in pairs(wowBusEvents) do
         local eventKey = busEventName
         addon[eventName] = function(_, ...)
-            Bus.triggerEvent(eventKey, ...)
+            Bus.TriggerEvent(eventKey, ...)
         end
     end
 end
@@ -755,6 +757,12 @@ function addon:ADDON_LOADED(name)
     addon:info(Diag.I.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")),
         tostring(lvl), tostring(true)))
     addon.LoadOptions()
+    local minimap = addon.Minimap
+    if minimap and minimap.EnsureUI then
+        minimap:EnsureUI()
+    elseif minimap and minimap.OnLoad then
+        minimap:OnLoad()
+    end
     local reservesService = addon.Services and addon.Services.Reserves
     if reservesService and reservesService.Load then
         reservesService:Load()
@@ -786,8 +794,8 @@ local function processRaidRosterUpdate()
     end
 
     -- Single source of truth for roster change notifications (join/update/leave delta).
-    Bus.triggerEvent(InternalEvents.RaidRosterDelta,
-        delta, addon.Raid:GetRosterVersion(), Core.getCurrentRaid())
+    Bus.TriggerEvent(InternalEvents.RaidRosterDelta,
+        delta, addon.Raid:GetRosterVersion(), Core.GetCurrentRaid())
 end
 
 -- RAID_ROSTER_UPDATE: Updates the raid roster when it changes.
@@ -810,7 +818,7 @@ end
 function addon:RAID_INSTANCE_WELCOME(...)
     local instanceName, instanceType, instanceDiff = GetInstanceInfo()
     local _, nextReset = ...
-    local resolvedNextReset = Core.setNextReset(nextReset)
+    local resolvedNextReset = Core.SetNextReset(nextReset)
     addon:trace(Diag.D.LogRaidInstanceWelcome:format(tostring(instanceName), tostring(instanceType),
         tostring(instanceDiff), tostring(resolvedNextReset)))
     if instanceType == "raid" and not L.RaidZones[instanceName] then
@@ -849,7 +857,7 @@ end
 -- CHAT_MSG_LOOT: Adds looted items to the raid log.
 function addon:CHAT_MSG_LOOT(msg)
     addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
-    if Core.getCurrentRaid() then
+    if Core.GetCurrentRaid() then
         self.Raid:AddLoot(msg)
     end
 end
@@ -870,7 +878,7 @@ end
 -- CHAT_MSG_MONSTER_YELL: Logs a boss kill based on specific boss yells.
 function addon:CHAT_MSG_MONSTER_YELL(...)
     local text = ...
-    if L.BossYells[text] and Core.getCurrentRaid() then
+    if L.BossYells[text] and Core.GetCurrentRaid() then
         addon:trace(Diag.D.LogBossYellMatched:format(tostring(text), tostring(L.BossYells[text])))
         self.Raid:AddBoss(L.BossYells[text])
     end
@@ -878,7 +886,7 @@ end
 
 -- COMBAT_LOG_EVENT_UNFILTERED: Logs a boss kill when a boss unit dies.
 function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
-    if not Core.getCurrentRaid() then return end
+    if not Core.GetCurrentRaid() then return end
 
     -- Hot-path fast check: inspect the event type before unpacking extra args.
     local subEvent = select(2, ...)
@@ -906,6 +914,6 @@ end
 function addon:PLAYER_LOGOUT()
     if type(KRT_Raids) ~= "table" then return end
     for i = 1, #KRT_Raids do
-        addon.Core.stripRuntimeRaidCaches(KRT_Raids[i])
+        addon.Core.StripRuntimeRaidCaches(KRT_Raids[i])
     end
 end

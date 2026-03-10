@@ -4,6 +4,11 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Bugfix:** Logger raid-selection callbacks now use a shared file-scoped
+  `triggerSelectionEvent(...)` helper, fixing nil-global errors during `RaidCreate`
+  and related raid-selection refresh flows.
+- **Bugfix:** Replaced legacy `addon:SetTooltip(...)` calls with `Frames.setTooltip(...)` in
+  `Spammer`, `Logger`, and `Master` to prevent nil-method crashes during UI `OnLoad` binding.
 - **Refactor:** Added `Modules/Features.lua` with widget feature profiles (`full`/`core`) and
   `addon.Features` runtime flags (`Config`, `LootCounter`, `Reserves`).
 - **Behavior:** `Modules/UIFacade.lua` is now feature-aware (`IsEnabled`, `IsRegistered`) and

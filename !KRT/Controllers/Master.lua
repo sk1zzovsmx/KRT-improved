@@ -1,16 +1,16 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 
 local Frames = feature.Frames or addon.Frames
-local Strings = feature.Strings or addon.Strings
+local Item = feature.Item or addon.Item
 local Colors = feature.Colors or addon.Colors
 local Comms = feature.Comms or addon.Comms
 local UIScaffold = addon.UIScaffold
@@ -22,8 +22,8 @@ local Core = feature.Core
 local Bus = feature.Bus or addon.Bus
 local MultiSelect = feature.MultiSelect or addon.MultiSelect
 
-local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
-local bindModuleToggleHide = feature.bindModuleToggleHide
+local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
+local bindModuleToggleHide = feature.BindModuleToggleHide
 
 local InternalEvents = Events.Internal
 
@@ -99,7 +99,9 @@ do
 
     local UpdateUIFrame
 
-    local getFrame = Frames.makeFrameGetter("KRTMaster")
+    local getFrame = Frames.MakeFrameGetter("KRTMaster")
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
 
     local InitializeDropDowns, PrepareDropDowns, UpdateDropDowns
     local dropDownData, dropDownGroupData = {}, {}
@@ -158,6 +160,91 @@ do
     }
 
     -- ----- Private helpers ----- --
+    local function AcquireRefs(frame)
+        return {
+            configBtn = Frames.Ref(frame, "ConfigBtn"),
+            selectItemBtn = Frames.Ref(frame, "SelectItemBtn"),
+            spamLootBtn = Frames.Ref(frame, "SpamLootBtn"),
+            msBtn = Frames.Ref(frame, "MSBtn"),
+            osBtn = Frames.Ref(frame, "OSBtn"),
+            srBtn = Frames.Ref(frame, "SRBtn"),
+            freeBtn = Frames.Ref(frame, "FreeBtn"),
+            countdownBtn = Frames.Ref(frame, "CountdownBtn"),
+            awardBtn = Frames.Ref(frame, "AwardBtn"),
+            rollBtn = Frames.Ref(frame, "RollBtn"),
+            clearBtn = Frames.Ref(frame, "ClearBtn"),
+            holdBtn = Frames.Ref(frame, "HoldBtn"),
+            bankBtn = Frames.Ref(frame, "BankBtn"),
+            disenchantBtn = Frames.Ref(frame, "DisenchantBtn"),
+            reserveListBtn = Frames.Ref(frame, "ReserveListBtn"),
+            lootCounterBtn = Frames.Ref(frame, "LootCounterBtn"),
+            itemCountBox = Frames.Ref(frame, "ItemCount"),
+            holdDropDown = Frames.Ref(frame, "HoldDropDown"),
+            bankDropDown = Frames.Ref(frame, "BankDropDown"),
+            disenchantDropDown = Frames.Ref(frame, "DisenchantDropDown"),
+        }
+    end
+
+    local function BindMainControlScripts(frame, refs)
+        if not (frame and refs) then
+            return
+        end
+        if frame._krtBoundUi then
+            return
+        end
+
+        Frames.SafeSetScript(refs.configBtn, "OnClick", function()
+            UI:Call("Config", "Toggle")
+        end)
+        Frames.SafeSetScript(refs.selectItemBtn, "OnClick", function(self, button)
+            module:BtnSelectItem(self, button)
+        end)
+        Frames.SafeSetScript(refs.spamLootBtn, "OnClick", function(self, button)
+            module:BtnSpamLoot(self, button)
+        end)
+        Frames.SafeSetScript(refs.msBtn, "OnClick", function(self, button)
+            module:BtnMS(self, button)
+        end)
+        Frames.SafeSetScript(refs.osBtn, "OnClick", function(self, button)
+            module:BtnOS(self, button)
+        end)
+        Frames.SafeSetScript(refs.srBtn, "OnClick", function(self, button)
+            module:BtnSR(self, button)
+        end)
+        Frames.SafeSetScript(refs.freeBtn, "OnClick", function(self, button)
+            module:BtnFree(self, button)
+        end)
+        Frames.SafeSetScript(refs.countdownBtn, "OnClick", function(self, button)
+            module:BtnCountdown(self, button)
+        end)
+        Frames.SafeSetScript(refs.awardBtn, "OnClick", function(self, button)
+            module:BtnAward(self, button)
+        end)
+        Frames.SafeSetScript(refs.rollBtn, "OnClick", function(self, button)
+            addon.Rolls:Roll(self, button)
+        end)
+        Frames.SafeSetScript(refs.clearBtn, "OnClick", function(self, button)
+            module:BtnClear(self, button)
+        end)
+        Frames.SafeSetScript(refs.holdBtn, "OnClick", function(self, button)
+            module:BtnHold(self, button)
+        end)
+        Frames.SafeSetScript(refs.bankBtn, "OnClick", function(self, button)
+            module:BtnBank(self, button)
+        end)
+        Frames.SafeSetScript(refs.disenchantBtn, "OnClick", function(self, button)
+            module:BtnDisenchant(self, button)
+        end)
+        Frames.SafeSetScript(refs.reserveListBtn, "OnClick", function(self, button)
+            module:BtnReserveList(self, button)
+        end)
+        Frames.SafeSetScript(refs.lootCounterBtn, "OnClick", function(self, button)
+            module:BtnLootCounter(self, button)
+        end)
+
+        frame._krtBoundUi = true
+    end
+
     local function SetItemCountValue(count, focus)
         local frame = getFrame()
         if not frame then return end
@@ -168,7 +255,7 @@ do
         count = tonumber(count) or 1
         if count < 1 then count = 1 end
         lootState.itemCount = count
-        Frames.setEditBoxValue(itemCountBox, count, focus)
+        Frames.SetEditBoxValue(itemCountBox, count, focus)
         lastUIState.itemCountText = tostring(count)
         dirtyFlags.itemCount = false
     end
@@ -234,7 +321,7 @@ do
             raidID = raidId,
             ok = false,
         }
-        Bus.triggerEvent(InternalEvents.LoggerLootLogRequest, request)
+        Bus.TriggerEvent(InternalEvents.LoggerLootLogRequest, request)
         return request.ok == true
     end
 
@@ -297,7 +384,7 @@ do
 
         local function UpdateEnabled(key, frame, enabled)
             if buttons[key] ~= enabled then
-                UIPrimitives.enableDisable(frame, enabled)
+                UIPrimitives.EnableDisable(frame, enabled)
                 buttons[key] = enabled
             end
         end
@@ -305,7 +392,7 @@ do
         local function UpdateItemState(enabled)
             local itemBtn = _G[frameName .. "ItemBtn"]
             if itemBtn and buttons.itemBtn ~= enabled then
-                UIPrimitives.enableDisable(itemBtn, enabled)
+                UIPrimitives.EnableDisable(itemBtn, enabled)
                 local texture = itemBtn:GetNormalTexture()
                 if texture and texture.SetDesaturated then
                     texture:SetDesaturated(not enabled)
@@ -378,14 +465,14 @@ do
     end
 
     local function FindLootSlotIndex(itemLink)
-        local wantedKey = Strings.getItemStringFromLink(itemLink) or itemLink
+        local wantedKey = Item.GetItemStringFromLink(itemLink) or itemLink
         for i = 1, GetNumLootItems() do
             local tempItemLink = GetLootSlotLink(i)
             if tempItemLink == itemLink then
                 return i
             end
             if wantedKey and tempItemLink then
-                local tempKey = Strings.getItemStringFromLink(tempItemLink) or tempItemLink
+                local tempKey = Item.GetItemStringFromLink(tempItemLink) or tempItemLink
                 if tempKey == wantedKey then
                     return i
                 end
@@ -480,7 +567,7 @@ do
     end
 
     local function BuildMultiAwardWinners(target)
-        local selCount = MultiSelect.multiSelectCount(ROLL_WINNERS_CTX) or 0
+        local selCount = MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0
         if selCount <= 0 then
             return nil, "empty_selection"
         end
@@ -501,8 +588,8 @@ do
             end
         end
 
-        MultiSelect.multiSelectClear(ROLL_WINNERS_CTX)
-        MultiSelect.multiSelectSetAnchor(ROLL_WINNERS_CTX, nil)
+        MultiSelect.MultiSelectClear(ROLL_WINNERS_CTX)
+        MultiSelect.MultiSelectSetAnchor(ROLL_WINNERS_CTX, nil)
 
         if #winners <= 0 then
             return nil, "empty_winners"
@@ -517,7 +604,7 @@ do
         lootState.multiAward = {
             active    = true,
             itemLink  = itemLink,
-            itemKey   = Strings.getItemStringFromLink(itemLink) or itemLink,
+            itemKey   = Item.GetItemStringFromLink(itemLink) or itemLink,
             lastCount = available,
             rollType  = lootState.currentRollType,
             winners   = winners,
@@ -743,14 +830,14 @@ do
 
         currentItemLink:SetText(addon.WrapTextInColorCode(
             itemName,
-            Colors.normalizeHexColor(itemColor)
+            Colors.NormalizeHexColor(itemColor)
         ))
         currentItemBtn:SetNormalTexture(itemTexture)
 
         local options = addon.options or KRT_Options or {}
         if options.showTooltips then
             currentItemBtn.tooltip_item = itemLink
-            addon:SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
+            Frames.SetTooltip(currentItemBtn, nil, "ANCHOR_CURSOR")
         end
         return true
     end
@@ -776,7 +863,7 @@ do
         if mf and frameName == mf:GetName() then
             local itemCountBox = _G[frameName .. "ItemCount"]
             if itemCountBox then
-                Frames.resetEditBox(itemCountBox, focusItemCount and true or false)
+                Frames.ResetEditBox(itemCountBox, focusItemCount and true or false)
             end
         end
         return true
@@ -793,7 +880,7 @@ do
 
     -- OnLoad frame:
     function module:OnLoad(frame)
-        frameName = Frames.initModuleFrame(module, frame, {
+        frameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnHide = function()
                 if selectionFrame then selectionFrame:Hide() end
@@ -829,10 +916,62 @@ do
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    UIScaffold.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+    UIScaffold.BootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
+
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
+    function addon.Controllers.Master:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            self:OnLoad(frame)
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        LocalizeUIFrame()
+        BindMainControlScripts(frame, refs)
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Controllers.Master:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
 
     -- Button: Select/Remove Item
     function module:BtnSelectItem(btn)
@@ -851,7 +990,7 @@ do
             itemInfo.slotID = nil
             if lootState.opened == true then addon.Loot:FetchLoot() end
         elseif selectionFrame then
-            UIPrimitives.toggle(selectionFrame)
+            UIPrimitives.Toggle(selectionFrame)
         end
         module:RequestRefresh()
     end
@@ -902,7 +1041,7 @@ do
             lootState.itemTraded = 0
 
             local itemLink = GetItemLink()
-            local itemID = Strings.getItemIdFromLink(itemLink)
+            local itemID = Item.GetItemIdFromLink(itemLink)
             local message
 
             if rollType == rollTypes.RESERVED then
@@ -1045,7 +1184,7 @@ do
         _G[frameName .. "RollsHeaderRoll"]:SetText(L.StrRoll)
         _G[frameName .. "ReserveListBtn"]:SetText(L.BtnInsertList)
         _G[frameName .. "LootCounterBtn"]:SetText(L.BtnLootCounter)
-        Frames.setFrameTitle(frameName, MASTER_LOOTER)
+        Frames.SetFrameTitle(frameName, MASTER_LOOTER)
 
         local itemCountBox = _G[frameName .. "ItemCount"]
         if itemCountBox and not itemCountBox.__krtMLHooked then
@@ -1177,7 +1316,7 @@ do
             btn:EnableMouse(data.canClick == true)
             btn:Show()
 
-            UIRowVisuals.ensureRowVisuals(btn)
+            UIRowVisuals.EnsureRowVisuals(btn)
 
             local nameStr = _G[btn:GetName() .. "Name"]
             local rollStr = _G[btn:GetName() .. "Roll"]
@@ -1189,7 +1328,7 @@ do
                 if data.isReserved then
                     nameStr:SetVertexColor(0.4, 0.6, 1.0)
                 else
-                    local r, g, b = Colors.getClassColor(class)
+                    local r, g, b = Colors.GetClassColor(class)
                     nameStr:SetVertexColor(r, g, b)
                 end
                 nameStr:SetText(data.displayName or data.name or "")
@@ -1202,9 +1341,9 @@ do
                 counterStr:SetText(data.counterText or "")
             end
 
-            UIRowVisuals.setRowSelected(btn, data.isSelected == true)
-            UIRowVisuals.setRowFocused(btn, data.isFocused == true)
-            UIPrimitives.showHide(star, data.showStar == true)
+            UIRowVisuals.SetRowSelected(btn, data.isSelected == true)
+            UIRowVisuals.SetRowFocused(btn, data.isFocused == true)
+            UIPrimitives.ShowHide(star, data.showStar == true)
 
             btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
             btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
@@ -1266,7 +1405,7 @@ do
 
         local itemId
         if hasItem then
-            itemId = Strings.getItemIdFromLink(GetItemLink())
+            itemId = Item.GetItemIdFromLink(GetItemLink())
         end
         local hasItemReserves = itemId and reserves and reserves.HasItemReserves and reserves:HasItemReserves(itemId)
             or false
@@ -1275,7 +1414,7 @@ do
         FlagButtonsOnChange("flowState", currentFlowState)
 
         local pickMode = (currentFlowState ~= FLOW_STATES.INVENTORY and currentFlowState ~= FLOW_STATES.TRADE)
-        local msCount = pickMode and (MultiSelect.multiSelectCount(ROLL_WINNERS_CTX) or 0) or 0
+        local msCount = pickMode and (MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0) or 0
         FlagButtonsOnChange("msCount", msCount)
 
         if dirtyFlags.buttons then
@@ -1407,13 +1546,13 @@ do
 
     -- OnClick handler for dropdown menu items (consolidated from 3 similar branches).
     function module:OnClickDropDown(owner, value)
-        if not addon.Core.getCurrentRaid() then return end
+        if not addon.Core.GetCurrentRaid() then return end
         UIDropDownMenu_SetText(owner, value)
         UIDropDownMenu_SetSelectedValue(owner, value)
 
         local field = FindDropDownField(owner:GetName())
         if field then
-            KRT_Raids[addon.Core.getCurrentRaid()][field.raidKey] = value
+            KRT_Raids[addon.Core.GetCurrentRaid()][field.raidKey] = value
             lootState[field.stateKey] = value
         end
 
@@ -1426,17 +1565,17 @@ do
 
     -- Updates the text of the dropdowns to reflect the current selection (consolidated from 3 similar branches).
     function UpdateDropDowns(frame)
-        if not frame or not addon.Core.getCurrentRaid() then return end
+        if not frame or not addon.Core.GetCurrentRaid() then return end
 
         local field = FindDropDownField(frame:GetName())
         if not field then return end
 
         -- Sync state from raid data
-        lootState[field.stateKey] = KRT_Raids[addon.Core.getCurrentRaid()][field.raidKey]
+        lootState[field.stateKey] = KRT_Raids[addon.Core.GetCurrentRaid()][field.raidKey]
 
         -- Clear if unit is no longer in raid
         if lootState[field.stateKey] and addon.Raid:GetUnitID(lootState[field.stateKey]) == "none" then
-            KRT_Raids[addon.Core.getCurrentRaid()][field.raidKey] = nil
+            KRT_Raids[addon.Core.GetCurrentRaid()][field.raidKey] = nil
             lootState[field.stateKey] = nil
         end
 
@@ -1476,6 +1615,15 @@ do
             local btn = _G[btnName] or CreateFrame("Button", btnName, selectionFrame, "KRTItemSelectionButton")
             btn:SetID(i)
             btn:Show()
+            if not btn._krtBoundUi then
+                if btn.RegisterForClicks then
+                    btn:RegisterForClicks("AnyUp")
+                end
+                Frames.SafeSetScript(btn, "OnClick", function(self, button)
+                    module:BtnSelectedItem(self, button)
+                end)
+                btn._krtBoundUi = true
+            end
             local itemName = GetItemName(i)
             local itemNameBtn = _G[btnName .. "Name"]
             local item = GetItem(i)
@@ -1501,8 +1649,8 @@ do
 
     local function ScanTradeableInventory(itemLink, itemId)
         if not itemLink and not itemId then return nil end
-        local wantedKey = itemLink and (Strings.getItemStringFromLink(itemLink) or itemLink) or nil
-        local wantedId = tonumber(itemId) or (itemLink and Strings.getItemIdFromLink(itemLink)) or nil
+        local wantedKey = itemLink and (Item.GetItemStringFromLink(itemLink) or itemLink) or nil
+        local wantedId = tonumber(itemId) or (itemLink and Item.GetItemIdFromLink(itemLink)) or nil
         local totalCount = 0
         local firstBag, firstSlot, firstSlotCount
         local hasMatch = false
@@ -1512,8 +1660,8 @@ do
             for slot = 1, n do
                 local link = GetContainerItemLink(bag, slot)
                 if link then
-                    local key = Strings.getItemStringFromLink(link) or link
-                    local linkId = Strings.getItemIdFromLink(link)
+                    local key = Item.GetItemStringFromLink(link) or link
+                    local linkId = Item.GetItemIdFromLink(link)
                     local matches = (wantedKey and key == wantedKey) or (wantedId and linkId == wantedId)
                     if matches then
                         hasMatch = true
@@ -1541,7 +1689,7 @@ do
         if itemCount < 1 then itemCount = 1 end
 
         -- Clear count:
-        Frames.resetEditBox(_G[frameName .. "ItemCount"], true)
+        Frames.ResetEditBox(_G[frameName .. "ItemCount"], true)
 
         lootState.fromInventory = true
         addon.Loot:AddItem(itemLink, itemCount)
@@ -1705,10 +1853,10 @@ do
                 if lootState.currentRollItem and lootState.currentRollItem > 0 then
                     local ok = RequestLoggerLootLog(lootState.currentRollItem, lootState.winner,
                         lootState.currentRollType, addon.Rolls:HighestRoll(), "TRADE_ACCEPT",
-                        addon.Core.getCurrentRaid())
+                        addon.Core.GetCurrentRaid())
 
                     if not ok then
-                        addon:error(Diag.E.LogTradeLoggerLogFailed:format(tostring(addon.Core.getCurrentRaid()),
+                        addon:error(Diag.E.LogTradeLoggerLogFailed:format(tostring(addon.Core.GetCurrentRaid()),
                             tostring(lootState.currentRollItem), tostring(GetItemLink())))
                     end
                 else
@@ -1717,7 +1865,7 @@ do
 
                 -- LootCounter (MS only): trade awards don't emit LOOT_ITEM for the winner.
                 if tonumber(lootState.currentRollType) == rollTypes.MAINSPEC then
-                    addon.Raid:AddPlayerCount(lootState.winner, 1, addon.Core.getCurrentRaid())
+                    addon.Raid:AddPlayerCount(lootState.winner, 1, addon.Core.GetCurrentRaid())
                 end
 
                 local done = RegisterAwardedItem()
@@ -1767,7 +1915,7 @@ do
                 announced = true
             end
             if whisper then
-                Comms.whisper(playerName, whisper)
+                Comms.Whisper(playerName, whisper)
             end
             -- IMPORTANT:
             -- Do NOT force-update an existing raid.loot entry here.
@@ -1843,8 +1991,8 @@ do
     local function ResolveTradeableInventoryItem(itemLink)
         local totalCount, bag, slot, slotCount
         local usedFastPath = false
-        local wantedKey = Strings.getItemStringFromLink(itemLink) or itemLink
-        local wantedId = Strings.getItemIdFromLink(itemLink)
+        local wantedKey = Item.GetItemStringFromLink(itemLink) or itemLink
+        local wantedId = Item.GetItemIdFromLink(itemLink)
 
         -- Fast-path: reuse the previously selected bag slot when still valid.
         local cachedBag = tonumber(itemInfo.bagID)
@@ -1852,8 +2000,8 @@ do
         if cachedBag and cachedSlot then
             local cachedLink = GetContainerItemLink(cachedBag, cachedSlot)
             if cachedLink then
-                local cachedKey = Strings.getItemStringFromLink(cachedLink) or cachedLink
-                local cachedId = Strings.getItemIdFromLink(cachedLink)
+                local cachedKey = Item.GetItemStringFromLink(cachedLink) or cachedLink
+                local cachedId = Item.GetItemIdFromLink(cachedLink)
                 local sameItem = (wantedKey and cachedKey == wantedKey)
                     or (wantedId and cachedId == wantedId)
                 if sameItem and not ItemIsSoulbound(cachedBag, cachedSlot) then
@@ -1957,15 +2105,15 @@ do
                 addon.Rolls:ClearRolls()
                 addon.Rolls:RecordRolls(false)
             else
-                Comms.whisper(playerName, whisper)
+                Comms.Whisper(playerName, whisper)
             end
         end
         if rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE
             and playerName == lootState.trader then
             local ok = RequestLoggerLootLog(lootState.currentRollItem, lootState.trader, rollType, rollValue,
-                "TRADE_KEEP", addon.Core.getCurrentRaid())
+                "TRADE_KEEP", addon.Core.GetCurrentRaid())
             if not ok then
-                addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Core.getCurrentRaid()),
+                addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Core.GetCurrentRaid()),
                     tostring(lootState.currentRollItem), tostring(itemLink)))
             end
         end
@@ -1980,7 +2128,7 @@ do
 
         ResetTradeState("TRADE_START")
 
-        lootState.trader = Core.getPlayerName()
+        lootState.trader = Core.GetPlayerName()
         lootState.winner = isAwardRoll and playerName or nil
 
         addon:debug(Diag.D.LogTradeStart:format(tostring(itemLink), tostring(lootState.trader),
@@ -2005,7 +2153,7 @@ do
 
             -- LootCounter (MS only): award is immediate (no trade window completion event).
             if tonumber(rollType) == rollTypes.MAINSPEC then
-                addon.Raid:AddPlayerCount(playerName, 1, addon.Core.getCurrentRaid())
+                addon.Raid:AddPlayerCount(playerName, 1, addon.Core.GetCurrentRaid())
             end
 
             local done = RegisterAwardedItem(lootState.itemCount)
@@ -2038,8 +2186,8 @@ do
 
     for i = 1, #wowForwardEvents do
         local methodName = wowForwardEvents[i]
-        local wowEventName = Events.wowForwarded and Events.wowForwarded(methodName)
-        Bus.registerCallback(wowEventName, function(_, ...)
+        local wowEventName = Events.WowForwarded and Events.WowForwarded(methodName)
+        Bus.RegisterCallback(wowEventName, function(_, ...)
             local fn = module[methodName]
             if fn then
                 fn(module, ...)
@@ -2047,7 +2195,7 @@ do
         end)
     end
 
-    Bus.registerCallback(InternalEvents.SetItem, function(_, itemLink, itemData)
+    Bus.RegisterCallback(InternalEvents.SetItem, function(_, itemLink, itemData)
         if itemLink ~= nil and type(itemLink) ~= "string" then
             addon:warn(Diag.W.LogMLSetItemPayloadInvalid:format(tostring(itemLink), type(itemData)))
             return
@@ -2072,7 +2220,7 @@ do
         module:RequestRefresh()
     end)
 
-    Bus.registerCallback(InternalEvents.RaidRosterDelta, function(_, delta, rosterVersion, raidId)
+    Bus.RegisterCallback(InternalEvents.RaidRosterDelta, function(_, delta, rosterVersion, raidId)
         local raidIdType = type(raidId)
         if type(delta) ~= "table" then
             addon:warn(Diag.W.LogMLRaidRosterDeltaPayloadInvalid:format(type(delta), tostring(rosterVersion),
@@ -2106,11 +2254,11 @@ do
     end)
 
     -- Keep Master UI in sync when SoftRes data changes (import/clear), event-driven.
-    Bus.registerCallback(InternalEvents.ReservesDataChanged, function()
+    Bus.RegisterCallback(InternalEvents.ReservesDataChanged, function()
         module:RequestRefresh()
     end)
 
-    Bus.registerCallback(InternalEvents.AddRoll, function(_, name, roll)
+    Bus.RegisterCallback(InternalEvents.AddRoll, function(_, name, roll)
         if type(name) ~= "string" or name == "" or tonumber(roll) == nil then
             addon:warn(Diag.W.LogMLAddRollPayloadInvalid:format(tostring(name), tostring(roll)))
             return
@@ -2118,12 +2266,12 @@ do
         module:RequestRefresh()
     end)
 
-    Bus.registerCallback(InternalEvents.ConfigSortAscending, function()
+    Bus.RegisterCallback(InternalEvents.ConfigSortAscending, function()
         module:RequestRefresh()
     end)
 
     -- Immediate redraw when toggling the optional +N column in MS roll list.
-    Bus.registerCallback(InternalEvents.ConfigShowLootCounterDuringMSRoll, function()
+    Bus.RegisterCallback(InternalEvents.ConfigShowLootCounterDuringMSRoll, function()
         module:RequestRefresh()
     end)
 end

@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
@@ -18,9 +18,9 @@ local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
 local Bus = feature.Bus or addon.Bus
 
-local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
-local bindModuleToggleHide = feature.bindModuleToggleHide
-local makeModuleFrameGetter = feature.makeModuleFrameGetter
+local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
+local bindModuleToggleHide = feature.BindModuleToggleHide
+local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
 local twipe = table.wipe
@@ -56,8 +56,12 @@ do
     local lastAddBtnMode
     local isAdd = false
     local isEdit = false
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
+    local AcquireRefs
+    local BindChangeRow
 
-    local controller = ListController.makeListController {
+    local controller = ListController.MakeListController {
         keyName = "ChangesList",
         poolTag = "changes",
         _rowParts = { "Name", "Spec" },
@@ -84,11 +88,12 @@ do
         rowName = function(n, it) return n .. "PlayerBtn" .. it.id end,
         rowTmpl = "KRTChangesButtonTemplate",
 
-        drawRow = ListController.createRowDrawer(function(row, it)
+        drawRow = ListController.CreateRowDrawer(function(row, it)
+            BindChangeRow(row)
             local ui = row._p
             ui.Name:SetText(it.name)
             local class = addon.Raid:GetPlayerClass(it.name)
-            local r, g, b = Colors.getClassColor(class)
+            local r, g, b = Colors.GetClassColor(class)
             ui.Name:SetVertexColor(r, g, b)
             ui.Spec:SetText(it.spec or L.StrNone)
         end),
@@ -97,7 +102,7 @@ do
         highlightKey = function() return tostring(selectedID or "nil") end,
     }
 
-    local panelScaffold = UIScaffold.createListPanelScaffold({
+    local panelScaffold = UIScaffold.CreateListPanelScaffold({
         module = module,
         getFrame = getFrame,
         controller = controller,
@@ -125,17 +130,117 @@ do
     })
 
     -- ----- Private helpers ----- --
+    function AcquireRefs(frame)
+        return {
+            addBtn = Frames.Ref(frame, "AddBtn"),
+            announceBtn = Frames.Ref(frame, "AnnounceBtn"),
+            clearBtn = Frames.Ref(frame, "ClearBtn"),
+            demandBtn = Frames.Ref(frame, "DemandBtn"),
+            editBtn = Frames.Ref(frame, "EditBtn"),
+            name = Frames.Ref(frame, "Name"),
+            spec = Frames.Ref(frame, "Spec"),
+        }
+    end
+
+    function BindChangeRow(row)
+        if not row or row._krtChangeBound then
+            return
+        end
+        Frames.SafeSetScript(row, "OnClick", function(self, button)
+            module:Select(self, button)
+        end)
+        Frames.SafeSetScript(row, "OnDoubleClick", function(self)
+            module:Edit(self)
+        end)
+        row._krtChangeBound = true
+    end
 
     -- ----- Public methods ----- --
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
+    function addon.Controllers.Changes:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            frameName = panelScaffold:OnLoad(frame) or frame:GetName()
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        Frames.SafeSetScript(refs.addBtn, "OnClick", function(self, button)
+            module:Add(self, button)
+        end)
+        Frames.SafeSetScript(refs.announceBtn, "OnClick", function()
+            module:Announce()
+        end)
+        Frames.SafeSetScript(refs.clearBtn, "OnClick", function()
+            module:Clear()
+        end)
+        Frames.SafeSetScript(refs.demandBtn, "OnClick", function()
+            module:Demand()
+        end)
+        Frames.SafeSetScript(refs.editBtn, "OnClick", function(self, button)
+            module:Edit(self, button)
+        end)
+        Frames.SafeSetScript(refs.name, "OnTabPressed", function(self)
+            local spec = Frames.Ref(self:GetParent(), "Spec")
+            if spec and spec.SetFocus then
+                spec:SetFocus()
+            end
+        end)
+        Frames.SafeSetScript(refs.spec, "OnTabPressed", function(self)
+            local name = Frames.Ref(self:GetParent(), "Name")
+            if name and name.SetFocus then
+                name:SetFocus()
+            end
+        end)
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Controllers.Changes:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
 
     -- OnLoad frame:
     function module:OnLoad(frame)
-        frameName = panelScaffold:OnLoad(frame)
+        frameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or frameName)
     end
 
     -- Clear module:
     function module:Clear()
-        if not addon.Core.getCurrentRaid() or changesTable == nil then return end
+        if not addon.Core.GetCurrentRaid() or changesTable == nil then return end
         for n in pairs(changesTable) do
             changesTable[n] = nil
         end
@@ -180,7 +285,7 @@ do
 
     -- Add / Delete:
     function module:Add(btn)
-        if not addon.Core.getCurrentRaid() or not btn then return end
+        if not addon.Core.GetCurrentRaid() or not btn then return end
         if not selectedID then
             btn:Hide()
             _G[frameName .. "Name"]:Show()
@@ -199,7 +304,7 @@ do
 
     -- Edit / Save
     function module:Edit()
-        if not addon.Core.getCurrentRaid() then return end
+        if not addon.Core.GetCurrentRaid() then return end
         if not selectedID or isEdit then
             local name = _G[frameName .. "Name"]:GetText()
             local spec = _G[frameName .. "Spec"]:GetText()
@@ -217,27 +322,27 @@ do
 
     -- Remove player's change:
     function module:Delete(name)
-        if not addon.Core.getCurrentRaid() or not name then return end
-        KRT_Raids[addon.Core.getCurrentRaid()].changes[name] = nil
+        if not addon.Core.GetCurrentRaid() or not name then return end
+        KRT_Raids[addon.Core.GetCurrentRaid()].changes[name] = nil
         changesDirty = true
         controller:Dirty()
         module:RequestRefresh()
     end
 
-    Bus.registerCallback(InternalEvents.RaidLeave, function(e, name)
+    Bus.RegisterCallback(InternalEvents.RaidLeave, function(e, name)
         module:Delete(name)
         CancelChanges()
     end)
 
     -- Ask For module:
     function module:Demand()
-        if not addon.Core.getCurrentRaid() then return end
+        if not addon.Core.GetCurrentRaid() then return end
         addon:Announce(L.StrChangesDemand)
     end
 
     -- Spam module:
     function module:Announce()
-        if not addon.Core.getCurrentRaid() then return end
+        if not addon.Core.GetCurrentRaid() then return end
         -- In case of a reload/relog and the frame wasn't loaded
         if not fetched or not next(changesTable) then
             InitChangesTable()
@@ -286,8 +391,8 @@ do
         _G[frameName .. "EditBtn"]:SetText(L.BtnEdit)
         _G[frameName .. "DemandBtn"]:SetText(L.BtnDemand)
         _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
-        Frames.setFrameTitle(frameName, L.StrChanges)
-        Frames.bindEditBoxHandlers(frameName, {
+        Frames.SetFrameTitle(frameName, L.StrChanges)
+        Frames.BindEditBoxHandlers(frameName, {
             { suffix = "Name", onEscape = CancelChanges, onEnter = module.Edit },
             { suffix = "Spec", onEscape = CancelChanges, onEnter = module.Edit },
         }, function()
@@ -313,11 +418,11 @@ do
             lastSelectedID = selectedID
             controller:Touch()
         end
-        UIPrimitives.showHideNamedPart(frameName, "Name", (isEdit or isAdd))
-        UIPrimitives.showHideNamedPart(frameName, "Spec", (isEdit or isAdd))
-        UIPrimitives.enableDisableNamedPart(frameName, "EditBtn", (selectedID or isEdit or isAdd))
+        UIPrimitives.ShowHideNamedPart(frameName, "Name", (isEdit or isAdd))
+        UIPrimitives.ShowHideNamedPart(frameName, "Spec", (isEdit or isAdd))
+        UIPrimitives.EnableDisableNamedPart(frameName, "EditBtn", (selectedID or isEdit or isAdd))
         local editBtnMode = isAdd or (selectedID and isEdit)
-        lastEditBtnMode = UIPrimitives.updateModeTextNamedPart(
+        lastEditBtnMode = UIPrimitives.UpdateModeTextNamedPart(
             frameName,
             "EditBtn",
             L.BtnSave,
@@ -326,7 +431,7 @@ do
             lastEditBtnMode
         )
         local addBtnMode = (not selectedID and not isEdit and not isAdd)
-        lastAddBtnMode = UIPrimitives.updateModeTextNamedPart(
+        lastAddBtnMode = UIPrimitives.UpdateModeTextNamedPart(
             frameName,
             "AddBtn",
             L.BtnAdd,
@@ -334,12 +439,12 @@ do
             addBtnMode,
             lastAddBtnMode
         )
-        UIPrimitives.showHideNamedPart(frameName, "AddBtn", (not isEdit and not isAdd))
-        UIPrimitives.enableDisableNamedPart(frameName, "ClearBtn", count > 0)
-        UIPrimitives.enableDisableNamedPart(frameName, "AnnounceBtn", count > 0)
-        local hasRaid = addon.Core.getCurrentRaid()
-        UIPrimitives.enableDisableNamedPart(frameName, "AddBtn", hasRaid)
-        UIPrimitives.enableDisableNamedPart(frameName, "DemandBtn", hasRaid)
+        UIPrimitives.ShowHideNamedPart(frameName, "AddBtn", (not isEdit and not isAdd))
+        UIPrimitives.EnableDisableNamedPart(frameName, "ClearBtn", count > 0)
+        UIPrimitives.EnableDisableNamedPart(frameName, "AnnounceBtn", count > 0)
+        local hasRaid = addon.Core.GetCurrentRaid()
+        UIPrimitives.EnableDisableNamedPart(frameName, "AddBtn", hasRaid)
+        UIPrimitives.EnableDisableNamedPart(frameName, "DemandBtn", hasRaid)
     end
 
     function module:Refresh()
@@ -349,20 +454,20 @@ do
     -- Initialize changes table:
     function InitChangesTable()
         addon:debug(Diag.D.LogChangesInitTable)
-        if not addon.Core.getCurrentRaid() then
+        if not addon.Core.GetCurrentRaid() then
             changesTable = {}
             return
         end
-        local raid = KRT_Raids[addon.Core.getCurrentRaid()]
+        local raid = KRT_Raids[addon.Core.GetCurrentRaid()]
         raid.changes = raid.changes or {}
         changesTable = raid.changes
     end
 
     -- Save module:
     function SaveChanges(name, spec)
-        if not addon.Core.getCurrentRaid() or not name then return end
-        name = Strings.normalizeName(name)
-        spec = Strings.normalizeName(spec)
+        if not addon.Core.GetCurrentRaid() or not name then return end
+        name = Strings.NormalizeName(name)
+        spec = Strings.NormalizeName(spec)
         -- Is the player in the raid?
         local found
         found, name = addon.Raid:CheckPlayer(name)
@@ -384,8 +489,8 @@ do
         isEdit = false
         selectedID = nil
         tempSelectedID = nil
-        Frames.resetEditBox(_G[frameName .. "Name"])
-        Frames.resetEditBox(_G[frameName .. "Spec"])
+        Frames.ResetEditBox(_G[frameName .. "Name"])
+        Frames.ResetEditBox(_G[frameName .. "Spec"])
         module:RequestRefresh()
     end
 end

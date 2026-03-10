@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
@@ -17,9 +17,9 @@ local C = feature.C
 local Options = feature.Options or addon.Options
 local Bus = feature.Bus or addon.Bus
 
-local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
-local bindModuleToggleHide = feature.bindModuleToggleHide
-local makeModuleFrameGetter = feature.makeModuleFrameGetter
+local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
+local bindModuleToggleHide = feature.BindModuleToggleHide
+local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
 local tinsert, twipe = table.insert, table.wipe
@@ -53,26 +53,41 @@ do
 
     local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
     local frameName
-    local getFrame = Frames.makeFrameGetter("KRTReserveListFrame")
+    local getFrame = Frames.MakeFrameGetter("KRTReserveListFrame")
     local scrollFrame, scrollChild
     local reserveHeaders = {}
     local reserveItemRows = {}
     local rowsByItemID = {}
     local localized = false
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
     local reserveRowStyle = {
         odd = { 0.04, 0.06, 0.09, 0.30 },
         even = { 0.08, 0.10, 0.14, 0.36 },
         separator = { 1.0, 1.0, 1.0, 0.10 },
     }
 
-    UIScaffold.bootstrapModuleUi(module, getFrame, function()
+    UIScaffold.BootstrapModuleUi(module, getFrame, function()
         module:RequestRefresh()
     end, {
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
 
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
     -- ----- Private helpers ----- --
+
+    local function AcquireRefs(frame)
+        return {
+            closeButton = Frames.Ref(frame, "CloseButton"),
+            clearButton = Frames.Ref(frame, "ClearButton"),
+            queryButton = Frames.Ref(frame, "QueryButton"),
+            scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"],
+            scrollChild = (frame.ScrollFrame and frame.ScrollFrame.ScrollChild) or _G["KRTReserveListFrameScrollChild"],
+        }
+    end
 
     local function getReservesModule()
         local services = addon.Services
@@ -308,7 +323,7 @@ do
             return
         end
         if frameName then
-            Frames.setFrameTitle(frameName, L.StrRaidReserves)
+            Frames.SetFrameTitle(frameName, L.StrRaidReserves)
             addon:debug(Diag.D.LogReservesUILocalized:format(L.StrRaidReserves))
         end
         local clearButton = frameName and _G[frameName .. "ClearButton"]
@@ -333,14 +348,14 @@ do
         if clearButton then
             if hasData then
                 clearButton:Show()
-                UIPrimitives.enableDisable(clearButton, true)
+                UIPrimitives.EnableDisable(clearButton, true)
             else
                 clearButton:Hide()
             end
         end
         local queryButton = _G[frameName .. "QueryButton"]
         if queryButton then
-            UIPrimitives.enableDisable(queryButton, hasData)
+            UIPrimitives.EnableDisable(queryButton, hasData)
         end
     end
 
@@ -541,9 +556,57 @@ do
         RenderReserveListUI()
     end
 
+    function addon.Widgets.ReservesUI:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            self:OnLoad(frame)
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+        scrollFrame = refs.scrollFrame or scrollFrame
+        scrollChild = refs.scrollChild or scrollChild
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Widgets.ReservesUI:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
+
     function UI:OnLoad(frame)
         addon:debug(Diag.D.LogReservesFrameLoaded)
-        frameName = Frames.initModuleFrame(module, frame, {
+        frameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 addon:debug(Diag.D.LogReservesShowWindow)
@@ -608,9 +671,11 @@ do
     local Import = UI.Import
     local getImportFrame = makeModuleFrameGetter(Import, "KRTImportWindow")
     local importLocalized = false
+    local importUiBound = false
+    local importScaffoldToggle, importScaffoldHide
     local MODE_MULTI, MODE_PLUS = 0, 1
 
-    UIScaffold.bootstrapModuleUi(Import, getImportFrame, function()
+    UIScaffold.BootstrapModuleUi(Import, getImportFrame, function()
         if Import.RequestRefresh then
             Import:RequestRefresh()
         end
@@ -618,6 +683,20 @@ do
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
+
+    importScaffoldToggle = Import.Toggle
+    importScaffoldHide = Import.Hide
+
+    local function AcquireImportRefs(frame)
+        return {
+            cancelButton = _G["KRTImportCancelButton"],
+            confirmButton = _G["KRTImportConfirmButton"],
+            editBox = _G["KRTImportEditBox"],
+            modeSlider = _G["KRTImportWindowModeSlider"] or _G["KRTImportModeSlider"],
+            status = _G["KRTImportWindowStatus"],
+            frame = frame,
+        }
+    end
 
     local function GetImportModeString()
         if Service and Service.GetImportMode then
@@ -708,7 +787,7 @@ do
             return
         end
 
-        Frames.setFrameTitle(frame, L.StrImportReservesTitle)
+        Frames.SetFrameTitle(frame, L.StrImportReservesTitle)
 
         local hint = _G["KRTImportWindowHint"]
         if hint then hint:SetText(L.StrImportReservesHint) end
@@ -722,12 +801,76 @@ do
         importLocalized = true
     end
 
+    function Import:BindUI()
+        if importUiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getImportFrame()
+        if not frame then
+            return nil
+        end
+        if not self.frame then
+            self:OnLoad(frame)
+        end
+
+        local refs = AcquireImportRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        Frames.SafeSetScript(refs.cancelButton, "OnClick", function()
+            if Import.Hide then
+                Import:Hide()
+            end
+        end)
+        Frames.SafeSetScript(refs.confirmButton, "OnClick", function()
+            Import:ImportFromEditBox()
+        end)
+        Frames.SafeSetScript(refs.editBox, "OnEscapePressed", function()
+            if Import.Hide then
+                Import:Hide()
+            end
+        end)
+        Frames.SafeSetScript(refs.modeSlider, "OnValueChanged", function(self, value)
+            Import:OnModeSliderChanged(self, value)
+        end)
+        Import:OnModeSliderLoad(refs.modeSlider)
+
+        importUiBound = true
+        return frame, refs
+    end
+
+    function Import:EnsureUI()
+        if importUiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function Import:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if importScaffoldToggle then
+            return importScaffoldToggle(self)
+        end
+    end
+
+    function Import:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if importScaffoldHide then
+            return importScaffoldHide(self)
+        end
+    end
+
     function Import:SetImportMode(modeValue, suppressSlider)
         local mode = (modeValue == MODE_PLUS) and "plus" or "multi"
         if Service and Service.SetImportMode then
             Service:SetImportMode(mode, true)
         else
-            Options.setOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
+            Options.SetOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
         end
 
         if suppressSlider then return end
@@ -782,10 +925,10 @@ do
     end
 
     function Import:OnLoad(frame)
-        Frames.initModuleFrame(Import, frame, {
+        Frames.InitModuleFrame(Import, frame, {
             enableDrag = true,
             hookOnShow = function()
-                Frames.resetEditBox(_G["KRTImportEditBox"])
+                Frames.ResetEditBox(_G["KRTImportEditBox"])
                 local editBox = _G["KRTImportEditBox"]
                 if editBox then
                     editBox:SetFocus()
@@ -882,7 +1025,7 @@ do
         })
     end
 
-    Bus.registerCallback(InternalEvents.ReservesDataChanged, function()
+    Bus.RegisterCallback(InternalEvents.ReservesDataChanged, function()
         UI:RequestRefresh()
     end)
 end

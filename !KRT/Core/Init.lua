@@ -1,6 +1,6 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
@@ -34,7 +34,6 @@ local UnitIsGroupLeader = _G.UnitIsGroupLeader
 local random = math.random
 local gsub = string.gsub
 local strsub, strlen = string.sub, string.len
-local lower = string.lower
 
 local Core = addon.Core
 local Diagnose = addon.Diagnose
@@ -155,7 +154,7 @@ local function installLegacyAliasProxy()
     end
 end
 
-function Core.registerLegacyAlias(aliasKey, cfg)
+function Core.RegisterLegacyAlias(aliasKey, cfg)
     if type(aliasKey) ~= "string" or aliasKey == "" then
         return
     end
@@ -179,7 +178,7 @@ function Core.registerLegacyAlias(aliasKey, cfg)
     rawset(addon, aliasKey, nil)
 end
 
-function Core.registerLegacyAliasPath(aliasKey, namespaceKey, moduleKey)
+function Core.RegisterLegacyAliasPath(aliasKey, namespaceKey, moduleKey)
     if type(aliasKey) ~= "string" or aliasKey == "" then
         return
     end
@@ -190,7 +189,7 @@ function Core.registerLegacyAliasPath(aliasKey, namespaceKey, moduleKey)
         return
     end
 
-    Core.registerLegacyAlias(aliasKey, {
+    Core.RegisterLegacyAlias(aliasKey, {
         targetPath = namespaceKey .. "." .. moduleKey,
         get = function()
             local ns = rawget(addon, namespaceKey)
@@ -230,7 +229,7 @@ local LEGACY_ALIAS_PATHS = {
 
 for i = 1, #LEGACY_ALIAS_PATHS do
     local entry = LEGACY_ALIAS_PATHS[i]
-    Core.registerLegacyAliasPath(entry[1], entry[2], entry[3])
+    Core.RegisterLegacyAliasPath(entry[1], entry[2], entry[3])
 end
 
 local function installCompatGlobalFunctions()
@@ -304,7 +303,7 @@ end
 
 installCompatGlobalFunctions()
 
-function Core.getController(name)
+function Core.GetController(name)
     if type(name) ~= "string" or name == "" then
         return nil
     end
@@ -312,7 +311,7 @@ function Core.getController(name)
     return controllers and controllers[name] or nil
 end
 
-function Core.getPlayerName()
+function Core.GetPlayerName()
     local state = addon.State
     state.player = state.player or {}
     local name = state.player.name or addon.UnitFullName("player")
@@ -320,7 +319,7 @@ function Core.getPlayerName()
     return name
 end
 
-function Core.getRealmName()
+function Core.GetRealmName()
     local realm = GetRealmName and GetRealmName() or ""
     if type(realm) ~= "string" then
         return ""
@@ -328,7 +327,7 @@ function Core.getRealmName()
     return realm
 end
 
-function Core.getUnitRank(unit, fallback)
+function Core.GetUnitRank(unit, fallback)
     local groupLeader = addon.UnitIsGroupLeader or UnitIsGroupLeader
     local groupAssistant = addon.UnitIsGroupAssistant or UnitIsGroupAssistant
 
@@ -370,15 +369,15 @@ local function copyFlat(dst, src)
     return dst
 end
 
-function Options.newOptions()
+function Options.NewOptions()
     return copyFlat({}, Options.defaultValues)
 end
 
-function Options.isDebugEnabled()
+function Options.IsDebugEnabled()
     return addon and addon.State and addon.State.debugEnabled == true
 end
 
-function Options.applyDebugSetting(enabled)
+function Options.ApplyDebugSetting(enabled)
     local state = addon.State
     state.debugEnabled = enabled and true or false
 
@@ -389,7 +388,7 @@ function Options.applyDebugSetting(enabled)
     end
 end
 
-function Options.setOption(key, value)
+function Options.SetOption(key, value)
     if type(key) ~= "string" or key == "" then
         return false
     end
@@ -414,8 +413,8 @@ function Options.setOption(key, value)
     return true
 end
 
-function Options.loadOptions()
-    local options = Options.newOptions()
+function Options.LoadOptions()
+    local options = Options.NewOptions()
     if type(KRT_Options) == "table" then
         copyFlat(options, KRT_Options)
     end
@@ -424,150 +423,21 @@ function Options.loadOptions()
     KRT_Options = options
     addon.options = options
 
-    Options.applyDebugSetting(false)
+    Options.ApplyDebugSetting(false)
     return options
 end
 
-function Options.restoreDefaults()
-    local options = Options.newOptions()
+function Options.RestoreDefaults()
+    local options = Options.NewOptions()
     KRT_Options = options
     addon.options = options
-    Options.applyDebugSetting(false)
+    Options.ApplyDebugSetting(false)
     return options
 end
 
-addon.LoadOptions = Options.loadOptions
+addon.LoadOptions = Options.LoadOptions
 
-do
-    local Events = addon.Events
-    Events.Internal = Events.Internal or {}
-    Events.Wow = Events.Wow or {}
-
-    local Internal = Events.Internal
-    local Wow = Events.Wow
-
-    Internal.AddRoll = "AddRoll"
-    Internal.LoggerLootLogRequest = "LoggerLootLogRequest"
-    Internal.LoggerSelectRaid = "LoggerSelectRaid"
-    Internal.LoggerSelectBoss = "LoggerSelectBoss"
-    Internal.LoggerSelectPlayer = "LoggerSelectPlayer"
-    Internal.LoggerSelectBossPlayer = "LoggerSelectBossPlayer"
-    Internal.LoggerSelectItem = "LoggerSelectItem"
-    Internal.PlayerCountChanged = "PlayerCountChanged"
-    Internal.RaidCreate = "RaidCreate"
-    Internal.RaidLeave = "RaidLeave"
-    Internal.RaidLootUpdate = "RaidLootUpdate"
-    Internal.RaidRosterDelta = "RaidRosterDelta"
-    Internal.ReservesDataChanged = "ReservesDataChanged"
-    Internal.SetItem = "SetItem"
-
-    Internal.ConfigSortAscending = "ConfigsortAscending"
-    Internal.ConfigShowLootCounterDuringMSRoll = "ConfigshowLootCounterDuringMSRoll"
-
-    Wow.LOOT_OPENED = "wow.LOOT_OPENED"
-    Wow.LOOT_CLOSED = "wow.LOOT_CLOSED"
-    Wow.LOOT_SLOT_CLEARED = "wow.LOOT_SLOT_CLEARED"
-    Wow.TRADE_ACCEPT_UPDATE = "wow.TRADE_ACCEPT_UPDATE"
-    Wow.TRADE_REQUEST_CANCEL = "wow.TRADE_REQUEST_CANCEL"
-    Wow.TRADE_CLOSED = "wow.TRADE_CLOSED"
-
-    function Events.configOptionChanged(optionName)
-        if type(optionName) ~= "string" or optionName == "" then
-            return nil
-        end
-        return "Config" .. optionName
-    end
-
-    function Events.wowForwarded(eventName)
-        if type(eventName) ~= "string" or eventName == "" then
-            return nil
-        end
-        return Wow[eventName] or ("wow." .. tostring(eventName))
-    end
-end
-
-do
-    local Features = addon.Features
-    Features.WidgetFlags = Features.WidgetFlags or {}
-    Features.Profiles = Features.Profiles or {
-        full = {
-            Config = true,
-            LootCounter = true,
-            Reserves = true,
-        },
-        core = {
-            Config = false,
-            LootCounter = false,
-            Reserves = false,
-        },
-    }
-
-    local function normalizeProfile(profileName)
-        if type(profileName) ~= "string" or profileName == "" then
-            return "full"
-        end
-        return lower(profileName)
-    end
-
-    local function applyProfileFlags(profileName)
-        local profileKey = normalizeProfile(profileName)
-        local profileFlags = Features.Profiles[profileKey] or Features.Profiles.full
-        local flags = Features.WidgetFlags
-
-        for widgetId in pairs(flags) do
-            flags[widgetId] = nil
-        end
-        for widgetId, enabled in pairs(profileFlags or {}) do
-            flags[widgetId] = enabled == true
-        end
-
-        Features.Profile = profileKey
-        return profileKey
-    end
-
-    function Features:SetProfile(profileName)
-        return applyProfileFlags(profileName)
-    end
-
-    function Features:Set(widgetId, enabled)
-        if type(widgetId) ~= "string" or widgetId == "" then
-            return false
-        end
-        self.WidgetFlags[widgetId] = enabled == true
-        return true
-    end
-
-    function Features:IsEnabled(widgetId)
-        if type(widgetId) ~= "string" or widgetId == "" then
-            return false
-        end
-
-        local flag = self.WidgetFlags[widgetId]
-        if flag == nil then
-            return true
-        end
-        return flag == true
-    end
-
-    function Features:GetProfile()
-        return self.Profile or "full"
-    end
-
-    local requestedProfile = _G.KRT_FEATURE_PROFILE
-    if type(requestedProfile) ~= "string" or requestedProfile == "" then
-        requestedProfile = Features.Profile or "full"
-    end
-    applyProfileFlags(requestedProfile)
-
-    local overrides = _G.KRT_FEATURE_FLAGS
-    if type(overrides) == "table" then
-        for widgetId, enabled in pairs(overrides) do
-            Features:Set(widgetId, enabled)
-        end
-    end
-end
-
-function Core.ensureLootRuntimeState()
+function Core.EnsureLootRuntimeState()
     local state = addon.State
     state.loot = state.loot or {}
 
@@ -608,14 +478,14 @@ function Core.ensureLootRuntimeState()
 end
 
 function Core.GetItemIndex()
-    local _, lootState = Core.ensureLootRuntimeState()
+    local _, lootState = Core.EnsureLootRuntimeState()
     return tonumber(lootState.currentItemIndex) or 0
 end
 
-function Core.getFeatureShared()
+function Core.GetFeatureShared()
     local constants = addon.C or {}
     local core = addon.Core
-    local state, lootState, itemInfo = core.ensureLootRuntimeState()
+    local state, lootState, itemInfo = core.EnsureLootRuntimeState()
 
     return {
         L = addon.L,
@@ -632,6 +502,8 @@ function Core.getFeatureShared()
         Time = addon.Time,
         Base64 = addon.Base64,
         Comms = addon.Comms,
+        Sort = addon.Sort,
+        Item = addon.Item,
 
         UI = addon.UI,
         Frames = addon.Frames,
@@ -645,9 +517,9 @@ function Core.getFeatureShared()
         Controllers = addon.Controllers,
         Widgets = addon.Widgets,
 
-        bindModuleRequestRefresh = core.bindModuleRequestRefresh,
-        bindModuleToggleHide = core.bindModuleToggleHide,
-        makeModuleFrameGetter = core.makeModuleFrameGetter,
+        BindModuleRequestRefresh = core.BindModuleRequestRefresh,
+        BindModuleToggleHide = core.BindModuleToggleHide,
+        MakeModuleFrameGetter = core.MakeModuleFrameGetter,
 
         UnitIsGroupLeader = addon.UnitIsGroupLeader,
         UnitIsGroupAssistant = addon.UnitIsGroupAssistant,

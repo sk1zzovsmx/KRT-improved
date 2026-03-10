@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local type = type
 local _G = _G
@@ -16,7 +16,7 @@ local UIPrimitives = addon.UIPrimitives
 addon.UIRowVisuals = addon.UIRowVisuals or {}
 local UIRowVisuals = addon.UIRowVisuals
 
-function UIPrimitives.enableDisable(frame, cond)
+function UIPrimitives.EnableDisable(frame, cond)
     if not frame then
         return
     end
@@ -27,7 +27,7 @@ function UIPrimitives.enableDisable(frame, cond)
     end
 end
 
-function UIPrimitives.toggle(frame)
+function UIPrimitives.Toggle(frame)
     if not frame then
         return
     end
@@ -38,7 +38,7 @@ function UIPrimitives.toggle(frame)
     end
 end
 
-function UIPrimitives.hideFrame(frame, onHide)
+function UIPrimitives.HideFrame(frame, onHide)
     if frame and frame:IsShown() then
         if onHide then
             onHide()
@@ -47,7 +47,7 @@ function UIPrimitives.hideFrame(frame, onHide)
     end
 end
 
-function UIPrimitives.showHide(frame, cond)
+function UIPrimitives.ShowHide(frame, cond)
     if not frame then
         return
     end
@@ -58,7 +58,7 @@ function UIPrimitives.showHide(frame, cond)
     end
 end
 
-function UIPrimitives.toggleHighlight(frame, cond)
+function UIPrimitives.ToggleHighlight(frame, cond)
     if not frame then
         return
     end
@@ -69,7 +69,7 @@ function UIPrimitives.toggleHighlight(frame, cond)
     end
 end
 
-function UIPrimitives.setButtonCount(btn, baseText, n)
+function UIPrimitives.SetButtonCount(btn, baseText, n)
     if not btn then
         return
     end
@@ -84,7 +84,7 @@ function UIPrimitives.setButtonCount(btn, baseText, n)
     end
 end
 
-function UIPrimitives.setText(frame, str1, str2, cond)
+function UIPrimitives.SetText(frame, str1, str2, cond)
     if not frame then
         return
     end
@@ -95,7 +95,7 @@ function UIPrimitives.setText(frame, str1, str2, cond)
     end
 end
 
-function UIPrimitives.getNamedFramePart(frameName, suffix)
+function UIPrimitives.GetNamedFramePart(frameName, suffix)
     if type(frameName) ~= "string" or frameName == "" then
         return nil
     end
@@ -105,39 +105,39 @@ function UIPrimitives.getNamedFramePart(frameName, suffix)
     return _G[frameName .. suffix]
 end
 
-function UIPrimitives.enableDisableNamedPart(frameName, suffix, cond)
-    local frame = UIPrimitives.getNamedFramePart(frameName, suffix)
+function UIPrimitives.EnableDisableNamedPart(frameName, suffix, cond)
+    local frame = UIPrimitives.GetNamedFramePart(frameName, suffix)
     if frame then
-        UIPrimitives.enableDisable(frame, cond)
+        UIPrimitives.EnableDisable(frame, cond)
     end
     return frame
 end
 
-function UIPrimitives.showHideNamedPart(frameName, suffix, cond)
-    local frame = UIPrimitives.getNamedFramePart(frameName, suffix)
+function UIPrimitives.ShowHideNamedPart(frameName, suffix, cond)
+    local frame = UIPrimitives.GetNamedFramePart(frameName, suffix)
     if frame then
-        UIPrimitives.showHide(frame, cond)
+        UIPrimitives.ShowHide(frame, cond)
     end
     return frame
 end
 
-function UIPrimitives.setTextNamedPart(frameName, suffix, str1, str2, cond)
-    local frame = UIPrimitives.getNamedFramePart(frameName, suffix)
+function UIPrimitives.SetTextNamedPart(frameName, suffix, str1, str2, cond)
+    local frame = UIPrimitives.GetNamedFramePart(frameName, suffix)
     if frame then
-        UIPrimitives.setText(frame, str1, str2, cond)
+        UIPrimitives.SetText(frame, str1, str2, cond)
     end
     return frame
 end
 
-function UIPrimitives.updateModeTextNamedPart(frameName, suffix, str1, str2, mode, lastMode)
+function UIPrimitives.UpdateModeTextNamedPart(frameName, suffix, str1, str2, mode, lastMode)
     if mode ~= lastMode then
-        UIPrimitives.setTextNamedPart(frameName, suffix, str1, str2, mode)
+        UIPrimitives.SetTextNamedPart(frameName, suffix, str1, str2, mode)
         return mode
     end
     return lastMode
 end
 
-local function ensureRowVisuals(row)
+local function ensureRowTextures(row)
     if not row or row._krtSelTex then
         return
     end
@@ -164,12 +164,12 @@ local function ensureRowVisuals(row)
     row:SetPushedTexture(pushed)
 end
 
-function UIRowVisuals.ensureRowVisuals(row)
-    ensureRowVisuals(row)
+function UIRowVisuals.EnsureRowVisuals(row)
+    ensureRowTextures(row)
 end
 
-function UIRowVisuals.setRowSelected(row, cond)
-    ensureRowVisuals(row)
+function UIRowVisuals.SetRowSelected(row, cond)
+    ensureRowTextures(row)
     if not row or not row._krtSelTex then
         return
     end
@@ -180,8 +180,8 @@ function UIRowVisuals.setRowSelected(row, cond)
     end
 end
 
-function UIRowVisuals.setRowFocused(row, cond)
-    ensureRowVisuals(row)
+function UIRowVisuals.SetRowFocused(row, cond)
+    ensureRowTextures(row)
     local texture = row and row._krtFocusTex
     if not texture then
         return
@@ -192,3 +192,4 @@ function UIRowVisuals.setRowFocused(row, cond)
         texture:Hide()
     end
 end
+

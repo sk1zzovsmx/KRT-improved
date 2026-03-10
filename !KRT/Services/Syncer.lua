@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
@@ -77,22 +77,22 @@ do
     local function normalizeSender(sender)
         if type(sender) ~= "string" then return nil end
         local short = sender:match("^([^%-]+)") or sender
-        return Strings.normalizeName(short, true) or short
+        return Strings.NormalizeName(short, true) or short
     end
 
     local function isSelfSender(sender)
-        local selfName = Core.getPlayerName()
+        local selfName = Core.GetPlayerName()
         if not selfName then
             return false
         end
-        local a = Strings.normalizeLower(selfName, true)
-        local b = Strings.normalizeLower(normalizeSender(sender), true)
+        local a = Strings.NormalizeLower(selfName, true)
+        local b = Strings.NormalizeLower(normalizeSender(sender), true)
         return (a ~= nil and b ~= nil and a == b)
     end
 
     local function encodeText(value)
         local input = tostring(value or "")
-        local ok, out = pcall(Base64.encode, input)
+        local ok, out = pcall(Base64.Encode, input)
         if ok and out then
             return out
         end
@@ -104,7 +104,7 @@ do
         if input == "" then
             return ""
         end
-        local ok, out = pcall(Base64.decode, input)
+        local ok, out = pcall(Base64.Decode, input)
         if ok and out then
             return out
         end
@@ -204,11 +204,11 @@ do
     end
 
     local function normalizeTargetName(raw)
-        local text = Strings.trimText(raw or "")
+        local text = Strings.TrimText(raw or "")
         if text == "" then
             return nil
         end
-        return Strings.normalizeName(text, true) or text
+        return Strings.NormalizeName(text, true) or text
     end
 
     local function sortedByNid(list, nidKey, tieKey)
@@ -243,11 +243,11 @@ do
             return nil
         end
 
-        Core.ensureRaidSchema(raid)
+        Core.EnsureRaidSchema(raid)
 
         local lines = {}
         local schemaVersion = tonumber(raid.schemaVersion)
-            or tonumber(Core.getRaidSchemaVersion and Core.getRaidSchemaVersion())
+            or tonumber(Core.GetRaidSchemaVersion and Core.GetRaidSchemaVersion())
             or 1
 
         lines[#lines + 1] = packFields(
@@ -500,7 +500,7 @@ do
         end
         for i = 1, #names do
             local raw = names[i]
-            local normalized = Strings.normalizeName(raw, true)
+            local normalized = Strings.NormalizeName(raw, true)
             local name = normalized or tostring(raw or "")
             if name ~= "" and not seen[name] then
                 seen[name] = true
@@ -554,22 +554,22 @@ do
     end
 
     local function getCurrentRaidRecord()
-        local currentId = Core.getCurrentRaid()
+        local currentId = Core.GetCurrentRaid()
         if not currentId then
             return nil, nil
         end
-        return Core.ensureRaidById(currentId), currentId
+        return Core.EnsureRaidById(currentId), currentId
     end
 
     local function resolveRaidByReference(raidRef, allowFallback)
         local n = tonumber(raidRef)
         if n and n > 0 then
-            local byId, byIdIndex = Core.ensureRaidById(n)
+            local byId, byIdIndex = Core.EnsureRaidById(n)
             if byId then
                 return byId, byIdIndex
             end
 
-            local byNid, byNidIndex = Core.ensureRaidByNid(n)
+            local byNid, byNidIndex = Core.EnsureRaidByNid(n)
             if byNid then
                 return byNid, byNidIndex
             end
@@ -583,15 +583,15 @@ do
 
         local selectedRaid = addon.State and addon.State.selectedRaid
         if selectedRaid then
-            local raid = Core.ensureRaidById(selectedRaid)
+            local raid = Core.EnsureRaidById(selectedRaid)
             if raid then
                 return raid, selectedRaid
             end
         end
 
-        local currentRaid = Core.getCurrentRaid()
+        local currentRaid = Core.GetCurrentRaid()
         if currentRaid then
-            return Core.ensureRaidById(currentRaid), currentRaid
+            return Core.EnsureRaidById(currentRaid), currentRaid
         end
 
         return nil, nil
@@ -628,7 +628,7 @@ do
                 local count = tonumber(src.count) or 0
                 if count < 0 then count = 0 end
                 dst.playerNid = nid
-                dst.name = Strings.normalizeName(src.name, true) or src.name or dst.name
+                dst.name = Strings.NormalizeName(src.name, true) or src.name or dst.name
                 dst.rank = tonumber(src.rank) or 0
                 dst.subgroup = tonumber(src.subgroup) or 1
                 dst.class = (src.class and src.class ~= "") and src.class or "UNKNOWN"
@@ -677,7 +677,7 @@ do
                     dst.itemTexture = src.itemTexture
                 end
                 dst.itemCount = count
-                dst.looter = Strings.normalizeName(src.looter, true) or src.looter or dst.looter
+                dst.looter = Strings.NormalizeName(src.looter, true) or src.looter or dst.looter
                 dst.rollType = tonumber(src.rollType) or 0
                 dst.rollValue = tonumber(src.rollValue) or 0
                 dst.bossNid = tonumber(src.bossNid) or 0
@@ -687,9 +687,9 @@ do
 
         raid.changes = raid.changes or {}
         for name, spec in pairs(snapshot.changes or {}) do
-            local normalizedName = Strings.normalizeName(name, true) or name
+            local normalizedName = Strings.NormalizeName(name, true) or name
             if normalizedName and normalizedName ~= "" then
-                local normalizedSpec = Strings.normalizeName(spec, true)
+                local normalizedSpec = Strings.NormalizeName(spec, true)
                 raid.changes[normalizedName] = (normalizedSpec and normalizedSpec ~= "") and normalizedSpec or nil
             end
         end
@@ -707,7 +707,7 @@ do
             tonumber(header.nextLootNid) or 1
         )
 
-        Core.ensureRaidSchema(raid)
+        Core.EnsureRaidSchema(raid)
 
         return raid
     end
@@ -718,12 +718,12 @@ do
             return nil, nil
         end
 
-        local raid = Core.createRaidRecord({
+        local raid = Core.CreateRaidRecord({
             realm = header.realm,
             zone = header.zone,
             size = tonumber(header.size),
             difficulty = tonumber(header.difficulty),
-            startTime = tonumber(header.startTime) or Time.getCurrentTime(),
+            startTime = tonumber(header.startTime) or Time.GetCurrentTime(),
             endTime = (tonumber(header.endTime) or 0) > 0 and tonumber(header.endTime) or nil,
         })
 
@@ -734,7 +734,7 @@ do
 
         tinsert(KRT_Raids, raid)
         local raidId = #KRT_Raids
-        local outRaid = Core.ensureRaidById(raidId)
+        local outRaid = Core.EnsureRaidById(raidId)
         return outRaid, raidId
     end
 
@@ -753,7 +753,7 @@ do
         if target and target ~= "" then
             SendAddonMessage(COMM_PREFIX, payload, "WHISPER", target)
         else
-            Comms.sync(COMM_PREFIX, payload)
+            Comms.Sync(COMM_PREFIX, payload)
         end
         addon:debug((Diag.D.LogSyncRequestSent):format(tostring(requestId), tostring(raidRef)))
     end
@@ -789,7 +789,7 @@ do
             if target and target ~= "" then
                 SendAddonMessage(COMM_PREFIX, msg, "WHISPER", target)
             else
-                Comms.sync(COMM_PREFIX, msg)
+                Comms.Sync(COMM_PREFIX, msg)
             end
         end
 
@@ -836,8 +836,8 @@ do
     local function refreshLoggerUi(focusRaidId)
         local selectedRaid = tonumber(focusRaidId)
             or tonumber(addon.State and addon.State.selectedRaid)
-            or tonumber(Core.getCurrentRaid())
-        Bus.triggerEvent(InternalEvents.LoggerSelectRaid, selectedRaid, "sync")
+            or tonumber(Core.GetCurrentRaid())
+        Bus.TriggerEvent(InternalEvents.LoggerSelectRaid, selectedRaid, "sync")
     end
 
     local function onSnapshotReady(sender, requestId, mode, snapshot)

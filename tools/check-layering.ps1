@@ -65,6 +65,10 @@ function Get-PatternMatches {
         [string[]]$ExtraArgs = @()
     )
 
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return @()
+    }
+
     if ($useRipgrep) {
         $args = @("--line-number", "--no-heading", "--color", "never")
         $args += $ExtraArgs
@@ -117,6 +121,23 @@ function Add-RgCheck {
     foreach ($line in $matches) {
         $violations.Add("  $line")
     }
+}
+
+function Add-RgRequireMatch {
+    param(
+        [string]$Name,
+        [string]$Pattern,
+        [string]$Path,
+        [string[]]$ExtraArgs = @()
+    )
+
+    $matches = @(Get-PatternMatches -Pattern $Pattern -Path $Path -ExtraArgs $ExtraArgs)
+    if ($matches.Count -gt 0) {
+        return
+    }
+
+    $violations.Add("[$Name]")
+    $violations.Add("  Missing required match for pattern '$Pattern' in '$Path'")
 }
 
 function Add-ControllerOwnershipCheck {
@@ -187,6 +208,29 @@ Add-RgCheck `
     -ExtraArgs @("--glob", "*.lua")
 
 Add-RgCheck `
+    -Name "Service direct UI frame APIs" `
+    -Pattern 'CreateFrame|SetScript|:Show\(|:Hide\(' `
+    -Path "!KRT/Services" `
+    -ExtraArgs @("--glob", "*.lua")
+
+Add-RgCheck `
+    -Name "Service tooltip probe API refs" `
+    -Pattern 'GameTooltip|CreateFrame\(|Set(Bag|Inventory|Loot)Item|SetHyperlink' `
+    -Path "!KRT/Services" `
+    -ExtraArgs @("--glob", "*.lua")
+
+Add-RgCheck `
+    -Name "Item tooltip hack leakage outside module" `
+    -Pattern 'KRT_ItemTooltip|Set(Bag|Inventory|Loot)Item' `
+    -Path "!KRT" `
+    -ExtraArgs @("--glob", "*.lua", "--glob", "!**/Modules/Item.lua")
+
+Add-RgRequireMatch `
+    -Name "Item module tooltip implementation missing" `
+    -Pattern 'KRT_ItemTooltip|GameTooltipTemplate|SetBagItem|SetHyperlink' `
+    -Path "!KRT/Modules/Item.lua"
+
+Add-RgCheck `
     -Name "Core parent frame leak" `
     -Pattern 'addon\.Master\.frame|KRTMaster' `
     -Path "!KRT/KRT.lua"
@@ -213,11 +257,6 @@ Add-RgCheck `
     -ExtraArgs @("--glob", "*.lua")
 
 Add-RgCheck `
-    -Name "UIBinder splitArgs local helper name collision" `
-    -Pattern 'local\s+function\s+splitArgs\s*\(' `
-    -Path "!KRT/Modules/UI/Binder/UIBinder.lua"
-
-Add-RgCheck `
     -Name "UI back-edge: Frames -> Utils" `
     -Pattern '\b(addon\.Utils|Utils\.)' `
     -Path "!KRT/Modules/UI/Frames.lua"
@@ -226,11 +265,6 @@ Add-RgCheck `
     -Name "UI back-edge: ListController -> Utils" `
     -Pattern '\b(addon\.Utils|Utils\.)' `
     -Path "!KRT/Modules/UI/ListController.lua"
-
-Add-RgCheck `
-    -Name "UI back-edge: UIBinder -> Utils" `
-    -Pattern '\b(addon\.Utils|Utils\.)' `
-    -Path "!KRT/Modules/UI/Binder/UIBinder.lua"
 
 Add-ControllerOwnershipCheck -FilePath "!KRT/Controllers/Changes.lua" -Owner "Changes"
 Add-ControllerOwnershipCheck -FilePath "!KRT/Controllers/Master.lua" -Owner "Master"
@@ -250,7 +284,10 @@ Write-Host "Layering check passed." -ForegroundColor Green
 Write-Host "Checked:"
 Write-Host "  Services -> Parents/frame refs"
 Write-Host "  Services -> hooksecurefunc(addon.Parent, ...)"
+Write-Host "  Services -> direct UI APIs"
+Write-Host "  Services -> tooltip probe APIs (GameTooltip/CreateFrame/Set*Item/SetHyperlink)"
+Write-Host "  Item tooltip-hack confinement (Modules/Item.lua)"
 Write-Host "  KRT.lua -> parent frame refs"
-Write-Host "  Quick-win duplicate regressions (Core/Reserves/EntryPoints/UIBinder)"
-Write-Host "  UI module back-edges (Frames/ListController/UIBinder -> Utils)"
+Write-Host "  Quick-win duplicate regressions (Core/Reserves/EntryPoints)"
+Write-Host "  UI module back-edges (Frames/ListController -> Utils)"
 Write-Host "  Controllers -> own parent only (addon.Parent and KRTParent* ownership)"

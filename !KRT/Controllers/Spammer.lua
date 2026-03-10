@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 
@@ -14,9 +14,9 @@ local Comms = feature.Comms or addon.Comms
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
-local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
-local bindModuleToggleHide = feature.bindModuleToggleHide
-local makeModuleFrameGetter = feature.makeModuleFrameGetter
+local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
+local bindModuleToggleHide = feature.BindModuleToggleHide
+local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
 local tinsert, tremove, tconcat = table.insert, table.remove, table.concat
@@ -46,6 +46,8 @@ do
 
     -- Runtime state
     local loaded = false
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
 
     -- Duration kept as string for coherence with EditBox/SV
     local duration = DEFAULT_DURATION_STR
@@ -129,8 +131,34 @@ do
     local UpdateTickDisplay
     local SetInputsLocked
     local GetValidDuration
+    local AcquireRefs
 
     -- ----- Private helpers ----- --
+    function AcquireRefs(frame)
+        local refs = {
+            clearBtn = Frames.Ref(frame, "ClearBtn"),
+            startBtn = Frames.Ref(frame, "StartBtn"),
+            duration = Frames.Ref(frame, "Duration"),
+            healer = Frames.Ref(frame, "Healer"),
+            healerClass = Frames.Ref(frame, "HealerClass"),
+            melee = Frames.Ref(frame, "Melee"),
+            meleeClass = Frames.Ref(frame, "MeleeClass"),
+            message = Frames.Ref(frame, "Message"),
+            name = Frames.Ref(frame, "Name"),
+            ranged = Frames.Ref(frame, "Ranged"),
+            rangedClass = Frames.Ref(frame, "RangedClass"),
+            tank = Frames.Ref(frame, "Tank"),
+            tankClass = Frames.Ref(frame, "TankClass"),
+            chatGuild = Frames.Ref(frame, "ChatGuild"),
+            chatYell = Frames.Ref(frame, "ChatYell"),
+            channels = {},
+        }
+        for i = 1, 8 do
+            refs.channels[i] = Frames.Ref(frame, "Chat" .. i)
+        end
+        return refs
+    end
+
     -- Small helpers
     local function ResetLastState()
         lastState.name = nil
@@ -225,7 +253,7 @@ do
     -- ----- Public methods ----- --
     -- OnLoad frame
     function module:OnLoad(frame)
-        frameName = Frames.initModuleFrame(module, frame, {
+        frameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 module:RequestRefresh()
@@ -242,10 +270,113 @@ do
     end
 
     -- Initialize UI controller for Toggle/Hide.
-    UIScaffold.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+    UIScaffold.BootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
+
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
+    function addon.Controllers.Spammer:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            self:OnLoad(frame)
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        Frames.SafeSetScript(refs.clearBtn, "OnClick", function()
+            module:Clear()
+        end)
+        Frames.SafeSetScript(refs.startBtn, "OnClick", function()
+            module:Start()
+        end)
+
+        Frames.SafeSetScript(refs.duration, "OnTabPressed", function()
+            module:Tab("Tank", "Name")
+        end)
+        Frames.SafeSetScript(refs.healer, "OnTabPressed", function()
+            module:Tab("HealerClass", "TankClass")
+        end)
+        Frames.SafeSetScript(refs.healerClass, "OnTabPressed", function()
+            module:Tab("Melee", "Healer")
+        end)
+        Frames.SafeSetScript(refs.melee, "OnTabPressed", function()
+            module:Tab("MeleeClass", "HealerClass")
+        end)
+        Frames.SafeSetScript(refs.meleeClass, "OnTabPressed", function()
+            module:Tab("Ranged", "Melee")
+        end)
+        Frames.SafeSetScript(refs.message, "OnTabPressed", function()
+            module:Tab("Name", "RangedClass")
+        end)
+        Frames.SafeSetScript(refs.name, "OnTabPressed", function()
+            module:Tab("Duration", "Message")
+        end)
+        Frames.SafeSetScript(refs.ranged, "OnTabPressed", function()
+            module:Tab("RangedClass", "MeleeClass")
+        end)
+        Frames.SafeSetScript(refs.rangedClass, "OnTabPressed", function()
+            module:Tab("Message", "Ranged")
+        end)
+        Frames.SafeSetScript(refs.tank, "OnTabPressed", function()
+            module:Tab("TankClass", "Duration")
+        end)
+        Frames.SafeSetScript(refs.tankClass, "OnTabPressed", function()
+            module:Tab("Healer", "Tank")
+        end)
+
+        for i = 1, #refs.channels do
+            local channelBox = refs.channels[i]
+            Frames.SafeSetScript(channelBox, "OnClick", function(self, button)
+                module:Save(self, button)
+            end)
+        end
+        Frames.SafeSetScript(refs.chatGuild, "OnClick", function(self, button)
+            module:Save(self, button)
+        end)
+        Frames.SafeSetScript(refs.chatYell, "OnClick", function(self, button)
+            module:Save(self, button)
+        end)
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Controllers.Spammer:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
 
     -- Save (EditBox / Checkbox)
     function module:Save(box)
@@ -276,7 +407,7 @@ do
                 end
             end
         else
-            local value = Strings.trimText(box:GetText())
+            local value = Strings.TrimText(box:GetText())
             value = (value == "") and nil or value
             KRT_Spammer[target] = value
             box:ClearFocus()
@@ -339,15 +470,15 @@ do
 
         -- CHANGE: fallback SAY (not YELL)
         if #chList <= 0 then
-            Comms.chat(tostring(finalOutput), "SAY", nil, nil, true)
+            Comms.Chat(tostring(finalOutput), "SAY", nil, nil, true)
             return
         end
 
         for _, c in ipairs(chList) do
             if type(c) == "number" then
-                Comms.chat(tostring(finalOutput), "CHANNEL", nil, c, true)
+                Comms.Chat(tostring(finalOutput), "CHANNEL", nil, c, true)
             else
-                Comms.chat(tostring(finalOutput), upper(c), nil, nil, true)
+                Comms.Chat(tostring(finalOutput), upper(c), nil, nil, true)
             end
         end
     end
@@ -377,7 +508,7 @@ do
         module:Stop()
 
         for _, field in ipairs(resetFields) do
-            Frames.resetEditBox(_G[frameName .. field])
+            Frames.ResetEditBox(_G[frameName .. field])
         end
 
         local durationBox = _G[frameName .. "Duration"]
@@ -385,7 +516,7 @@ do
         duration = DEFAULT_DURATION_STR
 
         if durationBox then
-            Frames.resetEditBox(durationBox)
+            Frames.ResetEditBox(durationBox)
             durationBox:SetText(DEFAULT_DURATION_STR)
         end
 
@@ -425,16 +556,15 @@ do
         _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
         _G[frameName .. "StartBtn"]:SetText(L.BtnStart)
 
-        Frames.setFrameTitle(frameName, L.StrSpammer)
-        _G[frameName .. "StartBtn"]:SetScript("OnClick", module.Start)
+        Frames.SetFrameTitle(frameName, L.StrSpammer)
 
         local durationBox = _G[frameName .. "Duration"]
         durationBox.tooltip_title = AUCTION_DURATION
-        addon:SetTooltip(durationBox, L.StrSpammerDurationHelp)
+        Frames.SetTooltip(durationBox, L.StrSpammerDurationHelp)
 
         local messageBox = _G[frameName .. "Message"]
         messageBox.tooltip_title = L.StrMessage
-        addon:SetTooltip(messageBox, {
+        Frames.SetTooltip(messageBox, {
             L.StrSpammerMessageHelp1,
             L.StrSpammerMessageHelp2,
             L.StrSpammerMessageHelp3,
@@ -516,11 +646,11 @@ do
         end
 
         for i = 1, 8 do
-            UIPrimitives.enableDisable(_G[frameName .. "Chat" .. i], not locked)
+            UIPrimitives.EnableDisable(_G[frameName .. "Chat" .. i], not locked)
         end
-        UIPrimitives.enableDisable(_G[frameName .. "ChatGuild"], not locked)
-        UIPrimitives.enableDisable(_G[frameName .. "ChatYell"], not locked)
-        UIPrimitives.enableDisable(_G[frameName .. "ClearBtn"], not locked)
+        UIPrimitives.EnableDisable(_G[frameName .. "ChatGuild"], not locked)
+        UIPrimitives.EnableDisable(_G[frameName .. "ChatYell"], not locked)
+        UIPrimitives.EnableDisable(_G[frameName .. "ClearBtn"], not locked)
     end
 
     -- Spam cycle
@@ -603,7 +733,7 @@ do
 
         if lastState.message and lastState.message ~= "" then
             outBuf[#outBuf + 1] = " - "
-            outBuf[#outBuf + 1] = Strings.findAchievement(lastState.message)
+            outBuf[#outBuf + 1] = Strings.FindAchievement(lastState.message)
         end
 
         local temp = tconcat(outBuf)
@@ -642,8 +772,8 @@ do
             SetInputsLocked(locked)
         end
 
-        UIPrimitives.setText(_G[frameName .. "StartBtn"], btnLabel, L.BtnStart, isStop)
-        UIPrimitives.enableDisable(_G[frameName .. "StartBtn"], canStart)
+        UIPrimitives.SetText(_G[frameName .. "StartBtn"], btnLabel, L.BtnStart, isStop)
+        UIPrimitives.EnableDisable(_G[frameName .. "StartBtn"], canStart)
 
         lastControls.locked = locked
         lastControls.canStart = canStart
@@ -664,7 +794,7 @@ do
             if field.number then
                 value = tonumber(box:GetText()) or 0
             else
-                value = Strings.trimText(box:GetText())
+                value = Strings.TrimText(box:GetText())
             end
 
             if lastState[field.key] ~= value then

@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 
@@ -15,9 +15,9 @@ local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Bus = feature.Bus or addon.Bus
 
-local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
-local bindModuleToggleHide = feature.bindModuleToggleHide
-local makeModuleFrameGetter = feature.makeModuleFrameGetter
+local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
+local bindModuleToggleHide = feature.BindModuleToggleHide
+local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
 local twipe = table.wipe
@@ -51,6 +51,8 @@ do
     local rows, raidPlayers = {}, {}
     local scrollFrame, scrollChild, header
     local getFrame = makeModuleFrameGetter(module, "KRTLootCounterFrame")
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
 
     -- Single-line column header.
     local HEADER_HEIGHT = 18
@@ -63,6 +65,17 @@ do
     local COUNT_COL_W = 40
 
     -- ----- Private helpers ----- --
+    local function AcquireRefs(frame)
+        local refs = {
+            scrollFrame = frame
+                and (frame.ScrollFrame or _G[(frame.GetName and frame:GetName() or "KRTLootCounterFrame") .. "ScrollFrame"])
+                or nil,
+        }
+        refs.scrollChild = (refs.scrollFrame and refs.scrollFrame.ScrollChild)
+            or _G["KRTLootCounterFrameScrollFrameScrollChild"]
+        return refs
+    end
+
     local function ensureFrames()
         local frame = getFrame()
         if not frame then
@@ -80,7 +93,7 @@ do
             or _G["KRTLootCounterFrameScrollFrameScrollChild"]
 
         if not frame._krtCounterInit then
-            Frames.setFrameTitle(frameName, L.StrLootCounter)
+            Frames.SetFrameTitle(frameName, L.StrLootCounter)
             frame._krtCounterInit = true
         end
 
@@ -120,10 +133,10 @@ do
 
     local function getCurrentRaidPlayers()
         twipe(raidPlayers)
-        if not addon.Core.getCurrentRaid() then
+        if not addon.Core.GetCurrentRaid() then
             return raidPlayers
         end
-        return addon.Raid:GetLootCounterRows(addon.Core.getCurrentRaid(), raidPlayers)
+        return addon.Raid:GetLootCounterRows(addon.Core.GetCurrentRaid(), raidPlayers)
     end
 
     local function ensureRow(i, rowHeight)
@@ -178,21 +191,21 @@ do
             row.plus:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:AddPlayerCountByNid(playerNid, 1, addon.Core.getCurrentRaid())
+                    addon.Raid:AddPlayerCountByNid(playerNid, 1, addon.Core.GetCurrentRaid())
                     module:RequestRefresh()
                 end
             end)
             row.minus:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:AddPlayerCountByNid(playerNid, -1, addon.Core.getCurrentRaid())
+                    addon.Raid:AddPlayerCountByNid(playerNid, -1, addon.Core.GetCurrentRaid())
                     module:RequestRefresh()
                 end
             end)
             row.reset:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:SetPlayerCountByNid(playerNid, 0, addon.Core.getCurrentRaid())
+                    addon.Raid:SetPlayerCountByNid(playerNid, 0, addon.Core.GetCurrentRaid())
                     module:RequestRefresh()
                 end
             end)
@@ -205,7 +218,7 @@ do
     -- ----- Public methods ----- --
     function module:OnLoad(frame)
         local f = frame or getFrame()
-        frameName = Frames.initModuleFrame(module, f, { enableDrag = true }) or frameName
+        frameName = Frames.InitModuleFrame(module, f, { enableDrag = true }) or frameName
         if not ensureFrames() then return end
     end
 
@@ -270,13 +283,13 @@ do
 
             local class = data and data.class or addon.Raid:GetPlayerClass(name)
             if row._lastClass ~= class then
-                local r, g, b = Colors.getClassColor(class)
+                local r, g, b = Colors.GetClassColor(class)
                 row.name:SetTextColor(r, g, b)
                 row._lastClass = class
             end
 
             local cnt = (data and tonumber(data.count))
-                or (playerNid and addon.Raid:GetPlayerCountByNid(playerNid, addon.Core.getCurrentRaid()))
+                or (playerNid and addon.Raid:GetPlayerCountByNid(playerNid, addon.Core.GetCurrentRaid()))
                 or 0
             if row._lastCount ~= cnt then
                 row.count:SetText(tostring(cnt))
@@ -293,10 +306,62 @@ do
     -- UI window management.
 
     -- Initialize UI controller for Toggle/Hide.
-    UIScaffold.bootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
+    UIScaffold.BootstrapModuleUi(module, getFrame, function() module:RequestRefresh() end, {
         bindToggleHide = bindModuleToggleHide,
         bindRequestRefresh = bindModuleRequestRefresh,
     })
+
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
+    function addon.Widgets.LootCounter:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            self:OnLoad(frame)
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        scrollFrame = refs.scrollFrame or scrollFrame
+        scrollChild = refs.scrollChild or scrollChild
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Widgets.LootCounter:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
 
     local function requestRefresh()
         -- Coalesced, event-driven refresh (safe even if frame is hidden/not yet created).
@@ -304,13 +369,13 @@ do
     end
 
     -- Refresh on roster updates (to keep list aligned).
-    Bus.registerCallback(InternalEvents.RaidRosterDelta, requestRefresh)
+    Bus.RegisterCallback(InternalEvents.RaidRosterDelta, requestRefresh)
 
     -- Refresh when counts actually change (MS loot award or manual +/-/reset).
-    Bus.registerCallback(InternalEvents.PlayerCountChanged, requestRefresh)
+    Bus.RegisterCallback(InternalEvents.PlayerCountChanged, requestRefresh)
 
     -- New raid session: reset view.
-    Bus.registerCallback(InternalEvents.RaidCreate, requestRefresh)
+    Bus.RegisterCallback(InternalEvents.RaidCreate, requestRefresh)
 
     if addon.UI and addon.UI.Register then
         addon.UI:Register("LootCounter", {

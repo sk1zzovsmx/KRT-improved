@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local Diag = feature.Diag
 
@@ -28,7 +28,7 @@ local function getUIPrimitives()
     return addon.UIPrimitives or {}
 end
 
-function ListController.createRowDrawer(fn)
+function ListController.CreateRowDrawer(fn)
     local rowHeight
     return function(row, it)
         if not rowHeight then
@@ -39,7 +39,7 @@ function ListController.createRowDrawer(fn)
     end
 end
 
-function ListController.makeListController(cfg)
+function ListController.MakeListController(cfg)
     local self = {
         frameName = nil,
         data = {},
@@ -74,8 +74,8 @@ function ListController.makeListController(cfg)
         if row then
             row:Show()
             local RowVisuals = getRowVisuals()
-            if RowVisuals.ensureRowVisuals then
-                RowVisuals.ensureRowVisuals(row)
+            if RowVisuals.EnsureRowVisuals then
+                RowVisuals.EnsureRowVisuals(row)
             end
             return row
         end
@@ -84,8 +84,8 @@ function ListController.makeListController(cfg)
         self._rowByName[btnName] = row
         buildRowParts(btnName, row)
         local RowVisuals = getRowVisuals()
-        if RowVisuals.ensureRowVisuals then
-            RowVisuals.ensureRowVisuals(row)
+        if RowVisuals.EnsureRowVisuals then
+            RowVisuals.EnsureRowVisuals(row)
         end
         return row
     end
@@ -212,14 +212,14 @@ function ListController.makeListController(cfg)
                     isSel = cfg.highlightFn(it.id, it, i, row) and true or false
                 end
 
-                if RowVisuals.setRowSelected then
-                    RowVisuals.setRowSelected(row, isSel)
-                elseif UIPrimitives.toggleHighlight then
-                    UIPrimitives.toggleHighlight(row, isSel)
+                if RowVisuals.SetRowSelected then
+                    RowVisuals.SetRowSelected(row, isSel)
+                elseif UIPrimitives.ToggleHighlight then
+                    UIPrimitives.ToggleHighlight(row, isSel)
                 end
 
-                if RowVisuals.setRowFocused then
-                    RowVisuals.setRowFocused(row, focusId ~= nil and it.id == focusId)
+                if RowVisuals.SetRowFocused then
+                    RowVisuals.SetRowFocused(row, focusId ~= nil and it.id == focusId)
                 end
             end
         end
@@ -429,14 +429,15 @@ function ListController.makeListController(cfg)
 
     local Frames = addon.Frames
     if Frames then
-        self._makeConfirmPopup = Frames.makeConfirmPopup
+        self._makeConfirmPopup = Frames.MakeConfirmPopup
     end
 
     return self
 end
 
-function ListController.bindListController(module, controller)
+function ListController.BindListController(module, controller)
     module.OnLoad = function(_, frame) controller:OnLoad(frame) end
     module.Fetch = function() controller:Fetch() end
     module.Sort = function(_, key) controller:Sort(key) end
 end
+

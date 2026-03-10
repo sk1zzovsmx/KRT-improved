@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local Bus = feature.Bus or addon.Bus
 local type = type
@@ -76,9 +76,9 @@ function UI:Call(widgetId, methodName, ...)
 end
 
 function UI:Emit(eventName, ...)
-    if not (Bus and Bus.triggerEvent) then
+    if not (Bus and Bus.TriggerEvent) then
         return nil
     end
-    Bus.triggerEvent(eventName, ...)
+    Bus.TriggerEvent(eventName, ...)
     return true
 end

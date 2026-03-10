@@ -1,7 +1,7 @@
 ﻿# Repository Tree
 
-- Generated: 2026-02-24 03:41:57 +01:00
-- Commit: 7e16a9c
+- Generated: 2026-02-26 02:48:57 +01:00
+- Commit: 9f8d3d6
 - Worktree: dirty
 - MaxDepth: 3
 
@@ -18,8 +18,9 @@
 |   |-- Core
 |   |   \\-- Init.lua
 |   |-- EntryPoints
-|   |   |-- EntryPoints.lua
-|   |   \\-- README.md
+|   |   |-- Minimap.lua
+|   |   |-- README.md
+|   |   \\-- SlashEvents.lua
 |   |-- Libs
 |   |   |-- CallbackHandler-1.0
 |   |   |   \\-- ...
@@ -37,12 +38,19 @@
 |   |   |-- DiagnoseLog.en.lua
 |   |   \\-- localization.en.lua
 |   |-- Modules
-|   |   |-- Compat
 |   |   |-- UI
 |   |   |   \\-- ...
+|   |   |-- Base64.lua
 |   |   |-- Bus.lua
 |   |   |-- C.lua
-|   |   \\-- Std.lua
+|   |   |-- Colors.lua
+|   |   |-- Comms.lua
+|   |   |-- Events.lua
+|   |   |-- Features.lua
+|   |   |-- Item.lua
+|   |   |-- Sort.lua
+|   |   |-- Strings.lua
+|   |   \\-- Time.lua
 |   |-- Services
 |   |   |-- Chat.lua
 |   |   |-- Loot.lua
@@ -88,11 +96,16 @@
 |   |-- FUNCTION_REGISTRY.md
 |   |-- LAYER_MAP.md
 |   |-- MODULES_UI_OWNERSHIP_MAP.md
+|   |-- NAMING_CONVENTIONS.md
+|   |-- NAMING_RENAME_MAP.md
 |   |-- REFACTOR_RULES.md
 |   |-- TREE.md
-|   \\-- UTILS_DEPRECATION_MAP.md
+|   |-- UI_BINDING_RULES.md
+|   |-- UTILS_DEPRECATION_MAP.md
+|   \\-- WOW_ADDON_TEMPLATE.md
 |-- tools
 |   |-- check-layering.ps1
+|   |-- check-ui-binding.ps1
 |   |-- fnmap-classify.ps1
 |   |-- fnmap-inventory.ps1
 |   |-- install-hooks.ps1

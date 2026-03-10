@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
@@ -34,7 +34,7 @@ local function ensureStats(eventName)
     return entry
 end
 
-function Bus.registerCallback(eventName, callback)
+function Bus.RegisterCallback(eventName, callback)
     if not eventName or type(callback) ~= "function" then
         error(L.StrCbErrUsage)
     end
@@ -57,7 +57,7 @@ function Bus.registerCallback(eventName, callback)
     return { e = eventName, t = token }
 end
 
-function Bus.unregisterCallback(handle)
+function Bus.UnregisterCallback(handle)
     if type(handle) ~= "table" or not handle.e or not handle.t then
         return
     end
@@ -74,7 +74,7 @@ function Bus.unregisterCallback(handle)
     end
 end
 
-function Bus.triggerEvent(eventName, ...)
+function Bus.TriggerEvent(eventName, ...)
     local listeners = events[eventName]
     if not listeners then
         return
@@ -115,13 +115,13 @@ function Bus.triggerEvent(eventName, ...)
     end
 end
 
-function Bus.registerCallbacks(names, callback)
+function Bus.RegisterCallbacks(names, callback)
     for i = 1, #names do
-        Bus.registerCallback(names[i], callback)
+        Bus.RegisterCallback(names[i], callback)
     end
 end
 
-function Bus.getInternalCallbackStats()
+function Bus.GetInternalCallbackStats()
     local out = {}
     for eventName, entry in pairs(stats) do
         out[eventName] = {
@@ -136,13 +136,13 @@ function Bus.getInternalCallbackStats()
     return out
 end
 
-function Bus.resetInternalCallbackStats()
+function Bus.ResetInternalCallbackStats()
     for eventName in pairs(stats) do
         stats[eventName] = nil
     end
 end
 
-function Bus.dumpInternalCallbackStats(sortBy)
+function Bus.DumpInternalCallbackStats(sortBy)
     if not addon or not addon.info then
         return
     end
@@ -208,3 +208,4 @@ function Bus.dumpInternalCallbackStats(sortBy)
     end
     addon:info("Tip: /krt debug callbacks reset  |  /krt debug callbacks fires|max|time|avg|errors")
 end
+

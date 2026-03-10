@@ -1,11 +1,11 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local Diag = feature.Diag
 
@@ -67,7 +67,7 @@ local function findIndex(ordered, key)
     return nil
 end
 
-function MultiSelect.multiSelectInit(contextKey)
+function MultiSelect.MultiSelectInit(contextKey)
     local st, key = ensureContext(contextKey)
     st.set = {}
     st.count = 0
@@ -76,11 +76,11 @@ function MultiSelect.multiSelectInit(contextKey)
     return st
 end
 
-function MultiSelect.multiSelectClear(contextKey)
-    return MultiSelect.multiSelectInit(contextKey)
+function MultiSelect.MultiSelectClear(contextKey)
+    return MultiSelect.MultiSelectInit(contextKey)
 end
 
-function MultiSelect.multiSelectToggle(contextKey, id, isMulti, allowDeselect)
+function MultiSelect.MultiSelectToggle(contextKey, id, isMulti, allowDeselect)
     local st, key = ensureContext(contextKey)
     local k = msKey(id)
     if k == nil then
@@ -130,7 +130,7 @@ function MultiSelect.multiSelectToggle(contextKey, id, isMulti, allowDeselect)
     return action, st.count or 0
 end
 
-function MultiSelect.multiSelectSetAnchor(contextKey, id)
+function MultiSelect.MultiSelectSetAnchor(contextKey, id)
     local st, key = ensureContext(contextKey)
     local before = st.anchor
     local k = msKey(id)
@@ -142,12 +142,12 @@ function MultiSelect.multiSelectSetAnchor(contextKey, id)
     return st.anchor
 end
 
-function MultiSelect.multiSelectGetAnchor(contextKey)
+function MultiSelect.MultiSelectGetAnchor(contextKey)
     local st = stateByContext[contextKey or "_default"]
     return st and st.anchor or nil
 end
 
-function MultiSelect.multiSelectRange(contextKey, ordered, id, isAdd)
+function MultiSelect.MultiSelectRange(contextKey, ordered, id, isAdd)
     local st, key = ensureContext(contextKey)
     local k = msKey(id)
     if k == nil then
@@ -199,7 +199,7 @@ function MultiSelect.multiSelectRange(contextKey, ordered, id, isAdd)
     return action, st.count or 0
 end
 
-function MultiSelect.multiSelectIsSelected(contextKey, id)
+function MultiSelect.MultiSelectIsSelected(contextKey, id)
     local st = stateByContext[contextKey or "_default"]
     if not st or not st.set then
         return false
@@ -208,17 +208,17 @@ function MultiSelect.multiSelectIsSelected(contextKey, id)
     return (k ~= nil) and (st.set[k] == true) or false
 end
 
-function MultiSelect.multiSelectCount(contextKey)
+function MultiSelect.MultiSelectCount(contextKey)
     local st = stateByContext[contextKey or "_default"]
     return (st and st.count) or 0
 end
 
-function MultiSelect.multiSelectGetVersion(contextKey)
+function MultiSelect.MultiSelectGetVersion(contextKey)
     local st = stateByContext[contextKey or "_default"]
     return (st and st.ver) or 0
 end
 
-function MultiSelect.multiSelectGetSelected(contextKey)
+function MultiSelect.MultiSelectGetSelected(contextKey)
     local st = stateByContext[contextKey or "_default"]
     local out = {}
     if not st or not st.set then
@@ -241,13 +241,3 @@ function MultiSelect.multiSelectGetSelected(contextKey)
     return out
 end
 
-MultiSelect.MultiSelect_Init = MultiSelect.multiSelectInit
-MultiSelect.MultiSelect_Clear = MultiSelect.multiSelectClear
-MultiSelect.MultiSelect_Toggle = MultiSelect.multiSelectToggle
-MultiSelect.MultiSelect_SetAnchor = MultiSelect.multiSelectSetAnchor
-MultiSelect.MultiSelect_GetAnchor = MultiSelect.multiSelectGetAnchor
-MultiSelect.MultiSelect_Range = MultiSelect.multiSelectRange
-MultiSelect.MultiSelect_IsSelected = MultiSelect.multiSelectIsSelected
-MultiSelect.MultiSelect_Count = MultiSelect.multiSelectCount
-MultiSelect.MultiSelect_GetVersion = MultiSelect.multiSelectGetVersion
-MultiSelect.MultiSelect_GetSelected = MultiSelect.multiSelectGetSelected

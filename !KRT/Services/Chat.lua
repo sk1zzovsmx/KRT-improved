@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 
@@ -64,14 +64,14 @@ do
 
     -- ----- Public methods ----- --
     function module:Print(text, prefix)
-        local msg = Strings.formatChatMessage(text, prefix or chatPrefixShort, chatOutputFormat, chatPrefixHex)
+        local msg = Strings.FormatChatMessage(text, prefix or chatPrefixShort, chatOutputFormat, chatPrefixHex)
         addon:info("%s", msg)
     end
 
     function module:Announce(text, channel)
         local msg = tostring(text)
         local selectedChannel = ResolveAnnounceChannel(msg, channel)
-        Comms.chat(msg, selectedChannel)
+        Comms.Chat(msg, selectedChannel)
     end
 
     -- ----- Legacy helpers ----- --

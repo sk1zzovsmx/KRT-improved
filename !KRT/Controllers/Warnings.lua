@@ -1,10 +1,10 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.getFeatureShared()
+-- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 local addon = select(2, ...)
-local feature = addon.Core.getFeatureShared()
+local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 
@@ -14,9 +14,9 @@ local Strings = feature.Strings or addon.Strings
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
-local bindModuleRequestRefresh = feature.bindModuleRequestRefresh
-local bindModuleToggleHide = feature.bindModuleToggleHide
-local makeModuleFrameGetter = feature.makeModuleFrameGetter
+local bindModuleRequestRefresh = feature.BindModuleRequestRefresh
+local bindModuleToggleHide = feature.BindModuleToggleHide
+local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
 local tinsert, twipe = table.insert, table.wipe
@@ -48,12 +48,36 @@ do
     local tempName, tempContent
     local SaveWarning
     local isEdit = false
+    local uiBound = false
+    local scaffoldToggle, scaffoldHide
 
     -- ----- Private helpers ----- --
+    local function AcquireRefs(frame)
+        return {
+            name = Frames.Ref(frame, "Name"),
+            content = Frames.Ref(frame, "Content"),
+            editBtn = Frames.Ref(frame, "EditBtn"),
+            deleteBtn = Frames.Ref(frame, "DeleteBtn"),
+            announceBtn = Frames.Ref(frame, "AnnounceBtn"),
+        }
+    end
+
+    local function BindWarningRow(row)
+        if not row or row._krtWarningBound then
+            return
+        end
+        if row.RegisterForClicks then
+            row:RegisterForClicks("LeftButtonUp")
+        end
+        Frames.SafeSetScript(row, "OnClick", function(self, button)
+            module:Select(self, button)
+        end)
+        row._krtWarningBound = true
+    end
 
     -- ----- Public methods ----- --
 
-    local controller = ListController.makeListController {
+    local controller = ListController.MakeListController {
         keyName = "WarningsList",
         poolTag = "warnings",
         _rowParts = { "ID", "Name" },
@@ -68,7 +92,8 @@ do
         rowName = function(n, _, i) return n .. "WarningBtn" .. i end,
         rowTmpl = "KRTWarningButtonTemplate",
 
-        drawRow = ListController.createRowDrawer(function(row, it)
+        drawRow = ListController.CreateRowDrawer(function(row, it)
+            BindWarningRow(row)
             local ui = row._p
             ui.ID:SetText(it.id)
             ui.Name:SetText(it.name)
@@ -77,7 +102,7 @@ do
         highlightId = function() return selectedID end,
     }
 
-    local panelScaffold = UIScaffold.createListPanelScaffold({
+    local panelScaffold = UIScaffold.CreateListPanelScaffold({
         module = module,
         getFrame = getFrame,
         controller = controller,
@@ -99,9 +124,86 @@ do
         end,
     })
 
+    scaffoldToggle = module.Toggle
+    scaffoldHide = module.Hide
+
+    function addon.Controllers.Warnings:BindUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame, self.refs
+        end
+
+        local frame = getFrame()
+        if not frame then
+            return nil
+        end
+        if not frameName then
+            frameName = panelScaffold:OnLoad(frame) or frame:GetName()
+        end
+
+        local refs = AcquireRefs(frame)
+        self.frame = frame
+        self.refs = refs
+
+        Frames.SafeSetScript(frame, "OnShow", function()
+            module:Cancel()
+        end)
+        Frames.SafeSetScript(frame, "OnHide", function()
+            module:Cancel()
+        end)
+        Frames.SafeSetScript(refs.announceBtn, "OnClick", function()
+            module:Announce()
+        end)
+        Frames.SafeSetScript(refs.deleteBtn, "OnClick", function(self, button)
+            module:Delete(self, button)
+        end)
+        Frames.SafeSetScript(refs.editBtn, "OnClick", function(self, button)
+            module:Edit(self, button)
+        end)
+        Frames.SafeSetScript(refs.name, "OnTabPressed", function(self)
+            local content = Frames.Ref(self:GetParent(), "Content")
+            if content and content.SetFocus then
+                content:SetFocus()
+            end
+        end)
+        Frames.SafeSetScript(refs.content, "OnTabPressed", function(self)
+            local name = Frames.Ref(self:GetParent(), "Name")
+            if name and name.SetFocus then
+                name:SetFocus()
+            end
+        end)
+
+        uiBound = true
+        return frame, refs
+    end
+
+    function addon.Controllers.Warnings:EnsureUI()
+        if uiBound and self.frame and self.refs then
+            return self.frame
+        end
+        return self:BindUI()
+    end
+
+    function module:Toggle()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldToggle then
+            return scaffoldToggle(self)
+        end
+    end
+
+    function module:Hide()
+        if not self:EnsureUI() then
+            return
+        end
+        if scaffoldHide then
+            return scaffoldHide(self)
+        end
+    end
+
     -- OnLoad frame:
     function module:OnLoad(frame)
-        frameName = panelScaffold:OnLoad(frame)
+        frameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or frameName)
     end
 
     -- Warning selection:
@@ -179,8 +281,8 @@ do
 
     -- Cancel editing/adding:
     function module:Cancel()
-        Frames.resetEditBox(_G[frameName .. "Name"])
-        Frames.resetEditBox(_G[frameName .. "Content"])
+        Frames.ResetEditBox(_G[frameName .. "Name"])
+        Frames.ResetEditBox(_G[frameName .. "Content"])
         selectedID = nil
         tempSelectedID = nil
         isEdit = false
@@ -196,8 +298,8 @@ do
         _G[frameName .. "DeleteBtn"]:SetText(L.BtnDelete)
         _G[frameName .. "AnnounceBtn"]:SetText(L.BtnAnnounce)
         _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
-        Frames.setFrameTitle(frameName, RAID_WARNING)
-        Frames.bindEditBoxHandlers(frameName, {
+        Frames.SetFrameTitle(frameName, RAID_WARNING)
+        Frames.BindEditBoxHandlers(frameName, {
             { suffix = "Name", onEscape = module.Cancel, onEnter = module.Edit },
             { suffix = "Content", onEscape = module.Cancel, onEnter = module.Edit },
         }, function()
@@ -232,11 +334,11 @@ do
         end
         tempName    = _G[frameName .. "Name"]:GetText()
         tempContent = _G[frameName .. "Content"]:GetText()
-        UIPrimitives.enableDisableNamedPart(frameName, "EditBtn", (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
-        UIPrimitives.enableDisableNamedPart(frameName, "DeleteBtn", selectedID ~= nil)
-        UIPrimitives.enableDisableNamedPart(frameName, "AnnounceBtn", selectedID ~= nil)
+        UIPrimitives.EnableDisableNamedPart(frameName, "EditBtn", (tempName ~= "" or tempContent ~= "") or selectedID ~= nil)
+        UIPrimitives.EnableDisableNamedPart(frameName, "DeleteBtn", selectedID ~= nil)
+        UIPrimitives.EnableDisableNamedPart(frameName, "AnnounceBtn", selectedID ~= nil)
         local editBtnMode = (tempName ~= "" or tempContent ~= "") or selectedID == nil
-        lastEditBtnMode = UIPrimitives.updateModeTextNamedPart(
+        lastEditBtnMode = UIPrimitives.UpdateModeTextNamedPart(
             frameName,
             "EditBtn",
             L.BtnSave,
@@ -253,8 +355,8 @@ do
     -- Saving a Warning:
     function SaveWarning(wContent, wName, wID)
         wID = wID and tonumber(wID) or 0
-        wName = Strings.trimText(wName)
-        wContent = Strings.trimText(wContent)
+        wName = Strings.TrimText(wName)
+        wContent = Strings.TrimText(wContent)
         if wName == "" then
             wName = (isEdit and wID > 0) and wID or (#KRT_Warnings + 1)
         end
