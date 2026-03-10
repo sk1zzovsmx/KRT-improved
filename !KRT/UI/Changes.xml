@@ -1,0 +1,214 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<Button name="KRTChangesButtonTemplate" virtual="true">
+		<Size>
+			<AbsDimension y="20" />
+		</Size>
+		<Anchors>
+			<Anchor point="LEFT">
+				<Offset>
+					<AbsDimension x="5" y="0" />
+				</Offset>
+			</Anchor>
+			<Anchor point="RIGHT">
+				<Offset>
+					<AbsDimension x="-5" y="0" />
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
+					<Size>
+						<AbsDimension x="10" y="23" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset>
+								<AbsDimension x="0" y="2" />
+							</Offset>
+						</Anchor>
+						<Anchor point="BOTTOMRIGHT">
+							<Offset>
+								<AbsDimension x="0" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<TexCoords top="0" right="0.75" bottom="1.0" left="0.078125" />
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentName" inherits="GameFontHighlightSmall" justifyH="LEFT">
+					<Size>
+						<AbsDimension x="95" y="5" />
+					</Size>
+					<Anchors>
+						<Anchor point="LEFT">
+							<Offset>
+								<AbsDimension x="5" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentSpec" inherits="GameFontHighlightSmall" justifyH="LEFT">
+					<Size>
+						<AbsDimension x="95" y="5" />
+					</Size>
+					<Anchors>
+						<Anchor point="LEFT" relativeTo="$parentName" relativePoint="RIGHT">
+							<Offset>
+								<AbsDimension x="5" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<HighlightTexture>
+			<Anchors>
+				<Anchor point="TOPLEFT" relativePoint="TOPLEFT" />
+				<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMRIGHT" />
+			</Anchors>
+			<Color r="1" g="0.8" b="0" a="0.1" />
+		</HighlightTexture>
+		<Scripts>
+			<OnClick>KRT.Changes:Select(self, button)</OnClick>
+			<OnDoubleClick>KRT.Changes:Edit(self)</OnDoubleClick>
+		</Scripts>
+	</Button>
+	<!-- The Frame: Changes -->
+	<Frame name="KRTChanges" inherits="KRTFrameTemplate">
+		<Size>
+			<AbsDimension x="248" y="205" />
+		</Size>
+		<Frames>
+			<Button name="$parentClearBtn" inherits="KRTButtonTemplate">
+				<Size>
+					<AbsDimension x="65" y="19" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPRIGHT">
+						<Offset>
+							<AbsDimension x="-27" y="-5" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>KRT.Changes:Clear()</OnClick>
+				</Scripts>
+			</Button>
+			<EditBox name="$parentName" inherits="KRTEditBoxTemplate" letters="20" hidden="true">
+				<Size>
+					<AbsDimension x="65" y="18" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset>
+							<AbsDimension x="20" y="-35" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<FontString inherits="GameFontHighlightSmall" />
+				<Scripts>
+					<OnTabPressed>_G[self:GetParent():GetName().."Spec"]:SetFocus()</OnTabPressed>
+				</Scripts>
+			</EditBox>
+			<EditBox name="$parentSpec" inherits="KRTEditBoxTemplate" letters="20" hidden="true">
+				<Size>
+					<AbsDimension x="65" y="18" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="TOPRIGHT">
+						<Offset>
+							<AbsDimension x="15" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<FontString inherits="GameFontHighlightSmall" />
+				<Scripts>
+					<OnTabPressed>_G[self:GetParent():GetName().."Name"]:SetFocus()</OnTabPressed>
+				</Scripts>
+			</EditBox>
+			<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
+				<Size>
+					<AbsDimension x="65" y="25" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="$parentSpec" relativePoint="TOPRIGHT">
+						<Offset>
+							<AbsDimension x="8" y="4" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>KRT.Changes:Edit(self, button)</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
+				<Size>
+					<AbsDimension x="65" y="25" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset>
+							<AbsDimension x="12" y="-32" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>KRT.Changes:Add(self, button)</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="$parentDemandBtn" inherits="KRTButtonTemplate">
+				<Size>
+					<AbsDimension x="105" y="25" />
+				</Size>
+				<Anchors>
+					<Anchor point="BOTTOMLEFT">
+						<Offset>
+							<AbsDimension x="12" y="12" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>KRT.Changes:Demand()</OnClick>
+				</Scripts>
+			</Button>
+			<Button name="$parentAnnounceBtn" inherits="KRTButtonTemplate">
+				<Size>
+					<AbsDimension x="105" y="25" />
+				</Size>
+				<Anchors>
+					<Anchor point="BOTTOMRIGHT">
+						<Offset>
+							<AbsDimension x="-12" y="12" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>KRT.Changes:Announce()</OnClick>
+				</Scripts>
+			</Button>
+			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset>
+							<AbsDimension x="15" y="-67" />
+						</Offset>
+					</Anchor>
+					<Anchor point="BOTTOMRIGHT">
+						<Offset>
+							<AbsDimension x="-32" y="46" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</ScrollFrame>
+		</Frames>
+		<Scripts>
+			<OnLoad>KRT.Changes:OnLoad(self)</OnLoad>
+		</Scripts>
+	</Frame>
+	<!-- ====== End of Changes ====== -->
+	<!-- ====== Reserve List Window ====== -->
+</Ui>
+

@@ -22,11 +22,17 @@ Do NOT record:
 
 Durable preferences learned from recent conversations:
 - Prefer PascalCase for addon module table names.
+- Prefer PascalCase for public exported methods on feature modules (`module:*`, `Store:*`, `View:*`, `Actions:*`,
+  `Box:*`); keep WoW-required event names unchanged (UPPERCASE handlers).
 - Prefer camelCase for utility functions and local variables; avoid snake_case for new naming.
+- In `Features/*.lua`, prefer canonical top-level section headers in order:
+  `-- ----- Internal state ----- --`, `-- ----- Private helpers ----- --`,
+  `-- ----- Public methods ----- --`.
 - UI refactors: centralize shared UI glue/patterns in `KRT.lua`; keep feature-specific UI logic in each module.
 - Move helpers to `Modules/Utils.lua` only when they are generic and reused, not for KRT-specific glue.
 - Keep diagnostic templates in `addon.Diagnose`; use severity buckets `I/W/E/D` (`DiagnoseLog.en.lua`).
 - Prefer local `Diag` wrapper aliases over direct `Diagnose.*` chains in implementation files.
+- For naming/API uniformization, choose the most repeated in-repo pattern and apply it consistently and robustly.
 - For XML and Lua analysis/reference, use Townlong-Yak FrameXML 3.3.5:
   `https://www.townlong-yak.com/framexml/3.3.5`.
 
@@ -54,21 +60,22 @@ UI is XML + Lua (no Ace3 GUI). Libraries are vendored via LibStub.
 
 ---
 
-## 3) Monolithic `KRT.lua` policy (**BINDING**)
+## 3) Modular feature policy (**BINDING**)
 
-Monolithic means:
-- Feature logic lives in `!KRT/KRT.lua` and is organized as `do ... end` module blocks.
-- `!KRT/Modules/` is reserved for utilities/constants/static data (e.g., `Utils.lua`, `C.lua`, `ignoredItems.lua`).
-  It must not become a feature plugin system.
+KRT is now modular by design:
+- Core bootstrap, shared runtime state, and global event wiring live in `!KRT/KRT.lua`.
+- Feature implementations can live in `!KRT/Features/*.lua`.
+- `!KRT/Modules/` remains reserved for utilities/constants/static data (e.g., `Utils.lua`, `C.lua`,
+  `ignoredItems.lua`) and must not become a feature folder.
+- XML is split into feature-oriented files under `!KRT/UI/`, loaded via `!KRT/KRT.xml` include manifest.
 
 Rules:
-1) New features and major refactors MUST be implemented inside `KRT.lua` (not new feature files).
-2) A new file is allowed only if it is:
-   - a static data list (IDs / lookup tables), or
-   - a generic reusable utility, or
-   - required by technical constraints/load order,
-   and it MUST be documented in CHANGELOG.md.
-3) Each in-file module block should keep private state local; public exports go on `addon.*`.
+1) New feature modules SHOULD be placed in `!KRT/Features/` unless there is a strong reason to keep them in
+   `KRT.lua`.
+2) `KRT.lua` should stay focused on bootstrap/glue and shared infrastructure that must exist before features.
+3) Prefer `addon.Core.getFeatureShared()` in feature file headers for shared locals/runtime state bootstrap.
+4) Public exports go on `addon.*`; avoid extra globals.
+5) Any user-visible behavior changes or migration notes MUST be documented in `CHANGELOG.md`.
 
 ---
 
@@ -86,9 +93,24 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 8) Localization/DiagnoseLog.en.lua (defines `addon.Diagnose`)
 9) Templates.xml
 10) Modules/Utils.lua, Modules/C.lua
-11) KRT.lua
-12) KRT.xml
-13) Modules/ignoredItems.lua (intentionally after KRT.lua/KRT.xml)
+11) KRT.lua (core bootstrap + event wiring + shared runtime glue)
+12) Features/Raid.lua
+13) Features/Chat.lua
+14) Features/Minimap.lua
+15) Features/Rolls.lua
+16) Features/Loot.lua
+17) Features/Master.lua
+18) Features/LootCounter.lua
+19) Features/Reserves.lua
+20) Features/ReservesImport.lua
+21) Features/Logger.lua
+22) Features/Config.lua
+23) Features/Warnings.lua
+24) Features/Changes.lua
+25) Features/Spammer.lua
+26) Features/SlashEvents.lua
+27) KRT.xml (UI include manifest)
+28) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
 
 ---
 
@@ -97,9 +119,39 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 ```
 !KRT/
   !KRT.toc
-  KRT.lua                  # MONOLITH: core + modules
-  KRT.xml                  # main UI (keep scripts thin)
+  KRT.lua                  # core bootstrap + shared runtime glue
+  KRT.xml                  # UI include manifest/orchestrator
   Templates.xml            # reusable XML templates
+
+  Features/
+    Raid.lua               # raid/session, roster, instance detection
+    Chat.lua               # output helpers (Print/Announce)
+    Minimap.lua            # minimap button + context menu
+    Rolls.lua              # roll tracking, sorting, winner logic
+    Loot.lua               # loot parsing, item selection, export strings
+    Master.lua             # master-loot helpers, award/trade tracking
+    LootCounter.lua        # loot counter UI + data
+    Reserves.lua           # soft reserves model + list UI
+    ReservesImport.lua     # SR import window glue + validation
+    Logger.lua             # loot logger module stack (store/view/actions/ui)
+    Config.lua             # options UI logic
+    Warnings.lua           # warnings list + announce helpers
+    Changes.lua            # MS changes list + announce
+    Spammer.lua            # LFM spam helper
+    SlashEvents.lua        # slash command router + addon event handlers
+
+  UI/
+    Minimap.xml            # minimap button frame
+    ReservesTemplates.xml  # reserve list templates
+    Reserves.xml           # reserve list UI
+    ReservesImport.xml     # reserve import UI
+    Logger.xml             # logger templates + frames
+    Config.xml             # config UI
+    Spammer.xml            # spammer UI
+    Warnings.xml           # warnings UI
+    Master.xml             # item selection + master looter UI
+    LootCounter.xml        # loot counter UI
+    Changes.xml            # changes UI
 
   Localization/
     localization.en.lua    # user-facing strings (enUS) -> addon.L
@@ -138,17 +190,12 @@ Do not introduce additional non-frame globals (tables/vars/functions) unless exp
 ### 6.2 SavedVariables (account)
 
 These keys are persisted and must remain compatible:
-- `KRT_Options`
 - `KRT_Raids`
 - `KRT_Players`
+- `KRT_Reserves`
 - `KRT_Warnings`
-- `KRT_ExportString`
 - `KRT_Spammer`
-- `KRT_CurrentRaid`
-- `KRT_LastBoss`
-- `KRT_NextReset`
-- `KRT_SavedReserves`
-- `KRT_PlayerCounts`
+- `KRT_Options`
 
 ---
 
@@ -206,10 +253,11 @@ For scroll lists:
   - update `KRT_Options[key]`,
   - update `addon.options[key]` (if present),
   - request a refresh of the owning UI module.
+- Exception: `debug` is runtime-only state and must not be persisted in `KRT_Options`.
 
 ---
 
-## 11) Module map (KRT.lua)
+## 11) Module map (runtime `addon.*`)
 
 Top-level feature modules on `addon.*`:
 - `addon.Raid`          - raid/session, roster, instance detection
@@ -220,7 +268,7 @@ Top-level feature modules on `addon.*`:
 - `addon.Master`        - master-loot helpers, award/trade tracking
 - `addon.LootCounter`   - loot counter UI + data
 - `addon.Reserves`      - soft reserves model + list UI
-- `addon.ReserveImport` - SR import window glue + validation
+- `addon.ReservesImport` - SR import window glue + validation
 - `addon.Config`        - options UI + defaults/load
 - `addon.Warnings`      - warnings list + announce helpers
 - `addon.Changes`       - MS changes list + announce
@@ -231,6 +279,10 @@ Top-level feature modules on `addon.*`:
 - `addon.Logger.Store`   - data access helpers + stable-ID indexing
 - `addon.Logger.View`    - view-model row builders (UI-friendly data)
 - `addon.Logger.Actions` - mutations + commit/refresh boundaries
+
+Implementation placement (current wave):
+- `KRT.lua`: core + most gameplay/logger logic
+- `Features/*.lua`: Reserves, ReservesImport, Logger, Config, Warnings, Changes, Spammer
 
 External modules:
 - `addon.Utils` (Modules/Utils.lua)
@@ -299,14 +351,14 @@ Do:
 - small testable changes,
 - reuse templates and Utils controllers,
 - keep state local to module blocks,
+- keep feature logic in `Features/*.lua` and shared infra in `KRT.lua`,
 - document user-visible changes in CHANGELOG.md.
 
 Don't:
 - Ace3,
 - long blocking loops,
 - new SV keys without migration,
-- new globals (beyond allowed ones),
-- moving features into new files.
+- new globals (beyond allowed ones).
 
 ---
 
