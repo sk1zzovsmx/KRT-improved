@@ -650,6 +650,10 @@ do
         return TryAwardSingleCopy(itemLink)
     end
 
+    local function GetManualTradeModule()
+        return addon.ManualTrade
+    end
+
     local function ResetTradeState()
         lootState.trader = nil
         lootState.winner = nil
@@ -1558,6 +1562,27 @@ do
         end
     end
 
+    function module:TRADE_SHOW()
+        local manualTrade = GetManualTradeModule()
+        if manualTrade and manualTrade.RefreshCandidate then
+            manualTrade:RefreshCandidate("TRADE_SHOW")
+        end
+    end
+
+    function module:TRADE_PLAYER_ITEM_CHANGED(slot)
+        local manualTrade = GetManualTradeModule()
+        if manualTrade and manualTrade.RefreshCandidate then
+            manualTrade:RefreshCandidate("TRADE_PLAYER_ITEM_CHANGED")
+        end
+    end
+
+    function module:TRADE_TARGET_ITEM_CHANGED(slot)
+        local manualTrade = GetManualTradeModule()
+        if manualTrade and manualTrade.RefreshCandidate then
+            manualTrade:RefreshCandidate("TRADE_TARGET_ITEM_CHANGED")
+        end
+    end
+
     function module:TRADE_ACCEPT_UPDATE(tAccepted, pAccepted)
         addon:trace(Diag.D.LogTradeAcceptUpdate:format(tostring(lootState.trader), tostring(lootState.winner),
             tostring(tAccepted), tostring(pAccepted)))
@@ -1592,18 +1617,33 @@ do
                 screenshotWarn = false
                 module:RequestRefresh()
             end
+            return
+        end
+
+        local manualTrade = GetManualTradeModule()
+        if manualTrade and manualTrade.HandleTradeAcceptUpdate
+            and manualTrade:HandleTradeAcceptUpdate(tAccepted, pAccepted) then
+            module:RequestRefresh()
         end
     end
 
     -- TRADE_CLOSED: trade window closed (completed or canceled)
     function module:TRADE_CLOSED()
         ResetTradeState("TRADE_CLOSED")
+        local manualTrade = GetManualTradeModule()
+        if manualTrade and manualTrade.Reset then
+            manualTrade:Reset(true)
+        end
         module:RequestRefresh()
     end
 
     -- TRADE_REQUEST_CANCEL: trade request canceled before opening
     function module:TRADE_REQUEST_CANCEL()
         ResetTradeState("TRADE_REQUEST_CANCEL")
+        local manualTrade = GetManualTradeModule()
+        if manualTrade and manualTrade.Reset then
+            manualTrade:Reset(true)
+        end
         module:RequestRefresh()
     end
 
@@ -1842,6 +1882,10 @@ do
         local isAwardRoll = (rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE)
 
         ResetTradeState("TRADE_START")
+        local manualTrade = GetManualTradeModule()
+        if manualTrade and manualTrade.Reset then
+            manualTrade:Reset(true)
+        end
 
         lootState.trader = Utils.getPlayerName()
         lootState.winner = isAwardRoll and playerName or nil

@@ -39,6 +39,7 @@ Features\Minimap.lua
 Features\Rolls.lua
 Features\Loot.lua
 Features\Master.lua
+Features\ManualTrade.lua
 Features\LootCounter.lua
 Features\Reserves.lua
 Features\ReservesImport.lua

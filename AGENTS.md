@@ -114,18 +114,19 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 15) Features/Rolls.lua
 16) Features/Loot.lua
 17) Features/Master.lua
-18) Features/LootCounter.lua
-19) Features/Reserves.lua
-20) Features/ReservesImport.lua
-21) Features/Logger.lua
-22) Features/Syncer.lua
-23) Features/Config.lua
-24) Features/Warnings.lua
-25) Features/Changes.lua
-26) Features/Spammer.lua
-27) Features/SlashEvents.lua
-28) KRT.xml (UI include manifest)
-29) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
+18) Features/ManualTrade.lua
+19) Features/LootCounter.lua
+20) Features/Reserves.lua
+21) Features/ReservesImport.lua
+22) Features/Logger.lua
+23) Features/Syncer.lua
+24) Features/Config.lua
+25) Features/Warnings.lua
+26) Features/Changes.lua
+27) Features/Spammer.lua
+28) Features/SlashEvents.lua
+29) KRT.xml (UI include manifest)
+30) Modules/ignoredItems.lua (intentionally after runtime/UI definitions)
 
 ---
 
@@ -145,6 +146,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Rolls.lua              # roll tracking, sorting, winner logic
     Loot.lua               # loot parsing, item selection, export strings
     Master.lua             # master-loot helpers, award/trade tracking
+    ManualTrade.lua        # manual trade HOLD-aware tracking + reason dropdown
     LootCounter.lua        # loot counter UI + data
     Reserves.lua           # soft reserves model + list UI
     ReservesImport.lua     # SR import window glue + validation
@@ -282,6 +284,7 @@ Top-level feature modules on `addon.*`:
 - `addon.Rolls`         - roll tracking, sorting, winner logic
 - `addon.Loot`          - loot parsing, item selection, export strings
 - `addon.Master`        - master-loot helpers, award/trade tracking
+- `addon.ManualTrade`   - manual trade HOLD-aware tracking (single-item + reason + logger/counter)
 - `addon.LootCounter`   - loot counter UI + data
 - `addon.Reserves`      - soft reserves model + list UI
 - `addon.ReservesImport` - SR import window glue + validation
@@ -299,7 +302,7 @@ Top-level feature modules on `addon.*`:
 
 Implementation placement (current wave):
 - `KRT.lua`: core + most gameplay/logger logic
-- `Features/*.lua`: Reserves, ReservesImport, Logger, Syncer, Config, Warnings, Changes, Spammer
+- `Features/*.lua`: ManualTrade, Reserves, ReservesImport, Logger, Syncer, Config, Warnings, Changes, Spammer
 
 External modules:
 - `addon.Utils` (Modules/Utils.lua)

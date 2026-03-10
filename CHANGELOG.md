@@ -4,6 +4,12 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Behavior:** Added manual trade HOLD-aware per-slot tracking for Master Looter: KRT now detects traded
+  hold-match items (`HOLD/BANK/DE/MANUAL` on ML), shows one contextual Reason dropdown per matched trade slot
+  (`MS/OS/SR/FREE/HOLD/BANK/DE`), updates the logger only on double-accept (`HOLD -> recipient`) with
+  `rollValue=0`, blocks addon-driven double logs, and increments Loot Counter only for per-item Reason `MS`.
+- **Refactor:** Extracted manual trade runtime logic from `Features/Master.lua` to
+  `Features/ManualTrade.lua` and wired `Master` as orchestrator only for trade callbacks.
 - **Bugfix:** Logger UI now refreshes immediately after incoming Sync snapshots (`req`, `push`, `sync`),
   including the Raids list update without requiring manual reopen or reselection.
 - **Behavior:** Added Logger Sync feature (`Features/Syncer.lua`) using addon-message request/response

@@ -92,6 +92,13 @@ Diag.D.LogTradeTraderKeeps = "[Trade] Trader keeps item=%s winner=%s"
 Diag.D.LogTradeStackBlocked = "[Trade] Stack trade blocked ignoreStacks=%s link=%s"
 Diag.D.LogTradeInitiated = "[Trade] Initiated item=%s -> %s"
 Diag.W.LogTradeDelayedOutOfRange = "[Trade] Delayed: %s out of range item=%s"
+Diag.D.LogTradeManualCandidateOn = "[Trade:Manual] candidate on lootNid=%s item=%s partner=%s match=%s"
+Diag.D.LogTradeManualCandidateOff = "[Trade:Manual] candidate off source=%s reason=%s"
+Diag.D.LogTradeManualNoHoldMatch = "[Trade:Manual] no hold-match items=%s looter=%s"
+Diag.D.LogTradeManualAcceptDone = "[Trade:Manual] accept applied lootNid=%s item=%s partner=%s type=%s"
+Diag.D.LogTradeManualAcceptSkipped = "[Trade:Manual] accept skipped reason=%s"
+Diag.W.LogTradeManualCounterSkipped = "[Trade:Manual] counter skipped partner not in raid partner=%s raidId=%s"
+Diag.E.LogTradeManualLoggerFailed = "[Trade:Manual] Logger log failed raidId=%s lootNid=%s item=%s partner=%s"
 
 -- SoftRes --
 Diag.D.LogSRImportRequested = "[SR] Import requested chars=%d"
