@@ -331,6 +331,39 @@ do
         return Strings.NormalizeName(text, true) or text
     end
 
+    local function ensureGroupSyncAvailable()
+        cleanupExpiredState()
+        if addon.IsInGroup() then
+            return true
+        end
+
+        addon:warn(L.MsgLoggerSyncNotInGroup)
+        return false
+    end
+
+    local function resolveExternalTarget(targetName)
+        local target = normalizeTargetName(targetName)
+        if not target then
+            addon:warn(L.MsgLoggerSyncTargetRequired)
+            return nil
+        end
+        if isSelfSender(target) then
+            addon:warn(L.MsgLoggerSyncTargetSelf)
+            return nil
+        end
+
+        return target
+    end
+
+    local function nextRequestId(syncer)
+        syncer._nextRequestId = (tonumber(syncer._nextRequestId) or 0) + 1
+        return tostring(syncer._nextRequestId)
+    end
+
+    local function trackPendingRequest(syncer, requestId, pendingState)
+        syncer._pendingRequests[requestId] = pendingState
+    end
+
     local function sortedByNid(list, nidKey, tieKey)
         local out = {}
         if type(list) ~= "table" then
@@ -984,6 +1017,22 @@ do
         return sender
     end
 
+    local function rejectSyncSender(pending, rawSender, requestId, reason)
+        local sender = markSyncSenderFailed(pending, rawSender)
+        if not sender then
+            sender = getSenderKey(rawSender) or tostring(rawSender or "?")
+        end
+        addon:debug((Diag.D.LogSyncSyncSenderFailed):format(tostring(sender), tostring(requestId), tostring(reason)))
+    end
+
+    local function finalizeSnapshotFailure(isSync, pending, sender, requestId, reason)
+        if isSync then
+            rejectSyncSender(pending, sender, requestId, reason)
+            return
+        end
+        completeRequest(requestId)
+    end
+
     local function isSyncSenderFailed(pending, rawSender)
         if type(pending) ~= "table" then
             return false
@@ -1089,16 +1138,14 @@ do
                 return
             end
             if not raidMatchesSnapshotHeader(currentRaid, snapshot.header) then
-                addon:debug((Diag.D.LogSyncSyncSenderFailed):format(tostring(sender), tostring(requestId), "raid_mismatch"))
-                markSyncSenderFailed(pending, sender)
+                rejectSyncSender(pending, sender, requestId, "raid_mismatch")
                 return
             end
 
             local ok, raid = pcall(applySnapshotToRaid, currentRaid, snapshot, false)
             if not ok or not raid then
                 addon:error((Diag.E.LogSyncMergeFailed):format(tostring(sender), tostring(requestId), tostring(snapshot.header.raidNid), tostring(raid)))
-                markSyncSenderFailed(pending, sender)
-                addon:debug((Diag.D.LogSyncSyncSenderFailed):format(tostring(sender), tostring(requestId), "merge_failed"))
+                rejectSyncSender(pending, sender, requestId, "merge_failed")
                 return
             end
 
@@ -1217,35 +1264,20 @@ do
         local payload = decodeText(encodedPayload)
         if payload == nil then
             addon:warn((Diag.W.LogSyncDecodeFailed):format(tostring(sender), tostring(requestId), tostring(raidNid)))
-            if isSync then
-                markSyncSenderFailed(pending, sender)
-                addon:debug((Diag.D.LogSyncSyncSenderFailed):format(tostring(sender), tostring(requestId), "decode_failed"))
-                return
-            end
-            completeRequest(requestId)
+            finalizeSnapshotFailure(isSync, pending, sender, requestId, "decode_failed")
             return
         end
 
         local snapshot = parseSnapshotPayload(payload)
         if not snapshot then
             addon:warn((Diag.W.LogSyncParseFailed):format(tostring(sender), tostring(requestId), tostring(raidNid)))
-            if isSync then
-                markSyncSenderFailed(pending, sender)
-                addon:debug((Diag.D.LogSyncSyncSenderFailed):format(tostring(sender), tostring(requestId), "parse_failed"))
-                return
-            end
-            completeRequest(requestId)
+            finalizeSnapshotFailure(isSync, pending, sender, requestId, "parse_failed")
             return
         end
 
         if tonumber(snapshot.header.protocolVersion) ~= PROTOCOL_VERSION then
             addon:debug((Diag.D.LogSyncVersionMismatch):format(tostring(sender), tostring(snapshot.header.protocolVersion), PROTOCOL_VERSION))
-            if isSync then
-                markSyncSenderFailed(pending, sender)
-                addon:debug((Diag.D.LogSyncSyncSenderFailed):format(tostring(sender), tostring(requestId), "version_mismatch"))
-                return
-            end
-            completeRequest(requestId)
+            finalizeSnapshotFailure(isSync, pending, sender, requestId, "version_mismatch")
             return
         end
 
@@ -1258,10 +1290,7 @@ do
     end
 
     function module:RequestLoggerReq(raidRef, targetName)
-        cleanupExpiredState()
-
-        if not addon.IsInGroup() then
-            addon:warn(L.MsgLoggerSyncNotInGroup)
+        if not ensureGroupSyncAvailable() then
             return false
         end
 
@@ -1271,27 +1300,21 @@ do
             return false
         end
 
-        local target = normalizeTargetName(targetName)
+        local target = resolveExternalTarget(targetName)
         if not target then
-            addon:warn(L.MsgLoggerSyncTargetRequired)
-            return false
-        end
-        if isSelfSender(target) then
-            addon:warn(L.MsgLoggerSyncTargetSelf)
             return false
         end
 
-        self._nextRequestId = (tonumber(self._nextRequestId) or 0) + 1
-        local requestId = tostring(self._nextRequestId)
+        local requestId = nextRequestId(self)
 
-        self._pendingRequests[requestId] = {
+        trackPendingRequest(self, requestId, {
             createdAt = nowSec(),
             mode = MODE_REQ,
             raidRef = requestRef,
             target = target,
             sender = target,
             completed = false,
-        }
+        })
 
         sendRequest(MODE_REQ, requestId, requestRef, nil, target)
         addon:info(L.MsgLoggerReqSent:format(tostring(requestRef), tostring(target)))
@@ -1299,10 +1322,7 @@ do
     end
 
     function module:BroadcastLoggerPush(raidRef, targetName)
-        cleanupExpiredState()
-
-        if not addon.IsInGroup() then
-            addon:warn(L.MsgLoggerSyncNotInGroup)
+        if not ensureGroupSyncAvailable() then
             return false
         end
 
@@ -1312,13 +1332,8 @@ do
             return false
         end
 
-        local target = normalizeTargetName(targetName)
+        local target = resolveExternalTarget(targetName)
         if not target then
-            addon:warn(L.MsgLoggerSyncTargetRequired)
-            return false
-        end
-        if isSelfSender(target) then
-            addon:warn(L.MsgLoggerSyncTargetSelf)
             return false
         end
 
@@ -1328,8 +1343,7 @@ do
             return false
         end
 
-        self._nextRequestId = (tonumber(self._nextRequestId) or 0) + 1
-        local requestId = tostring(self._nextRequestId)
+        local requestId = nextRequestId(self)
 
         sendSnapshot(target, requestId, MODE_PUSH, raid)
         addon:info(L.MsgLoggerSyncPushSent:format(tostring(tonumber(raid.raidNid) or raidRefNum), tostring(target)))
@@ -1337,10 +1351,7 @@ do
     end
 
     function module:RequestLoggerSync()
-        cleanupExpiredState()
-
-        if not addon.IsInGroup() then
-            addon:warn(L.MsgLoggerSyncNotInGroup)
+        if not ensureGroupSyncAvailable() then
             return false
         end
 
@@ -1351,10 +1362,9 @@ do
         end
 
         local signature = buildSignatureFromRaid(currentRaid)
-        self._nextRequestId = (tonumber(self._nextRequestId) or 0) + 1
-        local requestId = tostring(self._nextRequestId)
+        local requestId = nextRequestId(self)
 
-        self._pendingRequests[requestId] = {
+        trackPendingRequest(self, requestId, {
             createdAt = nowSec(),
             mode = MODE_SYNC,
             signature = signature,
@@ -1362,7 +1372,7 @@ do
             failedSenders = {},
             unauthorizedSenders = {},
             completed = false,
-        }
+        })
 
         sendRequest(MODE_SYNC, requestId, tonumber(currentRaid.raidNid) or 0, signature)
         addon:info(L.MsgLoggerSyncSent:format(tonumber(currentRaidId) or 0))

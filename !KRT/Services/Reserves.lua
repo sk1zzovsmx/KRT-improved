@@ -301,6 +301,21 @@ do
         return pending.name, pending.link, pending.icon
     end
 
+    local function notifyReservesDataChanged(reason, raidId, mode, nPlayers)
+        Bus.TriggerEvent(InternalEvents.ReservesDataChanged, reason, raidId, mode, nPlayers)
+    end
+
+    local function rebuildReserveIndexes(reason, raidId, mode, nPlayers)
+        if not RebuildIndex then
+            return false
+        end
+        RebuildIndex()
+        if reason then
+            notifyReservesDataChanged(reason, raidId, mode, nPlayers)
+        end
+        return true
+    end
+
     local function clearDisplayRefreshQueue()
         if pendingDisplayRefreshHandle then
             addon.CancelTimer(pendingDisplayRefreshHandle, true)
@@ -318,9 +333,7 @@ do
             return false
         end
         pendingDisplayRefreshQueued = false
-        RebuildIndex()
-        Bus.TriggerEvent(InternalEvents.ReservesDataChanged, "iteminfo-batch")
-        return true
+        return rebuildReserveIndexes("iteminfo-batch")
     end
 
     local function scheduleDisplayRefresh(forceImmediate)
@@ -353,6 +366,40 @@ do
             return
         end
         scheduleDisplayRefresh(false)
+    end
+
+    local function visitReserveEntriesByItemId(itemId, visitFn)
+        if not itemId or type(visitFn) ~= "function" then
+            return false
+        end
+
+        local list = reservesByItemID[itemId]
+        if type(list) == "table" then
+            for i = 1, #list do
+                local reserveEntry = list[i]
+                if type(reserveEntry) == "table" and reserveEntry.rawID == itemId then
+                    if visitFn(reserveEntry) == true then
+                        return true
+                    end
+                end
+            end
+            return false
+        end
+
+        for _, player in pairs(reservesData) do
+            if type(player) == "table" and type(player.reserves) == "table" then
+                for i = 1, #player.reserves do
+                    local reserveEntry = player.reserves[i]
+                    if type(reserveEntry) == "table" and reserveEntry.rawID == itemId then
+                        if visitFn(reserveEntry) == true then
+                            return true
+                        end
+                    end
+                end
+            end
+        end
+
+        return false
     end
 
     -- SoftRes exports class names like "Warrior", "Death Knight", etc.
@@ -760,7 +807,7 @@ do
 
     function Service:Save(contextTag)
         local canonical = applyRuntimeReservesData(reservesData, contextTag or "save")
-        RebuildIndex()
+        rebuildReserveIndexes()
         addon:debug(Diag.D.LogReservesSaveEntries:format(addon.tLength(reservesData)))
         KRT_Reserves = buildSavedReservesData(canonical)
     end
@@ -771,36 +818,10 @@ do
         local savedReserves = (type(KRT_Reserves) == "table") and KRT_Reserves or {}
         applyRuntimeReservesData(savedReserves, "load")
 
-        -- Infer import mode from saved data when possible.
-        -- If we detect any multi-item or quantity>1 entries, treat it as Multi-reserve.
         importMode = nil
-        local inferred
-        for _, p in pairs(reservesData) do
-            if type(p) == "table" and type(p.reserves) == "table" then
-                if #p.reserves > 1 then
-                    inferred = "multi"
-                    break
-                end
-                for i = 1, #p.reserves do
-                    local r = p.reserves[i]
-                    local qty = (type(r) == "table" and tonumber(r.quantity)) or 1
-                    if qty and qty > 1 then
-                        inferred = "multi"
-                        break
-                    end
-                end
-            end
-            if inferred == "multi" then
-                break
-            end
-        end
-        if not inferred then
-            local v = addon.options and addon.options.srImportMode
-            inferred = (v == 1) and "plus" or "multi"
-        end
-        setImportMode(inferred, true)
+        setImportMode(self:GetImportMode(), true)
 
-        RebuildIndex()
+        rebuildReserveIndexes()
     end
 
     function Service:ResetSaved()
@@ -808,8 +829,7 @@ do
         clearDisplayRefreshQueue()
         KRT_Reserves = nil
         twipe(reservesData)
-        RebuildIndex()
-        Bus.TriggerEvent(InternalEvents.ReservesDataChanged, "clear")
+        rebuildReserveIndexes("clear")
         local clearMessage = L[reserveListClearedKey]
         if clearMessage then
             addon:info(clearMessage)
@@ -857,8 +877,36 @@ do
     -- mode: "multi" (multi-reserve enabled; Plus ignored) or "plus" (priority; requires 1 item per player)
     function Service:GetImportMode()
         if importMode == nil then
-            local v = addon.options and addon.options.srImportMode
-            setImportMode((v == 1) and "plus" or "multi", false)
+            local inferred
+
+            -- Infer import mode from loaded data when possible.
+            -- If we detect any multi-item or quantity>1 entries, treat it as Multi-reserve.
+            for _, player in pairs(reservesData) do
+                if type(player) == "table" and type(player.reserves) == "table" then
+                    if #player.reserves > 1 then
+                        inferred = "multi"
+                        break
+                    end
+                    for i = 1, #player.reserves do
+                        local reserveEntry = player.reserves[i]
+                        local quantity = (type(reserveEntry) == "table" and tonumber(reserveEntry.quantity)) or 1
+                        if quantity and quantity > 1 then
+                            inferred = "multi"
+                            break
+                        end
+                    end
+                end
+                if inferred == "multi" then
+                    break
+                end
+            end
+
+            if not inferred then
+                local optionValue = addon.options and addon.options.srImportMode
+                inferred = (optionValue == 1) and "plus" or "multi"
+            end
+
+            setImportMode(inferred, false)
         end
         return importMode
     end
@@ -1318,31 +1366,12 @@ do
         end
         reservesDirty = true
 
-        local list = reservesByItemID[itemId]
-        if type(list) == "table" then
-            for i = 1, #list do
-                local r = list[i]
-                if type(r) == "table" and r.rawID == itemId then
-                    r.itemName = itemName
-                    r.itemLink = itemLink
-                    r.itemIcon = icon
-                end
-            end
-        else
-            -- Fallback: scan all players (should be rare if index is up to date)
-            for _, player in pairs(reservesData) do
-                if type(player) == "table" and type(player.reserves) == "table" then
-                    for i = 1, #player.reserves do
-                        local r = player.reserves[i]
-                        if type(r) == "table" and r.rawID == itemId then
-                            r.itemName = itemName
-                            r.itemLink = itemLink
-                            r.itemIcon = icon
-                        end
-                    end
-                end
-            end
-        end
+        visitReserveEntriesByItemId(itemId, function(reserveEntry)
+            reserveEntry.itemName = itemName
+            reserveEntry.itemLink = itemLink
+            reserveEntry.itemIcon = icon
+            return false
+        end)
 
         scheduleDisplayRefresh(false)
 
@@ -1408,33 +1437,10 @@ do
         if not itemId then
             return false
         end
-        local list = reservesByItemID[itemId]
-        if type(list) == "table" then
-            for i = 1, #list do
-                local r = list[i]
-                local qty = (type(r) == "table" and tonumber(r.quantity)) or 1
-                if (qty or 1) > 1 then
-                    return true
-                end
-            end
-            return false
-        end
-
-        -- Fallback: scan all players (should be rare if index is up to date)
-        for _, player in pairs(reservesData) do
-            if type(player) == "table" and type(player.reserves) == "table" then
-                for i = 1, #player.reserves do
-                    local r = player.reserves[i]
-                    if type(r) == "table" and r.rawID == itemId then
-                        local qty = tonumber(r.quantity) or 1
-                        if qty > 1 then
-                            return true
-                        end
-                    end
-                end
-            end
-        end
-        return false
+        return visitReserveEntriesByItemId(itemId, function(reserveEntry)
+            local quantity = tonumber(reserveEntry.quantity) or 1
+            return quantity > 1
+        end)
     end
 
     -- ----- SR Announcement Formatting ----- --

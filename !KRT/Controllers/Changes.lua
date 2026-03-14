@@ -36,13 +36,19 @@ do
     addon.Controllers = addon.Controllers or {}
     addon.Controllers.Changes = addon.Controllers.Changes or {}
     local module = addon.Controllers.Changes
-    local frameName
+    module._ui = module._ui
+        or {
+            Loaded = false,
+            Bound = false,
+            Localized = false,
+            Dirty = true,
+            Reason = nil,
+            FrameName = nil,
+        }
+    local UI = module._ui
 
     local getFrame = makeModuleFrameGetter(module, "KRTChanges")
     -- ----- Internal state ----- --
-    local UI = {
-        Localized = false,
-    }
 
     local changesTable = {}
     local tmpNames = {}
@@ -183,6 +189,7 @@ do
         if ref then
             return ref
         end
+        local frameName = UI.FrameName
         if not frameName then
             return nil
         end
@@ -220,8 +227,9 @@ do
     end
 
     local function OnLoadFrame(frame)
-        frameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or frameName)
-        return frameName
+        UI.FrameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or UI.FrameName)
+        UI.Loaded = UI.FrameName ~= nil
+        return UI.FrameName
     end
 
     -- ----- Public methods ----- --
@@ -234,9 +242,6 @@ do
             UI.Localize()
         end,
         onLoad = OnLoadFrame,
-        refresh = function()
-            panelScaffold:Refresh()
-        end,
     })
 
     -- OnLoad frame:
@@ -470,6 +475,7 @@ do
         if UI.Localized then
             return
         end
+        local frameName = UI.FrameName
         if not frameName then
             return
         end
@@ -505,6 +511,7 @@ do
 
     -- UI refresh.
     function UI.Refresh()
+        local frameName = UI.FrameName
         if not frameName then
             return
         end
@@ -539,8 +546,12 @@ do
         UIPrimitives.EnableDisableNamedPart(frameName, "DemandBtn", hasRaidGroup)
     end
 
-    function module:Refresh()
+    function module:RefreshUI()
         panelScaffold:Refresh()
+    end
+
+    function module:Refresh()
+        return self:RefreshUI()
     end
 
     -- Initialize changes table:

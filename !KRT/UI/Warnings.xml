@@ -74,8 +74,8 @@
 			</Anchors>
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
-</Button>
-	<!-- The Frame: Raid Warnings -->
+	</Button>
+	<!-- Raid warnings frame -->
 	<Frame name="KRTWarnings" inherits="KRTFrameTemplate">
 		<Size>
 			<AbsDimension x="595" y="245" />
@@ -164,7 +164,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString inherits="GameFontHighlight" />
-</EditBox>
+			</EditBox>
 			<EditBox name="$parentContent" inherits="KRTEditBoxTemplate" letters="255">
 				<Size>
 					<AbsDimension x="225" y="20" />
@@ -176,7 +176,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</EditBox>
+			</EditBox>
 			<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
@@ -188,7 +188,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
@@ -200,7 +200,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentAnnounceBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="85" y="25" />
@@ -212,12 +212,8 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 		</Frames>
-</Frame>
+	</Frame>
 	<!-- ====== End of Warnings ====== -->
-	<!-- ====== Start of Master Loot Frame ====== -->
-	<!-- Item Selection Frame -->
 </Ui>
-
-

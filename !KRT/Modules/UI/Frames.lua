@@ -23,6 +23,20 @@ addon.UIScaffold = addon.UIScaffold or {}
 local UIScaffold = addon.UIScaffold
 local tooltipColor = HIGHLIGHT_FONT_COLOR
 
+local function resolveFrameName(frameOrName)
+    if type(frameOrName) == "string" then
+        return frameOrName
+    end
+    if frameOrName and frameOrName.GetName then
+        return frameOrName:GetName()
+    end
+    return nil
+end
+
+local function isModuleUiBound(module, uiState)
+    return uiState and uiState.Bound and module and module.frame and module.refs
+end
+
 function Frames.EnableDrag(frame, dragButton)
     if not frame or not frame.RegisterForDrag then
         return
@@ -108,10 +122,7 @@ function Frames.MakeEditBoxPopup(key, text, onAccept, onShow, validate)
 end
 
 function Frames.SetFrameTitle(frameOrName, titleText, titleFormat)
-    local frameName = frameOrName
-    if type(frameOrName) ~= "string" then
-        frameName = frameOrName and frameOrName.GetName and frameOrName:GetName() or nil
-    end
+    local frameName = resolveFrameName(frameOrName)
     if not frameName then
         return
     end
@@ -166,10 +177,7 @@ function Frames.Get(frameName)
 end
 
 function Frames.Ref(frameOrName, childName)
-    local frameName = frameOrName
-    if type(frameOrName) ~= "string" then
-        frameName = frameOrName and frameOrName.GetName and frameOrName:GetName() or nil
-    end
+    local frameName = resolveFrameName(frameOrName)
     if type(frameName) ~= "string" or frameName == "" then
         return nil
     end
@@ -367,6 +375,13 @@ function Frames.InitModuleFrame(module, frame, opts)
 end
 
 local function makeUIFrameController(getFrame, requestRefreshFn)
+    local function showFrame(frame)
+        if requestRefreshFn then
+            requestRefreshFn()
+        end
+        Frames.SetShown(frame, true)
+    end
+
     return {
         Toggle = function(self)
             local frame = getFrame()
@@ -376,10 +391,7 @@ local function makeUIFrameController(getFrame, requestRefreshFn)
             if frame:IsShown() then
                 Frames.SetShown(frame, false)
             else
-                if requestRefreshFn then
-                    requestRefreshFn()
-                end
-                Frames.SetShown(frame, true)
+                showFrame(frame)
             end
         end,
         Hide = function(self)
@@ -391,10 +403,7 @@ local function makeUIFrameController(getFrame, requestRefreshFn)
         Show = function(self)
             local frame = getFrame()
             if frame then
-                if requestRefreshFn then
-                    requestRefreshFn()
-                end
-                Frames.SetShown(frame, true)
+                showFrame(frame)
             end
         end,
     }
@@ -499,7 +508,7 @@ function UIScaffold.DefineModuleUi(cfg)
     end)
 
     function module:BindUI()
-        if UI.Bound and self.frame and self.refs then
+        if isModuleUiBound(self, UI) then
             return self.frame, self.refs
         end
 
@@ -542,7 +551,7 @@ function UIScaffold.DefineModuleUi(cfg)
     end
 
     function module:EnsureUI()
-        if UI.Bound and self.frame and self.refs then
+        if isModuleUiBound(self, UI) then
             return self.frame
         end
         local frame = self:BindUI()

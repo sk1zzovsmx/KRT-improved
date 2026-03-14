@@ -407,6 +407,21 @@ do
         return count
     end
 
+    local function getCurrentRollContext(itemLink, rollType)
+        local currentItemLink = itemLink or getCurrentItemLink()
+        local currentItemId = currentItemLink and Item.GetItemIdFromLink(currentItemLink) or nil
+
+        if not currentItemId then
+            currentItemId = module:GetCurrentRollItemID()
+        end
+
+        return {
+            itemId = currentItemId and tonumber(currentItemId) or nil,
+            itemLink = currentItemLink,
+            rollType = tonumber(rollType) or getActiveRollType(),
+        }
+    end
+
     -- ============================================================================
     -- Eligibility helpers
     -- ============================================================================
@@ -892,6 +907,17 @@ do
         end
     end
 
+    local function prepareResponseState(context, opts)
+        opts = opts or {}
+        ensureResponseSession()
+        if opts.seedReserved ~= false then
+            seedReservedCandidates(context.itemId, context.itemLink, context.rollType)
+        end
+        if opts.seedTieReroll == true then
+            seedTieRerollCandidates(context.itemId, context.itemLink, context.rollType)
+        end
+    end
+
     local function refreshMaterializedResponses(itemId, itemLink, rollType)
         for name in pairs(state.responsesByPlayer) do
             syncResponseEligibility(name, itemId, itemLink, rollType)
@@ -1175,9 +1201,7 @@ do
     -- ============================================================================
     local function submitExplicitResponse(name, status, reason, source)
         local player = (Strings and Strings.NormalizeName and Strings.NormalizeName(name, true)) or name
-        local itemId
-        local itemLink
-        local currentRollType
+        local context
         local eligibility
         local response
 
@@ -1189,23 +1213,20 @@ do
             return false, reasonCodes.NAME_UNRESOLVED
         end
 
-        itemId = module:GetCurrentRollItemID()
-        if not itemId or lootState.lootCount == 0 then
+        context = getCurrentRollContext()
+        if not context.itemId or lootState.lootCount == 0 then
             return false, reasonCodes.MISSING_ITEM
         end
 
-        itemLink = getCurrentItemLink()
-        currentRollType = getActiveRollType()
-        ensureResponseSession()
-        seedReservedCandidates(itemId, itemLink, currentRollType)
-        eligibility = buildCandidateEligibility(player, itemId, itemLink, currentRollType)
+        prepareResponseState(context)
+        eligibility = buildCandidateEligibility(player, context.itemId, context.itemLink, context.rollType)
         traceEligibility(player, eligibility)
         if eligibility.ok ~= true then
             state.deniedReasons[player] = eligibility.reason
             return false, eligibility.reason
         end
 
-        response, eligibility = syncResponseEligibility(player, itemId, itemLink, currentRollType, source)
+        response, eligibility = syncResponseEligibility(player, context.itemId, context.itemLink, context.rollType, source)
         if status == RESPONSE_STATUS.CANCELLED and not (response and (response.bestRoll ~= nil or isExplicitResponseStatus(response.explicitStatus))) then
             return false, reasonCodes.NO_ACTIVE_RESPONSE
         end
@@ -1271,9 +1292,7 @@ do
     end
 
     local function submitIncomingRoll(player, roll, source)
-        local itemId
-        local itemLink
-        local currentRollType
+        local context
         local eligibility
         local denyMessage
         local denyKey
@@ -1283,19 +1302,15 @@ do
             return false, reasonCodes.RECORD_INACTIVE
         end
 
-        itemId = module:GetCurrentRollItemID()
-        if not itemId or lootState.lootCount == 0 then
+        context = getCurrentRollContext()
+        if not context.itemId or lootState.lootCount == 0 then
             addon:warn(Diag.W.LogRollsMissingItem)
             return false, reasonCodes.MISSING_ITEM
         end
 
-        itemLink = getCurrentItemLink()
-        currentRollType = getActiveRollType()
+        prepareResponseState(context)
 
-        ensureResponseSession()
-        seedReservedCandidates(itemId, itemLink, currentRollType)
-
-        eligibility = buildCandidateEligibility(player, itemId, itemLink, currentRollType, {
+        eligibility = buildCandidateEligibility(player, context.itemId, context.itemLink, context.rollType, {
             mode = "submission",
             requireOpenSession = true,
         })
@@ -1319,7 +1334,7 @@ do
         if not canTransitionResponseState(state.responsesByPlayer[player] and state.responsesByPlayer[player].status, RESPONSE_STATUS.ROLL) then
             return false, reasonCodes.STATE_TRANSITION_DENIED
         end
-        addRoll(player, roll, itemId)
+        addRoll(player, roll, context.itemId)
         applyAcceptedRollResponse(player, tonumber(roll), eligibility, source or "system_roll")
         return true, nil
     end
@@ -1381,12 +1396,9 @@ do
                 lootState.rollWinner = nil
             end
         else
-            local itemId = self:GetCurrentRollItemID()
-            local itemLink = getCurrentItemLink()
-            local currentRollType = getActiveRollType()
-            ensureResponseSession()
-            seedReservedCandidates(itemId, itemLink, currentRollType)
-            finalizeMaterializedResponses(itemId, itemLink, currentRollType)
+            local context = getCurrentRollContext()
+            prepareResponseState(context)
+            finalizeMaterializedResponses(context.itemId, context.itemLink, context.rollType)
         end
         updateSessionRollWindow(on)
 
@@ -1563,10 +1575,8 @@ do
     end
 
     function module:ValidateWinner(playerName, itemLink, rollType)
-        local currentRollType = tonumber(rollType) or getActiveRollType()
-        local currentItemLink = itemLink or getCurrentItemLink()
-        local currentItemId = Item.GetItemIdFromLink(currentItemLink) or module:GetCurrentRollItemID()
-        local eligibility = buildCandidateEligibility(playerName, currentItemId, currentItemLink, currentRollType)
+        local context = getCurrentRollContext(itemLink, rollType)
+        local eligibility = buildCandidateEligibility(playerName, context.itemId, context.itemLink, context.rollType)
         local response = state.responsesByPlayer[playerName]
         local reason
 
@@ -1575,12 +1585,13 @@ do
         end
 
         if getRollSession() then
-            seedReservedCandidates(currentItemId, currentItemLink, currentRollType)
-            seedTieRerollCandidates(currentItemId, currentItemLink, currentRollType)
-            response = select(1, syncResponseEligibility(playerName, currentItemId, currentItemLink, currentRollType, "award_validation"))
+            prepareResponseState(context, {
+                seedTieReroll = true,
+            })
+            response = select(1, syncResponseEligibility(playerName, context.itemId, context.itemLink, context.rollType, "award_validation"))
         end
 
-        if not isAwardRollType(currentRollType) then
+        if not isAwardRollType(context.rollType) then
             if eligibility.ok == true then
                 return buildWinnerValidationResult(true, nil, playerName, eligibility, response)
             end
@@ -1641,11 +1652,10 @@ do
     end
 
     local function buildDisplayModel()
-        ensureResponseSession()
-
-        local itemId = module:GetCurrentRollItemID()
-        local itemLink = getCurrentItemLink()
-        local currentRollType = getActiveRollType()
+        local context = getCurrentRollContext()
+        local itemId = context.itemId
+        local itemLink = context.itemLink
+        local currentRollType = context.rollType
         local isSR = currentRollType == rollTypes.RESERVED
         local wantLow = addon.options.sortAscending == true
         local display = {}
@@ -1658,8 +1668,9 @@ do
         local ma
         local selectionAllowed
 
-        seedReservedCandidates(itemId, itemLink, currentRollType)
-        seedTieRerollCandidates(itemId, itemLink, currentRollType)
+        prepareResponseState(context, {
+            seedTieReroll = true,
+        })
         refreshMaterializedResponses(itemId, itemLink, currentRollType)
         if state.canRoll == false then
             finalizeMaterializedResponses(itemId, itemLink, currentRollType)

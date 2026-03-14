@@ -33,15 +33,19 @@ do
     addon.Widgets = addon.Widgets or {}
     addon.Widgets.Config = addon.Widgets.Config or {}
     local module = addon.Widgets.Config
-    local frameName
+    module._ui = module._ui
+        or {
+            Loaded = false,
+            Bound = false,
+            Localized = false,
+            Dirty = true,
+            Reason = nil,
+            FrameName = nil,
+        }
+    local UI = module._ui
 
     local getFrame = makeModuleFrameGetter(module, "KRTConfig")
     -- ----- Internal state ----- --
-    local UI = {
-        Localized = false,
-        isDirty = false,
-        Loaded = false,
-    }
 
     local MIN_COUNTDOWN = 5
     local MAX_COUNTDOWN = 60
@@ -84,8 +88,7 @@ do
         if Options and Options.RestoreDefaults then
             Options.RestoreDefaults()
         end
-        UI.isDirty = true
-        module:RequestRefresh()
+        module:RequestRefresh("defaults")
         addon:info(L.MsgDefaultsRestored)
     end
 
@@ -94,8 +97,7 @@ do
         if Options and Options.LoadOptions then
             Options.LoadOptions()
         end
-        UI.isDirty = true
-        module:RequestRefresh()
+        module:RequestRefresh("options")
 
         if KRT_MINIMAP_GUI then
             addon.Minimap:SetPos(addon.options.minimapPos or 325)
@@ -115,14 +117,13 @@ do
 
     -- OnLoad handler for the configuration frame.
     function module:OnLoad(frame)
-        frameName = Frames.InitModuleFrame(module, frame, {
+        UI.FrameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
-                UI.isDirty = true
+                module:MarkDirty("show")
             end,
-        })
-        UI.Loaded = frameName ~= nil
-        if not UI.Loaded then
+        }) or UI.FrameName
+        if not UI.FrameName then
             return
         end
     end
@@ -168,7 +169,7 @@ do
 
     local function OnLoadFrame(frame)
         module:OnLoad(frame)
-        return frameName
+        return UI.FrameName
     end
 
     UIScaffold.DefineModuleUi({
@@ -187,9 +188,21 @@ do
         if not btn then
             return
         end
-        frameName = frameName or btn:GetParent():GetName()
+        local frameName = UI.FrameName
+        if not frameName and btn.GetParent then
+            local parent = btn:GetParent()
+            frameName = parent and parent.GetName and parent:GetName() or nil
+            UI.FrameName = frameName or UI.FrameName
+        end
+        if not frameName then
+            return
+        end
+
         local value
         local name = btn:GetName()
+        if type(name) ~= "string" or name == "" then
+            return
+        end
 
         if name ~= frameName .. "countdownDuration" then
             value = (btn:GetChecked() == 1) or false
@@ -210,17 +223,16 @@ do
             Bus.TriggerEvent(eventName, value)
         end
 
-        UI.isDirty = true
-        module:RequestRefresh()
+        module:RequestRefresh("option_changed")
     end
 
     -- Localizes UI elements.
     function UI.Localize()
-        if UI.Localized then
+        local frameName = UI.FrameName
+        if not frameName then
             return
         end
 
-        -- frameName must be ready here (OnLoad sets it before calling)
         _G[frameName .. "sortAscendingStr"]:SetText(L.StrConfigSortAscending)
         _G[frameName .. "useRaidWarningStr"]:SetText(L.StrConfigUseRaidWarning)
         _G[frameName .. "announceOnWinStr"]:SetText(L.StrConfigAnnounceOnWin)
@@ -241,13 +253,16 @@ do
         _G[frameName .. "AboutStr"]:SetText(L.StrConfigAbout)
         _G[frameName .. "DefaultsBtn"]:SetText(L.BtnDefaults)
         _G[frameName .. "CloseBtn"]:SetText(L.BtnClose)
-
-        UI.Localized = true
     end
 
     -- UI refresh handler for the configuration frame.
-    function UI.Refresh()
-        if not UI.isDirty then
+    function UI.Refresh(dirty)
+        if not dirty and not UI.Dirty then
+            return
+        end
+
+        local frameName = UI.FrameName
+        if not frameName then
             return
         end
         _G[frameName .. "sortAscending"]:SetChecked(addon.options.sortAscending == true)
@@ -287,11 +302,15 @@ do
             end
         end
 
-        UI.isDirty = false
+        UI.Dirty = false
+    end
+
+    function module:RefreshUI(_, _, _, dirty)
+        UI.Refresh(dirty)
     end
 
     function module:Refresh()
-        UI.Refresh()
+        return self:RefreshUI(nil, nil, nil, true)
     end
 
     if UIFacade and UIFacade.Register then
