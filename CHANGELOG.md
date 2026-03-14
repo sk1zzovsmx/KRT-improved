@@ -4,6 +4,14 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **UI:** Logger now shows panel-level empty states and orientation hints for
+  history and export views, so raid, boss, attendee, loot, and CSV panes stay
+  readable even before a selection exists.
+- **UI:** Master action buttons now expose contextual tooltips that explain the
+  current action, winner target, reserve availability, and countdown behavior.
+- **UI:** Master now shows contextual workflow status under the selected item,
+  and Logger panel titles now include live counts plus raid, boss, and player
+  context for faster navigation.
 - **Bugfix:** Master countdown now starts again after `MS/OS/SR/FREE`
   announcements even when the Rolls service pre-bootstraps the roll session;
   opening roll intake now restores the canonical `rollStarted` state.

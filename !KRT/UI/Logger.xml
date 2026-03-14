@@ -171,7 +171,7 @@
 			</Anchors>
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
-</Button>
+	</Button>
 	<Button name="KRTLoggerBossButton" virtual="true">
 		<Size>
 			<AbsDimension y="20" />
@@ -270,7 +270,7 @@
 			</Anchors>
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
-</Button>
+	</Button>
 	<Button name="KRTLoggerBossAttendeeButton" virtual="true">
 		<Size>
 			<AbsDimension y="20" />
@@ -334,7 +334,7 @@
 			</Anchors>
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
-</Button>
+	</Button>
 	<Button name="KRTLoggerRaidAttendeeButton" virtual="true">
 		<Size>
 			<AbsDimension y="20" />
@@ -421,7 +421,7 @@
 			</Anchors>
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
-</Button>
+	</Button>
 	<Button name="KRTLoggerLootButton" virtual="true">
 		<Size>
 			<AbsDimension y="26" />
@@ -566,7 +566,7 @@
 						</Anchor>
 					</Anchors>
 				</NormalTexture>
-</Button>
+			</Button>
 		</Frames>
 		<HighlightTexture>
 			<Anchors>
@@ -575,7 +575,7 @@
 			</Anchors>
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
-</Button>
+	</Button>
 	<!-- The Frame: Logger -->
 	<Frame name="KRTLogger" inherits="KRTFrameTemplate">
 		<Size>
@@ -593,7 +593,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentTab2" inherits="CharacterFrameTabButtonTemplate" id="2">
 				<Size>
 					<AbsDimension x="95" y="30" />
@@ -605,7 +605,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Frame name="$parentHistory">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativePoint="TOPLEFT">
@@ -619,7 +619,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Frame>
+			</Frame>
 			<Frame name="KRTLoggerRaids" inherits="KRTLoggerFrameTemplate" parent="KRTLoggerHistory">
 				<Size>
 					<AbsDimension x="330" y="195" />
@@ -651,6 +651,22 @@
 							</Anchors>
 						</FontString>
 					</Layer>
+					<Layer level="OVERLAY">
+						<FontString name="$parentEmptyState" font="GameFontDisableSmall" justifyH="CENTER" justifyV="MIDDLE">
+							<Anchors>
+								<Anchor point="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="-74" />
+									</Offset>
+								</Anchor>
+								<Anchor point="BOTTOMRIGHT">
+									<Offset>
+										<AbsDimension x="-30" y="36" />
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
 				</Layers>
 				<Frames>
 					<Button name="$parentCurrentBtn" inherits="KRTButtonTemplate">
@@ -664,7 +680,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
@@ -676,7 +692,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<!-- Table Headers -->
 					<Button name="$parentHeaderNum" inherits="KRTLoggerTableHeader">
 						<Size>
@@ -689,7 +705,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentHeaderDate" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="100" y="20" />
@@ -701,7 +717,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentHeaderZone" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="123" y="20" />
@@ -713,7 +729,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentHeaderSize" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="45" y="20" />
@@ -725,7 +741,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
@@ -741,7 +757,7 @@
 						</Anchors>
 					</ScrollFrame>
 				</Frames>
-</Frame>
+			</Frame>
 			<Frame name="KRTLoggerBosses" inherits="KRTLoggerFrameTemplate" parent="KRTLoggerHistory">
 				<Size>
 					<AbsDimension x="315" y="195" />
@@ -773,6 +789,22 @@
 							</Anchors>
 						</FontString>
 					</Layer>
+					<Layer level="OVERLAY">
+						<FontString name="$parentEmptyState" font="GameFontDisableSmall" justifyH="CENTER" justifyV="MIDDLE">
+							<Anchors>
+								<Anchor point="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="-74" />
+									</Offset>
+								</Anchor>
+								<Anchor point="BOTTOMRIGHT">
+									<Offset>
+										<AbsDimension x="-30" y="36" />
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
 				</Layers>
 				<Frames>
 					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
@@ -786,7 +818,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
@@ -798,7 +830,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
@@ -810,7 +842,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<!-- Table Headers -->
 					<Button name="$parentHeaderNum" inherits="KRTLoggerTableHeader">
 						<Size>
@@ -823,7 +855,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentHeaderName" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="148" y="20" />
@@ -835,7 +867,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentHeaderTime" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="45" y="20" />
@@ -847,7 +879,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentHeaderMode" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="65" y="20" />
@@ -859,7 +891,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
@@ -875,7 +907,7 @@
 						</Anchors>
 					</ScrollFrame>
 				</Frames>
-</Frame>
+			</Frame>
 			<Frame name="KRTLoggerBossAttendees" inherits="KRTLoggerFrameTemplate" parent="KRTLoggerHistory">
 				<Size>
 					<AbsDimension x="140" y="192" />
@@ -907,6 +939,22 @@
 							</Anchors>
 						</FontString>
 					</Layer>
+					<Layer level="OVERLAY">
+						<FontString name="$parentEmptyState" font="GameFontDisableSmall" justifyH="CENTER" justifyV="MIDDLE">
+							<Anchors>
+								<Anchor point="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="-74" />
+									</Offset>
+								</Anchor>
+								<Anchor point="BOTTOMRIGHT">
+									<Offset>
+										<AbsDimension x="-30" y="36" />
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
 				</Layers>
 				<Frames>
 					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
@@ -920,7 +968,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentRemoveBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
@@ -932,7 +980,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<!-- Table Headers -->
 					<Button name="$parentHeaderName" inherits="KRTLoggerTableHeader">
 						<Size>
@@ -945,7 +993,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
@@ -961,7 +1009,7 @@
 						</Anchors>
 					</ScrollFrame>
 				</Frames>
-</Frame>
+			</Frame>
 			<Frame name="KRTLoggerRaidAttendees" inherits="KRTLoggerFrameTemplate" parent="KRTLoggerHistory">
 				<Size>
 					<AbsDimension x="215" y="235" />
@@ -993,6 +1041,22 @@
 							</Anchors>
 						</FontString>
 					</Layer>
+					<Layer level="OVERLAY">
+						<FontString name="$parentEmptyState" font="GameFontDisableSmall" justifyH="CENTER" justifyV="MIDDLE">
+							<Anchors>
+								<Anchor point="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="-74" />
+									</Offset>
+								</Anchor>
+								<Anchor point="BOTTOMRIGHT">
+									<Offset>
+										<AbsDimension x="-30" y="36" />
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
 				</Layers>
 				<Frames>
 					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
@@ -1006,7 +1070,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
@@ -1018,7 +1082,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<!-- Table Headers -->
 					<Button name="$parentHeaderName" inherits="KRTLoggerTableHeader">
 						<Size>
@@ -1031,7 +1095,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentHeaderJoin" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="55" y="20" />
@@ -1043,7 +1107,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentHeaderLeave" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="55" y="20" />
@@ -1055,7 +1119,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
@@ -1071,7 +1135,7 @@
 						</Anchors>
 					</ScrollFrame>
 				</Frames>
-</Frame>
+			</Frame>
 			<Frame name="KRTLoggerLoot" inherits="KRTLoggerFrameTemplate" parent="KRTLoggerHistory">
 				<Size>
 					<AbsDimension x="578" y="235" />
@@ -1098,6 +1162,22 @@
 								<Anchor point="TOPRIGHT">
 									<Offset>
 										<AbsDimension x="-10" y="-10" />
+									</Offset>
+								</Anchor>
+							</Anchors>
+						</FontString>
+					</Layer>
+					<Layer level="OVERLAY">
+						<FontString name="$parentEmptyState" font="GameFontDisableSmall" justifyH="CENTER" justifyV="MIDDLE">
+							<Anchors>
+								<Anchor point="TOPLEFT">
+									<Offset>
+										<AbsDimension x="16" y="-74" />
+									</Offset>
+								</Anchor>
+								<Anchor point="BOTTOMRIGHT">
+									<Offset>
+										<AbsDimension x="-30" y="36" />
 									</Offset>
 								</Anchor>
 							</Anchors>
@@ -1164,7 +1244,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<!-- Table Headers -->
 					<Button name="$parentHeaderItem" inherits="KRTLoggerTableHeader">
 						<Size>
@@ -1177,7 +1257,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentHeaderSource" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="135" y="20" />
@@ -1189,7 +1269,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentHeaderWinner" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="90" y="20" />
@@ -1201,7 +1281,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentHeaderType" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="50" y="20" />
@@ -1213,7 +1293,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentHeaderRoll" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="45" y="20" />
@@ -1225,7 +1305,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentHeaderTime" inherits="KRTLoggerTableHeader">
 						<Size>
 							<AbsDimension x="45" y="20" />
@@ -1237,7 +1317,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
@@ -1253,7 +1333,7 @@
 						</Anchors>
 					</ScrollFrame>
 				</Frames>
-</Frame>
+			</Frame>
 			<Frame name="$parentExport" hidden="true">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativePoint="TOPLEFT">
@@ -1294,6 +1374,22 @@
 										<Anchor point="TOPRIGHT">
 											<Offset>
 												<AbsDimension x="-10" y="-10" />
+											</Offset>
+										</Anchor>
+									</Anchors>
+								</FontString>
+							</Layer>
+							<Layer level="OVERLAY">
+								<FontString name="$parentEmptyState" font="GameFontDisableSmall" justifyH="CENTER" justifyV="MIDDLE">
+									<Anchors>
+										<Anchor point="TOPLEFT">
+											<Offset>
+												<AbsDimension x="16" y="-74" />
+											</Offset>
+										</Anchor>
+										<Anchor point="BOTTOMRIGHT">
+											<Offset>
+												<AbsDimension x="-30" y="36" />
 											</Offset>
 										</Anchor>
 									</Anchors>
@@ -1397,6 +1493,22 @@
 									</Anchors>
 								</FontString>
 							</Layer>
+							<Layer level="OVERLAY">
+								<FontString name="$parentEmptyState" font="GameFontDisableSmall" justifyH="CENTER" justifyV="MIDDLE">
+									<Anchors>
+										<Anchor point="TOPLEFT">
+											<Offset>
+												<AbsDimension x="16" y="-74" />
+											</Offset>
+										</Anchor>
+										<Anchor point="BOTTOMRIGHT">
+											<Offset>
+												<AbsDimension x="-30" y="36" />
+											</Offset>
+										</Anchor>
+									</Anchors>
+								</FontString>
+							</Layer>
 						</Layers>
 						<Frames>
 							<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
@@ -1430,7 +1542,7 @@
 						</Frames>
 					</Frame>
 				</Frames>
-</Frame>
+			</Frame>
 			<!-- Add/Edit Boss: -->
 			<Frame name="KRTLoggerBossBox" inherits="KRTSimpleFrameTemplate" frameStrata="HIGH" parent="KRTLogger">
 				<Size>
@@ -1507,21 +1619,21 @@
 							<Anchor point="TOPLEFT" x="15" y="-40" />
 							<Anchor point="RIGHT" x="-10" />
 						</Anchors>
-</EditBox>
+					</EditBox>
 					<EditBox name="$parentDifficulty" inherits="KRTEditBoxTemplate" letters="1">
 						<Size x="100" y="25" />
 						<Anchors>
 							<Anchor point="TOPLEFT" x="15" y="-85" />
 							<Anchor point="RIGHT" x="-100" />
 						</Anchors>
-</EditBox>
+					</EditBox>
 					<EditBox name="$parentTime" inherits="KRTEditBoxTemplate">
 						<Size x="100" y="25" />
 						<Anchors>
 							<Anchor point="TOPLEFT" x="100" y="-85" />
 							<Anchor point="RIGHT" x="-10" />
 						</Anchors>
-</EditBox>
+					</EditBox>
 					<Button name="$parentSaveBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
@@ -1533,7 +1645,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentCancelBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
@@ -1545,9 +1657,9 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 				</Frames>
-</Frame>
+			</Frame>
 			<!-- Add/Edit Boss Attendee: -->
 			<Frame name="$parentPlayerBox" inherits="KRTSimpleFrameTemplate" frameStrata="HIGH" hidden="true" parent="KRTLogger">
 				<Size>
@@ -1617,7 +1729,7 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 					<Button name="$parentCancelBtn" inherits="KRTButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
@@ -1629,11 +1741,11 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-</Button>
+					</Button>
 				</Frames>
-</Frame>
+			</Frame>
 		</Frames>
-</Frame>
+	</Frame>
 	<Frame name="KRTLoggerRollTypePickerFrame" parent="UIParent" frameStrata="DIALOG" hidden="true">
 		<Size>
 			<AbsDimension x="312" y="22" />

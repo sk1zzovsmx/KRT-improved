@@ -25,6 +25,7 @@ local Services = feature.Services or addon.Services or {}
 local Loot = Services.Loot
 local Raid = Services.Raid
 local Rolls = Services.Rolls
+local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 local UnitIsGroupLeader = feature.UnitIsGroupLeader
 local UnitIsGroupAssistant = feature.UnitIsGroupAssistant
 
@@ -132,16 +133,19 @@ do
     addon.Controllers = addon.Controllers or {}
     addon.Controllers.Master = addon.Controllers.Master or {}
     local module = addon.Controllers.Master
-    local frameName
+    module._ui = module._ui
+        or {
+            Loaded = false,
+            Bound = false,
+            Localized = false,
+            Dirty = true,
+            Reason = nil,
+            FrameName = nil,
+        }
+    local UI = module._ui
 
     -- ----- Internal state ----- --
-    local UI = {
-        Localized = false,
-        Bound = false,
-        Loaded = false,
-    }
-
-    local getFrame = Frames.MakeFrameGetter("KRTMaster")
+    local getFrame = makeModuleFrameGetter(module, "KRTMaster")
 
     local initializeDropDowns, prepareDropDowns, updateDropDowns
     local dropDownData, dropDownGroupData = {}, {}
@@ -160,6 +164,7 @@ do
     local lastUIState = {
         buttons = {},
         texts = {},
+        tooltips = {},
         rollStatus = {},
         glows = {},
     }
@@ -220,6 +225,18 @@ do
     }
 
     -- ----- Private helpers ----- --
+
+    local function getFrameName()
+        return UI.FrameName
+    end
+
+    local function getNamedPart(suffix)
+        local frameName = getFrameName()
+        if not frameName then
+            return nil
+        end
+        return _G[frameName .. suffix]
+    end
 
     -- ============================================================================
     -- Dropdown / frame helpers
@@ -416,7 +433,7 @@ do
     end
 
     local function initItemButtonScripts()
-        local itemBtn = frameName and _G[frameName .. "ItemBtn"] or nil
+        local itemBtn = getNamedPart("ItemBtn")
         if not itemBtn or itemBtn._krtMlInvDropInit then
             return
         end
@@ -520,11 +537,12 @@ do
         if not frame then
             return
         end
-        frameName = frameName or frame:GetName()
+        UI.FrameName = UI.FrameName or (frame.GetName and frame:GetName()) or UI.FrameName
+        local frameName = getFrameName() or frame:GetName()
         if not frameName or frameName ~= frame:GetName() then
             return
         end
-        local itemCountBox = _G[frameName .. "ItemCount"]
+        local itemCountBox = getNamedPart("ItemCount")
         if not itemCountBox then
             return
         end
@@ -822,6 +840,100 @@ do
         local resolution = model and model.resolution or nil
         local requiredWinnerCount = tonumber(model and model.requiredWinnerCount) or 1
         return resolution and resolution.requiresManualResolution == true and model and model.pickMode ~= true and requiredWinnerCount == 1
+    end
+
+    local function buildMasterStatusText(currentFlowState, rollModel, hasItem, displayedWinner)
+        local resolution = rollModel and rollModel.resolution or {}
+        local requiredWinnerCount = tonumber(rollModel and rollModel.requiredWinnerCount) or 1
+        local selectedCount = tonumber(rollModel and rollModel.msCount) or 0
+        local selectionAllowed = rollModel and rollModel.selectionAllowed == true
+        local multiAward = lootState.multiAward
+        local currentTradeWinner = getCurrentTradeWinner()
+        local currentMultiWinner = getCurrentMultiAwardWinner()
+
+        if requiredWinnerCount < 1 then
+            requiredWinnerCount = 1
+        end
+
+        if not hasItem then
+            return L.StrMasterStatusIdle
+        end
+
+        if currentFlowState == FLOW_STATES.MULTI_AWARD then
+            local total = tonumber(multiAward and multiAward.total) or (multiAward and multiAward.winners and #multiAward.winners) or requiredWinnerCount
+            local position = tonumber(multiAward and multiAward.index) or 1
+            local currentWinner = currentMultiWinner or displayedWinner
+            if total < 1 then
+                total = requiredWinnerCount
+            end
+            if position < 1 then
+                position = 1
+            end
+            if currentWinner and currentWinner ~= "" then
+                return L.StrMasterStatusMultiAward:format(position, total, currentWinner)
+            end
+            if selectedCount >= requiredWinnerCount and requiredWinnerCount > 1 then
+                return L.StrMasterStatusAwardSelection:format(selectedCount)
+            end
+            return L.StrMasterStatusSelectWinners:format(requiredWinnerCount)
+        end
+
+        if currentFlowState == FLOW_STATES.TRADE then
+            if currentTradeWinner and currentTradeWinner ~= "" then
+                return L.StrMasterStatusTrade:format(currentTradeWinner)
+            end
+            return L.StrMasterStatusInventory
+        end
+
+        if currentFlowState == FLOW_STATES.INVENTORY then
+            if selectionAllowed and requiredWinnerCount > 1 then
+                if selectedCount >= requiredWinnerCount then
+                    return L.StrMasterStatusInventorySelection:format(selectedCount)
+                end
+                return L.StrMasterStatusSelectWinners:format(requiredWinnerCount)
+            end
+            if displayedWinner and displayedWinner ~= "" then
+                return L.StrMasterStatusInventoryTarget:format(displayedWinner)
+            end
+            if selectionAllowed then
+                return L.StrMasterStatusPickWinner
+            end
+            return L.StrMasterStatusInventory
+        end
+
+        if currentFlowState == FLOW_STATES.COUNTDOWN then
+            return L.StrMasterStatusCountdown
+        end
+
+        if currentFlowState == FLOW_STATES.ROLLING then
+            if not selectionAllowed then
+                return L.StrMasterStatusRolling:format(tonumber(lootState.rollsCount) or 0)
+            end
+
+            if resolution.requiresManualResolution then
+                if requiredWinnerCount > 1 then
+                    if selectedCount >= requiredWinnerCount then
+                        return L.StrMasterStatusAwardSelection:format(selectedCount)
+                    end
+                    return L.StrMasterStatusSelectWinners:format(requiredWinnerCount)
+                end
+                return L.StrMasterStatusResolveTie
+            end
+
+            if requiredWinnerCount > 1 then
+                if selectedCount >= requiredWinnerCount then
+                    return L.StrMasterStatusAwardSelection:format(selectedCount)
+                end
+                return L.StrMasterStatusSelectWinners:format(requiredWinnerCount)
+            end
+
+            if displayedWinner and displayedWinner ~= "" then
+                return L.StrMasterStatusAwardTarget:format(displayedWinner)
+            end
+            return L.StrMasterStatusPickWinner
+        end
+
+        return L.StrMasterStatusReady
     end
 
     local function resetItemCountAndRefresh(focus)
@@ -1135,7 +1247,12 @@ do
     local function updateMasterButtonsIfChanged(state)
         local buttons = lastUIState.buttons
         local texts = lastUIState.texts
+        local tooltips = lastUIState.tooltips
         local glows = lastUIState.glows
+        local frameName = getFrameName()
+        if not frameName then
+            return
+        end
 
         local function updateEnabled(key, frame, enabled)
             enabled = enabled and true or false
@@ -1159,7 +1276,7 @@ do
         end
 
         local function updateItemState(enabled)
-            local itemBtn = _G[frameName .. "ItemBtn"]
+            local itemBtn = getNamedPart("ItemBtn")
             if itemBtn and buttons.itemBtn ~= enabled then
                 UIPrimitives.EnableDisable(itemBtn, enabled)
                 local texture = itemBtn:GetNormalTexture()
@@ -1177,28 +1294,60 @@ do
             end
         end
 
-        updateText("countdown", _G[frameName .. "CountdownBtn"], state.countdownText)
-        updateText("award", _G[frameName .. "AwardBtn"], state.awardText)
-        updateText("selectItem", _G[frameName .. "SelectItemBtn"], state.selectItemText)
-        updateText("spamLoot", _G[frameName .. "SpamLootBtn"], state.spamLootText)
+        local function updateTooltip(key, frame, title, text)
+            local token
+            if not frame then
+                return
+            end
+            token = tostring(title or "") .. "\031" .. tostring(text or "")
+            if tooltips[key] ~= token then
+                Frames.SetTooltip(frame, text, nil, title)
+                tooltips[key] = token
+            end
+        end
 
-        updateEnabled("selectItem", _G[frameName .. "SelectItemBtn"], state.canSelectItem)
-        updateEnabled("spamLoot", _G[frameName .. "SpamLootBtn"], state.canSpamLoot)
-        updateEnabled("ms", _G[frameName .. "MSBtn"], state.canStartRolls)
-        updateEnabled("os", _G[frameName .. "OSBtn"], state.canStartRolls)
-        updateEnabled("sr", _G[frameName .. "SRBtn"], state.canStartSR)
-        updateEnabled("free", _G[frameName .. "FreeBtn"], state.canStartRolls)
-        updateEnabled("countdown", _G[frameName .. "CountdownBtn"], state.canCountdown)
-        updateEnabled("hold", _G[frameName .. "HoldBtn"], state.canHold)
-        updateEnabled("bank", _G[frameName .. "BankBtn"], state.canBank)
-        updateEnabled("disenchant", _G[frameName .. "DisenchantBtn"], state.canDisenchant)
-        updateEnabled("award", _G[frameName .. "AwardBtn"], state.canAward)
-        updateText("reserveList", _G[frameName .. "ReserveListBtn"], state.reserveListText)
-        updateEnabled("reserveList", _G[frameName .. "ReserveListBtn"], state.canReserveList)
-        updateEnabled("roll", _G[frameName .. "RollBtn"], state.canRoll)
-        updateEnabled("clear", _G[frameName .. "ClearBtn"], state.canClear)
+        updateText("countdown", getNamedPart("CountdownBtn"), state.countdownText)
+        updateText("award", getNamedPart("AwardBtn"), state.awardText)
+        updateText("selectItem", getNamedPart("SelectItemBtn"), state.selectItemText)
+        updateText("spamLoot", getNamedPart("SpamLootBtn"), state.spamLootText)
+        if getNamedPart("Status") then
+            updateText("status", getNamedPart("Status"), state.statusText)
+        end
+
+        updateEnabled("selectItem", getNamedPart("SelectItemBtn"), state.canSelectItem)
+        updateEnabled("spamLoot", getNamedPart("SpamLootBtn"), state.canSpamLoot)
+        updateEnabled("ms", getNamedPart("MSBtn"), state.canStartRolls)
+        updateEnabled("os", getNamedPart("OSBtn"), state.canStartRolls)
+        updateEnabled("sr", getNamedPart("SRBtn"), state.canStartSR)
+        updateEnabled("free", getNamedPart("FreeBtn"), state.canStartRolls)
+        updateEnabled("countdown", getNamedPart("CountdownBtn"), state.canCountdown)
+        updateEnabled("hold", getNamedPart("HoldBtn"), state.canHold)
+        updateEnabled("bank", getNamedPart("BankBtn"), state.canBank)
+        updateEnabled("disenchant", getNamedPart("DisenchantBtn"), state.canDisenchant)
+        updateEnabled("award", getNamedPart("AwardBtn"), state.canAward)
+        updateText("reserveList", getNamedPart("ReserveListBtn"), state.reserveListText)
+        updateEnabled("reserveList", getNamedPart("ReserveListBtn"), state.canReserveList)
+        updateEnabled("roll", getNamedPart("RollBtn"), state.canRoll)
+        updateEnabled("clear", getNamedPart("ClearBtn"), state.canClear)
         updateItemState(state.canChangeItem)
-        updateGlow("sr", _G[frameName .. "SRBtn"], state.glowSR, 0.20, 0.60, 1.00, "buttonOverlay")
+        updateGlow("sr", getNamedPart("SRBtn"), state.glowSR, 0.20, 0.60, 1.00, "buttonOverlay")
+
+        updateTooltip("config", getNamedPart("ConfigBtn"), L.BtnConfigure, state.configTooltip)
+        updateTooltip("selectItem", getNamedPart("SelectItemBtn"), state.selectItemText, state.selectItemTooltip)
+        updateTooltip("spamLoot", getNamedPart("SpamLootBtn"), state.spamLootText, state.spamLootTooltip)
+        updateTooltip("ms", getNamedPart("MSBtn"), L.BtnMS, state.msTooltip)
+        updateTooltip("os", getNamedPart("OSBtn"), L.BtnOS, state.osTooltip)
+        updateTooltip("sr", getNamedPart("SRBtn"), L.BtnSR, state.srTooltip)
+        updateTooltip("free", getNamedPart("FreeBtn"), L.BtnFree, state.freeTooltip)
+        updateTooltip("countdown", getNamedPart("CountdownBtn"), state.countdownText, state.countdownTooltip)
+        updateTooltip("award", getNamedPart("AwardBtn"), state.awardText, state.awardTooltip)
+        updateTooltip("roll", getNamedPart("RollBtn"), L.BtnRoll, state.rollTooltip)
+        updateTooltip("clear", getNamedPart("ClearBtn"), L.BtnClear, state.clearTooltip)
+        updateTooltip("hold", getNamedPart("HoldBtn"), L.BtnHold, state.holdTooltip)
+        updateTooltip("bank", getNamedPart("BankBtn"), L.BtnBank, state.bankTooltip)
+        updateTooltip("disenchant", getNamedPart("DisenchantBtn"), L.BtnDisenchant, state.disenchantTooltip)
+        updateTooltip("reserveList", getNamedPart("ReserveListBtn"), state.reserveListText, state.reserveListTooltip)
+        updateTooltip("lootCounter", getNamedPart("LootCounterBtn"), L.BtnLootCounter, state.lootCounterTooltip)
     end
 
     local function refreshDropDowns(force)
@@ -1837,8 +1986,12 @@ do
 
     -- ----- Public methods ----- --
 
-    function module:Refresh()
+    function module:RefreshUI()
         UI.Refresh()
+    end
+
+    function module:Refresh()
+        return self:RefreshUI()
     end
 
     function module:GetFlowState()
@@ -1854,13 +2007,14 @@ do
         if not frame then
             return false
         end
-        frameName = frameName or frame:GetName()
+        UI.FrameName = UI.FrameName or (frame.GetName and frame:GetName()) or UI.FrameName
+        local frameName = getFrameName() or frame:GetName()
         if not frameName or frameName ~= frame:GetName() then
             return false
         end
 
-        local currentItemLink = _G[frameName .. "Name"]
-        local currentItemBtn = _G[frameName .. "ItemBtn"]
+        local currentItemLink = getNamedPart("Name")
+        local currentItemBtn = getNamedPart("ItemBtn")
         if not (currentItemLink and currentItemBtn) then
             return false
         end
@@ -1881,13 +2035,14 @@ do
         if not frame then
             return false
         end
-        frameName = frameName or frame:GetName()
+        UI.FrameName = UI.FrameName or (frame.GetName and frame:GetName()) or UI.FrameName
+        local frameName = getFrameName() or frame:GetName()
         if not frameName or frameName ~= frame:GetName() then
             return false
         end
 
-        local currentItemLink = _G[frameName .. "Name"]
-        local currentItemBtn = _G[frameName .. "ItemBtn"]
+        local currentItemLink = getNamedPart("Name")
+        local currentItemBtn = getNamedPart("ItemBtn")
         if not (currentItemLink and currentItemBtn) then
             return false
         end
@@ -1899,7 +2054,7 @@ do
 
         local mf = module.frame
         if mf and frameName == mf:GetName() then
-            local itemCountBox = _G[frameName .. "ItemCount"]
+            local itemCountBox = getNamedPart("ItemCount")
             if itemCountBox then
                 Frames.ResetEditBox(itemCountBox, focusItemCount and true or false)
             end
@@ -1918,15 +2073,15 @@ do
 
     -- OnLoad frame:
     function module:OnLoad(frame)
-        frameName = Frames.InitModuleFrame(module, frame, {
+        UI.FrameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnHide = function()
                 if selectionFrame then
                     selectionFrame:Hide()
                 end
             end,
-        })
-        if not frameName then
+        }) or UI.FrameName
+        if not UI.FrameName then
             return
         end
         UI.Loaded = true
@@ -1947,7 +2102,7 @@ do
 
     local function OnLoadFrame(frame)
         module:OnLoad(frame)
-        return frameName
+        return UI.FrameName
     end
 
     UIScaffold.DefineModuleUi({
@@ -2062,7 +2217,10 @@ do
             end
 
             addon:Announce(message)
-            _G[frameName .. "ItemCount"]:ClearFocus()
+            local itemCountBox = getNamedPart("ItemCount")
+            if itemCountBox then
+                itemCountBox:ClearFocus()
+            end
             local session = Rolls:GetRollSession()
             if session and tonumber(session.lootNid) then
                 lootState.currentRollItem = session.lootNid
@@ -2181,33 +2339,37 @@ do
         if UI.Localized then
             return
         end
+        local frameName = getFrameName()
         if not frameName then
             return
         end
-        _G[frameName .. "ConfigBtn"]:SetText(L.BtnConfigure)
-        _G[frameName .. "SelectItemBtn"]:SetText(L.BtnSelectItem)
-        _G[frameName .. "SpamLootBtn"]:SetText(L.BtnSpamLoot)
-        _G[frameName .. "MSBtn"]:SetText(L.BtnMS)
-        _G[frameName .. "OSBtn"]:SetText(L.BtnOS)
-        _G[frameName .. "SRBtn"]:SetText(L.BtnSR)
-        _G[frameName .. "FreeBtn"]:SetText(L.BtnFree)
-        _G[frameName .. "CountdownBtn"]:SetText(L.BtnCountdown)
-        _G[frameName .. "AwardBtn"]:SetText(L.BtnAward)
-        _G[frameName .. "RollBtn"]:SetText(L.BtnRoll)
-        _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
-        _G[frameName .. "HoldBtn"]:SetText(L.BtnHold)
-        _G[frameName .. "BankBtn"]:SetText(L.BtnBank)
-        _G[frameName .. "DisenchantBtn"]:SetText(L.BtnDisenchant)
-        _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
-        _G[frameName .. "RollsHeaderPlayer"]:SetText(L.StrPlayer)
-        _G[frameName .. "RollsHeaderInfo"]:SetText(L.StrInfo)
-        _G[frameName .. "RollsHeaderCounter"]:SetText(L.StrCounter)
-        _G[frameName .. "RollsHeaderRoll"]:SetText(L.StrRolls)
-        _G[frameName .. "ReserveListBtn"]:SetText(L.BtnInsertList)
-        _G[frameName .. "LootCounterBtn"]:SetText(L.BtnLootCounter)
+        getNamedPart("ConfigBtn"):SetText(L.BtnConfigure)
+        getNamedPart("SelectItemBtn"):SetText(L.BtnSelectItem)
+        getNamedPart("SpamLootBtn"):SetText(L.BtnSpamLoot)
+        getNamedPart("MSBtn"):SetText(L.BtnMS)
+        getNamedPart("OSBtn"):SetText(L.BtnOS)
+        getNamedPart("SRBtn"):SetText(L.BtnSR)
+        getNamedPart("FreeBtn"):SetText(L.BtnFree)
+        getNamedPart("CountdownBtn"):SetText(L.BtnCountdown)
+        getNamedPart("AwardBtn"):SetText(L.BtnAward)
+        getNamedPart("RollBtn"):SetText(L.BtnRoll)
+        getNamedPart("ClearBtn"):SetText(L.BtnClear)
+        getNamedPart("HoldBtn"):SetText(L.BtnHold)
+        getNamedPart("BankBtn"):SetText(L.BtnBank)
+        getNamedPart("DisenchantBtn"):SetText(L.BtnDisenchant)
+        getNamedPart("Name"):SetText(L.StrNoItemSelected)
+        if getNamedPart("Status") then
+            getNamedPart("Status"):SetText(L.StrMasterStatusIdle)
+        end
+        getNamedPart("RollsHeaderPlayer"):SetText(L.StrPlayer)
+        getNamedPart("RollsHeaderInfo"):SetText(L.StrInfo)
+        getNamedPart("RollsHeaderCounter"):SetText(L.StrCounter)
+        getNamedPart("RollsHeaderRoll"):SetText(L.StrRolls)
+        getNamedPart("ReserveListBtn"):SetText(L.BtnInsertList)
+        getNamedPart("LootCounterBtn"):SetText(L.BtnLootCounter)
         Frames.SetFrameTitle(frameName, MASTER_LOOTER)
 
-        local itemCountBox = _G[frameName .. "ItemCount"]
+        local itemCountBox = getNamedPart("ItemCount")
         if itemCountBox and not itemCountBox._krtItemCountHooked then
             itemCountBox._krtItemCountHooked = true
             itemCountBox:SetScript("OnTextChanged", function(self, isUserInput)
@@ -2238,9 +2400,9 @@ do
                 dropDownData[i] = {}
             end
         end
-        dropDownFrameHolder = _G[frameName .. "HoldDropDown"]
-        dropDownFrameBanker = _G[frameName .. "BankDropDown"]
-        dropDownFrameDisenchanter = _G[frameName .. "DisenchantDropDown"]
+        dropDownFrameHolder = getNamedPart("HoldDropDown")
+        dropDownFrameBanker = getNamedPart("BankDropDown")
+        dropDownFrameDisenchanter = getNamedPart("DisenchantDropDown")
         prepareDropDowns()
         UIDropDownMenu_Initialize(dropDownFrameHolder, initializeDropDowns)
         UIDropDownMenu_Initialize(dropDownFrameBanker, initializeDropDowns)
@@ -2325,6 +2487,10 @@ do
     end
 
     local function ensureRollRow(i, scrollChild)
+        local frameName = getFrameName()
+        if not frameName then
+            return nil
+        end
         local btnName = frameName .. "PlayerBtn" .. i
         local btn = rollRows[i]
         if not btn then
@@ -2343,11 +2509,12 @@ do
     end
 
     local function renderRollRows(model)
+        local frameName = getFrameName()
         if not frameName then
             return
         end
-        local scrollFrame = _G[frameName .. "ScrollFrame"]
-        local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
+        local scrollFrame = getNamedPart("ScrollFrame")
+        local scrollChild = getNamedPart("ScrollFrameScrollChild")
         if not (scrollFrame and scrollChild) then
             return
         end
@@ -2427,9 +2594,11 @@ do
     end
     -- Refreshes the UI once (event-driven; coalesced via module:RequestRefresh()).
     function UI.Refresh()
-        UI.Localize()
+        if not UI.Localized then
+            UI.Localize()
+        end
         local currentFlowState = syncFlowState()
-        local itemCountBox = frameName and _G[frameName .. "ItemCount"] or nil
+        local itemCountBox = getNamedPart("ItemCount")
         updateItemCountFromBox(itemCountBox)
 
         if dropDownDirty then
@@ -2480,11 +2649,75 @@ do
         local canAwardSelection = (not pickMode) or msCount > 0
         local canStartSR = lootState.lootCount >= 1 and hasItemReserves
         local isTieReroll = shouldUseTieReroll(rollModel)
+        local statusText = buildMasterStatusText(currentFlowState, rollModel, hasItem, displayedWinner)
+        local selectedItemCount = tonumber(lootState.selectedItemCount) or 1
+        local awardTarget = displayedWinner or getCurrentTradeWinner() or getCurrentMultiAwardWinner()
+        local tooltipState = {}
         if rollResolution.requiresManualResolution and pickMode then
             canAwardSelection = msCount >= (tonumber(rollModel.requiredWinnerCount) or 1)
         end
+        if selectedItemCount < 1 then
+            selectedItemCount = 1
+        end
+
+        local function buildRollTooltip(label, needsReserves)
+            if needsReserves and not hasItemReserves then
+                return L.TipMasterSRUnavailable
+            end
+            if selectedItemCount > 1 then
+                return L.TipMasterRollModeMultiple:format(label, selectedItemCount)
+            end
+            return L.TipMasterRollMode:format(label)
+        end
+
+        tooltipState.config = L.TipMasterConfig
+        tooltipState.selectItem = lootState.fromInventory and L.TipMasterRemoveItem or L.TipMasterSelectItem
+        tooltipState.spamLoot = lootState.fromInventory and L.TipMasterReadyCheck or L.TipMasterSpamLoot
+        tooltipState.ms = buildRollTooltip(L.BtnMS, false)
+        tooltipState.os = buildRollTooltip(L.BtnOS, false)
+        tooltipState.sr = buildRollTooltip(L.BtnSR, true)
+        tooltipState.free = buildRollTooltip(L.BtnFree, false)
+        tooltipState.countdown = (countdownRun or lootState.rollStarted) and L.TipMasterCountdown or L.TipMasterCountdownInactive
+
+        if isTieReroll then
+            tooltipState.award = L.TipMasterReroll
+        elseif lootState.fromInventory then
+            if (tonumber(rollModel.requiredWinnerCount) or 1) > 1 then
+                if msCount >= (tonumber(rollModel.requiredWinnerCount) or 1) then
+                    tooltipState.award = L.TipMasterTradeMultiple:format(msCount)
+                else
+                    tooltipState.award = L.TipMasterPickWinner
+                end
+            elseif awardTarget and awardTarget ~= "" then
+                tooltipState.award = L.TipMasterTrade:format(awardTarget)
+            else
+                tooltipState.award = L.TipMasterPickWinner
+            end
+        else
+            if (tonumber(rollModel.requiredWinnerCount) or 1) > 1 then
+                if msCount >= (tonumber(rollModel.requiredWinnerCount) or 1) then
+                    tooltipState.award = L.TipMasterAwardMultiple:format(msCount)
+                else
+                    tooltipState.award = L.TipMasterPickWinner
+                end
+            elseif awardTarget and awardTarget ~= "" then
+                tooltipState.award = L.TipMasterAward:format(awardTarget)
+            else
+                tooltipState.award = L.TipMasterPickWinner
+            end
+        end
+
+        tooltipState.roll = L.TipMasterRollSelf
+        tooltipState.clear = L.TipMasterClear
+        tooltipState.hold = lootState.holder and L.TipMasterHold:format(lootState.holder) or L.TipMasterHoldUnset
+        tooltipState.bank = lootState.banker and L.TipMasterBank:format(lootState.banker) or L.TipMasterBankUnset
+        tooltipState.disenchant = lootState.disenchanter and L.TipMasterDisenchant:format(lootState.disenchanter) or L.TipMasterDisenchantUnset
+        tooltipState.reserveList = hasReserves and L.TipMasterReserveList or L.TipMasterReserveImport
+        tooltipState.lootCounter = L.TipMasterLootCounter
+
         flagButtonsOnChange("msCount", msCount)
         flagButtonsOnChange("manualResolution", rollResolution.requiresManualResolution == true)
+        flagButtonsOnChange("statusText", statusText)
 
         if dirtyFlags.buttons then
             updateMasterButtonsIfChanged({
@@ -2492,6 +2725,23 @@ do
                 awardText = isTieReroll and L.BtnReroll or (lootState.fromInventory and TRADE or L.BtnAward),
                 selectItemText = lootState.fromInventory and L.BtnRemoveItem or L.BtnSelectItem,
                 spamLootText = lootState.fromInventory and READY_CHECK or L.BtnSpamLoot,
+                statusText = statusText,
+                configTooltip = tooltipState.config,
+                selectItemTooltip = tooltipState.selectItem,
+                spamLootTooltip = tooltipState.spamLoot,
+                msTooltip = tooltipState.ms,
+                osTooltip = tooltipState.os,
+                srTooltip = tooltipState.sr,
+                freeTooltip = tooltipState.free,
+                countdownTooltip = tooltipState.countdown,
+                awardTooltip = tooltipState.award,
+                rollTooltip = tooltipState.roll,
+                clearTooltip = tooltipState.clear,
+                holdTooltip = tooltipState.hold,
+                bankTooltip = tooltipState.bank,
+                disenchantTooltip = tooltipState.disenchant,
+                reserveListTooltip = tooltipState.reserveList,
+                lootCounterTooltip = tooltipState.lootCounter,
                 canSelectItem = (lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRun,
                 canChangeItem = (currentFlowState ~= FLOW_STATES.COUNTDOWN),
                 canSpamLoot = lootState.lootCount >= 1,
@@ -2691,6 +2941,10 @@ do
     end
 
     local function ensureSelectionButton(index)
+        local frameName = getFrameName()
+        if not frameName then
+            return nil
+        end
         local btn = selectionButtons[index]
         if btn then
             return btn
@@ -2821,7 +3075,7 @@ do
         end
 
         -- Clear count:
-        local itemCountBox = frameName and _G[frameName .. "ItemCount"] or nil
+        local itemCountBox = getNamedPart("ItemCount")
         if itemCountBox then
             Frames.ResetEditBox(itemCountBox, true)
         end
