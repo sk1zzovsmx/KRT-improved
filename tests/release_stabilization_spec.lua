@@ -14,9 +14,14 @@ local function makeFrame(shown, name)
         _name = name,
         _width = 320,
         _height = 240,
+        _enabled = true,
     }
 
     function frame:IsShown()
+        return self._shown
+    end
+
+    function frame:IsVisible()
         return self._shown
     end
 
@@ -60,6 +65,34 @@ local function makeFrame(shown, name)
 
     function frame:EnableKeyboard() end
 
+    function frame:EnableMouse(enabled)
+        self._mouseEnabled = enabled ~= false
+    end
+
+    function frame:IsEnabled()
+        return self._enabled ~= false
+    end
+
+    function frame:Enable()
+        self._enabled = true
+    end
+
+    function frame:Disable()
+        self._enabled = false
+    end
+
+    function frame:RegisterForClicks() end
+
+    function frame:RegisterForDrag() end
+
+    function frame:SetScript(scriptType, callback)
+        self[scriptType] = callback
+    end
+
+    function frame:HookScript(scriptType, callback)
+        self["Hooked" .. tostring(scriptType)] = callback
+    end
+
     function frame:ClearFocus()
         self._focused = false
     end
@@ -70,6 +103,10 @@ local function makeFrame(shown, name)
 
     function frame:SetText(text)
         self.text = text
+    end
+
+    function frame:SetNumber(value)
+        self.text = tostring(value)
     end
 
     function frame:GetText()
@@ -126,6 +163,32 @@ local function makeFrame(shown, name)
 
     function frame:UnlockHighlight()
         self._highlighted = false
+    end
+
+    function frame:SetVertexColor(r, g, b)
+        self._vertexColor = { r, g, b }
+    end
+
+    function frame:SetNormalTexture(texture)
+        local normalTexture = self._normalTexture
+        if not normalTexture then
+            normalTexture = {
+                texture = nil,
+                desaturated = false,
+                SetDesaturated = function(tex, value)
+                    tex.desaturated = value and true or false
+                end,
+            }
+            self._normalTexture = normalTexture
+        end
+        normalTexture.texture = texture
+    end
+
+    function frame:GetNormalTexture()
+        if not self._normalTexture then
+            self:SetNormalTexture(nil)
+        end
+        return self._normalTexture
     end
 
     return frame
@@ -366,6 +429,9 @@ local function newHarness()
         GetRollSession = function()
             return nil
         end,
+        RollStatus = function()
+            return nil, false, false, false
+        end,
         SyncSessionState = function() end,
     }
 
@@ -484,6 +550,35 @@ local function newHarness()
         Call = function() end,
     }
 
+    addon.UIPrimitives.EnableDisable = function(frame, enabled)
+        if frame then
+            frame._enabled = enabled and true or false
+        end
+    end
+
+    addon.UIPrimitives.SetButtonGlow = function(frame, enabled)
+        if frame then
+            frame._glow = enabled and true or false
+        end
+    end
+
+    addon.UIPrimitives.ShowHide = function(frame, shown)
+        if not frame then
+            return
+        end
+        if shown then
+            frame:Show()
+        else
+            frame:Hide()
+        end
+    end
+
+    addon.UIRowVisuals = {
+        EnsureRowVisuals = function() end,
+        SetRowSelected = function() end,
+        SetRowFocused = function() end,
+    }
+
     addon.Comms = {
         Sync = function() end,
         Whisper = function() end,
@@ -552,6 +647,11 @@ local function newHarness()
             }
         end,
         SetTooltip = function() end,
+        SetEditBoxValue = function(editBox, value)
+            if editBox and editBox.SetText then
+                editBox:SetText(tostring(value or ""))
+            end
+        end,
         ResetEditBox = function(editBox)
             if editBox and editBox.SetText then
                 editBox:SetText("")
@@ -820,6 +920,30 @@ local function newHarness()
     _G.StaticPopup_Hide = function() end
 
     _G.CloseDropDownMenus = function() end
+
+    _G.UIDropDownMenu_CreateInfo = function()
+        return {}
+    end
+
+    _G.UIDropDownMenu_AddButton = function() end
+
+    _G.UIDropDownMenu_Initialize = function(frame, initFunc)
+        if frame then
+            frame._initialize = initFunc
+        end
+    end
+
+    _G.UIDropDownMenu_SetText = function(frame, value)
+        if frame then
+            frame._dropdownText = value
+        end
+    end
+
+    _G.UIDropDownMenu_SetSelectedValue = function(frame, value)
+        if frame then
+            frame._selectedValue = value
+        end
+    end
 
     _G.EasyMenu = function() end
 
@@ -1667,6 +1791,114 @@ test("master countdown starts after announcing rolls with service-owned session 
     Master:BtnCountdown(nil, "LeftButton")
 
     assertEqual(h.timerCount(), 2, "expected countdown click to schedule ticker and end timer")
+end)
+
+test("master assignment buttons stay disabled until a target is selected", function()
+    local h = newHarness()
+
+    h.addon.Services.Loot = {
+        GetItem = function()
+            return nil
+        end,
+        ItemExists = function()
+            return false
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Controllers/Master.lua")
+
+    local Master = h.addon.Controllers.Master
+    local frame = h.makeFrame(true, "KRTMaster")
+    local suffixes = {
+        "ConfigBtn",
+        "SelectItemBtn",
+        "SpamLootBtn",
+        "MSBtn",
+        "OSBtn",
+        "SRBtn",
+        "FreeBtn",
+        "CountdownBtn",
+        "AwardBtn",
+        "RollBtn",
+        "ClearBtn",
+        "HoldBtn",
+        "BankBtn",
+        "DisenchantBtn",
+        "Name",
+        "RollsHeaderPlayer",
+        "RollsHeaderInfo",
+        "RollsHeaderCounter",
+        "RollsHeaderRoll",
+        "ReserveListBtn",
+        "LootCounterBtn",
+        "ItemCount",
+        "HoldDropDown",
+        "BankDropDown",
+        "DisenchantDropDown",
+        "ScrollFrame",
+        "ScrollFrameScrollChild",
+        "ItemBtn",
+    }
+
+    _G.KRTMaster = frame
+    for i = 1, #suffixes do
+        local name = "KRTMaster" .. suffixes[i]
+        _G[name] = h.makeFrame(true, name)
+    end
+    _G.KRTMasterHoldDropDownButton = h.makeFrame(true, "KRTMasterHoldDropDownButton")
+    _G.KRTMasterBankDropDownButton = h.makeFrame(true, "KRTMasterBankDropDownButton")
+    _G.KRTMasterDisenchantDropDownButton = h.makeFrame(true, "KRTMasterDisenchantDropDownButton")
+
+    Master.RequestRefresh = function() end
+    Master:OnLoad(frame)
+
+    h.feature.lootState.lootCount = 1
+    h.feature.lootState.selectedItemCount = 1
+    h.feature.lootState.fromInventory = false
+    h.feature.lootState.holder = nil
+    h.feature.lootState.banker = nil
+    h.feature.lootState.disenchanter = nil
+
+    Master:Refresh()
+
+    assertEqual(_G.KRTMasterHoldBtn._enabled, false, "expected Hold to disable when no holder is selected")
+    assertEqual(_G.KRTMasterBankBtn._enabled, false, "expected Bank to disable when no banker is selected")
+    assertEqual(_G.KRTMasterDisenchantBtn._enabled, false, "expected Disenchant to disable when no disenchanter is selected")
+
+    h.feature.lootState.holder = "Alice"
+    h.feature.lootState.banker = "Bob"
+    h.feature.lootState.disenchanter = nil
+
+    Master:Refresh()
+
+    assertEqual(_G.KRTMasterHoldBtn._enabled, true, "expected Hold to enable when a holder is selected")
+    assertEqual(_G.KRTMasterBankBtn._enabled, true, "expected Bank to enable when a banker is selected")
+    assertEqual(_G.KRTMasterDisenchantBtn._enabled, false, "expected Disenchant to stay disabled without a target")
 end)
 
 test("manual exclusion blocks candidate eligibility and roll intake", function()

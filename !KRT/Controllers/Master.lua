@@ -1138,6 +1138,7 @@ do
         local glows = lastUIState.glows
 
         local function updateEnabled(key, frame, enabled)
+            enabled = enabled and true or false
             if buttons[key] ~= enabled then
                 UIPrimitives.EnableDisable(frame, enabled)
                 buttons[key] = enabled
