@@ -127,6 +127,7 @@ do
         buttons = {},
         texts = {},
         rollStatus = {},
+        glows = {},
     }
     local dirtyFlags = {
         itemCount = true,
@@ -1076,11 +1077,25 @@ do
     local function updateMasterButtonsIfChanged(state)
         local buttons = lastUIState.buttons
         local texts = lastUIState.texts
+        local glows = lastUIState.glows
 
         local function updateEnabled(key, frame, enabled)
             if buttons[key] ~= enabled then
                 UIPrimitives.EnableDisable(frame, enabled)
                 buttons[key] = enabled
+            end
+        end
+
+        local function updateGlow(key, frame, enabled, r, g, b, style)
+            local token
+            if enabled then
+                token = "1|" .. tostring(style or "")
+            else
+                token = "0"
+            end
+            if glows[key] ~= token then
+                UIPrimitives.SetButtonGlow(frame, enabled, r, g, b, style)
+                glows[key] = token
             end
         end
 
@@ -1124,6 +1139,7 @@ do
         updateEnabled("roll", _G[frameName .. "RollBtn"], state.canRoll)
         updateEnabled("clear", _G[frameName .. "ClearBtn"], state.canClear)
         updateItemState(state.canChangeItem)
+        updateGlow("sr", _G[frameName .. "SRBtn"], state.glowSR, 0.20, 0.60, 1.00, "buttonOverlay")
     end
 
     local function refreshDropDowns(force)
@@ -2375,6 +2391,7 @@ do
         local pickMode = rollModel.pickMode == true
         local msCount = pickMode and (tonumber(rollModel.msCount) or 0) or 0
         local canAwardSelection = (not pickMode) or msCount > 0
+        local canStartSR = lootState.lootCount >= 1 and hasItemReserves
         local isTieReroll = shouldUseTieReroll(rollModel)
         if rollResolution.requiresManualResolution and pickMode then
             canAwardSelection = msCount >= (tonumber(rollModel.requiredWinnerCount) or 1)
@@ -2392,7 +2409,7 @@ do
                 canChangeItem = (currentFlowState ~= FLOW_STATES.COUNTDOWN),
                 canSpamLoot = lootState.lootCount >= 1,
                 canStartRolls = lootState.lootCount >= 1,
-                canStartSR = lootState.lootCount >= 1 and hasItemReserves,
+                canStartSR = canStartSR,
                 canCountdown = lootState.lootCount >= 1 and hasItem and (lootState.rollStarted or countdownRun),
                 canHold = lootState.lootCount >= 1 and lootState.holder,
                 canBank = lootState.lootCount >= 1 and lootState.banker,
@@ -2402,6 +2419,7 @@ do
                 canReserveList = true,
                 canRoll = record and canRoll and rolled == false and countdownRun,
                 canClear = lootState.rollsCount >= 1,
+                glowSR = canStartSR,
             })
             dirtyFlags.buttons = false
         end

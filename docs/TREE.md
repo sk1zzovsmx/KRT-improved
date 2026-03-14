@@ -107,7 +107,8 @@
 |       |   \\-- ...
 |       \\-- s-working
 |           \\-- ...
-|-- .codex-temp
+|-- .codex
+|   \\-- config.toml
 |-- .devcontainer
 |   \\-- devcontainer.json
 |-- .githooks
@@ -135,7 +136,6 @@
 |   |   \\-- DBManager.Mock.lua
 |   \\-- release_stabilization_spec.lua
 |-- tools
-|   |-- __pycache__
 |   |-- agent-skills.manifest.json
 |   |-- check-layering.ps1
 |   |-- check-lua-syntax.ps1

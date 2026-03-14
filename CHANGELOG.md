@@ -4,6 +4,88 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **UI:** Button glow now auto-scales by target button size in
+  `Modules/UI/Effects.lua` (dynamic thickness/scale and proc lines/frequency),
+  and recomputes on `OnSizeChanged` for responsive fitting.
+- **UI:** Removed `Award/Trade` glow wiring from `Controllers/Master.lua`; the
+  master frame no longer manages any glow path for `Award`.
+- **Refactor:** Rewrote `Modules/UI/Effects.lua` into a stock single-module
+  implementation with direct method-driven glow rendering (`ACShine`, `Pixel`,
+  `Proc`, `buttonOverlay`), removing profile-name plumbing and defensive
+  compatibility branches.
+- **UI:** Removed glow profile-name plumbing from button glow APIs; methods now
+  resolve by explicit glow type only (for example `ACShine`, `Pixel`, `Proc`,
+  `buttonOverlay`) and no longer use names like `CombatPulse`.
+- **UI:** Glow effects are now single-choice in `Modules/UI/Effects.lua`: only
+  one method can be active at a time (`ACShine`, `Pixel`, `Proc`, or
+  `buttonOverlay`), with no combinable style mixing.
+- **UI:** Removed explicit `GLOW_PROFILES` presets (`SoftPulse` and
+  `CombatPulse`) from `Modules/UI/Effects.lua`; glow tuning now resolves from
+  the single default baseline in `DEFAULT_PROFILE_PARTS`.
+- **UI:** Added explicit 3.3.5a-safe glow type support in
+  `Modules/UI/Effects.lua` for `ACShine`, `Pixel`, `Proc`, and
+  `buttonOverlay`, with default subglow settings aligned to the provided
+  baseline (`duration=1`, `frequency=0.25`, `length=10`, `lines=8`,
+  `scale=1`, `thickness=1`, `x/y offset=0`, white color).
+- **UI:** Reduced default glow intensity in `Modules/UI/Effects.lua` (alpha,
+  pulse strength, border thickness, and proc density/frequency) for a lighter
+  visual footprint.
+- **UI:** Added explicit glow/border method registry in
+  `Modules/UI/Effects.lua` with canonical styles (`none`, `fill`, `ring`,
+  `borderOnly`, `proc`, `button`) and aliases (`border`, `outline`, `pixel`,
+  `autocast`, `shiny`, etc.).
+- **UI:** Disabled glow on the Master `Award/Trade` button; only `SR` keeps
+  contextual glow highlighting.
+- **UI:** Added a new `button` glow style in `Modules/UI/Effects.lua` using
+  `UI-ActionButton-Border` with pulse animation and button-size scaling; Master
+  `SR` now uses this style for a sharper, more visible border glow.
+- **Refactor:** Moved button glow/proc rendering internals from `Visuals.lua`
+  into `Modules/UI/Effects.lua`; `UIPrimitives.SetButtonGlow` is now a thin
+  bridge, keeping primitives and effects concerns separated.
+- **Refactor:** Replaced SR proc glow backend with a local `Visuals.lua`
+  LCG-like autocast/proc renderer (no full LibCustomGlow dependency), tuned for
+  WoW 3.3.5a compatibility and precise button-bound animation.
+- **UI:** Tuned `SR` `proc` glow to be tighter to the button and much faster,
+  and switched to a local per-frame sparkle updater so animation remains smooth
+  and independent from global `AutoCastShine` timing.
+- **Bugfix:** FrameXML `proc` glow now creates a named `AutoCastShineTemplate`
+  frame per button, preventing `UIParent.lua` nil-name errors on 3.3.5a.
+- **UI:** `SR` button glow now supports a native FrameXML-style `proc` effect
+  (`AutoCastShineTemplate`) for a stronger, animated highlight similar to
+  WeakAuras proc glow behavior, while `Award/Trade` keeps the precise ring glow.
+- **UI:** Tightened Master button glow geometry to the exact button border
+  (`padding=0`) with profile-driven dynamic edge thickness, and increased pulse
+  intensity for higher visibility on both `SR` (blue) and `Award/Trade`.
+- **Bugfix:** Master button glow animations now use a Wrath-compatible alpha
+  setup on 3.3.5a clients that do not expose `SetFromAlpha`/`SetToAlpha`.
+- **UI:** Added pulsing glow cues on Master Loot controls: `SR` now glows when
+  the selected item has reserves, and `Award/Trade` glows when an award can be
+  executed.
+- **UI:** Refined Master button glow visuals to a hybrid style (subtle
+  rectangular frame plus shiny ring pulse) while preserving button-sized
+  framing.
+- **UI:** Removed the extra outer square from Master button glow visuals to
+  avoid double-border appearance while keeping the shiny pulse effect.
+- **UI:** Removed the top glossy `shine` strip from Master button glows to
+  eliminate the visible white line above highlighted buttons.
+- **UI:** Master glow styles now support `ring` or `fill` mode; `SR` uses ring
+  glow, while `Award/Trade` uses fill-only glow to avoid oversized circular
+  aura on wide buttons.
+- **UI:** Restored ring glow on `Award/Trade` and adjusted ring sizing to scale
+  by button width/height ratio, keeping wide-button highlights visible without
+  oversized circular halos.
+- **UI:** Ring glow is now anchored to button bounds (with a small fixed
+  padding) so the aura follows each button size directly, including wide
+  controls like `Award/Trade`.
+- **UI:** Ring glow now selects square vs wide highlight textures by button
+  aspect ratio, improving `Award/Trade` visual fit while keeping `SR` glow
+  style unchanged.
+- **UI:** Replaced texture-driven ring glow with a dynamic 4-edge geometric
+  ring that is anchored to button bounds, so wide buttons (for example
+  `Award/Trade`) keep a consistent border glow shape.
+- **UI:** Added FrameXML glow profiles `SoftPulse` and `CombatPulse` for
+  animation-group tuning (alpha ranges and pulse cadence). Master now uses
+  `SoftPulse` on `SR` and `CombatPulse` on `Award/Trade`.
 - **Tooling:** Added `tools/dev-stack-status.ps1` as a single readiness check
   for vendored skills, local Codex installs, Mechanic, and the repo-local MCP
   server.
