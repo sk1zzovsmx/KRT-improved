@@ -30,6 +30,8 @@ local UnitIsGroupAssistant = feature.UnitIsGroupAssistant
 
 local InternalEvents = Events.Internal
 
+local _G = _G
+
 local rollTypes = feature.rollTypes
 local RAID_TARGET_MARKERS = feature.RAID_TARGET_MARKERS
 local PENDING_AWARD_TTL_SECONDS = C.PENDING_AWARD_TTL_SECONDS
@@ -42,10 +44,21 @@ if type(UIFacade.Call) ~= "function" then
     end
 end
 
-local lootState = feature.lootState
-local itemInfo = feature.itemInfo
+local lootState = feature.lootState or {}
+feature.lootState = lootState
+lootState.lootCount = tonumber(lootState.lootCount) or 0
+lootState.rollsCount = tonumber(lootState.rollsCount) or 0
+lootState.selectedItemCount = tonumber(lootState.selectedItemCount) or 1
+if lootState.selectedItemCount < 1 then
+    lootState.selectedItemCount = 1
+end
+if lootState.fromInventory == nil then
+    lootState.fromInventory = false
+end
 
-local _G = _G
+local itemInfo = feature.itemInfo or {}
+feature.itemInfo = itemInfo
+
 if not UnitIsGroupLeader then
     UnitIsGroupLeader = _G.UnitIsGroupLeader
 end
@@ -94,6 +107,26 @@ local function itemIsSoulbound(bag, slot)
     return loot and loot.ItemIsSoulbound and loot.ItemIsSoulbound(bag, slot) or false
 end
 
+local function getCurrentItemCount()
+    local loot = Loot
+    if loot and loot.GetCurrentItemCount then
+        local count = tonumber(loot:GetCurrentItemCount())
+        if count and count > 0 then
+            return count
+        end
+    end
+
+    if lootState.fromInventory then
+        local count = tonumber(itemInfo.count) or tonumber(lootState.selectedItemCount) or 1
+        if count < 1 then
+            count = 1
+        end
+        return count
+    end
+
+    return 1
+end
+
 -- =========== Master Looter Frame Module  =========== --
 do
     addon.Controllers = addon.Controllers or {}
@@ -122,6 +155,7 @@ do
 
     local selectionFrame, updateSelectionFrame
     local rollRows = {}
+    local selectionButtons = {}
 
     local lastUIState = {
         buttons = {},
@@ -236,7 +270,7 @@ do
     end
 
     local function isSelectableRollRow(row)
-        return row and row.selectionAllowed == true
+        return row and row.selectionAllowed ~= false
     end
 
     local function getSelectedRollWinnersOrdered(rows)
@@ -247,7 +281,7 @@ do
 
         for i = 1, #rows do
             local row = rows[i]
-            if row and row.name and MultiSelect.MultiSelectIsSelected(ROLL_WINNERS_CTX, row.name) then
+            if row and row.name and isSelectableRollRow(row) and MultiSelect.MultiSelectIsSelected(ROLL_WINNERS_CTX, row.name) then
                 selected[#selected + 1] = {
                     name = row.name,
                     roll = tonumber(row.roll) or 0,
@@ -379,10 +413,46 @@ do
             reserveListBtn = Frames.Ref(frame, "ReserveListBtn"),
             lootCounterBtn = Frames.Ref(frame, "LootCounterBtn"),
             itemCountBox = Frames.Ref(frame, "ItemCount"),
+            itemBtn = Frames.Ref(frame, "ItemBtn"),
+            itemNameText = Frames.Ref(frame, "Name"),
             holdDropDown = Frames.Ref(frame, "HoldDropDown"),
             bankDropDown = Frames.Ref(frame, "BankDropDown"),
             disenchantDropDown = Frames.Ref(frame, "DisenchantDropDown"),
+            rollsHeaderPlayer = Frames.Ref(frame, "RollsHeaderPlayer"),
+            rollsHeaderInfo = Frames.Ref(frame, "RollsHeaderInfo"),
+            rollsHeaderCounter = Frames.Ref(frame, "RollsHeaderCounter"),
+            rollsHeaderRoll = Frames.Ref(frame, "RollsHeaderRoll"),
+            scrollFrame = Frames.Ref(frame, "ScrollFrame"),
+            scrollChild = Frames.Ref(frame, "ScrollFrameScrollChild"),
         }
+    end
+
+    local function initItemButtonScripts(refs)
+        local itemBtn = refs and refs.itemBtn or nil
+        if not itemBtn or itemBtn._krtMlInvDropInit then
+            return
+        end
+
+        itemBtn._krtMlInvDropInit = true
+        itemBtn:RegisterForClicks("AnyUp")
+        itemBtn:RegisterForDrag("LeftButton")
+
+        -- Blizz-like gesture support:
+        -- - Click while holding an item on the cursor
+        -- - Drag&drop (release) an item onto the button
+        local function tryAcceptFromCursor()
+            if CursorHasItem and CursorHasItem() then
+                module:TryAcceptInventoryItemFromCursor()
+            end
+        end
+
+        itemBtn:SetScript("OnClick", function()
+            tryAcceptFromCursor()
+        end)
+
+        itemBtn:SetScript("OnReceiveDrag", function()
+            tryAcceptFromCursor()
+        end)
     end
 
     local function bindMainControlScripts(frame, refs)
@@ -392,6 +462,8 @@ do
         if frame._krtBound then
             return
         end
+
+        initItemButtonScripts(refs)
 
         Frames.SafeSetScript(refs.configBtn, "OnClick", function()
             UIFacade:Call("Config", "Toggle")
@@ -459,15 +531,12 @@ do
     -- ============================================================================
     local function setItemCountValue(count, focus)
         local frame = getFrame()
+        local refs = module.refs
         if not frame then
             return
         end
         frameName = frameName or frame:GetName()
-        if not frameName or frameName ~= frame:GetName() then
-            return
-        end
-        local itemCountBox = _G[frameName .. "ItemCount"]
-        if not itemCountBox then
+        if not frameName or frameName ~= frame:GetName() or not refs or not refs.itemCountBox then
             return
         end
         count = tonumber(count) or 1
@@ -476,7 +545,7 @@ do
         end
         lootState.selectedItemCount = count
         updateRollSessionExpectedWinners()
-        Frames.SetEditBoxValue(itemCountBox, count, focus)
+        Frames.SetEditBoxValue(refs.itemCountBox, count, focus)
         lastUIState.itemCountText = tostring(count)
         dirtyFlags.itemCount = false
     end
@@ -1078,6 +1147,11 @@ do
         local buttons = lastUIState.buttons
         local texts = lastUIState.texts
         local glows = lastUIState.glows
+        local refs = module.refs
+
+        if not refs then
+            return
+        end
 
         local function updateEnabled(key, frame, enabled)
             if buttons[key] ~= enabled then
@@ -1100,7 +1174,7 @@ do
         end
 
         local function updateItemState(enabled)
-            local itemBtn = _G[frameName .. "ItemBtn"]
+            local itemBtn = refs.itemBtn
             if itemBtn and buttons.itemBtn ~= enabled then
                 UIPrimitives.EnableDisable(itemBtn, enabled)
                 local texture = itemBtn:GetNormalTexture()
@@ -1118,28 +1192,28 @@ do
             end
         end
 
-        updateText("countdown", _G[frameName .. "CountdownBtn"], state.countdownText)
-        updateText("award", _G[frameName .. "AwardBtn"], state.awardText)
-        updateText("selectItem", _G[frameName .. "SelectItemBtn"], state.selectItemText)
-        updateText("spamLoot", _G[frameName .. "SpamLootBtn"], state.spamLootText)
+        updateText("countdown", refs.countdownBtn, state.countdownText)
+        updateText("award", refs.awardBtn, state.awardText)
+        updateText("selectItem", refs.selectItemBtn, state.selectItemText)
+        updateText("spamLoot", refs.spamLootBtn, state.spamLootText)
 
-        updateEnabled("selectItem", _G[frameName .. "SelectItemBtn"], state.canSelectItem)
-        updateEnabled("spamLoot", _G[frameName .. "SpamLootBtn"], state.canSpamLoot)
-        updateEnabled("ms", _G[frameName .. "MSBtn"], state.canStartRolls)
-        updateEnabled("os", _G[frameName .. "OSBtn"], state.canStartRolls)
-        updateEnabled("sr", _G[frameName .. "SRBtn"], state.canStartSR)
-        updateEnabled("free", _G[frameName .. "FreeBtn"], state.canStartRolls)
-        updateEnabled("countdown", _G[frameName .. "CountdownBtn"], state.canCountdown)
-        updateEnabled("hold", _G[frameName .. "HoldBtn"], state.canHold)
-        updateEnabled("bank", _G[frameName .. "BankBtn"], state.canBank)
-        updateEnabled("disenchant", _G[frameName .. "DisenchantBtn"], state.canDisenchant)
-        updateEnabled("award", _G[frameName .. "AwardBtn"], state.canAward)
-        updateText("reserveList", _G[frameName .. "ReserveListBtn"], state.reserveListText)
-        updateEnabled("reserveList", _G[frameName .. "ReserveListBtn"], state.canReserveList)
-        updateEnabled("roll", _G[frameName .. "RollBtn"], state.canRoll)
-        updateEnabled("clear", _G[frameName .. "ClearBtn"], state.canClear)
+        updateEnabled("selectItem", refs.selectItemBtn, state.canSelectItem)
+        updateEnabled("spamLoot", refs.spamLootBtn, state.canSpamLoot)
+        updateEnabled("ms", refs.msBtn, state.canStartRolls)
+        updateEnabled("os", refs.osBtn, state.canStartRolls)
+        updateEnabled("sr", refs.srBtn, state.canStartSR)
+        updateEnabled("free", refs.freeBtn, state.canStartRolls)
+        updateEnabled("countdown", refs.countdownBtn, state.canCountdown)
+        updateEnabled("hold", refs.holdBtn, state.canHold)
+        updateEnabled("bank", refs.bankBtn, state.canBank)
+        updateEnabled("disenchant", refs.disenchantBtn, state.canDisenchant)
+        updateEnabled("award", refs.awardBtn, state.canAward)
+        updateText("reserveList", refs.reserveListBtn, state.reserveListText)
+        updateEnabled("reserveList", refs.reserveListBtn, state.canReserveList)
+        updateEnabled("roll", refs.rollBtn, state.canRoll)
+        updateEnabled("clear", refs.clearBtn, state.canClear)
         updateItemState(state.canChangeItem)
-        updateGlow("sr", _G[frameName .. "SRBtn"], state.glowSR, 0.20, 0.60, 1.00, "buttonOverlay")
+        updateGlow("sr", refs.srBtn, state.glowSR, 0.20, 0.60, 1.00, "buttonOverlay")
     end
 
     local function refreshDropDowns(force)
@@ -1424,6 +1498,24 @@ do
         return winners
     end
 
+    local function validateInventoryTradeSelection(target)
+        local selCount = MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0
+        local rollModel
+        local picked
+
+        if selCount <= 0 then
+            return false, "empty_selection"
+        end
+
+        rollModel = buildRollUiModel(true)
+        picked = getSelectedRollWinnersOrdered(rollModel and rollModel.rows or nil)
+        if #picked < target then
+            return false, "not_enough_selection", target, #picked
+        end
+
+        return true
+    end
+
     local function startMultiAwardSequence(itemLink, available, winners)
         setItemCountValue(#winners, false)
         local candidateSlots, candidateSlotMap = buildMultiAwardSlotCandidates(itemLink)
@@ -1459,7 +1551,7 @@ do
         if target < 1 then
             target = 1
         end
-        local available = tonumber(Loot:GetCurrentItemCount()) or 1
+        local available = getCurrentItemCount()
         if available < 1 then
             available = 1
         end
@@ -1657,6 +1749,19 @@ do
         addon:debug(Diag.D.LogMLAwardRequested:format(tostring(winnerName), tonumber(lootState.currentRollType) or -1, Rolls:HighestRoll(winnerName) or 0, tostring(itemLink)))
 
         if lootState.fromInventory == true then
+            local targetCount = tonumber(lootState.selectedItemCount) or 1
+            if targetCount > 1 then
+                local okSelection, errType, wantedCount, pickedCount = validateInventoryTradeSelection(targetCount)
+                if not okSelection then
+                    if errType == "not_enough_selection" then
+                        addon:warn(Diag.W.ErrMLMultiSelectNotEnough:format(wantedCount or 0, pickedCount or 0))
+                    else
+                        addon:warn(L.ErrNoWinnerSelected)
+                    end
+                    module:ResetItemCount()
+                    return false
+                end
+            end
             local result = tradeItem(itemLink, winnerName, lootState.currentRollType, Rolls:HighestRoll(winnerName))
             resetItemCountAndRefresh()
             return result
@@ -1756,6 +1861,7 @@ do
     end
 
     function module:SetCurrentItemView(itemName, itemLink, itemTexture, itemColor)
+        local refs = module.refs
         if not (itemName and itemLink and itemTexture and itemColor) then
             return false
         end
@@ -1769,8 +1875,8 @@ do
             return false
         end
 
-        local currentItemLink = _G[frameName .. "Name"]
-        local currentItemBtn = _G[frameName .. "ItemBtn"]
+        local currentItemLink = refs and refs.itemNameText or nil
+        local currentItemBtn = refs and refs.itemBtn or nil
         if not (currentItemLink and currentItemBtn) then
             return false
         end
@@ -1787,6 +1893,7 @@ do
     end
 
     function module:ClearCurrentItemView(focusItemCount)
+        local refs = module.refs
         local frame = getFrame()
         if not frame then
             return false
@@ -1796,8 +1903,8 @@ do
             return false
         end
 
-        local currentItemLink = _G[frameName .. "Name"]
-        local currentItemBtn = _G[frameName .. "ItemBtn"]
+        local currentItemLink = refs and refs.itemNameText or nil
+        local currentItemBtn = refs and refs.itemBtn or nil
         if not (currentItemLink and currentItemBtn) then
             return false
         end
@@ -1809,9 +1916,8 @@ do
 
         local mf = module.frame
         if mf and frameName == mf:GetName() then
-            local itemCountBox = _G[frameName .. "ItemCount"]
-            if itemCountBox then
-                Frames.ResetEditBox(itemCountBox, focusItemCount and true or false)
+            if refs and refs.itemCountBox then
+                Frames.ResetEditBox(refs.itemCountBox, focusItemCount and true or false)
             end
         end
         return true
@@ -1823,7 +1929,7 @@ do
         if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
             return
         end
-        setItemCountValue(Loot:GetCurrentItemCount(), focus)
+        setItemCountValue(getCurrentItemCount(), focus)
     end
 
     -- OnLoad frame:
@@ -1841,31 +1947,7 @@ do
         end
         UI.Loaded = true
         UIFacade:Call("LootCounter", "AttachToMaster", frame)
-
-        -- Initialize ItemBtn scripts once (clean inventory drop support: click-to-drop).
-        local itemBtn = _G[frameName .. "ItemBtn"]
-        if itemBtn and not itemBtn._krtMlInvDropInit then
-            itemBtn._krtMlInvDropInit = true
-            itemBtn:RegisterForClicks("AnyUp")
-            itemBtn:RegisterForDrag("LeftButton")
-
-            -- Blizz-like gesture support:
-            -- - Click while holding an item on the cursor
-            -- - Drag&drop (release) an item onto the button
-            local function tryAcceptFromCursor()
-                if CursorHasItem and CursorHasItem() then
-                    module:TryAcceptInventoryItemFromCursor()
-                end
-            end
-
-            itemBtn:SetScript("OnClick", function(self, button)
-                tryAcceptFromCursor()
-            end)
-
-            itemBtn:SetScript("OnReceiveDrag", function(self)
-                tryAcceptFromCursor()
-            end)
-        end
+        initItemButtonScripts(module.refs or UI.AcquireRefs(frame))
     end
 
     local function BindHandlers(_, frame, refs)
@@ -1981,9 +2063,6 @@ do
             local itemLink = getItemLink()
             local itemID = Item.GetItemIdFromLink(itemLink)
             ensureRollSession(itemLink, rollType, lootState.fromInventory and "inventory" or "lootWindow")
-            if not Rolls:GetRollSession() then
-                lootState.rollStarted = true
-            end
             local message
 
             if rollType == rollTypes.RESERVED then
@@ -1999,7 +2078,10 @@ do
             end
 
             addon:Announce(message)
-            _G[frameName .. "ItemCount"]:ClearFocus()
+            local refs = module.refs
+            if refs and refs.itemCountBox then
+                refs.itemCountBox:ClearFocus()
+            end
             local session = Rolls:GetRollSession()
             if session and tonumber(session.lootNid) then
                 lootState.currentRollItem = session.lootNid
@@ -2115,33 +2197,37 @@ do
 
     -- Localizes UI frame elements.
     function UI.Localize()
+        local refs = module.refs
         if UI.Localized then
             return
         end
-        _G[frameName .. "ConfigBtn"]:SetText(L.BtnConfigure)
-        _G[frameName .. "SelectItemBtn"]:SetText(L.BtnSelectItem)
-        _G[frameName .. "SpamLootBtn"]:SetText(L.BtnSpamLoot)
-        _G[frameName .. "MSBtn"]:SetText(L.BtnMS)
-        _G[frameName .. "OSBtn"]:SetText(L.BtnOS)
-        _G[frameName .. "SRBtn"]:SetText(L.BtnSR)
-        _G[frameName .. "FreeBtn"]:SetText(L.BtnFree)
-        _G[frameName .. "CountdownBtn"]:SetText(L.BtnCountdown)
-        _G[frameName .. "AwardBtn"]:SetText(L.BtnAward)
-        _G[frameName .. "RollBtn"]:SetText(L.BtnRoll)
-        _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
-        _G[frameName .. "HoldBtn"]:SetText(L.BtnHold)
-        _G[frameName .. "BankBtn"]:SetText(L.BtnBank)
-        _G[frameName .. "DisenchantBtn"]:SetText(L.BtnDisenchant)
-        _G[frameName .. "Name"]:SetText(L.StrNoItemSelected)
-        _G[frameName .. "RollsHeaderPlayer"]:SetText(L.StrPlayer)
-        _G[frameName .. "RollsHeaderInfo"]:SetText(L.StrInfo)
-        _G[frameName .. "RollsHeaderCounter"]:SetText(L.StrCounter)
-        _G[frameName .. "RollsHeaderRoll"]:SetText(L.StrRolls)
-        _G[frameName .. "ReserveListBtn"]:SetText(L.BtnInsertList)
-        _G[frameName .. "LootCounterBtn"]:SetText(L.BtnLootCounter)
+        if not refs then
+            return
+        end
+        refs.configBtn:SetText(L.BtnConfigure)
+        refs.selectItemBtn:SetText(L.BtnSelectItem)
+        refs.spamLootBtn:SetText(L.BtnSpamLoot)
+        refs.msBtn:SetText(L.BtnMS)
+        refs.osBtn:SetText(L.BtnOS)
+        refs.srBtn:SetText(L.BtnSR)
+        refs.freeBtn:SetText(L.BtnFree)
+        refs.countdownBtn:SetText(L.BtnCountdown)
+        refs.awardBtn:SetText(L.BtnAward)
+        refs.rollBtn:SetText(L.BtnRoll)
+        refs.clearBtn:SetText(L.BtnClear)
+        refs.holdBtn:SetText(L.BtnHold)
+        refs.bankBtn:SetText(L.BtnBank)
+        refs.disenchantBtn:SetText(L.BtnDisenchant)
+        refs.itemNameText:SetText(L.StrNoItemSelected)
+        refs.rollsHeaderPlayer:SetText(L.StrPlayer)
+        refs.rollsHeaderInfo:SetText(L.StrInfo)
+        refs.rollsHeaderCounter:SetText(L.StrCounter)
+        refs.rollsHeaderRoll:SetText(L.StrRolls)
+        refs.reserveListBtn:SetText(L.BtnInsertList)
+        refs.lootCounterBtn:SetText(L.BtnLootCounter)
         Frames.SetFrameTitle(frameName, MASTER_LOOTER)
 
-        local itemCountBox = _G[frameName .. "ItemCount"]
+        local itemCountBox = refs.itemCountBox
         if itemCountBox and not itemCountBox._krtItemCountHooked then
             itemCountBox._krtItemCountHooked = true
             itemCountBox:SetScript("OnTextChanged", function(self, isUserInput)
@@ -2172,9 +2258,9 @@ do
                 dropDownData[i] = {}
             end
         end
-        dropDownFrameHolder = _G[frameName .. "HoldDropDown"]
-        dropDownFrameBanker = _G[frameName .. "BankDropDown"]
-        dropDownFrameDisenchanter = _G[frameName .. "DisenchantDropDown"]
+        dropDownFrameHolder = refs.holdDropDown
+        dropDownFrameBanker = refs.bankDropDown
+        dropDownFrameDisenchanter = refs.disenchantDropDown
         prepareDropDowns()
         UIDropDownMenu_Initialize(dropDownFrameHolder, initializeDropDowns)
         UIDropDownMenu_Initialize(dropDownFrameBanker, initializeDropDowns)
@@ -2239,9 +2325,28 @@ do
         return record, canRoll, rolled
     end
 
+    local function getRollRowRefs(btn)
+        if not btn then
+            return nil
+        end
+        if btn._krtRefs then
+            return btn._krtRefs
+        end
+
+        local btnName = btn:GetName()
+        btn._krtRefs = {
+            name = btnName and _G[btnName .. "Name"] or nil,
+            roll = btnName and _G[btnName .. "Roll"] or nil,
+            counter = btnName and _G[btnName .. "Counter"] or nil,
+            info = btnName and _G[btnName .. "Info"] or nil,
+            star = btnName and _G[btnName .. "Star"] or nil,
+        }
+        return btn._krtRefs
+    end
+
     local function ensureRollRow(i, scrollChild)
         local btnName = frameName .. "PlayerBtn" .. i
-        local btn = _G[btnName]
+        local btn = rollRows[i]
         if not btn then
             btn = CreateFrame("Button", btnName, scrollChild, "KRTSelectPlayerTemplate")
         end
@@ -2258,8 +2363,9 @@ do
     end
 
     local function renderRollRows(model)
-        local scrollFrame = _G[frameName .. "ScrollFrame"]
-        local scrollChild = _G[frameName .. "ScrollFrameScrollChild"]
+        local refs = module.refs
+        local scrollFrame = refs and refs.scrollFrame or nil
+        local scrollChild = refs and refs.scrollChild or nil
         if not (scrollFrame and scrollChild) then
             return
         end
@@ -2282,11 +2388,12 @@ do
 
             UIRowVisuals.EnsureRowVisuals(btn)
 
-            local nameStr = _G[btn:GetName() .. "Name"]
-            local rollStr = _G[btn:GetName() .. "Roll"]
-            local counterStr = _G[btn:GetName() .. "Counter"]
-            local infoStr = _G[btn:GetName() .. "Info"]
-            local star = _G[btn:GetName() .. "Star"]
+            local ui = getRollRowRefs(btn)
+            local nameStr = ui and ui.name or nil
+            local rollStr = ui and ui.roll or nil
+            local counterStr = ui and ui.counter or nil
+            local infoStr = ui and ui.info or nil
+            local star = ui and ui.star or nil
 
             if nameStr then
                 local class = data.class or "UNKNOWN"
@@ -2322,12 +2429,11 @@ do
             totalHeight = totalHeight + btn:GetHeight()
         end
 
-        local i = count + 1
-        local btn = rollRows[i] or _G[frameName .. "PlayerBtn" .. i]
-        while btn do
-            btn:Hide()
-            i = i + 1
-            btn = rollRows[i] or _G[frameName .. "PlayerBtn" .. i]
+        for i = count + 1, #rollRows do
+            local btn = rollRows[i]
+            if btn then
+                btn:Hide()
+            end
         end
     end
 
@@ -2341,8 +2447,8 @@ do
     function UI.Refresh()
         UI.Localize()
         local currentFlowState = syncFlowState()
-
-        local itemCountBox = _G[frameName .. "ItemCount"]
+        local refs = module.refs
+        local itemCountBox = refs and refs.itemCountBox or nil
         updateItemCountFromBox(itemCountBox)
 
         if dropDownDirty then
@@ -2587,6 +2693,41 @@ do
         end
     end
 
+    local function getSelectionButtonRefs(btn)
+        if not btn then
+            return nil
+        end
+        if btn._krtRefs then
+            return btn._krtRefs
+        end
+
+        local btnName = btn:GetName()
+        btn._krtRefs = {
+            name = btnName and _G[btnName .. "Name"] or nil,
+            icon = btnName and _G[btnName .. "Icon"] or nil,
+        }
+        return btn._krtRefs
+    end
+
+    local function ensureSelectionButton(index)
+        local btn = selectionButtons[index]
+        if btn then
+            return btn
+        end
+
+        local btnName = frameName .. "ItemSelectionBtn" .. index
+        btn = CreateFrame("Button", btnName, selectionFrame, "KRTItemSelectionButton")
+        btn:SetID(index)
+        if btn.RegisterForClicks then
+            btn:RegisterForClicks("AnyUp")
+        end
+        Frames.SafeSetScript(btn, "OnClick", function(self, button)
+            module:BtnSelectedItem(self, button)
+        end)
+        selectionButtons[index] = btn
+        return btn
+    end
+
     -- Creates the item selection frame if it doesn't exist.
     local function createSelectionFrame()
         if selectionFrame == nil then
@@ -2597,14 +2738,11 @@ do
             selectionFrame = CreateFrame("Frame", nil, frame, "KRTSimpleFrameTemplate")
             selectionFrame:Hide()
         end
-        local index = 1
-        local btnName = frameName .. "ItemSelectionBtn" .. index
-        local btn = _G[btnName]
-        while btn ~= nil do
-            btn:Hide()
-            index = index + 1
-            btnName = frameName .. "ItemSelectionBtn" .. index
-            btn = _G[btnName]
+        for i = 1, #selectionButtons do
+            local btn = selectionButtons[i]
+            if btn then
+                btn:Hide()
+            end
         end
     end
 
@@ -2613,33 +2751,33 @@ do
         createSelectionFrame()
         local height = 5
         for i = 1, lootState.lootCount do
-            local btnName = frameName .. "ItemSelectionBtn" .. i
-            local btn = _G[btnName] or CreateFrame("Button", btnName, selectionFrame, "KRTItemSelectionButton")
-            btn:SetID(i)
+            local btn = ensureSelectionButton(i)
+            local ui = getSelectionButtonRefs(btn)
             btn:Show()
-            if not btn._krtBound then
-                if btn.RegisterForClicks then
-                    btn:RegisterForClicks("AnyUp")
-                end
-                Frames.SafeSetScript(btn, "OnClick", function(self, button)
-                    module:BtnSelectedItem(self, button)
-                end)
-                btn._krtBound = true
-            end
             local itemName = getItemName(i)
-            local itemNameBtn = _G[btnName .. "Name"]
+            local itemNameBtn = ui and ui.name or nil
             local item = getItem(i)
             local count = item and item.count or 1
-            if count and count > 1 then
-                itemNameBtn:SetText(itemName .. " x" .. count)
-            else
-                itemNameBtn:SetText(itemName)
+            if itemNameBtn then
+                if count and count > 1 then
+                    itemNameBtn:SetText(itemName .. " x" .. count)
+                else
+                    itemNameBtn:SetText(itemName)
+                end
             end
             local itemTexture = getItemTexture(i)
-            local itemTextureBtn = _G[btnName .. "Icon"]
-            itemTextureBtn:SetTexture(itemTexture)
+            local itemTextureBtn = ui and ui.icon or nil
+            if itemTextureBtn then
+                itemTextureBtn:SetTexture(itemTexture)
+            end
             btn:SetPoint("TOPLEFT", selectionFrame, "TOPLEFT", 0, -height)
             height = height + 37
+        end
+        for i = lootState.lootCount + 1, #selectionButtons do
+            local btn = selectionButtons[i]
+            if btn then
+                btn:Hide()
+            end
         end
         selectionFrame:SetHeight(height)
         if lootState.lootCount <= 0 then
@@ -2690,6 +2828,7 @@ do
     end
 
     local function applyInventoryItem(itemLink, totalCount, inBag, inSlot, slotCount)
+        local refs = module.refs
         if countdownRun then
             return false
         end
@@ -2702,7 +2841,9 @@ do
         end
 
         -- Clear count:
-        Frames.ResetEditBox(_G[frameName .. "ItemCount"], true)
+        if refs and refs.itemCountBox then
+            Frames.ResetEditBox(refs.itemCountBox, true)
+        end
 
         lootState.fromInventory = true
         Loot:AddItem(itemLink, itemCount)
@@ -3081,7 +3222,8 @@ do
         end
 
         invalidateRollUiModel()
-        buildRollUiModel(true)
+        local rollModel = buildRollUiModel(true)
+        lootState.winner = rollModel and rollModel.winner or nil
     end
 
     completeInventoryAwardProgress = function(completedWinner, rollType, awardedCount)

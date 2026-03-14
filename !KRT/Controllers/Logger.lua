@@ -1443,6 +1443,9 @@ do
     function module:SetTab(tabName)
         module.activeTab = normalizeTabName(tabName)
         updateTabUi()
+        if module.activeTab == TAB_EXPORT and module.Export and module.Export._csvDirty == true and module.Export.RefreshCsv then
+            module.Export:RefreshCsv()
+        end
     end
 
     function module:OnLoad(frame)
@@ -3803,7 +3806,7 @@ do
         local it = Store:GetLoot(raid, lootNid)
         if not it then
             local rawItemMatch, rawItemMatches = findLootByItemId(raid, lootNid)
-            if rawItemMatch and Options.IsDebugEnabled() and addon.error then
+            if rawItemMatch and addon.error then
                 addon:error(Diag.E.LogLoggerLootNidExpected:format(tostring(raidID), tostring(lootNid), tostring(rawItemMatch.itemLink), tonumber(rawItemMatches) or 0))
             end
             addon:error(Diag.E.LogLoggerItemNotFound:format(raidID, tostring(lootNid), lootCount))

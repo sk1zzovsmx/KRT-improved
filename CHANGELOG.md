@@ -4,6 +4,21 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Bugfix:** Master countdown now starts again after `MS/OS/SR/FREE`
+  announcements even when the Rolls service pre-bootstraps the roll session;
+  opening roll intake now restores the canonical `rollStarted` state.
+- **Bugfix:** Rolls now materialize reserved candidates correctly even when the
+  reserves adapter is exposed as plain functions, so closed reserved sessions
+  render `TIMED_OUT` rows again; compact `TIE/PASS/CXL/OOT/OUT/BLK` info tags
+  also fall back safely when localization tables are not fully bootstrapped.
+- **Bugfix:** Master inventory award flow now treats roll rows as selectable
+  unless explicitly disabled by the service contract, validates multi-copy
+  inventory selections before trade, advances the next selected winner after
+  each completed keep/trade step, and tolerates missing optional runtime
+  helpers during lightweight test/harness loads.
+- **Bugfix:** Logger now tolerates lightweight list-controller adapters,
+  always emits the raw `itemId` vs `lootNid` guard-rail error, and refreshes
+  export CSV content as soon as the export tab becomes visible.
 - **UI:** Button glow now auto-scales by target button size in
   `Modules/UI/Effects.lua` (dynamic thickness/scale and proc lines/frequency),
   and recomputes on `OnSizeChanged` for responsive fitting.

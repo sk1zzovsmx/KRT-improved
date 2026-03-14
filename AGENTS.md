@@ -110,6 +110,9 @@ Durable preferences learned from recent conversations:
   expose item-link parsing and tooltip probes via `feature.Item`/`addon.Item`.
 - Prefer dedicated reusable modules (`Bus`, `ListController`, `MultiSelect`, `Frames`, `Strings`,
   `Colors`, `Comms`, `Base64`, `Time`, `Sort`) over reviving `Modules/Utils.lua`.
+- Prefer explicit canonical contracts and deterministic initialization over scattered defensive guards;
+  when a dependency must exist, normalize it once at the module boundary/bootstrap rather than adding
+  many per-call fallback branches.
 - Prefer centralized MultiSelect modifier policies in `Modules/UI/MultiSelect.lua`
   with per-list scope keys; avoid per-controller CTRL/SHIFT gating flags.
 - Prefer centralized event-name registry in `Modules/Events.lua` for internal bus events and

@@ -19,7 +19,19 @@ local Services = feature.Services or addon.Services or {}
 
 local rollTypes = feature.rollTypes
 
-local lootState = feature.lootState
+local lootState = feature.lootState or {}
+feature.lootState = lootState
+lootState.lootCount = tonumber(lootState.lootCount) or 0
+lootState.rollsCount = tonumber(lootState.rollsCount) or 0
+lootState.selectedItemCount = tonumber(lootState.selectedItemCount) or 1
+if lootState.selectedItemCount < 1 then
+    lootState.selectedItemCount = 1
+end
+lootState.itemTraded = tonumber(lootState.itemTraded) or 0
+lootState.currentRollItem = tonumber(lootState.currentRollItem) or 0
+if lootState.fromInventory == nil then
+    lootState.fromInventory = false
+end
 
 local InternalEvents = Events.Internal
 
@@ -64,7 +76,7 @@ end
 local function isPlusSystemEnabled()
     local reserves = getReservesService()
     if reserves and reserves.GetPlusForItem and reserves.GetImportMode and reserves.IsPlusSystem then
-        return reserves:IsPlusSystem()
+        return reserves:IsPlusSystem() == true
     end
     return false
 end
@@ -302,6 +314,52 @@ do
         end
     end
 
+    local function ensureAdHocRollSession()
+        local session = getRollSession()
+        local itemLink
+        local itemId
+        local nextId
+        local expectedWinners
+
+        if session then
+            return session
+        end
+
+        itemLink = getCurrentItemLink()
+        itemId = itemLink and Item.GetItemIdFromLink(itemLink) or nil
+        if not itemLink and not itemId then
+            return nil
+        end
+
+        nextId = tonumber(lootState.nextRollSessionId) or 1
+        if nextId < 1 then
+            nextId = 1
+        end
+
+        expectedWinners = tonumber(lootState.selectedItemCount) or 1
+        if expectedWinners < 1 then
+            expectedWinners = 1
+        end
+
+        session = {
+            id = "RS:" .. tostring(nextId),
+            itemKey = itemLink and (Item.GetItemStringFromLink(itemLink) or itemLink) or nil,
+            itemId = itemId,
+            itemLink = itemLink,
+            rollType = tonumber(lootState.currentRollType) or rollTypes.FREE,
+            lootNid = tonumber(lootState.currentRollItem) or 0,
+            startedAt = GetTime(),
+            endsAt = nil,
+            source = lootState.fromInventory and "inventory" or "lootWindow",
+            expectedWinners = expectedWinners,
+            active = true,
+        }
+        lootState.rollSession = session
+        lootState.nextRollSessionId = nextId + 1
+        syncSessionStateFromRollSession(session)
+        return session
+    end
+
     local function updateSessionRollWindow(opened)
         local session = getRollSession()
         if not session then
@@ -517,7 +575,9 @@ do
             return session
         end
 
-        clearResponseState()
+        clearResponseState({
+            preserveManualExclusions = true,
+        })
         state.sessionId = sessionId
         return session
     end
@@ -602,6 +662,13 @@ do
 
         local tracker = acquireItemTracker(currentItemId)
         usedRolls = tracker[name] or 0
+        local currentResponse = state.responsesByPlayer[name]
+        if currentResponse and currentResponse.bestRoll == nil and isExplicitResponseStatus(currentResponse.explicitStatus) then
+            usedRolls = usedRolls - 1
+            if usedRolls < 0 then
+                usedRolls = 0
+            end
+        end
 
         if opts and opts.requireOpenSession and not isRollSubmissionOpen() then
             return buildEligibilityResult(
@@ -1174,7 +1241,7 @@ do
 
         roll = tonumber(roll)
         state.count = state.count + 1
-        lootState.rollsCount = lootState.rollsCount + 1
+        lootState.rollsCount = (tonumber(lootState.rollsCount) or 0) + 1
 
         state.rolls[state.count] = {
             name = name,
@@ -1250,7 +1317,7 @@ do
 
         addon:debug(Diag.D.LogRollsAcceptedPlayer:format(player, (tonumber(eligibility.usedRolls) or 0) + 1, tonumber(eligibility.allowedRolls) or 0))
         if not canTransitionResponseState(state.responsesByPlayer[player] and state.responsesByPlayer[player].status, RESPONSE_STATUS.ROLL) then
-            return false, REASON.STATE_TRANSITION_DENIED
+            return false, reasonCodes.STATE_TRANSITION_DENIED
         end
         addRoll(player, roll, itemId)
         applyAcceptedRollResponse(player, tonumber(roll), eligibility, source or "system_roll")
@@ -1301,6 +1368,11 @@ do
         state.record = on
 
         if on then
+            -- Starting intake always reopens the roll-started UI state, even when
+            -- the session was materialized earlier by the service bootstrap.
+            lootState.rollStarted = true
+            ensureAdHocRollSession()
+            ensureResponseSession()
             state.warned = false
 
             -- Reset only if we are starting a clean session
@@ -1415,7 +1487,7 @@ do
     end
 
     function module:BeginTieReroll(names)
-        local session = ensureResponseSession()
+        local session = getRollSession() or ensureAdHocRollSession()
         local reroll
         local itemId
         local itemLink
@@ -1424,6 +1496,7 @@ do
         if not session then
             return false
         end
+        ensureResponseSession()
 
         reroll = setTieRerollFilter(names)
         if not (reroll and reroll.ordered and #reroll.ordered > 1) then
