@@ -60,6 +60,8 @@ Durable preferences learned from recent conversations:
   `Core.GetRaidStore` nil/method checks to keep diagnostics and guard behavior uniform.
 - Prefer homogeneous module structure/patterns across Lua modules; avoid one-off lifecycle variants
   unless behavior requires them.
+- For UI named-frame access standardization, prefer the dominant in-repo `_G[frameName .. suffix]`
+  pattern over introducing static local ref caches only for stylistic cleanup.
 - For XML and Lua analysis/reference, use Townlong-Yak FrameXML 3.3.5:
   `https://www.townlong-yak.com/framexml/3.3.5`.
 - For custom button glow UX, prefer high-visibility dynamic pulses with geometry
