@@ -127,6 +127,8 @@
 |   |-- REFACTOR_RULES.md
 |   |-- SV_SANITY_CHECKLIST.md
 |   |-- SV_SCHEMA.md
+|   |-- TECH_CLEANUP_BACKLOG.md
+|   |-- TECH_CLEANUP_WORKFLOW.md
 |   \\-- TREE.md
 |-- tests
 |   |-- fixtures

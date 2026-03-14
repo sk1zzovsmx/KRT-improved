@@ -83,5 +83,6 @@ multiple entry files.
 - `docs/SV_SCHEMA.md`: SavedVariables inventory and ownership notes
 - `docs/RAID_SCHEMA.md`: canonical persisted raid schema
 - `docs/REFACTOR_RULES.md`: function ownership and deduplication workflow
+- `docs/TECH_CLEANUP_WORKFLOW.md`: module-by-module technical cleanup workflow
 - `docs/AGENT_SKILLS.md`: repo-local skill sync and Mechanic workflow
 - `docs/KRT_MCP.md`: repo-local MCP server and tool inventory
