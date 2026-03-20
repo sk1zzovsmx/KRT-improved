@@ -1536,7 +1536,7 @@ do
 
     local rosterUiRefreshDebounceSeconds = 0.25
 
-    module._isLoggerViewingCurrentRaid = function()
+    module.IsLoggerViewingCurrentRaid = function()
         local frame = module.frame or getFrame()
         if not (frame and frame.IsShown and frame:IsShown()) then
             return false
@@ -1562,11 +1562,11 @@ do
         end
     end
 
-    module._requestRosterBoundListsRefresh = function()
+    module.RequestRosterBoundListsRefresh = function()
         addon.CancelTimer(module._rosterUiHandle, true)
         module._rosterUiHandle = addon.NewTimer(rosterUiRefreshDebounceSeconds, function()
             module._rosterUiHandle = nil
-            if not module._isLoggerViewingCurrentRaid() then
+            if not module.IsLoggerViewingCurrentRaid() then
                 return
             end
             refreshRosterBoundLists()
@@ -2630,11 +2630,11 @@ do
         if raidIdType ~= "number" and raidIdType ~= "string" then
             return
         end
-        if not module._isLoggerViewingCurrentRaid() then
+        if not module.IsLoggerViewingCurrentRaid() then
             return
         end
 
-        module._requestRosterBoundListsRefresh()
+        module.RequestRosterBoundListsRefresh()
     end)
 end
 

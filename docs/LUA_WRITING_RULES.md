@@ -130,6 +130,54 @@ Keep canonical UI hook names when they implement the scaffold/UI contract:
 - `RefreshUI`
 - `Refresh`
 
+### 3.4 Public API verb taxonomy (binding for new/renamed APIs)
+
+To keep API names readable and consistent, new or renamed public methods on
+`addon.*` should start with one of these verb groups.
+
+Query verbs:
+
+- `Get*`
+- `Find*`
+- `Is*`
+- `Can*`
+
+Mutation verbs:
+
+- `Set*`
+- `Add*`
+- `Remove*`
+- `Delete*`
+- `Upsert*`
+
+Lifecycle/UI verbs:
+
+- `Ensure*`
+- `Bind*`
+- `Localize*`
+- `Request*`
+- `RequestRefresh*`
+- `Refresh*`
+- `Toggle*`
+- `Show*`
+- `Hide*`
+
+Allowed exact lifecycle names:
+
+- `OnLoad`
+- `OnLoadFrame`
+- `AcquireRefs`
+- `BindHandlers`
+- `RefreshUI`
+- `Refresh`
+- `RequestRefresh`
+- `Toggle`
+- `Show`
+- `Hide`
+
+UPPER WoW event handlers stay valid (`ADDON_LOADED`, `RAID_ROSTER_UPDATE`,
+`CHAT_MSG_SYSTEM`, ...).
+
 ## 4. Function Declaration and Call Style
 
 Use `:` only for true methods that expect `self`.
@@ -219,6 +267,7 @@ Tool ownership:
 - `tools/check-toc-files.ps1`: verify TOC naming and that listed files exist
 - `tools/check-lua-syntax.ps1`: syntax-only validation for all Lua files
 - `tools/check-lua-uniformity.ps1`: repo-specific structural and naming rules
+- `tools/check-api-nomenclature.ps1`: staged public API case + verb-taxonomy check
 - `DEV_CHECKS.md`: copy-paste verification commands and audit greps
 
 Do not add a style rule that cannot be explained by one of those sources.

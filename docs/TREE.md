@@ -118,6 +118,10 @@
 |   \\-- settings.json
 |-- docs
 |   |-- AGENT_SKILLS.md
+|   |-- API_NOMENCLATURE_CENSUS.md
+|   |-- API_REGISTRY.csv
+|   |-- API_REGISTRY_INTERNAL.csv
+|   |-- API_REGISTRY_PUBLIC.csv
 |   |-- ARCHITECTURE.md
 |   |-- FN_CLUSTERS.md
 |   |-- FUNCTION_REGISTRY.csv
@@ -139,6 +143,7 @@
 |   \\-- release_stabilization_spec.lua
 |-- tools
 |   |-- agent-skills.manifest.json
+|   |-- check-api-nomenclature.ps1
 |   |-- check-layering.ps1
 |   |-- check-lua-syntax.ps1
 |   |-- check-lua-uniformity.ps1
@@ -146,6 +151,7 @@
 |   |-- check-toc-files.ps1
 |   |-- check-ui-binding.ps1
 |   |-- dev-stack-status.ps1
+|   |-- fnmap-api-census.ps1
 |   |-- fnmap-classify.ps1
 |   |-- fnmap-inventory.ps1
 |   |-- install-hooks.ps1

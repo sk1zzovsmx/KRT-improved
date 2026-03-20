@@ -32,8 +32,15 @@ Durable preferences learned from recent conversations:
   (`Core`, `Bus`, `Frames`, `UI*`, `Strings`, `Time`, `Comms`, `Base64`, `Colors`, `Item`, `Sort`).
 - Prefer camelCase for utility functions and local variables; avoid snake_case for new naming.
 - Keep file-local/private helpers in camelCase; keep Lua metamethods (`__index`, `__call`, etc.) unchanged.
-- For naming migrations, use phased rollout: add PascalCase API + temporary alias, migrate call-sites
-  (including XML/Binder/string references), then remove alias after zero legacy hits.
+- For naming migrations, prefer direct migration to canonical PascalCase call-sites with no legacy alias references;
+  add temporary aliases only when explicitly requested.
+- For API inventories and reports, separate `Public` and `Internal` surfaces; treat underscore methods
+  and `._ui` targets as internal implementation APIs.
+- For new/renamed public API methods, use a short verb taxonomy:
+  queries (`Get/Find/Is/Can`), mutations (`Set/Add/Remove/Delete/Upsert`),
+  lifecycle/UI (`Ensure/Bind/Localize/Request/RequestRefresh/Refresh/Toggle/Show/Hide`),
+  plus exact hooks (`OnLoad`, `OnLoadFrame`, `AcquireRefs`, `BindHandlers`, `RefreshUI`).
+- Keep staged API nomenclature checks automated in local gates/pre-commit to block new naming regressions.
 - In feature files under `Controllers/`, `Services/`, `Widgets/`, `EntryPoints/`, prefer canonical top-level
   section headers in order:
   `-- ----- Internal state ----- --`, `-- ----- Private helpers ----- --`,

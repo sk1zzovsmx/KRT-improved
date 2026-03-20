@@ -34,19 +34,27 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-uniformity.p
 Expected: `Lua uniformity checks passed.`
 This includes canonical public naming and private helper naming checks.
 
-5. Formatter check for KRT-owned Lua:
+5. API nomenclature check for staged Lua additions:
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-api-nomenclature.ps1
+```
+Expected:
+- `API nomenclature check passed.`
+- or `Skipping API nomenclature check (no staged Lua additions).`
+
+6. Formatter check for KRT-owned Lua:
 ```powershell
 stylua --check !KRT tools tests
 ```
 Expected: no diff output
 
-6. Install the repo-local hook once per clone:
+7. Install the repo-local hook once per clone:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/install-hooks.ps1
 ```
 Expected: `Configured core.hooksPath=.githooks`
 
-7. Targeted stabilization gate for `Services/Rolls.lua` and
+8. Targeted stabilization gate for `Services/Rolls.lua` and
 `Controllers/Master.lua` changes:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-release-targeted-tests.ps1
