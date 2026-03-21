@@ -38,7 +38,7 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 
 $safeVersion = ($Version -replace '[\\/:*?"<>| ]', "-")
 if ([string]::IsNullOrWhiteSpace($FileName)) {
-    $FileName = "{0}-{1}.zip" -f $addonName, $safeVersion
+    $FileName = "KRT-{0}.zip" -f $safeVersion
 }
 
 $outputRoot = if ([System.IO.Path]::IsPathRooted($OutputDir)) {
