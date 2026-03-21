@@ -118,9 +118,7 @@
 |-- .vscode
 |   \\-- settings.json
 |-- dist
-|   |-- !KRT-1.2.3.zip
-|   |-- !KRT-beta-0.5.6c.zip
-|   \\-- KRT-beta-0.5.6c.zip
+|   \\-- KRT-beta-0.6.0b.zip
 |-- docs
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
