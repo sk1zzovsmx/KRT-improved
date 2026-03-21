@@ -270,6 +270,7 @@ local function reservesApi(tbl)
         "GetReserveCountForItem",
         "GetPlusForItem",
         "GetPlayersForItem",
+        "HasCurrentRaidPlayersForItem",
         "GetImportMode",
         "IsPlusSystem",
     })
@@ -2993,6 +2994,66 @@ test("reserves item-info updates coalesce into a single refresh", function()
 
     local displayList = Service:GetDisplayList()
     assertEqual(#displayList, 2, "expected both resolved reserve items in display list")
+end)
+
+test("reserves format supports filtering to current raid players", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1201 },
+            },
+        },
+        Bob = {
+            reserves = {
+                { rawID = 1201 },
+            },
+        },
+        Cara = {
+            reserves = {
+                { rawID = 1201 },
+            },
+        },
+    }
+    h.addon.Services.Raid = {
+        GetPlayerID = function(_, name, raidNum)
+            local rid = tonumber(raidNum) or 0
+            if rid == 1 and (name == "Alice" or name == "Cara") then
+                return 100
+            end
+            if rid == 2 and name == "Bob" then
+                return 200
+            end
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Reserves = h.addon.Services.Reserves
+    local Service = Reserves.Service
+    Service:Load()
+
+    local allPlayers = Service:FormatReservedPlayersLine(1201, false, false, false)
+    local currentRaidOnly = Service:FormatReservedPlayersLine(1201, false, false, false, true)
+    local raidTwoOnly = Service:FormatReservedPlayersLine(1201, false, false, false, true, 2)
+    local raidTwoViaModule = Reserves:FormatReservedPlayersLine(1201, false, false, false, true, 2)
+    local hasCurrentRaidPlayer = Service:HasCurrentRaidPlayersForItem(1201)
+    local hasRaidTwoPlayer = Service:HasCurrentRaidPlayersForItem(1201, 2)
+    local hasUnknownRaidPlayer = Service:HasCurrentRaidPlayersForItem(1201, 999)
+    local hasRaidTwoPlayerViaModule = Reserves:HasCurrentRaidPlayersForItem(1201, 2)
+
+    assertEqual(allPlayers, "Alice, Bob, Cara", "expected default formatting to keep all reserved players")
+    assertEqual(currentRaidOnly, "Alice, Cara", "expected current-raid filtering to keep only active raid players")
+    assertEqual(raidTwoOnly, "Bob", "expected explicit raid filter to target the provided raid id")
+    assertEqual(raidTwoViaModule, "Bob", "expected module wrapper to pass filtering args to the service")
+    assertTrue(hasCurrentRaidPlayer == true, "expected current raid to report at least one eligible reserve player")
+    assertTrue(hasRaidTwoPlayer == true, "expected explicit raid id with roster matches to report eligible reserve players")
+    assertTrue(hasUnknownRaidPlayer ~= true, "expected explicit raid id without matches to report no eligible reserve players")
+    assertTrue(hasRaidTwoPlayerViaModule == true, "expected module wrapper to forward HasCurrentRaidPlayersForItem args")
 end)
 
 local failures = 0

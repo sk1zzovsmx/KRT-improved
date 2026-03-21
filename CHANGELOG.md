@@ -4,6 +4,10 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Behavior:** SR announce lines in Master now exclude reserve names that are
+  not part of the current raid roster.
+- **UI:** Master `SR` button now lights/enables only when at least one reserve
+  player for the selected item is present in the current raid roster.
 - **UI:** Logger now shows panel-level empty states and orientation hints for
   history and export views, so raid, boss, attendee, loot, and CSV panes stay
   readable even before a selection exists.

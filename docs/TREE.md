@@ -107,8 +107,6 @@
 |       |   \\-- ...
 |       \\-- s-working
 |           \\-- ...
-|-- .codex
-|   \\-- config.toml
 |-- .devcontainer
 |   \\-- devcontainer.json
 |-- .githooks

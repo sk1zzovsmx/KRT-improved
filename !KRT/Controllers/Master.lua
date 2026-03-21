@@ -2207,7 +2207,7 @@ do
             if rollType == rollTypes.RESERVED then
                 -- Chat-safe: keep UI colors in the Reserve Frame, but do not send class color codes in chat.
                 local reserves = getReservesService()
-                local srList = reserves and reserves.FormatReservedPlayersLine and reserves:FormatReservedPlayersLine(itemID, false, false, false) or ""
+                local srList = reserves and reserves.FormatReservedPlayersLine and reserves:FormatReservedPlayersLine(itemID, false, false, false, true) or ""
                 local suff = addon.options.sortAscending and "Low" or "High"
                 message = lootState.selectedItemCount > 1 and L[chatMsg .. "Multiple" .. suff]:format(srList, itemLink, lootState.selectedItemCount)
                     or L[chatMsg]:format(srList, itemLink)
@@ -2640,6 +2640,11 @@ do
         end
         local hasItemReserves = itemId and reserves and reserves.HasItemReserves and reserves:HasItemReserves(itemId) or false
         flagButtonsOnChange("hasItemReserves", hasItemReserves)
+        local hasEligibleRaidReserve = hasItemReserves
+        if hasItemReserves and reserves and reserves.HasCurrentRaidPlayersForItem and itemId then
+            hasEligibleRaidReserve = reserves:HasCurrentRaidPlayersForItem(itemId)
+        end
+        flagButtonsOnChange("hasEligibleRaidReserve", hasEligibleRaidReserve)
         flagButtonsOnChange("countdownRun", countdownRun)
         flagButtonsOnChange("flowState", currentFlowState)
 
@@ -2647,7 +2652,7 @@ do
         local pickMode = rollModel.pickMode == true
         local msCount = pickMode and (tonumber(rollModel.msCount) or 0) or 0
         local canAwardSelection = (not pickMode) or msCount > 0
-        local canStartSR = lootState.lootCount >= 1 and hasItemReserves
+        local canStartSR = lootState.lootCount >= 1 and hasEligibleRaidReserve
         local isTieReroll = shouldUseTieReroll(rollModel)
         local statusText = buildMasterStatusText(currentFlowState, rollModel, hasItem, displayedWinner)
         local selectedItemCount = tonumber(lootState.selectedItemCount) or 1
@@ -2661,7 +2666,7 @@ do
         end
 
         local function buildRollTooltip(label, needsReserves)
-            if needsReserves and not hasItemReserves then
+            if needsReserves and not hasEligibleRaidReserve then
                 return L.TipMasterSRUnavailable
             end
             if selectedItemCount > 1 then

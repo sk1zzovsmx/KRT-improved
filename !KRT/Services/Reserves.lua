@@ -1443,6 +1443,47 @@ do
         end)
     end
 
+    -- Returns true when at least one reserve player for the item is present in
+    -- the current raid (or in raidNum when provided).
+    -- If raid context is unavailable, keeps backward-compatible behavior and
+    -- treats any reserve entry as eligible.
+    function Service:HasCurrentRaidPlayersForItem(itemId, raidNum)
+        if not itemId then
+            return false
+        end
+
+        local list = reservesByItemID[itemId]
+        if type(list) ~= "table" or #list == 0 then
+            return false
+        end
+
+        local raidService = Services.Raid
+        if not (raidService and raidService.GetPlayerID) then
+            return true
+        end
+
+        local targetRaidNum = raidNum
+        if not targetRaidNum and addon.Core and addon.Core.GetCurrentRaid then
+            targetRaidNum = addon.Core.GetCurrentRaid()
+        end
+        if not targetRaidNum then
+            return true
+        end
+
+        for i = 1, #list do
+            local reserveEntry = list[i]
+            local name = reserveEntry and reserveEntry.playerNameDisplay
+            if type(name) == "string" and name ~= "" then
+                local playerNid = raidService:GetPlayerID(name, targetRaidNum)
+                if tonumber(playerNid) and playerNid > 0 then
+                    return true
+                end
+            end
+        end
+
+        return false
+    end
+
     -- ----- SR Announcement Formatting ----- --
 
     -- Returns a list of formatted player tokens for an item.
@@ -1455,7 +1496,11 @@ do
     -- showMulti:
     --   true/nil -> include "(xN)" when Multi-reserve is enabled
     --   false    -> hide multi-reserve count suffixes from player tokens
-    function Service:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
+    -- onlyCurrentRaidPlayers:
+    --   true -> include only players present in the current raid (or raidNum if provided)
+    -- raidNum:
+    --   optional explicit raid id used when onlyCurrentRaidPlayers is true
+    function Service:GetPlayersForItem(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
         if not itemId then
             return {}
         end
@@ -1473,6 +1518,29 @@ do
             end
         end
 
+        if onlyCurrentRaidPlayers == true then
+            local raidService = Services.Raid
+            if raidService and raidService.GetPlayerID then
+                local targetRaidNum = raidNum
+                if not targetRaidNum and addon.Core and addon.Core.GetCurrentRaid then
+                    targetRaidNum = addon.Core.GetCurrentRaid()
+                end
+                if targetRaidNum then
+                    local filteredPlayers = {}
+                    for i = 1, #data.players do
+                        local name = data.players[i]
+                        if type(name) == "string" and name ~= "" then
+                            local playerNid = raidService:GetPlayerID(name, targetRaidNum)
+                            if tonumber(playerNid) and playerNid > 0 then
+                                filteredPlayers[#filteredPlayers + 1] = name
+                            end
+                        end
+                    end
+                    data.players = filteredPlayers
+                end
+            end
+        end
+
         local tokens = buildPlayerTokens(itemId, data.players, data.playerCounts, data.playerMeta, useColor, showPlus, showMulti)
         local out = {}
         for i = 1, #tokens do
@@ -1482,10 +1550,11 @@ do
     end
 
     -- Returns the formatted player list for an item (comma-separated).
-    -- useColor, showPlus, and showMulti follow the same rules as GetPlayersForItem.
-    function Service:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti)
+    -- useColor, showPlus, showMulti, onlyCurrentRaidPlayers, and raidNum
+    -- follow the same rules as GetPlayersForItem.
+    function Service:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
         addon:debug(Diag.D.LogReservesFormatPlayers:format(itemId))
-        local list = self:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
+        local list = self:GetPlayersForItem(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
         -- Log the list of players found for the item
         addon:debug(Diag.D.LogReservesPlayersList:format(itemId, tconcat(list, ", ")))
         return #list > 0 and tconcat(list, ", ") or ""
@@ -1631,11 +1700,15 @@ do
         return Service:HasMultiReserveForItem(itemId)
     end
 
-    function module:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
-        return Service:GetPlayersForItem(itemId, useColor, showPlus, showMulti)
+    function module:HasCurrentRaidPlayersForItem(itemId, raidNum)
+        return Service:HasCurrentRaidPlayersForItem(itemId, raidNum)
     end
 
-    function module:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti)
-        return Service:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti)
+    function module:GetPlayersForItem(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
+        return Service:GetPlayersForItem(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
+    end
+
+    function module:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
+        return Service:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
     end
 end
