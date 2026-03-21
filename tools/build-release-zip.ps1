@@ -1,7 +1,8 @@
 param(
     [string]$OutputDir = "dist",
     [string]$Version = "",
-    [string]$FileName = ""
+    [string]$FileName = "",
+    [switch]$WriteChecksum
 )
 
 Set-StrictMode -Version Latest
@@ -86,3 +87,13 @@ if ($unexpectedEntries.Count -gt 0) {
 
 Write-Host ("Archive ready: {0}" -f $zipPath) -ForegroundColor Green
 Write-Host ("Contents root: {0}/" -f $addonName)
+
+if ($WriteChecksum) {
+    $hash = Get-FileHash -LiteralPath $zipPath -Algorithm SHA256
+    $zipLeaf = Split-Path -Path $zipPath -Leaf
+    $checksumPath = "$zipPath.sha256"
+    $checksumLine = "{0}  {1}" -f $hash.Hash.ToLowerInvariant(), $zipLeaf
+
+    Set-Content -LiteralPath $checksumPath -Value $checksumLine -NoNewline
+    Write-Host ("Checksum ready: {0}" -f $checksumPath) -ForegroundColor Green
+}

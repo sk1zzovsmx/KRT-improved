@@ -13,7 +13,7 @@ on:
             target_ref:
                 description: "Branch or commit to package"
                 required: false
-                default: "splitting-monolithic-KRT"
+                default: ""
                 type: string
             prerelease:
                 description: "Mark release as prerelease"
@@ -37,6 +37,9 @@ jobs:
                   if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
                       tag="${{ inputs.tag_name }}"
                       ref="${{ inputs.target_ref }}"
+                      if [[ -z "${ref}" ]]; then
+                          ref="${GITHUB_REF_NAME}"
+                      fi
                       prerelease="${{ inputs.prerelease }}"
                   else
                       tag="${GITHUB_REF_NAME}"
@@ -69,43 +72,15 @@ jobs:
 
             - name: Build addon archive (only !KRT/)
               id: pack
-              shell: bash
+              shell: pwsh
               env:
                   TAG: ${{ steps.meta.outputs.tag }}
               run: |
-                  set -euo pipefail
-
-                  asset="KRT-${TAG}.zip"
-                  mkdir -p dist
-                  rm -f "dist/${asset}"
-
-                  rm -rf package
-                  mkdir -p package
-                  cp -R "repo/!KRT" package/
-
-                  (
-                      cd package
-                      zip -r "../dist/${asset}" "!KRT"
-                  )
-
-                  python3 - "${asset}" <<'PY'
-                  import sys
-                  import zipfile
-
-                  zip_path = "dist/" + sys.argv[1]
-                  with zipfile.ZipFile(zip_path) as archive:
-                      invalid = [name for name in archive.namelist() if name and not name.startswith("!KRT/")]
-
-                  if invalid:
-                      raise SystemExit(
-                          "Archive validation failed. Unexpected entries: " + ", ".join(invalid[:5])
-                      )
-
-                  print("Archive validation OK.")
-                  PY
-
+                  $asset = "KRT-$env:TAG.zip"
+                  & ./repo/tools/build-release-zip.ps1 -OutputDir "../dist" -FileName $asset -WriteChecksum
                   echo "asset_name=${asset}" >> "$GITHUB_OUTPUT"
                   echo "asset_path=dist/${asset}" >> "$GITHUB_OUTPUT"
+                  echo "checksum_path=dist/${asset}.sha256" >> "$GITHUB_OUTPUT"
 
             - name: Create/update release and upload asset
               shell: bash
@@ -115,16 +90,21 @@ jobs:
                   REF: ${{ steps.meta.outputs.ref }}
                   PRERELEASE: ${{ steps.meta.outputs.prerelease }}
                   ASSET_PATH: ${{ steps.pack.outputs.asset_path }}
+                  CHECKSUM_PATH: ${{ steps.pack.outputs.checksum_path }}
               run: |
                   set -euo pipefail
 
                   if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-                      gh release upload "${TAG}" "${ASSET_PATH}" \
+                      gh release upload "${TAG}" "${ASSET_PATH}" "${CHECKSUM_PATH}" \
                           --repo "${GITHUB_REPOSITORY}" \
                           --clobber
+
+                      release_id="$(gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" --json id --jq '.id')"
+                      gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+                          -F "prerelease=${PRERELEASE}" >/dev/null
                   else
                       release_args=(
-                          release create "${TAG}" "${ASSET_PATH}"
+                          release create "${TAG}" "${ASSET_PATH}" "${CHECKSUM_PATH}"
                           --repo "${GITHUB_REPOSITORY}"
                           --title "${TAG}"
                           --target "${REF}"

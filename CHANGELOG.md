@@ -4,6 +4,14 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Release:** GitHub packaging now reuses `tools/build-release-zip.ps1` and
+  uploads both `KRT-<tag>.zip` and `KRT-<tag>.zip.sha256`.
+- **Regression/Bugfix:** Manual release creation keeps strict tag validation
+  (`--verify-tag`) to block non-tag refs.
+- **Tooling:** `workflow_dispatch` no longer uses a stale default branch;
+  empty `target_ref` now falls back to the current ref.
+- **Docs:** README release instructions now include checksum download and a
+  quick SHA-256 verification step.
 - **Behavior:** SR announce lines in Master now exclude reserve names that are
   not part of the current raid roster.
 - **UI:** Master `SR` button now lights/enables only when at least one reserve
