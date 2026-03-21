@@ -119,7 +119,9 @@
 |-- .vscode
 |   \\-- settings.json
 |-- dist
-|   \\-- KRT-beta-0.6.0b.zip
+|   |-- KRT-beta-0.6.0b.zip
+|   |-- KRT-beta-0.6.1b.zip
+|   \\-- KRT-beta-0.6.1b.zip.sha256
 |-- docs
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
@@ -183,7 +185,6 @@
 |-- .luacheckrc
 |-- .stylua.toml
 |-- .styluaignore
-|-- .tmp-run-23379532251-logs.zip
 |-- AGENTS.md
 |-- CHANGELOG.md
 |-- DEV_CHECKS.md

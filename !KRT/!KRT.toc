@@ -4,7 +4,7 @@
 ## Author: Kader (|cff808080bkader#5341|r)
 ## DefaultState: enabled
 ## SavedVariables: KRT_Raids, KRT_Players, KRT_Reserves, KRT_Warnings, KRT_Spammer, KRT_Options
-## Version: 0.6.1b
+## Version: 0.6.2b
 ## X-Date: 2022-06-03 @ 11:10 PM |cff808080UTC|r
 ## X-Category: Raid, Inventory
 ## X-License: MIT/X
