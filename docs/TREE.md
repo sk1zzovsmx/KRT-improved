@@ -183,6 +183,7 @@
 |-- .luacheckrc
 |-- .stylua.toml
 |-- .styluaignore
+|-- .tmp-run-23379532251-logs.zip
 |-- AGENTS.md
 |-- CHANGELOG.md
 |-- DEV_CHECKS.md

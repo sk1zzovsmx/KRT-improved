@@ -114,117 +114,27 @@ jobs:
                   TAG: ${{ steps.meta.outputs.tag }}
                   REF: ${{ steps.meta.outputs.ref }}
                   PRERELEASE: ${{ steps.meta.outputs.prerelease }}
-                  ASSET_NAME: ${{ steps.pack.outputs.asset_name }}
                   ASSET_PATH: ${{ steps.pack.outputs.asset_path }}
               run: |
                   set -euo pipefail
 
-                  api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
-                  auth_header="Authorization: Bearer ${GH_TOKEN}"
-                  accept_header="Accept: application/vnd.github+json"
-                  version_header="X-GitHub-Api-Version: 2022-11-28"
-
-                  release_lookup_json="$(mktemp)"
-                  http_code="$(curl -sS -o "${release_lookup_json}" -w "%{http_code}" \
-                      -H "${auth_header}" \
-                      -H "${accept_header}" \
-                      -H "${version_header}" \
-                      "${api}/releases/tags/${TAG}")"
-
-                  if [[ "${http_code}" == "200" ]]; then
-                      release_json="$(cat "${release_lookup_json}")"
-                  elif [[ "${http_code}" == "404" ]]; then
-                      release_json=""
+                  if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+                      gh release upload "${TAG}" "${ASSET_PATH}" \
+                          --repo "${GITHUB_REPOSITORY}" \
+                          --clobber
                   else
-                      echo "Failed to query release tag ${TAG}. HTTP ${http_code}."
-                      cat "${release_lookup_json}"
-                      exit 1
+                      release_args=(
+                          release create "${TAG}" "${ASSET_PATH}"
+                          --repo "${GITHUB_REPOSITORY}"
+                          --title "${TAG}"
+                          --target "${REF}"
+                          --generate-notes
+                          --verify-tag
+                      )
+
+                      if [[ "${PRERELEASE}" == "true" ]]; then
+                          release_args+=(--prerelease)
+                      fi
+
+                      gh "${release_args[@]}"
                   fi
-
-                  if [[ -z "${release_json}" ]]; then
-                      payload="$(python3 - <<'PY'
-                  import json
-                  import os
-
-                  print(json.dumps({
-                      "tag_name": os.environ["TAG"],
-                      "target_commitish": os.environ["REF"],
-                      "name": os.environ["TAG"],
-                      "prerelease": os.environ["PRERELEASE"].lower() == "true",
-                      "generate_release_notes": True,
-                  }))
-                  PY
-                  )"
-
-                      release_json="$(curl -sS \
-                          -X POST \
-                          -H "${auth_header}" \
-                          -H "${accept_header}" \
-                          -H "${version_header}" \
-                          "${api}/releases" \
-                          -d "${payload}")"
-                  else
-                      release_id="$(printf '%s' "${release_json}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
-                      payload="$(python3 - <<'PY'
-                  import json
-                  import os
-
-                  print(json.dumps({
-                      "name": os.environ["TAG"],
-                      "target_commitish": os.environ["REF"],
-                      "prerelease": os.environ["PRERELEASE"].lower() == "true",
-                      "generate_release_notes": True,
-                  }))
-                  PY
-                  )"
-
-                      release_json="$(curl -sS \
-                          -X PATCH \
-                          -H "${auth_header}" \
-                          -H "${accept_header}" \
-                          -H "${version_header}" \
-                          "${api}/releases/${release_id}" \
-                          -d "${payload}")"
-                  fi
-
-                  release_id="$(printf '%s' "${release_json}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
-                  upload_url="$(printf '%s' "${release_json}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["upload_url"].split("{")[0])')"
-
-                  assets_json="$(curl -sS \
-                      -H "${auth_header}" \
-                      -H "${accept_header}" \
-                      -H "${version_header}" \
-                      "${api}/releases/${release_id}/assets")"
-
-                  existing_asset_id="$(printf '%s' "${assets_json}" | python3 - "${ASSET_NAME}" <<'PY'
-                  import json
-                  import sys
-
-                  wanted = sys.argv[1]
-                  for asset in json.load(sys.stdin):
-                      if asset.get("name") == wanted:
-                          print(asset["id"])
-                          break
-                  PY
-                  )"
-
-                  if [[ -n "${existing_asset_id}" ]]; then
-                      curl -sS \
-                          -X DELETE \
-                          -H "${auth_header}" \
-                          -H "${accept_header}" \
-                          -H "${version_header}" \
-                          "${api}/releases/assets/${existing_asset_id}" > /dev/null
-                  fi
-
-                  upload_response="$(curl -sS \
-                      -X POST \
-                      -H "${auth_header}" \
-                      -H "${accept_header}" \
-                      -H "${version_header}" \
-                      -H "Content-Type: application/zip" \
-                      --data-binary @"${ASSET_PATH}" \
-                      "${upload_url}?name=${ASSET_NAME}")"
-
-                  download_url="$(printf '%s' "${upload_response}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["browser_download_url"])')"
-                  echo "Uploaded asset: ${download_url}"
