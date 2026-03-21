@@ -1,0 +1,198 @@
+name: Publish Addon From Changelog
+
+on:
+    push:
+        paths:
+            - "!KRT/CHANGELOG.md"
+            - "!KRT/!KRT.toc"
+    workflow_dispatch:
+        # GitHub only exposes workflow_dispatch when this workflow file is also present on the
+        # repository default branch. Once it is there, the UI/CLI can target any ref.
+        inputs:
+            target_ref:
+                description: "Branch, tag, or commit to publish from; default is the current ref"
+                required: false
+                default: ""
+                type: string
+
+permissions:
+    contents: write
+
+jobs:
+    resolve:
+        runs-on: ubuntu-latest
+        outputs:
+            requested_ref: ${{ steps.ref.outputs.requested_ref }}
+            previous_ref: ${{ steps.prev_ref.outputs.previous_ref }}
+            should_publish: ${{ steps.publish_gate.outputs.should_publish }}
+            publish_reason: ${{ steps.publish_gate.outputs.reason }}
+            version: ${{ steps.meta.outputs.version }}
+            channel: ${{ steps.meta.outputs.channel }}
+            prerelease: ${{ steps.meta.outputs.prerelease }}
+            publishable: ${{ steps.meta.outputs.publishable }}
+            tag: ${{ steps.meta.outputs.tag }}
+            asset_name: ${{ steps.meta.outputs.asset_name }}
+            checksum_name: ${{ steps.meta.outputs.checksum_name }}
+            release_title: ${{ steps.meta.outputs.release_title }}
+        steps:
+            - name: Resolve requested ref
+              id: ref
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  requested_ref="${GITHUB_SHA}"
+                  if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+                      requested_ref="${{ inputs.target_ref }}"
+                      if [[ -z "${requested_ref}" ]]; then
+                          requested_ref="${GITHUB_REF_NAME}"
+                      fi
+                  fi
+
+                  echo "requested_ref=${requested_ref}" >> "$GITHUB_OUTPUT"
+
+            - name: Checkout repository (no external action)
+              shell: bash
+              env:
+                  REF: ${{ steps.ref.outputs.requested_ref }}
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+
+                  rm -rf repo
+                  git init repo
+                  cd repo
+                  git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+                  git fetch --depth 2 origin "${REF}"
+                  git checkout --detach FETCH_HEAD
+
+            - name: Resolve release metadata from changelog
+              id: meta
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  python3 ./repo/tools/krt.py release-metadata --github-output "$GITHUB_OUTPUT"
+
+            - name: Resolve previous ref for numeric-version gate
+              id: prev_ref
+              shell: bash
+              env:
+                  BEFORE_SHA: ${{ github.event.before }}
+              run: |
+                  set -euo pipefail
+
+                  previous_ref=""
+                  if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+                      previous_ref="${BEFORE_SHA}"
+                      if [[ "${previous_ref}" == "0000000000000000000000000000000000000000" ]]; then
+                          previous_ref=""
+                      fi
+                  else
+                      previous_ref="$(git -C repo rev-list --parents -n 1 HEAD | awk '{print $2}')"
+                      if [[ "${previous_ref}" == "" ]]; then
+                          previous_ref=""
+                      fi
+                  fi
+
+                  echo "previous_ref=${previous_ref}" >> "$GITHUB_OUTPUT"
+
+            - name: Fetch previous ref for publish gate
+              if: ${{ steps.prev_ref.outputs.previous_ref != '' }}
+              shell: bash
+              env:
+                  PREVIOUS_REF: ${{ steps.prev_ref.outputs.previous_ref }}
+              run: |
+                  set -euo pipefail
+
+                  git -C repo fetch --depth 1 origin "${PREVIOUS_REF}"
+
+            - name: Decide whether this run should publish
+              id: publish_gate
+              shell: bash
+              env:
+                  PREVIOUS_REF: ${{ steps.prev_ref.outputs.previous_ref }}
+              run: |
+                  set -euo pipefail
+
+                  python3 ./repo/tools/krt.py release-publish-gate \
+                      --previous-ref "${PREVIOUS_REF}" \
+                      --github-output "$GITHUB_OUTPUT"
+
+    sync-tag:
+        runs-on: ubuntu-latest
+        needs: resolve
+        if: ${{ needs.resolve.outputs.should_publish == 'true' }}
+        steps:
+            - name: Checkout repository (no external action)
+              shell: bash
+              env:
+                  REF: ${{ needs.resolve.outputs.requested_ref }}
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+
+                  rm -rf repo
+                  git init repo
+                  cd repo
+                  git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+                  git fetch --depth 1 origin "${REF}"
+                  git checkout --detach FETCH_HEAD
+
+            - name: Create or update derived release tag
+              shell: bash
+              env:
+                  DERIVED_TAG: ${{ needs.resolve.outputs.tag }}
+                  CHANNEL: ${{ needs.resolve.outputs.channel }}
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+
+                  git -C repo config user.name "github-actions[bot]"
+                  git -C repo config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+                  target_commit="$(git -C repo rev-parse HEAD)"
+                  existing_commit=""
+
+                  if git -C repo fetch --depth 1 origin "refs/tags/${DERIVED_TAG}:refs/tags/${DERIVED_TAG}" >/dev/null 2>&1; then
+                      existing_commit="$(git -C repo rev-parse "refs/tags/${DERIVED_TAG}^{commit}")"
+                  fi
+
+                  if [[ -n "${existing_commit}" ]]; then
+                      if [[ "${existing_commit}" == "${target_commit}" ]]; then
+                          echo "Tag ${DERIVED_TAG} already points to ${target_commit}."
+                          exit 0
+                      fi
+
+                      if [[ "${CHANNEL}" == "release" ]]; then
+                          echo "Release tag ${DERIVED_TAG} already exists on ${existing_commit} and will not be moved." >&2
+                          exit 1
+                      fi
+                  fi
+
+                  git -C repo tag -fa "${DERIVED_TAG}" -m "Release ${DERIVED_TAG}" "${target_commit}"
+                  git -C repo push origin "refs/tags/${DERIVED_TAG}" --force
+
+    publish-beta:
+        if: ${{ needs.resolve.outputs.should_publish == 'true' && needs.resolve.outputs.channel == 'beta' }}
+        needs:
+            - resolve
+            - sync-tag
+        uses: ./.github/workflows/release-addon.yml
+        with:
+            expected_channel: beta
+            requested_ref: ${{ needs.resolve.outputs.requested_ref }}
+            requested_tag: ${{ needs.resolve.outputs.tag }}
+        secrets: inherit
+
+    publish-release:
+        if: ${{ needs.resolve.outputs.should_publish == 'true' && needs.resolve.outputs.channel == 'release' }}
+        needs:
+            - resolve
+            - sync-tag
+        uses: ./.github/workflows/release-addon.yml
+        with:
+            expected_channel: release
+            requested_ref: ${{ needs.resolve.outputs.requested_ref }}
+            requested_tag: ${{ needs.resolve.outputs.tag }}
+        secrets: inherit
