@@ -111,7 +111,6 @@ Add-MatchesOutsideAllowed `
     -Lines $directQueryMigrationMatches `
     -AllowedPaths @(
         "!KRT\Core\DBManager.lua",
-        "!KRT\Core\DBManager.Mock.lua",
         "!KRT\Core\DBRaidQueries.lua",
         "!KRT\Core\DBRaidMigrations.lua",
         "!KRT\Core\DBRaidValidator.lua",

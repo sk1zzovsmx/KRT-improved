@@ -3,7 +3,6 @@
 
 # --- Repo / tooling ---
 .vscode/**
-.devcontainer/**
 
 # --- Generati / minificati / backup (se mai li avessi) ---
 **/*.min.lua

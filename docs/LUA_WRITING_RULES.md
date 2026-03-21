@@ -268,7 +268,7 @@ Tool ownership:
 - `tools/check-lua-syntax.ps1`: syntax-only validation for all Lua files
 - `tools/check-lua-uniformity.ps1`: repo-specific structural and naming rules
 - `tools/check-api-nomenclature.ps1`: staged public API case + verb-taxonomy check
-- `DEV_CHECKS.md`: copy-paste verification commands and audit greps
+- `docs/DEV_CHECKS.md`: copy-paste verification commands and audit greps
 
 Do not add a style rule that cannot be explained by one of those sources.
 

@@ -289,4 +289,4 @@ In-game smoke path:
 - `docs/TECH_CLEANUP_BACKLOG.md`
 - `docs/REFACTOR_RULES.md`
 - `docs/LUA_WRITING_RULES.md`
-- `DEV_CHECKS.md`
+- `docs/DEV_CHECKS.md`

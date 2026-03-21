@@ -47,6 +47,6 @@ For binding rules and architectural constraints, use:
 
 - Lua rules and local gates: `docs/LUA_WRITING_RULES.md`
 - Layering map and repo-local automation: `docs/ARCHITECTURE.md`
-- Copy-paste checks: `DEV_CHECKS.md`
+- Copy-paste checks: `docs/DEV_CHECKS.md`
 - SavedVariables inventory: `docs/SV_SCHEMA.md`
 - Raid schema contract: `docs/RAID_SCHEMA.md`

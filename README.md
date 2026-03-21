@@ -1,7 +1,6 @@
 # KRT: Kader Raid Tools — Improved (Total Rework)
-[![Download latest beta](https://img.shields.io/github/v/release/sk1zzovsmx/KRT-improved?include_prereleases&label=Download%20latest%20beta)](https://github.com/sk1zzovsmx/KRT-improved/releases)
+[![Download latest beta](https://img.shields.io/github/v/release/sk1zzovsmx/KRT-improved?include_prereleases&label=Download%20latest%20beta)](https://github.com/sk1zzovsmx/KRT-improved/releases) [![Downloads](https://img.shields.io/github/downloads/sk1zzovsmx/KRT-improved/total?label=Downloads)](https://github.com/sk1zzovsmx/KRT-improved/releases)
 
-AddOn Version: **0.6.0b**  
 Game Version: **Wrath of the Lich King 3.3.5a** (Interface **30300**)
 
 Copyright (C) 2018 **Kader Bouyakoub**  
@@ -94,10 +93,10 @@ Compare the hash value with the content of `KRT-beta-0.6.0b.zip.sha256`.
 ## Developer Docs
 
 - Architecture and layering map: `docs/ARCHITECTURE.md`
-- Runtime ownership and module map: `OVERVIEW.md`
+- Runtime ownership and module map: `docs/OVERVIEW.md`
 - Lua writing rules and naming policy: `docs/LUA_WRITING_RULES.md`
 - Binding rules and coding policy: `AGENTS.md`
-- Quick layering checks: `DEV_CHECKS.md`
+- Quick layering checks: `docs/DEV_CHECKS.md`
 - Cross-platform tooling entrypoint: `tools/krt.py`
 - Agent skills + Mechanic companion workflow: `docs/AGENT_SKILLS.md`
 - Repo-local MCP server for skill/addon workflows: `docs/KRT_MCP.md`

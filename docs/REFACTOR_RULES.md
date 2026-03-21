@@ -24,7 +24,7 @@ Permanent guardrails for function mapping and unification work.
    - `luacheck --codes --no-color !KRT tools tests`
    - `tools/check-lua-uniformity.ps1`
    - `stylua --check !KRT tools tests`
-3. Run quick duplicate checks from `DEV_CHECKS.md` (function unification section).
+3. Run quick duplicate checks from `docs/DEV_CHECKS.md` (function unification section).
 4. If function ownership changed, regenerate:
    - `docs/FUNCTION_REGISTRY.csv`
    - `docs/FN_CLUSTERS.md`

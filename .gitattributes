@@ -1,6 +1,5 @@
 # Exclude repository-only files from GitHub source archives.
 .github            export-ignore
-.devcontainer      export-ignore
 .vscode            export-ignore
 .gitattributes     export-ignore
 .gitignore         export-ignore
@@ -9,9 +8,9 @@
 .editorconfig      export-ignore
 AGENTS.md          export-ignore
 CHANGELOG.md       export-ignore
-OVERVIEW.md        export-ignore
 README.md          export-ignore
-screenshot.jpg     export-ignore
+docs/OVERVIEW.md          export-ignore
+docs/DEV_CHECKS.md        export-ignore
 
 # Default: treat files as text where possible.
 * text=auto

@@ -107,8 +107,6 @@
 |       |   \\-- ...
 |       \\-- s-working
 |           \\-- ...
-|-- .devcontainer
-|   \\-- devcontainer.json
 |-- .githooks
 |   |-- pre-commit
 |   \\-- README.md
@@ -121,7 +119,7 @@
 |-- dist
 |   |-- KRT-beta-0.6.0b.zip
 |   |-- KRT-beta-0.6.1b.zip
-|   \\-- KRT-beta-0.6.1b.zip.sha256
+|   \\-- KRT-beta-0.6.2b.zip
 |-- docs
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
@@ -129,10 +127,12 @@
 |   |-- API_REGISTRY_INTERNAL.csv
 |   |-- API_REGISTRY_PUBLIC.csv
 |   |-- ARCHITECTURE.md
+|   |-- DEV_CHECKS.md
 |   |-- FN_CLUSTERS.md
 |   |-- FUNCTION_REGISTRY.csv
 |   |-- KRT_MCP.md
 |   |-- LUA_WRITING_RULES.md
+|   |-- OVERVIEW.md
 |   |-- RAID_SCHEMA.md
 |   |-- REFACTOR_RULES.md
 |   |-- SV_SANITY_CHECKLIST.md
@@ -144,8 +144,6 @@
 |   |-- fixtures
 |   |   \\-- sv
 |   |       \\-- ...
-|   |-- mocks
-|   |   \\-- DBManager.Mock.lua
 |   \\-- release_stabilization_spec.lua
 |-- tools
 |   |-- agent-skills.manifest.json
@@ -187,10 +185,7 @@
 |-- .styluaignore
 |-- AGENTS.md
 |-- CHANGELOG.md
-|-- DEV_CHECKS.md
-|-- OVERVIEW.md
-|-- README.md
-\\-- screenshot.jpg
+\\-- README.md
 ```
 
 _Regenerate with `tools/update-tree.ps1`._
