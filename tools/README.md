@@ -5,6 +5,24 @@ Stable index for repository tooling.
 Paths remain flat under `tools/` on purpose: the repo already references these scripts in hooks,
 docs, AGENTS, and MCP wiring. Grouping is documented here first to keep cleanup safe and churn low.
 
+## Cross-Platform Entrypoint
+
+Use `tools/krt.py` as the canonical repo tooling entrypoint when you want the same command shape on
+Windows and Linux.
+
+Examples:
+
+- Windows PowerShell: `py -3 tools/krt.py dev-stack-status --json`
+- Linux shell: `python3 tools/krt.py dev-stack-status --json`
+- Release metadata from `!KRT/CHANGELOG.md`: `python3 tools/krt.py release-metadata --json`
+- Publish gate by numeric version: `python3 tools/krt.py release-publish-gate --previous-ref HEAD^ --json`
+- Release packaging: `python3 tools/krt.py build-release-zip --output-dir dist --write-checksum`
+- Hook install: `python3 tools/krt.py install-hooks`
+- Mechanic wrapper: `python3 tools/krt.py mech AddonValidate --json`
+
+The legacy `*.ps1` scripts remain available for compatibility and for flows that have not been fully
+ported yet.
+
 ## Checks
 
 - `check-toc-files.ps1`: validates TOC naming, file entries, and SavedVariables declarations

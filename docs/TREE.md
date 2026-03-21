@@ -114,11 +114,13 @@
 |   \\-- README.md
 |-- .github
 |   \\-- workflows
-|       \\-- release-addon.yml
+|       |-- release-addon.yml
+|       \\-- release-router.yml
 |-- .vscode
 |   \\-- settings.json
 |-- dist
-|   \\-- KRT-beta-0.6.0b.zip
+|   |-- KRT-beta-0.6.0b.zip
+|   \\-- KRT-beta-0.6.0b.zip.sha256
 |-- docs
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
@@ -145,6 +147,8 @@
 |   |   \\-- DBManager.Mock.lua
 |   \\-- release_stabilization_spec.lua
 |-- tools
+|   |-- __pycache__
+|   |   \\-- krt.cpython-312.pyc
 |   |-- agent-skills.manifest.json
 |   |-- build-release-zip.ps1
 |   |-- check-api-nomenclature.ps1
@@ -159,6 +163,7 @@
 |   |-- fnmap-classify.ps1
 |   |-- fnmap-inventory.ps1
 |   |-- install-hooks.ps1
+|   |-- krt.py
 |   |-- krt_mcp_server.py
 |   |-- mech-bootstrap.ps1
 |   |-- mech-krt.ps1

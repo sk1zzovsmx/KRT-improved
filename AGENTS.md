@@ -158,6 +158,16 @@ Durable preferences learned from recent conversations:
   `Services/Rolls.lua` and `Controllers/Master.lua`; run it whenever those modules change.
 - Prefer repo-relative paths or placeholders in config/docs/examples; avoid personal absolute
   paths unless strictly required by the tool.
+- Prefer simplified repo tooling that works on both Windows and Linux with automatic OS-aware
+  execution; local runs should use Windows-native paths/tools, while cloud runs should use Linux-
+  compatible paths/tools without requiring separate user workflows.
+- Prefer release-channel resolution from changelog release metadata: under `## Unreleased`, keep
+  `Release-Version: <version>` in `!KRT/CHANGELOG.md` and derive channel from the final suffix
+  letter (`A`=alpha internal/no publication, `B`=beta prerelease, `R`=stable release); GitHub
+  workflows, tags, and assets should validate against that metadata instead of manual prerelease
+  toggles.
+- Prefer release publication only when the numeric version changes (`x.x.x`); suffix-only changes
+  such as `0.6.0b -> 0.6.0r` must not publish a new release.
 - For release artifacts, package only the addon folder `!KRT/`; do not include repo-level
   docs/tooling files in distributable ZIP outputs.
 

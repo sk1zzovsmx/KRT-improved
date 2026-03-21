@@ -4,6 +4,20 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Tooling:** Release channel resolution is now driven by
+  `!KRT/CHANGELOG.md` `Release-Version` suffixes (`A` internal/no publish,
+  `B` beta prerelease, `R` stable release), and GitHub publishing
+  routes only publishable channels through the shared workflow.
+- **Tooling:** Release publication now requires a changed numeric version
+  (`x.x.x`); suffix-only transitions such as `0.6.0b -> 0.6.0r` do not
+  publish.
+- **Tooling:** Added `tools/krt.py` as the canonical cross-platform entrypoint
+  for repo workflows such as release packaging, hook install, Mechanic calls,
+  MCP startup, and readiness checks on both Windows and Linux.
+- **Tooling:** GitHub release packaging now uses
+  `tools/krt.py build-release-zip`, and the repo-local pre-commit hook now
+  enters through the same Python CLI before delegating to the existing
+  PowerShell gates.
 - **Release:** GitHub packaging now reuses `tools/build-release-zip.ps1` and
   uploads both `KRT-<tag>.zip` and `KRT-<tag>.zip.sha256`.
 - **Regression/Bugfix:** Manual release creation keeps strict tag validation

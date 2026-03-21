@@ -1,25 +1,21 @@
-name: Release Addon Package
+name: Release Addon Publish (Reusable)
 
 on:
-    push:
-        tags:
-            - "beta-*"
-    workflow_dispatch:
+    workflow_call:
         inputs:
-            tag_name:
-                description: "Release tag (example: beta-0.6.0b)"
+            expected_channel:
+                description: "Expected release channel from CHANGELOG Release-Version suffix"
                 required: true
                 type: string
-            target_ref:
-                description: "Branch or commit to package"
+            requested_ref:
+                description: "Ref used to resolve metadata before switching to the derived tag"
+                required: true
+                type: string
+            requested_tag:
+                description: "Optional pushed tag to validate against derived release metadata"
                 required: false
                 default: ""
                 type: string
-            prerelease:
-                description: "Mark release as prerelease"
-                required: false
-                default: true
-                type: boolean
 
 permissions:
     contents: write
@@ -28,37 +24,10 @@ jobs:
     package-and-release:
         runs-on: ubuntu-latest
         steps:
-            - name: Resolve release metadata
-              id: meta
-              shell: bash
-              run: |
-                  set -euo pipefail
-
-                  if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-                      tag="${{ inputs.tag_name }}"
-                      ref="${{ inputs.target_ref }}"
-                      if [[ -z "${ref}" ]]; then
-                          ref="${GITHUB_REF_NAME}"
-                      fi
-                      prerelease="${{ inputs.prerelease }}"
-                  else
-                      tag="${GITHUB_REF_NAME}"
-                      ref="${GITHUB_SHA}"
-                      if [[ "${GITHUB_REF_NAME}" == beta-* ]]; then
-                          prerelease="true"
-                      else
-                          prerelease="false"
-                      fi
-                  fi
-
-                  echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-                  echo "ref=${ref}" >> "$GITHUB_OUTPUT"
-                  echo "prerelease=${prerelease}" >> "$GITHUB_OUTPUT"
-
             - name: Checkout repository (no external action)
               shell: bash
               env:
-                  REF: ${{ steps.meta.outputs.ref }}
+                  REF: ${{ inputs.requested_ref }}
                   GH_TOKEN: ${{ github.token }}
               run: |
                   set -euo pipefail
@@ -70,25 +39,68 @@ jobs:
                   git fetch --depth 1 origin "${REF}"
                   git checkout --detach FETCH_HEAD
 
+            - name: Resolve release metadata from changelog
+              id: meta
+              shell: bash
+              env:
+                  EXPECTED_CHANNEL: ${{ inputs.expected_channel }}
+              run: |
+                  set -euo pipefail
+
+                  python3 ./repo/tools/krt.py release-metadata \
+                      --expected-channel "${EXPECTED_CHANNEL}" \
+                      --github-output "$GITHUB_OUTPUT"
+
+            - name: Validate pushed tag matches derived release metadata
+              if: ${{ inputs.requested_tag != '' }}
+              shell: bash
+              env:
+                  REQUESTED_TAG: ${{ inputs.requested_tag }}
+                  DERIVED_TAG: ${{ steps.meta.outputs.tag }}
+              run: |
+                  set -euo pipefail
+
+                  if [[ "${REQUESTED_TAG}" != "${DERIVED_TAG}" ]]; then
+                      echo "Pushed tag '${REQUESTED_TAG}' does not match derived tag '${DERIVED_TAG}'." >&2
+                      exit 1
+                  fi
+
+            - name: Fetch and switch to derived release tag
+              shell: bash
+              env:
+                  DERIVED_TAG: ${{ steps.meta.outputs.tag }}
+              run: |
+                  set -euo pipefail
+
+                  if ! git -C repo fetch --depth 1 origin "refs/tags/${DERIVED_TAG}:refs/tags/${DERIVED_TAG}"; then
+                      echo "Expected release tag not found on origin: ${DERIVED_TAG}" >&2
+                      exit 1
+                  fi
+
+                  git -C repo checkout --detach "refs/tags/${DERIVED_TAG}"
+
             - name: Build addon archive (only !KRT/)
               id: pack
-              shell: pwsh
+              shell: bash
               env:
-                  TAG: ${{ steps.meta.outputs.tag }}
+                  ASSET_NAME: ${{ steps.meta.outputs.asset_name }}
               run: |
-                  $asset = "KRT-$env:TAG.zip"
-                  & ./repo/tools/build-release-zip.ps1 -OutputDir "../dist" -FileName $asset -WriteChecksum
-                  echo "asset_name=${asset}" >> "$GITHUB_OUTPUT"
-                  echo "asset_path=dist/${asset}" >> "$GITHUB_OUTPUT"
-                  echo "checksum_path=dist/${asset}.sha256" >> "$GITHUB_OUTPUT"
+                  set -euo pipefail
 
-            - name: Create/update release and upload asset
+                  python3 ./repo/tools/krt.py build-release-zip \
+                      --output-dir ../dist \
+                      --file-name "${ASSET_NAME}" \
+                      --write-checksum
+                  echo "asset_path=dist/${ASSET_NAME}" >> "$GITHUB_OUTPUT"
+                  echo "checksum_path=dist/${ASSET_NAME}.sha256" >> "$GITHUB_OUTPUT"
+
+            - name: Create or update GitHub release
               shell: bash
               env:
                   GH_TOKEN: ${{ github.token }}
                   TAG: ${{ steps.meta.outputs.tag }}
-                  REF: ${{ steps.meta.outputs.ref }}
                   PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+                  RELEASE_TITLE: ${{ steps.meta.outputs.release_title }}
                   ASSET_PATH: ${{ steps.pack.outputs.asset_path }}
                   CHECKSUM_PATH: ${{ steps.pack.outputs.checksum_path }}
               run: |
@@ -110,8 +122,7 @@ jobs:
                       release_args=(
                           release create "${TAG}" "${assets[@]}"
                           --repo "${GITHUB_REPOSITORY}"
-                          --title "${TAG}"
-                          --target "${REF}"
+                          --title "${RELEASE_TITLE}"
                           --generate-notes
                           --verify-tag
                       )

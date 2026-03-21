@@ -27,10 +27,11 @@ so there is a single execution path for humans and agents.
 
 ## Start command
 
-Use the PowerShell wrapper so the client does not need to know the Python path in advance:
+Use the cross-platform Python entrypoint so the client can keep one command shape on Windows and Linux:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-krt-mcp.ps1
+```text
+Windows: py -3 tools/krt.py run-krt-mcp
+Linux:   python3 tools/krt.py run-krt-mcp
 ```
 
 The Python server lives at `tools/krt_mcp_server.py`.
@@ -39,16 +40,16 @@ The Python server lives at `tools/krt_mcp_server.py`.
 
 - `KRT_LOCAL_SKILLS_ROOT`
   - Overrides the default local install target for `skills_sync installLocal=true`.
-  - Default: `%USERPROFILE%\.codex\skills`
+  - Default: `%USERPROFILE%\.codex\skills` on Windows, `~/.codex/skills` on Linux
 - `KRT_MECHANIC_ROOT`
   - Overrides the default bootstrap location used by `tools/mech-bootstrap.ps1`.
-  - Default: `C:\dev\Mechanic`
+  - Default: `C:\dev\Mechanic` on Windows, `~/dev/Mechanic` on Linux
 - `KRT_MECHANIC_EXE`
   - Overrides the `mech.exe` path used by `tools/mech-krt.ps1` and `mechanic_call`.
-  - Default: `C:\dev\Mechanic\desktop\.venv\Scripts\mech.exe`
+  - Default: repo-local Python tooling uses the OS-appropriate `.venv` path under `KRT_MECHANIC_ROOT`
 - `KRT_POWERSHELL_EXE`
   - Overrides the PowerShell executable used by the Python MCP server.
-  - Default: `powershell`
+  - Default: first available of `pwsh`, `pwsh.exe`, `powershell`, `powershell.exe`
 
 ## Suggested workflow
 
@@ -59,6 +60,9 @@ The Python server lives at `tools/krt_mcp_server.py`.
 5. If Mechanic is missing, call `mechanic_bootstrap`.
 6. Run `repo_quality_check` for fast local checks that do not need Mechanic.
 7. If Mechanic is ready, use `mechanic_call` for addon-aware validation and output.
+
+For shell entrypoints outside MCP, prefer `tools/krt.py` over direct `*.ps1` calls when you want the
+same invocation shape on Windows and Linux.
 
 ## Notes
 

@@ -21,8 +21,10 @@ screenshot.jpg     export-ignore
 *.xml  text eol=lf
 *.toc  text eol=lf
 *.md   text eol=lf
+*.py   text eol=lf
 *.yml  text eol=lf
 *.yaml text eol=lf
+.githooks/pre-commit text eol=lf
 
 # Vendored libraries: do not normalize/convert line endings.
 \!KRT/Libs/** -text

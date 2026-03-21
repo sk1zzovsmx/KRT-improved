@@ -40,13 +40,17 @@ Start with a single readiness check before switching between vendored skills,
 local Codex installs, Mechanic, and MCP:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/dev-stack-status.ps1
+py -3 tools/krt.py dev-stack-status
+```
+
+```bash
+python3 tools/krt.py dev-stack-status
 ```
 
 Machine-readable status for agents and wrappers:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/dev-stack-status.ps1 -Json
+py -3 tools/krt.py dev-stack-status --json
 ```
 
 Sync skills into `.agents/skills` from pinned sources:
@@ -96,9 +100,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/mech-bootstrap.ps1 -Ru
 Run Mechanic commands for KRT with explicit addon path:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/mech-krt.ps1 -Action AddonValidate -Json
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/mech-krt.ps1 -Action DocsStale -Json
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/mech-krt.ps1 -Action AddonDeadcode -Json
+py -3 tools/krt.py mech AddonValidate --json
+py -3 tools/krt.py mech DocsStale --json
+py -3 tools/krt.py mech AddonDeadcode --json
 ```
 
 Available wrapper actions:
@@ -119,15 +123,15 @@ Available wrapper actions:
 
 Treat the repo-local scripts as the CLI truth and use them in this order:
 
-1. `tools/dev-stack-status.ps1`
+1. `tools/krt.py dev-stack-status`
    - Confirms whether vendored skills, local installs, Mechanic, and MCP are ready.
 2. `tools/sync-agent-skills.ps1`
    - Restores vendored skills or installs them locally with `-InstallLocal`.
 3. `tools/mech-bootstrap.ps1`
    - Bootstraps Mechanic on the current device when `mech.exe` is missing.
-4. `tools/mech-krt.ps1`
+4. `tools/krt.py mech ...`
    - Validates the addon and docs through Mechanic-backed commands.
-5. `tools/run-krt-mcp.ps1`
+5. `tools/krt.py run-krt-mcp`
    - Exposes the same stack through one MCP endpoint for agents.
 
 This keeps the local workflow aligned with AFD's CLI-first rule: if a tool
@@ -141,8 +145,9 @@ through one stdio endpoint instead of shelling each script manually.
 
 Start command:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-krt-mcp.ps1
+```text
+Windows: py -3 tools/krt.py run-krt-mcp
+Linux:   python3 tools/krt.py run-krt-mcp
 ```
 
 See `docs/KRT_MCP.md` for tool inventory, readiness checks, environment
