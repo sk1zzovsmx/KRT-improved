@@ -7,13 +7,8 @@ on:
             - "!KRT/!KRT.toc"
     workflow_dispatch:
         # GitHub only exposes workflow_dispatch when this workflow file is also present on the
-        # repository default branch. Once it is there, the UI/CLI can target any ref.
-        inputs:
-            target_ref:
-                description: "Branch, tag, or commit to publish from; default is the current ref"
-                required: false
-                default: ""
-                type: string
+        # repository default branch. Once it is there, the Actions branch selector defines the
+        # release context directly.
 
 permissions:
     contents: write
@@ -43,10 +38,7 @@ jobs:
 
                   requested_ref="${GITHUB_SHA}"
                   if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-                      requested_ref="${{ inputs.target_ref }}"
-                      if [[ -z "${requested_ref}" ]]; then
-                          requested_ref="${GITHUB_REF_NAME}"
-                      fi
+                      requested_ref="${GITHUB_REF_NAME}"
                   fi
 
                   echo "requested_ref=${requested_ref}" >> "$GITHUB_OUTPUT"
