@@ -168,6 +168,12 @@ Durable preferences learned from recent conversations:
   toggles.
 - Prefer release publication only when the numeric version changes (`x.x.x`); suffix-only changes
   such as `0.6.0b -> 0.6.0r` must not publish a new release.
+- Prefer semantic version bumps with this policy: increment `patch` for backward-compatible fixes
+  and polish, increment `minor` for backward-compatible features or meaningful UI/workflow
+  additions, and increment `major` only for breaking API/SavedVariables changes or required user
+  migrations.
+- Treat channel suffix changes (`A/B/R`) as release-channel metadata only; they do not replace the
+  semantic version bump decision for `major.minor.patch`.
 - Prefer branch-agnostic release automation: release workflows should accept pushes from any branch,
   and manual release dispatch should target any ref once the workflow exists on the default branch.
 - Prefer manual release workflows to use the selected branch/ref directly; avoid redundant
