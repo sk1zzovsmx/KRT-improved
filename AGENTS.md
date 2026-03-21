@@ -168,6 +168,8 @@ Durable preferences learned from recent conversations:
   toggles.
 - Prefer release publication only when the numeric version changes (`x.x.x`); suffix-only changes
   such as `0.6.0b -> 0.6.0r` must not publish a new release.
+- Prefer release publication from the `splitting-monolithic-KRT` branch; treat it as a canonical
+  publish branch for this repo's automation.
 - For release artifacts, package only the addon folder `!KRT/`; do not include repo-level
   docs/tooling files in distributable ZIP outputs.
 

@@ -5,6 +5,7 @@ on:
         branches:
             - main
             - master
+            - splitting-monolithic-KRT
         paths:
             - "!KRT/CHANGELOG.md"
             - "!KRT/!KRT.toc"

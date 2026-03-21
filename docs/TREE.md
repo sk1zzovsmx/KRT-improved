@@ -119,8 +119,7 @@
 |-- .vscode
 |   \\-- settings.json
 |-- dist
-|   |-- KRT-beta-0.6.0b.zip
-|   \\-- KRT-beta-0.6.0b.zip.sha256
+|   \\-- KRT-beta-0.6.0b.zip
 |-- docs
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
@@ -147,8 +146,6 @@
 |   |   \\-- DBManager.Mock.lua
 |   \\-- release_stabilization_spec.lua
 |-- tools
-|   |-- __pycache__
-|   |   \\-- krt.cpython-312.pyc
 |   |-- agent-skills.manifest.json
 |   |-- build-release-zip.ps1
 |   |-- check-api-nomenclature.ps1

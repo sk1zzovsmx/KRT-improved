@@ -1391,6 +1391,7 @@ do
     module.selectedItem = nil
     local TAB_HISTORY = "history"
     local TAB_EXPORT = "export"
+    local EXPORT_TAB_ENABLED = false
 
     module.activeTab = module.activeTab or TAB_HISTORY
 
@@ -1441,7 +1442,7 @@ do
     MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_RAIDATT, { allowMulti = true, allowRange = true })
     MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_LOOT, { allowMulti = true, allowRange = true })
     local function normalizeTabName(tabName)
-        if tabName == TAB_EXPORT then
+        if tabName == TAB_EXPORT and EXPORT_TAB_ENABLED then
             return TAB_EXPORT
         end
         return TAB_HISTORY
@@ -1453,6 +1454,8 @@ do
             return
         end
 
+        module.activeTab = normalizeTabName(module.activeTab)
+
         local isHistory = (module.activeTab ~= TAB_EXPORT)
         local activeTabId = isHistory and 1 or 2
 
@@ -1462,6 +1465,10 @@ do
         local exportFrames = {
             refs.export,
         }
+
+        if refs.exportTabBtn then
+            Frames.SetShown(refs.exportTabBtn, EXPORT_TAB_ENABLED)
+        end
 
         -- Hard switch on concrete frames to avoid any residual visual overlap.
         for i = 1, #historyFrames do
@@ -1684,18 +1691,21 @@ do
             refs.exportTabBtn:SetText(L.StrExportTab)
         end
         if PanelTemplates_SetNumTabs then
-            PanelTemplates_SetNumTabs(frame, 2)
+            PanelTemplates_SetNumTabs(frame, EXPORT_TAB_ENABLED and 2 or 1)
         end
 
         ensureSubmoduleOnLoad(module.Raids, refs.raids)
-        ensureSubmoduleOnLoad(module.ExportRaids, refs.exportRaids)
         ensureSubmoduleOnLoad(module.Boss, refs.bosses)
         ensureSubmoduleOnLoad(module.Loot, refs.loot)
         ensureSubmoduleOnLoad(module.RaidAttendees, refs.raidAttendees)
         ensureSubmoduleOnLoad(module.BossAttendees, refs.bossAttendees)
-        ensureSubmoduleOnLoad(module.Export, refs.export)
         ensureSubmoduleOnLoad(module.BossBox, refs.bossBox)
         ensureSubmoduleOnLoad(module.AttendeesBox, refs.attendeesBox)
+
+        if EXPORT_TAB_ENABLED then
+            ensureSubmoduleOnLoad(module.ExportRaids, refs.exportRaids)
+            ensureSubmoduleOnLoad(module.Export, refs.export)
+        end
 
         module:SetTab(module.activeTab)
     end
