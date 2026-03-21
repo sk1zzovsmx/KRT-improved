@@ -1,29 +1,25 @@
-# Agent Skills Sync
+# Agent Skills and Mechanic Workflow
 
-This repository vendors selected AI skills under `.agents/skills` using an upstream-pure policy.
+This repository vendors selected AI skills under `.agents/skills` with an upstream-pure policy.
 
 ## Policy
 
-- Keep imported skills identical to upstream source files.
-- Do not patch or rewrite imported content, even when some relative links do not resolve in this repo.
-- Pin every imported skill to an explicit commit SHA for deterministic sync.
+- Keep imported skills byte-identical to upstream snapshots.
+- Do not patch vendored skill content locally.
+- Pin every imported skill to an explicit commit SHA.
 
-## Source Of Truth
+## Source of Truth
 
 - Manifest: `tools/agent-skills.manifest.json`
-- Script: `tools/sync-agent-skills.ps1`
+- Sync script: `tools/sync-agent-skills.ps1`
+- Cross-platform entrypoint: `tools/krt.py`
 
-The manifest defines:
-
-- `version`
-- `sources[]` entries with `skill`, `repo`, `commit`, `sourceBasePath`, `destinationPath`
-
-## Pinned Sources
+## Pinned Skill Sources
 
 - `Falkicon/Mechanic` @ `41ef25dcfcd7c1450577b5826fbba9c571c7c75d`
 - `lushly-dev/afd` @ `53084d96b61edc515cd85f64eec4aa514c68548d`
 
-Managed skills:
+Managed skills from the manifest:
 
 - `s-clean`
 - `s-audit`
@@ -34,127 +30,77 @@ Managed skills:
 - `k-docs`
 - `afd`
 
-## Commands
+## Recommended Command Flow
 
-Start with a single readiness check before switching between vendored skills,
-local Codex installs, Mechanic, and MCP:
+1. Inspect local readiness.
+2. Verify or sync vendored skills.
+3. Install skills locally if needed.
+4. Bootstrap Mechanic (once per machine).
+5. Run Mechanic-backed addon checks.
+6. Start MCP when agent workflows need a tool endpoint.
+
+## Cross-Platform Commands (`tools/krt.py`)
+
+Windows:
 
 ```powershell
 py -3 tools/krt.py dev-stack-status
+py -3 tools/krt.py skills-manifest
+py -3 tools/krt.py skills-sync --verify-only
+py -3 tools/krt.py skills-sync
+py -3 tools/krt.py skills-sync --install-local
+py -3 tools/krt.py mechanic-bootstrap --pull
+py -3 tools/krt.py mech AddonValidate --json
+py -3 tools/krt.py run-krt-mcp
 ```
+
+Linux:
 
 ```bash
 python3 tools/krt.py dev-stack-status
+python3 tools/krt.py skills-manifest
+python3 tools/krt.py skills-sync --verify-only
+python3 tools/krt.py skills-sync
+python3 tools/krt.py skills-sync --install-local
+python3 tools/krt.py mechanic-bootstrap --pull
+python3 tools/krt.py mech AddonValidate --json
+python3 tools/krt.py run-krt-mcp
 ```
 
-Machine-readable status for agents and wrappers:
+## Legacy Script Equivalents
 
-```powershell
-py -3 tools/krt.py dev-stack-status --json
-```
+These remain valid and are what `krt.py` wraps:
 
-Sync skills into `.agents/skills` from pinned sources:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/sync-agent-skills.ps1
-```
-
-Verify drift only (read-only check, no file writes):
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/sync-agent-skills.ps1 -VerifyOnly
-```
-
-Sync and install managed skills to local Codex profile:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/sync-agent-skills.ps1 -InstallLocal
-```
-
-Default local install target:
-
-- `%USERPROFILE%\.codex\skills\<skill>`
+- `tools/sync-agent-skills.ps1`
+- `tools/mech-bootstrap.ps1`
+- `tools/mech-krt.ps1`
+- `tools/dev-stack-status.ps1`
+- `tools/run-krt-mcp.ps1`
 
 ## Multi-Device Mechanic Companion
 
-When working on multiple devices, keep Mechanic outside this repo and bootstrap per machine.
+Keep Mechanic external to this repo, bootstrap per device.
 
-Bootstrap or update local Mechanic companion:
+Default roots:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/mech-bootstrap.ps1
-```
+- Windows: `C:\dev\Mechanic`
+- Linux: `~/dev/Mechanic`
 
-Bootstrap and pull latest `main` first:
+Environment overrides:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/mech-bootstrap.ps1 -Pull
-```
-
-Optional tool setup step (non-interactive config skip):
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/mech-bootstrap.ps1 -RunSetupTools
-```
-
-Run Mechanic commands for KRT with explicit addon path:
-
-```powershell
-py -3 tools/krt.py mech AddonValidate --json
-py -3 tools/krt.py mech DocsStale --json
-py -3 tools/krt.py mech AddonDeadcode --json
-```
-
-Available wrapper actions:
-
-- `EnvStatus`
-- `ToolsStatus`
-- `AddonValidate`
-- `DocsStale`
-- `AddonDeadcode`
-- `AddonLint`
-- `AddonFormat`
-- `AddonSecurity`
-- `AddonComplexity`
-- `AddonDeprecations`
-- `AddonOutput`
-
-## Canonical AFD Workflow
-
-Treat the repo-local scripts as the CLI truth and use them in this order:
-
-1. `tools/krt.py dev-stack-status`
-   - Confirms whether vendored skills, local installs, Mechanic, and MCP are ready.
-2. `tools/sync-agent-skills.ps1`
-   - Restores vendored skills or installs them locally with `-InstallLocal`.
-3. `tools/mech-bootstrap.ps1`
-   - Bootstraps Mechanic on the current device when `mech.exe` is missing.
-4. `tools/krt.py mech ...`
-   - Validates the addon and docs through Mechanic-backed commands.
-5. `tools/krt.py run-krt-mcp`
-   - Exposes the same stack through one MCP endpoint for agents.
-
-This keeps the local workflow aligned with AFD's CLI-first rule: if a tool
-chain is not ready or testable from the shell, do not assume an agent or UI
-surface will be reliable.
-
-## Repo-Local MCP Server
-
-Use the repo-local MCP server when you want agents to access the existing skill sync and addon tooling
-through one stdio endpoint instead of shelling each script manually.
-
-Start command:
-
-```text
-Windows: py -3 tools/krt.py run-krt-mcp
-Linux:   python3 tools/krt.py run-krt-mcp
-```
-
-See `docs/KRT_MCP.md` for tool inventory, readiness checks, environment
-overrides, and the recommended workflow.
+- `KRT_MECHANIC_ROOT`
+- `KRT_MECHANIC_EXE`
+- `KRT_LOCAL_SKILLS_ROOT`
+- `KRT_POWERSHELL_EXE`
 
 ## Safety Boundaries
 
-- Cleanup removes stale files only inside managed destinations from the manifest.
-- The script never touches `.system` skills.
-- Local install overwrites only the managed skill names listed in the manifest.
+- Sync cleanup is limited to managed destination paths from the manifest.
+- `.system` skills are never touched by repo sync.
+- Local install overwrites only managed skill names listed in the manifest.
+
+## Related Docs
+
+- `docs/KRT_MCP.md` - MCP tool inventory and workflow
+- `docs/DEV_CHECKS.md` - fast local checks
+- `tools/README.md` - tool index and command families

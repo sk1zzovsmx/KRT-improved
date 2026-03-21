@@ -1,52 +1,114 @@
-# KRT Overview
+# KRT Runtime Overview
 
-Purpose: quick navigation for contributors who need the current addon shape
-without reading full binding policy first.
+Purpose: quick orientation for contributors who need current runtime ownership without scanning
+all binding details first.
 
-For binding rules and architectural constraints, use:
-- `AGENTS.md`
-- `docs/ARCHITECTURE.md`
+For binding rules and invariants, see `AGENTS.md`.
+For architecture guardrails, see `docs/ARCHITECTURE.md`.
 
-## At A Glance
+## At a Glance
 
-- Runtime target: WoW 3.3.5a, Lua 5.1.
-- Addon root: `!KRT/`.
-- Unified bootstrap and shared runtime ownership live in `!KRT/Init.lua`.
-- Runtime code is split into `Controllers/`, `Services/`, `Widgets/`, and
-  `EntryPoints/`.
-- Shared infrastructure lives in `!KRT/Modules/`.
-- XML stays layout-only under `!KRT/UI/` and is loaded via `!KRT/KRT.xml`.
-- Persisted state is declared in `!KRT/!KRT.toc` through `KRT_*`
-  SavedVariables.
+- Runtime target: WoW 3.3.5a (`Interface: 30300`), Lua 5.1.
+- Addon folder: `!KRT/` (leading `!` is intentional).
+- Unified bootstrap ownership is in `!KRT/Init.lua`.
+- Runtime modules are split into `Controllers/`, `Services/`, `Widgets/`, and `EntryPoints/`.
+- Shared infra is in `!KRT/Modules/`.
+- XML is layout-only under `!KRT/UI/`, included through `!KRT/KRT.xml`.
 
-## Current Module Layout
+## Bootstrap Ownership (`Init.lua`)
 
-- `!KRT/Controllers/*.lua`
-  Parent owners such as `Master`, `Logger`, `Warnings`, `Changes`, `Spammer`.
-- `!KRT/Services/*.lua`
-  Runtime data/model logic such as `Raid`, `Chat`, `Rolls`, `Loot`,
-  `Reserves`.
-- `!KRT/Widgets/*.lua`
-  Feature UI controllers such as `LootCounter`, `ReservesUI`, `Config`.
-- `!KRT/EntryPoints/*.lua`
-  User entrypoints such as slash routing and minimap behavior.
-- `!KRT/Modules/*.lua`
-  Shared infra modules such as `Bus`, `Strings`, `Item`, `Time`, `Sort`,
-  `Base64`, `Colors`, `Frames`, `UIScaffold`, `ListController`, and
-  `MultiSelect`.
+`Init.lua` owns initialization of shared namespaces and runtime state roots:
 
-## Runtime Rules That Matter Most
+- `addon.Core`
+- `addon.L`
+- `addon.Diagnose`
+- `addon.State`
+- `addon.C`
+- `addon.Events` (`Internal` + forwarded `Wow` names)
+- `addon.Controllers`, `addon.Services`, `addon.Widgets`
+- compatibility alias proxy (`addon.Master`, `addon.Logger`, `addon.Raid`, ...)
 
-- Services stay UI-free and do not touch Parent frames.
-- Upward communication goes through `addon.Bus`.
-- EntryPoints may call `Parent:Toggle()` directly.
-- Public APIs use `PascalCase`; private helpers use `camelCase`.
-- XML does not own logic through inline `<Scripts>` or `<On...>` handlers.
+`Init.lua` also owns global WoW event wiring and bus forwarding.
 
-## Fast References
+## Runtime Module Map
 
-- Lua rules and local gates: `docs/LUA_WRITING_RULES.md`
-- Layering map and repo-local automation: `docs/ARCHITECTURE.md`
-- Copy-paste checks: `docs/DEV_CHECKS.md`
-- SavedVariables inventory: `docs/SV_SCHEMA.md`
-- Raid schema contract: `docs/RAID_SCHEMA.md`
+### Controllers (`addon.Controllers.*`)
+
+Top-level parent owners:
+
+- `addon.Controllers.Master`
+- `addon.Controllers.Logger`
+- `addon.Controllers.Warnings`
+- `addon.Controllers.Changes`
+- `addon.Controllers.Spammer`
+
+### Services (`addon.Services.*`)
+
+Runtime data/model/service modules:
+
+- `addon.Services.Raid`
+- `addon.Services.Chat`
+- `addon.Services.Rolls`
+- `addon.Services.Loot`
+- `addon.Services.Debug`
+- `addon.Services.Reserves` (`.Service` sub-owner for reserves store/index/import)
+
+### Widgets (`addon.Widgets.*`)
+
+Feature UI controllers:
+
+- `addon.Widgets.LootCounter`
+- `addon.Widgets.ReservesUI`
+- `addon.Widgets.Config`
+
+### EntryPoints
+
+Entrypoints stay narrow:
+
+- `addon.Minimap` (`EntryPoints/Minimap.lua`)
+- slash command routing (`EntryPoints/SlashEvents.lua`)
+
+### Shared Modules
+
+Common infra under `!KRT/Modules/`:
+
+- Data/utility: `Events`, `Strings`, `Item`, `Time`, `Sort`, `Comms`, `Base64`, `Colors`
+- UI infra: `Frames`, `UIScaffold`, `ListController`, `MultiSelect`, `UI` facade, `UIEffects`
+- Messaging: `Bus`
+- Feature toggles: `Features`
+
+## Public API Notes
+
+- Canonical owners are namespaced (`addon.Controllers.*`, `addon.Services.*`, `addon.Widgets.*`).
+- Legacy top-level aliases (`addon.Master`, `addon.Logger`, ...) are compatibility shims.
+- In debug mode, alias reads are intentionally warned to prevent new alias call sites.
+
+## Event and Refresh Flow
+
+- WoW events are received in `Init.lua`.
+- `Init.lua` forwards domain events through `addon.Bus`.
+- Services process model/runtime state.
+- Controllers and Widgets refresh UI on demand (`RequestRefresh`/`Refresh`), not by polling.
+
+## SavedVariables (Account Scope)
+
+Declared in `!KRT/!KRT.toc`:
+
+- `KRT_Raids`
+- `KRT_Players`
+- `KRT_Reserves`
+- `KRT_Warnings`
+- `KRT_Spammer`
+- `KRT_Options`
+
+Avoid key/shape breaks without migration and changelog notes.
+
+## Placement Guide for New Code
+
+- Parent feature logic -> `Controllers/`
+- Runtime model/state logic -> `Services/`
+- Feature UI controllers -> `Widgets/`
+- Slash/minimap routing -> `EntryPoints/`
+- Generic reusable helpers/constants -> `Modules/`
+
+When in doubt, keep behavior ownership explicit and route cross-layer notifications through `addon.Bus`.

@@ -1,74 +1,83 @@
 # KRT MCP Server
 
-This repository now ships a repo-local MCP server for addon development and skill maintenance.
+KRT ships a repo-local MCP server for addon and skill workflows.
 
-The server is intentionally thin: it wraps the existing PowerShell tooling already used in this repo,
-so there is a single execution path for humans and agents.
+The server is intentionally thin: it wraps existing repo scripts so humans and agents
+share one execution path.
 
-## What it exposes
+## Start Command
 
-- `dev_stack_status`
-  - Read unified readiness for vendored skills, local Codex installs, Mechanic,
-    and the repo-local MCP server.
-- `skills_manifest`
-  - Read the pinned manifest behind `.agents/skills`.
-- `skills_verify`
-  - Verify vendored skills against the pinned upstream commits.
-- `skills_sync`
-  - Sync vendored skills and optionally install them into a local Codex skills folder.
-- `repo_quality_check`
-  - Run repo-local checks such as `toc_files`, `lua_syntax`, `ui_binding`, `layering`,
-    `raid_hardening`, and `lua_uniformity`.
-- `mechanic_call`
-  - Call the existing `tools/mech-krt.ps1` wrapper for `env.status`, addon validation,
-    dead-code scans, lint, formatting, output, and similar Mechanic-backed flows.
-- `mechanic_bootstrap`
-  - Bootstrap or update the external Mechanic checkout used by repo-local wrappers.
-
-## Start command
-
-Use the cross-platform Python entrypoint so the client can keep one command shape on Windows and Linux:
+Use the cross-platform Python entrypoint:
 
 ```text
 Windows: py -3 tools/krt.py run-krt-mcp
 Linux:   python3 tools/krt.py run-krt-mcp
 ```
 
-The Python server lives at `tools/krt_mcp_server.py`.
+Server implementation: `tools/krt_mcp_server.py`.
 
-## Optional environment overrides
+## Exposed MCP Tools
+
+- `dev_stack_status`
+  Unified readiness across commands, manifests, local skills, Mechanic, and MCP dependencies.
+- `skills_manifest`
+  Read `tools/agent-skills.manifest.json` with resolved destination paths.
+- `skills_verify`
+  Verify vendored `.agents/skills` content against pinned manifest snapshots.
+- `skills_sync`
+  Sync vendored skills and optionally install them into local Codex skill paths.
+- `repo_quality_check`
+  Run one repo check: `toc_files`, `lua_syntax`, `ui_binding`, `layering`, `raid_hardening`,
+  or `lua_uniformity`.
+- `mechanic_call`
+  Execute existing Mechanic wrapper flows (`env.status`, addon validate/lint/deadcode, etc.).
+- `mechanic_bootstrap`
+  Bootstrap/update external Mechanic checkout used by wrappers.
+
+## Suggested Workflow
+
+1. Run `dev_stack_status` first.
+2. Inspect `skills_manifest`.
+3. Run `skills_verify` before doc/tooling updates.
+4. Run `skills_sync` when vendored snapshots drift.
+5. Run `repo_quality_check` for fast local guardrails.
+6. If Mechanic is required and missing, run `mechanic_bootstrap`.
+7. Use `mechanic_call` for addon-aware checks.
+
+## Shell Equivalents
+
+The MCP server delegates to these repo scripts:
+
+- `tools/dev-stack-status.ps1`
+- `tools/sync-agent-skills.ps1`
+- `tools/check-*.ps1` (`toc`, `lua`, `layering`, `ui_binding`, ...)
+- `tools/mech-krt.ps1`
+- `tools/mech-bootstrap.ps1`
+
+Equivalent direct CLI path:
+
+```bash
+python3 tools/krt.py dev-stack-status
+python3 tools/krt.py repo-quality-check --check layering
+python3 tools/krt.py skills-sync --verify-only
+python3 tools/krt.py mech AddonValidate --json
+```
+
+## Optional Environment Overrides
 
 - `KRT_LOCAL_SKILLS_ROOT`
-  - Overrides the default local install target for `skills_sync installLocal=true`.
-  - Default: `%USERPROFILE%\.codex\skills` on Windows, `~/.codex/skills` on Linux
+  Overrides local Codex skills destination.
+  Default: `%USERPROFILE%\.codex\skills` (Windows), `~/.codex/skills` (Linux).
 - `KRT_MECHANIC_ROOT`
-  - Overrides the default bootstrap location used by `tools/mech-bootstrap.ps1`.
-  - Default: `C:\dev\Mechanic` on Windows, `~/dev/Mechanic` on Linux
+  Overrides Mechanic checkout root.
+  Default: `C:\dev\Mechanic` (Windows), `~/dev/Mechanic` (Linux).
 - `KRT_MECHANIC_EXE`
-  - Overrides the `mech.exe` path used by `tools/mech-krt.ps1` and `mechanic_call`.
-  - Default: repo-local Python tooling uses the OS-appropriate `.venv` path under `KRT_MECHANIC_ROOT`
+  Overrides executable used by Mechanic wrapper calls.
 - `KRT_POWERSHELL_EXE`
-  - Overrides the PowerShell executable used by the Python MCP server.
-  - Default: first available of `pwsh`, `pwsh.exe`, `powershell`, `powershell.exe`
-
-## Suggested workflow
-
-1. Call `dev_stack_status` first.
-2. Call `skills_manifest` to inspect the pinned skill sources.
-3. Call `skills_verify` before editing repo docs or local tooling.
-4. If vendored skills drift, call `skills_sync`.
-5. If Mechanic is missing, call `mechanic_bootstrap`.
-6. Run `repo_quality_check` for fast local checks that do not need Mechanic.
-7. If Mechanic is ready, use `mechanic_call` for addon-aware validation and output.
-
-For shell entrypoints outside MCP, prefer `tools/krt.py` over direct `*.ps1` calls when you want the
-same invocation shape on Windows and Linux.
+  Overrides PowerShell executable used by the MCP server.
 
 ## Notes
 
-- The MCP server does not patch vendored skill content. It only reads the manifest or runs the existing sync
-  script.
-- `mechanic_call` depends on a local Mechanic install. Bootstrap it first with
-  `mechanic_bootstrap` or `tools/mech-bootstrap.ps1` if needed.
-- The server auto-detects current newline-delimited stdio framing and legacy `Content-Length` framing,
-  which keeps it usable across older and newer MCP clients.
+- MCP tool operations do not patch vendored skill content directly.
+- `skills_sync` and `mechanic_bootstrap` are intentionally marked as destructive operations.
+- The server supports both newline-delimited JSON-RPC framing and legacy `Content-Length` framing.

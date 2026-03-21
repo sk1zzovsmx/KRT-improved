@@ -69,6 +69,16 @@ ADDON_DIR = REPO_ROOT / "!KRT"
 TOC_PATH = ADDON_DIR / "!KRT.toc"
 ADDON_CHANGELOG_PATH = ADDON_DIR / "CHANGELOG.md"
 
+REPO_CHECK_SCRIPTS = {
+    "api_nomenclature": "check-api-nomenclature.ps1",
+    "layering": "check-layering.ps1",
+    "lua_syntax": "check-lua-syntax.ps1",
+    "lua_uniformity": "check-lua-uniformity.ps1",
+    "raid_hardening": "check-raid-hardening.ps1",
+    "toc_files": "check-toc-files.ps1",
+    "ui_binding": "check-ui-binding.ps1",
+}
+
 
 def first_command(candidates: list[str]) -> str | None:
     for candidate in candidates:
@@ -141,6 +151,28 @@ def run_command_capture(command: list[str], *, cwd: Path | None = None) -> subpr
         encoding="utf-8",
         errors="replace",
     )
+
+
+def run_powershell_script(script_name: str, args: list[str] | None = None) -> int:
+    powershell = powershell_executable()
+    if not powershell:
+        raise CliError("PowerShell not found. Set KRT_POWERSHELL_EXE or install PowerShell.")
+
+    script_path = TOOLS_DIR / script_name
+    if not script_path.is_file():
+        raise CliError(f"PowerShell script not found: {script_path}")
+
+    command = [
+        powershell,
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(script_path),
+    ]
+    if args:
+        command.extend(args)
+    return run_command(command, cwd=REPO_ROOT)
 
 
 def read_toc_version() -> str:
@@ -344,6 +376,70 @@ def install_hooks(_: argparse.Namespace) -> int:
 
     print("Configured core.hooksPath=.githooks")
     return 0
+
+
+def repo_quality_check(args: argparse.Namespace) -> int:
+    script_name = REPO_CHECK_SCRIPTS[args.check]
+    print(f"Running check '{args.check}' via {script_name}...", flush=True)
+    return run_powershell_script(script_name, [])
+
+
+def skills_manifest(args: argparse.Namespace) -> int:
+    manifest_path = TOOLS_DIR / "agent-skills.manifest.json"
+    if not manifest_path.is_file():
+        raise CliError(f"Skills manifest not found: {manifest_path}")
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if args.json:
+        print(json.dumps(manifest, indent=2))
+        return 0
+
+    sources = manifest.get("sources", [])
+    print(f"Manifest: {manifest_path}")
+    print(f"Version: {manifest.get('version')}")
+    print("")
+    print("Skills:")
+    for source in sources:
+        skill = str(source.get("skill", "")).strip() or "<unknown>"
+        repo = str(source.get("repo", "")).strip() or "<repo?>"
+        commit = str(source.get("commit", "")).strip() or "<commit?>"
+        destination = str(source.get("destinationPath", "")).strip()
+        suffix = f" -> {destination}" if destination else ""
+        print(f"  - {skill}: {repo}@{commit}{suffix}")
+    return 0
+
+
+def skills_sync(args: argparse.Namespace) -> int:
+    if args.verify_only and args.install_local:
+        raise CliError("Use either --verify-only or --install-local, not both.")
+
+    ps_args: list[str] = []
+    if args.verify_only:
+        ps_args.append("-VerifyOnly")
+    if args.install_local:
+        ps_args.append("-InstallLocal")
+    if args.local_skills_root:
+        root = str(Path(args.local_skills_root).expanduser())
+        ps_args.extend(["-LocalSkillsRoot", root])
+    return run_powershell_script("sync-agent-skills.ps1", ps_args)
+
+
+def mechanic_bootstrap(args: argparse.Namespace) -> int:
+    ps_args: list[str] = []
+    if args.mechanic_root:
+        root = str(Path(args.mechanic_root).expanduser())
+        ps_args.extend(["-MechanicRoot", root])
+    if args.repo_url:
+        ps_args.extend(["-RepoUrl", args.repo_url])
+    if args.ref:
+        ps_args.extend(["-Ref", args.ref])
+    if args.pull:
+        ps_args.append("-Pull")
+    if args.skip_pip_upgrade:
+        ps_args.append("-SkipPipUpgrade")
+    if args.run_setup_tools:
+        ps_args.append("-RunSetupTools")
+    return run_powershell_script("mech-bootstrap.ps1", ps_args)
 
 
 def run_krt_mcp(args: argparse.Namespace) -> int:
@@ -608,23 +704,7 @@ def dev_stack_status(args: argparse.Namespace) -> int:
 
 
 def pre_commit(_: argparse.Namespace) -> int:
-    powershell = powershell_executable()
-    if not powershell:
-        raise CliError(
-            "tools/pre-commit.ps1 requires PowerShell. Install pwsh or powershell to run the hook."
-        )
-
-    return run_command(
-        [
-            powershell,
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            str(TOOLS_DIR / "pre-commit.ps1"),
-        ],
-        cwd=REPO_ROOT,
-    )
+    return run_powershell_script("pre-commit.ps1", [])
 
 
 def read_release_version_from_git_ref(ref: str) -> str | None:
@@ -728,6 +808,29 @@ def build_parser() -> argparse.ArgumentParser:
 
     install = subparsers.add_parser("install-hooks", help="Set git core.hooksPath=.githooks")
     install.set_defaults(handler=install_hooks)
+
+    quality = subparsers.add_parser("repo-quality-check", help="Run one repo-local quality check script")
+    quality.add_argument("--check", choices=sorted(REPO_CHECK_SCRIPTS), required=True)
+    quality.set_defaults(handler=repo_quality_check)
+
+    skills_list = subparsers.add_parser("skills-manifest", help="Print managed skills manifest")
+    skills_list.add_argument("--json", action="store_true")
+    skills_list.set_defaults(handler=skills_manifest)
+
+    skills = subparsers.add_parser("skills-sync", help="Run vendored skill sync or verification")
+    skills.add_argument("--verify-only", action="store_true")
+    skills.add_argument("--install-local", action="store_true")
+    skills.add_argument("--local-skills-root", default="")
+    skills.set_defaults(handler=skills_sync)
+
+    bootstrap = subparsers.add_parser("mechanic-bootstrap", help="Bootstrap/update local Mechanic checkout")
+    bootstrap.add_argument("--mechanic-root", default="")
+    bootstrap.add_argument("--repo-url", default="")
+    bootstrap.add_argument("--ref", default="")
+    bootstrap.add_argument("--pull", action="store_true")
+    bootstrap.add_argument("--skip-pip-upgrade", action="store_true")
+    bootstrap.add_argument("--run-setup-tools", action="store_true")
+    bootstrap.set_defaults(handler=mechanic_bootstrap)
 
     mcp = subparsers.add_parser("run-krt-mcp", help="Start the repo-local MCP server")
     mcp.add_argument("--python-exe", default="")

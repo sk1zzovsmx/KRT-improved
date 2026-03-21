@@ -8,6 +8,15 @@ Exception: sections marked **BINDING** must be followed for every change.
 
 Changelog: **CHANGELOG.md** is the single source of truth for behavior/user-visible changes.
 
+Developer docs package (keep these files aligned when architecture/tooling changes):
+- `docs/ARCHITECTURE.md` (architecture/layering map + UI/XML binding and template policy)
+- `docs/OVERVIEW.md` (runtime ownership and module map)
+- `docs/LUA_WRITING_RULES.md` (Lua writing rules and naming policy)
+- `docs/DEV_CHECKS.md` (quick layering/tooling checks)
+- `docs/AGENT_SKILLS.md` (agent skills + Mechanic companion workflow)
+- `docs/KRT_MCP.md` (repo-local MCP server usage and tool inventory)
+- `tools/krt.py` (cross-platform tooling entrypoint)
+
 ---
 
 ## Conversations (Self-Learning)
