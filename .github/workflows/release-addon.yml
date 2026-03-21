@@ -35,55 +35,196 @@ jobs:
                   set -euo pipefail
 
                   if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-                      echo "tag=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
-                      echo "ref=${{ inputs.target_ref }}" >> "$GITHUB_OUTPUT"
-                      echo "prerelease=${{ inputs.prerelease }}" >> "$GITHUB_OUTPUT"
+                      tag="${{ inputs.tag_name }}"
+                      ref="${{ inputs.target_ref }}"
+                      prerelease="${{ inputs.prerelease }}"
                   else
-                      echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-                      echo "ref=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-
+                      tag="${GITHUB_REF_NAME}"
+                      ref="${GITHUB_REF_NAME}"
                       if [[ "${GITHUB_REF_NAME}" == beta-* ]]; then
-                          echo "prerelease=true" >> "$GITHUB_OUTPUT"
+                          prerelease="true"
                       else
-                          echo "prerelease=false" >> "$GITHUB_OUTPUT"
+                          prerelease="false"
                       fi
                   fi
 
-            - name: Checkout code
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
-                  ref: ${{ steps.meta.outputs.ref }}
+                  echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+                  echo "ref=${ref}" >> "$GITHUB_OUTPUT"
+                  echo "prerelease=${prerelease}" >> "$GITHUB_OUTPUT"
+
+            - name: Checkout repository (no external action)
+              shell: bash
+              env:
+                  REF: ${{ steps.meta.outputs.ref }}
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+
+                  rm -rf repo
+                  git init repo
+                  cd repo
+                  git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+                  git fetch --depth 1 origin "${REF}"
+                  git checkout --detach FETCH_HEAD
 
             - name: Build addon archive (only !KRT/)
               id: pack
               shell: bash
+              env:
+                  TAG: ${{ steps.meta.outputs.tag }}
               run: |
                   set -euo pipefail
 
-                  tag="${{ steps.meta.outputs.tag }}"
-                  asset="KRT-${tag}.zip"
+                  asset="KRT-${TAG}.zip"
                   mkdir -p dist
+                  rm -f "dist/${asset}"
 
-                  rm -f "dist/$asset"
                   rm -rf package
                   mkdir -p package
-                  cp -R "!KRT" package/
+                  cp -R "repo/!KRT" package/
 
                   (
                       cd package
-                      zip -r "../dist/$asset" "!KRT"
+                      zip -r "../dist/${asset}" "!KRT"
                   )
 
-                  echo "asset=dist/$asset" >> "$GITHUB_OUTPUT"
+                  python3 - "${asset}" <<'PY'
+                  import sys
+                  import zipfile
 
-            - name: Create GitHub release
-              uses: softprops/action-gh-release@v2
-              with:
-                  tag_name: ${{ steps.meta.outputs.tag }}
-                  target_commitish: ${{ steps.meta.outputs.ref }}
-                  name: ${{ steps.meta.outputs.tag }}
-                  prerelease: ${{ steps.meta.outputs.prerelease }}
-                  generate_release_notes: true
-                  files: ${{ steps.pack.outputs.asset }}
-                  overwrite_files: true
+                  zip_path = "dist/" + sys.argv[1]
+                  with zipfile.ZipFile(zip_path) as archive:
+                      invalid = [name for name in archive.namelist() if name and not name.startswith("!KRT/")]
+
+                  if invalid:
+                      raise SystemExit(
+                          "Archive validation failed. Unexpected entries: " + ", ".join(invalid[:5])
+                      )
+
+                  print("Archive validation OK.")
+                  PY
+
+                  echo "asset_name=${asset}" >> "$GITHUB_OUTPUT"
+                  echo "asset_path=dist/${asset}" >> "$GITHUB_OUTPUT"
+
+            - name: Create/update release and upload asset
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  TAG: ${{ steps.meta.outputs.tag }}
+                  REF: ${{ steps.meta.outputs.ref }}
+                  PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+                  ASSET_NAME: ${{ steps.pack.outputs.asset_name }}
+                  ASSET_PATH: ${{ steps.pack.outputs.asset_path }}
+              run: |
+                  set -euo pipefail
+
+                  api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+                  auth_header="Authorization: Bearer ${GH_TOKEN}"
+                  accept_header="Accept: application/vnd.github+json"
+                  version_header="X-GitHub-Api-Version: 2022-11-28"
+
+                  release_lookup_json="$(mktemp)"
+                  http_code="$(curl -sS -o "${release_lookup_json}" -w "%{http_code}" \
+                      -H "${auth_header}" \
+                      -H "${accept_header}" \
+                      -H "${version_header}" \
+                      "${api}/releases/tags/${TAG}")"
+
+                  if [[ "${http_code}" == "200" ]]; then
+                      release_json="$(cat "${release_lookup_json}")"
+                  elif [[ "${http_code}" == "404" ]]; then
+                      release_json=""
+                  else
+                      echo "Failed to query release tag ${TAG}. HTTP ${http_code}."
+                      cat "${release_lookup_json}"
+                      exit 1
+                  fi
+
+                  if [[ -z "${release_json}" ]]; then
+                      payload="$(python3 - <<'PY'
+                  import json
+                  import os
+
+                  print(json.dumps({
+                      "tag_name": os.environ["TAG"],
+                      "target_commitish": os.environ["REF"],
+                      "name": os.environ["TAG"],
+                      "prerelease": os.environ["PRERELEASE"].lower() == "true",
+                      "generate_release_notes": True,
+                  }))
+                  PY
+                  )"
+
+                      release_json="$(curl -sS \
+                          -X POST \
+                          -H "${auth_header}" \
+                          -H "${accept_header}" \
+                          -H "${version_header}" \
+                          "${api}/releases" \
+                          -d "${payload}")"
+                  else
+                      release_id="$(printf '%s' "${release_json}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
+                      payload="$(python3 - <<'PY'
+                  import json
+                  import os
+
+                  print(json.dumps({
+                      "name": os.environ["TAG"],
+                      "target_commitish": os.environ["REF"],
+                      "prerelease": os.environ["PRERELEASE"].lower() == "true",
+                      "generate_release_notes": True,
+                  }))
+                  PY
+                  )"
+
+                      release_json="$(curl -sS \
+                          -X PATCH \
+                          -H "${auth_header}" \
+                          -H "${accept_header}" \
+                          -H "${version_header}" \
+                          "${api}/releases/${release_id}" \
+                          -d "${payload}")"
+                  fi
+
+                  release_id="$(printf '%s' "${release_json}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
+                  upload_url="$(printf '%s' "${release_json}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["upload_url"].split("{")[0])')"
+
+                  assets_json="$(curl -sS \
+                      -H "${auth_header}" \
+                      -H "${accept_header}" \
+                      -H "${version_header}" \
+                      "${api}/releases/${release_id}/assets")"
+
+                  existing_asset_id="$(printf '%s' "${assets_json}" | python3 - "${ASSET_NAME}" <<'PY'
+                  import json
+                  import sys
+
+                  wanted = sys.argv[1]
+                  for asset in json.load(sys.stdin):
+                      if asset.get("name") == wanted:
+                          print(asset["id"])
+                          break
+                  PY
+                  )"
+
+                  if [[ -n "${existing_asset_id}" ]]; then
+                      curl -sS \
+                          -X DELETE \
+                          -H "${auth_header}" \
+                          -H "${accept_header}" \
+                          -H "${version_header}" \
+                          "${api}/releases/assets/${existing_asset_id}" > /dev/null
+                  fi
+
+                  upload_response="$(curl -sS \
+                      -X POST \
+                      -H "${auth_header}" \
+                      -H "${accept_header}" \
+                      -H "${version_header}" \
+                      -H "Content-Type: application/zip" \
+                      --data-binary @"${ASSET_PATH}" \
+                      "${upload_url}?name=${ASSET_NAME}")"
+
+                  download_url="$(printf '%s' "${upload_response}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["browser_download_url"])')"
+                  echo "Uploaded asset: ${download_url}"
