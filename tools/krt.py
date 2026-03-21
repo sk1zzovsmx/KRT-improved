@@ -103,6 +103,29 @@ def powershell_executable() -> str | None:
     return first_command(["pwsh", "pwsh.exe", "powershell", "powershell.exe"])
 
 
+def powershell_script_arg(script_path: Path, powershell: str) -> str:
+    script_arg = str(script_path)
+    if is_windows():
+        return script_arg
+
+    command_name = Path(powershell).name.lower()
+    is_windows_host = command_name.endswith(".exe") or command_name == "powershell"
+    if not is_windows_host:
+        return script_arg
+
+    for converter in ("wslpath", "cygpath"):
+        converter_path = shutil.which(converter)
+        if not converter_path:
+            continue
+        converted = run_command_capture([converter_path, "-w", script_arg], cwd=REPO_ROOT)
+        if converted.returncode == 0:
+            value = converted.stdout.strip()
+            if value:
+                return value
+
+    return script_arg
+
+
 def default_mechanic_root() -> Path:
     override = os.environ.get("KRT_MECHANIC_ROOT", "").strip()
     if override:
@@ -161,6 +184,7 @@ def run_powershell_script(script_name: str, args: list[str] | None = None) -> in
     script_path = TOOLS_DIR / script_name
     if not script_path.is_file():
         raise CliError(f"PowerShell script not found: {script_path}")
+    script_arg = powershell_script_arg(script_path, powershell)
 
     command = [
         powershell,
@@ -168,7 +192,7 @@ def run_powershell_script(script_name: str, args: list[str] | None = None) -> in
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        str(script_path),
+        script_arg,
     ]
     if args:
         command.extend(args)
@@ -570,7 +594,7 @@ def verify_skills_if_requested(verify_skills: bool) -> dict[str, Any] | None:
             "-ExecutionPolicy",
             "Bypass",
             "-File",
-            str(TOOLS_DIR / "sync-agent-skills.ps1"),
+            powershell_script_arg(TOOLS_DIR / "sync-agent-skills.ps1", powershell),
             "-VerifyOnly",
         ],
         cwd=REPO_ROOT,

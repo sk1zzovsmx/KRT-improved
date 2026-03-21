@@ -114,6 +114,23 @@
 |   \\-- workflows
 |       |-- release-addon.yml
 |       \\-- release-router.yml
+|-- .venv
+|   |-- Include
+|   |-- Lib
+|   |   \\-- site-packages
+|   |       \\-- ...
+|   |-- Scripts
+|   |   |-- activate
+|   |   |-- activate.bat
+|   |   |-- Activate.ps1
+|   |   |-- deactivate.bat
+|   |   |-- pip.exe
+|   |   |-- pip3.12.exe
+|   |   |-- pip3.exe
+|   |   |-- python.exe
+|   |   \\-- pythonw.exe
+|   |-- .gitignore
+|   \\-- pyvenv.cfg
 |-- .vscode
 |   \\-- settings.json
 |-- dist
@@ -135,6 +152,7 @@
 |   |-- OVERVIEW.md
 |   |-- RAID_SCHEMA.md
 |   |-- REFACTOR_RULES.md
+|   |-- RELEASE_DOWNLOAD.md
 |   |-- SV_SANITY_CHECKLIST.md
 |   |-- SV_SCHEMA.md
 |   |-- TECH_CLEANUP_BACKLOG.md
