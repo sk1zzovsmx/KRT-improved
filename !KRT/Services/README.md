@@ -5,8 +5,9 @@ Runtime data/model/gameplay modules without parent UI ownership.
 Allowed:
 - Use `Modules/*` helpers/constants and localization tables.
 - Depend on other Services when needed.
-- Emit upward signals through `StdFacade.triggerEvent(...)`.
-- Use generic utility helpers that may internally use WoW UI APIs (for example cache warmers in `StdFacade`).
+- Emit upward signals through `Bus.TriggerEvent(...)`.
+- Use generic utility helpers that may internally use WoW UI APIs when they stay service-level and
+  do not take ownership of frames.
 
 Disallowed:
 - Calling Parent modules directly (`Master`, `Logger`, `Warnings`, `Changes`, `Spammer`).

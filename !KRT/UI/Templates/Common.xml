@@ -227,7 +227,7 @@
 					<Anchors>
 						<Anchor point="RIGHT">
 							<Offset>
-								<AbsDimension x="-5" y="0" />
+								<AbsDimension x="-4" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
@@ -240,23 +240,35 @@
 					<Anchors>
 						<Anchor point="RIGHT" relativeTo="$parentRoll" relativePoint="LEFT">
 							<Offset>
-								<AbsDimension x="0" y="0" />
-								<!-- was -1 -->
+								<AbsDimension x="-2" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 					<Color r="1" g="1" b="1" a="1" />
 				</FontString>
+				<FontString name="$parentInfo" inherits="GameFontNormalSmall" justifyH="RIGHT">
+					<Size>
+						<AbsDimension x="22" />
+					</Size>
+					<Anchors>
+						<Anchor point="RIGHT" relativeTo="$parentCounter" relativePoint="LEFT">
+							<Offset>
+								<AbsDimension x="-2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="0.82" b="0.36" a="1" />
+				</FontString>
 				<FontString name="$parentName" inherits="GameFontNormal" justifyH="LEFT">
 					<Anchors>
 						<Anchor point="LEFT">
 							<Offset>
-								<AbsDimension x="20" y="0" />
+								<AbsDimension x="18" y="0" />
 							</Offset>
 						</Anchor>
-						<Anchor point="RIGHT" relativeTo="$parentCounter" relativePoint="LEFT">
+						<Anchor point="RIGHT" relativeTo="$parentInfo" relativePoint="LEFT">
 							<Offset>
-								<AbsDimension x="-4" y="0" />
+								<AbsDimension x="-3" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
@@ -269,7 +281,7 @@
 					<Anchors>
 						<Anchor point="LEFT" relativePoint="LEFT">
 							<Offset>
-								<AbsDimension x="3" y="0" />
+								<AbsDimension x="2" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>

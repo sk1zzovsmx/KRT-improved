@@ -1,12 +1,13 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-Set-Location $repoRoot
-
-if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
-    $PSNativeCommandUseErrorActionPreference = $false
+$toolingCommonPath = Join-Path $PSScriptRoot "tooling-common.ps1"
+if (-not (Test-Path -LiteralPath $toolingCommonPath)) {
+    $toolingCommonPath = Join-Path (Split-Path -Parent $PSScriptRoot) "tooling-common.ps1"
 }
+. $toolingCommonPath
+$repoRoot = Enter-KrtRepoRoot -ScriptRoot $PSScriptRoot
+Disable-KrtNativeCommandErrors
 
 $violations = New-Object System.Collections.Generic.List[string]
 $rgCmd = Get-Command rg -ErrorAction SilentlyContinue
@@ -14,94 +15,6 @@ $useRipgrep = ($null -ne $rgCmd)
 
 if (-not $useRipgrep) {
     Write-Host "rg not found in PATH; falling back to Select-String." -ForegroundColor Yellow
-}
-
-function Get-GlobFromArgs {
-    param([string[]]$ExtraArgs = @())
-
-    for ($i = 0; $i -lt $ExtraArgs.Count; $i = $i + 1) {
-        if ($ExtraArgs[$i] -eq "--glob" -and ($i + 1) -lt $ExtraArgs.Count) {
-            return $ExtraArgs[$i + 1]
-        }
-    }
-
-    return "*"
-}
-
-function Get-PathFiles {
-    param(
-        [string]$Path,
-        [string]$Glob = "*"
-    )
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        return @()
-    }
-
-    $item = Get-Item -LiteralPath $Path
-    if (-not $item.PSIsContainer) {
-        return @($item)
-    }
-
-    return @(Get-ChildItem -Path $Path -Recurse -File -Filter $Glob)
-}
-
-function To-RepoRelativePath {
-    param([string]$Path)
-
-    $full = [System.IO.Path]::GetFullPath($Path)
-    $root = [System.IO.Path]::GetFullPath($repoRoot.Path)
-    if ($full.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
-        return $full.Substring($root.Length).TrimStart('\', '/')
-    }
-
-    return $Path
-}
-
-function Get-PatternMatches {
-    param(
-        [string]$Pattern,
-        [string]$Path,
-        [string[]]$ExtraArgs = @()
-    )
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        return @()
-    }
-
-    if ($useRipgrep) {
-        $args = @("--line-number", "--no-heading", "--color", "never")
-        $args += $ExtraArgs
-        $args += @($Pattern, $Path)
-
-        $result = & $rgCmd.Source @args 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            return @($result)
-        }
-        if ($LASTEXITCODE -eq 1) {
-            return @()
-        }
-
-        $errorText = ($result -join [Environment]::NewLine)
-        throw "rg failed for pattern '$Pattern' in '$Path': $errorText"
-    }
-
-    $glob = Get-GlobFromArgs -ExtraArgs $ExtraArgs
-    $files = @(Get-PathFiles -Path $Path -Glob $glob)
-    if ($files.Count -eq 0) {
-        return @()
-    }
-
-    $matches = New-Object System.Collections.Generic.List[string]
-    foreach ($file in $files) {
-        $result = Select-String -Path $file.FullName -Pattern $Pattern -AllMatches
-        foreach ($m in $result) {
-            $relPath = To-RepoRelativePath -Path $m.Path
-            $matches.Add(("{0}:{1}:{2}" -f $relPath, $m.LineNumber, $m.Line.TrimEnd()))
-        }
-    }
-
-    return @($matches)
 }
 
 function Add-RgCheck {
@@ -112,7 +25,7 @@ function Add-RgCheck {
         [string[]]$ExtraArgs = @()
     )
 
-    $matches = @(Get-PatternMatches -Pattern $Pattern -Path $Path -ExtraArgs $ExtraArgs)
+    $matches = @(Get-KrtPatternMatches -RepoRoot $repoRoot -Pattern $Pattern -Path $Path -ExtraArgs $ExtraArgs)
     if ($matches.Count -eq 0) {
         return
     }
@@ -131,7 +44,7 @@ function Add-RgRequireMatch {
         [string[]]$ExtraArgs = @()
     )
 
-    $matches = @(Get-PatternMatches -Pattern $Pattern -Path $Path -ExtraArgs $ExtraArgs)
+    $matches = @(Get-KrtPatternMatches -RepoRoot $repoRoot -Pattern $Pattern -Path $Path -ExtraArgs $ExtraArgs)
     if ($matches.Count -gt 0) {
         return
     }

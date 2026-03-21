@@ -189,8 +189,7 @@ function ListController.MakeListController(cfg)
             selKey = false
         end
 
-        local focusKey = (cfg.focusKey and cfg.focusKey()) or
-            (focusId ~= nil and ("f:" .. tostring(focusId)) or "f:nil")
+        local focusKey = (cfg.focusKey and cfg.focusKey()) or (focusId ~= nil and ("f:" .. tostring(focusId)) or "f:nil")
         local combo = tostring(selKey) .. "|" .. tostring(focusKey)
         if combo == self._lastHL then
             return
@@ -227,9 +226,7 @@ function ListController.MakeListController(cfg)
             if info ~= "" then
                 info = " " .. info
             end
-            addon:debug((Diag.D.LogListHighlightRefresh):format(
-                tostring(cfg.highlightDebugTag), tostring(selKey), info
-            ))
+            addon:debug((Diag.D.LogListHighlightRefresh):format(tostring(cfg.highlightDebugTag), tostring(selKey), info))
         end
     end
 
@@ -293,14 +290,17 @@ function ListController.MakeListController(cfg)
                 local n = self.frameName
                 local sf = n and _G[n .. "ScrollFrame"]
                 local sc = n and _G[n .. "ScrollFrameScrollChild"]
-                addon:debug((Diag.D.LogLoggerUIWidgets):format(
-                    tostring(cfg.keyName or "?"),
-                    tostring(sf), tostring(sc),
-                    sf and (sf:GetWidth() or 0) or 0,
-                    sf and (sf:GetHeight() or 0) or 0,
-                    sc and (sc:GetWidth() or 0) or 0,
-                    sc and (sc:GetHeight() or 0) or 0
-                ))
+                addon:debug(
+                    (Diag.D.LogLoggerUIWidgets):format(
+                        tostring(cfg.keyName or "?"),
+                        tostring(sf),
+                        tostring(sc),
+                        sf and (sf:GetWidth() or 0) or 0,
+                        sf and (sf:GetHeight() or 0) or 0,
+                        sc and (sc:GetWidth() or 0) or 0,
+                        sc and (sc:GetHeight() or 0) or 0
+                    )
+                )
             end
         end)
 
@@ -346,14 +346,18 @@ function ListController.MakeListController(cfg)
 
         if not self._loggedFetch then
             self._loggedFetch = true
-            addon:debug((Diag.D.LogLoggerUIFetch):format(
-                tostring(cfg.keyName or "?"),
-                #self.data,
-                sf:GetWidth() or 0, sf:GetHeight() or 0,
-                sc:GetWidth() or 0, sc:GetHeight() or 0,
-                (_G[n] and _G[n]:GetWidth() or 0),
-                (_G[n] and _G[n]:GetHeight() or 0)
-            ))
+            addon:debug(
+                (Diag.D.LogLoggerUIFetch):format(
+                    tostring(cfg.keyName or "?"),
+                    #self.data,
+                    sf:GetWidth() or 0,
+                    sf:GetHeight() or 0,
+                    sc:GetWidth() or 0,
+                    sc:GetHeight() or 0,
+                    (_G[n] and _G[n]:GetWidth() or 0),
+                    (_G[n] and _G[n]:GetHeight() or 0)
+                )
+            )
         end
 
         local totalH = 0
@@ -419,7 +423,9 @@ function ListController.MakeListController(cfg)
             self._asc = false
         end
         self._asc = not self._asc
-        table.sort(self.data, function(a, b) return cmp(a, b, self._asc) end)
+        table.sort(self.data, function(a, b)
+            return cmp(a, b, self._asc)
+        end)
         self:Fetch()
         applyHighlight()
         postUpdate()
@@ -434,7 +440,13 @@ function ListController.MakeListController(cfg)
 end
 
 function ListController.BindListController(module, controller)
-    module.OnLoad = function(_, frame) controller:OnLoad(frame) end
-    module.Fetch = function() controller:Fetch() end
-    module.Sort = function(_, key) controller:Sort(key) end
+    module.OnLoad = function(_, frame)
+        controller:OnLoad(frame)
+    end
+    module.Fetch = function()
+        controller:Fetch()
+    end
+    module.Sort = function(_, key)
+        controller:Sort(key)
+    end
 end

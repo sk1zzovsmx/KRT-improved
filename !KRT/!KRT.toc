@@ -4,7 +4,7 @@
 ## Author: Kader (|cff808080bkader#5341|r)
 ## DefaultState: enabled
 ## SavedVariables: KRT_Raids, KRT_Players, KRT_Reserves, KRT_Warnings, KRT_Spammer, KRT_Options
-## Version: 0.5.6b
+## Version: 1.2.3
 ## X-Date: 2022-06-03 @ 11:10 PM |cff808080UTC|r
 ## X-Category: Raid, Inventory
 ## X-License: MIT/X
@@ -40,12 +40,15 @@ Modules\Events.lua
 Modules\Colors.lua
 Modules\Strings.lua
 Modules\Item.lua
+Modules\IgnoredItems.lua
+Modules\IgnoredMobs.lua
 Modules\Comms.lua
 Modules\Time.lua
 Modules\Base64.lua
 Modules\Sort.lua
 Modules\Features.lua
 Modules\UI\Facade.lua
+Modules\UI\Effects.lua
 Modules\UI\Visuals.lua
 Modules\UI\Frames.lua
 Modules\UI\ListController.lua
@@ -65,6 +68,7 @@ EntryPoints\Minimap.lua
 EntryPoints\SlashEvents.lua
 Services\Rolls.lua
 Services\Loot.lua
+Services\Debug.lua
 Controllers\Master.lua
 Widgets\LootCounter.lua
 Services\Reserves.lua

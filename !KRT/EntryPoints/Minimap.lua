@@ -12,6 +12,8 @@ local Options = feature.Options or addon.Options
 local Frames = feature.Frames or addon.Frames
 local Colors = feature.Colors or addon.Colors
 local Core = feature.Core or addon.Core
+local Services = feature.Services or addon.Services or {}
+local Widgets = feature.Widgets or addon.Widgets or {}
 
 local K_COLOR = feature.K_COLOR
 
@@ -44,35 +46,59 @@ local function getController(name)
     return controllers and controllers[name] or nil
 end
 
-local function getChangesController()
-    local controller = getController("Changes")
-    if type(controller) == "table" then
-        return controller
+local function callControllerMethod(name, methodName, ...)
+    local controller = getController(name)
+    local method = controller and controller[methodName]
+    if type(method) ~= "function" then
+        return nil
     end
-    local legacy = addon.Changes
-    if type(legacy) == "table" then
-        return legacy
+    return method(controller, ...)
+end
+
+local function getLootCounterController()
+    local widget = Widgets.LootCounter
+    if type(widget) == "table" and type(widget.Toggle) == "function" then
+        return widget
     end
     return nil
 end
 
-local function getLootCounterWidget()
-    local widgets = addon.Widgets
-    local legacy = (widgets and widgets.LootCounter) or addon.LootCounter
-    if type(legacy) == "table" and type(legacy.Toggle) == "function" then
-        return legacy
-    end
-    return nil
+local function getRaidService()
+    return Services.Raid
 end
 
-local function IsWidgetAvailable(widgetId)
+local function isWidgetAvailable(widgetId)
     if UIFacade:IsEnabled(widgetId) and UIFacade:IsRegistered(widgetId) then
         return true
     end
-    if widgetId == "LootCounter" and getLootCounterWidget() then
+    if widgetId == "LootCounter" and getLootCounterController() then
         return true
     end
     return false
+end
+
+local function callWidgetMethod(widgetId, methodName, ...)
+    if not (UIFacade:IsEnabled(widgetId) and UIFacade:IsRegistered(widgetId)) then
+        return nil
+    end
+    return UIFacade:Call(widgetId, methodName, ...)
+end
+
+local function toggleLootCounterWidget()
+    if not isWidgetAvailable("LootCounter") then
+        return nil
+    end
+
+    if UIFacade:IsEnabled("LootCounter") and UIFacade:IsRegistered("LootCounter") then
+        return UIFacade:Call("LootCounter", "Toggle")
+    end
+
+    local widget = getLootCounterController()
+    local method = widget and widget.Toggle
+    if type(method) ~= "function" then
+        return nil
+    end
+    return method(widget)
 end
 
 -- ----- Internal state ----- --
@@ -97,8 +123,9 @@ function UI.AcquireRefs(frame)
     }
 end
 
-local function BuildMenu()
-    local hasRaidGroup = addon.Raid:IsPlayerInRaid()
+local function buildMenu()
+    local raid = getRaidService()
+    local hasRaidGroup = raid:IsPlayerInRaid()
     local disableRaidActions = 1
     if hasRaidGroup then
         disableRaidActions = nil
@@ -109,127 +136,102 @@ local function BuildMenu()
             text = MASTER_LOOTER,
             notCheckable = 1,
             func = function()
-                local moduleRef = getController("Master")
-                if moduleRef and moduleRef.Toggle then
-                    moduleRef:Toggle()
-                end
-            end
+                callControllerMethod("Master", "Toggle")
+            end,
         },
         {
             text = L.StrLootCounter,
             notCheckable = 1,
             disabled = disableRaidActions,
             func = function()
-                if not addon.Raid:IsPlayerInRaid() then
+                if not raid:IsPlayerInRaid() then
                     return
                 end
-                if not IsWidgetAvailable("LootCounter") then
-                    return
-                end
-                if UIFacade:IsEnabled("LootCounter") and UIFacade:IsRegistered("LootCounter") then
-                    UIFacade:Call("LootCounter", "Toggle")
-                    return
-                end
-                local legacy = getLootCounterWidget()
-                if legacy and legacy.Toggle then
-                    legacy:Toggle()
-                end
-            end
+                toggleLootCounterWidget()
+            end,
         },
         {
             text = L.StrLootLogger,
             notCheckable = 1,
             func = function()
-                local moduleRef = getController("Logger")
-                if moduleRef and moduleRef.Toggle then
-                    moduleRef:Toggle()
-                end
-            end
+                callControllerMethod("Logger", "Toggle")
+            end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
-        { text = L.StrClearIcons, notCheckable = 1, func = function() addon.Raid:ClearRaidIcons() end },
+        {
+            text = L.StrClearIcons,
+            notCheckable = 1,
+            func = function()
+                raid:ClearRaidIcons()
+            end,
+        },
         { text = " ", disabled = 1, notCheckable = 1 },
         {
             text = RAID_WARNING,
             notCheckable = 1,
             func = function()
-                local moduleRef = getController("Warnings")
-                if moduleRef and moduleRef.Toggle then
-                    moduleRef:Toggle()
-                end
-            end
+                callControllerMethod("Warnings", "Toggle")
+            end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
         {
             text = L.StrMSChanges,
             notCheckable = 1,
             func = function()
-                local moduleRef = getChangesController()
-                if moduleRef and moduleRef.Toggle then
-                    moduleRef:Toggle()
-                end
-            end
+                callControllerMethod("Changes", "Toggle")
+            end,
         },
         {
             text = L.BtnDemand,
             notCheckable = 1,
             disabled = disableRaidActions,
             func = function()
-                if not addon.Raid:IsPlayerInRaid() then
+                if not raid:IsPlayerInRaid() then
                     return
                 end
-                local moduleRef = getChangesController()
-                if moduleRef and moduleRef.Demand then
-                    moduleRef:Demand()
-                end
-            end
+                callControllerMethod("Changes", "Demand")
+            end,
         },
         {
             text = CHAT_ANNOUNCE,
             notCheckable = 1,
             disabled = disableRaidActions,
             func = function()
-                if not addon.Raid:IsPlayerInRaid() then
+                if not raid:IsPlayerInRaid() then
                     return
                 end
-                local moduleRef = getChangesController()
-                if moduleRef and moduleRef.Announce then
-                    moduleRef:Announce()
-                end
-            end
+                callControllerMethod("Changes", "Announce")
+            end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
         {
             text = L.StrLFMSpam,
             notCheckable = 1,
             func = function()
-                local moduleRef = getController("Spammer")
-                if moduleRef and moduleRef.Toggle then
-                    moduleRef:Toggle()
-                end
-            end
+                callControllerMethod("Spammer", "Toggle")
+            end,
         },
     }
 end
 
 -- Initializes and opens the menu for the minimap button.
-local function OpenMenu()
+local function openMenu()
     addonMenu = addonMenu or CreateFrame("Frame", "KRTMenu", UIParent, "UIDropDownMenuTemplate")
-    local menu = BuildMenu()
+    local menu = buildMenu()
     -- EasyMenu handles UIDropDownMenu initialization and opening.
     EasyMenu(menu, addonMenu, KRT_MINIMAP_GUI, 0, 0, "MENU")
 end
 
-local function IsMenuOpen()
+local function isMenuOpen()
     return addonMenu and UIDROPDOWNMENU_OPEN_MENU == addonMenu and DropDownList1 and DropDownList1:IsShown()
 end
 
-local function ToggleMenu()
-    if IsMenuOpen() then
+local function toggleMenu()
+    if isMenuOpen() then
         CloseDropDownMenus()
         return
     end
-    OpenMenu()
+    openMenu()
 end
 
 -- Moves the minimap button while dragging.
@@ -271,7 +273,7 @@ local function moveButton(self)
     end
 end
 
-local function SetMinimapShown(show)
+local function setMinimapShown(show)
     Frames.SetShown(KRT_MINIMAP_GUI, show)
 end
 
@@ -298,7 +300,7 @@ function module:OnLoad(frame)
     local options = addon.options or KRT_Options or {}
     frame:SetUserPlaced(true)
     self:SetPos(options.minimapPos or 325)
-    SetMinimapShown(options.minimapButton ~= false)
+    setMinimapShown(options.minimapButton ~= false)
     frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     frame:SetScript("OnMouseDown", function(self, button)
         if button ~= "LeftButton" then
@@ -334,19 +336,19 @@ function module:OnLoad(frame)
     end)
     frame:SetScript("OnClick", function(self, button)
         -- Ignore clicks if Shift or Alt keys are held:
-        if IsShiftKeyDown() or IsAltKeyDown() then return end
+        if IsShiftKeyDown() or IsAltKeyDown() then
+            return
+        end
         if button == "RightButton" then
-            UIFacade:Call("Config", "Toggle")
+            callWidgetMethod("Config", "Toggle")
         elseif button == "LeftButton" then
-            ToggleMenu()
+            toggleMenu()
         end
     end)
     frame:SetScript("OnEnter", function(self)
         GameTooltip_SetDefaultAnchor(GameTooltip, self)
         GameTooltip:SetText(
-            addon.WrapTextInColorCode("Kader", Colors.NormalizeHexColor(K_COLOR))
-            .. " "
-            .. addon.WrapTextInColorCode("Raid Tools", Colors.NormalizeHexColor("aad4af37"))
+            addon.WrapTextInColorCode("Kader", Colors.NormalizeHexColor(K_COLOR)) .. " " .. addon.WrapTextInColorCode("Raid Tools", Colors.NormalizeHexColor("aad4af37"))
         )
         GameTooltip:AddLine(L.StrMinimapLClick, 1, 1, 1)
         GameTooltip:AddLine(L.StrMinimapRClick, 1, 1, 1)
@@ -394,7 +396,7 @@ function module:ToggleMinimapButton()
     local options = addon.options or KRT_Options or {}
     local nextValue = not options.minimapButton
     Options.SetOption("minimapButton", nextValue)
-    SetMinimapShown(nextValue)
+    setMinimapShown(nextValue)
 end
 
 -- Hides the minimap button.

@@ -9,7 +9,7 @@
 			<Anchor point="CENTER" />
 		</Anchors>
 		<Frames>
-			<!-- ScrollFrame con ScrollChild -->
+			<!-- Scroll frame with scroll child -->
 			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT">
@@ -68,7 +68,7 @@
 				</Anchors>
 			</Button>
 		</Frames>
-</Frame>
+	</Frame>
 	<!-- ====== Start of Reserve Import Window ====== -->
 	<Frame name="KRTImportWindow" inherits="KRTFrameTemplate" toplevel="true" hidden="true" frameStrata="DIALOG">
 		<Size>
@@ -129,7 +129,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Slider>
+			</Slider>
 			<!-- Multiline EditBox for CSV -->
 			<ScrollFrame name="KRTImportScrollFrame" inherits="KRTScrollFrameTemplate">
 				<Size>
@@ -147,7 +147,7 @@
 						<Size>
 							<AbsDimension x="320" y="160" />
 						</Size>
-</EditBox>
+					</EditBox>
 				</ScrollChild>
 			</ScrollFrame>
 			<!-- Import Button -->
@@ -162,7 +162,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<!-- Cancel Button -->
 			<Button name="KRTImportCancelButton" inherits="KRTButtonTemplate">
 				<Size>
@@ -175,10 +175,9 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 		</Frames>
-</Frame>
+	</Frame>
 	<!-- ====== End Reserve Import Window ====== -->
 	<!-- ====== End Reserve List Window ====== -->
 </Ui>
-

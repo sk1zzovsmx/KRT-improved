@@ -19,12 +19,18 @@ Permanent guardrails for function mapping and unification work.
 ## PR Checklist
 
 1. Run `tools/check-layering.ps1`.
-2. Run `tools/check-lua-uniformity.ps1`.
+2. When touching Lua, run the canonical local Lua gates:
+   - `tools/check-lua-syntax.ps1`
+   - `luacheck --codes --no-color !KRT tools tests`
+   - `tools/check-lua-uniformity.ps1`
+   - `stylua --check !KRT tools tests`
 3. Run quick duplicate checks from `DEV_CHECKS.md` (function unification section).
 4. If function ownership changed, regenerate:
    - `docs/FUNCTION_REGISTRY.csv`
-   - `docs/FUNCTION_REGISTRY.md`
    - `docs/FN_CLUSTERS.md`
+   Commands:
+   - `powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-inventory.ps1`
+   - `powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-classify.ps1`
 5. Update this policy when introducing new compat wrappers.
 
 ## Canonical Ownership (Quick Wins)

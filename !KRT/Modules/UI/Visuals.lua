@@ -84,6 +84,13 @@ function UIPrimitives.SetButtonCount(btn, baseText, n)
     end
 end
 
+function UIPrimitives.SetButtonGlow(button, enabled, r, g, b, style, options)
+    local effects = addon.UIEffects
+    if effects and effects.SetButtonGlow then
+        effects.SetButtonGlow(button, enabled, r, g, b, style, options)
+    end
+end
+
 function UIPrimitives.SetText(frame, str1, str2, cond)
     if not frame then
         return
@@ -192,4 +199,3 @@ function UIRowVisuals.SetRowFocused(row, cond)
         texture:Hide()
     end
 end
-

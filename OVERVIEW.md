@@ -1,304 +1,52 @@
-# Architecture Overview
+# KRT Overview
 
-Purpose: in ~5 minutes, understand what exists, where it lives, and where to edit safely.
-This is the primary start-here doc for contributors and coding agents.
+Purpose: quick navigation for contributors who need the current addon shape
+without reading full binding policy first.
 
-Keep this document navigational:
-- architecture and ownership,
-- entry points and data boundaries,
-- high-signal links to code.
-
-Behavior details belong in code and in `CHANGELOG.md`.
-Process and invariants belong in `AGENTS.md`.
-
----
+For binding rules and architectural constraints, use:
+- `AGENTS.md`
+- `docs/ARCHITECTURE.md`
 
 ## At A Glance
 
-- Runtime target: WoW 3.3.5a (Interface 30300), Lua 5.1.
-- Addon folder name is intentionally `!KRT`.
-- Core bootstrap/event wiring lives in `!KRT/Init.lua`.
-- Runtime modules are split by layer: `Controllers/`, `Services/`, `Widgets/`, `EntryPoints/`.
-- UI is XML-driven (`!KRT/KRT.xml`, `!KRT/Templates.xml`) with thin script glue.
-- Shared helpers/constants live in `!KRT/Modules/Utils.lua` and `!KRT/Modules/C.lua`.
-- Static data list: `!KRT/Modules/ignoredItems.lua`.
-- Slash entry points: `/krt`, `/kraidtools` with subcommands (including `/krt counter`).
-- Persistence uses account-wide SavedVariables declared in `!KRT/!KRT.toc`.
+- Runtime target: WoW 3.3.5a, Lua 5.1.
+- Addon root: `!KRT/`.
+- Unified bootstrap and shared runtime ownership live in `!KRT/Init.lua`.
+- Runtime code is split into `Controllers/`, `Services/`, `Widgets/`, and
+  `EntryPoints/`.
+- Shared infrastructure lives in `!KRT/Modules/`.
+- XML stays layout-only under `!KRT/UI/` and is loaded via `!KRT/KRT.xml`.
+- Persisted state is declared in `!KRT/!KRT.toc` through `KRT_*`
+  SavedVariables.
 
----
+## Current Module Layout
 
-## Repository Map
+- `!KRT/Controllers/*.lua`
+  Parent owners such as `Master`, `Logger`, `Warnings`, `Changes`, `Spammer`.
+- `!KRT/Services/*.lua`
+  Runtime data/model logic such as `Raid`, `Chat`, `Rolls`, `Loot`,
+  `Reserves`.
+- `!KRT/Widgets/*.lua`
+  Feature UI controllers such as `LootCounter`, `ReservesUI`, `Config`.
+- `!KRT/EntryPoints/*.lua`
+  User entrypoints such as slash routing and minimap behavior.
+- `!KRT/Modules/*.lua`
+  Shared infra modules such as `Bus`, `Strings`, `Item`, `Time`, `Sort`,
+  `Base64`, `Colors`, `Frames`, `UIScaffold`, `ListController`, and
+  `MultiSelect`.
 
-```text
-!KRT/
-  !KRT.toc                 # load order + SavedVariables declaration
-  Init.lua                 # core bootstrap + shared event wiring
-  KRT.xml                  # UI include manifest
-  Templates.xml            # shared XML templates
+## Runtime Rules That Matter Most
 
-  Controllers/             # parent owners (Master/Logger/Warnings/Changes/Spammer)
-  Services/                # data/model/gameplay services
-  Widgets/                 # feature UI controllers/widgets
-  EntryPoints/             # slash + minimap entrypoints
-  UI/                      # XML frames/templates
+- Services stay UI-free and do not touch Parent frames.
+- Upward communication goes through `addon.Bus`.
+- EntryPoints may call `Parent:Toggle()` directly.
+- Public APIs use `PascalCase`; private helpers use `camelCase`.
+- XML does not own logic through inline `<Scripts>` or `<On...>` handlers.
 
-  Localization/
-    localization.en.lua    # user-facing strings (addon.L)
-    DiagnoseLog.en.lua     # log/debug templates (addon.Diagnose)
+## Fast References
 
-  Modules/
-    Utils.lua              # generic utilities + UI controllers
-    C.lua                  # constants/enums/patterns
-    ignoredItems.lua       # static item filters/data
-
-  Libs/                    # vendored libs loaded from toc
-```
-
----
-
-## Runtime Topology
-
-### 1) System map
-
-```mermaid
-flowchart LR
-  subgraph EP["Entry points"]
-    WEV["WoW events"]
-    XUI["XML UI scripts"]
-    SLC["Slash commands"]
-    TMR["LibCompat timers"]
-  end
-
-  subgraph CORE["Core bootstrap (Init.lua)"]
-    EVT["addon event dispatcher"]
-    Slash["addon.Slash"]
-    Raid["addon.Raid"]
-    Chat["addon.Chat"]
-    Minimap["addon.Minimap"]
-    Config["addon.Config"]
-  end
-
-  subgraph FEATURES["Runtime modules (Controllers/Services/Widgets)"]
-    Rolls["addon.Rolls"]
-    Loot["addon.Loot"]
-    Master["addon.Master"]
-    LootCounter["addon.LootCounter"]
-    Reserves["addon.Reserves"]
-    ReservesImportWidget["addon.ReservesUI.Import"]
-    Warnings["addon.Warnings"]
-    Changes["addon.Changes"]
-    Spammer["addon.Spammer"]
-    Logger["addon.Logger"]
-  end
-
-  subgraph SHARED["Shared code and data"]
-    Utils["Modules/Utils.lua"]
-    Cmod["Modules/C.lua"]
-    L10n["Localization (addon.L / addon.Diagnose)"]
-    Ignored["Modules/ignoredItems.lua"]
-    Libs["Vendored libs"]
-  end
-
-  WEV --> EVT
-  XUI --> FEATURES
-  XUI --> Config
-  SLC --> Slash
-  TMR --> Utils
-
-  EVT --> Raid
-  EVT --> Loot
-  EVT --> Master
-  EVT --> Logger
-  EVT --> Config
-
-  Slash --> Master
-  Slash --> Reserves
-  Slash --> LootCounter
-  Slash --> Warnings
-  Slash --> Changes
-  Slash --> Spammer
-  Slash --> Logger
-  Slash --> Config
-  Slash --> Minimap
-
-  Warnings --> Chat
-  Changes --> Chat
-  Spammer --> Chat
-
-  FEATURES --> Utils
-  FEATURES --> Cmod
-  FEATURES --> L10n
-  CORE --> Utils
-  CORE --> Cmod
-  CORE --> L10n
-  Loot --> Ignored
-  Utils --> Libs
-```
-
-### 2) Integration contracts
-
-```mermaid
-flowchart LR
-  W["WoW event"] --> EVT["addon dispatcher in Init.lua"]
-  UI["XML OnClick/OnShow"] --> M["module methods in runtime modules"]
-  SL["/krt ..."] --> SC["addon.Slash:Handle(msg)"] --> M
-
-  M -->|request redraw| R["module:RequestRefresh()"]
-  R --> U["Utils.makeEventDrivenRefresher"]
-  U -->|throttle| T["LibCompat timer"]
-
-  M -->|render list| LC["Utils.makeListController"]
-  M -->|text| L["addon.L / addon.Diagnose"]
-  M -->|persist| SV["SavedVariables"]
-```
-
-Key contracts:
-- WoW event handlers are registered in `Init.lua` and dispatched to runtime modules.
-- XML handlers should delegate to module methods; avoid embedding feature logic in XML.
-- UI updates should be event-driven (`RequestRefresh`/`Refresh`), not polling loops.
-- Lists should use `Utils.makeListController(...):Dirty()` when possible.
-
----
-
-## Module Ownership
-
-Top-level runtime modules on `addon.*`:
-
-- `addon.Raid`: raid/session state, roster updates, instance context.
-- `addon.Chat`: chat output helpers (print/announce).
-- `addon.Minimap`: minimap button and menu behavior.
-- `addon.Rolls`: roll collection, sorting, winner logic.
-- `addon.Loot`: loot parsing and item selection glue.
-- `addon.Master`: master-loot workflow, award/trade handling.
-- `addon.LootCounter`: player loot counts UI and data updates.
-- `addon.Reserves`: soft-reserve model and reserve list UI.
-- `addon.ReservesUI.Import`: SR import window owned by the Reserves UI widget.
-- `addon.Config`: options defaults/load and config UI.
-- `addon.Warnings`: warning list CRUD and announces.
-- `addon.Changes`: MS changes list and announce flows.
-- `addon.Spammer`: LFM message composition and spam loop.
-- `addon.Logger`: loot logger UI and raid/boss/loot editing.
-- `addon.Slash`: slash command parser and dispatch table.
-
-Notes:
-- Import window is owned by Reserves UI widget.
-- ReservesImport module removed; XML points to Reserves Import widget.
-
-`addon.Logger` internal layering pattern:
-- `addon.Logger.Store`: data access and stable-id indexing.
-- `addon.Logger.View`: view-model row builders.
-- `addon.Logger.Actions`: mutation paths and refresh boundaries.
-
----
-
-## Slash Commands (Current)
-
-Primary commands:
-- `/krt`
-- `/kraidtools`
-
-Important subcommands routed by `addon.Slash` in `!KRT/EntryPoints/SlashEvents.lua`:
-- `config`
-- `lfm`/`pug`
-- `ach`
-- `changes`/`ms`
-- `warnings`/`rw`
-- `logger`
-- `debug`
-- `loot`/`ml`
-- `counter` (toggles Loot Counter)
-- `reserves`/`res`
-- `minimap`
-
-Notes:
-- Empty `/krt` message does nothing by design.
-- `/krt show` and `/krt toggle` open/close Master Looter.
-
----
-
-## SavedVariables Boundary
-
-Declared in `!KRT/!KRT.toc`:
-
-- `KRT_Raids`
-- `KRT_Players`
-- `KRT_Reserves`
-- `KRT_Warnings`
-- `KRT_Spammer`
-- `KRT_Options`
-
-Rule of thumb:
-- Preserve key names and shapes.
-- If schema changes are unavoidable, add migration logic and document behavior in `CHANGELOG.md`.
-
----
-
-## Dependency Rules
-
-- Feature logic lives in `Controllers/*.lua`, `Services/*.lua`, `Widgets/*.lua`, `EntryPoints/*.lua`.
-- `Modules/Utils.lua` and `Modules/C.lua` stay generic; no feature dependencies.
-- `Localization/*.lua` defines strings only; no feature logic.
-- No Ace3.
-- Use WoW 3.3.5a-compatible APIs only (avoid modern `C_`/`C_Timer` APIs).
-
-Load order matters (`!KRT/!KRT.toc`):
-1. `Libs/*` (LibStub, CallbackHandler, LibBossIDs, LibDeformat, LibCompat, LibLogger)
-2. `Localization/*.lua`
-3. `Templates.xml`
-4. `Modules/Utils.lua`, `Modules/C.lua`
-5. `Init.lua`
-6. Runtime modules in dependency order:
-   `Services/Raid.lua`, `Services/Chat.lua`, `EntryPoints/Minimap.lua`, `Services/Rolls.lua`,
-   `Services/Loot.lua`, `Controllers/Master.lua`, `Widgets/LootCounter.lua`,
-   `Services/Reserves.lua`, `Widgets/ReservesUI.lua`, `Controllers/Logger.lua`,
-   `Services/Syncer.lua`, `Widgets/Config.lua`, `Controllers/Warnings.lua`,
-   `Controllers/Changes.lua`, `Controllers/Spammer.lua`, `EntryPoints/SlashEvents.lua`
-7. `KRT.xml`
-8. `Modules/ignoredItems.lua`
-
----
-
-## Where To Edit (Common Tasks)
-
-Add or change a slash command:
-- `!KRT/EntryPoints/SlashEvents.lua` in the `addon.Slash` block.
-- Add help text in `!KRT/Localization/localization.en.lua`.
-- If user-visible, record in `CHANGELOG.md`.
-
-Add or change a feature window/list:
-- UI layout: `!KRT/KRT.xml` or `!KRT/Templates.xml`.
-- Module behavior: owning `Controllers/*.lua` / `Widgets/*.lua` and related `Services/*.lua`.
-- Prefer `Utils.makeEventDrivenRefresher` and `Utils.makeListController`.
-
-Add or change option behavior:
-- Defaults/load path in `addon.Config` (`!KRT/Widgets/Config.lua` + `!KRT/Init.lua` load).
-- Keep `KRT_Options` and `addon.options` in sync on writes.
-
-Add or change displayed text/log templates:
-- User-facing text: `!KRT/Localization/localization.en.lua` (`addon.L`).
-- Log/debug templates: `!KRT/Localization/DiagnoseLog.en.lua` (`addon.Diagnose`).
-
----
-
-## Smoke Test Checklist
-
-Use this quick pass after behavior changes:
-
-- Login with no Lua errors; `/krt` UI opens.
-- Raid detection/roster updates still trigger expected refreshes.
-- Rolls (MS/OS/SR) sort and resolve deterministically.
-- Reserves import/export and reserve gating still work.
-- Logger append/filter/edit/delete flows still update selection and lists.
-- Master award/trade flows still behave correctly.
-- `/krt counter` toggles Loot Counter.
-- `/reload` preserves expected state.
-
----
-
-## Related Docs
-
-- Working rules and invariants: `AGENTS.md`
-- User-visible change history: `CHANGELOG.md`
-- High-level feature narrative (legacy): `README.md`
-- Layering map and boundaries: `ARCHITECTURE.md`
-- Copy/paste checks for contributors: `DEV_CHECKS.md`
+- Lua rules and local gates: `docs/LUA_WRITING_RULES.md`
+- Layering map and repo-local automation: `docs/ARCHITECTURE.md`
+- Copy-paste checks: `DEV_CHECKS.md`
+- SavedVariables inventory: `docs/SV_SCHEMA.md`
+- Raid schema contract: `docs/RAID_SCHEMA.md`

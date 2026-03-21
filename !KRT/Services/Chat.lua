@@ -23,7 +23,6 @@ local tonumber = tonumber
 do
     addon.Services = addon.Services or {}
     addon.Services.Chat = addon.Services.Chat or {}
-    addon.Chat = addon.Services.Chat -- Legacy alias during namespacing migration.
     local module = addon.Services.Chat
 
     -- ----- Internal state ----- --
@@ -32,16 +31,16 @@ do
     local chatPrefixHex = C.CHAT_PREFIX_HEX
 
     -- ----- Private helpers ----- --
-    local function IsCountdownMessage(text)
+    local function isCountdownMessage(text)
         local seconds = addon.Deformat(text, L.ChatCountdownTic)
         return (seconds ~= nil) or (find(text, L.ChatCountdownEnd) ~= nil)
     end
 
-    local function CanUseRaidWarning()
+    local function canUseRaidWarning()
         return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
     end
 
-    local function ResolveGroupType()
+    local function resolveGroupType()
         if type(addon.GetGroupTypeAndCount) == "function" then
             local groupType = addon.GetGroupTypeAndCount()
             if groupType == "raid" or groupType == "party" then
@@ -59,16 +58,12 @@ do
             return "raid"
         end
 
-        local raidCount = (GetRealNumRaidMembers and GetRealNumRaidMembers())
-            or (GetNumRaidMembers and GetNumRaidMembers())
-            or 0
+        local raidCount = (GetRealNumRaidMembers and GetRealNumRaidMembers()) or (GetNumRaidMembers and GetNumRaidMembers()) or 0
         if (tonumber(raidCount) or 0) > 0 then
             return "raid"
         end
 
-        local partyCount = (GetRealNumPartyMembers and GetRealNumPartyMembers())
-            or (GetNumPartyMembers and GetNumPartyMembers())
-            or 0
+        local partyCount = (GetRealNumPartyMembers and GetRealNumPartyMembers()) or (GetNumPartyMembers and GetNumPartyMembers()) or 0
         if (tonumber(partyCount) or 0) > 0 then
             return "party"
         end
@@ -76,18 +71,18 @@ do
         return nil
     end
 
-    local function ResolveAnnounceChannel(text, preferredChannel)
+    local function resolveAnnounceChannel(text, preferredChannel)
         if preferredChannel then
             return preferredChannel
         end
 
-        local groupType = ResolveGroupType()
+        local groupType = resolveGroupType()
         if groupType == "raid" then
             local options = addon.options or {}
-            if IsCountdownMessage(text) and options.countdownSimpleRaidMsg then
+            if isCountdownMessage(text) and options.countdownSimpleRaidMsg then
                 return "RAID"
             end
-            if options.useRaidWarning and CanUseRaidWarning() then
+            if options.useRaidWarning and canUseRaidWarning() then
                 return "RAID_WARNING"
             end
             return "RAID"
@@ -106,14 +101,14 @@ do
 
     function module:Announce(text, channel)
         local msg = tostring(text)
-        local selectedChannel = ResolveAnnounceChannel(msg, channel)
+        local selectedChannel = resolveAnnounceChannel(msg, channel)
         if not selectedChannel or selectedChannel == "" then
             return module:Print(msg)
         end
         Comms.Chat(msg, selectedChannel)
     end
 
-    -- ----- Legacy helpers ----- --
+    -- ----- Addon facade ----- --
     function addon:Announce(text, channel)
         module:Announce(text, channel)
     end

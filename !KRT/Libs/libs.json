@@ -1,0 +1,13 @@
+{
+  "$schema": "https://mechanic.dev/schemas/libs.json",
+  "description": "Library configuration for !KRT",
+  "mode": "include",
+  "libraries": {
+    "CallbackHandler-1.0": "latest",
+    "LibBossIDs-1.0": "latest",
+    "LibCompat-1.0": "latest",
+    "LibDeformat-3.0": "latest",
+    "LibLogger-1.0": "latest",
+    "LibStub": "latest"
+  }
+}

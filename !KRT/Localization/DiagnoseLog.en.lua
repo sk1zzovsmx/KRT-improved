@@ -31,6 +31,7 @@ Diag.W.LogLegacyAliasAccess = "[Compat] Legacy alias used alias=%s target=%s sit
 
 -- Raid --
 Diag.D.LogRaidLeftGroupEndSession = "[Raid] Left group -> ending current raid session"
+Diag.W.LogRaidLegacyFieldsDetected = "[RaidStore] Legacy fields phase=%s raidNid=%s idx=%s runtime=%s " .. "looter=%d mask=%d"
 Diag.D.LogRaidRosterUpdate = "[Raid] RosterUpdate v=%d num=%d"
 Diag.I.LogRaidCreated = "[Raid] Created id=%d zone=%s size=%d players=%d"
 Diag.I.LogRaidEnded = "[Raid] Ended id=%d zone=%s size=%d bosses=%d loot=%d duration=%d"
@@ -43,6 +44,10 @@ Diag.D.LogRaidPlayerRefresh = "[Raid] Player refresh name=%s raidId=%d"
 Diag.D.LogRaidInstanceWelcome = "[Raid] RAID_INSTANCE_WELCOME name=%s type=%s diff=%s nextReset=%s"
 Diag.W.LogRaidUnmappedZone = "[Raid] Unmapped raid zone: %s (diff=%s) -> no session check"
 Diag.D.LogRaidInstanceRecognized = "[Raid] Instance recognized: %s diff=%s -> check"
+Diag.D.LogDebugRaidSeed = "[Debug] Raid seed raidId=%s name=%s class=%s"
+Diag.D.LogDebugRaidClearRemoved = "[Debug] Raid clear removed raidId=%s name=%s nid=%s"
+Diag.D.LogDebugRaidClearBlocked = "[Debug] Raid clear blocked raidId=%s name=%s nid=%s"
+Diag.D.LogDebugRaidRoll = "[Debug] Raid roll raidId=%s name=%s roll=%d ok=%s reason=%s"
 
 -- Boss --
 Diag.D.LogBossAddSkipped = "[Boss] AddBoss skipped raidId=%s boss=%s"
@@ -51,6 +56,8 @@ Diag.D.LogBossLastBossHash = "[Boss] lastBoss=%d hash=%s"
 Diag.D.LogBossNoContextTrash = "[Boss] No boss context -> creating _TrashMob_ bucket"
 Diag.D.LogBossYellMatched = "[Boss] Yell matched text=%s boss=%s"
 Diag.D.LogBossUnitDiedMatched = "[Boss] UNIT_DIED matched npcId=%d boss=%s"
+Diag.D.LogBossUnitDiedIgnored = "[Boss] UNIT_DIED ignored npcId=%d boss=%s"
+Diag.D.LogBossDuplicateSuppressed = "[Boss] Duplicate suppressed boss=%s sourceNpcId=%d existingBossNid=%d delta=%d"
 
 -- Loot --
 Diag.D.LogLootParseFailed = "[Loot] Parse failed msg=%s"
@@ -83,16 +90,14 @@ Diag.D.LogMLCandidateCacheMiss = "[ML] Candidate cache miss item=%s player=%s ->
 Diag.D.LogMLAwarded = "[ML] Awarded item=%s -> %s type=%d roll=%d slot=%d cand=%d"
 Diag.E.LogMLAwardLoggerFailed = "[ML] Awarded but Logger failed raidId=%s lootNid=%s link=%s"
 Diag.W.LogMLSetItemPayloadInvalid = "[ML] SetItem payload invalid itemLink=%s itemDataType=%s"
-Diag.W.LogMLRaidRosterDeltaPayloadInvalid = "[ML] RaidRosterDelta payload invalid deltaType=%s "
-    .. "rosterVersion=%s raidId=%s"
+Diag.W.LogMLRaidRosterDeltaPayloadInvalid = "[ML] RaidRosterDelta payload invalid deltaType=%s " .. "rosterVersion=%s raidId=%s"
 Diag.W.LogMLAddRollPayloadInvalid = "[ML] AddRoll payload invalid name=%s roll=%s"
 Diag.W.ErrMLMultiAwardInProgress = "[ML] Multi-award in progress: wait until it finishes before awarding again."
 Diag.W.ErrMLMultiSelectTooMany = "[ML] Cannot select more than %d winner(s) for this item."
 Diag.W.ErrMLMultiSelectNotEnough = "[ML] Select %d winner(s) before awarding multiple copies (currently %d)."
 Diag.D.LogMLMultiAwardStarted = "[ML] Multi-award start item=%s total=%d available=%d slots=%s timeout=%ds"
-Diag.W.ErrMLMultiAwardInterruptedTimeout =
-    "[ML] Multi-award interrupted: loot window did not update as expected within %ds "
-    .. "item=%s expected<%d observed=%d slot=%s"
+Diag.I.LogMLTieReroll = "[ML] Tie reroll item=%s players=%s"
+Diag.W.ErrMLMultiAwardInterruptedTimeout = "[ML] Multi-award interrupted: loot window did not update as expected within %ds " .. "item=%s expected<%d observed=%d slot=%s"
 
 -- Trade --
 Diag.D.LogTradeAcceptUpdate = "[Trade] ACCEPT_UPDATE trader=%s winner=%s t=%s p=%s"
@@ -108,8 +113,7 @@ Diag.D.LogTradeAwardedCountResolved = "[Trade] Awarded count=%d source=%s before
 Diag.D.LogTradeStackBlocked = "[Trade] Stack trade blocked ignoreStacks=%s link=%s"
 Diag.D.LogTradeInitiated = "[Trade] Initiated item=%s -> %s"
 Diag.W.LogTradeDelayedOutOfRange = "[Trade] Delayed: %s out of range item=%s"
-Diag.W.LogTradeNoLootContextTradeOnly =
-    "[Trade] No lootNid context; created trade-only entry lootNid=%s winner=%s item=%s count=%d"
+Diag.W.LogTradeNoLootContextTradeOnly = "[Trade] No lootNid context; created trade-only entry lootNid=%s winner=%s item=%s count=%d"
 
 -- SoftRes --
 Diag.D.LogSRImportRequested = "[SR] Import requested chars=%d"
@@ -129,8 +133,14 @@ Diag.W.LogRollsMissingItem = "[Rolls] Item ID missing or loot table not ready - 
 Diag.D.LogRollsDeniedPlayer = "[Rolls] Denied player=%s (%d/%d)"
 Diag.D.LogRollsAcceptedPlayer = "[Rolls] Accepted player=%s (%d/%d)"
 Diag.D.LogRollsCurrentItemId = "[Rolls] Current itemId=%s"
+Diag.D.LogRollsEligibility = "[Rolls] Eligibility name=%s ok=%s bucket=%s reason=%s used=%d/%d"
+Diag.D.LogRollsResponse = "[Rolls] Response name=%s status=%s bucket=%s best=%s last=%s"
+Diag.D.LogRollsResolution = "[Rolls] Resolution top=%s tied=%s cutoff=%d manual=%s"
+Diag.D.LogRollsTimedOut = "[Rolls] Timed out name=%s"
+Diag.D.LogRollsTieReroll = "[Rolls] Tie reroll item=%s players=%s"
 
 -- Reserves --
+Diag.W.LogReservesLegacyFieldsDetected = "[Reserves] Legacy fields phase=%s original=%d rowPlayer=%d dropped=%d merged=%d"
 Diag.D.LogReservesTrackPending = "[Reserves] Track pending itemId=%d pending=%d"
 Diag.D.LogReservesItemReady = "[Reserves] Item ready itemId=%d pending=%d"
 Diag.D.LogReservesPendingComplete = "[Reserves] Pending item info complete"
@@ -194,19 +204,16 @@ Diag.D.LogLoggerSelectClickContextMenu = "[LoggerSelect] click id=%s ctrl=0 acti
 Diag.D.LogLoggerSelectDeleteItems = "[LoggerSelect] delete items removed=%d"
 Diag.W.ErrLoggerUpdateRosterNotInRaid = "[Logger] Cannot update roster: you are not in a raid."
 Diag.W.ErrLoggerUpdateRosterNotCurrent = "[Logger] Cannot update roster: selected raid is not the current raid."
-Diag.D.LogLoggerLootLogAttempt = "[Logger] Loot:Log attempt source=%s raidId=%s lootNid=%s "
-    .. "looter=%s type=%s roll=%s lastBoss=%s"
+Diag.D.LogLoggerLootLogAttempt = "[Logger] Loot:Log attempt source=%s raidId=%s lootNid=%s " .. "looter=%s type=%s roll=%s lastBoss=%s"
 Diag.E.LogLoggerNoRaidSession = "[Logger] Loot:Log FAILED no raid session raidId=%s lootNid=%s"
+Diag.E.LogLoggerLootNidExpected = "[Logger] Loot:Log expected lootNid but got raw itemId raidId=%s value=%s link=%s matches=%d"
 Diag.E.LogLoggerItemNotFound = "[Logger] Loot:Log FAILED item not found raidId=%d lootNid=%s lootCount=%d"
 Diag.W.LogLoggerLooterEmpty = "[Logger] Loot:Log looter empty raidId=%d lootNid=%s link=%s"
 Diag.W.LogLoggerRollTypeNil = "[Logger] Loot:Log rollType nil raidId=%d lootNid=%s looter=%s"
-Diag.D.LogLoggerLootBefore = "[Logger] Loot:Log BEFORE raidId=%d lootNid=%s link=%s "
-    .. "prevLooter=%s prevType=%s prevRoll=%s"
+Diag.D.LogLoggerLootBefore = "[Logger] Loot:Log BEFORE raidId=%d lootNid=%s link=%s " .. "prevLooter=%s prevType=%s prevRoll=%s"
 Diag.W.LogLoggerLootOverwrite = "[Logger] Loot overwrite raidId=%d lootNid=%s link=%s from=%s to=%s"
-Diag.D.LogLoggerLootRecorded = "[Logger] Loot recorded source=%s raidId=%d lootNid=%s link=%s -> "
-    .. "looter=%s type=%s roll=%s"
-Diag.E.LogLoggerVerifyFailed = "[Logger] Loot:Log VERIFY FAILED raidId=%d lootNid=%s "
-    .. "got(looter=%s type=%s roll=%s)"
+Diag.D.LogLoggerLootRecorded = "[Logger] Loot recorded source=%s raidId=%d lootNid=%s link=%s -> " .. "looter=%s type=%s roll=%s"
+Diag.E.LogLoggerVerifyFailed = "[Logger] Loot:Log VERIFY FAILED raidId=%d lootNid=%s " .. "got(looter=%s type=%s roll=%s)"
 Diag.D.LogLoggerVerified = "[Logger] Loot:Log verified raidId=%d lootNid=%s"
 Diag.D.LogLoggerRecordedNoBossContext = "[Logger] Loot recorded without boss context raidId=%d lootNid=%s link=%s"
 Diag.D.LogLoggerBossLootRemoved = "[Logger] Boss delete removed loot raidId=%d bossId=%d removed=%d"

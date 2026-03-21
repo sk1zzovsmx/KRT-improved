@@ -71,8 +71,8 @@
 			</Anchors>
 			<Color r="1" g="0.8" b="0" a="0.1" />
 		</HighlightTexture>
-</Button>
-	<!-- The Frame: Changes -->
+	</Button>
+	<!-- Changes frame -->
 	<Frame name="KRTChanges" inherits="KRTFrameTemplate">
 		<Size>
 			<AbsDimension x="248" y="205" />
@@ -89,7 +89,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<EditBox name="$parentName" inherits="KRTEditBoxTemplate" letters="20" hidden="true">
 				<Size>
 					<AbsDimension x="65" y="18" />
@@ -102,7 +102,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString inherits="GameFontHighlightSmall" />
-</EditBox>
+			</EditBox>
 			<EditBox name="$parentSpec" inherits="KRTEditBoxTemplate" letters="20" hidden="true">
 				<Size>
 					<AbsDimension x="65" y="18" />
@@ -115,7 +115,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString inherits="GameFontHighlightSmall" />
-</EditBox>
+			</EditBox>
 			<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
@@ -127,7 +127,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
@@ -139,7 +139,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentDemandBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
@@ -151,7 +151,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentAnnounceBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
@@ -163,7 +163,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT">
@@ -179,9 +179,6 @@
 				</Anchors>
 			</ScrollFrame>
 		</Frames>
-</Frame>
+	</Frame>
 	<!-- ====== End of Changes ====== -->
-	<!-- ====== Reserve List Window ====== -->
 </Ui>
-
-

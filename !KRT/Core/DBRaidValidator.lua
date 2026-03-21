@@ -56,8 +56,7 @@ do
             migrations:ApplyRaidMigrations(clone, currentSchemaVersion)
         end
 
-        local raidStore = Core.GetRaidStoreOrNil and
-            Core.GetRaidStoreOrNil("DBRaidValidator.EnsureNormalizedClone", { "NormalizeRaidRecord" }) or nil
+        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("DBRaidValidator.EnsureNormalizedClone", { "NormalizeRaidRecord" }) or nil
         if raidStore then
             clone = raidStore:NormalizeRaidRecord(clone)
         end
@@ -109,8 +108,7 @@ do
         end
 
         -- Validate source keys directly (without normalization side effects).
-        local raidStore = Core.GetRaidStoreOrNil and
-            Core.GetRaidStoreOrNil("DBRaidValidator.ValidateRaid", { "IsLegacyRuntimeKey" }) or nil
+        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("DBRaidValidator.ValidateRaid", { "IsLegacyRuntimeKey" }) or nil
         for key in pairs(raid) do
             if type(key) == "string" and key:sub(1, 1) == "_" and key ~= "_runtime" then
                 pushDetail(result, "E", "RUNTIME_OUTSIDE", { key = key })
@@ -233,7 +231,7 @@ do
                     result.ok = result.ok + 1
                 end
 
-                local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter) or 0
+                local looterNid = tonumber(loot.looterNid) or 0
                 if looterNid > 0 and not playerByNid[looterNid] then
                     pushDetail(result, "E", "LOOT_MISSING_LOOTER", {
                         lootIndex = i,
@@ -286,8 +284,7 @@ do
             currentSchemaVersion = 1
         end
 
-        local raidStore = Core.GetRaidStoreOrNil and
-            Core.GetRaidStoreOrNil("DBRaidValidator.ValidateAllRaids", { "GetRawRaids" }) or nil
+        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("DBRaidValidator.ValidateAllRaids", { "GetRawRaids" }) or nil
         local raids = raidStore and raidStore:GetRawRaids() or {}
         raids = (type(raids) == "table") and raids or {}
         local report = {

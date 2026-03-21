@@ -14,6 +14,7 @@ local UIScaffold = addon.UIScaffold
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Bus = feature.Bus or addon.Bus
+local Services = feature.Services or addon.Services or {}
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
@@ -33,18 +34,23 @@ do
     end
 
     addon.Widgets = addon.Widgets or {}
-    addon.Widgets.LootCounter = addon.Widgets.LootCounter or addon.LootCounter or {}
-    addon.LootCounter = addon.Widgets.LootCounter -- Legacy alias during namespacing migration.
+    addon.Widgets.LootCounter = addon.Widgets.LootCounter or {}
     local module = addon.Widgets.LootCounter
+    module._ui = module._ui
+        or {
+            Loaded = false,
+            Bound = false,
+            Localized = false,
+            Dirty = true,
+            Reason = nil,
+            FrameName = nil,
+        }
+    local UI = module._ui
 
     -- ----- Internal state ----- --
-    local frameName
     local rows, raidPlayers = {}, {}
     local scrollFrame, scrollChild, header
     local getFrame = makeModuleFrameGetter(module, "KRTLootCounterFrame")
-    local UI = {
-        Loaded = false,
-    }
 
     -- Single-line column header.
     local HEADER_HEIGHT = 18
@@ -59,13 +65,18 @@ do
     -- ----- Private helpers ----- --
     function UI.AcquireRefs(frame)
         local refs = {
-            scrollFrame = frame
-                and (frame.ScrollFrame or _G[(frame.GetName and frame:GetName() or "KRTLootCounterFrame") .. "ScrollFrame"])
-                or nil,
+            scrollFrame = frame and (frame.ScrollFrame or _G[(frame.GetName and frame:GetName() or "KRTLootCounterFrame") .. "ScrollFrame"]) or nil,
         }
-        refs.scrollChild = (refs.scrollFrame and refs.scrollFrame.ScrollChild)
-            or _G["KRTLootCounterFrameScrollFrameScrollChild"]
+        refs.scrollChild = (refs.scrollFrame and refs.scrollFrame.ScrollChild) or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         return refs
+    end
+
+    function UI.Localize()
+        local frameName = UI.FrameName
+        if not frameName then
+            return
+        end
+        Frames.SetFrameTitle(frameName, L.StrLootCounter)
     end
 
     local function ensureFrames()
@@ -74,26 +85,18 @@ do
             return false
         end
 
-        frameName = frameName or (frame.GetName and frame:GetName()) or "KRTLootCounterFrame"
-        scrollFrame = scrollFrame
-            or frame.ScrollFrame
-            or _G[frameName .. "ScrollFrame"]
-            or _G["KRTLootCounterFrameScrollFrame"]
+        UI.FrameName = UI.FrameName or (frame.GetName and frame:GetName()) or "KRTLootCounterFrame"
+        scrollFrame = scrollFrame or frame.ScrollFrame or _G[UI.FrameName .. "ScrollFrame"] or _G["KRTLootCounterFrameScrollFrame"]
 
-        scrollChild = scrollChild
-            or (scrollFrame and scrollFrame.ScrollChild)
-            or _G["KRTLootCounterFrameScrollFrameScrollChild"]
-
-        if not frame._krtInitialized then
-            Frames.SetFrameTitle(frameName, L.StrLootCounter)
-            frame._krtInitialized = true
-        end
+        scrollChild = scrollChild or (scrollFrame and scrollFrame.ScrollChild) or _G["KRTLootCounterFrameScrollFrameScrollChild"]
 
         return true
     end
 
     local function ensureHeader()
-        if header or not scrollChild then return end
+        if header or not scrollChild then
+            return
+        end
 
         header = CreateFrame("Frame", nil, scrollChild)
         header:SetHeight(HEADER_HEIGHT)
@@ -128,7 +131,7 @@ do
         if not addon.Core.GetCurrentRaid() then
             return raidPlayers
         end
-        return addon.Raid:GetLootCounterRows(addon.Core.GetCurrentRaid(), raidPlayers)
+        return Services.Raid:GetLootCounterRows(addon.Core.GetCurrentRaid(), raidPlayers)
     end
 
     local function ensureRow(i, rowHeight)
@@ -153,7 +156,9 @@ do
             row.name:SetJustifyH("LEFT")
 
             local function setupTooltip(btn, text)
-                if not text or text == "" then return end
+                if not text or text == "" then
+                    return
+                end
                 btn:HookScript("OnEnter", function(self)
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                     GameTooltip:SetText(text, 1, 1, 1, true)
@@ -174,7 +179,7 @@ do
 
             row.reset = makeBtn("R", L.TipLootCounterReset)
             row.minus = makeBtn("-", L.TipLootCounterMinus)
-            row.plus  = makeBtn("+", L.TipLootCounterPlus)
+            row.plus = makeBtn("+", L.TipLootCounterPlus)
 
             row.reset:SetPoint("RIGHT", row.actions, "RIGHT", 0, 0)
             row.minus:SetPoint("RIGHT", row.reset, "LEFT", -BTN_GAP, 0)
@@ -183,22 +188,22 @@ do
             row.plus:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:AddPlayerCountByNid(playerNid, 1, addon.Core.GetCurrentRaid())
-                    module:RequestRefresh()
+                    Services.Raid:AddPlayerCountByNid(playerNid, 1, addon.Core.GetCurrentRaid())
+                    module:RequestRefresh("count_changed")
                 end
             end)
             row.minus:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:AddPlayerCountByNid(playerNid, -1, addon.Core.GetCurrentRaid())
-                    module:RequestRefresh()
+                    Services.Raid:AddPlayerCountByNid(playerNid, -1, addon.Core.GetCurrentRaid())
+                    module:RequestRefresh("count_changed")
                 end
             end)
             row.reset:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
-                    addon.Raid:SetPlayerCountByNid(playerNid, 0, addon.Core.GetCurrentRaid())
-                    module:RequestRefresh()
+                    Services.Raid:SetPlayerCountByNid(playerNid, 0, addon.Core.GetCurrentRaid())
+                    module:RequestRefresh("count_reset")
                 end
             end)
 
@@ -210,9 +215,10 @@ do
     -- ----- Public methods ----- --
     function module:OnLoad(frame)
         local f = frame or getFrame()
-        frameName = Frames.InitModuleFrame(module, f, { enableDrag = true }) or frameName
-        UI.Loaded = frameName ~= nil
-        if not ensureFrames() then return end
+        UI.FrameName = Frames.InitModuleFrame(module, f, { enableDrag = true }) or UI.FrameName
+        if not ensureFrames() then
+            return
+        end
     end
 
     function module:AttachToMaster(masterFrame)
@@ -227,10 +233,14 @@ do
         end)
     end
 
-    function module:Refresh()
-        if not ensureFrames() then return end
+    function module:RefreshUI()
+        if not ensureFrames() then
+            return
+        end
         local frame = getFrame()
-        if not frame or not scrollFrame or not scrollChild then return end
+        if not frame or not scrollFrame or not scrollChild then
+            return
+        end
 
         ensureHeader()
 
@@ -245,17 +255,23 @@ do
         local contentW = scrollFrame:GetWidth() or 0
         local sb = scrollFrame.ScrollBar or (scrollFrame.GetName and _G[scrollFrame:GetName() .. "ScrollBar"]) or nil
         local sbw = (sb and sb.GetWidth and sb:GetWidth()) or 16
-        if sbw <= 0 then sbw = 16 end
+        if sbw <= 0 then
+            sbw = 16
+        end
         contentW = math.max(1, contentW - sbw - 6)
         scrollChild:SetWidth(contentW)
         scrollChild:SetHeight(math.max(contentHeight, scrollFrame:GetHeight()))
         local maxScroll = contentHeight - scrollFrame:GetHeight()
-        if maxScroll < 0 then maxScroll = 0 end
+        if maxScroll < 0 then
+            maxScroll = 0
+        end
         if priorScroll > maxScroll then
             priorScroll = maxScroll
         end
         scrollFrame:SetVerticalScroll(priorScroll)
-        if header then header:Show() end
+        if header then
+            header:Show()
+        end
 
         for i = 1, numPlayers do
             local data = players[i]
@@ -274,16 +290,14 @@ do
                 row._lastName = name
             end
 
-            local class = data and data.class or addon.Raid:GetPlayerClass(name)
+            local class = data and data.class or Services.Raid:GetPlayerClass(name)
             if row._lastClass ~= class then
                 local r, g, b = Colors.GetClassColor(class)
                 row.name:SetTextColor(r, g, b)
                 row._lastClass = class
             end
 
-            local cnt = (data and tonumber(data.count))
-                or (playerNid and addon.Raid:GetPlayerCountByNid(playerNid, addon.Core.GetCurrentRaid()))
-                or 0
+            local cnt = (data and tonumber(data.count)) or (playerNid and Services.Raid:GetPlayerCountByNid(playerNid, addon.Core.GetCurrentRaid())) or 0
             if row._lastCount ~= cnt then
                 row.count:SetText(tostring(cnt))
                 row._lastCount = cnt
@@ -292,8 +306,14 @@ do
         end
 
         for i = numPlayers + 1, #rows do
-            if rows[i] then rows[i]:Hide() end
+            if rows[i] then
+                rows[i]:Hide()
+            end
         end
+    end
+
+    function module:Refresh()
+        return self:RefreshUI()
     end
 
     local function BindHandlers(_, _, refs)
@@ -303,7 +323,7 @@ do
 
     local function OnLoadFrame(frame)
         module:OnLoad(frame)
-        return frameName
+        return UI.FrameName
     end
 
     UIScaffold.DefineModuleUi({
@@ -311,6 +331,9 @@ do
         getFrame = getFrame,
         acquireRefs = UI.AcquireRefs,
         bind = BindHandlers,
+        localize = function()
+            UI.Localize()
+        end,
         onLoad = OnLoadFrame,
     })
 
@@ -329,10 +352,13 @@ do
     Bus.RegisterCallback(InternalEvents.RaidCreate, requestRefresh)
 
     if UIFacade and UIFacade.Register then
-        UIFacade:Register("LootCounter", UIScaffold.MakeStandardWidgetApi(module, {
-            AttachToMaster = function(masterFrame)
-                module:AttachToMaster(masterFrame)
-            end,
-        }))
+        UIFacade:Register(
+            "LootCounter",
+            UIScaffold.MakeStandardWidgetApi(module, {
+                AttachToMaster = function(masterFrame)
+                    module:AttachToMaster(masterFrame)
+                end,
+            })
+        )
     end
 end

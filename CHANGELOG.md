@@ -4,6 +4,211 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Behavior:** SR announce lines in Master now exclude reserve names that are
+  not part of the current raid roster.
+- **UI:** Master `SR` button now lights/enables only when at least one reserve
+  player for the selected item is present in the current raid roster.
+- **UI:** Logger now shows panel-level empty states and orientation hints for
+  history and export views, so raid, boss, attendee, loot, and CSV panes stay
+  readable even before a selection exists.
+- **UI:** Master action buttons now expose contextual tooltips that explain the
+  current action, winner target, reserve availability, and countdown behavior.
+- **UI:** Master now shows contextual workflow status under the selected item,
+  and Logger panel titles now include live counts plus raid, boss, and player
+  context for faster navigation.
+- **Bugfix:** Master countdown now starts again after `MS/OS/SR/FREE`
+  announcements even when the Rolls service pre-bootstraps the roll session;
+  opening roll intake now restores the canonical `rollStarted` state.
+- **Bugfix:** Rolls now materialize reserved candidates correctly even when the
+  reserves adapter is exposed as plain functions, so closed reserved sessions
+  render `TIMED_OUT` rows again; compact `TIE/PASS/CXL/OOT/OUT/BLK` info tags
+  also fall back safely when localization tables are not fully bootstrapped.
+- **Bugfix:** Master inventory award flow now treats roll rows as selectable
+  unless explicitly disabled by the service contract, validates multi-copy
+  inventory selections before trade, advances the next selected winner after
+  each completed keep/trade step, and tolerates missing optional runtime
+  helpers during lightweight test/harness loads.
+- **Bugfix:** Logger now tolerates lightweight list-controller adapters,
+  always emits the raw `itemId` vs `lootNid` guard-rail error, and refreshes
+  export CSV content as soon as the export tab becomes visible.
+- **UI:** Button glow now auto-scales by target button size in
+  `Modules/UI/Effects.lua` (dynamic thickness/scale and proc lines/frequency),
+  and recomputes on `OnSizeChanged` for responsive fitting.
+- **UI:** Removed `Award/Trade` glow wiring from `Controllers/Master.lua`; the
+  master frame no longer manages any glow path for `Award`.
+- **Refactor:** Rewrote `Modules/UI/Effects.lua` into a stock single-module
+  implementation with direct method-driven glow rendering (`ACShine`, `Pixel`,
+  `Proc`, `buttonOverlay`), removing profile-name plumbing and defensive
+  compatibility branches.
+- **UI:** Removed glow profile-name plumbing from button glow APIs; methods now
+  resolve by explicit glow type only (for example `ACShine`, `Pixel`, `Proc`,
+  `buttonOverlay`) and no longer use names like `CombatPulse`.
+- **UI:** Glow effects are now single-choice in `Modules/UI/Effects.lua`: only
+  one method can be active at a time (`ACShine`, `Pixel`, `Proc`, or
+  `buttonOverlay`), with no combinable style mixing.
+- **UI:** Removed explicit `GLOW_PROFILES` presets (`SoftPulse` and
+  `CombatPulse`) from `Modules/UI/Effects.lua`; glow tuning now resolves from
+  the single default baseline in `DEFAULT_PROFILE_PARTS`.
+- **UI:** Added explicit 3.3.5a-safe glow type support in
+  `Modules/UI/Effects.lua` for `ACShine`, `Pixel`, `Proc`, and
+  `buttonOverlay`, with default subglow settings aligned to the provided
+  baseline (`duration=1`, `frequency=0.25`, `length=10`, `lines=8`,
+  `scale=1`, `thickness=1`, `x/y offset=0`, white color).
+- **UI:** Reduced default glow intensity in `Modules/UI/Effects.lua` (alpha,
+  pulse strength, border thickness, and proc density/frequency) for a lighter
+  visual footprint.
+- **UI:** Added explicit glow/border method registry in
+  `Modules/UI/Effects.lua` with canonical styles (`none`, `fill`, `ring`,
+  `borderOnly`, `proc`, `button`) and aliases (`border`, `outline`, `pixel`,
+  `autocast`, `shiny`, etc.).
+- **UI:** Disabled glow on the Master `Award/Trade` button; only `SR` keeps
+  contextual glow highlighting.
+- **UI:** Added a new `button` glow style in `Modules/UI/Effects.lua` using
+  `UI-ActionButton-Border` with pulse animation and button-size scaling; Master
+  `SR` now uses this style for a sharper, more visible border glow.
+- **Refactor:** Moved button glow/proc rendering internals from `Visuals.lua`
+  into `Modules/UI/Effects.lua`; `UIPrimitives.SetButtonGlow` is now a thin
+  bridge, keeping primitives and effects concerns separated.
+- **Refactor:** Replaced SR proc glow backend with a local `Visuals.lua`
+  LCG-like autocast/proc renderer (no full LibCustomGlow dependency), tuned for
+  WoW 3.3.5a compatibility and precise button-bound animation.
+- **UI:** Tuned `SR` `proc` glow to be tighter to the button and much faster,
+  and switched to a local per-frame sparkle updater so animation remains smooth
+  and independent from global `AutoCastShine` timing.
+- **Bugfix:** FrameXML `proc` glow now creates a named `AutoCastShineTemplate`
+  frame per button, preventing `UIParent.lua` nil-name errors on 3.3.5a.
+- **UI:** `SR` button glow now supports a native FrameXML-style `proc` effect
+  (`AutoCastShineTemplate`) for a stronger, animated highlight similar to
+  WeakAuras proc glow behavior, while `Award/Trade` keeps the precise ring glow.
+- **UI:** Tightened Master button glow geometry to the exact button border
+  (`padding=0`) with profile-driven dynamic edge thickness, and increased pulse
+  intensity for higher visibility on both `SR` (blue) and `Award/Trade`.
+- **Bugfix:** Master button glow animations now use a Wrath-compatible alpha
+  setup on 3.3.5a clients that do not expose `SetFromAlpha`/`SetToAlpha`.
+- **UI:** Added pulsing glow cues on Master Loot controls: `SR` now glows when
+  the selected item has reserves, and `Award/Trade` glows when an award can be
+  executed.
+- **UI:** Refined Master button glow visuals to a hybrid style (subtle
+  rectangular frame plus shiny ring pulse) while preserving button-sized
+  framing.
+- **UI:** Removed the extra outer square from Master button glow visuals to
+  avoid double-border appearance while keeping the shiny pulse effect.
+- **UI:** Removed the top glossy `shine` strip from Master button glows to
+  eliminate the visible white line above highlighted buttons.
+- **UI:** Master glow styles now support `ring` or `fill` mode; `SR` uses ring
+  glow, while `Award/Trade` uses fill-only glow to avoid oversized circular
+  aura on wide buttons.
+- **UI:** Restored ring glow on `Award/Trade` and adjusted ring sizing to scale
+  by button width/height ratio, keeping wide-button highlights visible without
+  oversized circular halos.
+- **UI:** Ring glow is now anchored to button bounds (with a small fixed
+  padding) so the aura follows each button size directly, including wide
+  controls like `Award/Trade`.
+- **UI:** Ring glow now selects square vs wide highlight textures by button
+  aspect ratio, improving `Award/Trade` visual fit while keeping `SR` glow
+  style unchanged.
+- **UI:** Replaced texture-driven ring glow with a dynamic 4-edge geometric
+  ring that is anchored to button bounds, so wide buttons (for example
+  `Award/Trade`) keep a consistent border glow shape.
+- **UI:** Added FrameXML glow profiles `SoftPulse` and `CombatPulse` for
+  animation-group tuning (alpha ranges and pulse cadence). Master now uses
+  `SoftPulse` on `SR` and `CombatPulse` on `Award/Trade`.
+- **Tooling:** Added `tools/dev-stack-status.ps1` as a single readiness check
+  for vendored skills, local Codex installs, Mechanic, and the repo-local MCP
+  server.
+- **Tooling:** The repo-local MCP server now exposes `dev_stack_status` for
+  readiness inspection and `mechanic_bootstrap` for external Mechanic setup.
+- **Docs:** Documented the canonical local AFD workflow around
+  `dev-stack-status.ps1`, skill sync, Mechanic bootstrap, and MCP usage.
+- **Behavior:** The Master Loot window is back to a `250x480` footprint, with its
+  roll-table headers, scroll area, paired top/bottom action buttons, mode row,
+  left-side action column, and inner control alignment retuned for the narrower
+  layout; the `MS | OS | SR | Free | Countdown` row now shares the same left
+  start as `Select Item` and `Open SoftRes`, the `Roll` button expands while
+  `Clear` keeps its width, and the Hold/Bank/DE dropdowns now keep the same
+  right-side gap as `Loot Counter`. The rolls table uses a fixed
+  `Player | Info | Count | Rolls` grid,
+  and shortens info tags to compact `TIE / OOT / OUT / BLK` codes.
+- **Bugfix:** Synthetic `/krt debug raid` players now pass roll intake without
+  live-unit checks, and rejected debug submissions no longer whisper fake names.
+- **Behavior:** Added `/krt debug raid seed|clear|rolls|roll <1-4|name> [1-100]`
+  to seed four synthetic players into the current raid and submit synthetic
+  rolls against the active roll session for addon testing.
+- **Behavior:** Rolls now use a response-first resolver with centralized eligibility checks,
+  explicit tie-at-cutoff handling, runtime participant states, explicit `PASS` / `CANCELLED`
+  player responses, and award-time revalidation.
+- **Behavior:** Roll response transitions are now explicitly hardened: `PASS` and
+  `CANCELLED` stay reversible while the session is open, `TIMED_OUT` stays terminal
+  for the current session, and only eligible `ROLL` responses may enter the resolver.
+- **Bugfix:** Master Loot now consumes per-row `selectionAllowed` directly from the
+  rolls service contract, so controller-side selection and award flows no longer
+  reinterpret row pickability from local `status/isEligible` checks.
+- **Bugfix:** Final winner validation for award/trade now lives in the rolls service,
+  and `Master.lua` consumes the service result directly instead of remapping local
+  winner reason codes.
+- **Bugfix:** Accepted roll responses now stay candidate-eligible after consuming their
+  last allowed roll; extra `/roll` attempts are still denied, but valid winners no longer
+  disappear from resolution or award-time validation.
+- **Bugfix:** Trade and loot-window multi-award execution now track their active winner
+  outside the global compatibility mirror, reducing stale winner state during chained awards
+  and inventory trade progress.
+- **Behavior:** Rolls eligibility now supports opt-in `manual exclusion`
+  checks through the service API, so future loot-ban rules can reuse the same
+  intake/display/award validation path.
+- **Behavior:** Roll winner selection now uses one unified selection flow for auto winners,
+  inventory single-pick, and multi-pick, removing the old `selectedAuto` / `msPrefilled`
+  state split inside `Services/Rolls.lua`.
+- **Behavior:** The Master Loot rolls frame now defaults to `showRollsOnly`, so non-rolling
+  materialized candidates stay in the full runtime model but are hidden from the visible roll table
+  until they actually submit a `/roll`.
+- **Behavior:** Roll-row state tags such as `TIE`, `OUT`, `TIME`, and `BLOCK` now render in a
+  dedicated `Info` column, leaving the `Counter` column for loot-count, reserve-count, and plus-priority
+  values only; the Master Loot rolls table now reads left-to-right as `Player | Info | Counter | Rolls`.
+- **Behavior:** Single-winner ties now switch the `Award` button to `Reroll`, which clears the
+  current roll set, restricts the next intake to the tied players only, and reopens the session
+  for a targeted reroll instead of silently blocking on manual resolution.
+- **Bugfix:** Master Loot winner selection realigns single-award pick mode with the
+  `MLRollWinners` multiselect state, restoring the original `CTRL+click` deselect/swap flow.
+- **Behavior:** Inventory/trade winner rows now reuse the same selected-row marker (`> name <`)
+  and selection visuals as the loot-window boss roll flow, including multi-copy winner selection.
+- **Bugfix:** Inventory/trade multi-awards now execute one winner at a time from the selected
+  winner queue, so `self-keep` and real trades both consume one copy, advance to the next
+  selected winner, and keep `itemCount` progression symmetric.
+- **Refactor:** Centralized loot/item and boss-add ignore lookups into `Modules/IgnoredItems.lua`
+  and `Modules/IgnoredMobs.lua`, removing large hardcoded filter tables from `Services/Raid.lua`.
+- **Behavior:** Boss filtering now uses the curated raid-only `IgnoredMobs` module to suppress
+  LibBossIDs encounter adds, phase units, and support NPCs from Vanilla through Wrath.
+- **Bugfix:** Boss filtering now treats `LibBossIDs` as a first-pass allowlist and ignores known
+  encounter-helper false positives (for example `Death Knight Understudy`), while suppressing
+  near-duplicate boss logs so loot stays attached to the real boss context.
+- **Behavior:** `KRT_Reserves` now persists readable player-name keys and strips duplicated
+  `playerNameDisplay`; lowercase reserve-name lookup keys remain runtime-only and legacy reserve
+  name fields are normalized on load/save.
+- **Refactor:** Legacy fallback sunset for raid loot winner resolution: runtime/query paths now resolve
+  winners from `loot.looterNid` only; legacy `loot.looter` is diagnostics-only and stripped on normalize/save.
+- **Refactor:** Legacy fallback sunset for reserves: canonical display resolution now uses
+  `playerNameDisplay` only, and runtime reserve rows no longer use legacy `player` fallback fields.
+- **Tooling:** Updated `tools/sv-roundtrip.lua` and `tools/sv-inspector.lua` to enforce strict canonical
+  checks (no winner resolution fallback from legacy `loot.looter` and no reserve-name fallback from `original`).
+- **Docs:** Marked SV contract with explicit "legacy sunset" status in `docs/RAID_SCHEMA.md` and
+  `docs/SV_SANITY_CHECKLIST.md`, including the pre-release schema freeze gate.
+- **Behavior:** `schemaVersion` stays at `3`; `v4` is deferred until a net structural simplification is needed.
+- **Behavior:** Added a unified canonical SV save pipeline (`Core.PrepareSavedVariablesForSave`)
+  executed at `PLAYER_LOGOUT`, so both `KRT_Raids` and `KRT_Reserves` are normalized before persistence.
+- **Diagnostics:** Added explicit legacy-field warnings during SV load/save hardening:
+  raid warnings now cover legacy runtime caches + `loot[].looter` + `bossKills[].attendanceMask`,
+  and reserves warnings now cover legacy `original`/row `player` payload fields and dropped invalid rows.
+- **Tooling:** Added `tools/sv-roundtrip.lua` and `tools/run-sv-roundtrip.ps1` for
+  `load -> normalize -> save -> reload` no-drift validation on `KRT_Raids` + `KRT_Reserves`.
+- **Tooling:** Added mixed legacy fixtures under `tests/fixtures/sv/` for automated
+  compatibility validation against old/mixed SavedVariables payloads.
+- **Behavior:** Reserves SV naming/storage was canonicalized: player containers now
+  persist a single readable player-name key (replacing lowercase keys +
+  duplicated `playerNameDisplay`), and reserve rows no longer persist duplicated
+  `player` display-name fields; legacy data is migrated on load/save.
+- **Behavior:** Raid schema bumped to `v3` with lean persistence compaction at logout:
+  default-only/empty optional raid fields are omitted from SavedVariables while
+  runtime readers continue applying defaults for backward-compatible behavior.
 - **Behavior:** Raid schema bumped to `v2`; boss attendees are now stored as `playerNid` arrays
   (`bossKills[].players`) and loot winners are stored as `looterNid` (`loot[].looterNid`) to
   reduce SavedVariables duplication.

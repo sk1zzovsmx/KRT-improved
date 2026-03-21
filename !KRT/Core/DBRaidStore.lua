@@ -9,10 +9,12 @@ local feature = addon.Core.GetFeatureShared()
 local Core = feature.Core or addon.Core
 local Time = feature.Time or addon.Time
 local Strings = feature.Strings or addon.Strings
+local Diag = feature.Diag or {}
 
 local tinsert, tremove = table.insert, table.remove
 local pairs, type = pairs, type
 local tostring, tonumber = tostring, tonumber
+local tconcat = table.concat
 
 -- Raid storage service.
 do
@@ -45,6 +47,41 @@ do
         return map
     end
 
+    local function createNidAllocator(initialNext)
+        local usedNids = {}
+        local nextNid = tonumber(initialNext) or 1
+        if nextNid < 1 then
+            nextNid = 1
+        end
+
+        local function markAllocated(nid)
+            usedNids[nid] = true
+            if nid >= nextNid then
+                nextNid = nid + 1
+            end
+            return nid
+        end
+
+        local function allocate(preferred)
+            local nid = tonumber(preferred)
+            if nid and nid > 0 and not usedNids[nid] then
+                return markAllocated(nid)
+            end
+
+            while usedNids[nextNid] do
+                nextNid = nextNid + 1
+            end
+
+            return markAllocated(nextNid)
+        end
+
+        local function getNext()
+            return nextNid
+        end
+
+        return allocate, getNext
+    end
+
     local function ensureRaidsTable()
         if type(KRT_Raids) ~= "table" then
             KRT_Raids = {}
@@ -72,6 +109,45 @@ do
         for key in pairs(LEGACY_RUNTIME_KEYS) do
             raid[key] = nil
         end
+    end
+
+    local function isRuntimeIndexReady(runtime)
+        return type(runtime) == "table"
+            and type(runtime.playersByName) == "table"
+            and type(runtime.playerIdxByNid) == "table"
+            and type(runtime.bossIdxByNid) == "table"
+            and type(runtime.bossByNid) == "table"
+            and type(runtime.lootIdxByNid) == "table"
+            and type(runtime.lootByNid) == "table"
+    end
+
+    local function ensureRuntimeTable(raid)
+        local runtime = raid._runtime
+        if type(runtime) ~= "table" then
+            runtime = {}
+            raid._runtime = runtime
+        end
+        return runtime
+    end
+
+    local function acquireRuntimeIndexMap(runtime, key)
+        local map = clearMap(runtime[key])
+        runtime[key] = map
+        return map
+    end
+
+    local function buildRuntimeSignature(raid, players, bosses, lootRows)
+        return tostring(#players)
+            .. "|"
+            .. tostring(#bosses)
+            .. "|"
+            .. tostring(#lootRows)
+            .. "|"
+            .. tostring(tonumber(raid.nextPlayerNid) or 1)
+            .. "|"
+            .. tostring(tonumber(raid.nextBossNid) or 1)
+            .. "|"
+            .. tostring(tonumber(raid.nextLootNid) or 1)
     end
 
     local function normalizeChangeName(value)
@@ -113,31 +189,81 @@ do
         return string.lower(value)
     end
 
+    local function isLegacyDiagnosticPhase(contextTag)
+        return contextTag == "load" or contextTag == "save"
+    end
+
+    local function scanLegacyRaidPayload(raid)
+        local legacyRuntimeKeys = {}
+        for key in pairs(LEGACY_RUNTIME_KEYS) do
+            if raid[key] ~= nil then
+                legacyRuntimeKeys[#legacyRuntimeKeys + 1] = key
+            end
+        end
+
+        local legacyAttendanceMaskCount = 0
+        local bosses = (type(raid.bossKills) == "table") and raid.bossKills or nil
+        if bosses then
+            for i = 1, #bosses do
+                local boss = bosses[i]
+                if type(boss) == "table" and boss.attendanceMask ~= nil then
+                    legacyAttendanceMaskCount = legacyAttendanceMaskCount + 1
+                end
+            end
+        end
+
+        local legacyLootLooterCount = 0
+        local lootRows = (type(raid.loot) == "table") and raid.loot or nil
+        if lootRows then
+            for i = 1, #lootRows do
+                local loot = lootRows[i]
+                if type(loot) == "table" and loot.looter ~= nil then
+                    legacyLootLooterCount = legacyLootLooterCount + 1
+                end
+            end
+        end
+
+        return {
+            legacyRuntimeKeys = legacyRuntimeKeys,
+            legacyAttendanceMaskCount = legacyAttendanceMaskCount,
+            legacyLootLooterCount = legacyLootLooterCount,
+        }
+    end
+
+    local function warnLegacyRaidPayload(contextTag, raid, raidIndex, legacy)
+        local runtimeKeys = legacy.legacyRuntimeKeys or {}
+        local runtimeKeysCount = #runtimeKeys
+        local lootLooterCount = tonumber(legacy.legacyLootLooterCount) or 0
+        local attendanceMaskCount = tonumber(legacy.legacyAttendanceMaskCount) or 0
+        if runtimeKeysCount == 0 and lootLooterCount == 0 and attendanceMaskCount == 0 then
+            return
+        end
+
+        local runtimeText = (runtimeKeysCount > 0) and tconcat(runtimeKeys, ";") or "-"
+        local raidNid = tostring(tonumber(raid and raid.raidNid) or "?")
+        local idxText = tostring(tonumber(raidIndex) or "?")
+        local template = Diag.W and Diag.W.LogRaidLegacyFieldsDetected
+        if type(template) == "string" then
+            addon:warn(template:format(contextTag, raidNid, idxText, runtimeText, lootLooterCount, attendanceMaskCount))
+            return
+        end
+
+        addon:warn(
+            ("[RaidStore] Legacy fields detected phase=%s raidNid=%s idx=%s runtime=%s looter=%d mask=%d"):format(
+                tostring(contextTag or "?"),
+                raidNid,
+                idxText,
+                runtimeText,
+                lootLooterCount,
+                attendanceMaskCount
+            )
+        )
+    end
+
     local function rebuildRaidNidIndex()
         local raids = ensureRaidsTable()
-        local usedRaidNids = {}
         local raidIdxByNid = {}
-        local nextRaidNid = 1
-
-        local function allocateRaidNid(preferred)
-            local raidNid = tonumber(preferred)
-            if raidNid and raidNid > 0 and not usedRaidNids[raidNid] then
-                usedRaidNids[raidNid] = true
-                if raidNid >= nextRaidNid then
-                    nextRaidNid = raidNid + 1
-                end
-                return raidNid
-            end
-
-            while usedRaidNids[nextRaidNid] do
-                nextRaidNid = nextRaidNid + 1
-            end
-
-            local out = nextRaidNid
-            usedRaidNids[out] = true
-            nextRaidNid = out + 1
-            return out
-        end
+        local allocateRaidNid, getNextRaidNidValue = createNidAllocator(1)
 
         for i = 1, #raids do
             local raid = module:NormalizeRaidRecord(raids[i])
@@ -149,7 +275,7 @@ do
         end
 
         storeState.raidIdxByNid = raidIdxByNid
-        storeState.nextRaidNid = nextRaidNid
+        storeState.nextRaidNid = getNextRaidNidValue()
     end
 
     local function getNextRaidNid(preferred)
@@ -290,9 +416,14 @@ do
         return true, removed, idx
     end
 
-    function module:NormalizeRaidRecord(raid)
+    function module:NormalizeRaidRecord(raid, contextTag, raidIndex)
         if type(raid) ~= "table" then
             return nil
+        end
+
+        if isLegacyDiagnosticPhase(contextTag) then
+            local legacy = scanLegacyRaidPayload(raid)
+            warnLegacyRaidPayload(contextTag, raid, raidIndex, legacy)
         end
 
         local schemaVersion = getSchemaVersion()
@@ -313,28 +444,8 @@ do
         raid.loot = (type(raid.loot) == "table") and raid.loot or {}
         raid.changes = (type(raid.changes) == "table") and raid.changes or {}
 
-        local usedPlayerNids = {}
-        local nextPlayerNid = tonumber(raid.nextPlayerNid) or 1
-        if nextPlayerNid < 1 then
-            nextPlayerNid = 1
-        end
+        local allocatePlayerNid, getNextPlayerNid = createNidAllocator(raid.nextPlayerNid)
         local assignedByRef = {}
-
-        local function allocatePlayerNid(preferred)
-            local playerNid = tonumber(preferred)
-            if playerNid and playerNid > 0 and not usedPlayerNids[playerNid] then
-                usedPlayerNids[playerNid] = true
-                return playerNid
-            end
-
-            while usedPlayerNids[nextPlayerNid] do
-                nextPlayerNid = nextPlayerNid + 1
-            end
-            local out = nextPlayerNid
-            usedPlayerNids[out] = true
-            nextPlayerNid = out + 1
-            return out
-        end
 
         local players = raid.players
         local playerNidByName = {}
@@ -368,27 +479,7 @@ do
             end
         end
 
-        local usedBossNids = {}
-        local nextBossNid = tonumber(raid.nextBossNid) or 1
-        if nextBossNid < 1 then
-            nextBossNid = 1
-        end
-
-        local function allocateBossNid(preferred)
-            local bossNid = tonumber(preferred)
-            if bossNid and bossNid > 0 and not usedBossNids[bossNid] then
-                usedBossNids[bossNid] = true
-                return bossNid
-            end
-
-            while usedBossNids[nextBossNid] do
-                nextBossNid = nextBossNid + 1
-            end
-            local out = nextBossNid
-            usedBossNids[out] = true
-            nextBossNid = out + 1
-            return out
-        end
+        local allocateBossNid, getNextBossNid = createNidAllocator(raid.nextBossNid)
 
         local bosses = raid.bossKills
         for i = 1, #bosses do
@@ -441,27 +532,7 @@ do
             end
         end
 
-        local usedLootNids = {}
-        local nextLootNid = tonumber(raid.nextLootNid) or 1
-        if nextLootNid < 1 then
-            nextLootNid = 1
-        end
-
-        local function allocateLootNid(preferred)
-            local lootNid = tonumber(preferred)
-            if lootNid and lootNid > 0 and not usedLootNids[lootNid] then
-                usedLootNids[lootNid] = true
-                return lootNid
-            end
-
-            while usedLootNids[nextLootNid] do
-                nextLootNid = nextLootNid + 1
-            end
-            local out = nextLootNid
-            usedLootNids[out] = true
-            nextLootNid = out + 1
-            return out
-        end
+        local allocateLootNid, getNextLootNid = createNidAllocator(raid.nextLootNid)
 
         local lootRows = raid.loot
         for i = 1, #lootRows do
@@ -469,10 +540,7 @@ do
             if type(loot) == "table" then
                 loot.lootNid = allocateLootNid(loot.lootNid)
 
-                local looterNid = tonumber(loot.looterNid) or tonumber(loot.looter)
-                if not looterNid and type(loot.looter) == "string" then
-                    looterNid = playerNidByName[normalizeNameLower(loot.looter)]
-                end
+                local looterNid = tonumber(loot.looterNid)
                 if looterNid and looterNid > 0 and validPlayerNids[looterNid] then
                     loot.looterNid = looterNid
                 else
@@ -482,9 +550,9 @@ do
             end
         end
 
-        raid.nextPlayerNid = nextPlayerNid
-        raid.nextBossNid = nextBossNid
-        raid.nextLootNid = nextLootNid
+        raid.nextPlayerNid = getNextPlayerNid()
+        raid.nextBossNid = getNextBossNid()
+        raid.nextLootNid = getNextLootNid()
         raid.raidNid = tonumber(raid.raidNid)
 
         if type(raid._runtime) ~= "table" then
@@ -500,29 +568,13 @@ do
             return nil
         end
 
-        local runtime = raid._runtime
-        if type(runtime) ~= "table" then
-            runtime = {}
-            raid._runtime = runtime
-        end
-
-        local playersByName = clearMap(runtime.playersByName)
-        runtime.playersByName = playersByName
-
-        local playerIdxByNid = clearMap(runtime.playerIdxByNid)
-        runtime.playerIdxByNid = playerIdxByNid
-
-        local bossIdxByNid = clearMap(runtime.bossIdxByNid)
-        runtime.bossIdxByNid = bossIdxByNid
-
-        local bossByNid = clearMap(runtime.bossByNid)
-        runtime.bossByNid = bossByNid
-
-        local lootIdxByNid = clearMap(runtime.lootIdxByNid)
-        runtime.lootIdxByNid = lootIdxByNid
-
-        local lootByNid = clearMap(runtime.lootByNid)
-        runtime.lootByNid = lootByNid
+        local runtime = ensureRuntimeTable(raid)
+        local playersByName = acquireRuntimeIndexMap(runtime, "playersByName")
+        local playerIdxByNid = acquireRuntimeIndexMap(runtime, "playerIdxByNid")
+        local bossIdxByNid = acquireRuntimeIndexMap(runtime, "bossIdxByNid")
+        local bossByNid = acquireRuntimeIndexMap(runtime, "bossByNid")
+        local lootIdxByNid = acquireRuntimeIndexMap(runtime, "lootIdxByNid")
+        local lootByNid = acquireRuntimeIndexMap(runtime, "lootByNid")
 
         local players = raid.players or {}
         for i = 1, #players do
@@ -562,15 +614,21 @@ do
             end
         end
 
-        runtime.signature = tostring(#players) .. "|" .. tostring(#bosses) .. "|" .. tostring(#lootRows)
-            .. "|" .. tostring(tonumber(raid.nextPlayerNid) or 1)
-            .. "|" .. tostring(tonumber(raid.nextBossNid) or 1)
-            .. "|" .. tostring(tonumber(raid.nextLootNid) or 1)
+        runtime.signature = buildRuntimeSignature(raid, players, bosses, lootRows)
 
         return runtime
     end
 
     function module:EnsureRaidRuntime(raid)
+        raid = self:NormalizeRaidRecord(raid)
+        if not raid then
+            return nil
+        end
+
+        local runtime = raid._runtime
+        if isRuntimeIndexReady(runtime) then
+            return runtime
+        end
         return self:BuildRuntimeIndexes(raid)
     end
 
@@ -586,6 +644,38 @@ do
         local raids = ensureRaidsTable()
         for i = 1, #raids do
             self:StripRuntime(raids[i])
+        end
+    end
+
+    function module:NormalizeAllRaids(contextTag)
+        local raids = ensureRaidsTable()
+        for i = 1, #raids do
+            self:NormalizeRaidRecord(raids[i], contextTag, i)
+        end
+        rebuildRaidNidIndex()
+        return raids
+    end
+
+    function module:PrepareRaidForSave(raid, raidIndex)
+        raid = self:NormalizeRaidRecord(raid, "save", raidIndex)
+        if not raid then
+            return nil
+        end
+
+        self:StripRuntime(raid)
+
+        local migrations = getMigrations()
+        if migrations and migrations.CompactRaidForPersistence then
+            migrations:CompactRaidForPersistence(raid)
+        end
+
+        return raid
+    end
+
+    function module:PrepareAllRaidsForSave()
+        local raids = ensureRaidsTable()
+        for i = 1, #raids do
+            self:PrepareRaidForSave(raids[i], i)
         end
     end
 
@@ -657,7 +747,7 @@ do
     end
 
     function module:SaveRaid(raid)
-        raid = self:NormalizeRaidRecord(raid)
+        raid = self:NormalizeRaidRecord(raid, "save")
         if not raid then
             return false, nil
         end

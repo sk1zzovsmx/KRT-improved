@@ -1,6 +1,7 @@
 # Git Hooks
 
-KRT uses a repository-local pre-commit hook for layering hygiene and generated tree docs.
+KRT uses a repository-local pre-commit hook for layering hygiene, UI binding checks,
+Lua gates, and generated tree docs.
 
 Enable once per clone:
 
@@ -9,7 +10,14 @@ powershell -ExecutionPolicy Bypass -File tools/install-hooks.ps1
 ```
 
 The hook runs:
+- `tools/check-toc-files.ps1`
 - `tools/check-layering.ps1`
+- `tools/check-ui-binding.ps1`
+- staged Lua gates in check-only mode, when staged `.lua` files exist:
+  - `tools/check-lua-syntax.ps1`
+  - `luacheck --codes --no-color !KRT tools tests`
+  - `tools/check-lua-uniformity.ps1`
+  - `stylua --check !KRT tools tests`
 - `tools/update-tree.ps1`
 
 `docs/TREE.md` is auto-staged by the hook.

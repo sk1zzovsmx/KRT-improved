@@ -1,12 +1,13 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-Set-Location $repoRoot
-
-if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
-    $PSNativeCommandUseErrorActionPreference = $false
+$toolingCommonPath = Join-Path $PSScriptRoot "tooling-common.ps1"
+if (-not (Test-Path -LiteralPath $toolingCommonPath)) {
+    $toolingCommonPath = Join-Path (Split-Path -Parent $PSScriptRoot) "tooling-common.ps1"
 }
+. $toolingCommonPath
+$repoRoot = Enter-KrtRepoRoot -ScriptRoot $PSScriptRoot
+Disable-KrtNativeCommandErrors
 
 $luacheckCmd = Get-Command luacheck -ErrorAction SilentlyContinue
 if (-not $luacheckCmd) {
@@ -15,13 +16,29 @@ if (-not $luacheckCmd) {
 }
 
 $rgCmd = Get-Command rg -ErrorAction SilentlyContinue
+$files = @()
+$useFallback = $true
+
 if ($rgCmd) {
-    $files = @(& $rgCmd.Source --files -g "*.lua")
-    if ($LASTEXITCODE -ne 0) {
-        throw "rg failed while enumerating Lua files."
+    try {
+        $files = @(& $rgCmd.Source --files -g "*.lua" 2>&1)
+        $rgExitCode = $LASTEXITCODE
+        if ($rgExitCode -eq 0 -or $rgExitCode -eq 1) {
+            $useFallback = $false
+        } else {
+            $reason = "rg exited with code {0} while enumerating Lua files." -f $rgExitCode
+            Write-KrtRgFallbackWarning -Reason $reason
+            $files = @()
+        }
+    } catch {
+        Write-KrtRgFallbackWarning -Reason $_.Exception.Message
+        $files = @()
     }
 } else {
-    Write-Host "rg not found in PATH; falling back to Get-ChildItem." -ForegroundColor Yellow
+    Write-KrtRgFallbackWarning -Reason "rg not found in PATH."
+}
+
+if ($useFallback) {
     $files = @(Get-ChildItem -Path "." -Recurse -File -Filter "*.lua" | ForEach-Object { $_.FullName })
 }
 

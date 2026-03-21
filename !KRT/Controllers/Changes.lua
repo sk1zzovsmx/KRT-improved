@@ -18,6 +18,7 @@ local UIPrimitives = addon.UIPrimitives
 local Events = feature.Events or addon.Events or {}
 local Bus = feature.Bus or addon.Bus
 local Core = feature.Core or addon.Core
+local Services = feature.Services or addon.Services or {}
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
@@ -35,17 +36,23 @@ do
     addon.Controllers = addon.Controllers or {}
     addon.Controllers.Changes = addon.Controllers.Changes or {}
     local module = addon.Controllers.Changes
-    local frameName
+    module._ui = module._ui
+        or {
+            Loaded = false,
+            Bound = false,
+            Localized = false,
+            Dirty = true,
+            Reason = nil,
+            FrameName = nil,
+        }
+    local UI = module._ui
 
     local getFrame = makeModuleFrameGetter(module, "KRTChanges")
     -- ----- Internal state ----- --
-    local UI = {
-        Localized = false,
-    }
 
     local changesTable = {}
     local tmpNames = {}
-    local SaveChanges, CancelChanges, InitChangesTable
+    local saveChanges, cancelChanges, initChangesTable
     local fetched = false
     local changesDirty = false
     local selectedID, tempSelectedID
@@ -54,24 +61,24 @@ do
     local lastAddBtnMode
     local isAdd = false
     local isEdit = false
-    local BindChangeRow
+    local bindChangeRow
     local controller
 
-    local function MarkChangesDirty()
+    local function markChangesDirty()
         fetched = false
         changesDirty = true
         controller:Dirty()
         module:RequestRefresh()
     end
 
-    local function NotifyChangesUpdated(raidId, reason, playerName)
+    local function notifyChangesUpdated(raidId, reason, playerName)
         if not (Bus and Bus.TriggerEvent and InternalEvents.RaidChangesUpdated) then
             return
         end
         Bus.TriggerEvent(InternalEvents.RaidChangesUpdated, raidId, reason, playerName)
     end
 
-    controller = ListController.MakeListController {
+    controller = ListController.MakeListController({
         keyName = "ChangesList",
         poolTag = "changes",
         _rowParts = { "Name", "Spec" },
@@ -95,22 +102,28 @@ do
             end
         end,
 
-        rowName = function(n, it) return n .. "PlayerBtn" .. it.id end,
+        rowName = function(n, it)
+            return n .. "PlayerBtn" .. it.id
+        end,
         rowTmpl = "KRTChangesButtonTemplate",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
-            BindChangeRow(row)
+            bindChangeRow(row)
             local ui = row._p
             ui.Name:SetText(it.name)
-            local class = addon.Raid:GetPlayerClass(it.name)
+            local class = Services.Raid:GetPlayerClass(it.name)
             local r, g, b = Colors.GetClassColor(class)
             ui.Name:SetVertexColor(r, g, b)
             ui.Spec:SetText(it.spec or L.StrNone)
         end),
 
-        highlightFn = function(_, it) return it and it.name == selectedID end,
-        highlightKey = function() return tostring(selectedID or "nil") end,
-    }
+        highlightFn = function(_, it)
+            return it and it.name == selectedID
+        end,
+        highlightKey = function()
+            return tostring(selectedID or "nil")
+        end,
+    })
 
     local panelScaffold = UIScaffold.CreateListPanelScaffold({
         module = module,
@@ -121,8 +134,8 @@ do
             lastSelectedID = false
         end,
         onHide = function()
-            if CancelChanges then
-                CancelChanges()
+            if cancelChanges then
+                cancelChanges()
             end
         end,
         localize = function()
@@ -146,7 +159,7 @@ do
         }
     end
 
-    function BindChangeRow(row)
+    function bindChangeRow(row)
         if not row or row._krtBound then
             return
         end
@@ -169,13 +182,14 @@ do
         Spec = "spec",
     }
 
-    local function GetNamedPart(partName)
+    local function getNamedPart(partName)
         local refs = module.refs
         local refKey = partToRefKey[partName]
         local ref = refs and refKey and refs[refKey] or nil
         if ref then
             return ref
         end
+        local frameName = UI.FrameName
         if not frameName then
             return nil
         end
@@ -213,8 +227,9 @@ do
     end
 
     local function OnLoadFrame(frame)
-        frameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or frameName)
-        return frameName
+        UI.FrameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or UI.FrameName)
+        UI.Loaded = UI.FrameName ~= nil
+        return UI.FrameName
     end
 
     -- ----- Public methods ----- --
@@ -227,9 +242,6 @@ do
             UI.Localize()
         end,
         onLoad = OnLoadFrame,
-        refresh = function()
-            panelScaffold:Refresh()
-        end,
     })
 
     -- OnLoad frame:
@@ -240,7 +252,9 @@ do
     -- Clear module:
     function module:Clear()
         local currentRaid = Core.GetCurrentRaid()
-        if not currentRaid then return end
+        if not currentRaid then
+            return
+        end
 
         local raidStore = Core.GetRaidStoreOrNil("Changes.Clear", { "ClearRaidChanges" })
         if not raidStore then
@@ -252,15 +266,17 @@ do
             return
         end
 
-        NotifyChangesUpdated(currentRaid, "clear")
-        CancelChanges()
-        MarkChangesDirty()
+        notifyChangesUpdated(currentRaid, "clear")
+        cancelChanges()
+        markChangesDirty()
     end
 
     -- Selecting Player:
     function module:Select(btn)
         -- No selection.
-        if not btn then return end
+        if not btn then
+            return
+        end
         local btnName = btn:GetName()
         if not btnName or btnName == "" then
             return
@@ -271,11 +287,17 @@ do
         end
         local name = nameLabel:GetText()
         -- No ID set.
-        if not name then return end
+        if not name then
+            return
+        end
         -- Make sure the player exists in the raid:
         local found = true
-        if not addon.Raid:CheckPlayer(name) then found = false end
-        if not changesTable[name] then found = false end
+        if not Services.Raid:CheckPlayer(name) then
+            found = false
+        end
+        if not changesTable[name] then
+            found = false
+        end
         if not found then
             fetched = false
             changesDirty = true
@@ -298,9 +320,11 @@ do
 
     -- Add / Delete:
     function module:Add(btn)
-        if not addon.Core.GetCurrentRaid() or not btn then return end
+        if not addon.Core.GetCurrentRaid() or not btn then
+            return
+        end
         if not selectedID then
-            local nameBox = GetNamedPart("Name")
+            local nameBox = getNamedPart("Name")
             if not nameBox then
                 return
             end
@@ -324,24 +348,26 @@ do
             if not ok then
                 return
             end
-            NotifyChangesUpdated(currentRaid, "delete", selectedID)
-            CancelChanges()
-            MarkChangesDirty()
+            notifyChangesUpdated(currentRaid, "delete", selectedID)
+            cancelChanges()
+            markChangesDirty()
         end
     end
 
     -- Edit / Save
     function module:Edit()
-        if not addon.Core.GetCurrentRaid() then return end
-        local nameBox = GetNamedPart("Name")
-        local specBox = GetNamedPart("Spec")
+        if not addon.Core.GetCurrentRaid() then
+            return
+        end
+        local nameBox = getNamedPart("Name")
+        local specBox = getNamedPart("Spec")
         if not (nameBox and specBox) then
             return
         end
         if not selectedID or isEdit then
             local name = nameBox:GetText()
             local spec = specBox:GetText()
-            SaveChanges(name, spec)
+            saveChanges(name, spec)
         elseif changesTable[selectedID] then
             nameBox:SetText(selectedID)
             specBox:SetText(changesTable[selectedID])
@@ -358,7 +384,9 @@ do
     -- Remove player's change:
     function module:Delete(name)
         local currentRaid = Core.GetCurrentRaid()
-        if not currentRaid or not name then return end
+        if not currentRaid or not name then
+            return
+        end
         local raidStore = Core.GetRaidStoreOrNil("Changes.Delete", { "DeleteRaidChange" })
         if not raidStore then
             return
@@ -367,34 +395,38 @@ do
         if not ok then
             return
         end
-        NotifyChangesUpdated(currentRaid, "delete", name)
-        MarkChangesDirty()
+        notifyChangesUpdated(currentRaid, "delete", name)
+        markChangesDirty()
     end
 
     Bus.RegisterCallback(InternalEvents.RaidLeave, function(_, name)
         module:Delete(name)
-        CancelChanges()
+        cancelChanges()
     end)
 
     Bus.RegisterCallback(InternalEvents.RaidChangesUpdated, function(_, raidId)
         if tostring(raidId or "") ~= tostring(Core.GetCurrentRaid() or "") then
             return
         end
-        MarkChangesDirty()
+        markChangesDirty()
     end)
 
     -- Ask For module:
     function module:Demand()
-        if not addon.Raid:IsPlayerInRaid() then return end
+        if not Services.Raid:IsPlayerInRaid() then
+            return
+        end
         addon:Announce(L.StrChangesDemand)
     end
 
     -- Spam module:
     function module:Announce()
-        if not addon.Raid:IsPlayerInRaid() then return end
+        if not Services.Raid:IsPlayerInRaid() then
+            return
+        end
         -- In case of a reload/relog and the frame wasn't loaded
         if not fetched or not next(changesTable) then
-            InitChangesTable()
+            initChangesTable()
         end
         local count = addon.tLength(changesTable)
         local msg
@@ -406,8 +438,12 @@ do
             msg = L.StrChangesAnnounceNone
         elseif selectedID or tempSelectedID then
             local name = tempSelectedID and tempSelectedID or selectedID
-            if tempSelectedID ~= nil then tempSelectedID = nil end
-            if not changesTable[name] then return end
+            if tempSelectedID ~= nil then
+                tempSelectedID = nil
+            end
+            if not changesTable[name] then
+                return
+            end
             msg = format(L.StrChangesAnnounceOne, name, changesTable[name])
         else
             msg = L.StrChangesAnnounce
@@ -426,7 +462,9 @@ do
             for i = 1, #names do
                 local n = names[i]
                 msg = msg .. " " .. n .. "=" .. tostring(changesTable[n])
-                if i < #names then msg = msg .. " /" end
+                if i < #names then
+                    msg = msg .. " /"
+                end
             end
         end
         addon:Announce(msg)
@@ -434,24 +472,37 @@ do
 
     -- Localize UI Frame:
     function UI.Localize()
-        if UI.Localized then return end
+        if UI.Localized then
+            return
+        end
+        local frameName = UI.FrameName
         if not frameName then
             return
         end
-        local clearBtn = GetNamedPart("ClearBtn")
-        if clearBtn then clearBtn:SetText(L.BtnClear) end
-        local addBtn = GetNamedPart("AddBtn")
-        if addBtn then addBtn:SetText(L.BtnAdd) end
-        local editBtn = GetNamedPart("EditBtn")
-        if editBtn then editBtn:SetText(L.BtnEdit) end
-        local demandBtn = GetNamedPart("DemandBtn")
-        if demandBtn then demandBtn:SetText(L.BtnDemand) end
-        local announceBtn = GetNamedPart("AnnounceBtn")
-        if announceBtn then announceBtn:SetText(L.BtnAnnounce) end
+        local clearBtn = getNamedPart("ClearBtn")
+        if clearBtn then
+            clearBtn:SetText(L.BtnClear)
+        end
+        local addBtn = getNamedPart("AddBtn")
+        if addBtn then
+            addBtn:SetText(L.BtnAdd)
+        end
+        local editBtn = getNamedPart("EditBtn")
+        if editBtn then
+            editBtn:SetText(L.BtnEdit)
+        end
+        local demandBtn = getNamedPart("DemandBtn")
+        if demandBtn then
+            demandBtn:SetText(L.BtnDemand)
+        end
+        local announceBtn = getNamedPart("AnnounceBtn")
+        if announceBtn then
+            announceBtn:SetText(L.BtnAnnounce)
+        end
         Frames.SetFrameTitle(frameName, L.StrChanges)
         Frames.BindEditBoxHandlers(frameName, {
-            { suffix = "Name", onEscape = CancelChanges, onEnter = module.Edit },
-            { suffix = "Spec", onEscape = CancelChanges, onEnter = module.Edit },
+            { suffix = "Name", onEscape = cancelChanges, onEnter = module.Edit },
+            { suffix = "Spec", onEscape = cancelChanges, onEnter = module.Edit },
         }, function()
             module:RequestRefresh()
         end)
@@ -460,11 +511,12 @@ do
 
     -- UI refresh.
     function UI.Refresh()
+        local frameName = UI.FrameName
         if not frameName then
             return
         end
         if changesDirty or not fetched then
-            InitChangesTable()
+            initChangesTable()
             controller:Dirty()
             changesDirty = false
             fetched = true
@@ -482,38 +534,28 @@ do
         UIPrimitives.ShowHideNamedPart(frameName, "Spec", (isEdit or isAdd))
         UIPrimitives.EnableDisableNamedPart(frameName, "EditBtn", (selectedID or isEdit or isAdd))
         local editBtnMode = isAdd or (selectedID and isEdit)
-        lastEditBtnMode = UIPrimitives.UpdateModeTextNamedPart(
-            frameName,
-            "EditBtn",
-            L.BtnSave,
-            L.BtnEdit,
-            editBtnMode,
-            lastEditBtnMode
-        )
+        lastEditBtnMode = UIPrimitives.UpdateModeTextNamedPart(frameName, "EditBtn", L.BtnSave, L.BtnEdit, editBtnMode, lastEditBtnMode)
         local addBtnMode = (not selectedID and not isEdit and not isAdd)
-        lastAddBtnMode = UIPrimitives.UpdateModeTextNamedPart(
-            frameName,
-            "AddBtn",
-            L.BtnAdd,
-            L.BtnDelete,
-            addBtnMode,
-            lastAddBtnMode
-        )
+        lastAddBtnMode = UIPrimitives.UpdateModeTextNamedPart(frameName, "AddBtn", L.BtnAdd, L.BtnDelete, addBtnMode, lastAddBtnMode)
         UIPrimitives.ShowHideNamedPart(frameName, "AddBtn", (not isEdit and not isAdd))
         UIPrimitives.EnableDisableNamedPart(frameName, "ClearBtn", count > 0)
         UIPrimitives.EnableDisableNamedPart(frameName, "AnnounceBtn", count > 0)
         local hasRaid = addon.Core.GetCurrentRaid()
-        local hasRaidGroup = addon.Raid:IsPlayerInRaid()
+        local hasRaidGroup = Services.Raid:IsPlayerInRaid()
         UIPrimitives.EnableDisableNamedPart(frameName, "AddBtn", hasRaid)
         UIPrimitives.EnableDisableNamedPart(frameName, "DemandBtn", hasRaidGroup)
     end
 
-    function module:Refresh()
+    function module:RefreshUI()
         panelScaffold:Refresh()
     end
 
+    function module:Refresh()
+        return self:RefreshUI()
+    end
+
     -- Initialize changes table:
-    function InitChangesTable()
+    function initChangesTable()
         addon:debug(Diag.D.LogChangesInitTable)
         local currentRaid = Core.GetCurrentRaid()
         if not currentRaid then
@@ -534,14 +576,16 @@ do
     end
 
     -- Save module:
-    function SaveChanges(name, spec)
+    function saveChanges(name, spec)
         local currentRaid = Core.GetCurrentRaid()
-        if not currentRaid or not name then return end
+        if not currentRaid or not name then
+            return
+        end
         name = Strings.NormalizeName(name)
         spec = Strings.NormalizeName(spec)
         -- Is the player in the raid?
         local found
-        found, name = addon.Raid:CheckPlayer(name)
+        found, name = Services.Raid:CheckPlayer(name)
         if not found then
             addon:error(format((name == "" and L.ErrChangesNoPlayer or L.ErrCannotFindPlayer), name))
             return
@@ -558,22 +602,22 @@ do
         end
 
         local reason = (spec == nil or spec == "") and "delete" or "save"
-        NotifyChangesUpdated(currentRaid, reason, savedName)
-        CancelChanges()
-        MarkChangesDirty()
+        notifyChangesUpdated(currentRaid, reason, savedName)
+        cancelChanges()
+        markChangesDirty()
     end
 
     -- Cancel all actions:
-    function CancelChanges()
+    function cancelChanges()
         isAdd = false
         isEdit = false
         selectedID = nil
         tempSelectedID = nil
-        local nameBox = GetNamedPart("Name")
+        local nameBox = getNamedPart("Name")
         if nameBox then
             Frames.ResetEditBox(nameBox)
         end
-        local specBox = GetNamedPart("Spec")
+        local specBox = getNamedPart("Spec")
         if specBox then
             Frames.ResetEditBox(specBox)
         end

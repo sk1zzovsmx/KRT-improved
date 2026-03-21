@@ -1,0 +1,428 @@
+-- ----- KRT Lua Contract ----- --
+-- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Core.GetFeatureShared()
+-- exports: publish module APIs on addon.*
+-- events: document inbound/outbound events in module body
+local addon = select(2, ...)
+local feature = addon.Core.GetFeatureShared()
+
+local Diag = feature.Diag
+
+local Core = feature.Core
+local Strings = feature.Strings or addon.Strings
+local Time = feature.Time or addon.Time
+local Services = feature.Services or addon.Services or {}
+
+local tinsert, tremove = table.insert, table.remove
+local pairs, type = pairs, type
+local random = math.random
+local tostring, tonumber = tostring, tonumber
+
+-- Debug helper module.
+-- Seeds a current raid with synthetic players and submits synthetic rolls.
+do
+    addon.Services = addon.Services or {}
+    addon.Services.Debug = addon.Services.Debug or {}
+    local module = addon.Services.Debug
+
+    -- ----- Internal state ----- --
+    local syntheticProfiles = {
+        { name = "KRTDbgWar", class = "WARRIOR", subgroup = 1 },
+        { name = "KRTDbgPri", class = "PRIEST", subgroup = 1 },
+        { name = "KRTDbgMag", class = "MAGE", subgroup = 2 },
+        { name = "KRTDbgRog", class = "ROGUE", subgroup = 2 },
+    }
+    local syntheticByName = {}
+
+    -- ----- Private helpers ----- --
+    local function getRaidService()
+        return Services.Raid
+    end
+
+    local function getRollsService()
+        return Services.Rolls
+    end
+
+    local function normalizeSyntheticName(name)
+        return Strings and Strings.NormalizeName and Strings.NormalizeName(name, true) or name
+    end
+
+    local function isSyntheticProfileName(name)
+        local normalized = normalizeSyntheticName(name)
+        return normalized and syntheticByName[normalized] ~= nil
+    end
+
+    local function clearTable(map)
+        if type(map) ~= "table" then
+            return
+        end
+        for key in pairs(map) do
+            map[key] = nil
+        end
+    end
+
+    local function getDebugState()
+        addon.State = addon.State or {}
+        addon.State.debug = addon.State.debug or {}
+        addon.State.debug.syntheticByRaid = addon.State.debug.syntheticByRaid or {}
+        return addon.State.debug
+    end
+
+    local function getCurrentRaidId()
+        return Core.GetCurrentRaid and Core.GetCurrentRaid() or nil
+    end
+
+    local function getCurrentRaid()
+        local raidId = getCurrentRaidId()
+        if not raidId then
+            return nil, nil
+        end
+        return Core.EnsureRaidById(raidId), raidId
+    end
+
+    local function getSyntheticStateForRaid(raidId, create)
+        local debugState = getDebugState()
+        local syntheticByRaid = debugState.syntheticByRaid
+        local key = tonumber(raidId) or -1
+
+        if create and type(syntheticByRaid[key]) ~= "table" then
+            syntheticByRaid[key] = {}
+        end
+
+        return syntheticByRaid[key], key, syntheticByRaid
+    end
+
+    local function rebuildSyntheticState(raid, raidId)
+        local raidState, raidKey, syntheticByRaid = getSyntheticStateForRaid(raidId, true)
+        clearTable(raidState)
+
+        if type(raid) == "table" and type(raid.players) == "table" then
+            for i = 1, #raid.players do
+                local player = raid.players[i]
+                if type(player) == "table" and type(player.name) == "string" and isSyntheticProfileName(player.name) then
+                    raidState[normalizeSyntheticName(player.name)] = true
+                end
+            end
+        end
+
+        if next(raidState) == nil then
+            syntheticByRaid[raidKey] = nil
+        end
+    end
+
+    local function buildRosterDeltaEntry(player)
+        return {
+            name = player.name,
+            rank = player.rank or 0,
+            subgroup = player.subgroup or 1,
+            class = player.class or "UNKNOWN",
+            unitID = nil,
+        }
+    end
+
+    local function findSyntheticPlayer(raid, name)
+        local targetName = normalizeSyntheticName(name)
+        local players = raid and raid.players or {}
+        for i = #players, 1, -1 do
+            local player = players[i]
+            if type(player) == "table" and normalizeSyntheticName(player.name) == targetName then
+                return player, i
+            end
+        end
+        return nil, nil
+    end
+
+    local function collectProtectedPlayerNids(raid)
+        local protected = {}
+        local bossKills = raid and raid.bossKills or {}
+        local lootRows = raid and raid.loot or {}
+
+        for i = 1, #bossKills do
+            local bossKill = bossKills[i]
+            local players = bossKill and bossKill.players or {}
+            for j = 1, #players do
+                local playerNid = tonumber(players[j])
+                if playerNid and playerNid > 0 then
+                    protected[playerNid] = true
+                end
+            end
+        end
+
+        for i = 1, #lootRows do
+            local loot = lootRows[i]
+            local looterNid = loot and tonumber(loot.looterNid) or nil
+            if looterNid and looterNid > 0 then
+                protected[looterNid] = true
+            end
+        end
+
+        return protected
+    end
+
+    local function hasSyntheticRollEntries()
+        local rolls = getRollsService()
+        local entries = rolls and rolls.GetRolls and rolls:GetRolls() or nil
+        if type(entries) ~= "table" then
+            return false
+        end
+
+        for i = 1, #entries do
+            local entry = entries[i]
+            if entry and isSyntheticProfileName(entry.name) then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    local function clearSyntheticRollStateIfNeeded()
+        local rolls = getRollsService()
+        if not (rolls and rolls.ClearRolls and hasSyntheticRollEntries()) then
+            return false
+        end
+
+        rolls:ClearRolls()
+        return true
+    end
+
+    local function publishSyntheticDelta(delta, raidId)
+        local raidService = getRaidService()
+        if raidService and raidService.PublishRosterDelta then
+            raidService:PublishRosterDelta(delta, raidId)
+        end
+    end
+
+    local function ensureCurrentRaidForDebug()
+        local raid, raidId = getCurrentRaid()
+        if not raidId or type(raid) ~= "table" then
+            return nil, nil, "no_current_raid"
+        end
+        Core.EnsureRaidSchema(raid)
+        return raid, raidId, nil
+    end
+
+    local function resolveSyntheticProfile(playerRef)
+        local index = tonumber(playerRef)
+        local normalized = normalizeSyntheticName(playerRef)
+        if index and syntheticProfiles[index] then
+            return syntheticProfiles[index]
+        end
+        return syntheticByName[normalized]
+    end
+
+    local function buildSyntheticPlayer(profile, existing, now)
+        return {
+            playerNid = existing and tonumber(existing.playerNid) or nil,
+            name = normalizeSyntheticName(profile.name),
+            rank = 0,
+            subgroup = profile.subgroup or 1,
+            class = profile.class or "UNKNOWN",
+            join = (existing and existing.join) or now,
+            leave = nil,
+            count = (existing and tonumber(existing.count)) or 0,
+        }
+    end
+
+    local function submitSyntheticRoll(profile, roll, raidId)
+        local rolls = getRollsService()
+        local ok
+        local reason
+
+        if not (rolls and rolls.SubmitDebugRoll) then
+            return nil, "rolls_service_unavailable"
+        end
+
+        ok, reason = rolls:SubmitDebugRoll(profile.name, roll)
+        addon:debug(Diag.D.LogDebugRaidRoll:format(tostring(raidId), profile.name, roll, tostring(ok), tostring(reason)))
+
+        return {
+            raidId = raidId,
+            name = profile.name,
+            roll = roll,
+            ok = ok == true,
+            reason = reason,
+        }, nil
+    end
+
+    for i = 1, #syntheticProfiles do
+        local profile = syntheticProfiles[i]
+        profile.name = normalizeSyntheticName(profile.name)
+        syntheticByName[profile.name] = profile
+    end
+
+    -- ----- Public methods ----- --
+    function module:SeedRaidPlayers()
+        local raidService = getRaidService()
+        local raid, raidId, err = ensureCurrentRaidForDebug()
+        local delta = {
+            joined = {},
+            updated = {},
+            left = {},
+            unresolved = {},
+        }
+        local now = Time.GetCurrentTime()
+        local added = 0
+        local refreshed = 0
+
+        if err then
+            return nil, err
+        end
+        if not (raidService and raidService.AddPlayer) then
+            return nil, "raid_service_unavailable"
+        end
+
+        for i = 1, #syntheticProfiles do
+            local profile = syntheticProfiles[i]
+            local existing, existingIndex = findSyntheticPlayer(raid, profile.name)
+            local player = buildSyntheticPlayer(profile, existing, now)
+
+            if existingIndex and existing and existing.name ~= player.name then
+                tremove(raid.players, existingIndex)
+                if type(raid.changes) == "table" then
+                    raid.changes[existing.name] = nil
+                end
+                if raidService and raidService.InvalidateRaidRuntime then
+                    raidService:InvalidateRaidRuntime(raidId)
+                end
+            end
+
+            raidService:AddPlayer(player, raidId)
+            addon:debug(Diag.D.LogDebugRaidSeed:format(tostring(raidId), player.name, player.class))
+
+            if not existing or existing.leave ~= nil then
+                added = added + 1
+                tinsert(delta.joined, buildRosterDeltaEntry(player))
+            else
+                refreshed = refreshed + 1
+                tinsert(delta.updated, buildRosterDeltaEntry(player))
+            end
+        end
+
+        raid = Core.EnsureRaidById(raidId)
+        rebuildSyntheticState(raid, raidId)
+        publishSyntheticDelta(delta, raidId)
+
+        return {
+            raidId = raidId,
+            added = added,
+            refreshed = refreshed,
+            total = #syntheticProfiles,
+        }
+    end
+
+    function module:ClearRaidPlayers()
+        local raidService = getRaidService()
+        local raid, raidId, err = ensureCurrentRaidForDebug()
+        local protectedNids
+        local removed = 0
+        local blocked = 0
+        local clearedRolls = false
+        local delta = {
+            joined = {},
+            updated = {},
+            left = {},
+            unresolved = {},
+        }
+
+        if err then
+            return nil, err
+        end
+
+        protectedNids = collectProtectedPlayerNids(raid)
+
+        for i = #raid.players, 1, -1 do
+            local player = raid.players[i]
+            if type(player) == "table" and isSyntheticProfileName(player.name) then
+                local playerNid = tonumber(player.playerNid) or 0
+                if playerNid > 0 and protectedNids[playerNid] then
+                    blocked = blocked + 1
+                    addon:debug(Diag.D.LogDebugRaidClearBlocked:format(tostring(raidId), player.name, tostring(playerNid)))
+                else
+                    removed = removed + 1
+                    tinsert(delta.left, buildRosterDeltaEntry(player))
+                    tremove(raid.players, i)
+                    if type(raid.changes) == "table" then
+                        raid.changes[player.name] = nil
+                    end
+                    addon:debug(Diag.D.LogDebugRaidClearRemoved:format(tostring(raidId), player.name, tostring(playerNid)))
+                end
+            end
+        end
+
+        if removed > 0 and raidService and raidService.InvalidateRaidRuntime then
+            raidService:InvalidateRaidRuntime(raidId)
+        end
+
+        rebuildSyntheticState(raid, raidId)
+
+        if removed > 0 then
+            clearedRolls = clearSyntheticRollStateIfNeeded()
+            publishSyntheticDelta(delta, raidId)
+        end
+
+        return {
+            raidId = raidId,
+            removed = removed,
+            blocked = blocked,
+            clearedRolls = clearedRolls,
+        }
+    end
+
+    function module:RollRaidPlayer(playerRef, rollValue)
+        local seedResult, seedErr
+        local profile = resolveSyntheticProfile(playerRef)
+        local roll = tonumber(rollValue)
+
+        if not profile then
+            return nil, "unknown_player"
+        end
+
+        if roll == nil then
+            roll = random(1, 100)
+        end
+        if roll < 1 or roll > 100 then
+            return nil, "invalid_roll"
+        end
+
+        seedResult, seedErr = module:SeedRaidPlayers()
+        if not seedResult then
+            return nil, seedErr
+        end
+
+        return submitSyntheticRoll(profile, roll, seedResult.raidId)
+    end
+
+    function module:RollRaidPlayers()
+        local seedResult, err = module:SeedRaidPlayers()
+        local submitted = 0
+        local firstFailure = nil
+
+        if not seedResult then
+            return nil, err
+        end
+
+        for i = 1, #syntheticProfiles do
+            local profile = syntheticProfiles[i]
+            local result
+
+            result, err = submitSyntheticRoll(profile, random(1, 100), seedResult.raidId)
+            if not result then
+                return nil, err
+            end
+            if result.ok then
+                submitted = submitted + 1
+            elseif not firstFailure then
+                firstFailure = result.reason
+            end
+        end
+
+        return {
+            raidId = seedResult.raidId,
+            total = #syntheticProfiles,
+            submitted = submitted,
+            failed = #syntheticProfiles - submitted,
+            firstFailure = firstFailure,
+        }
+    end
+end

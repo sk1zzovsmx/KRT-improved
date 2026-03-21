@@ -2,14 +2,14 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
 	<EditBox name="KRTSpammerEditBox" inherits="KRTEditBoxTemplate" virtual="true">
 		<FontString inherits="GameFontHighlightSmall" />
-</EditBox>
+	</EditBox>
 	<!-- CheckBox Template -->
 	<CheckButton name="KRTSpammerCheckButton" inherits="SendMailRadioButtonTemplate" virtual="true">
 		<Size>
 			<AbsDimension x="15" y="15" />
 		</Size>
-</CheckButton>
-	<!-- The Frame: LFM Spam -->
+	</CheckButton>
+	<!-- LFM spam frame -->
 	<Frame name="KRTSpammer" inherits="KRTFrameTemplate">
 		<Size>
 			<AbsDimension x="260" y="380" />
@@ -355,7 +355,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<EditBox name="$parentName" inherits="KRTSpammerEditBox" letters="15">
 				<Size>
 					<AbsDimension x="75" y="18" />
@@ -367,7 +367,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</EditBox>
+			</EditBox>
 			<Button name="$parentStartBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="26" />
@@ -392,7 +392,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString inherits="GameFontHighlightSmall" justifyH="CENTER" />
-</EditBox>
+			</EditBox>
 			<EditBox name="$parentTank" inherits="KRTSpammerEditBox" letters="1" numeric="true">
 				<Size>
 					<AbsDimension x="25" y="13" />
@@ -405,7 +405,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString justifyH="CENTER" />
-</EditBox>
+			</EditBox>
 			<EditBox name="$parentTankClass" inherits="KRTSpammerEditBox">
 				<Size>
 					<AbsDimension x="100" y="13" />
@@ -417,7 +417,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</EditBox>
+			</EditBox>
 			<EditBox name="$parentHealer" inherits="KRTSpammerEditBox" letters="1" numeric="true">
 				<Size>
 					<AbsDimension x="25" y="13" />
@@ -430,7 +430,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString justifyH="CENTER" />
-</EditBox>
+			</EditBox>
 			<EditBox name="$parentHealerClass" inherits="KRTSpammerEditBox">
 				<Size>
 					<AbsDimension x="100" y="13" />
@@ -442,7 +442,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</EditBox>
+			</EditBox>
 			<EditBox name="$parentMelee" inherits="KRTSpammerEditBox" letters="2" numeric="true">
 				<Size>
 					<AbsDimension x="25" y="13" />
@@ -455,7 +455,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString justifyH="CENTER" />
-</EditBox>
+			</EditBox>
 			<EditBox name="$parentMeleeClass" inherits="KRTSpammerEditBox">
 				<Size>
 					<AbsDimension x="100" y="13" />
@@ -467,7 +467,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</EditBox>
+			</EditBox>
 			<EditBox name="$parentRanged" inherits="KRTSpammerEditBox" letters="2" numeric="true">
 				<Size>
 					<AbsDimension x="25" y="13" />
@@ -480,7 +480,7 @@
 					</Anchor>
 				</Anchors>
 				<FontString justifyH="CENTER" />
-</EditBox>
+			</EditBox>
 			<EditBox name="$parentRangedClass" inherits="KRTSpammerEditBox">
 				<Size>
 					<AbsDimension x="100" y="13" />
@@ -492,7 +492,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</EditBox>
+			</EditBox>
 			<EditBox name="$parentMessage" inherits="KRTSpammerEditBox">
 				<Size>
 					<AbsDimension x="100" y="13" />
@@ -601,10 +601,6 @@
 				</Anchors>
 			</CheckButton>
 		</Frames>
-</Frame>
+	</Frame>
 	<!-- ====== End of LFM Spam Frame ====== -->
-	<!-- ====== Start of Warnings ====== -->
-	<!-- Raid Warning Button -->
 </Ui>
-
-

@@ -1,7 +1,7 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
-<!-- ====== Start of Master Loot Frame ====== -->
-<Frame name="KRTItemSelectionFrame" toplevel="true" hidden="true" frameStrata="FULLSCREEN" virtual="true">
+	<!-- ====== Start of Master Loot Frame ====== -->
+	<Frame name="KRTItemSelectionFrame" toplevel="true" hidden="true" frameStrata="FULLSCREEN" virtual="true">
 		<Size>
 			<AbsDimension x="225" y="100" />
 		</Size>
@@ -34,7 +34,7 @@
 				</Offset>
 			</Anchor>
 		</Anchors>
-<Layers>
+		<Layers>
 			<Layer level="OVERLAY" textureSubLevel="1">
 				<Texture name="$parentIcon" file="">
 					<Size>
@@ -82,7 +82,7 @@
 	<!-- The Frame: Loot Manager -->
 	<Frame name="KRTMaster" inherits="KRTFrameTemplate">
 		<Size>
-			<AbsDimension x="230" y="480" />
+			<AbsDimension x="250" y="480" />
 		</Size>
 		<Layers>
 			<Layer level="ARTWORK">
@@ -93,31 +93,69 @@
 					<Anchors>
 						<Anchor point="TOPLEFT">
 							<Offset>
-								<AbsDimension x="50" y="-60" />
+								<AbsDimension x="47" y="-60" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentStatus" inherits="KRTFontStringGray" justifyH="LEFT" justifyV="TOP">
+					<Size>
+						<AbsDimension x="205" y="18" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset>
+								<AbsDimension x="16" y="-126" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
 				<FontString name="$parentRollsHeaderPlayer" inherits="KRTFontStringGray">
-					<Size>
-						<AbsDimension x="80" y="5" />
-					</Size>
 					<Anchors>
 						<Anchor point="TOPLEFT">
 							<Offset>
-								<AbsDimension x="20" y="-130" />
+								<AbsDimension x="16" y="-148" />
+							</Offset>
+						</Anchor>
+						<Anchor point="TOPRIGHT" relativeTo="$parentRollsHeaderInfo" relativePoint="TOPLEFT">
+							<Offset>
+								<AbsDimension x="-8" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
 				<FontString name="$parentRollsHeaderRoll" inherits="KRTFontStringGray" justifyH="RIGHT">
 					<Size>
-						<AbsDimension x="80" y="5" />
+						<AbsDimension x="28" y="5" />
 					</Size>
 					<Anchors>
 						<Anchor point="TOPRIGHT">
 							<Offset>
-								<AbsDimension x="-40" y="-130" />
+								<AbsDimension x="-34" y="-148" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentRollsHeaderCounter" inherits="KRTFontStringGray" justifyH="RIGHT">
+					<Size>
+						<AbsDimension x="30" y="5" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPRIGHT" relativeTo="$parentRollsHeaderRoll" relativePoint="TOPLEFT">
+							<Offset>
+								<AbsDimension x="-2" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentRollsHeaderInfo" inherits="KRTFontStringGray" justifyH="RIGHT">
+					<Size>
+						<AbsDimension x="24" y="5" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPRIGHT" relativeTo="$parentRollsHeaderCounter" relativePoint="TOPLEFT">
+							<Offset>
+								<AbsDimension x="-2" y="0" />
 							</Offset>
 						</Anchor>
 					</Anchors>
@@ -136,10 +174,10 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentSelectItemBtn" inherits="KRTButtonTemplate">
 				<Size>
-					<AbsDimension x="105" y="25" />
+					<AbsDimension x="113" y="25" />
 				</Size>
 				<Anchors>
 					<Anchor point="TOPLEFT">
@@ -148,19 +186,19 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentSpamLootBtn" inherits="KRTButtonTemplate">
 				<Size>
-					<AbsDimension x="105" y="25" />
+					<AbsDimension x="113" y="25" />
 				</Size>
 				<Anchors>
-					<Anchor point="TOPRIGHT">
+					<Anchor point="LEFT" relativeTo="$parentSelectItemBtn" relativePoint="RIGHT">
 						<Offset>
-							<AbsDimension x="-10" y="-30" />
+							<AbsDimension x="4" y="0" />
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentItemBtn" inherits="KRTItemButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentSelectItemBtn" relativePoint="BOTTOMLEFT">
@@ -177,82 +215,82 @@
 				<Anchors>
 					<Anchor point="TOPRIGHT">
 						<Offset>
-							<AbsDimension x="-12" y="-65" />
+							<AbsDimension x="-10" y="-65" />
 						</Offset>
 					</Anchor>
 				</Anchors>
 				<FontString inherits="GameFontHighlightSmall" justifyH="LEFT" />
-</EditBox>
+			</EditBox>
 			<Button name="$parentMSBtn" inherits="KRTButtonTemplate">
 				<Size>
-					<AbsDimension x="28" y="25" />
+					<AbsDimension x="30" y="25" />
 				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="$parentItemBtn" relativePoint="BOTTOMLEFT">
+					<Anchor point="TOPLEFT" relativeTo="$parentSelectItemBtn" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="-3" y="-5" />
+							<AbsDimension x="0" y="-42" />
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentOSBtn" inherits="KRTButtonTemplate">
 				<Size>
-					<AbsDimension x="28" y="25" />
+					<AbsDimension x="30" y="25" />
 				</Size>
 				<Anchors>
 					<Anchor point="LEFT" relativeTo="$parentMSBtn" relativePoint="RIGHT">
 						<Offset>
-							<AbsDimension x="5" y="0" />
+							<AbsDimension x="4" y="0" />
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentSRBtn" inherits="KRTButtonTemplate">
 				<Size>
-					<AbsDimension x="28" y="25" />
+					<AbsDimension x="30" y="25" />
 				</Size>
 				<Anchors>
 					<Anchor point="LEFT" relativeTo="$parentOSBtn" relativePoint="RIGHT">
 						<Offset>
-							<AbsDimension x="5" y="0" />
+							<AbsDimension x="4" y="0" />
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentFreeBtn" inherits="KRTButtonTemplate">
 				<Size>
-					<AbsDimension x="35" y="25" />
+					<AbsDimension x="38" y="25" />
 				</Size>
 				<Anchors>
 					<Anchor point="LEFT" relativeTo="$parentSRBtn" relativePoint="RIGHT">
 						<Offset>
-							<AbsDimension x="5" y="0" />
+							<AbsDimension x="4" y="0" />
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentCountdownBtn" inherits="KRTButtonTemplate">
 				<Size>
-					<AbsDimension x="70" y="25" />
+					<AbsDimension x="84" y="25" />
 				</Size>
 				<Anchors>
 					<Anchor point="LEFT" relativeTo="$parentFreeBtn" relativePoint="RIGHT">
 						<Offset>
-							<AbsDimension x="5" y="0" />
+							<AbsDimension x="4" y="0" />
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT">
 						<Offset>
-							<AbsDimension x="15" y="-145" />
+							<AbsDimension x="12" y="-163" />
 						</Offset>
 					</Anchor>
 					<Anchor point="BOTTOMRIGHT">
 						<Offset>
-							<AbsDimension x="-35" y="165" />
+							<AbsDimension x="-30" y="165" />
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -264,14 +302,14 @@
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentScrollFrame" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="-5" y="-7.5" />
+							<AbsDimension x="-2" y="-7.5" />
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentRollBtn" inherits="KRTButtonTemplate">
 				<Size>
-					<AbsDimension x="55" y="25" />
+					<AbsDimension x="77" y="25" />
 				</Size>
 				<Anchors>
 					<Anchor point="LEFT" relativeTo="$parentAwardBtn" relativePoint="RIGHT">
@@ -280,7 +318,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentClearBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="68" y="25" />
@@ -292,7 +330,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentHoldBtn" inherits="KRTButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="25" />
@@ -304,7 +342,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Frame name="$parentHoldDropDown" inherits="UIDropDownMenuTemplate">
 				<Anchors>
 					<Anchor point="LEFT" relativeTo="$parentHoldBtn" relativePoint="RIGHT">
@@ -325,7 +363,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Frame name="$parentBankDropDown" inherits="UIDropDownMenuTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentBankBtn" relativePoint="TOPRIGHT">
@@ -346,7 +384,7 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Frame name="$parentDisenchantDropDown" inherits="UIDropDownMenuTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentDisenchantBtn" relativePoint="TOPRIGHT">
@@ -359,7 +397,7 @@
 			<!-- First row: Reserve List (contextual) -->
 			<Button name="$parentReserveListBtn" inherits="KRTButtonTemplate">
 				<Size>
-					<AbsDimension x="105" y="25" />
+					<AbsDimension x="113" y="25" />
 				</Size>
 				<Anchors>
 					<!-- 10px in from left, 10px up from bottom -->
@@ -369,22 +407,20 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 			<Button name="$parentLootCounterBtn" inherits="KRTButtonTemplate">
 				<Size>
-					<AbsDimension x="105" y="25" />
+					<AbsDimension x="113" y="25" />
 				</Size>
 				<Anchors>
-					<!-- 10px in from right, 10px up from bottom -->
-					<Anchor point="BOTTOMRIGHT">
+					<Anchor point="LEFT" relativeTo="$parentReserveListBtn" relativePoint="RIGHT">
 						<Offset>
-							<AbsDimension x="-10" y="10" />
+							<AbsDimension x="4" y="0" />
 						</Offset>
 					</Anchor>
 				</Anchors>
-</Button>
+			</Button>
 		</Frames>
-</Frame>
+	</Frame>
 	<!-- ====== End of Master Loot Frame ====== -->
 </Ui>
-

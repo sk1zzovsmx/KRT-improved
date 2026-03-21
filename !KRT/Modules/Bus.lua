@@ -208,4 +208,3 @@ function Bus.DumpInternalCallbackStats(sortBy)
     end
     addon:info("Tip: /krt debug callbacks reset  |  /krt debug callbacks fires|max|time|avg|errors")
 end
-

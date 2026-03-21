@@ -28,7 +28,7 @@ end
 
 function Time.IsRaidInstance()
     local inInstance, instanceType = IsInInstance()
-    return ((inInstance) and (instanceType == "raid"))
+    return (inInstance and (instanceType == "raid"))
 end
 
 function Time.GetDifficulty()
