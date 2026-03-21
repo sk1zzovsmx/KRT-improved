@@ -170,6 +170,8 @@ Durable preferences learned from recent conversations:
   such as `0.6.0b -> 0.6.0r` must not publish a new release.
 - Prefer branch-agnostic release automation: release workflows should accept pushes from any branch,
   and manual release dispatch should target any ref once the workflow exists on the default branch.
+- Prefer manual release workflows to use the selected branch/ref directly; avoid redundant
+  `target_ref` inputs when the Actions branch selector already defines release context.
 - For release artifacts, package only the addon folder `!KRT/`; do not include repo-level
   docs/tooling files in distributable ZIP outputs.
 
