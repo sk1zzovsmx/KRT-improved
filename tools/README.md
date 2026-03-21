@@ -12,6 +12,7 @@ docs, AGENTS, and MCP wiring. Grouping is documented here first to keep cleanup 
 - `check-ui-binding.ps1`: binder absence and XML layout-only policy
 - `check-lua-syntax.ps1`: syntax-only validation for all Lua files
 - `check-lua-uniformity.ps1`: repo-specific naming, headers, whitespace, and line-ending checks
+- `check-api-nomenclature.ps1`: staged/new public API naming and verb-taxonomy guard
 - `check-raid-hardening.ps1`: DB/SV/UI hardening audits and fixture round-trip gate
 
 ## Runs
@@ -26,6 +27,7 @@ docs, AGENTS, and MCP wiring. Grouping is documented here first to keep cleanup 
 
 - `fnmap-inventory.ps1`: inventories Lua functions into `docs/FUNCTION_REGISTRY.csv`
 - `fnmap-classify.ps1`: classifies inventory rows and writes `docs/FN_CLUSTERS.md`
+- `fnmap-api-census.ps1`: inventories callable `addon.*` APIs and writes full/public/internal nomenclature reports
 
 ## Mechanic
 

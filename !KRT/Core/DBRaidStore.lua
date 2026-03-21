@@ -47,6 +47,41 @@ do
         return map
     end
 
+    local function createNidAllocator(initialNext)
+        local usedNids = {}
+        local nextNid = tonumber(initialNext) or 1
+        if nextNid < 1 then
+            nextNid = 1
+        end
+
+        local function markAllocated(nid)
+            usedNids[nid] = true
+            if nid >= nextNid then
+                nextNid = nid + 1
+            end
+            return nid
+        end
+
+        local function allocate(preferred)
+            local nid = tonumber(preferred)
+            if nid and nid > 0 and not usedNids[nid] then
+                return markAllocated(nid)
+            end
+
+            while usedNids[nextNid] do
+                nextNid = nextNid + 1
+            end
+
+            return markAllocated(nextNid)
+        end
+
+        local function getNext()
+            return nextNid
+        end
+
+        return allocate, getNext
+    end
+
     local function ensureRaidsTable()
         if type(KRT_Raids) ~= "table" then
             KRT_Raids = {}
@@ -84,6 +119,35 @@ do
             and type(runtime.bossByNid) == "table"
             and type(runtime.lootIdxByNid) == "table"
             and type(runtime.lootByNid) == "table"
+    end
+
+    local function ensureRuntimeTable(raid)
+        local runtime = raid._runtime
+        if type(runtime) ~= "table" then
+            runtime = {}
+            raid._runtime = runtime
+        end
+        return runtime
+    end
+
+    local function acquireRuntimeIndexMap(runtime, key)
+        local map = clearMap(runtime[key])
+        runtime[key] = map
+        return map
+    end
+
+    local function buildRuntimeSignature(raid, players, bosses, lootRows)
+        return tostring(#players)
+            .. "|"
+            .. tostring(#bosses)
+            .. "|"
+            .. tostring(#lootRows)
+            .. "|"
+            .. tostring(tonumber(raid.nextPlayerNid) or 1)
+            .. "|"
+            .. tostring(tonumber(raid.nextBossNid) or 1)
+            .. "|"
+            .. tostring(tonumber(raid.nextLootNid) or 1)
     end
 
     local function normalizeChangeName(value)
@@ -198,29 +262,8 @@ do
 
     local function rebuildRaidNidIndex()
         local raids = ensureRaidsTable()
-        local usedRaidNids = {}
         local raidIdxByNid = {}
-        local nextRaidNid = 1
-
-        local function allocateRaidNid(preferred)
-            local raidNid = tonumber(preferred)
-            if raidNid and raidNid > 0 and not usedRaidNids[raidNid] then
-                usedRaidNids[raidNid] = true
-                if raidNid >= nextRaidNid then
-                    nextRaidNid = raidNid + 1
-                end
-                return raidNid
-            end
-
-            while usedRaidNids[nextRaidNid] do
-                nextRaidNid = nextRaidNid + 1
-            end
-
-            local out = nextRaidNid
-            usedRaidNids[out] = true
-            nextRaidNid = out + 1
-            return out
-        end
+        local allocateRaidNid, getNextRaidNidValue = createNidAllocator(1)
 
         for i = 1, #raids do
             local raid = module:NormalizeRaidRecord(raids[i])
@@ -232,7 +275,7 @@ do
         end
 
         storeState.raidIdxByNid = raidIdxByNid
-        storeState.nextRaidNid = nextRaidNid
+        storeState.nextRaidNid = getNextRaidNidValue()
     end
 
     local function getNextRaidNid(preferred)
@@ -401,28 +444,8 @@ do
         raid.loot = (type(raid.loot) == "table") and raid.loot or {}
         raid.changes = (type(raid.changes) == "table") and raid.changes or {}
 
-        local usedPlayerNids = {}
-        local nextPlayerNid = tonumber(raid.nextPlayerNid) or 1
-        if nextPlayerNid < 1 then
-            nextPlayerNid = 1
-        end
+        local allocatePlayerNid, getNextPlayerNid = createNidAllocator(raid.nextPlayerNid)
         local assignedByRef = {}
-
-        local function allocatePlayerNid(preferred)
-            local playerNid = tonumber(preferred)
-            if playerNid and playerNid > 0 and not usedPlayerNids[playerNid] then
-                usedPlayerNids[playerNid] = true
-                return playerNid
-            end
-
-            while usedPlayerNids[nextPlayerNid] do
-                nextPlayerNid = nextPlayerNid + 1
-            end
-            local out = nextPlayerNid
-            usedPlayerNids[out] = true
-            nextPlayerNid = out + 1
-            return out
-        end
 
         local players = raid.players
         local playerNidByName = {}
@@ -456,27 +479,7 @@ do
             end
         end
 
-        local usedBossNids = {}
-        local nextBossNid = tonumber(raid.nextBossNid) or 1
-        if nextBossNid < 1 then
-            nextBossNid = 1
-        end
-
-        local function allocateBossNid(preferred)
-            local bossNid = tonumber(preferred)
-            if bossNid and bossNid > 0 and not usedBossNids[bossNid] then
-                usedBossNids[bossNid] = true
-                return bossNid
-            end
-
-            while usedBossNids[nextBossNid] do
-                nextBossNid = nextBossNid + 1
-            end
-            local out = nextBossNid
-            usedBossNids[out] = true
-            nextBossNid = out + 1
-            return out
-        end
+        local allocateBossNid, getNextBossNid = createNidAllocator(raid.nextBossNid)
 
         local bosses = raid.bossKills
         for i = 1, #bosses do
@@ -529,27 +532,7 @@ do
             end
         end
 
-        local usedLootNids = {}
-        local nextLootNid = tonumber(raid.nextLootNid) or 1
-        if nextLootNid < 1 then
-            nextLootNid = 1
-        end
-
-        local function allocateLootNid(preferred)
-            local lootNid = tonumber(preferred)
-            if lootNid and lootNid > 0 and not usedLootNids[lootNid] then
-                usedLootNids[lootNid] = true
-                return lootNid
-            end
-
-            while usedLootNids[nextLootNid] do
-                nextLootNid = nextLootNid + 1
-            end
-            local out = nextLootNid
-            usedLootNids[out] = true
-            nextLootNid = out + 1
-            return out
-        end
+        local allocateLootNid, getNextLootNid = createNidAllocator(raid.nextLootNid)
 
         local lootRows = raid.loot
         for i = 1, #lootRows do
@@ -567,9 +550,9 @@ do
             end
         end
 
-        raid.nextPlayerNid = nextPlayerNid
-        raid.nextBossNid = nextBossNid
-        raid.nextLootNid = nextLootNid
+        raid.nextPlayerNid = getNextPlayerNid()
+        raid.nextBossNid = getNextBossNid()
+        raid.nextLootNid = getNextLootNid()
         raid.raidNid = tonumber(raid.raidNid)
 
         if type(raid._runtime) ~= "table" then
@@ -585,29 +568,13 @@ do
             return nil
         end
 
-        local runtime = raid._runtime
-        if type(runtime) ~= "table" then
-            runtime = {}
-            raid._runtime = runtime
-        end
-
-        local playersByName = clearMap(runtime.playersByName)
-        runtime.playersByName = playersByName
-
-        local playerIdxByNid = clearMap(runtime.playerIdxByNid)
-        runtime.playerIdxByNid = playerIdxByNid
-
-        local bossIdxByNid = clearMap(runtime.bossIdxByNid)
-        runtime.bossIdxByNid = bossIdxByNid
-
-        local bossByNid = clearMap(runtime.bossByNid)
-        runtime.bossByNid = bossByNid
-
-        local lootIdxByNid = clearMap(runtime.lootIdxByNid)
-        runtime.lootIdxByNid = lootIdxByNid
-
-        local lootByNid = clearMap(runtime.lootByNid)
-        runtime.lootByNid = lootByNid
+        local runtime = ensureRuntimeTable(raid)
+        local playersByName = acquireRuntimeIndexMap(runtime, "playersByName")
+        local playerIdxByNid = acquireRuntimeIndexMap(runtime, "playerIdxByNid")
+        local bossIdxByNid = acquireRuntimeIndexMap(runtime, "bossIdxByNid")
+        local bossByNid = acquireRuntimeIndexMap(runtime, "bossByNid")
+        local lootIdxByNid = acquireRuntimeIndexMap(runtime, "lootIdxByNid")
+        local lootByNid = acquireRuntimeIndexMap(runtime, "lootByNid")
 
         local players = raid.players or {}
         for i = 1, #players do
@@ -647,17 +614,7 @@ do
             end
         end
 
-        runtime.signature = tostring(#players)
-            .. "|"
-            .. tostring(#bosses)
-            .. "|"
-            .. tostring(#lootRows)
-            .. "|"
-            .. tostring(tonumber(raid.nextPlayerNid) or 1)
-            .. "|"
-            .. tostring(tonumber(raid.nextBossNid) or 1)
-            .. "|"
-            .. tostring(tonumber(raid.nextLootNid) or 1)
+        runtime.signature = buildRuntimeSignature(raid, players, bosses, lootRows)
 
         return runtime
     end

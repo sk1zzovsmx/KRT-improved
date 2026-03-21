@@ -45,6 +45,9 @@ function Run-LuaChecks {
     Write-Host "Running Lua uniformity check..."
     & (Join-Path $repoRoot "tools/check-lua-uniformity.ps1")
 
+    Write-Host "Running API nomenclature check (staged additions)..."
+    & (Join-Path $repoRoot "tools/check-api-nomenclature.ps1")
+
     Write-Host "Running StyLua check..."
     $styluaCmd = Get-Command stylua -ErrorAction SilentlyContinue
     if (-not $styluaCmd) {

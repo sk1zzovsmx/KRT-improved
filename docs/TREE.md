@@ -107,7 +107,6 @@
 |       |   \\-- ...
 |       \\-- s-working
 |           \\-- ...
-|-- .codex-temp
 |-- .devcontainer
 |   \\-- devcontainer.json
 |-- .githooks
@@ -117,6 +116,10 @@
 |   \\-- settings.json
 |-- docs
 |   |-- AGENT_SKILLS.md
+|   |-- API_NOMENCLATURE_CENSUS.md
+|   |-- API_REGISTRY.csv
+|   |-- API_REGISTRY_INTERNAL.csv
+|   |-- API_REGISTRY_PUBLIC.csv
 |   |-- ARCHITECTURE.md
 |   |-- FN_CLUSTERS.md
 |   |-- FUNCTION_REGISTRY.csv
@@ -126,6 +129,8 @@
 |   |-- REFACTOR_RULES.md
 |   |-- SV_SANITY_CHECKLIST.md
 |   |-- SV_SCHEMA.md
+|   |-- TECH_CLEANUP_BACKLOG.md
+|   |-- TECH_CLEANUP_WORKFLOW.md
 |   \\-- TREE.md
 |-- tests
 |   |-- fixtures
@@ -135,8 +140,8 @@
 |   |   \\-- DBManager.Mock.lua
 |   \\-- release_stabilization_spec.lua
 |-- tools
-|   |-- __pycache__
 |   |-- agent-skills.manifest.json
+|   |-- check-api-nomenclature.ps1
 |   |-- check-layering.ps1
 |   |-- check-lua-syntax.ps1
 |   |-- check-lua-uniformity.ps1
@@ -144,6 +149,7 @@
 |   |-- check-toc-files.ps1
 |   |-- check-ui-binding.ps1
 |   |-- dev-stack-status.ps1
+|   |-- fnmap-api-census.ps1
 |   |-- fnmap-classify.ps1
 |   |-- fnmap-inventory.ps1
 |   |-- install-hooks.ps1

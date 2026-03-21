@@ -1051,6 +1051,25 @@ do
     Core.BindModuleToggleHide = bindModuleToggleHide
     Core.MakeModuleFrameGetter = makeModuleFrameGetter
 
+    local function getService(serviceName)
+        local services = addon.Services
+        if type(services) ~= "table" then
+            return nil
+        end
+        return services[serviceName]
+    end
+
+    local function getRaidService()
+        return getService("Raid")
+    end
+
+    local function getRaidStoreOrNil(contextTag, requiredMethods)
+        if not Core.GetRaidStoreOrNil then
+            return nil
+        end
+        return Core.GetRaidStoreOrNil(contextTag, requiredMethods)
+    end
+
     local function ensureDBManager()
         local db = addon.DB
         if not (db and type(db.SetManager) == "function" and type(db.GetManager) == "function") then
@@ -1075,7 +1094,7 @@ do
     ensureDBManager()
 
     function Core.EnsureRaidSchema(raid)
-        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("Core.EnsureRaidSchema", { "NormalizeRaidRecord" }) or nil
+        local raidStore = getRaidStoreOrNil("Core.EnsureRaidSchema", { "NormalizeRaidRecord" })
         if raidStore then
             return raidStore:NormalizeRaidRecord(raid)
         end
@@ -1088,7 +1107,7 @@ do
             return nil, nil
         end
 
-        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("Core.EnsureRaidById", { "GetRaidByIndex" }) or nil
+        local raidStore = getRaidStoreOrNil("Core.EnsureRaidById", { "GetRaidByIndex" })
         if raidStore then
             return raidStore:GetRaidByIndex(id)
         end
@@ -1101,7 +1120,7 @@ do
             return nil, nil, nil
         end
 
-        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("Core.EnsureRaidByNid", { "GetRaidByNid" }) or nil
+        local raidStore = getRaidStoreOrNil("Core.EnsureRaidByNid", { "GetRaidByNid" })
         if raidStore then
             return raidStore:GetRaidByNid(nid)
         end
@@ -1109,7 +1128,7 @@ do
     end
 
     function Core.GetRaidNidById(raidNum)
-        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("Core.GetRaidNidById", { "GetRaidNidByIndex" }) or nil
+        local raidStore = getRaidStoreOrNil("Core.GetRaidNidById", { "GetRaidNidByIndex" })
         if raidStore then
             return raidStore:GetRaidNidByIndex(raidNum)
         end
@@ -1118,7 +1137,7 @@ do
     end
 
     function Core.GetRaidIdByNid(raidNid)
-        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("Core.GetRaidIdByNid", { "GetRaidIndexByNid" }) or nil
+        local raidStore = getRaidStoreOrNil("Core.GetRaidIdByNid", { "GetRaidIndexByNid" })
         if raidStore then
             return raidStore:GetRaidIndexByNid(raidNid)
         end
@@ -1127,7 +1146,7 @@ do
     end
 
     function Core.StripRuntimeRaidCaches(raid)
-        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("Core.StripRuntimeRaidCaches", { "StripRuntime" }) or nil
+        local raidStore = getRaidStoreOrNil("Core.StripRuntimeRaidCaches", { "StripRuntime" })
         if raidStore then
             raidStore:StripRuntime(raid)
             return
@@ -1143,7 +1162,7 @@ do
     end
 
     function Core.NormalizeSavedVariablesAfterLoad()
-        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("Core.NormalizeSavedVariablesAfterLoad", { "NormalizeAllRaids" }) or nil
+        local raidStore = getRaidStoreOrNil("Core.NormalizeSavedVariablesAfterLoad", { "NormalizeAllRaids" })
         if raidStore and type(raidStore.NormalizeAllRaids) == "function" then
             raidStore:NormalizeAllRaids("load")
             return
@@ -1157,7 +1176,7 @@ do
     end
 
     function Core.PrepareSavedVariablesForSave(contextTag)
-        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("Core.PrepareSavedVariablesForSave", { "PrepareAllRaidsForSave" }) or nil
+        local raidStore = getRaidStoreOrNil("Core.PrepareSavedVariablesForSave", { "PrepareAllRaidsForSave" })
         if raidStore then
             if type(raidStore.PrepareAllRaidsForSave) == "function" then
                 raidStore:PrepareAllRaidsForSave()
@@ -1170,7 +1189,7 @@ do
             end
         end
 
-        local reservesService = addon.Services and addon.Services.Reserves
+        local reservesService = getService("Reserves")
         if reservesService and type(reservesService.Save) == "function" then
             reservesService:Save(contextTag or "save")
         end
@@ -1231,7 +1250,7 @@ do
         elseif minimap and minimap.OnLoad then
             minimap:OnLoad()
         end
-        local reservesService = addon.Services and addon.Services.Reserves
+        local reservesService = getService("Reserves")
         if reservesService and reservesService.Load then
             reservesService:Load()
         end
@@ -1246,7 +1265,7 @@ do
     local rosterUpdateDebounceSeconds = 0.2
 
     local function scheduleRaidInstanceChecksIfRecognized(instanceName, instanceType, instanceDiff, emitRecognizedLog)
-        local raidService = addon.Services and addon.Services.Raid or nil
+        local raidService = getRaidService()
         if instanceType ~= "raid" or L.RaidZones[instanceName] == nil then
             return false
         end
@@ -1261,7 +1280,7 @@ do
     end
 
     local function processRaidRosterUpdate()
-        local raidService = addon.Services and addon.Services.Raid or nil
+        local raidService = getRaidService()
         if not raidService then
             return
         end
@@ -1321,7 +1340,7 @@ do
     -- PLAYER_ENTERING_WORLD: Performs initial checks when the player logs in.
     function addon:PLAYER_ENTERING_WORLD()
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
-        local module = addon.Services and addon.Services.Raid or nil
+        local module = getRaidService()
         if not module then
             return
         end
@@ -1338,7 +1357,7 @@ do
     -- CHAT_MSG_LOOT: Adds looted items to the raid log.
     function addon:CHAT_MSG_LOOT(msg)
         addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
-        local raidService = addon.Services and addon.Services.Raid or nil
+        local raidService = getRaidService()
         if Core.GetCurrentRaid() and raidService then
             raidService:AddLoot(msg)
         end
@@ -1346,7 +1365,7 @@ do
 
     -- CHAT_MSG_SYSTEM: Forwards roll messages to the Rolls module.
     function addon:CHAT_MSG_SYSTEM(msg)
-        local rollsService = addon.Services and addon.Services.Rolls or nil
+        local rollsService = getService("Rolls")
         if rollsService and rollsService.CHAT_MSG_SYSTEM then
             rollsService:CHAT_MSG_SYSTEM(msg)
         end
@@ -1363,9 +1382,10 @@ do
     -- CHAT_MSG_MONSTER_YELL: Logs a boss kill based on specific boss yells.
     function addon:CHAT_MSG_MONSTER_YELL(...)
         local text = ...
-        if L.BossYells[text] and Core.GetCurrentRaid() then
+        local raidService = getRaidService()
+        if raidService and L.BossYells[text] and Core.GetCurrentRaid() then
             addon:trace(Diag.D.LogBossYellMatched:format(tostring(text), tostring(L.BossYells[text])))
-            self.Raid:AddBoss(L.BossYells[text])
+            raidService:AddBoss(L.BossYells[text])
         end
     end
 
@@ -1401,8 +1421,12 @@ do
             boss = bossLib:GetBossName(npcId)
         end
         if boss then
+            local raidService = getRaidService()
+            if not raidService then
+                return
+            end
             addon:trace(Diag.D.LogBossUnitDiedMatched:format(tonumber(npcId) or -1, tostring(boss)))
-            self.Raid:AddBoss(boss, nil, nil, npcId)
+            raidService:AddBoss(boss, nil, nil, npcId)
         end
     end
 

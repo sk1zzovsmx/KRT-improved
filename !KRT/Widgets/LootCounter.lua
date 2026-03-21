@@ -36,15 +36,21 @@ do
     addon.Widgets = addon.Widgets or {}
     addon.Widgets.LootCounter = addon.Widgets.LootCounter or {}
     local module = addon.Widgets.LootCounter
+    module._ui = module._ui
+        or {
+            Loaded = false,
+            Bound = false,
+            Localized = false,
+            Dirty = true,
+            Reason = nil,
+            FrameName = nil,
+        }
+    local UI = module._ui
 
     -- ----- Internal state ----- --
-    local frameName
     local rows, raidPlayers = {}, {}
     local scrollFrame, scrollChild, header
     local getFrame = makeModuleFrameGetter(module, "KRTLootCounterFrame")
-    local UI = {
-        Loaded = false,
-    }
 
     -- Single-line column header.
     local HEADER_HEIGHT = 18
@@ -65,21 +71,24 @@ do
         return refs
     end
 
+    function UI.Localize()
+        local frameName = UI.FrameName
+        if not frameName then
+            return
+        end
+        Frames.SetFrameTitle(frameName, L.StrLootCounter)
+    end
+
     local function ensureFrames()
         local frame = getFrame()
         if not frame then
             return false
         end
 
-        frameName = frameName or (frame.GetName and frame:GetName()) or "KRTLootCounterFrame"
-        scrollFrame = scrollFrame or frame.ScrollFrame or _G[frameName .. "ScrollFrame"] or _G["KRTLootCounterFrameScrollFrame"]
+        UI.FrameName = UI.FrameName or (frame.GetName and frame:GetName()) or "KRTLootCounterFrame"
+        scrollFrame = scrollFrame or frame.ScrollFrame or _G[UI.FrameName .. "ScrollFrame"] or _G["KRTLootCounterFrameScrollFrame"]
 
         scrollChild = scrollChild or (scrollFrame and scrollFrame.ScrollChild) or _G["KRTLootCounterFrameScrollFrameScrollChild"]
-
-        if not frame._krtInitialized then
-            Frames.SetFrameTitle(frameName, L.StrLootCounter)
-            frame._krtInitialized = true
-        end
 
         return true
     end
@@ -180,21 +189,21 @@ do
                 local playerNid = row._playerNid
                 if playerNid then
                     Services.Raid:AddPlayerCountByNid(playerNid, 1, addon.Core.GetCurrentRaid())
-                    module:RequestRefresh()
+                    module:RequestRefresh("count_changed")
                 end
             end)
             row.minus:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
                     Services.Raid:AddPlayerCountByNid(playerNid, -1, addon.Core.GetCurrentRaid())
-                    module:RequestRefresh()
+                    module:RequestRefresh("count_changed")
                 end
             end)
             row.reset:SetScript("OnClick", function()
                 local playerNid = row._playerNid
                 if playerNid then
                     Services.Raid:SetPlayerCountByNid(playerNid, 0, addon.Core.GetCurrentRaid())
-                    module:RequestRefresh()
+                    module:RequestRefresh("count_reset")
                 end
             end)
 
@@ -206,8 +215,7 @@ do
     -- ----- Public methods ----- --
     function module:OnLoad(frame)
         local f = frame or getFrame()
-        frameName = Frames.InitModuleFrame(module, f, { enableDrag = true }) or frameName
-        UI.Loaded = frameName ~= nil
+        UI.FrameName = Frames.InitModuleFrame(module, f, { enableDrag = true }) or UI.FrameName
         if not ensureFrames() then
             return
         end
@@ -225,7 +233,7 @@ do
         end)
     end
 
-    function module:Refresh()
+    function module:RefreshUI()
         if not ensureFrames() then
             return
         end
@@ -304,6 +312,10 @@ do
         end
     end
 
+    function module:Refresh()
+        return self:RefreshUI()
+    end
+
     local function BindHandlers(_, _, refs)
         scrollFrame = refs.scrollFrame or scrollFrame
         scrollChild = refs.scrollChild or scrollChild
@@ -311,7 +323,7 @@ do
 
     local function OnLoadFrame(frame)
         module:OnLoad(frame)
-        return frameName
+        return UI.FrameName
     end
 
     UIScaffold.DefineModuleUi({
@@ -319,6 +331,9 @@ do
         getFrame = getFrame,
         acquireRefs = UI.AcquireRefs,
         bind = BindHandlers,
+        localize = function()
+            UI.Localize()
+        end,
         onLoad = OnLoadFrame,
     })
 

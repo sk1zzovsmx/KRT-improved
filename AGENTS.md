@@ -32,8 +32,15 @@ Durable preferences learned from recent conversations:
   (`Core`, `Bus`, `Frames`, `UI*`, `Strings`, `Time`, `Comms`, `Base64`, `Colors`, `Item`, `Sort`).
 - Prefer camelCase for utility functions and local variables; avoid snake_case for new naming.
 - Keep file-local/private helpers in camelCase; keep Lua metamethods (`__index`, `__call`, etc.) unchanged.
-- For naming migrations, use phased rollout: add PascalCase API + temporary alias, migrate call-sites
-  (including XML/Binder/string references), then remove alias after zero legacy hits.
+- For naming migrations, prefer direct migration to canonical PascalCase call-sites with no legacy alias references;
+  add temporary aliases only when explicitly requested.
+- For API inventories and reports, separate `Public` and `Internal` surfaces; treat underscore methods
+  and `._ui` targets as internal implementation APIs.
+- For new/renamed public API methods, use a short verb taxonomy:
+  queries (`Get/Find/Is/Can`), mutations (`Set/Add/Remove/Delete/Upsert`),
+  lifecycle/UI (`Ensure/Bind/Localize/Request/RequestRefresh/Refresh/Toggle/Show/Hide`),
+  plus exact hooks (`OnLoad`, `OnLoadFrame`, `AcquireRefs`, `BindHandlers`, `RefreshUI`).
+- Keep staged API nomenclature checks automated in local gates/pre-commit to block new naming regressions.
 - In feature files under `Controllers/`, `Services/`, `Widgets/`, `EntryPoints/`, prefer canonical top-level
   section headers in order:
   `-- ----- Internal state ----- --`, `-- ----- Private helpers ----- --`,
@@ -60,8 +67,19 @@ Durable preferences learned from recent conversations:
   `Core.GetRaidStore` nil/method checks to keep diagnostics and guard behavior uniform.
 - Prefer homogeneous module structure/patterns across Lua modules; avoid one-off lifecycle variants
   unless behavior requires them.
+- For UI named-frame access standardization, prefer the dominant in-repo `_G[frameName .. suffix]`
+  pattern over introducing static local ref caches only for stylistic cleanup.
 - For XML and Lua analysis/reference, use Townlong-Yak FrameXML 3.3.5:
   `https://www.townlong-yak.com/framexml/3.3.5`.
+- For custom button glow UX, prefer high-visibility dynamic pulses with geometry
+  tightly aligned to each button's border (avoid diffuse/off-frame halos).
+- For button-glow styling, prefer clean border pulses; avoid glossy/sweep
+  "shiny" overlays unless explicitly requested for a specific patch.
+- For glow architecture on WoW 3.3.5a, prefer local UI module implementations
+  (for example LCG-like ports in `Modules/UI/Effects.lua`) over vendoring
+  full modern glow libs.
+- Keep glow/proc implementation details in `Modules/UI/Effects.lua`; keep
+  `Modules/UI/Visuals.lua` focused on generic UI primitives and row visuals.
 - Treat raid `players[].count` (LootCounter) as canonical persisted raid data; restoring/selecting an old current raid
   must preserve and reuse historical counts.
 - Prefer a clean persisted raid schema: keep `players[]` as the canonical persisted player store; treat
@@ -73,6 +91,8 @@ Durable preferences learned from recent conversations:
 - Keep `EntryPoints/SlashEvents.lua` focused on `/cmd` handling only.
 - Keep main WoW event handlers centralized in `Init.lua`; modules should expose callable APIs used by those handlers.
 - Prefer storing runtime-only addon state under `addon.State` (or feature state tables) over global runtime vars.
+- Keep glow effects single-choice by method (`ACShine`, `Pixel`, `Proc`, `buttonOverlay`);
+  avoid profile-name methods such as `SoftPulse`/`CombatPulse`.
 - Prefer deterministic sorting with explicit tie-breakers; when primary values are equal, use stable secondary keys
   (for Logger Loot, prefer loot name, then IDs) to avoid random reordering between sorts.
 - Prefer deterministic bugfixes over timing-dependent or fragile workaround-style fixes.
@@ -99,6 +119,9 @@ Durable preferences learned from recent conversations:
   expose item-link parsing and tooltip probes via `feature.Item`/`addon.Item`.
 - Prefer dedicated reusable modules (`Bus`, `ListController`, `MultiSelect`, `Frames`, `Strings`,
   `Colors`, `Comms`, `Base64`, `Time`, `Sort`) over reviving `Modules/Utils.lua`.
+- Prefer explicit canonical contracts and deterministic initialization over scattered defensive guards;
+  when a dependency must exist, normalize it once at the module boundary/bootstrap rather than adding
+  many per-call fallback branches.
 - Prefer centralized MultiSelect modifier policies in `Modules/UI/MultiSelect.lua`
   with per-list scope keys; avoid per-controller CTRL/SHIFT gating flags.
 - Prefer centralized event-name registry in `Modules/Events.lua` for internal bus events and
@@ -133,6 +156,8 @@ Durable preferences learned from recent conversations:
   `requiresManualResolution`, `cutoff`) instead of treating them as incidental internals.
 - Treat `tests/release_stabilization_spec.lua` as the regression gate for changes in
   `Services/Rolls.lua` and `Controllers/Master.lua`; run it whenever those modules change.
+- Prefer repo-relative paths or placeholders in config/docs/examples; avoid personal absolute
+  paths unless strictly required by the tool.
 
 ---
 
@@ -213,33 +238,34 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 24) Modules/Sort.lua
 25) Modules/Features.lua
 26) Modules/UI/Facade.lua
-27) Modules/UI/Visuals.lua
-28) Modules/UI/Frames.lua
-29) Modules/UI/ListController.lua
-30) Modules/UI/MultiSelect.lua
-31) Modules/Bus.lua
-32) Core/DBRaidMigrations.lua
-33) Core/DBRaidStore.lua
-34) Core/DBRaidQueries.lua
-35) Core/DBRaidValidator.lua
-36) Core/DBSyncer.lua
-37) Services/Raid.lua
-38) Services/Chat.lua
-39) EntryPoints/Minimap.lua
-40) EntryPoints/SlashEvents.lua
-41) Services/Rolls.lua
-42) Services/Loot.lua
-43) Services/Debug.lua
-44) Controllers/Master.lua
-45) Widgets/LootCounter.lua
-46) Services/Reserves.lua
-47) Widgets/ReservesUI.lua
-48) Controllers/Logger.lua
-49) Widgets/Config.lua
-50) Controllers/Warnings.lua
-51) Controllers/Changes.lua
-52) Controllers/Spammer.lua
-53) KRT.xml
+27) Modules/UI/Effects.lua
+28) Modules/UI/Visuals.lua
+29) Modules/UI/Frames.lua
+30) Modules/UI/ListController.lua
+31) Modules/UI/MultiSelect.lua
+32) Modules/Bus.lua
+33) Core/DBRaidMigrations.lua
+34) Core/DBRaidStore.lua
+35) Core/DBRaidQueries.lua
+36) Core/DBRaidValidator.lua
+37) Core/DBSyncer.lua
+38) Services/Raid.lua
+39) Services/Chat.lua
+40) EntryPoints/Minimap.lua
+41) EntryPoints/SlashEvents.lua
+42) Services/Rolls.lua
+43) Services/Loot.lua
+44) Services/Debug.lua
+45) Controllers/Master.lua
+46) Widgets/LootCounter.lua
+47) Services/Reserves.lua
+48) Widgets/ReservesUI.lua
+49) Controllers/Logger.lua
+50) Widgets/Config.lua
+51) Controllers/Warnings.lua
+52) Controllers/Changes.lua
+53) Controllers/Spammer.lua
+54) KRT.xml
 
 ---
 
@@ -318,6 +344,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Features.lua           # feature flags/profile toggles (addon.Features)
     UI/
       Facade.lua           # widget facade (addon.UI) with Register/Call no-op routing
+      Effects.lua          # glow/proc button effects backend (addon.UIEffects)
       Visuals.lua          # UI primitives + row visuals (addon.UIPrimitives/addon.UIRowVisuals)
       Frames.lua           # frame helpers + UI scaffold/orchestration (addon.Frames/addon.UIScaffold)
       ListController.lua   # reusable scroll-list controller (addon.ListController)
@@ -464,6 +491,7 @@ External modules:
 - `addon.Time` (Modules/Time.lua)
 - `addon.Base64` (Modules/Base64.lua)
 - `addon.Sort` (Modules/Sort.lua)
+- `addon.UIEffects` (Modules/UI/Effects.lua)
 - `addon.UIPrimitives` (Modules/UI/Visuals.lua)
 - `addon.UIRowVisuals` (Modules/UI/Visuals.lua)
 - `addon.Frames` (Modules/UI/Frames.lua)

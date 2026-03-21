@@ -49,6 +49,22 @@ local strlower = string.lower
 
 local SetSelectedRaid
 local deleteSelectedAttendees
+local setFrameLabel
+local setPanelTitle
+local buildCountTitle
+local buildContextTitle
+local buildCountContextTitle
+local getSelectedRaidRecord
+local getSelectedRaidContextLabel
+local getSelectedBossContextLabel
+local getSelectedPlayerContextLabel
+local buildLootPanelContextLabel
+local setFrameHint
+local buildBossEmptyStateText
+local buildBossAttendeesEmptyStateText
+local buildRaidAttendeesEmptyStateText
+local buildLootEmptyStateText
+local buildCsvEmptyStateText
 
 local function getRaidQueries()
     if Core.GetRaidQueries then
@@ -76,15 +92,20 @@ end
 addon.Controllers = addon.Controllers or {}
 addon.Controllers.Logger = addon.Controllers.Logger or {}
 local module = addon.Controllers.Logger
+module._ui = module._ui or {
+    Loaded = false,
+    Bound = false,
+    Localized = false,
+    Dirty = true,
+    Reason = nil,
+    FrameName = nil,
+}
 
 -- Logger frame module.
 do
     -- ----- Internal state ----- --
-    local frameName
+    local UI = module._ui
     local getFrame = makeModuleFrameGetter(module, "KRTLogger")
-    local UI = {
-        Loaded = false,
-    }
     -- Stable-ID data helpers (fresh SavedVariables only; no legacy migration).
     module.Store = module.Store or {}
     module.View = module.View or {}
@@ -198,6 +219,172 @@ do
         if multiSelectCtx then
             MultiSelect.MultiSelectClear(multiSelectCtx)
         end
+    end
+
+    setFrameLabel = function(frameName, suffix, text)
+        local label = frameName and _G[frameName .. suffix] or nil
+        if not label then
+            return nil
+        end
+        if label.GetText and label:GetText() == text then
+            return label
+        end
+        label:SetText(text)
+        return label
+    end
+
+    setPanelTitle = function(frameName, text)
+        setFrameLabel(frameName, "Title", text)
+    end
+
+    setFrameHint = function(frameName, suffix, text)
+        local label = setFrameLabel(frameName, suffix, text or "")
+        if label then
+            UIPrimitives.ShowHide(label, type(text) == "string" and text ~= "")
+        end
+    end
+
+    buildCountTitle = function(baseText, count)
+        return ("%s (%d)"):format(tostring(baseText or ""), tonumber(count) or 0)
+    end
+
+    buildContextTitle = function(baseText, contextText, emptyHint)
+        local suffix = contextText
+        if not suffix or suffix == "" then
+            suffix = emptyHint
+        end
+        if suffix and suffix ~= "" then
+            return ("%s - %s"):format(baseText, suffix)
+        end
+        return baseText
+    end
+
+    buildCountContextTitle = function(baseText, count, contextText, emptyHint)
+        return buildContextTitle(buildCountTitle(baseText, count), contextText, emptyHint)
+    end
+
+    getSelectedRaidRecord = function()
+        if not module.selectedRaid then
+            return nil
+        end
+        return Store:GetRaid(module.selectedRaid)
+    end
+
+    getSelectedRaidContextLabel = function()
+        local raid = getSelectedRaidRecord()
+        local zone = raid and raid.zone or nil
+        local difficulty = raid and View:GetRaidDifficultyLabel(raid) or ""
+        if zone and zone ~= "" and difficulty ~= "" then
+            return ("%s %s"):format(zone, difficulty)
+        end
+        if zone and zone ~= "" then
+            return zone
+        end
+        if difficulty ~= "" then
+            return difficulty
+        end
+        return nil
+    end
+
+    getSelectedBossContextLabel = function()
+        local raid = getSelectedRaidRecord()
+        local boss = (raid and module.selectedBoss) and Store:GetBoss(raid, module.selectedBoss) or nil
+        local name
+        local mode
+        if not boss then
+            return nil
+        end
+        name = boss.name
+        if not name or name == "" then
+            name = L.StrTrashMob
+        end
+        mode = View:GetBossModeLabel(boss)
+        if mode and mode ~= "" then
+            return ("%s %s"):format(name, mode)
+        end
+        return name
+    end
+
+    getSelectedPlayerContextLabel = function(playerNid)
+        local raid = getSelectedRaidRecord()
+        local player = (raid and playerNid) and Store:GetPlayer(raid, playerNid) or nil
+        if player and player.name and player.name ~= "" then
+            return L.StrLoggerLabelPlayer:format(player.name)
+        end
+        return nil
+    end
+
+    buildLootPanelContextLabel = function()
+        local parts = {}
+        local bossLabel = getSelectedBossContextLabel()
+        local playerLabel = getSelectedPlayerContextLabel(module.selectedBossPlayer or module.selectedPlayer)
+
+        if bossLabel and bossLabel ~= "" then
+            parts[#parts + 1] = bossLabel
+        end
+        if playerLabel and playerLabel ~= "" then
+            parts[#parts + 1] = playerLabel
+        end
+        if #parts > 0 then
+            return tconcat(parts, " | ")
+        end
+        return getSelectedRaidContextLabel()
+    end
+
+    buildBossEmptyStateText = function(count)
+        if (tonumber(count) or 0) > 0 then
+            return nil
+        end
+        if not module.selectedRaid then
+            return L.StrLoggerEmptyBossesSelectRaid
+        end
+        return L.StrLoggerEmptyBosses
+    end
+
+    buildBossAttendeesEmptyStateText = function(count)
+        if (tonumber(count) or 0) > 0 then
+            return nil
+        end
+        if not module.selectedRaid then
+            return L.StrLoggerEmptyBossAttendeesSelectRaid
+        end
+        if not module.selectedBoss then
+            return L.StrLoggerEmptyBossAttendeesSelectBoss
+        end
+        return L.StrLoggerEmptyBossAttendees
+    end
+
+    buildRaidAttendeesEmptyStateText = function(count)
+        if (tonumber(count) or 0) > 0 then
+            return nil
+        end
+        if not module.selectedRaid then
+            return L.StrLoggerEmptyRaidAttendeesSelectRaid
+        end
+        return L.StrLoggerEmptyRaidAttendees
+    end
+
+    buildLootEmptyStateText = function(count)
+        if (tonumber(count) or 0) > 0 then
+            return nil
+        end
+        if not module.selectedRaid then
+            return L.StrLoggerEmptyLootSelectRaid
+        end
+        if module.selectedBoss or module.selectedBossPlayer or module.selectedPlayer then
+            return L.StrLoggerEmptyLootFiltered
+        end
+        return L.StrLoggerEmptyLoot
+    end
+
+    buildCsvEmptyStateText = function(csvValue)
+        if not module.selectedRaid then
+            return L.StrLoggerEmptyCsvSelectRaid
+        end
+        if not csvValue or csvValue == "" then
+            return L.StrLoggerEmptyCsv
+        end
+        return nil
     end
 
     local function applyFocusedMultiSelect(opts)
@@ -1349,7 +1536,7 @@ do
 
     local rosterUiRefreshDebounceSeconds = 0.25
 
-    module._isLoggerViewingCurrentRaid = function()
+    module.IsLoggerViewingCurrentRaid = function()
         local frame = module.frame or getFrame()
         if not (frame and frame.IsShown and frame:IsShown()) then
             return false
@@ -1375,11 +1562,11 @@ do
         end
     end
 
-    module._requestRosterBoundListsRefresh = function()
+    module.RequestRosterBoundListsRefresh = function()
         addon.CancelTimer(module._rosterUiHandle, true)
         module._rosterUiHandle = addon.NewTimer(rosterUiRefreshDebounceSeconds, function()
             module._rosterUiHandle = nil
-            if not module._isLoggerViewingCurrentRaid() then
+            if not module.IsLoggerViewingCurrentRaid() then
                 return
             end
             refreshRosterBoundLists()
@@ -1443,10 +1630,13 @@ do
     function module:SetTab(tabName)
         module.activeTab = normalizeTabName(tabName)
         updateTabUi()
+        if module.activeTab == TAB_EXPORT and module.Export and module.Export._csvDirty == true and module.Export.RefreshCsv then
+            module.Export:RefreshCsv()
+        end
     end
 
     function module:OnLoad(frame)
-        frameName = Frames.InitModuleFrame(module, frame, {
+        UI.FrameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 if not module.selectedRaid then
@@ -1460,12 +1650,12 @@ do
                 SetSelectedRaid(Core.GetCurrentRaid())
                 clearSelections()
             end,
-        })
-        UI.Loaded = frameName ~= nil
+        }) or UI.FrameName
+        UI.Loaded = UI.FrameName ~= nil
         if not UI.Loaded then
             return
         end
-        Frames.SetFrameTitle(frameName, L.StrLootLogger)
+        Frames.SetFrameTitle(UI.FrameName, L.StrLootLogger)
     end
 
     local function BindHandlers(_, frame, refs)
@@ -1512,7 +1702,7 @@ do
 
     local function OnLoadFrame(frame)
         module:OnLoad(frame)
-        return frameName
+        return UI.FrameName
     end
 
     UIScaffold.DefineModuleUi({
@@ -1523,7 +1713,7 @@ do
         onLoad = OnLoadFrame,
     })
 
-    function module:Refresh()
+    function module:RefreshUI()
         local frame = getFrame()
         if not frame then
             return
@@ -1534,6 +1724,10 @@ do
         clearSelections()
         triggerSelectionEvent(module, "selectedRaid", "ui")
         module:SetTab(module.activeTab)
+    end
+
+    function module:Refresh()
+        return self:RefreshUI()
     end
 
     -- Selectors
@@ -2114,7 +2308,8 @@ do
     module.Raids = module.Raids or {}
     local Raids = module.Raids
     local Store = module.Store
-    local controller = ListController.MakeListController({
+    local controller
+    controller = ListController.MakeListController({
         keyName = "RaidsList",
         poolTag = "logger-raids",
         _rowParts = { "ID", "Date", "Zone", "Size" },
@@ -2224,6 +2419,7 @@ do
         postUpdate = function(n)
             local sel = module.selectedRaid
             local raid = sel and Core.EnsureRaidById(sel) or nil
+            local count = controller and controller.data and #controller.data or 0
 
             local canSetCurrent = false
             if sel and raid and sel ~= Core.GetCurrentRaid() then
@@ -2267,6 +2463,8 @@ do
             local delBtn = _G[n .. "DeleteBtn"]
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, selCount)
             UIPrimitives.EnableDisable(delBtn, canDelete)
+            setPanelTitle(n, buildCountTitle(L.StrRaidsList, count))
+            setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyRaids or nil)
         end,
 
         sorters = {
@@ -2432,11 +2630,11 @@ do
         if raidIdType ~= "number" and raidIdType ~= "string" then
             return
         end
-        if not module._isLoggerViewingCurrentRaid() then
+        if not module.IsLoggerViewingCurrentRaid() then
             return
         end
 
-        module._requestRosterBoundListsRefresh()
+        module.RequestRosterBoundListsRefresh()
     end)
 end
 
@@ -2546,6 +2744,12 @@ do
             return ("selectedRaidNid=%s"):format(tostring(raidNid))
         end,
 
+        postUpdate = function(n)
+            local count = controller and controller.data and #controller.data or 0
+            setPanelTitle(n, buildCountTitle(L.StrRaidsList, count))
+            setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyExportRaids or nil)
+        end,
+
         sorters = {
             id = function(a, b, asc)
                 return CompareNumbers(a.seq or a.id, b.seq or b.id, asc, 0)
@@ -2583,6 +2787,13 @@ do
     local Export = module.Export
     local Store = module.Store
     local View = module.View
+
+    local function updateCsvTitle(frame)
+        local frameName = frame and frame.GetName and frame:GetName() or nil
+        local titleText = buildContextTitle(L.StrRaidCsvTitle, getSelectedRaidContextLabel(), nil)
+        setFrameLabel(frameName, "CsvTitle", titleText)
+        setFrameHint(frameName, "CsvEmptyState", buildCsvEmptyStateText())
+    end
 
     local function getScrollBarInset(scrollFrame)
         if not scrollFrame then
@@ -2812,10 +3023,7 @@ do
             return
         end
 
-        local csvTitle = _G[frameName .. "CsvTitle"]
-        if csvTitle then
-            csvTitle:SetText(L.StrRaidCsvTitle)
-        end
+        updateCsvTitle(frame)
 
         local csvScrollFrame = _G[frameName .. "CsvScrollFrame"]
         hideCsvScrollFrameChrome(csvScrollFrame)
@@ -2856,6 +3064,7 @@ do
 
     function Export:RefreshCsv()
         local refs = module.refs
+        updateCsvTitle(refs and refs.export or nil)
         local csvText = refs and refs.exportCsvText or nil
         if not csvText then
             return
@@ -2867,6 +3076,7 @@ do
         self._csvDirty = false
         csvText._krtCsvText = csvValue
         csvText:SetText(csvValue)
+        setFrameHint(refs and refs.export and refs.export:GetName() or nil, "CsvEmptyState", buildCsvEmptyStateText(csvValue))
         hideCsvEditBoxChrome(csvText)
         hideCsvScrollFrameChrome(refs and refs.exportCsvScrollFrame or nil)
         setCsvEditBoxLayout(csvText, refs and refs.exportCsvScrollFrame or nil)
@@ -2895,7 +3105,8 @@ do
     local View = module.View
     local Actions = module.Actions
 
-    local controller = ListController.MakeListController({
+    local controller
+    controller = ListController.MakeListController({
         keyName = "BossList",
         poolTag = "logger-bosses",
         _rowParts = { "ID", "Name", "Time", "Mode" },
@@ -2993,12 +3204,15 @@ do
         postUpdate = function(n)
             local hasRaid = module.selectedRaid
             local hasBoss = module.selectedBoss
+            local count = controller and controller.data and #controller.data or 0
             UIPrimitives.EnableDisable(_G[n .. "AddBtn"], hasRaid ~= nil)
             UIPrimitives.EnableDisable(_G[n .. "EditBtn"], hasBoss ~= nil)
             local bossSelCount = MultiSelect.MultiSelectCount(module._msBossCtx)
             local delBtn = _G[n .. "DeleteBtn"]
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, bossSelCount)
             UIPrimitives.EnableDisable(delBtn, (bossSelCount and bossSelCount > 0) or false)
+            setPanelTitle(n, buildCountContextTitle(L.StrBosses, count, getSelectedRaidContextLabel(), nil))
+            setFrameHint(n, "EmptyState", buildBossEmptyStateText(count))
         end,
 
         sorters = {
@@ -3102,7 +3316,8 @@ do
     local View = module.View
     local Actions = module.Actions
 
-    local controller = ListController.MakeListController({
+    local controller
+    controller = ListController.MakeListController({
         keyName = "BossAttendeesList",
         poolTag = "logger-boss-attendees",
         _rowParts = { "Name" },
@@ -3187,6 +3402,9 @@ do
             local addBtn = _G[n .. "AddBtn"]
             local removeBtn = _G[n .. "RemoveBtn"]
             local attSelCount = MultiSelect.MultiSelectCount(module._msBossAttCtx)
+            local count = controller and controller.data and #controller.data or 0
+            setPanelTitle(n, buildCountContextTitle(L.StrBossAttendees, count, getSelectedBossContextLabel(), nil))
+            setFrameHint(n, "EmptyState", buildBossAttendeesEmptyStateText(count))
             if addBtn then
                 UIPrimitives.EnableDisable(addBtn, bSel and ((attSelCount or 0) == 0))
             end
@@ -3255,7 +3473,8 @@ do
     local View = module.View
     local Actions = module.Actions
 
-    local controller = ListController.MakeListController({
+    local controller
+    controller = ListController.MakeListController({
         keyName = "RaidAttendeesList",
         poolTag = "logger-raid-attendees",
         _rowParts = { "Name", "Join", "Leave" },
@@ -3346,6 +3565,9 @@ do
 
         postUpdate = function(n)
             local deleteBtn = _G[n .. "DeleteBtn"]
+            local count = controller and controller.data and #controller.data or 0
+            setPanelTitle(n, buildCountContextTitle(L.StrRaidAttendees, count, getSelectedRaidContextLabel(), nil))
+            setFrameHint(n, "EmptyState", buildRaidAttendeesEmptyStateText(count))
             if deleteBtn then
                 local attSelCount = MultiSelect.MultiSelectCount(module._msRaidAttCtx)
                 UIPrimitives.SetButtonCount(deleteBtn, L.BtnDelete, attSelCount)
@@ -3470,7 +3692,8 @@ do
         end
     end
 
-    local controller = ListController.MakeListController({
+    local controller
+    controller = ListController.MakeListController({
         keyName = "LootList",
         poolTag = "logger-loot",
         _rowParts = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
@@ -3631,8 +3854,11 @@ do
 
             local lootSelCount = MultiSelect.MultiSelectCount(module._msLootCtx)
             local delBtn = _G[n .. "DeleteBtn"]
+            local count = controller and controller.data and #controller.data or 0
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, lootSelCount)
             UIPrimitives.EnableDisable(delBtn, (lootSelCount or 0) > 0)
+            setPanelTitle(n, buildCountContextTitle(L.StrRaidLoot, count, buildLootPanelContextLabel(), nil))
+            setFrameHint(n, "EmptyState", buildLootEmptyStateText(count))
         end,
 
         sorters = {
@@ -3803,7 +4029,7 @@ do
         local it = Store:GetLoot(raid, lootNid)
         if not it then
             local rawItemMatch, rawItemMatches = findLootByItemId(raid, lootNid)
-            if rawItemMatch and Options.IsDebugEnabled() and addon.error then
+            if rawItemMatch and addon.error then
                 addon:error(Diag.E.LogLoggerLootNidExpected:format(tostring(raidID), tostring(lootNid), tostring(rawItemMatch.itemLink), tonumber(rawItemMatches) or 0))
             end
             addon:error(Diag.E.LogLoggerItemNotFound:format(raidID, tostring(lootNid), lootCount))
@@ -3910,80 +4136,121 @@ end
 do
     module.BossBox = module.BossBox or {}
     local Box = module.BossBox
-    local BoxUI = {}
+    Box._ui = Box._ui or {
+        Loaded = false,
+        Bound = false,
+        Localized = false,
+        Dirty = true,
+        Reason = nil,
+        FrameName = nil,
+    }
+    local BoxUI = Box._ui
     local Store = module.Store
 
-    local frameName, localized, isEdit = nil, false, false
+    local isEdit = false
+    local tooltipsBound = false
     local raidData, bossData, tempDate = {}, {}, {}
-    local getFrame = Frames.MakeFrameGetter("KRTLoggerBossBox")
+    local editBossNid
+    local getFrame = makeModuleFrameGetter(Box, "KRTLoggerBossBox")
+
+    local function getBoxFrameName()
+        return BoxUI.FrameName
+    end
+
+    local function getBoxPart(suffix)
+        local frameName = getBoxFrameName()
+        if not frameName then
+            return nil
+        end
+        return _G[frameName .. suffix]
+    end
+
+    function Box.AcquireRefs(frame)
+        return {
+            title = Frames.Ref(frame, "Title"),
+            name = Frames.Ref(frame, "Name"),
+            difficulty = Frames.Ref(frame, "Difficulty"),
+            time = Frames.Ref(frame, "Time"),
+            nameStr = Frames.Ref(frame, "NameStr"),
+            difficultyStr = Frames.Ref(frame, "DifficultyStr"),
+            timeStr = Frames.Ref(frame, "TimeStr"),
+            saveBtn = Frames.Ref(frame, "SaveBtn"),
+            cancelBtn = Frames.Ref(frame, "CancelBtn"),
+        }
+    end
+
+    local function bindBossBoxHandlers(_, frame, refs)
+        if not frame or frame._krtBound then
+            return
+        end
+        Frames.SafeSetScript(refs.saveBtn, "OnClick", function()
+            Box:Save()
+        end)
+        Frames.SafeSetScript(refs.cancelBtn, "OnClick", function()
+            Box:Hide()
+        end)
+        Frames.SafeSetScript(refs.name, "OnEnterPressed", function()
+            Box:Save()
+        end)
+        Frames.SafeSetScript(refs.difficulty, "OnEnterPressed", function()
+            Box:Save()
+        end)
+        Frames.SafeSetScript(refs.time, "OnEnterPressed", function()
+            Box:Save()
+        end)
+        frame._krtBound = true
+    end
+
+    function Box:LocalizeUI(_, _, refs)
+        if refs.nameStr then
+            refs.nameStr:SetText(L.StrName)
+        end
+        if refs.difficultyStr then
+            refs.difficultyStr:SetText(L.StrDifficulty)
+        end
+        if refs.timeStr then
+            refs.timeStr:SetText(L.StrTime)
+        end
+        if refs.saveBtn then
+            refs.saveBtn:SetText(L.BtnSave)
+        end
+        if refs.cancelBtn then
+            refs.cancelBtn:SetText(L.BtnCancel)
+        end
+    end
 
     function Box:OnLoad(frame)
-        frameName = Frames.InitModuleFrame(Box, frame, {
+        BoxUI.FrameName = Frames.InitModuleFrame(Box, frame, {
             enableDrag = true,
             hookOnShow = function()
-                BoxUI.Refresh()
+                Box:RequestRefresh("show")
             end,
             hookOnHide = function()
                 Box:CancelAddEdit()
             end,
-        })
-        if not frameName then
+        }) or BoxUI.FrameName
+        BoxUI.Loaded = BoxUI.FrameName ~= nil
+        if not BoxUI.Loaded then
             return
-        end
-
-        local nameStr = _G[frameName .. "NameStr"]
-        if nameStr then
-            nameStr:SetText(L.StrName)
-        end
-        local diffStr = _G[frameName .. "DifficultyStr"]
-        if diffStr then
-            diffStr:SetText(L.StrDifficulty)
-        end
-        local timeStr = _G[frameName .. "TimeStr"]
-        if timeStr then
-            timeStr:SetText(L.StrTime)
-        end
-        local saveBtn = _G[frameName .. "SaveBtn"]
-        if saveBtn then
-            saveBtn:SetText(L.BtnSave)
-        end
-        local cancelBtn = _G[frameName .. "CancelBtn"]
-        if cancelBtn then
-            cancelBtn:SetText(L.BtnCancel)
-        end
-
-        local boxFrame = _G[frameName]
-        if boxFrame and not boxFrame._krtBound then
-            Frames.SafeSetScript(saveBtn, "OnClick", function()
-                Box:Save()
-            end)
-            Frames.SafeSetScript(cancelBtn, "OnClick", function()
-                Box:Hide()
-            end)
-            Frames.SafeSetScript(_G[frameName .. "Name"], "OnEnterPressed", function()
-                Box:Save()
-            end)
-            Frames.SafeSetScript(_G[frameName .. "Difficulty"], "OnEnterPressed", function()
-                Box:Save()
-            end)
-            Frames.SafeSetScript(_G[frameName .. "Time"], "OnEnterPressed", function()
-                Box:Save()
-            end)
-            boxFrame._krtBound = true
         end
     end
 
     local function onLoadBossBoxFrame(frame)
         Box:OnLoad(frame)
-        return frameName
+        return BoxUI.FrameName
     end
 
     UIScaffold.DefineModuleUi({
         module = Box,
         getFrame = getFrame,
+        acquireRefs = Box.AcquireRefs,
+        bind = bindBossBoxHandlers,
+        localize = function(frameName, frame, refs)
+            Box:LocalizeUI(frameName, frame, refs)
+        end,
         onLoad = onLoadBossBoxFrame,
         refresh = function()
-            BoxUI.Refresh()
+            Box:RefreshUI()
         end,
     })
 
@@ -4006,18 +4273,25 @@ do
             return
         end
 
-        _G[frameName .. "Name"]:SetText(bossData.name or "")
+        local nameBox = getBoxPart("Name")
+        local timeBox = getBoxPart("Time")
+        local difficultyBox = getBoxPart("Difficulty")
+        if not (nameBox and timeBox and difficultyBox) then
+            return
+        end
+
+        nameBox:SetText(bossData.name or "")
 
         local bossTime = bossData.time or time()
         local d = date("*t", bossTime)
         tempDate = { day = d.day, month = d.month, year = d.year, hour = d.hour, min = d.min }
-        _G[frameName .. "Time"]:SetText(("%02d:%02d"):format(tempDate.hour, tempDate.min))
+        timeBox:SetText(("%02d:%02d"):format(tempDate.hour, tempDate.min))
 
         local mode = bossData.mode
         if not mode and bossData.difficulty then
             mode = (bossData.difficulty == 3 or bossData.difficulty == 4) and "h" or "n"
         end
-        _G[frameName .. "Difficulty"]:SetText((mode == "h") and "h" or "n")
+        difficultyBox:SetText((mode == "h") and "h" or "n")
 
         editBossNid = bossData and bossData.bossNid or nil
         isEdit = true
@@ -4030,9 +4304,16 @@ do
             return
         end
 
-        local name = Strings.TrimText(_G[frameName .. "Name"]:GetText())
-        local modeT = Strings.NormalizeLower(_G[frameName .. "Difficulty"]:GetText())
-        local bTime = Strings.TrimText(_G[frameName .. "Time"]:GetText())
+        local nameBox = getBoxPart("Name")
+        local difficultyBox = getBoxPart("Difficulty")
+        local timeBox = getBoxPart("Time")
+        if not (nameBox and difficultyBox and timeBox) then
+            return
+        end
+
+        local name = Strings.TrimText(nameBox:GetText())
+        local modeT = Strings.NormalizeLower(difficultyBox:GetText())
+        local bTime = Strings.TrimText(timeBox:GetText())
 
         name = (name == "") and "_TrashMob_" or name
         if name ~= "_TrashMob_" and (modeT ~= "h" and modeT ~= "n") then
@@ -4063,21 +4344,31 @@ do
     end
 
     function Box:CancelAddEdit()
-        Frames.ResetEditBox(_G[frameName .. "Name"])
-        Frames.ResetEditBox(_G[frameName .. "Difficulty"])
-        Frames.ResetEditBox(_G[frameName .. "Time"])
+        Frames.ResetEditBox(getBoxPart("Name"))
+        Frames.ResetEditBox(getBoxPart("Difficulty"))
+        Frames.ResetEditBox(getBoxPart("Time"))
         isEdit, raidData, bossData, editBossNid = false, {}, {}, nil
         twipe(tempDate)
     end
 
-    function BoxUI.Refresh()
-        if not localized then
-            Frames.SetTooltip(_G[frameName .. "Name"], L.StrBossNameHelp, "ANCHOR_LEFT")
-            Frames.SetTooltip(_G[frameName .. "Difficulty"], L.StrBossDifficultyHelp, "ANCHOR_LEFT")
-            Frames.SetTooltip(_G[frameName .. "Time"], L.StrBossTimeHelp, "ANCHOR_RIGHT")
-            localized = true
+    function Box:RefreshUI()
+        local title = getBoxPart("Title")
+        if not title then
+            return
         end
-        UIPrimitives.SetText(_G[frameName .. "Title"], L.StrEditBoss, L.StrAddBoss, isEdit)
+
+        if not tooltipsBound then
+            Frames.SetTooltip(getBoxPart("Name"), L.StrBossNameHelp, "ANCHOR_LEFT")
+            Frames.SetTooltip(getBoxPart("Difficulty"), L.StrBossDifficultyHelp, "ANCHOR_LEFT")
+            Frames.SetTooltip(getBoxPart("Time"), L.StrBossTimeHelp, "ANCHOR_RIGHT")
+            tooltipsBound = true
+        end
+
+        UIPrimitives.SetText(title, L.StrEditBoss, L.StrAddBoss, isEdit)
+    end
+
+    function Box:Refresh()
+        return self:RefreshUI()
     end
 end
 
@@ -4085,70 +4376,107 @@ end
 do
     module.AttendeesBox = module.AttendeesBox or {}
     local Box = module.AttendeesBox
+    Box._ui = Box._ui or {
+        Loaded = false,
+        Bound = false,
+        Localized = false,
+        Dirty = true,
+        Reason = nil,
+        FrameName = nil,
+    }
+    local BoxUI = Box._ui
 
-    local frameName
-    local getFrame = Frames.MakeFrameGetter("KRTLoggerPlayerBox")
+    local getFrame = makeModuleFrameGetter(Box, "KRTLoggerPlayerBox")
 
-    function Box:OnLoad(frame)
-        frameName = Frames.InitModuleFrame(Box, frame, {
-            enableDrag = true,
-            hookOnShow = function()
-                Frames.ResetEditBox(_G[frameName .. "Name"])
-            end,
-            hookOnHide = function()
-                Frames.ResetEditBox(_G[frameName .. "Name"])
-            end,
-        })
+    local function getBoxFrameName()
+        return BoxUI.FrameName
+    end
+
+    local function getBoxPart(suffix)
+        local frameName = getBoxFrameName()
         if not frameName then
+            return nil
+        end
+        return _G[frameName .. suffix]
+    end
+
+    function Box.AcquireRefs(frame)
+        return {
+            title = Frames.Ref(frame, "Title"),
+            nameStr = Frames.Ref(frame, "NameStr"),
+            addBtn = Frames.Ref(frame, "AddBtn"),
+            cancelBtn = Frames.Ref(frame, "CancelBtn"),
+            name = Frames.Ref(frame, "Name"),
+        }
+    end
+
+    local function bindAttendeesBoxHandlers(_, frame, refs)
+        if not frame or frame._krtBound then
             return
         end
+        Frames.SafeSetScript(refs.addBtn, "OnClick", function()
+            Box:Save()
+        end)
+        Frames.SafeSetScript(refs.cancelBtn, "OnClick", function()
+            Box:Hide()
+        end)
+        Frames.SafeSetScript(refs.name, "OnEnterPressed", function()
+            Box:Save()
+        end)
+        frame._krtBound = true
+    end
 
-        local title = _G[frameName .. "Title"]
-        if title then
-            title:SetText(L.StrAddPlayer)
+    function Box:LocalizeUI(_, _, refs)
+        if refs.title then
+            refs.title:SetText(L.StrAddPlayer)
         end
-        local nameStr = _G[frameName .. "NameStr"]
-        if nameStr then
-            nameStr:SetText(L.StrName)
+        if refs.nameStr then
+            refs.nameStr:SetText(L.StrName)
         end
-        local addBtn = _G[frameName .. "AddBtn"]
-        if addBtn then
-            addBtn:SetText(L.BtnAdd)
+        if refs.addBtn then
+            refs.addBtn:SetText(L.BtnAdd)
         end
-        local cancelBtn = _G[frameName .. "CancelBtn"]
-        if cancelBtn then
-            cancelBtn:SetText(L.BtnCancel)
+        if refs.cancelBtn then
+            refs.cancelBtn:SetText(L.BtnCancel)
         end
+    end
 
-        local boxFrame = _G[frameName]
-        if boxFrame and not boxFrame._krtBound then
-            Frames.SafeSetScript(addBtn, "OnClick", function()
-                Box:Save()
-            end)
-            Frames.SafeSetScript(cancelBtn, "OnClick", function()
-                Box:Hide()
-            end)
-            Frames.SafeSetScript(_G[frameName .. "Name"], "OnEnterPressed", function()
-                Box:Save()
-            end)
-            boxFrame._krtBound = true
-        end
+    function Box:OnLoad(frame)
+        BoxUI.FrameName = Frames.InitModuleFrame(Box, frame, {
+            enableDrag = true,
+            hookOnShow = function()
+                Frames.ResetEditBox(getBoxPart("Name"))
+            end,
+            hookOnHide = function()
+                Frames.ResetEditBox(getBoxPart("Name"))
+            end,
+        }) or BoxUI.FrameName
+        BoxUI.Loaded = BoxUI.FrameName ~= nil
     end
 
     local function onLoadAttendeesBoxFrame(frame)
         Box:OnLoad(frame)
-        return frameName
+        return BoxUI.FrameName
     end
 
     UIScaffold.DefineModuleUi({
         module = Box,
         getFrame = getFrame,
+        acquireRefs = Box.AcquireRefs,
+        bind = bindAttendeesBoxHandlers,
+        localize = function(frameName, frame, refs)
+            Box:LocalizeUI(frameName, frame, refs)
+        end,
         onLoad = onLoadAttendeesBoxFrame,
     })
 
     function Box:Save()
         local rID, bID = module.selectedRaid, module.selectedBoss
-        local name = Strings.TrimText(_G[frameName .. "Name"]:GetText())
+        local nameBox = getBoxPart("Name")
+        if not nameBox then
+            return
+        end
+        local name = Strings.TrimText(nameBox:GetText())
         if module.Actions:AddBossAttendee(rID, bID, name) then
             self:Toggle()
             triggerSelectionEvent(module, "selectedBoss")

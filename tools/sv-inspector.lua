@@ -351,9 +351,7 @@ local function inspectRaid(raid, raidIndex)
         schemaOk = true
     end
 
-    local referencesOk = (missingBossAttendeeRefs == 0)
-        and (missingLootBossRefs == 0)
-        and (missingLootLooterRefs == 0)
+    local referencesOk = (missingBossAttendeeRefs == 0) and (missingLootBossRefs == 0) and (missingLootLooterRefs == 0)
 
     local holder = (type(raid.holder) == "string") and raid.holder or ""
     local banker = (type(raid.banker) == "string") and raid.banker or ""
@@ -471,8 +469,7 @@ local function createWriter(outPath)
     if not outPath or outPath == "" then
         return function(line)
             print(line)
-        end, function()
-        end
+        end, function() end
     end
 
     local file, err = io.open(outPath, "wb")
@@ -544,8 +541,8 @@ end
 
 local function csvEscape(value)
     local text = toText(value)
-    if text:find("[,\r\n\"]") then
-        text = "\"" .. text:gsub("\"", "\"\"") .. "\""
+    if text:find('[,\r\n"]') then
+        text = '"' .. text:gsub('"', '""') .. '"'
     end
     return text
 end
@@ -609,10 +606,7 @@ local function emitRaidsTable(writeLine, report)
     end
 
     writeLine("Raid Snapshot")
-    renderAsciiTable(writeLine,
-        { "idx", "raidNid", "schema", "players", "bossKills", "loot", "holder", "miss", "legacy", "looter",
-            "mask", "ctr", "refs" },
-        rows)
+    renderAsciiTable(writeLine, { "idx", "raidNid", "schema", "players", "bossKills", "loot", "holder", "miss", "legacy", "looter", "mask", "ctr", "refs" }, rows)
 end
 
 local function emitSanityTable(writeLine, report)
@@ -727,50 +721,26 @@ local function emitSanityCsv(writeLine, report)
     end
 
     writeCsvRow(writeLine, { "check", "pass", "details" })
-    writeCsvRow(
-        writeLine,
-        { "topLevelKeysPresent", boolText(#sanity.missingTopLevelKeys == 0), missingTopLevel }
-    )
-    writeCsvRow(
-        writeLine,
-        { "schemaVersion", boolText(sanity.raidsWithSchemaIssue == 0), sanity.raidsWithSchemaIssue }
-    )
-    writeCsvRow(
-        writeLine,
-        {
-            "canonicalRaidKeys",
-            boolText(sanity.raidsWithMissingCanonical == 0),
-            sanity.raidsWithMissingCanonical,
-        }
-    )
-    writeCsvRow(
-        writeLine,
-        { "legacyRuntimeKeys", boolText(sanity.raidsWithLegacyRuntime == 0), sanity.raidsWithLegacyRuntime }
-    )
-    writeCsvRow(
-        writeLine,
-        {
-            "legacyLootLooter",
-            boolText(sanity.raidsWithLegacyLootLooter == 0),
-            sanity.raidsWithLegacyLootLooter,
-        }
-    )
-    writeCsvRow(
-        writeLine,
-        {
-            "legacyAttendanceMask",
-            boolText(sanity.raidsWithLegacyAttendanceMask == 0),
-            sanity.raidsWithLegacyAttendanceMask,
-        }
-    )
-    writeCsvRow(
-        writeLine,
-        { "nidCounters", boolText(sanity.raidsWithCounterIssue == 0), sanity.raidsWithCounterIssue }
-    )
-    writeCsvRow(
-        writeLine,
-        { "nidReferences", boolText(sanity.raidsWithReferenceIssue == 0), sanity.raidsWithReferenceIssue }
-    )
+    writeCsvRow(writeLine, { "topLevelKeysPresent", boolText(#sanity.missingTopLevelKeys == 0), missingTopLevel })
+    writeCsvRow(writeLine, { "schemaVersion", boolText(sanity.raidsWithSchemaIssue == 0), sanity.raidsWithSchemaIssue })
+    writeCsvRow(writeLine, {
+        "canonicalRaidKeys",
+        boolText(sanity.raidsWithMissingCanonical == 0),
+        sanity.raidsWithMissingCanonical,
+    })
+    writeCsvRow(writeLine, { "legacyRuntimeKeys", boolText(sanity.raidsWithLegacyRuntime == 0), sanity.raidsWithLegacyRuntime })
+    writeCsvRow(writeLine, {
+        "legacyLootLooter",
+        boolText(sanity.raidsWithLegacyLootLooter == 0),
+        sanity.raidsWithLegacyLootLooter,
+    })
+    writeCsvRow(writeLine, {
+        "legacyAttendanceMask",
+        boolText(sanity.raidsWithLegacyAttendanceMask == 0),
+        sanity.raidsWithLegacyAttendanceMask,
+    })
+    writeCsvRow(writeLine, { "nidCounters", boolText(sanity.raidsWithCounterIssue == 0), sanity.raidsWithCounterIssue })
+    writeCsvRow(writeLine, { "nidReferences", boolText(sanity.raidsWithReferenceIssue == 0), sanity.raidsWithReferenceIssue })
 end
 
 local function emitTable(writeLine, report, section)

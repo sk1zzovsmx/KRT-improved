@@ -46,6 +46,15 @@ local function getController(name)
     return controllers and controllers[name] or nil
 end
 
+local function callControllerMethod(name, methodName, ...)
+    local controller = getController(name)
+    local method = controller and controller[methodName]
+    if type(method) ~= "function" then
+        return nil
+    end
+    return method(controller, ...)
+end
+
 local function getLootCounterController()
     local widget = Widgets.LootCounter
     if type(widget) == "table" and type(widget.Toggle) == "function" then
@@ -66,6 +75,30 @@ local function isWidgetAvailable(widgetId)
         return true
     end
     return false
+end
+
+local function callWidgetMethod(widgetId, methodName, ...)
+    if not (UIFacade:IsEnabled(widgetId) and UIFacade:IsRegistered(widgetId)) then
+        return nil
+    end
+    return UIFacade:Call(widgetId, methodName, ...)
+end
+
+local function toggleLootCounterWidget()
+    if not isWidgetAvailable("LootCounter") then
+        return nil
+    end
+
+    if UIFacade:IsEnabled("LootCounter") and UIFacade:IsRegistered("LootCounter") then
+        return UIFacade:Call("LootCounter", "Toggle")
+    end
+
+    local widget = getLootCounterController()
+    local method = widget and widget.Toggle
+    if type(method) ~= "function" then
+        return nil
+    end
+    return method(widget)
 end
 
 -- ----- Internal state ----- --
@@ -103,10 +136,7 @@ local function buildMenu()
             text = MASTER_LOOTER,
             notCheckable = 1,
             func = function()
-                local moduleRef = getController("Master")
-                if moduleRef and moduleRef.Toggle then
-                    moduleRef:Toggle()
-                end
+                callControllerMethod("Master", "Toggle")
             end,
         },
         {
@@ -117,27 +147,14 @@ local function buildMenu()
                 if not raid:IsPlayerInRaid() then
                     return
                 end
-                if not isWidgetAvailable("LootCounter") then
-                    return
-                end
-                if UIFacade:IsEnabled("LootCounter") and UIFacade:IsRegistered("LootCounter") then
-                    UIFacade:Call("LootCounter", "Toggle")
-                    return
-                end
-                local widget = getLootCounterController()
-                if widget and widget.Toggle then
-                    widget:Toggle()
-                end
+                toggleLootCounterWidget()
             end,
         },
         {
             text = L.StrLootLogger,
             notCheckable = 1,
             func = function()
-                local moduleRef = getController("Logger")
-                if moduleRef and moduleRef.Toggle then
-                    moduleRef:Toggle()
-                end
+                callControllerMethod("Logger", "Toggle")
             end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
@@ -153,10 +170,7 @@ local function buildMenu()
             text = RAID_WARNING,
             notCheckable = 1,
             func = function()
-                local moduleRef = getController("Warnings")
-                if moduleRef and moduleRef.Toggle then
-                    moduleRef:Toggle()
-                end
+                callControllerMethod("Warnings", "Toggle")
             end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
@@ -164,10 +178,7 @@ local function buildMenu()
             text = L.StrMSChanges,
             notCheckable = 1,
             func = function()
-                local moduleRef = getController("Changes")
-                if moduleRef and moduleRef.Toggle then
-                    moduleRef:Toggle()
-                end
+                callControllerMethod("Changes", "Toggle")
             end,
         },
         {
@@ -178,10 +189,7 @@ local function buildMenu()
                 if not raid:IsPlayerInRaid() then
                     return
                 end
-                local moduleRef = getController("Changes")
-                if moduleRef and moduleRef.Demand then
-                    moduleRef:Demand()
-                end
+                callControllerMethod("Changes", "Demand")
             end,
         },
         {
@@ -192,10 +200,7 @@ local function buildMenu()
                 if not raid:IsPlayerInRaid() then
                     return
                 end
-                local moduleRef = getController("Changes")
-                if moduleRef and moduleRef.Announce then
-                    moduleRef:Announce()
-                end
+                callControllerMethod("Changes", "Announce")
             end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
@@ -203,10 +208,7 @@ local function buildMenu()
             text = L.StrLFMSpam,
             notCheckable = 1,
             func = function()
-                local moduleRef = getController("Spammer")
-                if moduleRef and moduleRef.Toggle then
-                    moduleRef:Toggle()
-                end
+                callControllerMethod("Spammer", "Toggle")
             end,
         },
     }
@@ -338,7 +340,7 @@ function module:OnLoad(frame)
             return
         end
         if button == "RightButton" then
-            UIFacade:Call("Config", "Toggle")
+            callWidgetMethod("Config", "Toggle")
         elseif button == "LeftButton" then
             toggleMenu()
         end

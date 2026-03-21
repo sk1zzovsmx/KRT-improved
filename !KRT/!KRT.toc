@@ -48,6 +48,7 @@ Modules\Base64.lua
 Modules\Sort.lua
 Modules\Features.lua
 Modules\UI\Facade.lua
+Modules\UI\Effects.lua
 Modules\UI\Visuals.lua
 Modules\UI\Frames.lua
 Modules\UI\ListController.lua

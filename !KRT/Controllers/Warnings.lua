@@ -29,14 +29,19 @@ do
     addon.Controllers = addon.Controllers or {}
     addon.Controllers.Warnings = addon.Controllers.Warnings or {}
     local module = addon.Controllers.Warnings
-    local frameName
+    module._ui = module._ui
+        or {
+            Loaded = false,
+            Bound = false,
+            Localized = false,
+            Dirty = true,
+            Reason = nil,
+            FrameName = nil,
+        }
+    local UI = module._ui
 
     local getFrame = makeModuleFrameGetter(module, "KRTWarnings")
     -- ----- Internal state ----- --
-    local UI = {
-        Localized = false,
-        Loaded = false,
-    }
     local fetched = false
     local warningsDirty = false
 
@@ -171,9 +176,9 @@ do
     end
 
     local function OnLoadFrame(frame)
-        frameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or frameName)
-        UI.Loaded = frameName ~= nil
-        return frameName
+        UI.FrameName = panelScaffold:OnLoad(frame) or (frame and frame.GetName and frame:GetName() or UI.FrameName)
+        UI.Loaded = UI.FrameName ~= nil
+        return UI.FrameName
     end
 
     UIScaffold.DefineModuleUi({
@@ -185,9 +190,6 @@ do
             UI.Localize()
         end,
         onLoad = OnLoadFrame,
-        refresh = function()
-            panelScaffold:Refresh()
-        end,
     })
 
     -- OnLoad frame:
@@ -217,6 +219,10 @@ do
     -- Edit/Save warning:
     function module:Edit()
         local wName, wContent
+        local frameName = UI.FrameName
+        if not frameName then
+            return
+        end
         local nameBox = _G[frameName .. "Name"]
         local contentBox = _G[frameName .. "Content"]
         if not (nameBox and contentBox) then
@@ -298,6 +304,10 @@ do
 
     -- Cancel editing/adding:
     function module:Cancel()
+        local frameName = UI.FrameName
+        if not frameName then
+            return
+        end
         Frames.ResetEditBox(_G[frameName .. "Name"])
         Frames.ResetEditBox(_G[frameName .. "Content"])
         selectedID = nil
@@ -309,6 +319,10 @@ do
     -- Localizing UI frame:
     function UI.Localize()
         if UI.Localized then
+            return
+        end
+        local frameName = UI.FrameName
+        if not frameName then
             return
         end
         _G[frameName .. "NameStr"]:SetText(L.StrName)
@@ -328,6 +342,10 @@ do
     end
 
     local function updateSelectionUI()
+        local frameName = UI.FrameName
+        if not frameName then
+            return
+        end
         if selectedID and KRT_Warnings[selectedID] then
             _G[frameName .. "OutputName"]:SetText(KRT_Warnings[selectedID].name)
             _G[frameName .. "OutputContent"]:SetText(KRT_Warnings[selectedID].content)
@@ -342,6 +360,10 @@ do
 
     -- UI refresh.
     function UI.Refresh()
+        local frameName = UI.FrameName
+        if not frameName then
+            return
+        end
         if warningsDirty or not fetched then
             controller:Dirty()
             warningsDirty = false
@@ -360,12 +382,20 @@ do
         lastEditBtnMode = UIPrimitives.UpdateModeTextNamedPart(frameName, "EditBtn", L.BtnSave, L.BtnEdit, editBtnMode, lastEditBtnMode)
     end
 
-    function module:Refresh()
+    function module:RefreshUI()
         panelScaffold:Refresh()
+    end
+
+    function module:Refresh()
+        return self:RefreshUI()
     end
 
     -- Saving a Warning:
     function saveWarning(wContent, wName, wID)
+        local frameName = UI.FrameName
+        if not frameName then
+            return
+        end
         local savedID
         if type(KRT_Warnings) ~= "table" then
             KRT_Warnings = {}

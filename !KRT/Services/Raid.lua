@@ -57,6 +57,7 @@ do
     local RETRY_DELAY_SECONDS = 1
     local RETRY_MAX_ATTEMPTS = 5
     local RAID_INSTANCE_CHECK_DELAYS = { 0.3, 0.8, 1.5, 2.5, 3.5 }
+    local ROSTER_REFRESH_DELAY_SECONDS = 2
 
     local function getLootService()
         local services = addon.Services
@@ -136,9 +137,26 @@ do
         twipe(liveNamesByUnit)
     end
 
-    local function resetPendingUnitRetry()
+    local function cancelPendingUnitRetryTimer()
         addon.CancelTimer(module.pendingUnitRetryHandle, true)
         module.pendingUnitRetryHandle = nil
+    end
+
+    local function cancelScheduledRosterRefresh()
+        addon.CancelTimer(module.updateRosterHandle, true)
+        module.updateRosterHandle = nil
+    end
+
+    local function scheduleRosterRefresh()
+        cancelScheduledRosterRefresh()
+        module.updateRosterHandle = addon.NewTimer(ROSTER_REFRESH_DELAY_SECONDS, function()
+            module.updateRosterHandle = nil
+            module:UpdateRaidRoster()
+        end)
+    end
+
+    local function resetPendingUnitRetry()
+        cancelPendingUnitRetryTimer()
         twipe(pendingUnits)
     end
 
@@ -172,7 +190,7 @@ do
             return
         end
 
-        addon.CancelTimer(module.pendingUnitRetryHandle, true)
+        cancelPendingUnitRetryTimer()
         module.pendingUnitRetryHandle = addon.NewTimer(RETRY_DELAY_SECONDS, function()
             module.pendingUnitRetryHandle = nil
             if not addon.IsInRaid() then
@@ -271,6 +289,34 @@ do
             end
         end
         return nil
+    end
+
+    local function buildDefaultRaidPlayer(name)
+        return {
+            name = name,
+            rank = 0,
+            subgroup = 1,
+            class = "UNKNOWN",
+            join = Time.GetCurrentTime(),
+            leave = nil,
+            count = 0,
+        }
+    end
+
+    local function ensureRaidPlayerNid(name, raidNum)
+        local resolvedName = Strings.NormalizeName(name, true) or name
+        if not resolvedName or resolvedName == "" then
+            return 0, resolvedName
+        end
+
+        local playerNid = module:GetPlayerID(resolvedName, raidNum)
+        if playerNid > 0 then
+            return playerNid, resolvedName
+        end
+
+        module:AddPlayer(buildDefaultRaidPlayer(resolvedName), raidNum)
+        playerNid = module:GetPlayerID(resolvedName, raidNum)
+        return playerNid, resolvedName
     end
 
     local function resolveRaidDifficulty(instanceDiff)
@@ -479,8 +525,7 @@ do
             return false
         end
         -- Cancel any pending roster update timer.
-        addon.CancelTimer(module.updateRosterHandle, true)
-        module.updateRosterHandle = nil
+        cancelScheduledRosterRefresh()
 
         local rosterChanged = false
         local delta = {
@@ -742,11 +787,7 @@ do
         Bus.TriggerEvent(InternalEvents.RaidCreate, Core.GetCurrentRaid())
 
         -- Schedule one delayed roster refresh.
-        addon.CancelTimer(module.updateRosterHandle, true)
-        module.updateRosterHandle = nil
-        module.updateRosterHandle = addon.NewTimer(2, function()
-            module:UpdateRaidRoster()
-        end)
+        scheduleRosterRefresh()
         return true
     end
 
@@ -810,16 +851,13 @@ do
     -- Ends the current raid log entry, marking end time.
     function module:End()
         cancelRaidInstanceChecks()
-        addon.CancelTimer(module.pendingUnitRetryHandle, true)
-        module.pendingUnitRetryHandle = nil
-        twipe(pendingUnits)
+        resetPendingUnitRetry()
         resetLiveUnitCaches()
         if not Core.GetCurrentRaid() then
             return
         end
         -- Stop any pending roster update when ending the raid
-        addon.CancelTimer(module.updateRosterHandle, true)
-        module.updateRosterHandle = nil
+        cancelScheduledRosterRefresh()
         local currentTime = Time.GetCurrentTime()
         local raid = Core.EnsureRaidById(Core.GetCurrentRaid())
         if raid then
@@ -884,11 +922,7 @@ do
 
         if Core.GetCurrentRaid() and module:CheckPlayer(Core.GetPlayerName(), Core.GetCurrentRaid()) then
             -- Restart the roster update timer: cancel the old one and schedule a new one
-            addon.CancelTimer(module.updateRosterHandle, true)
-            module.updateRosterHandle = nil
-            module.updateRosterHandle = addon.NewTimer(2, function()
-                module:UpdateRaidRoster()
-            end)
+            scheduleRosterRefresh()
             return
         end
 
@@ -1000,19 +1034,7 @@ do
                 local name = UnitName(unit)
                 if name then
                     local resolvedName = Strings.NormalizeName(name, true) or name
-                    local playerNid = module:GetPlayerID(resolvedName, raidNum)
-                    if playerNid == 0 then
-                        module:AddPlayer({
-                            name = resolvedName,
-                            rank = 0,
-                            subgroup = 1,
-                            class = "UNKNOWN",
-                            join = Time.GetCurrentTime(),
-                            leave = nil,
-                            count = 0,
-                        }, raidNum)
-                        playerNid = module:GetPlayerID(resolvedName, raidNum)
-                    end
+                    local playerNid = ensureRaidPlayerNid(resolvedName, raidNum)
                     if playerNid > 0 and not seenPlayers[playerNid] then
                         seenPlayers[playerNid] = true
                         tinsert(players, playerNid)
@@ -1143,19 +1165,8 @@ do
         end
         Core.EnsureRaidSchema(raid)
 
-        local looterNid = module:GetPlayerID(player, Core.GetCurrentRaid())
-        if looterNid == 0 then
-            module:AddPlayer({
-                name = player,
-                rank = 0,
-                subgroup = 1,
-                class = "UNKNOWN",
-                join = Time.GetCurrentTime(),
-                leave = nil,
-                count = 0,
-            }, Core.GetCurrentRaid())
-            looterNid = module:GetPlayerID(player, Core.GetCurrentRaid())
-        end
+        local looterNid
+        looterNid, player = ensureRaidPlayerNid(player, Core.GetCurrentRaid())
 
         local lootNid = tonumber(raid.nextLootNid) or 1
         raid.nextLootNid = lootNid + 1
@@ -1204,19 +1215,8 @@ do
         end
         Core.EnsureRaidSchema(raid)
 
-        local looterNid = module:GetPlayerID(looter, raidNum)
-        if looterNid == 0 then
-            module:AddPlayer({
-                name = looter,
-                rank = 0,
-                subgroup = 1,
-                class = "UNKNOWN",
-                join = Time.GetCurrentTime(),
-                leave = nil,
-                count = 0,
-            }, raidNum)
-            looterNid = module:GetPlayerID(looter, raidNum)
-        end
+        local looterNid
+        looterNid, looter = ensureRaidPlayerNid(looter, raidNum)
 
         local count = tonumber(itemCount) or 1
         if count < 1 then
@@ -1345,19 +1345,8 @@ do
         end
 
         -- Ensure the player exists in the raid log.
-        local playerNid = module:GetPlayerID(name, raidNum)
-        if playerNid == 0 then
-            module:AddPlayer({
-                name = name,
-                rank = 0,
-                subgroup = 1,
-                class = "UNKNOWN",
-                join = Time.GetCurrentTime(),
-                leave = nil,
-                count = 0,
-            }, raidNum)
-            playerNid = module:GetPlayerID(name, raidNum)
-        end
+        local playerNid
+        playerNid, name = ensureRaidPlayerNid(name, raidNum)
 
         if playerNid == 0 then
             return

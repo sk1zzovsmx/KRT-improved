@@ -36,21 +36,26 @@ do
     addon.Widgets = addon.Widgets or {}
     addon.Widgets.ReservesUI = addon.Widgets.ReservesUI or {}
     local module = addon.Widgets.ReservesUI
+    module._ui = module._ui
+        or {
+            Loaded = false,
+            Bound = false,
+            Localized = false,
+            Dirty = true,
+            Reason = nil,
+            FrameName = nil,
+        }
+    local UI = module._ui
     local Service = addon.Services and addon.Services.Reserves and addon.Services.Reserves.Service
 
     -- ----- Internal state ----- --
 
     local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
-    local frameName
-    local getFrame = Frames.MakeFrameGetter("KRTReserveListFrame")
+    local getFrame = makeModuleFrameGetter(module, "KRTReserveListFrame")
     local scrollFrame, scrollChild
     local reserveHeaders = {}
     local reserveItemRows = {}
     local rowsByItemID = {}
-    local UI = {
-        Localized = false,
-        Loaded = false,
-    }
     local lastQueryAttemptAt = 0
     local reserveRowStyle = {
         odd = { 0.04, 0.06, 0.09, 0.30 },
@@ -274,6 +279,10 @@ do
             addon:debug(Diag.D.LogReservesUIAlreadyLocalized)
             return
         end
+        local frameName = UI.FrameName
+        if not frameName then
+            return
+        end
         if frameName then
             Frames.SetFrameTitle(frameName, L.StrRaidReserves)
             addon:debug(Diag.D.LogReservesUILocalized:format(L.StrRaidReserves))
@@ -294,7 +303,10 @@ do
     end
 
     function UI.Refresh()
-        UI.Localize()
+        local frameName = UI.FrameName
+        if not frameName then
+            return
+        end
         local hasData = Service and Service.HasData and Service:HasData() or false
         local clearButton = _G[frameName .. "ClearButton"]
         if clearButton then
@@ -347,6 +359,10 @@ do
     -- ----- Public methods ----- --
 
     function module:CreateReserveHeader(parent, source, yOffset, index)
+        local frameName = UI.FrameName
+        if not frameName then
+            return nil
+        end
         local headerName = frameName .. "ReserveHeader" .. index
         local header = _G[headerName] or CreateFrame("Button", headerName, parent, "KRTReserveHeaderTemplate")
         header:ClearAllPoints()
@@ -369,6 +385,10 @@ do
     end
 
     function module:CreateReserveRow(parent, info, yOffset, index, isFirstInGroup)
+        local frameName = UI.FrameName
+        if not frameName then
+            return nil
+        end
         local rowName = frameName .. "ReserveRow" .. index
         local row = _G[rowName] or CreateFrame("Frame", rowName, parent, "KRTReserveRowTemplate")
         row:ClearAllPoints()
@@ -406,7 +426,7 @@ do
 
     local function renderReserveListUI()
         local frame = getFrame()
-        if not frame or not scrollChild then
+        if not frame or not scrollChild or not UI.FrameName then
             return
         end
 
@@ -484,7 +504,7 @@ do
         end)
 
         if updated then
-            module:RequestRefresh()
+            module:RequestRefresh("query_missing_items")
         end
 
         return updated, count
@@ -508,13 +528,20 @@ do
             out = Service:ResetSaved()
         end
         module:Hide()
-        module:RequestRefresh()
+        module:RequestRefresh("reset_saved")
         return out
     end
 
-    function module:Refresh()
+    function module:RefreshUI()
+        if not UI.Localized then
+            UI.Localize()
+        end
         UI.Refresh()
         renderReserveListUI()
+    end
+
+    function module:Refresh()
+        return self:RefreshUI()
     end
 
     local function BindHandlers(_, _, refs)
@@ -549,7 +576,7 @@ do
 
     function module:OnLoad(frame)
         addon:debug(Diag.D.LogReservesFrameLoaded)
-        frameName = Frames.InitModuleFrame(module, frame, {
+        UI.FrameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 addon:debug(Diag.D.LogReservesShowWindow)
@@ -557,8 +584,8 @@ do
             hookOnHide = function()
                 addon:debug(Diag.D.LogReservesHideWindow)
             end,
-        })
-        UI.Loaded = frameName ~= nil
+        }) or UI.FrameName
+        UI.Loaded = UI.FrameName ~= nil
         if not UI.Loaded then
             return
         end
@@ -583,7 +610,7 @@ do
 
     local function OnLoadFrame(frame)
         module:OnLoad(frame)
-        return frameName
+        return UI.FrameName
     end
 
     UIScaffold.DefineModuleUi({
@@ -601,12 +628,17 @@ do
 
     module.Import = module.Import or {}
     local Import = module.Import
+    Import._ui = Import._ui
+        or {
+            Loaded = false,
+            Bound = false,
+            Localized = false,
+            Dirty = true,
+            Reason = nil,
+            FrameName = nil,
+        }
+    local ImportUI = Import._ui
     local getImportFrame = makeModuleFrameGetter(Import, "KRTImportWindow")
-    local ImportUI = {
-        Localized = false,
-        Loaded = false,
-    }
-    local importFrameName
     local MODE_MULTI, MODE_PLUS = 0, 1
 
     function ImportUI.AcquireRefs(frame)
@@ -719,7 +751,7 @@ do
             return
         end
 
-        Frames.SetFrameTitle(frame, L.StrImportReservesTitle)
+        Frames.SetFrameTitle(ImportUI.FrameName or frame, L.StrImportReservesTitle)
 
         local hint = _G["KRTImportWindowHint"]
         if hint then
@@ -812,8 +844,10 @@ do
         self:SetImportMode(modeValue, true)
     end
 
-    function Import:Refresh()
-        ImportUI.Localize()
+    function Import:RefreshUI()
+        if not ImportUI.Localized then
+            ImportUI.Localize()
+        end
 
         local slider = getModeSlider()
         if slider and slider.SetValue then
@@ -826,8 +860,12 @@ do
         end
     end
 
+    function Import:Refresh()
+        return self:RefreshUI()
+    end
+
     function Import:OnLoad(frame)
-        importFrameName = Frames.InitModuleFrame(Import, frame, {
+        ImportUI.FrameName = Frames.InitModuleFrame(Import, frame, {
             enableDrag = true,
             hookOnShow = function()
                 Frames.ResetEditBox(_G["KRTImportEditBox"])
@@ -839,8 +877,8 @@ do
                 setImportStatus("")
                 Import:RequestRefresh()
             end,
-        })
-        ImportUI.Loaded = importFrameName ~= nil
+        }) or ImportUI.FrameName
+        ImportUI.Loaded = ImportUI.FrameName ~= nil
         if not ImportUI.Loaded then
             return
         end
@@ -850,7 +888,7 @@ do
 
     local function onLoadImportFrame(frame)
         Import:OnLoad(frame)
-        return importFrameName
+        return ImportUI.FrameName
     end
 
     UIScaffold.DefineModuleUi({

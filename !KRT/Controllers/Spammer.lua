@@ -29,14 +29,19 @@ do
     addon.Controllers = addon.Controllers or {}
     addon.Controllers.Spammer = addon.Controllers.Spammer or {}
     local module = addon.Controllers.Spammer
+    module._ui = module._ui
+        or {
+            Loaded = false,
+            Bound = false,
+            Localized = false,
+            Dirty = true,
+            Reason = nil,
+            FrameName = nil,
+        }
+    local UI = module._ui
     -- ----- Internal state ----- --
-    local frameName
 
     local getFrame = makeModuleFrameGetter(module, "KRTSpammer")
-    local UI = {
-        Localized = false,
-        Loaded = false,
-    }
     -- Defaults / constants
     local DEFAULT_DURATION_STR = "60"
     local DEFAULT_DURATION_NUM = 60
@@ -173,8 +178,16 @@ do
         lastState.duration = nil
     end
 
+    local function getNamedPart(suffix)
+        local frameName = UI.FrameName
+        if not frameName then
+            return nil
+        end
+        return _G[frameName .. suffix]
+    end
+
     local function setCheckbox(suffix, checked)
-        local chk = _G[frameName .. suffix]
+        local chk = getNamedPart(suffix)
         if chk and chk.SetChecked then
             chk:SetChecked(checked and true or false)
         end
@@ -194,7 +207,7 @@ do
         local frame = getFrame()
 
         if frame and frame:IsShown() then
-            local box = _G[frameName .. "Duration"]
+            local box = getNamedPart("Duration")
             if box then
                 value = box:GetText()
                 if value == "" then
@@ -236,18 +249,18 @@ do
         local len = strlen(DEFAULT_OUTPUT)
         local lenStr = len .. "/255"
 
-        local out = _G[frameName .. "Output"]
+        local out = getNamedPart("Output")
         if out then
             out:SetText(DEFAULT_OUTPUT)
         end
 
-        local lengthText = _G[frameName .. "Length"]
+        local lengthText = getNamedPart("Length")
         if lengthText then
             lengthText:SetText(lenStr)
             lengthText:SetTextColor(0.5, 0.5, 0.5)
         end
 
-        local msg = _G[frameName .. "Message"]
+        local msg = getNamedPart("Message")
         if msg and msg.SetMaxLetters then
             msg:SetMaxLetters(255)
         end
@@ -256,19 +269,16 @@ do
     -- ----- Public methods ----- --
     -- OnLoad frame
     function module:OnLoad(frame)
-        frameName = Frames.InitModuleFrame(module, frame, {
+        UI.FrameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 module:RequestRefresh()
             end,
-        })
-        UI.Loaded = frameName ~= nil
+        }) or UI.FrameName
+        UI.Loaded = UI.FrameName ~= nil
         if not UI.Loaded then
             return
         end
-
-        -- Localize once (not per tick)
-        UI.Localize()
 
         if frame:IsShown() then
             module:RequestRefresh()
@@ -333,7 +343,7 @@ do
 
     local function OnLoadFrame(frame)
         module:OnLoad(frame)
-        return frameName
+        return UI.FrameName
     end
 
     UIScaffold.DefineModuleUi({
@@ -350,6 +360,11 @@ do
     -- Save (EditBox / Checkbox)
     function module:Save(box)
         if not box then
+            return
+        end
+
+        local frameName = UI.FrameName
+        if not frameName then
             return
         end
 
@@ -476,10 +491,10 @@ do
     -- Tab
     function module:Tab(a, b)
         local target
-        if IsShiftKeyDown() and _G[frameName .. b] ~= nil then
-            target = _G[frameName .. b]
-        elseif _G[frameName .. a] ~= nil then
-            target = _G[frameName .. a]
+        if IsShiftKeyDown() and getNamedPart(b) ~= nil then
+            target = getNamedPart(b)
+        elseif getNamedPart(a) ~= nil then
+            target = getNamedPart(a)
         end
         if target then
             target:SetFocus()
@@ -500,10 +515,10 @@ do
         module:Stop()
 
         for _, field in ipairs(resetFields) do
-            Frames.ResetEditBox(_G[frameName .. field])
+            Frames.ResetEditBox(getNamedPart(field))
         end
 
-        local durationBox = _G[frameName .. "Duration"]
+        local durationBox = getNamedPart("Duration")
         KRT_Spammer.Duration = DEFAULT_DURATION_STR
         duration = DEFAULT_DURATION_STR
 
@@ -525,38 +540,42 @@ do
         if UI.Localized then
             return
         end
+        local frameName = UI.FrameName
+        if not frameName then
+            return
+        end
 
-        _G[frameName .. "NameStr"]:SetText(L.StrRaid)
-        _G[frameName .. "DurationStr"]:SetText(L.StrDuration)
-        _G[frameName .. "Tick"]:SetText("")
-        _G[frameName .. "CompStr"]:SetText(L.StrSpammerCompStr)
-        _G[frameName .. "NeedStr"]:SetText(L.StrSpammerNeedStr)
-        _G[frameName .. "ClassStr"]:SetText(L.StrClass)
-        _G[frameName .. "TanksStr"]:SetText(L.StrTank)
-        _G[frameName .. "HealersStr"]:SetText(L.StrHealer)
-        _G[frameName .. "MeleesStr"]:SetText(L.StrMelee)
-        _G[frameName .. "RangedStr"]:SetText(L.StrRanged)
-        _G[frameName .. "MessageStr"]:SetText(L.StrSpammerMessageStr)
-        _G[frameName .. "ChannelsStr"]:SetText(L.StrChannels)
+        getNamedPart("NameStr"):SetText(L.StrRaid)
+        getNamedPart("DurationStr"):SetText(L.StrDuration)
+        getNamedPart("Tick"):SetText("")
+        getNamedPart("CompStr"):SetText(L.StrSpammerCompStr)
+        getNamedPart("NeedStr"):SetText(L.StrSpammerNeedStr)
+        getNamedPart("ClassStr"):SetText(L.StrClass)
+        getNamedPart("TanksStr"):SetText(L.StrTank)
+        getNamedPart("HealersStr"):SetText(L.StrHealer)
+        getNamedPart("MeleesStr"):SetText(L.StrMelee)
+        getNamedPart("RangedStr"):SetText(L.StrRanged)
+        getNamedPart("MessageStr"):SetText(L.StrSpammerMessageStr)
+        getNamedPart("ChannelsStr"):SetText(L.StrChannels)
         for i = 1, 8 do
-            local label = _G[frameName .. "Channel" .. i .. "Str"]
+            local label = getNamedPart("Channel" .. i .. "Str")
             if label then
                 label:SetText(tostring(i))
             end
         end
-        _G[frameName .. "ChannelGuildStr"]:SetText(L.StrGuild)
-        _G[frameName .. "ChannelYellStr"]:SetText(L.StrYell)
-        _G[frameName .. "PreviewStr"]:SetText(L.StrSpammerPreviewStr)
-        _G[frameName .. "ClearBtn"]:SetText(L.BtnClear)
-        _G[frameName .. "StartBtn"]:SetText(L.BtnStart)
+        getNamedPart("ChannelGuildStr"):SetText(L.StrGuild)
+        getNamedPart("ChannelYellStr"):SetText(L.StrYell)
+        getNamedPart("PreviewStr"):SetText(L.StrSpammerPreviewStr)
+        getNamedPart("ClearBtn"):SetText(L.BtnClear)
+        getNamedPart("StartBtn"):SetText(L.BtnStart)
 
         Frames.SetFrameTitle(frameName, L.StrSpammer)
 
-        local durationBox = _G[frameName .. "Duration"]
+        local durationBox = getNamedPart("Duration")
         durationBox.tooltip_title = AUCTION_DURATION
         Frames.SetTooltip(durationBox, L.StrSpammerDurationHelp)
 
-        local messageBox = _G[frameName .. "Message"]
+        local messageBox = getNamedPart("Message")
         messageBox.tooltip_title = L.StrMessage
         Frames.SetTooltip(messageBox, {
             L.StrSpammerMessageHelp1,
@@ -565,7 +584,7 @@ do
         })
 
         local function setupEditBox(target)
-            local box = _G[frameName .. target]
+            local box = getNamedPart(target)
             if not box then
                 return
             end
@@ -607,10 +626,14 @@ do
 
     -- Tick display
     function updateTickDisplay()
+        local tickText = getNamedPart("Tick")
+        if not tickText then
+            return
+        end
         if countdownRemaining > 0 then
-            _G[frameName .. "Tick"]:SetText(countdownRemaining)
+            tickText:SetText(countdownRemaining)
         else
-            _G[frameName .. "Tick"]:SetText("")
+            tickText:SetText("")
         end
     end
 
@@ -637,7 +660,7 @@ do
         end
 
         for _, field in ipairs(inputFields) do
-            local box = _G[frameName .. field]
+            local box = getNamedPart(field)
             if box then
                 setEditBoxState(box, not locked)
                 box:SetAlpha(alpha)
@@ -648,11 +671,11 @@ do
         end
 
         for i = 1, 8 do
-            UIPrimitives.EnableDisable(_G[frameName .. "Chat" .. i], not locked)
+            UIPrimitives.EnableDisable(getNamedPart("Chat" .. i), not locked)
         end
-        UIPrimitives.EnableDisable(_G[frameName .. "ChatGuild"], not locked)
-        UIPrimitives.EnableDisable(_G[frameName .. "ChatYell"], not locked)
-        UIPrimitives.EnableDisable(_G[frameName .. "ClearBtn"], not locked)
+        UIPrimitives.EnableDisable(getNamedPart("ChatGuild"), not locked)
+        UIPrimitives.EnableDisable(getNamedPart("ChatYell"), not locked)
+        UIPrimitives.EnableDisable(getNamedPart("ClearBtn"), not locked)
     end
 
     -- Spam cycle
@@ -784,8 +807,8 @@ do
             setInputsLocked(locked)
         end
 
-        UIPrimitives.SetText(_G[frameName .. "StartBtn"], btnLabel, L.BtnStart, isStop)
-        UIPrimitives.EnableDisable(_G[frameName .. "StartBtn"], canStart)
+        UIPrimitives.SetText(getNamedPart("StartBtn"), btnLabel, L.BtnStart, isStop)
+        UIPrimitives.EnableDisable(getNamedPart("StartBtn"), canStart)
 
         lastControls.locked = locked
         lastControls.canStart = canStart
@@ -803,7 +826,7 @@ do
         local changed = false
 
         for _, field in ipairs(previewFields) do
-            local box = _G[frameName .. field.box]
+            local box = getNamedPart(field.box)
             local value
             if field.number then
                 value = tonumber(box:GetText()) or 0
@@ -817,7 +840,7 @@ do
             end
         end
 
-        local durationBox = _G[frameName .. "Duration"]
+        local durationBox = getNamedPart("Duration")
         local durationValue = durationBox and durationBox:GetText() or ""
         if durationValue == "" then
             durationValue = DEFAULT_DURATION_STR
@@ -834,13 +857,13 @@ do
         if changed then
             finalOutput = buildOutput()
 
-            local out = _G[frameName .. "Output"]
+            local out = getNamedPart("Output")
             if out then
                 out:SetText(finalOutput)
             end
 
             local len = strlen(finalOutput)
-            local lenText = _G[frameName .. "Length"]
+            local lenText = getNamedPart("Length")
             if lenText then
                 lenText:SetText(len .. "/255")
                 if finalOutput == DEFAULT_OUTPUT then
@@ -852,7 +875,7 @@ do
                 end
             end
 
-            local msg = _G[frameName .. "Message"]
+            local msg = getNamedPart("Message")
             if msg and msg.SetMaxLetters then
                 if len <= 255 then
                     msg:SetMaxLetters(255)
@@ -889,8 +912,8 @@ do
                         v[i] = id
                         setCheckbox("Chat" .. id, true)
                     end
-                elseif _G[frameName .. k] then
-                    _G[frameName .. k]:SetText(v)
+                elseif getNamedPart(k) then
+                    getNamedPart(k):SetText(v)
                 end
             end
 
@@ -913,7 +936,14 @@ do
         end
     end
 
-    function module:Refresh()
+    function module:RefreshUI()
+        if not UI.Localized then
+            UI.Localize()
+        end
         UI.Refresh()
+    end
+
+    function module:Refresh()
+        return self:RefreshUI()
     end
 end

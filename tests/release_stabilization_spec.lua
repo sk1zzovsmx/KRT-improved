@@ -14,9 +14,14 @@ local function makeFrame(shown, name)
         _name = name,
         _width = 320,
         _height = 240,
+        _enabled = true,
     }
 
     function frame:IsShown()
+        return self._shown
+    end
+
+    function frame:IsVisible()
         return self._shown
     end
 
@@ -60,6 +65,34 @@ local function makeFrame(shown, name)
 
     function frame:EnableKeyboard() end
 
+    function frame:EnableMouse(enabled)
+        self._mouseEnabled = enabled ~= false
+    end
+
+    function frame:IsEnabled()
+        return self._enabled ~= false
+    end
+
+    function frame:Enable()
+        self._enabled = true
+    end
+
+    function frame:Disable()
+        self._enabled = false
+    end
+
+    function frame:RegisterForClicks() end
+
+    function frame:RegisterForDrag() end
+
+    function frame:SetScript(scriptType, callback)
+        self[scriptType] = callback
+    end
+
+    function frame:HookScript(scriptType, callback)
+        self["Hooked" .. tostring(scriptType)] = callback
+    end
+
     function frame:ClearFocus()
         self._focused = false
     end
@@ -70,6 +103,10 @@ local function makeFrame(shown, name)
 
     function frame:SetText(text)
         self.text = text
+    end
+
+    function frame:SetNumber(value)
+        self.text = tostring(value)
     end
 
     function frame:GetText()
@@ -128,6 +165,32 @@ local function makeFrame(shown, name)
         self._highlighted = false
     end
 
+    function frame:SetVertexColor(r, g, b)
+        self._vertexColor = { r, g, b }
+    end
+
+    function frame:SetNormalTexture(texture)
+        local normalTexture = self._normalTexture
+        if not normalTexture then
+            normalTexture = {
+                texture = nil,
+                desaturated = false,
+                SetDesaturated = function(tex, value)
+                    tex.desaturated = value and true or false
+                end,
+            }
+            self._normalTexture = normalTexture
+        end
+        normalTexture.texture = texture
+    end
+
+    function frame:GetNormalTexture()
+        if not self._normalTexture then
+            self:SetNormalTexture(nil)
+        end
+        return self._normalTexture
+    end
+
     return frame
 end
 
@@ -184,6 +247,53 @@ local function installTableHelpers()
     end
 end
 
+local function wrapServiceMethods(tbl, methodNames)
+    if type(tbl) ~= "table" then
+        return tbl
+    end
+
+    for i = 1, #methodNames do
+        local key = methodNames[i]
+        local fn = tbl[key]
+        if type(fn) == "function" then
+            tbl[key] = function(_, ...)
+                return fn(...)
+            end
+        end
+    end
+
+    return tbl
+end
+
+local function reservesApi(tbl)
+    return wrapServiceMethods(tbl, {
+        "GetReserveCountForItem",
+        "GetPlusForItem",
+        "GetPlayersForItem",
+        "HasCurrentRaidPlayersForItem",
+        "GetImportMode",
+        "IsPlusSystem",
+    })
+end
+
+local function rollsApi(tbl)
+    tbl = tbl or {}
+
+    if type(tbl.ValidateWinner) ~= "function" then
+        function tbl:ValidateWinner()
+            return { ok = true, reason = nil }
+        end
+    end
+
+    if type(tbl.GetRolls) ~= "function" then
+        function tbl:GetRolls()
+            return {}
+        end
+    end
+
+    return tbl
+end
+
 local function newHarness()
     installTableHelpers()
 
@@ -208,6 +318,13 @@ local function newHarness()
         W = keyTable("Diag.W"),
         E = keyTable("Diag.E"),
     }
+    L.StrRollTieTag = "TIE"
+    L.StrRollPassTag = "PASS"
+    L.StrRollCancelledTag = "CXL"
+    L.StrRollTimedOutTag = "OOT"
+    L.StrRollOutTag = "OUT"
+    L.StrRollBlockedTag = "BLK"
+    Diag.E.LogLoggerLootNidExpected = "[Logger] Loot:Log expected lootNid but got raw itemId raidId=%s value=%s link=%s matches=%d"
     local InternalEvents = keyTable("Event")
     local Events = { Internal = InternalEvents }
     local rollTypes = {
@@ -227,6 +344,15 @@ local function newHarness()
         RESERVES_ITEM_FALLBACK_ICON = "fallback-icon",
         RESERVES_QUERY_COOLDOWN_SECONDS = 2,
         CLASS_COLORS = {},
+        RAID_TARGET_MARKERS = {
+            "{circle}",
+            "{diamond}",
+            "{triangle}",
+            "{moon}",
+            "{square}",
+            "{cross}",
+            "{skull}",
+        },
         rollTypes = rollTypes,
     }
 
@@ -279,26 +405,42 @@ local function newHarness()
         end,
     }
 
+    local servicesStore = {}
+    local services = setmetatable({}, {
+        __index = servicesStore,
+        __newindex = function(_, key, value)
+            if key == "Reserves" then
+                value = reservesApi(value)
+            elseif key == "Rolls" then
+                value = rollsApi(value)
+            end
+            rawset(servicesStore, key, value)
+        end,
+    })
+
+    services.Loot = {
+        ConsumePendingAward = function()
+            return nil
+        end,
+    }
+    services.Rolls = {
+        HighestRoll = function()
+            return 0
+        end,
+        GetRollSession = function()
+            return nil
+        end,
+        RollStatus = function()
+            return nil, false, false, false
+        end,
+        SyncSessionState = function() end,
+    }
+
     local addon = {
         State = { debugEnabled = true, raidStore = {}, currentRaid = 1, lastBoss = 0 },
         options = { srImportMode = 0 },
         Controllers = {},
-        Services = {
-            Loot = {
-                ConsumePendingAward = function()
-                    return nil
-                end,
-            },
-            Rolls = {
-                HighestRoll = function()
-                    return 0
-                end,
-                GetRollSession = function()
-                    return nil
-                end,
-                SyncSessionState = function() end,
-            },
-        },
+        Services = services,
         Widgets = {},
         DB = {},
         UIPrimitives = {},
@@ -341,6 +483,12 @@ local function newHarness()
 
     addon.GetClassColor = function()
         return nil, nil, nil, "ffffffff"
+    end
+
+    addon.UnitIterator = function()
+        return function()
+            return nil
+        end
     end
 
     addon.NewTimer = function(delay, callback)
@@ -401,6 +549,35 @@ local function newHarness()
         end,
         Register = function() end,
         Call = function() end,
+    }
+
+    addon.UIPrimitives.EnableDisable = function(frame, enabled)
+        if frame then
+            frame._enabled = enabled and true or false
+        end
+    end
+
+    addon.UIPrimitives.SetButtonGlow = function(frame, enabled)
+        if frame then
+            frame._glow = enabled and true or false
+        end
+    end
+
+    addon.UIPrimitives.ShowHide = function(frame, shown)
+        if not frame then
+            return
+        end
+        if shown then
+            frame:Show()
+        else
+            frame:Hide()
+        end
+    end
+
+    addon.UIRowVisuals = {
+        EnsureRowVisuals = function() end,
+        SetRowSelected = function() end,
+        SetRowFocused = function() end,
     }
 
     addon.Comms = {
@@ -471,6 +648,11 @@ local function newHarness()
             }
         end,
         SetTooltip = function() end,
+        SetEditBoxValue = function(editBox, value)
+            if editBox and editBox.SetText then
+                editBox:SetText(tostring(value or ""))
+            end
+        end,
         ResetEditBox = function(editBox)
             if editBox and editBox.SetText then
                 editBox:SetText("")
@@ -479,13 +661,44 @@ local function newHarness()
     }
 
     addon.ListController = {
+        CreateRowDrawer = function(fn)
+            return function(row, it)
+                return fn(row, it)
+            end
+        end,
         MakeListController = function(cfg)
             local controller = { cfg = cfg, dirtyCount = 0 }
             function controller:Dirty()
                 self.dirtyCount = self.dirtyCount + 1
             end
+            function controller:Touch()
+                self:Dirty()
+            end
             function controller:_makeConfirmPopup() end
             return controller
+        end,
+        BindListController = function(target, controller)
+            if not target or not controller then
+                return
+            end
+
+            target.OnLoad = function(_, frame)
+                if controller.OnLoad then
+                    controller:OnLoad(frame)
+                end
+            end
+
+            target.Fetch = function()
+                if controller.Fetch then
+                    return controller:Fetch()
+                end
+            end
+
+            target.Sort = function(_, key)
+                if controller.Sort then
+                    return controller:Sort(key)
+                end
+            end
         end,
     }
 
@@ -555,6 +768,7 @@ local function newHarness()
         rollTypes = rollTypes,
         lootTypesColored = {},
         itemColors = {},
+        RAID_TARGET_MARKERS = C.RAID_TARGET_MARKERS,
         ITEM_LINK_PATTERN = C.ITEM_LINK_PATTERN,
         lootState = {
             rollSession = nil,
@@ -707,6 +921,30 @@ local function newHarness()
     _G.StaticPopup_Hide = function() end
 
     _G.CloseDropDownMenus = function() end
+
+    _G.UIDropDownMenu_CreateInfo = function()
+        return {}
+    end
+
+    _G.UIDropDownMenu_AddButton = function() end
+
+    _G.UIDropDownMenu_Initialize = function(frame, initFunc)
+        if frame then
+            frame._initialize = initFunc
+        end
+    end
+
+    _G.UIDropDownMenu_SetText = function(frame, value)
+        if frame then
+            frame._dropdownText = value
+        end
+    end
+
+    _G.UIDropDownMenu_SetSelectedValue = function(frame, value)
+        if frame then
+            frame._selectedValue = value
+        end
+    end
 
     _G.EasyMenu = function() end
 
@@ -959,6 +1197,7 @@ local function setupInventoryTradeHarness(order, rollsByName)
         RecordRolls = function() end,
     }
     h.feature.Services = h.addon.Services
+    h.feature.RAID_TARGET_MARKERS = h.C.RAID_TARGET_MARKERS
 
     h.Bus.RegisterCallback(h.addon.Events.Internal.LoggerLootLogRequest, function(_, request)
         loggerRequests[#loggerRequests + 1] = {
@@ -1136,6 +1375,7 @@ local function setupMasterAwardHarness(cfg)
         RecordRolls = function() end,
     }
     h.feature.Services = h.addon.Services
+    h.feature.RAID_TARGET_MARKERS = h.C.RAID_TARGET_MARKERS
 
     h:load("!KRT/Controllers/Master.lua")
 
@@ -1490,6 +1730,176 @@ test("accepted roll stays eligible after using the last allowed roll", function(
     assertTrue(first ~= nil, "expected an eligible winner row in the display model")
     assertEqual(first.status, "ROLL", "expected recorded response to stay in ROLL status")
     assertTrue(first.isEligible == true, "expected recorded response to stay eligible in the UI model")
+end)
+
+test("master countdown starts after announcing rolls with service-owned session bootstrap", function()
+    local h = newHarness()
+    local link = h.registerItem(9321, "Countdownblade")
+
+    h.addon.options.countdownDuration = 5
+    h.addon.Services.Loot = {
+        GetItem = function(index)
+            if index ~= 1 then
+                return nil
+            end
+            return { itemLink = link, count = 1 }
+        end,
+        GetItemLink = function(index)
+            if index ~= 1 then
+                return nil
+            end
+            return link
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Controllers/Master.lua")
+
+    local Master = h.addon.Controllers.Master
+    local frame = h.makeFrame(true, "KRTMaster")
+    _G.KRTMasterItemCount = h.makeFrame(true, "KRTMasterItemCount")
+    Master.RequestRefresh = function() end
+    Master:OnLoad(frame)
+
+    h.feature.lootState.lootCount = 1
+    h.feature.lootState.selectedItemCount = 1
+    h.feature.lootState.fromInventory = false
+
+    Master:BtnMS()
+
+    assertEqual(h.feature.lootState.rollStarted, true, "expected MS announce to reopen the roll-started state")
+    assertEqual(h.timerCount(), 0, "expected no countdown timer before clicking the countdown button")
+
+    Master:BtnCountdown(nil, "LeftButton")
+
+    assertEqual(h.timerCount(), 2, "expected countdown click to schedule ticker and end timer")
+end)
+
+test("master assignment buttons stay disabled until a target is selected", function()
+    local h = newHarness()
+
+    h.addon.Services.Loot = {
+        GetItem = function()
+            return nil
+        end,
+        ItemExists = function()
+            return false
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Controllers/Master.lua")
+
+    local Master = h.addon.Controllers.Master
+    local frame = h.makeFrame(true, "KRTMaster")
+    local suffixes = {
+        "ConfigBtn",
+        "SelectItemBtn",
+        "SpamLootBtn",
+        "MSBtn",
+        "OSBtn",
+        "SRBtn",
+        "FreeBtn",
+        "CountdownBtn",
+        "AwardBtn",
+        "RollBtn",
+        "ClearBtn",
+        "HoldBtn",
+        "BankBtn",
+        "DisenchantBtn",
+        "Name",
+        "RollsHeaderPlayer",
+        "RollsHeaderInfo",
+        "RollsHeaderCounter",
+        "RollsHeaderRoll",
+        "ReserveListBtn",
+        "LootCounterBtn",
+        "ItemCount",
+        "HoldDropDown",
+        "BankDropDown",
+        "DisenchantDropDown",
+        "ScrollFrame",
+        "ScrollFrameScrollChild",
+        "ItemBtn",
+    }
+
+    _G.KRTMaster = frame
+    for i = 1, #suffixes do
+        local name = "KRTMaster" .. suffixes[i]
+        _G[name] = h.makeFrame(true, name)
+    end
+    _G.KRTMasterHoldDropDownButton = h.makeFrame(true, "KRTMasterHoldDropDownButton")
+    _G.KRTMasterBankDropDownButton = h.makeFrame(true, "KRTMasterBankDropDownButton")
+    _G.KRTMasterDisenchantDropDownButton = h.makeFrame(true, "KRTMasterDisenchantDropDownButton")
+
+    Master.RequestRefresh = function() end
+    Master:OnLoad(frame)
+
+    h.feature.lootState.lootCount = 1
+    h.feature.lootState.selectedItemCount = 1
+    h.feature.lootState.fromInventory = false
+    h.feature.lootState.holder = nil
+    h.feature.lootState.banker = nil
+    h.feature.lootState.disenchanter = nil
+
+    Master:Refresh()
+
+    assertEqual(_G.KRTMasterHoldBtn._enabled, false, "expected Hold to disable when no holder is selected")
+    assertEqual(_G.KRTMasterBankBtn._enabled, false, "expected Bank to disable when no banker is selected")
+    assertEqual(_G.KRTMasterDisenchantBtn._enabled, false, "expected Disenchant to disable when no disenchanter is selected")
+
+    h.feature.lootState.holder = "Alice"
+    h.feature.lootState.banker = "Bob"
+    h.feature.lootState.disenchanter = nil
+
+    Master:Refresh()
+
+    assertEqual(_G.KRTMasterHoldBtn._enabled, true, "expected Hold to enable when a holder is selected")
+    assertEqual(_G.KRTMasterBankBtn._enabled, true, "expected Bank to enable when a banker is selected")
+    assertEqual(_G.KRTMasterDisenchantBtn._enabled, false, "expected Disenchant to stay disabled without a target")
 end)
 
 test("manual exclusion blocks candidate eligibility and roll intake", function()
@@ -2081,6 +2491,7 @@ test("master award button triggers reroll for single-select ties", function()
         SyncSessionState = function() end,
     }
     h.feature.Services = h.addon.Services
+    h.feature.RAID_TARGET_MARKERS = h.C.RAID_TARGET_MARKERS
     h:load("!KRT/Controllers/Master.lua")
 
     local Master = h.addon.Controllers.Master
@@ -2583,6 +2994,66 @@ test("reserves item-info updates coalesce into a single refresh", function()
 
     local displayList = Service:GetDisplayList()
     assertEqual(#displayList, 2, "expected both resolved reserve items in display list")
+end)
+
+test("reserves format supports filtering to current raid players", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1201 },
+            },
+        },
+        Bob = {
+            reserves = {
+                { rawID = 1201 },
+            },
+        },
+        Cara = {
+            reserves = {
+                { rawID = 1201 },
+            },
+        },
+    }
+    h.addon.Services.Raid = {
+        GetPlayerID = function(_, name, raidNum)
+            local rid = tonumber(raidNum) or 0
+            if rid == 1 and (name == "Alice" or name == "Cara") then
+                return 100
+            end
+            if rid == 2 and name == "Bob" then
+                return 200
+            end
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Reserves = h.addon.Services.Reserves
+    local Service = Reserves.Service
+    Service:Load()
+
+    local allPlayers = Service:FormatReservedPlayersLine(1201, false, false, false)
+    local currentRaidOnly = Service:FormatReservedPlayersLine(1201, false, false, false, true)
+    local raidTwoOnly = Service:FormatReservedPlayersLine(1201, false, false, false, true, 2)
+    local raidTwoViaModule = Reserves:FormatReservedPlayersLine(1201, false, false, false, true, 2)
+    local hasCurrentRaidPlayer = Service:HasCurrentRaidPlayersForItem(1201)
+    local hasRaidTwoPlayer = Service:HasCurrentRaidPlayersForItem(1201, 2)
+    local hasUnknownRaidPlayer = Service:HasCurrentRaidPlayersForItem(1201, 999)
+    local hasRaidTwoPlayerViaModule = Reserves:HasCurrentRaidPlayersForItem(1201, 2)
+
+    assertEqual(allPlayers, "Alice, Bob, Cara", "expected default formatting to keep all reserved players")
+    assertEqual(currentRaidOnly, "Alice, Cara", "expected current-raid filtering to keep only active raid players")
+    assertEqual(raidTwoOnly, "Bob", "expected explicit raid filter to target the provided raid id")
+    assertEqual(raidTwoViaModule, "Bob", "expected module wrapper to pass filtering args to the service")
+    assertTrue(hasCurrentRaidPlayer == true, "expected current raid to report at least one eligible reserve player")
+    assertTrue(hasRaidTwoPlayer == true, "expected explicit raid id with roster matches to report eligible reserve players")
+    assertTrue(hasUnknownRaidPlayer ~= true, "expected explicit raid id without matches to report no eligible reserve players")
+    assertTrue(hasRaidTwoPlayerViaModule == true, "expected module wrapper to forward HasCurrentRaidPlayersForItem args")
 end)
 
 local failures = 0
