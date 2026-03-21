@@ -8,6 +8,8 @@ Dates are in YYYY-MM-DD.
   uploads both `KRT-<tag>.zip` and `KRT-<tag>.zip.sha256`.
 - **Regression/Bugfix:** Manual release creation keeps strict tag validation
   (`--verify-tag`) to block non-tag refs.
+- **Regression/Bugfix:** Release upload now falls back gracefully to ZIP-only
+  when a checksum asset is unexpectedly missing.
 - **Tooling:** `workflow_dispatch` no longer uses a stale default branch;
   empty `target_ref` now falls back to the current ref.
 - **Docs:** README release instructions now include checksum download and a

@@ -94,17 +94,21 @@ jobs:
               run: |
                   set -euo pipefail
 
+                  assets=("${ASSET_PATH}")
+                  if [[ -f "${CHECKSUM_PATH}" ]]; then
+                      assets+=("${CHECKSUM_PATH}")
+                  else
+                      echo "Checksum asset not found: ${CHECKSUM_PATH}"
+                      echo "Continuing with ZIP only."
+                  fi
+
                   if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-                      gh release upload "${TAG}" "${ASSET_PATH}" "${CHECKSUM_PATH}" \
+                      gh release upload "${TAG}" "${assets[@]}" \
                           --repo "${GITHUB_REPOSITORY}" \
                           --clobber
-
-                      release_id="$(gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" --json id --jq '.id')"
-                      gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
-                          -F "prerelease=${PRERELEASE}" >/dev/null
                   else
                       release_args=(
-                          release create "${TAG}" "${ASSET_PATH}" "${CHECKSUM_PATH}"
+                          release create "${TAG}" "${assets[@]}"
                           --repo "${GITHUB_REPOSITORY}"
                           --title "${TAG}"
                           --target "${REF}"
