@@ -26,7 +26,8 @@ Dates are in YYYY-MM-DD.
   when a checksum asset is unexpectedly missing.
 - **Tooling:** `workflow_dispatch` no longer uses a stale default branch;
   empty `target_ref` now falls back to the current ref.
-- **Docs:** README release instructions now include checksum download and a
+- **Docs:** GitHub release download/checksum instructions now live in
+  `docs/RELEASE_DOWNLOAD.md` (instead of root `README.md`) and include a
   quick SHA-256 verification step.
 - **Behavior:** SR announce lines in Master now exclude reserve names that are
   not part of the current raid roster.

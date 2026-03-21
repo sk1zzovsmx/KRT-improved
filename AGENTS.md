@@ -180,6 +180,8 @@ Durable preferences learned from recent conversations:
   `target_ref` inputs when the Actions branch selector already defines release context.
 - For release artifacts, package only the addon folder `!KRT/`; do not include repo-level
   docs/tooling files in distributable ZIP outputs.
+- Keep GitHub release asset download/checksum instructions out of root `README.md`;
+  document them in dedicated release/tooling docs under `docs/` or `tools/`.
 
 ---
 
