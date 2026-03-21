@@ -1,0 +1,87 @@
+name: Release Addon Package
+
+on:
+    push:
+        tags:
+            - "beta-*"
+    workflow_dispatch:
+        inputs:
+            tag_name:
+                description: "Release tag (example: beta-0.5.6c)"
+                required: true
+                type: string
+            target_ref:
+                description: "Branch or commit to package"
+                required: false
+                default: "splitting-monolithic-KRT"
+                type: string
+            prerelease:
+                description: "Mark release as prerelease"
+                required: false
+                default: true
+                type: boolean
+
+permissions:
+    contents: write
+
+jobs:
+    package-and-release:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Resolve release metadata
+              id: meta
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+                      echo "tag=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+                      echo "ref=${{ inputs.target_ref }}" >> "$GITHUB_OUTPUT"
+                      echo "prerelease=${{ inputs.prerelease }}" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+                      echo "ref=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+                      if [[ "${GITHUB_REF_NAME}" == beta-* ]]; then
+                          echo "prerelease=true" >> "$GITHUB_OUTPUT"
+                      else
+                          echo "prerelease=false" >> "$GITHUB_OUTPUT"
+                      fi
+                  fi
+
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  ref: ${{ steps.meta.outputs.ref }}
+
+            - name: Build addon archive (only !KRT/)
+              id: pack
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  tag="${{ steps.meta.outputs.tag }}"
+                  asset="!KRT-${tag}.zip"
+
+                  rm -f "$asset"
+                  rm -rf package
+                  mkdir -p package
+                  cp -R "!KRT" package/
+
+                  (
+                      cd package
+                      zip -r "../$asset" "!KRT"
+                  )
+
+                  echo "asset=$asset" >> "$GITHUB_OUTPUT"
+
+            - name: Create GitHub release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.meta.outputs.tag }}
+                  target_commitish: ${{ steps.meta.outputs.ref }}
+                  name: ${{ steps.meta.outputs.tag }}
+                  prerelease: ${{ steps.meta.outputs.prerelease }}
+                  generate_release_notes: true
+                  files: ${{ steps.pack.outputs.asset }}

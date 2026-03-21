@@ -158,6 +158,8 @@ Durable preferences learned from recent conversations:
   `Services/Rolls.lua` and `Controllers/Master.lua`; run it whenever those modules change.
 - Prefer repo-relative paths or placeholders in config/docs/examples; avoid personal absolute
   paths unless strictly required by the tool.
+- For release artifacts, package only the addon folder `!KRT/`; do not include repo-level
+  docs/tooling files in distributable ZIP outputs.
 
 ---
 

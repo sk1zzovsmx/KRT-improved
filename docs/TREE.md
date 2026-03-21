@@ -112,8 +112,14 @@
 |-- .githooks
 |   |-- pre-commit
 |   \\-- README.md
+|-- .github
+|   \\-- workflows
+|       \\-- release-addon.yml
 |-- .vscode
 |   \\-- settings.json
+|-- dist
+|   |-- !KRT-1.2.3.zip
+|   \\-- !KRT-beta-0.5.6c.zip
 |-- docs
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
@@ -141,6 +147,7 @@
 |   \\-- release_stabilization_spec.lua
 |-- tools
 |   |-- agent-skills.manifest.json
+|   |-- build-release-zip.ps1
 |   |-- check-api-nomenclature.ps1
 |   |-- check-layering.ps1
 |   |-- check-lua-syntax.ps1

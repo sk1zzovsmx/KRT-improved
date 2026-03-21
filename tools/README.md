@@ -22,6 +22,7 @@ docs, AGENTS, and MCP wiring. Grouping is documented here first to keep cleanup 
 - `run-sv-roundtrip.ps1`: runs `sv-roundtrip.lua` on one file or a fixture directory
 - `run-release-targeted-tests.ps1`: runs `tests/release_stabilization_spec.lua`
 - `run-krt-mcp.ps1`: starts the local KRT MCP server wrapper
+- `build-release-zip.ps1`: builds a distributable ZIP that contains only the `!KRT/` addon folder
 
 ## Fnmap
 
