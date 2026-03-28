@@ -141,6 +141,20 @@ local cmdCounter = { "counter", "counters", "counts" }
 local cmdReserves = { "res", "reserves", "reserve" }
 local cmdMinimap = { "minimap", "mm" }
 local cmdValidate = { "validate" }
+local lootOnlySlashCommands = {}
+
+local function markLootOnlyCommands(list)
+    for i = 1, #list do
+        local command = list[i]
+        if type(command) == "string" and command ~= "" then
+            lootOnlySlashCommands[command] = true
+        end
+    end
+end
+
+markLootOnlyCommands(cmdLoot)
+markLootOnlyCommands(cmdCounter)
+markLootOnlyCommands(cmdReserves)
 
 -- ----- Private helpers ----- --
 local helpString = "%s: %s"
@@ -252,6 +266,11 @@ function module:Handle(msg)
     local cmd, rest = Strings.SplitArgs(msg)
     if not cmd or cmd == "" then
         showHelp()
+        return
+    end
+
+    local requiresLootAccess = (cmd == "show" or cmd == "toggle" or lootOnlySlashCommands[cmd] == true)
+    if requiresLootAccess and not addon:EnsureMasterOnlyAccess() then
         return
     end
 

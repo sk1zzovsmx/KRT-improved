@@ -411,9 +411,39 @@ do
         markChangesDirty()
     end)
 
+    local function canBroadcastChanges()
+        local raidService = Services.Raid
+        if raidService and type(raidService.GetCapabilityState) == "function" then
+            local state = raidService:GetCapabilityState("changes_broadcast")
+            return state and state.allowed == true, state and state.reason or "missing_state"
+        end
+        if not Services.Raid:IsPlayerInRaid() then
+            return false, "not_in_raid"
+        end
+        if not Core.GetUnitRank then
+            return false, "missing_rank"
+        end
+        if (tonumber(Core.GetUnitRank("player", 0)) or 0) <= 0 then
+            return false, "missing_leadership"
+        end
+        return true
+    end
+
+    local function warnBroadcastDenied(reason)
+        if reason == "missing_leadership" or reason == "missing_rank" then
+            addon:warn(L.WarnChangesBroadcastNotAllowed)
+        end
+    end
+
+    function module:CanBroadcast()
+        return canBroadcastChanges()
+    end
+
     -- Ask For module:
     function module:Demand()
-        if not Services.Raid:IsPlayerInRaid() then
+        local ok, reason = canBroadcastChanges()
+        if not ok then
+            warnBroadcastDenied(reason)
             return
         end
         addon:Announce(L.StrChangesDemand)
@@ -421,7 +451,9 @@ do
 
     -- Spam module:
     function module:Announce()
-        if not Services.Raid:IsPlayerInRaid() then
+        local ok, reason = canBroadcastChanges()
+        if not ok then
+            warnBroadcastDenied(reason)
             return
         end
         -- In case of a reload/relog and the frame wasn't loaded
@@ -539,11 +571,11 @@ do
         lastAddBtnMode = UIPrimitives.UpdateModeTextNamedPart(frameName, "AddBtn", L.BtnAdd, L.BtnDelete, addBtnMode, lastAddBtnMode)
         UIPrimitives.ShowHideNamedPart(frameName, "AddBtn", (not isEdit and not isAdd))
         UIPrimitives.EnableDisableNamedPart(frameName, "ClearBtn", count > 0)
-        UIPrimitives.EnableDisableNamedPart(frameName, "AnnounceBtn", count > 0)
+        local canBroadcast = module:CanBroadcast()
+        UIPrimitives.EnableDisableNamedPart(frameName, "AnnounceBtn", count > 0 and canBroadcast)
         local hasRaid = addon.Core.GetCurrentRaid()
-        local hasRaidGroup = Services.Raid:IsPlayerInRaid()
         UIPrimitives.EnableDisableNamedPart(frameName, "AddBtn", hasRaid)
-        UIPrimitives.EnableDisableNamedPart(frameName, "DemandBtn", hasRaidGroup)
+        UIPrimitives.EnableDisableNamedPart(frameName, "DemandBtn", canBroadcast)
     end
 
     function module:RefreshUI()

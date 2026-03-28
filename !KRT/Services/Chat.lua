@@ -12,9 +12,6 @@ local C = feature.C
 local Strings = feature.Strings or addon.Strings
 local Comms = feature.Comms or addon.Comms
 
-local UnitIsGroupLeader = feature.UnitIsGroupLeader
-local UnitIsGroupAssistant = feature.UnitIsGroupAssistant
-
 local find = string.find
 local tostring = tostring
 local tonumber = tonumber
@@ -37,7 +34,13 @@ do
     end
 
     local function canUseRaidWarning()
-        return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
+        if type(addon.CanUseRaidCapability) == "function" then
+            return addon:CanUseRaidCapability("raid_warning")
+        end
+
+        local leaderFn = addon.UnitIsGroupLeader or feature.UnitIsGroupLeader
+        local assistantFn = addon.UnitIsGroupAssistant or feature.UnitIsGroupAssistant
+        return (leaderFn and leaderFn("player")) or (assistantFn and assistantFn("player")) or false
     end
 
     local function resolveGroupType()
@@ -108,8 +111,16 @@ do
         Comms.Chat(msg, selectedChannel)
     end
 
+    function module:WarnMasterOnlyMode()
+        addon:warn(L.WarnMLOnlyMode or L.WarnMLNoPermission)
+    end
+
     -- ----- Addon facade ----- --
     function addon:Announce(text, channel)
         module:Announce(text, channel)
+    end
+
+    function addon:WarnMasterOnlyMode()
+        module:WarnMasterOnlyMode()
     end
 end

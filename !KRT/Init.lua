@@ -1063,6 +1063,50 @@ do
         return getService("Raid")
     end
 
+    function addon:GetRaidRoleState()
+        local raidService = getRaidService()
+        if not raidService or type(raidService.GetPlayerRoleState) ~= "function" then
+            return nil
+        end
+        return raidService:GetPlayerRoleState()
+    end
+
+    function addon:GetRaidCapabilityState(capability)
+        local raidService = getRaidService()
+        if not raidService or type(raidService.GetCapabilityState) ~= "function" then
+            return {
+                capability = capability,
+                allowed = true,
+                reason = "raid_service_unavailable",
+                role = addon:GetRaidRoleState(),
+            }
+        end
+        return raidService:GetCapabilityState(capability)
+    end
+
+    function addon:CanUseRaidCapability(capability)
+        local state = self:GetRaidCapabilityState(capability)
+        return state and state.allowed == true
+    end
+
+    function addon:CanUseMasterOnlyFeatures()
+        return self:CanUseRaidCapability("loot")
+    end
+
+    function addon:IsMasterOnlyBlocked()
+        return not self:CanUseMasterOnlyFeatures()
+    end
+
+    function addon:EnsureMasterOnlyAccess()
+        if self:IsMasterOnlyBlocked() then
+            if type(self.WarnMasterOnlyMode) == "function" then
+                self:WarnMasterOnlyMode()
+            end
+            return false
+        end
+        return true
+    end
+
     local function getRaidStoreOrNil(contextTag, requiredMethods)
         if not Core.GetRaidStoreOrNil then
             return nil
@@ -1358,13 +1402,16 @@ do
     function addon:CHAT_MSG_LOOT(msg)
         addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
         local raidService = getRaidService()
-        if Core.GetCurrentRaid() and raidService then
+        if Core.GetCurrentRaid() and raidService and addon:CanUseMasterOnlyFeatures() then
             raidService:AddLoot(msg)
         end
     end
 
     -- CHAT_MSG_SYSTEM: Forwards roll messages to the Rolls module.
     function addon:CHAT_MSG_SYSTEM(msg)
+        if Core.GetCurrentRaid() and addon:IsMasterOnlyBlocked() then
+            return
+        end
         local rollsService = getService("Rolls")
         if rollsService and rollsService.CHAT_MSG_SYSTEM then
             rollsService:CHAT_MSG_SYSTEM(msg)

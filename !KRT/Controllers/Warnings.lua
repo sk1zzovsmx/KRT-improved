@@ -11,8 +11,6 @@ local L = feature.L
 local ListController = feature.ListController or addon.ListController
 local Frames = feature.Frames or addon.Frames
 local Strings = feature.Strings or addon.Strings
-local UnitIsGroupLeader = feature.UnitIsGroupLeader
-local UnitIsGroupAssistant = feature.UnitIsGroupAssistant
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
@@ -291,9 +289,7 @@ do
         end
 
         if addon.IsInRaid and addon.IsInRaid() and addon.options and addon.options.useRaidWarning then
-            local isLeader = UnitIsGroupLeader and UnitIsGroupLeader("player")
-            local isAssistant = UnitIsGroupAssistant and UnitIsGroupAssistant("player")
-            if not (isLeader or isAssistant) then
+            if type(addon.CanUseRaidCapability) == "function" and not addon:CanUseRaidCapability("raid_warning") then
                 addon:warn(L.WarnRaidWarningFallback)
             end
         end

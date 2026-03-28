@@ -26,8 +26,6 @@ local Loot = Services.Loot
 local Raid = Services.Raid
 local Rolls = Services.Rolls
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
-local UnitIsGroupLeader = feature.UnitIsGroupLeader
-local UnitIsGroupAssistant = feature.UnitIsGroupAssistant
 
 local InternalEvents = Events.Internal
 
@@ -59,13 +57,6 @@ end
 
 local itemInfo = feature.itemInfo or {}
 feature.itemInfo = itemInfo
-
-if not UnitIsGroupLeader then
-    UnitIsGroupLeader = _G.UnitIsGroupLeader
-end
-if not UnitIsGroupAssistant then
-    UnitIsGroupAssistant = _G.UnitIsGroupAssistant
-end
 
 local tinsert, tconcat, twipe = table.insert, table.concat, table.wipe
 local pairs, select, next = pairs, select, next
@@ -468,27 +459,70 @@ do
             return
         end
 
+        local function wrapMasterOnlyClick(handler)
+            return function(...)
+                if not addon:EnsureMasterOnlyAccess() then
+                    return
+                end
+                return handler(...)
+            end
+        end
+
+        local function ensureSpamLootAccess()
+            if lootState.fromInventory == true then
+                if addon:CanUseRaidCapability("ready_check") then
+                    return true
+                end
+                addon:warn(L.WarnReadyCheckNotAllowed)
+                return false
+            end
+            return addon:EnsureMasterOnlyAccess()
+        end
+
         Frames.SafeSetScript(refs.configBtn, "OnClick", function()
             UIFacade:Call("Config", "Toggle")
         end)
-        Frames.SafeSetScript(refs.selectItemBtn, "OnClick", function(self, button)
-            module:BtnSelectItem(self, button)
-        end)
+        Frames.SafeSetScript(
+            refs.selectItemBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                module:BtnSelectItem(self, button)
+            end)
+        )
         Frames.SafeSetScript(refs.spamLootBtn, "OnClick", function(self, button)
+            if not ensureSpamLootAccess() then
+                return
+            end
             module:BtnSpamLoot(self, button)
         end)
-        Frames.SafeSetScript(refs.msBtn, "OnClick", function(self, button)
-            module:BtnMS(self, button)
-        end)
-        Frames.SafeSetScript(refs.osBtn, "OnClick", function(self, button)
-            module:BtnOS(self, button)
-        end)
-        Frames.SafeSetScript(refs.srBtn, "OnClick", function(self, button)
-            module:BtnSR(self, button)
-        end)
-        Frames.SafeSetScript(refs.freeBtn, "OnClick", function(self, button)
-            module:BtnFree(self, button)
-        end)
+        Frames.SafeSetScript(
+            refs.msBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                module:BtnMS(self, button)
+            end)
+        )
+        Frames.SafeSetScript(
+            refs.osBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                module:BtnOS(self, button)
+            end)
+        )
+        Frames.SafeSetScript(
+            refs.srBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                module:BtnSR(self, button)
+            end)
+        )
+        Frames.SafeSetScript(
+            refs.freeBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                module:BtnFree(self, button)
+            end)
+        )
         if refs.countdownBtn and refs.countdownBtn.RegisterForClicks then
             local ok = pcall(function()
                 refs.countdownBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -498,33 +532,69 @@ do
                 refs.countdownBtn:RegisterForClicks("LeftButtonUp")
             end
         end
-        Frames.SafeSetScript(refs.countdownBtn, "OnClick", function(self, button)
-            module:BtnCountdown(self, button)
-        end)
-        Frames.SafeSetScript(refs.awardBtn, "OnClick", function(self, button)
-            module:BtnAward(self, button)
-        end)
-        Frames.SafeSetScript(refs.rollBtn, "OnClick", function(self, button)
-            Rolls:Roll(self, button)
-        end)
-        Frames.SafeSetScript(refs.clearBtn, "OnClick", function(self, button)
-            module:BtnClear(self, button)
-        end)
-        Frames.SafeSetScript(refs.holdBtn, "OnClick", function(self, button)
-            module:BtnHold(self, button)
-        end)
-        Frames.SafeSetScript(refs.bankBtn, "OnClick", function(self, button)
-            module:BtnBank(self, button)
-        end)
-        Frames.SafeSetScript(refs.disenchantBtn, "OnClick", function(self, button)
-            module:BtnDisenchant(self, button)
-        end)
-        Frames.SafeSetScript(refs.reserveListBtn, "OnClick", function(self, button)
-            module:BtnReserveList(self, button)
-        end)
-        Frames.SafeSetScript(refs.lootCounterBtn, "OnClick", function(self, button)
-            module:BtnLootCounter(self, button)
-        end)
+        Frames.SafeSetScript(
+            refs.countdownBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                module:BtnCountdown(self, button)
+            end)
+        )
+        Frames.SafeSetScript(
+            refs.awardBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                module:BtnAward(self, button)
+            end)
+        )
+        Frames.SafeSetScript(
+            refs.rollBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                Rolls:Roll(self, button)
+            end)
+        )
+        Frames.SafeSetScript(
+            refs.clearBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                module:BtnClear(self, button)
+            end)
+        )
+        Frames.SafeSetScript(
+            refs.holdBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                module:BtnHold(self, button)
+            end)
+        )
+        Frames.SafeSetScript(
+            refs.bankBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                module:BtnBank(self, button)
+            end)
+        )
+        Frames.SafeSetScript(
+            refs.disenchantBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                module:BtnDisenchant(self, button)
+            end)
+        )
+        Frames.SafeSetScript(
+            refs.reserveListBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                module:BtnReserveList(self, button)
+            end)
+        )
+        Frames.SafeSetScript(
+            refs.lootCounterBtn,
+            "OnClick",
+            wrapMasterOnlyClick(function(self, button)
+                module:BtnLootCounter(self, button)
+            end)
+        )
 
         frame._krtBound = true
     end
@@ -1832,6 +1902,9 @@ do
         local rerollNames
         local rerollStarted
 
+        if not addon:EnsureMasterOnlyAccess() then
+            return false
+        end
         if countdownRun then
             addon:warn(Diag.W.LogMLCountdownActive)
             return
@@ -2149,9 +2222,7 @@ do
             return
         end
         if lootState.fromInventory == true then
-            local isLeader = UnitIsGroupLeader and UnitIsGroupLeader("player")
-            local isAssistant = UnitIsGroupAssistant and UnitIsGroupAssistant("player")
-            local canReadyCheck = isLeader or isAssistant
+            local canReadyCheck = addon:CanUseRaidCapability("ready_check")
             if not canReadyCheck then
                 addon:warn(L.WarnReadyCheckNotAllowed)
                 return
@@ -2641,10 +2712,14 @@ do
         local hasItemReserves = itemId and reserves and reserves.HasItemReserves and reserves:HasItemReserves(itemId) or false
         flagButtonsOnChange("hasItemReserves", hasItemReserves)
         local hasEligibleRaidReserve = hasItemReserves
+        local hasLootAccess = addon:CanUseRaidCapability("loot")
+        local hasReadyCheckAccess = addon:CanUseRaidCapability("ready_check")
         if hasItemReserves and reserves and reserves.HasCurrentRaidPlayersForItem and itemId then
             hasEligibleRaidReserve = reserves:HasCurrentRaidPlayersForItem(itemId)
         end
         flagButtonsOnChange("hasEligibleRaidReserve", hasEligibleRaidReserve)
+        flagButtonsOnChange("hasLootAccess", hasLootAccess)
+        flagButtonsOnChange("hasReadyCheckAccess", hasReadyCheckAccess)
         flagButtonsOnChange("countdownRun", countdownRun)
         flagButtonsOnChange("flowState", currentFlowState)
 
@@ -2677,7 +2752,7 @@ do
 
         tooltipState.config = L.TipMasterConfig
         tooltipState.selectItem = lootState.fromInventory and L.TipMasterRemoveItem or L.TipMasterSelectItem
-        tooltipState.spamLoot = lootState.fromInventory and L.TipMasterReadyCheck or L.TipMasterSpamLoot
+        tooltipState.spamLoot = lootState.fromInventory and (hasReadyCheckAccess and L.TipMasterReadyCheck or L.WarnReadyCheckNotAllowed) or L.TipMasterSpamLoot
         tooltipState.ms = buildRollTooltip(L.BtnMS, false)
         tooltipState.os = buildRollTooltip(L.BtnOS, false)
         tooltipState.sr = buildRollTooltip(L.BtnSR, true)
@@ -2720,6 +2795,23 @@ do
         tooltipState.reserveList = hasReserves and L.TipMasterReserveList or L.TipMasterReserveImport
         tooltipState.lootCounter = L.TipMasterLootCounter
 
+        if not hasLootAccess then
+            tooltipState.selectItem = L.WarnMLOnlyMode
+            tooltipState.ms = L.WarnMLOnlyMode
+            tooltipState.os = L.WarnMLOnlyMode
+            tooltipState.sr = L.WarnMLOnlyMode
+            tooltipState.free = L.WarnMLOnlyMode
+            tooltipState.countdown = L.WarnMLOnlyMode
+            tooltipState.award = L.WarnMLOnlyMode
+            tooltipState.roll = L.WarnMLOnlyMode
+            tooltipState.clear = L.WarnMLOnlyMode
+            tooltipState.hold = L.WarnMLOnlyMode
+            tooltipState.bank = L.WarnMLOnlyMode
+            tooltipState.disenchant = L.WarnMLOnlyMode
+            tooltipState.reserveList = L.WarnMLOnlyMode
+            tooltipState.lootCounter = L.WarnMLOnlyMode
+        end
+
         flagButtonsOnChange("msCount", msCount)
         flagButtonsOnChange("manualResolution", rollResolution.requiresManualResolution == true)
         flagButtonsOnChange("statusText", statusText)
@@ -2747,21 +2839,21 @@ do
                 disenchantTooltip = tooltipState.disenchant,
                 reserveListTooltip = tooltipState.reserveList,
                 lootCounterTooltip = tooltipState.lootCounter,
-                canSelectItem = (lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRun,
-                canChangeItem = (currentFlowState ~= FLOW_STATES.COUNTDOWN),
-                canSpamLoot = lootState.lootCount >= 1,
-                canStartRolls = lootState.lootCount >= 1,
-                canStartSR = canStartSR,
-                canCountdown = lootState.lootCount >= 1 and hasItem and (lootState.rollStarted or countdownRun),
-                canHold = lootState.lootCount >= 1 and lootState.holder,
-                canBank = lootState.lootCount >= 1 and lootState.banker,
-                canDisenchant = lootState.lootCount >= 1 and lootState.disenchanter,
-                canAward = lootState.lootCount >= 1 and lootState.rollsCount >= 1 and not countdownRun and canAwardSelection,
+                canSelectItem = hasLootAccess and (lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRun,
+                canChangeItem = hasLootAccess and (currentFlowState ~= FLOW_STATES.COUNTDOWN),
+                canSpamLoot = lootState.lootCount >= 1 and ((lootState.fromInventory and hasReadyCheckAccess) or ((not lootState.fromInventory) and hasLootAccess)),
+                canStartRolls = hasLootAccess and lootState.lootCount >= 1,
+                canStartSR = hasLootAccess and canStartSR,
+                canCountdown = hasLootAccess and lootState.lootCount >= 1 and hasItem and (lootState.rollStarted or countdownRun),
+                canHold = hasLootAccess and lootState.lootCount >= 1 and lootState.holder,
+                canBank = hasLootAccess and lootState.lootCount >= 1 and lootState.banker,
+                canDisenchant = hasLootAccess and lootState.lootCount >= 1 and lootState.disenchanter,
+                canAward = hasLootAccess and lootState.lootCount >= 1 and lootState.rollsCount >= 1 and not countdownRun and canAwardSelection,
                 reserveListText = hasReserves and L.BtnOpenList or L.BtnInsertList,
-                canReserveList = true,
-                canRoll = record and canRoll and rolled == false and countdownRun,
-                canClear = lootState.rollsCount >= 1,
-                glowSR = canStartSR,
+                canReserveList = hasLootAccess,
+                canRoll = hasLootAccess and record and canRoll and rolled == false and countdownRun,
+                canClear = hasLootAccess and lootState.rollsCount >= 1,
+                glowSR = hasLootAccess and canStartSR,
             })
             dirtyFlags.buttons = false
         end

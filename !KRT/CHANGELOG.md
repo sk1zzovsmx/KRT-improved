@@ -6,6 +6,16 @@ All notable changes to !KRT will be documented in this file.
 
 Release-Version: 0.6.2b
 
+### Changed
+
+- Hardened master-looter-only behavior in raid context:
+  non-master clients no longer run loot/roll ingestion
+  (`CHAT_MSG_LOOT`/`CHAT_MSG_SYSTEM`) and slash/minimap
+  entrypoints now block master-only modules.
+- Centralized raid-role capability checks so loot, raid-warning,
+  changes broadcast, ready-check, and raid-icon actions derive
+  their enabled/disabled state from a shared policy.
+
 ## [0.6.2b] - 2026-03-21
 
 ### Changed

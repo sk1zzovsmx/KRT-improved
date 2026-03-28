@@ -30,6 +30,17 @@ Do NOT record:
 - temporary exceptions.
 
 Durable preferences learned from recent conversations:
+- Prefer master-looter-only runtime behavior: non-master clients should not run roll/award gameplay flows.
+- Prefer centralized Master Looter access policy via shared facade/helpers; avoid duplicating ML gate
+  checks and warnings across controllers and entrypoints.
+- Prefer capability-based access policy: looting flows require current Master Looter ownership, while
+  leadership features (for example Raid Warnings, Changes, LFM spammer) should remain available to raid
+  leader/assistant roles when appropriate.
+- Prefer `Changes:Demand()` and `Changes:Announce()` to require raid leader/assistant permission in raid;
+  being merely in raid is not sufficient.
+- Prefer centralized raid-role capability policy (`member`/`assistant`/`leader`/`master looter`) to drive
+  enable/disable and action guards across UI/controllers, instead of ad-hoc per-feature role checks.
+- Prefer simpler role-gated UI without extra explanatory tooltips for disabled actions unless explicitly requested.
 - Do not introduce Ace dependencies (Ace2/Ace3); prefer native KRT + LibCompat patterns.
 - Do not modify vendored libraries under `!KRT/Libs/*`; keep fixes in addon code.
 - Avoid runtime backward-compat shims when refactoring; target the fresh-SV model directly.

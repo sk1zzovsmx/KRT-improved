@@ -125,16 +125,32 @@ end
 
 local function buildMenu()
     local raid = getRaidService()
-    local hasRaidGroup = raid:IsPlayerInRaid()
-    local disableRaidActions = 1
-    if hasRaidGroup then
-        disableRaidActions = nil
+    local hasRaidGroup = raid and raid.IsPlayerInRaid and raid:IsPlayerInRaid() or false
+    local hasLootAccess = addon:CanUseRaidCapability("loot")
+    local hasRaidIconsAccess = addon:CanUseRaidCapability("raid_icons")
+    local hasChangesBroadcastAccess = addon:CanUseRaidCapability("changes_broadcast")
+    local disableLootActions = nil
+    if not hasLootAccess then
+        disableLootActions = 1
+    end
+    local disableRaidActions = nil
+    if not hasRaidIconsAccess then
+        disableRaidActions = 1
+    end
+    local disableLootRaidActions = 1
+    if hasRaidGroup and hasLootAccess then
+        disableLootRaidActions = nil
+    end
+    local disableChangesBroadcastActions = nil
+    if not hasChangesBroadcastAccess then
+        disableChangesBroadcastActions = 1
     end
 
     return {
         {
             text = MASTER_LOOTER,
             notCheckable = 1,
+            disabled = disableLootActions,
             func = function()
                 callControllerMethod("Master", "Toggle")
             end,
@@ -142,9 +158,9 @@ local function buildMenu()
         {
             text = L.StrLootCounter,
             notCheckable = 1,
-            disabled = disableRaidActions,
+            disabled = disableLootRaidActions,
             func = function()
-                if not raid:IsPlayerInRaid() then
+                if not (raid and raid.IsPlayerInRaid and raid:IsPlayerInRaid()) then
                     return
                 end
                 toggleLootCounterWidget()
@@ -161,8 +177,11 @@ local function buildMenu()
         {
             text = L.StrClearIcons,
             notCheckable = 1,
+            disabled = disableRaidActions,
             func = function()
-                raid:ClearRaidIcons()
+                if raid and raid.ClearRaidIcons then
+                    raid:ClearRaidIcons()
+                end
             end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
@@ -177,31 +196,32 @@ local function buildMenu()
         {
             text = L.StrMSChanges,
             notCheckable = 1,
-            func = function()
-                callControllerMethod("Changes", "Toggle")
-            end,
-        },
-        {
-            text = L.BtnDemand,
-            notCheckable = 1,
-            disabled = disableRaidActions,
-            func = function()
-                if not raid:IsPlayerInRaid() then
-                    return
-                end
-                callControllerMethod("Changes", "Demand")
-            end,
-        },
-        {
-            text = CHAT_ANNOUNCE,
-            notCheckable = 1,
-            disabled = disableRaidActions,
-            func = function()
-                if not raid:IsPlayerInRaid() then
-                    return
-                end
-                callControllerMethod("Changes", "Announce")
-            end,
+            hasArrow = 1,
+            menuList = {
+                {
+                    text = L.BtnOpen,
+                    notCheckable = 1,
+                    func = function()
+                        callControllerMethod("Changes", "Toggle")
+                    end,
+                },
+                {
+                    text = L.BtnDemand,
+                    notCheckable = 1,
+                    disabled = disableChangesBroadcastActions,
+                    func = function()
+                        callControllerMethod("Changes", "Demand")
+                    end,
+                },
+                {
+                    text = CHAT_ANNOUNCE,
+                    notCheckable = 1,
+                    disabled = disableChangesBroadcastActions,
+                    func = function()
+                        callControllerMethod("Changes", "Announce")
+                    end,
+                },
+            },
         },
         { text = " ", disabled = 1, notCheckable = 1 },
         {

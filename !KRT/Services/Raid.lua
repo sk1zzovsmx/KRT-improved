@@ -1864,6 +1864,80 @@ do
         return false
     end
 
+    function module:GetPlayerRoleState()
+        local inRaid = type(module.IsPlayerInRaid) == "function" and module:IsPlayerInRaid() or false
+        local rank = Core.GetUnitRank and (tonumber(Core.GetUnitRank("player", 0)) or 0) or 0
+        local isLeader = rank >= 2
+        local isAssistant = rank == 1
+        return {
+            inRaid = inRaid,
+            rank = rank,
+            isLeader = isLeader,
+            isAssistant = isAssistant,
+            hasRaidLeadership = inRaid and rank > 0,
+            hasGroupLeadership = rank > 0,
+            isMasterLooter = module:IsMasterLooter(),
+        }
+    end
+
+    function module:GetCapabilityState(capability)
+        local role = module:GetPlayerRoleState()
+        local state = {
+            capability = capability,
+            allowed = false,
+            reason = "unknown_capability",
+            role = role,
+        }
+
+        if capability == "loot" then
+            if not role.inRaid or role.isMasterLooter then
+                state.allowed = true
+                state.reason = nil
+            else
+                state.reason = "missing_master_looter"
+            end
+            return state
+        end
+
+        if capability == "raid_leadership" or capability == "changes_broadcast" or capability == "raid_warning" or capability == "raid_icons" then
+            if not role.inRaid then
+                state.reason = "not_in_raid"
+            elseif role.hasRaidLeadership then
+                state.allowed = true
+                state.reason = nil
+            else
+                state.reason = "missing_leadership"
+            end
+            return state
+        end
+
+        if capability == "group_leadership" or capability == "ready_check" then
+            if role.hasGroupLeadership then
+                state.allowed = true
+                state.reason = nil
+            else
+                state.reason = "missing_group_leadership"
+            end
+            return state
+        end
+
+        return state
+    end
+
+    function module:CanUseCapability(capability)
+        local state = module:GetCapabilityState(capability)
+        return state and state.allowed == true
+    end
+
+    -- Master-only actions are allowed out of raid, but in raid require current ML ownership.
+    function module:CanUseMasterOnlyFeatures()
+        return module:CanUseCapability("loot")
+    end
+
+    function module:IsMasterOnlyBlocked()
+        return not module:CanUseMasterOnlyFeatures()
+    end
+
     -- Clears all raid target icons.
     function module:ClearRaidIcons()
         local players = module:GetPlayers()

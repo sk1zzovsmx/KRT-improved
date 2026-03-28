@@ -315,6 +315,9 @@ do
         if not addon.IsInRaid() then
             return true
         end
+        if type(addon.CanUseRaidCapability) == "function" then
+            return addon:CanUseRaidCapability("raid_leadership")
+        end
 
         local leaderFn = addon.UnitIsGroupLeader
         local assistantFn = addon.UnitIsGroupAssistant
