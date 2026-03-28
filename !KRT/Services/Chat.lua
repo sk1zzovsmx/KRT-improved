@@ -111,7 +111,7 @@ do
         Comms.Chat(msg, selectedChannel)
     end
 
-    function module:WarnMasterOnlyMode()
+    function module:ShowMasterOnlyWarning()
         addon:warn(L.WarnMLOnlyMode or L.WarnMLNoPermission)
     end
 
@@ -120,7 +120,7 @@ do
         module:Announce(text, channel)
     end
 
-    function addon:WarnMasterOnlyMode()
-        module:WarnMasterOnlyMode()
+    function addon:ShowMasterOnlyWarning()
+        module:ShowMasterOnlyWarning()
     end
 end

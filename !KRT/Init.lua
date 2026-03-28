@@ -1099,8 +1099,8 @@ do
 
     function addon:EnsureMasterOnlyAccess()
         if self:IsMasterOnlyBlocked() then
-            if type(self.WarnMasterOnlyMode) == "function" then
-                self:WarnMasterOnlyMode()
+            if type(self.ShowMasterOnlyWarning) == "function" then
+                self:ShowMasterOnlyWarning()
             end
             return false
         end
