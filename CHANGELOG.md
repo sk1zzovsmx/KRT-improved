@@ -4,6 +4,12 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **UI:** Loot Counter now exposes a `Spam Counter` button that announces grouped
+  MS counts in chat using `+N` buckets (for example `+1: Name1, Name2`).
+- **UI:** Loot Counter now includes a `Reset All` button with confirmation popup
+  to prevent accidental full counter resets.
+- **Behavior:** Loot Counter grouped-count announce now requires raid lead or
+  assistant permission while in raid.
 - **Tooling:** Release channel resolution is now driven by
   `!KRT/CHANGELOG.md` `Release-Version` suffixes (`A` internal/no publish,
   `B` beta prerelease, `R` stable release), and GitHub publishing

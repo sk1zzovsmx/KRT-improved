@@ -13,6 +13,7 @@ local Colors = feature.Colors or addon.Colors
 local UIScaffold = addon.UIScaffold
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
+local Core = feature.Core or addon.Core
 local Bus = feature.Bus or addon.Bus
 local Services = feature.Services or addon.Services or {}
 
@@ -20,8 +21,10 @@ local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
 local twipe = table.wipe
+local tsort = table.sort
 
-local type, tostring = type, tostring
+local type, tostring, tonumber = type, tostring, tonumber
+local strlen = string.len
 
 local InternalEvents = Events.Internal
 local UIFacade = addon.UI
@@ -61,14 +64,156 @@ do
     local COL_GAP = 8
     local ACTION_COL_W = (BTN_W * 3) + (BTN_GAP * 2) + 2 -- (+/-/R + gaps + right pad)
     local COUNT_COL_W = 40
+    local CHAT_MSG_MAX_LEN = 255
+    local RESET_ALL_POPUP_KEY = "KRT_LOOTCOUNTER_RESET_ALL"
 
     -- ----- Private helpers ----- --
     function UI.AcquireRefs(frame)
         local refs = {
             scrollFrame = frame and (frame.ScrollFrame or _G[(frame.GetName and frame:GetName() or "KRTLootCounterFrame") .. "ScrollFrame"]) or nil,
+            announceBtn = Frames.Ref(frame, "AnnounceBtn"),
+            resetAllBtn = Frames.Ref(frame, "ResetAllBtn"),
         }
         refs.scrollChild = (refs.scrollFrame and refs.scrollFrame.ScrollChild) or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         return refs
+    end
+
+    local function getAnnounceButton()
+        local refs = module.refs
+        if refs and refs.announceBtn then
+            return refs.announceBtn
+        end
+        local frameName = UI.FrameName
+        if not frameName then
+            return nil
+        end
+        return _G[frameName .. "AnnounceBtn"]
+    end
+
+    local function getResetAllButton()
+        local refs = module.refs
+        if refs and refs.resetAllBtn then
+            return refs.resetAllBtn
+        end
+        local frameName = UI.FrameName
+        if not frameName then
+            return nil
+        end
+        return _G[frameName .. "ResetAllBtn"]
+    end
+
+    local function ensureResetAllPopup()
+        if not StaticPopupDialogs then
+            return false
+        end
+        if StaticPopupDialogs[RESET_ALL_POPUP_KEY] then
+            return true
+        end
+
+        Frames.MakeConfirmPopup(RESET_ALL_POPUP_KEY, L.StrConfirmLootCounterResetAll, function()
+            module:ResetAllCounts()
+        end)
+
+        local popup = StaticPopupDialogs[RESET_ALL_POPUP_KEY]
+        if popup then
+            popup.preferredIndex = 3
+            return true
+        end
+        return false
+    end
+
+    local function canBroadcastCounter()
+        local raidService = Services.Raid
+        if not (raidService and raidService.IsPlayerInRaid and raidService:IsPlayerInRaid()) then
+            return false, "not_in_raid"
+        end
+
+        if type(addon.GetRaidCapabilityState) == "function" then
+            local state = addon:GetRaidCapabilityState("changes_broadcast")
+            if state and state.allowed == true then
+                return true
+            end
+            return false, state and state.reason or "missing_leadership"
+        end
+
+        if type(addon.CanUseRaidCapability) == "function" then
+            if addon:CanUseRaidCapability("changes_broadcast") then
+                return true
+            end
+            return false, "missing_leadership"
+        end
+
+        if Core.GetUnitRank then
+            local rank = tonumber(Core.GetUnitRank("player", 0)) or 0
+            if rank > 0 then
+                return true
+            end
+        end
+
+        return false, "missing_leadership"
+    end
+
+    local function warnBroadcastDenied(reason)
+        if reason == "missing_leadership" or reason == "missing_rank" then
+            addon:warn(L.WarnLootCounterBroadcastNotAllowed)
+        end
+    end
+
+    local function collectAnnounceGroups(players)
+        local groupedByCount = {}
+        local counts = {}
+
+        for i = 1, #players do
+            local row = players[i]
+            local name = row and row.name
+            local count = (row and tonumber(row.count)) or 0
+            if name and name ~= "" and count > 0 then
+                local bucket = groupedByCount[count]
+                if not bucket then
+                    bucket = {}
+                    groupedByCount[count] = bucket
+                    counts[#counts + 1] = count
+                end
+                bucket[#bucket + 1] = name
+            end
+        end
+
+        tsort(counts)
+        for i = 1, #counts do
+            tsort(groupedByCount[counts[i]])
+        end
+
+        return groupedByCount, counts
+    end
+
+    local function appendBucketLines(outLines, count, names)
+        if not names or #names <= 0 then
+            return
+        end
+
+        local prefix = "+" .. tostring(count) .. ": "
+        local line = prefix
+        local hasNames = false
+
+        for i = 1, #names do
+            local name = names[i]
+            local candidate
+            if hasNames then
+                candidate = line .. ", " .. name
+            else
+                candidate = line .. name
+            end
+
+            if hasNames and strlen(candidate) > CHAT_MSG_MAX_LEN then
+                outLines[#outLines + 1] = line
+                line = prefix .. name
+            else
+                line = candidate
+            end
+            hasNames = true
+        end
+
+        outLines[#outLines + 1] = line
     end
 
     function UI.Localize()
@@ -77,6 +222,16 @@ do
             return
         end
         Frames.SetFrameTitle(frameName, L.StrLootCounter)
+        local announceBtn = getAnnounceButton()
+        if announceBtn then
+            announceBtn:SetText(L.BtnLootCounterAnnounce)
+            Frames.SetTooltip(announceBtn, L.TipLootCounterAnnounce)
+        end
+        local resetAllBtn = getResetAllButton()
+        if resetAllBtn then
+            resetAllBtn:SetText(L.BtnLootCounterResetAll)
+            Frames.SetTooltip(resetAllBtn, L.TipLootCounterResetAll)
+        end
     end
 
     local function ensureFrames()
@@ -233,6 +388,61 @@ do
         end)
     end
 
+    function module:AnnounceCounts()
+        local ok, reason = canBroadcastCounter()
+        if not ok then
+            warnBroadcastDenied(reason)
+            return
+        end
+
+        local players = getCurrentRaidPlayers()
+        local groupedByCount, counts = collectAnnounceGroups(players)
+        if #counts <= 0 then
+            addon:Announce(L.StrLootCounterAnnounceNone, "RAID")
+            return
+        end
+
+        addon:Announce(L.StrLootCounterAnnounceHeader, "RAID")
+        local outLines = {}
+        for i = 1, #counts do
+            local count = counts[i]
+            appendBucketLines(outLines, count, groupedByCount[count])
+        end
+        for i = 1, #outLines do
+            addon:Announce(outLines[i], "RAID")
+        end
+    end
+
+    function module:ResetAllCounts()
+        local currentRaid = addon.Core.GetCurrentRaid()
+        if not currentRaid then
+            return
+        end
+
+        local players = getCurrentRaidPlayers()
+        local changed = false
+        for i = 1, #players do
+            local data = players[i]
+            local playerNid = data and tonumber(data.playerNid)
+            local count = (data and tonumber(data.count)) or 0
+            if playerNid and count ~= 0 then
+                Services.Raid:SetPlayerCountByNid(playerNid, 0, currentRaid)
+                changed = true
+            end
+        end
+        if changed then
+            module:RequestRefresh("count_reset_all")
+        end
+    end
+
+    function module:ConfirmResetAllCounts()
+        if not ensureResetAllPopup() or type(StaticPopup_Show) ~= "function" then
+            module:ResetAllCounts()
+            return
+        end
+        StaticPopup_Show(RESET_ALL_POPUP_KEY)
+    end
+
     function module:RefreshUI()
         if not ensureFrames() then
             return
@@ -273,6 +483,7 @@ do
             header:Show()
         end
 
+        local hasAnyCount = false
         for i = 1, numPlayers do
             local data = players[i]
             local name = data and data.name
@@ -302,12 +513,34 @@ do
                 row.count:SetText(tostring(cnt))
                 row._lastCount = cnt
             end
+            if cnt > 0 then
+                hasAnyCount = true
+            end
             row:Show()
         end
 
         for i = numPlayers + 1, #rows do
             if rows[i] then
                 rows[i]:Hide()
+            end
+        end
+
+        local announceBtn = getAnnounceButton()
+        if announceBtn then
+            local canBroadcast = canBroadcastCounter()
+            if canBroadcast then
+                announceBtn:Enable()
+            else
+                announceBtn:Disable()
+            end
+        end
+
+        local resetAllBtn = getResetAllButton()
+        if resetAllBtn then
+            if numPlayers > 0 and hasAnyCount then
+                resetAllBtn:Enable()
+            else
+                resetAllBtn:Disable()
             end
         end
     end
@@ -319,6 +552,12 @@ do
     local function BindHandlers(_, _, refs)
         scrollFrame = refs.scrollFrame or scrollFrame
         scrollChild = refs.scrollChild or scrollChild
+        Frames.SafeSetScript(refs.announceBtn, "OnClick", function()
+            module:AnnounceCounts()
+        end)
+        Frames.SafeSetScript(refs.resetAllBtn, "OnClick", function()
+            module:ConfirmResetAllCounts()
+        end)
     end
 
     local function OnLoadFrame(frame)

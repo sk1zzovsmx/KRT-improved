@@ -38,6 +38,7 @@ Durable preferences learned from recent conversations:
   leader/assistant roles when appropriate.
 - Prefer `Changes:Demand()` and `Changes:Announce()` to require raid leader/assistant permission in raid;
   being merely in raid is not sufficient.
+- Prefer LootCounter grouped-count announce/spam actions to require raid leader/assistant permission in raid.
 - Prefer centralized raid-role capability policy (`member`/`assistant`/`leader`/`master looter`) to drive
   enable/disable and action guards across UI/controllers, instead of ad-hoc per-feature role checks.
 - Prefer simpler role-gated UI without extra explanatory tooltips for disabled actions unless explicitly requested.
