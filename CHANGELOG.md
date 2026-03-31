@@ -62,6 +62,8 @@ Dates are in YYYY-MM-DD.
 - **Bugfix:** Logger now tolerates lightweight list-controller adapters,
   always emits the raw `itemId` vs `lootNid` guard-rail error, and refreshes
   export CSV content as soon as the export tab becomes visible.
+- **UI:** Logger Export tab is temporarily disabled again while the export
+  workflow remains staged off in the live logger UI.
 - **UI:** Button glow now auto-scales by target button size in
   `Modules/UI/Effects.lua` (dynamic thickness/scale and proc lines/frequency),
   and recomputes on `OnSizeChanged` for responsive fitting.

@@ -306,9 +306,19 @@ local function newHarness()
     }
     local timers = {}
     local itemRegistry = {}
+    local raidRoleOverride = nil
+    local raidCapabilityOverrides = {}
 
     local function pushLog(bucket, message)
         logs[bucket][#logs[bucket] + 1] = tostring(message)
+    end
+
+    local function copyTable(tbl)
+        local copy = {}
+        for key, value in pairs(tbl or {}) do
+            copy[key] = value
+        end
+        return copy
     end
 
     local L = keyTable("L")
@@ -471,6 +481,147 @@ local function newHarness()
     end
     addon.trace = function(_, message)
         pushLog("trace", message)
+    end
+
+    local function getRaidService()
+        return addon.Services and addon.Services.Raid or nil
+    end
+
+    local function deriveRaidRank()
+        if type(addon.UnitIsGroupLeader) == "function" and addon.UnitIsGroupLeader("player") then
+            return 2
+        end
+        if type(addon.UnitIsGroupAssistant) == "function" and addon.UnitIsGroupAssistant("player") then
+            return 1
+        end
+        return 0
+    end
+
+    local function buildRaidRoleState()
+        local raidService = getRaidService()
+        local inRaid = raidService and type(raidService.IsPlayerInRaid) == "function" and raidService:IsPlayerInRaid() or false
+        local rank = deriveRaidRank()
+        local isMasterLooter = raidService and type(raidService.IsMasterLooter) == "function" and raidService:IsMasterLooter() or false
+
+        if type(raidRoleOverride) == "table" then
+            if raidRoleOverride.inRaid ~= nil then
+                inRaid = raidRoleOverride.inRaid == true
+            end
+            if raidRoleOverride.rank ~= nil then
+                rank = tonumber(raidRoleOverride.rank) or 0
+            elseif raidRoleOverride.isLeader == true then
+                rank = 2
+            elseif raidRoleOverride.isAssistant == true then
+                rank = 1
+            end
+            if raidRoleOverride.isMasterLooter ~= nil then
+                isMasterLooter = raidRoleOverride.isMasterLooter == true
+            end
+        end
+
+        return {
+            inRaid = inRaid,
+            rank = rank,
+            isLeader = rank >= 2,
+            isAssistant = rank == 1,
+            hasRaidLeadership = inRaid and rank > 0,
+            hasGroupLeadership = rank > 0,
+            isMasterLooter = isMasterLooter,
+        }
+    end
+
+    function addon:GetRaidRoleState()
+        return buildRaidRoleState()
+    end
+
+    function addon:GetRaidCapabilityState(capability)
+        local role = self:GetRaidRoleState()
+        local override = raidCapabilityOverrides[capability]
+        if override ~= nil then
+            local allowed = false
+            local reason
+            if type(override) == "table" then
+                allowed = override.allowed == true
+                reason = override.reason
+            else
+                allowed = override == true
+            end
+            if not allowed and reason == nil then
+                reason = "override_denied"
+            end
+            return {
+                capability = capability,
+                allowed = allowed,
+                reason = reason,
+                role = role,
+            }
+        end
+
+        local state = {
+            capability = capability,
+            allowed = false,
+            reason = "unknown_capability",
+            role = role,
+        }
+
+        if capability == "loot" then
+            if not role.inRaid or role.isMasterLooter then
+                state.allowed = true
+                state.reason = nil
+            else
+                state.reason = "missing_master_looter"
+            end
+            return state
+        end
+
+        if capability == "raid_leadership" or capability == "changes_broadcast" or capability == "raid_warning" or capability == "raid_icons" then
+            if not role.inRaid then
+                state.reason = "not_in_raid"
+            elseif role.hasRaidLeadership then
+                state.allowed = true
+                state.reason = nil
+            else
+                state.reason = "missing_leadership"
+            end
+            return state
+        end
+
+        if capability == "group_leadership" or capability == "ready_check" then
+            if role.hasGroupLeadership then
+                state.allowed = true
+                state.reason = nil
+            else
+                state.reason = "missing_group_leadership"
+            end
+            return state
+        end
+
+        return state
+    end
+
+    function addon:CanUseRaidCapability(capability)
+        local state = self:GetRaidCapabilityState(capability)
+        return state and state.allowed == true
+    end
+
+    function addon:CanUseMasterOnlyFeatures()
+        return self:CanUseRaidCapability("loot")
+    end
+
+    function addon:IsMasterOnlyBlocked()
+        return not self:CanUseMasterOnlyFeatures()
+    end
+
+    function addon:ShowMasterOnlyWarning()
+        self:warn(L.WarnMLOnlyMode or L.WarnMLNoPermission)
+    end
+
+    function addon:EnsureMasterOnlyAccess()
+        if self:IsMasterOnlyBlocked() then
+            self:ShowMasterOnlyWarning()
+            return false
+        end
+        return true
     end
 
     addon.tLength = function(tbl)
@@ -996,6 +1147,26 @@ local function newHarness()
         timerCount = function()
             return addon._timerCount()
         end,
+        setRaidRoleState = function(_, state)
+            raidRoleOverride = type(state) == "table" and copyTable(state) or nil
+        end,
+        setRaidCapabilityState = function(_, capability, allowed, reason)
+            if type(capability) ~= "string" or capability == "" then
+                return
+            end
+            if type(allowed) == "table" then
+                raidCapabilityOverrides[capability] = copyTable(allowed)
+                return
+            end
+            if allowed == nil then
+                raidCapabilityOverrides[capability] = nil
+                return
+            end
+            raidCapabilityOverrides[capability] = {
+                allowed = allowed == true,
+                reason = reason,
+            }
+        end,
     }
 
     function harness:installRaidStore(seedRaids)
@@ -1196,6 +1367,11 @@ local function setupInventoryTradeHarness(order, rollsByName)
         ClearRolls = function() end,
         RecordRolls = function() end,
     }
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
     h.feature.Services = h.addon.Services
     h.feature.RAID_TARGET_MARKERS = h.C.RAID_TARGET_MARKERS
 
@@ -1374,6 +1550,11 @@ local function setupMasterAwardHarness(cfg)
         ClearRolls = function() end,
         RecordRolls = function() end,
     }
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
     h.feature.Services = h.addon.Services
     h.feature.RAID_TARGET_MARKERS = h.C.RAID_TARGET_MARKERS
 
@@ -1732,6 +1913,36 @@ test("accepted roll stays eligible after using the last allowed roll", function(
     assertTrue(first.isEligible == true, "expected recorded response to stay eligible in the UI model")
 end)
 
+test("harness raid capability facade mirrors shared loot and leadership policy", function()
+    local h = newHarness()
+
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 0,
+        isMasterLooter = false,
+    })
+
+    local lootState = h.addon:GetRaidCapabilityState("loot")
+    local changesState = h.addon:GetRaidCapabilityState("changes_broadcast")
+
+    assertEqual(lootState.allowed, false, "expected loot capability to require master looter in raid")
+    assertEqual(lootState.reason, "missing_master_looter", "expected missing ML denial reason")
+    assertEqual(changesState.allowed, false, "expected changes broadcast to require raid leadership")
+    assertEqual(changesState.reason, "missing_leadership", "expected leadership denial reason")
+    assertTrue(h.addon:EnsureMasterOnlyAccess() ~= true, "expected shared master-only guard to block when loot access is denied")
+    assertContains(h.logs.warn, "L.WarnMLOnlyMode", "expected guard denial to use the shared warning")
+
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 1,
+        isMasterLooter = true,
+    })
+
+    assertTrue(h.addon:CanUseRaidCapability("loot") == true, "expected ML ownership to re-enable loot capability")
+    assertTrue(h.addon:CanUseRaidCapability("changes_broadcast") == true, "expected raid leadership to re-enable changes broadcast")
+    assertTrue(h.addon:CanUseRaidCapability("ready_check") == true, "expected leadership to re-enable ready checks")
+end)
+
 test("master countdown starts after announcing rolls with service-owned session bootstrap", function()
     local h = newHarness()
     local link = h.registerItem(9321, "Countdownblade")
@@ -1768,6 +1979,11 @@ test("master countdown starts after announcing rolls with service-owned session 
             return 0
         end,
     }
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
@@ -1828,6 +2044,11 @@ test("master assignment buttons stay disabled until a target is selected", funct
             return 0
         end,
     }
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
@@ -2490,6 +2711,11 @@ test("master award button triggers reroll for single-select ties", function()
         end,
         SyncSessionState = function() end,
     }
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
     h.feature.Services = h.addon.Services
     h.feature.RAID_TARGET_MARKERS = h.C.RAID_TARGET_MARKERS
     h:load("!KRT/Controllers/Master.lua")
@@ -2892,7 +3118,7 @@ test("inventory multi trade completion consumes one item and advances like self-
     assertEqual(ctx.getClearLootCount(), 0, "expected multi-step trade completion to preserve the current item until all winners are done")
 end)
 
-test("logger export csv stays dirty until export becomes visible", function()
+test("logger export tab stays disabled while the export workflow is staged off", function()
     local h = newHarness()
     h:installRaidStore({
         {
@@ -2948,17 +3174,20 @@ test("logger export csv stays dirty until export becomes visible", function()
 
     Logger:SetTab("export")
     h.flushTimers()
-    assertEqual(buildCount, 1, "expected csv to build when export tab becomes visible")
-    assertTrue(Logger.Export._csvDirty ~= true, "expected visible export rebuild to clear dirty flag")
+    assertEqual(Logger.activeTab, "history", "expected export tab requests to stay normalized to history")
+    assertEqual(buildCount, 0, "expected disabled export tab to skip csv rebuild")
+    assertTrue(exportFrame:IsShown() ~= true, "expected export panel to stay hidden while the tab is disabled")
+    assertTrue(Logger.Export._csvDirty == true, "expected disabled export tab to leave csv state dirty")
 
     Logger:SetTab("history")
     h.Bus.TriggerEvent(h.addon.Events.Internal.RaidLootUpdate, 1)
-    assertEqual(buildCount, 1, "expected hidden export updates to stay lazy")
+    assertEqual(buildCount, 0, "expected hidden export updates to stay lazy")
     assertTrue(Logger.Export._csvDirty == true, "expected hidden export changes to mark csv dirty")
 
     Logger:SetTab("export")
     h.flushTimers()
-    assertEqual(buildCount, 2, "expected dirty csv to rebuild once when export reopens")
+    assertEqual(Logger.activeTab, "history", "expected repeated export tab requests to keep the tab disabled")
+    assertEqual(buildCount, 0, "expected disabled export tab to keep csv rebuilds deferred")
 end)
 
 test("reserves item-info updates coalesce into a single refresh", function()

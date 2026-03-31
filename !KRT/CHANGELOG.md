@@ -15,6 +15,8 @@ Release-Version: 0.6.2b
 - Centralized raid-role capability checks so loot, raid-warning,
   changes broadcast, ready-check, and raid-icon actions derive
   their enabled/disabled state from a shared policy.
+- Temporarily disabled the Logger Export tab again while the
+  export workflow remains staged off.
 
 ## [0.6.2b] - 2026-03-21
 
