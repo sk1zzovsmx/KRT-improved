@@ -73,6 +73,8 @@ Controllers\Master.lua
 Widgets\LootCounter.lua
 Services\Reserves.lua
 Widgets\ReservesUI.lua
+Services\Logger\Store.lua
+Services\Logger\Actions.lua
 Controllers\Logger.lua
 Widgets\Config.lua
 Controllers\Warnings.lua

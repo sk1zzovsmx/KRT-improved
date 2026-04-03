@@ -34,6 +34,9 @@ Release-Version: 0.6.2b
   their enabled/disabled state from a shared policy.
 - Temporarily disabled the Logger Export tab again while the
   export workflow remains staged off.
+- Extracted Logger Store/View/Actions into `Services/Logger/Store.lua`
+  and `Services/Logger/Actions.lua`; Controllers/Logger.lua now imports
+  them via `addon.Services.Logger`. No behavior changes.
 
 ## [0.6.2b] - 2026-03-21
 

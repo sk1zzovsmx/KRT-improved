@@ -60,6 +60,8 @@
 |   |   |-- Strings.lua
 |   |   \\-- Time.lua
 |   |-- Services
+|   |   |-- Logger
+|   |   |   \\-- ...
 |   |   |-- Chat.lua
 |   |   |-- Debug.lua
 |   |   |-- Loot.lua

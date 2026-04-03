@@ -305,12 +305,14 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 46) Widgets/LootCounter.lua
 47) Services/Reserves.lua
 48) Widgets/ReservesUI.lua
-49) Controllers/Logger.lua
-50) Widgets/Config.lua
-51) Controllers/Warnings.lua
-52) Controllers/Changes.lua
-53) Controllers/Spammer.lua
-54) KRT.xml
+49) Services/Logger/Store.lua
+50) Services/Logger/Actions.lua
+51) Controllers/Logger.lua
+52) Widgets/Config.lua
+53) Controllers/Warnings.lua
+54) Controllers/Changes.lua
+55) Controllers/Spammer.lua
+56) KRT.xml
 
 ---
 
@@ -334,7 +336,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 
   Controllers/
     Master.lua             # master-loot parent owner
-    Logger.lua             # logger parent owner + submodules
+    Logger.lua             # logger parent owner (UI/controller; data via Services/Logger/)
     Warnings.lua           # warnings parent owner
     Changes.lua            # changes parent owner
     Spammer.lua            # spammer parent owner
@@ -346,6 +348,9 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Loot.lua               # loot parsing, item selection, export strings
     Debug.lua              # synthetic raid/roll test helpers for local addon testing
     Reserves.lua           # soft reserves service/model + import parsing + reserve lookups
+    Logger/
+      Store.lua            # logger stable-ID indexing + view-model row builders/CSV
+      Actions.lua          # logger mutations + commit/cascade + selection validation
 
   Widgets/
     LootCounter.lua        # loot counter UI + data
@@ -516,9 +521,13 @@ Namespaced service-only module:
 - `addon.Services.Debug` - synthetic raid/roll test helpers for current-raid testing
 
 `addon.Logger` internal structure (pattern for complex modules):
-- `addon.Logger.Store`   - data access helpers + stable-ID indexing
-- `addon.Logger.View`    - view-model row builders (UI-friendly data)
-- `addon.Logger.Actions` - mutations + commit/refresh boundaries
+- `addon.Logger.Store`   - data access helpers + stable-ID indexing (Services/Logger/Store.lua)
+- `addon.Logger.View`    - view-model row builders (UI-friendly data) (Services/Logger/Store.lua)
+- `addon.Logger.Actions` - mutations + commit/refresh boundaries (Services/Logger/Actions.lua)
+
+Namespaced service modules (loaded before Controller):
+- `addon.Services.Logger.Store`   - canonical Store + View service tables
+- `addon.Services.Logger.Actions` - canonical Actions service table
 
 Implementation placement (current wave):
 - `Init.lua`: unified bootstrap/runtime core + main gameplay/logger logic + `Core.GetFeatureShared()`

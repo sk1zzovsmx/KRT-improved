@@ -1708,6 +1708,8 @@ test("logger updates duplicate item entries by lootNid only", function()
     h.Core.GetLastBoss = function()
         return 10
     end
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
     h:load("!KRT/Controllers/Logger.lua")
 
     local Logger = h.addon.Controllers.Logger
@@ -1753,6 +1755,8 @@ test("trade-only loot creates a reusable lootNid", function()
 
     h:load("!KRT/Services/Raid.lua")
     h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
     h:load("!KRT/Controllers/Logger.lua")
 
     local Raid = h.addon.Services.Raid
@@ -4385,6 +4389,8 @@ test("logger export tab stays disabled while the export workflow is staged off",
     h.Core.GetCurrentRaid = function()
         return 1
     end
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
     h:load("!KRT/Controllers/Logger.lua")
 
     local Logger = h.addon.Controllers.Logger
