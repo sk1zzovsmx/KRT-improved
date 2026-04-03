@@ -53,6 +53,56 @@ do
         return tostring(itemKey) .. "\001" .. tostring(looter)
     end
 
+    local function getPendingAwardList(itemLink, looter)
+        local key = buildPendingAwardKey(itemLink, looter)
+        local list = lootState.pendingAwards[key]
+        if not list then
+            local rawLinkKey = buildPendingAwardKey(itemLink, looter, true)
+            if rawLinkKey ~= key then
+                key = rawLinkKey
+                list = lootState.pendingAwards[key]
+            end
+        end
+        return key, list
+    end
+
+    local function isPendingAwardValid(pending, now, ttl)
+        local expiresAt = tonumber(pending and pending.expiresAt) or nil
+        return pending and ((expiresAt and now <= expiresAt) or (not expiresAt and (now - (pending.ts or 0)) <= ttl))
+    end
+
+    local function isPendingAwardExpired(pending, now, ttl)
+        local expiresAt = tonumber(pending and pending.expiresAt) or nil
+        return not pending or ((expiresAt and now > expiresAt) or (not expiresAt and (now - (pending.ts or 0)) > ttl))
+    end
+
+    local function hasResolvedPendingAwardValue(pending)
+        return (tonumber(pending and pending.rollValue) or 0) > 0
+    end
+
+    local function consumePendingAwardAt(list, key, index, itemLink, looter, ttl)
+        local pending = list[index]
+        tremove(list, index)
+        local remaining = #list
+        if #list == 0 then
+            lootState.pendingAwards[key] = nil
+        end
+        addon:debug(Diag.D.LogLootPendingAwardConsumed:format(tostring(itemLink), tostring(looter), remaining, ttl))
+        return pending
+    end
+
+    local function pruneExpiredPendingAwards(list, now, ttl)
+        if type(list) ~= "table" then
+            return
+        end
+        for i = #list, 1, -1 do
+            local pending = list[i]
+            if isPendingAwardExpired(pending, now, ttl) then
+                tremove(list, i)
+            end
+        end
+    end
+
     local function warmItemCache(itemLink)
         local probe = Item or addon.Item
         if probe and probe.WarmItemCache then
@@ -99,7 +149,7 @@ do
 
     -- ----- Public methods ----- --
     -- Pending award helpers (shared with Master/Raid flows).
-    function module:QueuePendingAward(itemLink, looter, rollType, rollValue, rollSessionId)
+    function module:AddPendingAward(itemLink, looter, rollType, rollValue, rollSessionId, expiresAt)
         if not itemLink or not looter then
             return
         end
@@ -117,56 +167,156 @@ do
             list = {}
             lootState.pendingAwards[key] = list
         end
+        local now = GetTime()
+        local resolvedRollType = tonumber(rollType)
+        local resolvedRollValue = tonumber(rollValue)
+        local resolvedSessionId = rollSessionId and tostring(rollSessionId) or nil
+        local resolvedExpiresAt = tonumber(expiresAt) or nil
+
+        -- Group Loot commonly emits a "selected need/greed" message first, then
+        -- a later "Need Roll - 96 ..." line for the same item/player. Upgrade the
+        -- oldest zero-value pending entry so FIFO consumption keeps the numeric
+        -- rollValue attached to the same upcoming loot receipt.
+        if resolvedRollValue and resolvedRollValue > 0 then
+            for pass = 1, 2 do
+                for i = 1, #list do
+                    local pending = list[i]
+                    local pendingType = tonumber(pending and pending.rollType)
+                    local pendingValue = tonumber(pending and pending.rollValue) or 0
+                    local pendingSessionId = pending and pending.rollSessionId and tostring(pending.rollSessionId) or nil
+                    local canUpgrade = pending
+                        and pendingType == resolvedRollType
+                        and pendingValue <= 0
+                        and (
+                            (pass == 1 and resolvedSessionId and pendingSessionId == resolvedSessionId)
+                            or (pass == 2 and ((not resolvedSessionId) or pendingSessionId == nil or pendingSessionId == ""))
+                        )
+                    if canUpgrade then
+                        pending.rollValue = resolvedRollValue
+                        pending.ts = now
+                        if resolvedSessionId and not pendingSessionId then
+                            pending.rollSessionId = resolvedSessionId
+                        end
+                        if resolvedExpiresAt and ((tonumber(pending.expiresAt) or 0) < resolvedExpiresAt) then
+                            pending.expiresAt = resolvedExpiresAt
+                        end
+                        return
+                    end
+                end
+            end
+        end
+
         list[#list + 1] = {
             itemLink = itemLink,
             looter = looter,
-            rollType = rollType,
-            rollValue = rollValue,
-            rollSessionId = rollSessionId and tostring(rollSessionId) or nil,
-            ts = GetTime(),
+            rollType = resolvedRollType or rollType,
+            rollValue = resolvedRollValue or rollValue,
+            rollSessionId = resolvedSessionId,
+            expiresAt = resolvedExpiresAt,
+            ts = now,
         }
     end
 
-    function module:ConsumePendingAward(itemLink, looter, maxAge)
+    function module:RemovePendingAward(itemLink, looter, maxAge, rollSessionId, preferResolvedValue)
         local ttl = tonumber(maxAge) or PENDING_AWARD_TTL_SECONDS
         if ttl < 0 then
             ttl = 0
         end
-        local key = buildPendingAwardKey(itemLink, looter)
-        local list = lootState.pendingAwards[key]
-        if not list then
-            local rawLinkKey = buildPendingAwardKey(itemLink, looter, true)
-            if rawLinkKey ~= key then
-                key = rawLinkKey
-                list = lootState.pendingAwards[key]
-            end
-        end
+        local key, list = getPendingAwardList(itemLink, looter)
         if not list then
             return nil
         end
         local now = GetTime()
+        local preferredSessionId = rollSessionId and tostring(rollSessionId) or nil
+        if preferredSessionId and preferredSessionId ~= "" then
+            for i = 1, #list do
+                local p = list[i]
+                if isPendingAwardValid(p, now, ttl) and tostring(p.rollSessionId or "") == preferredSessionId then
+                    return consumePendingAwardAt(list, key, i, itemLink, looter, ttl)
+                end
+            end
+        end
+        if preferResolvedValue then
+            for i = 1, #list do
+                local p = list[i]
+                if isPendingAwardValid(p, now, ttl) and hasResolvedPendingAwardValue(p) then
+                    return consumePendingAwardAt(list, key, i, itemLink, looter, ttl)
+                end
+            end
+        end
         for i = 1, #list do
             local p = list[i]
-            if p and (now - (p.ts or 0)) <= ttl then
-                tremove(list, i)
-                local remaining = #list
-                if #list == 0 then
-                    lootState.pendingAwards[key] = nil
-                end
-                addon:debug(Diag.D.LogLootPendingAwardConsumed:format(tostring(itemLink), tostring(looter), remaining, ttl))
-                return p
+            if isPendingAwardValid(p, now, ttl) then
+                return consumePendingAwardAt(list, key, i, itemLink, looter, ttl)
             end
         end
-        for i = #list, 1, -1 do
-            local p = list[i]
-            if not p or (now - (p.ts or 0)) > ttl then
-                tremove(list, i)
-            end
-        end
+        pruneExpiredPendingAwards(list, now, ttl)
         if #list == 0 then
             lootState.pendingAwards[key] = nil
         end
         return nil
+    end
+
+    function module:RefreshPendingAward(itemLink, looter, maxAge, rollSessionId, expiresAt)
+        local ttl = tonumber(maxAge) or PENDING_AWARD_TTL_SECONDS
+        if ttl < 0 then
+            ttl = 0
+        end
+        local key, list = getPendingAwardList(itemLink, looter)
+        if not list then
+            return nil
+        end
+
+        local now = GetTime()
+        local resolvedSessionId = rollSessionId and tostring(rollSessionId) or nil
+        local resolvedExpiresAt = tonumber(expiresAt) or nil
+        local touched = nil
+
+        if resolvedSessionId and resolvedSessionId ~= "" then
+            for i = 1, #list do
+                local pending = list[i]
+                if isPendingAwardValid(pending, now, ttl) and tostring(pending.rollSessionId or "") == resolvedSessionId then
+                    touched = pending
+                    break
+                end
+            end
+        end
+
+        if not touched then
+            local uniqueIndex = nil
+            for i = 1, #list do
+                local pending = list[i]
+                if isPendingAwardValid(pending, now, ttl) then
+                    if uniqueIndex then
+                        uniqueIndex = false
+                        break
+                    end
+                    uniqueIndex = i
+                end
+            end
+
+            if type(uniqueIndex) == "number" then
+                touched = list[uniqueIndex]
+            end
+        end
+
+        pruneExpiredPendingAwards(list, now, ttl)
+        if #list == 0 then
+            lootState.pendingAwards[key] = nil
+        end
+
+        if not touched then
+            return nil
+        end
+
+        touched.ts = now
+        if resolvedSessionId and (not touched.rollSessionId or touched.rollSessionId == "") then
+            touched.rollSessionId = resolvedSessionId
+        end
+        if resolvedExpiresAt and ((tonumber(touched.expiresAt) or 0) < resolvedExpiresAt) then
+            touched.expiresAt = resolvedExpiresAt
+        end
+        return touched
     end
 
     function module:PurgePendingAwards(maxAge)
@@ -179,12 +329,7 @@ do
             if type(list) ~= "table" then
                 lootState.pendingAwards[key] = nil
             else
-                for i = #list, 1, -1 do
-                    local p = list[i]
-                    if not p or (now - (p.ts or 0)) > ttl then
-                        tremove(list, i)
-                    end
-                end
+                pruneExpiredPendingAwards(list, now, ttl)
                 if #list == 0 then
                     lootState.pendingAwards[key] = nil
                 end

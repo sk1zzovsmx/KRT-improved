@@ -346,11 +346,15 @@ local function newHarness()
         BANK = 5,
         DISENCHANT = 6,
         HOLD = 7,
+        NEED = 8,
+        GREED = 9,
     }
     local C = {
         ITEM_LINK_PATTERN = "|?c?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?" .. "(%-?%d*):?(%-?%d*):?(%d*)|?h?%[?([^%[%]]*)%]?|?h?|?r?",
         BOSS_KILL_DEDUPE_WINDOW_SECONDS = 30,
-        PENDING_AWARD_TTL_SECONDS = 120,
+        PENDING_AWARD_TTL_SECONDS = 8,
+        GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = 60,
+        GROUP_LOOT_ROLL_GRACE_SECONDS = 10,
         RESERVES_ITEM_FALLBACK_ICON = "fallback-icon",
         RESERVES_QUERY_COOLDOWN_SECONDS = 2,
         CLASS_COLORS = {},
@@ -429,7 +433,7 @@ local function newHarness()
     })
 
     services.Loot = {
-        ConsumePendingAward = function()
+        RemovePendingAward = function()
             return nil
         end,
     }
@@ -926,6 +930,7 @@ local function newHarness()
             fromInventory = false,
             currentRollType = nil,
             currentRollItem = 0,
+            pendingAwards = {},
         },
         raidState = {},
         Time = {
@@ -999,6 +1004,24 @@ local function newHarness()
     _G.LOOT_ITEM_SELF_MULTIPLE = "LOOT_ITEM_SELF_MULTIPLE"
     _G.LOOT_ITEM_SELF = "LOOT_ITEM_SELF"
     _G.LOOT_ROLL_YOU_WON = "LOOT_ROLL_YOU_WON"
+    _G.LOOT_ROLL_WON = "LOOT_ROLL_WON"
+    _G.LOOT_ROLL_NEED = "LOOT_ROLL_NEED"
+    _G.LOOT_ROLL_NEED_SELF = "LOOT_ROLL_NEED_SELF"
+    _G.LOOT_ROLL_GREED = "LOOT_ROLL_GREED"
+    _G.LOOT_ROLL_GREED_SELF = "LOOT_ROLL_GREED_SELF"
+    _G.LOOT_ROLL_DISENCHANT = "LOOT_ROLL_DISENCHANT"
+    _G.LOOT_ROLL_DISENCHANT_SELF = "LOOT_ROLL_DISENCHANT_SELF"
+    _G.LOOT_ROLL_ROLLED_NEED = "LOOT_ROLL_ROLLED_NEED"
+    _G.LOOT_ROLL_ROLLED_GREED = "LOOT_ROLL_ROLLED_GREED"
+    _G.LOOT_ROLL_ROLLED_DE = "LOOT_ROLL_ROLLED_DE"
+    _G.LOOT_ROLL_WON_NO_SPAM_NEED = "LOOT_ROLL_WON_NO_SPAM_NEED"
+    _G.LOOT_ROLL_YOU_WON_NO_SPAM_NEED = "LOOT_ROLL_YOU_WON_NO_SPAM_NEED"
+    _G.LOOT_ROLL_WON_NO_SPAM_GREED = "LOOT_ROLL_WON_NO_SPAM_GREED"
+    _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED = "LOOT_ROLL_YOU_WON_NO_SPAM_GREED"
+    _G.LOOT_ROLL_WON_NO_SPAM_DE = "LOOT_ROLL_WON_NO_SPAM_DE"
+    _G.LOOT_ROLL_YOU_WON_NO_SPAM_DE = "LOOT_ROLL_YOU_WON_NO_SPAM_DE"
+    _G.LOOT_ROLL_WON_NO_SPAM_DISENCHANT = "LOOT_ROLL_WON_NO_SPAM_DISENCHANT"
+    _G.LOOT_ROLL_YOU_WON_NO_SPAM_DISENCHANT = "LOOT_ROLL_YOU_WON_NO_SPAM_DISENCHANT"
     _G.TRADE = "Trade"
     _G.RAID_TARGET_MARKERS = {
         "{rt1}",
@@ -1116,6 +1139,10 @@ local function newHarness()
         local itemId = parseItemId(value)
         local item = itemId and itemRegistry[itemId] or nil
         return item and item.icon or nil
+    end
+
+    _G.GetLootRollItemLink = function()
+        return nil
     end
 
     _G.time = _G.time or os.time
@@ -1486,7 +1513,7 @@ local function setupMasterAwardHarness(cfg)
         GetItemLink = function()
             return link
         end,
-        QueuePendingAward = function(_, itemLinkArg, playerName, rollType, rollValue, sessionId)
+        AddPendingAward = function(_, itemLinkArg, playerName, rollType, rollValue, sessionId)
             queuedAwards[#queuedAwards + 1] = {
                 itemLink = itemLinkArg,
                 playerName = playerName,
@@ -1735,6 +1762,966 @@ test("trade-only loot creates a reusable lootNid", function()
     assertEqual(raid.loot[1].lootNid, lootNid, "expected trade-only entry to keep its lootNid")
     assertEqual(raid.loot[1].rollType, h.rollTypes.RESERVED, "expected logger update to mutate same entry")
     assertEqual(raid.loot[1].rollValue, 77, "expected logger update to keep same entry")
+end)
+
+test("group loot need selections log passive NE history on loot receipt", function()
+    local h = newHarness()
+    local link = h.registerItem(9150, "Needblade")
+    local pendingAwards = {}
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    h.addon.Services.Loot = {
+        AddPendingAward = function(_, itemLinkArg, looter, rollType, rollValue)
+            pendingAwards[#pendingAwards + 1] = {
+                itemLink = itemLinkArg,
+                looter = looter,
+                rollType = rollType,
+                rollValue = rollValue,
+            }
+        end,
+        RemovePendingAward = function(_, itemLinkArg, looter)
+            local entry = pendingAwards[1]
+            if entry and entry.itemLink == itemLinkArg and entry.looter == looter then
+                table.remove(pendingAwards, 1)
+                return entry
+            end
+            return nil
+        end,
+    }
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_NEED_SELF and msg == "need-select-self" then
+            return 77, link
+        end
+        if pattern == _G.LOOT_ITEM_SELF and msg == "loot-receive-self" then
+            return link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+    assertTrue(Raid:CanObservePassiveLoot(), "expected passive loot logging to stay enabled for group loot")
+    assertEqual(Raid:AddGroupLootMessage("need-select-self"), "selection", "expected self need selection to queue passive history")
+
+    Raid:AddLoot("loot-receive-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected group loot receipt to create one loot entry")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected queued need selection to classify the loot as NE")
+    assertEqual(raid.loot[1].rollValue, 0, "expected passive group loot entries to default rollValue to 0")
+end)
+
+test("group loot winner messages log passive GR history directly", function()
+    local h = newHarness()
+    local link = h.registerItem(9160, "Greedblade")
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "needbeforegreed", nil, nil
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "greed-win-self" then
+            return 91, 88, link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertEqual(Raid:AddGroupLootMessage("greed-win-self"), "winner", "expected self greed winner message to be recognized")
+    Raid:AddLoot("greed-win-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected self winner message to create one loot entry")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.GREED, "expected self winner message to classify the loot as GR")
+    assertEqual(raid.loot[1].rollValue, 88, "expected self winner message to preserve the greed roll value")
+end)
+
+test("group loot raw need and won messages log passive NE history", function()
+    local h = newHarness()
+    local link = h.registerItem(9170, "Sabatons")
+    local pendingAwards = {}
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    h.addon.Services.Loot = {
+        AddPendingAward = function(_, itemLinkArg, looter, rollType, rollValue)
+            pendingAwards[#pendingAwards + 1] = {
+                itemLink = itemLinkArg,
+                looter = looter,
+                rollType = rollType,
+                rollValue = rollValue,
+            }
+        end,
+        RemovePendingAward = function(_, itemLinkArg, looter)
+            local entry = pendingAwards[1]
+            if entry and entry.itemLink == itemLinkArg and entry.looter == looter then
+                table.remove(pendingAwards, 1)
+                return entry
+            end
+            return nil
+        end,
+    }
+    h.addon.Deformat = function()
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertEqual(Raid:AddGroupLootMessage("You have selected Need for: " .. link), "selection", "expected raw need selection message to queue passive history")
+
+    Raid:AddLoot("You won: " .. link)
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected raw win message to create one loot entry")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected raw need selection to classify the loot as NE")
+end)
+
+test("raw winner messages do not poison later duplicate passive receipts", function()
+    local h = newHarness()
+    local link = h.registerItem(9171, "Duplicate Sabatons")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    h.addon.Deformat = function()
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    assertEqual(Raid:AddGroupLootMessage("You have selected Need for: " .. link), "selection", "expected first raw need selection to queue passive history")
+    assertEqual(Raid:AddGroupLootMessage("You won: " .. link), "winner", "expected first raw winner message to be observed")
+    Raid:AddLoot("You won: " .. link)
+
+    assertEqual(Raid:AddGroupLootMessage("You have selected Need for: " .. link), "selection", "expected second raw need selection to queue passive history")
+    assertEqual(Raid:AddGroupLootMessage("You won: " .. link), "winner", "expected second raw winner message to be observed")
+    Raid:AddLoot("You won: " .. link)
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 2, "expected duplicate raw win messages to create two loot entries")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected first duplicate raw win to keep NE type")
+    assertEqual(raid.loot[2].rollType, h.rollTypes.NEED, "expected second duplicate raw win to keep NE type")
+end)
+
+test("group loot rolled lines queue winner type before raw won message", function()
+    local h = newHarness()
+    local link = h.registerItem(9180, "Protector Token")
+    local pendingAwards = {}
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    h.addon.Services.Loot = {
+        AddPendingAward = function(_, itemLinkArg, looter, rollType, rollValue)
+            pendingAwards[#pendingAwards + 1] = {
+                itemLink = itemLinkArg,
+                looter = looter,
+                rollType = rollType,
+                rollValue = rollValue,
+            }
+        end,
+        RemovePendingAward = function(_, itemLinkArg, looter)
+            local entry = pendingAwards[1]
+            if entry and entry.itemLink == itemLinkArg and entry.looter == looter then
+                table.remove(pendingAwards, 1)
+                return entry
+            end
+            return nil
+        end,
+    }
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_ROLLED_NEED and msg == "need-roll-45" then
+            return 45, link, "Tester"
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertEqual(Raid:AddGroupLootMessage("need-roll-45"), "selection", "expected rolled need line to queue passive history")
+
+    Raid:AddLoot("Tester won: " .. link)
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected raw winner line to create one loot entry")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected rolled need line to preserve NE type")
+    assertEqual(raid.loot[1].rollValue, 45, "expected rolled need line to preserve the rolled value")
+end)
+
+test("loot pending awards upgrade selection entries with later group roll values", function()
+    local h = newHarness()
+    local link = h.registerItem(9185, "Awareness Sigil")
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_ROLLED_NEED and msg == "need-roll-96" then
+            return 96, link, "Tester"
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    assertEqual(Raid:AddGroupLootMessage("You have selected Need for: " .. link), "selection", "expected raw need selection message to queue passive history")
+    assertEqual(Raid:AddGroupLootMessage("need-roll-96"), "selection", "expected rolled need line to upgrade passive history")
+
+    Raid:AddLoot("You won: " .. link)
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected upgraded pending award to create one loot entry")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected upgraded pending award to keep NE type")
+    assertEqual(raid.loot[1].rollValue, 96, "expected upgraded pending award to preserve the numeric rollValue")
+end)
+
+test("group loot pending awards fall back to 60 seconds without roll metadata", function()
+    local h = newHarness()
+    local link = h.registerItem(9187, "Delayed Needblade")
+    local now = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetTime = function()
+        return now
+    end
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_NEED_SELF and msg == "need-select-self" then
+            return 77, link
+        end
+        return nil
+    end
+
+    h.feature.lootState.currentRollType = h.rollTypes.FREE
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    assertEqual(Raid:AddGroupLootMessage("need-select-self"), "selection", "expected passive group-loot selection to queue")
+
+    now = now + 59
+    Raid:AddLoot("You won: " .. link)
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected delayed group-loot receipt to create one loot entry")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected delayed group-loot receipt to keep the queued NE type")
+end)
+
+test("start loot roll extends passive group loot expiry beyond the fallback ttl", function()
+    local h = newHarness()
+    local link = h.registerItem(9188, "Tracked Needblade")
+    local now = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetTime = function()
+        return now
+    end
+    _G.GetLootRollItemLink = function(rollId)
+        if rollId == 77 then
+            return link
+        end
+        return nil
+    end
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_NEED_SELF and msg == "need-select-self" then
+            return 77, link
+        end
+        return nil
+    end
+
+    h.feature.lootState.currentRollType = h.rollTypes.FREE
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    Raid:AddPassiveLootRoll(77, 65000)
+    assertEqual(Raid:AddGroupLootMessage("need-select-self"), "selection", "expected tracked passive group-loot selection to queue")
+
+    now = now + 70
+    Raid:AddLoot("You won: " .. link)
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected tracked passive group-loot receipt to create one loot entry")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected tracked passive group-loot receipt to keep the queued NE type")
+    assertEqual(raid.loot[1].rollSessionId, "GL:1", "expected START_LOOT_ROLL tracking to stamp a passive roll session id")
+end)
+
+test("loot winner dispatch defers passive logging to the later receipt", function()
+    local h = newHarness()
+    local addLootCalls = {}
+    local rollsMessages = {}
+    local oldLibStub = _G.LibStub
+    local mainFrame = h.makeFrame(true, "KRTMainTestFrame")
+
+    h.addon.Diagnose = {
+        D = {
+            LogLootChatMsgLootRaw = "[Loot] CHAT_MSG_LOOT raw=%s",
+        },
+        I = {},
+        W = {},
+        E = {},
+    }
+
+    function mainFrame:RegisterEvent(eventName)
+        self._events = self._events or {}
+        self._events[eventName] = true
+    end
+
+    function mainFrame:UnregisterEvent(eventName)
+        if self._events then
+            self._events[eventName] = nil
+        end
+    end
+
+    function mainFrame:UnregisterAllEvents()
+        self._events = {}
+    end
+
+    _G.LibStub = function(name)
+        if name == "LibCompat-1.0" then
+            return {
+                Embed = function() end,
+                Print = function() end,
+            }
+        end
+        if name == "LibBossIDs-1.0" then
+            return {}
+        end
+        if name == "LibLogger-1.0" then
+            return {
+                logLevels = {
+                    INFO = 1,
+                    DEBUG = 2,
+                },
+                Embed = function(_, target)
+                    target.SetLogLevel = target.SetLogLevel or function() end
+                end,
+            }
+        end
+        if name == "LibDeformat-3.0" then
+            return function()
+                return nil
+            end
+        end
+        error("unexpected LibStub request: " .. tostring(name), 0)
+    end
+
+    h.addon.State.frames = { main = mainFrame }
+    h:load("!KRT/Init.lua")
+    h.addon.Core.SetCurrentRaid(1)
+    h.addon.Services.Raid = {
+        AddGroupLootMessage = function(_, msg)
+            if msg == "winner-loot" then
+                return "winner"
+            end
+            return nil
+        end,
+        CanObservePassiveLoot = function()
+            return true
+        end,
+        AddLoot = function(_, msg)
+            addLootCalls[#addLootCalls + 1] = msg
+        end,
+    }
+    h.addon.Services.Rolls = {
+        CHAT_MSG_SYSTEM = function(_, msg)
+            rollsMessages[#rollsMessages + 1] = msg
+        end,
+    }
+
+    h.addon:CHAT_MSG_LOOT("winner-loot")
+    h.addon:CHAT_MSG_SYSTEM("roll-system")
+    h.addon:CHAT_MSG_LOOT("loot-receipt")
+
+    _G.LibStub = oldLibStub
+
+    assertEqual(#addLootCalls, 1, "expected only the loot receipt to materialize a passive loot row")
+    assertEqual(addLootCalls[1], "loot-receipt", "expected loot logging to be deferred to CHAT_MSG_LOOT")
+    assertEqual(#rollsMessages, 1, "expected system messages to keep flowing to the rolls service")
+    assertEqual(rollsMessages[1], "roll-system", "expected the rolls service to receive the unrelated system message")
+end)
+
+test("start loot roll dispatch forwards to the raid service", function()
+    local h = newHarness()
+    local observed = {}
+    local oldLibStub = _G.LibStub
+    local mainFrame = h.makeFrame(true, "KRTMainTestFrame")
+
+    function mainFrame:RegisterEvent(eventName)
+        self._events = self._events or {}
+        self._events[eventName] = true
+    end
+
+    function mainFrame:UnregisterEvent(eventName)
+        if self._events then
+            self._events[eventName] = nil
+        end
+    end
+
+    function mainFrame:UnregisterAllEvents()
+        self._events = {}
+    end
+
+    _G.LibStub = function(name)
+        if name == "LibCompat-1.0" then
+            return {
+                Embed = function() end,
+                Print = function() end,
+            }
+        end
+        if name == "LibBossIDs-1.0" then
+            return {}
+        end
+        if name == "LibLogger-1.0" then
+            return {
+                logLevels = {
+                    INFO = 1,
+                    DEBUG = 2,
+                },
+                Embed = function(_, target)
+                    target.SetLogLevel = target.SetLogLevel or function() end
+                end,
+            }
+        end
+        if name == "LibDeformat-3.0" then
+            return function()
+                return nil
+            end
+        end
+        error("unexpected LibStub request: " .. tostring(name), 0)
+    end
+
+    h.addon.State.frames = { main = mainFrame }
+    h:load("!KRT/Init.lua")
+    h.addon.Core.SetCurrentRaid(1)
+    h.addon.Services.Raid = {
+        AddPassiveLootRoll = function(_, rollId, rollTime)
+            observed.rollId = rollId
+            observed.rollTime = rollTime
+        end,
+    }
+
+    h.addon:START_LOOT_ROLL(44, 65000)
+    _G.LibStub = oldLibStub
+
+    assertEqual(observed.rollId, 44, "expected START_LOOT_ROLL to forward the roll id to the raid service")
+    assertEqual(observed.rollTime, 65000, "expected START_LOOT_ROLL to forward the roll time to the raid service")
+end)
+
+test("passive loot observation is limited to group-based loot methods", function()
+    local h = newHarness()
+    local lootMethod = "group"
+    _G.GetLootMethod = function()
+        return lootMethod, nil, nil
+    end
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertTrue(Raid:CanObservePassiveLoot(), "expected Group Loot to allow passive observation")
+
+    lootMethod = "needbeforegreed"
+    assertTrue(Raid:CanObservePassiveLoot(), "expected Need Before Greed to allow passive observation")
+
+    lootMethod = "freeforall"
+    assertTrue(not Raid:CanObservePassiveLoot(), "expected Free For All to keep passive observation disabled")
+
+    lootMethod = "roundrobin"
+    assertTrue(not Raid:CanObservePassiveLoot(), "expected Round Robin to keep passive observation disabled")
+end)
+
+test("loot pending awards prefer a matching roll session over older duplicates", function()
+    local h = newHarness()
+    local link = h.registerItem(9189, "Session Sigil")
+
+    h:load("!KRT/Services/Loot.lua")
+    local Loot = h.addon.Services.Loot
+
+    Loot:AddPendingAward(link, "Tester", h.rollTypes.MAINSPEC, 99, "RS:old")
+    Loot:AddPendingAward(link, "Tester", h.rollTypes.OFFSPEC, 12, "RS:new")
+
+    local picked = Loot:RemovePendingAward(link, "Tester", 120, "RS:new")
+    local fallback = Loot:RemovePendingAward(link, "Tester", 120)
+
+    assertTrue(picked ~= nil, "expected a pending award to match the preferred roll session")
+    assertEqual(picked.rollSessionId, "RS:new", "expected pending award lookup to prefer the requested roll session")
+    assertEqual(picked.rollType, h.rollTypes.OFFSPEC, "expected pending award lookup to return the matching session payload")
+    assertTrue(fallback ~= nil, "expected the older pending award to remain queued after the session-specific consume")
+    assertEqual(fallback.rollSessionId, "RS:old", "expected fallback consume to return the older unmatched pending award")
+end)
+
+test("master loot add loot prefers the active roll session pending award", function()
+    local h = newHarness()
+    local link = h.registerItem(9190, "Master Sigil")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "master", 0, 0
+    end
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "loot-receive-self" then
+            return link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Loot = h.addon.Services.Loot
+    local Raid = h.addon.Services.Raid
+    local itemId = h.addon.Item.GetItemIdFromLink(link)
+    Loot:AddPendingAward(link, "Tester", h.rollTypes.MAINSPEC, 99, "RS:old")
+    Loot:AddPendingAward(link, "Tester", h.rollTypes.OFFSPEC, 12, "RS:new")
+    h.feature.lootState.rollSession = {
+        id = "RS:new",
+        itemKey = h.addon.Item.GetItemStringFromLink(link),
+        itemId = itemId,
+        itemLink = link,
+        rollType = h.rollTypes.OFFSPEC,
+        lootNid = 0,
+        startedAt = 1000,
+        endsAt = nil,
+        source = "lootWindow",
+        expectedWinners = 1,
+        active = true,
+    }
+
+    Raid:AddLoot("loot-receive-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected master loot receipt to create one loot entry")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.OFFSPEC, "expected master loot receipt to use the pending award from the active roll session")
+    assertEqual(raid.loot[1].rollValue, 12, "expected master loot receipt to keep the active roll session rollValue")
+    assertEqual(raid.loot[1].rollSessionId, "RS:new", "expected master loot receipt to bind the active roll session id")
+end)
+
+test("loot pending awards upgrade the next FIFO duplicate entry", function()
+    local h = newHarness()
+    local link = h.registerItem(9186, "Twin Sigil")
+
+    h:load("!KRT/Services/Loot.lua")
+    local Loot = h.addon.Services.Loot
+
+    Loot:AddPendingAward(link, "Tester", h.rollTypes.NEED, 0, nil)
+    Loot:AddPendingAward(link, "Tester", h.rollTypes.NEED, 0, nil)
+    Loot:AddPendingAward(link, "Tester", h.rollTypes.NEED, 96, nil)
+
+    local first = Loot:RemovePendingAward(link, "Tester", 120)
+    local second = Loot:RemovePendingAward(link, "Tester", 120)
+
+    assertTrue(first ~= nil, "expected first pending award to exist")
+    assertTrue(second ~= nil, "expected second pending award to exist")
+    assertEqual(first.rollValue, 96, "expected FIFO consumption to receive the upgraded roll value first")
+    assertEqual(second.rollValue, 0, "expected later duplicate pending award to remain untouched")
+end)
+
+test("loot pending award upgrades prefer an explicit matching session", function()
+    local h = newHarness()
+    local link = h.registerItem(91861, "Twin Sigil Sessioned")
+
+    h:load("!KRT/Services/Loot.lua")
+    local Loot = h.addon.Services.Loot
+
+    Loot:AddPendingAward(link, "Tester", h.rollTypes.NEED, 0, "GL:1")
+    Loot:AddPendingAward(link, "Tester", h.rollTypes.NEED, 0, "GL:2")
+    Loot:AddPendingAward(link, "Tester", h.rollTypes.NEED, 96, "GL:2")
+
+    local first = Loot:RemovePendingAward(link, "Tester", 120, "GL:1")
+    local second = Loot:RemovePendingAward(link, "Tester", 120, "GL:2")
+
+    assertTrue(first ~= nil, "expected first session pending award to exist")
+    assertTrue(second ~= nil, "expected second session pending award to exist")
+    assertEqual(first.rollValue, 0, "expected unrelated session pending award to keep its zero roll value")
+    assertEqual(second.rollValue, 96, "expected explicit session upgrade to preserve the numeric roll value on the matching session")
+end)
+
+test("passive group loot selections keep duplicate item sessions separate by roll id", function()
+    local h = newHarness()
+    local link = h.registerItem(91862, "Duplicated Sigil")
+    local now = 1000
+
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetTime = function()
+        return now
+    end
+    _G.GetLootRollItemLink = function(rollId)
+        if rollId == 77 or rollId == 78 then
+            return link
+        end
+        return nil
+    end
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_NEED_SELF and msg == "need-select-self-1" then
+            return 77, link
+        end
+        if pattern == _G.LOOT_ROLL_NEED_SELF and msg == "need-select-self-2" then
+            return 78, link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Loot = h.addon.Services.Loot
+    local Raid = h.addon.Services.Raid
+    Raid:AddPassiveLootRoll(77, 65000)
+    Raid:AddPassiveLootRoll(78, 65000)
+    assertEqual(Raid:AddGroupLootMessage("need-select-self-1"), "selection", "expected first duplicate passive selection to queue")
+    assertEqual(Raid:AddGroupLootMessage("need-select-self-2"), "selection", "expected second duplicate passive selection to queue")
+
+    local first = Loot:RemovePendingAward(link, "Tester", 120, "GL:1")
+    local second = Loot:RemovePendingAward(link, "Tester", 120, "GL:2")
+
+    assertTrue(first ~= nil, "expected first passive duplicate session to remain consumable")
+    assertTrue(second ~= nil, "expected second passive duplicate session to remain consumable")
+    assertEqual(first.rollSessionId, "GL:1", "expected first duplicate passive selection to keep the first roll session id")
+    assertEqual(second.rollSessionId, "GL:2", "expected second duplicate passive selection to keep the second roll session id")
+end)
+
+test("ambiguous duplicate passive rolls stay sessionless without roll ids", function()
+    local h = newHarness()
+    local link = h.registerItem(91863, "Ambiguous Sigil")
+    local now = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetTime = function()
+        return now
+    end
+    _G.GetLootRollItemLink = function(rollId)
+        if rollId == 77 or rollId == 78 then
+            return link
+        end
+        return nil
+    end
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_ROLLED_NEED and msg == "need-roll-91" then
+            return 91, link, "Tester"
+        end
+        if pattern == _G.LOOT_ROLL_ROLLED_NEED and msg == "need-roll-87" then
+            return 87, link, "Tester"
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    Raid:AddPassiveLootRoll(77, 65000)
+    Raid:AddPassiveLootRoll(78, 65000)
+    assertEqual(Raid:AddGroupLootMessage("Tester has selected Need for: " .. link), "selection", "expected first ambiguous selection to queue")
+    assertEqual(Raid:AddGroupLootMessage("Tester has selected Need for: " .. link), "selection", "expected second ambiguous selection to queue")
+    assertEqual(Raid:AddGroupLootMessage("need-roll-91"), "selection", "expected first ambiguous numeric roll to queue")
+    assertEqual(Raid:AddGroupLootMessage("need-roll-87"), "selection", "expected second ambiguous numeric roll to queue")
+
+    Raid:AddLoot("Tester won: " .. link)
+    Raid:AddLoot("Tester won: " .. link)
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 2, "expected both ambiguous duplicate passive rolls to log")
+    assertEqual(raid.loot[1].rollValue, 91, "expected first ambiguous duplicate to keep the first numeric roll")
+    assertEqual(raid.loot[2].rollValue, 87, "expected second ambiguous duplicate to keep the second numeric roll")
+    assertEqual(raid.loot[1].rollSessionId, nil, "expected ambiguous duplicate passive rolls to stay sessionless")
+    assertEqual(raid.loot[2].rollSessionId, nil, "expected ambiguous duplicate passive rolls to stay sessionless")
+end)
+
+test("passive duplicate receipts prefer resolved winner values over zero placeholders", function()
+    local h = newHarness()
+    local link = h.registerItem(91864, "Resolved Sigil")
+    local now = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetTime = function()
+        return now
+    end
+    _G.GetLootRollItemLink = function(rollId)
+        if rollId == 77 or rollId == 78 then
+            return link
+        end
+        return nil
+    end
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_NEED_SELF and msg == "need-select-self-1" then
+            return 77, link
+        end
+        if pattern == _G.LOOT_ROLL_NEED_SELF and msg == "need-select-self-2" then
+            return 78, link
+        end
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_NEED and msg == "need-win-self-2" then
+            return 78, 97, link
+        end
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_NEED and msg == "need-win-self-1" then
+            return 77, 99, link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    Raid:AddPassiveLootRoll(77, 65000)
+    Raid:AddPassiveLootRoll(78, 65000)
+    assertEqual(Raid:AddGroupLootMessage("need-select-self-1"), "selection", "expected first duplicate selection to queue")
+    assertEqual(Raid:AddGroupLootMessage("need-select-self-2"), "selection", "expected second duplicate selection to queue")
+    assertEqual(Raid:AddGroupLootMessage("need-win-self-2"), "winner", "expected second duplicate winner to resolve first")
+
+    Raid:AddLoot("You won: " .. link)
+
+    assertEqual(Raid:AddGroupLootMessage("need-win-self-1"), "winner", "expected first duplicate winner to resolve second")
+    Raid:AddLoot("You won: " .. link)
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 2, "expected both resolved duplicate passive receipts to log")
+    assertEqual(raid.loot[1].rollValue, 97, "expected first receipt to consume the resolved winner value instead of a zero placeholder")
+    assertEqual(raid.loot[2].rollValue, 99, "expected second receipt to keep the later resolved winner value")
 end)
 
 test("held loot lookup skips consumed duplicates and returns the next matching hold", function()

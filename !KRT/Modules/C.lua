@@ -22,6 +22,8 @@ C.rollTypes = {
     BANK = 5,
     DISENCHANT = 6,
     HOLD = 7,
+    NEED = 8,
+    GREED = 9,
 }
 
 -- Roll Type Colored Display Text
@@ -34,6 +36,8 @@ C.lootTypesColored = {
     [5] = "|cffff7f00" .. L.BtnBank .. "|r",
     [6] = "|cffff2020" .. L.BtnDisenchant .. "|r",
     [7] = "|cffffffff" .. L.BtnHold .. "|r",
+    [8] = "|cff33ddff" .. L.BtnNeed .. "|r",
+    [9] = "|cffffd966" .. L.BtnGreed .. "|r",
 }
 
 -- Item Quality Colors
@@ -87,6 +91,10 @@ C.ML_MULTI_AWARD_DELAY = 0.2
 -- Safety timeout: abort multi-award if the loot window does not reflect expected decrements.
 C.ML_MULTI_AWARD_TIMEOUT_SECONDS = 4
 C.PENDING_AWARD_TTL_SECONDS = 8
+-- Passive Group Loot / Need Before Greed falls back to a short fixed window
+-- only when START_LOOT_ROLL metadata is unavailable.
+C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = 60
+C.GROUP_LOOT_ROLL_GRACE_SECONDS = 10
 C.BOSS_KILL_DEDUPE_WINDOW_SECONDS = 30
 
 C.LOOT_COUNTER_ROW_HEIGHT = 25

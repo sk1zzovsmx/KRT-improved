@@ -3429,7 +3429,7 @@ do
         if candidateIndex then
             -- Mark this award as addon-driven so AddLoot() won't classify it as MANUAL
             local session = ensureRollSession(itemLink, rollType, lootState.fromInventory and "inventory" or "lootWindow")
-            Loot:QueuePendingAward(itemLink, playerName, rollType, rollValue, session and session.id or nil)
+            Loot:AddPendingAward(itemLink, playerName, rollType, rollValue, session and session.id or nil)
             GiveMasterLoot(itemIndex, candidateIndex)
             addon:debug(
                 Diag.D.LogMLAwarded:format(

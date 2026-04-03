@@ -12,6 +12,12 @@ Release-Version: 0.6.2b
   non-master clients no longer run loot/roll ingestion
   (`CHAT_MSG_LOOT`/`CHAT_MSG_SYSTEM`) and slash/minimap
   entrypoints now block master-only modules.
+- Restored passive Logger history for non-master loot modes:
+  Group Loot / Need Before Greed outcomes now log into the
+  current raid history with `NE`, `GR`, and `DE` roll types
+  while keeping master-only gameplay flows blocked. When the
+  server also emits numeric group-roll lines, the Logger now
+  preserves that `rollValue` too.
 - Centralized raid-role capability checks so loot, raid-warning,
   changes broadcast, ready-check, and raid-icon actions derive
   their enabled/disabled state from a shared policy.

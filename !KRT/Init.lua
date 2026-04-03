@@ -1243,6 +1243,7 @@ do
     local addonEvents = {
         CHAT_MSG_SYSTEM = "CHAT_MSG_SYSTEM",
         CHAT_MSG_LOOT = "CHAT_MSG_LOOT",
+        START_LOOT_ROLL = "START_LOOT_ROLL",
         CHAT_MSG_ADDON = "CHAT_MSG_ADDON",
         CHAT_MSG_MONSTER_YELL = "CHAT_MSG_MONSTER_YELL",
         RAID_ROSTER_UPDATE = "RAID_ROSTER_UPDATE",
@@ -1398,17 +1399,34 @@ do
         end)
     end
 
+    local function observePassiveLootMessage(msg)
+        local currentRaid = Core.GetCurrentRaid()
+        local raidService = getRaidService()
+        if not (currentRaid and raidService and raidService.AddGroupLootMessage) then
+            return raidService, nil
+        end
+        return raidService, raidService:AddGroupLootMessage(msg)
+    end
+
     -- CHAT_MSG_LOOT: Adds looted items to the raid log.
     function addon:CHAT_MSG_LOOT(msg)
         addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
-        local raidService = getRaidService()
-        if Core.GetCurrentRaid() and raidService and addon:CanUseMasterOnlyFeatures() then
+        local currentRaid = Core.GetCurrentRaid()
+        local raidService, observedType = observePassiveLootMessage(msg)
+        if not (currentRaid and raidService) then
+            return
+        end
+
+        local canObservePassiveLoot = raidService.CanObservePassiveLoot and raidService:CanObservePassiveLoot() or addon:CanUseMasterOnlyFeatures()
+        if canObservePassiveLoot and observedType == nil then
             raidService:AddLoot(msg)
         end
     end
 
     -- CHAT_MSG_SYSTEM: Forwards roll messages to the Rolls module.
     function addon:CHAT_MSG_SYSTEM(msg)
+        observePassiveLootMessage(msg)
+
         if Core.GetCurrentRaid() and addon:IsMasterOnlyBlocked() then
             return
         end
@@ -1416,6 +1434,15 @@ do
         if rollsService and rollsService.CHAT_MSG_SYSTEM then
             rollsService:CHAT_MSG_SYSTEM(msg)
         end
+    end
+
+    function addon:START_LOOT_ROLL(rollId, rollTime)
+        local currentRaid = Core.GetCurrentRaid()
+        local raidService = getRaidService()
+        if not (currentRaid and raidService and raidService.AddPassiveLootRoll) then
+            return
+        end
+        raidService:AddPassiveLootRoll(rollId, rollTime)
     end
 
     -- CHAT_MSG_ADDON: Forwards addon communication messages to the Syncer module.

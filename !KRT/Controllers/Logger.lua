@@ -577,6 +577,10 @@ do
             return "MS"
         elseif rt == rollTypes.OFFSPEC then
             return "OS"
+        elseif rt == rollTypes.NEED then
+            return "NE"
+        elseif rt == rollTypes.GREED then
+            return "GR"
         elseif rt == rollTypes.RESERVED then
             return "SR"
         elseif rt == rollTypes.FREE then
