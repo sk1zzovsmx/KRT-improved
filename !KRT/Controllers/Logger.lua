@@ -41,7 +41,6 @@ local itemColors = feature.itemColors
 
 local _G = _G
 local tinsert, tremove, twipe = table.insert, table.remove, table.wipe
-local tconcat = table.concat
 local pairs, ipairs, type, select = pairs, ipairs, type, select
 
 local tostring, tonumber = tostring, tonumber
@@ -52,10 +51,6 @@ local deleteSelectedAttendees
 local setFrameLabel
 local setPanelTitle
 local getSelectedRaidRecord
-local getSelectedRaidContextLabel
-local getSelectedBossContextLabel
-local getSelectedPlayerContextLabel
-local buildLootPanelContextLabel
 local setFrameHint
 
 local function getRaidQueries()
@@ -115,6 +110,23 @@ do
 
     -- ----- Private helpers ----- --
 
+    function UI.AcquireRefs(frame)
+        return {
+            historyTabBtn = Frames.Ref(frame, "Tab1"),
+            exportTabBtn = Frames.Ref(frame, "Tab2"),
+            history = Frames.Ref(frame, "History"),
+            export = Frames.Ref(frame, "Export"),
+            raids = Frames.Ref(frame, "KRTLoggerRaids"),
+            bosses = Frames.Ref(frame, "KRTLoggerBosses"),
+            loot = Frames.Ref(frame, "KRTLoggerLoot"),
+            raidAttendees = Frames.Ref(frame, "KRTLoggerRaidAttendees"),
+            bossAttendees = Frames.Ref(frame, "KRTLoggerBossAttendees"),
+            bossBox = Frames.Ref(frame, "KRTLoggerBossBox"),
+            attendeesBox = Frames.Ref(frame, "KRTLoggerPlayerBox"),
+            exportRaids = Frames.Ref(frame, "KRTLoggerExportRaids"),
+        }
+    end
+
     local function ensureSubmoduleOnLoad(moduleRef, frame)
         if not (moduleRef and moduleRef.OnLoad and frame) then
             return
@@ -161,67 +173,6 @@ do
             return nil
         end
         return Store:GetRaid(module.selectedRaid)
-    end
-
-    getSelectedRaidContextLabel = function()
-        local raid = getSelectedRaidRecord()
-        local zone = raid and raid.zone or nil
-        local difficulty = raid and View:GetRaidDifficultyLabel(raid) or ""
-        if zone and zone ~= "" and difficulty ~= "" then
-            return ("%s %s"):format(zone, difficulty)
-        end
-        if zone and zone ~= "" then
-            return zone
-        end
-        if difficulty ~= "" then
-            return difficulty
-        end
-        return nil
-    end
-
-    getSelectedBossContextLabel = function()
-        local raid = getSelectedRaidRecord()
-        local boss = (raid and module.selectedBoss) and Store:GetBoss(raid, module.selectedBoss) or nil
-        local name
-        local mode
-        if not boss then
-            return nil
-        end
-        name = boss.name
-        if not name or name == "" then
-            name = L.StrTrashMob
-        end
-        mode = View:GetBossModeLabel(boss)
-        if mode and mode ~= "" then
-            return ("%s %s"):format(name, mode)
-        end
-        return name
-    end
-
-    getSelectedPlayerContextLabel = function(playerNid)
-        local raid = getSelectedRaidRecord()
-        local player = (raid and playerNid) and Store:GetPlayer(raid, playerNid) or nil
-        if player and player.name and player.name ~= "" then
-            return L.StrLoggerLabelPlayer:format(player.name)
-        end
-        return nil
-    end
-
-    buildLootPanelContextLabel = function()
-        local parts = {}
-        local bossLabel = getSelectedBossContextLabel()
-        local playerLabel = getSelectedPlayerContextLabel(module.selectedBossPlayer or module.selectedPlayer)
-
-        if bossLabel and bossLabel ~= "" then
-            parts[#parts + 1] = bossLabel
-        end
-        if playerLabel and playerLabel ~= "" then
-            parts[#parts + 1] = playerLabel
-        end
-        if #parts > 0 then
-            return tconcat(parts, " | ")
-        end
-        return getSelectedRaidContextLabel()
     end
 
     local function applyFocusedMultiSelect(opts)
@@ -480,6 +431,14 @@ do
         end)
     end
 
+    local function getRaidNidByIndex(raidIndex)
+        return raidIndex and Core.GetRaidNidById(raidIndex) or nil
+    end
+
+    local function getRaidIndexByNid(raidNid)
+        return raidNid and Core.GetRaidIdByNid(raidNid) or nil
+    end
+
     -- Logger helpers: resolve current raid/boss/loot and run raid actions with a single refresh.
     function module:NeedRaid()
         local rID = module.selectedRaid
@@ -641,7 +600,7 @@ do
         if not raidNid then
             return
         end
-        local raidIndex = Helpers:GetRaidIndexByNid(raidNid)
+        local raidIndex = getRaidIndexByNid(raidNid)
         if not raidIndex then
             return
         end
@@ -662,11 +621,9 @@ do
             isRange = isRange,
             allowDeselect = opts and opts.allowDeselect,
             setFocus = SetSelectedRaid,
-            mapSelectedToFocus = function(nid)
-                return Helpers:GetRaidIndexByNid(nid)
-            end,
+            mapSelectedToFocus = getRaidIndexByNid,
             isClickedFocused = function(clickedNid)
-                return Helpers:GetRaidNidByIndex(module.selectedRaid) == clickedNid
+                return getRaidNidByIndex(module.selectedRaid) == clickedNid
             end,
         })
 
@@ -1139,28 +1096,9 @@ do
             -- No-op: persistent selection is rendered via overlay textures.
         end
 
-        local function findLoggerPlayer(normalizedName, raid, bossKill)
-            if raid and raid.players then
-                for _, p in ipairs(raid.players) do
-                    if normalizedName == Strings.NormalizeLower(p.name) then
-                        return p.name
-                    end
-                end
-            end
-            if bossKill and bossKill.players then
-                for i = 1, #bossKill.players do
-                    local playerNid = tonumber(bossKill.players[i])
-                    local playerName = playerNid and Store:ResolvePlayerNameByNid(raid, playerNid) or nil
-                    if playerName and normalizedName == Strings.NormalizeLower(playerName) then
-                        return playerName
-                    end
-                end
-            end
-        end
-
         local function validateRollValue(_, text)
-            local value = text and tonumber(text)
-            if not value or value < 0 then
+            local ok, value = Helpers.IsValidRollValue(text)
+            if not ok then
                 addon:error(L.ErrLoggerInvalidRollValue)
                 return false
             end
@@ -1187,7 +1125,7 @@ do
             end
 
             local bossKill = (loot.bossNid and raid) and Store:GetBoss(raid, loot.bossNid) or nil
-            local winner = findLoggerPlayer(name, raid, bossKill)
+            local winner = Helpers.FindLoggerPlayer(name, raid, bossKill)
             if not winner then
                 addon:error(L.ErrLoggerWinnerNotFound:format(rawText))
                 return
@@ -1368,7 +1306,7 @@ do
             local delBtn = _G[n .. "DeleteBtn"]
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, selCount)
             UIPrimitives.EnableDisable(delBtn, canDelete)
-            setPanelTitle(n, Helpers:BuildCountTitle(L.StrRaidsList, count))
+            setPanelTitle(n, Helpers.GetCountTitle(L.StrRaidsList, count))
             setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyRaids or nil)
         end,
 
@@ -1652,7 +1590,7 @@ do
 
         postUpdate = function(n)
             local count = controller and controller.data and #controller.data or 0
-            setPanelTitle(n, Helpers:BuildCountTitle(L.StrRaidsList, count))
+            setPanelTitle(n, Helpers.GetCountTitle(L.StrRaidsList, count))
             setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyExportRaids or nil)
         end,
 
@@ -1697,9 +1635,9 @@ do
 
     local function updateCsvTitle(frame)
         local frameName = frame and frame.GetName and frame:GetName() or nil
-        local titleText = Helpers:BuildContextTitle(L.StrRaidCsvTitle, getSelectedRaidContextLabel(), nil)
+        local titleText = Helpers.GetContextTitle(L.StrRaidCsvTitle, Helpers.GetRaidContextLabel(module.selectedRaid), nil)
         setFrameLabel(frameName, "CsvTitle", titleText)
-        setFrameHint(frameName, "CsvEmptyState", Helpers:BuildCsvEmptyStateText(nil, module.selectedRaid ~= nil))
+        setFrameHint(frameName, "CsvEmptyState", Helpers.GetCsvEmptyStateText(module.selectedRaid, nil))
     end
 
     local function getScrollBarInset(scrollFrame)
@@ -1983,7 +1921,7 @@ do
         self._csvDirty = false
         csvText._krtCsvText = csvValue
         csvText:SetText(csvValue)
-        setFrameHint(refs and refs.export and refs.export:GetName() or nil, "CsvEmptyState", Helpers:BuildCsvEmptyStateText(csvValue, module.selectedRaid ~= nil))
+        setFrameHint(refs and refs.export and refs.export:GetName() or nil, "CsvEmptyState", Helpers.GetCsvEmptyStateText(module.selectedRaid, csvValue))
         hideCsvEditBoxChrome(csvText)
         hideCsvScrollFrameChrome(refs and refs.exportCsvScrollFrame or nil)
         setCsvEditBoxLayout(csvText, refs and refs.exportCsvScrollFrame or nil)
@@ -2119,8 +2057,8 @@ do
             local delBtn = _G[n .. "DeleteBtn"]
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, bossSelCount)
             UIPrimitives.EnableDisable(delBtn, (bossSelCount and bossSelCount > 0) or false)
-            setPanelTitle(n, Helpers:BuildCountContextTitle(L.StrBosses, count, getSelectedRaidContextLabel(), nil))
-            setFrameHint(n, "EmptyState", Helpers:BuildBossEmptyStateText(count, module.selectedRaid ~= nil))
+            setPanelTitle(n, Helpers.GetCountContextTitle(L.StrBosses, count, Helpers.GetRaidContextLabel(module.selectedRaid), nil))
+            setFrameHint(n, "EmptyState", Helpers.GetBossEmptyStateText(count, module.selectedRaid))
         end,
 
         sorters = {
@@ -2312,8 +2250,8 @@ do
             local removeBtn = _G[n .. "RemoveBtn"]
             local attSelCount = MultiSelect.MultiSelectCount(module._msBossAttCtx)
             local count = controller and controller.data and #controller.data or 0
-            setPanelTitle(n, Helpers:BuildCountContextTitle(L.StrBossAttendees, count, getSelectedBossContextLabel(), nil))
-            setFrameHint(n, "EmptyState", Helpers:BuildBossAttendeesEmptyStateText(count, module.selectedRaid ~= nil, module.selectedBoss ~= nil))
+            setPanelTitle(n, Helpers.GetCountContextTitle(L.StrBossAttendees, count, Helpers.GetBossContextLabel(module.selectedRaid, module.selectedBoss), nil))
+            setFrameHint(n, "EmptyState", Helpers.GetBossAttendeesEmptyStateText(count, module.selectedRaid, module.selectedBoss))
             if addBtn then
                 UIPrimitives.EnableDisable(addBtn, bSel and ((attSelCount or 0) == 0))
             end
@@ -2476,8 +2414,8 @@ do
         postUpdate = function(n)
             local deleteBtn = _G[n .. "DeleteBtn"]
             local count = controller and controller.data and #controller.data or 0
-            setPanelTitle(n, Helpers:BuildCountContextTitle(L.StrRaidAttendees, count, getSelectedRaidContextLabel(), nil))
-            setFrameHint(n, "EmptyState", Helpers:BuildRaidAttendeesEmptyStateText(count, module.selectedRaid ~= nil))
+            setPanelTitle(n, Helpers.GetCountContextTitle(L.StrRaidAttendees, count, Helpers.GetRaidContextLabel(module.selectedRaid), nil))
+            setFrameHint(n, "EmptyState", Helpers.GetRaidAttendeesEmptyStateText(count, module.selectedRaid))
             if deleteBtn then
                 local attSelCount = MultiSelect.MultiSelectCount(module._msRaidAttCtx)
                 UIPrimitives.SetButtonCount(deleteBtn, L.BtnDelete, attSelCount)
@@ -2768,12 +2706,8 @@ do
             local count = controller and controller.data and #controller.data or 0
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, lootSelCount)
             UIPrimitives.EnableDisable(delBtn, (lootSelCount or 0) > 0)
-            setPanelTitle(n, Helpers:BuildCountContextTitle(L.StrRaidLoot, count, buildLootPanelContextLabel(), nil))
-            setFrameHint(
-                n,
-                "EmptyState",
-                Helpers:BuildLootEmptyStateText(count, module.selectedRaid ~= nil, (module.selectedBoss or module.selectedBossPlayer or module.selectedPlayer) ~= nil)
-            )
+            setPanelTitle(n, Helpers.GetCountContextTitle(L.StrRaidLoot, count, Helpers.GetLootPanelContextLabel(module), nil))
+            setFrameHint(n, "EmptyState", Helpers.GetLootEmptyStateText(count, module))
         end,
 
         sorters = {
@@ -2882,30 +2816,6 @@ do
         controller._makeConfirmPopup("KRTLOGGER_DELETE_ITEM", L.StrConfirmDeleteItem, deleteItem)
     end
 
-    local function findLootByItemId(raid, itemId)
-        if not (raid and raid.loot) then
-            return nil, 0
-        end
-
-        local queryItemId = tonumber(itemId)
-        if not queryItemId then
-            return nil, 0
-        end
-
-        local match = nil
-        local matches = 0
-        for i = #raid.loot, 1, -1 do
-            local entry = raid.loot[i]
-            if entry and tonumber(entry.itemId) == queryItemId then
-                matches = matches + 1
-                if not match then
-                    match = entry
-                end
-            end
-        end
-        return match, matches
-    end
-
     function Loot:Log(lootNid, looter, rollType, rollValue, source, raidIDOverride)
         local raidID
         if raidIDOverride then
@@ -2943,7 +2853,7 @@ do
         local lootCount = raid.loot and #raid.loot or 0
         local it = Store:GetLoot(raid, lootNid)
         if not it then
-            local rawItemMatch, rawItemMatches = findLootByItemId(raid, lootNid)
+            local rawItemMatch, rawItemMatches = Helpers.FindLootByItemId(raid, lootNid)
             if rawItemMatch and addon.error then
                 addon:error(Diag.E.LogLoggerLootNidExpected:format(tostring(raidID), tostring(lootNid), tostring(rawItemMatch.itemLink), tonumber(rawItemMatches) or 0))
             end
