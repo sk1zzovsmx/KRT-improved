@@ -15,6 +15,7 @@ local strsub = string.sub
 
 local _G = _G
 local CreateFrame = _G.CreateFrame
+local InCombatLockdown = _G.InCombatLockdown
 
 addon.Frames = addon.Frames or {}
 local Frames = addon.Frames
@@ -54,6 +55,9 @@ function Frames.EnableDrag(frame, dragButton)
     if frame.GetScript and frame.SetScript then
         if not frame:GetScript("OnDragStart") then
             frame:SetScript("OnDragStart", function(self)
+                if InCombatLockdown() then
+                    return
+                end
                 if self.StartMoving then
                     self:StartMoving()
                 end
@@ -61,6 +65,9 @@ function Frames.EnableDrag(frame, dragButton)
         end
         if not frame:GetScript("OnDragStop") then
             frame:SetScript("OnDragStop", function(self)
+                if InCombatLockdown() then
+                    return
+                end
                 if self.StopMovingOrSizing then
                     self:StopMovingOrSizing()
                 end

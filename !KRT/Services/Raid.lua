@@ -2856,6 +2856,43 @@ do
         return isPassiveGroupLootMethod(method)
     end
 
+    -- Processes COMBAT_LOG_EVENT_UNFILTERED for boss-kill detection.
+    function module:COMBAT_LOG_EVENT_UNFILTERED(...)
+        if not Core.GetCurrentRaid() then
+            return
+        end
+
+        -- Hot-path fast check: inspect the event type before unpacking extra args.
+        local subEvent = select(2, ...)
+        if subEvent ~= "UNIT_DIED" then
+            return
+        end
+
+        -- 3.3.5a base params (8):
+        -- timestamp, event, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags
+        local destGUID, destName, destFlags = select(6, ...)
+        if bit.band(destFlags or 0, COMBATLOG_OBJECT_TYPE_PLAYER) ~= 0 then
+            return
+        end
+
+        -- LibCompat embeds GetCreatureId with the 3.3.5a GUID parsing rules.
+        local npcId = destGUID and addon.GetCreatureId(destGUID)
+        local bossLib = addon.BossIDs
+        local bossIds = bossLib and bossLib.BossIDs
+        if not (npcId and bossIds and bossIds[npcId]) then
+            return
+        end
+
+        local boss = destName
+        if not boss and bossLib and bossLib.GetBossName then
+            boss = bossLib:GetBossName(npcId)
+        end
+        if boss then
+            addon:trace(Diag.D.LogBossUnitDiedMatched:format(tonumber(npcId) or -1, tostring(boss)))
+            module:AddBoss(boss, nil, nil, npcId)
+        end
+    end
+
     -- Clears all raid target icons.
     function module:ClearRaidIcons()
         local players = module:GetPlayers()

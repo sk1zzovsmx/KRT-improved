@@ -31,8 +31,7 @@ if type(UI.Call) ~= "function" then
 end
 
 -- =========== Slash Commands  =========== --
-addon.Slash = addon.Slash or {}
-local module = addon.Slash
+local module = {}
 
 local function getController(name)
     if Core and Core.GetController then

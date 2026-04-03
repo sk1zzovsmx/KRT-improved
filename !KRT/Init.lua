@@ -1470,44 +1470,11 @@ do
         end
     end
 
-    -- COMBAT_LOG_EVENT_UNFILTERED: Logs a boss kill when a boss unit dies.
+    -- COMBAT_LOG_EVENT_UNFILTERED: Delegates boss-kill detection to the Raid service.
     function addon:COMBAT_LOG_EVENT_UNFILTERED(...)
-        if not Core.GetCurrentRaid() then
-            return
-        end
-
-        -- Hot-path fast check: inspect the event type before unpacking extra args.
-        local subEvent = select(2, ...)
-        if subEvent ~= "UNIT_DIED" then
-            return
-        end
-
-        -- 3.3.5a base params (8):
-        -- timestamp, event, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags
-        local destGUID, destName, destFlags = select(6, ...)
-        if bit.band(destFlags or 0, COMBATLOG_OBJECT_TYPE_PLAYER) ~= 0 then
-            return
-        end
-
-        -- LibCompat embeds GetCreatureId with the 3.3.5a GUID parsing rules.
-        local npcId = destGUID and addon.GetCreatureId(destGUID)
-        local bossLib = addon.BossIDs
-        local bossIds = bossLib and bossLib.BossIDs
-        if not (npcId and bossIds and bossIds[npcId]) then
-            return
-        end
-
-        local boss = destName
-        if not boss and bossLib and bossLib.GetBossName then
-            boss = bossLib:GetBossName(npcId)
-        end
-        if boss then
-            local raidService = getRaidService()
-            if not raidService then
-                return
-            end
-            addon:trace(Diag.D.LogBossUnitDiedMatched:format(tonumber(npcId) or -1, tostring(boss)))
-            raidService:AddBoss(boss, nil, nil, npcId)
+        local raidService = getRaidService()
+        if raidService and raidService.COMBAT_LOG_EVENT_UNFILTERED then
+            raidService:COMBAT_LOG_EVENT_UNFILTERED(...)
         end
     end
 

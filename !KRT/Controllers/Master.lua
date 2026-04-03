@@ -2169,7 +2169,7 @@ do
     local function Localize()
         local ok = pcall(UI.Localize)
         if not ok then
-            addon:error("[Master] UI localization failed; controls are still bound.")
+            addon:error(Diag.E.LogMasterUILocalizationFailed)
         end
     end
 

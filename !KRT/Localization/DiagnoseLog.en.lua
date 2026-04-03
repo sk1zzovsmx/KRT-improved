@@ -59,6 +59,9 @@ Diag.D.LogBossUnitDiedMatched = "[Boss] UNIT_DIED matched npcId=%d boss=%s"
 Diag.D.LogBossUnitDiedIgnored = "[Boss] UNIT_DIED ignored npcId=%d boss=%s"
 Diag.D.LogBossDuplicateSuppressed = "[Boss] Duplicate suppressed boss=%s sourceNpcId=%d existingBossNid=%d delta=%d"
 
+-- Master --
+Diag.E.LogMasterUILocalizationFailed = "[Master] UI localization failed; controls are still bound."
+
 -- Loot --
 Diag.D.LogLootParseFailed = "[Loot] Parse failed msg=%s"
 Diag.D.LogLootParsed = "[Loot] Parsed looter=%s link=%s count=%d"
