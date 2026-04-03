@@ -51,20 +51,12 @@ local SetSelectedRaid
 local deleteSelectedAttendees
 local setFrameLabel
 local setPanelTitle
-local buildCountTitle
-local buildContextTitle
-local buildCountContextTitle
 local getSelectedRaidRecord
 local getSelectedRaidContextLabel
 local getSelectedBossContextLabel
 local getSelectedPlayerContextLabel
 local buildLootPanelContextLabel
 local setFrameHint
-local buildBossEmptyStateText
-local buildBossAttendeesEmptyStateText
-local buildRaidAttendeesEmptyStateText
-local buildLootEmptyStateText
-local buildCsvEmptyStateText
 
 local function getRaidQueries()
     if Core.GetRaidQueries then
@@ -111,10 +103,12 @@ do
     local Store = LoggerSvc.Store
     local View = LoggerSvc.View
     local Actions = LoggerSvc.Actions
+    local Helpers = LoggerSvc.Helpers
 
     module.Store = Store
     module.View = View
     module.Actions = Actions
+    module.Helpers = Helpers
 
     -- Bind controller reference so Actions:Commit() can validate selections.
     Actions:BindController(module, triggerSelectionEvent)
@@ -160,25 +154,6 @@ do
         if label then
             UIPrimitives.ShowHide(label, type(text) == "string" and text ~= "")
         end
-    end
-
-    buildCountTitle = function(baseText, count)
-        return ("%s (%d)"):format(tostring(baseText or ""), tonumber(count) or 0)
-    end
-
-    buildContextTitle = function(baseText, contextText, emptyHint)
-        local suffix = contextText
-        if not suffix or suffix == "" then
-            suffix = emptyHint
-        end
-        if suffix and suffix ~= "" then
-            return ("%s - %s"):format(baseText, suffix)
-        end
-        return baseText
-    end
-
-    buildCountContextTitle = function(baseText, count, contextText, emptyHint)
-        return buildContextTitle(buildCountTitle(baseText, count), contextText, emptyHint)
     end
 
     getSelectedRaidRecord = function()
@@ -247,62 +222,6 @@ do
             return tconcat(parts, " | ")
         end
         return getSelectedRaidContextLabel()
-    end
-
-    buildBossEmptyStateText = function(count)
-        if (tonumber(count) or 0) > 0 then
-            return nil
-        end
-        if not module.selectedRaid then
-            return L.StrLoggerEmptyBossesSelectRaid
-        end
-        return L.StrLoggerEmptyBosses
-    end
-
-    buildBossAttendeesEmptyStateText = function(count)
-        if (tonumber(count) or 0) > 0 then
-            return nil
-        end
-        if not module.selectedRaid then
-            return L.StrLoggerEmptyBossAttendeesSelectRaid
-        end
-        if not module.selectedBoss then
-            return L.StrLoggerEmptyBossAttendeesSelectBoss
-        end
-        return L.StrLoggerEmptyBossAttendees
-    end
-
-    buildRaidAttendeesEmptyStateText = function(count)
-        if (tonumber(count) or 0) > 0 then
-            return nil
-        end
-        if not module.selectedRaid then
-            return L.StrLoggerEmptyRaidAttendeesSelectRaid
-        end
-        return L.StrLoggerEmptyRaidAttendees
-    end
-
-    buildLootEmptyStateText = function(count)
-        if (tonumber(count) or 0) > 0 then
-            return nil
-        end
-        if not module.selectedRaid then
-            return L.StrLoggerEmptyLootSelectRaid
-        end
-        if module.selectedBoss or module.selectedBossPlayer or module.selectedPlayer then
-            return L.StrLoggerEmptyLootFiltered
-        end
-        return L.StrLoggerEmptyLoot
-    end
-
-    buildCsvEmptyStateText = function(csvValue)
-        if not module.selectedRaid then
-            return L.StrLoggerEmptyCsvSelectRaid
-        end
-        if not csvValue or csvValue == "" then
-            return L.StrLoggerEmptyCsv
-        end
-        return nil
     end
 
     local function applyFocusedMultiSelect(opts)
@@ -561,14 +480,6 @@ do
         end)
     end
 
-    local function getRaidNidByIndex(raidIndex)
-        return raidIndex and Core.GetRaidNidById(raidIndex) or nil
-    end
-
-    local function getRaidIndexByNid(raidNid)
-        return raidNid and Core.GetRaidIdByNid(raidNid) or nil
-    end
-
     -- Logger helpers: resolve current raid/boss/loot and run raid actions with a single refresh.
     function module:NeedRaid()
         local rID = module.selectedRaid
@@ -730,7 +641,7 @@ do
         if not raidNid then
             return
         end
-        local raidIndex = getRaidIndexByNid(raidNid)
+        local raidIndex = Helpers:GetRaidIndexByNid(raidNid)
         if not raidIndex then
             return
         end
@@ -751,9 +662,11 @@ do
             isRange = isRange,
             allowDeselect = opts and opts.allowDeselect,
             setFocus = SetSelectedRaid,
-            mapSelectedToFocus = getRaidIndexByNid,
+            mapSelectedToFocus = function(nid)
+                return Helpers:GetRaidIndexByNid(nid)
+            end,
             isClickedFocused = function(clickedNid)
-                return getRaidNidByIndex(module.selectedRaid) == clickedNid
+                return Helpers:GetRaidNidByIndex(module.selectedRaid) == clickedNid
             end,
         })
 
@@ -1299,6 +1212,7 @@ do
     module.Raids = module.Raids or {}
     local Raids = module.Raids
     local Store = module.Store
+    local Helpers = module.Helpers
     local controller
     controller = ListController.MakeListController({
         keyName = "RaidsList",
@@ -1454,7 +1368,7 @@ do
             local delBtn = _G[n .. "DeleteBtn"]
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, selCount)
             UIPrimitives.EnableDisable(delBtn, canDelete)
-            setPanelTitle(n, buildCountTitle(L.StrRaidsList, count))
+            setPanelTitle(n, Helpers:BuildCountTitle(L.StrRaidsList, count))
             setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyRaids or nil)
         end,
 
@@ -1633,6 +1547,7 @@ end
 do
     module.ExportRaids = module.ExportRaids or {}
     local ExportRaids = module.ExportRaids
+    local Helpers = module.Helpers
 
     local controller
     controller = ListController.MakeListController({
@@ -1737,7 +1652,7 @@ do
 
         postUpdate = function(n)
             local count = controller and controller.data and #controller.data or 0
-            setPanelTitle(n, buildCountTitle(L.StrRaidsList, count))
+            setPanelTitle(n, Helpers:BuildCountTitle(L.StrRaidsList, count))
             setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyExportRaids or nil)
         end,
 
@@ -1778,12 +1693,13 @@ do
     local Export = module.Export
     local Store = module.Store
     local View = module.View
+    local Helpers = module.Helpers
 
     local function updateCsvTitle(frame)
         local frameName = frame and frame.GetName and frame:GetName() or nil
-        local titleText = buildContextTitle(L.StrRaidCsvTitle, getSelectedRaidContextLabel(), nil)
+        local titleText = Helpers:BuildContextTitle(L.StrRaidCsvTitle, getSelectedRaidContextLabel(), nil)
         setFrameLabel(frameName, "CsvTitle", titleText)
-        setFrameHint(frameName, "CsvEmptyState", buildCsvEmptyStateText())
+        setFrameHint(frameName, "CsvEmptyState", Helpers:BuildCsvEmptyStateText(nil, module.selectedRaid ~= nil))
     end
 
     local function getScrollBarInset(scrollFrame)
@@ -2067,7 +1983,7 @@ do
         self._csvDirty = false
         csvText._krtCsvText = csvValue
         csvText:SetText(csvValue)
-        setFrameHint(refs and refs.export and refs.export:GetName() or nil, "CsvEmptyState", buildCsvEmptyStateText(csvValue))
+        setFrameHint(refs and refs.export and refs.export:GetName() or nil, "CsvEmptyState", Helpers:BuildCsvEmptyStateText(csvValue, module.selectedRaid ~= nil))
         hideCsvEditBoxChrome(csvText)
         hideCsvScrollFrameChrome(refs and refs.exportCsvScrollFrame or nil)
         setCsvEditBoxLayout(csvText, refs and refs.exportCsvScrollFrame or nil)
@@ -2095,6 +2011,7 @@ do
     local Store = module.Store
     local View = module.View
     local Actions = module.Actions
+    local Helpers = module.Helpers
 
     local controller
     controller = ListController.MakeListController({
@@ -2202,8 +2119,8 @@ do
             local delBtn = _G[n .. "DeleteBtn"]
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, bossSelCount)
             UIPrimitives.EnableDisable(delBtn, (bossSelCount and bossSelCount > 0) or false)
-            setPanelTitle(n, buildCountContextTitle(L.StrBosses, count, getSelectedRaidContextLabel(), nil))
-            setFrameHint(n, "EmptyState", buildBossEmptyStateText(count))
+            setPanelTitle(n, Helpers:BuildCountContextTitle(L.StrBosses, count, getSelectedRaidContextLabel(), nil))
+            setFrameHint(n, "EmptyState", Helpers:BuildBossEmptyStateText(count, module.selectedRaid ~= nil))
         end,
 
         sorters = {
@@ -2306,6 +2223,7 @@ do
     local Store = module.Store
     local View = module.View
     local Actions = module.Actions
+    local Helpers = module.Helpers
 
     local controller
     controller = ListController.MakeListController({
@@ -2394,8 +2312,8 @@ do
             local removeBtn = _G[n .. "RemoveBtn"]
             local attSelCount = MultiSelect.MultiSelectCount(module._msBossAttCtx)
             local count = controller and controller.data and #controller.data or 0
-            setPanelTitle(n, buildCountContextTitle(L.StrBossAttendees, count, getSelectedBossContextLabel(), nil))
-            setFrameHint(n, "EmptyState", buildBossAttendeesEmptyStateText(count))
+            setPanelTitle(n, Helpers:BuildCountContextTitle(L.StrBossAttendees, count, getSelectedBossContextLabel(), nil))
+            setFrameHint(n, "EmptyState", Helpers:BuildBossAttendeesEmptyStateText(count, module.selectedRaid ~= nil, module.selectedBoss ~= nil))
             if addBtn then
                 UIPrimitives.EnableDisable(addBtn, bSel and ((attSelCount or 0) == 0))
             end
@@ -2463,6 +2381,7 @@ do
     local RaidAtt = module.RaidAttendees
     local View = module.View
     local Actions = module.Actions
+    local Helpers = module.Helpers
 
     local controller
     controller = ListController.MakeListController({
@@ -2557,8 +2476,8 @@ do
         postUpdate = function(n)
             local deleteBtn = _G[n .. "DeleteBtn"]
             local count = controller and controller.data and #controller.data or 0
-            setPanelTitle(n, buildCountContextTitle(L.StrRaidAttendees, count, getSelectedRaidContextLabel(), nil))
-            setFrameHint(n, "EmptyState", buildRaidAttendeesEmptyStateText(count))
+            setPanelTitle(n, Helpers:BuildCountContextTitle(L.StrRaidAttendees, count, getSelectedRaidContextLabel(), nil))
+            setFrameHint(n, "EmptyState", Helpers:BuildRaidAttendeesEmptyStateText(count, module.selectedRaid ~= nil))
             if deleteBtn then
                 local attSelCount = MultiSelect.MultiSelectCount(module._msRaidAttCtx)
                 UIPrimitives.SetButtonCount(deleteBtn, L.BtnDelete, attSelCount)
@@ -2667,6 +2586,7 @@ do
     local Store = module.Store
     local View = module.View
     local Actions = module.Actions
+    local Helpers = module.Helpers
 
     local function updateSourceHeaderState(frameName)
         local header = frameName and _G[frameName .. "HeaderSource"]
@@ -2848,8 +2768,12 @@ do
             local count = controller and controller.data and #controller.data or 0
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, lootSelCount)
             UIPrimitives.EnableDisable(delBtn, (lootSelCount or 0) > 0)
-            setPanelTitle(n, buildCountContextTitle(L.StrRaidLoot, count, buildLootPanelContextLabel(), nil))
-            setFrameHint(n, "EmptyState", buildLootEmptyStateText(count))
+            setPanelTitle(n, Helpers:BuildCountContextTitle(L.StrRaidLoot, count, buildLootPanelContextLabel(), nil))
+            setFrameHint(
+                n,
+                "EmptyState",
+                Helpers:BuildLootEmptyStateText(count, module.selectedRaid ~= nil, (module.selectedBoss or module.selectedBossPlayer or module.selectedPlayer) ~= nil)
+            )
         end,
 
         sorters = {
