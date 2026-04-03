@@ -74,6 +74,7 @@ Widgets\LootCounter.lua
 Services\Reserves.lua
 Widgets\ReservesUI.lua
 Services\Logger\Store.lua
+Services\Logger\View.lua
 Services\Logger\Actions.lua
 Controllers\Logger.lua
 Widgets\Config.lua

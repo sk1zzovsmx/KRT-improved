@@ -306,13 +306,14 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 47) Services/Reserves.lua
 48) Widgets/ReservesUI.lua
 49) Services/Logger/Store.lua
-50) Services/Logger/Actions.lua
-51) Controllers/Logger.lua
-52) Widgets/Config.lua
-53) Controllers/Warnings.lua
-54) Controllers/Changes.lua
-55) Controllers/Spammer.lua
-56) KRT.xml
+50) Services/Logger/View.lua
+51) Services/Logger/Actions.lua
+52) Controllers/Logger.lua
+53) Widgets/Config.lua
+54) Controllers/Warnings.lua
+55) Controllers/Changes.lua
+56) Controllers/Spammer.lua
+57) KRT.xml
 
 ---
 
@@ -349,7 +350,8 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Debug.lua              # synthetic raid/roll test helpers for local addon testing
     Reserves.lua           # soft reserves service/model + import parsing + reserve lookups
     Logger/
-      Store.lua            # logger stable-ID indexing + view-model row builders/CSV
+      Store.lua            # logger stable-ID indexing + data access
+      View.lua             # view-model row builders, label formatters, CSV generation
       Actions.lua          # logger mutations + commit/cascade + selection validation
 
   Widgets/
@@ -522,11 +524,12 @@ Namespaced service-only module:
 
 `addon.Logger` internal structure (pattern for complex modules):
 - `addon.Logger.Store`   - data access helpers + stable-ID indexing (Services/Logger/Store.lua)
-- `addon.Logger.View`    - view-model row builders (UI-friendly data) (Services/Logger/Store.lua)
+- `addon.Logger.View`    - view-model row builders (UI-friendly data) (Services/Logger/View.lua)
 - `addon.Logger.Actions` - mutations + commit/refresh boundaries (Services/Logger/Actions.lua)
 
 Namespaced service modules (loaded before Controller):
-- `addon.Services.Logger.Store`   - canonical Store + View service tables
+- `addon.Services.Logger.Store`   - canonical Store service table
+- `addon.Services.Logger.View`    - canonical View service table
 - `addon.Services.Logger.Actions` - canonical Actions service table
 
 Implementation placement (current wave):

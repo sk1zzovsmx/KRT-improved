@@ -1709,6 +1709,7 @@ test("logger updates duplicate item entries by lootNid only", function()
         return 10
     end
     h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/View.lua")
     h:load("!KRT/Services/Logger/Actions.lua")
     h:load("!KRT/Controllers/Logger.lua")
 
@@ -1756,6 +1757,7 @@ test("trade-only loot creates a reusable lootNid", function()
     h:load("!KRT/Services/Raid.lua")
     h.feature.Services = h.addon.Services
     h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/View.lua")
     h:load("!KRT/Services/Logger/Actions.lua")
     h:load("!KRT/Controllers/Logger.lua")
 
@@ -4390,6 +4392,7 @@ test("logger export tab stays disabled while the export workflow is staged off",
         return 1
     end
     h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/View.lua")
     h:load("!KRT/Services/Logger/Actions.lua")
     h:load("!KRT/Controllers/Logger.lua")
 
