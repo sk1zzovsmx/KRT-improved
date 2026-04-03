@@ -71,7 +71,7 @@ Diag.D.LogLootFetchDone = "[Loot] FetchLoot done lootCount=%d currentIndex=%d"
 Diag.D.LogLootItemInfoMissing = "[Loot] ItemInfo missing -> deferred link=%s"
 Diag.D.LogLootChatMsgLootRaw = "[Loot] CHAT_MSG_LOOT raw=%s"
 Diag.D.LogLootGroupSelectionQueued = "[Loot] Group selection queued type=%s looter=%s link=%s"
-Diag.D.LogLootGroupWinnerDetected = "[Loot] Group winner detected type=%s looter=%s roll=%s link=%s"
+Diag.D.LogLootGroupWinnerDetected = "[Loot] Group winner observed looter=%s msgType=%s msgRoll=%s link=%s"
 Diag.D.LogLootPendingAwardConsumed = "[Loot] Pending consumed item=%s looter=%s remaining=%d ttl=%d"
 Diag.D.LogLootTradeOnlyLogged = "[Loot] Trade-only logged raidId=%d itemId=%s lootNid=%s looter=%s count=%d source=%s"
 

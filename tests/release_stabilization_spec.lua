@@ -826,10 +826,13 @@ local function newHarness()
             function controller:Dirty()
                 self.dirtyCount = self.dirtyCount + 1
             end
+
             function controller:Touch()
                 self:Dirty()
             end
+
             function controller:_makeConfirmPopup() end
+
             return controller
         end,
         BindListController = function(target, controller)
@@ -1003,25 +1006,28 @@ local function newHarness()
     _G.LOOT_ITEM = "LOOT_ITEM"
     _G.LOOT_ITEM_SELF_MULTIPLE = "LOOT_ITEM_SELF_MULTIPLE"
     _G.LOOT_ITEM_SELF = "LOOT_ITEM_SELF"
-    _G.LOOT_ROLL_YOU_WON = "LOOT_ROLL_YOU_WON"
-    _G.LOOT_ROLL_WON = "LOOT_ROLL_WON"
-    _G.LOOT_ROLL_NEED = "LOOT_ROLL_NEED"
-    _G.LOOT_ROLL_NEED_SELF = "LOOT_ROLL_NEED_SELF"
-    _G.LOOT_ROLL_GREED = "LOOT_ROLL_GREED"
-    _G.LOOT_ROLL_GREED_SELF = "LOOT_ROLL_GREED_SELF"
-    _G.LOOT_ROLL_DISENCHANT = "LOOT_ROLL_DISENCHANT"
-    _G.LOOT_ROLL_DISENCHANT_SELF = "LOOT_ROLL_DISENCHANT_SELF"
-    _G.LOOT_ROLL_ROLLED_NEED = "LOOT_ROLL_ROLLED_NEED"
-    _G.LOOT_ROLL_ROLLED_GREED = "LOOT_ROLL_ROLLED_GREED"
-    _G.LOOT_ROLL_ROLLED_DE = "LOOT_ROLL_ROLLED_DE"
-    _G.LOOT_ROLL_WON_NO_SPAM_NEED = "LOOT_ROLL_WON_NO_SPAM_NEED"
-    _G.LOOT_ROLL_YOU_WON_NO_SPAM_NEED = "LOOT_ROLL_YOU_WON_NO_SPAM_NEED"
-    _G.LOOT_ROLL_WON_NO_SPAM_GREED = "LOOT_ROLL_WON_NO_SPAM_GREED"
-    _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED = "LOOT_ROLL_YOU_WON_NO_SPAM_GREED"
-    _G.LOOT_ROLL_WON_NO_SPAM_DE = "LOOT_ROLL_WON_NO_SPAM_DE"
-    _G.LOOT_ROLL_YOU_WON_NO_SPAM_DE = "LOOT_ROLL_YOU_WON_NO_SPAM_DE"
-    _G.LOOT_ROLL_WON_NO_SPAM_DISENCHANT = "LOOT_ROLL_WON_NO_SPAM_DISENCHANT"
-    _G.LOOT_ROLL_YOU_WON_NO_SPAM_DISENCHANT = "LOOT_ROLL_YOU_WON_NO_SPAM_DISENCHANT"
+    _G.LOOT_ROLL_YOU_WON = "You won: %s"
+    _G.LOOT_ROLL_WON = "%s won: %s"
+    _G.LOOT_ROLL_NEED = "%s has selected Need for: %s"
+    _G.LOOT_ROLL_NEED_SELF = "You have selected Need for: %s"
+    _G.LOOT_ROLL_GREED = "%s has selected Greed for: %s"
+    _G.LOOT_ROLL_GREED_SELF = "You have selected Greed for: %s"
+    _G.LOOT_ROLL_DISENCHANT = "%s has selected Disenchant for: %s"
+    _G.LOOT_ROLL_DISENCHANT_SELF = "You have selected Disenchant for: %s"
+    _G.LOOT_ROLL_ROLLED_NEED = "Need Roll - %d for %s by %s"
+    _G.LOOT_ROLL_ROLLED_NEED_SELF = _G.LOOT_ROLL_ROLLED_NEED
+    _G.LOOT_ROLL_ROLLED_GREED = "Greed Roll - %d for %s by %s"
+    _G.LOOT_ROLL_ROLLED_GREED_SELF = _G.LOOT_ROLL_ROLLED_GREED
+    _G.LOOT_ROLL_ROLLED_DE = "Disenchant Roll - %d for %s by %s"
+    _G.LOOT_ROLL_ROLLED_DE_SELF = _G.LOOT_ROLL_ROLLED_DE
+    _G.LOOT_ROLL_WON_NO_SPAM_NEED = "%1$s won: %3$s |cff818181(Need - %2$d)|r"
+    _G.LOOT_ROLL_YOU_WON_NO_SPAM_NEED = "You won: %2$s |cff818181(Need - %1$d)|r"
+    _G.LOOT_ROLL_WON_NO_SPAM_GREED = "%1$s won: %3$s |cff818181(Greed - %2$d)|r"
+    _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED = "You won: %2$s |cff818181(Greed - %1$d)|r"
+    _G.LOOT_ROLL_WON_NO_SPAM_DE = "%1$s won: %3$s |cff818181(Disenchant - %2$d)|r"
+    _G.LOOT_ROLL_YOU_WON_NO_SPAM_DE = "You won: %2$s |cff818181(Disenchant - %1$d)|r"
+    _G.LOOT_ROLL_WON_NO_SPAM_DISENCHANT = _G.LOOT_ROLL_WON_NO_SPAM_DE
+    _G.LOOT_ROLL_YOU_WON_NO_SPAM_DISENCHANT = _G.LOOT_ROLL_YOU_WON_NO_SPAM_DE
     _G.TRADE = "Trade"
     _G.RAID_TARGET_MARKERS = {
         "{rt1}",
@@ -1879,6 +1885,164 @@ test("group loot winner messages log passive GR history directly", function()
     assertEqual(raid.loot[1].rollValue, 88, "expected self winner message to preserve the greed roll value")
 end)
 
+test("group loot direct winner logs suppress later duplicate loot receipts", function()
+    local h = newHarness()
+    local link = h.registerItem(9161, "Needblade")
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_NEED and msg == "need-win-self" then
+            return 77, 96, link
+        end
+        if pattern == _G.LOOT_ITEM_SELF and msg == "loot-receive-self" then
+            return link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    assertEqual(Raid:AddGroupLootMessage("need-win-self"), "winner", "expected direct need winner to be recognized")
+
+    Raid:AddLoot("need-win-self")
+    Raid:AddLoot("loot-receive-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected later duplicate loot receipt to be suppressed after direct winner logging")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected direct winner log to preserve the need type")
+    assertEqual(raid.loot[1].rollValue, 96, "expected direct winner log to preserve the numeric roll value")
+end)
+
+test("group loot self roll lines preserve rollValue on direct passive winners", function()
+    local h = newHarness()
+    local link = h.registerItem(9162, "SelfNeedblade")
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_ROLLED_NEED_SELF and msg == "need-roll-self-96" then
+            return 96, link
+        end
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_NEED and msg == "need-win-self-no-value" then
+            return link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    assertEqual(Raid:AddGroupLootMessage("need-roll-self-96"), "selection", "expected self roll line to queue passive history")
+    assertEqual(Raid:AddGroupLootMessage("need-win-self-no-value"), "winner", "expected direct winner without numeric payload to be recognized")
+
+    Raid:AddLoot("need-win-self-no-value")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected self direct winner to create one loot entry")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected self roll line to preserve the need type")
+    assertEqual(raid.loot[1].rollValue, 96, "expected self roll line to preserve the numeric roll value")
+end)
+
+test("late self roll lines backfill rollValue on already logged passive winners", function()
+    local h = newHarness()
+    local link = h.registerItem(9163, "BackfillNeedblade")
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_NEED and msg == "need-win-self-late-roll" then
+            return link
+        end
+        if pattern == _G.LOOT_ROLL_ROLLED_NEED_SELF and msg == "need-roll-self-late-96" then
+            return 96, link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    assertEqual(Raid:AddGroupLootMessage("need-win-self-late-roll"), "winner", "expected direct winner without numeric payload to be recognized")
+    Raid:AddLoot("need-win-self-late-roll")
+
+    assertEqual(Raid:AddGroupLootMessage("need-roll-self-late-96"), "selection", "expected late self roll line to be observed")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected backfill flow to keep a single loot entry")
+    assertEqual(raid.loot[1].rollValue, 96, "expected late self roll line to backfill the missing roll value")
+end)
+
 test("group loot raw need and won messages log passive NE history", function()
     local h = newHarness()
     local link = h.registerItem(9170, "Sabatons")
@@ -2055,6 +2219,103 @@ test("group loot rolled lines queue winner type before raw won message", functio
     assertEqual(raid.loot[1].rollValue, 45, "expected rolled need line to preserve the rolled value")
 end)
 
+test("raw group loot roll lines preserve numeric rollValue", function()
+    local h = newHarness()
+    local link = h.registerItem(9181, "Dawnwalkers")
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    h.addon.Deformat = function()
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    assertEqual(Raid:AddGroupLootMessage("You have selected Need for: " .. link), "selection", "expected raw need selection to queue passive history")
+    assertEqual(Raid:AddGroupLootMessage("Need Roll - 67 for " .. link .. " by Tester"), "selection", "expected raw need roll line to be recognized")
+
+    Raid:AddLoot("Tester won: " .. link)
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected raw need roll flow to create one loot entry")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected raw need roll flow to preserve NE type")
+    assertEqual(raid.loot[1].rollValue, 67, "expected raw need roll flow to preserve numeric rollValue")
+end)
+
+test("localized group loot patterns preserve numeric rollValue without english raw fallbacks", function()
+    local h = newHarness()
+    local link = h.registerItem(91811, "Localized Dawnwalkers")
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.LOOT_ROLL_NEED = "%s ha selezionato Necessita per: %s"
+    _G.LOOT_ROLL_NEED_SELF = "Hai selezionato Necessita per: %s"
+    _G.LOOT_ROLL_ROLLED_NEED = "Tiro Necessita - %d per %s da %s"
+    _G.LOOT_ROLL_WON = "%s ha vinto: %s"
+    _G.LOOT_ROLL_YOU_WON = "Hai vinto: %s"
+    h.addon.Deformat = function()
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    assertEqual(Raid:AddGroupLootMessage("Tester ha selezionato Necessita per: " .. link), "selection", "expected localized selection text to queue passive history")
+    assertEqual(Raid:AddGroupLootMessage("Tiro Necessita - 67 per " .. link .. " da Tester"), "selection", "expected localized roll text to be recognized")
+
+    Raid:AddLoot("Tester ha vinto: " .. link)
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected localized group loot flow to create one loot entry")
+    assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected localized group loot flow to preserve NE type")
+    assertEqual(raid.loot[1].rollValue, 67, "expected localized group loot flow to preserve numeric rollValue")
+end)
+
 test("loot pending awards upgrade selection entries with later group roll values", function()
     local h = newHarness()
     local link = h.registerItem(9185, "Awareness Sigil")
@@ -2220,7 +2481,7 @@ test("start loot roll extends passive group loot expiry beyond the fallback ttl"
     assertEqual(raid.loot[1].rollSessionId, "GL:1", "expected START_LOOT_ROLL tracking to stamp a passive roll session id")
 end)
 
-test("loot winner dispatch defers passive logging to the later receipt", function()
+test("loot winner dispatch forwards passive winners immediately", function()
     local h = newHarness()
     local addLootCalls = {}
     local rollsMessages = {}
@@ -2285,7 +2546,7 @@ test("loot winner dispatch defers passive logging to the later receipt", functio
     h.addon.Core.SetCurrentRaid(1)
     h.addon.Services.Raid = {
         AddGroupLootMessage = function(_, msg)
-            if msg == "winner-loot" then
+            if msg == "winner-loot" or msg == "winner-system" then
                 return "winner"
             end
             return nil
@@ -2304,15 +2565,17 @@ test("loot winner dispatch defers passive logging to the later receipt", functio
     }
 
     h.addon:CHAT_MSG_LOOT("winner-loot")
+    h.addon:CHAT_MSG_SYSTEM("winner-system")
     h.addon:CHAT_MSG_SYSTEM("roll-system")
-    h.addon:CHAT_MSG_LOOT("loot-receipt")
 
     _G.LibStub = oldLibStub
 
-    assertEqual(#addLootCalls, 1, "expected only the loot receipt to materialize a passive loot row")
-    assertEqual(addLootCalls[1], "loot-receipt", "expected loot logging to be deferred to CHAT_MSG_LOOT")
-    assertEqual(#rollsMessages, 1, "expected system messages to keep flowing to the rolls service")
-    assertEqual(rollsMessages[1], "roll-system", "expected the rolls service to receive the unrelated system message")
+    assertEqual(#addLootCalls, 2, "expected passive winner messages on loot and system channels to reach the raid service")
+    assertEqual(addLootCalls[1], "winner-loot", "expected loot winner messages to materialize immediately")
+    assertEqual(addLootCalls[2], "winner-system", "expected system winner messages to materialize immediately")
+    assertEqual(#rollsMessages, 2, "expected system messages to keep flowing to the rolls service")
+    assertEqual(rollsMessages[1], "winner-system", "expected winner system messages to keep flowing to the rolls service")
+    assertEqual(rollsMessages[2], "roll-system", "expected the rolls service to receive unrelated system messages")
 end)
 
 test("start loot roll dispatch forwards to the raid service", function()

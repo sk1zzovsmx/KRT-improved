@@ -1418,14 +1418,21 @@ do
         end
 
         local canObservePassiveLoot = raidService.CanObservePassiveLoot and raidService:CanObservePassiveLoot() or addon:CanUseMasterOnlyFeatures()
-        if canObservePassiveLoot and observedType == nil then
+        if canObservePassiveLoot and (observedType == nil or observedType == "winner") then
             raidService:AddLoot(msg)
         end
     end
 
     -- CHAT_MSG_SYSTEM: Forwards roll messages to the Rolls module.
     function addon:CHAT_MSG_SYSTEM(msg)
-        observePassiveLootMessage(msg)
+        local currentRaid = Core.GetCurrentRaid()
+        local raidService, observedType = observePassiveLootMessage(msg)
+        if currentRaid and raidService then
+            local canObservePassiveLoot = raidService.CanObservePassiveLoot and raidService:CanObservePassiveLoot() or addon:CanUseMasterOnlyFeatures()
+            if canObservePassiveLoot and observedType == "winner" then
+                raidService:AddLoot(msg)
+            end
+        end
 
         if Core.GetCurrentRaid() and addon:IsMasterOnlyBlocked() then
             return

@@ -17,7 +17,18 @@ Release-Version: 0.6.2b
   current raid history with `NE`, `GR`, and `DE` roll types
   while keeping master-only gameplay flows blocked. When the
   server also emits numeric group-roll lines, the Logger now
-  preserves that `rollValue` too.
+  preserves that `rollValue` too. Passive winner messages now
+  materialize Logger rows immediately, while later duplicate
+  loot receipts are deduplicated. Self roll lines now feed the
+  same `rollValue` pipeline, and late numeric passive updates can
+  backfill a winner row that was logged before the value arrived.
+  Raw chat lines such as "Need Roll - 67 for ... by ..." are now
+  parsed too, so those values no longer fall through as passive
+  zero-value wins.
+- Isolated passive Group Loot pending awards from Master Looter
+  award resolution: switching from Group Loot/NBG to ML no
+  longer reuses stale `GL:*` pending sessions on the first
+  ML award.
 - Centralized raid-role capability checks so loot, raid-warning,
   changes broadcast, ready-check, and raid-icon actions derive
   their enabled/disabled state from a shared policy.

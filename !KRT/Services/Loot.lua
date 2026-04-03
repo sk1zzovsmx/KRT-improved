@@ -25,9 +25,11 @@ local getItemName, getItemLink, getItemTexture
 
 local tremove, twipe = table.remove, table.wipe
 local type, pairs = type, pairs
+local strsub = string.sub
 
 local tostring, tonumber = tostring, tonumber
-local PENDING_AWARD_TTL_SECONDS = C.PENDING_AWARD_TTL_SECONDS
+local PENDING_AWARD_TTL_SECONDS = tonumber(C.PENDING_AWARD_TTL_SECONDS) or 8
+local GROUP_LOOT_SESSION_PREFIX = "GL:"
 
 -- =========== Loot Helpers Module  =========== --
 -- Manages the loot window items (fetching from loot/inventory).
@@ -56,14 +58,39 @@ do
     local function getPendingAwardList(itemLink, looter)
         local key = buildPendingAwardKey(itemLink, looter)
         local list = lootState.pendingAwards[key]
+        if list then
+            return key, list
+        end
+
+        local rawLinkKey = buildPendingAwardKey(itemLink, looter, true)
+        if rawLinkKey == key then
+            return key, nil
+        end
+
+        list = lootState.pendingAwards[rawLinkKey]
+        if list then
+            lootState.pendingAwards[key] = list
+            lootState.pendingAwards[rawLinkKey] = nil
+        end
+
+        return key, list
+    end
+
+    local function ensurePendingAwardList(itemLink, looter)
+        local key, list = getPendingAwardList(itemLink, looter)
         if not list then
-            local rawLinkKey = buildPendingAwardKey(itemLink, looter, true)
-            if rawLinkKey ~= key then
-                key = rawLinkKey
-                list = lootState.pendingAwards[key]
-            end
+            list = {}
+            lootState.pendingAwards[key] = list
         end
         return key, list
+    end
+
+    local function normalizePendingAwardTtl(maxAge)
+        local ttl = tonumber(maxAge) or PENDING_AWARD_TTL_SECONDS
+        if ttl < 0 then
+            ttl = 0
+        end
+        return ttl
     end
 
     local function isPendingAwardValid(pending, now, ttl)
@@ -78,6 +105,18 @@ do
 
     local function hasResolvedPendingAwardValue(pending)
         return (tonumber(pending and pending.rollValue) or 0) > 0
+    end
+
+    local function isGroupLootSessionId(sessionId)
+        return type(sessionId) == "string" and strsub(sessionId, 1, #GROUP_LOOT_SESSION_PREFIX) == GROUP_LOOT_SESSION_PREFIX
+    end
+
+    local function shouldConsiderPendingForMode(pending, allowGroupLootPendingAwards)
+        if allowGroupLootPendingAwards ~= false then
+            return true
+        end
+        local sessionId = pending and pending.rollSessionId and tostring(pending.rollSessionId) or nil
+        return not isGroupLootSessionId(sessionId)
     end
 
     local function consumePendingAwardAt(list, key, index, itemLink, looter, ttl)
@@ -101,6 +140,77 @@ do
                 tremove(list, i)
             end
         end
+    end
+
+    local function findPendingAwardIndex(list, now, ttl, matcher)
+        for i = 1, #list do
+            local pending = list[i]
+            if isPendingAwardValid(pending, now, ttl) and (not matcher or matcher(pending)) then
+                return i
+            end
+        end
+        return nil
+    end
+
+    local function findUniqueValidPendingAwardIndex(list, now, ttl)
+        local uniqueIndex = nil
+        for i = 1, #list do
+            local pending = list[i]
+            if isPendingAwardValid(pending, now, ttl) then
+                if uniqueIndex then
+                    return nil
+                end
+                uniqueIndex = i
+            end
+        end
+        return uniqueIndex
+    end
+
+    local function tryUpgradePendingAward(list, rollType, rollValue, rollSessionId, expiresAt, now)
+        if not (rollValue and rollValue > 0) then
+            return false
+        end
+
+        for pass = 1, 2 do
+            for i = 1, #list do
+                local pending = list[i]
+                local pendingType = tonumber(pending and pending.rollType)
+                local pendingValue = tonumber(pending and pending.rollValue) or 0
+                local pendingSessionId = pending and pending.rollSessionId and tostring(pending.rollSessionId) or nil
+                local sameType = pending and pendingType == rollType and pendingValue <= 0
+                local sessionMatches = (pass == 1 and rollSessionId and pendingSessionId == rollSessionId)
+                    or (pass == 2 and ((not rollSessionId) or pendingSessionId == nil or pendingSessionId == ""))
+
+                if sameType and sessionMatches then
+                    pending.rollValue = rollValue
+                    pending.ts = now
+                    if rollSessionId and not pendingSessionId then
+                        pending.rollSessionId = rollSessionId
+                    end
+                    if expiresAt and ((tonumber(pending.expiresAt) or 0) < expiresAt) then
+                        pending.expiresAt = expiresAt
+                    end
+                    return true
+                end
+            end
+        end
+
+        return false
+    end
+
+    local function touchPendingAward(pending, now, rollSessionId, expiresAt)
+        if not pending then
+            return nil
+        end
+
+        pending.ts = now
+        if rollSessionId and (not pending.rollSessionId or pending.rollSessionId == "") then
+            pending.rollSessionId = rollSessionId
+        end
+        if expiresAt and ((tonumber(pending.expiresAt) or 0) < expiresAt) then
+            pending.expiresAt = expiresAt
+        end
+        return pending
     end
 
     local function warmItemCache(itemLink)
@@ -153,20 +263,7 @@ do
         if not itemLink or not looter then
             return
         end
-        local key = buildPendingAwardKey(itemLink, looter)
-        local list = lootState.pendingAwards[key]
-        if not list then
-            local rawLinkKey = buildPendingAwardKey(itemLink, looter, true)
-            if rawLinkKey ~= key and lootState.pendingAwards[rawLinkKey] then
-                list = lootState.pendingAwards[rawLinkKey]
-                lootState.pendingAwards[key] = list
-                lootState.pendingAwards[rawLinkKey] = nil
-            end
-        end
-        if not list then
-            list = {}
-            lootState.pendingAwards[key] = list
-        end
+        local _, list = ensurePendingAwardList(itemLink, looter)
         local now = GetTime()
         local resolvedRollType = tonumber(rollType)
         local resolvedRollValue = tonumber(rollValue)
@@ -177,33 +274,8 @@ do
         -- a later "Need Roll - 96 ..." line for the same item/player. Upgrade the
         -- oldest zero-value pending entry so FIFO consumption keeps the numeric
         -- rollValue attached to the same upcoming loot receipt.
-        if resolvedRollValue and resolvedRollValue > 0 then
-            for pass = 1, 2 do
-                for i = 1, #list do
-                    local pending = list[i]
-                    local pendingType = tonumber(pending and pending.rollType)
-                    local pendingValue = tonumber(pending and pending.rollValue) or 0
-                    local pendingSessionId = pending and pending.rollSessionId and tostring(pending.rollSessionId) or nil
-                    local canUpgrade = pending
-                        and pendingType == resolvedRollType
-                        and pendingValue <= 0
-                        and (
-                            (pass == 1 and resolvedSessionId and pendingSessionId == resolvedSessionId)
-                            or (pass == 2 and ((not resolvedSessionId) or pendingSessionId == nil or pendingSessionId == ""))
-                        )
-                    if canUpgrade then
-                        pending.rollValue = resolvedRollValue
-                        pending.ts = now
-                        if resolvedSessionId and not pendingSessionId then
-                            pending.rollSessionId = resolvedSessionId
-                        end
-                        if resolvedExpiresAt and ((tonumber(pending.expiresAt) or 0) < resolvedExpiresAt) then
-                            pending.expiresAt = resolvedExpiresAt
-                        end
-                        return
-                    end
-                end
-            end
+        if tryUpgradePendingAward(list, resolvedRollType, resolvedRollValue, resolvedSessionId, resolvedExpiresAt, now) then
+            return
         end
 
         list[#list + 1] = {
@@ -217,39 +289,40 @@ do
         }
     end
 
-    function module:RemovePendingAward(itemLink, looter, maxAge, rollSessionId, preferResolvedValue)
-        local ttl = tonumber(maxAge) or PENDING_AWARD_TTL_SECONDS
-        if ttl < 0 then
-            ttl = 0
-        end
+    function module:RemovePendingAward(itemLink, looter, maxAge, rollSessionId, preferResolvedValue, allowGroupLootPendingAwards)
+        local ttl = normalizePendingAwardTtl(maxAge)
         local key, list = getPendingAwardList(itemLink, looter)
         if not list then
             return nil
         end
+
         local now = GetTime()
         local preferredSessionId = rollSessionId and tostring(rollSessionId) or nil
         if preferredSessionId and preferredSessionId ~= "" then
-            for i = 1, #list do
-                local p = list[i]
-                if isPendingAwardValid(p, now, ttl) and tostring(p.rollSessionId or "") == preferredSessionId then
-                    return consumePendingAwardAt(list, key, i, itemLink, looter, ttl)
-                end
+            local sessionIndex = findPendingAwardIndex(list, now, ttl, function(pending)
+                return shouldConsiderPendingForMode(pending, allowGroupLootPendingAwards) and tostring(pending.rollSessionId or "") == preferredSessionId
+            end)
+            if sessionIndex then
+                return consumePendingAwardAt(list, key, sessionIndex, itemLink, looter, ttl)
             end
         end
+
         if preferResolvedValue then
-            for i = 1, #list do
-                local p = list[i]
-                if isPendingAwardValid(p, now, ttl) and hasResolvedPendingAwardValue(p) then
-                    return consumePendingAwardAt(list, key, i, itemLink, looter, ttl)
-                end
+            local resolvedIndex = findPendingAwardIndex(list, now, ttl, function(pending)
+                return shouldConsiderPendingForMode(pending, allowGroupLootPendingAwards) and hasResolvedPendingAwardValue(pending)
+            end)
+            if resolvedIndex then
+                return consumePendingAwardAt(list, key, resolvedIndex, itemLink, looter, ttl)
             end
         end
-        for i = 1, #list do
-            local p = list[i]
-            if isPendingAwardValid(p, now, ttl) then
-                return consumePendingAwardAt(list, key, i, itemLink, looter, ttl)
-            end
+
+        local firstValidIndex = findPendingAwardIndex(list, now, ttl, function(pending)
+            return shouldConsiderPendingForMode(pending, allowGroupLootPendingAwards)
+        end)
+        if firstValidIndex then
+            return consumePendingAwardAt(list, key, firstValidIndex, itemLink, looter, ttl)
         end
+
         pruneExpiredPendingAwards(list, now, ttl)
         if #list == 0 then
             lootState.pendingAwards[key] = nil
@@ -258,10 +331,7 @@ do
     end
 
     function module:RefreshPendingAward(itemLink, looter, maxAge, rollSessionId, expiresAt)
-        local ttl = tonumber(maxAge) or PENDING_AWARD_TTL_SECONDS
-        if ttl < 0 then
-            ttl = 0
-        end
+        local ttl = normalizePendingAwardTtl(maxAge)
         local key, list = getPendingAwardList(itemLink, looter)
         if not list then
             return nil
@@ -270,32 +340,20 @@ do
         local now = GetTime()
         local resolvedSessionId = rollSessionId and tostring(rollSessionId) or nil
         local resolvedExpiresAt = tonumber(expiresAt) or nil
-        local touched = nil
+        local touched
 
         if resolvedSessionId and resolvedSessionId ~= "" then
-            for i = 1, #list do
-                local pending = list[i]
-                if isPendingAwardValid(pending, now, ttl) and tostring(pending.rollSessionId or "") == resolvedSessionId then
-                    touched = pending
-                    break
-                end
+            local sessionIndex = findPendingAwardIndex(list, now, ttl, function(pending)
+                return tostring(pending.rollSessionId or "") == resolvedSessionId
+            end)
+            if sessionIndex then
+                touched = list[sessionIndex]
             end
         end
 
         if not touched then
-            local uniqueIndex = nil
-            for i = 1, #list do
-                local pending = list[i]
-                if isPendingAwardValid(pending, now, ttl) then
-                    if uniqueIndex then
-                        uniqueIndex = false
-                        break
-                    end
-                    uniqueIndex = i
-                end
-            end
-
-            if type(uniqueIndex) == "number" then
+            local uniqueIndex = findUniqueValidPendingAwardIndex(list, now, ttl)
+            if uniqueIndex then
                 touched = list[uniqueIndex]
             end
         end
@@ -309,21 +367,11 @@ do
             return nil
         end
 
-        touched.ts = now
-        if resolvedSessionId and (not touched.rollSessionId or touched.rollSessionId == "") then
-            touched.rollSessionId = resolvedSessionId
-        end
-        if resolvedExpiresAt and ((tonumber(touched.expiresAt) or 0) < resolvedExpiresAt) then
-            touched.expiresAt = resolvedExpiresAt
-        end
-        return touched
+        return touchPendingAward(touched, now, resolvedSessionId, resolvedExpiresAt)
     end
 
     function module:PurgePendingAwards(maxAge)
-        local ttl = tonumber(maxAge) or PENDING_AWARD_TTL_SECONDS
-        if ttl < 0 then
-            ttl = 0
-        end
+        local ttl = normalizePendingAwardTtl(maxAge)
         local now = GetTime()
         for key, list in pairs(lootState.pendingAwards) do
             if type(list) ~= "table" then

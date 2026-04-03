@@ -223,6 +223,100 @@ do
         return nil, GetTime() + GROUP_LOOT_PENDING_AWARD_TTL_SECONDS
     end
 
+    local function getLoggedPassiveLootState()
+        raidState.loggedPassiveLoot = raidState.loggedPassiveLoot or {}
+        return raidState.loggedPassiveLoot
+    end
+
+    local function buildLoggedPassiveLootKey(itemLink, looter)
+        local itemKey = getPassiveLootRollItemKey(itemLink)
+        local normalizedLooter = Strings.NormalizeName(looter, true) or looter
+        return tostring(itemKey) .. "\001" .. tostring(normalizedLooter)
+    end
+
+    local function purgeExpiredLoggedPassiveLoot(now)
+        local state = getLoggedPassiveLootState()
+        local currentTime = tonumber(now) or GetTime()
+
+        for key, list in pairs(state) do
+            if type(list) ~= "table" then
+                state[key] = nil
+            else
+                for i = #list, 1, -1 do
+                    local marker = list[i]
+                    local expiresAt = tonumber(marker and marker.expiresAt) or 0
+                    if not marker or expiresAt <= currentTime then
+                        tremove(list, i)
+                    end
+                end
+
+                if #list == 0 then
+                    state[key] = nil
+                end
+            end
+        end
+    end
+
+    local function rememberLoggedPassiveLoot(itemLink, looter, rollSessionId)
+        if not itemLink or not looter then
+            return
+        end
+
+        local now = GetTime()
+        purgeExpiredLoggedPassiveLoot(now)
+
+        local state = getLoggedPassiveLootState()
+        local key = buildLoggedPassiveLootKey(itemLink, looter)
+        local list = state[key]
+        if type(list) ~= "table" then
+            list = {}
+            state[key] = list
+        end
+
+        local resolvedSessionId = rollSessionId and tostring(rollSessionId) or nil
+        local expiresAt = now + GROUP_LOOT_PENDING_AWARD_TTL_SECONDS
+        for i = 1, #list do
+            local marker = list[i]
+            if marker and tostring(marker.rollSessionId or "") == tostring(resolvedSessionId or "") then
+                marker.rollSessionId = resolvedSessionId
+                marker.expiresAt = expiresAt
+                return
+            end
+        end
+
+        list[#list + 1] = {
+            rollSessionId = resolvedSessionId,
+            expiresAt = expiresAt,
+        }
+    end
+
+    local function hasLoggedPassiveLoot(itemLink, looter, rollSessionId)
+        if not itemLink or not looter then
+            return false
+        end
+
+        purgeExpiredLoggedPassiveLoot()
+
+        local state = getLoggedPassiveLootState()
+        local list = state[buildLoggedPassiveLootKey(itemLink, looter)]
+        if type(list) ~= "table" or #list == 0 then
+            return false
+        end
+
+        local resolvedSessionId = rollSessionId and tostring(rollSessionId) or nil
+        if resolvedSessionId and resolvedSessionId ~= "" then
+            for i = 1, #list do
+                local marker = list[i]
+                if marker and tostring(marker.rollSessionId or "") == resolvedSessionId then
+                    return true
+                end
+            end
+            return false
+        end
+
+        return #list == 1
+    end
+
     local function isUnknownName(name)
         return (not name) or name == "" or name == UNKNOWN_OBJECT or name == UNKNOWN_BEING
     end
@@ -270,19 +364,129 @@ do
         }
     end
 
-    local function tryDeformatValues(pattern, msg)
-        if type(addon.Deformat) ~= "function" then
+    local localizedDeformatCache = {}
+    local localizedFormatCaptures = {
+        c = { pattern = "(.)", numeric = false },
+        d = { pattern = "(-?%d+)", numeric = true },
+        f = { pattern = "(-?%d+%.?%d*)", numeric = true },
+        g = { pattern = "(-?%d+%.?%d*)", numeric = true },
+        i = { pattern = "(-?%d+)", numeric = true },
+        s = { pattern = "(.-)", numeric = false },
+    }
+
+    local function escapeLuaPatternText(text)
+        return (text:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"))
+    end
+
+    local function compileLocalizedDeformatPattern(pattern)
+        local cached = localizedDeformatCache[pattern]
+        if cached then
+            return cached
+        end
+
+        local luaPattern = { "^" }
+        local captures = {}
+        local nextIndex = 1
+        local maxIndex = 0
+        local cursor = 1
+
+        while cursor <= strlen(pattern) do
+            local percentIndex = string.find(pattern, "%", cursor, true)
+            if not percentIndex then
+                luaPattern[#luaPattern + 1] = escapeLuaPatternText(string.sub(pattern, cursor))
+                break
+            end
+
+            if percentIndex > cursor then
+                luaPattern[#luaPattern + 1] = escapeLuaPatternText(string.sub(pattern, cursor, percentIndex - 1))
+            end
+
+            local marker = string.sub(pattern, percentIndex + 1, percentIndex + 1)
+            if marker == "%" then
+                luaPattern[#luaPattern + 1] = "%%"
+                cursor = percentIndex + 2
+            else
+                local placeholder = string.sub(pattern, percentIndex + 1)
+                local explicitIndex, explicitFlags, explicitType = strmatch(placeholder, "^(%d+)%$([%-%d%.]*)([cdfgis])")
+                local flags = nil
+                local formatType = explicitType
+                local targetIndex = nil
+
+                if formatType then
+                    targetIndex = tonumber(explicitIndex)
+                    cursor = percentIndex + #explicitIndex + #explicitFlags + 3
+                else
+                    flags, formatType = strmatch(placeholder, "^([%-%d%.]*)([cdfgis])")
+                    if not formatType then
+                        luaPattern[#luaPattern + 1] = "%%"
+                        cursor = percentIndex + 1
+                    else
+                        targetIndex = nextIndex
+                        nextIndex = nextIndex + 1
+                        cursor = percentIndex + #flags + 2
+                    end
+                end
+
+                if formatType then
+                    local capture = localizedFormatCaptures[formatType]
+                    luaPattern[#luaPattern + 1] = capture.pattern
+                    captures[#captures + 1] = {
+                        targetIndex = targetIndex,
+                        numeric = capture.numeric,
+                    }
+                    if targetIndex > maxIndex then
+                        maxIndex = targetIndex
+                    end
+                end
+            end
+        end
+
+        luaPattern[#luaPattern + 1] = "$"
+        cached = {
+            captures = captures,
+            maxIndex = maxIndex,
+            matchPattern = table.concat(luaPattern),
+        }
+        localizedDeformatCache[pattern] = cached
+        return cached
+    end
+
+    local function tryLocalizedDeformatValues(pattern, msg)
+        local compiled = compileLocalizedDeformatPattern(pattern)
+        if not compiled or compiled.maxIndex < 1 then
             return nil
         end
+
+        local matches = packValues(strmatch(msg, compiled.matchPattern))
+        if matches.n == 0 or matches[1] == nil then
+            return nil
+        end
+
+        local values = { n = compiled.maxIndex }
+        for i = 1, #compiled.captures do
+            local capture = compiled.captures[i]
+            local value = matches[i]
+            if capture.numeric then
+                value = tonumber(value) or value
+            end
+            values[capture.targetIndex] = value
+        end
+        return values
+    end
+
+    local function tryDeformatValues(pattern, msg)
         if type(pattern) ~= "string" or pattern == "" or type(msg) ~= "string" or msg == "" then
             return nil
         end
 
-        local values = packValues(addon.Deformat(msg, pattern))
-        if values.n == 0 or values[1] == nil then
-            return nil
+        if type(addon.Deformat) == "function" then
+            local values = packValues(addon.Deformat(msg, pattern))
+            if values.n > 0 and values[1] ~= nil then
+                return values
+            end
         end
-        return values
+
+        return tryLocalizedDeformatValues(pattern, msg)
     end
 
     local function normalizeLootPlayerName(name)
@@ -296,8 +500,7 @@ do
             selectionGroupPattern = LOOT_ROLL_NEED,
             selectionSelfPattern = LOOT_ROLL_NEED_SELF,
             rollPattern = LOOT_ROLL_ROLLED_NEED,
-            rawSelectionGroupPattern = "^(.+) has selected Need for: (.+)$",
-            rawSelectionSelfPattern = "^You have selected Need for: (.+)$",
+            rollSelfPattern = _G["LOOT_ROLL_ROLLED_NEED_SELF"],
             winnerPatterns = {
                 { group = LOOT_ROLL_WON_NO_SPAM_NEED, self = LOOT_ROLL_YOU_WON_NO_SPAM_NEED },
             },
@@ -308,8 +511,7 @@ do
             selectionGroupPattern = LOOT_ROLL_GREED,
             selectionSelfPattern = LOOT_ROLL_GREED_SELF,
             rollPattern = LOOT_ROLL_ROLLED_GREED,
-            rawSelectionGroupPattern = "^(.+) has selected Greed for: (.+)$",
-            rawSelectionSelfPattern = "^You have selected Greed for: (.+)$",
+            rollSelfPattern = _G["LOOT_ROLL_ROLLED_GREED_SELF"],
             winnerPatterns = {
                 { group = LOOT_ROLL_WON_NO_SPAM_GREED, self = LOOT_ROLL_YOU_WON_NO_SPAM_GREED },
             },
@@ -320,8 +522,7 @@ do
             selectionGroupPattern = LOOT_ROLL_DISENCHANT,
             selectionSelfPattern = LOOT_ROLL_DISENCHANT_SELF,
             rollPattern = LOOT_ROLL_ROLLED_DE,
-            rawSelectionGroupPattern = "^(.+) has selected Disenchant for: (.+)$",
-            rawSelectionSelfPattern = "^You have selected Disenchant for: (.+)$",
+            rollSelfPattern = _G["LOOT_ROLL_ROLLED_DE_SELF"] or _G["LOOT_ROLL_ROLLED_DISENCHANT_SELF"],
             winnerPatterns = {
                 { group = LOOT_ROLL_WON_NO_SPAM_DE, self = LOOT_ROLL_YOU_WON_NO_SPAM_DE },
                 { group = LOOT_ROLL_WON_NO_SPAM_DISENCHANT, self = LOOT_ROLL_YOU_WON_NO_SPAM_DISENCHANT },
@@ -340,43 +541,115 @@ do
         return nil
     end
 
+    local function isGroupLootItemLink(value)
+        if type(value) ~= "string" or value == "" then
+            return false
+        end
+
+        if strmatch(value, ITEM_LINK_PATTERN) then
+            return true
+        end
+
+        if Item and Item.GetItemStringFromLink then
+            local itemKey = Item.GetItemStringFromLink(value)
+            if itemKey and itemKey ~= "" then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    local function extractGroupLootPatternValues(values)
+        local playerName
+        local itemLink
+        local numbers = {}
+
+        if not values then
+            return nil, nil, numbers
+        end
+
+        for i = 1, values.n do
+            local value = values[i]
+            local numberValue = tonumber(value)
+            if numberValue ~= nil then
+                numbers[#numbers + 1] = numberValue
+            elseif not itemLink and isGroupLootItemLink(value) then
+                itemLink = value
+            elseif not playerName and type(value) == "string" and value ~= "" then
+                playerName = normalizeLootPlayerName(value)
+            end
+        end
+
+        return playerName, itemLink, numbers
+    end
+
+    local function resolveGroupLootNumericFields(numbers, singleNumberMode)
+        local count = #numbers
+        if count >= 2 then
+            return numbers[1], numbers[count] or 0
+        end
+        if count == 1 then
+            if singleNumberMode == "roll_id" then
+                return numbers[1], 0
+            end
+            return nil, numbers[1] or 0
+        end
+        return nil, 0
+    end
+
     local function parseGroupLootSelection(msg, rule)
-        local values = tryDeformatValues(rule.selectionGroupPattern, msg)
-        if values and values.n >= 3 then
-            return normalizeLootPlayerName(values[2]), values[3], tonumber(values[1]) or nil
-        end
-        if values and values.n >= 2 then
-            return normalizeLootPlayerName(values[1]), values[2], nil
-        end
-
-        values = tryDeformatValues(rule.selectionSelfPattern, msg)
-        if values and values.n >= 2 then
-            return Core.GetPlayerName(), values[2], tonumber(values[1]) or nil
-        end
-        if values and values.n >= 1 then
-            return Core.GetPlayerName(), values[1], nil
+        local values = tryDeformatValues(rule.selectionSelfPattern, msg)
+        if values then
+            local _, itemLink, numbers = extractGroupLootPatternValues(values)
+            if itemLink then
+                return Core.GetPlayerName(), itemLink, numbers[1] or nil
+            end
         end
 
-        local playerName, itemLink
-        playerName, itemLink = strmatch(msg, rule.rawSelectionGroupPattern)
-        if playerName and itemLink then
-            return normalizeLootPlayerName(playerName), itemLink, nil
-        end
-
-        itemLink = strmatch(msg, rule.rawSelectionSelfPattern)
-        if itemLink then
-            return Core.GetPlayerName(), itemLink, nil
+        values = tryDeformatValues(rule.selectionGroupPattern, msg)
+        if values then
+            local playerName, itemLink, numbers = extractGroupLootPatternValues(values)
+            if playerName and itemLink then
+                return playerName, itemLink, numbers[1] or nil
+            end
         end
 
         return nil
     end
 
+    local function parseGroupLootRollPattern(msg, pattern, rollType, isSelf)
+        local values = tryDeformatValues(pattern, msg)
+        if not values then
+            return nil
+        end
+
+        local playerName, itemLink, numbers = extractGroupLootPatternValues(values)
+        local rollId, rollValue = resolveGroupLootNumericFields(numbers, "roll_value")
+        if not itemLink then
+            return nil
+        end
+        if isSelf then
+            playerName = Core.GetPlayerName()
+        end
+        if not playerName then
+            return nil
+        end
+
+        return playerName, itemLink, rollType, rollValue, rollId
+    end
+
     local function parseGroupLootRoll(msg)
         for i = 1, #GROUP_LOOT_RULES do
             local rule = GROUP_LOOT_RULES[i]
-            local values = tryDeformatValues(rule.rollPattern, msg)
-            if values and values.n >= 3 then
-                return normalizeLootPlayerName(values[3]), values[2], rule.rollType, tonumber(values[1]) or 0
+            local playerName, itemLink, rollType, rollValue, rollId = parseGroupLootRollPattern(msg, rule.rollPattern, rule.rollType, false)
+            if itemLink then
+                return playerName, itemLink, rollType, rollValue, rollId
+            end
+
+            playerName, itemLink, rollType, rollValue, rollId = parseGroupLootRollPattern(msg, rule.rollSelfPattern, rule.rollType, true)
+            if itemLink then
+                return playerName, itemLink, rollType, rollValue, rollId
             end
         end
 
@@ -384,43 +657,22 @@ do
     end
 
     local function parseGroupLootWinnerPattern(msg, groupPattern, selfPattern, rollType)
-        local values = tryDeformatValues(groupPattern, msg)
-        if values and values.n >= 4 then
-            return normalizeLootPlayerName(values[2]), values[4], rollType, tonumber(values[3]) or 0, tonumber(values[1]) or nil
-        end
-        if values and values.n >= 3 then
-            local firstNumber = tonumber(values[1])
-            local secondNumber = tonumber(values[2])
-            if secondNumber ~= nil then
-                return normalizeLootPlayerName(values[1]), values[3], rollType, secondNumber, nil
+        local values = tryDeformatValues(selfPattern, msg)
+        if values then
+            local _, itemLink, numbers = extractGroupLootPatternValues(values)
+            local rollId, rollValue = resolveGroupLootNumericFields(numbers, "roll_value")
+            if itemLink then
+                return Core.GetPlayerName(), itemLink, rollType, rollValue, rollId
             end
-            if firstNumber ~= nil then
-                return normalizeLootPlayerName(values[2]), values[3], rollType, 0, firstNumber
-            end
-        end
-        if values and values.n >= 2 then
-            return normalizeLootPlayerName(values[1]), values[2], rollType, 0, nil
         end
 
-        values = tryDeformatValues(selfPattern, msg)
-        if values and values.n >= 3 then
-            local firstNumber = tonumber(values[1])
-            local secondNumber = tonumber(values[2])
-            if firstNumber ~= nil and secondNumber ~= nil then
-                return Core.GetPlayerName(), values[3], rollType, secondNumber, firstNumber
+        values = tryDeformatValues(groupPattern, msg)
+        if values then
+            local playerName, itemLink, numbers = extractGroupLootPatternValues(values)
+            local rollId, rollValue = resolveGroupLootNumericFields(numbers, "roll_value")
+            if playerName and itemLink then
+                return playerName, itemLink, rollType, rollValue, rollId
             end
-            if secondNumber ~= nil then
-                return Core.GetPlayerName(), values[3], rollType, secondNumber, nil
-            end
-        end
-        if values and values.n >= 2 then
-            local firstNumber = tonumber(values[1])
-            if firstNumber ~= nil then
-                return Core.GetPlayerName(), values[2], rollType, firstNumber, nil
-            end
-        end
-        if values and values.n >= 1 then
-            return Core.GetPlayerName(), values[1], rollType, 0, nil
         end
 
         return nil
@@ -438,15 +690,7 @@ do
             end
         end
 
-        local values = tryDeformatValues(LOOT_ROLL_WON, msg)
-        if values and values.n >= 3 then
-            return normalizeLootPlayerName(values[2]), values[3], nil, nil, tonumber(values[1]) or nil
-        end
-        if values and values.n >= 2 then
-            return normalizeLootPlayerName(values[1]), values[2], nil, nil, nil
-        end
-
-        values = tryDeformatValues(LOOT_ROLL_YOU_WON, msg)
+        local values = tryDeformatValues(LOOT_ROLL_YOU_WON, msg)
         if values and values.n >= 2 then
             return Core.GetPlayerName(), values[2], nil, nil, tonumber(values[1]) or nil
         end
@@ -454,18 +698,20 @@ do
             return Core.GetPlayerName(), values[1], nil, nil, nil
         end
 
-        local playerName, itemLink
-        itemLink = strmatch(msg, "^You won: (.+)$")
-        if itemLink then
-            return Core.GetPlayerName(), itemLink, nil, nil, nil
+        values = tryDeformatValues(LOOT_ROLL_WON, msg)
+        if values and values.n >= 3 then
+            return normalizeLootPlayerName(values[2]), values[3], nil, nil, tonumber(values[1]) or nil
         end
-
-        playerName, itemLink = strmatch(msg, "^(.+) won: (.+)$")
-        if playerName and itemLink then
-            return normalizeLootPlayerName(playerName), itemLink, nil, nil, nil
+        if values and values.n >= 2 then
+            return normalizeLootPlayerName(values[1]), values[2], nil, nil, nil
         end
 
         return nil
+    end
+
+    local function isPassiveLootWinnerMessage(msg)
+        local _, itemLink = parseGroupLootWinner(msg)
+        return itemLink ~= nil
     end
 
     local function invalidateRaidRuntime(raid)
@@ -657,6 +903,98 @@ do
         return nil
     end
 
+    local function getLootItemKey(loot)
+        if type(loot) ~= "table" then
+            return nil
+        end
+        if type(loot.itemString) == "string" and loot.itemString ~= "" then
+            return loot.itemString
+        end
+        return getPassiveLootRollItemKey(loot.itemLink)
+    end
+
+    local function findUpgradeablePassiveLootEntry(raid, itemLink, looter, rollSessionId)
+        if type(raid) ~= "table" or not itemLink or not looter then
+            return nil
+        end
+
+        local targetItemKey = getPassiveLootRollItemKey(itemLink)
+        local targetLooter = Strings.NormalizeName(looter, true) or looter
+        local targetSessionId = rollSessionId and tostring(rollSessionId) or nil
+        local currentTime = tonumber(Time.GetCurrentTime()) or 0
+        local uniqueMatch = nil
+        local sessionlessMatch = nil
+        local lootList = raid.loot or {}
+
+        for i = #lootList, 1, -1 do
+            local loot = lootList[i]
+            local lootTime = tonumber(loot and loot.time) or 0
+            if currentTime > 0 and lootTime > 0 and (currentTime - lootTime) > GROUP_LOOT_PENDING_AWARD_TTL_SECONDS then
+                break
+            end
+
+            if loot and getLootItemKey(loot) == targetItemKey then
+                local lootLooter = resolveLootLooterName(raid, loot)
+                if lootLooter == targetLooter and (tonumber(loot.rollValue) or 0) <= 0 then
+                    local lootSessionId = loot.rollSessionId and tostring(loot.rollSessionId) or nil
+                    if targetSessionId and targetSessionId ~= "" then
+                        if lootSessionId == targetSessionId then
+                            return loot
+                        end
+                        if not lootSessionId or lootSessionId == "" then
+                            if sessionlessMatch then
+                                sessionlessMatch = false
+                            else
+                                sessionlessMatch = loot
+                            end
+                        end
+                    else
+                        if uniqueMatch then
+                            return nil
+                        end
+                        uniqueMatch = loot
+                    end
+                end
+            end
+        end
+
+        if targetSessionId and type(sessionlessMatch) == "table" then
+            return sessionlessMatch
+        end
+
+        return uniqueMatch
+    end
+
+    local function upgradeLoggedPassiveLootRoll(itemLink, looter, rollType, rollValue, rollSessionId)
+        local resolvedRollValue = tonumber(rollValue) or 0
+        local currentRaidId = Core.GetCurrentRaid()
+        if resolvedRollValue <= 0 or not currentRaidId then
+            return false
+        end
+
+        local raid = Core.EnsureRaidById(currentRaidId)
+        if not raid then
+            return false
+        end
+        Core.EnsureRaidSchema(raid)
+
+        local loot = findUpgradeablePassiveLootEntry(raid, itemLink, looter, rollSessionId)
+        if not loot then
+            return false
+        end
+
+        loot.rollType = rollType or loot.rollType
+        loot.rollValue = resolvedRollValue
+        if rollSessionId and (not loot.rollSessionId or loot.rollSessionId == "") then
+            loot.rollSessionId = tostring(rollSessionId)
+        end
+
+        invalidateRaidRuntime(raid)
+        bindLootNidToRollSession(loot.lootNid, loot.rollSessionId, loot.itemId, loot.itemString, loot.itemLink)
+        Bus.TriggerEvent(InternalEvents.RaidLootUpdate, currentRaidId, loot)
+        return true
+    end
+
     local function buildDefaultRaidPlayer(name)
         return {
             name = name,
@@ -768,6 +1106,177 @@ do
             end
         end
         return nil, nil
+    end
+
+    local function parseLootChatMessage(msg, rollType, rollValue)
+        -- Parse loot chat variants ("receives loot" and "receives item").
+        local player, itemLink, count = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
+        local itemCount = count or 1
+
+        if not player then
+            player, itemLink = addon.Deformat(msg, LOOT_ITEM)
+            itemCount = 1
+        end
+
+        -- Self loot path (no player name in the string).
+        if not itemLink then
+            local link
+            link, count = addon.Deformat(msg, LOOT_ITEM_SELF_MULTIPLE)
+            if link then
+                itemLink = link
+                itemCount = count or 1
+                player = Core.GetPlayerName()
+            end
+        end
+
+        if not itemLink then
+            local link = addon.Deformat(msg, LOOT_ITEM_SELF)
+            if link then
+                itemLink = link
+                itemCount = 1
+                player = Core.GetPlayerName()
+            end
+        end
+
+        -- Fallback for alternate loot-roll chat formats.
+        if not player or not itemLink then
+            local resolvedRollType, resolvedRollValue
+            player, itemLink, resolvedRollType, resolvedRollValue = parseGroupLootWinner(msg)
+            if itemLink then
+                itemCount = 1
+                rollType = rollType or resolvedRollType
+                if rollValue == nil then
+                    rollValue = resolvedRollValue
+                end
+            end
+        end
+
+        if not itemLink then
+            return nil, nil, nil, rollType, rollValue
+        end
+
+        return Strings.NormalizeName(player, true) or player, tonumber(itemCount) or 1, itemLink, rollType, rollValue
+    end
+
+    local function getLootItemDetails(itemLink)
+        local _, _, itemString = string.find(itemLink, "^|c%x+|H(.+)|h%[.*%]")
+        local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
+        local _, _, _, _, itemId = string.find(itemLink, ITEM_LINK_PATTERN)
+        return itemString, itemName, itemRarity, itemTexture, tonumber(itemId)
+    end
+
+    local function shouldSkipLootEntry(itemRarity, itemId, itemLink)
+        -- Ignore low-rarity and explicitly ignored items.
+        local lootThreshold = GetLootThreshold()
+        if itemRarity and itemRarity < lootThreshold then
+            addon:debug(Diag.D.LogLootIgnoredBelowThreshold:format(tostring(itemRarity), tonumber(lootThreshold) or -1, tostring(itemLink)))
+            return true
+        end
+        if itemId and module:IsIgnoredItem(itemId) then
+            addon:debug(Diag.D.LogLootIgnoredItemId:format(tostring(itemId), tostring(itemLink)))
+            return true
+        end
+        return false
+    end
+
+    local function resolveLootRollOutcome(itemLink, itemString, itemId, player, rollType, rollValue)
+        local passiveGroupLoot = isPassiveGroupLootMethod()
+        local preferredRollSessionId = nil
+        if not passiveGroupLoot then
+            preferredRollSessionId = resolveRollSessionIdForLoot(itemLink, itemString, itemId)
+        end
+
+        local rollSessionId
+        local outcome = {
+            consumedPendingAward = false,
+            matchedPassiveRoll = false,
+        }
+        local lootService = getLootService()
+        local pendingAwardTtl = passiveGroupLoot and GROUP_LOOT_PENDING_AWARD_TTL_SECONDS or PENDING_AWARD_TTL_SECONDS
+        -- In ML mode, block stale GL:* pending awards only when the current item
+        -- maps to an active roll session. Without a preferred session, keep GL
+        -- pending lookup enabled to preserve passive Group Loot logging in mixed
+        -- transition windows (Group Loot -> ML).
+        local allowGroupLootPendingAwards = passiveGroupLoot or not preferredRollSessionId
+        local pendingAward = lootService
+            and lootService:RemovePendingAward(itemLink, player, pendingAwardTtl, preferredRollSessionId, passiveGroupLoot, allowGroupLootPendingAwards)
+        if pendingAward then
+            if not rollType then
+                rollType = pendingAward.rollType
+            end
+            if rollValue == nil then
+                rollValue = pendingAward.rollValue
+            elseif passiveGroupLoot then
+                local currentRollValue = tonumber(rollValue) or 0
+                local pendingRollValue = tonumber(pendingAward.rollValue) or 0
+                if currentRollValue <= 0 and pendingRollValue > 0 then
+                    rollValue = pendingAward.rollValue
+                end
+            end
+            if rollValue == nil then
+                rollValue = pendingAward.rollValue
+            end
+            rollSessionId = pendingAward.rollSessionId and tostring(pendingAward.rollSessionId) or nil
+            outcome.consumedPendingAward = true
+        end
+
+        if not rollSessionId then
+            if passiveGroupLoot then
+                local passiveRoll = getPassiveLootRollEntry(itemLink)
+                rollSessionId = passiveRoll and passiveRoll.sessionId or nil
+                outcome.matchedPassiveRoll = passiveRoll ~= nil
+            else
+                rollSessionId = preferredRollSessionId
+            end
+        end
+
+        -- Resolve award source: pending award/group-loot choice -> manual ML tag -> current roll type.
+        if not rollType then
+            if module:IsMasterLooter() and not lootState.fromInventory then
+                rollType = rollTypes.MANUAL
+                rollValue = 0
+
+                -- Debug marker for manual-tagged loot.
+                addon:debug(Diag.D.LogLootTaggedManual, tostring(itemLink), tostring(player), tostring(lootState.currentRollType))
+            else
+                rollType = lootState.currentRollType
+            end
+        end
+
+        if not rollSessionId then
+            rollSessionId = resolveRollSessionIdForLoot(itemLink, itemString, itemId)
+        end
+
+        if not rollValue then
+            local rollsService = getRollsService()
+            rollValue = rollsService and rollsService:HighestRoll() or 0
+        end
+
+        return rollType, rollValue, rollSessionId, outcome
+    end
+
+    local function buildLootRecord(raid, itemId, itemName, itemString, itemLink, itemRarity, itemTexture, itemCount, looterNid, rollType, rollValue, rollSessionId)
+        local lootNid = tonumber(raid.nextLootNid) or 1
+        raid.nextLootNid = lootNid + 1
+
+        local lootInfo = {
+            itemId = itemId,
+            itemName = itemName,
+            itemString = itemString,
+            itemLink = itemLink,
+            itemRarity = itemRarity,
+            itemTexture = itemTexture,
+            itemCount = itemCount,
+            looterNid = (looterNid > 0) and looterNid or nil,
+            rollType = rollType,
+            rollValue = rollValue,
+            rollSessionId = rollSessionId,
+            lootNid = lootNid,
+            bossNid = tonumber(Core.GetLastBoss()) or 0,
+            time = Time.GetCurrentTime(),
+        }
+
+        return lootInfo, lootNid
     end
 
     -- ----- Public methods ----- --
@@ -1432,69 +1941,19 @@ do
 
     -- Adds a loot item to the active raid log.
     function module:AddLoot(msg, rollType, rollValue)
-        -- Parse loot chat variants ("receives loot" and "receives item").
-        local player, itemLink, count = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
-        local itemCount = count or 1
-
-        if not player then
-            player, itemLink = addon.Deformat(msg, LOOT_ITEM)
-            itemCount = 1
-        end
-
-        -- Self loot path (no player name in the string).
-        if not itemLink then
-            local link
-            link, count = addon.Deformat(msg, LOOT_ITEM_SELF_MULTIPLE)
-            if link then
-                itemLink = link
-                itemCount = count or 1
-                player = Core.GetPlayerName()
-            end
-        end
-
-        if not itemLink then
-            local link = addon.Deformat(msg, LOOT_ITEM_SELF)
-            if link then
-                itemLink = link
-                itemCount = 1
-                player = Core.GetPlayerName()
-            end
-        end
-
-        -- Fallback for alternate loot-roll chat formats.
-        if not player or not itemLink then
-            local resolvedRollType, resolvedRollValue
-            player, itemLink, resolvedRollType, resolvedRollValue = parseGroupLootWinner(msg)
-            if itemLink then
-                itemCount = 1
-                rollType = rollType or resolvedRollType
-                if rollValue == nil then
-                    rollValue = resolvedRollValue
-                end
-            end
-        end
+        local player
+        local itemCount
+        local itemLink
+        player, itemCount, itemLink, rollType, rollValue = parseLootChatMessage(msg, rollType, rollValue)
         if not itemLink then
             addon:debug(Diag.D.LogLootParseFailed:format(tostring(msg)))
             return
         end
 
-        player = Strings.NormalizeName(player, true) or player
-        itemCount = tonumber(itemCount) or 1
-
-        local _, _, itemString = string.find(itemLink, "^|c%x+|H(.+)|h%[.*%]")
-        local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
-        local _, _, _, _, itemId = string.find(itemLink, ITEM_LINK_PATTERN)
-        itemId = tonumber(itemId)
+        local itemString, itemName, itemRarity, itemTexture, itemId = getLootItemDetails(itemLink)
         addon:trace(Diag.D.LogLootParsed:format(tostring(player), tostring(itemLink), itemCount))
 
-        -- Ignore low-rarity and explicitly ignored items.
-        local lootThreshold = GetLootThreshold()
-        if itemRarity and itemRarity < lootThreshold then
-            addon:debug(Diag.D.LogLootIgnoredBelowThreshold:format(tostring(itemRarity), tonumber(lootThreshold) or -1, tostring(itemLink)))
-            return
-        end
-        if itemId and module:IsIgnoredItem(itemId) then
-            addon:debug(Diag.D.LogLootIgnoredItemId:format(tostring(itemId), tostring(itemLink)))
+        if shouldSkipLootEntry(itemRarity, itemId, itemLink) then
             return
         end
         raidState.lastLootCount = itemCount
@@ -1503,95 +1962,45 @@ do
             addon:debug(Diag.D.LogBossNoContextTrash)
             self:AddBoss("_TrashMob_")
         end
+
+        local passiveGroupLoot = isPassiveGroupLootMethod()
+        local isPassiveWinnerMessage = passiveGroupLoot and isPassiveLootWinnerMessage(msg)
         local rollSessionId
-        local preferredRollSessionId = nil
-        if not isPassiveGroupLootMethod() then
-            preferredRollSessionId = resolveRollSessionIdForLoot(itemLink, itemString, itemId)
-        end
-        local lootService = getLootService()
-        local pendingAwardTtl = isPassiveGroupLootMethod() and GROUP_LOOT_PENDING_AWARD_TTL_SECONDS or PENDING_AWARD_TTL_SECONDS
-        local preferResolvedPendingAward = isPassiveGroupLootMethod()
-        local pendingAward = lootService and lootService:RemovePendingAward(itemLink, player, pendingAwardTtl, preferredRollSessionId, preferResolvedPendingAward)
-        if pendingAward then
-            if not rollType then
-                rollType = pendingAward.rollType
-            end
-            if rollValue == nil then
-                rollValue = pendingAward.rollValue
-            end
-            rollSessionId = pendingAward.rollSessionId and tostring(pendingAward.rollSessionId) or nil
-        end
-        if not rollSessionId then
-            if isPassiveGroupLootMethod() then
-                local passiveRoll = getPassiveLootRollEntry(itemLink)
-                rollSessionId = passiveRoll and passiveRoll.sessionId or nil
-            else
-                rollSessionId = preferredRollSessionId
-            end
+        local rollOutcome
+        rollType, rollValue, rollSessionId, rollOutcome = resolveLootRollOutcome(itemLink, itemString, itemId, player, rollType, rollValue)
+
+        if passiveGroupLoot and not (rollOutcome and rollOutcome.consumedPendingAward) and hasLoggedPassiveLoot(itemLink, player, rollSessionId) then
+            return
         end
 
-        -- Resolve award source: pending award/group-loot choice -> manual ML tag -> current roll type.
-        if not rollType then
-            if self:IsMasterLooter() and not lootState.fromInventory then
-                rollType = rollTypes.MANUAL
-                rollValue = 0
-
-                -- Debug marker for manual-tagged loot.
-                addon:debug(Diag.D.LogLootTaggedManual, tostring(itemLink), tostring(player), tostring(lootState.currentRollType))
-            else
-                rollType = lootState.currentRollType
-            end
-        end
-        if not rollSessionId then
-            rollSessionId = resolveRollSessionIdForLoot(itemLink, itemString, itemId)
-        end
-
-        if not rollValue then
-            local rollsService = getRollsService()
-            rollValue = rollsService and rollsService:HighestRoll() or 0
-        end
-
-        local raid = Core.EnsureRaidById(Core.GetCurrentRaid())
+        local currentRaidId = Core.GetCurrentRaid()
+        local raid = Core.EnsureRaidById(currentRaidId)
         if not raid then
             return
         end
         Core.EnsureRaidSchema(raid)
 
         local looterNid
-        looterNid, player = ensureRaidPlayerNid(player, Core.GetCurrentRaid())
+        looterNid, player = ensureRaidPlayerNid(player, currentRaidId)
 
-        local lootNid = tonumber(raid.nextLootNid) or 1
-        raid.nextLootNid = lootNid + 1
-
-        local lootInfo = {
-            itemId = itemId,
-            itemName = itemName,
-            itemString = itemString,
-            itemLink = itemLink,
-            itemRarity = itemRarity,
-            itemTexture = itemTexture,
-            itemCount = itemCount,
-            looterNid = (looterNid > 0) and looterNid or nil,
-            rollType = rollType,
-            rollValue = rollValue,
-            rollSessionId = rollSessionId,
-            lootNid = lootNid,
-            bossNid = tonumber(Core.GetLastBoss()) or 0,
-            time = Time.GetCurrentTime(),
-        }
+        local lootInfo, lootNid = buildLootRecord(raid, itemId, itemName, itemString, itemLink, itemRarity, itemTexture, itemCount, looterNid, rollType, rollValue, rollSessionId)
 
         -- LootCounter (MS only): increment the winner's count when the loot is actually awarded.
         -- This runs off the authoritative LOOT_ITEM / LOOT_ITEM_MULTIPLE chat event.
         if tonumber(rollType) == rollTypes.MAINSPEC then
-            module:AddPlayerCount(player, itemCount, Core.GetCurrentRaid())
+            module:AddPlayerCount(player, itemCount, currentRaidId)
+        end
+
+        if passiveGroupLoot and isPassiveWinnerMessage then
+            rememberLoggedPassiveLoot(itemLink, player, rollSessionId)
         end
 
         tinsert(raid.loot, lootInfo)
         invalidateRaidRuntime(raid)
         bindLootNidToRollSession(lootNid, rollSessionId, itemId, itemString, itemLink)
         consumePassiveLootRollEntry(rollSessionId)
-        Bus.TriggerEvent(InternalEvents.RaidLootUpdate, Core.GetCurrentRaid(), lootInfo)
-        addon:debug(Diag.D.LogLootLogged:format(tonumber(Core.GetCurrentRaid()) or -1, tostring(itemId), tostring(lootInfo.bossNid), tostring(player)))
+        Bus.TriggerEvent(InternalEvents.RaidLootUpdate, currentRaidId, lootInfo)
+        addon:debug(Diag.D.LogLootLogged:format(tonumber(currentRaidId) or -1, tostring(itemId), tostring(lootInfo.bossNid), tostring(player)))
     end
 
     function module:AddPassiveLootRoll(rollId, rollTime)
@@ -1670,11 +2079,13 @@ do
                 end
             end
 
-            local rollPlayer, rollItemLink, rollType, rollValue = parseGroupLootRoll(msg)
+            local rollPlayer, rollItemLink, rollType, rollValue, rollId = parseGroupLootRoll(msg)
             if rollPlayer and rollItemLink and rollType then
                 local rule = getGroupLootRule(rollType)
-                local rollSessionId, expiresAt = resolvePassivePendingAwardContext(rollItemLink)
-                lootService:AddPendingAward(rollItemLink, rollPlayer, rollType, rollValue, rollSessionId, expiresAt)
+                local rollSessionId, expiresAt = resolvePassivePendingAwardContext(rollItemLink, rollId)
+                if not upgradeLoggedPassiveLootRoll(rollItemLink, rollPlayer, rollType, rollValue, rollSessionId) then
+                    lootService:AddPendingAward(rollItemLink, rollPlayer, rollType, rollValue, rollSessionId, expiresAt)
+                end
                 addon:debug(Diag.D.LogLootGroupSelectionQueued:format((rule and rule.label) or "?", tostring(rollPlayer), tostring(rollItemLink)))
                 return "selection"
             end
@@ -1683,15 +2094,17 @@ do
         local playerName, itemLink, winnerRollType, winnerRollValue, winnerRollId = parseGroupLootWinner(msg)
         if playerName and itemLink then
             local rule = getGroupLootRule(winnerRollType)
+            local winnerTypeLabel = (rule and rule.label) or "msg-generic"
+            local winnerRollLabel = (winnerRollValue ~= nil) and tostring(winnerRollValue) or "msg-none"
             if canQueuePendingAward then
                 local rollSessionId, expiresAt = resolvePassivePendingAwardContext(itemLink, winnerRollId)
-                if winnerRollType ~= nil or winnerRollValue ~= nil then
+                if not upgradeLoggedPassiveLootRoll(itemLink, playerName, winnerRollType, winnerRollValue, rollSessionId) and (winnerRollType ~= nil or winnerRollValue ~= nil) then
                     lootService:AddPendingAward(itemLink, playerName, winnerRollType, winnerRollValue, rollSessionId, expiresAt)
                 elseif lootService.RefreshPendingAward then
                     lootService:RefreshPendingAward(itemLink, playerName, GROUP_LOOT_PENDING_AWARD_TTL_SECONDS, rollSessionId, expiresAt)
                 end
             end
-            addon:debug(Diag.D.LogLootGroupWinnerDetected:format((rule and rule.label) or "?", tostring(playerName), tostring(winnerRollValue), tostring(itemLink)))
+            addon:debug(Diag.D.LogLootGroupWinnerDetected:format(tostring(playerName), winnerTypeLabel, winnerRollLabel, tostring(itemLink)))
             return "winner"
         end
 
