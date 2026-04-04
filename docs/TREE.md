@@ -93,8 +93,6 @@
 |   \\-- KRT.xml
 |-- .agents
 |   \\-- skills
-|       |-- afd
-|       |   \\-- ...
 |       |-- k-docs
 |       |   \\-- ...
 |       |-- s-audit
@@ -134,6 +132,7 @@
 |   |-- .gitignore
 |   \\-- pyvenv.cfg
 |-- .vscode
+|   |-- mcp.json
 |   \\-- settings.json
 |-- dist
 |   |-- KRT-beta-0.6.0b.zip

@@ -1,0 +1,9 @@
+{
+    "servers": {
+        "krt-dev-tools": {
+            "type": "stdio",
+            "command": "py",
+            "args": ["-3", "tools/krt_mcp_server.py"]
+        }
+    }
+}

@@ -178,11 +178,22 @@ import json; open('/path/to/debug.log','a').write(json.dumps({"location":"file.p
 # endregion
 ```
 
-### Lua (WoW Addons)
+### Lua (KRT Addon)
 
 ```lua
 -- #region agent log
-if MechanicLib then MechanicLib:Log("DEBUG", "location=File.lua:LINE msg=desc hypothesisId=A data=" .. tostring(val), MechanicLib.Categories.CORE) end
+addon:debug(("[Debug] location=File.lua:LINE msg=desc hypothesisId=A data=%s"):format(tostring(val)))
+-- #endregion
+```
+
+Or using the Diag template system:
+
+```lua
+-- Add to Localization/DiagnoseLog.en.lua:
+-- Diag.D.LogDebugHypA = "[Debug] hypothesisA location=%s data=%s"
+
+-- #region agent log
+addon:debug(Diag.D.LogDebugHypA:format("File.lua:LINE", tostring(val)))
 -- #endregion
 ```
 

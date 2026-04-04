@@ -1,126 +1,150 @@
 ---
 name: s-audit
 description: >
-  Comprehensive quality analysis for WoW addons. Combines security, complexity,
-  deprecation, and dead code analysis into a single audit workflow.
+  Comprehensive quality analysis for KRT addon (WoW 3.3.5a / Lua 5.1).
+  Combines layering, naming, raid hardening, TOC, UI binding, and dead code
+  checks into a single audit workflow.
   Triggers: audit, quality, analysis, review, check, scan.
 ---
 
-# Auditing WoW Addons
+# Auditing KRT
 
-Expert guidance for comprehensive addon quality analysis.
+Quality analysis workflow for KRT addon codebase (WotLK 3.3.5a, Interface 30300).
 
-## Related Commands
-
-- [c-audit](../../commands/c-audit.md) - Full audit workflow
-- [c-clean](../../commands/c-clean.md) - Dead code cleanup
-- [c-lint](../../commands/c-lint.md) - Syntax and style
-- [c-review](../../commands/c-review.md) - Full review (includes audit)
-
-## MCP Tools
+## MCP Tools (KRT Server)
 
 | Task | MCP Tool |
 |------|----------|
-| Security Analysis | `addon.security(addon="MyAddon")` |
-| Complexity Analysis | `addon.complexity(addon="MyAddon")` |
-| Deprecation Scan | `addon.deprecations(addon="MyAddon")` |
-| Dead Code Detection | `addon.deadcode(addon="MyAddon")` |
+| Layering check | `repo_quality_check(check="layering")` |
+| TOC validation | `repo_quality_check(check="toc_files")` |
+| UI binding check | `repo_quality_check(check="ui_binding")` |
+| Lua syntax | `repo_quality_check(check="lua_syntax")` |
+| Naming/uniformity | `repo_quality_check(check="lua_uniformity")` |
+| Raid hardening | `repo_quality_check(check="raid_hardening")` |
+| Dev stack status | `dev_stack_status(verifySkills=true)` |
+
+If Mechanic is bootstrapped, additional checks are available via `mechanic_call`:
+
+| Task | Action |
+|------|--------|
+| Dead code detection | `mechanic_call(action="AddonDeadcode")` |
+| Security analysis | `mechanic_call(action="AddonSecurity")` |
+| Complexity analysis | `mechanic_call(action="AddonComplexity")` |
 
 ## Capabilities
 
-1. **Security Analysis** — Combat lockdown, secret values, taint, unsafe eval
-2. **Complexity Analysis** — Deep nesting, long functions, magic numbers, duplicates
-3. **Deprecation Scanning** — 100+ deprecated APIs with migration paths
-4. **Dead Code Detection** — Unused functions, orphaned files, dead exports
+1. **Layering Verification** — Services must not call Controllers/Widgets or own frames
+2. **Naming Compliance** — PascalCase public, camelCase private, canonical section headers
+3. **Raid Hardening** — DB facade encapsulation, legacy key cleanup, SV round-trip stability
+4. **TOC Integrity** — File existence, naming conventions, SavedVariables declarations
+5. **UI Binding** — XML layout-only policy (no inline scripts), no Binder files
+6. **Dead Code** — Function registry via `fnmap-inventory.ps1`, orphaned file detection
 
 ## Analysis Categories
 
-### Security (`addon.security`)
+### Layering (`check-layering.ps1`)
 
-| Category | Description | Severity |
-|----------|-------------|----------|
-| `combat_violation` | Protected API without InCombatLockdown() guard | Error |
-| `secret_leak` | Logging/storing secret values (12.0+) | Error |
-| `taint_risk` | Unsafe global modifications | Warning |
-| `unsafe_eval` | loadstring/RunScript with variable input | Warning |
-| `addon_comm` | Unvalidated message parsing | Info |
+| Check | Description | Severity |
+|-------|-------------|----------|
+| Service→Parent refs | Services referencing Controllers directly | Error |
+| Service→Parent frames | Services accessing Controller frame objects | Error |
+| Service hooksecurefunc | Services hooking Controller code | Error |
+| Service UI frame APIs | Services creating/showing/hiding frames | Error |
+| Item tooltip leak | Item helpers leaking outside `Modules/Item.lua` | Warning |
+| Core parent frame leak | Init.lua accessing Master.frame | Warning |
 
-### Complexity (`addon.complexity`)
+### Naming (`check-lua-uniformity.ps1`)
 
-| Category | Threshold | Description |
-|----------|-----------|-------------|
-| `deep_nesting` | > 5 levels | Excessive if/for/while nesting |
-| `long_function` | > 100 lines | Functions too long to understand |
-| `long_file` | > 500 lines | Files that should be split |
-| `magic_number` | pattern-based | Unexplained numeric literals |
-| `duplicate_code` | > 10 lines | Near-identical code blocks |
+| Check | Expected Pattern | Description |
+|-------|-----------------|-------------|
+| Public functions | PascalCase or UPPER_SNAKE | Exported methods on modules |
+| Private functions | camelCase | File-local helpers |
+| UI hooks | `AcquireRefs`, `BindHandlers`, `Localize`, `OnLoadFrame`, `RefreshUI` | Canonical names |
+| Section headers | `-- ----- Internal state ----- --` etc. | Required in Controllers/Services/Widgets |
 
-### Deprecations (`addon.deprecations`)
+### Raid Hardening (`check-raid-hardening.ps1`)
 
-| Category | Example APIs | Since |
-|----------|--------------|-------|
-| `addons` | GetAddOnInfo → C_AddOns.GetAddOnInfo | 11.0 |
-| `spells` | GetSpellInfo → C_Spell.GetSpellInfo | 11.0 |
-| `items` | GetItemInfo → C_Item.GetItemInfo | 11.0 |
-| `containers` | GetContainerItemInfo → C_Container | 10.0 |
-| `unit` | UnitHealth (returns secret for enemies) | 12.0 |
+| Check | Description |
+|-------|-------------|
+| KRT_Raids access confinement | Only Init.lua + DBRaidStore.lua may touch `KRT_Raids` |
+| Legacy runtime key cleanup | `_playersByName` etc. only in DBRaidStore.lua |
+| XML layout-only | No inline scripts in UI XML |
+| DB facade access | Raid store accessed only through DB facade |
+| Schema validation | `validate-raid-schema.lua` passes luacheck |
+| SV round-trip | Fixture stability via `sv-roundtrip.lua` |
 
-### Dead Code (`addon.deadcode`)
+### Dead Code (`fnmap-inventory.ps1`)
 
 | Category | Description |
 |----------|-------------|
-| `unused_function` | Functions defined but never called |
-| `orphaned_file` | Lua files not in TOC |
-| `dead_export` | Exported values never used |
-| `unused_library` | Libraries in Libs/ never used |
+| Function registry | Scans all KRT-owned Lua for function definitions |
+| Layer classification | Maps functions to Core/Modules/Services/Controllers/Widgets |
+| Owner extraction | Identifies `addon.*`, `module.*` ownership |
+| API census | `fnmap-api-census.ps1` enumerates public API surface |
 
 ## Workflow
 
 ### Quick Audit
 
 ```
-1. addon.security   → Critical issues (combat, secrets)
-2. addon.deprecations (min_severity=error) → Breaking changes
-3. Report critical findings
+1. repo_quality_check(check="layering")      → Architecture violations
+2. repo_quality_check(check="lua_syntax")     → Syntax errors
+3. repo_quality_check(check="toc_files")      → Missing files / broken TOC
+4. Report critical findings
 ```
 
 ### Full Audit
 
 ```
-1. addon.security   → All security issues
-2. addon.complexity → All maintainability issues
-3. addon.deprecations → All deprecated APIs
-4. addon.deadcode   → All dead code
-5. Comprehensive report with priority order
+1. repo_quality_check(check="layering")       → Architecture
+2. repo_quality_check(check="ui_binding")     → XML policy
+3. repo_quality_check(check="raid_hardening") → DB encapsulation + SV stability
+4. repo_quality_check(check="lua_syntax")     → Syntax
+5. repo_quality_check(check="lua_uniformity") → Naming + luacheck
+6. repo_quality_check(check="toc_files")      → TOC integrity
+7. Report with priority order
 ```
 
-## Interpreting Results
+### Shell Fallback
 
-### Priority Order
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-layering.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-raid-hardening.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-uniformity.ps1
+```
+
+Or via cross-platform entrypoint:
+
+```powershell
+py -3 tools/krt.py repo-quality-check --check layering
+py -3 tools/krt.py repo-quality-check --check raid_hardening
+```
+
+## Priority Order
 
 1. **Critical** (Fix immediately):
-   - Combat lockdown violations (will cause bugs)
-   - Secret value leaks (12.0+ breaking)
-   - Deprecated APIs with `severity: error`
+   - Layering violations (Services calling Controllers/Widgets)
+   - Raid hardening failures (DB facade bypass, SV corruption risk)
+   - Missing TOC entries (addon files won't load)
 
 2. **High** (Fix before release):
-   - Taint risks
-   - Deprecated APIs with `severity: warning`
-   - Orphaned files
+   - Lua syntax errors
+   - UI binding violations (inline XML scripts)
+   - Naming regressions
 
 3. **Medium** (Fix when convenient):
-   - Deep nesting (maintainability)
-   - Long functions
-   - Magic numbers
+   - Long functions (>100 lines)
+   - Missing section headers in feature modules
+   - Dead code / unused exports
 
-4. **Low** (Consider fixing):
+4. **Low** (Monitor):
    - Code duplicates
-   - Suspicious dead code
+   - Function registry drift
 
 ## Best Practices
 
-1. **Run before release** — Catch breaking changes early
-2. **Start with critical** — Security and deprecations first
-3. **Filter by severity** — Use `include_suspicious=false` for focused results
-4. **Check 12.0 readiness** — Secret value APIs are breaking changes
-5. **Review complexity** — High complexity = high bug risk
+1. **Run pre-commit gate** — `tools/pre-commit.ps1` chains all checks
+2. **Start with layering** — Architecture violations block everything else
+3. **Check raid hardening after DB changes** — SV round-trip must stay stable
+4. **Use MCP tools when available** — Faster than shell for iterative checks
+5. **Target 3.3.5a only** — Do not flag modern API deprecations (C_Timer, C_Spell, etc.)

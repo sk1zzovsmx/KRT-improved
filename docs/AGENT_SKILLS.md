@@ -1,12 +1,13 @@
 # Agent Skills and Mechanic Workflow
 
-This repository vendors selected AI skills under `.agents/skills` with an upstream-pure policy.
+This repository maintains AI skills under `.agents/skills`, customized for KRT addon development.
 
 ## Policy
 
-- Keep imported skills byte-identical to upstream snapshots.
-- Do not patch vendored skill content locally.
-- Pin every imported skill to an explicit commit SHA.
+- Skills are KRT-native: content is tailored for KRT addon architecture, WoW 3.3.5a, and Lua 5.1.
+- Upstream Mechanic skill snapshots serve as structural templates; content is overridden locally.
+- Pin every imported skill to an explicit commit SHA for structural reference.
+- Do not introduce Mechanic/Fen/AFD-specific guidance in skills; keep all references KRT-relevant.
 
 ## Source of Truth
 
@@ -17,7 +18,6 @@ This repository vendors selected AI skills under `.agents/skills` with an upstre
 ## Pinned Skill Sources
 
 - `Falkicon/Mechanic` @ `41ef25dcfcd7c1450577b5826fbba9c571c7c75d`
-- `lushly-dev/afd` @ `53084d96b61edc515cd85f64eec4aa514c68548d`
 
 Managed skills from the manifest:
 
@@ -28,7 +28,6 @@ Managed skills from the manifest:
 - `s-lint`
 - `s-release`
 - `k-docs`
-- `afd`
 
 ## Recommended Command Flow
 

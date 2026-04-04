@@ -307,13 +307,14 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 48) Widgets/ReservesUI.lua
 49) Services/Logger/Store.lua
 50) Services/Logger/View.lua
-51) Services/Logger/Actions.lua
-52) Controllers/Logger.lua
-53) Widgets/Config.lua
-54) Controllers/Warnings.lua
-55) Controllers/Changes.lua
-56) Controllers/Spammer.lua
-57) KRT.xml
+51) Services/Logger/Helpers.lua
+52) Services/Logger/Actions.lua
+53) Controllers/Logger.lua
+54) Widgets/Config.lua
+55) Controllers/Warnings.lua
+56) Controllers/Changes.lua
+57) Controllers/Spammer.lua
+58) KRT.xml
 
 ---
 
@@ -352,6 +353,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Logger/
       Store.lua            # logger stable-ID indexing + data access
       View.lua             # view-model row builders, label formatters, CSV generation
+      Helpers.lua          # logger UI label/title formatting helpers
       Actions.lua          # logger mutations + commit/cascade + selection validation
 
   Widgets/
@@ -525,11 +527,13 @@ Namespaced service-only module:
 `addon.Logger` internal structure (pattern for complex modules):
 - `addon.Logger.Store`   - data access helpers + stable-ID indexing (Services/Logger/Store.lua)
 - `addon.Logger.View`    - view-model row builders (UI-friendly data) (Services/Logger/View.lua)
+- `addon.Logger.Helpers` - UI label/title formatting helpers (Services/Logger/Helpers.lua)
 - `addon.Logger.Actions` - mutations + commit/refresh boundaries (Services/Logger/Actions.lua)
 
 Namespaced service modules (loaded before Controller):
 - `addon.Services.Logger.Store`   - canonical Store service table
 - `addon.Services.Logger.View`    - canonical View service table
+- `addon.Services.Logger.Helpers` - canonical Helpers service table
 - `addon.Services.Logger.Actions` - canonical Actions service table
 
 Implementation placement (current wave):

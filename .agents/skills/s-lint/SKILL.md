@@ -1,40 +1,28 @@
 ---
 name: s-lint
 description: >
-  Ensure code quality using Luacheck linting and StyLua formatting. Covers
-  common warnings, style rules, and auto-formatting. Use when checking code
-  quality, fixing style issues, or preparing code for review.
+  Ensure code quality for KRT addon using Luacheck linting and StyLua formatting.
+  Covers KRT-specific warnings, naming rules, and pre-commit gates.
   Triggers: lint, format, style, luacheck, stylua, code quality, warnings.
 ---
 
-# Linting WoW Addons
+# Linting KRT
 
-Expert guidance for code quality and formatting in WoW addon development.
+Code quality and formatting for KRT addon (WotLK 3.3.5a, Lua 5.1).
 
-## Related Commands
-
-- [c-lint](../../commands/c-lint.md) - Lint and format workflow
-- [c-review](../../commands/c-review.md) - Full code review (includes lint step)
-- [c-clean](../../commands/c-clean.md) - Cleanup workflow (dead code, stale docs)
-
-## MCP Tools
+## MCP Tools (KRT Server)
 
 | Task | MCP Tool |
 |------|----------|
-| Lint Addon | `addon.lint(addon="MyAddon")` |
-| Format Addon | `addon.format(addon="MyAddon")` |
-| Check Format Only | `addon.format(addon="MyAddon", check=true)` |
-| Security Analysis | `addon.security(addon="MyAddon")` |
-| Complexity Analysis | `addon.complexity(addon="MyAddon")` |
+| Syntax check | `repo_quality_check(check="lua_syntax")` |
+| Full uniformity | `repo_quality_check(check="lua_uniformity")` |
 
 ## Capabilities
 
-1. **Luacheck Linting** — Detect syntax errors, undefined globals, unused variables
-2. **StyLua Formatting** — Consistent code style across all files
-3. **Error Resolution** — Fix common linting issues systematically
-4. **Security Analysis** — Detect combat lockdown violations, secret leaks, taint risks
-5. **Complexity Analysis** — Find deep nesting, long functions, magic numbers
-6. **Dead Code Detection** — For unused function analysis, use `addon.deadcode` (see [s-clean](../s-clean/SKILL.md))
+1. **Luacheck Linting** — Syntax errors, undefined globals, unused variables (Lua 5.1)
+2. **StyLua Formatting** — Consistent code style, 4-space indent, Unix line endings
+3. **Naming Compliance** — PascalCase public, camelCase private, canonical section headers
+4. **Pre-Commit Gate** — All checks chained in `tools/pre-commit.ps1`
 
 ## Common Luacheck Warnings
 
@@ -42,89 +30,145 @@ Expert guidance for code quality and formatting in WoW addon development.
 |------|---------|-----|
 | W111 | Setting undefined global | Add to `.luacheckrc` globals or fix typo |
 | W112 | Mutating undefined global | Same as W111 |
-| W113 | Accessing undefined global | Check if API exists, add to read_globals |
+| W113 | Accessing undefined global | Check if WoW API exists in 3.3.5a |
 | W211 | Unused local variable | Remove or prefix with `_` |
 | W212 | Unused argument | Prefix with `_` (e.g., `_event`) |
 | W213 | Unused loop variable | Prefix with `_` |
 | W311 | Value assigned but never used | Remove assignment or use the value |
 | W431 | Shadowing upvalue | Rename the local variable |
 
-## .luacheckrc Configuration
+## KRT .luacheckrc Configuration
 
-Standard WoW addon configuration:
+The actual configuration:
 
 ```lua
-std = "lua51"
-max_line_length = false
-
-globals = {
-    -- Addon globals
-    "MyAddon",
-}
-
-read_globals = {
-    -- WoW API
-    "C_Timer", "C_Spell", "CreateFrame",
-    -- Ace3
-    "LibStub",
-}
+std = "lua51c"               -- Lua 5.1 compat variant
+codes = true                 -- Show error codes
+ranges = true                -- Show location ranges
+quiet = 1                    -- Suppress header
+cache = false                -- Disable cache
+allow_defined = true         -- Allow globals (WoW APIs)
+max_line_length = false      -- No line-length limits
 ```
 
-## StyLua Configuration
+**Ignored patterns**:
+- `11./SLASH_.*` — Slash command globals
+- `11./BINDING_.*` — Keybinding globals
+- `111/[A-Z][A-Z0-9_]+` — Global constants
+- `113/LE_.*` — Lua enum globals
+- `211/L` — Unused localization table
+- `231/_.*` — Unused `_`-prefixed vars
+- `42.` — Shadowing (allowed except upvalues)
 
-Standard `.stylua.toml`:
+**Global allowlist includes**:
+- LibCompat functions: `tInvert`, `Round`, `tIndexOf`, `IsInGroup`, `IsInRaid`
+- KRT runtime: `KRT`
+- Named XML frames: `KRTConfig`, `KRTMaster`, `KRTLogger`, `KRTLootCounterFrame`, etc.
+- SavedVariables: `KRT_Raids`, `KRT_Players`, `KRT_Reserves`, etc.
+
+**When adding new named frames in XML**: update `.luacheckrc` global allowlist in the same change.
+
+## KRT .stylua.toml Configuration
+
+The actual configuration:
 
 ```toml
-column_width = 120
+syntax = "Lua51"
+column_width = 180
 line_endings = "Unix"
-indent_type = "Tabs"
+indent_type = "Spaces"       # 4 spaces, NOT tabs
 indent_width = 4
 quote_style = "AutoPreferDouble"
 call_parentheses = "Always"
+collapse_simple_statement = "Never"
+sort_requires = { enabled = false }
+space_after_function_names = "Never"
+```
+
+## KRT Naming Rules
+
+### Public Functions (PascalCase)
+
+```lua
+-- Exported methods on feature modules
+function module:Toggle() end
+function Store:GetRaid(raidId) end
+function View:GetBossModeLabel(boss) end
+function Actions:CommitLootEdit(lootNid, changes) end
+```
+
+### Private Functions (camelCase)
+
+```lua
+-- File-local helpers
+local function buildRosterCache() end
+local function validatePlayerNid(nid) end
+```
+
+### UI Hooks (canonical names)
+
+```lua
+-- These exact names are called by UIScaffold
+function module.AcquireRefs(frame) end
+function module.BindHandlers(frame) end
+function module.Localize(frame) end
+function module.OnLoadFrame(frame) end
+function module.RefreshUI() end
+function module.Refresh() end
+```
+
+### Section Headers (required in Controllers/Services/Widgets)
+
+```lua
+-- ----- Internal state ----- --
+-- ----- Private helpers ----- --
+-- ----- Public methods ----- --
 ```
 
 ## Quick Reference
 
-### Lint Then Format
+### Run All Lint Checks
 
-```bash
-# Check for issues
-addon.lint(addon="MyAddon")
+```powershell
+# Via MCP
+repo_quality_check(check="lua_uniformity")
 
-# Auto-format
-addon.format(addon="MyAddon")
+# Via shell
+py -3 tools/krt.py repo-quality-check --check lua_uniformity
 
-# Verify clean
-addon.lint(addon="MyAddon")
+# Direct
+luacheck --codes --no-color !KRT tools tests
+stylua --check !KRT tools tests
 ```
 
-### Best Practices
+### Fix Formatting
 
-1. **Run lint before commit** — Catch issues early
-2. **Format consistently** — Use StyLua for all files
-3. **Configure globals** — Add addon-specific globals to `.luacheckrc`
-4. **Prefix unused** — Use `_` prefix for intentionally unused variables
+```powershell
+stylua !KRT tools tests
+```
 
-## Security Analysis
+### Pre-Commit Gate
 
-Beyond syntax linting, use `addon.security` to detect runtime safety issues:
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/pre-commit.ps1
+```
 
-| Category | Description |
-|----------|-------------|
-| `combat_violation` | Protected API calls without `InCombatLockdown()` guard |
-| `secret_leak` | Logging/printing secret values (12.0+) |
-| `taint_risk` | Unsafe global modifications (`_G` without namespace) |
-| `unsafe_eval` | `loadstring`/`RunScript` with unsanitized input |
+Gate order:
+1. TOC files check
+2. Layering check
+3. UI binding check
+4. Lua syntax (if .lua staged)
+5. Luacheck full
+6. Lua uniformity (naming + headers)
+7. API nomenclature (staged additions)
+8. StyLua format check
+9. Tree update
 
-## Complexity Analysis
+## Best Practices
 
-Use `addon.complexity` to identify maintainability issues:
-
-| Category | Threshold | Description |
-|----------|-----------|-------------|
-| `deep_nesting` | > 5 levels | Excessive if/for/while nesting |
-| `long_function` | > 100 lines | Functions that should be split |
-| `long_file` | > 500 lines | Files that need restructuring |
-| `magic_number` | pattern-based | Unexplained numeric literals |
-
-For comprehensive analysis, use [c-audit](../../commands/c-audit.md).
+1. **Run pre-commit before pushing** — Catches all issues in order
+2. **Update .luacheckrc with XML changes** — New frames need global entries
+3. **Prefix unused with `_`** — `_event`, `_self`, `_unused`
+4. **Use 4 spaces** — Never tabs (StyLua enforces this)
+5. **No C_ namespace APIs** — 3.3.5a doesn't have `C_Timer`, `C_Spell`, etc.
+6. **Keep section headers** — Required in Controllers/Services/Widgets files

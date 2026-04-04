@@ -1,92 +1,137 @@
 ---
 name: s-debug
 description: >
-  Diagnose and fix bugs using evidence-based investigation. Requires runtime
-  evidence before fixes—never guess based on code alone. Covers hypothesis-driven
-  debugging, instrumentation logging, Lua errors, taint issues, combat lockdown,
-  and API failures. Triggers: error, bug, debug, fix, crash, taint, nil value,
-  diagnose, hypothesis, runtime, evidence, instrumentation.
+  Diagnose and fix bugs in KRT addon (WoW 3.3.5a / Lua 5.1) using evidence-based
+  investigation. Requires runtime evidence before fixes. Covers hypothesis-driven
+  debugging, LibLogger instrumentation, Lua errors, taint, and combat lockdown.
+  Triggers: error, bug, debug, fix, crash, taint, nil value, diagnose, hypothesis.
 ---
 
-# Debugging WoW Addons
+# Debugging KRT
 
-Systematic debugging and error recovery for WoW addons.
+Systematic debugging and error recovery for KRT addon (WotLK 3.3.5a, Interface 30300).
 
-## Related Commands
-
-- [c-debug](../../commands/c-debug.md) - Reload loop workflow for finding and fixing issues
-- [c-review](../../commands/c-review.md) - Full code review (includes debug step)
-
-## MCP Tools (Use These First)
-
-> **MANDATORY**: ALWAYS use MCP tools directly instead of the shell.
+## MCP Tools (KRT Server)
 
 | Task | MCP Tool |
 |------|----------|
-| Get All Output | `addon.output(agent_mode=true)` |
-| Lint Addon | `addon.lint(addon="MyAddon")` |
-| Scan Deprecations | `addon.deprecations(addon="MyAddon")` |
-| Queue Lua Eval | `lua.queue(code=["GetMoney()"])` |
-| Get Eval Results | `lua.results()` |
+| Lua syntax check | `repo_quality_check(check="lua_syntax")` |
+| Layering check | `repo_quality_check(check="layering")` |
+| Raid hardening | `repo_quality_check(check="raid_hardening")` |
 
-## Capabilities
+## KRT Logging System
 
-1. **Evidence-Based Debugging** — Hypothesis-driven investigation with runtime instrumentation and log proof
-2. **Error Analysis** — Parse Lua errors, identify root cause in stack traces
-3. **Taint Investigation** — Track secure/insecure code interaction and "Action blocked" issues
-4. **Combat Issues** — Debug lockdown-related failures and protected frame issues
-5. **API Failures** — Handle deprecated or changed APIs (Midnight 12.0 prep)
+KRT uses **LibLogger-1.0** embedded on the addon table:
+
+```lua
+-- Setup (Init.lua)
+addon.Debugger = LibStub("LibLogger-1.0")
+addon.Debugger:Embed(addon)
+
+-- Usage anywhere
+addon:info(Diag.I.LogCoreLoaded:format(version, logLevel, perfMode))
+addon:warn(Diag.W.LogRaidUnmappedZone:format(zoneName, difficulty))
+addon:debug(Diag.D.LogDebugRaidRoll:format(raidId, name, roll, ok, reason))
+addon:error(Diag.E.LogSomeError:format(details))
+```
+
+**Log levels**: DEBUG < INFO < WARN < ERROR
+**Toggle**: `/krt debug on` enables DEBUG level (runtime-only, not persisted)
+
+### Diagnostic Templates
+
+All log messages use `addon.Diagnose` templates from `Localization/DiagnoseLog.en.lua`:
+
+```lua
+local Diag = feature.Diag
+Diag.I = {}  -- INFO templates
+Diag.W = {}  -- WARN templates
+Diag.E = {}  -- ERROR templates
+Diag.D = {}  -- DEBUG templates
+
+-- Naming: {Severity}.Log{Module}{Event}
+Diag.I.LogCoreLoaded = "[Core] Loaded version=%s logLevel=%s perfMode=%s"
+Diag.D.LogDebugRaidRoll = "[Debug] Raid roll raidId=%s name=%s roll=%d ok=%s reason=%s"
+```
 
 ## Routing Logic
 
-| Request type | Load reference |
-|--------------|----------------|
-| Evidence-based debugging, hypothesis-driven | [references/evidence-based-debugging.md](references/evidence-based-debugging.md) |
-| Lua errors, nil values | [references/error-patterns.md](references/error-patterns.md) |
-| Debug workflow, isolation | [references/debugging-strategies.md](references/debugging-strategies.md) |
-| Error tracking (BugGrabber) | [../../docs/integration/errors.md](../../docs/integration/errors.md) |
-| Troubleshooting guide | [../../docs/integration/troubleshooting.md](../../docs/integration/troubleshooting.md) |
-| Structured logging | [../../docs/integration/console.md](../../docs/integration/console.md) |
-| Frame inspection | [../../docs/integration/inspect.md](../../docs/integration/inspect.md) |
-
-## Debug Output Best Practice
-
-> **CRITICAL**: Use `MechanicLib:Log()` instead of `print()` for all debug output.
-
-| Feature | `print()` | `MechanicLib:Log()` |
-|---------|-----------|---------------------|
-| Agent access | ❌ Requires screenshot | ✅ `addon.output` retrieves directly |
-| Filtering | ❌ None | ✅ Source + category filters |
-| Copyable | ❌ No | ✅ Yes, via Console export |
-
-```lua
--- ✅ Correct: Agent can see this in addon.output
-local MechanicLib = LibStub("MechanicLib-1.0", true)
-if MechanicLib then
-    MechanicLib:Log("MyAddon", "Debug: value=" .. tostring(val), MechanicLib.Categories.CORE)
-end
-
--- ❌ Avoid: Spams chat, requires screenshot
-print("[MyAddon] Debug: value=" .. tostring(val))
-```
+| Error type | Reference |
+|------------|-----------|
+| Common Lua errors, nil values | [references/error-patterns.md](references/error-patterns.md) |
+| Evidence-based methodology | [references/evidence-based-debugging.md](references/evidence-based-debugging.md) |
+| Isolation and strategies | [references/debugging-strategies.md](references/debugging-strategies.md) |
 
 ## Quick Reference
 
-### Get Addon Data (Compressed for AI)
+### Common KRT Error Patterns
 
-**Ask** user to `/reload` and confirm, then:
-
-```bash
-addon.output(agent_mode=true)
-```
-
-### Common Error Patterns
-- `attempt to index nil value`: API returned nil, check if unit exists or data is loaded.
-- `Action blocked by Blizzard`: You tried to call a protected function in combat.
-- `Interface action failed`: Taint has spread to a secure UI component.
+- `attempt to index nil value`: Data not loaded yet, or module not initialized. Check load order in `!KRT.toc`.
+- `attempt to call nil value (method 'X')`: Method doesn't exist on table. Check `:` vs `.` call convention.
+- `Action blocked by Blizzard`: Secure frame modification in combat. Guard with `InCombatLockdown()`.
+- Roll/award not working: Check `addon.State` for master looter status and raid detection.
 
 ### Systematic Workflow
-1. **Gather Evidence**: **Ask** user to `/reload`, wait for confirmation, then `addon.output(agent_mode=true)`
-2. **Isolate**: Can you reproduce with minimal code?
-3. **Hypothesis**: "If X then Y because Z"
-4. **Fix & Validate**: Apply minimal fix, **ask** user to `/reload` and confirm, then verify with `addon.output`.
+
+1. **Gather Evidence**: Ask user to reproduce the error, get the exact Lua error message and stack trace
+2. **Check Syntax**: `repo_quality_check(check="lua_syntax")` to rule out parse errors
+3. **Hypothesize**: Generate 3-5 hypotheses about root cause
+4. **Instrument**: Add `addon:debug()` calls with `Diag.D.*` templates at suspected locations
+5. **Ask user to `/reload`** and reproduce, then check debug output
+6. **Fix**: Apply minimal fix based on evidence
+
+### Adding Debug Instrumentation
+
+```lua
+-- 1. Add template to Localization/DiagnoseLog.en.lua
+Diag.D.LogMyFeatureState = "[MyFeature] state=%s value=%s expected=%s"
+
+-- 2. Add logging call at suspected location
+addon:debug(Diag.D.LogMyFeatureState:format(
+    tostring(state), tostring(value), tostring(expected)))
+
+-- 3. Enable debug: /krt debug on
+-- 4. Remove instrumentation after fix confirmed
+```
+
+### WoW 3.3.5a API Gotchas
+
+- No `C_Timer`, `C_` namespaces, `C_Spell`, `C_Item` — these are modern API
+- Use `LibCompat-1.0` timers: `addon.NewTimer()`, `addon.CancelTimer()`, `addon.After()`
+- No `io/os/debug` standard libraries in WoW runtime
+- `GetLootSlotLink()` may return nil before loot window is fully loaded
+- `UnitName("player")` always works, but `GetRaidRosterInfo(i)` can return nil for empty slots
+
+### SavedVariables Debugging
+
+```powershell
+# Validate raid schema
+py -3 tools/krt.py repo-quality-check --check raid_hardening
+
+# SV round-trip stability
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-sv-roundtrip.ps1
+
+# Inspect SV structure
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-sv-inspector.ps1
+```
+
+### Test Infrastructure
+
+KRT uses **Busted** for regression tests:
+
+```powershell
+# Run release stabilization tests (Rolls + Master)
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-release-targeted-tests.ps1
+```
+
+Test file: `tests/release_stabilization_spec.lua`
+Covers: `Services/Rolls.lua` and `Controllers/Master.lua`
+
+## Best Practices
+
+1. **Never guess** — Always get the actual error message before proposing fixes
+2. **Check load order** — Many nil errors come from wrong file order in `.toc`
+3. **Use Diag templates** — Never use raw `print()` for debug output
+4. **Guard combat** — Any frame manipulation needs `InCombatLockdown()` check
+5. **Run tests after Rolls/Master changes** — `tools/run-release-targeted-tests.ps1`
+6. **Check `:` vs `.`** — Most KRT "nil method" errors are call convention mismatches

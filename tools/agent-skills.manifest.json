@@ -49,13 +49,6 @@
             "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
             "sourceBasePath": ".agent/skills/k-docs",
             "destinationPath": ".agents/skills/k-docs"
-        },
-        {
-            "skill": "afd",
-            "repo": "lushly-dev/afd",
-            "commit": "53084d96b61edc515cd85f64eec4aa514c68548d",
-            "sourceBasePath": ".claude/skills/afd",
-            "destinationPath": ".agents/skills/afd"
         }
     ]
 }
