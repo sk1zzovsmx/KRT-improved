@@ -257,6 +257,116 @@ do
         end
     end
 
+    local function findLootSlotIndex(itemLink)
+        local wantedKey = Item.GetItemStringFromLink(itemLink) or itemLink
+        local wantedId = Item.GetItemIdFromLink(itemLink)
+        for i = 1, GetNumLootItems() do
+            local tempItemLink = GetLootSlotLink(i)
+            if tempItemLink == itemLink then
+                return i
+            end
+            if wantedKey and tempItemLink then
+                local tempKey = Item.GetItemStringFromLink(tempItemLink) or tempItemLink
+                if tempKey == wantedKey then
+                    return i
+                end
+            end
+            if wantedId and tempItemLink then
+                local tempItemId = Item.GetItemIdFromLink(tempItemLink)
+                if tempItemId and tempItemId == wantedId then
+                    return i
+                end
+            end
+        end
+        return nil
+    end
+
+    local function scanTradeableInventory(itemLink, itemId)
+        if not itemLink and not itemId then
+            return nil
+        end
+
+        local wantedKey = itemLink and (Item.GetItemStringFromLink(itemLink) or itemLink) or nil
+        local wantedId = tonumber(itemId) or (itemLink and Item.GetItemIdFromLink(itemLink)) or nil
+        local totalCount = 0
+        local firstBag, firstSlot, firstSlotCount
+        local hasMatch = false
+
+        for bag = 0, 4 do
+            local n = GetContainerNumSlots(bag) or 0
+            for slot = 1, n do
+                local link = GetContainerItemLink(bag, slot)
+                if link then
+                    local key = Item.GetItemStringFromLink(link) or link
+                    local linkId = Item.GetItemIdFromLink(link)
+                    local matches = (wantedKey and key == wantedKey) or (wantedId and linkId == wantedId)
+                    if matches then
+                        hasMatch = true
+                        if not itemIsSoulbound(bag, slot) then
+                            local _, count = GetContainerItemInfo(bag, slot)
+                            local slotCount = tonumber(count) or 1
+                            totalCount = totalCount + slotCount
+                            if not firstBag then
+                                firstBag = bag
+                                firstSlot = slot
+                                firstSlotCount = slotCount
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        return totalCount, firstBag, firstSlot, firstSlotCount, hasMatch
+    end
+
+    local function resolveTradeableInventoryItem(itemLink, cachedBag, cachedSlot, selectedItemCount)
+        local totalCount, bag, slot, slotCount
+        local usedFastPath = false
+        local wantedKey = Item.GetItemStringFromLink(itemLink) or itemLink
+        local wantedId = Item.GetItemIdFromLink(itemLink)
+
+        cachedBag = tonumber(cachedBag)
+        cachedSlot = tonumber(cachedSlot)
+
+        if cachedBag and cachedSlot then
+            local cachedLink = GetContainerItemLink(cachedBag, cachedSlot)
+            if cachedLink then
+                local cachedKey = Item.GetItemStringFromLink(cachedLink) or cachedLink
+                local cachedId = Item.GetItemIdFromLink(cachedLink)
+                local sameItem = (wantedKey and cachedKey == wantedKey) or (wantedId and cachedId == wantedId)
+                if sameItem and not itemIsSoulbound(cachedBag, cachedSlot) then
+                    local _, count = GetContainerItemInfo(cachedBag, cachedSlot)
+                    bag = cachedBag
+                    slot = cachedSlot
+                    slotCount = tonumber(count) or 1
+                    usedFastPath = true
+                end
+            end
+        end
+
+        if not (bag and slot) then
+            totalCount, bag, slot, slotCount = scanTradeableInventory(itemLink, wantedId)
+        elseif usedFastPath then
+            if (tonumber(selectedItemCount) or 1) > 1 then
+                totalCount = scanTradeableInventory(itemLink, wantedId)
+            else
+                totalCount = tonumber(slotCount) or 1
+            end
+        end
+
+        if not (bag and slot) then
+            return nil
+        end
+
+        return {
+            bag = bag,
+            slot = slot,
+            slotCount = tonumber(slotCount) or 1,
+            totalCount = tonumber(totalCount) or tonumber(slotCount) or 1,
+        }
+    end
+
     -- ----- Public methods ----- --
     -- Pending award helpers (shared with Master/Raid flows).
     function module:AddPendingAward(itemLink, looter, rollType, rollValue, rollSessionId, expiresAt)
@@ -567,4 +677,36 @@ do
     module.GetItemTexture = getItemTexture
     module.ItemExists = itemExists
     module.ItemIsSoulbound = itemIsSoulbound
+    function module.FindLootSlotIndex(selfOrItemLink, maybeItemLink)
+        local itemLink = maybeItemLink ~= nil and maybeItemLink or selfOrItemLink
+        return findLootSlotIndex(itemLink)
+    end
+
+    function module.ScanTradeableInventory(selfOrItemLink, arg2, arg3)
+        local itemLink, itemId
+        if type(selfOrItemLink) == "table" then
+            itemLink = arg2
+            itemId = arg3
+        else
+            itemLink = selfOrItemLink
+            itemId = arg2
+        end
+        return scanTradeableInventory(itemLink, itemId)
+    end
+
+    function module.ResolveTradeableInventoryItem(selfOrItemLink, arg2, arg3, arg4, arg5)
+        local itemLink, cachedBag, cachedSlot, selectedItemCount
+        if type(selfOrItemLink) == "table" then
+            itemLink = arg2
+            cachedBag = arg3
+            cachedSlot = arg4
+            selectedItemCount = arg5
+        else
+            itemLink = selfOrItemLink
+            cachedBag = arg2
+            cachedSlot = arg3
+            selectedItemCount = arg4
+        end
+        return resolveTradeableInventoryItem(itemLink, cachedBag, cachedSlot, selectedItemCount)
+    end
 end

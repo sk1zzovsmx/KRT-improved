@@ -52,6 +52,11 @@ do
     local liveNamesByUnit = {}
     local pendingUnits = {}
     local raidInstanceCheckHandles = {}
+    local masterLootCandidateCache = {
+        itemLink = nil,
+        rosterVersion = nil,
+        indexByName = {},
+    }
 
     local UNKNOWN_OBJECT = _G.UNKNOWNOBJECT
     local UNKNOWN_BEING = _G.UNKNOWNBEING or _G.UKNOWNBEING
@@ -70,6 +75,7 @@ do
         return services and services.Rolls or nil
     end
     local BOSS_KILL_DEDUPE_WINDOW_SECONDS = tonumber(C.BOSS_KILL_DEDUPE_WINDOW_SECONDS) or 30
+    local BOSS_EVENT_CONTEXT_TTL_SECONDS = tonumber(C.BOSS_EVENT_CONTEXT_TTL_SECONDS) or BOSS_KILL_DEDUPE_WINDOW_SECONDS
     local PENDING_AWARD_TTL_SECONDS = tonumber(C.PENDING_AWARD_TTL_SECONDS) or 8
     local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = tonumber(C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60
     local GROUP_LOOT_ROLL_GRACE_SECONDS = tonumber(C.GROUP_LOOT_ROLL_GRACE_SECONDS) or 10
@@ -84,6 +90,35 @@ do
             return nil
         end
         return method
+    end
+
+    local function invalidateMasterLootCandidateCache()
+        masterLootCandidateCache.itemLink = nil
+        masterLootCandidateCache.rosterVersion = nil
+        twipe(masterLootCandidateCache.indexByName)
+    end
+
+    local function buildMasterLootCandidateCache(itemLink)
+        masterLootCandidateCache.itemLink = itemLink
+        masterLootCandidateCache.rosterVersion = rosterVersion
+        twipe(masterLootCandidateCache.indexByName)
+
+        for p = 1, addon.GetNumGroupMembers() do
+            local candidate = GetMasterLootCandidate(p)
+            if candidate and candidate ~= "" then
+                masterLootCandidateCache.indexByName[candidate] = p
+            end
+        end
+
+        addon:debug(Diag.D.LogMLCandidateCacheBuilt:format(tostring(itemLink), addon.tLength(masterLootCandidateCache.indexByName)))
+        return masterLootCandidateCache
+    end
+
+    local function ensureMasterLootCandidateCache(itemLink)
+        if masterLootCandidateCache.itemLink ~= itemLink or masterLootCandidateCache.rosterVersion ~= rosterVersion then
+            return buildMasterLootCandidateCache(itemLink)
+        end
+        return masterLootCandidateCache
     end
 
     local function isPassiveGroupLootMethod(method)
@@ -1108,6 +1143,127 @@ do
         return nil, nil
     end
 
+    local function findRecentBossContext(raid, now)
+        if not raid then
+            return nil, nil
+        end
+
+        local bossKills = raid.bossKills or {}
+        for i = #bossKills, 1, -1 do
+            local bossKill = bossKills[i]
+            local killTime = tonumber(bossKill and bossKill.time) or 0
+            local delta = now - killTime
+            if delta > BOSS_KILL_DEDUPE_WINDOW_SECONDS then
+                return nil, nil
+            end
+
+            local bossName = bossKill and (bossKill.name or bossKill.boss) or nil
+            local bossNid = tonumber(bossKill and bossKill.bossNid) or 0
+            if delta >= 0 and bossNid > 0 and bossName and bossName ~= "_TrashMob_" then
+                return bossKill, delta
+            end
+        end
+
+        return nil, nil
+    end
+
+    local function clearBossEventContext()
+        raidState.bossEventContext = nil
+    end
+
+    local function setBossEventContext(raidNum, bossNid, bossName, source, seenAt)
+        raidNum = tonumber(raidNum) or 0
+        bossNid = tonumber(bossNid) or 0
+        if raidNum <= 0 or bossNid <= 0 or not bossName then
+            clearBossEventContext()
+            return nil
+        end
+
+        raidState.bossEventContext = {
+            raidNum = raidNum,
+            bossNid = bossNid,
+            name = bossName,
+            source = source or "event",
+            seenAt = tonumber(seenAt) or Time.GetCurrentTime(),
+        }
+
+        addon:debug(Diag.D.LogBossEventContextSet:format(tostring(bossName), bossNid, raidNum, tostring(source or "event")))
+
+        return raidState.bossEventContext
+    end
+
+    local function recoverBossEventContext(raidNum, now)
+        local bossEventContext = raidState.bossEventContext
+        if type(bossEventContext) ~= "table" then
+            return 0
+        end
+
+        local contextRaidNum = tonumber(bossEventContext.raidNum) or 0
+        local contextBossNid = tonumber(bossEventContext.bossNid) or 0
+        local delta = (tonumber(now) or 0) - (tonumber(bossEventContext.seenAt) or 0)
+
+        if contextRaidNum ~= (tonumber(raidNum) or 0) or contextBossNid <= 0 then
+            clearBossEventContext()
+            return 0
+        end
+
+        if delta < 0 or delta > BOSS_EVENT_CONTEXT_TTL_SECONDS then
+            clearBossEventContext()
+            return 0
+        end
+
+        Core.SetLastBoss(contextBossNid)
+        addon:debug(
+            Diag.D.LogBossEventContextRecovered:format(tostring(bossEventContext.name), contextBossNid, tonumber(delta) or -1, tostring(bossEventContext.source or "event"))
+        )
+
+        return contextBossNid
+    end
+
+    local function recoverRecentBossContext(raid, now)
+        local bossKill, delta = findRecentBossContext(raid, now)
+        local bossNid = tonumber(bossKill and bossKill.bossNid) or 0
+        if bossNid <= 0 then
+            return 0
+        end
+
+        Core.SetLastBoss(bossNid)
+        addon:debug(Diag.D.LogBossRecentContextRecovered:format(tostring(bossKill.name or bossKill.boss), bossNid, tonumber(delta) or -1))
+        return bossNid
+    end
+
+    local function recoverBossContextFromCurrentTarget()
+        if not Core.GetCurrentRaid() or Core.GetLastBoss() then
+            return 0
+        end
+
+        local targetGuid = UnitGUID and UnitGUID("target") or nil
+        local npcId = targetGuid and addon.GetCreatureId and addon.GetCreatureId(targetGuid) or nil
+        local bossLib = addon.BossIDs
+        local bossIds = bossLib and bossLib.BossIDs
+        if not (npcId and bossIds and bossIds[npcId]) then
+            return 0
+        end
+        if shouldIgnoreBossKillNpcId(npcId) then
+            return 0
+        end
+
+        local targetName = UnitName and UnitName("target") or nil
+        local bossName = targetName
+        if isUnknownName(bossName) then
+            bossName = nil
+        end
+        if not bossName and bossLib and bossLib.GetBossName then
+            bossName = bossLib:GetBossName(npcId)
+        end
+        if not bossName then
+            return 0
+        end
+
+        addon:debug(Diag.D.LogBossLootTargetMatched:format(tonumber(npcId) or -1, tostring(bossName)))
+        return module:AddBoss(bossName, nil, nil, npcId)
+    end
+
     local function parseLootChatMessage(msg, rollType, rollValue)
         -- Parse loot chat variants ("receives loot" and "receives item").
         local player, itemLink, count = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
@@ -1283,6 +1439,26 @@ do
 
     function module:GetRosterVersion()
         return rosterVersion
+    end
+
+    function module:InvalidateMasterLootCandidateCache()
+        invalidateMasterLootCandidateCache()
+    end
+
+    function module:ResolveMasterLootCandidateIndex(itemLink, playerName)
+        local cache = ensureMasterLootCandidateCache(itemLink)
+        local candidateIndex = cache.indexByName[playerName]
+        if not candidateIndex then
+            addon:debug(Diag.D.LogMLCandidateCacheMiss:format(tostring(itemLink), tostring(playerName)))
+            cache = buildMasterLootCandidateCache(itemLink)
+            candidateIndex = cache.indexByName[playerName]
+        end
+        return candidateIndex
+    end
+
+    function module:HasMasterLootCandidates(itemLink)
+        local cache = ensureMasterLootCandidateCache(itemLink)
+        return next(cache.indexByName) ~= nil
     end
 
     function module:PublishRosterDelta(delta, raidNum)
@@ -1652,6 +1828,7 @@ do
             return false
         end
         Core.SetCurrentRaid(raidId)
+        clearBossEventContext()
         -- New session context: force version-gated roster consumers (e.g. Master dropdowns) to rebuild.
         rosterVersion = rosterVersion + 1
         resetPendingUnitRetry()
@@ -1757,6 +1934,7 @@ do
         end
         Core.SetCurrentRaid(nil)
         Core.SetLastBoss(nil)
+        clearBossEventContext()
     end
 
     -- Checks the current raid status and creates a new session if needed.
@@ -1892,11 +2070,13 @@ do
         end
 
         local currentTime = Time.GetCurrentTime()
+        local bossSource = sourceNpcId and "UNIT_DIED" or "YELL"
         local existingBoss, delta = findRecentBossKillByName(raid, bossName, currentTime)
         if existingBoss then
             local existingBossNid = tonumber(existingBoss.bossNid) or 0
             if existingBossNid > 0 then
                 Core.SetLastBoss(existingBossNid)
+                setBossEventContext(raidNum, existingBossNid, bossName, bossSource, currentTime)
             end
             addon:trace(Diag.D.LogBossDuplicateSuppressed:format(tostring(bossName), sourceNpcId or -1, existingBossNid, tonumber(delta) or -1))
             return existingBossNid
@@ -1934,6 +2114,7 @@ do
         tinsert(raid.bossKills, killInfo)
         invalidateRaidRuntime(raid)
         Core.SetLastBoss(bossNid)
+        setBossEventContext(raidNum, bossNid, bossName, bossSource, currentTime)
         addon:info(Diag.I.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1, tonumber(raidNum) or -1, #players))
         addon:debug(Diag.D.LogBossLastBossHash:format(tonumber(Core.GetLastBoss()) or -1, tostring(killInfo.hash)))
         return bossNid
@@ -1958,9 +2139,26 @@ do
         end
         raidState.lastLootCount = itemCount
 
+        local currentRaidId = Core.GetCurrentRaid()
+        local raid = Core.EnsureRaidById(currentRaidId)
+        if not raid then
+            return
+        end
+        Core.EnsureRaidSchema(raid)
+
         if not Core.GetLastBoss() then
-            addon:debug(Diag.D.LogBossNoContextTrash)
-            self:AddBoss("_TrashMob_")
+            local currentTime = Time.GetCurrentTime()
+            local recoveredBossNid = recoverBossEventContext(currentRaidId, currentTime)
+            if recoveredBossNid <= 0 then
+                recoveredBossNid = recoverRecentBossContext(raid, currentTime)
+            end
+            if recoveredBossNid <= 0 then
+                recoveredBossNid = recoverBossContextFromCurrentTarget()
+            end
+            if recoveredBossNid <= 0 then
+                addon:debug(Diag.D.LogBossNoContextTrash)
+                self:AddBoss("_TrashMob_")
+            end
         end
 
         local passiveGroupLoot = isPassiveGroupLootMethod()
@@ -1972,13 +2170,6 @@ do
         if passiveGroupLoot and not (rollOutcome and rollOutcome.consumedPendingAward) and hasLoggedPassiveLoot(itemLink, player, rollSessionId) then
             return
         end
-
-        local currentRaidId = Core.GetCurrentRaid()
-        local raid = Core.EnsureRaidById(currentRaidId)
-        if not raid then
-            return
-        end
-        Core.EnsureRaidSchema(raid)
 
         local looterNid
         looterNid, player = ensureRaidPlayerNid(player, currentRaidId)

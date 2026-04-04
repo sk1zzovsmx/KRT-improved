@@ -15,7 +15,7 @@ local Colors = feature.Colors or addon.Colors
 local Comms = feature.Comms or addon.Comms
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
-local UIRowVisuals = addon.UIRowVisuals
+local ListController = feature.ListController or addon.ListController
 local Events = feature.Events or addon.Events or {}
 local C = feature.C
 local Core = feature.Core
@@ -38,7 +38,7 @@ local ML_MULTI_AWARD_TIMEOUT_SECONDS = C.ML_MULTI_AWARD_TIMEOUT_SECONDS
 
 local UIFacade = addon.UI or {}
 if type(UIFacade.Call) ~= "function" then
-    UIFacade.Call = function()
+    UIFacade.Call = function(...)
         return nil
     end
 end
@@ -94,29 +94,9 @@ local function itemExists(i)
     return loot and loot.ItemExists and loot.ItemExists(i) or false
 end
 
-local function itemIsSoulbound(bag, slot)
-    local loot = Loot
-    return loot and loot.ItemIsSoulbound and loot.ItemIsSoulbound(bag, slot) or false
-end
-
 local function getCurrentItemCount()
     local loot = Loot
-    if loot and loot.GetCurrentItemCount then
-        local count = tonumber(loot:GetCurrentItemCount())
-        if count and count > 0 then
-            return count
-        end
-    end
-
-    if lootState.fromInventory then
-        local count = tonumber(itemInfo.count) or tonumber(lootState.selectedItemCount) or 1
-        if count < 1 then
-            count = 1
-        end
-        return count
-    end
-
-    return 1
+    return loot and loot.GetCurrentItemCount and loot:GetCurrentItemCount() or 1
 end
 
 -- =========== Master Looter Frame Module  =========== --
@@ -149,7 +129,7 @@ do
     local dropDownDirty = true
 
     local selectionFrame, updateSelectionFrame
-    local rollRows = {}
+    local rollListController
     local selectionButtons = {}
 
     local lastUIState = {
@@ -209,11 +189,6 @@ do
     }
     local assignDropDownWidth = 132
     local assignDropDownButtonWidth = 152
-    local candidateCache = {
-        itemLink = nil,
-        rosterVersion = nil,
-        indexByName = {},
-    }
 
     -- ----- Private helpers ----- --
 
@@ -353,7 +328,7 @@ do
         return MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0
     end
 
-    local buildRollUiModel
+    local buildRollUiModel, selectRollWinnerRow, getRollRowRefs
 
     local function applyRollWinnerSelection(name, pickMode, maxSel)
         local isMulti
@@ -635,9 +610,9 @@ do
     end
 
     local function invalidateCandidateCache()
-        candidateCache.itemLink = nil
-        candidateCache.rosterVersion = nil
-        twipe(candidateCache.indexByName)
+        if Raid and Raid.InvalidateMasterLootCandidateCache then
+            Raid:InvalidateMasterLootCandidateCache()
+        end
     end
 
     local function computeFlowState()
@@ -844,7 +819,7 @@ do
         return model
     end
 
-    local function selectRollWinnerRow(name)
+    selectRollWinnerRow = function(name)
         local model = buildRollUiModel(true)
         local rows = model and model.rows or {}
         local requiredWinnerCount = tonumber(model and model.requiredWinnerCount) or 1
@@ -889,6 +864,108 @@ do
             Comms.Sync("KRT-RollWinner", name)
         end
         return true
+    end
+
+    local function copyVisibleRollRows(out)
+        local model = rollUiState.model
+        local visibleRows = model and model.visibleRows or {}
+
+        for i = 1, #visibleRows do
+            local source = visibleRows[i]
+            local target = {}
+
+            if source then
+                for key, value in pairs(source) do
+                    target[key] = value
+                end
+            end
+
+            target.id = i
+            out[#out + 1] = target
+        end
+    end
+
+    local function getFocusedRollRowId()
+        local model = rollUiState.model
+        local visibleRows = model and model.visibleRows or nil
+
+        if type(visibleRows) ~= "table" then
+            return nil
+        end
+
+        for i = 1, #visibleRows do
+            local row = visibleRows[i]
+            if row and row.isFocused == true then
+                return i
+            end
+        end
+
+        return nil
+    end
+
+    local function drawRollRow(row, data)
+        if not row.krtHasOnClick then
+            row:SetScript("OnClick", function(self)
+                if selectRollWinnerRow(self.playerName) then
+                    module:RequestRefresh()
+                end
+            end)
+            row.krtHasOnClick = true
+        end
+
+        row.playerName = data.name
+        row:EnableMouse(data.canClick == true)
+
+        local ui = getRollRowRefs(row)
+        local nameStr = ui and ui.name or nil
+        local rollStr = ui and ui.roll or nil
+        local counterStr = ui and ui.counter or nil
+        local infoStr = ui and ui.info or nil
+        local star = ui and ui.star or nil
+
+        if nameStr then
+            local class = data.class or "UNKNOWN"
+            if data.isReserved then
+                nameStr:SetVertexColor(0.4, 0.6, 1.0)
+            else
+                local r, g, b = Colors.GetClassColor(class)
+                nameStr:SetVertexColor(r, g, b)
+            end
+            nameStr:SetText(data.displayName or data.name or "")
+            nameStr:Show()
+        end
+
+        if rollStr then
+            rollStr:SetText(tostring(data.roll or ""))
+            rollStr:Show()
+        end
+        if counterStr then
+            counterStr:SetText(data.counterText or "")
+            counterStr:Show()
+        end
+        if infoStr then
+            infoStr:SetText(data.infoText or "")
+            infoStr:Show()
+        end
+
+        UIPrimitives.ShowHide(star, data.showStar == true)
+    end
+
+    if ListController and ListController.MakeListController and ListController.CreateRowDrawer then
+        rollListController = ListController.MakeListController({
+            keyName = "MasterRolls",
+            rowName = function(frameName, _, index)
+                return frameName .. "PlayerBtn" .. index
+            end,
+            rowTmpl = "KRTSelectPlayerTemplate",
+            _rowParts = { "Name", "Roll", "Counter", "Info", "Star" },
+            getData = copyVisibleRollRows,
+            drawRow = ListController.CreateRowDrawer(drawRollRow),
+            highlightFn = function(_, data)
+                return data and data.isSelected == true
+            end,
+            focusId = getFocusedRollRowId,
+        })
     end
 
     local function getDisplayedWinnerName(model)
@@ -1011,28 +1088,12 @@ do
         module:RequestRefresh()
     end
 
-    local function allocateRollSessionId()
-        local nextId = tonumber(lootState.nextRollSessionId) or 1
-        if nextId < 1 then
-            nextId = 1
-        end
-        lootState.nextRollSessionId = nextId + 1
-        return "RS:" .. tostring(nextId)
-    end
-
-    local function getRollSessionItemKey(itemLink)
-        if not itemLink then
-            return nil
-        end
-        return Item.GetItemStringFromLink(itemLink) or itemLink
-    end
-
     local function matchHeldInventoryLoot(entry, raidNum, itemLink, holderName)
         if type(entry) ~= "table" or tonumber(entry.rollType) ~= rollTypes.HOLD or not itemLink then
             return false
         end
 
-        local queryItemKey = getRollSessionItemKey(itemLink)
+        local queryItemKey = Rolls and Rolls.GetRollSessionItemKey and Rolls:GetRollSessionItemKey(itemLink) or (Item.GetItemStringFromLink(itemLink) or itemLink)
         local queryItemId = tonumber(Item.GetItemIdFromLink(itemLink)) or 0
         local entryItemKey = entry.itemString or entry.itemLink
         local sameItem = false
@@ -1082,78 +1143,19 @@ do
         return 0
     end
 
-    updateRollSessionExpectedWinners = function()
-        local session = Rolls:GetRollSession()
-        if not session then
-            return
+    updateRollSessionExpectedWinners = function(count)
+        if Rolls and Rolls.UpdateExpectedWinners then
+            return Rolls:UpdateExpectedWinners(count)
         end
-        local expected = tonumber(lootState.selectedItemCount) or 1
-        if expected < 1 then
-            expected = 1
-        end
-        session.expectedWinners = expected
-    end
-
-    local function openRollSession(itemLink, rollType, source)
-        if not itemLink then
-            return nil
-        end
-        local expected = tonumber(lootState.selectedItemCount) or 1
-        if expected < 1 then
-            expected = 1
-        end
-        local itemId = Item.GetItemIdFromLink(itemLink)
-
-        local session = {
-            id = allocateRollSessionId(),
-            itemKey = getRollSessionItemKey(itemLink),
-            itemId = tonumber(itemId) or nil,
-            itemLink = itemLink,
-            rollType = tonumber(rollType) or tonumber(lootState.currentRollType) or rollTypes.FREE,
-            startedAt = GetTime(),
-            endsAt = nil,
-            source = source or (lootState.fromInventory and "inventory" or "lootWindow"),
-            expectedWinners = expected,
-            lootNid = 0,
-            active = true,
-        }
-
-        lootState.rollSession = session
-        lootState.rollStarted = true
-        Rolls:SyncSessionState(session)
-        return session
+        return nil
     end
 
     local function ensureRollSession(itemLink, rollType, source)
-        local session = Rolls:GetRollSession()
+        local session = Rolls and Rolls.EnsureRollSession and Rolls:EnsureRollSession(itemLink, rollType, source) or nil
         if not session then
-            return openRollSession(itemLink, rollType, source)
+            return nil
         end
 
-        if itemLink then
-            local previousItemKey = session.itemKey
-            local previousItemId = tonumber(session.itemId) or nil
-            local nextItemKey = getRollSessionItemKey(itemLink)
-            session.itemLink = itemLink
-            session.itemKey = nextItemKey
-            local itemId = Item.GetItemIdFromLink(itemLink)
-            local nextItemId = tonumber(itemId) or nil
-            local isSameItem = false
-            if nextItemKey and previousItemKey and nextItemKey == previousItemKey then
-                isSameItem = true
-            elseif nextItemId and previousItemId and nextItemId == previousItemId then
-                isSameItem = true
-            end
-            session.itemId = nextItemId or session.itemId
-            if not isSameItem then
-                session.lootNid = 0
-            end
-        end
-        if rollType ~= nil then
-            session.rollType = tonumber(rollType) or session.rollType
-        end
-        session.source = source or session.source or (lootState.fromInventory and "inventory" or "lootWindow")
-        session.lootNid = tonumber(session.lootNid) or 0
         if lootState.fromInventory then
             local heldLootNid = resolveHeldInventoryLootNid(itemLink or session.itemLink, session.lootNid, Core.GetPlayerName())
             if heldLootNid > 0 then
@@ -1164,12 +1166,6 @@ do
                 lootState.currentRollItem = 0
             end
         end
-        session.active = true
-        session.endsAt = nil
-        if not session.startedAt then
-            session.startedAt = GetTime()
-        end
-        updateRollSessionExpectedWinners()
         Rolls:SyncSessionState(session)
         return session
     end
@@ -1447,49 +1443,18 @@ do
         end
     end
 
-    local function buildCandidateCache(itemLink)
-        candidateCache.itemLink = itemLink
-        candidateCache.rosterVersion = getRaidRosterVersion()
-        twipe(candidateCache.indexByName)
-        for p = 1, addon.GetNumGroupMembers() do
-            local candidate = GetMasterLootCandidate(p)
-            if candidate and candidate ~= "" then
-                candidateCache.indexByName[candidate] = p
-            end
-        end
-        addon:debug(Diag.D.LogMLCandidateCacheBuilt:format(tostring(itemLink), addon.tLength(candidateCache.indexByName)))
-    end
-
-    local function findLootSlotIndex(itemLink)
-        local wantedKey = Item.GetItemStringFromLink(itemLink) or itemLink
-        for i = 1, GetNumLootItems() do
-            local tempItemLink = GetLootSlotLink(i)
-            if tempItemLink == itemLink then
-                return i
-            end
-            if wantedKey and tempItemLink then
-                local tempKey = Item.GetItemStringFromLink(tempItemLink) or tempItemLink
-                if tempKey == wantedKey then
-                    return i
-                end
-            end
+    local function resolveCandidateIndex(itemLink, playerName)
+        if Raid and Raid.ResolveMasterLootCandidateIndex then
+            return Raid:ResolveMasterLootCandidateIndex(itemLink, playerName)
         end
         return nil
     end
 
-    local function resolveCandidateIndex(itemLink, playerName)
-        local rosterVersion = getRaidRosterVersion()
-        local rosterChanged = rosterVersion and candidateCache.rosterVersion ~= rosterVersion
-        if candidateCache.itemLink ~= itemLink or rosterChanged then
-            buildCandidateCache(itemLink)
+    local function hasMasterLootCandidates(itemLink)
+        if Raid and Raid.HasMasterLootCandidates then
+            return Raid:HasMasterLootCandidates(itemLink)
         end
-        local candidateIndex = candidateCache.indexByName[playerName]
-        if not candidateIndex then
-            addon:debug(Diag.D.LogMLCandidateCacheMiss:format(tostring(itemLink), tostring(playerName)))
-            buildCandidateCache(itemLink)
-            candidateIndex = candidateCache.indexByName[playerName]
-        end
-        return candidateIndex
+        return false
     end
 
     local function validateAwardWinner(playerName, itemLink, rollType)
@@ -1570,11 +1535,13 @@ do
         local slots = {}
         local slotMap = {}
         local wantedKey = Item.GetItemStringFromLink(itemLink) or itemLink
+        local wantedId = Item.GetItemIdFromLink(itemLink)
         for slot = 1, (GetNumLootItems() or 0) do
             local link = GetLootSlotLink(slot)
             if link then
                 local slotKey = Item.GetItemStringFromLink(link) or link
-                if slotKey == wantedKey then
+                local slotId = Item.GetItemIdFromLink(link)
+                if slotKey == wantedKey or (wantedId and slotId and slotId == wantedId) then
                     slots[#slots + 1] = slot
                     slotMap[slot] = true
                 end
@@ -2160,6 +2127,10 @@ do
         UI.Loaded = true
         UIFacade:Call("LootCounter", "AttachToMaster", frame)
         initItemButtonScripts()
+        if rollListController and rollListController.OnLoad and not frame._krtRollListBound then
+            rollListController:OnLoad(frame)
+            frame._krtRollListBound = true
+        end
     end
 
     local function BindHandlers(_, frame, refs)
@@ -2191,7 +2162,7 @@ do
     -- Button handlers
     -- ============================================================================
     -- Button: Select/Remove Item
-    function module:BtnSelectItem(btn)
+    function module:BtnSelectItem(btn, _button)
         if btn == nil or lootState.lootCount <= 0 then
             return
         end
@@ -2217,7 +2188,7 @@ do
     end
 
     -- Button: Spam Loot Links or Do Ready Check
-    function module:BtnSpamLoot(btn)
+    function module:BtnSpamLoot(btn, _button)
         if btn == nil or lootState.lootCount <= 0 then
             return
         end
@@ -2244,7 +2215,7 @@ do
     end
 
     -- Button: Reserve List (contextual)
-    function module:BtnReserveList(btn)
+    function module:BtnReserveList(_btn, _button)
         local reserves = getReservesService()
         if reserves and reserves.HasData and reserves:HasData() then
             UIFacade:Call("Reserves", "Toggle")
@@ -2254,7 +2225,7 @@ do
     end
 
     -- Button: Loot Counter
-    function module:BtnLootCounter(btn)
+    function module:BtnLootCounter(_btn, _button)
         UIFacade:Call("LootCounter", "Toggle")
     end
 
@@ -2327,24 +2298,24 @@ do
         return ok
     end
 
-    function module:BtnMS(btn)
+    function module:BtnMS(_btn, _button)
         return announceRoll(rollTypes.MAINSPEC, rollAnnouncementKeys[rollTypes.MAINSPEC])
     end
 
-    function module:BtnOS(btn)
+    function module:BtnOS(_btn, _button)
         return announceRoll(rollTypes.OFFSPEC, rollAnnouncementKeys[rollTypes.OFFSPEC])
     end
 
-    function module:BtnSR(btn)
+    function module:BtnSR(_btn, _button)
         return announceRoll(rollTypes.RESERVED, rollAnnouncementKeys[rollTypes.RESERVED])
     end
 
-    function module:BtnFree(btn)
+    function module:BtnFree(_btn, _button)
         return announceRoll(rollTypes.FREE, rollAnnouncementKeys[rollTypes.FREE])
     end
 
     -- Button: left click starts/stops countdown, right click finalizes rolls immediately.
-    function module:BtnCountdown(btn, button)
+    function module:BtnCountdown(_btn, button)
         if countdownRun then
             finalizeRollSession()
         elseif not lootState.rollStarted then
@@ -2365,34 +2336,34 @@ do
     end
 
     -- Button: Clear Rolls
-    function module:BtnClear(btn)
+    function module:BtnClear(_btn, _button)
         announced = false
         Rolls:ClearRolls()
         module:RequestRefresh()
     end
 
     -- Button: Award/Trade
-    function module:BtnAward(btn)
+    function module:BtnAward(_btn, _button)
         return handleAwardRequest()
     end
 
     -- Button: Hold item
-    function module:BtnHold(btn)
+    function module:BtnHold(_btn, _button)
         return assignToTarget(rollTypes.HOLD, "holder")
     end
 
     -- Button: Bank item
-    function module:BtnBank(btn)
+    function module:BtnBank(_btn, _button)
         return assignToTarget(rollTypes.BANK, "banker")
     end
 
     -- Button: Disenchant item
-    function module:BtnDisenchant(btn)
+    function module:BtnDisenchant(_btn, _button)
         return assignToTarget(rollTypes.DISENCHANT, "disenchanter")
     end
 
     -- Selects an item from the item selection frame.
-    function module:BtnSelectedItem(btn)
+    function module:BtnSelectedItem(btn, _button)
         if not btn then
             return
         end
@@ -2440,32 +2411,25 @@ do
         getNamedPart("LootCounterBtn"):SetText(L.BtnLootCounter)
         Frames.SetFrameTitle(frameName, MASTER_LOOTER)
 
-        local itemCountBox = getNamedPart("ItemCount")
-        if itemCountBox and not itemCountBox._krtItemCountHooked then
-            itemCountBox._krtItemCountHooked = true
-            itemCountBox:SetScript("OnTextChanged", function(self, isUserInput)
-                if not isUserInput then
-                    return
-                end
-                announced = false
-                dirtyFlags.itemCount = true
-                dirtyFlags.buttons = true
-                module:RequestRefresh()
-            end)
-            itemCountBox:SetScript("OnEnterPressed", function(self)
-                self:ClearFocus()
-                announced = false
-                dirtyFlags.itemCount = true
-                dirtyFlags.buttons = true
-                module:RequestRefresh()
-            end)
-            itemCountBox:SetScript("OnEditFocusLost", function(self)
-                announced = false
-                dirtyFlags.itemCount = true
-                dirtyFlags.buttons = true
-                module:RequestRefresh()
-            end)
+        local function requestItemCountRefresh()
+            announced = false
+            dirtyFlags.itemCount = true
+            dirtyFlags.buttons = true
+            module:RequestRefresh()
         end
+
+        Frames.BindEditBoxHandlers(frameName, {
+            {
+                suffix = "ItemCount",
+                onEnter = function(self)
+                    self:ClearFocus()
+                    requestItemCountRefresh()
+                end,
+                onFocusLost = function()
+                    requestItemCountRefresh()
+                end,
+            },
+        }, requestItemCountRefresh)
         if next(dropDownData) == nil then
             for i = 1, 8 do
                 dropDownData[i] = {}
@@ -2538,123 +2502,14 @@ do
         return record, canRoll, rolled
     end
 
-    local function getRollRowRefs(btn)
-        if not btn then
-            return nil
-        end
-        if btn._krtRefs then
-            return btn._krtRefs
-        end
-
-        local btnName = btn:GetName()
-        btn._krtRefs = {
-            name = btnName and _G[btnName .. "Name"] or nil,
-            roll = btnName and _G[btnName .. "Roll"] or nil,
-            counter = btnName and _G[btnName .. "Counter"] or nil,
-            info = btnName and _G[btnName .. "Info"] or nil,
-            star = btnName and _G[btnName .. "Star"] or nil,
-        }
-        return btn._krtRefs
-    end
-
-    local function ensureRollRow(i, scrollChild)
-        local frameName = getFrameName()
-        if not frameName then
-            return nil
-        end
-        local btnName = frameName .. "PlayerBtn" .. i
-        local btn = rollRows[i]
-        if not btn then
-            btn = CreateFrame("Button", btnName, scrollChild, "KRTSelectPlayerTemplate")
-        end
-        if not btn.krtHasOnClick then
-            btn:SetScript("OnClick", function(self)
-                if selectRollWinnerRow(self.playerName) then
-                    module:RequestRefresh()
-                end
-            end)
-            btn.krtHasOnClick = true
-        end
-        rollRows[i] = btn
-        return btn
-    end
-
-    local function renderRollRows(model)
-        local frameName = getFrameName()
-        if not frameName then
-            return
-        end
-        local scrollFrame = getNamedPart("ScrollFrame")
-        local scrollChild = getNamedPart("ScrollFrameScrollChild")
-        if not (scrollFrame and scrollChild) then
-            return
-        end
-
-        local rows = (model and (model.visibleRows or model.rows)) or {}
-        local count = #rows
-
-        scrollChild:SetHeight(scrollFrame:GetHeight())
-        local contentW = math.max(1, scrollFrame:GetWidth() or 0)
-        scrollChild:SetWidth(contentW)
-
-        local totalHeight = 0
-        for i = 1, count do
-            local data = rows[i]
-            local btn = ensureRollRow(i, scrollChild)
-            btn:SetID(tonumber(data.id) or i)
-            btn.playerName = data.name
-            btn:EnableMouse(data.canClick == true)
-            btn:Show()
-
-            UIRowVisuals.EnsureRowVisuals(btn)
-
-            local ui = getRollRowRefs(btn)
-            local nameStr = ui and ui.name or nil
-            local rollStr = ui and ui.roll or nil
-            local counterStr = ui and ui.counter or nil
-            local infoStr = ui and ui.info or nil
-            local star = ui and ui.star or nil
-
-            if nameStr then
-                local class = data.class or "UNKNOWN"
-                if data.isReserved then
-                    nameStr:SetVertexColor(0.4, 0.6, 1.0)
-                else
-                    local r, g, b = Colors.GetClassColor(class)
-                    nameStr:SetVertexColor(r, g, b)
-                end
-                nameStr:SetText(data.displayName or data.name or "")
-                nameStr:Show()
-            end
-
-            if rollStr then
-                rollStr:SetText(tostring(data.roll or ""))
-                rollStr:Show()
-            end
-            if counterStr then
-                counterStr:SetText(data.counterText or "")
-                counterStr:Show()
-            end
-            if infoStr then
-                infoStr:SetText(data.infoText or "")
-                infoStr:Show()
-            end
-
-            UIRowVisuals.SetRowSelected(btn, data.isSelected == true)
-            UIRowVisuals.SetRowFocused(btn, data.isFocused == true)
-            UIPrimitives.ShowHide(star, data.showStar == true)
-
-            btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -totalHeight)
-            btn:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
-            totalHeight = totalHeight + btn:GetHeight()
-        end
-
-        for i = count + 1, #rollRows do
-            local btn = rollRows[i]
-            if btn then
-                btn:Hide()
-            end
-        end
+    getRollRowRefs = function(btn)
+        return Frames.CacheNamedParts(btn, {
+            name = "Name",
+            roll = "Roll",
+            counter = "Counter",
+            info = "Info",
+            star = "Star",
+        })
     end
 
     local function flagButtonsOnChange(key, value)
@@ -2858,7 +2713,14 @@ do
             dirtyFlags.buttons = false
         end
 
-        renderRollRows(rollModel)
+        if rollListController then
+            if rollListController.Dirty then
+                rollListController:Dirty()
+            end
+            if rollListController.UpdateNow then
+                rollListController:UpdateNow()
+            end
+        end
 
         dirtyFlags.rolls = false
         dirtyFlags.winner = false
@@ -3022,19 +2884,10 @@ do
     end
 
     local function getSelectionButtonRefs(btn)
-        if not btn then
-            return nil
-        end
-        if btn._krtRefs then
-            return btn._krtRefs
-        end
-
-        local btnName = btn:GetName()
-        btn._krtRefs = {
-            name = btnName and _G[btnName .. "Name"] or nil,
-            icon = btnName and _G[btnName .. "Icon"] or nil,
-        }
-        return btn._krtRefs
+        return Frames.CacheNamedParts(btn, {
+            name = "Name",
+            icon = "Icon",
+        })
     end
 
     local function ensureSelectionButton(index)
@@ -3060,7 +2913,6 @@ do
         return btn
     end
 
-    -- Creates the item selection frame if it doesn't exist.
     local function createSelectionFrame()
         if selectionFrame == nil then
             local frame = getFrame()
@@ -3081,29 +2933,35 @@ do
     -- Updates the item selection frame with the current loot items.
     function updateSelectionFrame()
         createSelectionFrame()
+        if not selectionFrame then
+            return
+        end
+
         local height = 5
         for i = 1, lootState.lootCount do
             local btn = ensureSelectionButton(i)
-            local ui = getSelectionButtonRefs(btn)
-            btn:Show()
-            local itemName = getItemName(i)
-            local itemNameBtn = ui and ui.name or nil
-            local item = getItem(i)
-            local count = item and item.count or 1
-            if itemNameBtn then
-                if count and count > 1 then
-                    itemNameBtn:SetText(itemName .. " x" .. count)
-                else
-                    itemNameBtn:SetText(itemName)
+            if btn then
+                local ui = getSelectionButtonRefs(btn)
+                btn:Show()
+                local itemName = getItemName(i)
+                local itemNameBtn = ui and ui.name or nil
+                local item = getItem(i)
+                local count = item and item.count or 1
+                if itemNameBtn then
+                    if count and count > 1 then
+                        itemNameBtn:SetText(itemName .. " x" .. count)
+                    else
+                        itemNameBtn:SetText(itemName)
+                    end
                 end
+                local itemTexture = getItemTexture(i)
+                local itemTextureBtn = ui and ui.icon or nil
+                if itemTextureBtn then
+                    itemTextureBtn:SetTexture(itemTexture)
+                end
+                btn:SetPoint("TOPLEFT", selectionFrame, "TOPLEFT", 0, -height)
+                height = height + 37
             end
-            local itemTexture = getItemTexture(i)
-            local itemTextureBtn = ui and ui.icon or nil
-            if itemTextureBtn then
-                itemTextureBtn:SetTexture(itemTexture)
-            end
-            btn:SetPoint("TOPLEFT", selectionFrame, "TOPLEFT", 0, -height)
-            height = height + 37
         end
         for i = lootState.lootCount + 1, #selectionButtons do
             local btn = selectionButtons[i]
@@ -3122,43 +2980,6 @@ do
     -- ============================================================================
     -- Inventory / cursor helpers
     -- ============================================================================
-    local function scanTradeableInventory(itemLink, itemId)
-        if not itemLink and not itemId then
-            return nil
-        end
-        local wantedKey = itemLink and (Item.GetItemStringFromLink(itemLink) or itemLink) or nil
-        local wantedId = tonumber(itemId) or (itemLink and Item.GetItemIdFromLink(itemLink)) or nil
-        local totalCount = 0
-        local firstBag, firstSlot, firstSlotCount
-        local hasMatch = false
-        -- Backpack (0) + 4 bag slots (1..4) in WoW 3.3.5a.
-        for bag = 0, 4 do
-            local n = GetContainerNumSlots(bag) or 0
-            for slot = 1, n do
-                local link = GetContainerItemLink(bag, slot)
-                if link then
-                    local key = Item.GetItemStringFromLink(link) or link
-                    local linkId = Item.GetItemIdFromLink(link)
-                    local matches = (wantedKey and key == wantedKey) or (wantedId and linkId == wantedId)
-                    if matches then
-                        hasMatch = true
-                        if not itemIsSoulbound(bag, slot) then
-                            local _, count = GetContainerItemInfo(bag, slot)
-                            local slotCount = tonumber(count) or 1
-                            totalCount = totalCount + slotCount
-                            if not firstBag then
-                                firstBag = bag
-                                firstSlot = slot
-                                firstSlotCount = slotCount
-                            end
-                        end
-                    end
-                end
-            end
-        end
-        return totalCount, firstBag, firstSlot, firstSlotCount, hasMatch
-    end
-
     local function applyInventoryItem(itemLink, totalCount, inBag, inSlot, slotCount)
         if countdownRun then
             return false
@@ -3207,7 +3028,7 @@ do
             return false
         end
 
-        local totalCount, bag, slot, slotCount, hasMatch = scanTradeableInventory(itemLink, itemId)
+        local totalCount, bag, slot, slotCount, hasMatch = Loot:ScanTradeableInventory(itemLink, itemId)
         if not totalCount or totalCount < 1 then
             local itemRef = tostring(itemLink or itemId or "unknown")
             if hasMatch then
@@ -3404,7 +3225,7 @@ do
     -- ============================================================================
     -- Assigns an item from the loot window to a player.
     function assignItem(itemLink, playerName, rollType, rollValue)
-        local itemIndex = findLootSlotIndex(itemLink)
+        local itemIndex = Loot:FindLootSlotIndex(itemLink)
         if itemIndex == nil then
             addon:error(L.ErrCannotFindItem:format(itemLink))
             return false
@@ -3461,7 +3282,7 @@ do
             return true
         end
 
-        if not next(candidateCache.indexByName) then
+        if not hasMasterLootCandidates(itemLink) then
             addon:warn(L.WarnMLNoCandidatesAvailable)
         else
             addon:warn(L.WarnMLWinnerNoCandidate:format(tostring(playerName)))
@@ -3610,55 +3431,8 @@ do
         return L.ChatTradeMutiple:format(tconcat(winners, ", "), lootState.trader)
     end
 
-    local function resolveTradeableInventoryItem(itemLink)
-        local totalCount, bag, slot, slotCount
-        local usedFastPath = false
-        local wantedKey = Item.GetItemStringFromLink(itemLink) or itemLink
-        local wantedId = Item.GetItemIdFromLink(itemLink)
-
-        -- Fast-path: reuse the previously selected bag slot when still valid.
-        local cachedBag = tonumber(itemInfo.bagID)
-        local cachedSlot = tonumber(itemInfo.slotID)
-        if cachedBag and cachedSlot then
-            local cachedLink = GetContainerItemLink(cachedBag, cachedSlot)
-            if cachedLink then
-                local cachedKey = Item.GetItemStringFromLink(cachedLink) or cachedLink
-                local cachedId = Item.GetItemIdFromLink(cachedLink)
-                local sameItem = (wantedKey and cachedKey == wantedKey) or (wantedId and cachedId == wantedId)
-                if sameItem and not itemIsSoulbound(cachedBag, cachedSlot) then
-                    local _, count = GetContainerItemInfo(cachedBag, cachedSlot)
-                    bag = cachedBag
-                    slot = cachedSlot
-                    slotCount = tonumber(count) or 1
-                    usedFastPath = true
-                end
-            end
-        end
-
-        if not (bag and slot) then
-            totalCount, bag, slot, slotCount = scanTradeableInventory(itemLink, wantedId)
-        elseif usedFastPath then
-            if (tonumber(lootState.selectedItemCount) or 1) > 1 then
-                totalCount = scanTradeableInventory(itemLink, wantedId)
-            else
-                totalCount = tonumber(slotCount) or 1
-            end
-        end
-
-        if not (bag and slot) then
-            return nil
-        end
-
-        return {
-            bag = bag,
-            slot = slot,
-            slotCount = tonumber(slotCount) or 1,
-            totalCount = tonumber(totalCount) or tonumber(slotCount) or 1,
-        }
-    end
-
     local function prepareTradeableItem(itemLink)
-        local itemData = resolveTradeableInventoryItem(itemLink)
+        local itemData = Loot:ResolveTradeableInventoryItem(itemLink, itemInfo.bagID, itemInfo.slotID, lootState.selectedItemCount)
         if not itemData then
             addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemLink)))
             return false

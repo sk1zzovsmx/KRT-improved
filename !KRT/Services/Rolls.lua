@@ -314,12 +314,60 @@ do
         end
     end
 
+    local function normalizeExpectedWinners(count)
+        count = tonumber(count) or tonumber(lootState.selectedItemCount) or 1
+        if count < 1 then
+            count = 1
+        end
+        return count
+    end
+
+    local function allocateRollSessionId()
+        local nextId = tonumber(lootState.nextRollSessionId) or 1
+        if nextId < 1 then
+            nextId = 1
+        end
+        lootState.nextRollSessionId = nextId + 1
+        return "RS:" .. tostring(nextId)
+    end
+
+    local function getRollSessionItemKey(itemLink)
+        if not itemLink then
+            return nil
+        end
+        return Item.GetItemStringFromLink(itemLink) or itemLink
+    end
+
+    local function openRollSession(itemLink, rollType, source)
+        if not itemLink then
+            return nil
+        end
+
+        local itemId = Item.GetItemIdFromLink(itemLink)
+        local session = {
+            id = allocateRollSessionId(),
+            itemKey = getRollSessionItemKey(itemLink),
+            itemId = tonumber(itemId) or nil,
+            itemLink = itemLink,
+            rollType = tonumber(rollType) or tonumber(lootState.currentRollType) or rollTypes.FREE,
+            lootNid = tonumber(lootState.currentRollItem) or 0,
+            startedAt = GetTime(),
+            endsAt = nil,
+            source = source or (lootState.fromInventory and "inventory" or "lootWindow"),
+            expectedWinners = normalizeExpectedWinners(),
+            active = true,
+        }
+
+        lootState.rollSession = session
+        lootState.rollStarted = true
+        syncSessionStateFromRollSession(session)
+        return session
+    end
+
     local function ensureAdHocRollSession()
         local session = getRollSession()
         local itemLink
         local itemId
-        local nextId
-        local expectedWinners
 
         if session then
             return session
@@ -331,19 +379,9 @@ do
             return nil
         end
 
-        nextId = tonumber(lootState.nextRollSessionId) or 1
-        if nextId < 1 then
-            nextId = 1
-        end
-
-        expectedWinners = tonumber(lootState.selectedItemCount) or 1
-        if expectedWinners < 1 then
-            expectedWinners = 1
-        end
-
         session = {
-            id = "RS:" .. tostring(nextId),
-            itemKey = itemLink and (Item.GetItemStringFromLink(itemLink) or itemLink) or nil,
+            id = allocateRollSessionId(),
+            itemKey = getRollSessionItemKey(itemLink),
             itemId = itemId,
             itemLink = itemLink,
             rollType = tonumber(lootState.currentRollType) or rollTypes.FREE,
@@ -351,11 +389,55 @@ do
             startedAt = GetTime(),
             endsAt = nil,
             source = lootState.fromInventory and "inventory" or "lootWindow",
-            expectedWinners = expectedWinners,
+            expectedWinners = normalizeExpectedWinners(),
             active = true,
         }
         lootState.rollSession = session
-        lootState.nextRollSessionId = nextId + 1
+        syncSessionStateFromRollSession(session)
+        return session
+    end
+
+    local function ensureRollSession(itemLink, rollType, source)
+        local session = getRollSession()
+        if not session then
+            return openRollSession(itemLink, rollType, source)
+        end
+
+        if itemLink then
+            local previousItemKey = session.itemKey
+            local previousItemId = tonumber(session.itemId) or nil
+            local nextItemKey = getRollSessionItemKey(itemLink)
+            local itemId = Item.GetItemIdFromLink(itemLink)
+            local nextItemId = tonumber(itemId) or nil
+            local isSameItem = false
+
+            session.itemLink = itemLink
+            session.itemKey = nextItemKey
+
+            if nextItemKey and previousItemKey and nextItemKey == previousItemKey then
+                isSameItem = true
+            elseif nextItemId and previousItemId and nextItemId == previousItemId then
+                isSameItem = true
+            end
+
+            session.itemId = nextItemId or session.itemId
+            if not isSameItem then
+                session.lootNid = 0
+            end
+        end
+
+        if rollType ~= nil then
+            session.rollType = tonumber(rollType) or session.rollType
+        end
+        session.source = source or session.source or (lootState.fromInventory and "inventory" or "lootWindow")
+        session.lootNid = tonumber(session.lootNid) or 0
+        session.active = true
+        session.endsAt = nil
+        if not session.startedAt then
+            session.startedAt = GetTime()
+        end
+
+        session.expectedWinners = normalizeExpectedWinners()
         syncSessionStateFromRollSession(session)
         return session
     end
@@ -1784,6 +1866,23 @@ do
 
     function module:GetRollSession()
         return getRollSession()
+    end
+
+    function module:GetRollSessionItemKey(itemLink)
+        return getRollSessionItemKey(itemLink)
+    end
+
+    function module:UpdateExpectedWinners(count)
+        local session = getRollSession()
+        if not session then
+            return nil
+        end
+        session.expectedWinners = normalizeExpectedWinners(count)
+        return session.expectedWinners
+    end
+
+    function module:EnsureRollSession(itemLink, rollType, source)
+        return ensureRollSession(itemLink, rollType, source)
     end
 
     function module:SyncSessionState(session)

@@ -157,6 +157,10 @@ local function makeFrame(shown, name)
         self.id = id
     end
 
+    function frame:GetID()
+        return self.id
+    end
+
     function frame:LockHighlight()
         self._highlighted = true
     end
@@ -352,6 +356,7 @@ local function newHarness()
     local C = {
         ITEM_LINK_PATTERN = "|?c?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?" .. "(%-?%d*):?(%-?%d*):?(%d*)|?h?%[?([^%[%]]*)%]?|?h?|?r?",
         BOSS_KILL_DEDUPE_WINDOW_SECONDS = 30,
+        BOSS_EVENT_CONTEXT_TTL_SECONDS = 30,
         PENDING_AWARD_TTL_SECONDS = 8,
         GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = 60,
         GROUP_LOOT_ROLL_GRACE_SECONDS = 10,
@@ -485,6 +490,9 @@ local function newHarness()
     end
     addon.trace = function(_, message)
         pushLog("trace", message)
+    end
+    addon.Base64.Encode = function(value)
+        return tostring(value)
     end
 
     local function getRaidService()
@@ -718,6 +726,17 @@ local function newHarness()
         end
     end
 
+    addon.UIPrimitives.Toggle = function(frame)
+        if not frame then
+            return
+        end
+        if frame:IsVisible() then
+            frame:Hide()
+        else
+            frame:Show()
+        end
+    end
+
     addon.UIPrimitives.ShowHide = function(frame, shown)
         if not frame then
             return
@@ -790,6 +809,27 @@ local function newHarness()
                 frame[scriptType] = callback
             end
         end,
+        CacheNamedParts = function(widget, parts, cacheField)
+            if not widget or type(parts) ~= "table" then
+                return nil
+            end
+
+            cacheField = cacheField or "_krtRefs"
+            if widget[cacheField] then
+                return widget[cacheField]
+            end
+
+            local widgetName = widget.GetName and widget:GetName() or nil
+            local refs = {}
+
+            for key, suffix in pairs(parts) do
+                local refKey = type(key) == "number" and suffix or key
+                refs[refKey] = widgetName and _G[widgetName .. suffix] or nil
+            end
+
+            widget[cacheField] = refs
+            return refs
+        end,
         MakeFrameGetter = function(name)
             return function()
                 return _G[name]
@@ -807,6 +847,151 @@ local function newHarness()
             if editBox and editBox.SetText then
                 editBox:SetText(tostring(value or ""))
             end
+        end,
+        BindEditBoxHandlers = function(frameName, specs, requestRefreshFn)
+            if type(frameName) ~= "string" or type(specs) ~= "table" then
+                return
+            end
+
+            for i = 1, #specs do
+                local spec = specs[i]
+                local suffix = spec and spec.suffix
+                local editBox = suffix and _G[frameName .. suffix] or nil
+                if editBox then
+                    if spec.onEscape then
+                        editBox.OnEscapePressed = spec.onEscape
+                    end
+                    if spec.onEnter then
+                        editBox.OnEnterPressed = spec.onEnter
+                    end
+                    if spec.onFocusLost then
+                        editBox.OnEditFocusLost = spec.onFocusLost
+                    end
+                    if requestRefreshFn then
+                        editBox.OnTextChanged = function(_, isUserInput)
+                            if isUserInput then
+                                requestRefreshFn()
+                            end
+                        end
+                    end
+                end
+            end
+        end,
+        CreateButtonPopup = function(cfg)
+            local popup = {
+                frame = nil,
+                buttons = {},
+            }
+
+            local function resolveParent()
+                if type(cfg.getParent) == "function" then
+                    return cfg.getParent()
+                end
+                return cfg.parent
+            end
+
+            local function ensureFrame()
+                if popup.frame then
+                    return popup.frame
+                end
+
+                local parent = resolveParent()
+                if not parent then
+                    return nil
+                end
+
+                popup.frame = _G.CreateFrame("Frame", cfg.frameName, parent, cfg.frameTemplate)
+                popup.frame:Hide()
+                return popup.frame
+            end
+
+            local function ensureButton(index)
+                local frame = ensureFrame()
+                if not frame then
+                    return nil
+                end
+
+                local button = popup.buttons[index]
+                if button then
+                    return button
+                end
+
+                local buttonName = cfg.buttonName and cfg.buttonName(index) or nil
+                button = _G.CreateFrame("Button", buttonName, frame, cfg.buttonTemplate)
+                button:SetID(index)
+                if button.RegisterForClicks then
+                    button:RegisterForClicks(cfg.clickRegistration or "AnyUp")
+                end
+                if cfg.onButtonClick then
+                    button.OnClick = cfg.onButtonClick
+                end
+
+                popup.buttons[index] = button
+                return button
+            end
+
+            function popup:GetFrame()
+                return self.frame or ensureFrame()
+            end
+
+            function popup:Hide()
+                if self.frame then
+                    self.frame:Hide()
+                end
+            end
+
+            function popup:Toggle()
+                local frame = ensureFrame()
+                if not frame then
+                    return false
+                end
+
+                if frame:IsShown() then
+                    frame:Hide()
+                else
+                    frame:Show()
+                end
+
+                return frame:IsShown()
+            end
+
+            function popup:Refresh(count)
+                local frame = ensureFrame()
+                local rowCount = tonumber(count) or 0
+                local height = tonumber(cfg.topInset) or 5
+                local rowStep = tonumber(cfg.rowStep) or 37
+
+                if not frame then
+                    return nil
+                end
+
+                for index = 1, rowCount do
+                    local button = ensureButton(index)
+                    if button then
+                        if cfg.drawButton then
+                            cfg.drawButton(button, index)
+                        end
+                        button:Show()
+                        height = height + rowStep
+                    end
+                end
+
+                for index = rowCount + 1, #self.buttons do
+                    local button = self.buttons[index]
+                    if button then
+                        button:Hide()
+                    end
+                end
+
+                frame:SetHeight(height)
+                if rowCount <= 0 then
+                    frame:Hide()
+                end
+
+                return frame
+            end
+
+            return popup
         end,
         ResetEditBox = function(editBox)
             if editBox and editBox.SetText then
@@ -958,6 +1143,10 @@ local function newHarness()
     Core.GetLastBoss = function()
         return addon.State.lastBoss
     end
+    Core.SetLastBoss = function(bossNid)
+        addon.State.lastBoss = bossNid
+        return addon.State.lastBoss
+    end
     Core.GetPlayerName = function()
         return "Tester"
     end
@@ -972,6 +1161,200 @@ local function newHarness()
     end
     Core.GetRaidStoreOrNil = function()
         return nil
+    end
+
+    if type(services.Loot.GetCurrentItemCount) ~= "function" then
+        function services.Loot:GetCurrentItemCount()
+            return tonumber(feature.itemInfo and feature.itemInfo.count) or tonumber(feature.lootState and feature.lootState.selectedItemCount) or 1
+        end
+    end
+
+    if type(services.Loot.FindLootSlotIndex) ~= "function" then
+        function services.Loot:FindLootSlotIndex(itemLink)
+            local wantedKey = addon.Item.GetItemStringFromLink(itemLink) or itemLink
+            local wantedId = addon.Item.GetItemIdFromLink(itemLink)
+            local count = type(_G.GetNumLootItems) == "function" and (_G.GetNumLootItems() or 0) or 0
+            for i = 1, count do
+                local tempItemLink = type(_G.GetLootSlotLink) == "function" and _G.GetLootSlotLink(i) or nil
+                if tempItemLink == itemLink then
+                    return i
+                end
+                if wantedKey and tempItemLink then
+                    local tempKey = addon.Item.GetItemStringFromLink(tempItemLink) or tempItemLink
+                    if tempKey == wantedKey then
+                        return i
+                    end
+                end
+                if wantedId and tempItemLink then
+                    local tempItemId = addon.Item.GetItemIdFromLink(tempItemLink)
+                    if tempItemId and tempItemId == wantedId then
+                        return i
+                    end
+                end
+            end
+            return nil
+        end
+    end
+
+    if type(services.Loot.ScanTradeableInventory) ~= "function" then
+        function services.Loot:ScanTradeableInventory(itemLink, itemId)
+            if not itemLink and not itemId then
+                return nil
+            end
+
+            local wantedKey = itemLink and (addon.Item.GetItemStringFromLink(itemLink) or itemLink) or nil
+            local wantedId = tonumber(itemId) or (itemLink and addon.Item.GetItemIdFromLink(itemLink)) or nil
+            local totalCount = 0
+            local firstBag, firstSlot, firstSlotCount
+            local hasMatch = false
+
+            for bag = 0, 4 do
+                local slots = type(_G.GetContainerNumSlots) == "function" and (_G.GetContainerNumSlots(bag) or 0) or 0
+                for slot = 1, slots do
+                    local link = type(_G.GetContainerItemLink) == "function" and _G.GetContainerItemLink(bag, slot) or nil
+                    if link then
+                        local key = addon.Item.GetItemStringFromLink(link) or link
+                        local linkId = addon.Item.GetItemIdFromLink(link)
+                        local matches = (wantedKey and key == wantedKey) or (wantedId and linkId == wantedId)
+                        if matches then
+                            hasMatch = true
+                            local _, count = type(_G.GetContainerItemInfo) == "function" and _G.GetContainerItemInfo(bag, slot) or nil, 0
+                            if type(_G.GetContainerItemInfo) == "function" then
+                                _, count = _G.GetContainerItemInfo(bag, slot)
+                            end
+                            local slotCount = tonumber(count) or 1
+                            totalCount = totalCount + slotCount
+                            if not firstBag then
+                                firstBag = bag
+                                firstSlot = slot
+                                firstSlotCount = slotCount
+                            end
+                        end
+                    end
+                end
+            end
+
+            return totalCount, firstBag, firstSlot, firstSlotCount, hasMatch
+        end
+    end
+
+    if type(services.Loot.ResolveTradeableInventoryItem) ~= "function" then
+        function services.Loot:ResolveTradeableInventoryItem(itemLink, cachedBag, cachedSlot, selectedItemCount)
+            local totalCount, bag, slot, slotCount
+            local usedFastPath = false
+            local wantedKey = addon.Item.GetItemStringFromLink(itemLink) or itemLink
+            local wantedId = addon.Item.GetItemIdFromLink(itemLink)
+
+            cachedBag = tonumber(cachedBag)
+            cachedSlot = tonumber(cachedSlot)
+
+            if cachedBag and cachedSlot then
+                local cachedLink = type(_G.GetContainerItemLink) == "function" and _G.GetContainerItemLink(cachedBag, cachedSlot) or nil
+                if cachedLink then
+                    local cachedKey = addon.Item.GetItemStringFromLink(cachedLink) or cachedLink
+                    local cachedId = addon.Item.GetItemIdFromLink(cachedLink)
+                    local sameItem = (wantedKey and cachedKey == wantedKey) or (wantedId and cachedId == wantedId)
+                    if sameItem then
+                        local _, count = type(_G.GetContainerItemInfo) == "function" and _G.GetContainerItemInfo(cachedBag, cachedSlot) or nil, 0
+                        if type(_G.GetContainerItemInfo) == "function" then
+                            _, count = _G.GetContainerItemInfo(cachedBag, cachedSlot)
+                        end
+                        bag = cachedBag
+                        slot = cachedSlot
+                        slotCount = tonumber(count) or 1
+                        usedFastPath = true
+                    end
+                end
+            end
+
+            if not (bag and slot) then
+                totalCount, bag, slot, slotCount = self:ScanTradeableInventory(itemLink, wantedId)
+            elseif usedFastPath then
+                if (tonumber(selectedItemCount) or 1) > 1 then
+                    totalCount = self:ScanTradeableInventory(itemLink, wantedId)
+                else
+                    totalCount = tonumber(slotCount) or 1
+                end
+            end
+
+            if not (bag and slot) then
+                return nil
+            end
+
+            return {
+                bag = bag,
+                slot = slot,
+                slotCount = tonumber(slotCount) or 1,
+                totalCount = tonumber(totalCount) or tonumber(slotCount) or 1,
+            }
+        end
+    end
+
+    if type(services.Rolls.GetRollSessionItemKey) ~= "function" then
+        function services.Rolls:GetRollSessionItemKey(itemLink)
+            if not itemLink then
+                return nil
+            end
+            return addon.Item.GetItemStringFromLink(itemLink) or itemLink
+        end
+    end
+
+    if type(services.Rolls.UpdateExpectedWinners) ~= "function" then
+        function services.Rolls:UpdateExpectedWinners(count)
+            local session = feature.lootState.rollSession
+            if not session then
+                return nil
+            end
+            count = tonumber(count) or tonumber(feature.lootState.selectedItemCount) or 1
+            if count < 1 then
+                count = 1
+            end
+            session.expectedWinners = count
+            return count
+        end
+    end
+
+    if type(services.Rolls.EnsureRollSession) ~= "function" then
+        function services.Rolls:EnsureRollSession(itemLink, rollType, source)
+            local session = feature.lootState.rollSession
+            if not session then
+                local nextId = tonumber(feature.lootState.nextRollSessionId) or 1
+                if nextId < 1 then
+                    nextId = 1
+                end
+                feature.lootState.nextRollSessionId = nextId + 1
+                session = {
+                    id = "RS:" .. tostring(nextId),
+                    itemKey = self:GetRollSessionItemKey(itemLink),
+                    itemId = addon.Item.GetItemIdFromLink(itemLink),
+                    itemLink = itemLink,
+                    rollType = tonumber(rollType) or tonumber(feature.lootState.currentRollType) or rollTypes.FREE,
+                    lootNid = tonumber(feature.lootState.currentRollItem) or 0,
+                    startedAt = (_G.GetTime and _G.GetTime()) or 0,
+                    endsAt = nil,
+                    source = source or (feature.lootState.fromInventory and "inventory" or "lootWindow"),
+                    expectedWinners = tonumber(feature.lootState.selectedItemCount) or 1,
+                    active = true,
+                }
+                feature.lootState.rollSession = session
+                feature.lootState.rollStarted = true
+            else
+                if itemLink then
+                    session.itemLink = itemLink
+                    session.itemKey = self:GetRollSessionItemKey(itemLink)
+                    session.itemId = addon.Item.GetItemIdFromLink(itemLink)
+                end
+                if rollType ~= nil then
+                    session.rollType = tonumber(rollType) or session.rollType
+                end
+                session.source = source or session.source
+                session.active = true
+                session.endsAt = nil
+            end
+            self:UpdateExpectedWinners(feature.lootState.selectedItemCount)
+            self:SyncSessionState(session)
+            return session
+        end
     end
 
     local function parseItemId(value)
@@ -1323,11 +1706,51 @@ local function setupInventoryTradeHarness(order, rollsByName)
         GetItemLink = function()
             return link
         end,
+        GetCurrentItemCount = function()
+            return tonumber(h.feature.itemInfo and h.feature.itemInfo.count) or tonumber(h.feature.lootState and h.feature.lootState.selectedItemCount) or 1
+        end,
         ClearLoot = function()
             clearLootCount = clearLootCount + 1
         end,
         ItemIsSoulbound = function()
             return false
+        end,
+        ResolveTradeableInventoryItem = function(_, itemLinkArg)
+            if itemLinkArg ~= link then
+                return nil
+            end
+
+            local firstBag, firstSlot, firstSlotCount
+            local totalCount = 0
+
+            for bag = 0, 4 do
+                local slots = bagItems[bag]
+                if slots then
+                    for slot = 1, 4 do
+                        local item = slots[slot]
+                        if item and item.link == link then
+                            local count = tonumber(item.count) or 1
+                            totalCount = totalCount + count
+                            if not firstBag then
+                                firstBag = bag
+                                firstSlot = slot
+                                firstSlotCount = count
+                            end
+                        end
+                    end
+                end
+            end
+
+            if not firstBag then
+                return nil
+            end
+
+            return {
+                bag = firstBag,
+                slot = firstSlot,
+                slotCount = firstSlotCount,
+                totalCount = totalCount,
+            }
         end,
     }
     h.addon.Services.Raid = {
@@ -1476,19 +1899,36 @@ end
 local function setupMasterAwardHarness(cfg)
     local h = newHarness()
     local link = h.registerItem(cfg.itemId or 9313, cfg.itemName or "AwardHarnessBlade")
+    local lootSlotLink = cfg.lootSlotLink or link
     local currentModel = cfg.model or {}
     local candidates = cfg.candidates or { "Alice", "Bob", "Cara" }
+    local candidateCache = {
+        itemLink = nil,
+        indexByName = {},
+    }
     local queuedAwards = {}
     local givenLoot = {}
     local validationCalls = {}
     local refreshCount = 0
+
+    local function rebuildCandidateCache(itemLinkArg)
+        candidateCache.itemLink = itemLinkArg
+        table.wipe(candidateCache.indexByName)
+        for i = 1, #candidates do
+            local candidate = candidates[i]
+            if candidate and candidate ~= "" then
+                candidateCache.indexByName[candidate] = i
+            end
+        end
+        return candidateCache
+    end
 
     _G.GetNumLootItems = function()
         return 1
     end
     _G.GetLootSlotLink = function(index)
         if index == 1 then
-            return link
+            return lootSlotLink
         end
         return nil
     end
@@ -1519,6 +1959,16 @@ local function setupMasterAwardHarness(cfg)
         GetItemLink = function()
             return link
         end,
+        FindLootSlotIndex = function(_, itemLinkArg)
+            local wantedKey = h.addon.Item.GetItemStringFromLink(itemLinkArg) or itemLinkArg
+            local wantedId = h.addon.Item.GetItemIdFromLink(itemLinkArg)
+            local slotKey = h.addon.Item.GetItemStringFromLink(link) or link
+            local slotId = h.addon.Item.GetItemIdFromLink(link)
+            if itemLinkArg == link or (wantedKey and slotKey == wantedKey) or (wantedId and slotId and slotId == wantedId) then
+                return 1
+            end
+            return nil
+        end,
         AddPendingAward = function(_, itemLinkArg, playerName, rollType, rollValue, sessionId)
             queuedAwards[#queuedAwards + 1] = {
                 itemLink = itemLinkArg,
@@ -1532,6 +1982,32 @@ local function setupMasterAwardHarness(cfg)
     h.addon.Services.Raid = {
         IsMasterLooter = function()
             return true
+        end,
+        GetRosterVersion = function()
+            return 1
+        end,
+        InvalidateMasterLootCandidateCache = function()
+            candidateCache.itemLink = nil
+            table.wipe(candidateCache.indexByName)
+        end,
+        ResolveMasterLootCandidateIndex = function(_, itemLinkArg, playerName)
+            local cache = candidateCache
+            if cache.itemLink ~= itemLinkArg then
+                cache = rebuildCandidateCache(itemLinkArg)
+            end
+            local candidateIndex = cache.indexByName[playerName]
+            if not candidateIndex then
+                cache = rebuildCandidateCache(itemLinkArg)
+                candidateIndex = cache.indexByName[playerName]
+            end
+            return candidateIndex
+        end,
+        HasMasterLootCandidates = function(_, itemLinkArg)
+            local cache = candidateCache
+            if cache.itemLink ~= itemLinkArg then
+                cache = rebuildCandidateCache(itemLinkArg)
+            end
+            return next(cache.indexByName) ~= nil
         end,
         GetUnitID = function(_, playerName)
             local units = cfg.unitsByName or {}
@@ -1847,6 +2323,158 @@ test("group loot need selections log passive NE history on loot receipt", functi
     assertEqual(raid.loot[1].rollValue, 0, "expected passive group loot entries to default rollValue to 0")
 end)
 
+test("loot receipts reuse a recent boss context before falling back to trash", function()
+    local h = newHarness()
+    local link = h.registerItem(9155, "Recovery Blade")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, name = "Sapphiron", time = 990 },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "loot-receive-self" then
+            return link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    Raid:AddLoot("loot-receive-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected recent boss-context recovery to avoid creating a TrashMob bucket")
+    assertEqual(raid.loot[1].bossNid, 10, "expected the loot entry to reuse the most recent real boss context")
+    assertEqual(h.Core.GetLastBoss(), 10, "expected recent boss-context recovery to restore lastBoss for subsequent loot")
+end)
+
+test("loot receipts reuse short-lived boss event context even if lastBoss is cleared", function()
+    local h = newHarness()
+    local link = h.registerItem(9157, "Event Context Blade")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "loot-receive-self" then
+            return link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertEqual(Raid:AddBoss("Sapphiron"), 1, "expected the boss event to materialize a boss kill")
+    h.Core.SetLastBoss(nil)
+
+    Raid:AddLoot("loot-receive-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected event-context recovery to reuse the boss kill instead of creating TrashMob")
+    assertEqual(raid.loot[1].bossNid, 1, "expected loot logging to attach to the boss carried by the event context")
+    assertEqual(h.Core.GetLastBoss(), 1, "expected event-context recovery to restore lastBoss after an explicit clear")
+end)
+
+test("loot receipts recover boss context from the current target before trash", function()
+    local h = newHarness()
+    local link = h.registerItem(9156, "Target Recovery Blade")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.addon.BossIDs = {
+        BossIDs = {
+            [36612] = true,
+        },
+        GetBossName = function(_, npcId)
+            if npcId == 36612 then
+                return "Lord Marrowgar"
+            end
+            return nil
+        end,
+    }
+    h.addon.GetCreatureId = function(guid)
+        if guid == "Creature-0-0-0-0-36612-0000000000" then
+            return 36612
+        end
+        return nil
+    end
+    _G.UnitGUID = function(unit)
+        if unit == "target" then
+            return "Creature-0-0-0-0-36612-0000000000"
+        end
+        return nil
+    end
+    _G.UnitName = function(unit)
+        if unit == "target" then
+            return "Lord Marrowgar"
+        end
+        return unit
+    end
+    _G.GetInstanceInfo = function()
+        return "Icecrown Citadel", "raid", 4
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "loot-receive-self" then
+            return link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    Raid:AddLoot("loot-receive-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected loot logging to materialize the current target boss before creating TrashMob")
+    assertEqual(raid.bossKills[1].name, "Lord Marrowgar", "expected target-based recovery to keep the boss name")
+    assertEqual(raid.loot[1].bossNid, 1, "expected the loot entry to attach to the recovered boss context")
+    assertEqual(h.Core.GetLastBoss(), 1, "expected target-based recovery to restore lastBoss for subsequent loot")
+end)
+
 test("group loot winner messages log passive GR history directly", function()
     local h = newHarness()
     local link = h.registerItem(9160, "Greedblade")
@@ -2160,6 +2788,96 @@ test("raw winner messages do not poison later duplicate passive receipts", funct
     assertEqual(#raid.loot, 2, "expected duplicate raw win messages to create two loot entries")
     assertEqual(raid.loot[1].rollType, h.rollTypes.NEED, "expected first duplicate raw win to keep NE type")
     assertEqual(raid.loot[2].rollType, h.rollTypes.NEED, "expected second duplicate raw win to keep NE type")
+end)
+
+test("item link parser ignores non-string values", function()
+    local h = newHarness()
+
+    h:load("!KRT/Modules/Item.lua")
+
+    assertEqual(h.addon.Item.GetItemIdFromLink({}), nil, "expected non-string item refs to be ignored instead of reaching LibDeformat")
+    assertEqual(h.addon.Item.GetItemIdFromLink(39718), 39718, "expected numeric item ids to pass through unchanged")
+end)
+
+test("loot service slot lookup works with method-call syntax and itemId fallback", function()
+    local h = newHarness()
+    local lootLink = h.registerItem(39718, "Corpse Scarab Handguards")
+    local awardLink = "|cff0070dd|Hitem:39718:5:0:0:0:0:0:0|h[Corpse Scarab Handguards]|h|r"
+
+    _G.GetNumLootItems = function()
+        return 1
+    end
+    _G.GetLootSlotLink = function(index)
+        if index == 1 then
+            return lootLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+
+    local itemIndex = h.addon.Services.Loot:FindLootSlotIndex(awardLink)
+
+    assertEqual(itemIndex, 1, "expected real Loot service method calls to keep matching the same itemId across hyperlink variants")
+end)
+
+test("raid service owns master loot candidate cache resolution", function()
+    local h = newHarness()
+    local itemLink = h.registerItem(9701, "Candidate Cache Blade")
+    local candidates = { "Alice", "Bob" }
+
+    h.addon.GetNumGroupMembers = function()
+        return #candidates
+    end
+    _G.GetMasterLootCandidate = function(index)
+        return candidates[index]
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    assertEqual(Raid:ResolveMasterLootCandidateIndex(itemLink, "Bob"), 2, "expected raid service to resolve the current master loot candidate index")
+    assertTrue(Raid:HasMasterLootCandidates(itemLink), "expected raid service to report available master loot candidates")
+
+    candidates = { "Cara" }
+    Raid:InvalidateMasterLootCandidateCache()
+
+    assertEqual(Raid:ResolveMasterLootCandidateIndex(itemLink, "Cara"), 1, "expected raid candidate cache invalidation to force a rebuild")
+end)
+
+test("master award matches loot slots by itemId when hyperlinks differ", function()
+    local liveLootSlotLink = "|cff0070dd|Hitem:39718:5:0:0:0:0:0:0|h[Corpse Scarab Handguards]|h|r"
+    local ctx = setupMasterAwardHarness({
+        itemId = 39718,
+        itemName = "Corpse Scarab Handguards",
+        lootSlotLink = liveLootSlotLink,
+        candidates = { "Disonesta" },
+        rollsByName = {
+            Disonesta = 69,
+        },
+        model = {
+            rows = {
+                makeMasterRollRow("Disonesta", 69, "ROLL", true),
+            },
+            selectionAllowed = false,
+            requiredWinnerCount = 1,
+            resolution = {
+                autoWinners = {
+                    { name = "Disonesta", roll = 69 },
+                },
+                tiedNames = {},
+                requiresManualResolution = false,
+                topRollName = "Disonesta",
+            },
+        },
+    })
+
+    local ok = ctx.Master:BtnAward()
+
+    assertTrue(ok == true, "expected award flow to succeed when the live loot slot link differs but the itemId matches")
+    assertEqual(#ctx.givenLoot, 1, "expected award flow to reach GiveMasterLoot once")
+    assertEqual(ctx.givenLoot[1].itemIndex, 1, "expected itemId fallback to resolve the first loot slot")
+    assertEqual(ctx.givenLoot[1].candidateIndex, 1, "expected award flow to resolve the candidate index for the winner")
 end)
 
 test("group loot rolled lines queue winner type before raw won message", function()
@@ -3379,6 +4097,378 @@ test("master assignment buttons stay disabled until a target is selected", funct
     assertEqual(_G.KRTMasterHoldBtn._enabled, true, "expected Hold to enable when a holder is selected")
     assertEqual(_G.KRTMasterBankBtn._enabled, true, "expected Bank to enable when a banker is selected")
     assertEqual(_G.KRTMasterDisenchantBtn._enabled, false, "expected Disenchant to stay disabled without a target")
+end)
+
+test("master item count bindings use shared edit-box handlers", function()
+    local h = newHarness()
+    local refreshCount = 0
+
+    h.addon.Services.Loot = {
+        GetItem = function()
+            return nil
+        end,
+        ItemExists = function()
+            return false
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Controllers/Master.lua")
+
+    local Master = h.addon.Controllers.Master
+    local frame = h.makeFrame(true, "KRTMaster")
+    local suffixes = {
+        "ConfigBtn",
+        "SelectItemBtn",
+        "SpamLootBtn",
+        "MSBtn",
+        "OSBtn",
+        "SRBtn",
+        "FreeBtn",
+        "CountdownBtn",
+        "AwardBtn",
+        "RollBtn",
+        "ClearBtn",
+        "HoldBtn",
+        "BankBtn",
+        "DisenchantBtn",
+        "Name",
+        "RollsHeaderPlayer",
+        "RollsHeaderInfo",
+        "RollsHeaderCounter",
+        "RollsHeaderRoll",
+        "ReserveListBtn",
+        "LootCounterBtn",
+        "ItemCount",
+        "HoldDropDown",
+        "BankDropDown",
+        "DisenchantDropDown",
+        "ScrollFrame",
+        "ScrollFrameScrollChild",
+        "ItemBtn",
+    }
+
+    _G.KRTMaster = frame
+    for i = 1, #suffixes do
+        local name = "KRTMaster" .. suffixes[i]
+        _G[name] = h.makeFrame(true, name)
+    end
+    _G.KRTMasterHoldDropDownButton = h.makeFrame(true, "KRTMasterHoldDropDownButton")
+    _G.KRTMasterBankDropDownButton = h.makeFrame(true, "KRTMasterBankDropDownButton")
+    _G.KRTMasterDisenchantDropDownButton = h.makeFrame(true, "KRTMasterDisenchantDropDownButton")
+
+    Master.RequestRefresh = function()
+        refreshCount = refreshCount + 1
+    end
+    Master:OnLoad(frame)
+    Master:Refresh()
+
+    local itemCountBox = _G.KRTMasterItemCount
+    assertTrue(type(itemCountBox.OnTextChanged) == "function", "expected OnTextChanged to be bound through Frames.BindEditBoxHandlers")
+    assertTrue(type(itemCountBox.OnEnterPressed) == "function", "expected OnEnterPressed to be bound through Frames.BindEditBoxHandlers")
+    assertTrue(type(itemCountBox.OnEditFocusLost) == "function", "expected OnEditFocusLost to be bound through Frames.BindEditBoxHandlers")
+
+    refreshCount = 0
+    itemCountBox:OnTextChanged(true)
+    itemCountBox:OnEnterPressed()
+    itemCountBox:OnEditFocusLost()
+
+    assertEqual(refreshCount, 3, "expected all shared edit-box handlers to request a refresh")
+end)
+
+test("master item selection popup stays clickable", function()
+    local h = newHarness()
+    local selectedIndex = nil
+    local linkOne = h.registerItem(9401, "Popup Blade")
+    local linkTwo = h.registerItem(9402, "Popup Axe")
+    local items = {
+        [1] = { itemLink = linkOne, itemName = "Popup Blade", itemTexture = "IconOne", count = 1 },
+        [2] = { itemLink = linkTwo, itemName = "Popup Axe", itemTexture = "IconTwo", count = 2 },
+    }
+
+    h.addon.Services.Loot = {
+        FetchLoot = function()
+            h.feature.lootState.lootCount = 2
+            h.feature.lootState.currentItemIndex = 1
+        end,
+        GetItem = function(index)
+            return items[index]
+        end,
+        GetItemName = function(index)
+            return items[index] and items[index].itemName or nil
+        end,
+        GetItemTexture = function(index)
+            return items[index] and items[index].itemTexture or nil
+        end,
+        GetCurrentItemCount = function()
+            return 1
+        end,
+        SelectItem = function(_, index)
+            selectedIndex = index
+        end,
+        ItemExists = function(_, index)
+            return items[index] ~= nil
+        end,
+    }
+    h.addon.Services.Raid = {
+        IsMasterLooter = function()
+            return true
+        end,
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
+    _G.UnitName = function(unit)
+        if unit == "target" then
+            return "Loot Target"
+        end
+        return unit
+    end
+
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Controllers/Master.lua")
+
+    local Master = h.addon.Controllers.Master
+    local frame = h.makeFrame(true, "KRTMaster")
+    local suffixes = {
+        "ConfigBtn",
+        "SelectItemBtn",
+        "SpamLootBtn",
+        "MSBtn",
+        "OSBtn",
+        "SRBtn",
+        "FreeBtn",
+        "CountdownBtn",
+        "AwardBtn",
+        "RollBtn",
+        "ClearBtn",
+        "HoldBtn",
+        "BankBtn",
+        "DisenchantBtn",
+        "Name",
+        "RollsHeaderPlayer",
+        "RollsHeaderInfo",
+        "RollsHeaderCounter",
+        "RollsHeaderRoll",
+        "ReserveListBtn",
+        "LootCounterBtn",
+        "ItemCount",
+        "HoldDropDown",
+        "BankDropDown",
+        "DisenchantDropDown",
+        "ScrollFrame",
+        "ScrollFrameScrollChild",
+        "ItemBtn",
+    }
+
+    _G.KRTMaster = frame
+    for i = 1, #suffixes do
+        local name = "KRTMaster" .. suffixes[i]
+        _G[name] = h.makeFrame(true, name)
+    end
+    _G.KRTMasterHoldDropDownButton = h.makeFrame(true, "KRTMasterHoldDropDownButton")
+    _G.KRTMasterBankDropDownButton = h.makeFrame(true, "KRTMasterBankDropDownButton")
+    _G.KRTMasterDisenchantDropDownButton = h.makeFrame(true, "KRTMasterDisenchantDropDownButton")
+
+    Master.RequestRefresh = function() end
+    Master:OnLoad(frame)
+    Master.EnsureUI = function()
+        return frame
+    end
+    Master:LOOT_OPENED()
+    Master:BtnSelectItem(h.makeFrame(true, "ItemSelectInvoker"))
+
+    local firstButton = _G.KRTMasterItemSelectionBtn1
+    local secondButton = _G.KRTMasterItemSelectionBtn2
+
+    assertTrue(firstButton ~= nil, "expected the selection popup to create the first selection button")
+    assertTrue(secondButton ~= nil, "expected the selection popup to create the second selection button")
+    assertTrue(type(firstButton.OnClick) == "function", "expected the created selection button to keep its click handler")
+
+    firstButton:OnClick("LeftButton")
+
+    assertEqual(selectedIndex, 1, "expected clicking the selection popup button to pick the corresponding loot index")
+end)
+
+test("master roll rows stay clickable through the shared list controller", function()
+    local h = newHarness()
+
+    h.addon.Services.Loot = {
+        ItemExists = function()
+            return false
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Rolls = {
+        GetDisplayModel = function()
+            return {
+                rows = {
+                    {
+                        name = "Alice",
+                        roll = 98,
+                        selectionAllowed = true,
+                    },
+                },
+                selectionAllowed = true,
+                requiredWinnerCount = 1,
+                resolution = {
+                    autoWinners = {},
+                    tiedNames = {},
+                    requiresManualResolution = true,
+                    topRollName = "Alice",
+                },
+            }
+        end,
+        GetRollSession = function()
+            return { id = "session-1" }
+        end,
+        RollStatus = function()
+            return h.rollTypes.MAINSPEC, true, false, false
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
+
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Modules/UI/ListController.lua")
+    h.feature.ListController = h.addon.ListController
+    h:load("!KRT/Controllers/Master.lua")
+
+    local Master = h.addon.Controllers.Master
+    local frame = h.makeFrame(true, "KRTMaster")
+    local suffixes = {
+        "ConfigBtn",
+        "SelectItemBtn",
+        "SpamLootBtn",
+        "MSBtn",
+        "OSBtn",
+        "SRBtn",
+        "FreeBtn",
+        "CountdownBtn",
+        "AwardBtn",
+        "RollBtn",
+        "ClearBtn",
+        "HoldBtn",
+        "BankBtn",
+        "DisenchantBtn",
+        "Name",
+        "RollsHeaderPlayer",
+        "RollsHeaderInfo",
+        "RollsHeaderCounter",
+        "RollsHeaderRoll",
+        "ReserveListBtn",
+        "LootCounterBtn",
+        "ItemCount",
+        "HoldDropDown",
+        "BankDropDown",
+        "DisenchantDropDown",
+        "ScrollFrame",
+        "ScrollFrameScrollChild",
+        "ItemBtn",
+    }
+
+    _G.KRTMaster = frame
+    for i = 1, #suffixes do
+        local name = "KRTMaster" .. suffixes[i]
+        _G[name] = h.makeFrame(true, name)
+    end
+    _G.KRTMasterHoldDropDownButton = h.makeFrame(true, "KRTMasterHoldDropDownButton")
+    _G.KRTMasterBankDropDownButton = h.makeFrame(true, "KRTMasterBankDropDownButton")
+    _G.KRTMasterDisenchantDropDownButton = h.makeFrame(true, "KRTMasterDisenchantDropDownButton")
+
+    Master.RequestRefresh = function() end
+    Master:OnLoad(frame)
+    Master:Refresh()
+
+    local row = _G.KRTMasterPlayerBtn1
+    assertTrue(row ~= nil, "expected the shared list controller to create the first roll row")
+    assertEqual(row.playerName, "Alice", "expected the created roll row to keep the player identity for click handling")
+    assertTrue(type(row.OnClick) == "function", "expected the created roll row to keep an OnClick handler")
+
+    row:OnClick()
+
+    assertTrue(h.addon.MultiSelect.MultiSelectIsSelected("MLRollWinners", "Alice"), "expected clicking the rendered row to select the winner")
 end)
 
 test("manual exclusion blocks candidate eligibility and roll intake", function()

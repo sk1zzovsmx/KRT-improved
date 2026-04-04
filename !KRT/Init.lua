@@ -480,6 +480,20 @@ function Core.EnsureLootRuntimeState()
         raidState.lastLootCount = 1
     end
 
+    if type(raidState.bossEventContext) == "table" then
+        local bossEventContext = raidState.bossEventContext
+        bossEventContext.raidNum = tonumber(bossEventContext.raidNum) or 0
+        bossEventContext.bossNid = tonumber(bossEventContext.bossNid) or 0
+        bossEventContext.name = bossEventContext.name or nil
+        bossEventContext.source = bossEventContext.source or nil
+        bossEventContext.seenAt = tonumber(bossEventContext.seenAt) or 0
+        if bossEventContext.bossNid <= 0 or bossEventContext.raidNum <= 0 then
+            raidState.bossEventContext = nil
+        end
+    else
+        raidState.bossEventContext = nil
+    end
+
     lootState.lootCount = tonumber(lootState.lootCount) or 0
     if lootState.lootCount < 0 then
         lootState.lootCount = 0

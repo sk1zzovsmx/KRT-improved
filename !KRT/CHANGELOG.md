@@ -38,6 +38,14 @@ Release-Version: 0.6.2b
   `Services/Logger/View.lua`, and `Services/Logger/Actions.lua`;
   Controllers/Logger.lua now imports them via `addon.Services.Logger`.
   No behavior changes.
+- Hardened Master loot-slot resolution so award/trade flows keep matching
+  the same item even when the live loot window hyperlink payload differs
+  from the stored item link; multi-award slot scanning now uses the same
+  itemId fallback.
+- Hardened boss-context recovery for loot logging: boss events now populate
+  a dedicated short-lived context independent from `lastBoss`; loot logging
+  consumes that event context first, then falls back to recent real boss
+  kills and only finally to the current target / `_TrashMob_`.
 
 ## [0.6.2b] - 2026-03-21
 

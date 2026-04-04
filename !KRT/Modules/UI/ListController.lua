@@ -26,6 +26,14 @@ local function getUIPrimitives()
     return addon.UIPrimitives or {}
 end
 
+local function getListDiag(bucketName, keyName, fallbackKey)
+    local bucket = Diag and Diag[bucketName]
+    if not bucket then
+        return nil
+    end
+    return bucket[keyName] or bucket[fallbackKey]
+end
+
 function ListController.CreateRowDrawer(fn)
     local rowHeight
     return function(row, it)
@@ -262,13 +270,28 @@ function ListController.MakeListController(cfg)
         postUpdate()
     end
 
+    function self:UpdateNow()
+        defer:Hide()
+
+        local ok, err = pcall(runUpdate)
+        if not ok then
+            if err ~= self._lastErr then
+                self._lastErr = err
+                addon:error((getListDiag("E", "LogListUIError", "LogLoggerUIError")):format(tostring(cfg.keyName or "?"), tostring(err)))
+            end
+            return false, err
+        end
+
+        return true
+    end
+
     defer:SetScript("OnUpdate", function(frame)
         frame:Hide()
         local ok, err = pcall(runUpdate)
         if not ok then
             if err ~= self._lastErr then
                 self._lastErr = err
-                addon:error((Diag.E.LogLoggerUIError):format(tostring(cfg.keyName or "?"), tostring(err)))
+                addon:error((getListDiag("E", "LogListUIError", "LogLoggerUIError")):format(tostring(cfg.keyName or "?"), tostring(err)))
             end
         end
     end)
@@ -282,7 +305,7 @@ function ListController.MakeListController(cfg)
         frame:HookScript("OnShow", function()
             if not self._shownOnce then
                 self._shownOnce = true
-                addon:debug((Diag.D.LogLoggerUIShow):format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
+                addon:debug((getListDiag("D", "LogListUIShow", "LogLoggerUIShow")):format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
             end
             setActive(true)
             if not self._loggedWidgets then
@@ -291,7 +314,7 @@ function ListController.MakeListController(cfg)
                 local sf = n and _G[n .. "ScrollFrame"]
                 local sc = n and _G[n .. "ScrollFrameScrollChild"]
                 addon:debug(
-                    (Diag.D.LogLoggerUIWidgets):format(
+                    (getListDiag("D", "LogListUIWidgets", "LogLoggerUIWidgets")):format(
                         tostring(cfg.keyName or "?"),
                         tostring(sf),
                         tostring(sc),
@@ -324,7 +347,7 @@ function ListController.MakeListController(cfg)
         if not (sf and sc) then
             if not self._missingScroll then
                 self._missingScroll = true
-                addon:warn((Diag.W.LogLoggerUIMissingWidgets):format(tostring(cfg.keyName or "?"), tostring(n)))
+                addon:warn((getListDiag("W", "LogListUIMissingWidgets", "LogLoggerUIMissingWidgets")):format(tostring(cfg.keyName or "?"), tostring(n)))
             end
             return
         end
@@ -335,7 +358,7 @@ function ListController.MakeListController(cfg)
         if scrollW < 10 then
             if not self._warnW0 then
                 self._warnW0 = true
-                addon:debug((Diag.D.LogLoggerUIDeferLayout):format(tostring(cfg.keyName or "?"), scrollW))
+                addon:debug((getListDiag("D", "LogListUIDeferLayout", "LogLoggerUIDeferLayout")):format(tostring(cfg.keyName or "?"), scrollW))
             end
             defer:Show()
             return false
@@ -347,7 +370,7 @@ function ListController.MakeListController(cfg)
         if not self._loggedFetch then
             self._loggedFetch = true
             addon:debug(
-                (Diag.D.LogLoggerUIFetch):format(
+                (getListDiag("D", "LogListUIFetch", "LogLoggerUIFetch")):format(
                     tostring(cfg.keyName or "?"),
                     #self.data,
                     sf:GetWidth() or 0,

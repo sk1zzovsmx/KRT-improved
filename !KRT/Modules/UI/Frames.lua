@@ -204,6 +204,28 @@ function Frames.Ref(frameOrName, childName)
     return _G[frameName .. childName]
 end
 
+function Frames.CacheNamedParts(widget, parts, cacheField)
+    if not widget or type(parts) ~= "table" then
+        return nil
+    end
+
+    cacheField = cacheField or "_krtRefs"
+    if widget[cacheField] then
+        return widget[cacheField]
+    end
+
+    local widgetName = widget.GetName and widget:GetName() or nil
+    local refs = {}
+
+    for key, suffix in pairs(parts) do
+        local refKey = type(key) == "number" and suffix or key
+        refs[refKey] = widgetName and _G[widgetName .. suffix] or nil
+    end
+
+    widget[cacheField] = refs
+    return refs
+end
+
 function Frames.SafeSetScript(widget, scriptType, handler)
     if not widget or not widget.SetScript then
         return false
@@ -220,6 +242,131 @@ function Frames.SafeSetScript(widget, scriptType, handler)
 
     widget:SetScript(scriptType, handler)
     return true
+end
+
+function Frames.CreateButtonPopup(cfg)
+    cfg = cfg or {}
+
+    local popup = {
+        frame = nil,
+        buttons = {},
+    }
+
+    local function resolveParent()
+        if type(cfg.getParent) == "function" then
+            return cfg.getParent()
+        end
+        return cfg.parent
+    end
+
+    local function ensureFrame()
+        if popup.frame then
+            return popup.frame
+        end
+
+        local parent = resolveParent()
+        if not parent then
+            return nil
+        end
+
+        popup.frame = CreateFrame("Frame", cfg.frameName, parent, cfg.frameTemplate or "KRTSimpleFrameTemplate")
+        popup.frame:Hide()
+        return popup.frame
+    end
+
+    local function ensureButton(index)
+        local frame = ensureFrame()
+        if not frame then
+            return nil
+        end
+
+        local button = popup.buttons[index]
+        if button then
+            return button
+        end
+
+        local buttonName = cfg.buttonName and cfg.buttonName(index) or nil
+        button = CreateFrame("Button", buttonName, frame, cfg.buttonTemplate)
+        button:SetID(index)
+        if button.RegisterForClicks then
+            button:RegisterForClicks(cfg.clickRegistration or "AnyUp")
+        end
+        if cfg.onButtonClick then
+            Frames.SafeSetScript(button, "OnClick", cfg.onButtonClick)
+        end
+        if cfg.initButton then
+            cfg.initButton(button, index)
+        end
+
+        popup.buttons[index] = button
+        return button
+    end
+
+    function popup:GetFrame()
+        return self.frame or ensureFrame()
+    end
+
+    function popup:Hide()
+        if self.frame then
+            self.frame:Hide()
+        end
+    end
+
+    function popup:Toggle()
+        local frame = ensureFrame()
+        if not frame then
+            return false
+        end
+
+        if frame:IsShown() then
+            frame:Hide()
+        else
+            frame:Show()
+        end
+
+        return frame:IsShown()
+    end
+
+    function popup:Refresh(count)
+        local frame = ensureFrame()
+        local rowCount = tonumber(count) or 0
+        local height = tonumber(cfg.topInset) or 5
+        local rowStep = tonumber(cfg.rowStep) or 37
+        local leftInset = tonumber(cfg.leftInset) or 0
+
+        if not frame then
+            return nil
+        end
+
+        for index = 1, rowCount do
+            local button = ensureButton(index)
+            if button then
+                if cfg.drawButton then
+                    cfg.drawButton(button, index)
+                end
+                button:ClearAllPoints()
+                button:SetPoint("TOPLEFT", frame, "TOPLEFT", leftInset, -height)
+                button:Show()
+                height = height + rowStep
+            end
+        end
+
+        for index = rowCount + 1, #self.buttons do
+            local button = self.buttons[index]
+            if button then
+                button:Hide()
+            end
+        end
+
+        frame:SetHeight(height)
+        if rowCount <= 0 then
+            frame:Hide()
+        end
+
+        return frame
+    end
+
+    return popup
 end
 
 local function showTooltip(frame)
@@ -722,6 +869,9 @@ function Frames.BindEditBoxHandlers(frameName, specs, requestRefreshFn)
             end
             if spec.onEnter then
                 editBox:SetScript("OnEnterPressed", spec.onEnter)
+            end
+            if spec.onFocusLost then
+                editBox:SetScript("OnEditFocusLost", spec.onFocusLost)
             end
             if requestRefreshFn then
                 editBox:SetScript("OnTextChanged", function(_, isUserInput)

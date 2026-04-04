@@ -54,7 +54,10 @@ local function scanSoulboundFlag(tip)
 end
 
 function Item.GetItemIdFromLink(itemLink)
-    if not itemLink then
+    if type(itemLink) == "number" then
+        return itemLink
+    end
+    if type(itemLink) ~= "string" or itemLink == "" then
         return nil
     end
     local _, itemId = addon.Deformat(itemLink, ITEM_LINK_FORMAT)
