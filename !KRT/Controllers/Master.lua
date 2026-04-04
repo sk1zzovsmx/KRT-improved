@@ -610,8 +610,8 @@ do
     end
 
     local function invalidateCandidateCache()
-        if Raid and Raid.InvalidateMasterLootCandidateCache then
-            Raid:InvalidateMasterLootCandidateCache()
+        if Raid and Raid.RequestMasterLootCandidateRefresh then
+            Raid:RequestMasterLootCandidateRefresh()
         end
     end
 
@@ -1144,8 +1144,8 @@ do
     end
 
     updateRollSessionExpectedWinners = function(count)
-        if Rolls and Rolls.UpdateExpectedWinners then
-            return Rolls:UpdateExpectedWinners(count)
+        if Rolls and Rolls.SetExpectedWinners then
+            return Rolls:SetExpectedWinners(count)
         end
         return nil
     end
@@ -1444,15 +1444,15 @@ do
     end
 
     local function resolveCandidateIndex(itemLink, playerName)
-        if Raid and Raid.ResolveMasterLootCandidateIndex then
-            return Raid:ResolveMasterLootCandidateIndex(itemLink, playerName)
+        if Raid and Raid.FindMasterLootCandidateIndex then
+            return Raid:FindMasterLootCandidateIndex(itemLink, playerName)
         end
         return nil
     end
 
     local function hasMasterLootCandidates(itemLink)
-        if Raid and Raid.HasMasterLootCandidates then
-            return Raid:HasMasterLootCandidates(itemLink)
+        if Raid and Raid.CanResolveMasterLootCandidates then
+            return Raid:CanResolveMasterLootCandidates(itemLink)
         end
         return false
     end
@@ -2503,7 +2503,7 @@ do
     end
 
     getRollRowRefs = function(btn)
-        return Frames.CacheNamedParts(btn, {
+        return Frames.GetNamedParts(btn, {
             name = "Name",
             roll = "Roll",
             counter = "Counter",
@@ -2884,7 +2884,7 @@ do
     end
 
     local function getSelectionButtonRefs(btn)
-        return Frames.CacheNamedParts(btn, {
+        return Frames.GetNamedParts(btn, {
             name = "Name",
             icon = "Icon",
         })
@@ -3028,7 +3028,7 @@ do
             return false
         end
 
-        local totalCount, bag, slot, slotCount, hasMatch = Loot:ScanTradeableInventory(itemLink, itemId)
+        local totalCount, bag, slot, slotCount, hasMatch = Loot:FindTradeableInventoryMatch(itemLink, itemId)
         if not totalCount or totalCount < 1 then
             local itemRef = tostring(itemLink or itemId or "unknown")
             if hasMatch then
@@ -3432,7 +3432,7 @@ do
     end
 
     local function prepareTradeableItem(itemLink)
-        local itemData = Loot:ResolveTradeableInventoryItem(itemLink, itemInfo.bagID, itemInfo.slotID, lootState.selectedItemCount)
+        local itemData = Loot:FindTradeableInventoryItem(itemLink, itemInfo.bagID, itemInfo.slotID, lootState.selectedItemCount)
         if not itemData then
             addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemLink)))
             return false

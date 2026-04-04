@@ -1441,11 +1441,11 @@ do
         return rosterVersion
     end
 
-    function module:InvalidateMasterLootCandidateCache()
+    function module:RequestMasterLootCandidateRefresh()
         invalidateMasterLootCandidateCache()
     end
 
-    function module:ResolveMasterLootCandidateIndex(itemLink, playerName)
+    function module:FindMasterLootCandidateIndex(itemLink, playerName)
         local cache = ensureMasterLootCandidateCache(itemLink)
         local candidateIndex = cache.indexByName[playerName]
         if not candidateIndex then
@@ -1456,7 +1456,7 @@ do
         return candidateIndex
     end
 
-    function module:HasMasterLootCandidates(itemLink)
+    function module:CanResolveMasterLootCandidates(itemLink)
         local cache = ensureMasterLootCandidateCache(itemLink)
         return next(cache.indexByName) ~= nil
     end

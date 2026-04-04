@@ -809,7 +809,7 @@ local function newHarness()
                 frame[scriptType] = callback
             end
         end,
-        CacheNamedParts = function(widget, parts, cacheField)
+        GetNamedParts = function(widget, parts, cacheField)
             if not widget or type(parts) ~= "table" then
                 return nil
             end
@@ -877,7 +877,7 @@ local function newHarness()
                 end
             end
         end,
-        CreateButtonPopup = function(cfg)
+        GetButtonPopup = function(cfg)
             local popup = {
                 frame = nil,
                 buttons = {},
@@ -1196,8 +1196,8 @@ local function newHarness()
         end
     end
 
-    if type(services.Loot.ScanTradeableInventory) ~= "function" then
-        function services.Loot:ScanTradeableInventory(itemLink, itemId)
+    if type(services.Loot.FindTradeableInventoryMatch) ~= "function" then
+        function services.Loot:FindTradeableInventoryMatch(itemLink, itemId)
             if not itemLink and not itemId then
                 return nil
             end
@@ -1238,8 +1238,8 @@ local function newHarness()
         end
     end
 
-    if type(services.Loot.ResolveTradeableInventoryItem) ~= "function" then
-        function services.Loot:ResolveTradeableInventoryItem(itemLink, cachedBag, cachedSlot, selectedItemCount)
+    if type(services.Loot.FindTradeableInventoryItem) ~= "function" then
+        function services.Loot:FindTradeableInventoryItem(itemLink, cachedBag, cachedSlot, selectedItemCount)
             local totalCount, bag, slot, slotCount
             local usedFastPath = false
             local wantedKey = addon.Item.GetItemStringFromLink(itemLink) or itemLink
@@ -1268,10 +1268,10 @@ local function newHarness()
             end
 
             if not (bag and slot) then
-                totalCount, bag, slot, slotCount = self:ScanTradeableInventory(itemLink, wantedId)
+                totalCount, bag, slot, slotCount = self:FindTradeableInventoryMatch(itemLink, wantedId)
             elseif usedFastPath then
                 if (tonumber(selectedItemCount) or 1) > 1 then
-                    totalCount = self:ScanTradeableInventory(itemLink, wantedId)
+                    totalCount = self:FindTradeableInventoryMatch(itemLink, wantedId)
                 else
                     totalCount = tonumber(slotCount) or 1
                 end
@@ -1299,8 +1299,8 @@ local function newHarness()
         end
     end
 
-    if type(services.Rolls.UpdateExpectedWinners) ~= "function" then
-        function services.Rolls:UpdateExpectedWinners(count)
+    if type(services.Rolls.SetExpectedWinners) ~= "function" then
+        function services.Rolls:SetExpectedWinners(count)
             local session = feature.lootState.rollSession
             if not session then
                 return nil
@@ -1351,7 +1351,7 @@ local function newHarness()
                 session.active = true
                 session.endsAt = nil
             end
-            self:UpdateExpectedWinners(feature.lootState.selectedItemCount)
+            self:SetExpectedWinners(feature.lootState.selectedItemCount)
             self:SyncSessionState(session)
             return session
         end
@@ -1715,7 +1715,7 @@ local function setupInventoryTradeHarness(order, rollsByName)
         ItemIsSoulbound = function()
             return false
         end,
-        ResolveTradeableInventoryItem = function(_, itemLinkArg)
+        FindTradeableInventoryItem = function(_, itemLinkArg)
             if itemLinkArg ~= link then
                 return nil
             end
@@ -1986,11 +1986,11 @@ local function setupMasterAwardHarness(cfg)
         GetRosterVersion = function()
             return 1
         end,
-        InvalidateMasterLootCandidateCache = function()
+        RequestMasterLootCandidateRefresh = function()
             candidateCache.itemLink = nil
             table.wipe(candidateCache.indexByName)
         end,
-        ResolveMasterLootCandidateIndex = function(_, itemLinkArg, playerName)
+        FindMasterLootCandidateIndex = function(_, itemLinkArg, playerName)
             local cache = candidateCache
             if cache.itemLink ~= itemLinkArg then
                 cache = rebuildCandidateCache(itemLinkArg)
@@ -2002,7 +2002,7 @@ local function setupMasterAwardHarness(cfg)
             end
             return candidateIndex
         end,
-        HasMasterLootCandidates = function(_, itemLinkArg)
+        CanResolveMasterLootCandidates = function(_, itemLinkArg)
             local cache = candidateCache
             if cache.itemLink ~= itemLinkArg then
                 cache = rebuildCandidateCache(itemLinkArg)
@@ -2836,13 +2836,13 @@ test("raid service owns master loot candidate cache resolution", function()
     h:load("!KRT/Services/Raid.lua")
 
     local Raid = h.addon.Services.Raid
-    assertEqual(Raid:ResolveMasterLootCandidateIndex(itemLink, "Bob"), 2, "expected raid service to resolve the current master loot candidate index")
-    assertTrue(Raid:HasMasterLootCandidates(itemLink), "expected raid service to report available master loot candidates")
+    assertEqual(Raid:FindMasterLootCandidateIndex(itemLink, "Bob"), 2, "expected raid service to resolve the current master loot candidate index")
+    assertTrue(Raid:CanResolveMasterLootCandidates(itemLink), "expected raid service to report available master loot candidates")
 
     candidates = { "Cara" }
-    Raid:InvalidateMasterLootCandidateCache()
+    Raid:RequestMasterLootCandidateRefresh()
 
-    assertEqual(Raid:ResolveMasterLootCandidateIndex(itemLink, "Cara"), 1, "expected raid candidate cache invalidation to force a rebuild")
+    assertEqual(Raid:FindMasterLootCandidateIndex(itemLink, "Cara"), 1, "expected raid candidate cache invalidation to force a rebuild")
 end)
 
 test("master award matches loot slots by itemId when hyperlinks differ", function()

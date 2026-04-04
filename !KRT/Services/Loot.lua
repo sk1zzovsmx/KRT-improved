@@ -682,7 +682,7 @@ do
         return findLootSlotIndex(itemLink)
     end
 
-    function module.ScanTradeableInventory(selfOrItemLink, arg2, arg3)
+    function module.FindTradeableInventoryMatch(selfOrItemLink, arg2, arg3)
         local itemLink, itemId
         if type(selfOrItemLink) == "table" then
             itemLink = arg2
@@ -694,7 +694,7 @@ do
         return scanTradeableInventory(itemLink, itemId)
     end
 
-    function module.ResolveTradeableInventoryItem(selfOrItemLink, arg2, arg3, arg4, arg5)
+    function module.FindTradeableInventoryItem(selfOrItemLink, arg2, arg3, arg4, arg5)
         local itemLink, cachedBag, cachedSlot, selectedItemCount
         if type(selfOrItemLink) == "table" then
             itemLink = arg2

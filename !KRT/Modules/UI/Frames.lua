@@ -204,7 +204,7 @@ function Frames.Ref(frameOrName, childName)
     return _G[frameName .. childName]
 end
 
-function Frames.CacheNamedParts(widget, parts, cacheField)
+function Frames.GetNamedParts(widget, parts, cacheField)
     if not widget or type(parts) ~= "table" then
         return nil
     end
@@ -244,7 +244,7 @@ function Frames.SafeSetScript(widget, scriptType, handler)
     return true
 end
 
-function Frames.CreateButtonPopup(cfg)
+function Frames.GetButtonPopup(cfg)
     cfg = cfg or {}
 
     local popup = {

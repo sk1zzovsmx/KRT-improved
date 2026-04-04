@@ -1872,7 +1872,7 @@ do
         return getRollSessionItemKey(itemLink)
     end
 
-    function module:UpdateExpectedWinners(count)
+    function module:SetExpectedWinners(count)
         local session = getRollSession()
         if not session then
             return nil
