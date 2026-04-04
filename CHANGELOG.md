@@ -4,6 +4,8 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **UI:** Master now disables `MS/OS/SR/FREE` while countdown is running,
+  and roll-start actions are ignored until countdown is stopped/finalized.
 - **UI:** Loot Counter now exposes a `Spam Counter` button that announces grouped
   MS counts in chat using `+N` buckets (for example `+1: Name1, Name2`).
 - **UI:** Loot Counter now includes a `Reset All` button with confirmation popup

@@ -2160,6 +2160,10 @@ do
     -- ============================================================================
     -- Generic function to announce a roll for the current item.
     local function announceRoll(rollType, chatMsg)
+        if isCountdownRunning() then
+            return false
+        end
+
         if lootState.lootCount >= 1 then
             announced = false
             lootState.currentRollType = rollType
@@ -2509,7 +2513,8 @@ do
         local pickMode = rollModel.pickMode == true
         local msCount = pickMode and (tonumber(rollModel.msCount) or 0) or 0
         local canAwardSelection = (not pickMode) or msCount > 0
-        local canStartSR = lootState.lootCount >= 1 and hasEligibleRaidReserve
+        local canStartRolls = hasLootAccess and lootState.lootCount >= 1 and not countdownRunning
+        local canStartSR = canStartRolls and hasEligibleRaidReserve
         local isTieReroll = shouldUseTieReroll(rollModel)
         local statusText = buildMasterStatusText(currentFlowState, rollModel, hasItem, displayedWinner)
         local selectedItemCount = tonumber(lootState.selectedItemCount) or 1
@@ -2624,8 +2629,8 @@ do
                 canSelectItem = hasLootAccess and (lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRunning,
                 canChangeItem = hasLootAccess and (currentFlowState ~= FLOW_STATES.COUNTDOWN),
                 canSpamLoot = lootState.lootCount >= 1 and ((lootState.fromInventory and hasReadyCheckAccess) or ((not lootState.fromInventory) and hasLootAccess)),
-                canStartRolls = hasLootAccess and lootState.lootCount >= 1,
-                canStartSR = hasLootAccess and canStartSR,
+                canStartRolls = canStartRolls,
+                canStartSR = canStartSR,
                 canCountdown = hasLootAccess and lootState.lootCount >= 1 and hasItem and (lootState.rollStarted or countdownRunning),
                 canHold = hasLootAccess and lootState.lootCount >= 1 and lootState.holder,
                 canBank = hasLootAccess and lootState.lootCount >= 1 and lootState.banker,
@@ -2635,7 +2640,7 @@ do
                 canReserveList = hasLootAccess,
                 canRoll = hasLootAccess and record and canRoll and rolled == false and countdownRunning,
                 canClear = hasLootAccess and lootState.rollsCount >= 1,
-                glowSR = hasLootAccess and canStartSR,
+                glowSR = canStartSR,
             })
             dirtyFlags.buttons = false
         end
