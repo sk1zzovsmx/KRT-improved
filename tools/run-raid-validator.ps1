@@ -7,6 +7,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$invocationLocation = Get-Location
 $toolingCommonPath = Join-Path $PSScriptRoot "tooling-common.ps1"
 if (-not (Test-Path -LiteralPath $toolingCommonPath)) {
     $toolingCommonPath = Join-Path (Split-Path -Parent $PSScriptRoot) "tooling-common.ps1"
@@ -19,7 +20,7 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction Sile
 }
 
 $validatorPath = Resolve-Path (Join-Path $repoRoot "tools/validate-raid-schema.lua")
-$svPath = Resolve-Path -LiteralPath $SavedVariablesPath
+$svPath = Resolve-KrtInputPath -Path $SavedVariablesPath -BasePath $invocationLocation
 $luaRuntime = Resolve-KrtLuaRuntime -Preferred $Runtime
 
 if (-not $luaRuntime) {

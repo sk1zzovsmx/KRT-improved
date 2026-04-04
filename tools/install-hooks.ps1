@@ -2,11 +2,18 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-Set-Location $repoRoot
+$cliPath = Join-Path $repoRoot "tools/krt.py"
 
-if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-    throw "git not found in PATH."
+$pyCmd = Get-Command py -ErrorAction SilentlyContinue
+if ($pyCmd) {
+    & $pyCmd.Source -3 $cliPath install-hooks
+    exit $LASTEXITCODE
 }
 
-& git config core.hooksPath .githooks
-Write-Host "Configured core.hooksPath=.githooks"
+$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+if ($pythonCmd) {
+    & $pythonCmd.Source $cliPath install-hooks
+    exit $LASTEXITCODE
+}
+
+throw "Python 3 not found. Install Python or use 'tools/krt.py install-hooks'."

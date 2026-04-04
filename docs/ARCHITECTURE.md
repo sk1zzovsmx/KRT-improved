@@ -78,29 +78,25 @@ New call sites should use namespaced owners (`addon.Controllers.*`, `addon.Servi
 
 ## Quick Layering Verification
 
-Cross-platform entrypoint (`tools/krt.py`):
+Use `tools/krt.py` as the canonical entrypoint. For the full command matrix and PowerShell fallbacks,
+see `docs/DEV_CHECKS.md`.
+
+Common examples:
 
 ```bash
+python3 tools/krt.py repo-quality-check --check all
 python3 tools/krt.py repo-quality-check --check layering
-python3 tools/krt.py repo-quality-check --check ui_binding
-python3 tools/krt.py repo-quality-check --check lua_uniformity
 ```
 
-Windows equivalents:
+Windows equivalent:
 
 ```powershell
+py -3 tools/krt.py repo-quality-check --check all
 py -3 tools/krt.py repo-quality-check --check layering
-py -3 tools/krt.py repo-quality-check --check ui_binding
-py -3 tools/krt.py repo-quality-check --check lua_uniformity
 ```
 
-Direct PowerShell fallback (when needed):
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-layering.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-ui-binding.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-uniformity.ps1
-```
+Use `--check all` for a fast repo-wide preflight; keep the narrower commands when you only need to
+verify architecture-specific constraints during refactors.
 
 ## Related Docs
 

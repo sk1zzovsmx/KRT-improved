@@ -14,17 +14,22 @@ Examples:
 
 - Windows PowerShell: `py -3 tools/krt.py dev-stack-status --json`
 - Linux shell: `python3 tools/krt.py dev-stack-status --json`
+- Repository quality sweep: `python3 tools/krt.py repo-quality-check --check all`
+- Stabilization tests: `python3 tools/krt.py run-release-targeted-tests`
+- SV fixture round-trip: `python3 tools/krt.py run-sv-roundtrip --fixtures`
+- SV validator: `python3 tools/krt.py run-raid-validator --saved-variables-path "<path>/!KRT.lua"`
 - Release metadata from `!KRT/CHANGELOG.md`: `python3 tools/krt.py release-metadata --json`
 - Publish gate by numeric version: `python3 tools/krt.py release-publish-gate --previous-ref HEAD^ --json`
 - Release packaging: `python3 tools/krt.py build-release-zip --output-dir dist --write-checksum`
 - Hook install: `python3 tools/krt.py install-hooks`
 - Mechanic wrapper: `python3 tools/krt.py mech AddonValidate --json`
 
-The legacy `*.ps1` scripts remain available for compatibility and for flows that have not been fully
-ported yet.
+The legacy `*.ps1` scripts remain available for compatibility and for lower-level/script-specific
+control.
 
 ## Checks
 
+- `tools/krt.py repo-quality-check --check all`: runs the canonical full quality sweep in repo order
 - `check-toc-files.ps1`: validates TOC naming, file entries, and SavedVariables declarations
 - `check-layering.ps1`: repo architecture and ownership guardrails
 - `check-ui-binding.ps1`: binder absence and XML layout-only policy
@@ -35,13 +40,18 @@ ported yet.
 
 ## Runs
 
+- `tools/krt.py run-raid-validator`: wraps `run-raid-validator.ps1`
+- `tools/krt.py run-sv-inspector`: wraps `run-sv-inspector.ps1`
+- `tools/krt.py run-sv-roundtrip`: wraps `run-sv-roundtrip.ps1`
+- `tools/krt.py run-release-targeted-tests`: wraps `run-release-targeted-tests.ps1`
+- `tools/krt.py run-krt-mcp`: starts the local KRT MCP server wrapper
 - `run-raid-validator.ps1`: runs `validate-raid-schema.lua` against a SavedVariables file
 - `run-sv-inspector.ps1`: runs `sv-inspector.lua` with table or CSV output
 - `run-sv-roundtrip.ps1`: runs `sv-roundtrip.lua` on one file or a fixture directory
 - `run-release-targeted-tests.ps1`: runs `tests/release_stabilization_spec.lua`
 - `run-krt-mcp.ps1`: starts the local KRT MCP server wrapper
-- `build-release-zip.ps1`: builds a distributable ZIP that contains only the `!KRT/` addon folder
-  and can emit a matching `.sha256` checksum file
+- `build-release-zip.ps1`: compatibility shim around `tools/krt.py build-release-zip`
+  for existing PowerShell workflows
 
 ## Fnmap
 
@@ -65,7 +75,7 @@ ported yet.
 
 - `tooling-common.ps1`: shared PowerShell helpers for repo root, Lua runtime, `rg`, and path handling
 - `pre-commit.ps1`: canonical local pre-commit entrypoint
-- `install-hooks.ps1`: configures `core.hooksPath=.githooks`
+- `install-hooks.ps1`: compatibility shim around `tools/krt.py install-hooks`
 - `update-tree.ps1`: regenerates `docs/TREE.md`
 - `krt_mcp_server.py`: MCP server implementation used by `run-krt-mcp.ps1`
 

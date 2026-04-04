@@ -109,30 +109,22 @@ Prefer stable, scoped diffs over mass reformatting untouched legacy code.
 Canonical cross-platform entrypoint:
 
 ```bash
-python3 tools/krt.py repo-quality-check --check toc_files
-python3 tools/krt.py repo-quality-check --check lua_syntax
-python3 tools/krt.py repo-quality-check --check lua_uniformity
-python3 tools/krt.py repo-quality-check --check api_nomenclature
-python3 tools/krt.py repo-quality-check --check layering
-python3 tools/krt.py repo-quality-check --check ui_binding
+python3 tools/krt.py repo-quality-check --check all
 ```
 
-Windows equivalents:
+Windows equivalent:
 
 ```powershell
-py -3 tools/krt.py repo-quality-check --check toc_files
-py -3 tools/krt.py repo-quality-check --check lua_syntax
-py -3 tools/krt.py repo-quality-check --check lua_uniformity
-py -3 tools/krt.py repo-quality-check --check api_nomenclature
-py -3 tools/krt.py repo-quality-check --check layering
-py -3 tools/krt.py repo-quality-check --check ui_binding
+py -3 tools/krt.py repo-quality-check --check all
 ```
+
+For the expanded per-check command list and direct PowerShell fallbacks, see `docs/DEV_CHECKS.md`.
 
 Direct tool commands still supported:
 
 - `luacheck --codes --no-color !KRT tools tests`
 - `stylua --check !KRT tools tests`
-- `powershell -NoProfile -ExecutionPolicy Bypass -File tools/install-hooks.ps1`
+- `py -3 tools/krt.py install-hooks`
 
 ## 7) Incremental Rollout Rules
 

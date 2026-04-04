@@ -210,8 +210,11 @@ Run the broader local gates before closing a larger cleanup batch.
 ### 8.3 If `Controllers/Master.lua` or `Services/Rolls.lua` Changed
 
 ```powershell
+py -3 tools/krt.py run-release-targeted-tests
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-release-targeted-tests.ps1
 ```
+
+Prefer the `tools/krt.py` wrapper for the default path; keep the PowerShell command for script-level control.
 
 ### 8.4 If XML Changed
 

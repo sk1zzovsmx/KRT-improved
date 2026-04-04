@@ -8,92 +8,30 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$toolingCommonPath = Join-Path $PSScriptRoot "tooling-common.ps1"
-if (-not (Test-Path -LiteralPath $toolingCommonPath)) {
-    $toolingCommonPath = Join-Path (Split-Path -Parent $PSScriptRoot) "tooling-common.ps1"
-}
-. $toolingCommonPath
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$cliPath = Join-Path $repoRoot "tools/krt.py"
+$argsList = @($cliPath, "build-release-zip", "--output-dir", $OutputDir)
 
-$repoRoot = Enter-KrtRepoRoot -ScriptRoot $PSScriptRoot
-$addonName = "!KRT"
-$addonPath = Join-Path $repoRoot $addonName
-if (-not (Test-Path -LiteralPath $addonPath -PathType Container)) {
-    throw "Addon folder not found: $addonPath"
+if (-not [string]::IsNullOrWhiteSpace($Version)) {
+    $argsList += @("--version", $Version)
 }
-
-$tocPath = Join-Path $addonPath "!KRT.toc"
-if (-not (Test-Path -LiteralPath $tocPath -PathType Leaf)) {
-    throw "TOC file not found: $tocPath"
+if (-not [string]::IsNullOrWhiteSpace($FileName)) {
+    $argsList += @("--file-name", $FileName)
 }
-
-if ([string]::IsNullOrWhiteSpace($Version)) {
-    $versionMatch = Select-String -Path $tocPath -Pattern '^## Version:\s*(.+)\s*$' | Select-Object -First 1
-    if ($versionMatch) {
-        $Version = $versionMatch.Matches[0].Groups[1].Value.Trim()
-    }
-}
-
-if ([string]::IsNullOrWhiteSpace($Version)) {
-    $Version = "dev"
-}
-
-$safeVersion = ($Version -replace '[\\/:*?"<>| ]', "-")
-if ([string]::IsNullOrWhiteSpace($FileName)) {
-    $FileName = "KRT-{0}.zip" -f $safeVersion
-}
-
-$outputRoot = if ([System.IO.Path]::IsPathRooted($OutputDir)) {
-    [System.IO.Path]::GetFullPath($OutputDir)
-} else {
-    [System.IO.Path]::GetFullPath((Join-Path $repoRoot $OutputDir))
-}
-if (-not (Test-Path -LiteralPath $outputRoot -PathType Container)) {
-    New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
-}
-
-$zipPath = Join-Path $outputRoot $FileName
-if (Test-Path -LiteralPath $zipPath -PathType Leaf) {
-    Remove-Item -LiteralPath $zipPath -Force
-}
-
-Write-Host ("Building release archive: {0}" -f $zipPath)
-Push-Location $repoRoot
-try {
-    Compress-Archive -LiteralPath $addonName -DestinationPath $zipPath -CompressionLevel Optimal -Force
-} finally {
-    Pop-Location
-}
-
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-$zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
-try {
-    $unexpectedEntries = @(
-        $zip.Entries | Where-Object {
-            $entryName = ($_.FullName -replace "\\", "/")
-            if ([string]::IsNullOrWhiteSpace($entryName)) {
-                return $false
-            }
-            return -not ($entryName -eq "$addonName/" -or $entryName.StartsWith("$addonName/"))
-        }
-    )
-} finally {
-    $zip.Dispose()
-}
-
-if ($unexpectedEntries.Count -gt 0) {
-    $sample = ($unexpectedEntries | Select-Object -First 5 | ForEach-Object { $_.FullName }) -join ", "
-    throw "Archive validation failed. Unexpected entries: $sample"
-}
-
-Write-Host ("Archive ready: {0}" -f $zipPath) -ForegroundColor Green
-Write-Host ("Contents root: {0}/" -f $addonName)
-
 if ($WriteChecksum) {
-    $hash = Get-FileHash -LiteralPath $zipPath -Algorithm SHA256
-    $zipLeaf = Split-Path -Path $zipPath -Leaf
-    $checksumPath = "$zipPath.sha256"
-    $checksumLine = "{0}  {1}" -f $hash.Hash.ToLowerInvariant(), $zipLeaf
-
-    Set-Content -LiteralPath $checksumPath -Value $checksumLine -NoNewline
-    Write-Host ("Checksum ready: {0}" -f $checksumPath) -ForegroundColor Green
+    $argsList += "--write-checksum"
 }
+
+$pyCmd = Get-Command py -ErrorAction SilentlyContinue
+if ($pyCmd) {
+    & $pyCmd.Source -3 @argsList
+    exit $LASTEXITCODE
+}
+
+$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+if ($pythonCmd) {
+    & $pythonCmd.Source @argsList
+    exit $LASTEXITCODE
+}
+
+throw "Python 3 not found. Install Python or use 'tools/krt.py build-release-zip'."

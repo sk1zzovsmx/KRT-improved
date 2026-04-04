@@ -7,6 +7,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$invocationLocation = Get-Location
 $toolingCommonPath = Join-Path $PSScriptRoot "tooling-common.ps1"
 if (-not (Test-Path -LiteralPath $toolingCommonPath)) {
     $toolingCommonPath = Join-Path (Split-Path -Parent $PSScriptRoot) "tooling-common.ps1"
@@ -33,7 +34,7 @@ if (-not $luaRuntime) {
     exit 1
 }
 
-$target = Resolve-Path -LiteralPath $TargetPath
+$target = Resolve-KrtInputPath -Path $TargetPath -BasePath $invocationLocation
 $item = Get-Item -LiteralPath $target.Path
 
 $inputs = @()

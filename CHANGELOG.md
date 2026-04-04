@@ -24,8 +24,9 @@ Dates are in YYYY-MM-DD.
   `tools/krt.py build-release-zip`, and the repo-local pre-commit hook now
   enters through the same Python CLI before delegating to the existing
   PowerShell gates.
-- **Release:** GitHub packaging now reuses `tools/build-release-zip.ps1` and
-  uploads both `KRT-<tag>.zip` and `KRT-<tag>.zip.sha256`.
+- **Release:** GitHub packaging now uploads both `KRT-<tag>.zip` and
+  `KRT-<tag>.zip.sha256`; the legacy `tools/build-release-zip.ps1` path
+  remains only as a compatibility shim around the same Python owner.
 - **Regression/Bugfix:** Manual release creation keeps strict tag validation
   (`--verify-tag`) to block non-tag refs.
 - **Regression/Bugfix:** Release upload now falls back gracefully to ZIP-only

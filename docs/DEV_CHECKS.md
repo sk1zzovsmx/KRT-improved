@@ -4,12 +4,16 @@ Quick copy-paste checks for layering, UI binding, Lua quality, and release harde
 
 Primary entrypoint: `tools/krt.py`.
 Use direct `*.ps1` scripts only when you need script-level control.
+Examples below assume repo root. If you launch from inside `!KRT/` or another repo subfolder,
+adjust the path to `tools/krt.py` relative to your current directory; `run-*` wrappers resolve their
+input paths from the directory where you launch the command.
 
 ## 1) Fast Checks via `tools/krt.py`
 
 Linux/macOS shell:
 
 ```bash
+python3 tools/krt.py repo-quality-check --check all
 python3 tools/krt.py repo-quality-check --check toc_files
 python3 tools/krt.py repo-quality-check --check lua_syntax
 python3 tools/krt.py repo-quality-check --check lua_uniformity
@@ -22,6 +26,7 @@ python3 tools/krt.py repo-quality-check --check raid_hardening
 Windows PowerShell:
 
 ```powershell
+py -3 tools/krt.py repo-quality-check --check all
 py -3 tools/krt.py repo-quality-check --check toc_files
 py -3 tools/krt.py repo-quality-check --check lua_syntax
 py -3 tools/krt.py repo-quality-check --check lua_uniformity
@@ -33,7 +38,18 @@ py -3 tools/krt.py repo-quality-check --check raid_hardening
 
 Expected: each command exits `0` and prints `... passed.` from the wrapped script.
 
-## 2) Direct PowerShell Equivalents
+## 2) Common Runs via `tools/krt.py`
+
+```powershell
+py -3 tools/krt.py run-release-targeted-tests
+py -3 tools/krt.py run-sv-roundtrip --fixtures
+py -3 tools/krt.py run-raid-validator --saved-variables-path "WTF\Account\<Account>\SavedVariables\!KRT.lua"
+py -3 tools/krt.py run-sv-inspector --saved-variables-path "WTF\Account\<Account>\SavedVariables\!KRT.lua" --format table --section baseline
+```
+
+Use direct PowerShell only when you need to pass the native script parameters exactly as-is.
+
+## 3) Direct PowerShell Equivalents
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-toc-files.ps1
@@ -44,6 +60,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-layering.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-ui-binding.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-raid-hardening.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-release-targeted-tests.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-sv-roundtrip.ps1 -Fixtures
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-raid-validator.ps1 "WTF\Account\<Account>\SavedVariables\!KRT.lua"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-sv-inspector.ps1 "WTF\Account\<Account>\SavedVariables\!KRT.lua" -Format table -Section baseline
 ```
 
 Extra gates:
@@ -53,7 +72,7 @@ luacheck --codes --no-color !KRT tools tests
 stylua --check !KRT tools tests
 ```
 
-## 3) Layering and Ownership Spot Checks
+## 4) Layering and Ownership Spot Checks
 
 `rg` version:
 
@@ -77,7 +96,7 @@ Get-ChildItem -Recurse !KRT/UI -Filter *.xml |
   Select-String -Pattern "<Scripts>|<On[A-Za-z]+>"
 ```
 
-## 4) Release-Path Checks
+## 5) Release-Path Checks
 
 ```powershell
 py -3 tools/krt.py release-metadata --json
@@ -91,7 +110,7 @@ Expected:
 - publish gate blocks suffix-only releases when numeric version is unchanged
 - archive contains only `!KRT/`
 
-## 5) Hook Setup
+## 6) Hook Setup
 
 ```powershell
 py -3 tools/krt.py install-hooks

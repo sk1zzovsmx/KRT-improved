@@ -31,6 +31,39 @@ function Enter-KrtRepoRoot {
     return $repoRoot
 }
 
+function Resolve-KrtInputPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [object]$BasePath = $null,
+        [switch]$AllowMissing
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw "Path cannot be empty."
+    }
+
+    $base = if ($BasePath -is [System.Management.Automation.PathInfo]) {
+        $BasePath.Path
+    } elseif ($BasePath) {
+        [string]$BasePath
+    } else {
+        (Get-Location).Path
+    }
+
+    $candidate = if ([System.IO.Path]::IsPathRooted($Path)) {
+        [System.IO.Path]::GetFullPath($Path)
+    } else {
+        [System.IO.Path]::GetFullPath((Join-Path $base $Path))
+    }
+
+    if ($AllowMissing) {
+        return $candidate
+    }
+
+    return Resolve-Path -LiteralPath $candidate
+}
+
 function Resolve-KrtLuaRuntime {
     param(
         [string]$Preferred = ""

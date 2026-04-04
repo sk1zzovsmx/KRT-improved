@@ -32,17 +32,29 @@ Use this before releases and before/after schema refactors.
 Use the real SavedVariables file path, for example
 `WTF\\Account\\<Account>\\SavedVariables\\!KRT.lua`.
 
+When you use the `tools/krt.py run-*` wrappers, the SavedVariables path is resolved from your current
+working directory. This means you can launch the wrapper from repo root or from inside `!KRT/`
+subfolders as long as both the path to `tools/krt.py` and the `--saved-variables-path` argument are
+written relative to the folder you are currently in.
+
 - Validator:
+   `py -3 tools/krt.py run-raid-validator --saved-variables-path "<path>\\!KRT.lua"`
+- Validator (PowerShell wrapper on Windows):
   `powershell -ExecutionPolicy Bypass -File tools/run-raid-validator.ps1 "<path>\\!KRT.lua"`
 - Inspector (table + baseline metrics):
   `lua tools/sv-inspector.lua "<path>\\!KRT.lua"`
 - Inspector (PowerShell wrapper on Windows):
   `powershell -ExecutionPolicy Bypass -File tools/run-sv-inspector.ps1 "<path>\\!KRT.lua"`
+- Inspector (cross-platform wrapper):
+   `py -3 tools/krt.py run-sv-inspector --saved-variables-path "<path>\\!KRT.lua" --format table --section baseline`
 - Inspector CSV export (per-raid):
   `lua tools/sv-inspector.lua "<path>\\!KRT.lua" --format csv --section raids`
 - Round-trip no-drift validation (single SV file):
   `lua tools/sv-roundtrip.lua "<path>\\!KRT.lua"`
 - Round-trip compatibility suite on legacy/mixed fixtures:
+   `py -3 tools/krt.py run-sv-roundtrip --fixtures`
+- Round-trip compatibility suite on legacy/mixed fixtures (PowerShell wrapper on Windows):
   `powershell -ExecutionPolicy Bypass -File tools/run-sv-roundtrip.ps1 -Fixtures`
+- Note: the bundled `legacy-mixed-*` fixtures are compatibility inputs for round-trip checks; they are not expected to pass the canonical validator unchanged.
 - Composite hardening check (DB boundary + XML layout + validator + fixtures):
   `powershell -ExecutionPolicy Bypass -File tools/check-raid-hardening.ps1`

@@ -153,7 +153,7 @@ Non-goals:
 
 Validation:
 - all standard Lua gates
-- `tools/run-release-targeted-tests.ps1`
+- `tools/krt.py run-release-targeted-tests`
 
 Smoke path:
 - start roll
@@ -286,7 +286,7 @@ Non-goals:
 
 Validation:
 - standard Lua gates
-- `tools/run-raid-validator.ps1` if impacted
+- `tools/krt.py run-raid-validator --saved-variables-path <path>` if impacted
 
 ### Wave U1: UI Scaffold Infrastructure
 

@@ -79,6 +79,8 @@ REPO_CHECK_SCRIPTS = {
     "ui_binding": "check-ui-binding.ps1",
 }
 
+REPO_CHECK_ORDER = tuple(REPO_CHECK_SCRIPTS.keys())
+
 
 def first_command(candidates: list[str]) -> str | None:
     for candidate in candidates:
@@ -176,7 +178,12 @@ def run_command_capture(command: list[str], *, cwd: Path | None = None) -> subpr
     )
 
 
-def run_powershell_script(script_name: str, args: list[str] | None = None) -> int:
+def run_powershell_script(
+    script_name: str,
+    args: list[str] | None = None,
+    *,
+    cwd: Path | None = None,
+) -> int:
     powershell = powershell_executable()
     if not powershell:
         raise CliError("PowerShell not found. Set KRT_POWERSHELL_EXE or install PowerShell.")
@@ -196,7 +203,7 @@ def run_powershell_script(script_name: str, args: list[str] | None = None) -> in
     ]
     if args:
         command.extend(args)
-    return run_command(command, cwd=REPO_ROOT)
+    return run_command(command, cwd=(cwd or Path.cwd()))
 
 
 def read_toc_version() -> str:
@@ -402,10 +409,67 @@ def install_hooks(_: argparse.Namespace) -> int:
     return 0
 
 
-def repo_quality_check(args: argparse.Namespace) -> int:
-    script_name = REPO_CHECK_SCRIPTS[args.check]
-    print(f"Running check '{args.check}' via {script_name}...", flush=True)
+def run_repo_quality_script(check_name: str) -> int:
+    script_name = REPO_CHECK_SCRIPTS[check_name]
+    print(f"Running check '{check_name}' via {script_name}...", flush=True)
     return run_powershell_script(script_name, [])
+
+
+def repo_quality_check(args: argparse.Namespace) -> int:
+    if args.check == "all":
+        for check_name in REPO_CHECK_ORDER:
+            exit_code = run_repo_quality_script(check_name)
+            if exit_code != 0:
+                return exit_code
+        return 0
+
+    return run_repo_quality_script(args.check)
+
+
+def run_release_targeted_tests(args: argparse.Namespace) -> int:
+    ps_args: list[str] = []
+    if args.runtime:
+        ps_args.extend(["-Runtime", args.runtime])
+    return run_powershell_script("run-release-targeted-tests.ps1", ps_args)
+
+
+def run_raid_validator(args: argparse.Namespace) -> int:
+    ps_args = ["-SavedVariablesPath", str(Path(args.saved_variables_path).expanduser())]
+    if args.runtime:
+        ps_args.extend(["-Runtime", args.runtime])
+    return run_powershell_script("run-raid-validator.ps1", ps_args)
+
+
+def run_sv_inspector(args: argparse.Namespace) -> int:
+    ps_args = [
+        "-SavedVariablesPath",
+        str(Path(args.saved_variables_path).expanduser()),
+        "-Format",
+        args.format,
+        "-Section",
+        args.section,
+    ]
+    if args.out:
+        ps_args.extend(["-Out", str(Path(args.out).expanduser())])
+    if args.runtime:
+        ps_args.extend(["-Runtime", args.runtime])
+    return run_powershell_script("run-sv-inspector.ps1", ps_args)
+
+
+def run_sv_roundtrip(args: argparse.Namespace) -> int:
+    if args.fixtures and args.target_path:
+        raise CliError("Use either --fixtures or --target-path, not both.")
+    if not args.fixtures and not args.target_path:
+        raise CliError("Pass --fixtures or --target-path.")
+
+    ps_args: list[str] = []
+    if args.target_path:
+        ps_args.extend(["-TargetPath", str(Path(args.target_path).expanduser())])
+    if args.fixtures:
+        ps_args.append("-Fixtures")
+    if args.runtime:
+        ps_args.extend(["-Runtime", args.runtime])
+    return run_powershell_script("run-sv-roundtrip.ps1", ps_args)
 
 
 def skills_manifest(args: argparse.Namespace) -> int:
@@ -834,8 +898,43 @@ def build_parser() -> argparse.ArgumentParser:
     install.set_defaults(handler=install_hooks)
 
     quality = subparsers.add_parser("repo-quality-check", help="Run one repo-local quality check script")
-    quality.add_argument("--check", choices=sorted(REPO_CHECK_SCRIPTS), required=True)
+    quality.add_argument("--check", choices=["all", *sorted(REPO_CHECK_SCRIPTS)], required=True)
     quality.set_defaults(handler=repo_quality_check)
+
+    targeted_tests = subparsers.add_parser(
+        "run-release-targeted-tests",
+        help="Run tests/release_stabilization_spec.lua via the PowerShell wrapper",
+    )
+    targeted_tests.add_argument("--runtime", default="")
+    targeted_tests.set_defaults(handler=run_release_targeted_tests)
+
+    raid_validator = subparsers.add_parser(
+        "run-raid-validator",
+        help="Run validate-raid-schema.lua against a SavedVariables file",
+    )
+    raid_validator.add_argument("--saved-variables-path", required=True)
+    raid_validator.add_argument("--runtime", default="")
+    raid_validator.set_defaults(handler=run_raid_validator)
+
+    sv_inspector = subparsers.add_parser(
+        "run-sv-inspector",
+        help="Run sv-inspector.lua against a SavedVariables file",
+    )
+    sv_inspector.add_argument("--saved-variables-path", required=True)
+    sv_inspector.add_argument("--format", choices=("table", "csv"), default="table")
+    sv_inspector.add_argument("--section", choices=("all", "baseline", "raids", "sanity"), default="all")
+    sv_inspector.add_argument("--out", default="")
+    sv_inspector.add_argument("--runtime", default="")
+    sv_inspector.set_defaults(handler=run_sv_inspector)
+
+    sv_roundtrip = subparsers.add_parser(
+        "run-sv-roundtrip",
+        help="Run sv-roundtrip.lua on one file or on the legacy fixture directory",
+    )
+    sv_roundtrip.add_argument("--target-path", default="")
+    sv_roundtrip.add_argument("--fixtures", action="store_true")
+    sv_roundtrip.add_argument("--runtime", default="")
+    sv_roundtrip.set_defaults(handler=run_sv_roundtrip)
 
     skills_list = subparsers.add_parser("skills-manifest", help="Print managed skills manifest")
     skills_list.add_argument("--json", action="store_true")
