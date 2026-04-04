@@ -493,14 +493,15 @@ local function chatApi(tbl)
 
     if type(tbl.GetSpamRuntimeState) ~= "function" then
         function tbl:GetSpamRuntimeState()
-            self._spamRuntime = self._spamRuntime or {
-                ticking = false,
-                paused = false,
-                countdownRemaining = 0,
-                runElapsedSeconds = 0,
-                messagesSent = 0,
-                durationSeconds = 60,
-            }
+            self._spamRuntime = self._spamRuntime
+                or {
+                    ticking = false,
+                    paused = false,
+                    countdownRemaining = 0,
+                    runElapsedSeconds = 0,
+                    messagesSent = 0,
+                    durationSeconds = 60,
+                }
             return self._spamRuntime
         end
     end

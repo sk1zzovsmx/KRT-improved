@@ -311,10 +311,7 @@ do
             return output
         end
 
-        local total = (tonumber(source.tank) or 0)
-            + (tonumber(source.healer) or 0)
-            + (tonumber(source.melee) or 0)
-            + (tonumber(source.ranged) or 0)
+        local total = (tonumber(source.tank) or 0) + (tonumber(source.healer) or 0) + (tonumber(source.melee) or 0) + (tonumber(source.ranged) or 0)
 
         local is25 = (name ~= "" and name:match("%f[%d]25%f[%D]")) ~= nil
         local maxSize = is25 and 25 or 10
