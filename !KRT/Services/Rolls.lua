@@ -196,6 +196,11 @@ do
         sessionId = nil,
         manualExclusions = {},
         tieReroll = nil,
+        countdownRunning = false,
+        countdownDuration = 0,
+        countdownRemaining = 0,
+        countdownTicker = nil,
+        countdownEndTimer = nil,
     }
     local newItemCounts, delItemCounts
     if addon.TablePool then
@@ -228,6 +233,22 @@ do
             return string.lower(name)
         end
         return nil
+    end
+
+    local function shouldAnnounceCountdownTick(remaining, duration)
+        if remaining >= duration then
+            return true
+        end
+        if remaining >= 10 then
+            return (remaining % 10 == 0)
+        end
+        if remaining > 0 and remaining < 10 and remaining % 7 == 0 then
+            return true
+        end
+        if remaining > 0 and remaining >= 5 and remaining % 5 == 0 then
+            return true
+        end
+        return remaining > 0 and remaining <= 3
     end
 
     local function clearTieRerollFilter()
@@ -1887,5 +1908,91 @@ do
 
     function module:SyncSessionState(session)
         syncSessionStateFromRollSession(session or getRollSession())
+    end
+
+    function module:GetResolvedWinner(model)
+        local activeModel = model or buildDisplayModel()
+        return activeModel and activeModel.winner or lootState.winner
+    end
+
+    function module:GetDisplayedWinner(preferredWinner, model)
+        if preferredWinner and preferredWinner ~= "" then
+            return preferredWinner
+        end
+        return module:GetResolvedWinner(model)
+    end
+
+    function module:ShouldUseTieReroll(model)
+        local activeModel = model or buildDisplayModel()
+        local resolution = activeModel and activeModel.resolution or nil
+        local requiredWinnerCount = tonumber(activeModel and activeModel.requiredWinnerCount) or 1
+        return resolution and resolution.requiresManualResolution == true and activeModel and activeModel.pickMode ~= true and requiredWinnerCount == 1
+    end
+
+    function module:StopCountdown()
+        addon.CancelTimer(state.countdownTicker, true)
+        addon.CancelTimer(state.countdownEndTimer, true)
+        state.countdownTicker = nil
+        state.countdownEndTimer = nil
+        state.countdownRunning = false
+        state.countdownRemaining = 0
+    end
+
+    function module:StartCountdown(duration, onTick, onComplete)
+        module:StopCountdown()
+
+        local countdownDuration = tonumber(duration) or 0
+        if countdownDuration <= 0 then
+            return false
+        end
+
+        state.countdownRunning = true
+        state.countdownDuration = countdownDuration
+        state.countdownRemaining = countdownDuration
+
+        if shouldAnnounceCountdownTick(state.countdownRemaining, countdownDuration) then
+            addon:Announce(L.ChatCountdownTic:format(state.countdownRemaining))
+        end
+        if type(onTick) == "function" then
+            onTick(state.countdownRemaining, countdownDuration)
+        end
+
+        state.countdownTicker = addon.NewTicker(1, function()
+            if not state.countdownRunning then
+                return
+            end
+            state.countdownRemaining = state.countdownRemaining - 1
+            if state.countdownRemaining > 0 then
+                if shouldAnnounceCountdownTick(state.countdownRemaining, countdownDuration) then
+                    addon:Announce(L.ChatCountdownTic:format(state.countdownRemaining))
+                end
+                if type(onTick) == "function" then
+                    onTick(state.countdownRemaining, countdownDuration)
+                end
+            end
+        end, countdownDuration)
+
+        state.countdownEndTimer = addon.NewTimer(countdownDuration, function()
+            if not state.countdownRunning then
+                return
+            end
+            module:StopCountdown()
+            addon:Announce(L.ChatCountdownEnd)
+            if type(onComplete) == "function" then
+                onComplete()
+            end
+        end)
+
+        return true
+    end
+
+    function module:IsCountdownRunning()
+        return state.countdownRunning == true
+    end
+
+    function module:FinalizeRollSession()
+        module:RecordRolls(false)
+        module:StopCountdown()
+        module:GetDisplayModel()
     end
 end

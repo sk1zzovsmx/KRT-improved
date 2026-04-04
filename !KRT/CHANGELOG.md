@@ -46,6 +46,49 @@ Release-Version: 0.6.2b
   a dedicated short-lived context independent from `lastBoss`; loot logging
   consumes that event context first, then falls back to recent real boss
   kills and only finally to the current target / `_TrashMob_`.
+- Started the Changes slimdown implementation without adding new service files:
+  raid-scoped changes CRUD, broadcast capability checks, and announce/demand
+  text builders now live in `Services/Raid.lua`, while
+  `Controllers/Changes.lua` is reduced to UI state, list rendering, and action
+  wiring. No behavior changes.
+- Continued slimdown with Spammer phase 2 without adding new service files:
+  spam output building, duration normalization, channel send path, and
+  runtime cycle state/timer control now live in `Services/Chat.lua`
+  (`BuildSpammerOutput`, `NormalizeSpamDuration`, `SendSpamOutput`,
+  `GetSpamRuntimeState`, `StartSpamCycle`, `PauseSpamCycle`,
+  `StopSpamCycle`), while `Controllers/Spammer.lua` stays focused on
+  refs/binding, localization, input lock visuals, countdown text, and refresh.
+  No behavior changes.
+- Continued with conservative Warnings phase 3: kept warning CRUD/UI ownership
+  in `Controllers/Warnings.lua` and extracted only the announce path into
+  `Services/Chat.lua` via `NormalizeWarningMessage` and
+  `AnnounceWarningMessage` (including raid-warning permission fallback notice).
+  No behavior changes.
+- Started Master phase 4 micro-extractions without adding new service files:
+  held-inventory loot slot matching/resolution moved to `Services/Raid.lua`
+  (`MatchHeldInventoryLoot`, `ResolveHeldLootNid`), while winner/tie helpers
+  and countdown lifecycle APIs are now exposed by `Services/Rolls.lua`
+  (`GetDisplayedWinner`, `GetResolvedWinner`, `ShouldUseTieReroll`,
+  `StartCountdown`, `StopCountdown`, `FinalizeRollSession`).
+  `Controllers/Master.lua` now delegates to those services with local
+  compatibility fallbacks. No behavior changes.
+- Continued Master phase 4 countdown cleanup: `Controllers/Master.lua`
+  no longer owns local countdown runtime state/timers and now derives
+  countdown state from `Services/Rolls.lua` (`IsCountdownRunning`) while
+  delegating start/stop/finalize entirely to Rolls service APIs.
+  No behavior changes.
+- Completed dedicated Master hardening step before fallback removal:
+  `Controllers/Master.lua` now validates required Raid/Rolls method contracts
+  at load time and uses direct service calls for winner/tie resolution,
+  held-loot resolution, candidate resolution, expected-winner sync, and
+  countdown lifecycle (removed legacy compatibility fallback branches).
+  No behavior changes.
+- Applied the same dedicated hardening to the remaining slimdown controllers:
+  `Controllers/Changes.lua`, `Controllers/Spammer.lua`, and
+  `Controllers/Warnings.lua` now validate required service contracts at load
+  time and use direct service calls (removed residual compatibility fallback
+  branches to Raid/Chat). Test harness service defaults were aligned to the
+  hardened contracts. No behavior changes.
 
 ## [0.6.2b] - 2026-03-21
 

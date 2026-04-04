@@ -295,6 +295,266 @@ local function rollsApi(tbl)
         end
     end
 
+    if type(tbl.GetDisplayedWinner) ~= "function" then
+        function tbl:GetDisplayedWinner(preferredWinner, model)
+            if preferredWinner and preferredWinner ~= "" then
+                return preferredWinner
+            end
+            return model and model.winner or nil
+        end
+    end
+
+    if type(tbl.GetResolvedWinner) ~= "function" then
+        function tbl:GetResolvedWinner(model)
+            return model and model.winner or nil
+        end
+    end
+
+    if type(tbl.ShouldUseTieReroll) ~= "function" then
+        function tbl:ShouldUseTieReroll(model)
+            local resolution = model and model.resolution or nil
+            local requiredWinnerCount = tonumber(model and model.requiredWinnerCount) or 1
+            return resolution and resolution.requiresManualResolution == true and model and model.pickMode ~= true and requiredWinnerCount == 1
+        end
+    end
+
+    if type(tbl.SetExpectedWinners) ~= "function" then
+        function tbl:SetExpectedWinners(count)
+            return count
+        end
+    end
+
+    if type(tbl.EnsureRollSession) ~= "function" then
+        function tbl:EnsureRollSession(itemLink, rollType, source)
+            self._session = self._session or {}
+            self._session.itemLink = itemLink
+            self._session.rollType = rollType
+            self._session.source = source
+            self._session.id = self._session.id or "test-session"
+            self._session.lootNid = tonumber(self._session.lootNid) or 0
+            return self._session
+        end
+    end
+
+    if type(tbl.SyncSessionState) ~= "function" then
+        function tbl:SyncSessionState(_session)
+            return nil
+        end
+    end
+
+    if type(tbl.IsCountdownRunning) ~= "function" then
+        function tbl:IsCountdownRunning()
+            return self._countdownRunning == true
+        end
+    end
+
+    if type(tbl.StopCountdown) ~= "function" then
+        function tbl:StopCountdown()
+            self._countdownRunning = false
+        end
+    end
+
+    if type(tbl.StartCountdown) ~= "function" then
+        function tbl:StartCountdown(_duration, _onTick, _onComplete)
+            self._countdownRunning = true
+            return true
+        end
+    end
+
+    if type(tbl.FinalizeRollSession) ~= "function" then
+        function tbl:FinalizeRollSession()
+            self._countdownRunning = false
+        end
+    end
+
+    return tbl
+end
+
+local function raidApi(tbl)
+    tbl = tbl or {}
+
+    if type(tbl.GetPlayerClass) ~= "function" then
+        function tbl:GetPlayerClass()
+            return "UNKNOWN"
+        end
+    end
+
+    if type(tbl.CheckPlayer) ~= "function" then
+        function tbl:CheckPlayer(name)
+            return true, name
+        end
+    end
+
+    if type(tbl.ClearRaidChanges) ~= "function" then
+        function tbl:ClearRaidChanges()
+            return true, 0
+        end
+    end
+
+    if type(tbl.DeleteRaidChange) ~= "function" then
+        function tbl:DeleteRaidChange()
+            return true, false
+        end
+    end
+
+    if type(tbl.CanBroadcastChanges) ~= "function" then
+        function tbl:CanBroadcastChanges()
+            return true, nil
+        end
+    end
+
+    if type(tbl.BuildRaidChangesDemandText) ~= "function" then
+        function tbl:BuildRaidChangesDemandText()
+            return "Demand"
+        end
+    end
+
+    if type(tbl.BuildRaidChangesAnnouncement) ~= "function" then
+        function tbl:BuildRaidChangesAnnouncement(changesByName)
+            local count = 0
+            for _ in pairs(changesByName or {}) do
+                count = count + 1
+            end
+            return count > 0 and "Announce" or "None", count
+        end
+    end
+
+    if type(tbl.GetRaidChanges) ~= "function" then
+        function tbl:GetRaidChanges()
+            return {}
+        end
+    end
+
+    if type(tbl.UpsertRaidChange) ~= "function" then
+        function tbl:UpsertRaidChange(_, playerName, spec)
+            return true, playerName, spec
+        end
+    end
+
+    if type(tbl.GetRosterVersion) ~= "function" then
+        function tbl:GetRosterVersion()
+            return 0
+        end
+    end
+
+    if type(tbl.RequestMasterLootCandidateRefresh) ~= "function" then
+        function tbl:RequestMasterLootCandidateRefresh()
+            return nil
+        end
+    end
+
+    if type(tbl.FindMasterLootCandidateIndex) ~= "function" then
+        function tbl:FindMasterLootCandidateIndex()
+            return nil
+        end
+    end
+
+    if type(tbl.CanResolveMasterLootCandidates) ~= "function" then
+        function tbl:CanResolveMasterLootCandidates()
+            return false
+        end
+    end
+
+    if type(tbl.MatchHeldInventoryLoot) ~= "function" then
+        function tbl:MatchHeldInventoryLoot(entry)
+            return type(entry) == "table" and tonumber(entry.rollType) == 7
+        end
+    end
+
+    if type(tbl.ResolveHeldLootNid) ~= "function" then
+        function tbl:ResolveHeldLootNid(itemLink, preferredLootNid, holderName, raidNum)
+            local preferred = tonumber(preferredLootNid) or 0
+            if preferred > 0 and type(self.GetLootByNid) == "function" then
+                local entry = self:GetLootByNid(preferred, raidNum)
+                if self:MatchHeldInventoryLoot(entry, raidNum, itemLink, holderName) then
+                    return preferred
+                end
+            end
+
+            if type(self.GetHeldLootNid) == "function" then
+                return tonumber(self:GetHeldLootNid(itemLink, raidNum, holderName, 0)) or 0
+            end
+
+            return 0
+        end
+    end
+
+    return tbl
+end
+
+local function chatApi(tbl)
+    tbl = tbl or {}
+
+    if type(tbl.AnnounceWarningMessage) ~= "function" then
+        function tbl:AnnounceWarningMessage(_content)
+            return true
+        end
+    end
+
+    if type(tbl.GetSpamRuntimeState) ~= "function" then
+        function tbl:GetSpamRuntimeState()
+            self._spamRuntime = self._spamRuntime or {
+                ticking = false,
+                paused = false,
+                countdownRemaining = 0,
+                runElapsedSeconds = 0,
+                messagesSent = 0,
+                durationSeconds = 60,
+            }
+            return self._spamRuntime
+        end
+    end
+
+    if type(tbl.StartSpamCycle) ~= "function" then
+        function tbl:StartSpamCycle(config)
+            local runtime = self:GetSpamRuntimeState()
+            runtime.ticking = true
+            runtime.paused = false
+            runtime.durationSeconds = tonumber(config and config.duration) or runtime.durationSeconds
+            runtime.countdownRemaining = runtime.durationSeconds
+            return true, runtime
+        end
+    end
+
+    if type(tbl.StopSpamCycle) ~= "function" then
+        function tbl:StopSpamCycle(resetCountdown, resetRun)
+            local runtime = self:GetSpamRuntimeState()
+            runtime.ticking = false
+            runtime.paused = false
+            if resetCountdown then
+                runtime.countdownRemaining = 0
+            end
+            if resetRun then
+                runtime.runElapsedSeconds = 0
+                runtime.messagesSent = 0
+            end
+            return runtime
+        end
+    end
+
+    if type(tbl.PauseSpamCycle) ~= "function" then
+        function tbl:PauseSpamCycle()
+            local runtime = self:GetSpamRuntimeState()
+            if not runtime.ticking or runtime.paused then
+                return false, runtime
+            end
+            runtime.paused = true
+            return true, runtime
+        end
+    end
+
+    if type(tbl.SendSpamOutput) ~= "function" then
+        function tbl:SendSpamOutput(_output, _channels)
+            return true
+        end
+    end
+
+    if type(tbl.BuildSpammerOutput) ~= "function" then
+        function tbl:BuildSpammerOutput(_state, defaultOutput)
+            return defaultOutput or "LFM"
+        end
+    end
+
     return tbl
 end
 
@@ -432,6 +692,10 @@ local function newHarness()
                 value = reservesApi(value)
             elseif key == "Rolls" then
                 value = rollsApi(value)
+            elseif key == "Raid" then
+                value = raidApi(value)
+            elseif key == "Chat" then
+                value = chatApi(value)
             end
             rawset(servicesStore, key, value)
         end,
@@ -454,6 +718,8 @@ local function newHarness()
         end,
         SyncSessionState = function() end,
     }
+    services.Raid = {}
+    services.Chat = {}
 
     local addon = {
         State = { debugEnabled = true, raidStore = {}, currentRaid = 1, lastBoss = 0 },

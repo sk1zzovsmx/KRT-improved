@@ -11,6 +11,7 @@ local L = feature.L
 local ListController = feature.ListController or addon.ListController
 local Frames = feature.Frames or addon.Frames
 local Strings = feature.Strings or addon.Strings
+local Services = feature.Services or addon.Services or {}
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
@@ -21,6 +22,18 @@ local tinsert, twipe = table.insert, table.wipe
 local ipairs = ipairs
 
 local tonumber = tonumber
+
+local function requireServiceMethod(serviceName, serviceTable, methodName)
+    assert(type(serviceTable) == "table", "KRT Warnings missing service: " .. tostring(serviceName))
+    local method = serviceTable[methodName]
+    assert(type(method) == "function", "KRT Warnings missing service method: " .. tostring(serviceName) .. "." .. tostring(methodName))
+    return method
+end
+
+local Chat = Services.Chat
+local ChatApi = {
+    AnnounceWarningMessage = requireServiceMethod("Chat", Chat, "AnnounceWarningMessage"),
+}
 
 -- =========== Warnings Frame Module  =========== --
 do
@@ -288,14 +301,9 @@ do
             return
         end
 
-        if addon.IsInRaid and addon.IsInRaid() and addon.options and addon.options.useRaidWarning then
-            if type(addon.CanUseRaidCapability) == "function" and not addon:CanUseRaidCapability("raid_warning") then
-                addon:warn(L.WarnRaidWarningFallback)
-            end
-        end
-
         tempSelectedID = nil -- Always clear temporary selected id:
-        return addon:Announce(KRT_Warnings[wID].content)
+
+        return ChatApi.AnnounceWarningMessage(Chat, KRT_Warnings[wID].content)
     end
 
     -- Cancel editing/adding:

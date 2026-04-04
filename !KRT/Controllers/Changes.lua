@@ -31,6 +31,26 @@ local tostring = tostring
 
 local InternalEvents = Events.Internal
 
+local function requireServiceMethod(serviceName, serviceTable, methodName)
+    assert(type(serviceTable) == "table", "KRT Changes missing service: " .. tostring(serviceName))
+    local method = serviceTable[methodName]
+    assert(type(method) == "function", "KRT Changes missing service method: " .. tostring(serviceName) .. "." .. tostring(methodName))
+    return method
+end
+
+local Raid = Services.Raid
+local RaidApi = {
+    GetPlayerClass = requireServiceMethod("Raid", Raid, "GetPlayerClass"),
+    CheckPlayer = requireServiceMethod("Raid", Raid, "CheckPlayer"),
+    ClearRaidChanges = requireServiceMethod("Raid", Raid, "ClearRaidChanges"),
+    DeleteRaidChange = requireServiceMethod("Raid", Raid, "DeleteRaidChange"),
+    CanBroadcastChanges = requireServiceMethod("Raid", Raid, "CanBroadcastChanges"),
+    BuildRaidChangesDemandText = requireServiceMethod("Raid", Raid, "BuildRaidChangesDemandText"),
+    BuildRaidChangesAnnouncement = requireServiceMethod("Raid", Raid, "BuildRaidChangesAnnouncement"),
+    GetRaidChanges = requireServiceMethod("Raid", Raid, "GetRaidChanges"),
+    UpsertRaidChange = requireServiceMethod("Raid", Raid, "UpsertRaidChange"),
+}
+
 -- =========== MS Changes Module  =========== --
 do
     addon.Controllers = addon.Controllers or {}
@@ -111,7 +131,7 @@ do
             bindChangeRow(row)
             local ui = row._p
             ui.Name:SetText(it.name)
-            local class = Services.Raid:GetPlayerClass(it.name)
+            local class = RaidApi.GetPlayerClass(Raid, it.name)
             local r, g, b = Colors.GetClassColor(class)
             ui.Name:SetVertexColor(r, g, b)
             ui.Spec:SetText(it.spec or L.StrNone)
@@ -256,12 +276,7 @@ do
             return
         end
 
-        local raidStore = Core.GetRaidStoreOrNil("Changes.Clear", { "ClearRaidChanges" })
-        if not raidStore then
-            return
-        end
-
-        local ok = raidStore:ClearRaidChanges(currentRaid)
+        local ok = RaidApi.ClearRaidChanges(Raid, currentRaid)
         if not ok then
             return
         end
@@ -292,7 +307,7 @@ do
         end
         -- Make sure the player exists in the raid:
         local found = true
-        if not Services.Raid:CheckPlayer(name) then
+        if not RaidApi.CheckPlayer(Raid, name) then
             found = false
         end
         if not changesTable[name] then
@@ -340,11 +355,7 @@ do
             if not currentRaid then
                 return
             end
-            local raidStore = Core.GetRaidStoreOrNil("Changes.Add.Delete", { "DeleteRaidChange" })
-            if not raidStore then
-                return
-            end
-            local ok = raidStore:DeleteRaidChange(currentRaid, selectedID)
+            local ok = RaidApi.DeleteRaidChange(Raid, currentRaid, selectedID)
             if not ok then
                 return
             end
@@ -387,11 +398,7 @@ do
         if not currentRaid or not name then
             return
         end
-        local raidStore = Core.GetRaidStoreOrNil("Changes.Delete", { "DeleteRaidChange" })
-        if not raidStore then
-            return
-        end
-        local ok = raidStore:DeleteRaidChange(currentRaid, name)
+        local ok = RaidApi.DeleteRaidChange(Raid, currentRaid, name)
         if not ok then
             return
         end
@@ -412,21 +419,7 @@ do
     end)
 
     local function canBroadcastChanges()
-        local raidService = Services.Raid
-        if raidService and type(raidService.GetCapabilityState) == "function" then
-            local state = raidService:GetCapabilityState("changes_broadcast")
-            return state and state.allowed == true, state and state.reason or "missing_state"
-        end
-        if not Services.Raid:IsPlayerInRaid() then
-            return false, "not_in_raid"
-        end
-        if not Core.GetUnitRank then
-            return false, "missing_rank"
-        end
-        if (tonumber(Core.GetUnitRank("player", 0)) or 0) <= 0 then
-            return false, "missing_leadership"
-        end
-        return true
+        return RaidApi.CanBroadcastChanges(Raid)
     end
 
     local function warnBroadcastDenied(reason)
@@ -446,7 +439,9 @@ do
             warnBroadcastDenied(reason)
             return
         end
-        addon:Announce(L.StrChangesDemand)
+
+        local msg = RaidApi.BuildRaidChangesDemandText(Raid)
+        addon:Announce(msg)
     end
 
     -- Spam module:
@@ -460,44 +455,20 @@ do
         if not fetched or not next(changesTable) then
             initChangesTable()
         end
-        local count = addon.tLength(changesTable)
-        local msg
-        if count == 0 then
-            if tempSelectedID then
-                tempSelectedID = nil
-                return
-            end
-            msg = L.StrChangesAnnounceNone
-        elseif selectedID or tempSelectedID then
-            local name = tempSelectedID and tempSelectedID or selectedID
-            if tempSelectedID ~= nil then
-                tempSelectedID = nil
-            end
-            if not changesTable[name] then
-                return
-            end
-            msg = format(L.StrChangesAnnounceOne, name, changesTable[name])
-        else
-            msg = L.StrChangesAnnounce
-            local names = tmpNames
-            if twipe then
-                twipe(names)
-            else
-                for i = 1, #names do
-                    names[i] = nil
-                end
-            end
-            for n in pairs(changesTable) do
-                names[#names + 1] = n
-            end
-            table.sort(names)
-            for i = 1, #names do
-                local n = names[i]
-                msg = msg .. " " .. n .. "=" .. tostring(changesTable[n])
-                if i < #names then
-                    msg = msg .. " /"
-                end
-            end
+
+        local selectedName = tempSelectedID and tempSelectedID or selectedID
+        local hadTempSelected = tempSelectedID ~= nil
+        if tempSelectedID ~= nil then
+            tempSelectedID = nil
+        end
+
+        local msg, count = RaidApi.BuildRaidChangesAnnouncement(Raid, changesTable, selectedName, tmpNames)
+
+        if hadTempSelected and (tonumber(count) or 0) == 0 then
+            return
+        end
+        if not msg then
+            return
         end
         addon:Announce(msg)
     end
@@ -594,12 +565,8 @@ do
             changesTable = {}
             return
         end
-        local raidStore = Core.GetRaidStoreOrNil("Changes.InitChangesTable", { "GetRaidChanges" })
-        if not raidStore then
-            changesTable = {}
-            return
-        end
-        local changes = raidStore:GetRaidChanges(currentRaid)
+
+        local changes = RaidApi.GetRaidChanges(Raid, currentRaid)
         if type(changes) ~= "table" then
             changesTable = {}
             return
@@ -617,18 +584,13 @@ do
         spec = Strings.NormalizeName(spec)
         -- Is the player in the raid?
         local found
-        found, name = Services.Raid:CheckPlayer(name)
+        found, name = RaidApi.CheckPlayer(Raid, name)
         if not found then
             addon:error(format((name == "" and L.ErrChangesNoPlayer or L.ErrCannotFindPlayer), name))
             return
         end
 
-        local raidStore = Core.GetRaidStoreOrNil("Changes.SaveChanges", { "UpsertRaidChange" })
-        if not raidStore then
-            return
-        end
-
-        local ok, savedName = raidStore:UpsertRaidChange(currentRaid, name, spec)
+        local ok, savedName = RaidApi.UpsertRaidChange(Raid, currentRaid, name, spec)
         if not ok then
             return
         end

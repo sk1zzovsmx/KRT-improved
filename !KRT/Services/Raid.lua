@@ -32,6 +32,7 @@ local tinsert, tremove, twipe = table.insert, table.remove, table.wipe
 local pairs, ipairs, type, select = pairs, ipairs, type, select
 local strlen = string.len
 local strmatch = string.match
+local format = string.format
 
 local tostring, tonumber = tostring, tonumber
 local UnitRace, UnitSex = UnitRace, UnitSex
@@ -1501,6 +1502,118 @@ do
         return nil, raidNum
     end
 
+    function module:GetRaidChanges(raidNum)
+        raidNum = raidNum or Core.GetCurrentRaid()
+        if not raidNum then
+            return {}
+        end
+
+        local raidStore = Core.GetRaidStoreOrNil("Raid.GetRaidChanges", { "GetRaidChanges" })
+        if not raidStore then
+            return {}
+        end
+
+        local changes = raidStore:GetRaidChanges(raidNum)
+        if type(changes) ~= "table" then
+            return {}
+        end
+
+        return changes
+    end
+
+    function module:UpsertRaidChange(raidNum, playerName, spec)
+        raidNum = raidNum or Core.GetCurrentRaid()
+        if not raidNum then
+            return false, nil, nil
+        end
+
+        local raidStore = Core.GetRaidStoreOrNil("Raid.UpsertRaidChange", { "UpsertRaidChange" })
+        if not raidStore then
+            return false, nil, nil
+        end
+
+        local ok, savedName, savedSpec = raidStore:UpsertRaidChange(raidNum, playerName, spec)
+        return ok == true, savedName, savedSpec
+    end
+
+    function module:DeleteRaidChange(raidNum, playerName)
+        raidNum = raidNum or Core.GetCurrentRaid()
+        if not raidNum then
+            return false, false
+        end
+
+        local raidStore = Core.GetRaidStoreOrNil("Raid.DeleteRaidChange", { "DeleteRaidChange" })
+        if not raidStore then
+            return false, false
+        end
+
+        local ok, existed = raidStore:DeleteRaidChange(raidNum, playerName)
+        return ok == true, existed == true
+    end
+
+    function module:ClearRaidChanges(raidNum)
+        raidNum = raidNum or Core.GetCurrentRaid()
+        if not raidNum then
+            return false, 0
+        end
+
+        local raidStore = Core.GetRaidStoreOrNil("Raid.ClearRaidChanges", { "ClearRaidChanges" })
+        if not raidStore then
+            return false, 0
+        end
+
+        local ok, removed = raidStore:ClearRaidChanges(raidNum)
+        return ok == true, tonumber(removed) or 0
+    end
+
+    function module:CanBroadcastChanges()
+        local state = module:GetCapabilityState("changes_broadcast")
+        return state and state.allowed == true, state and state.reason or "missing_state"
+    end
+
+    function module:BuildRaidChangesDemandText()
+        return L.StrChangesDemand
+    end
+
+    function module:BuildRaidChangesAnnouncement(changesByName, selectedName, namesOut)
+        local count = (type(changesByName) == "table") and addon.tLength(changesByName) or 0
+        if count == 0 then
+            return L.StrChangesAnnounceNone, 0
+        end
+
+        if selectedName then
+            local spec = changesByName[selectedName]
+            if spec == nil then
+                return nil, count
+            end
+            return format(L.StrChangesAnnounceOne, selectedName, spec), count
+        end
+
+        local names = namesOut or {}
+        if twipe then
+            twipe(names)
+        else
+            for i = 1, #names do
+                names[i] = nil
+            end
+        end
+
+        for name in pairs(changesByName) do
+            names[#names + 1] = name
+        end
+        table.sort(names)
+
+        local msg = L.StrChangesAnnounce
+        for i = 1, #names do
+            local name = names[i]
+            msg = msg .. " " .. name .. "=" .. tostring(changesByName[name])
+            if i < #names then
+                msg = msg .. " /"
+            end
+        end
+        return msg, count
+    end
+
     function module:ResolveRaid(raidNum)
         return module:GetRaid(raidNum)
     end
@@ -2614,6 +2727,61 @@ do
             end
         end
         return 0
+    end
+
+    function module:MatchHeldInventoryLoot(entry, raidNum, itemLink, holderName)
+        if type(entry) ~= "table" or tonumber(entry.rollType) ~= rollTypes.HOLD or not itemLink then
+            return false
+        end
+
+        raidNum = raidNum or Core.GetCurrentRaid()
+
+        local rolls = getRollsService()
+        local queryItemKey = (rolls and rolls.GetRollSessionItemKey and rolls:GetRollSessionItemKey(itemLink)) or (Item.GetItemStringFromLink(itemLink) or itemLink)
+        local queryItemId = tonumber(Item.GetItemIdFromLink(itemLink)) or 0
+        local entryItemKey = entry.itemString or entry.itemLink
+        local sameItem = false
+
+        if queryItemKey and entryItemKey and queryItemKey == entryItemKey then
+            sameItem = true
+        elseif queryItemId > 0 and tonumber(entry.itemId) == queryItemId then
+            sameItem = true
+        end
+        if not sameItem then
+            return false
+        end
+
+        local resolvedHolder = Strings.NormalizeName(holderName or Core.GetPlayerName(), true)
+        if not resolvedHolder or resolvedHolder == "" then
+            return true
+        end
+
+        local holderNid = module:GetPlayerID(resolvedHolder, raidNum)
+        if holderNid > 0 then
+            return tonumber(entry.looterNid) == holderNid
+        end
+        return true
+    end
+
+    function module:ResolveHeldLootNid(itemLink, preferredLootNid, holderName, raidNum)
+        if not itemLink then
+            return 0
+        end
+
+        raidNum = raidNum or Core.GetCurrentRaid()
+        if not raidNum then
+            return 0
+        end
+
+        local preferred = tonumber(preferredLootNid) or 0
+        if preferred > 0 then
+            local entry = module:GetLootByNid(preferred, raidNum)
+            if module:MatchHeldInventoryLoot(entry, raidNum, itemLink, holderName) then
+                return preferred
+            end
+        end
+
+        return tonumber(module:GetHeldLootNid(itemLink, raidNum, holderName, 0)) or 0
     end
 
     function module:GetHeldLootNid(itemLink, raidNum, holderName, bossNid)

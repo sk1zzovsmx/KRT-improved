@@ -10,7 +10,6 @@ local L = feature.L
 
 local Frames = feature.Frames or addon.Frames
 local Strings = feature.Strings or addon.Strings
-local Comms = feature.Comms or addon.Comms
 local Services = feature.Services or addon.Services or {}
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
@@ -18,11 +17,28 @@ local UIPrimitives = addon.UIPrimitives
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
-local tinsert, tremove, tconcat = table.insert, table.remove, table.concat
+local tinsert, tremove = table.insert, table.remove
 local pairs, ipairs, type, select = pairs, ipairs, type, select
 local find, strlen = string.find, string.len
-local gsub, upper = string.gsub, string.upper
+local gsub = string.gsub
 local tostring, tonumber = tostring, tonumber
+
+local function requireServiceMethod(serviceName, serviceTable, methodName)
+    assert(type(serviceTable) == "table", "KRT Spammer missing service: " .. tostring(serviceName))
+    local method = serviceTable[methodName]
+    assert(type(method) == "function", "KRT Spammer missing service method: " .. tostring(serviceName) .. "." .. tostring(methodName))
+    return method
+end
+
+local Chat = Services.Chat
+local ChatApi = {
+    GetSpamRuntimeState = requireServiceMethod("Chat", Chat, "GetSpamRuntimeState"),
+    StartSpamCycle = requireServiceMethod("Chat", Chat, "StartSpamCycle"),
+    StopSpamCycle = requireServiceMethod("Chat", Chat, "StopSpamCycle"),
+    PauseSpamCycle = requireServiceMethod("Chat", Chat, "PauseSpamCycle"),
+    SendSpamOutput = requireServiceMethod("Chat", Chat, "SendSpamOutput"),
+    BuildSpammerOutput = requireServiceMethod("Chat", Chat, "BuildSpammerOutput"),
+}
 
 -- =========== LFM Spam Module  =========== --
 do
@@ -44,10 +60,7 @@ do
     local getFrame = makeModuleFrameGetter(module, "KRTSpammer")
     -- Defaults / constants
     local DEFAULT_DURATION_STR = "60"
-    local DEFAULT_DURATION_NUM = 60
     local DEFAULT_OUTPUT = "LFM"
-    local MAX_SPAM_RUNTIME_SECONDS = 1800
-    local MAX_SPAM_MESSAGES_PER_RUN = 30
 
     -- Runtime state
     local loaded = false
@@ -56,13 +69,6 @@ do
     local duration = DEFAULT_DURATION_STR
 
     local finalOutput = DEFAULT_OUTPUT
-
-    local ticking = false
-    local paused = false
-    local countdownTicker
-    local countdownRemaining = 0
-    local runElapsedSeconds = 0
-    local messagesSent = 0
 
     local inputsLocked = false
     local previewDirty = true
@@ -129,13 +135,9 @@ do
     }
     -- Forward declarations
     local renderPreview
-    local startSpamCycle
-    local stopSpamCycle
     local updateControls
-    local buildOutput
     local updateTickDisplay
     local setInputsLocked
-    local getValidDuration
 
     -- ----- Private helpers ----- --
     function UI.AcquireRefs(frame)
@@ -199,6 +201,10 @@ do
         end
         setCheckbox("ChatGuild", false)
         setCheckbox("ChatYell", false)
+    end
+
+    local function getSpamRuntimeState()
+        return ChatApi.GetSpamRuntimeState(Chat)
     end
 
     -- Deterministic: sync Duration immediately from UI/SV (no waiting for preview tick)
@@ -408,44 +414,63 @@ do
     function module:Start()
         ensureReadyForStart()
 
-        if addon.WithinRange(strlen(finalOutput), 4, 255) then
-            if paused then
-                paused = false
-                setInputsLocked(true)
-                startSpamCycle(false)
-            elseif ticking then
-                ticking = false
-                paused = false
-                stopSpamCycle(true)
-                setInputsLocked(false)
-            else
-                ticking = true
-                paused = false
-                runElapsedSeconds = 0
-                messagesSent = 0
-                setInputsLocked(true)
-                startSpamCycle(true)
-            end
-            module:RequestRefresh()
+        if not addon.WithinRange(strlen(finalOutput), 4, 255) then
+            return
         end
+
+        local runtime = getSpamRuntimeState()
+        if runtime.ticking and runtime.paused then
+            setInputsLocked(true)
+            ChatApi.StartSpamCycle(Chat, {
+                duration = duration,
+                output = finalOutput,
+                channels = KRT_Spammer.Channels,
+                resetCountdown = false,
+                resetRun = false,
+                onTick = function()
+                    module:RequestRefresh()
+                end,
+                onAutoStop = function()
+                    setInputsLocked(false)
+                    module:RequestRefresh()
+                end,
+            })
+        elseif runtime.ticking then
+            ChatApi.StopSpamCycle(Chat, true, true)
+            setInputsLocked(false)
+        else
+            setInputsLocked(true)
+            ChatApi.StartSpamCycle(Chat, {
+                duration = duration,
+                output = finalOutput,
+                channels = KRT_Spammer.Channels,
+                resetCountdown = true,
+                resetRun = true,
+                onTick = function()
+                    module:RequestRefresh()
+                end,
+                onAutoStop = function()
+                    setInputsLocked(false)
+                    module:RequestRefresh()
+                end,
+            })
+        end
+
+        module:RequestRefresh()
     end
 
     function module:Stop()
-        ticking = false
-        paused = false
-        runElapsedSeconds = 0
-        messagesSent = 0
-        stopSpamCycle(true)
+        ChatApi.StopSpamCycle(Chat, true, true)
         setInputsLocked(false)
         module:RequestRefresh()
     end
 
     function module:Pause()
-        if not ticking or paused then
+        local pausedOk = ChatApi.PauseSpamCycle(Chat)
+        if not pausedOk then
             return
         end
-        paused = true
-        stopSpamCycle(false)
+
         setInputsLocked(false)
         module:RequestRefresh()
     end
@@ -458,34 +483,7 @@ do
             return false
         end
 
-        local chList = KRT_Spammer.Channels or {}
-
-        if #chList <= 0 then
-            local groupType = addon.GetGroupTypeAndCount()
-            if groupType == "raid" then
-                Comms.Chat(tostring(finalOutput), "RAID", nil, nil, true)
-            elseif groupType == "party" then
-                Comms.Chat(tostring(finalOutput), "PARTY", nil, nil, true)
-            else
-                local chatService = Services.Chat
-                if chatService and chatService.Print then
-                    chatService:Print(tostring(finalOutput))
-                else
-                    addon:info("%s", tostring(finalOutput))
-                end
-            end
-            return true
-        end
-
-        for _, c in ipairs(chList) do
-            if type(c) == "number" then
-                Comms.Chat(tostring(finalOutput), "CHANNEL", nil, c, true)
-            else
-                Comms.Chat(tostring(finalOutput), upper(c), nil, nil, true)
-            end
-        end
-
-        return true
+        return ChatApi.SendSpamOutput(Chat, tostring(finalOutput), KRT_Spammer.Channels)
     end
 
     -- Tab
@@ -590,7 +588,8 @@ do
             end
 
             box:SetScript("OnEditFocusGained", function()
-                if ticking and not paused then
+                local runtime = getSpamRuntimeState()
+                if runtime.ticking and not runtime.paused then
                     module:Pause()
                 end
             end)
@@ -626,6 +625,8 @@ do
 
     -- Tick display
     function updateTickDisplay()
+        local runtime = getSpamRuntimeState()
+        local countdownRemaining = tonumber(runtime.countdownRemaining) or 0
         local tickText = getNamedPart("Tick")
         if not tickText then
             return
@@ -678,125 +679,13 @@ do
         UIPrimitives.EnableDisable(getNamedPart("ClearBtn"), not locked)
     end
 
-    -- Spam cycle
-    function stopSpamCycle(resetCountdown)
-        -- Stop and clear the spam ticker
-        addon.CancelTimer(countdownTicker, true)
-        countdownTicker = nil
-
-        if resetCountdown then
-            countdownRemaining = 0
-        end
-
-        updateTickDisplay()
-    end
-
-    function getValidDuration()
-        local value = tonumber(duration)
-        if not value or value <= 0 then
-            value = DEFAULT_DURATION_NUM
-        end
-        return value
-    end
-
-    function startSpamCycle(resetCountdown)
-        stopSpamCycle(false)
-
-        local d = getValidDuration()
-        if resetCountdown or countdownRemaining <= 0 then
-            countdownRemaining = d
-        end
-
-        updateTickDisplay()
-
-        countdownTicker = addon.NewTicker(1, function()
-            if not ticking or paused then
-                return
-            end
-
-            runElapsedSeconds = runElapsedSeconds + 1
-            if runElapsedSeconds >= MAX_SPAM_RUNTIME_SECONDS then
-                addon:warn(L.MsgSpammerAutoStopDuration:format(MAX_SPAM_RUNTIME_SECONDS))
-                module:Stop()
-                return
-            end
-
-            countdownRemaining = countdownRemaining - 1
-            if countdownRemaining <= 0 then
-                if not module:Spam() then
-                    return
-                end
-                messagesSent = messagesSent + 1
-                if messagesSent >= MAX_SPAM_MESSAGES_PER_RUN then
-                    addon:warn(L.MsgSpammerAutoStopMessages:format(MAX_SPAM_MESSAGES_PER_RUN))
-                    module:Stop()
-                    return
-                end
-                countdownRemaining = getValidDuration()
-            end
-
-            updateTickDisplay()
-        end)
-    end
-
-    -- Build output
-    function buildOutput()
-        local outBuf = { DEFAULT_OUTPUT }
-
-        local name = lastState.name or ""
-        if name ~= "" then
-            outBuf[#outBuf + 1] = " "
-            outBuf[#outBuf + 1] = name
-        end
-
-        local needParts = {}
-        local function addNeed(n, label, class)
-            n = tonumber(n) or 0
-            if n > 0 then
-                local s = n .. " " .. label
-                if class and class ~= "" then
-                    s = s .. " (" .. class .. ")"
-                end
-                needParts[#needParts + 1] = s
-            end
-        end
-
-        addNeed(lastState.tank, L.StrTank, lastState.tankClass)
-        addNeed(lastState.healer, L.StrHealer, lastState.healerClass)
-        addNeed(lastState.melee, L.StrMelee, lastState.meleeClass)
-        addNeed(lastState.ranged, L.StrRanged, lastState.rangedClass)
-
-        if #needParts > 0 then
-            outBuf[#outBuf + 1] = " - "
-            outBuf[#outBuf + 1] = L.StrSpammerNeedStr
-            outBuf[#outBuf + 1] = " "
-            outBuf[#outBuf + 1] = tconcat(needParts, ", ")
-        end
-
-        if lastState.message and lastState.message ~= "" then
-            outBuf[#outBuf + 1] = " - "
-            outBuf[#outBuf + 1] = Strings.FindAchievement(lastState.message)
-        end
-
-        local temp = tconcat(outBuf)
-
-        if temp ~= DEFAULT_OUTPUT then
-            local total = (tonumber(lastState.tank) or 0) + (tonumber(lastState.healer) or 0) + (tonumber(lastState.melee) or 0) + (tonumber(lastState.ranged) or 0)
-
-            local is25 = (name ~= "" and name:match("%f[%d]25%f[%D]")) ~= nil
-            local max = is25 and 25 or 10
-            temp = temp .. " (" .. (max - total) .. "/" .. max .. ")"
-        end
-
-        return temp
-    end
-
     -- Controls update
     function updateControls()
-        local locked = ticking and not paused
+        local runtime = getSpamRuntimeState()
+        local locked = runtime.ticking and not runtime.paused
         local canStart = (strlen(finalOutput) > 3 and strlen(finalOutput) <= 255)
-        local btnLabel = paused and L.BtnResume or L.BtnStop
-        local isStop = ticking == true
+        local btnLabel = runtime.paused and L.BtnResume or L.BtnStop
+        local isStop = runtime.ticking == true
 
         if lastControls.locked == locked and lastControls.canStart == canStart and lastControls.btnLabel == btnLabel and lastControls.isStop == isStop then
             return
@@ -829,9 +718,9 @@ do
             local box = getNamedPart(field.box)
             local value
             if field.number then
-                value = tonumber(box:GetText()) or 0
+                value = box and (tonumber(box:GetText()) or 0) or 0
             else
-                value = Strings.TrimText(box:GetText())
+                value = box and Strings.TrimText(box:GetText()) or ""
             end
 
             if lastState[field.key] ~= value then
@@ -855,7 +744,7 @@ do
         end
 
         if changed then
-            finalOutput = buildOutput()
+            finalOutput = ChatApi.BuildSpammerOutput(Chat, lastState, DEFAULT_OUTPUT)
 
             local out = getNamedPart("Output")
             if out then
@@ -921,7 +810,8 @@ do
             previewDirty = true
         end
 
-        if ticking and not paused then
+        local runtime = getSpamRuntimeState()
+        if runtime.ticking and not runtime.paused then
             updateControls()
             updateTickDisplay()
             return

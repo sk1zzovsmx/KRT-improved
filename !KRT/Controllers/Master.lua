@@ -63,6 +63,34 @@ local pairs, select, next = pairs, select, next
 
 local tostring, tonumber = tostring, tonumber
 
+local function requireServiceMethod(serviceName, serviceTable, methodName)
+    assert(type(serviceTable) == "table", "KRT Master missing service: " .. tostring(serviceName))
+    local method = serviceTable[methodName]
+    assert(type(method) == "function", "KRT Master missing service method: " .. tostring(serviceName) .. "." .. tostring(methodName))
+    return method
+end
+
+local RaidApi = {
+    GetRosterVersion = requireServiceMethod("Raid", Raid, "GetRosterVersion"),
+    RequestMasterLootCandidateRefresh = requireServiceMethod("Raid", Raid, "RequestMasterLootCandidateRefresh"),
+    FindMasterLootCandidateIndex = requireServiceMethod("Raid", Raid, "FindMasterLootCandidateIndex"),
+    CanResolveMasterLootCandidates = requireServiceMethod("Raid", Raid, "CanResolveMasterLootCandidates"),
+    ResolveHeldLootNid = requireServiceMethod("Raid", Raid, "ResolveHeldLootNid"),
+}
+
+local RollsApi = {
+    GetDisplayedWinner = requireServiceMethod("Rolls", Rolls, "GetDisplayedWinner"),
+    GetResolvedWinner = requireServiceMethod("Rolls", Rolls, "GetResolvedWinner"),
+    ShouldUseTieReroll = requireServiceMethod("Rolls", Rolls, "ShouldUseTieReroll"),
+    SetExpectedWinners = requireServiceMethod("Rolls", Rolls, "SetExpectedWinners"),
+    EnsureRollSession = requireServiceMethod("Rolls", Rolls, "EnsureRollSession"),
+    SyncSessionState = requireServiceMethod("Rolls", Rolls, "SyncSessionState"),
+    IsCountdownRunning = requireServiceMethod("Rolls", Rolls, "IsCountdownRunning"),
+    StopCountdown = requireServiceMethod("Rolls", Rolls, "StopCountdown"),
+    StartCountdown = requireServiceMethod("Rolls", Rolls, "StartCountdown"),
+    FinalizeRollSession = requireServiceMethod("Rolls", Rolls, "FinalizeRollSession"),
+}
+
 -- ----- Service accessors ----- --
 local function getReservesService()
     return Services.Reserves
@@ -146,10 +174,6 @@ do
         rolls = true,
         buttons = true,
     }
-
-    local countdownRun = false
-    local countdownTicker
-    local countdownEndTimer
 
     local assignItem, tradeItem, registerAwardedItem, clearMultiAwardState
     local advanceInventoryWinnerSelection
@@ -603,16 +627,15 @@ do
     end
 
     local function getRaidRosterVersion()
-        if Raid and Raid.GetRosterVersion then
-            return Raid:GetRosterVersion()
-        end
-        return nil
+        return RaidApi.GetRosterVersion(Raid)
     end
 
     local function invalidateCandidateCache()
-        if Raid and Raid.RequestMasterLootCandidateRefresh then
-            Raid:RequestMasterLootCandidateRefresh()
-        end
+        RaidApi.RequestMasterLootCandidateRefresh(Raid)
+    end
+
+    local function isCountdownRunning()
+        return RollsApi.IsCountdownRunning(Rolls) == true
     end
 
     local function computeFlowState()
@@ -625,7 +648,7 @@ do
         if lootState.fromInventory then
             return FLOW_STATES.INVENTORY
         end
-        if countdownRun then
+        if isCountdownRunning() then
             return FLOW_STATES.COUNTDOWN
         end
         if lootState.rollStarted then
@@ -970,23 +993,17 @@ do
 
     local function getDisplayedWinnerName(model)
         local currentWinner = getCurrentTradeWinner() or getCurrentMultiAwardWinner()
-        if currentWinner then
-            return currentWinner
-        end
-
         local activeModel = model or (buildRollUiModel and buildRollUiModel(true)) or nil
-        return activeModel and activeModel.winner or lootState.winner
+        return RollsApi.GetDisplayedWinner(Rolls, currentWinner, activeModel)
     end
 
     local function getResolvedRollWinnerName(model)
         local activeModel = model or (buildRollUiModel and buildRollUiModel(true)) or nil
-        return activeModel and activeModel.winner or lootState.winner
+        return RollsApi.GetResolvedWinner(Rolls, activeModel)
     end
 
     local function shouldUseTieReroll(model)
-        local resolution = model and model.resolution or nil
-        local requiredWinnerCount = tonumber(model and model.requiredWinnerCount) or 1
-        return resolution and resolution.requiresManualResolution == true and model and model.pickMode ~= true and requiredWinnerCount == 1
+        return RollsApi.ShouldUseTieReroll(Rolls, model)
     end
 
     local function buildMasterStatusText(currentFlowState, rollModel, hasItem, displayedWinner)
@@ -1088,36 +1105,6 @@ do
         module:RequestRefresh()
     end
 
-    local function matchHeldInventoryLoot(entry, raidNum, itemLink, holderName)
-        if type(entry) ~= "table" or tonumber(entry.rollType) ~= rollTypes.HOLD or not itemLink then
-            return false
-        end
-
-        local queryItemKey = Rolls and Rolls.GetRollSessionItemKey and Rolls:GetRollSessionItemKey(itemLink) or (Item.GetItemStringFromLink(itemLink) or itemLink)
-        local queryItemId = tonumber(Item.GetItemIdFromLink(itemLink)) or 0
-        local entryItemKey = entry.itemString or entry.itemLink
-        local sameItem = false
-        if queryItemKey and entryItemKey and queryItemKey == entryItemKey then
-            sameItem = true
-        elseif queryItemId > 0 and tonumber(entry.itemId) == queryItemId then
-            sameItem = true
-        end
-        if not sameItem then
-            return false
-        end
-
-        local resolvedHolder = holderName or Core.GetPlayerName()
-        if not resolvedHolder or resolvedHolder == "" then
-            return true
-        end
-
-        local holderNid = Raid.GetPlayerID and Raid:GetPlayerID(resolvedHolder, raidNum) or 0
-        if holderNid > 0 then
-            return tonumber(entry.looterNid) == holderNid
-        end
-        return true
-    end
-
     local function resolveHeldInventoryLootNid(itemLink, preferredLootNid, holderName)
         if not lootState.fromInventory or not itemLink then
             return 0
@@ -1128,30 +1115,15 @@ do
             return 0
         end
 
-        local preferred = tonumber(preferredLootNid) or 0
-        if preferred > 0 and Raid.GetLootByNid then
-            local entry = Raid:GetLootByNid(preferred, raidNum)
-            if matchHeldInventoryLoot(entry, raidNum, itemLink, holderName) then
-                return preferred
-            end
-        end
-
-        if Raid.GetHeldLootNid then
-            return tonumber(Raid:GetHeldLootNid(itemLink, raidNum, holderName, 0)) or 0
-        end
-
-        return 0
+        return tonumber(RaidApi.ResolveHeldLootNid(Raid, itemLink, preferredLootNid, holderName, raidNum)) or 0
     end
 
     updateRollSessionExpectedWinners = function(count)
-        if Rolls and Rolls.SetExpectedWinners then
-            return Rolls:SetExpectedWinners(count)
-        end
-        return nil
+        return RollsApi.SetExpectedWinners(Rolls, count)
     end
 
     local function ensureRollSession(itemLink, rollType, source)
-        local session = Rolls and Rolls.EnsureRollSession and Rolls:EnsureRollSession(itemLink, rollType, source) or nil
+        local session = RollsApi.EnsureRollSession(Rolls, itemLink, rollType, source)
         if not session then
             return nil
         end
@@ -1166,7 +1138,7 @@ do
                 lootState.currentRollItem = 0
             end
         end
-        Rolls:SyncSessionState(session)
+        RollsApi.SyncSessionState(Rolls, session)
         return session
     end
 
@@ -1236,28 +1208,7 @@ do
     end
 
     local function stopCountdown()
-        -- Cancel active countdown timers and clear their handles
-        addon.CancelTimer(countdownTicker, true)
-        addon.CancelTimer(countdownEndTimer, true)
-        countdownTicker = nil
-        countdownEndTimer = nil
-        countdownRun = false
-    end
-
-    local function shouldAnnounceCountdownTick(remaining, duration)
-        if remaining >= duration then
-            return true
-        end
-        if remaining >= 10 then
-            return (remaining % 10 == 0)
-        end
-        if remaining > 0 and remaining < 10 and remaining % 7 == 0 then
-            return true
-        end
-        if remaining > 0 and remaining >= 5 and remaining % 5 == 0 then
-            return true
-        end
-        return remaining > 0 and remaining <= 3
+        RollsApi.StopCountdown(Rolls)
     end
 
     local function refreshRollDisplay()
@@ -1277,27 +1228,9 @@ do
 
     local function startCountdown()
         stopCountdown()
-        countdownRun = true
         local duration = addon.options.countdownDuration or 0
-        local remaining = duration
-        if shouldAnnounceCountdownTick(remaining, duration) then
-            addon:Announce(L.ChatCountdownTic:format(remaining))
-        end
-        countdownTicker = addon.NewTicker(1, function()
-            remaining = remaining - 1
-            if remaining > 0 then
-                if shouldAnnounceCountdownTick(remaining, duration) then
-                    addon:Announce(L.ChatCountdownTic:format(remaining))
-                end
-            end
-        end, duration)
-        countdownEndTimer = addon.NewTimer(duration, function()
-            if not countdownRun then
-                return
-            end
-            stopCountdown()
-            addon:Announce(L.ChatCountdownEnd)
 
+        RollsApi.StartCountdown(Rolls, duration, nil, function()
             -- At zero: stop roll (enables selection in rolls) and refresh the UI
             Rolls:RecordRolls(false)
             refreshRollDisplay()
@@ -1305,9 +1238,8 @@ do
     end
 
     local function finalizeRollSession()
-        Rolls:RecordRolls(false)
-        stopCountdown()
-        refreshRollDisplay()
+        RollsApi.FinalizeRollSession(Rolls)
+        module:RequestRefresh()
     end
 
     local function updateMasterButtonsIfChanged(state)
@@ -1444,17 +1376,11 @@ do
     end
 
     local function resolveCandidateIndex(itemLink, playerName)
-        if Raid and Raid.FindMasterLootCandidateIndex then
-            return Raid:FindMasterLootCandidateIndex(itemLink, playerName)
-        end
-        return nil
+        return RaidApi.FindMasterLootCandidateIndex(Raid, itemLink, playerName)
     end
 
     local function hasMasterLootCandidates(itemLink)
-        if Raid and Raid.CanResolveMasterLootCandidates then
-            return Raid:CanResolveMasterLootCandidates(itemLink)
-        end
-        return false
+        return RaidApi.CanResolveMasterLootCandidates(Raid, itemLink)
     end
 
     local function validateAwardWinner(playerName, itemLink, rollType)
@@ -1872,7 +1798,7 @@ do
         if not addon:EnsureMasterOnlyAccess() then
             return false
         end
-        if countdownRun then
+        if isCountdownRunning() then
             addon:warn(Diag.W.LogMLCountdownActive)
             return
         end
@@ -1918,7 +1844,7 @@ do
         end
 
         lootState.winner = winnerName
-        countdownRun = false
+        stopCountdown()
         local itemLink = getItemLink()
         addon:debug(Diag.D.LogMLAwardRequested:format(tostring(winnerName), tonumber(lootState.currentRollType) or -1, Rolls:HighestRoll(winnerName) or 0, tostring(itemLink)))
 
@@ -2166,7 +2092,7 @@ do
         if btn == nil or lootState.lootCount <= 0 then
             return
         end
-        if countdownRun then
+        if isCountdownRunning() then
             return
         end
         clearMultiAwardState(false)
@@ -2277,7 +2203,7 @@ do
         if lootState.lootCount <= 0 or not lootState[targetKey] then
             return
         end
-        countdownRun = false
+        stopCountdown()
         local itemLink = getItemLink()
         if not itemLink then
             return
@@ -2316,7 +2242,7 @@ do
 
     -- Button: left click starts/stops countdown, right click finalizes rolls immediately.
     function module:BtnCountdown(_btn, button)
-        if countdownRun then
+        if isCountdownRunning() then
             finalizeRollSession()
         elseif not lootState.rollStarted then
             return
@@ -2572,10 +2498,11 @@ do
         if hasItemReserves and reserves and reserves.HasCurrentRaidPlayersForItem and itemId then
             hasEligibleRaidReserve = reserves:HasCurrentRaidPlayersForItem(itemId)
         end
+        local countdownRunning = isCountdownRunning()
         flagButtonsOnChange("hasEligibleRaidReserve", hasEligibleRaidReserve)
         flagButtonsOnChange("hasLootAccess", hasLootAccess)
         flagButtonsOnChange("hasReadyCheckAccess", hasReadyCheckAccess)
-        flagButtonsOnChange("countdownRun", countdownRun)
+        flagButtonsOnChange("countdownRun", countdownRunning)
         flagButtonsOnChange("flowState", currentFlowState)
 
         local rollResolution = rollModel.resolution or {}
@@ -2612,7 +2539,7 @@ do
         tooltipState.os = buildRollTooltip(L.BtnOS, false)
         tooltipState.sr = buildRollTooltip(L.BtnSR, true)
         tooltipState.free = buildRollTooltip(L.BtnFree, false)
-        tooltipState.countdown = (countdownRun or lootState.rollStarted) and L.TipMasterCountdown or L.TipMasterCountdownInactive
+        tooltipState.countdown = (countdownRunning or lootState.rollStarted) and L.TipMasterCountdown or L.TipMasterCountdownInactive
 
         if isTieReroll then
             tooltipState.award = L.TipMasterReroll
@@ -2673,7 +2600,7 @@ do
 
         if dirtyFlags.buttons then
             updateMasterButtonsIfChanged({
-                countdownText = countdownRun and L.BtnStop or L.BtnCountdown,
+                countdownText = countdownRunning and L.BtnStop or L.BtnCountdown,
                 awardText = isTieReroll and L.BtnReroll or (lootState.fromInventory and TRADE or L.BtnAward),
                 selectItemText = lootState.fromInventory and L.BtnRemoveItem or L.BtnSelectItem,
                 spamLootText = lootState.fromInventory and READY_CHECK or L.BtnSpamLoot,
@@ -2694,19 +2621,19 @@ do
                 disenchantTooltip = tooltipState.disenchant,
                 reserveListTooltip = tooltipState.reserveList,
                 lootCounterTooltip = tooltipState.lootCounter,
-                canSelectItem = hasLootAccess and (lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRun,
+                canSelectItem = hasLootAccess and (lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRunning,
                 canChangeItem = hasLootAccess and (currentFlowState ~= FLOW_STATES.COUNTDOWN),
                 canSpamLoot = lootState.lootCount >= 1 and ((lootState.fromInventory and hasReadyCheckAccess) or ((not lootState.fromInventory) and hasLootAccess)),
                 canStartRolls = hasLootAccess and lootState.lootCount >= 1,
                 canStartSR = hasLootAccess and canStartSR,
-                canCountdown = hasLootAccess and lootState.lootCount >= 1 and hasItem and (lootState.rollStarted or countdownRun),
+                canCountdown = hasLootAccess and lootState.lootCount >= 1 and hasItem and (lootState.rollStarted or countdownRunning),
                 canHold = hasLootAccess and lootState.lootCount >= 1 and lootState.holder,
                 canBank = hasLootAccess and lootState.lootCount >= 1 and lootState.banker,
                 canDisenchant = hasLootAccess and lootState.lootCount >= 1 and lootState.disenchanter,
-                canAward = hasLootAccess and lootState.lootCount >= 1 and lootState.rollsCount >= 1 and not countdownRun and canAwardSelection,
+                canAward = hasLootAccess and lootState.lootCount >= 1 and lootState.rollsCount >= 1 and not countdownRunning and canAwardSelection,
                 reserveListText = hasReserves and L.BtnOpenList or L.BtnInsertList,
                 canReserveList = hasLootAccess,
-                canRoll = hasLootAccess and record and canRoll and rolled == false and countdownRun,
+                canRoll = hasLootAccess and record and canRoll and rolled == false and countdownRunning,
                 canClear = hasLootAccess and lootState.rollsCount >= 1,
                 glowSR = hasLootAccess and canStartSR,
             })
@@ -2981,7 +2908,7 @@ do
     -- Inventory / cursor helpers
     -- ============================================================================
     local function applyInventoryItem(itemLink, totalCount, inBag, inSlot, slotCount)
-        if countdownRun then
+        if isCountdownRunning() then
             return false
         end
         if not itemLink then
@@ -3016,7 +2943,7 @@ do
     -- Accept an item currently held on the cursor (bag click-pickup).
     -- This is triggered by ItemBtn's OnClick.
     function module:TryAcceptInventoryItemFromCursor()
-        if countdownRun then
+        if isCountdownRunning() then
             return false
         end
         if not CursorHasItem or not CursorHasItem() then
