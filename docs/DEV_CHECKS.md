@@ -107,7 +107,7 @@ py -3 tools/krt.py build-release-zip --output-dir dist --write-checksum
 Expected:
 
 - metadata resolves from `!KRT/CHANGELOG.md` + `!KRT/!KRT.toc`
-- publish gate blocks suffix-only releases when numeric version is unchanged
+- publish gate accepts only strictly increasing publishable SemVer versions
 - archive contains only `!KRT/`
 
 ## 6) Hook Setup

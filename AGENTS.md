@@ -186,18 +186,17 @@ Durable preferences learned from recent conversations:
   execution; local runs should use Windows-native paths/tools, while cloud runs should use Linux-
   compatible paths/tools without requiring separate user workflows.
 - Prefer release-channel resolution from changelog release metadata: under `## Unreleased`, keep
-  `Release-Version: <version>` in `!KRT/CHANGELOG.md` and derive channel from the final suffix
-  letter (`A`=alpha internal/no publication, `B`=beta prerelease, `R`=stable release); GitHub
-  workflows, tags, and assets should validate against that metadata instead of manual prerelease
-  toggles.
-- Prefer release publication only when the numeric version changes (`x.x.x`); suffix-only changes
-  such as `0.6.0b -> 0.6.0r` must not publish a new release.
+  `Release-Version: <version>` in `!KRT/CHANGELOG.md` using SemVer forms `x.y.z` (stable),
+  `x.y.z-alpha.N` (internal/no publication), or `x.y.z-beta.N` (GitHub prerelease); workflows,
+  tags, and assets should validate against that metadata instead of manual prerelease toggles.
+- Prefer release publication only when the full SemVer increases; unchanged or lower versions
+  must not publish a new release.
 - Prefer semantic version bumps with this policy: increment `patch` for backward-compatible fixes
   and polish, increment `minor` for backward-compatible features or meaningful UI/workflow
   additions, and increment `major` only for breaking API/SavedVariables changes or required user
   migrations.
-- Treat channel suffix changes (`A/B/R`) as release-channel metadata only; they do not replace the
-  semantic version bump decision for `major.minor.patch`.
+- Treat prerelease transitions (`alpha.N`, `beta.N`, or `-> stable`) as explicit SemVer versions;
+  publish a new version instead of moving or replacing existing release tags/assets.
 - Prefer branch-agnostic release automation: release workflows should accept pushes from any branch,
   and manual release dispatch should target any ref once the workflow exists on the default branch.
 - Prefer manual release workflows to use the selected branch/ref directly; avoid redundant

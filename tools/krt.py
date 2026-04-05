@@ -69,6 +69,24 @@ ADDON_DIR = REPO_ROOT / "!KRT"
 TOC_PATH = ADDON_DIR / "!KRT.toc"
 ADDON_CHANGELOG_PATH = ADDON_DIR / "CHANGELOG.md"
 
+SEMVER_RELEASE_RE = re.compile(
+    r"^(?P<major>0|[1-9]\d*)\."
+    r"(?P<minor>0|[1-9]\d*)\."
+    r"(?P<patch>0|[1-9]\d*)"
+    r"(?:-(?P<channel>alpha|beta)\.(?P<prerelease_number>0|[1-9]\d*))?$"
+)
+LEGACY_RELEASE_RE = re.compile(r"^(\d+\.\d+\.\d+)([A-Za-z])$")
+RELEASE_CHANNEL_ORDER = {
+    "alpha": 0,
+    "beta": 1,
+    "release": 2,
+}
+LEGACY_RELEASE_CHANNELS = {
+    "A": "alpha",
+    "B": "beta",
+    "R": "release",
+}
+
 REPO_CHECK_SCRIPTS = {
     "api_nomenclature": "check-api-nomenclature.ps1",
     "layering": "check-layering.ps1",
@@ -272,61 +290,147 @@ def read_addon_changelog_release_version() -> str:
     return version
 
 
-def parse_release_version(version: str) -> tuple[str, str]:
-    match = re.fullmatch(r"(\d+\.\d+\.\d+)([A-Za-z])", version.strip())
-    if not match:
-        raise CliError(
-            f"Release version '{version}' must use the format x.x.xA, x.x.xB, or x.x.xR."
-        )
-    return match.group(1), match.group(2).upper()
+def build_release_version_info(
+    *,
+    raw_version: str,
+    version_format: str,
+    major: int,
+    minor: int,
+    patch: int,
+    channel: str,
+    prerelease_number: int | None,
+    legacy_suffix: str | None = None,
+) -> dict[str, Any]:
+    version_core = f"{major}.{minor}.{patch}"
+    normalized_semver = version_core
+    if channel != "release":
+        assert prerelease_number is not None
+        normalized_semver = f"{version_core}-{channel}.{prerelease_number}"
 
-
-def resolve_release_channel(version: str) -> tuple[str, bool]:
-    _, suffix = parse_release_version(version)
-    mapping = {
-        "A": ("alpha", True),
-        "B": ("beta", True),
-        "R": ("release", False),
+    precedence = (
+        major,
+        minor,
+        patch,
+        RELEASE_CHANNEL_ORDER[channel],
+        prerelease_number or 0,
+    )
+    return {
+        "raw_version": raw_version,
+        "version_format": version_format,
+        "version_core": version_core,
+        "normalized_semver": normalized_semver,
+        "channel": channel,
+        "prerelease": channel != "release",
+        "prerelease_number": prerelease_number,
+        "publishable": channel != "alpha",
+        "legacy_suffix": legacy_suffix,
+        "precedence": precedence,
     }
-    if suffix not in mapping:
-        raise CliError(
-            f"Release version '{version}' must end with A, B, or R to resolve alpha, beta, or release."
+
+
+def parse_release_version(version: str) -> dict[str, Any]:
+    value = version.strip()
+    match = SEMVER_RELEASE_RE.fullmatch(value)
+    if match:
+        channel = match.group("channel") or "release"
+        prerelease_number = match.group("prerelease_number")
+        return build_release_version_info(
+            raw_version=value,
+            version_format="semver",
+            major=int(match.group("major")),
+            minor=int(match.group("minor")),
+            patch=int(match.group("patch")),
+            channel=channel,
+            prerelease_number=int(prerelease_number) if prerelease_number else None,
         )
 
-    return mapping[suffix]
+    legacy_match = LEGACY_RELEASE_RE.fullmatch(value)
+    if legacy_match:
+        version_core, legacy_suffix = legacy_match.groups()
+        channel = LEGACY_RELEASE_CHANNELS.get(legacy_suffix.upper())
+        if not channel:
+            raise CliError(
+                f"Legacy release version '{version}' must end with A, B, or R."
+            )
+        major, minor, patch = [int(part) for part in version_core.split(".")]
+        prerelease_number = 1 if channel != "release" else None
+        return build_release_version_info(
+            raw_version=value,
+            version_format="legacy",
+            major=major,
+            minor=minor,
+            patch=patch,
+            channel=channel,
+            prerelease_number=prerelease_number,
+            legacy_suffix=legacy_suffix.upper(),
+        )
+
+    raise CliError(
+        "Release version "
+        f"'{version}' must use SemVer `x.y.z`, `x.y.z-alpha.N`, or `x.y.z-beta.N`."
+    )
+
+
+def compare_release_versions(left: dict[str, Any], right: dict[str, Any]) -> int:
+    if left["precedence"] < right["precedence"]:
+        return -1
+    if left["precedence"] > right["precedence"]:
+        return 1
+    return 0
+
+
+def format_release_progression_reason(
+    current_version: str,
+    previous_version: str,
+    comparison: int,
+) -> str:
+    if comparison == 0:
+        return (
+            "Release versions are unchanged after normalization. "
+            f"Current '{current_version}' vs previous '{previous_version}'."
+        )
+    if comparison < 0:
+        return (
+            "Release version must increase. "
+            f"Current '{current_version}' vs previous '{previous_version}'."
+        )
+
+    return (
+        "Release version increased. "
+        f"Current '{current_version}' vs previous '{previous_version}'."
+    )
 
 
 def resolve_release_metadata(expected_channel: str | None = None) -> dict[str, Any]:
     changelog_version = read_addon_changelog_release_version()
     addon_version = read_toc_version()
-    if changelog_version.lower() != addon_version.lower():
+    if changelog_version != addon_version:
         raise CliError(
             "!KRT/CHANGELOG.md Release-Version does not match !KRT/!KRT.toc version: "
             f"'{changelog_version}' vs '{addon_version}'."
         )
 
-    version_core, version_suffix = parse_release_version(changelog_version)
-    channel, prerelease = resolve_release_channel(changelog_version)
-    if expected_channel and channel != expected_channel:
+    release_info = parse_release_version(changelog_version)
+    if expected_channel and release_info["channel"] != expected_channel:
         raise CliError(
             f"Expected release channel '{expected_channel}', but changelog version '{changelog_version}' "
-            f"resolves to '{channel}'."
+            f"resolves to '{release_info['channel']}'."
         )
 
-    tag = f"{channel}-{changelog_version}"
-    publishable = channel != "alpha"
+    normalized_version = release_info["normalized_semver"]
+    tag = f"v{normalized_version}"
     return {
-        "version": changelog_version,
-        "version_core": version_core,
-        "version_suffix": version_suffix,
+        "version": normalized_version,
+        "source_version": changelog_version,
+        "version_core": release_info["version_core"],
         "addon_version": addon_version,
-        "channel": channel,
-        "prerelease": prerelease,
-        "publishable": publishable,
+        "channel": release_info["channel"],
+        "prerelease": release_info["prerelease"],
+        "publishable": release_info["publishable"],
         "tag": tag,
-        "asset_name": f"KRT-{tag}.zip",
-        "checksum_name": f"KRT-{tag}.zip.sha256",
-        "release_title": tag,
+        "asset_name": f"KRT-{normalized_version}.zip",
+        "checksum_name": f"KRT-{normalized_version}.zip.sha256",
+        "release_title": f"KRT {normalized_version}",
     }
 
 
@@ -813,29 +917,30 @@ def read_release_version_from_git_ref(ref: str) -> str | None:
 
 def release_publish_gate(args: argparse.Namespace) -> int:
     payload = resolve_release_metadata()
+    current_version_info = parse_release_version(payload["version"])
     previous_ref = args.previous_ref.strip()
     previous_version = read_release_version_from_git_ref(previous_ref) if previous_ref else None
     previous_version_core = None
-    if previous_version:
-        previous_version_core, _ = parse_release_version(previous_version)
+    previous_version_normalized = None
+    previous_version_info = parse_release_version(previous_version) if previous_version else None
+    if previous_version_info:
+        previous_version_core = previous_version_info["version_core"]
+        previous_version_normalized = previous_version_info["normalized_semver"]
 
     should_publish = False
     reason = ""
     if not payload["publishable"]:
         reason = "Channel is internal-only and must not publish."
-    elif not previous_version_core:
+    elif not previous_version_info:
         should_publish = True
         reason = "No previous addon changelog version was found."
-    elif previous_version_core == payload["version_core"]:
-        reason = (
-            "Numeric version is unchanged. "
-            f"Current '{payload['version']}' vs previous '{previous_version}'."
-        )
     else:
-        should_publish = True
-        reason = (
-            "Numeric version changed. "
-            f"Current '{payload['version']}' vs previous '{previous_version}'."
+        comparison = compare_release_versions(current_version_info, previous_version_info)
+        should_publish = comparison > 0
+        reason = format_release_progression_reason(
+            payload["version"],
+            previous_version_info["normalized_semver"],
+            comparison,
         )
 
     gate = {
@@ -847,6 +952,7 @@ def release_publish_gate(args: argparse.Namespace) -> int:
         "publishable": payload["publishable"],
         "previous_ref": previous_ref or None,
         "previous_version": previous_version,
+        "previous_version_normalized": previous_version_normalized,
         "previous_version_core": previous_version_core,
     }
 
@@ -979,7 +1085,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     release = subparsers.add_parser(
         "release-metadata",
-        help="Resolve release version, channel, and tag from !KRT/CHANGELOG.md and !KRT/!KRT.toc",
+        help="Resolve SemVer release metadata from !KRT/CHANGELOG.md and !KRT/!KRT.toc",
     )
     release.add_argument("--expected-channel", choices=("alpha", "beta", "release"), default="")
     release.add_argument("--json", action="store_true")
@@ -988,7 +1094,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     release_gate = subparsers.add_parser(
         "release-publish-gate",
-        help="Decide whether a publish is allowed by comparing current and previous numeric versions",
+        help="Decide whether publish is allowed by comparing release-version precedence",
     )
     release_gate.add_argument("--previous-ref", default="")
     release_gate.add_argument("--json", action="store_true")

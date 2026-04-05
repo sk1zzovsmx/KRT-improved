@@ -19,7 +19,7 @@ Examples:
 - SV fixture round-trip: `python3 tools/krt.py run-sv-roundtrip --fixtures`
 - SV validator: `python3 tools/krt.py run-raid-validator --saved-variables-path "<path>/!KRT.lua"`
 - Release metadata from `!KRT/CHANGELOG.md`: `python3 tools/krt.py release-metadata --json`
-- Publish gate by numeric version: `python3 tools/krt.py release-publish-gate --previous-ref HEAD^ --json`
+- Publish gate by SemVer progression: `python3 tools/krt.py release-publish-gate --previous-ref HEAD^ --json`
 - Release packaging: `python3 tools/krt.py build-release-zip --output-dir dist --write-checksum`
 - Hook install: `python3 tools/krt.py install-hooks`
 - Mechanic wrapper: `python3 tools/krt.py mech AddonValidate --json`

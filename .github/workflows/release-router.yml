@@ -135,7 +135,6 @@ jobs:
               shell: bash
               env:
                   DERIVED_TAG: ${{ needs.resolve.outputs.tag }}
-                  CHANNEL: ${{ needs.resolve.outputs.channel }}
                   GH_TOKEN: ${{ github.token }}
               run: |
                   set -euo pipefail
@@ -156,14 +155,12 @@ jobs:
                           exit 0
                       fi
 
-                      if [[ "${CHANNEL}" == "release" ]]; then
-                          echo "Release tag ${DERIVED_TAG} already exists on ${existing_commit} and will not be moved." >&2
-                          exit 1
-                      fi
+                      echo "Release tag ${DERIVED_TAG} already exists on ${existing_commit} and is immutable." >&2
+                      exit 1
                   fi
 
-                  git -C repo tag -fa "${DERIVED_TAG}" -m "Release ${DERIVED_TAG}" "${target_commit}"
-                  git -C repo push origin "refs/tags/${DERIVED_TAG}" --force
+                  git -C repo tag -a "${DERIVED_TAG}" -m "Release ${DERIVED_TAG}" "${target_commit}"
+                  git -C repo push origin "refs/tags/${DERIVED_TAG}"
 
     publish-beta:
         if: ${{ needs.resolve.outputs.should_publish == 'true' && needs.resolve.outputs.channel == 'beta' }}

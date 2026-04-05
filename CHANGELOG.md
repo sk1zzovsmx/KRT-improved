@@ -16,12 +16,13 @@ Dates are in YYYY-MM-DD.
 - **Behavior:** Loot Counter grouped-count announce now requires raid lead or
   assistant permission while in raid.
 - **Tooling:** Release channel resolution is now driven by
-  `!KRT/CHANGELOG.md` `Release-Version` suffixes (`A` internal/no publish,
-  `B` beta prerelease, `R` stable release), and GitHub publishing
-  routes only publishable channels through the shared workflow.
-- **Tooling:** Release publication now requires a changed numeric version
-  (`x.x.x`); suffix-only transitions such as `0.6.0b -> 0.6.0r` do not
-  publish.
+  `!KRT/CHANGELOG.md` `Release-Version` SemVer values: `x.y.z-alpha.N`
+  stays internal, `x.y.z-beta.N` publishes as a GitHub prerelease, and
+  `x.y.z` publishes as a stable release.
+- **Tooling:** Release publication now requires a strictly newer SemVer
+  than the previous ref. `0.6.0-beta.1 -> 0.6.0-beta.2` and
+  `0.6.0-beta.2 -> 0.6.0` publish, while unchanged or downgraded versions
+  do not.
 - **Tooling:** Added `tools/krt.py` as the canonical cross-platform entrypoint
   for repo workflows such as release packaging, hook install, Mechanic calls,
   MCP startup, and readiness checks on both Windows and Linux.
@@ -32,6 +33,9 @@ Dates are in YYYY-MM-DD.
 - **Release:** GitHub packaging now uploads both `KRT-<tag>.zip` and
   `KRT-<tag>.zip.sha256`; the legacy `tools/build-release-zip.ps1` path
   remains only as a compatibility shim around the same Python owner.
+- **Release:** Published release tags and assets are now immutable per
+  SemVer version: workflows refuse to move an existing version tag or
+  clobber assets on an existing GitHub release.
 - **Regression/Bugfix:** Manual release creation keeps strict tag validation
   (`--verify-tag`) to block non-tag refs.
 - **Regression/Bugfix:** Release upload now falls back gracefully to ZIP-only

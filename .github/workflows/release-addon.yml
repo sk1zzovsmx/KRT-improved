@@ -4,7 +4,7 @@ on:
     workflow_call:
         inputs:
             expected_channel:
-                description: "Expected release channel from CHANGELOG Release-Version suffix"
+                description: "Expected release channel from CHANGELOG Release-Version SemVer"
                 required: true
                 type: string
             requested_ref:
@@ -94,7 +94,7 @@ jobs:
                   echo "asset_path=dist/${ASSET_NAME}" >> "$GITHUB_OUTPUT"
                   echo "checksum_path=dist/${ASSET_NAME}.sha256" >> "$GITHUB_OUTPUT"
 
-            - name: Create or update GitHub release
+            - name: Create GitHub release
               shell: bash
               env:
                   GH_TOKEN: ${{ github.token }}
@@ -115,21 +115,38 @@ jobs:
                   fi
 
                   if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-                      gh release upload "${TAG}" "${assets[@]}" \
+                      existing_assets="$(gh release view "${TAG}" \
                           --repo "${GITHUB_REPOSITORY}" \
-                          --clobber
-                  else
-                      release_args=(
-                          release create "${TAG}" "${assets[@]}"
-                          --repo "${GITHUB_REPOSITORY}"
-                          --title "${RELEASE_TITLE}"
-                          --generate-notes
-                          --verify-tag
-                      )
+                          --json assets \
+                          --jq '.assets[].name')"
+                      missing_assets=()
+                      for asset in "${assets[@]}"; do
+                          asset_name="$(basename "${asset}")"
+                          if ! grep -Fxq "${asset_name}" <<< "${existing_assets}"; then
+                              missing_assets+=("${asset_name}")
+                          fi
+                      done
 
-                      if [[ "${PRERELEASE}" == "true" ]]; then
-                          release_args+=(--prerelease)
+                      if [[ ${#missing_assets[@]} -eq 0 ]]; then
+                          echo "Release ${TAG} already exists with the expected assets."
+                          exit 0
                       fi
 
-                      gh "${release_args[@]}"
+                      echo "Release ${TAG} already exists but is missing expected assets: ${missing_assets[*]}." >&2
+                      echo "SemVer releases are immutable. Publish a new version instead of replacing assets." >&2
+                      exit 1
                   fi
+
+                  release_args=(
+                      release create "${TAG}" "${assets[@]}"
+                      --repo "${GITHUB_REPOSITORY}"
+                      --title "${RELEASE_TITLE}"
+                      --generate-notes
+                      --verify-tag
+                  )
+
+                  if [[ "${PRERELEASE}" == "true" ]]; then
+                      release_args+=(--prerelease)
+                  fi
+
+                  gh "${release_args[@]}"
