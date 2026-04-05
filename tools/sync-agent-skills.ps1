@@ -258,6 +258,12 @@ foreach ($source in $manifest.sources) {
     $repo = [string]$source.repo
     $commit = [string]$source.commit
     $sourceBasePath = Normalize-RelativePath -PathValue ([string]$source.sourceBasePath) -FieldName "sourceBasePath"
+    $verifyPolicyRaw = [string]$source.verifyPolicy
+    $verifyPolicy = if ([string]::IsNullOrWhiteSpace($verifyPolicyRaw)) {
+        "exact"
+    } else {
+        $verifyPolicyRaw.Trim().ToLowerInvariant()
+    }
     $destinationPath = Normalize-RelativePath -PathValue ([string]$source.destinationPath) -FieldName "destinationPath"
 
     if ([string]::IsNullOrWhiteSpace($skill)) {
@@ -265,6 +271,9 @@ foreach ($source in $manifest.sources) {
     }
     if ([string]::IsNullOrWhiteSpace($repo) -or [string]::IsNullOrWhiteSpace($commit)) {
         throw "Manifest source '$skill' has empty repo/commit."
+    }
+    if ($verifyPolicy -ne "exact" -and $verifyPolicy -ne "presence") {
+        throw "Manifest source '$skill' has invalid verifyPolicy '$verifyPolicy'. Use 'exact' or 'presence'."
     }
     if (-not $destinationPath.StartsWith(".agents/skills/", [System.StringComparison]::Ordinal)) {
         throw "Destination for '$skill' must stay under .agents/skills/: $destinationPath"
@@ -307,7 +316,7 @@ foreach ($source in $manifest.sources) {
                 $verificationProblems.Add("Missing file for '$skill': $destinationPath/$relativePath")
                 continue
             }
-            if (-not (Test-ByteArrayEqual -Left $localBytes -Right $expectedBytes)) {
+            if ($verifyPolicy -eq "exact" -and -not (Test-ByteArrayEqual -Left $localBytes -Right $expectedBytes)) {
                 $verificationProblems.Add("Modified file for '$skill': $destinationPath/$relativePath")
             } else {
                 $verifiedFiles = $verifiedFiles + 1

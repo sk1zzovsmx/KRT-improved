@@ -6,6 +6,7 @@
             "repo": "Falkicon/Mechanic",
             "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
             "sourceBasePath": ".agent/skills/s-clean",
+            "verifyPolicy": "presence",
             "destinationPath": ".agents/skills/s-clean"
         },
         {
@@ -13,6 +14,7 @@
             "repo": "Falkicon/Mechanic",
             "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
             "sourceBasePath": ".agent/skills/s-audit",
+            "verifyPolicy": "presence",
             "destinationPath": ".agents/skills/s-audit"
         },
         {
@@ -20,6 +22,7 @@
             "repo": "Falkicon/Mechanic",
             "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
             "sourceBasePath": ".agent/skills/s-debug",
+            "verifyPolicy": "presence",
             "destinationPath": ".agents/skills/s-debug"
         },
         {
@@ -27,6 +30,7 @@
             "repo": "Falkicon/Mechanic",
             "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
             "sourceBasePath": ".agent/skills/s-working",
+            "verifyPolicy": "presence",
             "destinationPath": ".agents/skills/s-working"
         },
         {
@@ -34,6 +38,7 @@
             "repo": "Falkicon/Mechanic",
             "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
             "sourceBasePath": ".agent/skills/s-lint",
+            "verifyPolicy": "presence",
             "destinationPath": ".agents/skills/s-lint"
         },
         {
@@ -41,6 +46,7 @@
             "repo": "Falkicon/Mechanic",
             "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
             "sourceBasePath": ".agent/skills/s-release",
+            "verifyPolicy": "presence",
             "destinationPath": ".agents/skills/s-release"
         },
         {
@@ -48,6 +54,7 @@
             "repo": "Falkicon/Mechanic",
             "commit": "41ef25dcfcd7c1450577b5826fbba9c571c7c75d",
             "sourceBasePath": ".agent/skills/k-docs",
+            "verifyPolicy": "presence",
             "destinationPath": ".agents/skills/k-docs"
         }
     ]
