@@ -6,19 +6,18 @@ All notable changes to !KRT will be documented in this file.
 
 Release-Version: 0.7.0-beta.1
 
+### Added
+
+- Extended synthetic raid-roll debug helper: `/krt debug raid rolls` now
+  accepts optional `tie` mode (`/krt debug raid rolls tie`) to submit
+  deterministic high-priority ties across a random 2-3 subset of synthetic
+  players, making tie-resolution testing faster.
+
 ### Changed
 
 - Logger loot now shows the item tooltip on mouse over the item icon only and
   anchors it to the cursor, with an `itemId` fallback hyperlink when a stored
   `itemLink` is missing.
-
-- Extended synthetic raid-roll debug helper: `/krt debug raid rolls`
-  now accepts optional `tie` mode (`/krt debug raid rolls tie`) to
-  submit deterministic high-priority ties across a random 2-3 subset
-  of synthetic players, making tie-resolution testing faster.
-- Fixed single-winner tie flow in Master UI: tie reroll is now available
-  even when the winner list is in pick mode and no manual winner has been
-  selected yet.
 - Countdown late-roll handling now honors `countdownRollsBlock`: when disabled,
   rolls submitted after countdown expiry remain accepted and are marked as
   `OOT` in the rolls Info column, but `OOT` responses are excluded from
@@ -26,10 +25,6 @@ Release-Version: 0.7.0-beta.1
 - Improved Master status readability: long status lines now wrap instead of
   clipping (for example countdown-bypassed rolling status), and the rolls
   header/list anchors were shifted to preserve spacing.
-- Master roll intake now reopens correctly after `MS/OS/SR/FREE`
-  announcements even when the Rolls service pre-bootstraps the roll session;
-  opening roll intake restores the canonical `rollStarted` state so countdown
-  can be started again from the Countdown button.
 - Hardened master-looter-only behavior in raid context:
   non-master clients no longer run loot/roll ingestion
   (`CHAT_MSG_LOOT`/`CHAT_MSG_SYSTEM`) and slash/minimap
@@ -47,27 +42,19 @@ Release-Version: 0.7.0-beta.1
   Raw chat lines such as "Need Roll - 67 for ... by ..." are now
   parsed too, so those values no longer fall through as passive
   zero-value wins.
-- Isolated passive Group Loot pending awards from Master Looter
-  award resolution: switching from Group Loot/NBG to ML no
-  longer reuses stale `GL:*` pending sessions on the first
-  ML award.
 - Centralized raid-role capability checks so loot, raid-warning,
   changes broadcast, ready-check, and raid-icon actions derive
   their enabled/disabled state from a shared policy.
+- Published release metadata now uses SemVer forms
+  (`x.y.z`, `x.y.z-alpha.N`, `x.y.z-beta.N`) in `Release-Version`
+  and TOC versioning so workflows and packaged assets resolve
+  consistently.
 - Temporarily disabled the Logger Export tab again while the
   export workflow remains staged off.
 - Extracted Logger Store/View/Actions into `Services/Logger/Store.lua`,
   `Services/Logger/View.lua`, and `Services/Logger/Actions.lua`;
-  Controllers/Logger.lua now imports them via `addon.Services.Logger`.
+  `Controllers/Logger.lua` now imports them via `addon.Services.Logger`.
   No behavior changes.
-- Hardened Master loot-slot resolution so award/trade flows keep matching
-  the same item even when the live loot window hyperlink payload differs
-  from the stored item link; multi-award slot scanning now uses the same
-  itemId fallback.
-- Hardened boss-context recovery for loot logging: boss events now populate
-  a dedicated short-lived context independent from `lastBoss`; loot logging
-  consumes that event context first, then falls back to recent real boss
-  kills and only finally to the current target / `_TrashMob_`.
 - Started the Changes slimdown implementation without adding new service files:
   raid-scoped changes CRUD, broadcast capability checks, and announce/demand
   text builders now live in `Services/Raid.lua`, while
@@ -111,6 +98,28 @@ Release-Version: 0.7.0-beta.1
   time and use direct service calls (removed residual compatibility fallback
   branches to Raid/Chat). Test harness service defaults were aligned to the
   hardened contracts. No behavior changes.
+
+### Fixed
+
+- Fixed single-winner tie flow in Master UI: tie reroll is now available
+  even when the winner list is in pick mode and no manual winner has been
+  selected yet.
+- Master roll intake now reopens correctly after `MS/OS/SR/FREE`
+  announcements even when the Rolls service pre-bootstraps the roll session;
+  opening roll intake restores the canonical `rollStarted` state so countdown
+  can be started again from the Countdown button.
+- Isolated passive Group Loot pending awards from Master Looter
+  award resolution: switching from Group Loot/NBG to ML no
+  longer reuses stale `GL:*` pending sessions on the first
+  ML award.
+- Hardened Master loot-slot resolution so award/trade flows keep matching
+  the same item even when the live loot window hyperlink payload differs
+  from the stored item link; multi-award slot scanning now uses the same
+  itemId fallback.
+- Hardened boss-context recovery for loot logging: boss events now populate
+  a dedicated short-lived context independent from `lastBoss`; loot logging
+  consumes that event context first, then falls back to recent real boss
+  kills and only finally to the current target / `_TrashMob_`.
 
 ## [0.6.2b] - 2026-03-21
 

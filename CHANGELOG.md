@@ -9,6 +9,32 @@ Dates are in YYYY-MM-DD.
   a stored `itemLink` is missing.
 - **UI:** Master now disables `MS/OS/SR/FREE` while countdown is running,
   and roll-start actions are ignored until countdown is stopped/finalized.
+- **Debugging:** `/krt debug raid rolls` now accepts optional `tie` mode
+  (`/krt debug raid rolls tie`) to submit deterministic high-priority ties
+  across a random 2-3 subset of synthetic players, making tie-resolution
+  testing faster.
+- **Behavior:** When `countdownRollsBlock` is disabled, rolls submitted after
+  countdown expiry remain visible as `OOT` in the rolls `Info` column, but are
+  excluded from resolver candidates, manual winner selection, and tie rerolls.
+- **Bugfix:** Single-winner ties can now reroll correctly even while the
+  Master UI winner list is in pick mode and no manual winner has been selected
+  yet.
+- **UI:** Master long workflow status lines now wrap instead of clipping, and
+  the rolls header/list anchors were retuned to preserve spacing for longer
+  messages.
+- **Behavior:** Non-master clients no longer run master-loot loot/roll
+  ingestion from `CHAT_MSG_LOOT` or `CHAT_MSG_SYSTEM`, and slash/minimap
+  entrypoints now block master-only modules.
+- **Behavior:** Passive Group Loot / Need Before Greed results now populate
+  Logger history with `NE`, `GR`, and `DE` roll types, preserve numeric
+  `rollValue` when available, deduplicate duplicate loot receipts, and
+  backfill late numeric updates.
+- **Bugfix:** Passive Group Loot pending awards are now isolated from Master
+  Looter award resolution, so switching from Group Loot/NBG to ML no longer
+  reuses stale `GL:*` pending sessions.
+- **Behavior:** Raid-role capability checks are now centralized across loot,
+  raid-warning, changes broadcast, ready-check, raid-icon, and grouped-count
+  announce actions.
 - **UI:** Loot Counter now exposes a `Spam Counter` button that announces grouped
   MS counts in chat using `+N` buckets (for example `+1: Name1, Name2`).
 - **UI:** Loot Counter now includes a `Reset All` button with confirmation popup
