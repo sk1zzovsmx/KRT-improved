@@ -314,7 +314,8 @@ local function rollsApi(tbl)
         function tbl:ShouldUseTieReroll(model)
             local resolution = model and model.resolution or nil
             local requiredWinnerCount = tonumber(model and model.requiredWinnerCount) or 1
-            return resolution and resolution.requiresManualResolution == true and model and model.pickMode ~= true and requiredWinnerCount == 1
+            local selectedCount = tonumber(model and model.msCount) or 0
+            return resolution and resolution.requiresManualResolution == true and requiredWinnerCount == 1 and selectedCount <= 0
         end
     end
 
@@ -4156,6 +4157,142 @@ test("accepted roll stays eligible after using the last allowed roll", function(
     assertTrue(first.isEligible == true, "expected recorded response to stay eligible in the UI model")
 end)
 
+test("late accepted rolls show OOT info when intake remains open", function()
+    local h = newHarness()
+    local link = h.registerItem(9306, "Outoftimeblade")
+
+    h.addon.Services.Loot = {
+        GetItem = function(index)
+            if index ~= 1 then
+                return nil
+            end
+            return { itemLink = link }
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Services/Rolls.lua")
+
+    local Rolls = h.addon.Services.Rolls
+    h.feature.lootState.lootCount = 1
+    h.feature.lootState.selectedItemCount = 1
+    h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
+    h.feature.lootState.fromInventory = false
+
+    Rolls:RecordRolls(true)
+    assertTrue(Rolls:StartCountdown(5) == true, "expected countdown to start")
+    h:flushTimers()
+
+    local ok, reason = Rolls:SubmitDebugRoll("Alice", 87)
+    local model = Rolls:FetchRolls()
+    local row = model and model.rows and model.rows[1]
+
+    assertTrue(ok == true, "expected late roll to stay accepted while intake is open")
+    assertEqual(reason, nil, "expected no rejection reason for accepted late roll")
+    assertEqual(#Rolls:GetRolls(), 1, "expected the accepted late roll to be recorded")
+    assertTrue(model ~= nil and model.resolution ~= nil, "expected a display model with resolution")
+    assertEqual(#(model.resolution.autoWinners or {}), 0, "expected OOT late roll to stay out of resolver winners")
+    assertTrue(row ~= nil, "expected the late roll to appear in the display model")
+    assertEqual(row.status, "ROLL", "expected accepted late roll to keep ROLL status")
+    assertTrue(row.isEligible == true, "expected accepted late roll to stay eligible")
+    assertTrue(row.selectionAllowed ~= true, "expected accepted OOT row to remain non-selectable")
+    assertEqual(row.infoText, "OOT", "expected accepted late roll to be tagged as OOT in info")
+    assertTrue(Rolls:ShouldUseTieReroll(model) ~= true, "expected OOT late roll to never trigger tie reroll")
+end)
+
+test("late tied OOT rolls stay excluded from manual resolution and reroll", function()
+    local h = newHarness()
+    local link = h.registerItem(9307, "Outoftimetieblade")
+
+    h.addon.Services.Loot = {
+        GetItem = function(index)
+            if index ~= 1 then
+                return nil
+            end
+            return { itemLink = link }
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Services/Rolls.lua")
+
+    local Rolls = h.addon.Services.Rolls
+    h.feature.lootState.lootCount = 1
+    h.feature.lootState.selectedItemCount = 1
+    h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
+    h.feature.lootState.fromInventory = false
+
+    Rolls:RecordRolls(true)
+    assertTrue(Rolls:StartCountdown(5) == true, "expected countdown to start")
+    h:flushTimers()
+
+    local okAlice, reasonAlice = Rolls:SubmitDebugRoll("Alice", 96)
+    local okBob, reasonBob = Rolls:SubmitDebugRoll("Bob", 96)
+    local model = Rolls:FetchRolls()
+    local rows = model and model.rows or {}
+    local aliceRow
+    local bobRow
+
+    for i = 1, #rows do
+        local row = rows[i]
+        if row and row.name == "Alice" then
+            aliceRow = row
+        elseif row and row.name == "Bob" then
+            bobRow = row
+        end
+    end
+
+    assertTrue(okAlice == true and okBob == true, "expected tied late rolls to be accepted while intake stays open")
+    assertEqual(reasonAlice, nil, "expected no rejection reason for Alice")
+    assertEqual(reasonBob, nil, "expected no rejection reason for Bob")
+    assertTrue(model ~= nil and model.resolution ~= nil, "expected a display model with resolution")
+    assertTrue(model.resolution.requiresManualResolution ~= true, "expected OOT-only ties to stay out of manual resolution")
+    assertEqual(#(model.resolution.autoWinners or {}), 0, "expected OOT-only ties to produce no resolver winners")
+    assertTrue(Rolls:ShouldUseTieReroll(model) ~= true, "expected OOT-only ties to never trigger tie reroll")
+    assertTrue(aliceRow ~= nil and bobRow ~= nil, "expected tied rows to appear in the display model")
+    assertTrue(aliceRow.selectionAllowed ~= true and bobRow.selectionAllowed ~= true, "expected tied OOT rows to remain non-clickable/non-selectable")
+    assertEqual(aliceRow.infoText, "OOT", "expected Alice late tie row to retain OOT tag")
+    assertEqual(bobRow.infoText, "OOT", "expected Bob late tie row to retain OOT tag")
+end)
+
 test("harness raid capability facade mirrors shared loot and leadership policy", function()
     local h = newHarness()
 
@@ -5305,7 +5442,8 @@ test("master award button triggers reroll for single-select ties", function()
     h.addon.Services.Rolls = {
         GetDisplayModel = function()
             return {
-                pickMode = false,
+                pickMode = true,
+                msCount = 0,
                 requiredWinnerCount = 1,
                 winner = nil,
                 resolution = {

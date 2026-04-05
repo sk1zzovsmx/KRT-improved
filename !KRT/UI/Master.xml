@@ -100,7 +100,7 @@
 				</FontString>
 				<FontString name="$parentStatus" inherits="KRTFontStringGray" justifyH="LEFT" justifyV="TOP">
 					<Size>
-						<AbsDimension x="205" y="18" />
+						<AbsDimension x="205" y="30" />
 					</Size>
 					<Anchors>
 						<Anchor point="TOPLEFT">
@@ -114,7 +114,7 @@
 					<Anchors>
 						<Anchor point="TOPLEFT">
 							<Offset>
-								<AbsDimension x="16" y="-148" />
+								<AbsDimension x="16" y="-160" />
 							</Offset>
 						</Anchor>
 						<Anchor point="TOPRIGHT" relativeTo="$parentRollsHeaderInfo" relativePoint="TOPLEFT">
@@ -131,7 +131,7 @@
 					<Anchors>
 						<Anchor point="TOPRIGHT">
 							<Offset>
-								<AbsDimension x="-34" y="-148" />
+								<AbsDimension x="-34" y="-160" />
 							</Offset>
 						</Anchor>
 					</Anchors>
@@ -285,7 +285,7 @@
 				<Anchors>
 					<Anchor point="TOPLEFT">
 						<Offset>
-							<AbsDimension x="12" y="-163" />
+							<AbsDimension x="12" y="-175" />
 						</Offset>
 					</Anchor>
 					<Anchor point="BOTTOMRIGHT">

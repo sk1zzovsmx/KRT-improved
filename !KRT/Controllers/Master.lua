@@ -1065,6 +1065,9 @@ do
 
         if currentFlowState == FLOW_STATES.ROLLING then
             if not selectionAllowed then
+                if rollModel and rollModel.countdownExpired == true then
+                    return L.StrMasterStatusRollingBypassed:format(tonumber(lootState.rollsCount) or 0)
+                end
                 return L.StrMasterStatusRolling:format(tonumber(lootState.rollsCount) or 0)
             end
 
@@ -1223,10 +1226,13 @@ do
     local function startCountdown()
         stopCountdown()
         local duration = addon.options.countdownDuration or 0
+        local blockAfterCountdown = addon.options.countdownRollsBlock == true
 
         RollsApi.StartCountdown(Rolls, duration, nil, function()
-            -- At zero: stop roll (enables selection in rolls) and refresh the UI
-            Rolls:RecordRolls(false)
+            -- At zero: either block late rolls or keep intake open and tag late responses as OOT.
+            if blockAfterCountdown then
+                Rolls:RecordRolls(false)
+            end
             refreshRollDisplay()
         end)
     end
@@ -2309,30 +2315,50 @@ do
         if not frameName then
             return
         end
-        getNamedPart("ConfigBtn"):SetText(L.BtnConfigure)
-        getNamedPart("SelectItemBtn"):SetText(L.BtnSelectItem)
-        getNamedPart("SpamLootBtn"):SetText(L.BtnSpamLoot)
-        getNamedPart("MSBtn"):SetText(L.BtnMS)
-        getNamedPart("OSBtn"):SetText(L.BtnOS)
-        getNamedPart("SRBtn"):SetText(L.BtnSR)
-        getNamedPart("FreeBtn"):SetText(L.BtnFree)
-        getNamedPart("CountdownBtn"):SetText(L.BtnCountdown)
-        getNamedPart("AwardBtn"):SetText(L.BtnAward)
-        getNamedPart("RollBtn"):SetText(L.BtnRoll)
-        getNamedPart("ClearBtn"):SetText(L.BtnClear)
-        getNamedPart("HoldBtn"):SetText(L.BtnHold)
-        getNamedPart("BankBtn"):SetText(L.BtnBank)
-        getNamedPart("DisenchantBtn"):SetText(L.BtnDisenchant)
-        getNamedPart("Name"):SetText(L.StrNoItemSelected)
-        if getNamedPart("Status") then
-            getNamedPart("Status"):SetText(L.StrMasterStatusIdle)
+
+        local function setPartText(suffix, text)
+            local part = getNamedPart(suffix)
+            if part and part.SetText then
+                part:SetText(text)
+            end
+            return part
         end
-        getNamedPart("RollsHeaderPlayer"):SetText(L.StrPlayer)
-        getNamedPart("RollsHeaderInfo"):SetText(L.StrInfo)
-        getNamedPart("RollsHeaderCounter"):SetText(L.StrCounter)
-        getNamedPart("RollsHeaderRoll"):SetText(L.StrRolls)
-        getNamedPart("ReserveListBtn"):SetText(L.BtnInsertList)
-        getNamedPart("LootCounterBtn"):SetText(L.BtnLootCounter)
+
+        setPartText("ConfigBtn", L.BtnConfigure)
+        setPartText("SelectItemBtn", L.BtnSelectItem)
+        setPartText("SpamLootBtn", L.BtnSpamLoot)
+        setPartText("MSBtn", L.BtnMS)
+        setPartText("OSBtn", L.BtnOS)
+        setPartText("SRBtn", L.BtnSR)
+        setPartText("FreeBtn", L.BtnFree)
+        setPartText("CountdownBtn", L.BtnCountdown)
+        setPartText("AwardBtn", L.BtnAward)
+        setPartText("RollBtn", L.BtnRoll)
+        setPartText("ClearBtn", L.BtnClear)
+        setPartText("HoldBtn", L.BtnHold)
+        setPartText("BankBtn", L.BtnBank)
+        setPartText("DisenchantBtn", L.BtnDisenchant)
+        setPartText("Name", L.StrNoItemSelected)
+
+        local status = getNamedPart("Status")
+        if status then
+            if status.SetWordWrap then
+                status:SetWordWrap(true)
+            end
+            if status.SetNonSpaceWrap then
+                status:SetNonSpaceWrap(false)
+            end
+            if status.SetText then
+                status:SetText(L.StrMasterStatusIdle)
+            end
+        end
+
+        setPartText("RollsHeaderPlayer", L.StrPlayer)
+        setPartText("RollsHeaderInfo", L.StrInfo)
+        setPartText("RollsHeaderCounter", L.StrCounter)
+        setPartText("RollsHeaderRoll", L.StrRolls)
+        setPartText("ReserveListBtn", L.BtnInsertList)
+        setPartText("LootCounterBtn", L.BtnLootCounter)
         Frames.SetFrameTitle(frameName, MASTER_LOOTER)
 
         local function requestItemCountRefresh()
@@ -2515,7 +2541,11 @@ do
         local awardTarget = displayedWinner or getCurrentTradeWinner() or getCurrentMultiAwardWinner()
         local tooltipState = {}
         if rollResolution.requiresManualResolution and pickMode then
-            canAwardSelection = msCount >= (tonumber(rollModel.requiredWinnerCount) or 1)
+            if isTieReroll then
+                canAwardSelection = true
+            else
+                canAwardSelection = msCount >= (tonumber(rollModel.requiredWinnerCount) or 1)
+            end
         end
         if selectedItemCount < 1 then
             selectedItemCount = 1

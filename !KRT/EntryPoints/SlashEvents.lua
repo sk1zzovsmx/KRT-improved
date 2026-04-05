@@ -174,7 +174,7 @@ local function showDebugRaidHelp()
     addon:info(format(L.StrCmdCommands, "krt debug raid"), "KRT")
     printHelp("seed", L.StrCmdDebugRaidSeed)
     printHelp("clear", L.StrCmdDebugRaidClear)
-    printHelp("rolls", L.StrCmdDebugRaidRolls)
+    printHelp("rolls [tie]", L.StrCmdDebugRaidRolls)
     printHelp("roll <1-4|name> [1-100]", L.StrCmdDebugRaidRoll)
 end
 
@@ -396,7 +396,16 @@ registerAliases(cmdDebug, function(rest)
         end
 
         if raidCmd == "rolls" or raidCmd == "all" then
-            result, err = debugService:RollRaidPlayers()
+            local rollsMode, rollsModeExtra = Strings.SplitArgs(raidArg)
+            if rollsMode == "" then
+                rollsMode = nil
+            end
+            if (rollsMode and rollsMode ~= "tie") or (rollsModeExtra and rollsModeExtra ~= "") then
+                showDebugRaidHelp()
+                return
+            end
+
+            result, err = debugService:RequestRaidRolls(rollsMode)
             if not result then
                 reportDebugRaidError(err)
                 return
@@ -413,7 +422,11 @@ registerAliases(cmdDebug, function(rest)
                 addon:warn(L.MsgDebugRaidRollsPartial, result.submitted, result.total, tostring(result.firstFailure))
                 return
             end
-            addon:info(L.MsgDebugRaidRolls, result.submitted, result.total)
+            if result.tieMode then
+                addon:info(L.MsgDebugRaidRollsTie, result.submitted, result.total, tonumber(result.tieCount) or 0, tonumber(result.tieRoll) or 0)
+            else
+                addon:info(L.MsgDebugRaidRolls, result.submitted, result.total)
+            end
             return
         end
 

@@ -198,6 +198,7 @@ do
         countdownRunning = false,
         countdownDuration = 0,
         countdownRemaining = 0,
+        countdownExpired = false,
         countdownTicker = nil,
         countdownEndTimer = nil,
     }
@@ -666,6 +667,7 @@ do
             source = nil,
             updatedAt = nil,
             isEligible = false,
+            isOutOfTime = false,
         }
         state.responsesByPlayer[name] = response
         return response
@@ -903,8 +905,9 @@ do
     --   status == ROLL
     --   and isEligible == true
     --   and bestRoll ~= nil
+    --   and isOutOfTime ~= true
     local function isSelectableRollResponse(response)
-        return response and response.status == RESPONSE_STATUS.ROLL and response.bestRoll ~= nil and response.isEligible == true
+        return response and response.status == RESPONSE_STATUS.ROLL and response.bestRoll ~= nil and response.isEligible == true and response.isOutOfTime ~= true
     end
 
     local function getAwardValidationResponseReason(response, eligibility)
@@ -1038,7 +1041,7 @@ do
         end
     end
 
-    local function applyAcceptedRollResponse(name, roll, eligibility, source)
+    local function applyAcceptedRollResponse(name, roll, eligibility, source, isOutOfTime)
         local response = getOrCreateResponse(name)
         local wantLow = addon.options.sortAscending == true
         local nextUsedRolls = (eligibility and tonumber(eligibility.usedRolls) or 0) + 1
@@ -1063,6 +1066,7 @@ do
         response.source = source or "system_roll"
         response.updatedAt = GetTime()
         response.isEligible = true
+        response.isOutOfTime = isOutOfTime == true
 
         addon:debug(Diag.D.LogRollsResponse:format(tostring(name), tostring(response.status), tostring(response.bucket), tostring(response.bestRoll), tostring(response.lastRoll)))
     end
@@ -1081,6 +1085,7 @@ do
         response.source = source or reason
         response.updatedAt = GetTime()
         response.isEligible = eligibility and eligibility.ok == true or false
+        response.isOutOfTime = false
 
         addon:debug(Diag.D.LogRollsResponse:format(tostring(name), tostring(response.status), tostring(response.bucket), tostring(response.bestRoll), tostring(response.lastRoll)))
 
@@ -1278,6 +1283,10 @@ do
     end
 
     local function buildRowInfoText(response, isTied)
+        if response and response.isOutOfTime == true then
+            return L.StrRollTimedOutTag
+        end
+
         if isTied then
             return L.StrRollTieTag
         end
@@ -1383,6 +1392,7 @@ do
         state.rolled = false
         state.warned = false
         state.canRoll = false
+        state.countdownExpired = false
 
         lootState.winner = nil
         lootState.rollWinner = nil
@@ -1398,6 +1408,7 @@ do
         local eligibility
         local denyMessage
         local denyKey
+        local isOutOfTime
         local isDebugSource = source == "debug_roll"
 
         if not state.record then
@@ -1436,8 +1447,9 @@ do
         if not canTransitionResponseState(state.responsesByPlayer[player] and state.responsesByPlayer[player].status, RESPONSE_STATUS.ROLL) then
             return false, reasonCodes.STATE_TRANSITION_DENIED
         end
+        isOutOfTime = state.countdownExpired == true
         addRoll(player, roll, context.itemId)
-        applyAcceptedRollResponse(player, tonumber(roll), eligibility, source or "system_roll")
+        applyAcceptedRollResponse(player, tonumber(roll), eligibility, source or "system_roll", isOutOfTime)
         return true, nil
     end
 
@@ -1491,6 +1503,7 @@ do
             ensureAdHocRollSession()
             ensureResponseSession()
             state.warned = false
+            state.countdownExpired = false
 
             -- Reset only if we are starting a clean session
             if state.count == 0 then
@@ -1631,6 +1644,7 @@ do
         state.warned = false
         state.record = true
         state.canRoll = true
+        state.countdownExpired = false
 
         lootState.winner = nil
         lootState.rollWinner = nil
@@ -1826,7 +1840,7 @@ do
         end)
 
         ma = lootState.multiAward
-        selectionAllowed = (state.canRoll == false) and not (ma and ma.active)
+        selectionAllowed = (state.canRoll == false or state.countdownExpired == true) and not (ma and ma.active)
 
         for i = 1, #display do
             local entry = display[i]
@@ -1870,6 +1884,7 @@ do
             requiredWinnerCount = getExpectedWinnerCount(),
             -- Convenience alias over resolution.autoWinners for controller prefill flows.
             winnerSuggestions = resolution.autoWinners,
+            countdownExpired = state.countdownExpired == true,
         }
     end
 
@@ -1925,7 +1940,9 @@ do
         local activeModel = model or buildDisplayModel()
         local resolution = activeModel and activeModel.resolution or nil
         local requiredWinnerCount = tonumber(activeModel and activeModel.requiredWinnerCount) or 1
-        return resolution and resolution.requiresManualResolution == true and activeModel and activeModel.pickMode ~= true and requiredWinnerCount == 1
+        local selectedCount = tonumber(activeModel and activeModel.msCount) or 0
+
+        return resolution and resolution.requiresManualResolution == true and requiredWinnerCount == 1 and selectedCount <= 0
     end
 
     function module:StopCountdown()
@@ -1948,6 +1965,7 @@ do
         state.countdownRunning = true
         state.countdownDuration = countdownDuration
         state.countdownRemaining = countdownDuration
+        state.countdownExpired = false
 
         if shouldAnnounceCountdownTick(state.countdownRemaining, countdownDuration) then
             addon:Announce(L.ChatCountdownTic:format(state.countdownRemaining))
@@ -1976,6 +1994,7 @@ do
                 return
             end
             module:StopCountdown()
+            state.countdownExpired = true
             addon:Announce(L.ChatCountdownEnd)
             if type(onComplete) == "function" then
                 onComplete()

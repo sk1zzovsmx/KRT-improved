@@ -244,6 +244,60 @@ do
         }, nil
     end
 
+    local function buildRaidRollBatch(mode)
+        local modeText = Strings and Strings.NormalizeLower and Strings.NormalizeLower(mode, true) or nil
+        local tieMode = modeText == "tie"
+        local total = #syntheticProfiles
+        local values = {}
+        local tiedIndexes = {}
+        local tieCount = 0
+        local tieRoll = 0
+        local wantLow = addon.options and addon.options.sortAscending == true or false
+
+        if tieMode and total > 1 then
+            tieCount = random(2, 3)
+            if tieCount > total then
+                tieCount = total
+            end
+
+            local selected = 0
+            while selected < tieCount do
+                local idx = random(1, total)
+                if not tiedIndexes[idx] then
+                    tiedIndexes[idx] = true
+                    selected = selected + 1
+                end
+            end
+
+            if wantLow then
+                tieRoll = random(2, 45)
+            else
+                tieRoll = random(55, 99)
+            end
+        else
+            tieMode = false
+        end
+
+        for i = 1, total do
+            if tieMode and tiedIndexes[i] then
+                values[i] = tieRoll
+            elseif tieMode and wantLow then
+                values[i] = random(tieRoll + 1, 100)
+            elseif tieMode then
+                values[i] = random(1, tieRoll - 1)
+            else
+                values[i] = random(1, 100)
+            end
+        end
+
+        return {
+            values = values,
+            tieMode = tieMode,
+            tieCount = tieCount,
+            tieRoll = tieRoll,
+        }
+    end
+
     for i = 1, #syntheticProfiles do
         local profile = syntheticProfiles[i]
         profile.name = normalizeSyntheticName(profile.name)
@@ -392,20 +446,23 @@ do
         return submitSyntheticRoll(profile, roll, seedResult.raidId)
     end
 
-    function module:RollRaidPlayers()
+    function module:RequestRaidRolls(mode)
         local seedResult, err = module:SeedRaidPlayers()
         local submitted = 0
         local firstFailure = nil
+        local rollBatch
 
         if not seedResult then
             return nil, err
         end
 
+        rollBatch = buildRaidRollBatch(mode)
+
         for i = 1, #syntheticProfiles do
             local profile = syntheticProfiles[i]
             local result
 
-            result, err = submitSyntheticRoll(profile, random(1, 100), seedResult.raidId)
+            result, err = submitSyntheticRoll(profile, rollBatch.values[i], seedResult.raidId)
             if not result then
                 return nil, err
             end
@@ -422,6 +479,9 @@ do
             submitted = submitted,
             failed = #syntheticProfiles - submitted,
             firstFailure = firstFailure,
+            tieMode = rollBatch.tieMode == true,
+            tieCount = rollBatch.tieCount or 0,
+            tieRoll = rollBatch.tieRoll or 0,
         }
     end
 end

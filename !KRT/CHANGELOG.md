@@ -8,6 +8,20 @@ Release-Version: 0.6.2b
 
 ### Changed
 
+- Extended synthetic raid-roll debug helper: `/krt debug raid rolls`
+  now accepts optional `tie` mode (`/krt debug raid rolls tie`) to
+  submit deterministic high-priority ties across a random 2-3 subset
+  of synthetic players, making tie-resolution testing faster.
+- Fixed single-winner tie flow in Master UI: tie reroll is now available
+  even when the winner list is in pick mode and no manual winner has been
+  selected yet.
+- Countdown late-roll handling now honors `countdownRollsBlock`: when disabled,
+  rolls submitted after countdown expiry remain accepted and are marked as
+  `OOT` in the rolls Info column, but `OOT` responses are excluded from
+  resolver candidates, manual winner selection, and tie-reroll triggers.
+- Improved Master status readability: long status lines now wrap instead of
+  clipping (for example countdown-bypassed rolling status), and the rolls
+  header/list anchors were shifted to preserve spacing.
 - Hardened master-looter-only behavior in raid context:
   non-master clients no longer run loot/roll ingestion
   (`CHAT_MSG_LOOT`/`CHAT_MSG_SYSTEM`) and slash/minimap

@@ -172,6 +172,9 @@ Durable preferences learned from recent conversations:
   `PASS` reversible, `CANCELLED` reversible, `TIMED_OUT` terminal for the session,
   `INELIGIBLE` recoverable only through eligibility refresh, and only eligible `ROLL`
   responses may enter the resolver.
+- For countdown-bypass intake (`countdownRollsBlock=false`), late rolls should stay visible
+  with `OOT` tagging but must be excluded from resolver candidates, manual winner
+  selection, and tie-reroll triggers.
 - Treat `Rolls:GetDisplayModel().resolution` as an explicit public service contract;
   keep its stable fields documented (`autoWinners`, `tiedNames`, `topRollName`,
   `requiresManualResolution`, `cutoff`) instead of treating them as incidental internals.
