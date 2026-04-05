@@ -2158,7 +2158,8 @@ do
     -- ============================================================================
     -- Roll announcement / assignment helpers
     -- ============================================================================
-    -- Generic function to announce a roll for the current item.
+    -- Generic function to announce a roll for the current item and reopen intake.
+    -- Countdown remains a separate explicit action on the Countdown button.
     local function announceRoll(rollType, chatMsg)
         if isCountdownRunning() then
             return false

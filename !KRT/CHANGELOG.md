@@ -26,6 +26,10 @@ Release-Version: 0.6.2b
 - Improved Master status readability: long status lines now wrap instead of
   clipping (for example countdown-bypassed rolling status), and the rolls
   header/list anchors were shifted to preserve spacing.
+- Master roll intake now reopens correctly after `MS/OS/SR/FREE`
+  announcements even when the Rolls service pre-bootstraps the roll session;
+  opening roll intake restores the canonical `rollStarted` state so countdown
+  can be started again from the Countdown button.
 - Hardened master-looter-only behavior in raid context:
   non-master clients no longer run loot/roll ingestion
   (`CHAT_MSG_LOOT`/`CHAT_MSG_SYSTEM`) and slash/minimap

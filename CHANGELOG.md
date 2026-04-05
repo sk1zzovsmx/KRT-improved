@@ -53,9 +53,10 @@ Dates are in YYYY-MM-DD.
 - **UI:** Master now shows contextual workflow status under the selected item,
   and Logger panel titles now include live counts plus raid, boss, and player
   context for faster navigation.
-- **Bugfix:** Master countdown now starts again after `MS/OS/SR/FREE`
+- **Bugfix:** Master roll intake now reopens correctly after `MS/OS/SR/FREE`
   announcements even when the Rolls service pre-bootstraps the roll session;
-  opening roll intake now restores the canonical `rollStarted` state.
+  opening roll intake restores the canonical `rollStarted` state so countdown
+  can be started again from the Countdown button.
 - **Bugfix:** Rolls now materialize reserved candidates correctly even when the
   reserves adapter is exposed as plain functions, so closed reserved sessions
   render `TIMED_OUT` rows again; compact `TIE/PASS/CXL/OOT/OUT/BLK` info tags

@@ -4323,7 +4323,7 @@ test("harness raid capability facade mirrors shared loot and leadership policy",
     assertTrue(h.addon:CanUseRaidCapability("ready_check") == true, "expected leadership to re-enable ready checks")
 end)
 
-test("master countdown starts after announcing rolls with service-owned session bootstrap", function()
+test("master roll intake reopens after announcing rolls with service-owned session bootstrap", function()
     local h = newHarness()
     local link = h.registerItem(9321, "Countdownblade")
 
