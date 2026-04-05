@@ -4,7 +4,9 @@ All notable changes to !KRT will be documented in this file.
 
 ## Unreleased
 
-Release-Version: 0.6.2b
+Release-Version: 0.7.0-beta.1
+
+## [0.7.0-beta.1] - 2026-04-05
 
 ### Added
 
