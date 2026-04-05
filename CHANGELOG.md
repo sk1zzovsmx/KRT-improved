@@ -4,6 +4,9 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **UI:** Logger loot now shows the item tooltip on mouse over the item icon
+  only and anchors it to the cursor, with an `itemId` fallback hyperlink when
+  a stored `itemLink` is missing.
 - **UI:** Master now disables `MS/OS/SR/FREE` while countdown is running,
   and roll-start actions are ignored until countdown is stopped/finalized.
 - **UI:** Loot Counter now exposes a `Spam Counter` button that announces grouped

@@ -8,6 +8,10 @@ Release-Version: 0.6.2b
 
 ### Changed
 
+- Logger loot now shows the item tooltip on mouse over the item icon only and
+  anchors it to the cursor, with an `itemId` fallback hyperlink when a stored
+  `itemLink` is missing.
+
 - Extended synthetic raid-roll debug helper: `/krt debug raid rolls`
   now accepts optional `tie` mode (`/krt debug raid rolls tie`) to
   submit deterministic high-priority ties across a random 2-3 subset

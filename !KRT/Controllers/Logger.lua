@@ -1085,14 +1085,13 @@ do
             end
         end
 
-        -- Hover sync: keep selection highlight persistent while hover uses default Button behavior.
+        -- Keep row hover neutral; item tooltip is bound to icon hover only.
         function module:OnLootRowEnter(row)
-            -- No-op: persistent selection is rendered via overlay textures (addon.UIRowVisuals).
-            -- Leave native hover highlight behavior intact.
+            -- No-op.
         end
 
         function module:OnLootRowLeave(row)
-            -- No-op: persistent selection is rendered via overlay textures.
+            -- No-op.
         end
 
         local function validateRollValue(_, text)
@@ -2620,6 +2619,7 @@ do
         rowTmpl = "KRTLoggerLootButton",
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
+            local ui = row._p
             if not row._krtBound then
                 if row.RegisterForClicks then
                     row:RegisterForClicks("AnyUp")
@@ -2634,17 +2634,60 @@ do
                     module:OnLootRowLeave(self)
                 end)
                 local itemButton = row.GetName and _G[row:GetName() .. "Item"] or nil
-                Frames.SafeSetScript(itemButton, "OnEnter", function(self)
-                    Loot:OnEnter(self)
-                end)
-                Frames.SafeSetScript(itemButton, "OnLeave", function()
-                    GameTooltip:Hide()
-                end)
+                if itemButton and itemButton.EnableMouse then
+                    itemButton:EnableMouse(true)
+                end
+                if itemButton and itemButton.RegisterForClicks then
+                    itemButton:RegisterForClicks("AnyUp")
+                end
+                if itemButton then
+                    itemButton._krtRow = row
+                    Frames.SafeSetScript(itemButton, "OnClick", function(_, button)
+                        module:SelectItem(row, button)
+                    end)
+                    Frames.SafeSetScript(itemButton, "OnEnter", function(self)
+                        Loot:OnEnter(self)
+                    end)
+                    Frames.SafeSetScript(itemButton, "OnLeave", function()
+                        GameTooltip:Hide()
+                    end)
+                end
+
+                -- Compatibility cleanup: disable legacy shared hover hitbox if present.
+                local itemHover = row._itemHover
+                if itemHover then
+                    if itemHover.Hide then
+                        itemHover:Hide()
+                    end
+                    if itemHover.EnableMouse then
+                        itemHover:EnableMouse(false)
+                    end
+                end
                 row._krtBound = true
             end
-            local ui = row._p
-            -- Preserve the original item link on the row for tooltips.
+
+            local itemButton = row.GetName and _G[row:GetName() .. "Item"] or nil
+            if itemButton then
+                itemButton._krtRow = row
+                if itemButton.EnableMouse then
+                    itemButton:EnableMouse(true)
+                end
+            end
+
+            local itemHover = row._itemHover
+            if itemHover then
+                if itemHover.Hide then
+                    itemHover:Hide()
+                end
+                if itemHover.EnableMouse then
+                    itemHover:EnableMouse(false)
+                end
+            end
+
+            -- Preserve a tooltip-ready hyperlink on the pooled row.
             row._itemLink = it.itemLink
+            local itemId = tonumber(it.itemId)
+            row._itemTooltipLink = it.itemLink or (itemId and itemId > 0 and ("item:" .. itemId) or nil)
             local nameText = it.itemLink or it.itemName or ("[Item " .. (it.itemId or "?") .. "]")
             if it.itemLink then
                 ui.Name:SetText(nameText)
@@ -2770,17 +2813,25 @@ do
         if not widget then
             return
         end
-        local row = (widget.IsObjectType and widget:IsObjectType("Button")) and widget or (widget.GetParent and widget:GetParent()) or widget
-        if not (row and row.GetID) then
+
+        local row = widget._krtRow
+        if not row then
+            row = widget
+            -- Climb parents until we find the pooled row carrying tooltip data.
+            while row and not (row._itemTooltipLink or row._itemLink) do
+                row = row.GetParent and row:GetParent() or nil
+            end
+        end
+        if not row then
             return
         end
 
-        local link = row._itemLink
+        local link = row._itemTooltipLink or row._itemLink
         if not link then
             return
         end
 
-        GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+        GameTooltip:SetOwner(widget, "ANCHOR_CURSOR")
         GameTooltip:SetHyperlink(link)
     end
 
