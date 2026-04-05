@@ -6,6 +6,8 @@ All notable changes to !KRT will be documented in this file.
 
 Release-Version: 0.7.0-beta.1
 
+## [0.7.0-beta.1] - 2026-04-05
+
 ### Added
 
 - Extended synthetic raid-roll debug helper: `/krt debug raid rolls` now

@@ -135,6 +135,8 @@
 |   |-- mcp.json
 |   \\-- settings.json
 |-- dist
+|   |-- KRT-0.7.0-beta.1.zip
+|   |-- KRT-0.7.0-beta.1.zip.sha256
 |   |-- KRT-beta-0.6.0b.zip
 |   |-- KRT-beta-0.6.1b.zip
 |   \\-- KRT-beta-0.6.2b.zip
