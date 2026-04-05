@@ -15,12 +15,14 @@ local type, pairs, pcall, tostring = type, pairs, pcall, tostring
 addon.Bus = addon.Bus or {}
 local Bus = addon.Bus
 
+-- ----- Internal state ----- --
 local events = Bus._events or {}
 Bus._events = events
 
 local stats = Bus._stats or {}
 Bus._stats = stats
 
+-- ----- Private helpers ----- --
 local function isDebugEnabled()
     return addon and addon.State and addon.State.debugEnabled == true
 end
@@ -34,6 +36,7 @@ local function ensureStats(eventName)
     return entry
 end
 
+-- ----- Public methods ----- --
 function Bus.RegisterCallback(eventName, callback)
     if not eventName or type(callback) ~= "function" then
         error(L.StrCbErrUsage)

@@ -14,6 +14,12 @@ local format = string.format
 addon.Time = addon.Time or feature.Time or {}
 local Time = addon.Time
 
+-- ----- Internal state ----- --
+
+-- ----- Private helpers ----- --
+
+-- ----- Public methods ----- --
+
 function Time.SecondsToClock(seconds)
     local sec = tonumber(seconds)
     if sec <= 0 then

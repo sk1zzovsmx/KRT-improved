@@ -18,6 +18,9 @@ local ITEM_LINK_FORMAT = "|c%s|Hitem:%d:%s|h[%s]|h|r"
 local TOOLTIP_NAME = "KRT_ItemTooltip"
 local tooltip
 
+-- ----- Internal state ----- --
+
+-- ----- Private helpers ----- --
 local function ensureTooltip()
     if tooltip then
         return tooltip
@@ -53,6 +56,7 @@ local function scanSoulboundFlag(tip)
     return false
 end
 
+-- ----- Public methods ----- --
 function Item.GetItemIdFromLink(itemLink)
     if type(itemLink) == "number" then
         return itemLink

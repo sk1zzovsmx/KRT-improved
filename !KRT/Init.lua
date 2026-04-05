@@ -11,6 +11,7 @@ if not addon then
     error("KRT addon table not found in Init.lua")
 end
 
+-- ----- Internal state ----- --
 addon.name = addon.name or addonName
 addon.Core = addon.Core or {}
 addon.L = addon.L or {}
@@ -64,6 +65,7 @@ local Diag = setmetatable({}, {
 local legacyAliasMap = addon.LegacyAliases or {}
 addon.LegacyAliases = legacyAliasMap
 
+-- ----- Private helpers ----- --
 local function isDebugEnabled()
     local state = addon.State
     return state and state.debugEnabled == true
@@ -169,6 +171,7 @@ local function installLegacyAliasProxy()
     end
 end
 
+-- ----- Public methods ----- --
 function Core.RegisterLegacyAlias(aliasKey, cfg)
     if type(aliasKey) ~= "string" or aliasKey == "" then
         return

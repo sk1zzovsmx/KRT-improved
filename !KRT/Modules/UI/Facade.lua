@@ -13,8 +13,10 @@ local type = type
 addon.UI = addon.UI or {}
 local UI = addon.UI
 
+-- ----- Internal state ----- --
 UI._registry = UI._registry or {}
 
+-- ----- Private helpers ----- --
 local function isWidgetEnabled(widgetId)
     local Features = addon.Features
     if type(Features) ~= "table" then
@@ -30,6 +32,7 @@ local function isWidgetEnabled(widgetId)
     return true
 end
 
+-- ----- Public methods ----- --
 function UI:IsEnabled(widgetId)
     if type(widgetId) ~= "string" or widgetId == "" then
         return false

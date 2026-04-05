@@ -14,6 +14,7 @@ local lower = string.lower
 addon.Features = addon.Features or feature.Features or {}
 local Features = addon.Features
 
+-- ----- Internal state ----- --
 Features.WidgetFlags = Features.WidgetFlags or {}
 Features.Profiles = Features.Profiles
     or {
@@ -29,6 +30,7 @@ Features.Profiles = Features.Profiles
         },
     }
 
+-- ----- Private helpers ----- --
 local function normalizeProfile(profileName)
     if type(profileName) ~= "string" or profileName == "" then
         return "full"
@@ -52,6 +54,7 @@ local function applyProfileFlags(profileName)
     return profileKey
 end
 
+-- ----- Public methods ----- --
 function Features:SetProfile(profileName)
     return applyProfileFlags(profileName)
 end

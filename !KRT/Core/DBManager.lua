@@ -14,6 +14,7 @@ DBManager.SavedVariables = DBManager.SavedVariables or {}
 local SavedVariablesManager = DBManager.SavedVariables
 DBManager.Default = SavedVariablesManager
 
+-- ----- Private helpers ----- --
 local function getAddonDbStore(storeKey)
     local db = addon.DB
     if type(db) ~= "table" then

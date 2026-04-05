@@ -20,6 +20,9 @@ local Colors = feature.Colors or addon.Colors or {}
 addon.Strings = addon.Strings or feature.Strings or {}
 local Strings = addon.Strings
 
+-- ----- Internal state ----- --
+
+-- ----- Private helpers ----- --
 local function trimRaw(value)
     if value == nil then
         return ""
@@ -27,6 +30,7 @@ local function trimRaw(value)
     return gsub(tostring(value), "^%s*(.-)%s*$", "%1")
 end
 
+-- ----- Public methods ----- --
 function Strings.UpperFirst(value)
     if type(value) ~= "string" then
         value = tostring(value or "")

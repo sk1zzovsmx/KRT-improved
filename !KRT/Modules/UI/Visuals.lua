@@ -16,6 +16,37 @@ local UIPrimitives = addon.UIPrimitives
 addon.UIRowVisuals = addon.UIRowVisuals or {}
 local UIRowVisuals = addon.UIRowVisuals
 
+-- ----- Internal state ----- --
+
+-- ----- Private helpers ----- --
+local function ensureRowTextures(row)
+    if not row or row._krtSelTex then
+        return
+    end
+
+    local sel = row:CreateTexture(nil, "BACKGROUND")
+    sel:SetAllPoints(row)
+    sel:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+    sel:SetBlendMode("ADD")
+    sel:SetVertexColor(0.20, 0.60, 1.00, 0.52)
+    sel:Hide()
+    row._krtSelTex = sel
+
+    local focus = row:CreateTexture(nil, "ARTWORK")
+    focus:SetAllPoints(row)
+    focus:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+    focus:SetBlendMode("ADD")
+    focus:SetVertexColor(0.20, 0.60, 1.00, 0.72)
+    focus:Hide()
+    row._krtFocusTex = focus
+
+    local pushed = row:CreateTexture(nil, "ARTWORK")
+    pushed:SetAllPoints(row)
+    pushed:SetTexture(1, 1, 1, 0.08)
+    row:SetPushedTexture(pushed)
+end
+
+-- ----- Public methods ----- --
 function UIPrimitives.EnableDisable(frame, cond)
     if not frame then
         return
@@ -142,33 +173,6 @@ function UIPrimitives.UpdateModeTextNamedPart(frameName, suffix, str1, str2, mod
         return mode
     end
     return lastMode
-end
-
-local function ensureRowTextures(row)
-    if not row or row._krtSelTex then
-        return
-    end
-
-    local sel = row:CreateTexture(nil, "BACKGROUND")
-    sel:SetAllPoints(row)
-    sel:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-    sel:SetBlendMode("ADD")
-    sel:SetVertexColor(0.20, 0.60, 1.00, 0.52)
-    sel:Hide()
-    row._krtSelTex = sel
-
-    local focus = row:CreateTexture(nil, "ARTWORK")
-    focus:SetAllPoints(row)
-    focus:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-    focus:SetBlendMode("ADD")
-    focus:SetVertexColor(0.20, 0.60, 1.00, 0.72)
-    focus:Hide()
-    row._krtFocusTex = focus
-
-    local pushed = row:CreateTexture(nil, "ARTWORK")
-    pushed:SetAllPoints(row)
-    pushed:SetTexture(1, 1, 1, 0.08)
-    row:SetPushedTexture(pushed)
 end
 
 function UIRowVisuals.EnsureRowVisuals(row)

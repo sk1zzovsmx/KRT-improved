@@ -13,6 +13,12 @@ local strlower = string.lower
 addon.Sort = addon.Sort or feature.Sort or {}
 local Sort = addon.Sort
 
+-- ----- Internal state ----- --
+
+-- ----- Private helpers ----- --
+
+-- ----- Public methods ----- --
+
 function Sort.CompareValues(aValue, bValue, asc)
     if asc then
         return aValue < bValue

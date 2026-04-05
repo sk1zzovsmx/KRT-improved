@@ -24,6 +24,9 @@ addon.UIScaffold = addon.UIScaffold or {}
 local UIScaffold = addon.UIScaffold
 local tooltipColor = HIGHLIGHT_FONT_COLOR
 
+-- ----- Internal state ----- --
+
+-- ----- Private helpers ----- --
 local function resolveFrameName(frameOrName)
     if type(frameOrName) == "string" then
         return frameOrName
@@ -38,6 +41,7 @@ local function isModuleUiBound(module, uiState)
     return uiState and uiState.Bound and module and module.frame and module.refs
 end
 
+-- ----- Public methods ----- --
 function Frames.EnableDrag(frame, dragButton)
     if not frame or not frame.RegisterForDrag then
         return

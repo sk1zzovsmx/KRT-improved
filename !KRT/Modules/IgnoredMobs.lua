@@ -12,6 +12,7 @@ local tonumber = tonumber
 addon.IgnoredMobs = addon.IgnoredMobs or feature.IgnoredMobs or {}
 local IgnoredMobs = addon.IgnoredMobs
 
+-- ----- Internal state ----- --
 IgnoredMobs.Ids = {
     -- Classic raids
     [12557] = true, -- Grethok the Controller (Razorgore event)
@@ -120,6 +121,9 @@ IgnoredMobs.Ids = {
     [39899] = true, -- Baltharus the Warborn (clone)
 }
 
+-- ----- Private helpers ----- --
+
+-- ----- Public methods ----- --
 function IgnoredMobs.Contains(npcId)
     return IgnoredMobs.Ids[tonumber(npcId)] == true
 end

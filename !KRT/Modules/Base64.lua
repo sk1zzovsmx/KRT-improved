@@ -11,10 +11,15 @@ local find, gsub = string.find, string.gsub
 local strsub = string.sub
 local char, byte = string.char, string.byte
 
+-- ----- Internal state ----- --
 local BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
 addon.Base64 = addon.Base64 or feature.Base64 or {}
 local Base64 = addon.Base64
+
+-- ----- Private helpers ----- --
+
+-- ----- Public methods ----- --
 
 function Base64.Encode(data)
     return (

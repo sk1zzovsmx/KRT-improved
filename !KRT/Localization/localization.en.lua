@@ -21,6 +21,12 @@ setmetatable(L, {
     end,
 })
 
+-- ----- Internal state ----- --
+
+-- ----- Private helpers ----- --
+
+-- ----- Public methods ----- --
+
 -- ==================== Callbacks ==================== --
 L.StrCbErrUsage = "Usage: KRT:registerCallback(event, callbacks)"
 

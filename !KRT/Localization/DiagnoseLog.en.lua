@@ -14,6 +14,12 @@ Diag.W = Diag.W or {}
 Diag.E = Diag.E or {}
 Diag.D = Diag.D or {}
 
+-- ----- Internal state ----- --
+
+-- ----- Private helpers ----- --
+
+-- ----- Public methods ----- --
+
 -- ==================== Log Messages ==================== --
 -- Core --
 Diag.W.LogCoreCallbackHandlerMissing = "[Core] CallbackHandler missing: using fallback event wiring"

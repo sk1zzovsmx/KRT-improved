@@ -12,6 +12,7 @@ local type, tostring = type, tostring
 addon.Events = addon.Events or feature.Events or {}
 local Events = addon.Events
 
+-- ----- Internal state ----- --
 Events.Internal = Events.Internal or {}
 Events.Wow = Events.Wow or {}
 
@@ -45,6 +46,9 @@ Wow.TradeAcceptUpdate = Wow.TradeAcceptUpdate or "wow.TRADE_ACCEPT_UPDATE"
 Wow.TradeRequestCancel = Wow.TradeRequestCancel or "wow.TRADE_REQUEST_CANCEL"
 Wow.TradeClosed = Wow.TradeClosed or "wow.TRADE_CLOSED"
 
+-- ----- Private helpers ----- --
+
+-- ----- Public methods ----- --
 function Events.ConfigOptionChanged(optionName)
     if type(optionName) ~= "string" or optionName == "" then
         return nil

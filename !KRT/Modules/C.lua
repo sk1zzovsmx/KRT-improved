@@ -10,6 +10,12 @@ local feature = addon.Core.GetFeatureShared()
 local C = feature.C
 local L = feature.L
 
+-- ----- Internal state ----- --
+
+-- ----- Private helpers ----- --
+
+-- ----- Public methods ----- --
+
 C.ITEM_LINK_PATTERN = "|?c?(%x*)|?H?([^:]*):?(%d+):?(%d*):?(%d*):?(%d*):?(%d*):?(%d*):?" .. "(%-?%d*):?(%-?%d*):?(%d*)|?h?%[?([^%[%]]*)%]?|?h?|?r?"
 
 -- Roll Types Enum

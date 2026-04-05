@@ -15,6 +15,7 @@ local pairs = pairs
 addon.UIEffects = addon.UIEffects or {}
 local UIEffects = addon.UIEffects
 
+-- ----- Internal state ----- --
 local DEFAULT_GLOW_METHOD = "Proc"
 local FRAME_LEVEL_OFFSETS = {
     frame = 6,
@@ -124,6 +125,7 @@ for methodKey, _ in pairs(METHOD_VISUALS) do
     UIEffects.GlowMethods.defaultSettings[methodKey] = buildMethodDefaults(methodKey)
 end
 
+-- ----- Private helpers ----- --
 local function resolveMethodKey(methodName)
     if METHOD_VISUALS[methodName] then
         return methodName
@@ -146,6 +148,7 @@ local function resolveMethod(methodName, options)
     return methodKey, methodCfg, settings
 end
 
+-- ----- Public methods ----- --
 function UIEffects.GetGlowMethods()
     return UIEffects.GlowMethods
 end

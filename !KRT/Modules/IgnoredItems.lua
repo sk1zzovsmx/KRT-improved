@@ -12,6 +12,7 @@ local tonumber = tonumber
 addon.IgnoredItems = addon.IgnoredItems or feature.IgnoredItems or {}
 local IgnoredItems = addon.IgnoredItems
 
+-- ----- Internal state ----- --
 IgnoredItems.Ids = {
     -- Emblems (Wrath of the Lich King)
     [40752] = true, -- Emblem of Heroism
@@ -80,6 +81,9 @@ IgnoredItems.Ids = {
     [34057] = true, -- Abyss Crystal
 }
 
+-- ----- Private helpers ----- --
+
+-- ----- Public methods ----- --
 function IgnoredItems.Contains(itemId)
     return IgnoredItems.Ids[tonumber(itemId)] == true
 end

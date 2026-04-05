@@ -14,12 +14,14 @@ local pairs, tostring, tonumber, type = pairs, tostring, tonumber, type
 addon.MultiSelect = addon.MultiSelect or {}
 local MultiSelect = addon.MultiSelect
 
+-- ----- Internal state ----- --
 local stateByContext = MultiSelect._stateByContext or {}
 MultiSelect._stateByContext = stateByContext
 
 local modifierPolicyByScope = MultiSelect._modifierPolicyByScope or {}
 MultiSelect._modifierPolicyByScope = modifierPolicyByScope
 
+-- ----- Private helpers ----- --
 local function normalizeScopeKey(scopeKey)
     if not scopeKey or scopeKey == "" then
         return "_default"
@@ -105,6 +107,7 @@ local function findIndex(ordered, key)
     return nil
 end
 
+-- ----- Public methods ----- --
 function MultiSelect.MultiSelectInit(contextKey)
     local st, key = ensureContext(contextKey)
     st.set = {}

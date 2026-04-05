@@ -12,6 +12,12 @@ local type = type
 addon.Colors = addon.Colors or feature.Colors or {}
 local Colors = addon.Colors
 
+-- ----- Internal state ----- --
+
+-- ----- Private helpers ----- --
+
+-- ----- Public methods ----- --
+
 function Colors.NormalizeHexColor(color)
     if type(color) == "string" then
         local hex = color:gsub("^|c", ""):gsub("|r$", ""):gsub("^#", "")

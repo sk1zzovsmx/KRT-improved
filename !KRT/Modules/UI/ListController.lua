@@ -18,6 +18,9 @@ local CreateFrame = _G.CreateFrame
 addon.ListController = addon.ListController or {}
 local ListController = addon.ListController
 
+-- ----- Internal state ----- --
+
+-- ----- Private helpers ----- --
 local function getRowVisuals()
     return addon.UIRowVisuals or {}
 end
@@ -34,6 +37,7 @@ local function getListDiag(bucketName, keyName, fallbackKey)
     return bucket[keyName] or bucket[fallbackKey]
 end
 
+-- ----- Public methods ----- --
 function ListController.CreateRowDrawer(fn)
     local rowHeight
     return function(row, it)

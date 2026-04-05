@@ -13,6 +13,12 @@ local select = select
 addon.Comms = addon.Comms or feature.Comms or {}
 local Comms = addon.Comms
 
+-- ----- Internal state ----- --
+
+-- ----- Private helpers ----- --
+
+-- ----- Public methods ----- --
+
 function Comms.Sync(prefix, msg)
     local zone = select(2, IsInInstance())
     local raidCount = (GetRealNumRaidMembers and GetRealNumRaidMembers()) or (GetNumRaidMembers and GetNumRaidMembers()) or 0
