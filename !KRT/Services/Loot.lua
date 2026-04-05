@@ -8,7 +8,7 @@ local feature = addon.Core.GetFeatureShared()
 
 local Diag = feature.Diag
 
-local Events = feature.Events or addon.Events or {}
+local Events = feature.Events or addon.Events
 local C = feature.C
 local Bus = feature.Bus or addon.Bus
 local Item = feature.Item or addon.Item
@@ -34,7 +34,6 @@ local GROUP_LOOT_SESSION_PREFIX = "GL:"
 -- =========== Loot Helpers Module  =========== --
 -- Manages the loot window items (fetching from loot/inventory).
 do
-    addon.Services = addon.Services or {}
     addon.Services.Loot = addon.Services.Loot or {}
     local module = addon.Services.Loot
 

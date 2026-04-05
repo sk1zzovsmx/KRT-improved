@@ -11,7 +11,7 @@ local L = feature.L
 local ListController = feature.ListController or addon.ListController
 local Frames = feature.Frames or addon.Frames
 local Strings = feature.Strings or addon.Strings
-local Services = feature.Services or addon.Services or {}
+local Services = feature.Services or addon.Services
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
@@ -37,7 +37,6 @@ local ChatApi = {
 
 -- =========== Warnings Frame Module  =========== --
 do
-    addon.Controllers = addon.Controllers or {}
     addon.Controllers.Warnings = addon.Controllers.Warnings or {}
     local module = addon.Controllers.Warnings
     module._ui = module._ui

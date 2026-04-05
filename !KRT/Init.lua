@@ -25,6 +25,7 @@ addon.DB = addon.DB or {}
 addon.Features = addon.Features or {}
 addon.Controllers = addon.Controllers or {}
 addon.Services = addon.Services or {}
+addon.Services.Logger = addon.Services.Logger or {}
 addon.Widgets = addon.Widgets or {}
 addon.Bus = addon.Bus or {}
 addon.Frames = addon.Frames or {}
@@ -651,7 +652,7 @@ do
     local Bus = feature.Bus or addon.Bus
     local Frames = feature.Frames or addon.Frames
     local Time = feature.Time or addon.Time
-    local Events = feature.Events or addon.Events or {}
+    local Events = feature.Events or addon.Events
     local C = feature.C
 
     local InternalEvents = Events.Internal

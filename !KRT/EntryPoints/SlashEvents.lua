@@ -23,12 +23,7 @@ local upper = string.upper
 local type = type
 local tostring, tonumber = tostring, tonumber
 
-local UI = addon.UI or {}
-if type(UI.Call) ~= "function" then
-    UI.Call = function()
-        return nil
-    end
-end
+local UI = addon.UI
 
 -- =========== Slash Commands  =========== --
 local module = {}

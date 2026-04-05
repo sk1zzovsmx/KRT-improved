@@ -15,7 +15,6 @@ local tonumber, tostring = tonumber, tostring
 
 -- Raid read-only projection/query service.
 do
-    addon.DB = addon.DB or {}
     addon.DB.RaidQueries = addon.DB.RaidQueries or {}
     local module = addon.DB.RaidQueries
 

@@ -9,7 +9,7 @@ local feature = addon.Core.GetFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 
-local Events = feature.Events or addon.Events or {}
+local Events = feature.Events or addon.Events
 local C = feature.C
 local Core = feature.Core
 local Bus = feature.Bus or addon.Bus
@@ -40,7 +40,6 @@ local UnitRace, UnitSex = UnitRace, UnitSex
 -- Raid helper module.
 -- Manages raid state, roster, boss kills, and loot logging.
 do
-    addon.Services = addon.Services or {}
     addon.Services.Raid = addon.Services.Raid or {}
     local module = addon.Services.Raid
     -- ----- Internal state ----- --

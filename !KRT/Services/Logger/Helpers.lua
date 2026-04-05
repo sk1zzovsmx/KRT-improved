@@ -14,8 +14,6 @@ local tostring, tonumber = tostring, tonumber
 local ipairs = ipairs
 
 -- ----- Internal state ----- --
-addon.Services = addon.Services or {}
-addon.Services.Logger = addon.Services.Logger or {}
 addon.Services.Logger.Helpers = addon.Services.Logger.Helpers or {}
 
 local Helpers = addon.Services.Logger.Helpers

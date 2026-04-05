@@ -4,6 +4,38 @@ Repo-wide cleanup program built on top of `docs/TECH_CLEANUP_WORKFLOW.md`.
 
 Status date: 2026-03-14
 
+## 1.1 Cleanup Snapshot (2026-04-05)
+
+Completed in this pass:
+
+- Removed redundant parent re-bootstrap from feature files:
+  `addon.Controllers = addon.Controllers or {}` and
+  `addon.Widgets = addon.Widgets or {}` now remain only in bootstrap.
+- Removed redundant service re-bootstrap from feature/service files:
+  `addon.Services = addon.Services or {}` now remains only in bootstrap.
+- Removed fallback no-op shims for UI facade in EntryPoints/Controllers where
+  `Modules/UI/Facade.lua` already guarantees `addon.UI:Call()` and related APIs.
+- Removed broad `or {}` fallback aliases for `feature.Services` in feature files,
+  keeping fail-fast behavior aligned with canonical bootstrap contracts.
+- Reduced redundant `addon.DB` re-bootstrap in secondary Core DB files that load
+  after bootstrap according to TOC order.
+- Removed residual diagnostic fallbacks on `feature.Diag` and `feature.Events`
+  (`or {}`) in Core/Init high-churn boundaries.
+- Ran conservative deadcode scan (`fnmap-inventory` + `fnmap-classify`): no
+  `delete` candidates with definite confidence; only merge/rename clusters.
+
+Residual redundancy catalog (post-cleanup):
+
+1. `addon.DB = addon.DB or {}` remains in:
+   - `!KRT/Init.lua`
+   Rationale: canonical bootstrap ownership.
+
+2. `addon.Services.Logger = addon.Services.Logger or {}` remains in:
+   - `!KRT/Init.lua`
+   - `!KRT/Services/Logger/Store.lua`
+   Rationale: Init is canonical bootstrap; Store keeps a compatibility fallback
+   for harness/standalone module loads.
+
 ## 1. Audit Snapshot
 
 Signals used for this backlog:
@@ -362,3 +394,60 @@ If continuing the cleanup program immediately, start with:
 
 That sequence gives the best technical ROI while keeping the already-stable UI
 owner layer closed.
+
+## 8. Services Redundancy Catalog (Analysis-only, 2026-04-05)
+
+Scope of this catalog:
+
+- `!KRT/Services/Raid.lua`
+- `!KRT/Services/Rolls.lua`
+- `!KRT/Services/Reserves.lua`
+
+No behavior changes were applied in this pass. This section records only
+verified redundancy signals with direct file evidence.
+
+### 8.1 High-confidence structural redundancies
+
+1. `Reserves`: duplicated API surface (`Service:*` + `module:*` delegate 1:1).
+  Evidence examples:
+  - `Service:Save` at line 807 and `module:Save` at line 1602
+  - `Service:Load` at line 814 and `module:Load` at line 1606
+  - `Service:GetImportMode` at line 877 and `module:GetImportMode` at line 1642
+  - `Service:ParseImport` at line 1186 and `module:ParseImport` at line 1662
+  - `Service:GetPlayersForItem` at line 1502 and `module:GetPlayersForItem`
+    at line 1706
+  Assessment: pure delegation boilerplate, high maintenance overhead.
+  Suggested cleanup lane: S3, with compatibility-preserving public facade.
+
+2. `Rolls`: legacy alias with equivalent behavior.
+  Evidence:
+  - `module:GetDisplayModel` at line 1878
+  - `module:FetchRolls` at line 1883 (legacy alias returning `GetDisplayModel`)
+  Assessment: intentional compatibility alias; redundancy is known and low risk.
+  Suggested cleanup lane: S2, only after call-site census.
+
+3. `Raid`: local alias with equivalent behavior.
+  Evidence:
+  - `module:GetRaid` at line 1489
+  - `module:ResolveRaid` at line 1616 (returns `module:GetRaid`)
+  Assessment: semantic alias, low immediate cost, but redundant surface.
+  Suggested cleanup lane: S1, only with usage verification.
+
+### 8.2 Medium-confidence technical redundancies
+
+1. `Raid` DB facade wrappers are repeated with similar guard + dispatch shape:
+  `GetRaidChanges` (line 1504), `UpsertRaidChange` (line 1523),
+  `DeleteRaidChange` (line 1538), `ClearRaidChanges` (line 1553).
+  Assessment: mostly intentional service boundary, but helper extraction could
+  reduce repeated control flow.
+
+2. `Rolls` module methods expose local helper outputs almost verbatim:
+  `GetRollSession` (line 1887), `GetRollSessionItemKey` (line 1891),
+  `EnsureRollSession` (line 1904), `FinalizeRollSession` (line 1992).
+  Assessment: likely acceptable service API, but naming/collision noise remains.
+
+### 8.3 Deadcode outcome for these Services
+
+- No definite delete candidates were identified in this pass.
+- Current signals are redundancy/alias clusters (`merge`/`rename`), not safe
+  deadcode removals.

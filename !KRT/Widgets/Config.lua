@@ -11,7 +11,7 @@ local L = feature.L
 local Options = feature.Options or addon.Options
 local Frames = feature.Frames or addon.Frames
 local UIScaffold = addon.UIScaffold
-local Events = feature.Events or addon.Events or {}
+local Events = feature.Events or addon.Events
 local Bus = feature.Bus or addon.Bus
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
@@ -30,7 +30,6 @@ do
         return
     end
 
-    addon.Widgets = addon.Widgets or {}
     addon.Widgets.Config = addon.Widgets.Config or {}
     local module = addon.Widgets.Config
     module._ui = module._ui

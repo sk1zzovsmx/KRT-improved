@@ -13,7 +13,6 @@ local tostring = tostring
 
 -- Read-only raid validation service.
 do
-    addon.DB = addon.DB or {}
     addon.DB.RaidValidator = addon.DB.RaidValidator or {}
     local module = addon.DB.RaidValidator
 

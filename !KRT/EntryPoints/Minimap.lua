@@ -12,27 +12,12 @@ local Options = feature.Options or addon.Options
 local Frames = feature.Frames or addon.Frames
 local Colors = feature.Colors or addon.Colors
 local Core = feature.Core or addon.Core
-local Services = feature.Services or addon.Services or {}
-local Widgets = feature.Widgets or addon.Widgets or {}
+local Services = feature.Services or addon.Services
+local Widgets = feature.Widgets or addon.Widgets
 
 local K_COLOR = feature.K_COLOR
 
-local UIFacade = addon.UI or {}
-if type(UIFacade.Call) ~= "function" then
-    UIFacade.Call = function()
-        return nil
-    end
-end
-if type(UIFacade.IsEnabled) ~= "function" then
-    UIFacade.IsEnabled = function()
-        return true
-    end
-end
-if type(UIFacade.IsRegistered) ~= "function" then
-    UIFacade.IsRegistered = function()
-        return false
-    end
-end
+local UIFacade = addon.UI
 
 -- =========== Minimap Button Module  =========== --
 addon.Minimap = addon.Minimap or {}

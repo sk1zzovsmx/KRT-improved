@@ -10,7 +10,7 @@ local L = feature.L
 
 local Frames = feature.Frames or addon.Frames
 local Strings = feature.Strings or addon.Strings
-local Services = feature.Services or addon.Services or {}
+local Services = feature.Services or addon.Services
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 
@@ -42,7 +42,6 @@ local ChatApi = {
 
 -- =========== LFM Spam Module  =========== --
 do
-    addon.Controllers = addon.Controllers or {}
     addon.Controllers.Spammer = addon.Controllers.Spammer or {}
     local module = addon.Controllers.Spammer
     module._ui = module._ui

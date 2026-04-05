@@ -9,13 +9,13 @@ local feature = addon.Core.GetFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 
-local Events = feature.Events or addon.Events or {}
+local Events = feature.Events or addon.Events
 local Core = feature.Core
 local Bus = feature.Bus or addon.Bus
 local Item = feature.Item or addon.Item
 local Strings = feature.Strings or addon.Strings
 local Comms = feature.Comms or addon.Comms
-local Services = feature.Services or addon.Services or {}
+local Services = feature.Services or addon.Services
 
 local rollTypes = feature.rollTypes
 
@@ -89,7 +89,6 @@ end
 -- =========== Rolls Helpers Module  =========== --
 -- Manages roll tracking, response state, and winner determination.
 do
-    addon.Services = addon.Services or {}
     addon.Services.Rolls = addon.Services.Rolls or {}
     local module = addon.Services.Rolls
     --[[

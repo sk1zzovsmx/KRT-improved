@@ -9,7 +9,7 @@ local feature = addon.Core.GetFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 
-local Events = feature.Events or addon.Events or {}
+local Events = feature.Events or addon.Events
 local Core = feature.Core
 local Bus = feature.Bus or addon.Bus
 local Strings = feature.Strings or addon.Strings
@@ -33,7 +33,6 @@ local InternalEvents = Events.Internal
 
 -- Logger synchronization module.
 do
-    addon.DB = addon.DB or {}
     addon.DB.Syncer = addon.DB.Syncer or {}
     local module = addon.DB.Syncer
 

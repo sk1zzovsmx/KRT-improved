@@ -11,7 +11,6 @@ local Strings = feature.Strings or addon.Strings
 
 -- Raid schema migrations service.
 do
-    addon.DB = addon.DB or {}
     addon.DB.RaidMigrations = addon.DB.RaidMigrations or {}
     local module = addon.DB.RaidMigrations
 

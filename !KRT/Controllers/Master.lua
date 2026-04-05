@@ -16,12 +16,12 @@ local Comms = feature.Comms or addon.Comms
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 local ListController = feature.ListController or addon.ListController
-local Events = feature.Events or addon.Events or {}
+local Events = feature.Events or addon.Events
 local C = feature.C
 local Core = feature.Core
 local Bus = feature.Bus or addon.Bus
 local MultiSelect = feature.MultiSelect or addon.MultiSelect
-local Services = feature.Services or addon.Services or {}
+local Services = feature.Services or addon.Services
 local Loot = Services.Loot
 local Raid = Services.Raid
 local Rolls = Services.Rolls
@@ -36,12 +36,7 @@ local RAID_TARGET_MARKERS = feature.RAID_TARGET_MARKERS
 local PENDING_AWARD_TTL_SECONDS = C.PENDING_AWARD_TTL_SECONDS
 local ML_MULTI_AWARD_TIMEOUT_SECONDS = C.ML_MULTI_AWARD_TIMEOUT_SECONDS
 
-local UIFacade = addon.UI or {}
-if type(UIFacade.Call) ~= "function" then
-    UIFacade.Call = function(...)
-        return nil
-    end
-end
+local UIFacade = addon.UI
 
 local lootState = feature.lootState or {}
 feature.lootState = lootState
@@ -129,7 +124,6 @@ end
 
 -- =========== Master Looter Frame Module  =========== --
 do
-    addon.Controllers = addon.Controllers or {}
     addon.Controllers.Master = addon.Controllers.Master or {}
     local module = addon.Controllers.Master
     module._ui = module._ui

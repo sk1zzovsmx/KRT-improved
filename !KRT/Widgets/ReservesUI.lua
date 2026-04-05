@@ -12,7 +12,7 @@ local Diag = feature.Diag
 local Frames = feature.Frames or addon.Frames
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
-local Events = feature.Events or addon.Events or {}
+local Events = feature.Events or addon.Events
 local C = feature.C
 local Options = feature.Options or addon.Options
 local Bus = feature.Bus or addon.Bus
@@ -33,7 +33,6 @@ do
         return
     end
 
-    addon.Widgets = addon.Widgets or {}
     addon.Widgets.ReservesUI = addon.Widgets.ReservesUI or {}
     local module = addon.Widgets.ReservesUI
     module._ui = module._ui

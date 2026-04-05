@@ -11,7 +11,7 @@ local Diag = feature.Diag
 local Core = feature.Core
 local Strings = feature.Strings or addon.Strings
 local Time = feature.Time or addon.Time
-local Services = feature.Services or addon.Services or {}
+local Services = feature.Services or addon.Services
 
 local tinsert, tremove = table.insert, table.remove
 local pairs, type = pairs, type
@@ -21,7 +21,6 @@ local tostring, tonumber = tostring, tonumber
 -- Debug helper module.
 -- Seeds a current raid with synthetic players and submits synthetic rolls.
 do
-    addon.Services = addon.Services or {}
     addon.Services.Debug = addon.Services.Debug or {}
     local module = addon.Services.Debug
 

@@ -19,8 +19,6 @@ local tostring, tonumber = tostring, tonumber
 local date, time = date, time
 
 -- ----- Internal state ----- --
-addon.Services = addon.Services or {}
-addon.Services.Logger = addon.Services.Logger or {}
 addon.Services.Logger.View = addon.Services.Logger.View or {}
 
 local View = addon.Services.Logger.View

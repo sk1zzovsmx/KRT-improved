@@ -24,7 +24,6 @@ local ipairs = ipairs
 
 -- =========== Chat Output Helpers  =========== --
 do
-    addon.Services = addon.Services or {}
     addon.Services.Chat = addon.Services.Chat or {}
     local module = addon.Services.Chat
 

@@ -12,7 +12,6 @@ local Core = feature.Core
 local type, tostring, tonumber = type, tostring, tonumber
 
 -- ----- Internal state ----- --
-addon.Services = addon.Services or {}
 addon.Services.Logger = addon.Services.Logger or {}
 addon.Services.Logger.Store = addon.Services.Logger.Store or {}
 

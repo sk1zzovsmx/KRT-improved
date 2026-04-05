@@ -11,11 +11,11 @@ local L = feature.L
 local Frames = feature.Frames or addon.Frames
 local Colors = feature.Colors or addon.Colors
 local UIScaffold = addon.UIScaffold
-local Events = feature.Events or addon.Events or {}
+local Events = feature.Events or addon.Events
 local C = feature.C
 local Core = feature.Core or addon.Core
 local Bus = feature.Bus or addon.Bus
-local Services = feature.Services or addon.Services or {}
+local Services = feature.Services or addon.Services
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
@@ -36,7 +36,6 @@ do
         return
     end
 
-    addon.Widgets = addon.Widgets or {}
     addon.Widgets.LootCounter = addon.Widgets.LootCounter or {}
     local module = addon.Widgets.LootCounter
     module._ui = module._ui

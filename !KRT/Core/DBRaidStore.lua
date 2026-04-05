@@ -9,7 +9,7 @@ local feature = addon.Core.GetFeatureShared()
 local Core = feature.Core or addon.Core
 local Time = feature.Time or addon.Time
 local Strings = feature.Strings or addon.Strings
-local Diag = feature.Diag or {}
+local Diag = feature.Diag
 
 local tinsert, tremove = table.insert, table.remove
 local pairs, type = pairs, type
@@ -18,7 +18,6 @@ local tconcat = table.concat
 
 -- Raid storage service.
 do
-    addon.DB = addon.DB or {}
     addon.DB.RaidStore = addon.DB.RaidStore or {}
     local module = addon.DB.RaidStore
 

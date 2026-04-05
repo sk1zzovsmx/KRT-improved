@@ -15,10 +15,10 @@ local Colors = feature.Colors or addon.Colors
 local Strings = feature.Strings or addon.Strings
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
-local Events = feature.Events or addon.Events or {}
+local Events = feature.Events or addon.Events
 local Bus = feature.Bus or addon.Bus
 local Core = feature.Core or addon.Core
-local Services = feature.Services or addon.Services or {}
+local Services = feature.Services or addon.Services
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
@@ -53,7 +53,6 @@ local RaidApi = {
 
 -- =========== MS Changes Module  =========== --
 do
-    addon.Controllers = addon.Controllers or {}
     addon.Controllers.Changes = addon.Controllers.Changes or {}
     local module = addon.Controllers.Changes
     module._ui = module._ui

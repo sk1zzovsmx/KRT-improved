@@ -12,7 +12,7 @@ local Diag = feature.Diag
 local Frames = feature.Frames or addon.Frames
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
-local Events = feature.Events or addon.Events or {}
+local Events = feature.Events or addon.Events
 local C = feature.C
 local Core = feature.Core
 local Options = feature.Options or addon.Options
@@ -23,7 +23,7 @@ local Strings = feature.Strings or addon.Strings
 local Colors = feature.Colors or addon.Colors
 local Base64 = feature.Base64 or addon.Base64
 local Sort = feature.Sort or addon.Sort
-local Services = feature.Services or addon.Services or {}
+local Services = feature.Services or addon.Services
 
 local CompareValues = Sort.CompareValues
 local CompareNumbers = Sort.CompareNumbers
@@ -76,7 +76,6 @@ local function triggerSelectionEvent(target, key, ...)
     Bus.TriggerEvent(eventName, target[key], ...)
 end
 
-addon.Controllers = addon.Controllers or {}
 addon.Controllers.Logger = addon.Controllers.Logger or {}
 local module = addon.Controllers.Logger
 module._ui = module._ui or {
