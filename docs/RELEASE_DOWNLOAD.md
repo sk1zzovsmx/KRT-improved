@@ -22,10 +22,10 @@ GitHub publishing starts from that changelog version metadata:
 - or running the publish workflow manually
 
 Published GitHub release notes include:
-- `New Functions` from changelog `### Added`
-- `Enhancements` from changelog `### Changed`
-- `Commit Summary` from the release tag compare range
-- `Full Changelog` as the GitHub compare link
+- `Included Commits` from the release tag commit range, with short hashes
+- `New Functionality` from changelog `### Added`
+- `Enhancements/Improvement` from changelog `### Changed`, `### Fixed`,
+  and `### Removed`
 
 Only strictly newer publishable versions trigger publication:
 - `0.6.0-beta.1 -> 0.6.0-beta.2` publishes

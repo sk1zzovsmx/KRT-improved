@@ -124,7 +124,8 @@ Get-ChildItem -Recurse !KRT/UI -Filter *.xml |
 ```powershell
 py -3 tools/krt.py release-metadata --json
 py -3 tools/krt.py release-publish-gate --previous-ref HEAD^ --json
-py -3 tools/krt.py release-notes --repository <owner>/<repo> --current-ref HEAD --output-file dist/release-notes.md
+py -3 tools/krt.py release-prepare --current-ref HEAD --output-dir dist --json
+py -3 tools/krt.py release-notes --current-ref HEAD --output-file dist/release-notes.md
 py -3 tools/krt.py build-release-zip --output-dir dist --write-checksum
 ```
 
@@ -132,8 +133,9 @@ Expected:
 
 - metadata resolves from `!KRT/CHANGELOG.md` + `!KRT/!KRT.toc`
 - publish gate accepts only strictly increasing publishable SemVer versions
-- release notes render changelog-backed `New Functions` / `Enhancements`
-  sections plus commit summary and compare link
+- `release-prepare` emits the standard release bundle used by CI
+- release notes render concise `Included Commits`, `New Functionality`,
+  and `Enhancements/Improvement` sections, with commit short hashes included
 - archive contains only `!KRT/`
 
 ## 6) Hook Setup

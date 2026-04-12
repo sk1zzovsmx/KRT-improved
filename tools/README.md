@@ -20,7 +20,8 @@ Examples:
 - SV validator: `python3 tools/krt.py run-raid-validator --saved-variables-path "<path>/!KRT.lua"`
 - Release metadata from `!KRT/CHANGELOG.md`: `python3 tools/krt.py release-metadata --json`
 - Publish gate by SemVer progression: `python3 tools/krt.py release-publish-gate --previous-ref HEAD^ --json`
-- Release notes for GitHub releases: `python3 tools/krt.py release-notes --repository <owner>/<repo> --current-ref HEAD --output-file dist/release-notes.md`
+- Canonical release prep bundle: `python3 tools/krt.py release-prepare --current-ref HEAD --output-dir dist --json`
+- Release notes for GitHub releases: `python3 tools/krt.py release-notes --current-ref HEAD --output-file dist/release-notes.md`
 - Release packaging: `python3 tools/krt.py build-release-zip --output-dir dist --write-checksum`
 - Hook install: `python3 tools/krt.py install-hooks`
 - Mechanic wrapper: `python3 tools/krt.py mech AddonValidate --json`
@@ -46,6 +47,7 @@ control.
 - `tools/krt.py run-sv-roundtrip`: wraps `run-sv-roundtrip.ps1`
 - `tools/krt.py run-release-targeted-tests`: wraps `run-release-targeted-tests.ps1`
 - `tools/krt.py run-krt-mcp`: starts the local KRT MCP server wrapper
+- `tools/krt.py release-prepare`: builds the canonical release notes plus ZIP/checksum bundle
 - `run-raid-validator.ps1`: runs `validate-raid-schema.lua` against a SavedVariables file
 - `run-sv-inspector.ps1`: runs `sv-inspector.lua` with table or CSV output
 - `run-sv-roundtrip.ps1`: runs `sv-roundtrip.lua` on one file or a fixture directory

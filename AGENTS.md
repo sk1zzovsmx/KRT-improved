@@ -229,8 +229,10 @@ Durable preferences learned from recent conversations:
   and manual release dispatch should target any ref once the workflow exists on the default branch.
 - Prefer manual release workflows to use the selected branch/ref directly; avoid redundant
   `target_ref` inputs when the Actions branch selector already defines release context.
-- Prefer GitHub release notes to include a `Full Changelog` compare link plus concise
-  summary sections for newly introduced functions and notable improvements.
+- Prefer concise GitHub release notes with headings `Included Commits`,
+  `New Functionality`, and `Enhancements/Improvement`; keep bullets short
+  and avoid overly detailed release-note prose. In `Included Commits`,
+  include commit short hashes alongside each subject.
 - Prefer GitHub release notes to call out regressions/fixes explicitly when a
   release contains behavior corrections or recovery from prior regressions.
 - For release artifacts, package only the addon folder `!KRT/`; do not include repo-level

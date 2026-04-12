@@ -80,35 +80,21 @@ jobs:
                   git -C repo fetch --tags --force origin
                   git -C repo checkout --detach "refs/tags/${DERIVED_TAG}"
 
-            - name: Build addon archive (only !KRT/)
-              id: pack
+            - name: Prepare release artifacts
+              id: prep
               shell: bash
               env:
-                  ASSET_NAME: ${{ steps.meta.outputs.asset_name }}
-              run: |
-                  set -euo pipefail
-
-                  python3 ./repo/tools/krt.py build-release-zip \
-                      --output-dir ../dist \
-                      --file-name "${ASSET_NAME}" \
-                      --write-checksum
-                  echo "asset_path=dist/${ASSET_NAME}" >> "$GITHUB_OUTPUT"
-                  echo "checksum_path=dist/${ASSET_NAME}.sha256" >> "$GITHUB_OUTPUT"
-
-            - name: Build release notes
-              id: notes
-              shell: bash
-              env:
+                  EXPECTED_CHANNEL: ${{ inputs.expected_channel }}
                   DERIVED_TAG: ${{ steps.meta.outputs.tag }}
               run: |
                   set -euo pipefail
 
-                  python3 ./repo/tools/krt.py release-notes \
-                      --repository "${GITHUB_REPOSITORY}" \
+                  python3 ./repo/tools/krt.py release-prepare \
+                      --expected-channel "${EXPECTED_CHANNEL}" \
                       --current-tag "${DERIVED_TAG}" \
                       --current-ref HEAD \
-                      --output-file ../dist/release-notes.md
-                  echo "notes_path=dist/release-notes.md" >> "$GITHUB_OUTPUT"
+                      --output-dir ../dist \
+                      --github-output "$GITHUB_OUTPUT"
 
             - name: Create GitHub release
               shell: bash
@@ -117,9 +103,9 @@ jobs:
                   TAG: ${{ steps.meta.outputs.tag }}
                   PRERELEASE: ${{ steps.meta.outputs.prerelease }}
                   RELEASE_TITLE: ${{ steps.meta.outputs.release_title }}
-                  ASSET_PATH: ${{ steps.pack.outputs.asset_path }}
-                  CHECKSUM_PATH: ${{ steps.pack.outputs.checksum_path }}
-                  NOTES_PATH: ${{ steps.notes.outputs.notes_path }}
+                  ASSET_PATH: ${{ steps.prep.outputs.asset_path }}
+                  CHECKSUM_PATH: ${{ steps.prep.outputs.checksum_path }}
+                  NOTES_PATH: ${{ steps.prep.outputs.notes_path }}
               run: |
                   set -euo pipefail
 

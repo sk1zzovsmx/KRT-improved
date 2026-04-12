@@ -19,8 +19,8 @@ Release-Version: 0.7.0-beta.3
   `FindAndRememberBossEventContextForLootSession`, and
   `FindOrCreateBossNidForLoot` to centralize controller/service access rules.
 - Added changelog-driven GitHub release note generation in `tools/krt.py` and
-  the publish workflow, with explicit `New Functions`, `Enhancements`,
-  `Commit Summary`, and `Full Changelog` sections.
+  the publish workflow, with concise `Included Commits`,
+  `New Functionality`, and `Enhancements/Improvement` sections.
 
 ### Changed
 

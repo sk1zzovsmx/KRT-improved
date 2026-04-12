@@ -504,21 +504,50 @@ def parse_markdown_release_sections(section_text: str) -> dict[str, list[str]]:
     return sections
 
 
+def compact_release_note_entry(entry: str) -> str:
+    text = " ".join(entry.split())
+    if len(text) <= 140:
+        return text
+
+    marker_patterns = (
+        (") so ", 1),
+        (") while ", 1),
+        (", so ", 0),
+        (", while ", 0),
+        (", with ", 0),
+        (", including ", 0),
+        (", reducing ", 0),
+        (", then ", 0),
+        ("; ", 0),
+        (". ", 0),
+    )
+    for marker, keep_offset in marker_patterns:
+        index = text.find(marker)
+        if index >= 80:
+            return text[: index + keep_offset].rstrip(" ,;:.") + "."
+
+    fallback_cut = text.find(", ", 100)
+    if fallback_cut >= 100:
+        return text[:fallback_cut].rstrip(" ,;:.") + "."
+
+    return text
+
+
 def get_release_note_sections(changelog_sections: dict[str, list[str]]) -> list[tuple[str, list[str]]]:
     ordered_sections = (
-        ("New Functions", ("New Functions", "Added")),
-        ("Enhancements", ("Enhancements", "Changed")),
-        ("Fixes", ("Fixes", "Fixed")),
-        ("Removed", ("Removed",)),
+        ("New Functionality", ("New Functionality", "Added")),
+        ("Enhancements/Improvement", ("Enhancements/Improvement", "Changed", "Fixed", "Removed")),
     )
 
     selected: list[tuple[str, list[str]]] = []
     for release_title, changelog_titles in ordered_sections:
+        collected_entries: list[str] = []
         for changelog_title in changelog_titles:
             entries = changelog_sections.get(changelog_title) or []
             if entries:
-                selected.append((release_title, entries))
-                break
+                collected_entries.extend(entries)
+        if collected_entries:
+            selected.append((release_title, collected_entries))
     return selected
 
 
@@ -563,62 +592,152 @@ def find_previous_release_tag(current_version: str, current_tag: str) -> str | N
     return previous[1] if previous else None
 
 
-def git_commit_subjects(range_expr: str) -> list[str]:
+def git_commit_entries(range_expr: str) -> list[dict[str, str]]:
     output = require_git_stdout(
-        ["log", "--no-merges", "--format=%s", range_expr],
-        operation=f"read commit subjects for '{range_expr}'",
+        ["log", "--no-merges", "--format=%h%x09%s", range_expr],
+        operation=f"read commit entries for '{range_expr}'",
     )
-    return [line.strip() for line in output.splitlines() if line.strip()]
+    entries: list[dict[str, str]] = []
+    for raw_line in output.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        parts = line.split("\t", 1)
+        short_sha = parts[0].strip()
+        subject = parts[1].strip() if len(parts) > 1 else ""
+        if not short_sha or not subject:
+            continue
+        entries.append({
+            "short_sha": short_sha,
+            "subject": subject,
+        })
+    return entries
 
 
-def build_github_compare_url(repository: str, previous_tag: str, current_tag: str) -> str:
-    repo = repository.strip().strip("/")
-    if not repo:
-        raise CliError("Repository slug is required to build the GitHub compare URL.")
-    return f"https://github.com/{repo}/compare/{previous_tag}...{current_tag}"
+def resolve_release_note_context(
+    *,
+    current_version: str,
+    current_tag: str,
+    current_ref: str,
+    previous_tag: str | None,
+) -> dict[str, Any]:
+    commit_entries: list[dict[str, str]] = []
+    if previous_tag:
+        commit_entries = [
+            entry
+            for entry in git_commit_entries(f"{previous_tag}..{current_ref}")
+            if not entry["subject"].lower().startswith("release: prepare ")
+        ]
+
+    return {
+        "current_version": current_version,
+        "current_tag": current_tag,
+        "current_ref": current_ref,
+        "previous_tag": previous_tag,
+        "commit_entries": commit_entries,
+    }
 
 
 def build_release_notes_markdown(
     *,
-    repository: str,
     current_tag: str,
     current_version: str,
     current_ref: str,
     changelog_sections: dict[str, list[str]],
     previous_tag: str | None,
 ) -> str:
+    context = resolve_release_note_context(
+        current_version=current_version,
+        current_tag=current_tag,
+        current_ref=current_ref,
+        previous_tag=previous_tag,
+    )
     lines: list[str] = []
 
+    if context["commit_entries"]:
+        lines.append("Included Commits:")
+        lines.append("")
+        for entry in context["commit_entries"]:
+            lines.append(f"- `{entry['short_sha']}` {entry['subject']}")
+        lines.append("")
+
     for title, entries in get_release_note_sections(changelog_sections):
-        lines.append(f"## {title}")
+        lines.append(f"{title}:")
         lines.append("")
         for entry in entries:
-            lines.append(f"- {entry}")
+            lines.append(f"- {compact_release_note_entry(entry)}")
         lines.append("")
 
-    if previous_tag:
-        commit_subjects = [
-            subject
-            for subject in git_commit_subjects(f"{previous_tag}..{current_ref}")
-            if not subject.lower().startswith("release: prepare ")
-        ]
-        if commit_subjects:
-            lines.append("## Commit Summary")
-            lines.append("")
-            for subject in commit_subjects:
-                lines.append(f"- {subject}")
-            lines.append("")
-
-        compare_url = build_github_compare_url(repository, previous_tag, current_tag)
-        lines.append("## Full Changelog")
-        lines.append("")
-        lines.append(f"- [{previous_tag}...{current_tag}]({compare_url})")
-    else:
-        lines.append("## Full Changelog")
+    if not context["previous_tag"]:
+        lines.append("Included Commits:")
         lines.append("")
         lines.append(f"- First publishable release for `{current_version}`.")
 
     return "\n".join(lines).rstrip() + "\n"
+
+
+def prepare_release_artifacts(
+    *,
+    output_dir_text: str,
+    expected_channel: str | None,
+    current_tag: str,
+    current_ref: str,
+    previous_tag: str | None,
+) -> dict[str, Any]:
+    metadata = resolve_release_metadata(expected_channel)
+    output_dir = Path(output_dir_text).expanduser()
+    if not output_dir.is_absolute():
+        output_dir = (REPO_ROOT / output_dir).resolve()
+    ensure_dir(output_dir)
+
+    notes_path = output_dir / "release-notes.md"
+    asset_name = metadata["asset_name"]
+    version = metadata["version"]
+    build_args = argparse.Namespace(
+        output_dir=str(output_dir),
+        version=version,
+        file_name=asset_name,
+        write_checksum=True,
+    )
+    build_release_zip(build_args)
+
+    changelog_text = read_addon_changelog_text()
+    release_section_text, release_date = extract_release_section_from_text(
+        changelog_text,
+        version,
+        source_label=str(ADDON_CHANGELOG_PATH),
+    )
+    changelog_sections = parse_markdown_release_sections(release_section_text)
+    notes = build_release_notes_markdown(
+        current_tag=current_tag,
+        current_version=version,
+        current_ref=current_ref,
+        changelog_sections=changelog_sections,
+        previous_tag=previous_tag,
+    )
+    notes_path.write_text(notes, encoding="utf-8")
+
+    asset_path = output_dir / asset_name
+    checksum_path = Path(f"{asset_path}.sha256")
+    context = resolve_release_note_context(
+        current_version=version,
+        current_tag=current_tag,
+        current_ref=current_ref,
+        previous_tag=previous_tag,
+    )
+    return {
+        **metadata,
+        "current_tag": current_tag,
+        "current_ref": current_ref,
+        "previous_tag": previous_tag,
+        "release_date": release_date,
+        "output_dir": str(output_dir),
+        "notes_path": str(notes_path),
+        "asset_path": str(asset_path),
+        "checksum_path": str(checksum_path),
+        "notes": notes,
+        "included_commits": context["commit_entries"],
+    }
 
 
 def write_github_output(path_text: str, payload: dict[str, Any]) -> None:
@@ -1179,7 +1298,7 @@ def release_metadata(args: argparse.Namespace) -> int:
 def release_notes(args: argparse.Namespace) -> int:
     payload = resolve_release_metadata()
     current_tag = args.current_tag.strip() or payload["tag"]
-    current_ref = args.current_ref.strip() or current_tag or "HEAD"
+    current_ref = args.current_ref.strip() or "HEAD"
     previous_tag = args.previous_tag.strip() or find_previous_release_tag(payload["version"], current_tag) or ""
 
     changelog_text = read_addon_changelog_text()
@@ -1189,8 +1308,13 @@ def release_notes(args: argparse.Namespace) -> int:
         source_label=str(ADDON_CHANGELOG_PATH),
     )
     changelog_sections = parse_markdown_release_sections(release_section_text)
+    note_context = resolve_release_note_context(
+        current_version=payload["version"],
+        current_tag=current_tag,
+        current_ref=current_ref,
+        previous_tag=previous_tag or None,
+    )
     notes = build_release_notes_markdown(
-        repository=args.repository,
         current_tag=current_tag,
         current_version=payload["version"],
         current_ref=current_ref,
@@ -1204,6 +1328,7 @@ def release_notes(args: argparse.Namespace) -> int:
         "current_ref": current_ref,
         "previous_tag": previous_tag or None,
         "release_date": release_date,
+        "included_commits": note_context["commit_entries"],
         "notes": notes,
     }
 
@@ -1224,6 +1349,54 @@ def release_notes(args: argparse.Namespace) -> int:
         return 0
 
     print(notes, end="")
+    return 0
+
+
+def release_prepare(args: argparse.Namespace) -> int:
+    metadata = resolve_release_metadata(args.expected_channel or None)
+    current_tag = args.current_tag.strip() or metadata["tag"]
+    current_ref = args.current_ref.strip() or "HEAD"
+    previous_tag = args.previous_tag.strip() or find_previous_release_tag(metadata["version"], current_tag) or ""
+    payload = prepare_release_artifacts(
+        output_dir_text=args.output_dir,
+        expected_channel=args.expected_channel or None,
+        current_tag=current_tag,
+        current_ref=current_ref,
+        previous_tag=previous_tag or None,
+    )
+
+    result = {
+        "version": payload["version"],
+        "channel": payload["channel"],
+        "tag": payload["tag"],
+        "release_title": payload["release_title"],
+        "asset_name": payload["asset_name"],
+        "checksum_name": payload["checksum_name"],
+        "notes_path": payload["notes_path"],
+        "asset_path": payload["asset_path"],
+        "checksum_path": payload["checksum_path"],
+        "previous_tag": payload["previous_tag"],
+        "included_commits": payload["included_commits"],
+    }
+
+    if args.github_output:
+        github_payload = {
+            **metadata,
+            "notes_path": Path(payload["notes_path"]).relative_to(REPO_ROOT).as_posix(),
+            "asset_path": Path(payload["asset_path"]).relative_to(REPO_ROOT).as_posix(),
+            "checksum_path": Path(payload["checksum_path"]).relative_to(REPO_ROOT).as_posix(),
+        }
+        write_github_output(args.github_output, github_payload)
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+        return 0
+
+    print(f"Release artifacts ready in: {payload['output_dir']}")
+    print(f"Tag: {payload['tag']}")
+    print(f"Notes: {payload['notes_path']}")
+    print(f"ZIP: {payload['asset_path']}")
+    print(f"Checksum: {payload['checksum_path']}")
     return 0
 
 
@@ -1334,13 +1507,26 @@ def build_parser() -> argparse.ArgumentParser:
         "release-notes",
         help="Build GitHub release notes from the changelog section and commit range",
     )
-    release_notes_parser.add_argument("--repository", required=True)
+    release_notes_parser.add_argument("--repository", default="")
     release_notes_parser.add_argument("--current-tag", default="")
     release_notes_parser.add_argument("--current-ref", default="")
     release_notes_parser.add_argument("--previous-tag", default="")
     release_notes_parser.add_argument("--output-file", default="")
     release_notes_parser.add_argument("--json", action="store_true")
     release_notes_parser.set_defaults(handler=release_notes)
+
+    release_prepare_parser = subparsers.add_parser(
+        "release-prepare",
+        help="Generate release notes plus ZIP/checksum artifacts with the canonical release flow",
+    )
+    release_prepare_parser.add_argument("--expected-channel", choices=("alpha", "beta", "release"), default="")
+    release_prepare_parser.add_argument("--current-tag", default="")
+    release_prepare_parser.add_argument("--current-ref", default="")
+    release_prepare_parser.add_argument("--previous-tag", default="")
+    release_prepare_parser.add_argument("--output-dir", default="dist")
+    release_prepare_parser.add_argument("--github-output", default="")
+    release_prepare_parser.add_argument("--json", action="store_true")
+    release_prepare_parser.set_defaults(handler=release_prepare)
 
     release_gate = subparsers.add_parser(
         "release-publish-gate",
