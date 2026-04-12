@@ -1170,22 +1170,13 @@ do
         end
 
         if lootNid <= 0 and not lootState.fromInventory and session and session.id and Raid.GetLootNidByRollSessionId then
-            lootNid = Raid:GetLootNidByRollSessionId(session.id, addon.Core.GetCurrentRaid(), playerName, addon.Core.GetLastBoss())
+            lootNid = Raid:GetLootNidByRollSessionId(session.id, addon.Core.GetCurrentRaid(), playerName)
         end
 
         local createdTradeOnly = false
         if lootNid <= 0 and Raid.LogTradeOnlyLoot then
-            local created = Raid:LogTradeOnlyLoot(
-                itemLink,
-                playerName,
-                rollType,
-                rollValue,
-                awardedCount,
-                source,
-                addon.Core.GetCurrentRaid(),
-                addon.Core.GetLastBoss(),
-                session and session.id or nil
-            ) or 0
+            local created = Raid:LogTradeOnlyLoot(itemLink, playerName, rollType, rollValue, awardedCount, source, addon.Core.GetCurrentRaid(), nil, session and session.id or nil)
+                or 0
             created = tonumber(created) or 0
             if created > 0 then
                 lootNid = created

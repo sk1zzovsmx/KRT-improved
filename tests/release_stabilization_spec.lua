@@ -2591,7 +2591,7 @@ test("group loot need selections log passive NE history on loot receipt", functi
     assertEqual(raid.loot[1].rollValue, 0, "expected passive group loot entries to default rollValue to 0")
 end)
 
-test("loot receipts reuse a recent boss context before falling back to trash", function()
+test("loot receipts without scoped context fall back to trash", function()
     local h = newHarness()
     local link = h.registerItem(9155, "Recovery Blade")
 
@@ -2611,6 +2611,9 @@ test("loot receipts reuse a recent boss context before falling back to trash", f
     })
     h.addon.State.currentRaid = 1
     h.addon.State.lastBoss = nil
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
 
     h.addon.Deformat = function(msg, pattern)
         if pattern == _G.LOOT_ITEM_SELF and msg == "loot-receive-self" then
@@ -2625,9 +2628,9 @@ test("loot receipts reuse a recent boss context before falling back to trash", f
     Raid:AddLoot("loot-receive-self")
 
     local raid = h.Core.EnsureRaidById(1)
-    assertEqual(#raid.bossKills, 1, "expected recent boss-context recovery to avoid creating a TrashMob bucket")
-    assertEqual(raid.loot[1].bossNid, 10, "expected the loot entry to reuse the most recent real boss context")
-    assertEqual(h.Core.GetLastBoss(), 10, "expected recent boss-context recovery to restore lastBoss for subsequent loot")
+    assertEqual(#raid.bossKills, 2, "expected missing scoped context to create a TrashMob bucket")
+    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected loot fallback to create the canonical TrashMob boss entry")
+    assertEqual(raid.loot[1].bossNid, 11, "expected loot without scoped context to attach to TrashMob")
 end)
 
 test("loot receipts reuse short-lived boss event context even if lastBoss is cleared", function()
@@ -2648,6 +2651,9 @@ test("loot receipts reuse short-lived boss event context even if lastBoss is cle
     })
     h.addon.State.currentRaid = 1
     h.addon.State.lastBoss = nil
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
     _G.GetInstanceInfo = function()
         return "Naxxramas", "raid", 3
     end
@@ -2673,7 +2679,7 @@ test("loot receipts reuse short-lived boss event context even if lastBoss is cle
     assertEqual(h.Core.GetLastBoss(), 1, "expected event-context recovery to restore lastBoss after an explicit clear")
 end)
 
-test("loot receipts recover boss context from the current target before trash", function()
+test("loot receipts do not recover boss context from the current target", function()
     local h = newHarness()
     local link = h.registerItem(9156, "Target Recovery Blade")
 
@@ -2691,6 +2697,9 @@ test("loot receipts recover boss context from the current target before trash", 
     })
     h.addon.State.currentRaid = 1
     h.addon.State.lastBoss = nil
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
     h.addon.BossIDs = {
         BossIDs = {
             [36612] = true,
@@ -2737,10 +2746,69 @@ test("loot receipts recover boss context from the current target before trash", 
     Raid:AddLoot("loot-receive-self")
 
     local raid = h.Core.EnsureRaidById(1)
-    assertEqual(#raid.bossKills, 1, "expected loot logging to materialize the current target boss before creating TrashMob")
-    assertEqual(raid.bossKills[1].name, "Lord Marrowgar", "expected target-based recovery to keep the boss name")
-    assertEqual(raid.loot[1].bossNid, 1, "expected the loot entry to attach to the recovered boss context")
-    assertEqual(h.Core.GetLastBoss(), 1, "expected target-based recovery to restore lastBoss for subsequent loot")
+    assertEqual(#raid.bossKills, 1, "expected loot logging to fall back to TrashMob when no scoped boss context exists")
+    assertEqual(raid.bossKills[1].name, "_TrashMob_", "expected target heuristic recovery to stay disabled")
+    assertEqual(raid.loot[1].bossNid, 1, "expected loot without scoped context to attach to TrashMob")
+end)
+
+test("group loot sessions keep boss association without relying on lastBoss", function()
+    local h = newHarness()
+    local link = h.registerItem(9158, "Scoped Context Blade")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, name = "Sapphiron", time = 990 },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    _G.GetLootMethod = function()
+        return "needbeforegreed", nil, nil
+    end
+    _G.GetLootRollItemLink = function(rollId)
+        if rollId == 91 then
+            return link
+        end
+        return nil
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "greed-win-self" then
+            return 91, 88, link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    h.feature.raidState.bossEventContext = {
+        raidNum = 1,
+        bossNid = 10,
+        name = "Sapphiron",
+        source = "UNIT_DIED",
+        seenAt = h.feature.Time.GetCurrentTime(),
+    }
+
+    Raid:AddPassiveLootRoll(91, 45000)
+    h.feature.raidState.bossEventContext = nil
+    h.Core.SetLastBoss(nil)
+
+    assertEqual(Raid:AddGroupLootMessage("greed-win-self"), "winner", "expected passive winner message to be recognized")
+    Raid:AddLoot("greed-win-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected scoped session association to avoid creating TrashMob")
+    assertEqual(raid.loot[1].bossNid, 10, "expected scoped session association to preserve original boss context")
 end)
 
 test("group loot winner messages log passive GR history directly", function()

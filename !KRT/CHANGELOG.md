@@ -4,7 +4,29 @@ All notable changes to !KRT will be documented in this file.
 
 ## Unreleased
 
-Release-Version: 0.7.0-beta.1
+Release-Version: 0.7.0-beta.2
+
+## [0.7.0-beta.2] - 2026-04-06
+
+### Added
+
+- Introduced scoped loot-boss session tracking for passive Group Loot and
+  trade follow-up flows, so later loot receipts can reuse the original boss
+  context without relying on implicit `lastBoss` inheritance.
+
+### Changed
+
+- Tightened boss/trash loot association policy: loot records now resolve
+  `bossNid` from scoped roll-session context (including passive Group Loot
+  sessions) and only use short-lived boss-event context for non-passive flows.
+  The previous recent-boss and current-target recovery heuristics were removed,
+  and missing scoped context now falls back directly to `_TrashMob_`.
+- Trade-only loot and roll-session lookups no longer rely on implicit
+  `lastBoss` inheritance; they now use explicit/scoped context and the same
+  `_TrashMob_` fallback policy.
+- Localized the synthetic trash bucket label through `L.StrTrashMobName`
+  while keeping legacy `_TrashMob_` compatibility in logger and validator
+  flows.
 
 ## [0.7.0-beta.1] - 2026-04-05
 

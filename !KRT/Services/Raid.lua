@@ -37,6 +37,20 @@ local format = string.format
 local tostring, tonumber = tostring, tonumber
 local UnitRace, UnitSex = UnitRace, UnitSex
 
+local LEGACY_TRASH_MOB_NAME = "_TrashMob_"
+local function resolveTrashMobName()
+    local localizedName = L and L.StrTrashMobName
+    if type(localizedName) ~= "string" or localizedName == "" then
+        return LEGACY_TRASH_MOB_NAME
+    end
+    if localizedName == "StrTrashMobName" or localizedName == "L.StrTrashMobName" then
+        return LEGACY_TRASH_MOB_NAME
+    end
+    return localizedName
+end
+
+local TRASH_MOB_NAME = resolveTrashMobName()
+
 -- Raid helper module.
 -- Manages raid state, roster, boss kills, and loot logging.
 do
@@ -74,6 +88,11 @@ do
         local services = addon.Services
         return services and services.Rolls or nil
     end
+
+    local function isTrashMobName(name)
+        return name == TRASH_MOB_NAME or name == LEGACY_TRASH_MOB_NAME
+    end
+
     local BOSS_KILL_DEDUPE_WINDOW_SECONDS = tonumber(C.BOSS_KILL_DEDUPE_WINDOW_SECONDS) or 30
     local BOSS_EVENT_CONTEXT_TTL_SECONDS = tonumber(C.BOSS_EVENT_CONTEXT_TTL_SECONDS) or BOSS_KILL_DEDUPE_WINDOW_SECONDS
     local PENDING_AWARD_TTL_SECONDS = tonumber(C.PENDING_AWARD_TTL_SECONDS) or 8
@@ -248,6 +267,87 @@ do
 
         removePassiveLootRollEntry(state, entry)
         return entry
+    end
+
+    local function getLootBossSessionState()
+        raidState.lootBossSessions = raidState.lootBossSessions or {}
+        local state = raidState.lootBossSessions
+        state.bySessionId = state.bySessionId or {}
+        return state
+    end
+
+    local function clearLootBossSessionState()
+        raidState.lootBossSessions = nil
+    end
+
+    local function purgeExpiredLootBossSessions(now)
+        local state = getLootBossSessionState()
+        local currentTime = tonumber(now) or Time.GetCurrentTime()
+
+        for sessionId, entry in pairs(state.bySessionId) do
+            local expiresAt = tonumber(entry and entry.expiresAt) or 0
+            local entryRaidNum = tonumber(entry and entry.raidNum) or 0
+            local entryBossNid = tonumber(entry and entry.bossNid) or 0
+            if type(sessionId) ~= "string" or sessionId == "" or entryRaidNum <= 0 or entryBossNid <= 0 or (expiresAt > 0 and expiresAt <= currentTime) then
+                state.bySessionId[sessionId] = nil
+            end
+        end
+    end
+
+    local function rememberLootBossSession(raidNum, rollSessionId, bossNid, ttlSeconds)
+        local sessionId = rollSessionId and tostring(rollSessionId) or nil
+        local resolvedRaidNum = tonumber(raidNum) or 0
+        local resolvedBossNid = tonumber(bossNid) or 0
+        if not sessionId or sessionId == "" or resolvedRaidNum <= 0 or resolvedBossNid <= 0 then
+            return
+        end
+
+        local ttl = tonumber(ttlSeconds) or GROUP_LOOT_PENDING_AWARD_TTL_SECONDS
+        if ttl < 1 then
+            ttl = GROUP_LOOT_PENDING_AWARD_TTL_SECONDS
+        end
+
+        local state = getLootBossSessionState()
+        local now = Time.GetCurrentTime()
+        state.bySessionId[sessionId] = {
+            raidNum = resolvedRaidNum,
+            bossNid = resolvedBossNid,
+            expiresAt = now + ttl,
+        }
+    end
+
+    local function resolveLootBossSession(raid, raidNum, rollSessionId, now)
+        local sessionId = rollSessionId and tostring(rollSessionId) or nil
+        if not sessionId or sessionId == "" then
+            return 0
+        end
+
+        local currentTime = tonumber(now) or Time.GetCurrentTime()
+        purgeExpiredLootBossSessions(currentTime)
+
+        local state = getLootBossSessionState()
+        local entry = state.bySessionId[sessionId]
+        if type(entry) ~= "table" then
+            return 0
+        end
+
+        local entryRaidNum = tonumber(entry.raidNum) or 0
+        local entryBossNid = tonumber(entry.bossNid) or 0
+        if entryRaidNum ~= (tonumber(raidNum) or 0) or entryBossNid <= 0 then
+            state.bySessionId[sessionId] = nil
+            return 0
+        end
+
+        local bosses = raid and raid.bossKills or {}
+        for i = 1, #bosses do
+            local boss = bosses[i]
+            if boss and tonumber(boss.bossNid) == entryBossNid then
+                return entryBossNid
+            end
+        end
+
+        state.bySessionId[sessionId] = nil
+        return 0
     end
 
     local function resolvePassivePendingAwardContext(itemLink, rollId)
@@ -1060,6 +1160,9 @@ do
 
     local function resolveRaidDifficulty(instanceDiff)
         local diff = tonumber(instanceDiff)
+        if type(GetInstanceInfo) ~= "function" then
+            return diff
+        end
         local _, instanceType, liveDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
         if instanceType ~= "raid" then
             return diff
@@ -1143,30 +1246,6 @@ do
         return nil, nil
     end
 
-    local function findRecentBossContext(raid, now)
-        if not raid then
-            return nil, nil
-        end
-
-        local bossKills = raid.bossKills or {}
-        for i = #bossKills, 1, -1 do
-            local bossKill = bossKills[i]
-            local killTime = tonumber(bossKill and bossKill.time) or 0
-            local delta = now - killTime
-            if delta > BOSS_KILL_DEDUPE_WINDOW_SECONDS then
-                return nil, nil
-            end
-
-            local bossName = bossKill and (bossKill.name or bossKill.boss) or nil
-            local bossNid = tonumber(bossKill and bossKill.bossNid) or 0
-            if delta >= 0 and bossNid > 0 and bossName and bossName ~= "_TrashMob_" then
-                return bossKill, delta
-            end
-        end
-
-        return nil, nil
-    end
-
     local function clearBossEventContext()
         raidState.bossEventContext = nil
     end
@@ -1192,7 +1271,7 @@ do
         return raidState.bossEventContext
     end
 
-    local function recoverBossEventContext(raidNum, now)
+    local function resolveBossEventContext(raidNum, now, applyLastBoss)
         local bossEventContext = raidState.bossEventContext
         if type(bossEventContext) ~= "table" then
             return 0
@@ -1200,9 +1279,10 @@ do
 
         local contextRaidNum = tonumber(bossEventContext.raidNum) or 0
         local contextBossNid = tonumber(bossEventContext.bossNid) or 0
+        local contextBossName = bossEventContext.name
         local delta = (tonumber(now) or 0) - (tonumber(bossEventContext.seenAt) or 0)
 
-        if contextRaidNum ~= (tonumber(raidNum) or 0) or contextBossNid <= 0 then
+        if contextRaidNum ~= (tonumber(raidNum) or 0) or contextBossNid <= 0 or isTrashMobName(contextBossName) then
             clearBossEventContext()
             return 0
         end
@@ -1212,56 +1292,36 @@ do
             return 0
         end
 
-        Core.SetLastBoss(contextBossNid)
-        addon:debug(
-            Diag.D.LogBossEventContextRecovered:format(tostring(bossEventContext.name), contextBossNid, tonumber(delta) or -1, tostring(bossEventContext.source or "event"))
-        )
+        if applyLastBoss then
+            Core.SetLastBoss(contextBossNid)
+            addon:debug(Diag.D.LogBossEventContextRecovered:format(tostring(contextBossName), contextBossNid, tonumber(delta) or -1, tostring(bossEventContext.source or "event")))
+        end
 
         return contextBossNid
     end
 
-    local function recoverRecentBossContext(raid, now)
-        local bossKill, delta = findRecentBossContext(raid, now)
-        local bossNid = tonumber(bossKill and bossKill.bossNid) or 0
-        if bossNid <= 0 then
-            return 0
-        end
-
-        Core.SetLastBoss(bossNid)
-        addon:debug(Diag.D.LogBossRecentContextRecovered:format(tostring(bossKill.name or bossKill.boss), bossNid, tonumber(delta) or -1))
-        return bossNid
+    local function recoverBossEventContext(raidNum, now)
+        return resolveBossEventContext(raidNum, now, true)
     end
 
-    local function recoverBossContextFromCurrentTarget()
-        if not Core.GetCurrentRaid() or Core.GetLastBoss() then
-            return 0
+    local function peekBossEventContext(raidNum, now)
+        return resolveBossEventContext(raidNum, now, false)
+    end
+
+    local function findOrCreateTrashBossNid(raidNum, raid)
+        local bossKills = raid and raid.bossKills or {}
+        for i = #bossKills, 1, -1 do
+            local boss = bossKills[i]
+            if boss and isTrashMobName(boss.name) then
+                local existingBossNid = tonumber(boss.bossNid) or 0
+                if existingBossNid > 0 then
+                    return existingBossNid
+                end
+            end
         end
 
-        local targetGuid = UnitGUID and UnitGUID("target") or nil
-        local npcId = targetGuid and addon.GetCreatureId and addon.GetCreatureId(targetGuid) or nil
-        local bossLib = addon.BossIDs
-        local bossIds = bossLib and bossLib.BossIDs
-        if not (npcId and bossIds and bossIds[npcId]) then
-            return 0
-        end
-        if shouldIgnoreBossKillNpcId(npcId) then
-            return 0
-        end
-
-        local targetName = UnitName and UnitName("target") or nil
-        local bossName = targetName
-        if isUnknownName(bossName) then
-            bossName = nil
-        end
-        if not bossName and bossLib and bossLib.GetBossName then
-            bossName = bossLib:GetBossName(npcId)
-        end
-        if not bossName then
-            return 0
-        end
-
-        addon:debug(Diag.D.LogBossLootTargetMatched:format(tonumber(npcId) or -1, tostring(bossName)))
-        return module:AddBoss(bossName, nil, nil, npcId)
+        local createdBossNid = tonumber(module:AddBoss(TRASH_MOB_NAME, nil, raidNum)) or 0
+        return createdBossNid
     end
 
     local function parseLootChatMessage(msg, rollType, rollValue)
@@ -1411,7 +1471,26 @@ do
         return rollType, rollValue, rollSessionId, outcome
     end
 
-    local function buildLootRecord(raid, itemId, itemName, itemString, itemLink, itemRarity, itemTexture, itemCount, looterNid, rollType, rollValue, rollSessionId)
+    local function resolveBossNidForLoot(raid, raidNum, rollSessionId, passiveGroupLoot, now)
+        local currentTime = tonumber(now) or Time.GetCurrentTime()
+        local bossNid = resolveLootBossSession(raid, raidNum, rollSessionId, currentTime)
+        if bossNid > 0 then
+            return bossNid
+        end
+
+        if passiveGroupLoot then
+            return 0
+        end
+
+        bossNid = recoverBossEventContext(raidNum, currentTime)
+        if bossNid > 0 then
+            rememberLootBossSession(raidNum, rollSessionId, bossNid, BOSS_EVENT_CONTEXT_TTL_SECONDS)
+        end
+
+        return bossNid
+    end
+
+    local function buildLootRecord(raid, itemId, itemName, itemString, itemLink, itemRarity, itemTexture, itemCount, looterNid, rollType, rollValue, rollSessionId, bossNid)
         local lootNid = tonumber(raid.nextLootNid) or 1
         raid.nextLootNid = lootNid + 1
 
@@ -1428,7 +1507,7 @@ do
             rollValue = rollValue,
             rollSessionId = rollSessionId,
             lootNid = lootNid,
-            bossNid = tonumber(Core.GetLastBoss()) or 0,
+            bossNid = tonumber(bossNid) or 0,
             time = Time.GetCurrentTime(),
         }
 
@@ -1941,6 +2020,7 @@ do
         end
         Core.SetCurrentRaid(raidId)
         clearBossEventContext()
+        clearLootBossSessionState()
         -- New session context: force version-gated roster consumers (e.g. Master dropdowns) to rebuild.
         rosterVersion = rosterVersion + 1
         resetPendingUnitRetry()
@@ -2047,6 +2127,7 @@ do
         Core.SetCurrentRaid(nil)
         Core.SetLastBoss(nil)
         clearBossEventContext()
+        clearLootBossSessionState()
     end
 
     -- Checks the current raid status and creates a new session if needed.
@@ -2166,6 +2247,7 @@ do
             addon:debug(Diag.D.LogBossAddSkipped:format(tostring(raidNum), tostring(bossName)))
             return 0
         end
+        local isTrashBoss = isTrashMobName(bossName)
 
         local raid = Core.EnsureRaidById(raidNum)
         if not raid then
@@ -2188,7 +2270,11 @@ do
             local existingBossNid = tonumber(existingBoss.bossNid) or 0
             if existingBossNid > 0 then
                 Core.SetLastBoss(existingBossNid)
-                setBossEventContext(raidNum, existingBossNid, bossName, bossSource, currentTime)
+                if not isTrashBoss then
+                    setBossEventContext(raidNum, existingBossNid, bossName, bossSource, currentTime)
+                else
+                    clearBossEventContext()
+                end
             end
             addon:trace(Diag.D.LogBossDuplicateSuppressed:format(tostring(bossName), sourceNpcId or -1, existingBossNid, tonumber(delta) or -1))
             return existingBossNid
@@ -2226,7 +2312,11 @@ do
         tinsert(raid.bossKills, killInfo)
         invalidateRaidRuntime(raid)
         Core.SetLastBoss(bossNid)
-        setBossEventContext(raidNum, bossNid, bossName, bossSource, currentTime)
+        if not isTrashBoss then
+            setBossEventContext(raidNum, bossNid, bossName, bossSource, currentTime)
+        else
+            clearBossEventContext()
+        end
         addon:info(Diag.I.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1, tonumber(raidNum) or -1, #players))
         addon:debug(Diag.D.LogBossLastBossHash:format(tonumber(Core.GetLastBoss()) or -1, tostring(killInfo.hash)))
         return bossNid
@@ -2258,21 +2348,6 @@ do
         end
         Core.EnsureRaidSchema(raid)
 
-        if not Core.GetLastBoss() then
-            local currentTime = Time.GetCurrentTime()
-            local recoveredBossNid = recoverBossEventContext(currentRaidId, currentTime)
-            if recoveredBossNid <= 0 then
-                recoveredBossNid = recoverRecentBossContext(raid, currentTime)
-            end
-            if recoveredBossNid <= 0 then
-                recoveredBossNid = recoverBossContextFromCurrentTarget()
-            end
-            if recoveredBossNid <= 0 then
-                addon:debug(Diag.D.LogBossNoContextTrash)
-                self:AddBoss("_TrashMob_")
-            end
-        end
-
         local passiveGroupLoot = isPassiveGroupLootMethod()
         local isPassiveWinnerMessage = passiveGroupLoot and isPassiveLootWinnerMessage(msg)
         local rollSessionId
@@ -2283,10 +2358,21 @@ do
             return
         end
 
+        local currentTime = Time.GetCurrentTime()
+        local bossNid = resolveBossNidForLoot(raid, currentRaidId, rollSessionId, passiveGroupLoot, currentTime)
+        if bossNid <= 0 then
+            addon:debug(Diag.D.LogBossNoContextTrash)
+            bossNid = findOrCreateTrashBossNid(currentRaidId, raid)
+        end
+
+        local sessionBossTtl = passiveGroupLoot and GROUP_LOOT_PENDING_AWARD_TTL_SECONDS or BOSS_EVENT_CONTEXT_TTL_SECONDS
+        rememberLootBossSession(currentRaidId, rollSessionId, bossNid, sessionBossTtl)
+
         local looterNid
         looterNid, player = ensureRaidPlayerNid(player, currentRaidId)
 
-        local lootInfo, lootNid = buildLootRecord(raid, itemId, itemName, itemString, itemLink, itemRarity, itemTexture, itemCount, looterNid, rollType, rollValue, rollSessionId)
+        local lootInfo, lootNid =
+            buildLootRecord(raid, itemId, itemName, itemString, itemLink, itemRarity, itemTexture, itemCount, looterNid, rollType, rollValue, rollSessionId, bossNid)
 
         -- LootCounter (MS only): increment the winner's count when the loot is actually awarded.
         -- This runs off the authoritative LOOT_ITEM / LOOT_ITEM_MULTIPLE chat event.
@@ -2311,6 +2397,8 @@ do
             return nil
         end
 
+        local currentRaidId = Core.GetCurrentRaid()
+
         local resolvedRollId = tonumber(rollId)
         if not resolvedRollId then
             return nil
@@ -2334,11 +2422,17 @@ do
             durationSeconds = 0
         end
         local expiresAt = GetTime() + durationSeconds + GROUP_LOOT_ROLL_GRACE_SECONDS
+        local currentTime = Time.GetCurrentTime()
+        local contextBossNid = peekBossEventContext(currentRaidId, currentTime)
 
         if existing then
             existing.itemLink = itemLink
             existing.itemKey = getPassiveLootRollItemKey(itemLink)
             existing.expiresAt = expiresAt
+            if contextBossNid > 0 then
+                existing.bossNid = contextBossNid
+                rememberLootBossSession(currentRaidId, existing.sessionId, contextBossNid, durationSeconds + GROUP_LOOT_ROLL_GRACE_SECONDS)
+            end
             return existing
         end
 
@@ -2355,11 +2449,15 @@ do
             itemKey = itemKey,
             sessionId = "GL:" .. tostring(state.nextSessionId),
             expiresAt = expiresAt,
+            bossNid = (contextBossNid > 0) and contextBossNid or nil,
         }
         state.nextSessionId = state.nextSessionId + 1
         list[#list + 1] = entry
         state.bySessionId[entry.sessionId] = entry
         state.byRollId[resolvedRollId] = entry
+        if contextBossNid > 0 then
+            rememberLootBossSession(currentRaidId, entry.sessionId, contextBossNid, durationSeconds + GROUP_LOOT_ROLL_GRACE_SECONDS)
+        end
         return entry
     end
 
@@ -2447,6 +2545,16 @@ do
         local lootNid = tonumber(raid.nextLootNid) or 1
         raid.nextLootNid = lootNid + 1
 
+        local currentTime = Time.GetCurrentTime()
+        local resolvedBossNid = tonumber(bossNid) or 0
+        if resolvedBossNid <= 0 then
+            resolvedBossNid = resolveLootBossSession(raid, raidNum, rollSessionId, currentTime)
+        end
+        if resolvedBossNid <= 0 then
+            resolvedBossNid = findOrCreateTrashBossNid(raidNum, raid)
+        end
+        rememberLootBossSession(raidNum, rollSessionId, resolvedBossNid, GROUP_LOOT_PENDING_AWARD_TTL_SECONDS)
+
         local lootInfo = {
             itemId = itemId,
             itemName = itemName,
@@ -2460,8 +2568,8 @@ do
             rollValue = tonumber(rollValue) or 0,
             rollSessionId = rollSessionId and tostring(rollSessionId) or nil,
             lootNid = lootNid,
-            bossNid = tonumber(bossNid) or tonumber(Core.GetLastBoss()) or 0,
-            time = Time.GetCurrentTime(),
+            bossNid = resolvedBossNid,
+            time = currentTime,
             source = source or "TRADE_ONLY",
         }
 
@@ -2696,7 +2804,7 @@ do
     end
 
     -- Retrieves the position of a specific loot item within the raid's loot table.
-    function module:GetLootID(itemID, raidNum, holderName)
+    function module:GetLootID(itemID, raidNum, holderName, bossNid)
         raidNum = raidNum or Core.GetCurrentRaid()
         local raid = Core.EnsureRaidById(raidNum)
         if not raid then
@@ -2711,7 +2819,7 @@ do
             return 0
         end
 
-        local bossNid = tonumber(Core.GetLastBoss()) or 0
+        local queryBossNid = tonumber(bossNid) or 0
         local loot = raid.loot or {}
 
         for i = #loot, 1, -1 do
@@ -2719,7 +2827,7 @@ do
             if v and tonumber(v.itemId) == itemID then
                 local winnerName = resolveLootLooterName(raid, v)
                 if not holderName or holderName == "" or winnerName == holderName then
-                    if bossNid <= 0 or tonumber(v.bossNid) == bossNid then
+                    if queryBossNid <= 0 or tonumber(v.bossNid) == queryBossNid then
                         return tonumber(v.lootNid) or 0
                     end
                 end

@@ -46,6 +46,20 @@ local pairs, ipairs, type, select = pairs, ipairs, type, select
 local tostring, tonumber = tostring, tonumber
 local strlower = string.lower
 
+local LEGACY_TRASH_MOB_NAME = "_TrashMob_"
+local function resolveTrashMobName()
+    local localizedName = L and L.StrTrashMobName
+    if type(localizedName) ~= "string" or localizedName == "" then
+        return LEGACY_TRASH_MOB_NAME
+    end
+    if localizedName == "StrTrashMobName" or localizedName == "L.StrTrashMobName" then
+        return LEGACY_TRASH_MOB_NAME
+    end
+    return localizedName
+end
+
+local TRASH_MOB_NAME = resolveTrashMobName()
+
 local SetSelectedRaid
 local deleteSelectedAttendees
 local setFrameLabel
@@ -58,6 +72,10 @@ local function getRaidQueries()
         return Core.GetRaidQueries()
     end
     return nil
+end
+
+local function isTrashMobName(name)
+    return name == TRASH_MOB_NAME or name == LEGACY_TRASH_MOB_NAME
 end
 
 local selectionEvents = {
@@ -3190,8 +3208,8 @@ do
         local modeT = Strings.NormalizeLower(difficultyBox:GetText())
         local bTime = Strings.TrimText(timeBox:GetText())
 
-        name = (name == "") and "_TrashMob_" or name
-        if name ~= "_TrashMob_" and (modeT ~= "h" and modeT ~= "n") then
+        name = (name == "") and TRASH_MOB_NAME or name
+        if not isTrashMobName(name) and (modeT ~= "h" and modeT ~= "n") then
             addon:error(L.ErrBossDifficulty)
             return
         end

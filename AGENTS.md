@@ -201,6 +201,8 @@ Durable preferences learned from recent conversations:
   and manual release dispatch should target any ref once the workflow exists on the default branch.
 - Prefer manual release workflows to use the selected branch/ref directly; avoid redundant
   `target_ref` inputs when the Actions branch selector already defines release context.
+- Prefer GitHub release notes to include a `Full Changelog` compare link plus concise
+  summary sections for newly introduced functions and notable improvements.
 - For release artifacts, package only the addon folder `!KRT/`; do not include repo-level
   docs/tooling files in distributable ZIP outputs.
 - Keep GitHub release asset download/checksum instructions out of root `README.md`;
