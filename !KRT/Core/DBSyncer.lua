@@ -29,6 +29,12 @@ local floor = math.floor
 
 local GetTime = _G.GetTime
 local SendAddonMessage = _G.SendAddonMessage
+local GetNumRaidMembers = _G.GetNumRaidMembers
+local GetRaidRosterInfo = _G.GetRaidRosterInfo
+
+local NormalizeName = Strings.NormalizeName
+local NormalizeLower = Strings.NormalizeLower
+local TrimText = Strings.TrimText
 
 local InternalEvents = Events.Internal
 
@@ -83,7 +89,7 @@ do
             return nil
         end
         local short = sender:match("^([^%-]+)") or sender
-        return Strings.NormalizeName(short, true) or short
+        return NormalizeName(short, true) or short
     end
 
     local function isSelfSender(sender)
@@ -91,8 +97,8 @@ do
         if not selfName then
             return false
         end
-        local a = Strings.NormalizeLower(selfName, true)
-        local b = Strings.NormalizeLower(normalizeSender(sender), true)
+        local a = NormalizeLower(selfName, true)
+        local b = NormalizeLower(normalizeSender(sender), true)
         return (a ~= nil and b ~= nil and a == b)
     end
 
@@ -178,7 +184,7 @@ do
                     validNids[playerNid] = true
                     if type(playerName) == "string" and playerName ~= "" then
                         byNid[playerNid] = playerName
-                        local normalized = Strings.NormalizeLower(playerName, true)
+                        local normalized = NormalizeLower(playerName, true)
                         if normalized and normalized ~= "" and byNameLower[normalized] == nil then
                             byNameLower[normalized] = playerNid
                         end
@@ -203,7 +209,7 @@ do
             if playerNid and playerNid > 0 then
                 playerName = playerNameByNid and playerNameByNid[playerNid] or nil
             elseif type(raw) == "string" then
-                playerName = Strings.NormalizeName(raw, true) or raw
+                playerName = NormalizeName(raw, true) or raw
             end
             if playerName and playerName ~= "" and not seen[playerName] then
                 seen[playerName] = true
@@ -338,11 +344,11 @@ do
     end
 
     local function normalizeTargetName(raw)
-        local text = Strings.TrimText(raw or "")
+        local text = TrimText(raw or "")
         if text == "" then
             return nil
         end
-        return Strings.NormalizeName(text, true) or text
+        return NormalizeName(text, true) or text
     end
 
     local function ensureGroupSyncAvailable()
@@ -704,7 +710,7 @@ do
             local raw = values[i]
             local playerNid = tonumber(raw)
             if not playerNid and type(raw) == "string" then
-                playerNid = playerNidByName and playerNidByName[Strings.NormalizeLower(raw, true)] or nil
+                playerNid = playerNidByName and playerNidByName[NormalizeLower(raw, true)] or nil
             end
             if playerNid and playerNid > 0 then
                 if (not validPlayerNids) or validPlayerNids[playerNid] then
@@ -838,7 +844,7 @@ do
                     count = 0
                 end
                 dst.playerNid = nid
-                dst.name = Strings.NormalizeName(src.name, true) or src.name or dst.name
+                dst.name = NormalizeName(src.name, true) or src.name or dst.name
                 dst.rank = tonumber(src.rank) or 0
                 dst.subgroup = tonumber(src.subgroup) or 1
                 dst.class = (src.class and src.class ~= "") and src.class or "UNKNOWN"
@@ -931,7 +937,7 @@ do
                 dst.itemCount = count
                 local looterNid = tonumber(src.looterNid)
                 if not looterNid and type(src.looterName) == "string" then
-                    looterNid = playerNidByName[Strings.NormalizeLower(src.looterName, true)]
+                    looterNid = playerNidByName[NormalizeLower(src.looterName, true)]
                 end
                 if looterNid and looterNid > 0 and validPlayerNids[looterNid] then
                     dst.looterNid = looterNid
@@ -946,9 +952,9 @@ do
 
         raid.changes = raid.changes or {}
         for name, spec in pairs(snapshot.changes or {}) do
-            local normalizedName = Strings.NormalizeName(name, true) or name
+            local normalizedName = NormalizeName(name, true) or name
             if normalizedName and normalizedName ~= "" then
-                local normalizedSpec = Strings.NormalizeName(spec, true)
+                local normalizedSpec = NormalizeName(spec, true)
                 raid.changes[normalizedName] = (normalizedSpec and normalizedSpec ~= "") and normalizedSpec or nil
             end
         end

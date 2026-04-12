@@ -25,6 +25,10 @@ local Base64 = feature.Base64 or addon.Base64
 local Sort = feature.Sort or addon.Sort
 local Services = feature.Services or addon.Services
 
+local NormalizeName = Strings.NormalizeName
+local NormalizeLower = Strings.NormalizeLower
+local TrimText = Strings.TrimText
+
 local CompareValues = Sort.CompareValues
 local CompareNumbers = Sort.CompareNumbers
 local CompareStrings = Sort.CompareStrings
@@ -1356,8 +1360,8 @@ do
         end
 
         Frames.MakeEditBoxPopup("KRTLOGGER_ITEM_EDIT_WINNER", L.StrEditItemLooterHelp, function(self, text)
-            local rawText = Strings.TrimText(text)
-            local name = Strings.NormalizeLower(rawText)
+            local rawText = TrimText(text)
+            local name = NormalizeLower(rawText)
             if not name or name == "" then
                 addon:error(L.ErrLoggerWinnerEmpty)
                 return
@@ -2992,9 +2996,9 @@ do
             return
         end
 
-        local name = Strings.TrimText(nameBox:GetText())
-        local modeT = Strings.NormalizeLower(difficultyBox:GetText())
-        local bTime = Strings.TrimText(timeBox:GetText())
+        local name = TrimText(nameBox:GetText())
+        local modeT = NormalizeLower(difficultyBox:GetText())
+        local bTime = TrimText(timeBox:GetText())
 
         name = (name == "") and TRASH_MOB_NAME or name
         if not isTrashMobName(name) and (modeT ~= "h" and modeT ~= "n") then
@@ -3084,7 +3088,7 @@ do
         if not nameBox then
             return
         end
-        local name = Strings.TrimText(nameBox:GetText())
+        local name = TrimText(nameBox:GetText())
         if module.Actions:AddBossAttendee(rID, bID, name) then
             Box:Toggle()
             triggerSelectionEvent(module, "selectedBoss")
