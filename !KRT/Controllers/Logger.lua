@@ -84,13 +84,6 @@ local markCsvDirty
 local ensureCsvFresh
 local refreshCsv
 
-local function getRaidQueries()
-    if Core.GetRaidQueries then
-        return Core.GetRaidQueries()
-    end
-    return nil
-end
-
 local function isTrashMobName(name)
     return name == TRASH_MOB_NAME or name == LEGACY_TRASH_MOB_NAME
 end
@@ -111,16 +104,68 @@ local function triggerSelectionEvent(target, key, ...)
     Bus.TriggerEvent(eventName, target[key], ...)
 end
 
+local RAID_SORT_HEADERS = {
+    { suffix = "HeaderNum", key = "id" },
+    { suffix = "HeaderDate", key = "date" },
+    { suffix = "HeaderZone", key = "zone" },
+    { suffix = "HeaderSize", key = "size" },
+}
+
+local function bindRaidSortHeaders(frameName, listRef)
+    local frame = frameName and _G[frameName] or nil
+    if not frame or frame._krtBound then
+        return
+    end
+
+    for i = 1, #RAID_SORT_HEADERS do
+        local header = RAID_SORT_HEADERS[i]
+        local sortKey = header.key
+        local headerButton = _G[frameName .. header.suffix]
+        if headerButton then
+            Frames.SafeSetScript(headerButton, "OnClick", function()
+                listRef:Sort(sortKey)
+            end)
+        end
+    end
+
+    frame._krtBound = true
+end
+
+local function buildRaidListRow(raid, seq, queries)
+    if not raid then
+        return nil
+    end
+
+    local summary = queries and queries.GetRaidSummary and queries:GetRaidSummary(raid) or nil
+    local row = {}
+    row.id = tonumber(raid.raidNid)
+    row.seq = seq
+    row.zone = raid.zone
+    row.size = (summary and summary.size) or raid.size
+    row.difficulty = tonumber((summary and summary.difficulty) or raid.difficulty)
+    local mode = row.difficulty and ((row.difficulty == 3 or row.difficulty == 4) and "H" or "N") or "?"
+    row.sizeLabel = tostring(row.size or "") .. mode
+    row.date = (summary and summary.startTime) or raid.startTime
+    row.dateFmt = date("%d/%m/%Y %H:%M", row.date)
+    return row
+end
+
+local function fillRaidListData(out, contextTag)
+    local raidStore = Core.GetRaidStoreOrNil(contextTag, { "GetAllRaids", "GetRaidByIndex" })
+    local raids = raidStore and raidStore:GetAllRaids() or {}
+    local queries = Core.GetRaidQueries and Core.GetRaidQueries() or nil
+    for i = 1, #raids do
+        local raid = raidStore and raidStore:GetRaidByIndex(i) or Core.EnsureRaidById(i)
+        local row = buildRaidListRow(raid, i, queries)
+        if row then
+            out[i] = row
+        end
+    end
+end
+
 addon.Controllers.Logger = addon.Controllers.Logger or {}
 local module = addon.Controllers.Logger
-module._ui = module._ui or {
-    Loaded = false,
-    Bound = false,
-    Localized = false,
-    Dirty = true,
-    Reason = nil,
-    FrameName = nil,
-}
+module._ui = UIScaffold.EnsureModuleUi(module)
 
 -- Logger frame module.
 do
@@ -438,19 +483,12 @@ do
     end
 
     local function refreshRosterBoundLists()
-        local raidAttendeesCtrl = module.RaidAttendees and module.RaidAttendees._ctrl
-        if raidAttendeesCtrl and raidAttendeesCtrl.Dirty then
-            raidAttendeesCtrl:Dirty()
-        end
-
-        local bossAttendeesCtrl = module.BossAttendees and module.BossAttendees._ctrl
-        if bossAttendeesCtrl and bossAttendeesCtrl.Dirty then
-            bossAttendeesCtrl:Dirty()
-        end
-
-        local lootCtrl = module.Loot and module.Loot._ctrl
-        if lootCtrl and lootCtrl.Dirty then
-            lootCtrl:Dirty()
+        local listModules = { module.RaidAttendees, module.BossAttendees, module.Loot }
+        for i = 1, #listModules do
+            local ctrl = listModules[i] and listModules[i]._ctrl
+            if ctrl and ctrl.Dirty then
+                ctrl:Dirty()
+            end
         end
     end
 
@@ -463,14 +501,6 @@ do
             end
             refreshRosterBoundLists()
         end)
-    end
-
-    local function getRaidNidByIndex(raidIndex)
-        return raidIndex and Core.GetRaidNidById(raidIndex) or nil
-    end
-
-    local function getRaidIndexByNid(raidNid)
-        return raidNid and Core.GetRaidIdByNid(raidNid) or nil
     end
 
     -- Logger helpers: resolve current raid/boss/loot and run raid actions with a single refresh.
@@ -579,13 +609,19 @@ do
             PanelTemplates_SetNumTabs(frame, EXPORT_TAB_ENABLED and 2 or 1)
         end
 
-        ensureSubmoduleOnLoad(module.Raids, refs.raids)
-        ensureSubmoduleOnLoad(module.Boss, refs.bosses)
-        ensureSubmoduleOnLoad(module.Loot, refs.loot)
-        ensureSubmoduleOnLoad(module.RaidAttendees, refs.raidAttendees)
-        ensureSubmoduleOnLoad(module.BossAttendees, refs.bossAttendees)
-        ensureSubmoduleOnLoad(module.BossBox, refs.bossBox)
-        ensureSubmoduleOnLoad(module.AttendeesBox, refs.attendeesBox)
+        local onLoadPairs = {
+            { moduleRef = module.Raids, frameRef = refs.raids },
+            { moduleRef = module.Boss, frameRef = refs.bosses },
+            { moduleRef = module.Loot, frameRef = refs.loot },
+            { moduleRef = module.RaidAttendees, frameRef = refs.raidAttendees },
+            { moduleRef = module.BossAttendees, frameRef = refs.bossAttendees },
+            { moduleRef = module.BossBox, frameRef = refs.bossBox },
+            { moduleRef = module.AttendeesBox, frameRef = refs.attendeesBox },
+        }
+        for i = 1, #onLoadPairs do
+            local pair = onLoadPairs[i]
+            ensureSubmoduleOnLoad(pair.moduleRef, pair.frameRef)
+        end
 
         if EXPORT_TAB_ENABLED then
             ensureSubmoduleOnLoad(module.ExportRaids, refs.exportRaids)
@@ -634,7 +670,7 @@ do
         if not raidNid then
             return
         end
-        local raidIndex = getRaidIndexByNid(raidNid)
+        local raidIndex = raidNid and Core.GetRaidIdByNid(raidNid) or nil
         if not raidIndex then
             return
         end
@@ -655,9 +691,12 @@ do
             isRange = isRange,
             allowDeselect = opts and opts.allowDeselect,
             setFocus = SetSelectedRaid,
-            mapSelectedToFocus = getRaidIndexByNid,
+            mapSelectedToFocus = function(nid)
+                return nid and Core.GetRaidIdByNid(nid) or nil
+            end,
             isClickedFocused = function(clickedNid)
-                return getRaidNidByIndex(module.selectedRaid) == clickedNid
+                local selectedRaidNid = module.selectedRaid and Core.GetRaidNidById(module.selectedRaid) or nil
+                return selectedRaidNid == clickedNid
             end,
         })
 
@@ -866,7 +905,7 @@ do
                 addon:error(L.ErrLoggerInvalidItem)
                 return
             end
-            module.Loot:Log(lootNid, nil, rollType, nil, "LOGGER_EDIT_ROLLTYPE")
+            module.Loot:SetLootEntry(lootNid, nil, rollType, nil, "LOGGER_EDIT_ROLLTYPE")
         end
 
         local function getItemMenuFrame()
@@ -1164,18 +1203,57 @@ do
                 return
             end
 
-            module.Loot:Log(self.lootNid, winner, nil, nil, "LOGGER_EDIT_WINNER")
+            module.Loot:SetLootEntry(self.lootNid, winner, nil, nil, "LOGGER_EDIT_WINNER")
         end, function(self)
             self.raidId = module.selectedRaid
             self.lootNid = module.selectedItem
         end)
 
         Frames.MakeEditBoxPopup("KRTLOGGER_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp, function(self, text)
-            module.Loot:Log(self.lootNid, nil, nil, text, "LOGGER_EDIT_ROLLVALUE")
+            module.Loot:SetLootEntry(self.lootNid, nil, nil, text, "LOGGER_EDIT_ROLLVALUE")
         end, function(self)
             self.lootNid = module.selectedItem
         end, validateRollValue)
     end
+end
+
+-- Shared factory for Logger list controllers with standardized highlight/focus config.
+local function makeLoggerList(cfg, selField, msCtxField, hlOpts)
+    hlOpts = hlOpts or {}
+    local transform = hlOpts.transform
+    local debugTag = hlOpts.debugTag or "LoggerSelect"
+
+    local function resolve()
+        local v = module[selField]
+        if v == nil then
+            return nil
+        end
+        return transform and transform(v) or v
+    end
+
+    if msCtxField then
+        cfg.highlightFn = function(id)
+            return MultiSelect.MultiSelectIsSelected(module[msCtxField], id)
+        end
+        cfg.highlightKey = function()
+            return MultiSelect.MultiSelectGetVersion(module[msCtxField])
+        end
+        cfg.highlightDebugInfo = function()
+            return ("ctx=%s selectedCount=%d"):format(tostring(module[msCtxField]), MultiSelect.MultiSelectCount(module[msCtxField]))
+        end
+    else
+        cfg.highlightId = resolve
+        cfg.highlightDebugInfo = function()
+            return ("%s=%s"):format(selField, tostring(resolve()))
+        end
+    end
+
+    cfg.focusId = resolve
+    cfg.focusKey = function()
+        return tostring(resolve() or "nil")
+    end
+    cfg.highlightDebugTag = debugTag
+    return ListController.MakeListController(cfg)
 end
 
 -- Raids list.
@@ -1185,179 +1263,137 @@ do
     local Store = module.Store
     local Helpers = module.Helpers
     local controller
-    controller = ListController.MakeListController({
-        keyName = "RaidsList",
-        poolTag = "logger-raids",
-        _rowParts = { "ID", "Date", "Zone", "Size" },
+    controller = makeLoggerList(
+        {
+            keyName = "RaidsList",
+            poolTag = "logger-raids",
+            _rowParts = { "ID", "Date", "Zone", "Size" },
 
-        localize = function(n)
-            local title = _G[n .. "Title"]
-            if title then
-                title:SetText(L.StrRaidsList)
-            end
-            _G[n .. "HeaderNum"]:SetText(L.StrNumber)
-            _G[n .. "HeaderDate"]:SetText(L.StrDate)
-            _G[n .. "HeaderZone"]:SetText(L.StrZone)
-            _G[n .. "HeaderSize"]:SetText(L.StrSize)
-            _G[n .. "CurrentBtn"]:SetText(L.StrSetCurrent)
-            local del = _G[n .. "DeleteBtn"]
-            if del then
-                del:SetText(L.BtnDelete)
-            end
-            Frames.SetTooltip(_G[n .. "CurrentBtn"], L.StrRaidsCurrentHelp, nil, L.StrRaidCurrentTitle)
-
-            local frame = _G[n]
-            if frame and not frame._krtBound then
-                Frames.SafeSetScript(_G[n .. "CurrentBtn"], "OnClick", function(self, button)
-                    Raids:SetCurrent(self, button)
-                end)
-                Frames.SafeSetScript(_G[n .. "DeleteBtn"], "OnClick", function(self, button)
-                    Raids:Delete(self, button)
-                end)
-                Frames.SafeSetScript(_G[n .. "HeaderNum"], "OnClick", function()
-                    Raids:Sort("id")
-                end)
-                Frames.SafeSetScript(_G[n .. "HeaderDate"], "OnClick", function()
-                    Raids:Sort("date")
-                end)
-                Frames.SafeSetScript(_G[n .. "HeaderZone"], "OnClick", function()
-                    Raids:Sort("zone")
-                end)
-                Frames.SafeSetScript(_G[n .. "HeaderSize"], "OnClick", function()
-                    Raids:Sort("size")
-                end)
-                frame._krtBound = true
-            end
-        end,
-
-        getData = function(out)
-            local raidStore = Core.GetRaidStoreOrNil("Logger.Raids.GetData", { "GetAllRaids", "GetRaidByIndex" })
-            local raids = raidStore and raidStore:GetAllRaids() or {}
-            local queries = getRaidQueries()
-            for i = 1, #raids do
-                local r = raidStore and raidStore:GetRaidByIndex(i) or Core.EnsureRaidById(i)
-                if r then
-                    local summary = queries and queries.GetRaidSummary and queries:GetRaidSummary(r) or nil
-                    local it = {}
-                    it.id = tonumber(r.raidNid)
-                    it.seq = i
-                    it.zone = r.zone
-                    it.size = (summary and summary.size) or r.size
-                    it.difficulty = tonumber((summary and summary.difficulty) or r.difficulty)
-                    local mode = it.difficulty and ((it.difficulty == 3 or it.difficulty == 4) and "H" or "N") or "?"
-                    it.sizeLabel = tostring(it.size or "") .. mode
-                    it.date = (summary and summary.startTime) or r.startTime
-                    it.dateFmt = date("%d/%m/%Y %H:%M", it.date)
-                    out[i] = it
+            localize = function(n)
+                local title = _G[n .. "Title"]
+                if title then
+                    title:SetText(L.StrRaidsList)
                 end
-            end
-        end,
+                _G[n .. "HeaderNum"]:SetText(L.StrNumber)
+                _G[n .. "HeaderDate"]:SetText(L.StrDate)
+                _G[n .. "HeaderZone"]:SetText(L.StrZone)
+                _G[n .. "HeaderSize"]:SetText(L.StrSize)
+                _G[n .. "CurrentBtn"]:SetText(L.StrSetCurrent)
+                local del = _G[n .. "DeleteBtn"]
+                if del then
+                    del:SetText(L.BtnDelete)
+                end
+                Frames.SetTooltip(_G[n .. "CurrentBtn"], L.StrRaidsCurrentHelp, nil, L.StrRaidCurrentTitle)
 
-        rowName = function(n, _, i)
-            return n .. "RaidBtn" .. i
-        end,
-        rowTmpl = "KRTLoggerRaidButton",
+                local frame = _G[n]
+                if frame and not frame._krtBound then
+                    Frames.SafeSetScript(_G[n .. "CurrentBtn"], "OnClick", function(self, button)
+                        Raids:SetCurrent(self, button)
+                    end)
+                    Frames.SafeSetScript(_G[n .. "DeleteBtn"], "OnClick", function(self, button)
+                        Raids:Delete(self, button)
+                    end)
+                    bindRaidSortHeaders(n, Raids)
+                end
+            end,
 
-        drawRow = ListController.CreateRowDrawer(function(row, it)
-            if not row._krtBound then
-                Frames.SafeSetScript(row, "OnClick", function(self, button)
-                    selectRaid(self, button)
-                end)
-                row._krtBound = true
-            end
-            local ui = row._p
-            ui.ID:SetText(it.seq or it.id)
-            ui.Date:SetText(it.dateFmt)
-            ui.Zone:SetText(it.zone)
-            ui.Size:SetText(it.sizeLabel or it.size)
-        end),
+            getData = function(out)
+                fillRaidListData(out, "Logger.Raids.GetData")
+            end,
 
-        highlightFn = function(id)
-            return MultiSelect.MultiSelectIsSelected(module._msRaidCtx, id)
-        end,
-        focusId = function()
-            local selected = module.selectedRaid
-            return selected and Core.GetRaidNidById(selected) or nil
-        end,
-        focusKey = function()
-            local selected = module.selectedRaid
-            local raidNid = selected and Core.GetRaidNidById(selected) or nil
-            return tostring(raidNid or "nil")
-        end,
-        highlightKey = function()
-            return MultiSelect.MultiSelectGetVersion(module._msRaidCtx)
-        end,
-        highlightDebugTag = "LoggerSelect",
-        highlightDebugInfo = function()
-            return ("ctx=%s selectedCount=%d"):format(tostring(module._msRaidCtx), MultiSelect.MultiSelectCount(module._msRaidCtx))
-        end,
+            rowName = function(n, _, i)
+                return n .. "RaidBtn" .. i
+            end,
+            rowTmpl = "KRTLoggerRaidButton",
 
-        postUpdate = function(n)
-            local sel = module.selectedRaid
-            local raid = sel and Core.EnsureRaidById(sel) or nil
-            local count = controller and controller.data and #controller.data or 0
+            drawRow = ListController.CreateRowDrawer(function(row, it)
+                if not row._krtBound then
+                    Frames.SafeSetScript(row, "OnClick", function(self, button)
+                        selectRaid(self, button)
+                    end)
+                    row._krtBound = true
+                end
+                local ui = row._p
+                ui.ID:SetText(it.seq or it.id)
+                ui.Date:SetText(it.dateFmt)
+                ui.Zone:SetText(it.zone)
+                ui.Size:SetText(it.sizeLabel or it.size)
+            end),
 
-            local canSetCurrent = false
-            if sel and raid and sel ~= Core.GetCurrentRaid() then
-                -- This button is intended to resolve duplicate raid creation while actively raiding.
-                if not addon.IsInRaid() then
-                    canSetCurrent = false
-                elseif Services.Raid:Expired(sel) then
-                    canSetCurrent = false
-                else
-                    local instanceName, instanceType, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
-                    if isDyn then
-                        instanceDiff = instanceDiff + (2 * dynDiff)
-                    end
-                    if instanceType == "raid" then
-                        local raidSize = tonumber(raid.size)
-                        local groupSize = Services.Raid:GetRaidSize()
-                        local zoneOk = (not raid.zone) or (raid.zone == instanceName)
-                        local raidDiff = tonumber(raid.difficulty)
-                        local curDiff = tonumber(instanceDiff)
-                        local diffOk = raidDiff and curDiff and (raidDiff == curDiff)
-                        canSetCurrent = zoneOk and raidSize and (raidSize == groupSize) and diffOk
+            postUpdate = function(n)
+                local sel = module.selectedRaid
+                local raid = sel and Core.EnsureRaidById(sel) or nil
+                local count = controller and controller.data and #controller.data or 0
+
+                local canSetCurrent = false
+                if sel and raid and sel ~= Core.GetCurrentRaid() then
+                    -- This button is intended to resolve duplicate raid creation while actively raiding.
+                    if not addon.IsInRaid() then
+                        canSetCurrent = false
+                    elseif Services.Raid:Expired(sel) then
+                        canSetCurrent = false
+                    else
+                        local instanceName, instanceType, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
+                        if isDyn then
+                            instanceDiff = instanceDiff + (2 * dynDiff)
+                        end
+                        if instanceType == "raid" then
+                            local raidSize = tonumber(raid.size)
+                            local groupSize = Services.Raid:GetRaidSize()
+                            local zoneOk = (not raid.zone) or (raid.zone == instanceName)
+                            local raidDiff = tonumber(raid.difficulty)
+                            local curDiff = tonumber(instanceDiff)
+                            local diffOk = raidDiff and curDiff and (raidDiff == curDiff)
+                            canSetCurrent = zoneOk and raidSize and (raidSize == groupSize) and diffOk
+                        end
                     end
                 end
-            end
 
-            UIPrimitives.EnableDisable(_G[n .. "CurrentBtn"], canSetCurrent)
+                UIPrimitives.EnableDisable(_G[n .. "CurrentBtn"], canSetCurrent)
 
-            local ctx = module._msRaidCtx
-            local selCount = MultiSelect.MultiSelectCount(ctx)
-            local canDelete = (selCount and selCount > 0) or false
-            if canDelete and Core.GetCurrentRaid() then
-                local currentRaidNid = Core.GetRaidNidById(Core.GetCurrentRaid())
-                local ids = MultiSelect.MultiSelectGetSelected(ctx)
-                for i = 1, #ids do
-                    if currentRaidNid and tonumber(ids[i]) == tonumber(currentRaidNid) then
-                        canDelete = false
-                        break
+                local ctx = module._msRaidCtx
+                local selCount = MultiSelect.MultiSelectCount(ctx)
+                local canDelete = (selCount and selCount > 0) or false
+                if canDelete and Core.GetCurrentRaid() then
+                    local currentRaidNid = Core.GetRaidNidById(Core.GetCurrentRaid())
+                    local ids = MultiSelect.MultiSelectGetSelected(ctx)
+                    for i = 1, #ids do
+                        if currentRaidNid and tonumber(ids[i]) == tonumber(currentRaidNid) then
+                            canDelete = false
+                            break
+                        end
                     end
                 end
-            end
-            local delBtn = _G[n .. "DeleteBtn"]
-            UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, selCount)
-            UIPrimitives.EnableDisable(delBtn, canDelete)
-            setPanelTitle(n, Helpers.GetCountTitle(L.StrRaidsList, count))
-            setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyRaids or nil)
-        end,
+                local delBtn = _G[n .. "DeleteBtn"]
+                UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, selCount)
+                UIPrimitives.EnableDisable(delBtn, canDelete)
+                setPanelTitle(n, Helpers.GetCountTitle(L.StrRaidsList, count))
+                setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyRaids or nil)
+            end,
 
-        sorters = {
-            id = function(a, b, asc)
-                return CompareNumbers(a.seq or a.id, b.seq or b.id, asc, 0)
-            end,
-            date = function(a, b, asc)
-                return CompareNumbers(a.date, b.date, asc, 0)
-            end,
-            zone = function(a, b, asc)
-                return CompareStrings(a.zone, b.zone, asc)
-            end,
-            size = function(a, b, asc)
-                return CompareNumbers(a.size, b.size, asc, 0)
-            end,
+            sorters = {
+                id = function(a, b, asc)
+                    return CompareNumbers(a.seq or a.id, b.seq or b.id, asc, 0)
+                end,
+                date = function(a, b, asc)
+                    return CompareNumbers(a.date, b.date, asc, 0)
+                end,
+                zone = function(a, b, asc)
+                    return CompareStrings(a.zone, b.zone, asc)
+                end,
+                size = function(a, b, asc)
+                    return CompareNumbers(a.size, b.size, asc, 0)
+                end,
+            },
         },
-    })
+        "selectedRaid",
+        "_msRaidCtx",
+        {
+            transform = function(id)
+                return Core.GetRaidNidById(id)
+            end,
+        }
+    )
 
     Raids._ctrl = controller
     ListController.BindListController(Raids, controller)
@@ -1521,127 +1557,82 @@ do
     local Helpers = module.Helpers
 
     local controller
-    controller = ListController.MakeListController({
-        keyName = "ExportRaidsList",
-        poolTag = "logger-export-raids",
-        _rowParts = { "ID", "Date", "Zone", "Size" },
+    controller = makeLoggerList(
+        {
+            keyName = "ExportRaidsList",
+            poolTag = "logger-export-raids",
+            _rowParts = { "ID", "Date", "Zone", "Size" },
 
-        localize = function(n)
-            local title = _G[n .. "Title"]
-            if title then
-                title:SetText(L.StrRaidsList)
-            end
-            _G[n .. "HeaderNum"]:SetText(L.StrNumber)
-            _G[n .. "HeaderDate"]:SetText(L.StrDate)
-            _G[n .. "HeaderZone"]:SetText(L.StrZone)
-            _G[n .. "HeaderSize"]:SetText(L.StrSize)
-
-            local frame = _G[n]
-            if frame and not frame._krtBound then
-                Frames.SafeSetScript(_G[n .. "HeaderNum"], "OnClick", function()
-                    ExportRaids:Sort("id")
-                end)
-                Frames.SafeSetScript(_G[n .. "HeaderDate"], "OnClick", function()
-                    ExportRaids:Sort("date")
-                end)
-                Frames.SafeSetScript(_G[n .. "HeaderZone"], "OnClick", function()
-                    ExportRaids:Sort("zone")
-                end)
-                Frames.SafeSetScript(_G[n .. "HeaderSize"], "OnClick", function()
-                    ExportRaids:Sort("size")
-                end)
-                frame._krtBound = true
-            end
-        end,
-
-        getData = function(out)
-            local raidStore = Core.GetRaidStoreOrNil("Logger.ExportRaids.GetData", { "GetAllRaids", "GetRaidByIndex" })
-            local raids = raidStore and raidStore:GetAllRaids() or {}
-            local queries = getRaidQueries()
-            for i = 1, #raids do
-                local raid = raidStore and raidStore:GetRaidByIndex(i) or Core.EnsureRaidById(i)
-                if raid then
-                    local summary = queries and queries.GetRaidSummary and queries:GetRaidSummary(raid) or nil
-                    local it = {}
-                    it.id = tonumber(raid.raidNid)
-                    it.seq = i
-                    it.zone = raid.zone
-                    it.size = (summary and summary.size) or raid.size
-                    it.difficulty = tonumber((summary and summary.difficulty) or raid.difficulty)
-                    local mode = it.difficulty and ((it.difficulty == 3 or it.difficulty == 4) and "H" or "N") or "?"
-                    it.sizeLabel = tostring(it.size or "") .. mode
-                    it.date = (summary and summary.startTime) or raid.startTime
-                    it.dateFmt = date("%d/%m/%Y %H:%M", it.date)
-                    out[i] = it
+            localize = function(n)
+                local title = _G[n .. "Title"]
+                if title then
+                    title:SetText(L.StrRaidsList)
                 end
-            end
-        end,
-
-        rowName = function(n, _, i)
-            return n .. "RaidBtn" .. i
-        end,
-        rowTmpl = "KRTLoggerRaidButton",
-
-        drawRow = ListController.CreateRowDrawer(function(row, it)
-            if not row._krtBound then
-                Frames.SafeSetScript(row, "OnClick", function(self, button)
-                    selectRaid(self, button, {
-                        ordered = controller.data,
-                        modifierScope = module._msRaidScopeExport,
-                        forceSingle = true,
-                        allowDeselect = false,
-                    })
-                end)
-                row._krtBound = true
-            end
-            local ui = row._p
-            ui.ID:SetText(it.seq or it.id)
-            ui.Date:SetText(it.dateFmt)
-            ui.Zone:SetText(it.zone)
-            ui.Size:SetText(it.sizeLabel or it.size)
-        end),
-
-        highlightId = function()
-            local selected = module.selectedRaid
-            return selected and Core.GetRaidNidById(selected) or nil
-        end,
-        focusId = function()
-            local selected = module.selectedRaid
-            return selected and Core.GetRaidNidById(selected) or nil
-        end,
-        focusKey = function()
-            local selected = module.selectedRaid
-            local raidNid = selected and Core.GetRaidNidById(selected) or nil
-            return tostring(raidNid or "nil")
-        end,
-        highlightDebugTag = "LoggerExportSelect",
-        highlightDebugInfo = function()
-            local selected = module.selectedRaid
-            local raidNid = selected and Core.GetRaidNidById(selected) or nil
-            return ("selectedRaidNid=%s"):format(tostring(raidNid))
-        end,
-
-        postUpdate = function(n)
-            local count = controller and controller.data and #controller.data or 0
-            setPanelTitle(n, Helpers.GetCountTitle(L.StrRaidsList, count))
-            setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyExportRaids or nil)
-        end,
-
-        sorters = {
-            id = function(a, b, asc)
-                return CompareNumbers(a.seq or a.id, b.seq or b.id, asc, 0)
+                _G[n .. "HeaderNum"]:SetText(L.StrNumber)
+                _G[n .. "HeaderDate"]:SetText(L.StrDate)
+                _G[n .. "HeaderZone"]:SetText(L.StrZone)
+                _G[n .. "HeaderSize"]:SetText(L.StrSize)
+                bindRaidSortHeaders(n, ExportRaids)
             end,
-            date = function(a, b, asc)
-                return CompareNumbers(a.date, b.date, asc, 0)
+
+            getData = function(out)
+                fillRaidListData(out, "Logger.ExportRaids.GetData")
             end,
-            zone = function(a, b, asc)
-                return CompareStrings(a.zone, b.zone, asc)
+
+            rowName = function(n, _, i)
+                return n .. "RaidBtn" .. i
             end,
-            size = function(a, b, asc)
-                return CompareNumbers(a.size, b.size, asc, 0)
+            rowTmpl = "KRTLoggerRaidButton",
+
+            drawRow = ListController.CreateRowDrawer(function(row, it)
+                if not row._krtBound then
+                    Frames.SafeSetScript(row, "OnClick", function(self, button)
+                        selectRaid(self, button, {
+                            ordered = controller.data,
+                            modifierScope = module._msRaidScopeExport,
+                            forceSingle = true,
+                            allowDeselect = false,
+                        })
+                    end)
+                    row._krtBound = true
+                end
+                local ui = row._p
+                ui.ID:SetText(it.seq or it.id)
+                ui.Date:SetText(it.dateFmt)
+                ui.Zone:SetText(it.zone)
+                ui.Size:SetText(it.sizeLabel or it.size)
+            end),
+
+            postUpdate = function(n)
+                local count = controller and controller.data and #controller.data or 0
+                setPanelTitle(n, Helpers.GetCountTitle(L.StrRaidsList, count))
+                setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyExportRaids or nil)
             end,
+
+            sorters = {
+                id = function(a, b, asc)
+                    return CompareNumbers(a.seq or a.id, b.seq or b.id, asc, 0)
+                end,
+                date = function(a, b, asc)
+                    return CompareNumbers(a.date, b.date, asc, 0)
+                end,
+                zone = function(a, b, asc)
+                    return CompareStrings(a.zone, b.zone, asc)
+                end,
+                size = function(a, b, asc)
+                    return CompareNumbers(a.size, b.size, asc, 0)
+                end,
+            },
         },
-    })
+        "selectedRaid",
+        nil,
+        {
+            transform = function(id)
+                return Core.GetRaidNidById(id)
+            end,
+            debugTag = "LoggerExportSelect",
+        }
+    )
 
     ExportRaids._ctrl = controller
     ListController.BindListController(ExportRaids, controller)
@@ -1986,7 +1977,7 @@ do
     local editSelectedBoss
 
     local controller
-    controller = ListController.MakeListController({
+    controller = makeLoggerList({
         keyName = "BossList",
         poolTag = "logger-bosses",
         _rowParts = { "ID", "Name", "Time", "Mode" },
@@ -2064,23 +2055,6 @@ do
             ui.Mode:SetText(it.mode)
         end),
 
-        highlightFn = function(id)
-            return MultiSelect.MultiSelectIsSelected(module._msBossCtx, id)
-        end,
-        focusId = function()
-            return module.selectedBoss
-        end,
-        focusKey = function()
-            return tostring(module.selectedBoss or "nil")
-        end,
-        highlightKey = function()
-            return MultiSelect.MultiSelectGetVersion(module._msBossCtx)
-        end,
-        highlightDebugTag = "LoggerSelect",
-        highlightDebugInfo = function()
-            return ("ctx=%s selectedCount=%d"):format(tostring(module._msBossCtx), MultiSelect.MultiSelectCount(module._msBossCtx))
-        end,
-
         postUpdate = function(n)
             local hasRaid = module.selectedRaid
             local hasBoss = module.selectedBoss
@@ -2110,7 +2084,7 @@ do
                 return CompareStrings(a.mode, b.mode, asc)
             end,
         },
-    })
+    }, "selectedBoss", "_msBossCtx")
 
     Boss._ctrl = controller
     ListController.BindListController(Boss, controller)
@@ -2198,7 +2172,7 @@ do
     local Helpers = module.Helpers
 
     local controller
-    controller = ListController.MakeListController({
+    controller = makeLoggerList({
         keyName = "BossAttendeesList",
         poolTag = "logger-boss-attendees",
         _rowParts = { "Name" },
@@ -2261,23 +2235,6 @@ do
             ui.Name:SetVertexColor(r, g, b)
         end),
 
-        highlightFn = function(id)
-            return MultiSelect.MultiSelectIsSelected(module._msBossAttCtx, id)
-        end,
-        focusId = function()
-            return module.selectedBossPlayer
-        end,
-        focusKey = function()
-            return tostring(module.selectedBossPlayer or "nil")
-        end,
-        highlightKey = function()
-            return MultiSelect.MultiSelectGetVersion(module._msBossAttCtx)
-        end,
-        highlightDebugTag = "LoggerSelect",
-        highlightDebugInfo = function()
-            return ("ctx=%s selectedCount=%d"):format(tostring(module._msBossAttCtx), MultiSelect.MultiSelectCount(module._msBossAttCtx))
-        end,
-
         postUpdate = function(n)
             local bSel = module.selectedBoss
             local addBtn = _G[n .. "AddBtn"]
@@ -2300,7 +2257,7 @@ do
                 return CompareStrings(a.name, b.name, asc)
             end,
         },
-    })
+    }, "selectedBossPlayer", "_msBossAttCtx")
 
     BossAtt._ctrl = controller
     ListController.BindListController(BossAtt, controller)
@@ -2356,7 +2313,7 @@ do
     local Helpers = module.Helpers
 
     local controller
-    controller = ListController.MakeListController({
+    controller = makeLoggerList({
         keyName = "RaidAttendeesList",
         poolTag = "logger-raid-attendees",
         _rowParts = { "Name", "Join", "Leave" },
@@ -2428,23 +2385,6 @@ do
             ui.Leave:SetText(it.leaveFmt)
         end),
 
-        highlightFn = function(id)
-            return MultiSelect.MultiSelectIsSelected(module._msRaidAttCtx, id)
-        end,
-        focusId = function()
-            return module.selectedPlayer
-        end,
-        focusKey = function()
-            return tostring(module.selectedPlayer or "nil")
-        end,
-        highlightKey = function()
-            return MultiSelect.MultiSelectGetVersion(module._msRaidAttCtx)
-        end,
-        highlightDebugTag = "LoggerSelect",
-        highlightDebugInfo = function()
-            return ("ctx=%s selectedCount=%d"):format(tostring(module._msRaidAttCtx), MultiSelect.MultiSelectCount(module._msRaidAttCtx))
-        end,
-
         postUpdate = function(n)
             local deleteBtn = _G[n .. "DeleteBtn"]
             local count = controller and controller.data and #controller.data or 0
@@ -2476,7 +2416,7 @@ do
                 return CompareNumbers(a.leave, b.leave, asc, missing)
             end,
         },
-    })
+    }, "selectedPlayer", "_msRaidAttCtx")
 
     RaidAtt._ctrl = controller
     ListController.BindListController(RaidAtt, controller)
@@ -2578,7 +2518,7 @@ do
     end
 
     local controller
-    controller = ListController.MakeListController({
+    controller = makeLoggerList({
         keyName = "LootList",
         poolTag = "logger-loot",
         _rowParts = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
@@ -2761,23 +2701,6 @@ do
             ui.ItemIconTexture:SetTexture(icon)
         end),
 
-        highlightFn = function(id)
-            return MultiSelect.MultiSelectIsSelected(module._msLootCtx, id)
-        end,
-        focusId = function()
-            return module.selectedItem
-        end,
-        focusKey = function()
-            return tostring(module.selectedItem or "nil")
-        end,
-        highlightKey = function()
-            return MultiSelect.MultiSelectGetVersion(module._msLootCtx)
-        end,
-        highlightDebugTag = "LoggerSelect",
-        highlightDebugInfo = function()
-            return ("ctx=%s selectedCount=%d"):format(tostring(module._msLootCtx), MultiSelect.MultiSelectCount(module._msLootCtx))
-        end,
-
         postUpdate = function(n)
             updateSourceHeaderState(n)
 
@@ -2835,7 +2758,7 @@ do
                 return CompareLootTie(a, b, asc)
             end,
         },
-    })
+    }, "selectedItem", "_msLootCtx")
 
     Loot._ctrl = controller
     ListController.BindListController(Loot, controller)
@@ -2904,37 +2827,26 @@ do
         controller._makeConfirmPopup("KRTLOGGER_DELETE_ITEM", L.StrConfirmDeleteItem, deleteItem)
     end
 
-    function Loot:Log(lootNid, looter, rollType, rollValue, source, raidIDOverride)
-        local raidID
+    local function resolveLoggerLootRaidId(source, raidIDOverride)
         if raidIDOverride then
-            raidID = raidIDOverride
-        else
-            -- If the module window is open and browsing an old raid,
-            -- selectedRaid may differ from Core.GetCurrentRaid().
-            -- Runtime sources must always write into the CURRENT raid session.
-            -- Logger UI edits target selectedRaid.
-            local isLoggerSource = (type(source) == "string") and (source:find("^LOGGER_") ~= nil)
-            if isLoggerSource then
-                raidID = module.selectedRaid or Core.GetCurrentRaid()
-            else
-                raidID = Core.GetCurrentRaid() or module.selectedRaid
-            end
+            return raidIDOverride
         end
-        addon:trace(
-            Diag.D.LogLoggerLootLogAttempt:format(
-                tostring(source),
-                tostring(raidID),
-                tostring(lootNid),
-                tostring(looter),
-                tostring(rollType),
-                tostring(rollValue),
-                tostring(Core.GetLastBoss())
-            )
-        )
+
+        -- If the module window is open and browsing an old raid, selectedRaid may
+        -- differ from Core.GetCurrentRaid(). Runtime sources must always write
+        -- into the current raid session; Logger UI edits target selectedRaid.
+        local isLoggerSource = (type(source) == "string") and (source:find("^LOGGER_") ~= nil)
+        if isLoggerSource then
+            return module.selectedRaid or Core.GetCurrentRaid()
+        end
+        return Core.GetCurrentRaid() or module.selectedRaid
+    end
+
+    local function resolveLoggerLootEntry(raidID, lootNid)
         local raid = raidID and Core.EnsureRaidById(raidID) or nil
         if not raid then
             addon:error(Diag.E.LogLoggerNoRaidSession:format(tostring(raidID), tostring(lootNid)))
-            return false
+            return nil, nil
         end
 
         Store:EnsureRaid(raid)
@@ -2946,9 +2858,13 @@ do
                 addon:error(Diag.E.LogLoggerLootNidExpected:format(tostring(raidID), tostring(lootNid), tostring(rawItemMatch.itemLink), tonumber(rawItemMatches) or 0))
             end
             addon:error(Diag.E.LogLoggerItemNotFound:format(raidID, tostring(lootNid), lootCount))
-            return false
+            return nil, nil
         end
 
+        return raid, it
+    end
+
+    local function applyLoggerLootMutation(raid, it, raidID, lootNid, looter, rollType, rollValue)
         if not looter or looter == "" then
             addon:warn(Diag.W.LogLoggerLooterEmpty:format(raidID, tostring(lootNid), tostring(it.itemLink)))
         end
@@ -2969,7 +2885,7 @@ do
             local looterNid = Store._ResolveLootLooterNid(raid, looter)
             if not looterNid then
                 addon:warn(Diag.W.LogLoggerLooterEmpty:format(raidID, tostring(lootNid), tostring(it.itemLink)))
-                return false
+                return false, nil, nil, nil
             end
             it.looterNid = looterNid
             it.looter = nil
@@ -2984,20 +2900,10 @@ do
             expectedRollValue = tonumber(rollValue)
         end
 
-        controller:Dirty()
-        local recordedLooterName = Store._ResolveLootLooterName(raid, it)
-        addon:debug(
-            Diag.D.LogLoggerLootRecorded:format(
-                tostring(source),
-                raidID,
-                tostring(lootNid),
-                tostring(it.itemLink),
-                tostring(recordedLooterName),
-                tostring(it.rollType),
-                tostring(it.rollValue)
-            )
-        )
+        return true, expectedLooterNid, expectedRollType, expectedRollValue
+    end
 
+    local function verifyLoggerLootMutation(raidID, lootNid, it, recordedLooterName, expectedLooterNid, expectedRollType, expectedRollValue)
         local ok = true
         if expectedLooterNid and tonumber(it.looterNid) ~= expectedLooterNid then
             ok = false
@@ -3020,6 +2926,47 @@ do
         return true
     end
 
+    function Loot:SetLootEntry(lootNid, looter, rollType, rollValue, source, raidIDOverride)
+        local raidID = resolveLoggerLootRaidId(source, raidIDOverride)
+        addon:trace(
+            Diag.D.LogLoggerLootLogAttempt:format(
+                tostring(source),
+                tostring(raidID),
+                tostring(lootNid),
+                tostring(looter),
+                tostring(rollType),
+                tostring(rollValue),
+                tostring(Core.GetLastBoss())
+            )
+        )
+
+        local raid, it = resolveLoggerLootEntry(raidID, lootNid)
+        if not raid then
+            return false
+        end
+
+        local ok, expectedLooterNid, expectedRollType, expectedRollValue = applyLoggerLootMutation(raid, it, raidID, lootNid, looter, rollType, rollValue)
+        if not ok then
+            return false
+        end
+        controller:Dirty()
+
+        local recordedLooterName = Store._ResolveLootLooterName(raid, it)
+        addon:debug(
+            Diag.D.LogLoggerLootRecorded:format(
+                tostring(source),
+                raidID,
+                tostring(lootNid),
+                tostring(it.itemLink),
+                tostring(recordedLooterName),
+                tostring(it.rollType),
+                tostring(it.rollValue)
+            )
+        )
+
+        return verifyLoggerLootMutation(raidID, lootNid, it, recordedLooterName, expectedLooterNid, expectedRollType, expectedRollValue)
+    end
+
     Bus.RegisterCallback(InternalEvents.LoggerLootLogRequest, function(_, request)
         if type(request) ~= "table" then
             addon:error(Diag.E.LogLoggerLootLogRequestPayloadInvalid:format(type(request)))
@@ -3027,7 +2974,7 @@ do
         end
         local raidId = request.raidId or request.raidID
         local lootNid = request.lootNid or request.itemID
-        request.ok = Loot:Log(lootNid, request.looter, request.rollType, request.rollValue, request.source, raidId) == true
+        request.ok = Loot:SetLootEntry(lootNid, request.looter, request.rollType, request.rollValue, request.source, raidId) == true
     end)
 
     local function reset()
@@ -3058,10 +3005,9 @@ local function ensurePopupRefs(box)
     return box.refs
 end
 
--- Add/edit boss popup (time/mode normalization).
-do
-    module.BossBox = module.BossBox or {}
-    local Box = module.BossBox
+local function makePopupBox(moduleName, frameName, cfg)
+    local Box = module[moduleName] or {}
+    module[moduleName] = Box
     Box._ui = Box._ui or {
         Loaded = false,
         Bound = false,
@@ -3071,103 +3017,118 @@ do
         FrameName = nil,
     }
     local BoxUI = Box._ui
-    local Store = module.Store
-
-    local isEdit = false
-    local tooltipsBound = false
-    local raidData, bossData, tempDate = {}, {}, {}
-    local editBossNid
-    local getFrame = makeModuleFrameGetter(Box, "KRTLoggerBossBox")
-    local saveBossBox
+    local getFrame = makeModuleFrameGetter(Box, frameName)
+    local suffixes = cfg.refSuffixes
+    local saveRef, cancelRef = cfg.saveRef, cfg.cancelRef or "cancelBtn"
+    local enterRefs = cfg.enterRefs or {}
+    local localizeMap = cfg.localizeMap
+    local onShow, onHide = cfg.onShow, cfg.onHide
 
     function Box.AcquireRefs(frame)
-        return {
-            title = Frames.Ref(frame, "Title"),
-            name = Frames.Ref(frame, "Name"),
-            difficulty = Frames.Ref(frame, "Difficulty"),
-            time = Frames.Ref(frame, "Time"),
-            nameStr = Frames.Ref(frame, "NameStr"),
-            difficultyStr = Frames.Ref(frame, "DifficultyStr"),
-            timeStr = Frames.Ref(frame, "TimeStr"),
-            saveBtn = Frames.Ref(frame, "SaveBtn"),
-            cancelBtn = Frames.Ref(frame, "CancelBtn"),
-        }
+        local refs = {}
+        for i = 1, #suffixes do
+            local s = suffixes[i]
+            refs[s:sub(1, 1):lower() .. s:sub(2)] = Frames.Ref(frame, s)
+        end
+        return refs
     end
 
-    local function bindBossBoxHandlers(_, frame, refs)
+    local function bindHandlers(_, frame, refs)
         if not frame or frame._krtBound then
             return
         end
-        Frames.SafeSetScript(refs.saveBtn, "OnClick", function()
-            saveBossBox()
-        end)
-        Frames.SafeSetScript(refs.cancelBtn, "OnClick", function()
-            Box:Hide()
-        end)
-        Frames.SafeSetScript(refs.name, "OnEnterPressed", function()
-            saveBossBox()
-        end)
-        Frames.SafeSetScript(refs.difficulty, "OnEnterPressed", function()
-            saveBossBox()
-        end)
-        Frames.SafeSetScript(refs.time, "OnEnterPressed", function()
-            saveBossBox()
-        end)
+        if refs[saveRef] then
+            Frames.SafeSetScript(refs[saveRef], "OnClick", function()
+                Box._doSave()
+            end)
+        end
+        if refs[cancelRef] then
+            Frames.SafeSetScript(refs[cancelRef], "OnClick", function()
+                Box:Hide()
+            end)
+        end
+        for i = 1, #enterRefs do
+            if refs[enterRefs[i]] then
+                Frames.SafeSetScript(refs[enterRefs[i]], "OnEnterPressed", function()
+                    Box._doSave()
+                end)
+            end
+        end
         frame._krtBound = true
     end
 
     function Box:LocalizeUI(_, _, refs)
-        if refs.nameStr then
-            refs.nameStr:SetText(L.StrName)
-        end
-        if refs.difficultyStr then
-            refs.difficultyStr:SetText(L.StrDifficulty)
-        end
-        if refs.timeStr then
-            refs.timeStr:SetText(L.StrTime)
-        end
-        if refs.saveBtn then
-            refs.saveBtn:SetText(L.BtnSave)
-        end
-        if refs.cancelBtn then
-            refs.cancelBtn:SetText(L.BtnCancel)
+        for key, text in pairs(localizeMap) do
+            if refs[key] then
+                refs[key]:SetText(text)
+            end
         end
     end
 
     function Box:OnLoad(frame)
         BoxUI.FrameName = Frames.InitModuleFrame(Box, frame, {
             enableDrag = true,
-            hookOnShow = function()
-                Box:RequestRefresh("show")
-            end,
-            hookOnHide = function()
-                Box:CancelAddEdit()
-            end,
+            hookOnShow = onShow and function()
+                onShow(Box)
+            end or nil,
+            hookOnHide = onHide and function()
+                onHide(Box)
+            end or nil,
         }) or BoxUI.FrameName
         BoxUI.Loaded = BoxUI.FrameName ~= nil
-        if not BoxUI.Loaded then
-            return
-        end
     end
 
-    local function onLoadBossBoxFrame(frame)
-        Box:OnLoad(frame)
-        return BoxUI.FrameName
-    end
-
+    local refreshFn = cfg.refresh
     UIScaffold.DefineModuleUi({
         module = Box,
         getFrame = getFrame,
         acquireRefs = Box.AcquireRefs,
-        bind = bindBossBoxHandlers,
-        localize = function(frameName, frame, refs)
-            Box:LocalizeUI(frameName, frame, refs)
+        bind = bindHandlers,
+        localize = function(fn, frame, refs)
+            Box:LocalizeUI(fn, frame, refs)
         end,
-        onLoad = onLoadBossBoxFrame,
-        refresh = function()
-            Box:RefreshUI()
+        onLoad = function(frame)
+            Box:OnLoad(frame)
+            return BoxUI.FrameName
+        end,
+        refresh = refreshFn and function()
+            refreshFn(Box)
+        end or nil,
+    })
+
+    Box._doSave = function() end
+    return Box, BoxUI
+end
+
+-- Add/edit boss popup (time/mode normalization).
+do
+    local Box, BoxUI = makePopupBox("BossBox", "KRTLoggerBossBox", {
+        refSuffixes = { "Title", "Name", "Difficulty", "Time", "NameStr", "DifficultyStr", "TimeStr", "SaveBtn", "CancelBtn" },
+        saveRef = "saveBtn",
+        enterRefs = { "name", "difficulty", "time" },
+        localizeMap = {
+            nameStr = L.StrName,
+            difficultyStr = L.StrDifficulty,
+            timeStr = L.StrTime,
+            saveBtn = L.BtnSave,
+            cancelBtn = L.BtnCancel,
+        },
+        onShow = function(b)
+            b:RequestRefresh("show")
+        end,
+        onHide = function(b)
+            b:CancelAddEdit()
+        end,
+        refresh = function(b)
+            b:RefreshUI()
         end,
     })
+    local Store = module.Store
+
+    local isEdit = false
+    local tooltipsBound = false
+    local raidData, bossData, tempDate = {}, {}, {}
+    local editBossNid
 
     -- Campi uniformi:
     --   bossData.time : timestamp
@@ -3214,7 +3175,7 @@ do
         Box:Toggle()
     end
 
-    saveBossBox = function()
+    Box._doSave = function()
         local rID = module.selectedRaid
         if not rID then
             return
@@ -3293,94 +3254,27 @@ end
 
 -- Add attendee popup.
 do
-    module.AttendeesBox = module.AttendeesBox or {}
-    local Box = module.AttendeesBox
-    Box._ui = Box._ui or {
-        Loaded = false,
-        Bound = false,
-        Localized = false,
-        Dirty = true,
-        Reason = nil,
-        FrameName = nil,
-    }
-    local BoxUI = Box._ui
-
-    local getFrame = makeModuleFrameGetter(Box, "KRTLoggerPlayerBox")
-    local saveAttendeesBox
-
-    function Box.AcquireRefs(frame)
-        return {
-            title = Frames.Ref(frame, "Title"),
-            nameStr = Frames.Ref(frame, "NameStr"),
-            addBtn = Frames.Ref(frame, "AddBtn"),
-            cancelBtn = Frames.Ref(frame, "CancelBtn"),
-            name = Frames.Ref(frame, "Name"),
-        }
-    end
-
-    local function bindAttendeesBoxHandlers(_, frame, refs)
-        if not frame or frame._krtBound then
-            return
-        end
-        Frames.SafeSetScript(refs.addBtn, "OnClick", function()
-            saveAttendeesBox()
-        end)
-        Frames.SafeSetScript(refs.cancelBtn, "OnClick", function()
-            Box:Hide()
-        end)
-        Frames.SafeSetScript(refs.name, "OnEnterPressed", function()
-            saveAttendeesBox()
-        end)
-        frame._krtBound = true
-    end
-
-    function Box:LocalizeUI(_, _, refs)
-        if refs.title then
-            refs.title:SetText(L.StrAddPlayer)
-        end
-        if refs.nameStr then
-            refs.nameStr:SetText(L.StrName)
-        end
-        if refs.addBtn then
-            refs.addBtn:SetText(L.BtnAdd)
-        end
-        if refs.cancelBtn then
-            refs.cancelBtn:SetText(L.BtnCancel)
-        end
-    end
-
-    function Box:OnLoad(frame)
-        BoxUI.FrameName = Frames.InitModuleFrame(Box, frame, {
-            enableDrag = true,
-            hookOnShow = function()
-                local refs = ensurePopupRefs(Box)
-                Frames.ResetEditBox(refs and refs.name)
-            end,
-            hookOnHide = function()
-                local refs = ensurePopupRefs(Box)
-                Frames.ResetEditBox(refs and refs.name)
-            end,
-        }) or BoxUI.FrameName
-        BoxUI.Loaded = BoxUI.FrameName ~= nil
-    end
-
-    local function onLoadAttendeesBoxFrame(frame)
-        Box:OnLoad(frame)
-        return BoxUI.FrameName
-    end
-
-    UIScaffold.DefineModuleUi({
-        module = Box,
-        getFrame = getFrame,
-        acquireRefs = Box.AcquireRefs,
-        bind = bindAttendeesBoxHandlers,
-        localize = function(frameName, frame, refs)
-            Box:LocalizeUI(frameName, frame, refs)
+    local Box = makePopupBox("AttendeesBox", "KRTLoggerPlayerBox", {
+        refSuffixes = { "Title", "NameStr", "AddBtn", "CancelBtn", "Name" },
+        saveRef = "addBtn",
+        enterRefs = { "name" },
+        localizeMap = {
+            title = L.StrAddPlayer,
+            nameStr = L.StrName,
+            addBtn = L.BtnAdd,
+            cancelBtn = L.BtnCancel,
+        },
+        onShow = function(b)
+            local refs = ensurePopupRefs(b)
+            Frames.ResetEditBox(refs and refs.name)
         end,
-        onLoad = onLoadAttendeesBoxFrame,
+        onHide = function(b)
+            local refs = ensurePopupRefs(b)
+            Frames.ResetEditBox(refs and refs.name)
+        end,
     })
 
-    saveAttendeesBox = function()
+    Box._doSave = function()
         local rID, bID = module.selectedRaid, module.selectedBoss
         local refs = ensurePopupRefs(Box)
         local nameBox = refs and refs.name

@@ -284,10 +284,20 @@ local function updateGlowGeometry(glow, button, settings)
     glow.buttonTexture:SetPoint("CENTER", glow.buttonFrame, "CENTER", xOffset, yOffset)
 end
 
+local PROC_GLOW_UPDATE_INTERVAL = 1 / 30 -- cap sparkle updates at ~30 FPS
+
 local function onProcGlowUpdate(self, elapsed)
     local info = self.info
     local timers = self.timer
     local sparkles = self.sparkles
+
+    -- Accumulate elapsed time and skip frames to reduce SetPoint overhead.
+    info._elapsed = (info._elapsed or 0) + elapsed
+    if info._elapsed < PROC_GLOW_UPDATE_INTERVAL then
+        return
+    end
+    local dt = info._elapsed
+    info._elapsed = 0
 
     local width = self:GetWidth() or 0
     local height = self:GetHeight() or 0
@@ -306,7 +316,7 @@ local function onProcGlowUpdate(self, elapsed)
     local period = info.period
     local texIndex = 0
     for i = 1, 4 do
-        timers[i] = (timers[i] + elapsed / (period * i)) % 1
+        timers[i] = (timers[i] + dt / (period * i)) % 1
 
         for k = 1, info.N do
             texIndex = texIndex + 1

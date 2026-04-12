@@ -469,6 +469,8 @@ end
 
 addon.LoadOptions = Options.LoadOptions
 
+Core._LootContext = Core._LootContext or {}
+
 function Core.EnsureLootRuntimeState()
     local state = addon.State
     state.loot = state.loot or {}
@@ -496,18 +498,60 @@ function Core.EnsureLootRuntimeState()
         raidState.lastLootCount = 1
     end
 
-    if type(raidState.bossEventContext) == "table" then
-        local bossEventContext = raidState.bossEventContext
-        bossEventContext.raidNum = tonumber(bossEventContext.raidNum) or 0
-        bossEventContext.bossNid = tonumber(bossEventContext.bossNid) or 0
-        bossEventContext.name = bossEventContext.name or nil
-        bossEventContext.source = bossEventContext.source or nil
-        bossEventContext.seenAt = tonumber(bossEventContext.seenAt) or 0
-        if bossEventContext.bossNid <= 0 or bossEventContext.raidNum <= 0 then
-            raidState.bossEventContext = nil
-        end
+    local lootContext = type(raidState.lootContext) == "table" and raidState.lootContext or {}
+    raidState.lootContext = lootContext
+
+    local LootStateHelpers = addon.Services and addon.Services.Loot and addon.Services.Loot._State
+    if LootStateHelpers and LootStateHelpers.SyncRuntimeState then
+        lootContext = LootStateHelpers.SyncRuntimeState(raidState)
+        raidState.lootContext = lootContext
     else
-        raidState.bossEventContext = nil
+        local LootContext = addon.Services and addon.Services.Loot and addon.Services.Loot._Context or Core._LootContext
+        local normalizeBossEventContext = LootContext and LootContext.NormalizeBossEventContext
+        local normalizeLootSessionState = LootContext and LootContext.NormalizeLootSessionState
+        local normalizeLootSnapshotState = LootContext and LootContext.NormalizeLootSnapshotState
+        local buildActiveLootContext = LootContext and LootContext.BuildActiveLootContext
+        local projectLootWindowBossContext = LootContext and LootContext.ProjectLootWindowBossContext
+        local projectLootSourceState = LootContext and LootContext.ProjectLootSourceState
+
+        if
+            normalizeBossEventContext
+            and normalizeLootSessionState
+            and normalizeLootSnapshotState
+            and buildActiveLootContext
+            and projectLootWindowBossContext
+            and projectLootSourceState
+        then
+            lootContext.eventBoss = normalizeBossEventContext(raidState.bossEventContext or lootContext.eventBoss)
+            raidState.bossEventContext = lootContext.eventBoss
+            lootContext.activeLoot =
+                buildActiveLootContext(lootContext.activeLoot, raidState.lootWindowBossContext or lootContext.activeWindow, raidState.lootSource or lootContext.source)
+            lootContext.activeWindow = projectLootWindowBossContext(lootContext.activeLoot)
+            raidState.lootWindowBossContext = lootContext.activeWindow
+            lootContext.sessions = normalizeLootSessionState(raidState.lootBossSessions or lootContext.sessions)
+            raidState.lootBossSessions = lootContext.sessions
+            lootContext.snapshots = normalizeLootSnapshotState(raidState.lootWindowItemSnapshots or lootContext.snapshots)
+            raidState.lootWindowItemSnapshots = lootContext.snapshots
+            lootContext.source = projectLootSourceState(lootContext.activeLoot)
+            raidState.lootSource = lootContext.source
+        else
+            -- During early bootstrap, Loot context services may not be loaded yet.
+            -- Keep runtime/legacy state mirrored without hard-failing load.
+            lootContext.eventBoss = raidState.bossEventContext or lootContext.eventBoss or nil
+            raidState.bossEventContext = lootContext.eventBoss
+
+            lootContext.activeWindow = raidState.lootWindowBossContext or lootContext.activeWindow or nil
+            raidState.lootWindowBossContext = lootContext.activeWindow
+
+            lootContext.sessions = raidState.lootBossSessions or lootContext.sessions or nil
+            raidState.lootBossSessions = lootContext.sessions
+
+            lootContext.snapshots = raidState.lootWindowItemSnapshots or lootContext.snapshots or nil
+            raidState.lootWindowItemSnapshots = lootContext.snapshots
+
+            lootContext.source = raidState.lootSource or lootContext.source or nil
+            raidState.lootSource = lootContext.source
+        end
     end
 
     lootState.lootCount = tonumber(lootState.lootCount) or 0
@@ -534,6 +578,7 @@ function Core.EnsureLootRuntimeState()
             itemLink = nil,
             rollType = tonumber(lootState.currentRollType) or 4,
             lootNid = tonumber(lootState.currentRollItem) or 0,
+            bossNid = nil,
             startedAt = GetTime(),
             endsAt = nil,
             source = "lootWindow",
@@ -554,6 +599,7 @@ function Core.EnsureLootRuntimeState()
         session.itemLink = session.itemLink or nil
         session.rollType = tonumber(session.rollType) or tonumber(lootState.currentRollType) or 4
         session.lootNid = tonumber(session.lootNid) or tonumber(lootState.currentRollItem) or 0
+        session.bossNid = tonumber(session.bossNid) or nil
         session.startedAt = tonumber(session.startedAt) or GetTime()
         session.endsAt = tonumber(session.endsAt) or nil
         session.source = session.source or "lootWindow"
@@ -1080,6 +1126,13 @@ do
     Core.BindModuleRequestRefresh = bindModuleRequestRefresh
     Core.BindModuleToggleHide = bindModuleToggleHide
     Core.MakeModuleFrameGetter = makeModuleFrameGetter
+
+    function Core.RequireServiceMethod(serviceName, serviceTable, methodName)
+        assert(type(serviceTable) == "table", "KRT missing service: " .. tostring(serviceName))
+        local method = serviceTable[methodName]
+        assert(type(method) == "function", "KRT missing service method: " .. tostring(serviceName) .. "." .. tostring(methodName))
+        return method
+    end
 
     local function getService(serviceName)
         local services = addon.Services

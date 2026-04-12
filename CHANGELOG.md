@@ -4,6 +4,9 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **Performance:** Loot-window fetch now defers tooltip-based item cache warming
+  through a timer queue, reducing `LOOT_OPENED` frame spikes when many items
+  are uncached.
 - **UI:** Logger loot now shows the item tooltip on mouse over the item icon
   only and anchors it to the cursor, with an `itemId` fallback hyperlink when
   a stored `itemLink` is missing.
@@ -227,7 +230,7 @@ Dates are in YYYY-MM-DD.
   intake/display/award validation path.
 - **Behavior:** Roll winner selection now uses one unified selection flow for auto winners,
   inventory single-pick, and multi-pick, removing the old `selectedAuto` / `msPrefilled`
-  state split inside `Services/Rolls.lua`.
+  state split inside the `Services/Rolls/*` service modules.
 - **Behavior:** The Master Loot rolls frame now defaults to `showRollsOnly`, so non-rolling
   materialized candidates stay in the full runtime model but are hidden from the visible roll table
   until they actually submit a `/roll`.

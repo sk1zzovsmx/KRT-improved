@@ -31,9 +31,7 @@ setmetatable(L, {
 L.StrCbErrUsage = "Usage: KRT:registerCallback(event, callbacks)"
 
 -- ==================== General Buttons ==================== --
-L.BtnConfig = "Config"
 L.BtnConfigure = "Configure"
-L.BtnConfirm = "Confirm"
 L.BtnDefaults = "Defaults"
 L.BtnEdit = "Edit"
 L.BtnOpen = "Open"
@@ -41,7 +39,6 @@ L.BtnAdd = "Add"
 L.BtnRemove = "Remove"
 L.BtnDelete = "Delete"
 L.BtnUpdate = "Update"
-L.BtnOK = "OK"
 L.BtnStart = "Start"
 L.BtnStop = "Stop"
 L.BtnResume = "Resume"
@@ -56,11 +53,8 @@ L.StrMinimapSClick = "|cffffd700Shift+Click|r to move"
 L.StrMinimapAClick = "|cffffd700Alt+Click|r for free drag and drop"
 L.StrLootLogger = "Loot Logger"
 L.StrLootCounter = "Loot Counter"
-L.StrRaidWarnings = "Raid Warnings"
 L.StrLFMSpam = "LFM Spam"
 L.StrMSChanges = "MS Changes"
-L.StrLootBans = "Loot Bans"
-L.StrSpamBans = "Spam Bans"
 L.StrClearIcons = "Clear Raid Icons"
 
 -- ==================== Loot Master Frame ==================== --
@@ -150,14 +144,6 @@ L.ChatRollMS = "Roll for MS on: %s"
 L.ChatRollOS = "Roll for OS on: %s"
 L.ChatRollSR = "Roll %s for SR on: %s"
 L.ChatRollFree = "Free roll on: %s"
-L.ChatRollMSMultipleHigh = "Roll for MS on: %s. Highest %s rolls win"
-L.ChatRollOSMultipleHigh = "Roll for OS on: %s. Highest %s rolls win"
-L.ChatRollSRMultipleHigh = "Roll %s for SR on: %s. Highest %s rolls win"
-L.ChatRollFreeMultipleHigh = "Free roll on: %s. Highest %s rolls win"
-L.ChatRollMSMultipleLow = "Roll for MS on: %s. Lowest %s rolls win"
-L.ChatRollOSMultipleLow = "Roll for OS on: %s. Lowest %s rolls win"
-L.ChatRollSRMultipleLow = "Roll %s for SR on: %s. Lowest %s rolls win"
-L.ChatRollFreeMultipleLow = "Free roll on: %s. Lowest %s rolls win"
 L.ChatCountdownTic = "Rolling ends in %d sec"
 L.ChatCountdownEnd = "Rolling ends now!"
 L.ChatCountdownBlock = "Rolls are ignored after countdown!"
@@ -165,7 +151,6 @@ L.ChatAward = "Congrats! %s won %s"
 L.ChatAwardMutiple = "Congrats! %s have won %s"
 L.ChatTrade = "Congrats {triangle} %s ! Please trade {star} %s"
 L.ChatTradeMutiple = "Winners are: %s, Please trade {star} %s"
-L.ChatPlayerRolled = "%s rolled %s"
 L.ChatHold = "%s is holding %s for later roll"
 L.ChatBank = "%s is holding %s for the bank"
 L.ChatDisenchant = "%s will be disenchanted by %s"
@@ -205,7 +190,6 @@ L.ErrMLWinnerTieUnresolved = "Cannot award: tie at the winner cutoff. Select win
 L.ErrMLInventorySoulbound = "Only non-soulbound or tradeable items can be added: %s"
 L.ErrMLInventoryItemMissing = "Cannot find the item in your bags: %s"
 L.ErrNoWinnerSelected = "No winner selected. Use Roll or Select Winner first."
-L.ErrPlayerCountBelowZero = "Cannot decrement player count below zero for %s"
 L.StrRollTieTag = "TIE"
 L.StrRollPassTag = "PASS"
 L.StrRollCancelledTag = "CXL"
@@ -233,10 +217,7 @@ L.StrConfigAbout = "Made with love by |cfff58cbaKader|r B\n|cffffffffhttps://git
 
 -- ==================== Raid Helper Reserves ==================== --
 L.BtnClearReserve = "Clear Reserve"
-L.BtnCloseWindow = "Close Window"
 L.BtnQueryItem = "Query Item"
-L.BtnOpenReserve = "Open Reserves"
-L.StrNoReserveFound = "No reserves found."
 L.StrRaidReserves = "Raid Reserves"
 L.StrImportReservesTitle = "Import Raid Reserves"
 L.StrImportReservesHint = "Paste your raid reserves CSV data below:"
@@ -248,18 +229,9 @@ L.ErrCSVWrongForPlusWithPlayer = "Wrong CSV format for Plus System.\nPlayer '%s'
 L.ErrCSVWrongForPlus = "Wrong CSV format for Plus System.\nThis CSV contains players with multiple reserve entries.\nSwitch to Multi-reserve or check your SoftRes settings."
 L.BtnSwitchToMulti = "Switch to Multi-reserve"
 L.ErrImportReservesEmpty = "Import failed: empty or invalid CSV data."
-L.BtnLoad = "Load"
-L.ErrNoTextFound = "No text found in the import window."
 L.WarnNoValidRows = "No valid rows found in CSV (check header)."
 L.WarnReservesHeaderHint = "CSV header not detected. Expected columns include itemId and name."
 L.SuccessReservesParsed = "Reserves parsed: %s"
-L.StrItemUnavailable = "[Item ID %s unavailable]"
-L.TooltipQueryItemHelp1 = "Click to retrieve item information from the server."
-L.TooltipQueryItemHelp2 = "|cffff0000Warning: May cause a temporary disconnect!|r"
-L.StrQueryingItemInitiated = "Attempting to retrieve info for ItemID: %s. You might be disconnected!"
-L.StrQueryingItemSuccess = "Successfully retrieved item information for %s."
-L.StrReserveListCleared = "Reserves: list cleared."
-L.StrReserveListTitle = "Reserve List"
 L.BtnClose = "Close"
 L.BtnClearReserves = "Clear Reserves"
 L.StrReserveCountSuffix = " (x%d)"
@@ -280,7 +252,6 @@ L.StrWarningsHelpBody =
     "- |cffffd700Left-Click|r to select a warning, click again to cancel selection.\n- |cffffd700Ctrl-Click|r for a quick raid warning.\n- When you select a warning, you can either |cffffd700Edit|r it, |cffffd700Delete|r it or |cffffd700Announce|r it using the provided buttons."
 L.StrWarningsError = "Only the body of a message is required! Though, we recommend naming your warnings so you never get lost."
 L.StrCmdWarningAnnounce = "announce the specified raid warning"
-L.StrConfirmDeleteWarning = "Are you sure you want to delete this raid warning?"
 
 -- ==================== MS Changes Frame ==================== --
 L.StrChanges = "MS Changes"
@@ -322,7 +293,6 @@ L.StrZone = "Zone"
 L.StrSize = "Size"
 L.StrName = "Name"
 L.StrCount = "Count"
-L.StrAction = "Action"
 L.StrPlayer = "Player"
 L.StrClass = "Class"
 L.StrDifficulty = "Difficulty"
@@ -332,14 +302,10 @@ L.StrItem = "Item"
 L.StrSource = "Source"
 L.StrWinner = "Winner"
 L.StrType = "Type"
-L.StrLoading = "Loading..."
 L.BtnExport = "Export"
 L.StrHistoryTab = "History"
 L.StrExportTab = "Export"
 L.StrRaidCsvTitle = "Raid CSV"
-L.StrLoggerHintSelectRaid = "Select a raid"
-L.StrLoggerHintSelectBoss = "Select a boss"
-L.StrLoggerHintSelectRaidForExport = "Select a raid to preview CSV"
 L.StrLoggerLabelPlayer = "Player: %s"
 L.StrLoggerEmptyRaids = "No raid logs yet. Enter a raid and log a boss or loot event to start history."
 L.StrLoggerEmptyBossesSelectRaid = "Select a raid to inspect boss kills and trash entries."
@@ -385,7 +351,6 @@ L.StrLeave = "Leave"
 L.StrConfirmDeleteAttendee = "Are you sure you want to remove this player from the raid?"
 
 L.StrBossAttendees = "Boss Attendees"
-L.StrPlayers = "Players"
 
 -- Raid loot list:
 L.StrRaidLoot = "Raid Loot"
@@ -395,7 +360,6 @@ L.StrConfirmDeleteItem = "Are you sure you want to delete this item from the log
 L.StrEditItemLooter = "Change winner"
 L.StrEditItemLooterHelp = "Enter the name of the winner:"
 L.StrEditItemRollType = "Change roll type"
-L.StrEditItemRollTypeHelp = "1=MS, 2=OS, 3=SR, 4=Free, 5=Bank, 6=DE, 7=Hold"
 L.StrEditItemRollValue = "Change roll value"
 L.StrEditItemRollValueHelp = "Enter the value of the roll:"
 
@@ -416,28 +380,14 @@ L.ErrAttendeesPlayerExists = "This player is already on the boss attendees list.
 L.StrAttendeesAddSuccess = "Attendees: player added."
 
 -- ==================== Logger: EditBox Frame ==================== --
-L.StrAddEntry = "Add Entry"
-L.StrEditEntry = "Edit Entry"
-L.StrDateEditBox = "Day/Month/Year"
 -- Error Messages:
-L.ErrEditBoxInvalidData = "Attempt to add an invalid item. Possible loss of data."
-L.ErrEditBoxInvalidItem = "Invalid Item: Please use a valid item link or ID."
-L.ErrEditBoxInvalidYear = "Invalid Year: Please enter a valid year."
-L.ErrEditBoxInvalidMonth = "Invalid Month: Please enter a valid month."
-L.ErrEditBoxInvalidDay = "Invalid Day: Please enter a valid day."
-L.ErrEditBoxInvalidHour = "Invalid Hour: Please enter a valid hour."
-L.ErrEditBoxInvalidMinute = "Invalid Minute: Please enter a valid minute."
 L.ErrLoggerInvalidRaid = "Invalid raid selection for Logger edit."
 L.ErrLoggerInvalidItem = "Invalid loot item selection for Logger edit."
 L.ErrLoggerWinnerEmpty = "Please enter a valid winner name."
 L.ErrLoggerWinnerNotFound = "Winner not found in raid or boss attendees: %s"
-L.ErrLoggerInvalidRollType = "Invalid roll type. Use a valid roll type number."
 L.ErrLoggerInvalidRollValue = "Invalid roll value. Enter a non-negative number."
 
 -- ==================== Logger: Export Frame ==================== --
-L.StrExportBoxTitle = "Export Loot Logger"
-L.StrExportFormat = "Please enter the export format:"
-L.StrExportBoxHelp = "Copy the data below and paste it to an external location to save it:"
 
 -- ==================== Slash Commands ==================== --
 L.StrCmdCommands = "Commands: valid subcommands for |caaf49141/%s|r:"
@@ -506,7 +456,6 @@ L.MsgLoggerReqImported = "Logger Sync: imported requested snapshot from %s as ra
 L.MsgLoggerPushImported = "Logger Sync: imported pushed snapshot from %s as raid #%d."
 L.MsgLoggerSyncSent = "Logger Sync: sync request sent for current raid #%d."
 L.MsgLoggerSyncNoCurrent = "Logger Sync: no current raid available for sync."
-L.MsgLoggerSyncRaidMismatch = "Logger Sync: incoming raid does not match current raid signature."
 L.MsgLoggerSyncApplied = "Logger Sync: applied sync to current raid #%d from %s."
 L.MsgValidateUnavailable = "Validation service is not available."
 L.MsgValidateRaidsNoData = "Raid validation: no raids available."
@@ -529,18 +478,7 @@ L.MsgValidateDetailRuntimeOutside = "raid[%d] nid=%s: runtime key outside _runti
 L.MsgValidateDetailLegacyRuntime = "raid[%d] nid=%s: legacy runtime key found: %s."
 L.MsgValidateDetailUnknown = "raid[%d] nid=%s: %s."
 
-L.LFM_TEMPLATE = "[KRT] LFM: {raid} {roles} {time}"
-
 -- ==================== Raid & Loot Locales ==================== --
-L.ItemValues = {
-    [1] = "Poor",
-    [2] = "Common",
-    [3] = "Uncommon",
-    [4] = "Rare",
-    [5] = "Epic",
-    [6] = "Legendary",
-    [7] = "Artifact",
-}
 L.RaidZones = {
     -- The Burning Crusade
     ["Karazhan"] = "Karazhan",

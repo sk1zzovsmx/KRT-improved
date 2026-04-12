@@ -26,6 +26,9 @@ local tinsert, twipe = table.insert, table.wipe
 local pairs, ipairs, type, select = pairs, ipairs, type, select
 
 local tostring, tonumber = tostring, tonumber
+local UnitExists = UnitExists
+local UnitGUID = UnitGUID
+local UnitName = UnitName
 local UnitRace = UnitRace
 
 local LEGACY_TRASH_MOB_NAME = "_TrashMob_"
@@ -62,16 +65,34 @@ do
     local BOSS_KILL_DEDUPE_WINDOW_SECONDS = tonumber(C.BOSS_KILL_DEDUPE_WINDOW_SECONDS) or 30
     local BOSS_EVENT_CONTEXT_TTL_SECONDS = tonumber(C.BOSS_EVENT_CONTEXT_TTL_SECONDS) or BOSS_KILL_DEDUPE_WINDOW_SECONDS
     local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = tonumber(C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60
+    local LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS = math.max(BOSS_EVENT_CONTEXT_TTL_SECONDS, GROUP_LOOT_PENDING_AWARD_TTL_SECONDS)
+    local LootService = addon.Services and addon.Services.Loot or {}
+    local LootContextHelpers = assert(LootService._Context or Core._LootContext, "Loot context helpers are not initialized")
+    local LootContextState = assert(LootService._State, "Loot state helpers are not initialized")
+    local LootContextSessions = assert(LootService._Sessions, "Loot session helpers are not initialized")
+    local LootContextSnapshots = assert(LootService._Snapshots, "Loot snapshot helpers are not initialized")
+    local copyActiveLootSource = assert(LootContextHelpers.CopyLootSource, "Missing LootContext.CopyLootSource")
 
     -- ----- Private helpers ----- --
+    local function isDebugEnabled()
+        return addon.Options and addon.Options.IsDebugEnabled and addon.Options.IsDebugEnabled() == true
+    end
+
     local function invalidateMasterLootCandidateCache()
         masterLootCandidateCache.itemLink = nil
         masterLootCandidateCache.rosterVersion = nil
         twipe(masterLootCandidateCache.indexByName)
     end
 
+    local function getRosterVersion()
+        if type(module.GetRosterVersion) == "function" then
+            return module:GetRosterVersion()
+        end
+        return 0
+    end
+
     local function buildMasterLootCandidateCache(itemLink)
-        local currentRosterVersion = (type(module.GetRosterVersion) == "function" and module:GetRosterVersion()) or 0
+        local currentRosterVersion = getRosterVersion()
         masterLootCandidateCache.itemLink = itemLink
         masterLootCandidateCache.rosterVersion = currentRosterVersion
         twipe(masterLootCandidateCache.indexByName)
@@ -83,97 +104,375 @@ do
             end
         end
 
-        addon:debug(Diag.D.LogMLCandidateCacheBuilt:format(tostring(itemLink), addon.tLength(masterLootCandidateCache.indexByName)))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogMLCandidateCacheBuilt:format(tostring(itemLink), addon.tLength(masterLootCandidateCache.indexByName)))
+        end
         return masterLootCandidateCache
     end
 
     local function ensureMasterLootCandidateCache(itemLink)
-        local currentRosterVersion = (type(module.GetRosterVersion) == "function" and module:GetRosterVersion()) or 0
+        local currentRosterVersion = getRosterVersion()
         if masterLootCandidateCache.itemLink ~= itemLink or masterLootCandidateCache.rosterVersion ~= currentRosterVersion then
             return buildMasterLootCandidateCache(itemLink)
         end
         return masterLootCandidateCache
     end
 
-    local function getLootBossSessionState()
-        raidState.lootBossSessions = raidState.lootBossSessions or {}
-        local state = raidState.lootBossSessions
-        state.bySessionId = state.bySessionId or {}
-        return state
+    local function setLootContextField(slotKey, legacyKey, value)
+        return LootContextState.SetField(raidState, slotKey, legacyKey, value)
     end
 
-    local function clearLootBossSessionState()
-        raidState.lootBossSessions = nil
+    local function setActiveLootContextState(activeLoot)
+        return LootContextState.SetActive(raidState, activeLoot)
     end
 
-    local function purgeExpiredLootBossSessions(now)
-        local state = getLootBossSessionState()
-        local currentTime = tonumber(now) or Time.GetCurrentTime()
-
-        for sessionId, entry in pairs(state.bySessionId) do
-            local expiresAt = tonumber(entry and entry.expiresAt) or 0
-            local entryRaidNum = tonumber(entry and entry.raidNum) or 0
-            local entryBossNid = tonumber(entry and entry.bossNid) or 0
-            if type(sessionId) ~= "string" or sessionId == "" or entryRaidNum <= 0 or entryBossNid <= 0 or (expiresAt > 0 and expiresAt <= currentTime) then
-                state.bySessionId[sessionId] = nil
-            end
-        end
+    local function syncActiveLootContextState()
+        return LootContextState.SyncActive(raidState)
     end
 
-    local function rememberLootBossSession(raidNum, rollSessionId, bossNid, ttlSeconds)
-        local sessionId = rollSessionId and tostring(rollSessionId) or nil
-        local resolvedRaidNum = tonumber(raidNum) or 0
+    local function findBossByNid(raid, bossNid)
         local resolvedBossNid = tonumber(bossNid) or 0
-        if not sessionId or sessionId == "" or resolvedRaidNum <= 0 or resolvedBossNid <= 0 then
-            return
-        end
-
-        local ttl = tonumber(ttlSeconds) or GROUP_LOOT_PENDING_AWARD_TTL_SECONDS
-        if ttl < 1 then
-            ttl = GROUP_LOOT_PENDING_AWARD_TTL_SECONDS
-        end
-
-        local state = getLootBossSessionState()
-        local now = Time.GetCurrentTime()
-        state.bySessionId[sessionId] = {
-            raidNum = resolvedRaidNum,
-            bossNid = resolvedBossNid,
-            expiresAt = now + ttl,
-        }
-    end
-
-    local function resolveLootBossSession(raid, raidNum, rollSessionId, now)
-        local sessionId = rollSessionId and tostring(rollSessionId) or nil
-        if not sessionId or sessionId == "" then
-            return 0
-        end
-
-        local currentTime = tonumber(now) or Time.GetCurrentTime()
-        purgeExpiredLootBossSessions(currentTime)
-
-        local state = getLootBossSessionState()
-        local entry = state.bySessionId[sessionId]
-        if type(entry) ~= "table" then
-            return 0
-        end
-
-        local entryRaidNum = tonumber(entry.raidNum) or 0
-        local entryBossNid = tonumber(entry.bossNid) or 0
-        if entryRaidNum ~= (tonumber(raidNum) or 0) or entryBossNid <= 0 then
-            state.bySessionId[sessionId] = nil
-            return 0
+        if resolvedBossNid <= 0 then
+            return nil
         end
 
         local bosses = raid and raid.bossKills or {}
         for i = 1, #bosses do
             local boss = bosses[i]
-            if boss and tonumber(boss.bossNid) == entryBossNid then
-                return entryBossNid
+            if boss and tonumber(boss.bossNid) == resolvedBossNid then
+                return boss
             end
         end
 
-        state.bySessionId[sessionId] = nil
+        return nil
+    end
+
+    local function findBossByName(raid, bossName)
+        local resolvedBossName = Strings.NormalizeLower(bossName, true)
+        if not resolvedBossName or resolvedBossName == "" then
+            return nil
+        end
+
+        local bosses = raid and raid.bossKills or {}
+        for i = #bosses, 1, -1 do
+            local boss = bosses[i]
+            if boss then
+                local candidateName = Strings.NormalizeLower(boss.name, true)
+                if candidateName == resolvedBossName then
+                    return boss
+                end
+            end
+        end
+
+        return nil
+    end
+
+    local function findBossBySourceNpcId(raid, sourceNpcId)
+        local resolvedNpcId = tonumber(sourceNpcId) or 0
+        if resolvedNpcId <= 0 then
+            return nil
+        end
+
+        local bosses = raid and raid.bossKills or {}
+        for i = #bosses, 1, -1 do
+            local boss = bosses[i]
+            if boss and (tonumber(boss.sourceNpcId) or 0) == resolvedNpcId then
+                return boss
+            end
+        end
+
+        return nil
+    end
+
+    local function isBossNpcId(npcId)
+        local resolvedNpcId = tonumber(npcId) or 0
+        if resolvedNpcId <= 0 then
+            return false
+        end
+
+        local bossLib = addon.BossIDs
+        local bossIds = bossLib and bossLib.BossIDs
+        return bossIds and bossIds[resolvedNpcId] == true or false
+    end
+
+    local function getLootWindowBossContextState()
+        return LootContextState.GetWindow(raidState)
+    end
+
+    local function clearLootWindowBossContext()
+        LootContextState.ClearWindow(raidState)
+    end
+
+    local setActiveLootSource
+    local setLootWindowBossContext
+
+    local function resolveContextExpiry(now, ttlSeconds, defaultTtl, minTtl)
+        return LootContextState.ResolveExpiry(now, ttlSeconds, defaultTtl, minTtl)
+    end
+
+    local function setBlockedLootWindowBossContext(raidNum, source, now, ttlSeconds, sourceMeta)
+        local resolvedRaidNum = tonumber(raidNum) or 0
+        if resolvedRaidNum <= 0 then
+            clearLootWindowBossContext()
+            return 0
+        end
+
+        local resolvedNow, _, expiresAt = resolveContextExpiry(now, ttlSeconds, LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS, LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS)
+        local activeLoot = syncActiveLootContextState() or {}
+        activeLoot.raidNum = resolvedRaidNum
+        activeLoot.kind = "trash"
+        activeLoot.bossNid = 0
+        activeLoot.blocked = true
+        activeLoot.source = source or "lootWindowBlocked"
+        activeLoot.sourceUnit = sourceMeta and sourceMeta.unit or nil
+        activeLoot.sourceNpcId = tonumber(sourceMeta and sourceMeta.npcId) or 0
+        activeLoot.sourceName = sourceMeta and sourceMeta.name or nil
+        activeLoot.snapshotId = nil
+        activeLoot.openedAt = resolvedNow
+        activeLoot.expiresAt = expiresAt
+        activeLoot.windowExpiresAt = expiresAt
+        setActiveLootContextState(activeLoot)
+
+        if isDebugEnabled() then
+            addon:debug(
+                Diag.D.LogBossLootWindowContextBlocked:format(
+                    resolvedRaidNum,
+                    tostring(sourceMeta and sourceMeta.unit or "?"),
+                    tostring(sourceMeta and sourceMeta.name or "?"),
+                    tonumber(sourceMeta and sourceMeta.npcId) or 0,
+                    tostring(source or "lootWindowBlocked")
+                )
+            )
+        end
+
         return 0
+    end
+
+    local function getLootSourceState()
+        return LootContextState.GetSource(raidState)
+    end
+
+    local function clearLootSourceState()
+        LootContextState.ClearSource(raidState)
+    end
+
+    local function getBossEventContextState()
+        return LootContextState.GetBossEvent(raidState)
+    end
+
+    local function resetLootContextState()
+        LootContextState.Reset(raidState)
+    end
+
+    local function clearActiveLootWindowItemSnapshot()
+        LootContextSnapshots.ClearActive(raidState)
+    end
+
+    local function createLootWindowItemSnapshot(raidNum, bossNid, items, source, now, ttlSeconds)
+        return LootContextSnapshots.Create(raidState, raidNum, bossNid, items, source, now, ttlSeconds, LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS)
+    end
+
+    local function setActiveLootWindowItemSnapshot(raid, raidNum, snapshot, now, ttlSeconds)
+        local bossNid = LootContextSnapshots.MarkActive(raidState, snapshot, now, ttlSeconds, LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS)
+        if bossNid <= 0 then
+            return 0
+        end
+        setLootWindowBossContext(raid, raidNum, bossNid, snapshot.source or "lootWindow", now, ttlSeconds, nil, snapshot.id)
+        return bossNid
+    end
+
+    local function findMatchingLootWindowItemSnapshot(raidNum, items)
+        return LootContextSnapshots.FindMatching(raidState, raidNum, items)
+    end
+
+    local function consumeActiveLootWindowItemSnapshot(itemLink)
+        return LootContextSnapshots.ConsumeActive(raidState, itemLink)
+    end
+
+    local function resolveLootWindowSourceUnitContext(raid)
+        if type(UnitExists) ~= "function" or type(UnitGUID) ~= "function" then
+            return nil
+        end
+
+        local function buildUnitContext(unit, allowBossMatch)
+            if not UnitExists(unit) then
+                return nil
+            end
+
+            local guid = UnitGUID(unit)
+            local npcId = guid and addon.GetCreatureId and addon.GetCreatureId(guid) or 0
+            if npcId <= 0 then
+                return nil
+            end
+
+            local name = type(UnitName) == "function" and UnitName(unit) or nil
+            if isBossNpcId(npcId) then
+                if not allowBossMatch then
+                    return nil
+                end
+
+                local boss = findBossBySourceNpcId(raid, npcId)
+                if not boss and name then
+                    boss = findBossByName(raid, name)
+                end
+                if not boss then
+                    return nil
+                end
+
+                return {
+                    kind = "boss",
+                    unit = unit,
+                    npcId = npcId,
+                    name = boss.name or name,
+                    bossNid = tonumber(boss.bossNid) or 0,
+                }
+            end
+
+            return {
+                kind = "nonBoss",
+                unit = unit,
+                npcId = npcId,
+                name = name,
+                bossNid = 0,
+            }
+        end
+
+        local mouseoverContext = buildUnitContext("mouseover", true)
+        if mouseoverContext then
+            return mouseoverContext
+        end
+
+        return buildUnitContext("target", false)
+    end
+
+    setActiveLootSource = function(raid, raidNum, kind, bossNid, sourceMeta, now, ttlSeconds, snapshotId)
+        local resolvedRaidNum = tonumber(raidNum) or 0
+        local resolvedKind = (kind == "boss" or kind == "trash" or kind == "object") and kind or nil
+        if resolvedRaidNum <= 0 or not resolvedKind then
+            clearLootSourceState()
+            return nil
+        end
+
+        local resolvedNow, _, expiresAt = resolveContextExpiry(now, ttlSeconds, LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS, 1)
+        local resolvedBossNid = tonumber(bossNid) or 0
+        local boss = (resolvedBossNid > 0) and findBossByNid(raid, resolvedBossNid) or nil
+        local sourceName = sourceMeta and sourceMeta.name or nil
+        if not sourceName and boss then
+            sourceName = boss.name or boss.boss
+        end
+
+        local activeLoot = syncActiveLootContextState() or {}
+        activeLoot.raidNum = resolvedRaidNum
+        activeLoot.kind = resolvedKind
+        activeLoot.bossNid = resolvedBossNid
+        activeLoot.sourceNpcId = tonumber(sourceMeta and sourceMeta.npcId) or tonumber(sourceMeta and sourceMeta.sourceNpcId) or 0
+        activeLoot.sourceName = sourceName
+        activeLoot.snapshotId = tonumber(snapshotId) or nil
+        activeLoot.openedAt = resolvedNow
+        activeLoot.expiresAt = expiresAt
+        return setActiveLootContextState(activeLoot)
+    end
+
+    setLootWindowBossContext = function(raid, raidNum, bossNid, source, now, ttlSeconds, sourceMeta, snapshotId, updateLootSource)
+        local resolvedRaidNum = tonumber(raidNum) or 0
+        local resolvedBossNid = tonumber(bossNid) or 0
+        local boss = findBossByNid(raid, resolvedBossNid)
+        if resolvedRaidNum <= 0 or resolvedBossNid <= 0 or not boss then
+            clearLootWindowBossContext()
+            return 0
+        end
+
+        local _, _, expiresAt = resolveContextExpiry(now, ttlSeconds, LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS, LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS)
+        local activeLoot = syncActiveLootContextState() or {}
+        activeLoot.raidNum = resolvedRaidNum
+        activeLoot.bossNid = resolvedBossNid
+        activeLoot.blocked = false
+        activeLoot.source = source or "lootWindow"
+        activeLoot.sourceUnit = sourceMeta and sourceMeta.unit or nil
+        activeLoot.sourceNpcId = tonumber(sourceMeta and sourceMeta.npcId) or tonumber(activeLoot.sourceNpcId) or 0
+        activeLoot.sourceName = sourceMeta and sourceMeta.name or tostring(boss.name)
+        activeLoot.windowExpiresAt = expiresAt
+        if updateLootSource ~= false then
+            activeLoot.kind = isTrashMobName(boss.name) and "trash" or "boss"
+            activeLoot.snapshotId = tonumber(snapshotId) or nil
+            activeLoot.openedAt = tonumber(now) or Time.GetCurrentTime()
+            activeLoot.expiresAt = expiresAt
+        end
+        setActiveLootContextState(activeLoot)
+
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogBossLootWindowContextSet:format(tostring(boss.name), resolvedBossNid, resolvedRaidNum, tostring(source or "lootWindow")))
+        end
+
+        return resolvedBossNid
+    end
+
+    local function resolveLootWindowContextState(raid, raidNum, now)
+        local lootWindowBossContext = getLootWindowBossContextState()
+        if type(lootWindowBossContext) ~= "table" then
+            return nil
+        end
+
+        local currentTime = tonumber(now) or Time.GetCurrentTime()
+        local contextRaidNum = tonumber(lootWindowBossContext.raidNum) or 0
+        local contextBossNid = tonumber(lootWindowBossContext.bossNid) or 0
+        local expiresAt = tonumber(lootWindowBossContext.expiresAt) or 0
+
+        if contextRaidNum ~= (tonumber(raidNum) or 0) or contextBossNid <= 0 then
+            if lootWindowBossContext.blocked ~= true then
+                clearLootWindowBossContext()
+                return nil
+            end
+            if contextRaidNum ~= (tonumber(raidNum) or 0) then
+                clearLootWindowBossContext()
+                return nil
+            end
+        end
+
+        if expiresAt > 0 and currentTime > expiresAt then
+            clearLootWindowBossContext()
+            return nil
+        end
+
+        if lootWindowBossContext.blocked == true then
+            return "blocked", lootWindowBossContext, nil
+        end
+
+        local boss = findBossByNid(raid, contextBossNid)
+        if not boss then
+            clearLootWindowBossContext()
+            return nil
+        end
+
+        return "boss", lootWindowBossContext, boss
+    end
+
+    local function resolveLootWindowBossContext(raid, raidNum, now)
+        local contextState, lootWindowBossContext, boss = resolveLootWindowContextState(raid, raidNum, now)
+        if contextState ~= "boss" then
+            return 0
+        end
+
+        if isDebugEnabled() then
+            addon:debug(
+                Diag.D.LogBossLootWindowContextRecovered:format(
+                    tostring(boss.name),
+                    tonumber(lootWindowBossContext.bossNid) or 0,
+                    tonumber(lootWindowBossContext.raidNum) or 0,
+                    tostring(lootWindowBossContext.source or "lootWindow")
+                )
+            )
+        end
+
+        return tonumber(lootWindowBossContext.bossNid) or 0
+    end
+
+    local function rememberLootBossSession(raidNum, rollSessionId, bossNid, ttlSeconds)
+        LootContextSessions.Remember(raidState, raidNum, rollSessionId, bossNid, ttlSeconds, Time.GetCurrentTime())
+    end
+
+    local function resolveLootBossSession(raid, raidNum, rollSessionId, now)
+        return LootContextSessions.Resolve(raidState, raid, raidNum, rollSessionId, now, findBossByNid)
     end
 
     local function isUnknownName(name)
@@ -285,7 +584,7 @@ do
     end
 
     local function clearBossEventContext()
-        raidState.bossEventContext = nil
+        setLootContextField("eventBoss", "bossEventContext", nil)
     end
 
     local function setBossEventContext(raidNum, bossNid, bossName, source, seenAt)
@@ -296,21 +595,23 @@ do
             return nil
         end
 
-        raidState.bossEventContext = {
+        local bossEventContext = setLootContextField("eventBoss", "bossEventContext", {
             raidNum = raidNum,
             bossNid = bossNid,
             name = bossName,
             source = source or "event",
             seenAt = tonumber(seenAt) or Time.GetCurrentTime(),
-        }
+        })
 
-        addon:debug(Diag.D.LogBossEventContextSet:format(tostring(bossName), bossNid, raidNum, tostring(source or "event")))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogBossEventContextSet:format(tostring(bossName), bossNid, raidNum, tostring(source or "event")))
+        end
 
-        return raidState.bossEventContext
+        return bossEventContext
     end
 
     local function resolveBossEventContext(raidNum, now, applyLastBoss)
-        local bossEventContext = raidState.bossEventContext
+        local bossEventContext = getBossEventContextState()
         if type(bossEventContext) ~= "table" then
             return 0
         end
@@ -332,7 +633,11 @@ do
 
         if applyLastBoss then
             Core.SetLastBoss(contextBossNid)
-            addon:debug(Diag.D.LogBossEventContextRecovered:format(tostring(contextBossName), contextBossNid, tonumber(delta) or -1, tostring(bossEventContext.source or "event")))
+            if isDebugEnabled() then
+                addon:debug(
+                    Diag.D.LogBossEventContextRecovered:format(tostring(contextBossName), contextBossNid, tonumber(delta) or -1, tostring(bossEventContext.source or "event"))
+                )
+            end
         end
 
         return contextBossNid
@@ -344,6 +649,64 @@ do
 
     local function peekBossEventContext(raidNum, now)
         return resolveBossEventContext(raidNum, now, false)
+    end
+
+    local function ensureLootWindowBossContext(raid, raidNum, now, ttlSeconds, source)
+        local currentTime = tonumber(now) or Time.GetCurrentTime()
+        local contextState = resolveLootWindowContextState(raid, raidNum, currentTime)
+        if contextState == "blocked" then
+            return 0
+        end
+
+        local bossNid = resolveLootWindowBossContext(raid, raidNum, currentTime)
+        if bossNid > 0 then
+            return bossNid
+        end
+
+        local sourceUnitContext = resolveLootWindowSourceUnitContext(raid)
+        if type(sourceUnitContext) == "table" then
+            if sourceUnitContext.kind == "boss" then
+                return setLootWindowBossContext(raid, raidNum, sourceUnitContext.bossNid, source or "lootWindowUnit", currentTime, ttlSeconds, sourceUnitContext)
+            end
+
+            setBlockedLootWindowBossContext(raidNum, source or "lootWindowBlocked", currentTime, ttlSeconds, sourceUnitContext)
+            return 0
+        end
+
+        bossNid = peekBossEventContext(raidNum, currentTime)
+        if bossNid <= 0 then
+            setActiveLootSource(raid, raidNum, "object", 0, nil, currentTime, ttlSeconds, nil)
+            return 0
+        end
+
+        return setLootWindowBossContext(raid, raidNum, bossNid, source or "lootWindow", currentTime, ttlSeconds)
+    end
+
+    local function findAndRememberBossContextForLoot(raid, raidNum, rollSessionId, now, ttlSeconds, allowLootWindowContext, allowContextRecovery, applyLastBossOnRecovery)
+        local currentTime = tonumber(now) or Time.GetCurrentTime()
+        local bossNid = resolveLootBossSession(raid, raidNum, rollSessionId, currentTime)
+
+        if bossNid <= 0 and allowLootWindowContext then
+            local contextState = resolveLootWindowContextState(raid, raidNum, currentTime)
+            if contextState == "blocked" then
+                allowContextRecovery = false
+            else
+                bossNid = resolveLootWindowBossContext(raid, raidNum, currentTime)
+            end
+        end
+        if bossNid <= 0 and allowContextRecovery then
+            if applyLastBossOnRecovery then
+                bossNid = recoverBossEventContext(raidNum, currentTime)
+            else
+                bossNid = peekBossEventContext(raidNum, currentTime)
+            end
+        end
+
+        if bossNid > 0 and rollSessionId then
+            rememberLootBossSession(raidNum, rollSessionId, bossNid, ttlSeconds)
+        end
+
+        return tonumber(bossNid) or 0
     end
 
     local function findOrCreateTrashBossNid(raidNum, raid)
@@ -372,7 +735,9 @@ do
         local cache = ensureMasterLootCandidateCache(itemLink)
         local candidateIndex = cache.indexByName[playerName]
         if not candidateIndex then
-            addon:debug(Diag.D.LogMLCandidateCacheMiss:format(tostring(itemLink), tostring(playerName)))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogMLCandidateCacheMiss:format(tostring(itemLink), tostring(playerName)))
+            end
             cache = buildMasterLootCandidateCache(itemLink)
             candidateIndex = cache.indexByName[playerName]
         end
@@ -388,32 +753,108 @@ do
         return ensureRaidPlayerNid(name, raidNum)
     end
 
-    function module:FindAndRememberBossEventContextForLootSession(raidNum, rollSessionId, ttlSeconds, now)
-        local contextBossNid = peekBossEventContext(raidNum, now)
-        if tonumber(contextBossNid) > 0 then
-            rememberLootBossSession(raidNum, rollSessionId, contextBossNid, ttlSeconds)
+    function module:FindAndRememberBossContextForLootSession(raidNum, rollSessionId, options)
+        options = options or {}
+        local raid = type(Core.EnsureRaidById) == "function" and Core.EnsureRaidById(raidNum) or nil
+        if not raid then
+            return 0
         end
-        return tonumber(contextBossNid) or 0
+        return findAndRememberBossContextForLoot(
+            raid,
+            raidNum,
+            rollSessionId,
+            options.now,
+            options.ttlSeconds,
+            options.allowLootWindowContext == true,
+            options.allowContextRecovery == true,
+            false
+        )
+    end
+
+    function module:SetBossContextForLootSession(raidNum, rollSessionId, bossNid, ttlSeconds)
+        rememberLootBossSession(raidNum, rollSessionId, bossNid, ttlSeconds)
+        return tonumber(bossNid) or 0
+    end
+
+    module._EnsureLootWindowItemContext = function(_, raidNum, items, options)
+        options = options or {}
+        local raid = type(Core.EnsureRaidById) == "function" and Core.EnsureRaidById(raidNum) or nil
+        if not raid then
+            return 0
+        end
+
+        local snapshot = findMatchingLootWindowItemSnapshot(raidNum, items)
+        if snapshot then
+            return setActiveLootWindowItemSnapshot(raid, raidNum, snapshot, options.now, options.ttlSeconds)
+        end
+
+        local bossNid = tonumber(options.bossNid) or 0
+        if bossNid <= 0 then
+            bossNid = ensureLootWindowBossContext(raid, raidNum, options.now, options.ttlSeconds, options.source)
+        end
+        if bossNid <= 0 then
+            clearActiveLootWindowItemSnapshot()
+            return 0
+        end
+
+        snapshot = createLootWindowItemSnapshot(raidNum, bossNid, items, options.source, options.now, options.ttlSeconds)
+        if not snapshot then
+            local boss = findBossByNid(raid, bossNid)
+            setActiveLootSource(raid, raidNum, boss and isTrashMobName(boss.name) and "trash" or "boss", bossNid, nil, options.now, options.ttlSeconds, nil)
+            return bossNid
+        end
+
+        return setActiveLootWindowItemSnapshot(raid, raidNum, snapshot, options.now, options.ttlSeconds)
+    end
+
+    module._ConsumeLootWindowItemContext = function(_, itemLink)
+        return consumeActiveLootWindowItemSnapshot(itemLink)
+    end
+
+    function module:GetActiveLootSource(raidNum, bossNidOverride)
+        local source = getLootSourceState()
+        if type(source) ~= "table" then
+            return nil
+        end
+
+        local expiresAt = tonumber(source.expiresAt) or 0
+        if expiresAt > 0 and Time.GetCurrentTime() > expiresAt then
+            clearLootSourceState()
+            return nil
+        end
+
+        local queryRaidNum = tonumber(raidNum) or tonumber(Core.GetCurrentRaid and Core.GetCurrentRaid()) or 0
+        local sourceRaidNum = tonumber(source.raidNum) or 0
+        if queryRaidNum > 0 and sourceRaidNum > 0 and queryRaidNum ~= sourceRaidNum then
+            return nil
+        end
+
+        return copyActiveLootSource(syncActiveLootContextState(), bossNidOverride)
     end
 
     function module:FindOrCreateBossNidForLoot(raid, raidNum, rollSessionId, options)
         options = options or {}
         local currentTime = tonumber(options.now) or Time.GetCurrentTime()
         local allowContextRecovery = options.allowContextRecovery == true
+        local allowLootWindowContext = options.allowLootWindowContext == true
         local allowTrashFallback = options.allowTrashFallback == true
         local ttlSeconds = options.ttlSeconds
 
-        local bossNid = resolveLootBossSession(raid, raidNum, rollSessionId, currentTime)
-        if bossNid <= 0 and allowContextRecovery then
-            bossNid = recoverBossEventContext(raidNum, currentTime)
-        end
+        local bossNid = findAndRememberBossContextForLoot(raid, raidNum, rollSessionId, currentTime, ttlSeconds, allowLootWindowContext, allowContextRecovery, true)
         if bossNid <= 0 and allowTrashFallback then
             bossNid = findOrCreateTrashBossNid(raidNum, raid)
         end
         if bossNid > 0 then
-            rememberLootBossSession(raidNum, rollSessionId, bossNid, ttlSeconds)
+            if allowLootWindowContext then
+                setLootWindowBossContext(raid, raidNum, bossNid, "lootWindow", currentTime, ttlSeconds, nil, nil, false)
+            end
         end
         return tonumber(bossNid) or 0
+    end
+
+    function module:ClearLootWindowBossContext()
+        clearLootWindowBossContext()
+        clearActiveLootWindowItemSnapshot()
     end
 
     -- Creates a new raid log entry.
@@ -488,8 +929,7 @@ do
             return false
         end
         Core.SetCurrentRaid(raidId)
-        clearBossEventContext()
-        clearLootBossSessionState()
+        resetLootContextState()
         -- New session context: force version-gated roster consumers (e.g. Master dropdowns) to rebuild.
         if type(module._BumpRosterVersionInternal) == "function" then
             module._BumpRosterVersionInternal()
@@ -559,8 +999,7 @@ do
         end
         Core.SetCurrentRaid(nil)
         Core.SetLastBoss(nil)
-        clearBossEventContext()
-        clearLootBossSessionState()
+        resetLootContextState()
     end
 
     -- Performs an initial raid check on player login.
@@ -710,6 +1149,7 @@ do
         local killInfo = {
             bossNid = bossNid,
             name = bossName,
+            sourceNpcId = sourceNpcId or nil,
             difficulty = instanceDiff,
             mode = (instanceDiff == 3 or instanceDiff == 4) and "h" or "n",
             players = players,

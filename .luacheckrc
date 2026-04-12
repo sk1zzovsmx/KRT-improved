@@ -21,6 +21,7 @@ exclude_files = {
 	".luacheckrc",
 	"ElvUI_AddOnSkins/**",
 	"_dev/**",
+	"tests/fixtures/sv/**",
 }
 
 ignore = {

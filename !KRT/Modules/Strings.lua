@@ -62,6 +62,10 @@ function Strings.NormalizeLower(value, allowNil)
     return lower(text)
 end
 
+function Strings.GetNormalizedNameLower(value)
+    return Strings.NormalizeLower(value, true)
+end
+
 function Strings.FindAchievement(inp)
     local out = trimRaw(inp)
     if out ~= "" and find(out, "%{%d*%}") then

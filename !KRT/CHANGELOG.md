@@ -4,9 +4,90 @@ All notable changes to !KRT will be documented in this file.
 
 ## Unreleased
 
-Release-Version: 0.7.0-beta.3
+Release-Version: 0.7.0-beta.1
 
-## [0.7.0-beta.3] - 2026-04-06
+### Enhancements
+
+- **Performance: Bus event dispatch** — Eliminated per-fire table allocation
+  in `Bus.TriggerEvent`; reuses a static dispatch buffer to reduce GC pressure
+  during active raiding (dozens of events/second).
+- **Performance: Proc glow animation** — Throttled sparkle `OnUpdate` to ~30 FPS
+  (was unthrottled at 60 FPS), cutting `SetPoint` layout recalculations by half
+  during glow effects.
+- **Performance: Roll UI model** — Decorated roll rows in-place instead of
+  allocating + copying a new table per visible row per refresh; also simplified
+  `copyVisibleRollRows` to reference existing rows directly.
+- **Performance: Loot window item info** — When loot-slot hints are available
+  (loot window path), skip the blocking `GetItemInfo` call and defer tooltip-
+  based item cache warming through a timer queue, avoiding micro-freezes on
+  `LOOT_OPENED` with many items.
+- **Performance: Passive group loot** — Reuse a static `numbers` buffer in
+  `extractGroupLootPatternValues` instead of allocating a new table per
+  parsed loot message.
+
+### Internal
+
+- Consolidated `Services/Raid/Boss.lua` and `Services/Raid/Changes.lua` into
+  `Services/Raid/Session.lua`; removed 2 redundant thin-wrapper files.
+- Consolidated `Services/Loot/Sessions.lua` into `Services/Loot/State.lua`;
+  removed 1 redundant thin-wrapper file.
+- Cleaned `Services/Loot/PendingAwards.lua` public surface: removed 13
+  internal helpers that were unnecessarily exported; only
+  `NormalizePendingAwardItemKey` remains exposed for cross-module use.
+- Removed 9 pure pass-through `PassiveGroupLoot` wrappers from
+  `Services/Loot/Service.lua`; internal callers now call
+  `PassiveGroupLoot.*` directly.
+- Removed redundant `normalizeCandidateKey` local from
+  `Services/Rolls/Service.lua`; calls `Sessions.NormalizeCandidateKey`
+  directly.
+- Removed 3 pass-through format methods from `Services/Reserves.lua`;
+  `Widgets/ReservesUI.lua` now uses inline `L.*` format calls directly.
+- Simplified verbose `getRaidService()` pattern in 3 Loot service files
+  to the concise 1-line variant.
+- Removed inline fallback loop from `resolveLootLooterName` in
+  `Services/Loot/Service.lua`; delegates to canonical
+  `Roster:GetPlayerName` instead of reimplementing player-by-NID lookup.
+- Replaced inline `string.find` item-link parsing in
+  `Services/Loot/Service.lua` with canonical `Item.GetItemStringFromLink`
+  and `Item.GetItemIdFromLink`; removed unused `ITEM_LINK_PATTERN` local.
+- Centralized `requireServiceMethod` in `Core.RequireServiceMethod`;
+  removed 4 identical copies from Controllers (Master, Warnings, Spammer,
+  Changes).
+- Removed `resolveRaidDifficulty` and `getRaidSizeFromDifficulty`
+  pass-through wrappers from `Services/Raid/Session.lua`; call sites use
+  internal `_ResolveRaidDifficultyInternal`/`_GetRaidSizeFromDifficultyInternal`
+  directly.
+- Eliminated `getRaidService()` wrapper functions from 5 Service files
+  (Chat, Rolls/Service, Loot/Service, Loot/PassiveGroupLoot, Loot/Tracking);
+  replaced with direct `Services.Raid` access.
+- Removed `getLootModule()` pass-through from `Services/Rolls/Service.lua`;
+  replaced with direct `Services.Loot` access.
+- Simplified 6 defensive item-helper wrappers in `Controllers/Master.lua`
+  to direct `Loot.*` delegation (load order guarantees availability).
+- Added `UIScaffold.EnsureModuleUi(module)` factory in `Modules/UI/Frames.lua`;
+  replaced 8 identical inline `_ui` schema initializations across Controllers
+  and Widgets with single-line factory calls.
+
+### Fixed
+
+- Fixed Master assignment dropdown clicks (`Hold`/`Bank`/`Disenchant`) using the
+  wrong `UIDropDownMenu` callback argument order, which could trigger
+  `UIDropDownMenu.lua:862` (`filterText` nil) on selection.
+- Fixed multi-item boss loot attribution in Master Loot windows: once the first
+  item resolves the boss correctly, later items from the same open boss loot
+  window now keep that scoped boss context instead of falling back to
+  `_TrashMob_` after the short event context expires.
+- Fixed Award and Hold/Trade boss propagation so loot-window event context is
+  snapped on open, carried on the roll session, and reused by trade-only
+  fallbacks instead of reclassifying the loot source late.
+- Tightened Boss/Trash attribution on `LOOT_OPENED`: an explicitly opened
+  non-boss corpse now blocks recent boss-context recovery, while boss corpse
+  mouseover can restore the correct boss scope without relying on late loot
+  receipt heuristics.
+
+## Archived (not published)
+
+### [0.7.0-beta.3] - 2026-04-06
 
 ### Added
 
@@ -16,8 +97,8 @@ Release-Version: 0.7.0-beta.3
   expose focused canonical APIs outside the old monolithic `Services/Raid.lua`.
 - Added canonical raid capability and loot-context APIs such as
   `CanUseCapability`, `EnsureMasterOnlyAccess`, `CanBroadcastChanges`,
-  `FindAndRememberBossEventContextForLootSession`, and
-  `FindOrCreateBossNidForLoot` to centralize controller/service access rules.
+  `FindAndRememberBossContextForLootSession`, and `FindOrCreateBossNidForLoot`
+  to centralize controller/service access rules.
 - Added changelog-driven GitHub release note generation in `tools/krt.py` and
   the publish workflow, with concise `Included Commits`,
   `New Functionality`, and `Enhancements/Improvement` sections.
@@ -33,7 +114,7 @@ Release-Version: 0.7.0-beta.3
 - GitHub release publishing now uses changelog-derived summaries plus an exact
   commit-range compare link instead of raw auto-generated release notes.
 
-## [0.7.0-beta.2] - 2026-04-06
+### [0.7.0-beta.2] - 2026-04-06
 
 ### Added
 
@@ -133,14 +214,14 @@ Release-Version: 0.7.0-beta.3
 - Started Master phase 4 micro-extractions without adding new service files:
   held-inventory loot slot matching/resolution moved to `Services/Raid.lua`
   (`MatchHeldInventoryLoot`, `ResolveHeldLootNid`), while winner/tie helpers
-  and countdown lifecycle APIs are now exposed by `Services/Rolls.lua`
+  and countdown lifecycle APIs are now exposed by `Services/Rolls/Service.lua`
   (`GetDisplayedWinner`, `GetResolvedWinner`, `ShouldUseTieReroll`,
   `StartCountdown`, `StopCountdown`, `FinalizeRollSession`).
   `Controllers/Master.lua` now delegates to those services with local
   compatibility fallbacks. No behavior changes.
 - Continued Master phase 4 countdown cleanup: `Controllers/Master.lua`
   no longer owns local countdown runtime state/timers and now derives
-  countdown state from `Services/Rolls.lua` (`IsCountdownRunning`) while
+  countdown state from `Services/Rolls/Service.lua` (`IsCountdownRunning`) while
   delegating start/stop/finalize entirely to Rolls service APIs.
   No behavior changes.
 - Completed dedicated Master hardening step before fallback removal:

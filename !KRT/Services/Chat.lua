@@ -53,17 +53,13 @@ do
     }
 
     -- ----- Private helpers ----- --
-    local function getRaidService()
-        return Services and Services.Raid or nil
-    end
-
     local function isCountdownMessage(text)
         local seconds = addon.Deformat(text, L.ChatCountdownTic)
         return (seconds ~= nil) or (find(text, L.ChatCountdownEnd) ~= nil)
     end
 
     local function canUseRaidWarning()
-        local raidService = getRaidService()
+        local raidService = Services.Raid
         if raidService and type(raidService.CanUseCapability) == "function" then
             return raidService:CanUseCapability("raid_warning")
         end
@@ -249,7 +245,7 @@ do
         end
 
         if addon.IsInRaid and addon.IsInRaid() and addon.options and addon.options.useRaidWarning then
-            local raidService = getRaidService()
+            local raidService = Services.Raid
             if raidService and type(raidService.CanUseCapability) == "function" and not raidService:CanUseCapability("raid_warning") then
                 addon:warn(L.WarnRaidWarningFallback)
             end

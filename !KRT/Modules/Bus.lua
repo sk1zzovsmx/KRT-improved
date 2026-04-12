@@ -77,6 +77,11 @@ function Bus.UnregisterCallback(handle)
     end
 end
 
+-- Reusable dispatch buffers keyed by nesting depth to keep nested TriggerEvent()
+-- calls isolated while still avoiding per-fire table allocation.
+local dispatchStack = {}
+local dispatchDepth = 0
+
 function Bus.TriggerEvent(eventName, ...)
     local listeners = events[eventName]
     if not listeners then
@@ -88,19 +93,30 @@ function Bus.TriggerEvent(eventName, ...)
 
     local profileNow = (isDebugEnabled() and debugprofilestop) or nil
     local t0 = profileNow and profileNow() or nil
+    local dispatchBuf
+    local dispatchCount = 0
+    local depth
 
-    local tokens, count = {}, 0
+    dispatchDepth = dispatchDepth + 1
+    depth = dispatchDepth
+    dispatchBuf = dispatchStack[depth]
+    if not dispatchBuf then
+        dispatchBuf = {}
+        dispatchStack[depth] = dispatchBuf
+    end
+
     for token in pairs(listeners) do
-        count = count + 1
-        tokens[count] = token
+        dispatchCount = dispatchCount + 1
+        dispatchBuf[dispatchCount] = token
     end
 
-    if count > entry.maxListeners then
-        entry.maxListeners = count
+    if dispatchCount > entry.maxListeners then
+        entry.maxListeners = dispatchCount
     end
 
-    for i = 1, count do
-        local token = tokens[i]
+    for i = 1, dispatchCount do
+        local token = dispatchBuf[i]
+        dispatchBuf[i] = nil
         local fn = listeners[token]
         if fn then
             local ok, err = pcall(fn, eventName, ...)
@@ -116,6 +132,8 @@ function Bus.TriggerEvent(eventName, ...)
         entry.lastMs = elapsed
         entry.totalMs = entry.totalMs + elapsed
     end
+
+    dispatchDepth = depth - 1
 end
 
 function Bus.RegisterCallbacks(names, callback)

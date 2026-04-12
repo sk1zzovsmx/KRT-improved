@@ -40,15 +40,7 @@ do
 
     addon.Widgets.LootCounter = addon.Widgets.LootCounter or {}
     local module = addon.Widgets.LootCounter
-    module._ui = module._ui
-        or {
-            Loaded = false,
-            Bound = false,
-            Localized = false,
-            Dirty = true,
-            Reason = nil,
-            FrameName = nil,
-        }
+    module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
     -- ----- Internal state ----- --

@@ -108,24 +108,7 @@ do
         return name == TRASH_MOB_NAME or name == LEGACY_TRASH_MOB_NAME
     end
 
-    -- ----- Public methods ----- --
-    function module:ValidateRaidRecord(raid, index, currentSchemaVersion)
-        local raidNid = type(raid) == "table" and tonumber(raid.raidNid) or nil
-        local result = {
-            index = tonumber(index) or 0,
-            raidNid = raidNid,
-            ok = 0,
-            warn = 0,
-            err = 0,
-            details = {},
-        }
-
-        if type(raid) ~= "table" then
-            pushDetail(result, "E", "RAID_NOT_TABLE")
-            return result
-        end
-
-        -- Validate source keys directly (without normalization side effects).
+    local function validateRaidSourceKeys(result, raid)
         local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("DBRaidValidator.ValidateRaid", { "IsLegacyRuntimeKey" }) or nil
         for key in pairs(raid) do
             if type(key) == "string" and key:sub(1, 1) == "_" and key ~= "_runtime" then
@@ -136,13 +119,9 @@ do
                 pushDetail(result, "E", "LEGACY_RUNTIME", { key = key })
             end
         end
+    end
 
-        local normalized = ensureNormalizedClone(raid, currentSchemaVersion)
-        if type(normalized) ~= "table" then
-            pushDetail(result, "E", "NORMALIZE_FAILED")
-            return result
-        end
-
+    local function validateSchemaVersion(result, normalized, currentSchemaVersion)
         local schemaVersion = tonumber(normalized.schemaVersion)
         if not schemaVersion then
             pushDetail(result, "E", "SCHEMA_MISSING")
@@ -154,13 +133,12 @@ do
         else
             result.ok = result.ok + 1
         end
+    end
 
-        local players = normalized.players
-        local bosses = normalized.bossKills
-        local lootRows = normalized.loot
-
+    local function validatePlayers(result, players)
         local maxPlayerNid = 0
         local playerByNid = {}
+
         for i = 1, #players do
             local player = players[i]
             if type(player) == "table" then
@@ -186,9 +164,14 @@ do
             end
         end
 
+        return maxPlayerNid, playerByNid
+    end
+
+    local function validateBosses(result, bosses, playerByNid)
         local maxBossNid = 0
         local bossByNid = {}
         local hasTrashBoss = false
+
         for i = 1, #bosses do
             local boss = bosses[i]
             if type(boss) == "table" then
@@ -226,7 +209,12 @@ do
             end
         end
 
+        return maxBossNid, bossByNid, hasTrashBoss
+    end
+
+    local function validateLootRows(result, lootRows, bossByNid, playerByNid, hasTrashBoss)
         local maxLootNid = 0
+
         for i = 1, #lootRows do
             local loot = lootRows[i]
             if type(loot) == "table" then
@@ -265,6 +253,10 @@ do
             end
         end
 
+        return maxLootNid
+    end
+
+    local function validateNidCounters(result, normalized, maxPlayerNid, maxBossNid, maxLootNid)
         local checks = {
             { field = "nextPlayerNid", required = maxPlayerNid + 1 },
             { field = "nextBossNid", required = maxBossNid + 1 },
@@ -284,6 +276,44 @@ do
                 result.ok = result.ok + 1
             end
         end
+    end
+
+    -- ----- Public methods ----- --
+    function module:GetRaidRecordValidation(raid, index, currentSchemaVersion)
+        local raidNid = type(raid) == "table" and tonumber(raid.raidNid) or nil
+        local result = {
+            index = tonumber(index) or 0,
+            raidNid = raidNid,
+            ok = 0,
+            warn = 0,
+            err = 0,
+            details = {},
+        }
+
+        if type(raid) ~= "table" then
+            pushDetail(result, "E", "RAID_NOT_TABLE")
+            return result
+        end
+
+        -- Validate source keys directly (without normalization side effects).
+        validateRaidSourceKeys(result, raid)
+
+        local normalized = ensureNormalizedClone(raid, currentSchemaVersion)
+        if type(normalized) ~= "table" then
+            pushDetail(result, "E", "NORMALIZE_FAILED")
+            return result
+        end
+
+        validateSchemaVersion(result, normalized, currentSchemaVersion)
+
+        local players = normalized.players
+        local bosses = normalized.bossKills
+        local lootRows = normalized.loot
+
+        local maxPlayerNid, playerByNid = validatePlayers(result, players)
+        local maxBossNid, bossByNid, hasTrashBoss = validateBosses(result, bosses, playerByNid)
+        local maxLootNid = validateLootRows(result, lootRows, bossByNid, playerByNid, hasTrashBoss)
+        validateNidCounters(result, normalized, maxPlayerNid, maxBossNid, maxLootNid)
 
         return result
     end
@@ -316,7 +346,7 @@ do
         }
 
         for i = 1, #raids do
-            local raidResult = self:ValidateRaidRecord(raids[i], i, currentSchemaVersion)
+            local raidResult = self:GetRaidRecordValidation(raids[i], i, currentSchemaVersion)
             report.ok = report.ok + (raidResult.ok or 0)
             report.warn = report.warn + (raidResult.warn or 0)
             report.err = report.err + (raidResult.err or 0)

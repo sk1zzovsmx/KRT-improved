@@ -8,6 +8,8 @@ Allowed:
 - Emit upward signals through `Bus.TriggerEvent(...)`.
 - Use generic utility helpers that may internally use WoW UI APIs when they stay service-level and
   do not take ownership of frames.
+- Keep internal cross-file helpers on underscore-prefixed service-owned tables
+  (for example `addon.Services.Loot._Context`).
 
 Disallowed:
 - Calling Parent modules directly (`Master`, `Logger`, `Warnings`, `Changes`, `Spammer`).

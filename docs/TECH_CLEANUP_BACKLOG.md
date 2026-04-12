@@ -117,7 +117,7 @@ Stage 1 target set:
 - `!KRT/Services/Reserves.lua`
 - `!KRT/Widgets/ReservesUI.lua`
 - `!KRT/Controllers/Master.lua`
-- `!KRT/Services/Rolls.lua`
+- `!KRT/Services/Rolls/Service.lua`
 - `!KRT/EntryPoints/{SlashEvents,Minimap}.lua`
 - `!KRT/Init.lua`
 
@@ -207,7 +207,7 @@ Contract wave result snapshot (`2026-04-06`, Chat/Raid ownership):
     - `!KRT/Controllers/Master.lua`
     - `!KRT/Controllers/Changes.lua`
     - `!KRT/Widgets/LootCounter.lua`
-    - `!KRT/Services/Rolls.lua`
+    - `!KRT/Services/Rolls/Service.lua`
     - `!KRT/EntryPoints/Minimap.lua`
     - `!KRT/EntryPoints/SlashEvents.lua`
     - `!KRT/Core/DBSyncer.lua`
@@ -278,7 +278,7 @@ Contract wave result snapshot (`2026-04-06`, Logger public contract cleanup):
   - `merge-now`: remains empty
 - residual note:
   - remaining Logger public `Unclassified` entries are now mostly deliberate
-    service/controller contracts (`Loot.Log`, `Store.Resolve*`, `View.Fill*`,
+    service/controller contracts (`Loot.SetLootEntry`, `Store.Resolve*`, `View.Fill*`,
     export-state helpers), not file-local UI glue
   - the next `Unclassified` lane should focus on ownership-heavy contracts, not
     bulk renames
@@ -325,7 +325,7 @@ Contract wave result snapshot (`2026-04-06`, internal-surface ownership cleanup)
       unused `ParseCSV` facade
   - `!KRT/Widgets/ReservesUI.lua`
     - migrated pending-item checks to the internal underscore surface
-  - `!KRT/Services/Rolls.lua`
+  - `!KRT/Services/Rolls/Service.lua`
     - reviewed and intentionally left unchanged in this wave because remaining
       candidates are covered service contracts, not ownership accidents
 - metrics:
@@ -385,11 +385,11 @@ What this means:
 - `!KRT/Services/Raid/{Capabilities,Changes,Counts,Roster,LootRecords,Session,Boss}.lua`:
   split completed; Chat/Raid contract wave completed in `Capabilities`; `Roster`
   internal helper exposure reduced, monitor only
-- `!KRT/Services/Rolls.lua`: reviewed in the ownership wave; no safe contract
+- `!KRT/Services/Rolls/Service.lua`: reviewed in the ownership wave; no safe contract
   contraction identified, monitor only with stabilization tests
 - `!KRT/Services/Reserves.lua`: ownership/internal-surface cleanup completed;
   parser/cache helper exposure reduced
-- `!KRT/Services/Loot.lua`: wave S1b completed (canonical ingestion + narrowed raid bridge)
+- `!KRT/Services/Loot/Service.lua`: wave S1b completed (canonical ingestion + narrowed raid bridge)
 - `!KRT/Services/Chat.lua`: contract wave completed, canonical announce/warn owner confirmed
 - `!KRT/Services/Logger/{Actions,Store,View}.lua`: Logger contract wave completed;
   file-local helper surfaces reduced; store-internal helpers moved to underscore APIs
@@ -427,9 +427,9 @@ What this means:
 These files are the highest-value cleanup targets because they still expose
 duplicated/pass-through contracts or heavy bridge logic across services.
 
-1. `!KRT/Services/Rolls.lua` - about 2016 lines
+1. `!KRT/Services/Rolls/Service.lua` - about 726 lines
 2. `!KRT/Services/Reserves.lua` - about 1713 lines
-3. `!KRT/Services/Loot.lua` - about 2049 lines
+3. `!KRT/Services/Loot/Service.lua` - about 2049 lines
 4. `!KRT/Services/Raid/State.lua` - about 847 lines
 
 ### P2: Routing and Infra Cleanup
@@ -457,7 +457,7 @@ proves a residual owner clearly belongs elsewhere.
 Owner files:
 - `!KRT/Services/Raid/State.lua`
 - `!KRT/Services/Raid/LootRecords.lua`
-- `!KRT/Services/Loot.lua`
+- `!KRT/Services/Loot/Service.lua`
 - `!KRT/Init.lua`
 - `!KRT/Controllers/Master.lua`
 
@@ -476,7 +476,7 @@ Current worktree progress:
 - monolithic `!KRT/Services/Raid.lua` has already been split into focused
   `Services/Raid/*.lua` modules
 - passive/group loot ingestion and trade-only creation are centralized in
-  `!KRT/Services/Loot.lua`, and runtime call sites no longer fall back to
+  `!KRT/Services/Loot/Service.lua`, and runtime call sites no longer fall back to
   `Raid` wrappers
 - `Raid` pass-through wrappers and `*Internal` bridge methods were removed and
   replaced by narrow bridge contracts for boss context/player resolution
@@ -501,7 +501,7 @@ Smoke path:
 ### Wave S2: Rolls Service
 
 Owner files:
-- `!KRT/Services/Rolls.lua`
+- `!KRT/Services/Rolls/Service.lua`
 
 Scope:
 - separate session, eligibility, response-state, and resolver helpers more
@@ -721,7 +721,7 @@ These are not strong cleanup candidates right now.
 
 If continuing the cleanup program immediately, start with:
 
-1. `!KRT/Services/Rolls.lua` API contraction and helper dedup
+1. `!KRT/Services/Rolls/Service.lua` API contraction and helper dedup
 2. `!KRT/Services/Reserves.lua` facade dedup (`Service:*` + `module:*`)
 3. `!KRT/EntryPoints/SlashEvents.lua` boundary cleanup follow-up
 
@@ -733,8 +733,8 @@ owner layer closed.
 Scope of this catalog:
 
 - `!KRT/Services/Raid/*.lua`
-- `!KRT/Services/Loot.lua`
-- `!KRT/Services/Rolls.lua`
+- `!KRT/Services/Loot/Service.lua`
+- `!KRT/Services/Rolls/Service.lua`
 - `!KRT/Services/Reserves.lua`
 - `!KRT/Init.lua`
 - `!KRT/Controllers/Master.lua`

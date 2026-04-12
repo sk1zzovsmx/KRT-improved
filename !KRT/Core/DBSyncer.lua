@@ -914,6 +914,19 @@ do
         return raidStore:InsertRaid(raid)
     end
 
+    local function sendAddonPayload(target, payload)
+        if target and target ~= "" then
+            SendAddonMessage(COMM_PREFIX, payload, "WHISPER", target)
+            return
+        end
+
+        Comms.Sync(COMM_PREFIX, payload)
+    end
+
+    local function buildIncomingSnapshotKey(sender, requestId, mode, raidNid)
+        return tostring(sender) .. "|" .. tostring(requestId) .. "|" .. mode .. "|" .. tostring(raidNid)
+    end
+
     local function sendRequest(mode, requestId, raidRef, signature, target)
         signature = signature or {}
         local payload = packFields(
@@ -926,11 +939,7 @@ do
             tonumber(signature.size) or 0,
             tonumber(signature.diff) or 0
         )
-        if target and target ~= "" then
-            SendAddonMessage(COMM_PREFIX, payload, "WHISPER", target)
-        else
-            Comms.Sync(COMM_PREFIX, payload)
-        end
+        sendAddonPayload(target, payload)
         addon:debug((Diag.D.LogSyncRequestSent):format(tostring(requestId), tostring(raidRef)))
     end
 
@@ -953,11 +962,7 @@ do
             local chunk = strsub(encodedPayload, fromPos, toPos)
             local msg = packFields(MSG_SNAPSHOT, PROTOCOL_VERSION, requestId, mode, tonumber(raid.raidNid) or 0, idx, totalChunks, chunk)
 
-            if target and target ~= "" then
-                SendAddonMessage(COMM_PREFIX, msg, "WHISPER", target)
-            else
-                Comms.Sync(COMM_PREFIX, msg)
-            end
+            sendAddonPayload(target, msg)
         end
 
         addon:debug((Diag.D.LogSyncSnapshotSent):format(tostring(target or "GROUP"), tostring(requestId), tostring(raid.raidNid), totalChunks, payloadLen))
@@ -1181,26 +1186,68 @@ do
         refreshLoggerUi(raidId)
     end
 
+    local function shouldIgnoreSnapshotSender(sender, requestId, mode, raidNid, pending, isPush, isSync)
+        if isPush then
+            return false
+        end
+
+        if not pending or pending.completed or pending.mode ~= mode then
+            addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            return true
+        end
+
+        if isSync and isSyncSenderFailed(pending, sender) then
+            addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            return true
+        end
+
+        local expectedTarget = normalizeSender(pending.target)
+        if expectedTarget and expectedTarget ~= "" and not shouldAcceptResponseSender(pending, sender) then
+            addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            return true
+        end
+
+        return false
+    end
+
+    local function getOrCreateIncomingSnapshotState(sender, requestId, mode, raidNid, partCount, pending, isSync)
+        local key = buildIncomingSnapshotKey(sender, requestId, mode, raidNid)
+        local state = module._incoming[key]
+        if state then
+            return key, state
+        end
+
+        if isSync and isSyncSenderUnauthorized(pending, sender) then
+            addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            return key, nil
+        end
+        if isSync and not isAuthorizedSyncResponder(sender, pending) then
+            warnSyncSenderNotOfficer(pending, requestId, sender)
+            addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            return key, nil
+        end
+
+        state = {
+            createdAt = nowSec(),
+            sender = sender,
+            requestId = requestId,
+            mode = mode,
+            raidNid = raidNid,
+            total = partCount,
+            got = 0,
+            parts = {},
+        }
+        module._incoming[key] = state
+        return key, state
+    end
+
     local function handleIncomingSnapshot(sender, requestId, mode, raidNid, partIndex, partCount, chunkData)
         local pending = module._pendingRequests[requestId]
         local isPush = (mode == MODE_PUSH)
         local isSync = (mode == MODE_SYNC)
 
-        if not isPush then
-            if not pending or pending.completed or pending.mode ~= mode then
-                addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
-                return
-            end
-
-            if isSync and isSyncSenderFailed(pending, sender) then
-                addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
-                return
-            end
-            local expectedTarget = normalizeSender(pending.target)
-            if expectedTarget and expectedTarget ~= "" and not shouldAcceptResponseSender(pending, sender) then
-                addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
-                return
-            end
+        if shouldIgnoreSnapshotSender(sender, requestId, mode, raidNid, pending, isPush, isSync) then
+            return
         end
 
         if partIndex < 1 or partCount < 1 or partIndex > partCount then
@@ -1208,30 +1255,9 @@ do
             return
         end
 
-        local key = tostring(sender) .. "|" .. tostring(requestId) .. "|" .. mode .. "|" .. tostring(raidNid)
-        local state = module._incoming[key]
+        local key, state = getOrCreateIncomingSnapshotState(sender, requestId, mode, raidNid, partCount, pending, isSync)
         if not state then
-            if isSync and isSyncSenderUnauthorized(pending, sender) then
-                addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
-                return
-            end
-            if isSync and not isAuthorizedSyncResponder(sender, pending) then
-                warnSyncSenderNotOfficer(pending, requestId, sender)
-                addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
-                return
-            end
-
-            state = {
-                createdAt = nowSec(),
-                sender = sender,
-                requestId = requestId,
-                mode = mode,
-                raidNid = raidNid,
-                total = partCount,
-                got = 0,
-                parts = {},
-            }
-            module._incoming[key] = state
+            return
         end
 
         if state.total ~= partCount then

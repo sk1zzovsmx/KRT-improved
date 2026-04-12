@@ -178,15 +178,7 @@ do
         return out
     end
 
-    local function normalizeNameLower(value)
-        if Strings and Strings.NormalizeLower then
-            return Strings.NormalizeLower(value, true)
-        end
-        if type(value) ~= "string" then
-            return nil
-        end
-        return string.lower(value)
-    end
+    local normalizeNameLower = Strings.GetNormalizedNameLower
 
     local function isLegacyDiagnosticPhase(contextTag)
         return contextTag == "load" or contextTag == "save"

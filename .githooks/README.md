@@ -24,7 +24,7 @@ The hook runs:
   - `luacheck --codes --no-color !KRT tools tests`
   - `tools/check-lua-uniformity.ps1`
   - `stylua --check !KRT tools tests`
-- `tools/update-tree.ps1`
+- `tools/update-tree.ps1` (default `-MaxDepth 4`)
 
 `docs/TREE.md` is auto-staged by the hook.
 

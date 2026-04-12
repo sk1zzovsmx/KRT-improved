@@ -30,6 +30,8 @@ Do NOT record:
 - temporary exceptions.
 
 Durable preferences learned from recent conversations:
+- Prefer refactors to reduce code surface while adding new behavior; avoid keeping debug-only or
+  redundant helper layers when a simpler implementation preserves the same contract.
 - Prefer master-looter-only runtime behavior: non-master clients should not run roll/award gameplay flows.
 - Prefer centralized Master Looter access policy via shared facade/helpers; avoid duplicating ML gate
   checks and warnings across controllers and entrypoints.
@@ -53,7 +55,7 @@ Durable preferences learned from recent conversations:
   contracts; do not leave them exposed as public `*Internal` methods on canonical owner tables.
 - In `Controllers/Master.lua`, keep button/dropdown/cursor glue private unless a test or another
   module genuinely depends on the public handler contract.
-- In `Services/Logger/*`, `Services/Raid/*`, and `Services/Reserves.lua`, keep parser/cache/selection
+- In `Services/Logger/*`, `Services/Raid/*`, and `Services/Reserves/*`, keep parser/cache/selection
   and other package-internal helpers on local helpers or underscore-prefixed owner-table fields rather
   than public APIs.
 - Prefer simpler role-gated UI without extra explanatory tooltips for disabled actions unless explicitly requested.
@@ -172,7 +174,14 @@ Durable preferences learned from recent conversations:
 - Prefer centralized event-name registry in `Modules/Events.lua` for internal bus events and
   wow-forwarded events (avoid ad-hoc string literals in modules).
 - Prefer minimizing cross-service interlacing: keep loot ingestion/parsing ownership in
-  `Services/Loot.lua`, and avoid over-splitting `Services/Raid/*` into thin pass-through files.
+  `Services/Loot/Service.lua`, and avoid over-splitting `Services/Raid/*` into thin pass-through files.
+- Prefer loot-context runtime internals (`LootContext`, `activeLoot`, loot-window session/snapshot
+  state) to live under `Services/Loot/*`; keep `Services/Loot/Service.lua` focused on
+  ingestion/parsing and public loot-service APIs, while `Services/Raid/State.lua` consumes shared helpers instead of
+  owning those internals directly.
+- Prefer splitting oversized service hotspots into focused sibling modules (for example
+  `PendingAwards`, `PassiveGroupLoot`, and `Tracking`) while keeping `Services/Loot/Service.lua`
+  as the stable public facade.
 - Prefer namespaced module ownership under `addon.Controllers.*`, `addon.Services.*`, `addon.Widgets.*`;
   keep temporary legacy aliases (`addon.Master`, `addon.Raid`, etc.) during soft migrations.
 - Alias lockdown: keep legacy aliases as compatibility only; in debug mode, warn on legacy alias reads
@@ -207,7 +216,7 @@ Durable preferences learned from recent conversations:
   keep its stable fields documented (`autoWinners`, `tiedNames`, `topRollName`,
   `requiresManualResolution`, `cutoff`) instead of treating them as incidental internals.
 - Treat `tests/release_stabilization_spec.lua` as the regression gate for changes in
-  `Services/Rolls.lua` and `Controllers/Master.lua`; run it whenever those modules change.
+  `Services/Rolls/Service.lua` and `Controllers/Master.lua`; run it whenever those modules change.
 - Prefer repo-relative paths or placeholders in config/docs/examples; avoid personal absolute
   paths unless strictly required by the tool.
 - Prefer simplified repo tooling that works on both Windows and Linux with automatic OS-aware
@@ -330,34 +339,46 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 35) Core/DBRaidQueries.lua
 36) Core/DBRaidValidator.lua
 37) Core/DBSyncer.lua
-38) Services/Raid/State.lua
-39) Services/Raid/Capabilities.lua
-40) Services/Raid/Changes.lua
-41) Services/Raid/Counts.lua
-42) Services/Raid/Roster.lua
-43) Services/Raid/LootRecords.lua
-44) Services/Raid/Session.lua
-45) Services/Raid/Boss.lua
-46) Services/Chat.lua
-47) EntryPoints/Minimap.lua
-48) EntryPoints/SlashEvents.lua
-49) Services/Rolls.lua
-50) Services/Loot.lua
-51) Services/Debug.lua
-52) Controllers/Master.lua
-53) Widgets/LootCounter.lua
-54) Services/Reserves.lua
-55) Widgets/ReservesUI.lua
-56) Services/Logger/Store.lua
-57) Services/Logger/View.lua
-58) Services/Logger/Helpers.lua
-59) Services/Logger/Actions.lua
-60) Controllers/Logger.lua
-61) Widgets/Config.lua
-62) Controllers/Warnings.lua
-63) Controllers/Changes.lua
-64) Controllers/Spammer.lua
-65) KRT.xml
+38) Services/Loot/Context.lua
+39) Services/Loot/State.lua
+40) Services/Loot/Snapshots.lua
+41) Services/Loot/PendingAwards.lua
+42) Services/Loot/PassiveGroupLoot.lua
+43) Services/Loot/Tracking.lua
+44) Services/Raid/State.lua
+45) Services/Raid/Capabilities.lua
+46) Services/Raid/Counts.lua
+47) Services/Raid/Roster.lua
+48) Services/Raid/LootRecords.lua
+49) Services/Raid/Session.lua
+50) Services/Chat.lua
+51) EntryPoints/Minimap.lua
+52) EntryPoints/SlashEvents.lua
+53) Services/Rolls/Countdown.lua
+54) Services/Rolls/Sessions.lua
+55) Services/Rolls/History.lua
+56) Services/Rolls/Responses.lua
+57) Services/Rolls/Resolution.lua
+58) Services/Rolls/Display.lua
+59) Services/Rolls/Service.lua
+60) Services/Loot/Service.lua
+61) Services/Debug.lua
+62) Controllers/Master.lua
+63) Widgets/LootCounter.lua
+64) Services/Reserves/Import.lua
+65) Services/Reserves/Display.lua
+66) Services/Reserves.lua
+67) Widgets/ReservesUI.lua
+68) Services/Logger/Store.lua
+69) Services/Logger/View.lua
+70) Services/Logger/Helpers.lua
+71) Services/Logger/Actions.lua
+72) Controllers/Logger.lua
+73) Widgets/Config.lua
+74) Controllers/Warnings.lua
+75) Controllers/Changes.lua
+76) Controllers/Spammer.lua
+77) KRT.xml
 
 ---
 
@@ -390,17 +411,32 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Raid/
       State.lua            # raid core state + shared internals
       Capabilities.lua     # raid role/capability policy
-      Changes.lua          # changes data APIs + message builders
       Counts.lua           # loot counter/player count APIs
       Roster.lua           # player lookup/class/rank helper APIs
       LootRecords.lua      # loot-record lookup/matching/resolution APIs
-      Session.lua          # raid/session facade APIs
-      Boss.lua             # boss query/icon APIs
+      Session.lua          # raid/session facade + boss query/icon + changes data APIs
     Chat.lua               # output helpers (Print/Announce)
-    Rolls.lua              # roll tracking, sorting, winner logic
-    Loot.lua               # loot parsing, item selection, export strings
+    Rolls/
+      Countdown.lua        # countdown runtime helper (loaded before Service.lua)
+      Sessions.lua         # roll-session lifecycle, tie-reroll, and current-context helpers
+      History.lua          # raw roll entries, per-item trackers, and local roll-state helpers
+      Responses.lua        # response lifecycle, eligibility, and incoming-roll helpers
+      Resolution.lua       # resolver ordering, cutoff ties, and row-policy helpers
+      Display.lua          # display-model assembly and winner/display helpers
+      Service.lua          # roll tracking, sorting, winner logic (public service facade)
+    Loot/
+      Service.lua          # loot parsing, item selection, export strings, public service API
+      Context.lua          # loot-context normalization/projection helpers
+      State.lua            # activeLoot + legacy mirror synchronization + session helpers
+      Snapshots.lua        # loot-window item snapshot state helpers
+      PendingAwards.lua    # pending-award lifecycle helpers + consume/refresh policy
+      PassiveGroupLoot.lua # passive group-loot parser/state/winner helpers
+      Tracking.lua         # runtime tracking/debug snapshot builders
     Debug.lua              # synthetic raid/roll test helpers for local addon testing
-    Reserves.lua           # soft reserves service/model + import parsing + reserve lookups
+    Reserves/
+      Import.lua           # import parser/strategy helpers (loaded before Reserves.lua)
+      Display.lua          # grouped display/player-format helpers (loaded before Reserves.lua)
+    Reserves.lua           # soft reserves service/model + canonical public facade
     Logger/
       Store.lua            # logger stable-ID indexing + data access
       View.lua             # view-model row builders, label formatters, CSV generation
@@ -562,7 +598,6 @@ Top-level feature modules on `addon.*`:
 - `addon.Master`        - master-loot helpers, award/trade tracking
 - `addon.LootCounter`   - loot counter UI + data
 - `addon.Reserves`      - soft reserves service facade (data/model APIs)
-- `addon.Reserves.Service` - compatibility alias of `addon.Reserves` (not a separate owner)
 - `addon.ReservesUI`    - reserve list UI widget owner
 - `addon.ReservesUI.Import` - reserve import UI widget owner
 - `addon.Config`        - options UI + defaults/load
@@ -574,6 +609,14 @@ Top-level feature modules on `addon.*`:
 
 Namespaced service-only module:
 - `addon.Services.Debug` - synthetic raid/roll test helpers for current-raid testing
+- `addon.Services.Rolls._Countdown` - rolls countdown runtime helper surface
+- `addon.Services.Rolls._Sessions` - rolls session/tie-reroll helper surface
+- `addon.Services.Rolls._History` - rolls raw-history and tracker helper surface
+- `addon.Services.Rolls._Responses` - rolls response/eligibility helper surface
+- `addon.Services.Rolls._Resolution` - rolls resolver and row-policy helper surface
+- `addon.Services.Rolls._Display` - rolls display-model and winner helper surface
+- `addon.Services.Reserves._Import` - reserves import parser helper surface
+- `addon.Services.Reserves._Display` - reserves grouped display/player formatting helper surface
 
 Root-method compatibility exception:
 - `addon:Print` remains a compatibility hook required by `LibLogger-1.0`.

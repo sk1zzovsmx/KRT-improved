@@ -31,12 +31,7 @@ local tostring = tostring
 
 local InternalEvents = Events.Internal
 
-local function requireServiceMethod(serviceName, serviceTable, methodName)
-    assert(type(serviceTable) == "table", "KRT Changes missing service: " .. tostring(serviceName))
-    local method = serviceTable[methodName]
-    assert(type(method) == "function", "KRT Changes missing service method: " .. tostring(serviceName) .. "." .. tostring(methodName))
-    return method
-end
+local requireServiceMethod = Core.RequireServiceMethod
 
 local Raid = Services.Raid
 local Chat = Services.Chat
@@ -59,15 +54,7 @@ local ChatApi = {
 do
     addon.Controllers.Changes = addon.Controllers.Changes or {}
     local module = addon.Controllers.Changes
-    module._ui = module._ui
-        or {
-            Loaded = false,
-            Bound = false,
-            Localized = false,
-            Dirty = true,
-            Reason = nil,
-            FrameName = nil,
-        }
+    module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
     local getFrame = makeModuleFrameGetter(module, "KRTChanges")

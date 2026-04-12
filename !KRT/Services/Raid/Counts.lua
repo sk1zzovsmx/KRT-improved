@@ -14,7 +14,6 @@ local InternalEvents = Events.Internal
 local tostring = tostring
 local tonumber = tonumber
 
-local tinsert = table.insert
 local twipe = table.wipe
 
 local function findRaidPlayerByNid(raid, playerNid)
@@ -33,9 +32,29 @@ local function findRaidPlayerByNid(raid, playerNid)
     return nil
 end
 
+local function resolveRaidWithSchema(raidNum)
+    local resolvedRaidNum = raidNum or Core.GetCurrentRaid()
+    local raid = Core.EnsureRaidById(resolvedRaidNum)
+    if not raid then
+        return nil, nil
+    end
+    Core.EnsureRaidSchema(raid)
+    return raid, resolvedRaidNum
+end
+
+local function resolveRaidPlayerByNid(playerNid, raidNum)
+    local raid, resolvedRaidNum = resolveRaidWithSchema(raidNum)
+    if not raid then
+        return nil, nil
+    end
+    local player = findRaidPlayerByNid(raid, playerNid)
+    return player, resolvedRaidNum
+end
+
 do
     addon.Services.Raid = addon.Services.Raid or {}
     local module = addon.Services.Raid
+    module._FindRaidPlayerByNid = findRaidPlayerByNid
 
     -- ----- Internal state ----- --
 
@@ -78,14 +97,7 @@ do
     end
 
     function module:GetPlayerCountByNid(playerNid, raidNum)
-        raidNum = raidNum or Core.GetCurrentRaid()
-        local raid = Core.EnsureRaidById(raidNum)
-        if not raid then
-            return 0
-        end
-        Core.EnsureRaidSchema(raid)
-
-        local player = findRaidPlayerByNid(raid, playerNid)
+        local player = resolveRaidPlayerByNid(playerNid, raidNum)
         if not player then
             return 0
         end
@@ -93,14 +105,7 @@ do
     end
 
     function module:SetPlayerCountByNid(playerNid, value, raidNum)
-        raidNum = raidNum or Core.GetCurrentRaid()
-        local raid = Core.EnsureRaidById(raidNum)
-        if not raid then
-            return
-        end
-        Core.EnsureRaidSchema(raid)
-
-        local player = findRaidPlayerByNid(raid, playerNid)
+        local player, resolvedRaidNum = resolveRaidPlayerByNid(playerNid, raidNum)
         if not player then
             return
         end
@@ -116,7 +121,7 @@ do
 
         if old ~= value then
             local bus = feature.Bus or addon.Bus
-            bus.TriggerEvent(InternalEvents.PlayerCountChanged, player.name, value, old, raidNum)
+            bus.TriggerEvent(InternalEvents.PlayerCountChanged, player.name, value, old, resolvedRaidNum)
         end
     end
 

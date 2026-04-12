@@ -237,7 +237,7 @@ stylua --check !KRT tools tests
 For small waves, targeted `luacheck` on touched files is acceptable during iteration.
 Run the broader local gates before closing a larger cleanup batch.
 
-### 8.3 If `Controllers/Master.lua` or `Services/Rolls.lua` Changed
+### 8.3 If `Controllers/Master.lua` or `Services/Rolls/Service.lua` Changed
 
 ```powershell
 py -3 tools/krt.py run-release-targeted-tests

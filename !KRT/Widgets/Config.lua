@@ -32,15 +32,7 @@ do
 
     addon.Widgets.Config = addon.Widgets.Config or {}
     local module = addon.Widgets.Config
-    module._ui = module._ui
-        or {
-            Loaded = false,
-            Bound = false,
-            Localized = false,
-            Dirty = true,
-            Reason = nil,
-            FrameName = nil,
-        }
+    module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
     local getFrame = makeModuleFrameGetter(module, "KRTConfig")

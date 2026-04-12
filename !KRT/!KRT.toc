@@ -4,7 +4,7 @@
 ## Author: Kader (|cff808080bkader#5341|r)
 ## DefaultState: enabled
 ## SavedVariables: KRT_Raids, KRT_Players, KRT_Reserves, KRT_Warnings, KRT_Spammer, KRT_Options
-## Version: 0.7.0-beta.3
+## Version: 0.7.0-beta.1
 ## X-Date: 2022-06-03 @ 11:10 PM |cff808080UTC|r
 ## X-Category: Raid, Inventory
 ## X-License: MIT/X
@@ -62,22 +62,34 @@ Core\DBRaidStore.lua
 Core\DBRaidQueries.lua
 Core\DBRaidValidator.lua
 Core\DBSyncer.lua
+Services\Loot\Context.lua
+Services\Loot\State.lua
+Services\Loot\Snapshots.lua
+Services\Loot\PendingAwards.lua
+Services\Loot\PassiveGroupLoot.lua
+Services\Loot\Tracking.lua
 Services\Raid\State.lua
 Services\Raid\Capabilities.lua
-Services\Raid\Changes.lua
 Services\Raid\Counts.lua
 Services\Raid\Roster.lua
 Services\Raid\LootRecords.lua
 Services\Raid\Session.lua
-Services\Raid\Boss.lua
 Services\Chat.lua
 EntryPoints\Minimap.lua
 EntryPoints\SlashEvents.lua
-Services\Rolls.lua
-Services\Loot.lua
+Services\Rolls\Countdown.lua
+Services\Rolls\Sessions.lua
+Services\Rolls\History.lua
+Services\Rolls\Responses.lua
+Services\Rolls\Resolution.lua
+Services\Rolls\Display.lua
+Services\Rolls\Service.lua
+Services\Loot\Service.lua
 Services\Debug.lua
 Controllers\Master.lua
 Widgets\LootCounter.lua
+Services\Reserves\Import.lua
+Services\Reserves\Display.lua
 Services\Reserves.lua
 Widgets\ReservesUI.lua
 Services\Logger\Store.lua

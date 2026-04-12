@@ -35,15 +35,7 @@ do
 
     addon.Widgets.ReservesUI = addon.Widgets.ReservesUI or {}
     local module = addon.Widgets.ReservesUI
-    module._ui = module._ui
-        or {
-            Loaded = false,
-            Bound = false,
-            Localized = false,
-            Dirty = true,
-            Reason = nil,
-            FrameName = nil,
-        }
+    module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
     local Reserves = addon.Services and addon.Services.Reserves
 
@@ -193,12 +185,9 @@ do
         if not row or not info then
             return
         end
-        local itemIdLabel = Reserves and Reserves.FormatReserveItemIdLabel and Reserves:FormatReserveItemIdLabel(info.itemId)
-            or format(L.StrReservesItemIdLabel, tostring(info.itemId or "?"))
-        local itemFallback = Reserves and Reserves.FormatReserveItemFallback and Reserves:FormatReserveItemFallback(info.itemId)
-            or format(L.StrReservesItemFallback, tostring(info.itemId or "?"))
-        local droppedBy = Reserves and Reserves.FormatReserveDroppedBy and Reserves:FormatReserveDroppedBy(info.source)
-            or ((info.source and info.source ~= "") and format(L.StrReservesTooltipDroppedBy, info.source) or nil)
+        local itemIdLabel = format(L.StrReservesItemIdLabel, tostring(info.itemId or "?"))
+        local itemFallback = format(L.StrReservesItemFallback, tostring(info.itemId or "?"))
+        local droppedBy = (info.source and info.source ~= "") and format(L.StrReservesTooltipDroppedBy, info.source) or nil
 
         row._itemId = info.itemId
         row._itemLink = info.itemLink

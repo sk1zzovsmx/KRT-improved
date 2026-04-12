@@ -129,6 +129,15 @@ do
         return nil
     end
 
+    local function buildRosterDelta()
+        return {
+            joined = {},
+            updated = {},
+            left = {},
+            unresolved = {},
+        }
+    end
+
     local function ensureRealmPlayerMeta(realm)
         KRT_Players[realm] = KRT_Players[realm] or {}
         return KRT_Players[realm]
@@ -191,22 +200,6 @@ do
         resetLiveUnitCaches()
     end
 
-    local function cancelRosterRefreshInternal()
-        cancelScheduledRosterRefresh()
-    end
-
-    local function scheduleRosterRefreshInternal()
-        scheduleRosterRefresh()
-    end
-
-    local function ensureRealmPlayerMetaInternal(realm)
-        return ensureRealmPlayerMeta(realm)
-    end
-
-    local function upsertPlayerMetaInternal(realmPlayers, name, unitID, level, race, raceL, class, classL)
-        upsertPlayerMeta(realmPlayers, name, unitID, level, race, raceL, class, classL)
-    end
-
     function module:GetRosterVersion()
         return rosterVersion
     end
@@ -243,10 +236,10 @@ do
     module._SetNumRaidInternal = setNumRaidInternal
     module._BumpRosterVersionInternal = bumpRosterVersionInternal
     module._ResetRosterTrackingInternal = resetRosterTrackingInternal
-    module._CancelRosterRefreshInternal = cancelRosterRefreshInternal
-    module._ScheduleRosterRefreshInternal = scheduleRosterRefreshInternal
-    module._EnsureRealmPlayerMetaInternal = ensureRealmPlayerMetaInternal
-    module._UpsertPlayerMetaInternal = upsertPlayerMetaInternal
+    module._CancelRosterRefreshInternal = cancelScheduledRosterRefresh
+    module._ScheduleRosterRefreshInternal = scheduleRosterRefresh
+    module._EnsureRealmPlayerMetaInternal = ensureRealmPlayerMeta
+    module._UpsertPlayerMetaInternal = upsertPlayerMeta
     module._PublishRosterDelta = publishRosterDeltaInternal
 
     function module:IsSyntheticPlayerActive(name, raidNum)
@@ -270,15 +263,155 @@ do
         return module:GetPlayerID(resolvedName, currentRaidId) > 0
     end
 
+    local function checkCurrentRaidInstance()
+        if not addon.IsInRaid() then
+            return
+        end
+
+        local instanceName, instanceType, instanceDiff = GetInstanceInfo()
+        if instanceType == "raid" and feature.L.RaidZones[instanceName] ~= nil then
+            module:Check(instanceName, instanceDiff)
+        end
+    end
+
+    local function endRosterSession(resetRaidSize, debugMessage)
+        if resetRaidSize then
+            numRaid = 0
+        end
+        if debugMessage then
+            addon:debug(debugMessage)
+        end
+        resetPendingUnitRetry()
+        resetLiveUnitCaches()
+        module:End()
+        rosterVersion = rosterVersion + 1
+        return true
+    end
+
+    local function applyUnknownRosterUnit(ctx, unitID)
+        markPendingUnit(unitID)
+        local prevName = ctx.prevNamesByUnit[unitID]
+        if prevName and not ctx.nextUnitsByName[prevName] then
+            ctx.seen[prevName] = true
+            ctx.nextUnitsByName[prevName] = unitID
+            ctx.nextNamesByUnit[unitID] = prevName
+        end
+        tinsert(ctx.delta.unresolved, { unitID = unitID, name = prevName })
+        return true
+    end
+
+    local function buildJoinedRosterPlayer(ctx, name, rank, subgroup, class)
+        local prevPlayer = ctx.playersByName[name]
+        local newRank = rank or (prevPlayer and prevPlayer.rank) or 0
+        local newSubgroup = subgroup or (prevPlayer and prevPlayer.subgroup) or 1
+        local newClass = class or (prevPlayer and prevPlayer.class) or "UNKNOWN"
+
+        tinsert(ctx.delta.joined, {
+            name = name,
+            unitID = ctx.unitID,
+            rank = newRank,
+            subgroup = newSubgroup,
+            class = newClass,
+        })
+
+        return {
+            playerNid = prevPlayer and prevPlayer.playerNid or nil,
+            name = name,
+            rank = newRank,
+            subgroup = newSubgroup,
+            class = newClass,
+            join = ctx.now,
+            leave = nil,
+            count = (prevPlayer and prevPlayer.count) or 0,
+        }
+    end
+
+    local function refreshActiveRosterPlayer(ctx, name, rank, subgroup, class)
+        local player = ctx.playersByName[name]
+        local oldUnitID = ctx.prevUnitsByName[name]
+        local oldRank = player.rank or 0
+        local oldSubgroup = player.subgroup or 1
+        local oldClass = player.class or "UNKNOWN"
+        local newRank = rank or oldRank
+        local newSubgroup = subgroup or oldSubgroup
+        local newClass = class or oldClass
+        local fieldChanged = (oldRank ~= newRank) or (oldSubgroup ~= newSubgroup) or (oldClass ~= newClass)
+        local unitChanged = oldUnitID and (oldUnitID ~= ctx.unitID)
+        local changed = fieldChanged or unitChanged
+
+        if changed then
+            tinsert(ctx.delta.updated, {
+                name = name,
+                oldUnitID = oldUnitID,
+                unitID = ctx.unitID,
+                oldRank = oldRank,
+                rank = newRank,
+                oldSubgroup = oldSubgroup,
+                subgroup = newSubgroup,
+                oldClass = oldClass,
+                class = newClass,
+            })
+        end
+
+        player.rank = newRank
+        player.subgroup = newSubgroup
+        player.class = newClass
+        return player, changed
+    end
+
+    local function applyKnownRosterUnit(ctx, unitID, name, rank, subgroup, level, classL, class)
+        pendingUnits[unitID] = nil
+        ctx.unitID = unitID
+        ctx.nextUnitsByName[name] = unitID
+        ctx.nextNamesByUnit[unitID] = name
+
+        local raceL, race = UnitRace(unitID)
+        local prevPlayer = ctx.playersByName[name]
+        local active = prevPlayer and prevPlayer.leave == nil
+        local player
+        local changed = false
+
+        if active then
+            player, changed = refreshActiveRosterPlayer(ctx, name, rank, subgroup, class)
+        else
+            player = buildJoinedRosterPlayer(ctx, name, rank, subgroup, class)
+            changed = true
+        end
+
+        -- Keep raid.players consistent even if rows were manually edited.
+        module:AddPlayer(player)
+
+        ctx.seen[name] = true
+        upsertPlayerMeta(ctx.realmPlayers, name, unitID, level, race, raceL, class, classL)
+        return changed
+    end
+
+    local function markRosterLeavers(ctx)
+        local changed = false
+        for pname, p in pairs(ctx.playersByName) do
+            if p.leave == nil and not ctx.seen[pname] then
+                if isSyntheticRosterPlayer(pname, ctx.currentRaidId) then
+                    ctx.seen[pname] = true
+                else
+                    p.leave = ctx.now
+                    changed = true
+                    tinsert(ctx.delta.left, {
+                        name = pname,
+                        unitID = ctx.prevUnitsByName[pname],
+                        rank = p.rank or 0,
+                        subgroup = p.subgroup or 1,
+                        class = p.class or "UNKNOWN",
+                    })
+                end
+            end
+        end
+        return changed
+    end
+
     -- Updates the current raid roster, adding new players and marking those who left.
     -- Returns rosterChanged, delta where delta contains joined/updated/left/unresolved lists.
     function module:UpdateRaidRoster()
-        if addon.IsInRaid() then
-            local instanceName, instanceType, instanceDiff = GetInstanceInfo()
-            if instanceType == "raid" and feature.L.RaidZones[instanceName] ~= nil then
-                module:Check(instanceName, instanceDiff)
-            end
-        end
+        checkCurrentRaidInstance()
 
         if not Core.GetCurrentRaid() then
             resetPendingUnitRetry()
@@ -289,24 +422,10 @@ do
         cancelScheduledRosterRefresh()
 
         local rosterChanged = false
-        local delta = {
-            joined = {},
-            updated = {},
-            left = {},
-            unresolved = {},
-        }
+        local delta = buildRosterDelta()
 
         if not addon.IsInRaid() then
-            rosterChanged = true
-            numRaid = 0
-            addon:debug(Diag.D.LogRaidLeftGroupEndSession)
-            resetPendingUnitRetry()
-            resetLiveUnitCaches()
-            module:End()
-            if rosterChanged then
-                rosterVersion = rosterVersion + 1
-            end
-            return rosterChanged
+            return endRosterSession(true, Diag.D.LogRaidLeftGroupEndSession)
         end
 
         local currentRaidId = Core.GetCurrentRaid()
@@ -331,129 +450,40 @@ do
         end
 
         if n == 0 then
-            rosterChanged = true
-            resetPendingUnitRetry()
-            resetLiveUnitCaches()
-            module:End()
-            rosterVersion = rosterVersion + 1
-            return rosterChanged
+            return endRosterSession(false)
         end
 
         local prevUnitsByName = liveUnitsByName
         local prevNamesByUnit = liveNamesByUnit
-        local nextUnitsByName = {}
-        local nextNamesByUnit = {}
-        local seen = {}
-        local now = Time.GetCurrentTime()
+        local ctx = {
+            currentRaidId = currentRaidId,
+            realmPlayers = realmPlayers,
+            playersByName = playersByName,
+            prevUnitsByName = prevUnitsByName,
+            prevNamesByUnit = prevNamesByUnit,
+            nextUnitsByName = {},
+            nextNamesByUnit = {},
+            seen = {},
+            delta = delta,
+            now = Time.GetCurrentTime(),
+        }
         local hasUnknownUnits = false
 
         for i = 1, n do
             local unitID = "raid" .. tostring(i)
             local name, rank, subgroup, level, classL, class = getRaidRosterInfo(i)
             if isUnknownName(name) then
-                hasUnknownUnits = true
-                markPendingUnit(unitID)
-                local prevName = prevNamesByUnit[unitID]
-                if prevName and not nextUnitsByName[prevName] then
-                    seen[prevName] = true
-                    nextUnitsByName[prevName] = unitID
-                    nextNamesByUnit[unitID] = prevName
-                end
-                tinsert(delta.unresolved, { unitID = unitID, name = prevName })
+                hasUnknownUnits = applyUnknownRosterUnit(ctx, unitID) or hasUnknownUnits
             else
-                pendingUnits[unitID] = nil
-                nextUnitsByName[name] = unitID
-                nextNamesByUnit[unitID] = name
-
-                local raceL, race = UnitRace(unitID)
-                local oldUnitID = prevUnitsByName[name]
-                local prevPlayer = playersByName[name]
-                local active = prevPlayer and prevPlayer.leave == nil
-                local player = prevPlayer
-
-                if not active then
-                    rosterChanged = true
-                    local newRank = rank or (prevPlayer and prevPlayer.rank) or 0
-                    local newSubgroup = subgroup or (prevPlayer and prevPlayer.subgroup) or 1
-                    local newClass = class or (prevPlayer and prevPlayer.class) or "UNKNOWN"
-                    player = {
-                        playerNid = prevPlayer and prevPlayer.playerNid or nil,
-                        name = name,
-                        rank = newRank,
-                        subgroup = newSubgroup,
-                        class = newClass,
-                        join = now,
-                        leave = nil,
-                        count = (prevPlayer and prevPlayer.count) or 0,
-                    }
-                    tinsert(delta.joined, {
-                        name = name,
-                        unitID = unitID,
-                        rank = newRank,
-                        subgroup = newSubgroup,
-                        class = newClass,
-                    })
-                else
-                    local oldRank = player.rank or 0
-                    local oldSubgroup = player.subgroup or 1
-                    local oldClass = player.class or "UNKNOWN"
-                    local newRank = rank or oldRank
-                    local newSubgroup = subgroup or oldSubgroup
-                    local newClass = class or oldClass
-                    local fieldChanged = (oldRank ~= newRank) or (oldSubgroup ~= newSubgroup) or (oldClass ~= newClass)
-                    local unitChanged = oldUnitID and (oldUnitID ~= unitID)
-
-                    if fieldChanged or unitChanged then
-                        rosterChanged = true
-                        tinsert(delta.updated, {
-                            name = name,
-                            oldUnitID = oldUnitID,
-                            unitID = unitID,
-                            oldRank = oldRank,
-                            rank = newRank,
-                            oldSubgroup = oldSubgroup,
-                            subgroup = newSubgroup,
-                            oldClass = oldClass,
-                            class = newClass,
-                        })
-                    end
-
-                    player.rank = newRank
-                    player.subgroup = newSubgroup
-                    player.class = newClass
-                end
-
-                -- Keep raid.players consistent even if rows were manually edited.
-                module:AddPlayer(player)
-
-                seen[name] = true
-
-                upsertPlayerMeta(realmPlayers, name, unitID, level, race, raceL, class, classL)
+                rosterChanged = applyKnownRosterUnit(ctx, unitID, name, rank, subgroup, level, classL, class) or rosterChanged
             end
         end
 
         trimPendingUnits(n)
-        liveUnitsByName = nextUnitsByName
-        liveNamesByUnit = nextNamesByUnit
+        liveUnitsByName = ctx.nextUnitsByName
+        liveNamesByUnit = ctx.nextNamesByUnit
 
-        -- Mark leavers
-        for pname, p in pairs(playersByName) do
-            if p.leave == nil and not seen[pname] then
-                if isSyntheticRosterPlayer(pname, currentRaidId) then
-                    seen[pname] = true
-                else
-                    p.leave = now
-                    rosterChanged = true
-                    tinsert(delta.left, {
-                        name = pname,
-                        unitID = prevUnitsByName[pname],
-                        rank = p.rank or 0,
-                        subgroup = p.subgroup or 1,
-                        class = p.class or "UNKNOWN",
-                    })
-                end
-            end
-        end
+        rosterChanged = markRosterLeavers(ctx) or rosterChanged
 
         if hasUnknownUnits then
             schedulePendingUnitRetry()

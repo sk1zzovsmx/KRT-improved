@@ -125,7 +125,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-release-targeted-t
 ```
 
 Test file: `tests/release_stabilization_spec.lua`
-Covers: `Services/Rolls.lua` and `Controllers/Master.lua`
+Covers: `Services/Rolls/Service.lua` and `Controllers/Master.lua`
 
 ## Best Practices
 

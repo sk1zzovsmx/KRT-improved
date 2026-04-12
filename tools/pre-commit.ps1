@@ -21,6 +21,29 @@ function Get-StagedLuaFiles {
     return @($output | Where-Object { $_ -is [string] -and $_.Trim() -ne "" })
 }
 
+function Invoke-KrtCli {
+    param([string[]]$Arguments)
+
+    $scriptPath = Join-Path $repoRoot "tools/krt.py"
+    $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+    if ($pyLauncher) {
+        & $pyLauncher.Source -3 $scriptPath @Arguments
+    } else {
+        $pythonCmd = Get-Command python3 -ErrorAction SilentlyContinue
+        if (-not $pythonCmd) {
+            $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+        }
+        if (-not $pythonCmd) {
+            throw "python3/python not found in PATH."
+        }
+        & $pythonCmd.Source $scriptPath @Arguments
+    }
+
+    if ($LASTEXITCODE -ne 0) {
+        throw ("tools/krt.py {0} failed." -f ($Arguments -join " "))
+    }
+}
+
 function Run-LuaChecks {
     param([string[]]$StagedLuaFiles)
 
@@ -71,6 +94,9 @@ Write-Host "Running UI binding checks..."
 & (Join-Path $repoRoot "tools/check-ui-binding.ps1")
 
 Run-LuaChecks -StagedLuaFiles $stagedLuaFiles
+
+Write-Host "Running API catalog drift check..."
+Invoke-KrtCli @("api-catalog-check")
 
 Write-Host "Refreshing docs/TREE.md..."
 & (Join-Path $repoRoot "tools/update-tree.ps1")

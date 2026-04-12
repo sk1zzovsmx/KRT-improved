@@ -48,21 +48,44 @@ Runtime data/model/service modules:
 
 - `addon.Services.Raid` (split owner across `Services/Raid/*.lua`)
 - `addon.Services.Chat`
-- `addon.Services.Rolls`
-- `addon.Services.Loot`
+- `addon.Services.Rolls` (public facade in `Services/Rolls/Service.lua`; internal helpers in
+  `Services/Rolls/Countdown.lua`, `Services/Rolls/Sessions.lua`, `Services/Rolls/History.lua`, `Services/Rolls/Responses.lua`,
+  `Services/Rolls/Resolution.lua`, `Services/Rolls/Display.lua`)
+- `addon.Services.Loot` (public API in `Services/Loot/Service.lua`; internal loot-context helpers in
+  `Services/Loot/*.lua`)
 - `addon.Services.Debug`
-- `addon.Services.Reserves` (canonical reserves data/model/import owner;
-  `.Service` is a compatibility alias to the same table)
+- `addon.Services.Reserves` (public facade in `Services/Reserves.lua`; internal import and grouped-display
+  helpers in `Services/Reserves/{Import,Display}.lua`)
 
 `addon.Services.Raid` is composed by:
-- `Services/Raid/State.lua` (core raid state + boss/loot context + reduced loot bridge contracts)
+- `Services/Raid/State.lua` (core raid state + raid-side loot/boss coordination contracts)
 - `Services/Raid/Capabilities.lua` (role/capability policy + shared master-only guard)
-- `Services/Raid/Changes.lua` (raid changes CRUD/message builders)
 - `Services/Raid/Counts.lua` (loot counter operations)
 - `Services/Raid/Roster.lua` (live roster tracking and player lookups)
 - `Services/Raid/LootRecords.lua` (loot-record query helpers)
-- `Services/Raid/Session.lua` (raid session checks/scheduling)
-- `Services/Raid/Boss.lua` (boss query and icon helpers)
+- `Services/Raid/Session.lua` (raid session checks/scheduling + raid changes CRUD/message builders
+  + boss query/icon helpers)
+
+`addon.Services.Loot` internal runtime helpers are composed by:
+- `Services/Loot/Context.lua` (`LootContext` normalization/projection helpers)
+- `Services/Loot/State.lua` (`activeLoot` + legacy mirror synchronization helpers + loot
+  roll-session boss-context state)
+- `Services/Loot/Snapshots.lua` (loot-window item snapshot state)
+- `Services/Loot/PendingAwards.lua` (pending-award lifecycle and consume/refresh policy)
+- `Services/Loot/PassiveGroupLoot.lua` (passive group-loot parser/state/winner helpers)
+- `Services/Loot/Tracking.lua` (runtime tracking/debug snapshot builders)
+
+`addon.Services.Rolls` internal runtime helpers are composed by:
+- `Services/Rolls/Countdown.lua` (countdown start/stop/tick runtime logic)
+- `Services/Rolls/Sessions.lua` (roll-session lifecycle, tie-reroll state, and current-roll context helpers)
+- `Services/Rolls/History.lua` (raw roll entries, per-item trackers, and local roll-state helpers)
+- `Services/Rolls/Responses.lua` (response lifecycle, eligibility, and incoming-roll materialization)
+- `Services/Rolls/Resolution.lua` (resolver ordering, tie-cutoff handling, and row-policy helpers)
+- `Services/Rolls/Display.lua` (display-model assembly and winner/display contract helpers)
+
+`addon.Services.Reserves` internal runtime helpers are composed by:
+- `Services/Reserves/Import.lua` (CSV parsing plus/multi strategies and import aggregation)
+- `Services/Reserves/Display.lua` (grouped display rows, player formatting, and reserve-list projections)
 
 ### Widgets (`addon.Widgets.*`)
 
@@ -101,7 +124,7 @@ Common infra under `!KRT/Modules/`:
   are intentionally absent.
 - `addon:Print` remains a compatibility hook for `LibLogger-1.0`.
 - For reserves, use `addon.Services.Reserves` / `addon.Reserves` as the canonical public surface.
-  `addon.Services.Reserves.Service` / `addon.Reserves.Service` is compatibility-only.
+  Do not rely on `addon.Services.Reserves.Service` / `addon.Reserves.Service` alias surfaces.
 - For DB-manager-backed accessors, use `addon.Core.GetRaidStore`,
   `addon.Core.GetRaidStoreOrNil`, `addon.Core.GetRaidQueries`,
   `addon.Core.GetRaidMigrations`, `addon.Core.GetRaidValidator`, and

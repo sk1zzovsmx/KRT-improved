@@ -7,6 +7,7 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
+local Core = feature.Core or addon.Core
 
 local Frames = feature.Frames or addon.Frames
 local Strings = feature.Strings or addon.Strings
@@ -23,12 +24,7 @@ local find, strlen = string.find, string.len
 local gsub = string.gsub
 local tostring, tonumber = tostring, tonumber
 
-local function requireServiceMethod(serviceName, serviceTable, methodName)
-    assert(type(serviceTable) == "table", "KRT Spammer missing service: " .. tostring(serviceName))
-    local method = serviceTable[methodName]
-    assert(type(method) == "function", "KRT Spammer missing service method: " .. tostring(serviceName) .. "." .. tostring(methodName))
-    return method
-end
+local requireServiceMethod = Core.RequireServiceMethod
 
 local Chat = Services.Chat
 local ChatApi = {
@@ -44,15 +40,7 @@ local ChatApi = {
 do
     addon.Controllers.Spammer = addon.Controllers.Spammer or {}
     local module = addon.Controllers.Spammer
-    module._ui = module._ui
-        or {
-            Loaded = false,
-            Bound = false,
-            Localized = false,
-            Dirty = true,
-            Reason = nil,
-            FrameName = nil,
-        }
+    module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
     -- ----- Internal state ----- --
 

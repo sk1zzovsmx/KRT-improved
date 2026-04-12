@@ -99,6 +99,23 @@ REPO_CHECK_SCRIPTS = {
 
 REPO_CHECK_ORDER = tuple(REPO_CHECK_SCRIPTS.keys())
 
+API_CATALOG_FILES = (
+    "docs/FUNCTION_REGISTRY.csv",
+    "docs/FN_CLUSTERS.md",
+    "docs/API_REGISTRY.csv",
+    "docs/API_REGISTRY_PUBLIC.csv",
+    "docs/API_REGISTRY_INTERNAL.csv",
+    "docs/API_NOMENCLATURE_CENSUS.md",
+    "docs/TREE.md",
+)
+
+API_CATALOG_SCRIPT_STEPS = (
+    ("fnmap-inventory.ps1", []),
+    ("fnmap-classify.ps1", []),
+    ("fnmap-api-census.ps1", []),
+    ("update-tree.ps1", ["-MaxDepth", "4"]),
+)
+
 
 def first_command(candidates: list[str]) -> str | None:
     for candidate in candidates:
@@ -836,6 +853,42 @@ def repo_quality_check(args: argparse.Namespace) -> int:
     return run_repo_quality_script(args.check)
 
 
+def api_catalog_refresh(_: argparse.Namespace) -> int:
+    for script_name, script_args in API_CATALOG_SCRIPT_STEPS:
+        print(f"Running API catalog step via {script_name}...", flush=True)
+        exit_code = run_powershell_script(script_name, list(script_args), cwd=REPO_ROOT)
+        if exit_code != 0:
+            return exit_code
+    return 0
+
+
+def api_catalog_check(args: argparse.Namespace) -> int:
+    before = {}
+    for path_text in API_CATALOG_FILES:
+        path = REPO_ROOT / path_text
+        before[path_text] = path.read_bytes() if path.is_file() else None
+
+    exit_code = api_catalog_refresh(args)
+    if exit_code != 0:
+        return exit_code
+
+    changed = []
+    for path_text in API_CATALOG_FILES:
+        path = REPO_ROOT / path_text
+        after = path.read_bytes() if path.is_file() else None
+        if before[path_text] != after:
+            changed.append(path_text)
+
+    if changed:
+        print("API catalogs are stale. Refresh changed these files:")
+        for path in changed:
+            print(f"  - {path}")
+        return 1
+
+    print("API catalogs are up to date.")
+    return 0
+
+
 def run_release_targeted_tests(args: argparse.Namespace) -> int:
     ps_args: list[str] = []
     if args.runtime:
@@ -1417,6 +1470,18 @@ def build_parser() -> argparse.ArgumentParser:
     quality = subparsers.add_parser("repo-quality-check", help="Run one repo-local quality check script")
     quality.add_argument("--check", choices=["all", *sorted(REPO_CHECK_SCRIPTS)], required=True)
     quality.set_defaults(handler=repo_quality_check)
+
+    api_catalog_refresh_parser = subparsers.add_parser(
+        "api-catalog-refresh",
+        help="Regenerate function/API catalogs and docs/TREE.md in canonical order",
+    )
+    api_catalog_refresh_parser.set_defaults(handler=api_catalog_refresh)
+
+    api_catalog_check_parser = subparsers.add_parser(
+        "api-catalog-check",
+        help="Regenerate function/API catalogs and fail if catalog files changed",
+    )
+    api_catalog_check_parser.set_defaults(handler=api_catalog_check)
 
     targeted_tests = subparsers.add_parser(
         "run-release-targeted-tests",

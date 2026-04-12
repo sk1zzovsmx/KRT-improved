@@ -7,6 +7,7 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
+local Core = feature.Core or addon.Core
 
 local ListController = feature.ListController or addon.ListController
 local Frames = feature.Frames or addon.Frames
@@ -23,12 +24,7 @@ local ipairs = ipairs
 
 local tonumber = tonumber
 
-local function requireServiceMethod(serviceName, serviceTable, methodName)
-    assert(type(serviceTable) == "table", "KRT Warnings missing service: " .. tostring(serviceName))
-    local method = serviceTable[methodName]
-    assert(type(method) == "function", "KRT Warnings missing service method: " .. tostring(serviceName) .. "." .. tostring(methodName))
-    return method
-end
+local requireServiceMethod = Core.RequireServiceMethod
 
 local Chat = Services.Chat
 local ChatApi = {
@@ -39,15 +35,7 @@ local ChatApi = {
 do
     addon.Controllers.Warnings = addon.Controllers.Warnings or {}
     local module = addon.Controllers.Warnings
-    module._ui = module._ui
-        or {
-            Loaded = false,
-            Bound = false,
-            Localized = false,
-            Dirty = true,
-            Reason = nil,
-            FrameName = nil,
-        }
+    module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
     local getFrame = makeModuleFrameGetter(module, "KRTWarnings")

@@ -34,10 +34,20 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   `addon.Services.Raid` is split across `!KRT/Services/Raid/*.lua` and loaded by TOC order.
   `State.lua` is the state/compat anchor file; the other files extend the same service table by domain
   (`Capabilities`, `Changes`, `Counts`, `Roster`, `LootRecords`, `Session`, `Boss`).
+  `addon.Services.Rolls` keeps its public roll/session contract in `!KRT/Services/Rolls/Service.lua` and owns
+  internal runtime helpers in `!KRT/Services/Rolls/*.lua` for countdown/session lifecycle,
+  raw history/tracker state, response intake/eligibility, resolver policy, and display assembly
+  (`addon.Services.Rolls._Countdown`, `_Sessions`, `_History`, `_Responses`, `_Resolution`, `_Display`).
+  `addon.Services.Loot` keeps its public ingestion/parsing API in `!KRT/Services/Loot/Service.lua` and owns
+  internal loot-context runtime helpers in `!KRT/Services/Loot/*.lua`
+  (`Context`, `State`, `Sessions`, `Snapshots`, `PendingAwards`, `PassiveGroupLoot`, `Tracking`) on
+  underscore-prefixed internal surfaces.
+  `addon.Services.Reserves` keeps its public reserves contract in `!KRT/Services/Reserves.lua` and owns
+  internal import parsing plus grouped-display/player-format helpers in
+  `!KRT/Services/Reserves/{Import,Display}.lua`
+  (`addon.Services.Reserves._Import`, `_Display`).
   `Services/Raid/Capabilities.lua` owns capability queries and the shared master-only access guard.
   `Services/Chat.lua` owns announce/warn output contracts.
-  `addon.Services.Reserves` owns the canonical public reserves contract; its `.Service`
-  field is a compatibility alias to the same table, not a second owner.
 - `!KRT/Core/DB.lua`
   Owns the canonical public accessor facade for DB-manager-backed services on
   `addon.Core.*`; `addon.DB` remains the concrete namespace for DB submodules and

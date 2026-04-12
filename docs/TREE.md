@@ -1,6 +1,6 @@
 # Repository Tree
 
-- MaxDepth: 3
+- MaxDepth: 4
 - Deterministic: true
 
 ```text
@@ -28,24 +28,41 @@
 |   |   \\-- SlashEvents.lua
 |   |-- Libs
 |   |   |-- CallbackHandler-1.0
-|   |   |   \\-- ...
+|   |   |   |-- CallbackHandler-1.0.lua
+|   |   |   \\-- CallbackHandler-1.0.xml
 |   |   |-- LibBossIDs-1.0
-|   |   |   \\-- ...
+|   |   |   |-- lib.xml
+|   |   |   |-- LibBossIDs-1.0.lua
+|   |   |   \\-- LibBossIDs-1.0.toc
 |   |   |-- LibCompat-1.0
-|   |   |   \\-- ...
+|   |   |   |-- Libs
+|   |   |   |   \\-- ...
+|   |   |   |-- lib.xml
+|   |   |   |-- LibCompat-1.0.lua
+|   |   |   \\-- LibCompat-1.0.toc
 |   |   |-- LibDeformat-3.0
-|   |   |   \\-- ...
+|   |   |   |-- lib.xml
+|   |   |   |-- LibDeformat-3.0.lua
+|   |   |   \\-- LibDeformat-3.0.toc
 |   |   |-- LibLogger-1.0
-|   |   |   \\-- ...
+|   |   |   |-- lib.xml
+|   |   |   |-- LibLogger-1.0.lua
+|   |   |   \\-- LibLogger-1.0.toc
 |   |   |-- LibStub
-|   |   |   \\-- ...
+|   |   |   |-- LibStub.lua
+|   |   |   \\-- LibStub.toc
 |   |   \\-- libs.json
 |   |-- Localization
 |   |   |-- DiagnoseLog.en.lua
 |   |   \\-- localization.en.lua
 |   |-- Modules
 |   |   |-- UI
-|   |   |   \\-- ...
+|   |   |   |-- Effects.lua
+|   |   |   |-- Facade.lua
+|   |   |   |-- Frames.lua
+|   |   |   |-- ListController.lua
+|   |   |   |-- MultiSelect.lua
+|   |   |   \\-- Visuals.lua
 |   |   |-- Base64.lua
 |   |   |-- Bus.lua
 |   |   |-- C.lua
@@ -61,18 +78,43 @@
 |   |   \\-- Time.lua
 |   |-- Services
 |   |   |-- Logger
-|   |   |   \\-- ...
+|   |   |   |-- Actions.lua
+|   |   |   |-- Helpers.lua
+|   |   |   |-- Store.lua
+|   |   |   \\-- View.lua
+|   |   |-- Loot
+|   |   |   |-- Context.lua
+|   |   |   |-- PassiveGroupLoot.lua
+|   |   |   |-- PendingAwards.lua
+|   |   |   |-- Service.lua
+|   |   |   |-- Snapshots.lua
+|   |   |   |-- State.lua
+|   |   |   \\-- Tracking.lua
 |   |   |-- Raid
-|   |   |   \\-- ...
+|   |   |   |-- Capabilities.lua
+|   |   |   |-- Counts.lua
+|   |   |   |-- LootRecords.lua
+|   |   |   |-- Roster.lua
+|   |   |   |-- Session.lua
+|   |   |   \\-- State.lua
+|   |   |-- Reserves
+|   |   |   |-- Display.lua
+|   |   |   \\-- Import.lua
+|   |   |-- Rolls
+|   |   |   |-- Countdown.lua
+|   |   |   |-- Display.lua
+|   |   |   |-- History.lua
+|   |   |   |-- Resolution.lua
+|   |   |   |-- Responses.lua
+|   |   |   |-- Service.lua
+|   |   |   \\-- Sessions.lua
 |   |   |-- Chat.lua
 |   |   |-- Debug.lua
-|   |   |-- Loot.lua
 |   |   |-- README.md
-|   |   |-- Reserves.lua
-|   |   \\-- Rolls.lua
+|   |   \\-- Reserves.lua
 |   |-- UI
 |   |   |-- Templates
-|   |   |   \\-- ...
+|   |   |   \\-- Common.xml
 |   |   |-- Changes.xml
 |   |   |-- Config.xml
 |   |   |-- Logger.xml
@@ -95,31 +137,37 @@
 |-- .agents
 |   \\-- skills
 |       |-- k-docs
-|       |   \\-- ...
+|       |   \\-- SKILL.md
 |       |-- s-audit
-|       |   \\-- ...
+|       |   \\-- SKILL.md
 |       |-- s-clean
-|       |   \\-- ...
+|       |   \\-- SKILL.md
 |       |-- s-debug
-|       |   \\-- ...
+|       |   |-- references
+|       |   |   \\-- ...
+|       |   \\-- SKILL.md
 |       |-- s-lint
-|       |   \\-- ...
+|       |   \\-- SKILL.md
 |       |-- s-release
-|       |   \\-- ...
+|       |   \\-- SKILL.md
 |       \\-- s-working
-|           \\-- ...
+|           \\-- SKILL.md
 |-- .githooks
 |   |-- pre-commit
 |   \\-- README.md
 |-- .github
 |   \\-- workflows
+|       |-- quality.yml
 |       |-- release-addon.yml
 |       \\-- release-router.yml
 |-- .venv
 |   |-- Include
 |   |-- Lib
 |   |   \\-- site-packages
-|   |       \\-- ...
+|   |       |-- pip
+|   |       |   \\-- ...
+|   |       \\-- pip-25.0.1.dist-info
+|   |           \\-- ...
 |   |-- Scripts
 |   |   |-- activate
 |   |   |-- activate.bat
@@ -159,7 +207,10 @@
 |-- tests
 |   |-- fixtures
 |   |   \\-- sv
-|   |       \\-- ...
+|   |       |-- canonical-minimal-01.lua
+|   |       |-- legacy-duplicates-03.lua
+|   |       |-- legacy-mixed-01.lua
+|   |       \\-- legacy-mixed-02.lua
 |   \\-- release_stabilization_spec.lua
 |-- tools
 |   |-- agent-skills.manifest.json
@@ -202,7 +253,10 @@
 |-- .styluaignore
 |-- AGENTS.md
 |-- CHANGELOG.md
+|-- KRT-0.7.0-beta.4.zip
+|-- KRT-0.7.0-beta.5.zip
+|-- KRT-0.7.0-beta.6.zip
 \\-- README.md
 ```
 
-_Regenerate with `tools/update-tree.ps1`._
+_Regenerate with tools/update-tree.ps1 -MaxDepth 4._

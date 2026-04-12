@@ -23,21 +23,7 @@ do
     -- ----- Internal state ----- --
 
     -- ----- Private helpers ----- --
-    local function findRaidPlayerByNid(raid, playerNid)
-        local nid = tonumber(playerNid)
-        if not nid or nid <= 0 then
-            return nil
-        end
-
-        local players = raid and raid.players or {}
-        for i = #players, 1, -1 do
-            local player = players[i]
-            if player and tonumber(player.playerNid) == nid then
-                return player, i
-            end
-        end
-        return nil
-    end
+    local findRaidPlayerByNid = assert(module._FindRaidPlayerByNid, "Missing Raid._FindRaidPlayerByNid")
 
     local function resolveLootLooterName(raid, loot)
         if type(loot) ~= "table" then

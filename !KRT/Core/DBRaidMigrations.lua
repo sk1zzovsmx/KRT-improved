@@ -38,15 +38,7 @@ do
         end
     end
 
-    local function normalizeNameLower(name)
-        if Strings and Strings.NormalizeLower then
-            return Strings.NormalizeLower(name, true)
-        end
-        if type(name) ~= "string" then
-            return nil
-        end
-        return string.lower(name)
-    end
+    local normalizeNameLower = Strings.GetNormalizedNameLower
 
     local function normalizeName(name)
         if Strings and Strings.NormalizeName then

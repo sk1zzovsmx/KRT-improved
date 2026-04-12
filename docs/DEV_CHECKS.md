@@ -34,6 +34,7 @@ py -3 tools/krt.py repo-quality-check --check api_nomenclature
 py -3 tools/krt.py repo-quality-check --check layering
 py -3 tools/krt.py repo-quality-check --check ui_binding
 py -3 tools/krt.py repo-quality-check --check raid_hardening
+py -3 tools/krt.py api-catalog-check
 ```
 
 Expected: each command exits `0` and prints `... passed.` from the wrapped script.
@@ -57,12 +58,25 @@ Use this sequence before and after API cleanup waves:
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-inventory.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-classify.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-api-census.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/update-tree.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/update-tree.ps1 -MaxDepth 4
 py -3 tools/krt.py repo-quality-check --check all
 ```
 
-Run the `fnmap` steps sequentially in that order. `fnmap-classify.ps1` depends on the
-fresh CSV written by `fnmap-inventory.ps1`, so parallel runs can produce stale catalogs.
+Preferred one-command refresh:
+
+```powershell
+py -3 tools/krt.py api-catalog-refresh
+```
+
+CI/read-only drift check:
+
+```powershell
+py -3 tools/krt.py api-catalog-check
+```
+
+Run the `fnmap` steps sequentially in that order when using direct scripts.
+`fnmap-classify.ps1` depends on the fresh CSV written by `fnmap-inventory.ps1`,
+so parallel runs can produce stale catalogs.
 
 Expected:
 

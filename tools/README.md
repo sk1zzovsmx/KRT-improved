@@ -25,6 +25,8 @@ Examples:
 - Release packaging: `python3 tools/krt.py build-release-zip --output-dir dist --write-checksum`
 - Hook install: `python3 tools/krt.py install-hooks`
 - Mechanic wrapper: `python3 tools/krt.py mech AddonValidate --json`
+- API catalog refresh: `python3 tools/krt.py api-catalog-refresh`
+- API catalog drift check: `python3 tools/krt.py api-catalog-check`
 
 The legacy `*.ps1` scripts remain available for compatibility and for lower-level/script-specific
 control.
@@ -61,6 +63,8 @@ control.
 - `fnmap-inventory.ps1`: inventories Lua functions into `docs/FUNCTION_REGISTRY.csv`
 - `fnmap-classify.ps1`: classifies inventory rows and writes `docs/FN_CLUSTERS.md`
 - `fnmap-api-census.ps1`: inventories callable `addon.*` APIs and writes full/public/internal nomenclature reports
+- `tools/krt.py api-catalog-refresh`: runs inventory, classify, census, and tree refresh in canonical order
+- `tools/krt.py api-catalog-check`: runs the same sequence and fails if catalog files changed
 
 ## Mechanic
 
@@ -81,7 +85,7 @@ control.
 - `tooling-common.ps1`: shared PowerShell helpers for repo root, Lua runtime, `rg`, and path handling
 - `pre-commit.ps1`: canonical local pre-commit entrypoint
 - `install-hooks.ps1`: compatibility shim around `tools/krt.py install-hooks`
-- `update-tree.ps1`: regenerates `docs/TREE.md`
+- `update-tree.ps1`: regenerates `docs/TREE.md` (default `-MaxDepth 4`)
 - `krt_mcp_server.py`: MCP server implementation used by `run-krt-mcp.ps1`
 
 ## Lua Helpers

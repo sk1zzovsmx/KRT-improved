@@ -53,20 +53,11 @@ local function callWidgetMethod(widgetId, methodName, ...)
 end
 
 local function toggleLootCounterWidget()
-    if not isWidgetAvailable("LootCounter") then
-        return nil
-    end
-
     if UIFacade:IsEnabled("LootCounter") and UIFacade:IsRegistered("LootCounter") then
         return UIFacade:Call("LootCounter", "Toggle")
     end
-
     local widget = getLootCounterController()
-    local method = widget and widget.Toggle
-    if type(method) ~= "function" then
-        return nil
-    end
-    return method(widget)
+    return widget and type(widget.Toggle) == "function" and widget:Toggle() or nil
 end
 
 -- ----- Internal state ----- --

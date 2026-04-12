@@ -1,6 +1,6 @@
 param(
     [string]$OutputPath = "docs/TREE.md",
-    [int]$MaxDepth = 3,
+    [int]$MaxDepth = 4,
     [switch]$IncludeMetadata
 )
 
@@ -90,7 +90,7 @@ foreach ($line in $treeLines) {
 }
 $content.Add('```')
 $content.Add("")
-$content.Add('_Regenerate with `tools/update-tree.ps1`._')
+$content.Add("_Regenerate with tools/update-tree.ps1 -MaxDepth $MaxDepth._")
 
 Set-Content -Path $OutputPath -Value $content -Encoding utf8
 Write-Host "Updated $OutputPath"

@@ -36,8 +36,8 @@ py -3 tools/krt.py repo-quality-check --check layering
 ### Stack Trace Reading
 
 ```
-1x [ADDON]!KRT\Services\Rolls.lua:123: attempt to index nil value
-[string "@!KRT\Services\Rolls.lua"]:123: in function 'SubmitRoll'
+1x [ADDON]!KRT\Services\Rolls\Service.lua:123: attempt to index nil value
+[string "@!KRT\Services\Rolls\Service.lua"]:123: in function 'SubmitRoll'
 [string "@!KRT\Controllers\Master.lua"]:45: in function 'HandleRoll'
 ```
 
@@ -105,7 +105,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-raid-validator.ps1
 
 ## Regression Tests
 
-Run after changing `Services/Rolls.lua` or `Controllers/Master.lua`:
+Run after changing `Services/Rolls/Service.lua` or `Controllers/Master.lua`:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-release-targeted-tests.ps1

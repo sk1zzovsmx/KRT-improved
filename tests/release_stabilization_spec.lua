@@ -600,7 +600,7 @@ local function newHarness()
     L.StrRollTimedOutTag = "OOT"
     L.StrRollOutTag = "OUT"
     L.StrRollBlockedTag = "BLK"
-    Diag.E.LogLoggerLootNidExpected = "[Logger] Loot:Log expected lootNid but got raw itemId raidId=%s value=%s link=%s matches=%d"
+    Diag.E.LogLoggerLootNidExpected = "[Logger] Loot:SetLootEntry expected lootNid but got raw itemId raidId=%s value=%s link=%s matches=%d"
     local InternalEvents = keyTable("Event")
     local Events = { Internal = InternalEvents }
     local rollTypes = {
@@ -653,6 +653,10 @@ local function newHarness()
     function Strings.NormalizeLower(name)
         local out = Strings.NormalizeName(name)
         return out and string.lower(out) or nil
+    end
+
+    function Strings.GetNormalizedNameLower(value)
+        return Strings.NormalizeLower(value, true)
     end
 
     local Sort = {
@@ -1088,6 +1092,18 @@ local function newHarness()
     }
 
     addon.UIScaffold = {
+        EnsureModuleUi = function(module)
+            module._ui = module._ui
+                or {
+                    Loaded = false,
+                    Bound = false,
+                    Localized = false,
+                    Dirty = true,
+                    Reason = nil,
+                    FrameName = nil,
+                }
+            return module._ui
+        end,
         DefineModuleUi = function() end,
         MakeStandardWidgetApi = function(_, api)
             return api or {}
@@ -1472,6 +1488,12 @@ local function newHarness()
     Core.GetRaidStoreOrNil = function()
         return nil
     end
+    Core.RequireServiceMethod = function(serviceName, serviceTable, methodName)
+        assert(type(serviceTable) == "table", "KRT missing service: " .. tostring(serviceName))
+        local method = serviceTable[methodName]
+        assert(type(method) == "function", "KRT missing service method: " .. tostring(serviceName) .. "." .. tostring(methodName))
+        return method
+    end
 
     if type(services.Loot.GetCurrentItemCount) ~= "function" then
         function services.Loot:GetCurrentItemCount()
@@ -1850,6 +1872,257 @@ local function newHarness()
         return nil
     end
 
+    local function ensureLootContextHelpers()
+        local lootContext = addon.Core._LootContext
+        if type(lootContext) == "table" and type(lootContext.NormalizeActiveLootContext) == "function" then
+            return lootContext
+        end
+
+        lootContext = lootContext or {}
+        addon.Core._LootContext = lootContext
+
+        local function isValidLootSourceKind(kind)
+            return kind == "boss" or kind == "trash" or kind == "object"
+        end
+
+        local function hasActiveLootSource(context)
+            if type(context) ~= "table" or not isValidLootSourceKind(context.kind) then
+                return false
+            end
+            if context.kind == "object" then
+                return true
+            end
+            return context.blocked == true or (tonumber(context.bossNid) or 0) > 0
+        end
+
+        local function hasActiveLootWindow(context)
+            if type(context) ~= "table" then
+                return false
+            end
+            local windowExpiresAt = tonumber(context.windowExpiresAt) or 0
+            if windowExpiresAt <= 0 then
+                return false
+            end
+            if context.blocked == true then
+                return true
+            end
+            return (tonumber(context.bossNid) or 0) > 0
+        end
+
+        function lootContext.NormalizeBossEventContext(context)
+            if type(context) ~= "table" then
+                return nil
+            end
+            context.raidNum = tonumber(context.raidNum) or 0
+            context.bossNid = tonumber(context.bossNid) or 0
+            context.name = context.name or nil
+            context.source = context.source or nil
+            context.seenAt = tonumber(context.seenAt) or 0
+            if context.bossNid <= 0 or context.raidNum <= 0 then
+                return nil
+            end
+            return context
+        end
+
+        function lootContext.NormalizeLootWindowBossContext(context)
+            if type(context) ~= "table" then
+                return nil
+            end
+            context.raidNum = tonumber(context.raidNum) or 0
+            context.bossNid = tonumber(context.bossNid) or 0
+            context.blocked = context.blocked == true
+            context.source = context.source or nil
+            context.sourceUnit = context.sourceUnit or nil
+            context.sourceNpcId = tonumber(context.sourceNpcId) or 0
+            context.sourceName = context.sourceName or nil
+            context.expiresAt = tonumber(context.expiresAt) or 0
+            if context.raidNum <= 0 then
+                return nil
+            end
+            if context.blocked ~= true and context.bossNid <= 0 then
+                return nil
+            end
+            return context
+        end
+
+        function lootContext.NormalizeLootSessionState(state)
+            if type(state) ~= "table" then
+                return nil
+            end
+            state.bySessionId = type(state.bySessionId) == "table" and state.bySessionId or {}
+            return state
+        end
+
+        function lootContext.NormalizeLootSnapshotState(state)
+            if type(state) ~= "table" then
+                return nil
+            end
+            state.byId = type(state.byId) == "table" and state.byId or {}
+            state.bySignature = type(state.bySignature) == "table" and state.bySignature or {}
+            state.nextId = tonumber(state.nextId) or 1
+            state.activeId = tonumber(state.activeId) or nil
+            state.nextPurgeAt = tonumber(state.nextPurgeAt) or 0
+            state.signatureIndexVersion = tonumber(state.signatureIndexVersion) or 0
+            if state.nextId < 1 then
+                state.nextId = 1
+            end
+            return state
+        end
+
+        function lootContext.NormalizeLootSourceState(state)
+            if type(state) ~= "table" then
+                return nil
+            end
+            state.raidNum = tonumber(state.raidNum) or 0
+            state.kind = isValidLootSourceKind(state.kind) and state.kind or nil
+            state.bossNid = tonumber(state.bossNid) or 0
+            state.sourceNpcId = tonumber(state.sourceNpcId) or 0
+            state.sourceName = state.sourceName or nil
+            state.openedAt = tonumber(state.openedAt) or 0
+            state.snapshotId = tonumber(state.snapshotId) or nil
+            state.expiresAt = tonumber(state.expiresAt) or 0
+            if state.raidNum <= 0 or not state.kind then
+                return nil
+            end
+            return state
+        end
+
+        function lootContext.NormalizeActiveLootContext(context)
+            if type(context) ~= "table" then
+                return nil
+            end
+            context.raidNum = tonumber(context.raidNum) or 0
+            context.kind = isValidLootSourceKind(context.kind) and context.kind or nil
+            context.bossNid = tonumber(context.bossNid) or 0
+            context.blocked = context.blocked == true
+            context.source = context.source or nil
+            context.sourceUnit = context.sourceUnit or nil
+            context.sourceNpcId = tonumber(context.sourceNpcId) or 0
+            context.sourceName = context.sourceName or nil
+            context.snapshotId = tonumber(context.snapshotId) or nil
+            context.openedAt = tonumber(context.openedAt) or 0
+            context.expiresAt = tonumber(context.expiresAt) or 0
+            context.windowExpiresAt = tonumber(context.windowExpiresAt) or 0
+            if context.raidNum <= 0 then
+                return nil
+            end
+
+            local hasSource = hasActiveLootSource(context)
+            local hasWindow = hasActiveLootWindow(context)
+            if not hasSource and not hasWindow then
+                return nil
+            end
+
+            if not hasSource then
+                context.kind = nil
+                context.snapshotId = nil
+                context.openedAt = 0
+                context.expiresAt = 0
+            end
+            if not hasWindow then
+                context.blocked = false
+                context.source = nil
+                context.sourceUnit = nil
+                context.windowExpiresAt = 0
+            end
+
+            return context
+        end
+
+        function lootContext.BuildActiveLootContext(activeLoot, lootWindowBossContext, lootSource)
+            local context = lootContext.NormalizeActiveLootContext(activeLoot)
+            if type(context) == "table" then
+                return context
+            end
+
+            local activeWindow = lootContext.NormalizeLootWindowBossContext(lootWindowBossContext)
+            local activeSource = lootContext.NormalizeLootSourceState(lootSource)
+            if type(activeWindow) ~= "table" and type(activeSource) ~= "table" then
+                return nil
+            end
+
+            return lootContext.NormalizeActiveLootContext({
+                raidNum = tonumber(activeWindow and activeWindow.raidNum) or tonumber(activeSource and activeSource.raidNum) or 0,
+                kind = activeSource and activeSource.kind or nil,
+                bossNid = tonumber(activeWindow and activeWindow.bossNid) or tonumber(activeSource and activeSource.bossNid) or 0,
+                blocked = activeWindow and activeWindow.blocked == true or false,
+                source = activeWindow and activeWindow.source or nil,
+                sourceUnit = activeWindow and activeWindow.sourceUnit or nil,
+                sourceNpcId = tonumber(activeWindow and activeWindow.sourceNpcId) or tonumber(activeSource and activeSource.sourceNpcId) or 0,
+                sourceName = (activeWindow and activeWindow.sourceName) or (activeSource and activeSource.sourceName) or nil,
+                snapshotId = tonumber(activeSource and activeSource.snapshotId) or nil,
+                openedAt = tonumber(activeSource and activeSource.openedAt) or 0,
+                expiresAt = tonumber(activeSource and activeSource.expiresAt) or 0,
+                windowExpiresAt = tonumber(activeWindow and activeWindow.expiresAt) or 0,
+            })
+        end
+
+        function lootContext.ProjectLootWindowBossContext(context)
+            context = lootContext.NormalizeActiveLootContext(context)
+            if not hasActiveLootWindow(context) then
+                return nil
+            end
+
+            return lootContext.NormalizeLootWindowBossContext({
+                raidNum = tonumber(context.raidNum) or 0,
+                bossNid = context.blocked == true and 0 or (tonumber(context.bossNid) or 0),
+                blocked = context.blocked == true,
+                source = context.source or nil,
+                sourceUnit = context.sourceUnit or nil,
+                sourceNpcId = tonumber(context.sourceNpcId) or 0,
+                sourceName = context.sourceName or nil,
+                expiresAt = tonumber(context.windowExpiresAt) or 0,
+            })
+        end
+
+        function lootContext.ProjectLootSourceState(context)
+            context = lootContext.NormalizeActiveLootContext(context)
+            if not hasActiveLootSource(context) then
+                return nil
+            end
+
+            local bossNid = tonumber(context.bossNid) or 0
+            if context.kind == "object" then
+                bossNid = 0
+            end
+
+            return lootContext.NormalizeLootSourceState({
+                raidNum = tonumber(context.raidNum) or 0,
+                kind = context.kind,
+                bossNid = bossNid,
+                sourceNpcId = tonumber(context.sourceNpcId) or 0,
+                sourceName = context.sourceName or nil,
+                openedAt = tonumber(context.openedAt) or 0,
+                snapshotId = tonumber(context.snapshotId) or nil,
+                expiresAt = tonumber(context.expiresAt) or 0,
+            })
+        end
+
+        function lootContext.CopyLootSource(context, bossNidOverride)
+            local source = lootContext.ProjectLootSourceState(context)
+            if type(source) ~= "table" then
+                return nil
+            end
+
+            local bossNid = tonumber(source.bossNid) or 0
+            local overrideBossNid = tonumber(bossNidOverride) or 0
+            if bossNid <= 0 and overrideBossNid > 0 and source.kind ~= "object" then
+                bossNid = overrideBossNid
+            end
+
+            return {
+                kind = source.kind,
+                bossNid = bossNid,
+                sourceNpcId = tonumber(source.sourceNpcId) or 0,
+                sourceName = source.sourceName,
+                openedAt = tonumber(source.openedAt) or 0,
+                snapshotId = tonumber(source.snapshotId) or nil,
+            }
+        end
+
+        return lootContext
+    end
+
     local harness = {
         addon = addon,
         Core = Core,
@@ -1863,18 +2136,26 @@ local function newHarness()
         load = function(_, path)
             ensureCanonicalChatService()
             ensureCanonicalRaidCapabilityService()
-            if path == "!KRT/Services/Raid.lua" then
-                local files = {
-                    "!KRT/Services/Raid/State.lua",
-                    "!KRT/Services/Raid/Capabilities.lua",
-                    "!KRT/Services/Raid/Changes.lua",
-                    "!KRT/Services/Raid/Counts.lua",
-                    "!KRT/Services/Raid/Roster.lua",
-                    "!KRT/Services/Raid/LootRecords.lua",
-                    "!KRT/Services/Raid/Session.lua",
-                    "!KRT/Services/Raid/Boss.lua",
-                    "!KRT/Services/Loot.lua",
-                }
+
+            local lootServiceFiles = {
+                "!KRT/Services/Loot/Context.lua",
+                "!KRT/Services/Loot/State.lua",
+                "!KRT/Services/Loot/Snapshots.lua",
+                "!KRT/Services/Loot/PendingAwards.lua",
+                "!KRT/Services/Loot/PassiveGroupLoot.lua",
+                "!KRT/Services/Loot/Tracking.lua",
+                "!KRT/Services/Loot/Service.lua",
+            }
+            local raidServiceFiles = {
+                "!KRT/Services/Raid/State.lua",
+                "!KRT/Services/Raid/Capabilities.lua",
+                "!KRT/Services/Raid/Counts.lua",
+                "!KRT/Services/Raid/Roster.lua",
+                "!KRT/Services/Raid/LootRecords.lua",
+                "!KRT/Services/Raid/Session.lua",
+            }
+
+            local function loadFiles(files)
                 for i = 1, #files do
                     local chunk, err = loadfile(files[i])
                     if not chunk then
@@ -1882,6 +2163,17 @@ local function newHarness()
                     end
                     chunk("!KRT", addon)
                 end
+            end
+
+            if path == "!KRT/Services/Loot.lua" then
+                loadFiles(lootServiceFiles)
+                return addon.Services.Loot
+            end
+
+            if path == "!KRT/Services/Raid.lua" then
+                ensureLootContextHelpers()
+                loadFiles(lootServiceFiles)
+                loadFiles(raidServiceFiles)
                 local raid = addon.Services.Raid
                 local loot = addon.Services.Loot
                 if raid and loot then
@@ -1901,6 +2193,24 @@ local function newHarness()
                     end
                 end
                 return addon.Services.Raid
+            end
+
+            if path == "!KRT/Services/Rolls/Service.lua" then
+                loadFiles({
+                    "!KRT/Services/Rolls/Countdown.lua",
+                    "!KRT/Services/Rolls/Sessions.lua",
+                    "!KRT/Services/Rolls/History.lua",
+                    "!KRT/Services/Rolls/Responses.lua",
+                    "!KRT/Services/Rolls/Resolution.lua",
+                    "!KRT/Services/Rolls/Display.lua",
+                })
+            end
+
+            if path == "!KRT/Services/Reserves.lua" then
+                loadFiles({
+                    "!KRT/Services/Reserves/Import.lua",
+                    "!KRT/Services/Reserves/Display.lua",
+                })
             end
 
             local chunk, err = loadfile(path)
@@ -2311,6 +2621,9 @@ local function setupMasterAwardHarness(cfg)
         GetItemLink = function()
             return link
         end,
+        GetCurrentItemCount = function()
+            return tonumber(h.feature.itemInfo and h.feature.itemInfo.count) or tonumber(h.feature.lootState and h.feature.lootState.selectedItemCount) or 1
+        end,
         FindLootSlotIndex = function(_, itemLinkArg)
             local wantedKey = h.addon.Item.GetItemStringFromLink(itemLinkArg) or itemLinkArg
             local wantedId = h.addon.Item.GetItemIdFromLink(itemLinkArg)
@@ -2491,6 +2804,393 @@ test("runtime cache reuses runtime until invalidated", function()
     assertEqual(runtime3.lootIdxByNid[2], 2, "expected rebuilt loot index to include new loot")
 end)
 
+test("raid roster update records joins leaves and player metadata", function()
+    local h = newHarness()
+    h.feature.L.RaidZones = { Naxxramas = true }
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            realm = "TestRealm",
+            startTime = 1000,
+            nextPlayerNid = 3,
+            players = {
+                { playerNid = 1, name = "Alice", rank = 1, subgroup = 1, class = "MAGE", join = 900, count = 2 },
+                { playerNid = 2, name = "Bob", rank = 0, subgroup = 2, class = "WARRIOR", join = 900, count = 0 },
+            },
+            bossKills = {},
+            loot = {},
+            changes = {},
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetRealmName = function()
+        return "TestRealm"
+    end
+    h.addon.IsInRaid = function()
+        return true
+    end
+    h.addon.IsInGroup = function()
+        return true
+    end
+    _G.KRT_Players = {}
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 4
+    end
+    _G.GetNumRaidMembers = function()
+        return 2
+    end
+    _G.GetRaidRosterInfo = function(index)
+        if index == 1 then
+            return "Alice", 1, 1, 80, "Mage", "MAGE"
+        end
+        if index == 2 then
+            return "Cara", 0, 3, 80, "Priest", "PRIEST"
+        end
+        return nil
+    end
+    _G.UnitRace = function(unit)
+        if unit == "raid2" then
+            return "Human", "Human"
+        end
+        return "Gnome", "Gnome"
+    end
+    _G.UnitSex = function()
+        return 2
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    local rosterChanged, delta = Raid:UpdateRaidRoster()
+    local raid = h.Core.EnsureRaidById(1)
+
+    assertTrue(rosterChanged == true, "expected roster update to report a join/leave change")
+    assertEqual(delta.joined[1].name, "Cara", "expected Cara to be reported as joined")
+    assertEqual(delta.left[1].name, "Bob", "expected Bob to be reported as left")
+    assertTrue(delta.updated == nil, "expected unchanged Alice to avoid an update delta")
+    assertEqual(raid.players[1].name, "Alice", "expected Alice to stay in roster")
+    assertEqual(raid.players[1].count, 2, "expected existing loot count to be preserved")
+    assertEqual(raid.players[2].name, "Bob", "expected Bob row to stay persisted")
+    assertTrue(tonumber(raid.players[2].leave) == 1000, "expected Bob to be marked left")
+    assertEqual(raid.players[3].name, "Cara", "expected Cara to be added to roster")
+    assertEqual(_G.KRT_Players.TestRealm.Cara.class, "PRIEST", "expected realm player metadata to be updated")
+end)
+
+test("raid roster update preserves previous names for temporary unknown units", function()
+    local h = newHarness()
+    h.feature.L.RaidZones = { Naxxramas = true }
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            realm = "TestRealm",
+            startTime = 1000,
+            nextPlayerNid = 2,
+            players = {
+                { playerNid = 1, name = "Alice", rank = 1, subgroup = 1, class = "MAGE", join = 900, count = 1 },
+            },
+            bossKills = {},
+            loot = {},
+            changes = {},
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetRealmName = function()
+        return "TestRealm"
+    end
+    h.addon.IsInRaid = function()
+        return true
+    end
+    _G.KRT_Players = {}
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 4
+    end
+    _G.GetNumRaidMembers = function()
+        return 1
+    end
+    local rosterName = "Alice"
+    _G.GetRaidRosterInfo = function()
+        return rosterName, 1, 1, 80, "Mage", "MAGE"
+    end
+    _G.UnitRace = function()
+        return "Gnome", "Gnome"
+    end
+    _G.UnitSex = function()
+        return 2
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+
+    local Raid = h.addon.Services.Raid
+    local firstChanged = Raid:UpdateRaidRoster()
+    assertTrue(firstChanged == true, "expected initial roster size sync to report a change")
+
+    rosterName = _G.UNKNOWNOBJECT
+    local secondChanged, delta = Raid:UpdateRaidRoster()
+    local raid = h.Core.EnsureRaidById(1)
+
+    assertTrue(secondChanged ~= true, "expected temporary unknown unit to avoid roster churn")
+    assertEqual(delta.unresolved[1].unitID, "raid1", "expected unresolved unit to be reported")
+    assertEqual(delta.unresolved[1].name, "Alice", "expected previous live name to be preserved")
+    assertTrue(raid.players[1].leave == nil, "expected Alice not to be marked left while unit is unknown")
+    assertEqual(h.timerCount(), 1, "expected unknown unit retry to be scheduled")
+end)
+
+test("db syncer routes requests through whisper and group transports", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 77,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            realm = "TestRealm",
+            startTime = 1000,
+            players = {},
+            bossKills = {},
+            loot = {},
+            changes = {},
+        },
+    })
+
+    local whisperMessages = {}
+    local groupMessages = {}
+
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.addon.IsInGroup = function()
+        return true
+    end
+    h.addon.IsInRaid = function()
+        return false
+    end
+    h.addon.Strings.TrimText = function(value)
+        return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    end
+    _G.SendAddonMessage = function(prefix, payload, channel, target)
+        whisperMessages[#whisperMessages + 1] = {
+            prefix = prefix,
+            payload = payload,
+            channel = channel,
+            target = target,
+        }
+    end
+    h.addon.Comms.Sync = function(prefix, payload)
+        groupMessages[#groupMessages + 1] = {
+            prefix = prefix,
+            payload = payload,
+        }
+    end
+
+    h:load("!KRT/Core/DBSyncer.lua")
+    local syncer = h.addon.DB.Syncer
+
+    assertTrue(syncer:RequestLoggerReq(42, " Alice ") == true, "expected targeted logger request to send")
+    assertEqual(#whisperMessages, 1, "expected one whisper transport message")
+    assertEqual(whisperMessages[1].prefix, "KRTLogSync", "expected sync prefix on whisper")
+    assertEqual(whisperMessages[1].channel, "WHISPER", "expected direct sync to use whisper transport")
+    assertEqual(whisperMessages[1].target, "Alice", "expected target name to be normalized before whisper")
+    local reqPrefix = table.concat({ "RQ", "1", "1", "REQ", "42" }, "\t")
+    assertEqual(whisperMessages[1].payload:sub(1, #reqPrefix), reqPrefix, "expected request payload header to stay stable")
+
+    assertTrue(syncer:RequestLoggerSync() == true, "expected current raid sync request to send")
+    assertEqual(#groupMessages, 1, "expected one group transport message")
+    assertEqual(groupMessages[1].prefix, "KRTLogSync", "expected sync prefix on group message")
+    local syncPrefix = table.concat({ "RQ", "1", "2", "SYNC", "77", "Naxxramas", "25", "4" }, "\t")
+    assertEqual(groupMessages[1].payload:sub(1, #syncPrefix), syncPrefix, "expected sync payload header to stay stable")
+end)
+
+test("db syncer imports push snapshots and merges requested sync chunks", function()
+    local source = newHarness()
+    local itemLink = source.registerItem(9001, "Sync Blade")
+    local itemString = source.addon.Item.GetItemStringFromLink(itemLink)
+    source:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 77,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            realm = "TestRealm",
+            startTime = 1000,
+            players = {
+                { playerNid = 1, name = "Alice", rank = 1, subgroup = 2, class = "MAGE", join = 1000, count = 3 },
+            },
+            bossKills = {
+                { bossNid = 10, name = "Patchwerk", mode = "n", difficulty = 4, time = 1010, hash = "patchwerk-1010", players = { 1 } },
+            },
+            loot = {
+                {
+                    lootNid = 101,
+                    itemId = 9001,
+                    itemName = "Sync Blade",
+                    itemString = itemString,
+                    itemLink = itemLink,
+                    itemRarity = 4,
+                    itemTexture = "Icon9001",
+                    itemCount = 1,
+                    looterNid = 1,
+                    rollType = source.rollTypes.MAINSPEC,
+                    rollValue = 98,
+                    bossNid = 10,
+                    time = 1015,
+                },
+            },
+            changes = {
+                Alice = "Fire",
+            },
+            nextPlayerNid = 2,
+            nextBossNid = 11,
+            nextLootNid = 102,
+        },
+    })
+
+    local snapshotMessages = {}
+    source.addon.IsInGroup = function()
+        return true
+    end
+    source.addon.IsInRaid = function()
+        return false
+    end
+    source.addon.Strings.TrimText = function(value)
+        return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    end
+    _G.SendAddonMessage = function(prefix, payload, channel, target)
+        snapshotMessages[#snapshotMessages + 1] = {
+            prefix = prefix,
+            payload = payload,
+            channel = channel,
+            target = target,
+        }
+    end
+
+    source:load("!KRT/Modules/Base64.lua")
+    source:load("!KRT/Core/DBSyncer.lua")
+    assertTrue(source.addon.DB.Syncer:BroadcastLoggerPush(77, "Bob") == true, "expected source push snapshot to send")
+    assertTrue(#snapshotMessages > 1, "expected source snapshot to be chunked")
+
+    local function rewriteSnapshotMessage(payload, requestId, mode, partIndex, partCount)
+        local fields = {}
+        for field in payload:gmatch("[^\t]+") do
+            fields[#fields + 1] = field
+        end
+        fields[3] = requestId or fields[3]
+        fields[4] = mode or fields[4]
+        fields[6] = tostring(partIndex or fields[6])
+        fields[7] = tostring(partCount or fields[7])
+        return table.concat(fields, "\t")
+    end
+
+    local pushTarget = newHarness()
+    pushTarget:installRaidStore({})
+    pushTarget.addon.IsInGroup = function()
+        return true
+    end
+    pushTarget.addon.IsInRaid = function()
+        return false
+    end
+    pushTarget:load("!KRT/Modules/Base64.lua")
+    pushTarget:load("!KRT/Core/DBSyncer.lua")
+
+    local badChunk = table.concat({ "SN", "1", "bad", "PUSH", "77", "2", "1", "corrupt" }, "\t")
+    pushTarget.addon.DB.Syncer:OnAddonMessage("KRTLogSync", badChunk, "WHISPER", "Alice")
+    assertEqual(#_G.KRT_Raids, 0, "expected malformed chunk metadata to avoid importing a raid")
+    assertContains(pushTarget.logs.warn, "Diag.W.LogSyncChunkMalformed", "expected malformed snapshot chunk to be reported")
+
+    local changedCountId = "changed-count"
+    local changedCountFirst = rewriteSnapshotMessage(snapshotMessages[1].payload, changedCountId, "PUSH", 1, #snapshotMessages)
+    local changedCountSecond = rewriteSnapshotMessage(snapshotMessages[1].payload, changedCountId, "PUSH", 1, #snapshotMessages + 1)
+    pushTarget.addon.DB.Syncer:OnAddonMessage(snapshotMessages[1].prefix, changedCountFirst, "WHISPER", "Alice")
+    pushTarget.addon.DB.Syncer:OnAddonMessage(snapshotMessages[1].prefix, changedCountSecond, "WHISPER", "Alice")
+    assertEqual(#_G.KRT_Raids, 0, "expected part-count changes to reset chunk assembly without import")
+    assertContains(pushTarget.logs.warn, "Diag.W.LogSyncChunkPartCountChanged", "expected part-count changes to be reported")
+
+    for i = 1, #snapshotMessages do
+        local msg = snapshotMessages[i]
+        pushTarget.addon.DB.Syncer:OnAddonMessage(msg.prefix, msg.payload, msg.channel, "Alice")
+    end
+
+    assertEqual(#_G.KRT_Raids, 1, "expected push snapshot to import one raid")
+    assertEqual(_G.KRT_Raids[1].players[1].name, "Alice", "expected imported push snapshot to preserve players")
+    assertEqual(_G.KRT_Raids[1].loot[1].rollValue, 98, "expected imported push snapshot to preserve loot roll values")
+    assertEqual(_G.KRT_Raids[1].changes.Alice, "Fire", "expected imported push snapshot to preserve changes")
+
+    local syncTarget = newHarness()
+    syncTarget:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 700,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            realm = "TestRealm",
+            startTime = 900,
+            players = {},
+            bossKills = {},
+            loot = {},
+            changes = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    syncTarget.Core.GetCurrentRaid = function()
+        return 1
+    end
+    syncTarget.addon.IsInGroup = function()
+        return true
+    end
+    syncTarget.addon.IsInRaid = function()
+        return false
+    end
+    syncTarget:load("!KRT/Modules/Base64.lua")
+    syncTarget:load("!KRT/Core/DBSyncer.lua")
+
+    local groupMessages = {}
+    syncTarget.addon.Comms.Sync = function(prefix, payload)
+        groupMessages[#groupMessages + 1] = {
+            prefix = prefix,
+            payload = payload,
+        }
+    end
+
+    assertTrue(syncTarget.addon.DB.Syncer:RequestLoggerSync() == true, "expected sync request to create pending state")
+    assertEqual(#groupMessages, 1, "expected one outgoing sync request")
+    local fields = {}
+    for field in groupMessages[1].payload:gmatch("[^\t]+") do
+        fields[#fields + 1] = field
+    end
+    local syncRequestId = fields[3]
+    assertTrue(syncTarget.addon.DB.Syncer._pendingRequests[syncRequestId] ~= nil, "expected sync request to be pending")
+
+    for i = 1, #snapshotMessages do
+        local msg = snapshotMessages[i]
+        local rewritten = rewriteSnapshotMessage(msg.payload, syncRequestId, "SYNC")
+        syncTarget.addon.DB.Syncer:OnAddonMessage(msg.prefix, rewritten, "RAID", "Officer")
+    end
+
+    local mergedRaid = _G.KRT_Raids[1]
+    assertEqual(#_G.KRT_Raids, 1, "expected requested sync to merge into the current raid")
+    assertEqual(mergedRaid.raidNid, 700, "expected requested sync to preserve the local raid nid")
+    assertEqual(mergedRaid.players[1].name, "Alice", "expected requested sync to merge players")
+    assertEqual(mergedRaid.loot[1].lootNid, 101, "expected requested sync to merge loot by nid")
+    assertEqual(mergedRaid.changes.Alice, "Fire", "expected requested sync to merge changes")
+    assertTrue(syncTarget.addon.DB.Syncer._pendingRequests[syncRequestId] == nil, "expected successful sync merge to complete the pending request")
+end)
+
 test("logger updates duplicate item entries by lootNid only", function()
     local h = newHarness()
     local link = h.registerItem(9001, "Twinblade")
@@ -2545,7 +3245,7 @@ test("logger updates duplicate item entries by lootNid only", function()
     local Logger = h.addon.Controllers.Logger
     local raid = h.Core.EnsureRaidById(1)
 
-    local ok = Logger.Loot:Log(102, "Alice", h.rollTypes.OFFSPEC, 22, "TEST_DUPLICATE", 1)
+    local ok = Logger.Loot:SetLootEntry(102, "Alice", h.rollTypes.OFFSPEC, 22, "TEST_DUPLICATE", 1)
     assertTrue(ok == true, "expected loot log update to succeed")
     assertEqual(raid.loot[1].looterNid, 1, "expected first duplicate entry to remain untouched")
     assertEqual(raid.loot[1].rollValue, 80, "expected first duplicate roll to remain untouched")
@@ -2554,7 +3254,7 @@ test("logger updates duplicate item entries by lootNid only", function()
     assertEqual(raid.loot[2].rollValue, 22, "expected second duplicate roll value to update")
 
     h.logs.error = {}
-    local bad = Logger.Loot:Log(9001, "Bob", h.rollTypes.FREE, 1, "TEST_RAW_ITEM_ID", 1)
+    local bad = Logger.Loot:SetLootEntry(9001, "Bob", h.rollTypes.FREE, 1, "TEST_RAW_ITEM_ID", 1)
     assertTrue(bad == false, "expected raw itemId logger update to fail")
     assertContains(h.logs.error, "expected lootNid but got raw itemId", "expected explicit raw itemId guard-rail log")
 end)
@@ -2597,7 +3297,7 @@ test("trade-only loot creates a reusable lootNid", function()
     assertTrue((tonumber(lootNid) or 0) > 0, "expected trade-only path to create a lootNid")
     assertEqual(Raid:GetLootNidByRollSessionId("roll-session-1", 1, "Alice", 10), lootNid, "expected rollSessionId lookup to resolve trade-only loot")
 
-    local ok = Logger.Loot:Log(lootNid, "Alice", h.rollTypes.RESERVED, 77, "TEST_TRADE_ONLY", 1)
+    local ok = Logger.Loot:SetLootEntry(lootNid, "Alice", h.rollTypes.RESERVED, 77, "TEST_TRADE_ONLY", 1)
     assertTrue(ok == true, "expected logger update to reuse trade-only lootNid")
 
     local raid = h.Core.EnsureRaidById(1)
@@ -2703,6 +3403,7 @@ end)
 test("loot receipts reuse short-lived boss event context even if lastBoss is cleared", function()
     local h = newHarness()
     local link = h.registerItem(9157, "Event Context Blade")
+    local currentTime = 1000
 
     h:installRaidStore({
         {
@@ -2718,6 +3419,12 @@ test("loot receipts reuse short-lived boss event context even if lastBoss is cle
     })
     h.addon.State.currentRaid = 1
     h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
     _G.GetLootMethod = function()
         return "master", nil, nil
     end
@@ -2744,6 +3451,742 @@ test("loot receipts reuse short-lived boss event context even if lastBoss is cle
     assertEqual(#raid.bossKills, 1, "expected event-context recovery to reuse the boss kill instead of creating TrashMob")
     assertEqual(raid.loot[1].bossNid, 1, "expected loot logging to attach to the boss carried by the event context")
     assertEqual(h.Core.GetLastBoss(), 1, "expected event-context recovery to restore lastBoss after an explicit clear")
+end)
+
+test("loot window snapshot keeps first boss loot after event context expires", function()
+    local h = newHarness()
+    local link = h.registerItem(9158, "Window Snapshot Blade")
+    local currentTime = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "loot-receive-self" then
+            return link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertEqual(Raid:AddBoss("Sapphiron"), 1, "expected the boss kill to create a boss context")
+
+    currentTime = 1005
+    assertEqual(
+        Raid:_EnsureLootWindowItemContext(1, {}, {
+            ttlSeconds = 60,
+            source = "LOOT_OPENED",
+        }),
+        1,
+        "expected loot window open to snapshot the boss context"
+    )
+
+    currentTime = 1040
+    h.feature.lootState.opened = true
+    h.feature.raidState.bossEventContext = nil
+    h.Core.SetLastBoss(nil)
+    Raid:AddLoot("loot-receive-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected the first delayed boss loot to avoid creating TrashMob")
+    assertEqual(raid.loot[1].bossNid, 1, "expected the delayed first boss loot to reuse the window snapshot")
+end)
+
+test("loot window source persists boss snapshot metadata into loot rows", function()
+    local h = newHarness()
+    local link = h.registerItem(91581, "Window Source Blade")
+    local itemKey = h.addon.Item.GetItemStringFromLink(link)
+    local currentTime = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "source-loot-self" then
+            return link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertEqual(Raid:AddBoss("Sapphiron"), 1, "expected the boss kill to create a boss context")
+
+    currentTime = 1005
+    assertEqual(
+        Raid:_EnsureLootWindowItemContext(1, {
+            { itemKey = itemKey, count = 1 },
+        }, {
+            ttlSeconds = 60,
+            source = "LOOT_OPENED",
+        }),
+        1,
+        "expected loot window open to create a boss snapshot source"
+    )
+
+    local source = Raid:GetActiveLootSource(1)
+    assertTrue(source ~= nil, "expected an active loot source after LOOT_OPENED")
+    assertEqual(source.kind, "boss", "expected the active loot source to classify the window as boss loot")
+    assertEqual(source.bossNid, 1, "expected the active loot source to keep the boss nid")
+    assertTrue((tonumber(source.snapshotId) or 0) > 0, "expected the active loot source to expose the item snapshot id")
+    assertEqual(source.openedAt, 1005, "expected the active loot source to keep the LOOT_OPENED timestamp")
+
+    h.feature.lootState.opened = true
+    currentTime = 1006
+    Raid:AddLoot("source-loot-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected the boss loot receipt to log one row")
+    assertTrue(type(raid.loot[1].lootSource) == "table", "expected the logged loot row to persist lootSource metadata")
+    assertEqual(raid.loot[1].lootSource.kind, "boss", "expected the logged loot row to keep the boss source kind")
+    assertEqual(raid.loot[1].lootSource.bossNid, 1, "expected the logged loot row to keep the boss source nid")
+    assertEqual(raid.loot[1].lootSource.snapshotId, source.snapshotId, "expected the logged loot row to retain the originating snapshot id")
+    assertEqual(raid.loot[1].lootSource.openedAt, 1005, "expected the logged loot row to retain the LOOT_OPENED timestamp")
+end)
+
+test("loot window keeps boss association for later boss items after event context expires", function()
+    local h = newHarness()
+    local firstLink = h.registerItem(9159, "First Boss Blade")
+    local secondLink = h.registerItem(9162, "Second Boss Blade")
+    local currentTime = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "loot-receive-first" then
+            return firstLink
+        end
+        if pattern == _G.LOOT_ITEM_SELF and msg == "loot-receive-second" then
+            return secondLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertEqual(Raid:AddBoss("Sapphiron"), 1, "expected the boss kill to create a boss context")
+
+    h.feature.lootState.opened = true
+    Raid:AddLoot("loot-receive-first")
+
+    currentTime = 1031
+    h.Core.SetLastBoss(nil)
+    Raid:AddLoot("loot-receive-second")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected later boss loot in the same window to avoid creating TrashMob")
+    assertEqual(#raid.loot, 2, "expected both boss loot items to be recorded")
+    assertEqual(raid.loot[1].bossNid, 1, "expected the first boss loot item to attach to the boss")
+    assertEqual(raid.loot[2].bossNid, 1, "expected the later boss loot item to reuse the loot-window boss context")
+end)
+
+test("trade-only loot reuses boss context captured for the award session", function()
+    local h = newHarness()
+    local link = h.registerItem(9163, "Trade Session Blade")
+    local currentTime = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertEqual(Raid:AddBoss("Sapphiron"), 1, "expected the boss kill to create a boss context")
+
+    currentTime = 1005
+    assertEqual(
+        Raid:_EnsureLootWindowItemContext(1, {}, {
+            ttlSeconds = 60,
+            source = "LOOT_OPENED",
+        }),
+        1,
+        "expected loot window open to snapshot the boss context"
+    )
+
+    currentTime = 1035
+    assertEqual(
+        Raid:FindAndRememberBossContextForLootSession(1, "RS:trade", {
+            allowLootWindowContext = true,
+            allowContextRecovery = false,
+            ttlSeconds = 60,
+        }),
+        1,
+        "expected the award session to capture the boss context from the loot window"
+    )
+
+    Raid:ClearLootWindowBossContext()
+    currentTime = 1045
+    local lootNid = Raid:LogTradeOnlyLoot(link, "Tester", h.rollTypes.HOLD, 0, 1, "TRADE_ONLY_TEST", 1, nil, "RS:trade")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertTrue((tonumber(lootNid) or 0) > 0, "expected the trade-only path to create a loot entry")
+    assertEqual(#raid.loot, 1, "expected the trade-only path to create one loot entry")
+    assertEqual(raid.loot[1].bossNid, 1, "expected the trade-only path to reuse the session boss context")
+end)
+
+test("reopening a partially looted boss corpse after trash reuses the original boss snapshot", function()
+    local h = newHarness()
+    local bossLink1 = h.registerItem(9164, "Boss Snapshot One")
+    local bossLink2 = h.registerItem(9165, "Boss Snapshot Two")
+    local bossLink3 = h.registerItem(9166, "Boss Snapshot Three")
+    local bossLink4 = h.registerItem(9167, "Boss Snapshot Four")
+    local trashLink = h.registerItem(9168, "Trash Snapshot One")
+    local currentTime = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "boss-loot-three" then
+            return bossLink3
+        end
+        if pattern == _G.LOOT_ITEM_SELF and msg == "boss-loot-four" then
+            return bossLink4
+        end
+        if pattern == _G.LOOT_ITEM_SELF and msg == "trash-loot-one" then
+            return trashLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+    local bossKey1 = h.addon.Item.GetItemStringFromLink(bossLink1)
+    local bossKey2 = h.addon.Item.GetItemStringFromLink(bossLink2)
+    local bossKey3 = h.addon.Item.GetItemStringFromLink(bossLink3)
+    local bossKey4 = h.addon.Item.GetItemStringFromLink(bossLink4)
+
+    assertEqual(Raid:AddBoss("Anub'Rekhan"), 1, "expected the boss kill to create a boss context")
+    currentTime = 1005
+    assertEqual(
+        Raid:_EnsureLootWindowItemContext(1, {
+            { itemKey = bossKey1, count = 1 },
+            { itemKey = bossKey2, count = 1 },
+            { itemKey = bossKey3, count = 1 },
+            { itemKey = bossKey4, count = 1 },
+        }, {
+            ttlSeconds = 60,
+            source = "LOOT_OPENED",
+        }),
+        1,
+        "expected the first boss open to snapshot the whole corpse loot"
+    )
+    Raid:_ConsumeLootWindowItemContext(bossLink1)
+    Raid:_ConsumeLootWindowItemContext(bossLink2)
+
+    Raid:ClearLootWindowBossContext()
+    h.feature.lootState.opened = true
+    currentTime = 1040
+    h.feature.raidState.bossEventContext = nil
+    h.Core.SetLastBoss(nil)
+    Raid:AddLoot("trash-loot-one")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected trash loot in the middle to be recorded")
+    assertEqual(raid.loot[1].bossNid, 2, "expected the interleaved trash loot to use TrashMob")
+
+    Raid:ClearLootWindowBossContext()
+    currentTime = 1025
+    h.feature.raidState.bossEventContext = nil
+    h.Core.SetLastBoss(nil)
+    assertEqual(
+        Raid:_EnsureLootWindowItemContext(1, {
+            { itemKey = bossKey3, count = 1 },
+            { itemKey = bossKey4, count = 1 },
+        }, {
+            ttlSeconds = 60,
+            source = "LOOT_OPENED",
+        }),
+        1,
+        "expected the reopened boss corpse to reactivate the original boss snapshot"
+    )
+
+    Raid:AddLoot("boss-loot-three")
+    Raid:AddLoot("boss-loot-four")
+
+    assertEqual(#raid.loot, 3, "expected the reopened boss corpse to add the remaining two boss items")
+    assertEqual(raid.loot[2].bossNid, 1, "expected the third logged item to return to the boss context")
+    assertEqual(raid.loot[3].bossNid, 1, "expected the fourth logged item to return to the boss context")
+end)
+
+test("loot window opened on trash blocks recent boss event recovery", function()
+    local h = newHarness()
+    local trashLink = h.registerItem(9169, "Trash Context Belt")
+    local trashKey = h.addon.Item.GetItemStringFromLink(trashLink)
+    local currentTime = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+
+    h.addon.BossIDs = {
+        BossIDs = {
+            [15953] = true,
+        },
+    }
+    h.addon.GetCreatureId = function(guid)
+        if guid == "Creature-0-0-0-0-15989-0000000000" then
+            return 15989
+        end
+        return 0
+    end
+    _G.UnitExists = function(unit)
+        return unit == "mouseover"
+    end
+    _G.UnitGUID = function(unit)
+        if unit == "mouseover" then
+            return "Creature-0-0-0-0-15989-0000000000"
+        end
+        return nil
+    end
+    _G.UnitName = function(unit)
+        if unit == "mouseover" then
+            return "Naxxramas Cultist"
+        end
+        return unit
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "trash-loot-self" then
+            return trashLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertEqual(Raid:AddBoss("Grand Widow Faerlina", nil, nil, 15953), 1, "expected the boss kill to create the recent boss event context")
+
+    h.feature.lootState.opened = true
+    assertEqual(
+        Raid:_EnsureLootWindowItemContext(1, {
+            { itemKey = trashKey, count = 1 },
+        }, {
+            ttlSeconds = 60,
+            source = "LOOT_OPENED",
+        }),
+        0,
+        "expected an explicit trash corpse open to block boss recovery"
+    )
+
+    Raid:AddLoot("trash-loot-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 2, "expected trash loot to create a TrashMob bucket instead of reusing the boss")
+    assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected the original boss entry to stay intact")
+    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected the opened trash corpse to stay on TrashMob")
+    assertEqual(raid.loot[1].bossNid, 2, "expected trash loot to avoid inheriting the recent boss context")
+end)
+
+test("loot window source classifies blocked non-boss opens as trash", function()
+    local h = newHarness()
+    local trashLink = h.registerItem(91691, "Trash Source Belt")
+    local trashKey = h.addon.Item.GetItemStringFromLink(trashLink)
+    local currentTime = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+
+    h.addon.BossIDs = {
+        BossIDs = {
+            [15953] = true,
+        },
+    }
+    h.addon.GetCreatureId = function(guid)
+        if guid == "Creature-0-0-0-0-15989-0000000000" then
+            return 15989
+        end
+        return 0
+    end
+    _G.UnitExists = function(unit)
+        return unit == "mouseover"
+    end
+    _G.UnitGUID = function(unit)
+        if unit == "mouseover" then
+            return "Creature-0-0-0-0-15989-0000000000"
+        end
+        return nil
+    end
+    _G.UnitName = function(unit)
+        if unit == "mouseover" then
+            return "Naxxramas Cultist"
+        end
+        return unit
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "trash-source-self" then
+            return trashLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertEqual(
+        Raid:_EnsureLootWindowItemContext(1, {
+            { itemKey = trashKey, count = 1 },
+        }, {
+            ttlSeconds = 60,
+            source = "LOOT_OPENED",
+        }),
+        0,
+        "expected an explicit trash corpse open to avoid boss snapshot creation"
+    )
+
+    local source = Raid:GetActiveLootSource(1)
+    assertTrue(source ~= nil, "expected a loot source even when the open is blocked for boss recovery")
+    assertEqual(source.kind, "trash", "expected blocked non-boss openings to classify as trash")
+    assertEqual(source.sourceNpcId, 15989, "expected trash loot source to preserve the source npc id")
+    assertEqual(source.sourceName, "Naxxramas Cultist", "expected trash loot source to preserve the source name")
+
+    h.feature.lootState.opened = true
+    Raid:AddLoot("trash-source-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(raid.loot[1].lootSource.kind, "trash", "expected trash loot rows to persist the trash source kind")
+    assertEqual(raid.loot[1].lootSource.bossNid, 1, "expected trash loot rows to bind lootSource to the TrashMob boss bucket")
+    assertEqual(raid.loot[1].lootSource.sourceNpcId, 15989, "expected trash loot rows to keep the source npc id")
+end)
+
+test("loot window mouseover boss resolves boss context without event recovery", function()
+    local h = newHarness()
+    local bossLink = h.registerItem(9170, "Faerlina Mantle")
+    local bossKey = h.addon.Item.GetItemStringFromLink(bossLink)
+    local currentTime = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+
+    h.addon.BossIDs = {
+        BossIDs = {
+            [15953] = true,
+        },
+    }
+    h.addon.GetCreatureId = function(guid)
+        if guid == "Creature-0-0-0-0-15953-0000000000" then
+            return 15953
+        end
+        return 0
+    end
+    _G.UnitExists = function(unit)
+        return unit == "mouseover"
+    end
+    _G.UnitGUID = function(unit)
+        if unit == "mouseover" then
+            return "Creature-0-0-0-0-15953-0000000000"
+        end
+        return nil
+    end
+    _G.UnitName = function(unit)
+        if unit == "mouseover" then
+            return "Grand Widow Faerlina"
+        end
+        return unit
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "boss-loot-self" then
+            return bossLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertEqual(Raid:AddBoss("Grand Widow Faerlina", nil, nil, 15953), 1, "expected the boss kill to be logged before the later loot open")
+
+    currentTime = 1040
+    h.feature.raidState.bossEventContext = nil
+    h.Core.SetLastBoss(nil)
+    h.feature.lootState.opened = true
+
+    assertEqual(
+        Raid:_EnsureLootWindowItemContext(1, {
+            { itemKey = bossKey, count = 1 },
+        }, {
+            ttlSeconds = 60,
+            source = "LOOT_OPENED",
+        }),
+        1,
+        "expected boss corpse mouseover to restore the boss context without event recovery"
+    )
+
+    Raid:AddLoot("boss-loot-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected no TrashMob fallback for a boss corpse open")
+    assertEqual(raid.loot[1].bossNid, 1, "expected the loot to stay attached to Grand Widow Faerlina")
+end)
+
+test("loot window source marks context-free openings as object", function()
+    local h = newHarness()
+    local link = h.registerItem(91701, "Object Source Ring")
+    local itemKey = h.addon.Item.GetItemStringFromLink(link)
+    local currentTime = 1000
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+    _G.UnitExists = function()
+        return false
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "object-source-self" then
+            return link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertEqual(
+        Raid:_EnsureLootWindowItemContext(1, {
+            { itemKey = itemKey, count = 1 },
+        }, {
+            ttlSeconds = 60,
+            source = "LOOT_OPENED",
+        }),
+        0,
+        "expected a context-free loot open to avoid inventing a boss snapshot"
+    )
+
+    local source = Raid:GetActiveLootSource(1)
+    assertTrue(source ~= nil, "expected a loot source even without a boss or corpse unit")
+    assertEqual(source.kind, "object", "expected context-free loot openings to classify as object")
+    assertEqual(source.snapshotId, nil, "expected context-free object openings to have no snapshot id")
+
+    h.feature.lootState.opened = true
+    Raid:AddLoot("object-source-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected object-source loot to log one row")
+    assertEqual(raid.loot[1].lootSource.kind, "object", "expected object-source loot rows to persist the object kind")
+    assertEqual(raid.loot[1].lootSource.bossNid, 0, "expected object-source loot rows to keep an unresolved lootSource boss nid")
 end)
 
 test("loot receipts do not recover boss context from the current target", function()
@@ -4139,6 +5582,242 @@ test("held loot lookup skips consumed duplicates and returns the next matching h
     assertEqual(Raid:GetHeldLootNid(link, 1, "Tester", 0), 1, "expected lookup to fall back to the remaining hold row after consumption")
 end)
 
+test("loot tracking snapshot exposes runtime and authoritative loot state", function()
+    local h = newHarness()
+    local windowLink = h.registerItem(9201, "Windowblade")
+    local historyLink = h.registerItem(9202, "Historyblade")
+    local historyItemString = h.addon.Item.GetItemStringFromLink(historyLink)
+    local windowItemString = h.addon.Item.GetItemStringFromLink(windowLink)
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {
+                { playerNid = 1, name = "Alice", count = 0 },
+            },
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {
+                {
+                    lootNid = 7,
+                    itemId = 9202,
+                    itemName = "Historyblade",
+                    itemString = historyItemString,
+                    itemLink = historyLink,
+                    itemRarity = 4,
+                    itemTexture = "icon-9202",
+                    itemCount = 2,
+                    looterNid = 1,
+                    rollType = h.rollTypes.MAINSPEC,
+                    rollValue = 88,
+                    rollSessionId = "RS:logged",
+                    bossNid = 10,
+                    time = 1234,
+                    source = "CHAT_MSG_LOOT",
+                },
+            },
+            nextPlayerNid = 2,
+            nextBossNid = 11,
+            nextLootNid = 8,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.addon.Services.Raid = {
+        GetPlayerName = function(_, playerNid)
+            if tonumber(playerNid) == 1 then
+                return "Alice"
+            end
+            return nil
+        end,
+    }
+
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetItemFamily = function()
+        return 0
+    end
+    _G.GetNumLootItems = function()
+        return 1
+    end
+    _G.LootSlotIsItem = function(slot)
+        return slot == 1
+    end
+    _G.GetLootSlotLink = function(slot)
+        if slot == 1 then
+            return windowLink
+        end
+        return nil
+    end
+    _G.GetLootSlotInfo = function(slot)
+        if slot == 1 then
+            return "icon-9201", "Windowblade", 1, 4, false, false, nil, true
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    local Loot = h.addon.Services.Loot
+
+    Loot:FetchLoot()
+    Loot:AddPendingAward(windowLink, "Alice", h.rollTypes.NEED, 91, "GL:1", 2000)
+
+    h.feature.lootState.rollSession = {
+        id = "RS:1",
+        itemKey = windowItemString,
+        itemId = 9201,
+        itemLink = windowLink,
+        rollType = h.rollTypes.MAINSPEC,
+        lootNid = 0,
+        bossNid = 10,
+        startedAt = 1000,
+        endsAt = nil,
+        source = "lootWindow",
+        expectedWinners = 1,
+        active = true,
+    }
+    h.feature.raidState.passiveLootRolls = {
+        byItemKey = {},
+        bySessionId = {
+            ["GL:1"] = {
+                rollId = 44,
+                itemLink = windowLink,
+                itemKey = windowItemString,
+                sessionId = "GL:1",
+                expiresAt = 1300,
+                bossNid = 10,
+            },
+        },
+        byRollId = {},
+        nextSessionId = 2,
+    }
+    h.feature.raidState.loggedPassiveLoot = {
+        [windowItemString .. "\001Alice"] = {
+            {
+                rollSessionId = "GL:1",
+                expiresAt = 1400,
+            },
+        },
+    }
+
+    local snapshot = Loot:GetTrackingSnapshot()
+
+    assertEqual(snapshot.schemaVersion, 1, "expected a stable tracking snapshot schema version")
+    assertEqual(snapshot.state.currentRaid, 1, "expected snapshot to target the current raid")
+    assertEqual(snapshot.window.items[1].itemLink, windowLink, "expected snapshot to include the current loot window item")
+    assertTrue(snapshot.window.items[1].selected == true, "expected current loot window item to be marked as selected")
+    assertEqual(snapshot.rolls.session.id, "RS:1", "expected snapshot to include the active roll session")
+    assertEqual(snapshot.rolls.pendingAwards[1].rollSessionId, "GL:1", "expected pending award snapshot to preserve roll session ids")
+    assertEqual(snapshot.rolls.passive.entries[1].sessionId, "GL:1", "expected passive loot snapshot to expose the passive roll session")
+    assertEqual(snapshot.rolls.loggedReceipts[1].looter, "Alice", "expected logged passive loot snapshot to expose the looter name")
+    assertEqual(snapshot.history.loot[1].looterName, "Alice", "expected history snapshot to resolve looter names")
+    assertEqual(snapshot.history.loot[1].bossName, "Sapphiron", "expected history snapshot to resolve boss names")
+end)
+
+test("loot window fetch defers item cache warming", function()
+    local h = newHarness()
+    local itemLink = h.registerItem(9202, "Deferred Cache Blade")
+    local warmed = {}
+
+    h.addon.Item.WarmItemCache = function(link)
+        warmed[#warmed + 1] = link
+    end
+
+    _G.GetItemFamily = function()
+        return 0
+    end
+    _G.GetNumLootItems = function()
+        return 1
+    end
+    _G.LootSlotIsItem = function(slot)
+        return slot == 1
+    end
+    _G.GetLootSlotLink = function(slot)
+        if slot == 1 then
+            return itemLink
+        end
+        return nil
+    end
+    _G.GetLootSlotInfo = function(slot)
+        if slot == 1 then
+            return "icon-9202", "Deferred Cache Blade", 1, 4, false, false, nil, true
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+
+    h.addon.Services.Loot:FetchLoot()
+
+    assertEqual(#warmed, 0, "expected loot fetch to avoid synchronous item cache warming")
+    assertEqual(h.timerCount(), 1, "expected deferred item cache warming to schedule one timer")
+
+    h:flushTimers()
+
+    assertEqual(#warmed, 1, "expected deferred item cache warming to run after the timer")
+    assertEqual(warmed[1], itemLink, "expected deferred item cache warming to preserve the item link")
+    assertEqual(h.timerCount(), 0, "expected item cache warm queue to drain")
+end)
+
+test("loot tracking snapshot includes master loot candidates by slot", function()
+    local h = newHarness()
+    local itemLink = h.registerItem(9203, "Masterblade")
+
+    h.addon.GetNumGroupMembers = function()
+        return 2
+    end
+    _G.GetLootMethod = function()
+        return "master", 3, 0
+    end
+    _G.GetMasterLootCandidate = function(slotOrIndex, index)
+        local candidates = { "Alice", "Bob" }
+        if index == nil then
+            return candidates[slotOrIndex]
+        end
+        if slotOrIndex == 1 then
+            return candidates[index]
+        end
+        return nil
+    end
+    _G.GetItemFamily = function()
+        return 0
+    end
+    _G.GetNumLootItems = function()
+        return 1
+    end
+    _G.LootSlotIsItem = function(slot)
+        return slot == 1
+    end
+    _G.GetLootSlotLink = function(slot)
+        if slot == 1 then
+            return itemLink
+        end
+        return nil
+    end
+    _G.GetLootSlotInfo = function(slot)
+        if slot == 1 then
+            return "icon-9203", "Masterblade", 1, 4, false, false, nil, true
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    local Loot = h.addon.Services.Loot
+
+    Loot:FetchLoot()
+    local snapshot = Loot:GetTrackingSnapshot()
+
+    assertEqual(snapshot.masterLoot.method, "master", "expected snapshot to expose the active master loot method")
+    assertEqual(snapshot.masterLoot.masterLooterPartyId, 3, "expected snapshot to preserve master looter metadata")
+    assertEqual(#snapshot.masterLoot.slots, 1, "expected snapshot to expose one master loot slot")
+    assertEqual(snapshot.masterLoot.slots[1].slot, 1, "expected snapshot to resolve the underlying loot slot index")
+    assertEqual(snapshot.masterLoot.slots[1].candidates[2].name, "Bob", "expected snapshot to expose per-slot master loot candidates")
+end)
+
 test("single winner ctrl-click clears and replaces the prefilled multiselect winner", function()
     local h = newHarness()
     local link = h.registerItem(9300, "Winnerblade")
@@ -4180,7 +5859,7 @@ test("single winner ctrl-click clears and replaces the prefilled multiselect win
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -4239,7 +5918,7 @@ test("accepted roll stays eligible after using the last allowed roll", function(
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -4297,7 +5976,7 @@ test("late accepted rolls show OOT info when intake remains open", function()
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -4359,7 +6038,7 @@ test("late tied OOT rolls stay excluded from manual resolution and reroll", func
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -4475,7 +6154,7 @@ test("master roll intake reopens after announcing rolls with service-owned sessi
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
     h:load("!KRT/Controllers/Master.lua")
 
     local Master = h.addon.Controllers.Master
@@ -4609,6 +6288,163 @@ test("master assignment buttons stay disabled until a target is selected", funct
     assertEqual(_G.KRTMasterHoldBtn._enabled, true, "expected Hold to enable when a holder is selected")
     assertEqual(_G.KRTMasterBankBtn._enabled, true, "expected Bank to enable when a banker is selected")
     assertEqual(_G.KRTMasterDisenchantBtn._enabled, false, "expected Disenchant to stay disabled without a target")
+end)
+
+test("master dropdown click uses UIDropDown owner/value arguments", function()
+    local h = newHarness()
+    local raid = {
+        holder = nil,
+        banker = nil,
+        disenchanter = nil,
+    }
+
+    h.addon.Services.Loot = {
+        GetItem = function()
+            return nil
+        end,
+        ItemExists = function()
+            return false
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 1
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
+
+    h.addon.UnitIterator = function()
+        local emitted = false
+        return function()
+            if emitted then
+                return nil
+            end
+            emitted = true
+            return "raid1"
+        end
+    end
+
+    _G.UnitName = function(unit)
+        if unit == "raid1" then
+            return "Elenwen"
+        end
+        return nil
+    end
+
+    _G.GetRaidRosterInfo = function(index)
+        if index == 1 then
+            return "Elenwen", nil, 1
+        end
+        return nil
+    end
+
+    h.Core.GetRaidStoreOrNil = function()
+        return {
+            GetRaidByIndex = function(_, raidId)
+                if raidId == 1 then
+                    return raid
+                end
+                return nil
+            end,
+        }
+    end
+
+    local capturedSelectionInfo = nil
+    _G.UIDropDownMenu_AddButton = function(info, level)
+        if level == 2 and info and info.text == "Elenwen" then
+            capturedSelectionInfo = info
+        end
+    end
+
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Controllers/Master.lua")
+
+    local Master = h.addon.Controllers.Master
+    local frame = h.makeFrame(true, "KRTMaster")
+    local suffixes = {
+        "ConfigBtn",
+        "SelectItemBtn",
+        "SpamLootBtn",
+        "MSBtn",
+        "OSBtn",
+        "SRBtn",
+        "FreeBtn",
+        "CountdownBtn",
+        "AwardBtn",
+        "RollBtn",
+        "ClearBtn",
+        "HoldBtn",
+        "BankBtn",
+        "DisenchantBtn",
+        "Name",
+        "RollsHeaderPlayer",
+        "RollsHeaderInfo",
+        "RollsHeaderCounter",
+        "RollsHeaderRoll",
+        "ReserveListBtn",
+        "LootCounterBtn",
+        "ItemCount",
+        "HoldDropDown",
+        "BankDropDown",
+        "DisenchantDropDown",
+        "ScrollFrame",
+        "ScrollFrameScrollChild",
+        "ItemBtn",
+    }
+
+    _G.KRTMaster = frame
+    for i = 1, #suffixes do
+        local name = "KRTMaster" .. suffixes[i]
+        _G[name] = h.makeFrame(true, name)
+    end
+    _G.KRTMasterHoldDropDownButton = h.makeFrame(true, "KRTMasterHoldDropDownButton")
+    _G.KRTMasterBankDropDownButton = h.makeFrame(true, "KRTMasterBankDropDownButton")
+    _G.KRTMasterDisenchantDropDownButton = h.makeFrame(true, "KRTMasterDisenchantDropDownButton")
+
+    Master.RequestRefresh = function() end
+    Master:OnLoad(frame)
+    Master:Refresh()
+
+    local holdDropDown = _G.KRTMasterHoldDropDown
+    assertTrue(type(holdDropDown._initialize) == "function", "expected Hold dropdown to be initialized")
+    UIDROPDOWNMENU_OPEN_MENU = holdDropDown
+    UIDROPDOWNMENU_MENU_LEVEL = 2
+    UIDROPDOWNMENU_MENU_VALUE = 1
+    holdDropDown._initialize()
+
+    assertTrue(capturedSelectionInfo ~= nil, "expected level-2 dropdown info for the raid member")
+
+    local listButton = h.makeFrame(true, "DropDownList2Button4")
+    capturedSelectionInfo.func(listButton, capturedSelectionInfo.arg1, capturedSelectionInfo.arg2)
+
+    assertEqual(holdDropDown._dropdownText, "Elenwen", "expected dropdown text to use the selected player")
+    assertEqual(holdDropDown._selectedValue, "Elenwen", "expected dropdown selected value to use the player")
+    assertEqual(h.feature.lootState.holder, "Elenwen", "expected holder state to track dropdown selection")
+    assertEqual(raid.holder, "Elenwen", "expected raid holder field to persist dropdown selection")
 end)
 
 test("master item count bindings use shared edit-box handlers", function()
@@ -5024,7 +6860,7 @@ test("manual exclusion blocks candidate eligibility and roll intake", function()
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -5083,7 +6919,7 @@ test("explicit pass stays visible without entering winner resolution", function(
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -5151,7 +6987,7 @@ test("explicit pass can transition back into a valid roll while the session stay
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -5205,7 +7041,7 @@ test("validate winner rejects explicit pass with a service-owned denial reason",
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -5264,7 +7100,7 @@ test("cancelled response keeps raw roll history but leaves current resolution", 
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -5330,7 +7166,7 @@ test("validate winner allows non-roll assignment targets without an active roll 
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -5375,7 +7211,7 @@ test("cancelled responses can roll again while the session stays open", function
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -5439,7 +7275,7 @@ test("timed out responses stay terminal for the current session", function()
     h.feature.Services = h.addon.Services
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -5499,7 +7335,7 @@ test("tie reroll resets intake to tied players only", function()
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -5778,7 +7614,7 @@ test("row info tags stay separate from counter values", function()
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -5840,7 +7676,7 @@ test("inventory winner stays undecorated in the pure rolls service model", funct
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -5905,7 +7741,7 @@ test("inventory multi winners stay undecorated in the pure rolls service model",
 
     h:load("!KRT/Modules/UI/MultiSelect.lua")
     h.feature.MultiSelect = h.addon.MultiSelect
-    h:load("!KRT/Services/Rolls.lua")
+    h:load("!KRT/Services/Rolls/Service.lua")
 
     local Rolls = h.addon.Services.Rolls
     h.feature.lootState.lootCount = 1
@@ -6067,7 +7903,7 @@ test("reserves item-info updates coalesce into a single refresh", function()
     }
     h:load("!KRT/Services/Reserves.lua")
 
-    local Service = h.addon.Services.Reserves.Service
+    local Service = h.addon.Services.Reserves
     Service:Load()
 
     local updated, missingCount = Service:QueryMissingItems(true)
@@ -6128,7 +7964,7 @@ test("reserves format supports filtering to current raid players", function()
     h:load("!KRT/Services/Reserves.lua")
 
     local Reserves = h.addon.Services.Reserves
-    local Service = Reserves.Service
+    local Service = Reserves
     Service:Load()
 
     local allPlayers = Service:FormatReservedPlayersLine(1201, false, false, false)

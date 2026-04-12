@@ -29,27 +29,12 @@ local UI = addon.UI
 -- =========== Slash Commands  =========== --
 local module = {}
 
-local function getSyncerService()
-    if Core.GetSyncer then
-        return Core.GetSyncer()
+local function getCoreService(getterName)
+    local getter = Core and Core[getterName]
+    if type(getter) == "function" then
+        return getter()
     end
     return nil
-end
-
-local function getRaidValidatorService()
-    if Core.GetRaidValidator then
-        return Core.GetRaidValidator()
-    end
-    return nil
-end
-
-local function getDebugService()
-    local services = addon.Services
-    return services and services.Debug or nil
-end
-
-local function getRaidService()
-    return Services and Services.Raid or nil
 end
 
 local function formatValidateRaidDetail(entry)
@@ -111,18 +96,10 @@ end
 -- ----- Internal state ----- --
 module.sub = module.sub or {}
 
-local cmdAchiev = { "ach", "achi", "achiev", "achievement" }
-local cmdLFM = { "pug", "lfm", "group", "grouper" }
-local cmdConfig = { "config", "conf", "options", "opt" }
-local cmdChanges = { "ms", "changes", "mschanges" }
-local cmdWarnings = { "warning", "warnings", "warn", "rw" }
-local cmdLogger = { "logger", "history", "log" }
-local cmdDebug = { "debug", "dbg", "debugger" }
-local cmdLoot = { "loot", "ml", "master" }
-local cmdCounter = { "counter", "counters", "counts" }
-local cmdReserves = { "res", "reserves", "reserve" }
-local cmdMinimap = { "minimap", "mm" }
-local cmdValidate = { "validate" }
+local cmdAchiev, cmdLFM, cmdConfig = { "ach", "achi", "achiev", "achievement" }, { "pug", "lfm", "group", "grouper" }, { "config", "conf", "options", "opt" }
+local cmdChanges, cmdWarnings, cmdLogger = { "ms", "changes", "mschanges" }, { "warning", "warnings", "warn", "rw" }, { "logger", "history", "log" }
+local cmdDebug, cmdLoot, cmdCounter = { "debug", "dbg", "debugger" }, { "loot", "ml", "master" }, { "counter", "counters", "counts" }
+local cmdReserves, cmdMinimap, cmdValidate = { "res", "reserves", "reserve" }, { "minimap", "mm" }, { "validate" }
 local lootOnlySlashCommands = {}
 
 local function markLootOnlyCommands(list)
@@ -134,9 +111,9 @@ local function markLootOnlyCommands(list)
     end
 end
 
-markLootOnlyCommands(cmdLoot)
-markLootOnlyCommands(cmdCounter)
-markLootOnlyCommands(cmdReserves)
+for _, commandList in ipairs({ cmdLoot, cmdCounter, cmdReserves }) do
+    markLootOnlyCommands(commandList)
+end
 
 -- ----- Private helpers ----- --
 local helpString = "%s: %s"
@@ -166,21 +143,23 @@ local function showDebugRaidHelp()
     printHelp("roll <1-4|name> [1-100]", L.StrCmdDebugRaidRoll)
 end
 
+local debugNoActiveRollReasons = {
+    record_inactive = true,
+    missing_item = true,
+    session_inactive = true,
+}
+
 local function reportDebugRaidError(reason, playerRef)
     if reason == "no_current_raid" then
         addon:warn(L.MsgDebugRaidNoCurrent)
         return
     end
-    if reason == "invalid_player" then
+    if reason == "invalid_player" or reason == "unknown_player" then
         addon:warn(L.MsgDebugRaidUnknownPlayer, tostring(playerRef or "?"))
         return
     end
     if reason == "invalid_roll" then
         addon:warn(L.MsgDebugRaidInvalidRoll)
-        return
-    end
-    if reason == "unknown_player" then
-        addon:warn(L.MsgDebugRaidUnknownPlayer, tostring(playerRef or "?"))
         return
     end
     if reason == "raid_service_unavailable" then
@@ -191,11 +170,114 @@ local function reportDebugRaidError(reason, playerRef)
         addon:warn(L.MsgFeatureUnavailable, "Debug", "rolls")
         return
     end
-    if reason == "record_inactive" or reason == "missing_item" or reason == "session_inactive" then
+    if debugNoActiveRollReasons[reason] then
         addon:warn(L.MsgDebugRaidNoActiveRoll)
         return
     end
     addon:warn(L.MsgDebugRaidRollRejected, tostring(playerRef or "?"), tostring(reason or "unknown"))
+end
+
+local function handleDebugRaidCommand(arg)
+    local raidCmd, raidArg = Strings.SplitArgs(arg)
+    local result
+    local err
+    local playerRef
+    local rollArg
+
+    local debugService = Services and Services.Debug or nil
+    if not debugService then
+        addon:warn(L.MsgFeatureUnavailable, "Debug", "raid")
+        return
+    end
+
+    if raidCmd == "" then
+        raidCmd = nil
+    end
+    if not raidCmd or raidCmd == "help" then
+        showDebugRaidHelp()
+        return
+    end
+
+    if raidCmd == "seed" or raidCmd == "add" then
+        result, err = debugService:SeedRaidPlayers()
+        if not result then
+            reportDebugRaidError(err)
+            return
+        end
+        addon:info(L.MsgDebugRaidSeeded, result.total, result.added, result.refreshed)
+        return
+    end
+
+    if raidCmd == "clear" or raidCmd == "reset" then
+        result, err = debugService:ClearRaidPlayers()
+        if not result then
+            reportDebugRaidError(err)
+            return
+        end
+        addon:info(L.MsgDebugRaidCleared, result.removed, result.blocked)
+        if result.clearedRolls then
+            addon:info(L.MsgDebugRaidClearResetRolls)
+        end
+        return
+    end
+
+    if raidCmd == "rolls" or raidCmd == "all" then
+        local rollsMode, rollsModeExtra = Strings.SplitArgs(raidArg)
+        if rollsMode == "" then
+            rollsMode = nil
+        end
+        if (rollsMode and rollsMode ~= "tie") or (rollsModeExtra and rollsModeExtra ~= "") then
+            showDebugRaidHelp()
+            return
+        end
+
+        result, err = debugService:RequestRaidRolls(rollsMode)
+        if not result then
+            reportDebugRaidError(err)
+            return
+        end
+        if result.submitted <= 0 and result.firstFailure then
+            if debugNoActiveRollReasons[result.firstFailure] then
+                reportDebugRaidError(result.firstFailure)
+            else
+                addon:warn(L.MsgDebugRaidRollsPartial, result.submitted, result.total, tostring(result.firstFailure))
+            end
+            return
+        end
+        if result.failed > 0 and result.firstFailure then
+            addon:warn(L.MsgDebugRaidRollsPartial, result.submitted, result.total, tostring(result.firstFailure))
+            return
+        end
+        if result.tieMode then
+            addon:info(L.MsgDebugRaidRollsTie, result.submitted, result.total, tonumber(result.tieCount) or 0, tonumber(result.tieRoll) or 0)
+        else
+            addon:info(L.MsgDebugRaidRolls, result.submitted, result.total)
+        end
+        return
+    end
+
+    if raidCmd == "roll" then
+        playerRef, rollArg = Strings.SplitArgs(raidArg)
+        if not playerRef or playerRef == "" then
+            showDebugRaidHelp()
+            return
+        end
+
+        result, err = debugService:RollRaidPlayer(playerRef, rollArg)
+        if not result then
+            reportDebugRaidError(err, playerRef)
+            return
+        end
+        if not result.ok then
+            reportDebugRaidError(result.reason, result.name)
+            return
+        end
+
+        addon:info(L.MsgDebugRaidRollSingle, result.name, result.roll)
+        return
+    end
+
+    showDebugRaidHelp()
 end
 
 local function getFeatureProfile()
@@ -234,44 +316,31 @@ local function registerAliases(list, fn)
     end
 end
 
--- ----- Public methods ----- --
-function module:Register(cmd, fn)
-    self.sub[cmd] = fn
+local function isBlank(value)
+    return not value or value == ""
 end
 
-function module:Handle(msg)
-    if not msg or msg == "" then
-        showHelp()
-        return
-    end
-
-    local cmd, rest = Strings.SplitArgs(msg)
-    if not cmd or cmd == "" then
-        showHelp()
-        return
-    end
-
-    local requiresLootAccess = (cmd == "show" or cmd == "toggle" or lootOnlySlashCommands[cmd] == true)
-    local raid = getRaidService()
-    if requiresLootAccess and raid and raid.EnsureMasterOnlyAccess and not raid:EnsureMasterOnlyAccess() then
-        return
-    end
-
-    if cmd == "show" or cmd == "toggle" then
-        Core.RequestControllerMethod("Master", "Toggle")
-        return
-    end
-    local fn = self.sub[cmd]
-    if fn then
-        return fn(rest, cmd, msg)
-    end
-    showHelp()
+local function isToggleCommand(sub)
+    return isBlank(sub) or sub == "toggle"
 end
 
-registerAliases(cmdDebug, function(rest)
+local function callSyncerMethod(methodName, ...)
+    local syncer = getCoreService("GetSyncer")
+    local method = syncer and syncer[methodName]
+    if type(method) == "function" then
+        return method(syncer, ...)
+    end
+    return nil
+end
+
+local function callSyncerMethodWithTarget(methodName, args)
+    local raidRefArg, targetArg = Strings.SplitArgs(args)
+    callSyncerMethod(methodName, tonumber(raidRefArg), targetArg)
+end
+
+local function handleDebugCommand(rest)
     local subCmd, arg = Strings.SplitArgs(rest)
-    local debugService
-    if subCmd == "" then
+    if isBlank(subCmd) then
         subCmd = nil
     end
 
@@ -341,106 +410,7 @@ registerAliases(cmdDebug, function(rest)
     end
 
     if subCmd == "raid" or subCmd == "players" then
-        local raidCmd, raidArg = Strings.SplitArgs(arg)
-        local result
-        local err
-        local playerRef
-        local rollArg
-
-        debugService = getDebugService()
-        if not debugService then
-            addon:warn(L.MsgFeatureUnavailable, "Debug", "raid")
-            return
-        end
-
-        if raidCmd == "" then
-            raidCmd = nil
-        end
-        if not raidCmd or raidCmd == "help" then
-            showDebugRaidHelp()
-            return
-        end
-
-        if raidCmd == "seed" or raidCmd == "add" then
-            result, err = debugService:SeedRaidPlayers()
-            if not result then
-                reportDebugRaidError(err)
-                return
-            end
-            addon:info(L.MsgDebugRaidSeeded, result.total, result.added, result.refreshed)
-            return
-        end
-
-        if raidCmd == "clear" or raidCmd == "reset" then
-            result, err = debugService:ClearRaidPlayers()
-            if not result then
-                reportDebugRaidError(err)
-                return
-            end
-            addon:info(L.MsgDebugRaidCleared, result.removed, result.blocked)
-            if result.clearedRolls then
-                addon:info(L.MsgDebugRaidClearResetRolls)
-            end
-            return
-        end
-
-        if raidCmd == "rolls" or raidCmd == "all" then
-            local rollsMode, rollsModeExtra = Strings.SplitArgs(raidArg)
-            if rollsMode == "" then
-                rollsMode = nil
-            end
-            if (rollsMode and rollsMode ~= "tie") or (rollsModeExtra and rollsModeExtra ~= "") then
-                showDebugRaidHelp()
-                return
-            end
-
-            result, err = debugService:RequestRaidRolls(rollsMode)
-            if not result then
-                reportDebugRaidError(err)
-                return
-            end
-            if result.submitted <= 0 and result.firstFailure then
-                if result.firstFailure == "record_inactive" or result.firstFailure == "missing_item" or result.firstFailure == "session_inactive" then
-                    reportDebugRaidError(result.firstFailure)
-                else
-                    addon:warn(L.MsgDebugRaidRollsPartial, result.submitted, result.total, tostring(result.firstFailure))
-                end
-                return
-            end
-            if result.failed > 0 and result.firstFailure then
-                addon:warn(L.MsgDebugRaidRollsPartial, result.submitted, result.total, tostring(result.firstFailure))
-                return
-            end
-            if result.tieMode then
-                addon:info(L.MsgDebugRaidRollsTie, result.submitted, result.total, tonumber(result.tieCount) or 0, tonumber(result.tieRoll) or 0)
-            else
-                addon:info(L.MsgDebugRaidRolls, result.submitted, result.total)
-            end
-            return
-        end
-
-        if raidCmd == "roll" then
-            playerRef, rollArg = Strings.SplitArgs(raidArg)
-            if not playerRef or playerRef == "" then
-                showDebugRaidHelp()
-                return
-            end
-
-            result, err = debugService:RollRaidPlayer(playerRef, rollArg)
-            if not result then
-                reportDebugRaidError(err, playerRef)
-                return
-            end
-            if not result.ok then
-                reportDebugRaidError(result.reason, result.name)
-                return
-            end
-
-            addon:info(L.MsgDebugRaidRollSingle, result.name, result.roll)
-            return
-        end
-
-        showDebugRaidHelp()
+        handleDebugRaidCommand(arg)
         return
     end
 
@@ -457,9 +427,9 @@ registerAliases(cmdDebug, function(rest)
     else
         addon:info(L.MsgDebugOff)
     end
-end)
+end
 
-registerAliases(cmdMinimap, function(rest)
+local function handleMinimapCommand(rest)
     local sub, arg = Strings.SplitArgs(rest)
     if sub == "on" then
         Options.SetOption("minimapButton", true)
@@ -481,9 +451,9 @@ registerAliases(cmdMinimap, function(rest)
         printHelp("off", L.StrCmdToggle)
         printHelp("pos <deg>", L.StrCmdMinimapPos)
     end
-end)
+end
 
-registerAliases(cmdAchiev, function(_, _, raw)
+local function handleAchievementCommand(_, _, raw)
     if not raw or not raw:find("achievement:%d*:") then
         addon:info(format(L.StrCmdCommands, "krt ach"), "KRT")
         return
@@ -497,20 +467,20 @@ registerAliases(cmdAchiev, function(_, _, raw)
     from, to = raw:find("%|cffffff00%|Hachievement%:.*%]%|h%|r")
     local name = (from and to) and raw:sub(from, to) or ""
     printHelp("KRT", name .. " - ID#" .. id)
-end)
+end
 
-registerAliases(cmdConfig, function(rest)
+local function handleConfigCommand(rest)
     local sub = Strings.SplitArgs(rest)
     if sub == "reset" then
         callWidget("Config", "Default")
     else
         callWidget("Config", "Toggle")
     end
-end)
+end
 
-registerAliases(cmdWarnings, function(rest)
+local function handleWarningsCommand(rest)
     local sub = Strings.SplitArgs(rest)
-    if not sub or sub == "" or sub == "toggle" then
+    if isToggleCommand(sub) then
         Core.RequestControllerMethod("Warnings", "Toggle")
     elseif sub == "help" then
         addon:info(format(L.StrCmdCommands, "krt rw"), "KRT")
@@ -519,11 +489,11 @@ registerAliases(cmdWarnings, function(rest)
     else
         Core.RequestControllerMethod("Warnings", "Announce", sub)
     end
-end)
+end
 
-registerAliases(cmdChanges, function(rest)
+local function handleChangesCommand(rest)
     local sub = Strings.SplitArgs(rest)
-    if not sub or sub == "" or sub == "toggle" then
+    if isToggleCommand(sub) then
         Core.RequestControllerMethod("Changes", "Toggle")
     elseif sub == "demand" or sub == "ask" then
         Core.RequestControllerMethod("Changes", "Demand")
@@ -535,29 +505,18 @@ registerAliases(cmdChanges, function(rest)
         printHelp("demand", L.StrCmdChangesDemand)
         printHelp("announce", L.StrCmdChangesAnnounce)
     end
-end)
+end
 
-registerAliases(cmdLogger, function(rest)
+local function handleLoggerCommand(rest)
     local sub, arg = Strings.SplitArgs(rest)
-    if not sub or sub == "" or sub == "toggle" then
+    if isToggleCommand(sub) then
         Core.RequestControllerMethod("Logger", "Toggle")
     elseif sub == "req" then
-        local raidRefArg, targetArg = Strings.SplitArgs(arg)
-        local syncer = getSyncerService()
-        if syncer and syncer.RequestLoggerReq then
-            syncer:RequestLoggerReq(tonumber(raidRefArg), targetArg)
-        end
+        callSyncerMethodWithTarget("RequestLoggerReq", arg)
     elseif sub == "push" then
-        local raidRefArg, targetArg = Strings.SplitArgs(arg)
-        local syncer = getSyncerService()
-        if syncer and syncer.BroadcastLoggerPush then
-            syncer:BroadcastLoggerPush(tonumber(raidRefArg), targetArg)
-        end
+        callSyncerMethodWithTarget("BroadcastLoggerPush", arg)
     elseif sub == "sync" then
-        local syncer = getSyncerService()
-        if syncer and syncer.RequestLoggerSync then
-            syncer:RequestLoggerSync()
-        end
+        callSyncerMethod("RequestLoggerSync")
     else
         addon:info(format(L.StrCmdCommands, "krt logger"), "KRT")
         printHelp("toggle", L.StrCmdToggle)
@@ -565,25 +524,25 @@ registerAliases(cmdLogger, function(rest)
         printHelp("push <raidId|raidNid> <player>", L.StrCmdLoggerPush)
         printHelp("sync", L.StrCmdLoggerSync)
     end
-end)
+end
 
-registerAliases(cmdLoot, function(rest)
+local function handleLootCommand(rest)
     local sub = Strings.SplitArgs(rest)
-    if not sub or sub == "" or sub == "toggle" then
+    if isToggleCommand(sub) then
         Core.RequestControllerMethod("Master", "Toggle")
     end
-end)
+end
 
-registerAliases(cmdCounter, function(rest)
+local function handleCounterCommand(rest)
     local sub = Strings.SplitArgs(rest)
-    if not sub or sub == "" or sub == "toggle" then
+    if isToggleCommand(sub) then
         callWidget("LootCounter", "Toggle")
     end
-end)
+end
 
-registerAliases(cmdReserves, function(rest)
+local function handleReservesCommand(rest)
     local sub = Strings.SplitArgs(rest)
-    if not sub or sub == "" or sub == "toggle" then
+    if isToggleCommand(sub) then
         callWidget("Reserves", "Toggle")
     elseif sub == "import" then
         callWidget("Reserves", "ToggleImport")
@@ -592,13 +551,13 @@ registerAliases(cmdReserves, function(rest)
         printHelp("toggle", L.StrCmdToggle)
         printHelp("import", L.StrCmdReservesImport)
     end
-end)
+end
 
-registerAliases(cmdValidate, function(rest)
+local function handleValidateCommand(rest)
     local sub, arg = Strings.SplitArgs(rest)
     if sub == "raids" then
         local verboseArg = Strings.SplitArgs(arg)
-        local validator = getRaidValidatorService()
+        local validator = getCoreService("GetRaidValidator")
         if not (validator and validator.ValidateAllRaids) then
             addon:warn(L.MsgValidateUnavailable)
             return
@@ -655,11 +614,11 @@ registerAliases(cmdValidate, function(rest)
         addon:info(format(L.StrCmdCommands, "krt validate"), "KRT")
         printHelp("raids [verbose]", L.StrCmdValidateRaids)
     end
-end)
+end
 
-registerAliases(cmdLFM, function(rest)
+local function handleLfmCommand(rest)
     local sub = Strings.SplitArgs(rest)
-    if not sub or sub == "" or sub == "toggle" or sub == "show" then
+    if isToggleCommand(sub) or sub == "show" then
         Core.RequestControllerMethod("Spammer", "Toggle")
     elseif sub == "start" then
         Core.RequestControllerMethod("Spammer", "Start")
@@ -671,7 +630,54 @@ registerAliases(cmdLFM, function(rest)
         printHelp("start", L.StrCmdLFMStart)
         printHelp("stop", L.StrCmdLFMStop)
     end
-end)
+end
+
+-- ----- Public methods ----- --
+function module:Register(cmd, fn)
+    self.sub[cmd] = fn
+end
+
+function module:Handle(msg)
+    if isBlank(msg) then
+        showHelp()
+        return
+    end
+
+    local cmd, rest = Strings.SplitArgs(msg)
+    if isBlank(cmd) then
+        showHelp()
+        return
+    end
+
+    local requiresLootAccess = (cmd == "show" or cmd == "toggle" or lootOnlySlashCommands[cmd] == true)
+    local raid = Services and Services.Raid or nil
+    if requiresLootAccess and raid and raid.EnsureMasterOnlyAccess and not raid:EnsureMasterOnlyAccess() then
+        return
+    end
+
+    if cmd == "show" or cmd == "toggle" then
+        Core.RequestControllerMethod("Master", "Toggle")
+        return
+    end
+    local fn = self.sub[cmd]
+    if fn then
+        return fn(rest, cmd, msg)
+    end
+    showHelp()
+end
+
+registerAliases(cmdDebug, handleDebugCommand)
+registerAliases(cmdMinimap, handleMinimapCommand)
+registerAliases(cmdAchiev, handleAchievementCommand)
+registerAliases(cmdConfig, handleConfigCommand)
+registerAliases(cmdWarnings, handleWarningsCommand)
+registerAliases(cmdChanges, handleChangesCommand)
+registerAliases(cmdLogger, handleLoggerCommand)
+registerAliases(cmdLoot, handleLootCommand)
+registerAliases(cmdCounter, handleCounterCommand)
+registerAliases(cmdReserves, handleReservesCommand)
+registerAliases(cmdValidate, handleValidateCommand)
+registerAliases(cmdLFM, handleLfmCommand)
 
 -- Register slash commands
 SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"

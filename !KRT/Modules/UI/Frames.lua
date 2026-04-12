@@ -580,6 +580,18 @@ function UIScaffold.BootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
     return uiController
 end
 
+function UIScaffold.EnsureModuleUi(mod)
+    mod._ui = mod._ui or {
+        Loaded = false,
+        Bound = false,
+        Localized = false,
+        Dirty = true,
+        Reason = nil,
+        FrameName = nil,
+    }
+    return mod._ui
+end
+
 function UIScaffold.DefineModuleUi(cfg)
     cfg = cfg or {}
     local module = cfg.module
@@ -613,15 +625,7 @@ function UIScaffold.DefineModuleUi(cfg)
         error("UIScaffold.DefineModuleUi: cfg.refresh must be a function")
     end
 
-    module._ui = module._ui
-        or {
-            Loaded = false,
-            Bound = false,
-            Localized = false,
-            Dirty = true,
-            Reason = nil,
-            FrameName = nil,
-        }
+    module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
     local function doRefresh()

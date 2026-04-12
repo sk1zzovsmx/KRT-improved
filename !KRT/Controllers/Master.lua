@@ -19,6 +19,7 @@ local ListController = feature.ListController or addon.ListController
 local Events = feature.Events or addon.Events
 local C = feature.C
 local Core = feature.Core
+local Options = feature.Options or addon.Options
 local Bus = feature.Bus or addon.Bus
 local MultiSelect = feature.MultiSelect or addon.MultiSelect
 local Services = feature.Services or addon.Services
@@ -36,8 +37,13 @@ local rollTypes = feature.rollTypes
 local RAID_TARGET_MARKERS = feature.RAID_TARGET_MARKERS
 local PENDING_AWARD_TTL_SECONDS = C.PENDING_AWARD_TTL_SECONDS
 local ML_MULTI_AWARD_TIMEOUT_SECONDS = C.ML_MULTI_AWARD_TIMEOUT_SECONDS
+local LOOT_CONTEXT_SESSION_TTL_SECONDS = math.max(tonumber(C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60, tonumber(C.BOSS_EVENT_CONTEXT_TTL_SECONDS) or 30)
 
 local UIFacade = addon.UI
+
+local function isDebugEnabled()
+    return Options and Options.IsDebugEnabled and Options.IsDebugEnabled() == true
+end
 
 local lootState = feature.lootState or {}
 feature.lootState = lootState
@@ -59,12 +65,7 @@ local pairs, select, next = pairs, select, next
 
 local tostring, tonumber = tostring, tonumber
 
-local function requireServiceMethod(serviceName, serviceTable, methodName)
-    assert(type(serviceTable) == "table", "KRT Master missing service: " .. tostring(serviceName))
-    local method = serviceTable[methodName]
-    assert(type(method) == "function", "KRT Master missing service method: " .. tostring(serviceName) .. "." .. tostring(methodName))
-    return method
-end
+local requireServiceMethod = Core.RequireServiceMethod
 
 local RaidApi = {
     GetRosterVersion = requireServiceMethod("Raid", Raid, "GetRosterVersion"),
@@ -92,50 +93,11 @@ local RollsApi = {
     FinalizeRollSession = requireServiceMethod("Rolls", Rolls, "FinalizeRollSession"),
 }
 
--- ----- Item helpers ----- --
-local function getItem(i)
-    local loot = Loot
-    return loot and loot.GetItem and loot.GetItem(i) or nil
-end
-
-local function getItemName(i)
-    local loot = Loot
-    return loot and loot.GetItemName and loot.GetItemName(i) or nil
-end
-
-local function getItemLink(i)
-    local loot = Loot
-    return loot and loot.GetItemLink and loot.GetItemLink(i) or nil
-end
-
-local function getItemTexture(i)
-    local loot = Loot
-    return loot and loot.GetItemTexture and loot.GetItemTexture(i) or nil
-end
-
-local function itemExists(i)
-    local loot = Loot
-    return loot and loot.ItemExists and loot.ItemExists(i) or false
-end
-
-local function getCurrentItemCount()
-    local loot = Loot
-    return loot and loot.GetCurrentItemCount and loot:GetCurrentItemCount() or 1
-end
-
 -- =========== Master Looter Frame Module  =========== --
 do
     addon.Controllers.Master = addon.Controllers.Master or {}
     local module = addon.Controllers.Master
-    module._ui = module._ui
-        or {
-            Loaded = false,
-            Bound = false,
-            Localized = false,
-            Dirty = true,
-            Reason = nil,
-            FrameName = nil,
-        }
+    module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
     -- ----- Internal state ----- --
@@ -710,43 +672,15 @@ do
         return starMap
     end
 
-    buildRollUiModel = function(forceRefresh)
-        if forceRefresh ~= true and rollUiState.model then
-            return rollUiState.model
-        end
-
-        local model = Rolls and Rolls.GetDisplayModel and Rolls:GetDisplayModel() or {}
-        local baseRows = model.rows or {}
-        local decoratedRows = {}
-        local visibleRows = {}
-        local resolution = model.resolution or {}
-        local starWinners = buildRollStarWinnerMap(resolution)
-        local selectionAllowed = model.selectionAllowed == true
-        local requiredWinnerCount = tonumber(model.requiredWinnerCount) or 1
-        local inventoryMultiSelectMode
-        local pickMode
-        local selectedWinners
-        local selectedNames = {}
-        local msCount
-        local manualEmptySelection
-        local autoWinner = resolution.autoWinners and resolution.autoWinners[1] or nil
-        local autoWinnerName = autoWinner and autoWinner.name or nil
-        local winnerName
-        local pickName
-        local starTarget
-        local highlightTarget
-        local singleWinnerSelected
-
-        syncRollSelectionSession()
-
+    Private.syncRollWinnerSelectionState = function(baseRows, resolution, selectionAllowed, requiredWinnerCount)
         if selectionAllowed then
             pruneRollWinnerSelection(baseRows)
         elseif (MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0) > 0 then
             resetRollWinnerSelection(ROLL_SELECTION_MODE.AUTO)
         end
 
-        inventoryMultiSelectMode = lootState.fromInventory and (requiredWinnerCount > 1 or rollUiState.mode == ROLL_SELECTION_MODE.MANUAL_MULTI)
-        pickMode = selectionAllowed and ((not lootState.fromInventory) or inventoryMultiSelectMode)
+        local inventoryMultiSelectMode = lootState.fromInventory and (requiredWinnerCount > 1 or rollUiState.mode == ROLL_SELECTION_MODE.MANUAL_MULTI)
+        local pickMode = selectionAllowed and ((not lootState.fromInventory) or inventoryMultiSelectMode)
 
         if pickMode and rollUiState.mode == ROLL_SELECTION_MODE.AUTO then
             local prefillNames = {}
@@ -761,7 +695,8 @@ do
             resetRollWinnerSelection(ROLL_SELECTION_MODE.AUTO)
         end
 
-        selectedWinners = getSelectedRollWinnersOrdered(baseRows)
+        local selectedWinners = getSelectedRollWinnersOrdered(baseRows)
+        local selectedNames = {}
         for i = 1, #selectedWinners do
             local winner = selectedWinners[i]
             if winner and winner.name then
@@ -769,8 +704,11 @@ do
             end
         end
 
-        msCount = pickMode and #selectedWinners or 0
-        manualEmptySelection = pickMode and rollUiState.mode == ROLL_SELECTION_MODE.MANUAL_MULTI and msCount == 0
+        local msCount = pickMode and #selectedWinners or 0
+        local manualEmptySelection = pickMode and rollUiState.mode == ROLL_SELECTION_MODE.MANUAL_MULTI and msCount == 0
+        local autoWinner = resolution.autoWinners and resolution.autoWinners[1] or nil
+        local autoWinnerName = autoWinner and autoWinner.name or nil
+        local winnerName
 
         if pickMode then
             if rollUiState.mode == ROLL_SELECTION_MODE.MANUAL_MULTI then
@@ -791,48 +729,78 @@ do
             end
         end
 
-        pickName = selectionAllowed and winnerName or nil
-        starTarget = resolution.topRollName
-        highlightTarget = selectionAllowed and (pickName or starTarget) or starTarget
-        singleWinnerSelected = selectionAllowed and not pickMode and winnerName ~= nil and winnerName ~= ""
+        local pickName = selectionAllowed and winnerName or nil
+        local starTarget = resolution.topRollName
+        local highlightTarget = selectionAllowed and (pickName or starTarget) or starTarget
+        local singleWinnerSelected = selectionAllowed and not pickMode and winnerName ~= nil and winnerName ~= ""
         if msCount > 0 or singleWinnerSelected or manualEmptySelection then
             highlightTarget = nil
         end
+
+        return {
+            highlightTarget = highlightTarget,
+            msCount = msCount,
+            pickMode = pickMode and true or false,
+            selectedNames = selectedNames,
+            selectionAllowed = selectionAllowed and true or false,
+            singleWinnerSelected = singleWinnerSelected,
+            winnerName = winnerName,
+        }
+    end
+
+    Private.decorateRollUiRows = function(baseRows, resolution, selectionState)
+        local starWinners = buildRollStarWinnerMap(resolution)
+        local decoratedRows = {}
+        local visibleRows = {}
 
         for i = 1, #baseRows do
             local row = baseRows[i]
             local isSelected
             local isFocused
-            local decorated
 
             if row then
-                isSelected = selectedNames[row.name] == true or (singleWinnerSelected and winnerName == row.name)
-                isFocused = (highlightTarget and highlightTarget == row.name) or false
+                isSelected = selectionState.selectedNames[row.name] == true or (selectionState.singleWinnerSelected and selectionState.winnerName == row.name)
+                isFocused = (selectionState.highlightTarget and selectionState.highlightTarget == row.name) or false
 
-                decorated = {}
-                for key, value in pairs(row) do
-                    decorated[key] = value
-                end
-                decorated.displayName = (selectionAllowed and isSelected) and ("> " .. row.name .. " <") or row.name
-                decorated.isSelected = isSelected and true or false
-                decorated.isFocused = isFocused and true or false
-                decorated.canClick = selectionAllowed and isSelectableRollRow(row)
-                decorated.showStar = starWinners[row.name] and true or false
-                decoratedRows[#decoratedRows + 1] = decorated
+                -- Decorate in-place to avoid per-row table copy + allocation.
+                row.displayName = (selectionState.selectionAllowed and isSelected) and ("> " .. row.name .. " <") or row.name
+                row.isSelected = isSelected and true or false
+                row.isFocused = isFocused and true or false
+                row.canClick = selectionState.selectionAllowed and isSelectableRollRow(row)
+                row.showStar = starWinners[row.name] and true or false
+                decoratedRows[#decoratedRows + 1] = row
 
-                if rollUiState.showRollsOnly ~= true or shouldShowRollRowInFrame(decorated) then
-                    visibleRows[#visibleRows + 1] = decorated
+                if rollUiState.showRollsOnly ~= true or shouldShowRollRowInFrame(row) then
+                    visibleRows[#visibleRows + 1] = row
                 end
             end
         end
 
+        return decoratedRows, visibleRows
+    end
+
+    buildRollUiModel = function(forceRefresh)
+        if forceRefresh ~= true and rollUiState.model then
+            return rollUiState.model
+        end
+
+        local model = Rolls and Rolls.GetDisplayModel and Rolls:GetDisplayModel() or {}
+        local baseRows = model.rows or {}
+        local resolution = model.resolution or {}
+        local selectionAllowed = model.selectionAllowed == true
+        local requiredWinnerCount = tonumber(model.requiredWinnerCount) or 1
+
+        syncRollSelectionSession()
+        local selectionState = Private.syncRollWinnerSelectionState(baseRows, resolution, selectionAllowed, requiredWinnerCount)
+        local decoratedRows, visibleRows = Private.decorateRollUiRows(baseRows, resolution, selectionState)
+
         model.rows = decoratedRows
         model.visibleRows = visibleRows
-        model.pickMode = pickMode and true or false
-        model.msCount = msCount
-        model.highlightTarget = highlightTarget
-        model.winner = winnerName
-        model.selectionAllowed = selectionAllowed and true or false
+        model.pickMode = selectionState.pickMode
+        model.msCount = selectionState.msCount
+        model.highlightTarget = selectionState.highlightTarget
+        model.winner = selectionState.winnerName
+        model.selectionAllowed = selectionState.selectionAllowed
         model.showRollsOnly = rollUiState.showRollsOnly == true
         rollUiState.model = model
         return model
@@ -891,16 +859,10 @@ do
 
         for i = 1, #visibleRows do
             local source = visibleRows[i]
-            local target = {}
-
             if source then
-                for key, value in pairs(source) do
-                    target[key] = value
-                end
+                source.id = i
+                out[#out + 1] = source
             end
-
-            target.id = i
-            out[#out + 1] = target
         end
     end
 
@@ -1099,6 +1061,150 @@ do
         return L.StrMasterStatusReady
     end
 
+    local function buildRollModeTooltip(label, needsReserves, selectedItemCount, hasEligibleRaidReserve)
+        if needsReserves and not hasEligibleRaidReserve then
+            return L.TipMasterSRUnavailable
+        end
+        if selectedItemCount > 1 then
+            return L.TipMasterRollModeMultiple:format(label, selectedItemCount)
+        end
+        return L.TipMasterRollMode:format(label)
+    end
+
+    local function buildAwardTooltip(rollModel, isTieReroll, awardTarget, msCount)
+        local requiredWinnerCount = tonumber(rollModel and rollModel.requiredWinnerCount) or 1
+        if isTieReroll then
+            return L.TipMasterReroll
+        end
+
+        if lootState.fromInventory then
+            if requiredWinnerCount > 1 then
+                if msCount >= requiredWinnerCount then
+                    return L.TipMasterTradeMultiple:format(msCount)
+                end
+                return L.TipMasterPickWinner
+            end
+            if awardTarget and awardTarget ~= "" then
+                return L.TipMasterTrade:format(awardTarget)
+            end
+            return L.TipMasterPickWinner
+        end
+
+        if requiredWinnerCount > 1 then
+            if msCount >= requiredWinnerCount then
+                return L.TipMasterAwardMultiple:format(msCount)
+            end
+            return L.TipMasterPickWinner
+        end
+        if awardTarget and awardTarget ~= "" then
+            return L.TipMasterAward:format(awardTarget)
+        end
+        return L.TipMasterPickWinner
+    end
+
+    local function buildMasterTooltipState(opts)
+        local selectedItemCount = tonumber(opts.selectedItemCount) or 1
+        local tooltipState = {
+            config = L.TipMasterConfig,
+            selectItem = lootState.fromInventory and L.TipMasterRemoveItem or L.TipMasterSelectItem,
+            spamLoot = lootState.fromInventory and (opts.hasReadyCheckAccess and L.TipMasterReadyCheck or L.WarnReadyCheckNotAllowed) or L.TipMasterSpamLoot,
+            ms = buildRollModeTooltip(L.BtnMS, false, selectedItemCount, opts.hasEligibleRaidReserve),
+            os = buildRollModeTooltip(L.BtnOS, false, selectedItemCount, opts.hasEligibleRaidReserve),
+            sr = buildRollModeTooltip(L.BtnSR, true, selectedItemCount, opts.hasEligibleRaidReserve),
+            free = buildRollModeTooltip(L.BtnFree, false, selectedItemCount, opts.hasEligibleRaidReserve),
+            countdown = (opts.countdownRunning or lootState.rollStarted) and L.TipMasterCountdown or L.TipMasterCountdownInactive,
+            award = buildAwardTooltip(opts.rollModel, opts.isTieReroll, opts.awardTarget, opts.msCount),
+            roll = L.TipMasterRollSelf,
+            clear = L.TipMasterClear,
+            hold = lootState.holder and L.TipMasterHold:format(lootState.holder) or L.TipMasterHoldUnset,
+            bank = lootState.banker and L.TipMasterBank:format(lootState.banker) or L.TipMasterBankUnset,
+            disenchant = lootState.disenchanter and L.TipMasterDisenchant:format(lootState.disenchanter) or L.TipMasterDisenchantUnset,
+            reserveList = opts.hasReserves and L.TipMasterReserveList or L.TipMasterReserveImport,
+            lootCounter = L.TipMasterLootCounter,
+        }
+
+        if not opts.hasLootAccess then
+            tooltipState.selectItem = L.WarnMLOnlyMode
+            tooltipState.ms = L.WarnMLOnlyMode
+            tooltipState.os = L.WarnMLOnlyMode
+            tooltipState.sr = L.WarnMLOnlyMode
+            tooltipState.free = L.WarnMLOnlyMode
+            tooltipState.countdown = L.WarnMLOnlyMode
+            tooltipState.award = L.WarnMLOnlyMode
+            tooltipState.roll = L.WarnMLOnlyMode
+            tooltipState.clear = L.WarnMLOnlyMode
+            tooltipState.hold = L.WarnMLOnlyMode
+            tooltipState.bank = L.WarnMLOnlyMode
+            tooltipState.disenchant = L.WarnMLOnlyMode
+            tooltipState.reserveList = L.WarnMLOnlyMode
+            tooltipState.lootCounter = L.WarnMLOnlyMode
+        end
+
+        return tooltipState
+    end
+
+    local function resolveAwardSelectionState(rollModel, isTieReroll)
+        local rollResolution = rollModel.resolution or {}
+        local pickMode = rollModel.pickMode == true
+        local msCount = pickMode and (tonumber(rollModel.msCount) or 0) or 0
+        local canAwardSelection = (not pickMode) or msCount > 0
+
+        if rollResolution.requiresManualResolution and pickMode then
+            if isTieReroll then
+                canAwardSelection = true
+            else
+                canAwardSelection = msCount >= (tonumber(rollModel.requiredWinnerCount) or 1)
+            end
+        end
+
+        return rollResolution, msCount, canAwardSelection
+    end
+
+    local function buildMasterButtonState(opts)
+        local tooltipState = opts.tooltipState or {}
+        local hasLootAccess = opts.hasLootAccess
+        local countdownRunning = opts.countdownRunning
+
+        return {
+            countdownText = countdownRunning and L.BtnStop or L.BtnCountdown,
+            awardText = opts.isTieReroll and L.BtnReroll or (lootState.fromInventory and TRADE or L.BtnAward),
+            selectItemText = lootState.fromInventory and L.BtnRemoveItem or L.BtnSelectItem,
+            spamLootText = lootState.fromInventory and READY_CHECK or L.BtnSpamLoot,
+            statusText = opts.statusText,
+            configTooltip = tooltipState.config,
+            selectItemTooltip = tooltipState.selectItem,
+            spamLootTooltip = tooltipState.spamLoot,
+            msTooltip = tooltipState.ms,
+            osTooltip = tooltipState.os,
+            srTooltip = tooltipState.sr,
+            freeTooltip = tooltipState.free,
+            countdownTooltip = tooltipState.countdown,
+            awardTooltip = tooltipState.award,
+            rollTooltip = tooltipState.roll,
+            clearTooltip = tooltipState.clear,
+            holdTooltip = tooltipState.hold,
+            bankTooltip = tooltipState.bank,
+            disenchantTooltip = tooltipState.disenchant,
+            reserveListTooltip = tooltipState.reserveList,
+            lootCounterTooltip = tooltipState.lootCounter,
+            canSelectItem = hasLootAccess and (lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRunning,
+            canChangeItem = hasLootAccess and (opts.currentFlowState ~= FLOW_STATES.COUNTDOWN),
+            canSpamLoot = lootState.lootCount >= 1 and ((lootState.fromInventory and opts.hasReadyCheckAccess) or ((not lootState.fromInventory) and hasLootAccess)),
+            canStartRolls = opts.canStartRolls,
+            canStartSR = opts.canStartSR,
+            canCountdown = hasLootAccess and lootState.lootCount >= 1 and opts.hasItem and (lootState.rollStarted or countdownRunning),
+            canHold = hasLootAccess and lootState.lootCount >= 1 and lootState.holder,
+            canBank = hasLootAccess and lootState.lootCount >= 1 and lootState.banker,
+            canDisenchant = hasLootAccess and lootState.lootCount >= 1 and lootState.disenchanter,
+            canAward = hasLootAccess and lootState.lootCount >= 1 and lootState.rollsCount >= 1 and not countdownRunning and opts.canAwardSelection,
+            reserveListText = opts.hasReserves and L.BtnOpenList or L.BtnInsertList,
+            canReserveList = hasLootAccess,
+            canRoll = hasLootAccess and opts.record and opts.canRoll and opts.rolled == false and countdownRunning,
+            canClear = hasLootAccess and lootState.rollsCount >= 1,
+            glowSR = opts.canStartSR,
+        }
+    end
+
     local function resetItemCountAndRefresh(focus)
         Private.ResetItemCount(focus)
         module:RequestRefresh()
@@ -1121,6 +1227,39 @@ do
         return RollsApi.SetExpectedWinners(Rolls, count)
     end
 
+    local function captureRollSessionBossContext(session, source)
+        if type(session) ~= "table" or not session.id then
+            return 0
+        end
+
+        local raidNum = Core.GetCurrentRaid()
+        if not raidNum then
+            return tonumber(session.bossNid) or 0
+        end
+
+        local sessionBossNid = tonumber(session.bossNid) or 0
+        if sessionBossNid > 0 and Raid.SetBossContextForLootSession then
+            Raid:SetBossContextForLootSession(raidNum, session.id, sessionBossNid, LOOT_CONTEXT_SESSION_TTL_SECONDS)
+            return sessionBossNid
+        end
+
+        if not Raid.FindAndRememberBossContextForLootSession then
+            return 0
+        end
+
+        sessionBossNid = tonumber(Raid:FindAndRememberBossContextForLootSession(raidNum, session.id, {
+            allowLootWindowContext = source ~= "inventory",
+            allowContextRecovery = source ~= "inventory",
+            ttlSeconds = LOOT_CONTEXT_SESSION_TTL_SECONDS,
+        })) or 0
+
+        if sessionBossNid > 0 then
+            session.bossNid = sessionBossNid
+        end
+
+        return sessionBossNid
+    end
+
     local function ensureRollSession(itemLink, rollType, source)
         local session = RollsApi.EnsureRollSession(Rolls, itemLink, rollType, source)
         if not session then
@@ -1137,6 +1276,7 @@ do
                 lootState.currentRollItem = 0
             end
         end
+        captureRollSessionBossContext(session, source)
         RollsApi.SyncSessionState(Rolls, session)
         return session
     end
@@ -1177,8 +1317,17 @@ do
 
         local createdTradeOnly = false
         if lootNid <= 0 and Loot and Loot.LogTradeOnlyLoot then
-            local created = Loot:LogTradeOnlyLoot(itemLink, playerName, rollType, rollValue, awardedCount, source, addon.Core.GetCurrentRaid(), nil, session and session.id or nil)
-                or 0
+            local created = Loot:LogTradeOnlyLoot(
+                itemLink,
+                playerName,
+                rollType,
+                rollValue,
+                awardedCount,
+                source,
+                addon.Core.GetCurrentRaid(),
+                session and session.bossNid or nil,
+                session and session.id or nil
+            ) or 0
             created = tonumber(created) or 0
             if created > 0 then
                 lootNid = created
@@ -1472,7 +1621,7 @@ do
     local function getCurrentMultiAwardCount(itemKey)
         local currentCount = 0
         for i = 1, (lootState.lootCount or 0) do
-            local it = getItem and getItem(i)
+            local it = Loot.GetItem(i)
             if it and it.itemKey == itemKey then
                 currentCount = tonumber(it.count) or 1
                 break
@@ -1641,7 +1790,7 @@ do
         if target < 1 then
             target = 1
         end
-        local available = getCurrentItemCount()
+        local available = Loot:GetCurrentItemCount() or 1
         if available < 1 then
             available = 1
         end
@@ -1815,8 +1964,8 @@ do
             end
             announced = false
             resetRollWinnerSelection(ROLL_SELECTION_MODE.AUTO)
-            ChatApi.Announce(Chat, L.ChatTieReroll:format(tconcat(rerollNames or {}, ", "), getItemLink() or ""))
-            addon:debug(Diag.I.LogMLTieReroll:format(tostring(getItemLink() or ""), tconcat(rerollNames or {}, ",")))
+            ChatApi.Announce(Chat, L.ChatTieReroll:format(tconcat(rerollNames or {}, ", "), Loot.GetItemLink() or ""))
+            addon:debug(Diag.I.LogMLTieReroll:format(tostring(Loot.GetItemLink() or ""), tconcat(rerollNames or {}, ",")))
             module:RequestRefresh()
             return true
         end
@@ -1838,7 +1987,7 @@ do
 
         lootState.winner = winnerName
         stopCountdown()
-        local itemLink = getItemLink()
+        local itemLink = Loot.GetItemLink()
         addon:debug(Diag.D.LogMLAwardRequested:format(tostring(winnerName), tonumber(lootState.currentRollType) or -1, Rolls:HighestRoll(winnerName) or 0, tostring(itemLink)))
 
         if lootState.fromInventory == true then
@@ -1895,7 +2044,7 @@ do
         local bag = tonumber(itemInfo.tradeStartBag) or tonumber(itemInfo.bagID)
         local slot = tonumber(itemInfo.tradeStartSlot) or tonumber(itemInfo.slotID)
         if bag and slot and before and before > 0 then
-            local expectedLink = itemInfo.tradeStartItemLink or lootState.tradeItemLink or getItemLink()
+            local expectedLink = itemInfo.tradeStartItemLink or lootState.tradeItemLink or Loot.GetItemLink()
             local expectedKey = expectedLink and (Item.GetItemStringFromLink(expectedLink) or expectedLink) or nil
             local afterLink = GetContainerItemLink(bag, slot)
             if not afterLink then
@@ -2027,7 +2176,7 @@ do
         if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
             return
         end
-        setItemCountValue(getCurrentItemCount(), focus)
+        setItemCountValue(Loot:GetCurrentItemCount() or 1, focus)
     end
 
     -- OnLoad frame:
@@ -2122,9 +2271,9 @@ do
         else
             ChatApi.Announce(Chat, L.ChatSpamLoot, "RAID")
             for i = 1, lootState.lootCount do
-                local itemLink = getItemLink(i)
+                local itemLink = Loot.GetItemLink(i)
                 if itemLink then
-                    local item = getItem(i)
+                    local item = Loot.GetItem(i)
                     local count = item and item.count or 1
                     local suffix = (count and count > 1) and (" x" .. count) or ""
                     ChatApi.Announce(Chat, i .. ". " .. itemLink .. suffix, "RAID")
@@ -2165,7 +2314,7 @@ do
             Rolls:RecordRolls(true)
             lootState.itemTraded = 0
 
-            local itemLink = getItemLink()
+            local itemLink = Loot.GetItemLink()
             local itemID = Item.GetItemIdFromLink(itemLink)
             ensureRollSession(itemLink, rollType, lootState.fromInventory and "inventory" or "lootWindow")
             local message
@@ -2202,7 +2351,7 @@ do
             return
         end
         stopCountdown()
-        local itemLink = getItemLink()
+        local itemLink = Loot.GetItemLink()
         if not itemLink then
             return
         end
@@ -2501,12 +2650,12 @@ do
         local hasReserves = reserves and reserves.HasData and reserves:HasData() or false
         flagButtonsOnChange("hasReserves", hasReserves)
 
-        local hasItem = itemExists()
+        local hasItem = Loot.ItemExists() or false
         flagButtonsOnChange("hasItem", hasItem)
 
         local itemId
         if hasItem then
-            itemId = Item.GetItemIdFromLink(getItemLink())
+            itemId = Item.GetItemIdFromLink(Loot.GetItemLink())
         end
         local hasItemReserves = itemId and reserves and reserves.HasItemReserves and reserves:HasItemReserves(itemId) or false
         flagButtonsOnChange("hasItemReserves", hasItemReserves)
@@ -2523,143 +2672,52 @@ do
         flagButtonsOnChange("countdownRun", countdownRunning)
         flagButtonsOnChange("flowState", currentFlowState)
 
-        local rollResolution = rollModel.resolution or {}
-        local pickMode = rollModel.pickMode == true
-        local msCount = pickMode and (tonumber(rollModel.msCount) or 0) or 0
-        local canAwardSelection = (not pickMode) or msCount > 0
         local canStartRolls = hasLootAccess and lootState.lootCount >= 1 and not countdownRunning
         local canStartSR = canStartRolls and hasEligibleRaidReserve
         local isTieReroll = shouldUseTieReroll(rollModel)
+        local rollResolution, msCount, canAwardSelection = resolveAwardSelectionState(rollModel, isTieReroll)
         local statusText = buildMasterStatusText(currentFlowState, rollModel, hasItem, displayedWinner)
         local selectedItemCount = tonumber(lootState.selectedItemCount) or 1
         local awardTarget = displayedWinner or getCurrentTradeWinner() or getCurrentMultiAwardWinner()
-        local tooltipState = {}
-        if rollResolution.requiresManualResolution and pickMode then
-            if isTieReroll then
-                canAwardSelection = true
-            else
-                canAwardSelection = msCount >= (tonumber(rollModel.requiredWinnerCount) or 1)
-            end
-        end
         if selectedItemCount < 1 then
             selectedItemCount = 1
         end
 
-        local function buildRollTooltip(label, needsReserves)
-            if needsReserves and not hasEligibleRaidReserve then
-                return L.TipMasterSRUnavailable
-            end
-            if selectedItemCount > 1 then
-                return L.TipMasterRollModeMultiple:format(label, selectedItemCount)
-            end
-            return L.TipMasterRollMode:format(label)
-        end
-
-        tooltipState.config = L.TipMasterConfig
-        tooltipState.selectItem = lootState.fromInventory and L.TipMasterRemoveItem or L.TipMasterSelectItem
-        tooltipState.spamLoot = lootState.fromInventory and (hasReadyCheckAccess and L.TipMasterReadyCheck or L.WarnReadyCheckNotAllowed) or L.TipMasterSpamLoot
-        tooltipState.ms = buildRollTooltip(L.BtnMS, false)
-        tooltipState.os = buildRollTooltip(L.BtnOS, false)
-        tooltipState.sr = buildRollTooltip(L.BtnSR, true)
-        tooltipState.free = buildRollTooltip(L.BtnFree, false)
-        tooltipState.countdown = (countdownRunning or lootState.rollStarted) and L.TipMasterCountdown or L.TipMasterCountdownInactive
-
-        if isTieReroll then
-            tooltipState.award = L.TipMasterReroll
-        elseif lootState.fromInventory then
-            if (tonumber(rollModel.requiredWinnerCount) or 1) > 1 then
-                if msCount >= (tonumber(rollModel.requiredWinnerCount) or 1) then
-                    tooltipState.award = L.TipMasterTradeMultiple:format(msCount)
-                else
-                    tooltipState.award = L.TipMasterPickWinner
-                end
-            elseif awardTarget and awardTarget ~= "" then
-                tooltipState.award = L.TipMasterTrade:format(awardTarget)
-            else
-                tooltipState.award = L.TipMasterPickWinner
-            end
-        else
-            if (tonumber(rollModel.requiredWinnerCount) or 1) > 1 then
-                if msCount >= (tonumber(rollModel.requiredWinnerCount) or 1) then
-                    tooltipState.award = L.TipMasterAwardMultiple:format(msCount)
-                else
-                    tooltipState.award = L.TipMasterPickWinner
-                end
-            elseif awardTarget and awardTarget ~= "" then
-                tooltipState.award = L.TipMasterAward:format(awardTarget)
-            else
-                tooltipState.award = L.TipMasterPickWinner
-            end
-        end
-
-        tooltipState.roll = L.TipMasterRollSelf
-        tooltipState.clear = L.TipMasterClear
-        tooltipState.hold = lootState.holder and L.TipMasterHold:format(lootState.holder) or L.TipMasterHoldUnset
-        tooltipState.bank = lootState.banker and L.TipMasterBank:format(lootState.banker) or L.TipMasterBankUnset
-        tooltipState.disenchant = lootState.disenchanter and L.TipMasterDisenchant:format(lootState.disenchanter) or L.TipMasterDisenchantUnset
-        tooltipState.reserveList = hasReserves and L.TipMasterReserveList or L.TipMasterReserveImport
-        tooltipState.lootCounter = L.TipMasterLootCounter
-
-        if not hasLootAccess then
-            tooltipState.selectItem = L.WarnMLOnlyMode
-            tooltipState.ms = L.WarnMLOnlyMode
-            tooltipState.os = L.WarnMLOnlyMode
-            tooltipState.sr = L.WarnMLOnlyMode
-            tooltipState.free = L.WarnMLOnlyMode
-            tooltipState.countdown = L.WarnMLOnlyMode
-            tooltipState.award = L.WarnMLOnlyMode
-            tooltipState.roll = L.WarnMLOnlyMode
-            tooltipState.clear = L.WarnMLOnlyMode
-            tooltipState.hold = L.WarnMLOnlyMode
-            tooltipState.bank = L.WarnMLOnlyMode
-            tooltipState.disenchant = L.WarnMLOnlyMode
-            tooltipState.reserveList = L.WarnMLOnlyMode
-            tooltipState.lootCounter = L.WarnMLOnlyMode
-        end
+        local tooltipState = buildMasterTooltipState({
+            awardTarget = awardTarget,
+            countdownRunning = countdownRunning,
+            hasEligibleRaidReserve = hasEligibleRaidReserve,
+            hasLootAccess = hasLootAccess,
+            hasReadyCheckAccess = hasReadyCheckAccess,
+            hasReserves = hasReserves,
+            isTieReroll = isTieReroll,
+            msCount = msCount,
+            rollModel = rollModel,
+            selectedItemCount = selectedItemCount,
+        })
 
         flagButtonsOnChange("msCount", msCount)
         flagButtonsOnChange("manualResolution", rollResolution.requiresManualResolution == true)
         flagButtonsOnChange("statusText", statusText)
 
         if dirtyFlags.buttons then
-            updateMasterButtonsIfChanged({
-                countdownText = countdownRunning and L.BtnStop or L.BtnCountdown,
-                awardText = isTieReroll and L.BtnReroll or (lootState.fromInventory and TRADE or L.BtnAward),
-                selectItemText = lootState.fromInventory and L.BtnRemoveItem or L.BtnSelectItem,
-                spamLootText = lootState.fromInventory and READY_CHECK or L.BtnSpamLoot,
-                statusText = statusText,
-                configTooltip = tooltipState.config,
-                selectItemTooltip = tooltipState.selectItem,
-                spamLootTooltip = tooltipState.spamLoot,
-                msTooltip = tooltipState.ms,
-                osTooltip = tooltipState.os,
-                srTooltip = tooltipState.sr,
-                freeTooltip = tooltipState.free,
-                countdownTooltip = tooltipState.countdown,
-                awardTooltip = tooltipState.award,
-                rollTooltip = tooltipState.roll,
-                clearTooltip = tooltipState.clear,
-                holdTooltip = tooltipState.hold,
-                bankTooltip = tooltipState.bank,
-                disenchantTooltip = tooltipState.disenchant,
-                reserveListTooltip = tooltipState.reserveList,
-                lootCounterTooltip = tooltipState.lootCounter,
-                canSelectItem = hasLootAccess and (lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRunning,
-                canChangeItem = hasLootAccess and (currentFlowState ~= FLOW_STATES.COUNTDOWN),
-                canSpamLoot = lootState.lootCount >= 1 and ((lootState.fromInventory and hasReadyCheckAccess) or ((not lootState.fromInventory) and hasLootAccess)),
+            updateMasterButtonsIfChanged(buildMasterButtonState({
+                canAwardSelection = canAwardSelection,
+                canRoll = canRoll,
                 canStartRolls = canStartRolls,
                 canStartSR = canStartSR,
-                canCountdown = hasLootAccess and lootState.lootCount >= 1 and hasItem and (lootState.rollStarted or countdownRunning),
-                canHold = hasLootAccess and lootState.lootCount >= 1 and lootState.holder,
-                canBank = hasLootAccess and lootState.lootCount >= 1 and lootState.banker,
-                canDisenchant = hasLootAccess and lootState.lootCount >= 1 and lootState.disenchanter,
-                canAward = hasLootAccess and lootState.lootCount >= 1 and lootState.rollsCount >= 1 and not countdownRunning and canAwardSelection,
-                reserveListText = hasReserves and L.BtnOpenList or L.BtnInsertList,
-                canReserveList = hasLootAccess,
-                canRoll = hasLootAccess and record and canRoll and rolled == false and countdownRunning,
-                canClear = hasLootAccess and lootState.rollsCount >= 1,
-                glowSR = canStartSR,
-            })
+                countdownRunning = countdownRunning,
+                currentFlowState = currentFlowState,
+                hasItem = hasItem,
+                hasLootAccess = hasLootAccess,
+                hasReadyCheckAccess = hasReadyCheckAccess,
+                hasReserves = hasReserves,
+                isTieReroll = isTieReroll,
+                record = record,
+                rolled = rolled,
+                statusText = statusText,
+                tooltipState = tooltipState,
+            }))
             dirtyFlags.buttons = false
         end
 
@@ -2776,8 +2834,8 @@ do
     end
 
     -- OnClick handler for dropdown menu items (consolidated from 3 similar branches).
-    Private.OnClickDropDown = function(owner, value)
-        if not addon.Core.GetCurrentRaid() then
+    Private.OnClickDropDown = function(_button, owner, value)
+        if not owner or not value or not addon.Core.GetCurrentRaid() then
             return
         end
         UIDropDownMenu_SetText(owner, value)
@@ -2893,9 +2951,9 @@ do
             if btn then
                 local ui = getSelectionButtonRefs(btn)
                 btn:Show()
-                local itemName = getItemName(i)
+                local itemName = Loot.GetItemName(i)
                 local itemNameBtn = ui and ui.name or nil
-                local item = getItem(i)
+                local item = Loot.GetItem(i)
                 local count = item and item.count or 1
                 if itemNameBtn then
                     if count and count > 1 then
@@ -2904,7 +2962,7 @@ do
                         itemNameBtn:SetText(itemName)
                     end
                 end
-                local itemTexture = getItemTexture(i)
+                local itemTexture = Loot.GetItemTexture(i)
                 local itemTextureBtn = ui and ui.icon or nil
                 if itemTextureBtn then
                     itemTextureBtn:SetTexture(itemTexture)
@@ -3084,12 +3142,25 @@ do
     function module:LOOT_OPENED()
         cancelLootClosedCleanup()
         if Raid:IsMasterLooter() then
+            local debugEnabled = isDebugEnabled()
+            local raidNum = Core.GetCurrentRaid()
+            if Raid.ClearLootWindowBossContext then
+                Raid:ClearLootWindowBossContext()
+            end
             lootState.opened = true
             announced = false
             Loot:FetchLoot()
-            addon:trace(Diag.D.LogMLLootOpenedTrace:format(lootState.lootCount or 0, tostring(lootState.fromInventory)))
+            if raidNum and Raid._EnsureLootWindowItemContext and Loot.GetLootWindowItems then
+                Raid:_EnsureLootWindowItemContext(raidNum, Loot:GetLootWindowItems(), {
+                    ttlSeconds = LOOT_CONTEXT_SESSION_TTL_SECONDS,
+                    source = "LOOT_OPENED",
+                })
+            end
             updateSelectionFrame()
-            addon:debug(Diag.D.LogMLLootOpenedInfo:format(lootState.lootCount or 0, tostring(lootState.fromInventory), tostring(UnitName("target"))))
+            if debugEnabled then
+                addon:trace(Diag.D.LogMLLootOpenedTrace:format(lootState.lootCount or 0, tostring(lootState.fromInventory)))
+                addon:debug(Diag.D.LogMLLootOpenedInfo:format(lootState.lootCount or 0, tostring(lootState.fromInventory), tostring(UnitName("target"))))
+            end
             handleLootOpenedVisibility()
         end
     end
@@ -3097,8 +3168,13 @@ do
     -- LOOT_CLOSED: Triggered when the loot window closes.
     function module:LOOT_CLOSED()
         if Raid:IsMasterLooter() then
-            addon:trace(Diag.D.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
-            addon:trace(Diag.D.LogMLLootClosedCleanup)
+            if Raid.ClearLootWindowBossContext then
+                Raid:ClearLootWindowBossContext()
+            end
+            if isDebugEnabled() then
+                addon:trace(Diag.D.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
+                addon:trace(Diag.D.LogMLLootClosedCleanup)
+            end
             clearMultiAwardState(false)
             scheduleLootClosedCleanup()
         end
@@ -3108,7 +3184,9 @@ do
     function module:LOOT_SLOT_CLEARED(clearedSlot)
         if Raid:IsMasterLooter() then
             Loot:FetchLoot()
-            addon:trace(Diag.D.LogMLLootSlotCleared:format(lootState.lootCount or 0))
+            if isDebugEnabled() then
+                addon:trace(Diag.D.LogMLLootSlotCleared:format(lootState.lootCount or 0))
+            end
             updateSelectionFrame()
             Private.ResetItemCount()
             handleLootSlotClearedVisibility()
@@ -3125,11 +3203,22 @@ do
             if tAccepted == 1 and pAccepted == 1 then
                 local awardedCount = resolveTradeAwardedCount()
                 local rollValue = Rolls:HighestRoll(tradeWinner)
-                local lootNid, createdTradeOnly =
-                    ensureTradeLootContext(lootState.tradeItemLink or getItemLink(), tradeWinner, lootState.currentRollType, rollValue, awardedCount, "TRADE_ACCEPT_NO_CONTEXT")
+                local lootNid, createdTradeOnly = ensureTradeLootContext(
+                    lootState.tradeItemLink or Loot.GetItemLink(),
+                    tradeWinner,
+                    lootState.currentRollType,
+                    rollValue,
+                    awardedCount,
+                    "TRADE_ACCEPT_NO_CONTEXT"
+                )
                 if lootNid > 0 and createdTradeOnly then
                     addon:warn(
-                        Diag.W.LogTradeNoLootContextTradeOnly:format(tostring(lootNid), tostring(tradeWinner), tostring(lootState.tradeItemLink or getItemLink()), awardedCount)
+                        Diag.W.LogTradeNoLootContextTradeOnly:format(
+                            tostring(lootNid),
+                            tostring(tradeWinner),
+                            tostring(lootState.tradeItemLink or Loot.GetItemLink()),
+                            awardedCount
+                        )
                     )
                 end
 
@@ -3139,7 +3228,7 @@ do
 
                     if not ok then
                         addon:error(
-                            Diag.E.LogTradeLoggerLogFailed:format(tostring(addon.Core.GetCurrentRaid()), tostring(lootNid), tostring(lootState.tradeItemLink or getItemLink()))
+                            Diag.E.LogTradeLoggerLogFailed:format(tostring(addon.Core.GetCurrentRaid()), tostring(lootNid), tostring(lootState.tradeItemLink or Loot.GetItemLink()))
                         )
                     end
                 else
@@ -3147,7 +3236,7 @@ do
                         Diag.W.LogTradeCurrentRollItemMissingContext:format(
                             tostring(tradeWinner),
                             tostring(lootState.tradeItemId),
-                            tostring(lootState.tradeItemLink or getItemLink())
+                            tostring(lootState.tradeItemLink or Loot.GetItemLink())
                         )
                     )
                 end
@@ -3463,33 +3552,27 @@ do
         return true
     end
 
-    -- Trades an item from inventory to a player.
-    function tradeItem(itemLink, playerName, rollType, rollValue)
-        if itemLink ~= getItemLink() then
-            return
-        end
-        local isAwardRoll = (rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE)
-        local winnerName
+    local function beginTradeItemState(itemLink, playerName, rollType, rollValue, isAwardRoll)
         ensureRollSession(itemLink, rollType, lootState.fromInventory and "inventory" or "lootWindow")
 
         resetTradeState()
 
         lootState.trader = Core.GetPlayerName()
-        winnerName = resolveTradeExecutionWinner(playerName, isAwardRoll)
+        local winnerName = resolveTradeExecutionWinner(playerName, isAwardRoll)
         lootState.tradeItemLink = itemLink
         lootState.tradeItemId = Item.GetItemIdFromLink(itemLink)
 
         if isAwardRoll and (not winnerName or winnerName == "") then
             addon:warn(L.ErrNoWinnerSelected)
             resetTradeState()
-            return false
+            return false, nil
         end
         if isAwardRoll then
             local validation = validateAwardWinner(winnerName, itemLink, rollType)
             if not (validation and validation.ok == true) then
                 addon:warn((validation and validation.warnMessage) or L.ErrMLWinnerIneligible:format(tostring(winnerName)))
                 resetTradeState()
-                return false
+                return false, nil
             end
         end
         lootState.tradeWinner = winnerName
@@ -3505,44 +3588,70 @@ do
             )
         )
 
-        -- Prepare initial output and whisper:
+        return true, winnerName
+    end
+
+    local function buildTradeNotificationPlan(itemLink, playerName, winnerName, rollType, isAwardRoll)
         local output = buildTradeInitialOutput(itemLink, winnerName or playerName, rollType, isAwardRoll)
         local whisper
         local keep = not isAwardRoll
 
-        -- Keeping the item:
         if keep then
             whisper = buildTradeKeepWhisper(itemLink, rollType)
         elseif lootState.selectedItemCount > 1 then
             output = buildTradeMultiWinnersOutput(winnerName)
         end
 
-        if not keep and lootState.trader == winnerName then
-            -- Trader won: complete the current inventory award step without opening a trade window.
-            addon:debug(Diag.D.LogTradeTraderKeeps:format(tostring(itemLink), tostring(winnerName)))
-            local awardedCount = resolveInventoryAwardedCount()
-            local lootNid, createdTradeOnly = ensureTradeLootContext(itemLink, winnerName, rollType, rollValue, awardedCount, "TRADE_KEEP_NO_CONTEXT")
-            if lootNid <= 0 then
-                addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Core.GetCurrentRaid()), tostring(lootNid), tostring(itemLink)))
-            elseif createdTradeOnly ~= true then
-                local ok = requestLoggerLootLog(lootNid, winnerName, rollType, rollValue, "TRADE_KEEP", addon.Core.GetCurrentRaid())
-                if not ok then
-                    addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Core.GetCurrentRaid()), tostring(lootNid), tostring(itemLink)))
-                end
-            end
+        return keep, output, whisper
+    end
 
-            finalizeTradeNotifications(itemLink, winnerName, rollType, rollValue, output, whisper)
-            completeInventoryAwardProgress(winnerName, rollType, awardedCount)
-            return true
+    local function completeTraderKeepAward(itemLink, winnerName, rollType, rollValue, output, whisper)
+        addon:debug(Diag.D.LogTradeTraderKeeps:format(tostring(itemLink), tostring(winnerName)))
+        local awardedCount = resolveInventoryAwardedCount()
+        local lootNid, createdTradeOnly = ensureTradeLootContext(itemLink, winnerName, rollType, rollValue, awardedCount, "TRADE_KEEP_NO_CONTEXT")
+        if lootNid <= 0 then
+            addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Core.GetCurrentRaid()), tostring(lootNid), tostring(itemLink)))
+        elseif createdTradeOnly ~= true then
+            local ok = requestLoggerLootLog(lootNid, winnerName, rollType, rollValue, "TRADE_KEEP", addon.Core.GetCurrentRaid())
+            if not ok then
+                addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Core.GetCurrentRaid()), tostring(lootNid), tostring(itemLink)))
+            end
+        end
+
+        finalizeTradeNotifications(itemLink, winnerName, rollType, rollValue, output, whisper)
+        completeInventoryAwardProgress(winnerName, rollType, awardedCount)
+        return true
+    end
+
+    local function prepareExternalAwardTrade(itemLink, winnerName, isAwardRoll, output)
+        local ok, outputOverride = tryInitiateTrade(itemLink, winnerName, isAwardRoll)
+        if not ok then
+            return false, output
+        end
+        return true, outputOverride or output
+    end
+
+    -- Trades an item from inventory to a player.
+    function tradeItem(itemLink, playerName, rollType, rollValue)
+        if itemLink ~= Loot.GetItemLink() then
+            return
+        end
+        local isAwardRoll = (rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE)
+        local ok, winnerName = beginTradeItemState(itemLink, playerName, rollType, rollValue, isAwardRoll)
+        if not ok then
+            return false
+        end
+
+        local keep, output, whisper = buildTradeNotificationPlan(itemLink, playerName, winnerName, rollType, isAwardRoll)
+
+        if not keep and lootState.trader == winnerName then
+            return completeTraderKeepAward(itemLink, winnerName, rollType, rollValue, output, whisper)
         end
 
         if not keep then
-            local ok, outputOverride = tryInitiateTrade(itemLink, winnerName, isAwardRoll)
+            ok, output = prepareExternalAwardTrade(itemLink, winnerName, isAwardRoll, output)
             if not ok then
                 return false
-            end
-            if outputOverride then
-                output = outputOverride
             end
         end
 

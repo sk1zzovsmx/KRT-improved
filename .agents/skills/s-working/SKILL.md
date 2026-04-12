@@ -55,7 +55,7 @@ Init.lua             Bootstrap, shared runtime glue, main event wiring
 | Module | File | Runtime |
 |--------|------|---------|
 | Raid service | `Services/Raid.lua` | `addon.Raid` |
-| Roll tracking | `Services/Rolls.lua` | `addon.Rolls` |
+| Roll tracking | `Services/Rolls/Service.lua` | `addon.Rolls` |
 | Loot parsing | `Services/Loot.lua` | `addon.Loot` |
 | Reserves service | `Services/Reserves.lua` | `addon.Reserves` |
 | Master controller | `Controllers/Master.lua` | `addon.Master` |
