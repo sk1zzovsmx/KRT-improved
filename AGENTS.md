@@ -114,6 +114,8 @@ Durable preferences learned from recent conversations:
   `Core.GetRaidStore` nil/method checks to keep diagnostics and guard behavior uniform.
 - Prefer homogeneous module structure/patterns across Lua modules; avoid one-off lifecycle variants
   unless behavior requires them.
+- Prefer Lua fixes to follow the established local-helper/module pattern; use scoped local blocks or
+  focused splits before moving private helpers onto tables just to work around local limits.
 - For UI named-frame access standardization, prefer the dominant in-repo `_G[frameName .. suffix]`
   pattern over introducing static local ref caches only for stylistic cleanup.
 - For XML and Lua analysis/reference, use Townlong-Yak FrameXML 3.3.5:

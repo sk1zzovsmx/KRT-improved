@@ -80,6 +80,8 @@ Release-Version: 0.7.0-beta.1
 
 ### Fixed
 
+- Fixed Master loading on Lua 5.1/WoW clients by reducing chunk-scope locals in
+  `Controllers/Master.lua`.
 - Fixed Master assignment dropdown clicks (`Hold`/`Bank`/`Disenchant`) using the
   wrong `UIDropDownMenu` callback argument order, which could trigger
   `UIDropDownMenu.lua:862` (`filterText` nil) on selection.
