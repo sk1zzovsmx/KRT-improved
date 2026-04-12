@@ -31,6 +31,20 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   Own top-level parent feature modules under `addon.Controllers.*`.
 - `!KRT/Services/*.lua`
   Own runtime model/service logic under `addon.Services.*`.
+  `addon.Services.Raid` is split across `!KRT/Services/Raid/*.lua` and loaded by TOC order.
+  `State.lua` is the state/compat anchor file; the other files extend the same service table by domain
+  (`Capabilities`, `Changes`, `Counts`, `Roster`, `LootRecords`, `Session`, `Boss`).
+  `Services/Raid/Capabilities.lua` owns capability queries and the shared master-only access guard.
+  `Services/Chat.lua` owns announce/warn output contracts.
+  `addon.Services.Reserves` owns the canonical public reserves contract; its `.Service`
+  field is a compatibility alias to the same table, not a second owner.
+- `!KRT/Core/DB.lua`
+  Owns the canonical public accessor facade for DB-manager-backed services on
+  `addon.Core.*`; `addon.DB` remains the concrete namespace for DB submodules and
+  manager state, not a parallel getter surface.
+- `!KRT/Core/DBSchema.lua`
+  Owns schema-version state while exposing the canonical public accessor on
+  `addon.Core.GetRaidSchemaVersion`; `addon.DBSchema` is not a second parallel getter facade.
 - `!KRT/Widgets/*.lua`
   Own child UI controllers under `addon.Widgets.*`.
 - `!KRT/EntryPoints/*.lua`
@@ -40,6 +54,8 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
 
 Compatibility aliases (`addon.Master`, `addon.Logger`, `addon.Raid`, ...) are legacy adapters.
 New call sites should use namespaced owners (`addon.Controllers.*`, `addon.Services.*`, `addon.Widgets.*`).
+Avoid root addon method facades for chat/capability contracts; the only intentional root-method
+compatibility exception is `addon:Print` for `LibLogger-1.0`.
 
 ## Dependency Rules
 
@@ -61,6 +77,14 @@ New call sites should use namespaced owners (`addon.Controllers.*`, `addon.Servi
 - Controllers must not reference other parent owners directly.
 - Upward communication should use `addon.Bus` and canonical event names from `Modules/Events.lua`.
 - Prefer existing internal events (`SetItem`, `RaidRosterDelta`, etc.) over new micro-events.
+- EntryPoints should prefer `addon.Core.RequestControllerMethod(...)` for parent routing instead
+  of open-coded controller lookup helpers.
+- Capability checks and announce/warn output should target `addon.Services.Raid` and
+  `addon.Services.Chat` (or their top-level alias tables), not root addon methods.
+- Controller-local UI glue should stay local: avoid exporting selection handlers, popup save/fill
+  helpers, row-hover glue, and similar file-local mechanics on controller public surfaces.
+- Cross-file helpers that are still package-internal should move to underscore internal surfaces
+  on the owner table, not remain public `*Internal` methods.
 
 ## UI/XML Binding and Template Policy
 

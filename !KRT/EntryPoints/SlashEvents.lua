@@ -14,6 +14,7 @@ local Colors = feature.Colors or addon.Colors
 local Strings = feature.Strings or addon.Strings
 local Bus = feature.Bus or addon.Bus
 local Core = feature.Core or addon.Core
+local Services = feature.Services or addon.Services
 
 local RT_COLOR = feature.RT_COLOR
 
@@ -27,23 +28,6 @@ local UI = addon.UI
 
 -- =========== Slash Commands  =========== --
 local module = {}
-
-local function getController(name)
-    if Core and Core.GetController then
-        return Core.GetController(name)
-    end
-    local controllers = addon.Controllers
-    return controllers and controllers[name] or nil
-end
-
-local function callControllerMethod(name, methodName, ...)
-    local controller = getController(name)
-    local method = controller and controller[methodName]
-    if type(method) ~= "function" then
-        return nil
-    end
-    return method(controller, ...)
-end
 
 local function getSyncerService()
     if Core.GetSyncer then
@@ -62,6 +46,10 @@ end
 local function getDebugService()
     local services = addon.Services
     return services and services.Debug or nil
+end
+
+local function getRaidService()
+    return Services and Services.Raid or nil
 end
 
 local function formatValidateRaidDetail(entry)
@@ -264,12 +252,13 @@ function module:Handle(msg)
     end
 
     local requiresLootAccess = (cmd == "show" or cmd == "toggle" or lootOnlySlashCommands[cmd] == true)
-    if requiresLootAccess and not addon:EnsureMasterOnlyAccess() then
+    local raid = getRaidService()
+    if requiresLootAccess and raid and raid.EnsureMasterOnlyAccess and not raid:EnsureMasterOnlyAccess() then
         return
     end
 
     if cmd == "show" or cmd == "toggle" then
-        callControllerMethod("Master", "Toggle")
+        Core.RequestControllerMethod("Master", "Toggle")
         return
     end
     local fn = self.sub[cmd]
@@ -522,24 +511,24 @@ end)
 registerAliases(cmdWarnings, function(rest)
     local sub = Strings.SplitArgs(rest)
     if not sub or sub == "" or sub == "toggle" then
-        callControllerMethod("Warnings", "Toggle")
+        Core.RequestControllerMethod("Warnings", "Toggle")
     elseif sub == "help" then
         addon:info(format(L.StrCmdCommands, "krt rw"), "KRT")
         printHelp("toggle", L.StrCmdToggle)
         printHelp("[ID]", L.StrCmdWarningAnnounce)
     else
-        callControllerMethod("Warnings", "Announce", sub)
+        Core.RequestControllerMethod("Warnings", "Announce", sub)
     end
 end)
 
 registerAliases(cmdChanges, function(rest)
     local sub = Strings.SplitArgs(rest)
     if not sub or sub == "" or sub == "toggle" then
-        callControllerMethod("Changes", "Toggle")
+        Core.RequestControllerMethod("Changes", "Toggle")
     elseif sub == "demand" or sub == "ask" then
-        callControllerMethod("Changes", "Demand")
+        Core.RequestControllerMethod("Changes", "Demand")
     elseif sub == "announce" or sub == "spam" then
-        callControllerMethod("Changes", "Announce")
+        Core.RequestControllerMethod("Changes", "Announce")
     else
         addon:info(format(L.StrCmdCommands, "krt ms"), "KRT")
         printHelp("toggle", L.StrCmdToggle)
@@ -551,7 +540,7 @@ end)
 registerAliases(cmdLogger, function(rest)
     local sub, arg = Strings.SplitArgs(rest)
     if not sub or sub == "" or sub == "toggle" then
-        callControllerMethod("Logger", "Toggle")
+        Core.RequestControllerMethod("Logger", "Toggle")
     elseif sub == "req" then
         local raidRefArg, targetArg = Strings.SplitArgs(arg)
         local syncer = getSyncerService()
@@ -581,7 +570,7 @@ end)
 registerAliases(cmdLoot, function(rest)
     local sub = Strings.SplitArgs(rest)
     if not sub or sub == "" or sub == "toggle" then
-        callControllerMethod("Master", "Toggle")
+        Core.RequestControllerMethod("Master", "Toggle")
     end
 end)
 
@@ -671,11 +660,11 @@ end)
 registerAliases(cmdLFM, function(rest)
     local sub = Strings.SplitArgs(rest)
     if not sub or sub == "" or sub == "toggle" or sub == "show" then
-        callControllerMethod("Spammer", "Toggle")
+        Core.RequestControllerMethod("Spammer", "Toggle")
     elseif sub == "start" then
-        callControllerMethod("Spammer", "Start")
+        Core.RequestControllerMethod("Spammer", "Start")
     elseif sub == "stop" then
-        callControllerMethod("Spammer", "Stop")
+        Core.RequestControllerMethod("Spammer", "Stop")
     else
         addon:info(format(L.StrCmdCommands, "krt pug"), "KRT")
         printHelp("toggle", L.StrCmdToggle)

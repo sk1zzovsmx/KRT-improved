@@ -23,15 +23,15 @@ local function normalizeSchemaVersion(value)
     return version
 end
 
--- ----- Public methods ----- --
-DBSchema.RAID_SCHEMA_VERSION = normalizeSchemaVersion(DBSchema.RAID_SCHEMA_VERSION)
-
-function DBSchema.GetRaidSchemaVersion()
+local function getCanonicalRaidSchemaVersion()
     local version = normalizeSchemaVersion(DBSchema.RAID_SCHEMA_VERSION)
     DBSchema.RAID_SCHEMA_VERSION = version
     return version
 end
 
+-- ----- Public methods ----- --
+DBSchema.RAID_SCHEMA_VERSION = normalizeSchemaVersion(DBSchema.RAID_SCHEMA_VERSION)
+
 function Core.GetRaidSchemaVersion()
-    return DBSchema.GetRaidSchemaVersion()
+    return getCanonicalRaidSchemaVersion()
 end

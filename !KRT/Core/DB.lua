@@ -73,16 +73,12 @@ function DB.GetManager()
     return ensureManager()
 end
 
-function DB.GetRaidStore()
+function Core.GetRaidStore()
     return getManagerStore("GetRaidStore")
 end
 
-function Core.GetRaidStore()
-    return DB.GetRaidStore()
-end
-
 function Core.GetRaidStoreOrNil(contextTag, requiredMethods)
-    local raidStore = DB.GetRaidStore()
+    local raidStore = Core.GetRaidStore()
     local ctx = tostring(contextTag or "?")
 
     if type(raidStore) ~= "table" then
@@ -107,44 +103,20 @@ function Core.GetRaidStoreOrNil(contextTag, requiredMethods)
     return raidStore
 end
 
-function DB.GetRaidQueries()
+function Core.GetRaidQueries()
     return getManagerStore("GetRaidQueries")
 end
 
-function Core.GetRaidQueries()
-    return DB.GetRaidQueries()
-end
-
-function DB.GetRaidMigrations()
+function Core.GetRaidMigrations()
     return getManagerStore("GetRaidMigrations")
 end
 
-function Core.GetRaidMigrations()
-    return DB.GetRaidMigrations()
-end
-
-function DB.GetRaidValidator()
+function Core.GetRaidValidator()
     return getManagerStore("GetRaidValidator")
 end
 
-function Core.GetRaidValidator()
-    return DB.GetRaidValidator()
-end
-
-function DB.GetSyncer()
-    return getManagerStore("GetSyncer")
-end
-
 function Core.GetSyncer()
-    return DB.GetSyncer()
-end
-
-function DB.GetCharStore()
-    return getManagerStore("GetCharStore")
-end
-
-function DB.GetConfigStore()
-    return getManagerStore("GetConfigStore")
+    return getManagerStore("GetSyncer")
 end
 
 function Core.GetDB()

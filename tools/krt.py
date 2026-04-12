@@ -434,6 +434,193 @@ def resolve_release_metadata(expected_channel: str | None = None) -> dict[str, A
     }
 
 
+def read_addon_changelog_text() -> str:
+    if not ADDON_CHANGELOG_PATH.is_file():
+        raise CliError(f"Addon changelog not found: {ADDON_CHANGELOG_PATH}")
+
+    return ADDON_CHANGELOG_PATH.read_text(encoding="utf-8", errors="replace")
+
+
+def extract_release_section_from_text(
+    text: str,
+    version: str,
+    *,
+    source_label: str,
+) -> tuple[str, str | None]:
+    heading_re = re.compile(r"^## \[([^\]]+)\](?:\s*-\s*(.+))?$")
+    found = False
+    release_date = None
+    collected: list[str] = []
+
+    for line in text.splitlines():
+        if line.startswith("## "):
+            heading = heading_re.fullmatch(line.strip())
+            if heading:
+                heading_version = heading.group(1).strip()
+                if found:
+                    break
+                if heading_version == version:
+                    found = True
+                    date_value = heading.group(2) or ""
+                    release_date = date_value.strip() or None
+                    continue
+            elif found:
+                break
+
+        if found:
+            collected.append(line)
+
+    if not found:
+        raise CliError(f"{source_label} is missing the release section for '{version}'.")
+
+    return "\n".join(collected).strip(), release_date
+
+
+def parse_markdown_release_sections(section_text: str) -> dict[str, list[str]]:
+    sections: dict[str, list[str]] = {}
+    current_section: str | None = None
+
+    for raw_line in section_text.splitlines():
+        line = raw_line.rstrip()
+        if line.startswith("### "):
+            current_section = line[4:].strip()
+            sections.setdefault(current_section, [])
+            continue
+
+        if current_section is None:
+            continue
+
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        if stripped.startswith("- "):
+            sections[current_section].append(stripped[2:].strip())
+            continue
+
+        if sections[current_section]:
+            sections[current_section][-1] = f"{sections[current_section][-1]} {stripped}"
+
+    return sections
+
+
+def get_release_note_sections(changelog_sections: dict[str, list[str]]) -> list[tuple[str, list[str]]]:
+    ordered_sections = (
+        ("New Functions", ("New Functions", "Added")),
+        ("Enhancements", ("Enhancements", "Changed")),
+        ("Fixes", ("Fixes", "Fixed")),
+        ("Removed", ("Removed",)),
+    )
+
+    selected: list[tuple[str, list[str]]] = []
+    for release_title, changelog_titles in ordered_sections:
+        for changelog_title in changelog_titles:
+            entries = changelog_sections.get(changelog_title) or []
+            if entries:
+                selected.append((release_title, entries))
+                break
+    return selected
+
+
+def run_git_capture(args: list[str]) -> subprocess.CompletedProcess[str]:
+    return run_command_capture(["git", *args], cwd=REPO_ROOT)
+
+
+def require_git_stdout(args: list[str], *, operation: str) -> str:
+    result = run_git_capture(args)
+    if result.returncode != 0:
+        message = result.stderr.strip() or result.stdout.strip() or "git command failed."
+        raise CliError(f"Unable to {operation}: {message}")
+    return result.stdout
+
+
+def find_previous_release_tag(current_version: str, current_tag: str) -> str | None:
+    current_info = parse_release_version(current_version)
+    tag_lines = require_git_stdout(["tag", "--list", "v*"], operation="list release tags").splitlines()
+
+    previous: tuple[tuple[int, int, int, int, int], str] | None = None
+    for raw_tag in tag_lines:
+        tag = raw_tag.strip()
+        if not tag or tag == current_tag:
+            continue
+        if not tag.startswith("v"):
+            continue
+
+        try:
+            tag_info = parse_release_version(tag[1:])
+        except CliError:
+            continue
+
+        if not tag_info["publishable"]:
+            continue
+        if compare_release_versions(tag_info, current_info) >= 0:
+            continue
+
+        candidate = (tag_info["precedence"], tag)
+        if previous is None or previous[0] < candidate[0]:
+            previous = candidate
+
+    return previous[1] if previous else None
+
+
+def git_commit_subjects(range_expr: str) -> list[str]:
+    output = require_git_stdout(
+        ["log", "--no-merges", "--format=%s", range_expr],
+        operation=f"read commit subjects for '{range_expr}'",
+    )
+    return [line.strip() for line in output.splitlines() if line.strip()]
+
+
+def build_github_compare_url(repository: str, previous_tag: str, current_tag: str) -> str:
+    repo = repository.strip().strip("/")
+    if not repo:
+        raise CliError("Repository slug is required to build the GitHub compare URL.")
+    return f"https://github.com/{repo}/compare/{previous_tag}...{current_tag}"
+
+
+def build_release_notes_markdown(
+    *,
+    repository: str,
+    current_tag: str,
+    current_version: str,
+    current_ref: str,
+    changelog_sections: dict[str, list[str]],
+    previous_tag: str | None,
+) -> str:
+    lines: list[str] = []
+
+    for title, entries in get_release_note_sections(changelog_sections):
+        lines.append(f"## {title}")
+        lines.append("")
+        for entry in entries:
+            lines.append(f"- {entry}")
+        lines.append("")
+
+    if previous_tag:
+        commit_subjects = [
+            subject
+            for subject in git_commit_subjects(f"{previous_tag}..{current_ref}")
+            if not subject.lower().startswith("release: prepare ")
+        ]
+        if commit_subjects:
+            lines.append("## Commit Summary")
+            lines.append("")
+            for subject in commit_subjects:
+                lines.append(f"- {subject}")
+            lines.append("")
+
+        compare_url = build_github_compare_url(repository, previous_tag, current_tag)
+        lines.append("## Full Changelog")
+        lines.append("")
+        lines.append(f"- [{previous_tag}...{current_tag}]({compare_url})")
+    else:
+        lines.append("## Full Changelog")
+        lines.append("")
+        lines.append(f"- First publishable release for `{current_version}`.")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def write_github_output(path_text: str, payload: dict[str, Any]) -> None:
     output_path = Path(path_text)
     with output_path.open("a", encoding="utf-8") as handle:
@@ -989,6 +1176,57 @@ def release_metadata(args: argparse.Namespace) -> int:
     return 0
 
 
+def release_notes(args: argparse.Namespace) -> int:
+    payload = resolve_release_metadata()
+    current_tag = args.current_tag.strip() or payload["tag"]
+    current_ref = args.current_ref.strip() or current_tag or "HEAD"
+    previous_tag = args.previous_tag.strip() or find_previous_release_tag(payload["version"], current_tag) or ""
+
+    changelog_text = read_addon_changelog_text()
+    release_section_text, release_date = extract_release_section_from_text(
+        changelog_text,
+        payload["version"],
+        source_label=str(ADDON_CHANGELOG_PATH),
+    )
+    changelog_sections = parse_markdown_release_sections(release_section_text)
+    notes = build_release_notes_markdown(
+        repository=args.repository,
+        current_tag=current_tag,
+        current_version=payload["version"],
+        current_ref=current_ref,
+        changelog_sections=changelog_sections,
+        previous_tag=previous_tag or None,
+    )
+
+    result = {
+        "version": payload["version"],
+        "current_tag": current_tag,
+        "current_ref": current_ref,
+        "previous_tag": previous_tag or None,
+        "release_date": release_date,
+        "notes": notes,
+    }
+
+    if args.output_file:
+        output_path = Path(args.output_file).expanduser()
+        if not output_path.is_absolute():
+            output_path = (REPO_ROOT / output_path).resolve()
+        ensure_dir(output_path.parent)
+        output_path.write_text(notes, encoding="utf-8")
+        result["output_file"] = str(output_path)
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+        return 0
+
+    if args.output_file:
+        print(f"Release notes ready: {result['output_file']}")
+        return 0
+
+    print(notes, end="")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Cross-platform KRT repo tooling")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -1091,6 +1329,18 @@ def build_parser() -> argparse.ArgumentParser:
     release.add_argument("--json", action="store_true")
     release.add_argument("--github-output", default="")
     release.set_defaults(handler=release_metadata)
+
+    release_notes_parser = subparsers.add_parser(
+        "release-notes",
+        help="Build GitHub release notes from the changelog section and commit range",
+    )
+    release_notes_parser.add_argument("--repository", required=True)
+    release_notes_parser.add_argument("--current-tag", default="")
+    release_notes_parser.add_argument("--current-ref", default="")
+    release_notes_parser.add_argument("--previous-tag", default="")
+    release_notes_parser.add_argument("--output-file", default="")
+    release_notes_parser.add_argument("--json", action="store_true")
+    release_notes_parser.set_defaults(handler=release_notes)
 
     release_gate = subparsers.add_parser(
         "release-publish-gate",

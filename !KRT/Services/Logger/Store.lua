@@ -16,22 +16,31 @@ addon.Services.Logger = addon.Services.Logger or {}
 addon.Services.Logger.Store = addon.Services.Logger.Store or {}
 
 local Store = addon.Services.Logger.Store
+local bossIdx
+local lootIdx
+local playerIdx
+local resolvePlayerNameByNid
+local resolvePlayerClassByNid
+local resolveLootLooterNid
+local resolveLootLooterName
+local resolveLootLooterClass
+local invalidateIndexes
 
 -- ----- Private helpers ----- --
 
 -- ----- Public methods ----- --
 
-function Store:ResolvePlayerNameByNid(raid, playerNid)
-    local player = self and self.GetPlayer and self:GetPlayer(raid, playerNid) or nil
+resolvePlayerNameByNid = function(raid, playerNid)
+    local player = Store and Store.GetPlayer and Store:GetPlayer(raid, playerNid) or nil
     return player and player.name or nil
 end
 
-function Store:ResolvePlayerClassByNid(raid, playerNid)
-    local player = self and self.GetPlayer and self:GetPlayer(raid, playerNid) or nil
+resolvePlayerClassByNid = function(raid, playerNid)
+    local player = Store and Store.GetPlayer and Store:GetPlayer(raid, playerNid) or nil
     return player and player.class or nil
 end
 
-function Store:ResolveLootLooterNid(raid, looter)
+resolveLootLooterNid = function(raid, looter)
     local looterNid = tonumber(looter)
     if looterNid and looterNid > 0 then
         return looterNid
@@ -55,13 +64,13 @@ function Store:ResolveLootLooterNid(raid, looter)
     return nil
 end
 
-function Store:ResolveLootLooterName(raid, loot)
+resolveLootLooterName = function(raid, loot)
     if type(loot) ~= "table" then
         return nil
     end
     local looterNid = tonumber(loot.looterNid)
     if looterNid and looterNid > 0 then
-        local playerName = self:ResolvePlayerNameByNid(raid, looterNid)
+        local playerName = resolvePlayerNameByNid(raid, looterNid)
         if playerName and playerName ~= "" then
             return playerName
         end
@@ -69,13 +78,13 @@ function Store:ResolveLootLooterName(raid, loot)
     return nil
 end
 
-function Store:ResolveLootLooterClass(raid, loot)
+resolveLootLooterClass = function(raid, loot)
     if type(loot) ~= "table" then
         return nil
     end
     local looterNid = tonumber(loot.looterNid)
     if looterNid and looterNid > 0 then
-        return self:ResolvePlayerClassByNid(raid, looterNid)
+        return resolvePlayerClassByNid(raid, looterNid)
     end
     return nil
 end
@@ -120,7 +129,7 @@ function Store:GetRaidByNid(raidNid)
     return raid
 end
 
-function Store:InvalidateIndexes(raid)
+invalidateIndexes = function(raid)
     if type(raid) ~= "table" then
         return
     end
@@ -131,7 +140,14 @@ function Store:InvalidateIndexes(raid)
     raid._runtime = nil
 end
 
-function Store:BossIdx(raid, bossNid)
+Store._ResolvePlayerNameByNid = resolvePlayerNameByNid
+Store._ResolvePlayerClassByNid = resolvePlayerClassByNid
+Store._ResolveLootLooterNid = resolveLootLooterNid
+Store._ResolveLootLooterName = resolveLootLooterName
+Store._ResolveLootLooterClass = resolveLootLooterClass
+Store._InvalidateIndexes = invalidateIndexes
+
+bossIdx = function(raid, bossNid)
     local queryNid = tonumber(bossNid)
     if not (raid and queryNid) then
         return nil
@@ -142,7 +158,7 @@ function Store:BossIdx(raid, bossNid)
     return idxByNid and idxByNid[queryNid] or nil
 end
 
-function Store:LootIdx(raid, lootNid)
+lootIdx = function(raid, lootNid)
     local queryNid = tonumber(lootNid)
     if not (raid and queryNid) then
         return nil
@@ -154,16 +170,16 @@ function Store:LootIdx(raid, lootNid)
 end
 
 function Store:GetBoss(raid, bossNid)
-    local idx = self:BossIdx(raid, bossNid)
+    local idx = bossIdx(raid, bossNid)
     return idx and raid.bossKills[idx] or nil, idx
 end
 
 function Store:GetLoot(raid, lootNid)
-    local idx = self:LootIdx(raid, lootNid)
+    local idx = lootIdx(raid, lootNid)
     return idx and raid.loot[idx] or nil, idx
 end
 
-function Store:PlayerIdx(raid, playerNid)
+playerIdx = function(raid, playerNid)
     local queryNid = tonumber(playerNid)
     if not (raid and queryNid) then
         return nil
@@ -175,7 +191,7 @@ function Store:PlayerIdx(raid, playerNid)
 end
 
 function Store:GetPlayer(raid, playerNid)
-    local idx = self:PlayerIdx(raid, playerNid)
+    local idx = playerIdx(raid, playerNid)
     return idx and raid.players[idx] or nil, idx
 end
 

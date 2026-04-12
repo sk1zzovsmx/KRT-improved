@@ -187,8 +187,8 @@ do
 
     local function publishSyntheticDelta(delta, raidId)
         local raidService = getRaidService()
-        if raidService and raidService.PublishRosterDelta then
-            raidService:PublishRosterDelta(delta, raidId)
+        if raidService and raidService._PublishRosterDelta then
+            raidService._PublishRosterDelta(delta, raidId)
         end
     end
 

@@ -49,6 +49,29 @@ py -3 tools/krt.py run-sv-inspector --saved-variables-path "WTF\Account\<Account
 
 Use direct PowerShell only when you need to pass the native script parameters exactly as-is.
 
+## 2.1 API Catalog Refresh
+
+Use this sequence before and after API cleanup waves:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-inventory.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-classify.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/fnmap-api-census.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/update-tree.ps1
+py -3 tools/krt.py repo-quality-check --check all
+```
+
+Run the `fnmap` steps sequentially in that order. `fnmap-classify.ps1` depends on the
+fresh CSV written by `fnmap-inventory.ps1`, so parallel runs can produce stale catalogs.
+
+Expected:
+
+- `docs/FUNCTION_REGISTRY.csv` refreshed
+- `docs/FN_CLUSTERS.md` refreshed
+- `docs/API_REGISTRY*.csv` and `docs/API_NOMENCLATURE_CENSUS.md` refreshed
+- `docs/TREE.md` refreshed
+- repo-level static checks still pass after the contraction
+
 ## 3) Direct PowerShell Equivalents
 
 ```powershell
@@ -101,6 +124,7 @@ Get-ChildItem -Recurse !KRT/UI -Filter *.xml |
 ```powershell
 py -3 tools/krt.py release-metadata --json
 py -3 tools/krt.py release-publish-gate --previous-ref HEAD^ --json
+py -3 tools/krt.py release-notes --repository <owner>/<repo> --current-ref HEAD --output-file dist/release-notes.md
 py -3 tools/krt.py build-release-zip --output-dir dist --write-checksum
 ```
 
@@ -108,6 +132,8 @@ Expected:
 
 - metadata resolves from `!KRT/CHANGELOG.md` + `!KRT/!KRT.toc`
 - publish gate accepts only strictly increasing publishable SemVer versions
+- release notes render changelog-backed `New Functions` / `Enhancements`
+  sections plus commit summary and compare link
 - archive contains only `!KRT/`
 
 ## 6) Hook Setup

@@ -16,6 +16,8 @@ local C = feature.C
 local Core = feature.Core or addon.Core
 local Bus = feature.Bus or addon.Bus
 local Services = feature.Services or addon.Services
+local Chat = Services.Chat
+local Raid = Services.Raid
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
@@ -122,24 +124,17 @@ do
     end
 
     local function canBroadcastCounter()
-        local raidService = Services.Raid
+        local raidService = Raid
         if not (raidService and raidService.IsPlayerInRaid and raidService:IsPlayerInRaid()) then
             return false, "not_in_raid"
         end
 
-        if type(addon.GetRaidCapabilityState) == "function" then
-            local state = addon:GetRaidCapabilityState("changes_broadcast")
+        if type(raidService.GetCapabilityState) == "function" then
+            local state = raidService:GetCapabilityState("changes_broadcast")
             if state and state.allowed == true then
                 return true
             end
             return false, state and state.reason or "missing_leadership"
-        end
-
-        if type(addon.CanUseRaidCapability) == "function" then
-            if addon:CanUseRaidCapability("changes_broadcast") then
-                return true
-            end
-            return false, "missing_leadership"
         end
 
         if Core.GetUnitRank then
@@ -155,6 +150,12 @@ do
     local function warnBroadcastDenied(reason)
         if reason == "missing_leadership" or reason == "missing_rank" then
             addon:warn(L.WarnLootCounterBroadcastNotAllowed)
+        end
+    end
+
+    local function announceToRaid(text)
+        if Chat and Chat.Announce then
+            Chat:Announce(text, "RAID")
         end
     end
 
@@ -397,18 +398,18 @@ do
         local players = getCurrentRaidPlayers()
         local groupedByCount, counts = collectAnnounceGroups(players)
         if #counts <= 0 then
-            addon:Announce(L.StrLootCounterAnnounceNone, "RAID")
+            announceToRaid(L.StrLootCounterAnnounceNone)
             return
         end
 
-        addon:Announce(L.StrLootCounterAnnounceHeader, "RAID")
+        announceToRaid(L.StrLootCounterAnnounceHeader)
         local outLines = {}
         for i = 1, #counts do
             local count = counts[i]
             appendBucketLines(outLines, count, groupedByCount[count])
         end
         for i = 1, #outLines do
-            addon:Announce(outLines[i], "RAID")
+            announceToRaid(outLines[i])
         end
     end
 

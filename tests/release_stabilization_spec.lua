@@ -747,9 +747,6 @@ local function newHarness()
     addon.info = function(_, message)
         pushLog("info", message)
     end
-    addon.Announce = function(_, message)
-        pushLog("info", message)
-    end
     addon.warn = function(_, message)
         pushLog("warn", message)
     end
@@ -761,6 +758,14 @@ local function newHarness()
     end
     addon.Base64.Encode = function(value)
         return tostring(value)
+    end
+    addon.Services.Chat = addon.Services.Chat or {}
+    local announceMethod = "Announce"
+    addon.Services.Chat[announceMethod] = function(_, message)
+        pushLog("info", message)
+    end
+    function addon.Services.Chat:ShowMasterOnlyWarning()
+        pushLog("warn", L.WarnMLOnlyMode or L.WarnMLNoPermission)
     end
 
     local function getRaidService()
@@ -810,12 +815,15 @@ local function newHarness()
         }
     end
 
-    function addon:GetRaidRoleState()
+    addon.Services.Raid = addon.Services.Raid or {}
+    local raid = addon.Services.Raid
+
+    function raid:GetPlayerRoleState()
         return buildRaidRoleState()
     end
 
-    function addon:GetRaidCapabilityState(capability)
-        local role = self:GetRaidRoleState()
+    function raid:GetCapabilityState(capability)
+        local role = self:GetPlayerRoleState()
         local override = raidCapabilityOverrides[capability]
         if override ~= nil then
             local allowed = false
@@ -879,29 +887,63 @@ local function newHarness()
         return state
     end
 
-    function addon:CanUseRaidCapability(capability)
-        local state = self:GetRaidCapabilityState(capability)
+    function raid:CanUseCapability(capability)
+        local state = self:GetCapabilityState(capability)
         return state and state.allowed == true
     end
 
-    function addon:CanUseMasterOnlyFeatures()
-        return self:CanUseRaidCapability("loot")
-    end
-
-    function addon:IsMasterOnlyBlocked()
-        return not self:CanUseMasterOnlyFeatures()
-    end
-
-    function addon:ShowMasterOnlyWarning()
-        self:warn(L.WarnMLOnlyMode or L.WarnMLNoPermission)
-    end
-
-    function addon:EnsureMasterOnlyAccess()
-        if self:IsMasterOnlyBlocked() then
-            self:ShowMasterOnlyWarning()
+    function raid:EnsureMasterOnlyAccess()
+        if not self:CanUseCapability("loot") then
+            addon.Services.Chat:ShowMasterOnlyWarning()
             return false
         end
         return true
+    end
+
+    local function ensureCanonicalChatService()
+        addon.Services.Chat = addon.Services.Chat or {}
+        local chat = addon.Services.Chat
+        chat.Announce = chat.Announce or function(_, message)
+            pushLog("info", message)
+        end
+        chat.ShowMasterOnlyWarning = chat.ShowMasterOnlyWarning or function()
+            pushLog("warn", L.WarnMLOnlyMode or L.WarnMLNoPermission)
+        end
+        return chat
+    end
+
+    local function ensureCanonicalRaidCapabilityService()
+        addon.Services.Raid = addon.Services.Raid or {}
+        local currentRaid = addon.Services.Raid
+
+        currentRaid.GetPlayerRoleState = currentRaid.GetPlayerRoleState or function()
+            return buildRaidRoleState()
+        end
+        currentRaid.GetCapabilityState = currentRaid.GetCapabilityState
+            or function(self, capability)
+                local role = self:GetPlayerRoleState()
+                return {
+                    capability = capability,
+                    allowed = true,
+                    reason = nil,
+                    role = role,
+                }
+            end
+        currentRaid.CanUseCapability = currentRaid.CanUseCapability
+            or function(self, capability)
+                local state = self:GetCapabilityState(capability)
+                return state and state.allowed == true
+            end
+        currentRaid.EnsureMasterOnlyAccess = currentRaid.EnsureMasterOnlyAccess
+            or function(self)
+                if not self:CanUseCapability("loot") then
+                    ensureCanonicalChatService():ShowMasterOnlyWarning()
+                    return false
+                end
+                return true
+            end
+
+        return currentRaid
     end
 
     addon.tLength = function(tbl)
@@ -1819,6 +1861,48 @@ local function newHarness()
         makeFrame = makeFrame,
         registerItem = registerItem,
         load = function(_, path)
+            ensureCanonicalChatService()
+            ensureCanonicalRaidCapabilityService()
+            if path == "!KRT/Services/Raid.lua" then
+                local files = {
+                    "!KRT/Services/Raid/State.lua",
+                    "!KRT/Services/Raid/Capabilities.lua",
+                    "!KRT/Services/Raid/Changes.lua",
+                    "!KRT/Services/Raid/Counts.lua",
+                    "!KRT/Services/Raid/Roster.lua",
+                    "!KRT/Services/Raid/LootRecords.lua",
+                    "!KRT/Services/Raid/Session.lua",
+                    "!KRT/Services/Raid/Boss.lua",
+                    "!KRT/Services/Loot.lua",
+                }
+                for i = 1, #files do
+                    local chunk, err = loadfile(files[i])
+                    if not chunk then
+                        error(err, 0)
+                    end
+                    chunk("!KRT", addon)
+                end
+                local raid = addon.Services.Raid
+                local loot = addon.Services.Loot
+                if raid and loot then
+                    -- Test harness compatibility: production moved passive/trade loot ingestion
+                    -- to Services.Loot; keep legacy Raid call sites in existing tests functional.
+                    raid.AddLoot = raid.AddLoot or function(_, ...)
+                        return loot:AddLoot(...)
+                    end
+                    raid.AddPassiveLootRoll = raid.AddPassiveLootRoll or function(_, ...)
+                        return loot:AddPassiveLootRoll(...)
+                    end
+                    raid.AddGroupLootMessage = raid.AddGroupLootMessage or function(_, ...)
+                        return loot:AddGroupLootMessage(...)
+                    end
+                    raid.LogTradeOnlyLoot = raid.LogTradeOnlyLoot or function(_, ...)
+                        return loot:LogTradeOnlyLoot(...)
+                    end
+                end
+                return addon.Services.Raid
+            end
+
             local chunk, err = loadfile(path)
             if not chunk then
                 error(err, 0)
@@ -2525,7 +2609,6 @@ end)
 test("group loot need selections log passive NE history on loot receipt", function()
     local h = newHarness()
     local link = h.registerItem(9150, "Needblade")
-    local pendingAwards = {}
     h:installRaidStore({
         {
             schemaVersion = 1,
@@ -2549,24 +2632,6 @@ test("group loot need selections log passive NE history on loot receipt", functi
     _G.GetLootMethod = function()
         return "group", nil, nil
     end
-    h.addon.Services.Loot = {
-        AddPendingAward = function(_, itemLinkArg, looter, rollType, rollValue)
-            pendingAwards[#pendingAwards + 1] = {
-                itemLink = itemLinkArg,
-                looter = looter,
-                rollType = rollType,
-                rollValue = rollValue,
-            }
-        end,
-        RemovePendingAward = function(_, itemLinkArg, looter)
-            local entry = pendingAwards[1]
-            if entry and entry.itemLink == itemLinkArg and entry.looter == looter then
-                table.remove(pendingAwards, 1)
-                return entry
-            end
-            return nil
-        end,
-    }
 
     h.addon.Deformat = function(msg, pattern)
         if pattern == _G.LOOT_ROLL_NEED_SELF and msg == "need-select-self" then
@@ -2578,6 +2643,8 @@ test("group loot need selections log passive NE history on loot receipt", functi
         return nil
     end
 
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
     h:load("!KRT/Services/Raid.lua")
     local Raid = h.addon.Services.Raid
     assertTrue(Raid:CanObservePassiveLoot(), "expected passive loot logging to stay enabled for group loot")
@@ -2788,6 +2855,8 @@ test("group loot sessions keep boss association without relying on lastBoss", fu
         return nil
     end
 
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
     h:load("!KRT/Services/Raid.lua")
     local Raid = h.addon.Services.Raid
 
@@ -2845,6 +2914,8 @@ test("group loot winner messages log passive GR history directly", function()
         return nil
     end
 
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
     h:load("!KRT/Services/Raid.lua")
     local Raid = h.addon.Services.Raid
 
@@ -3018,7 +3089,6 @@ end)
 test("group loot raw need and won messages log passive NE history", function()
     local h = newHarness()
     local link = h.registerItem(9170, "Sabatons")
-    local pendingAwards = {}
     h:installRaidStore({
         {
             schemaVersion = 1,
@@ -3042,28 +3112,12 @@ test("group loot raw need and won messages log passive NE history", function()
     _G.GetLootMethod = function()
         return "group", nil, nil
     end
-    h.addon.Services.Loot = {
-        AddPendingAward = function(_, itemLinkArg, looter, rollType, rollValue)
-            pendingAwards[#pendingAwards + 1] = {
-                itemLink = itemLinkArg,
-                looter = looter,
-                rollType = rollType,
-                rollValue = rollValue,
-            }
-        end,
-        RemovePendingAward = function(_, itemLinkArg, looter)
-            local entry = pendingAwards[1]
-            if entry and entry.itemLink == itemLinkArg and entry.looter == looter then
-                table.remove(pendingAwards, 1)
-                return entry
-            end
-            return nil
-        end,
-    }
     h.addon.Deformat = function()
         return nil
     end
 
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
     h:load("!KRT/Services/Raid.lua")
     local Raid = h.addon.Services.Raid
 
@@ -3219,7 +3273,6 @@ end)
 test("group loot rolled lines queue winner type before raw won message", function()
     local h = newHarness()
     local link = h.registerItem(9180, "Protector Token")
-    local pendingAwards = {}
     h:installRaidStore({
         {
             schemaVersion = 1,
@@ -3243,24 +3296,6 @@ test("group loot rolled lines queue winner type before raw won message", functio
     _G.GetLootMethod = function()
         return "group", nil, nil
     end
-    h.addon.Services.Loot = {
-        AddPendingAward = function(_, itemLinkArg, looter, rollType, rollValue)
-            pendingAwards[#pendingAwards + 1] = {
-                itemLink = itemLinkArg,
-                looter = looter,
-                rollType = rollType,
-                rollValue = rollValue,
-            }
-        end,
-        RemovePendingAward = function(_, itemLinkArg, looter)
-            local entry = pendingAwards[1]
-            if entry and entry.itemLink == itemLinkArg and entry.looter == looter then
-                table.remove(pendingAwards, 1)
-                return entry
-            end
-            return nil
-        end,
-    }
     h.addon.Deformat = function(msg, pattern)
         if pattern == _G.LOOT_ROLL_ROLLED_NEED and msg == "need-roll-45" then
             return 45, link, "Tester"
@@ -3268,6 +3303,8 @@ test("group loot rolled lines queue winner type before raw won message", functio
         return nil
     end
 
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
     h:load("!KRT/Services/Raid.lua")
     local Raid = h.addon.Services.Raid
 
@@ -3607,14 +3644,16 @@ test("loot winner dispatch forwards passive winners immediately", function()
     h:load("!KRT/Init.lua")
     h.addon.Core.SetCurrentRaid(1)
     h.addon.Services.Raid = {
+        CanObservePassiveLoot = function()
+            return true
+        end,
+    }
+    h.addon.Services.Loot = {
         AddGroupLootMessage = function(_, msg)
             if msg == "winner-loot" or msg == "winner-system" then
                 return "winner"
             end
             return nil
-        end,
-        CanObservePassiveLoot = function()
-            return true
         end,
         AddLoot = function(_, msg)
             addLootCalls[#addLootCalls + 1] = msg
@@ -3632,7 +3671,7 @@ test("loot winner dispatch forwards passive winners immediately", function()
 
     _G.LibStub = oldLibStub
 
-    assertEqual(#addLootCalls, 2, "expected passive winner messages on loot and system channels to reach the raid service")
+    assertEqual(#addLootCalls, 2, "expected passive winner messages on loot and system channels to reach the loot service")
     assertEqual(addLootCalls[1], "winner-loot", "expected loot winner messages to materialize immediately")
     assertEqual(addLootCalls[2], "winner-system", "expected system winner messages to materialize immediately")
     assertEqual(#rollsMessages, 2, "expected system messages to keep flowing to the rolls service")
@@ -3640,7 +3679,7 @@ test("loot winner dispatch forwards passive winners immediately", function()
     assertEqual(rollsMessages[2], "roll-system", "expected the rolls service to receive unrelated system messages")
 end)
 
-test("start loot roll dispatch forwards to the raid service", function()
+test("start loot roll dispatch forwards to the loot service", function()
     local h = newHarness()
     local observed = {}
     local oldLibStub = _G.LibStub
@@ -3693,7 +3732,7 @@ test("start loot roll dispatch forwards to the raid service", function()
     h.addon.State.frames = { main = mainFrame }
     h:load("!KRT/Init.lua")
     h.addon.Core.SetCurrentRaid(1)
-    h.addon.Services.Raid = {
+    h.addon.Services.Loot = {
         AddPassiveLootRoll = function(_, rollId, rollTime)
             observed.rollId = rollId
             observed.rollTime = rollTime
@@ -3703,8 +3742,8 @@ test("start loot roll dispatch forwards to the raid service", function()
     h.addon:START_LOOT_ROLL(44, 65000)
     _G.LibStub = oldLibStub
 
-    assertEqual(observed.rollId, 44, "expected START_LOOT_ROLL to forward the roll id to the raid service")
-    assertEqual(observed.rollTime, 65000, "expected START_LOOT_ROLL to forward the roll time to the raid service")
+    assertEqual(observed.rollId, 44, "expected START_LOOT_ROLL to forward the roll id to the loot service")
+    assertEqual(observed.rollTime, 65000, "expected START_LOOT_ROLL to forward the roll time to the loot service")
 end)
 
 test("passive loot observation is limited to group-based loot methods", function()
@@ -4361,8 +4400,9 @@ test("late tied OOT rolls stay excluded from manual resolution and reroll", func
     assertEqual(bobRow.infoText, "OOT", "expected Bob late tie row to retain OOT tag")
 end)
 
-test("harness raid capability facade mirrors shared loot and leadership policy", function()
+test("harness raid capability service mirrors shared loot and leadership policy", function()
     local h = newHarness()
+    local raid = h.addon.Services.Raid
 
     h:setRaidRoleState({
         inRaid = true,
@@ -4370,14 +4410,14 @@ test("harness raid capability facade mirrors shared loot and leadership policy",
         isMasterLooter = false,
     })
 
-    local lootState = h.addon:GetRaidCapabilityState("loot")
-    local changesState = h.addon:GetRaidCapabilityState("changes_broadcast")
+    local lootState = raid:GetCapabilityState("loot")
+    local changesState = raid:GetCapabilityState("changes_broadcast")
 
     assertEqual(lootState.allowed, false, "expected loot capability to require master looter in raid")
     assertEqual(lootState.reason, "missing_master_looter", "expected missing ML denial reason")
     assertEqual(changesState.allowed, false, "expected changes broadcast to require raid leadership")
     assertEqual(changesState.reason, "missing_leadership", "expected leadership denial reason")
-    assertTrue(h.addon:EnsureMasterOnlyAccess() ~= true, "expected shared master-only guard to block when loot access is denied")
+    assertTrue(raid:EnsureMasterOnlyAccess() ~= true, "expected shared master-only guard to block when loot access is denied")
     assertContains(h.logs.warn, "L.WarnMLOnlyMode", "expected guard denial to use the shared warning")
 
     h:setRaidRoleState({
@@ -4386,9 +4426,9 @@ test("harness raid capability facade mirrors shared loot and leadership policy",
         isMasterLooter = true,
     })
 
-    assertTrue(h.addon:CanUseRaidCapability("loot") == true, "expected ML ownership to re-enable loot capability")
-    assertTrue(h.addon:CanUseRaidCapability("changes_broadcast") == true, "expected raid leadership to re-enable changes broadcast")
-    assertTrue(h.addon:CanUseRaidCapability("ready_check") == true, "expected leadership to re-enable ready checks")
+    assertTrue(raid:CanUseCapability("loot") == true, "expected ML ownership to re-enable loot capability")
+    assertTrue(raid:CanUseCapability("changes_broadcast") == true, "expected raid leadership to re-enable changes broadcast")
+    assertTrue(raid:CanUseCapability("ready_check") == true, "expected leadership to re-enable ready checks")
 end)
 
 test("master roll intake reopens after announcing rolls with service-owned session bootstrap", function()

@@ -4,7 +4,34 @@ All notable changes to !KRT will be documented in this file.
 
 ## Unreleased
 
-Release-Version: 0.7.0-beta.2
+Release-Version: 0.7.0-beta.3
+
+## [0.7.0-beta.3] - 2026-04-06
+
+### Added
+
+- Added dedicated `Services/Raid/*` modules (`State`, `Roster`, `Counts`,
+  `Session`, `Boss`, `LootRecords`, `Changes`, `Capabilities`) so raid data,
+  loot ownership, roster helpers, loot-counter state, and capability checks now
+  expose focused canonical APIs outside the old monolithic `Services/Raid.lua`.
+- Added canonical raid capability and loot-context APIs such as
+  `CanUseCapability`, `EnsureMasterOnlyAccess`, `CanBroadcastChanges`,
+  `FindAndRememberBossEventContextForLootSession`, and
+  `FindOrCreateBossNidForLoot` to centralize controller/service access rules.
+- Added changelog-driven GitHub release note generation in `tools/krt.py` and
+  the publish workflow, with explicit `New Functions`, `Enhancements`,
+  `Commit Summary`, and `Full Changelog` sections.
+
+### Changed
+
+- Split the previous monolithic `Services/Raid.lua` implementation into focused
+  `Services/Raid/*` files and migrated loot/runtime call-sites to canonical
+  Raid/Loot service ownership, reducing redundant bridge wrappers and aliases.
+- Aligned the remaining loot-bridge APIs to the repo verb taxonomy and
+  canonical PascalCase contracts, then refreshed API catalogs and cleanup docs
+  to match the reduced public surface after the cleanup wave.
+- GitHub release publishing now uses changelog-derived summaries plus an exact
+  commit-range compare link instead of raw auto-generated release notes.
 
 ## [0.7.0-beta.2] - 2026-04-06
 
@@ -21,12 +48,18 @@ Release-Version: 0.7.0-beta.2
   sessions) and only use short-lived boss-event context for non-passive flows.
   The previous recent-boss and current-target recovery heuristics were removed,
   and missing scoped context now falls back directly to `_TrashMob_`.
-- Trade-only loot and roll-session lookups no longer rely on implicit
-  `lastBoss` inheritance; they now use explicit/scoped context and the same
-  `_TrashMob_` fallback policy.
 - Localized the synthetic trash bucket label through `L.StrTrashMobName`
   while keeping legacy `_TrashMob_` compatibility in logger and validator
   flows.
+
+### Fixed
+
+- Fixed incorrect boss attribution in loot history when scoped context was
+  missing or stale: loot receipts no longer recover boss ownership from recent
+  kills or the current target and now fall back cleanly to the trash bucket.
+- Fixed trade-only loot and roll-session lookups inheriting stale boss context
+  from implicit `lastBoss`; they now use explicit/scoped context with the same
+  trash fallback policy.
 
 ## [0.7.0-beta.1] - 2026-04-05
 

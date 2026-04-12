@@ -401,7 +401,7 @@ local function showTooltip(frame)
     GameTooltip:Show()
 end
 
-local function hideTooltip()
+function Frames.HideTooltip()
     GameTooltip:Hide()
 end
 
@@ -416,7 +416,7 @@ function Frames.SetTooltip(frame, text, anchor, title)
         return
     end
     frame:SetScript("OnEnter", showTooltip)
-    frame:SetScript("OnLeave", hideTooltip)
+    frame:SetScript("OnLeave", Frames.HideTooltip)
 end
 
 function Frames.MakeEventDrivenRefresher(targetOrGetter, updateFn)

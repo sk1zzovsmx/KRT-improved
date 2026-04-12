@@ -218,7 +218,7 @@ function Helpers.FindLoggerPlayer(normalizedName, raid, bossKill)
     if bossKill and bossKill.players then
         for i = 1, #bossKill.players do
             local playerNid = tonumber(bossKill.players[i])
-            local playerName = playerNid and Store:ResolvePlayerNameByNid(raid, playerNid) or nil
+            local playerName = playerNid and Store._ResolvePlayerNameByNid(raid, playerNid) or nil
             if playerName and normalizedName == Strings.NormalizeLower(playerName) then
                 return playerName
             end

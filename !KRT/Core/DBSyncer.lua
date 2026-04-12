@@ -16,6 +16,7 @@ local Strings = feature.Strings or addon.Strings
 local Base64 = feature.Base64 or addon.Base64
 local Time = feature.Time or addon.Time
 local Comms = feature.Comms or addon.Comms
+local Services = feature.Services or addon.Services
 
 local _G = _G
 local tinsert = table.insert
@@ -314,8 +315,9 @@ do
         if not addon.IsInRaid() then
             return true
         end
-        if type(addon.CanUseRaidCapability) == "function" then
-            return addon:CanUseRaidCapability("raid_leadership")
+        local raidService = Services and Services.Raid or nil
+        if raidService and type(raidService.CanUseCapability) == "function" then
+            return raidService:CanUseCapability("raid_leadership")
         end
 
         local leaderFn = addon.UnitIsGroupLeader

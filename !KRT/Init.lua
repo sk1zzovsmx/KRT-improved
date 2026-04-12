@@ -330,6 +330,18 @@ function Core.GetController(name)
     return controllers and controllers[name] or nil
 end
 
+function Core.RequestControllerMethod(name, methodName, ...)
+    if type(methodName) ~= "string" or methodName == "" then
+        return nil
+    end
+    local controller = Core.GetController(name)
+    local method = controller and controller[methodName]
+    if type(method) ~= "function" then
+        return nil
+    end
+    return method(controller, ...)
+end
+
 function Core.GetPlayerName()
     local state = addon.State
     state.player = state.player or {}
@@ -1081,50 +1093,6 @@ do
         return getService("Raid")
     end
 
-    function addon:GetRaidRoleState()
-        local raidService = getRaidService()
-        if not raidService or type(raidService.GetPlayerRoleState) ~= "function" then
-            return nil
-        end
-        return raidService:GetPlayerRoleState()
-    end
-
-    function addon:GetRaidCapabilityState(capability)
-        local raidService = getRaidService()
-        if not raidService or type(raidService.GetCapabilityState) ~= "function" then
-            return {
-                capability = capability,
-                allowed = true,
-                reason = "raid_service_unavailable",
-                role = addon:GetRaidRoleState(),
-            }
-        end
-        return raidService:GetCapabilityState(capability)
-    end
-
-    function addon:CanUseRaidCapability(capability)
-        local state = self:GetRaidCapabilityState(capability)
-        return state and state.allowed == true
-    end
-
-    function addon:CanUseMasterOnlyFeatures()
-        return self:CanUseRaidCapability("loot")
-    end
-
-    function addon:IsMasterOnlyBlocked()
-        return not self:CanUseMasterOnlyFeatures()
-    end
-
-    function addon:EnsureMasterOnlyAccess()
-        if self:IsMasterOnlyBlocked() then
-            if type(self.ShowMasterOnlyWarning) == "function" then
-                self:ShowMasterOnlyWarning()
-            end
-            return false
-        end
-        return true
-    end
-
     local function getRaidStoreOrNil(contextTag, requiredMethods)
         if not Core.GetRaidStoreOrNil then
             return nil
@@ -1420,10 +1388,16 @@ do
     local function observePassiveLootMessage(msg)
         local currentRaid = Core.GetCurrentRaid()
         local raidService = getRaidService()
-        if not (currentRaid and raidService and raidService.AddGroupLootMessage) then
+        local lootService = getService("Loot")
+        if not currentRaid then
             return raidService, nil
         end
-        return raidService, raidService:AddGroupLootMessage(msg)
+
+        if lootService and lootService.AddGroupLootMessage then
+            return raidService, lootService:AddGroupLootMessage(msg)
+        end
+
+        return raidService, nil
     end
 
     -- CHAT_MSG_LOOT: Adds looted items to the raid log.
@@ -1431,13 +1405,16 @@ do
         addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
         local currentRaid = Core.GetCurrentRaid()
         local raidService, observedType = observePassiveLootMessage(msg)
+        local lootService = getService("Loot")
         if not (currentRaid and raidService) then
             return
         end
 
-        local canObservePassiveLoot = raidService.CanObservePassiveLoot and raidService:CanObservePassiveLoot() or addon:CanUseMasterOnlyFeatures()
+        local canObservePassiveLoot = raidService.CanObservePassiveLoot and raidService:CanObservePassiveLoot()
         if canObservePassiveLoot and (observedType == nil or observedType == "winner") then
-            raidService:AddLoot(msg)
+            if lootService and lootService.AddLoot then
+                lootService:AddLoot(msg)
+            end
         end
     end
 
@@ -1445,14 +1422,17 @@ do
     function addon:CHAT_MSG_SYSTEM(msg)
         local currentRaid = Core.GetCurrentRaid()
         local raidService, observedType = observePassiveLootMessage(msg)
+        local lootService = getService("Loot")
         if currentRaid and raidService then
-            local canObservePassiveLoot = raidService.CanObservePassiveLoot and raidService:CanObservePassiveLoot() or addon:CanUseMasterOnlyFeatures()
+            local canObservePassiveLoot = raidService.CanObservePassiveLoot and raidService:CanObservePassiveLoot()
             if canObservePassiveLoot and observedType == "winner" then
-                raidService:AddLoot(msg)
+                if lootService and lootService.AddLoot then
+                    lootService:AddLoot(msg)
+                end
             end
         end
 
-        if Core.GetCurrentRaid() and addon:IsMasterOnlyBlocked() then
+        if Core.GetCurrentRaid() and raidService and raidService.CanUseCapability and not raidService:CanUseCapability("loot") then
             return
         end
         local rollsService = getService("Rolls")
@@ -1463,11 +1443,10 @@ do
 
     function addon:START_LOOT_ROLL(rollId, rollTime)
         local currentRaid = Core.GetCurrentRaid()
-        local raidService = getRaidService()
-        if not (currentRaid and raidService and raidService.AddPassiveLootRoll) then
-            return
+        local lootService = getService("Loot")
+        if currentRaid and lootService and lootService.AddPassiveLootRoll then
+            lootService:AddPassiveLootRoll(rollId, rollTime)
         end
-        raidService:AddPassiveLootRoll(rollId, rollTime)
     end
 
     -- CHAT_MSG_ADDON: Forwards addon communication messages to the Syncer module.

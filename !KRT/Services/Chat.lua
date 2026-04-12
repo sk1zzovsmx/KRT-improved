@@ -11,6 +11,7 @@ local L = feature.L
 local C = feature.C
 local Strings = feature.Strings or addon.Strings
 local Comms = feature.Comms or addon.Comms
+local Services = feature.Services or addon.Services
 
 local find = string.find
 local len = string.len
@@ -52,14 +53,19 @@ do
     }
 
     -- ----- Private helpers ----- --
+    local function getRaidService()
+        return Services and Services.Raid or nil
+    end
+
     local function isCountdownMessage(text)
         local seconds = addon.Deformat(text, L.ChatCountdownTic)
         return (seconds ~= nil) or (find(text, L.ChatCountdownEnd) ~= nil)
     end
 
     local function canUseRaidWarning()
-        if type(addon.CanUseRaidCapability) == "function" then
-            return addon:CanUseRaidCapability("raid_warning")
+        local raidService = getRaidService()
+        if raidService and type(raidService.CanUseCapability) == "function" then
+            return raidService:CanUseCapability("raid_warning")
         end
 
         local leaderFn = addon.UnitIsGroupLeader or feature.UnitIsGroupLeader
@@ -243,7 +249,8 @@ do
         end
 
         if addon.IsInRaid and addon.IsInRaid() and addon.options and addon.options.useRaidWarning then
-            if type(addon.CanUseRaidCapability) == "function" and not addon:CanUseRaidCapability("raid_warning") then
+            local raidService = getRaidService()
+            if raidService and type(raidService.CanUseCapability) == "function" and not raidService:CanUseCapability("raid_warning") then
                 addon:warn(L.WarnRaidWarningFallback)
             end
         end
@@ -416,14 +423,5 @@ do
         cancelSpamTicker()
         fireSpamTick()
         return true, getSpamRuntimeSnapshot()
-    end
-
-    -- ----- Addon facade ----- --
-    function addon:Announce(text, channel)
-        module:Announce(text, channel)
-    end
-
-    function addon:ShowMasterOnlyWarning()
-        module:ShowMasterOnlyWarning()
     end
 end

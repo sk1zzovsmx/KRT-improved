@@ -39,6 +39,7 @@ local function requireServiceMethod(serviceName, serviceTable, methodName)
 end
 
 local Raid = Services.Raid
+local Chat = Services.Chat
 local RaidApi = {
     GetPlayerClass = requireServiceMethod("Raid", Raid, "GetPlayerClass"),
     CheckPlayer = requireServiceMethod("Raid", Raid, "CheckPlayer"),
@@ -49,6 +50,9 @@ local RaidApi = {
     BuildRaidChangesAnnouncement = requireServiceMethod("Raid", Raid, "BuildRaidChangesAnnouncement"),
     GetRaidChanges = requireServiceMethod("Raid", Raid, "GetRaidChanges"),
     UpsertRaidChange = requireServiceMethod("Raid", Raid, "UpsertRaidChange"),
+}
+local ChatApi = {
+    Announce = requireServiceMethod("Chat", Chat, "Announce"),
 }
 
 -- =========== MS Changes Module  =========== --
@@ -440,7 +444,7 @@ do
         end
 
         local msg = RaidApi.BuildRaidChangesDemandText(Raid)
-        addon:Announce(msg)
+        ChatApi.Announce(Chat, msg)
     end
 
     -- Spam module:
@@ -469,7 +473,7 @@ do
         if not msg then
             return
         end
-        addon:Announce(msg)
+        ChatApi.Announce(Chat, msg)
     end
 
     -- Localize UI Frame:

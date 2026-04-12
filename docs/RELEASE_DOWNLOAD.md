@@ -21,6 +21,12 @@ GitHub publishing starts from that changelog version metadata:
 - pushing to `main` or `master` with a newer SemVer in `!KRT/CHANGELOG.md`
 - or running the publish workflow manually
 
+Published GitHub release notes include:
+- `New Functions` from changelog `### Added`
+- `Enhancements` from changelog `### Changed`
+- `Commit Summary` from the release tag compare range
+- `Full Changelog` as the GitHub compare link
+
 Only strictly newer publishable versions trigger publication:
 - `0.6.0-beta.1 -> 0.6.0-beta.2` publishes
 - `0.6.0-beta.2 -> 0.6.0` publishes

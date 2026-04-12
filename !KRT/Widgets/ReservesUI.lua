@@ -45,7 +45,7 @@ do
             FrameName = nil,
         }
     local UI = module._ui
-    local Service = addon.Services and addon.Services.Reserves and addon.Services.Reserves.Service
+    local Reserves = addon.Services and addon.Services.Reserves
 
     -- ----- Internal state ----- --
 
@@ -85,10 +85,6 @@ do
         return v
     end
 
-    local function hideTooltip()
-        GameTooltip:Hide()
-    end
-
     local function setupReserveRowTooltip(row)
         if not row then
             return
@@ -124,7 +120,7 @@ do
 
         if row.iconBtn then
             row.iconBtn:SetScript("OnEnter", showItemTooltip)
-            row.iconBtn:SetScript("OnLeave", hideTooltip)
+            row.iconBtn:SetScript("OnLeave", Frames.HideTooltip)
         end
 
         if row.textBlock then
@@ -139,7 +135,7 @@ do
                 hs:SetFrameLevel(row.textBlock:GetFrameLevel() + 2)
                 hs:EnableMouse(true)
                 hs:SetScript("OnEnter", showItemTooltip)
-                hs:SetScript("OnLeave", hideTooltip)
+                hs:SetScript("OnLeave", Frames.HideTooltip)
                 row._nameHotspot = hs
             end
 
@@ -152,7 +148,7 @@ do
                 hs:SetFrameLevel(row.textBlock:GetFrameLevel() + 2)
                 hs:EnableMouse(true)
                 hs:SetScript("OnEnter", showPlayersTooltip)
-                hs:SetScript("OnLeave", hideTooltip)
+                hs:SetScript("OnLeave", Frames.HideTooltip)
                 row._playersHotspot = hs
             end
         end
@@ -197,11 +193,11 @@ do
         if not row or not info then
             return
         end
-        local itemIdLabel = Service and Service.FormatReserveItemIdLabel and Service:FormatReserveItemIdLabel(info.itemId)
+        local itemIdLabel = Reserves and Reserves.FormatReserveItemIdLabel and Reserves:FormatReserveItemIdLabel(info.itemId)
             or format(L.StrReservesItemIdLabel, tostring(info.itemId or "?"))
-        local itemFallback = Service and Service.FormatReserveItemFallback and Service:FormatReserveItemFallback(info.itemId)
+        local itemFallback = Reserves and Reserves.FormatReserveItemFallback and Reserves:FormatReserveItemFallback(info.itemId)
             or format(L.StrReservesItemFallback, tostring(info.itemId or "?"))
-        local droppedBy = Service and Service.FormatReserveDroppedBy and Service:FormatReserveDroppedBy(info.source)
+        local droppedBy = Reserves and Reserves.FormatReserveDroppedBy and Reserves:FormatReserveDroppedBy(info.source)
             or ((info.source and info.source ~= "") and format(L.StrReservesTooltipDroppedBy, info.source) or nil)
 
         row._itemId = info.itemId
@@ -267,8 +263,8 @@ do
         if not source then
             return
         end
-        if Service and Service.ToggleSourceCollapsed then
-            Service:ToggleSourceCollapsed(source)
+        if Reserves and Reserves.ToggleSourceCollapsed then
+            Reserves:ToggleSourceCollapsed(source)
         end
         module:RequestRefresh()
     end
@@ -306,7 +302,7 @@ do
         if not frameName then
             return
         end
-        local hasData = Service and Service.HasData and Service:HasData() or false
+        local hasData = Reserves and Reserves.HasData and Reserves:HasData() or false
         local clearButton = _G[frameName .. "ClearButton"]
         if clearButton then
             if hasData then
@@ -374,7 +370,7 @@ do
         end
 
         if header.label then
-            local collapsed = Service and Service.IsSourceCollapsed and Service:IsSourceCollapsed(source)
+            local collapsed = Reserves and Reserves.IsSourceCollapsed and Reserves:IsSourceCollapsed(source)
             local prefix = collapsed and "|TInterface\\Buttons\\UI-PlusButton-Up:12|t " or "|TInterface\\Buttons\\UI-MinusButton-Up:12|t "
             header.label:SetText(prefix .. source)
         end
@@ -446,7 +442,7 @@ do
         local headerIndex = 0
         local seenSources = {}
         local firstRenderedRowBySource = {}
-        local displayList = Service and Service.GetDisplayList and Service:GetDisplayList() or {}
+        local displayList = Reserves and Reserves.GetDisplayList and Reserves:GetDisplayList() or {}
 
         for i = 1, #displayList do
             local entry = displayList[i]
@@ -460,7 +456,7 @@ do
                 yOffset = yOffset + C.RESERVE_HEADER_HEIGHT
             end
 
-            local collapsed = Service and Service.IsSourceCollapsed and Service:IsSourceCollapsed(source)
+            local collapsed = Reserves and Reserves.IsSourceCollapsed and Reserves:IsSourceCollapsed(source)
             if not collapsed then
                 rowIndex = rowIndex + 1
                 local isFirstInGroup = not firstRenderedRowBySource[source]
@@ -487,18 +483,18 @@ do
     end
 
     function module:QueryItemInfo(itemId)
-        if not (Service and Service.QueryItemInfo) then
+        if not (Reserves and Reserves.QueryItemInfo) then
             return false
         end
-        return Service:QueryItemInfo(itemId)
+        return Reserves:QueryItemInfo(itemId)
     end
 
     function module:QueryMissingItems(silent)
-        if not (Service and Service.QueryMissingItems) then
+        if not (Reserves and Reserves.QueryMissingItems) then
             return false, 0
         end
 
-        local updated, count = Service:QueryMissingItems(silent, function(itemId)
+        local updated, count = Reserves:QueryMissingItems(silent, function(itemId)
             module:PrimeItemInfoQuery(itemId)
         end)
 
@@ -523,8 +519,8 @@ do
 
     local function resetSavedFromUI()
         local out
-        if Service and Service.ResetSaved then
-            out = Service:ResetSaved()
+        if Reserves and Reserves.ResetSaved then
+            out = Reserves:ResetSaved()
         end
         module:Hide()
         module:RequestRefresh("reset_saved")
@@ -596,7 +592,7 @@ do
         refreshFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
         refreshFrame:SetScript("OnEvent", function(_, _, itemId)
             addon:debug(Diag.D.LogReservesItemInfoReceived:format(itemId))
-            if not (Service and Service.HasPendingItem and Service:HasPendingItem(itemId)) then
+            if not (Reserves and Reserves._HasPendingItem and Reserves._HasPendingItem(itemId)) then
                 return
             end
 
@@ -652,8 +648,8 @@ do
     end
 
     local function getImportModeString()
-        if Service and Service.GetImportMode then
-            return Service:GetImportMode()
+        if Reserves and Reserves.GetImportMode then
+            return Reserves:GetImportMode()
         end
         local value = addon.options and addon.options.srImportMode
         if value == MODE_PLUS then
@@ -722,13 +718,13 @@ do
                     return
                 end
                 Import:SetImportMode(MODE_MULTI)
-                local parsed = Service and Service.ParseImport and Service:ParseImport(data.csv, "multi")
+                local parsed = Reserves and Reserves.ParseImport and Reserves:ParseImport(data.csv, "multi")
                 if not parsed then
                     setImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
                     return
                 end
 
-                local ok, nPlayers = Service:ApplyImport(parsed, nil, { reason = "import" })
+                local ok, nPlayers = Reserves:ApplyImport(parsed, nil, { reason = "import" })
                 if not ok then
                     setImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
                     return
@@ -788,8 +784,8 @@ do
 
     function Import:SetImportMode(modeValue, suppressSlider)
         local mode = (modeValue == MODE_PLUS) and "plus" or "multi"
-        if Service and Service.SetImportMode then
-            Service:SetImportMode(mode, true)
+        if Reserves and Reserves.SetImportMode then
+            Reserves:SetImportMode(mode, true)
         else
             Options.SetOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
         end
@@ -920,7 +916,7 @@ do
         ensureWrongCSVPopup()
 
         local mode = getImportModeString()
-        local parsed, errCode, errData = Service:ParseImport(csv, mode, { source = "import_window" })
+        local parsed, errCode, errData = Reserves:ParseImport(csv, mode, { source = "import_window" })
         if not parsed then
             if errCode == "CSV_WRONG_FOR_PLUS" then
                 setImportStatus(L.ErrCSVWrongForPlusShort, 1, 0.2, 0.2)
@@ -939,7 +935,7 @@ do
             return false, 0, errCode, errData
         end
 
-        local ok, nPlayersOrErr, applyErrData = Service:ApplyImport(parsed, nil, { reason = "import" })
+        local ok, nPlayersOrErr, applyErrData = Reserves:ApplyImport(parsed, nil, { reason = "import" })
         if not ok then
             setImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
             return false, 0, nPlayersOrErr, applyErrData

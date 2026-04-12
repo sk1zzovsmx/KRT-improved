@@ -62,10 +62,11 @@
 |   |-- Services
 |   |   |-- Logger
 |   |   |   \\-- ...
+|   |   |-- Raid
+|   |   |   \\-- ...
 |   |   |-- Chat.lua
 |   |   |-- Debug.lua
 |   |   |-- Loot.lua
-|   |   |-- Raid.lua
 |   |   |-- README.md
 |   |   |-- Reserves.lua
 |   |   \\-- Rolls.lua
@@ -134,14 +135,6 @@
 |-- .vscode
 |   |-- mcp.json
 |   \\-- settings.json
-|-- dist
-|   |-- KRT-0.7.0-beta.1.zip
-|   |-- KRT-0.7.0-beta.1.zip.sha256
-|   |-- KRT-0.7.0-beta.2.zip
-|   |-- KRT-0.7.0-beta.2.zip.sha256
-|   |-- KRT-beta-0.6.0b.zip
-|   |-- KRT-beta-0.6.1b.zip
-|   \\-- KRT-beta-0.6.2b.zip
 |-- docs
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
@@ -170,6 +163,7 @@
 |   \\-- release_stabilization_spec.lua
 |-- tools
 |   |-- agent-skills.manifest.json
+|   |-- api-contract-cleanup-wave.md
 |   |-- build-release-zip.ps1
 |   |-- check-api-nomenclature.ps1
 |   |-- check-layering.ps1

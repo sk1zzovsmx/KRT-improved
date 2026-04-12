@@ -23,6 +23,8 @@ addon.Services.Logger.View = addon.Services.Logger.View or {}
 
 local View = addon.Services.Logger.View
 local Store = addon.Services.Logger.Store
+local escapeCsvField
+local buildRows
 
 local function getRaidQueries()
     if Core.GetRaidQueries then
@@ -88,7 +90,7 @@ function View:GetRaidDifficultyLabel(raid)
     return ""
 end
 
-function View:EscapeCsvField(value)
+escapeCsvField = function(value)
     local text = tostring(value or "")
     text = text:gsub('"', '""')
     local hasComma = text:find(",", 1, true) ~= nil
@@ -143,7 +145,7 @@ function View:BuildRaidCsv(raid, raidIndex)
 
     local function appendRow(fields)
         for i = 1, #fields do
-            fields[i] = View:EscapeCsvField(fields[i])
+            fields[i] = escapeCsvField(fields[i])
         end
         rows[#rows + 1] = tconcat(fields, ",")
     end
@@ -177,7 +179,7 @@ function View:BuildRaidCsv(raid, raidIndex)
             local boss = bossByNid[tonumber(loot.bossNid)]
             local bossTime = boss and boss.time and date("%Y-%m-%d %H:%M:%S", boss.time) or ""
             local lootTime = loot.time and date("%Y-%m-%d %H:%M:%S", loot.time) or ""
-            local looterName = Store:ResolveLootLooterName(raid, loot) or ""
+            local looterName = Store._ResolveLootLooterName(raid, loot) or ""
 
             appendRow({
                 raidIndex or "",
@@ -204,7 +206,7 @@ function View:BuildRaidCsv(raid, raidIndex)
     return tconcat(rows, "\n")
 end
 
-function View:BuildRows(out, list, pred, map)
+buildRows = function(out, list, pred, map)
     if not out then
         return
     end
@@ -227,7 +229,7 @@ function View:FillBossList(out, raid)
     if queries and queries.GetBossKills then
         return queries:GetBossKills(raid, out)
     end
-    self:BuildRows(out, raid and raid.bossKills, nil, function(boss, i)
+    buildRows(out, raid and raid.bossKills, nil, function(boss, i)
         local it = {}
         it.id = tonumber(boss and boss.bossNid)
         it.seq = i
@@ -244,7 +246,7 @@ function View:FillRaidAttendeesList(out, raid)
     if queries and queries.GetRaidAttendance then
         return queries:GetRaidAttendance(raid, out)
     end
-    self:BuildRows(out, raid and raid.players, nil, function(p)
+    buildRows(out, raid and raid.players, nil, function(p)
         local it = {}
         it.id = tonumber(p and p.playerNid)
         it.name = p.name
@@ -303,14 +305,14 @@ function View:FillLootList(out, raid, bossNid, playerName)
         return queries:GetLoot(raid, bossNid, playerName, out)
     end
     local bossFilter = tonumber(bossNid) or bossNid
-    local playerFilterNid = Store:ResolveLootLooterNid(raid, playerName)
-    self:BuildRows(out, raid and raid.loot, function(v)
+    local playerFilterNid = Store._ResolveLootLooterNid(raid, playerName)
+    buildRows(out, raid and raid.loot, function(v)
         if not v then
             return false
         end
         local okBoss = (not bossFilter) or (bossFilter <= 0) or (tonumber(v.bossNid) == bossFilter)
         local looterNid = tonumber(v.looterNid)
-        local looterName = Store:ResolveLootLooterName(raid, v)
+        local looterName = Store._ResolveLootLooterName(raid, v)
         local okPlayer = not playerName or (playerFilterNid and looterNid and playerFilterNid == looterNid) or ((not playerFilterNid) and looterName and looterName == playerName)
         return okBoss and okPlayer
     end, function(v)
@@ -326,8 +328,8 @@ function View:FillLootList(out, raid, bossNid, playerName)
         local boss = Store:GetBoss(raid, v.bossNid)
         it.sourceName = (boss and boss.name) or ""
         it.looterNid = tonumber(v.looterNid)
-        it.looter = Store:ResolveLootLooterName(raid, v) or ""
-        it.looterClass = Store:ResolveLootLooterClass(raid, v)
+        it.looter = Store._ResolveLootLooterName(raid, v) or ""
+        it.looterClass = Store._ResolveLootLooterClass(raid, v)
         it.rollType = tonumber(v.rollType) or 0
         it.rollValue = v.rollValue
         it.time = v.time or time()

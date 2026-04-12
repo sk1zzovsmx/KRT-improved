@@ -23,23 +23,6 @@ local UIFacade = addon.UI
 addon.Minimap = addon.Minimap or {}
 local module = addon.Minimap
 
-local function getController(name)
-    if Core and Core.GetController then
-        return Core.GetController(name)
-    end
-    local controllers = addon.Controllers
-    return controllers and controllers[name] or nil
-end
-
-local function callControllerMethod(name, methodName, ...)
-    local controller = getController(name)
-    local method = controller and controller[methodName]
-    if type(method) ~= "function" then
-        return nil
-    end
-    return method(controller, ...)
-end
-
 local function getLootCounterController()
     local widget = Widgets.LootCounter
     if type(widget) == "table" and type(widget.Toggle) == "function" then
@@ -111,9 +94,9 @@ end
 local function buildMenu()
     local raid = getRaidService()
     local hasRaidGroup = raid and raid.IsPlayerInRaid and raid:IsPlayerInRaid() or false
-    local hasLootAccess = addon:CanUseRaidCapability("loot")
-    local hasRaidIconsAccess = addon:CanUseRaidCapability("raid_icons")
-    local hasChangesBroadcastAccess = addon:CanUseRaidCapability("changes_broadcast")
+    local hasLootAccess = raid and raid.CanUseCapability and raid:CanUseCapability("loot") or false
+    local hasRaidIconsAccess = raid and raid.CanUseCapability and raid:CanUseCapability("raid_icons") or false
+    local hasChangesBroadcastAccess = raid and raid.CanUseCapability and raid:CanUseCapability("changes_broadcast") or false
     local disableLootActions = nil
     if not hasLootAccess then
         disableLootActions = 1
@@ -137,7 +120,7 @@ local function buildMenu()
             notCheckable = 1,
             disabled = disableLootActions,
             func = function()
-                callControllerMethod("Master", "Toggle")
+                Core.RequestControllerMethod("Master", "Toggle")
             end,
         },
         {
@@ -155,7 +138,7 @@ local function buildMenu()
             text = L.StrLootLogger,
             notCheckable = 1,
             func = function()
-                callControllerMethod("Logger", "Toggle")
+                Core.RequestControllerMethod("Logger", "Toggle")
             end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
@@ -174,7 +157,7 @@ local function buildMenu()
             text = RAID_WARNING,
             notCheckable = 1,
             func = function()
-                callControllerMethod("Warnings", "Toggle")
+                Core.RequestControllerMethod("Warnings", "Toggle")
             end,
         },
         { text = " ", disabled = 1, notCheckable = 1 },
@@ -187,7 +170,7 @@ local function buildMenu()
                     text = L.BtnOpen,
                     notCheckable = 1,
                     func = function()
-                        callControllerMethod("Changes", "Toggle")
+                        Core.RequestControllerMethod("Changes", "Toggle")
                     end,
                 },
                 {
@@ -195,7 +178,7 @@ local function buildMenu()
                     notCheckable = 1,
                     disabled = disableChangesBroadcastActions,
                     func = function()
-                        callControllerMethod("Changes", "Demand")
+                        Core.RequestControllerMethod("Changes", "Demand")
                     end,
                 },
                 {
@@ -203,7 +186,7 @@ local function buildMenu()
                     notCheckable = 1,
                     disabled = disableChangesBroadcastActions,
                     func = function()
-                        callControllerMethod("Changes", "Announce")
+                        Core.RequestControllerMethod("Changes", "Announce")
                     end,
                 },
             },
@@ -213,7 +196,7 @@ local function buildMenu()
             text = L.StrLFMSpam,
             notCheckable = 1,
             func = function()
-                callControllerMethod("Spammer", "Toggle")
+                Core.RequestControllerMethod("Spammer", "Toggle")
             end,
         },
     }

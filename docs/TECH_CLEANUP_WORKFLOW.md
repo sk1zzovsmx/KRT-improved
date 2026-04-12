@@ -81,6 +81,29 @@ rg "addon\\.(Master|Logger|Warnings|Changes|Spammer)" !KRT -g "*.lua"
 rg "<Scripts>|<OnLoad>|<OnShow>|<OnClick>" !KRT/UI -g "*.xml"
 ```
 
+### 5.1 API-Reduction Loop
+
+When the goal is API deduplication or owner contraction, use this loop before
+editing code:
+
+1. Regenerate `docs/FUNCTION_REGISTRY.csv`.
+2. Regenerate `docs/FN_CLUSTERS.md`.
+3. Regenerate `docs/API_REGISTRY*.csv` and
+   `docs/API_NOMENCLATURE_CENSUS.md`.
+4. Regenerate `docs/TREE.md` if file ownership or structure may matter.
+5. Split findings into:
+   - exact or near clones that can merge now
+   - duplicated public facades or pass-through APIs
+   - simple name collisions with different responsibilities
+6. Pick one canonical owner per behavior and migrate call sites there before
+   deleting wrappers.
+
+Run the catalog scripts sequentially: `fnmap-inventory` -> `fnmap-classify` ->
+`fnmap-api-census` -> `update-tree`. Do not parallelize `inventory` and `classify`.
+
+Do not treat raw `name-collision` counts as removal candidates without owner and
+behavior review.
+
 ## 6. Module-Type Workflow
 
 ### 6.1 Controllers and Widgets
@@ -183,6 +206,13 @@ Use this order unless the module clearly requires a different one:
 Rationale:
 - behavior risk is easier to isolate in Lua-only waves
 - XML-only waves are easier to review once runtime ownership is already stable
+
+For API-reduction passes, insert this mandatory checkpoint after each stage:
+
+1. update the affected narrative docs under `docs/`
+2. regenerate `fnmap`/API catalogs
+3. rerun the relevant repo checks
+4. only then continue to the next stage
 
 ## 8. Validation Matrix
 

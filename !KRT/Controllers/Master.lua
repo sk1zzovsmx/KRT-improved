@@ -25,6 +25,7 @@ local Services = feature.Services or addon.Services
 local Loot = Services.Loot
 local Raid = Services.Raid
 local Rolls = Services.Rolls
+local Chat = Services.Chat
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local InternalEvents = Events.Internal
@@ -70,7 +71,12 @@ local RaidApi = {
     RequestMasterLootCandidateRefresh = requireServiceMethod("Raid", Raid, "RequestMasterLootCandidateRefresh"),
     FindMasterLootCandidateIndex = requireServiceMethod("Raid", Raid, "FindMasterLootCandidateIndex"),
     CanResolveMasterLootCandidates = requireServiceMethod("Raid", Raid, "CanResolveMasterLootCandidates"),
+    CanUseCapability = requireServiceMethod("Raid", Raid, "CanUseCapability"),
+    EnsureMasterOnlyAccess = requireServiceMethod("Raid", Raid, "EnsureMasterOnlyAccess"),
     ResolveHeldLootNid = requireServiceMethod("Raid", Raid, "ResolveHeldLootNid"),
+}
+local ChatApi = {
+    Announce = requireServiceMethod("Chat", Chat, "Announce"),
 }
 
 local RollsApi = {
@@ -85,11 +91,6 @@ local RollsApi = {
     StartCountdown = requireServiceMethod("Rolls", Rolls, "StartCountdown"),
     FinalizeRollSession = requireServiceMethod("Rolls", Rolls, "FinalizeRollSession"),
 }
-
--- ----- Service accessors ----- --
-local function getReservesService()
-    return Services.Reserves
-end
 
 -- ----- Item helpers ----- --
 local function getItem(i)
@@ -173,6 +174,7 @@ do
     local advanceInventoryWinnerSelection
     local completeInventoryAwardProgress
     local updateRollSessionExpectedWinners
+    local Private = {}
     local screenshotWarn = false
 
     local announced = false
@@ -431,7 +433,7 @@ do
         -- - Drag&drop (release) an item onto the button
         local function tryAcceptFromCursor()
             if CursorHasItem and CursorHasItem() then
-                module:TryAcceptInventoryItemFromCursor()
+                Private.TryAcceptInventoryItemFromCursor()
             end
         end
 
@@ -454,7 +456,7 @@ do
 
         local function wrapMasterOnlyClick(handler)
             return function(...)
-                if not addon:EnsureMasterOnlyAccess() then
+                if not RaidApi.EnsureMasterOnlyAccess(Raid) then
                     return
                 end
                 return handler(...)
@@ -463,13 +465,13 @@ do
 
         local function ensureSpamLootAccess()
             if lootState.fromInventory == true then
-                if addon:CanUseRaidCapability("ready_check") then
+                if RaidApi.CanUseCapability(Raid, "ready_check") then
                     return true
                 end
                 addon:warn(L.WarnReadyCheckNotAllowed)
                 return false
             end
-            return addon:EnsureMasterOnlyAccess()
+            return RaidApi.EnsureMasterOnlyAccess(Raid)
         end
 
         Frames.SafeSetScript(refs.configBtn, "OnClick", function()
@@ -486,7 +488,7 @@ do
             if not ensureSpamLootAccess() then
                 return
             end
-            module:BtnSpamLoot(self, button)
+            Private.BtnSpamLoot(self, button)
         end)
         Frames.SafeSetScript(
             refs.msBtn,
@@ -499,21 +501,21 @@ do
             refs.osBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
-                module:BtnOS(self, button)
+                Private.BtnOS(self, button)
             end)
         )
         Frames.SafeSetScript(
             refs.srBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
-                module:BtnSR(self, button)
+                Private.BtnSR(self, button)
             end)
         )
         Frames.SafeSetScript(
             refs.freeBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
-                module:BtnFree(self, button)
+                Private.BtnFree(self, button)
             end)
         )
         if refs.countdownBtn and refs.countdownBtn.RegisterForClicks then
@@ -550,42 +552,42 @@ do
             refs.clearBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
-                module:BtnClear(self, button)
+                Private.BtnClear(self, button)
             end)
         )
         Frames.SafeSetScript(
             refs.holdBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
-                module:BtnHold(self, button)
+                Private.BtnHold(self, button)
             end)
         )
         Frames.SafeSetScript(
             refs.bankBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
-                module:BtnBank(self, button)
+                Private.BtnBank(self, button)
             end)
         )
         Frames.SafeSetScript(
             refs.disenchantBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
-                module:BtnDisenchant(self, button)
+                Private.BtnDisenchant(self, button)
             end)
         )
         Frames.SafeSetScript(
             refs.reserveListBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
-                module:BtnReserveList(self, button)
+                Private.BtnReserveList(self, button)
             end)
         )
         Frames.SafeSetScript(
             refs.lootCounterBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
-                module:BtnLootCounter(self, button)
+                Private.BtnLootCounter(self, button)
             end)
         )
 
@@ -1098,7 +1100,7 @@ do
     end
 
     local function resetItemCountAndRefresh(focus)
-        module:ResetItemCount(focus)
+        Private.ResetItemCount(focus)
         module:RequestRefresh()
     end
 
@@ -1174,8 +1176,8 @@ do
         end
 
         local createdTradeOnly = false
-        if lootNid <= 0 and Raid.LogTradeOnlyLoot then
-            local created = Raid:LogTradeOnlyLoot(itemLink, playerName, rollType, rollValue, awardedCount, source, addon.Core.GetCurrentRaid(), nil, session and session.id or nil)
+        if lootNid <= 0 and Loot and Loot.LogTradeOnlyLoot then
+            local created = Loot:LogTradeOnlyLoot(itemLink, playerName, rollType, rollValue, awardedCount, source, addon.Core.GetCurrentRaid(), nil, session and session.id or nil)
                 or 0
             created = tonumber(created) or 0
             if created > 0 then
@@ -1441,9 +1443,9 @@ do
             return
         end
         if #names == 1 then
-            addon:Announce(L.ChatAward:format(names[1], ma.itemLink))
+            ChatApi.Announce(Chat, L.ChatAward:format(names[1], ma.itemLink))
         else
-            addon:Announce(L.ChatAwardMutiple:format(table.concat(names, ", "), ma.itemLink))
+            ChatApi.Announce(Chat, L.ChatAwardMutiple:format(table.concat(names, ", "), ma.itemLink))
         end
         ma.congratsSent = true
     end
@@ -1530,7 +1532,7 @@ do
         lootState.multiAward = nil
         announced = false
         if resetItemCount then
-            module:ResetItemCount()
+            Private.ResetItemCount()
         end
     end
 
@@ -1656,17 +1658,17 @@ do
         local winners, errType, wantedCount, pickedCount = buildMultiAwardWinners(target)
         if errType == "empty_selection" then
             addon:warn(L.ErrNoWinnerSelected)
-            module:ResetItemCount()
+            Private.ResetItemCount()
             return false
         end
         if errType == "not_enough_selection" then
             addon:warn(Diag.W.ErrMLMultiSelectNotEnough:format(wantedCount or 0, pickedCount or 0))
-            module:ResetItemCount()
+            Private.ResetItemCount()
             return false
         end
         if errType == "empty_winners" or #winners <= 0 then
             addon:warn(L.ErrNoWinnerSelected)
-            module:ResetItemCount()
+            Private.ResetItemCount()
             return false
         end
 
@@ -1786,7 +1788,7 @@ do
         local rerollNames
         local rerollStarted
 
-        if not addon:EnsureMasterOnlyAccess() then
+        if not RaidApi.EnsureMasterOnlyAccess(Raid) then
             return false
         end
         if isCountdownRunning() then
@@ -1813,7 +1815,7 @@ do
             end
             announced = false
             resetRollWinnerSelection(ROLL_SELECTION_MODE.AUTO)
-            addon:Announce(L.ChatTieReroll:format(tconcat(rerollNames or {}, ", "), getItemLink() or ""))
+            ChatApi.Announce(Chat, L.ChatTieReroll:format(tconcat(rerollNames or {}, ", "), getItemLink() or ""))
             addon:debug(Diag.I.LogMLTieReroll:format(tostring(getItemLink() or ""), tconcat(rerollNames or {}, ",")))
             module:RequestRefresh()
             return true
@@ -1849,7 +1851,7 @@ do
                     else
                         addon:warn(L.ErrNoWinnerSelected)
                     end
-                    module:ResetItemCount()
+                    Private.ResetItemCount()
                     return false
                 end
             end
@@ -1987,7 +1989,7 @@ do
         return true
     end
 
-    function module:ClearCurrentItemView(focusItemCount)
+    Private.ClearCurrentItemView = function(focusItemCount)
         local frame = getFrame()
         if not frame then
             return false
@@ -2019,7 +2021,7 @@ do
         return true
     end
 
-    function module:ResetItemCount(focus)
+    Private.ResetItemCount = function(focus)
         -- During multi-award from loot window we keep ItemCount stable (target N) to avoid
         -- mid-sequence clamping to the remaining copies.
         if lootState.multiAward and lootState.multiAward.active and not lootState.fromInventory then
@@ -2105,35 +2107,35 @@ do
     end
 
     -- Button: Spam Loot Links or Do Ready Check
-    function module:BtnSpamLoot(btn, _button)
+    Private.BtnSpamLoot = function(btn, _button)
         if btn == nil or lootState.lootCount <= 0 then
             return
         end
         if lootState.fromInventory == true then
-            local canReadyCheck = addon:CanUseRaidCapability("ready_check")
+            local canReadyCheck = RaidApi.CanUseCapability(Raid, "ready_check")
             if not canReadyCheck then
                 addon:warn(L.WarnReadyCheckNotAllowed)
                 return
             end
-            addon:Announce(L.ChatReadyCheck)
+            ChatApi.Announce(Chat, L.ChatReadyCheck)
             DoReadyCheck()
         else
-            addon:Announce(L.ChatSpamLoot, "RAID")
+            ChatApi.Announce(Chat, L.ChatSpamLoot, "RAID")
             for i = 1, lootState.lootCount do
                 local itemLink = getItemLink(i)
                 if itemLink then
                     local item = getItem(i)
                     local count = item and item.count or 1
                     local suffix = (count and count > 1) and (" x" .. count) or ""
-                    addon:Announce(i .. ". " .. itemLink .. suffix, "RAID")
+                    ChatApi.Announce(Chat, i .. ". " .. itemLink .. suffix, "RAID")
                 end
             end
         end
     end
 
     -- Button: Reserve List (contextual)
-    function module:BtnReserveList(_btn, _button)
-        local reserves = getReservesService()
+    Private.BtnReserveList = function(_btn, _button)
+        local reserves = Services.Reserves
         if reserves and reserves.HasData and reserves:HasData() then
             UIFacade:Call("Reserves", "Toggle")
         else
@@ -2142,7 +2144,7 @@ do
     end
 
     -- Button: Loot Counter
-    function module:BtnLootCounter(_btn, _button)
+    Private.BtnLootCounter = function(_btn, _button)
         UIFacade:Call("LootCounter", "Toggle")
     end
 
@@ -2170,7 +2172,7 @@ do
 
             if rollType == rollTypes.RESERVED then
                 -- Chat-safe: keep UI colors in the Reserve Frame, but do not send class color codes in chat.
-                local reserves = getReservesService()
+                local reserves = Services.Reserves
                 local srList = reserves and reserves.FormatReservedPlayersLine and reserves:FormatReservedPlayersLine(itemID, false, false, false, true) or ""
                 local suff = addon.options.sortAscending and "Low" or "High"
                 message = lootState.selectedItemCount > 1 and L[chatMsg .. "Multiple" .. suff]:format(srList, itemLink, lootState.selectedItemCount)
@@ -2180,7 +2182,7 @@ do
                 message = lootState.selectedItemCount > 1 and L[chatMsg .. "Multiple" .. suff]:format(itemLink, lootState.selectedItemCount) or L[chatMsg]:format(itemLink)
             end
 
-            addon:Announce(message)
+            ChatApi.Announce(Chat, message)
             local itemCountBox = getNamedPart("ItemCount")
             if itemCountBox then
                 itemCountBox:ClearFocus()
@@ -2224,15 +2226,15 @@ do
         return announceRoll(rollTypes.MAINSPEC, rollAnnouncementKeys[rollTypes.MAINSPEC])
     end
 
-    function module:BtnOS(_btn, _button)
+    Private.BtnOS = function(_btn, _button)
         return announceRoll(rollTypes.OFFSPEC, rollAnnouncementKeys[rollTypes.OFFSPEC])
     end
 
-    function module:BtnSR(_btn, _button)
+    Private.BtnSR = function(_btn, _button)
         return announceRoll(rollTypes.RESERVED, rollAnnouncementKeys[rollTypes.RESERVED])
     end
 
-    function module:BtnFree(_btn, _button)
+    Private.BtnFree = function(_btn, _button)
         return announceRoll(rollTypes.FREE, rollAnnouncementKeys[rollTypes.FREE])
     end
 
@@ -2258,7 +2260,7 @@ do
     end
 
     -- Button: Clear Rolls
-    function module:BtnClear(_btn, _button)
+    Private.BtnClear = function(_btn, _button)
         announced = false
         Rolls:ClearRolls()
         module:RequestRefresh()
@@ -2270,22 +2272,22 @@ do
     end
 
     -- Button: Hold item
-    function module:BtnHold(_btn, _button)
+    Private.BtnHold = function(_btn, _button)
         return assignToTarget(rollTypes.HOLD, "holder")
     end
 
     -- Button: Bank item
-    function module:BtnBank(_btn, _button)
+    Private.BtnBank = function(_btn, _button)
         return assignToTarget(rollTypes.BANK, "banker")
     end
 
     -- Button: Disenchant item
-    function module:BtnDisenchant(_btn, _button)
+    Private.BtnDisenchant = function(_btn, _button)
         return assignToTarget(rollTypes.DISENCHANT, "disenchanter")
     end
 
     -- Selects an item from the item selection frame.
-    function module:BtnSelectedItem(btn, _button)
+    Private.BtnSelectedItem = function(btn, _button)
         if not btn then
             return
         end
@@ -2495,7 +2497,7 @@ do
         flagButtonsOnChange("banker", lootState.banker)
         flagButtonsOnChange("disenchanter", lootState.disenchanter)
 
-        local reserves = getReservesService()
+        local reserves = Services.Reserves
         local hasReserves = reserves and reserves.HasData and reserves:HasData() or false
         flagButtonsOnChange("hasReserves", hasReserves)
 
@@ -2509,8 +2511,8 @@ do
         local hasItemReserves = itemId and reserves and reserves.HasItemReserves and reserves:HasItemReserves(itemId) or false
         flagButtonsOnChange("hasItemReserves", hasItemReserves)
         local hasEligibleRaidReserve = hasItemReserves
-        local hasLootAccess = addon:CanUseRaidCapability("loot")
-        local hasReadyCheckAccess = addon:CanUseRaidCapability("ready_check")
+        local hasLootAccess = RaidApi.CanUseCapability(Raid, "loot")
+        local hasReadyCheckAccess = RaidApi.CanUseCapability(Raid, "ready_check")
         if hasItemReserves and reserves and reserves.HasCurrentRaidPlayersForItem and itemId then
             hasEligibleRaidReserve = reserves:HasCurrentRaidPlayersForItem(itemId)
         end
@@ -2687,7 +2689,7 @@ do
                 info.hasArrow = false
                 info.notCheckable = 1
                 info.text = key
-                info.func = module.OnClickDropDown
+                info.func = Private.OnClickDropDown
                 info.arg1 = UIDROPDOWNMENU_OPEN_MENU
                 info.arg2 = key
                 UIDropDownMenu_AddButton(info, UIDROPDOWNMENU_MENU_LEVEL)
@@ -2774,7 +2776,7 @@ do
     end
 
     -- OnClick handler for dropdown menu items (consolidated from 3 similar branches).
-    function module:OnClickDropDown(owner, value)
+    Private.OnClickDropDown = function(owner, value)
         if not addon.Core.GetCurrentRaid() then
             return
         end
@@ -2855,7 +2857,7 @@ do
             btn:RegisterForClicks("AnyUp")
         end
         Frames.SafeSetScript(btn, "OnClick", function(self, button)
-            module:BtnSelectedItem(self, button)
+            Private.BtnSelectedItem(self, button)
         end)
         selectionButtons[index] = btn
         return btn
@@ -2963,7 +2965,7 @@ do
 
     -- Accept an item currently held on the cursor (bag click-pickup).
     -- This is triggered by ItemBtn's OnClick.
-    function module:TryAcceptInventoryItemFromCursor()
+    Private.TryAcceptInventoryItemFromCursor = function()
         if isCountdownRunning() then
             return false
         end
@@ -3108,7 +3110,7 @@ do
             Loot:FetchLoot()
             addon:trace(Diag.D.LogMLLootSlotCleared:format(lootState.lootCount or 0))
             updateSelectionFrame()
-            module:ResetItemCount()
+            Private.ResetItemCount()
             handleLootSlotClearedVisibility()
 
             -- Continue a multi-award sequence (loot window only).
@@ -3213,7 +3215,7 @@ do
             local output, whisper = buildAssignMessages(itemLink, playerName, rollType)
 
             if output and not announced then
-                addon:Announce(output)
+                ChatApi.Announce(Chat, output)
                 announced = true
             end
             if whisper then
@@ -3221,7 +3223,8 @@ do
             end
             -- IMPORTANT:
             -- Do NOT force-update an existing raid.loot entry here.
-            -- For Master Loot awards from the loot window, the authoritative record is created by Raid:AddLoot()
+            -- For Master Loot awards from the loot window, the authoritative record is created by Loot:AddLoot()
+            -- (also reachable through Raid:AddLoot facade)
             -- from the LOOT_ITEM / LOOT_ITEM_MULTIPLE chat event, where we also apply the pending rollType/rollValue.
             --
             -- If multiple identical items are distributed across different roll types ("partial award" workflow),
@@ -3447,7 +3450,7 @@ do
         end
 
         if output then
-            addon:Announce(output)
+            ChatApi.Announce(Chat, output)
         end
         if whisper then
             if playerName == lootState.trader then
@@ -3587,9 +3590,9 @@ do
 
         if itemData and itemData.itemName and itemData.itemTexture and itemData.itemColor and itemData.itemLink then
             module:SetCurrentItemView(itemData.itemName, itemData.itemLink, itemData.itemTexture, itemData.itemColor)
-            module:ResetItemCount()
+            Private.ResetItemCount()
         else
-            module:ClearCurrentItemView(true)
+            Private.ClearCurrentItemView(true)
         end
 
         module:RequestRefresh()

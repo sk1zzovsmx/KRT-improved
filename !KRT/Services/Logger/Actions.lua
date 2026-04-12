@@ -27,6 +27,7 @@ local Store = addon.Services.Logger.Store
 -- Controller binding (injected by Controllers/Logger.lua at setup time).
 local _controller = nil
 local _triggerSelectionEvent = nil
+local commitRaidSelections
 
 -- ----- Private helpers ----- --
 
@@ -50,7 +51,7 @@ function Actions:RemoveAll(list, value)
     end
 end
 
-function Actions:Commit(raid, opts)
+commitRaidSelections = function(raid, opts)
     if not raid then
         return
     end
@@ -60,7 +61,7 @@ function Actions:Commit(raid, opts)
     Core.EnsureRaidSchema(raid)
 
     if opts.invalidate ~= false then
-        Store:InvalidateIndexes(raid)
+        Store._InvalidateIndexes(raid)
     end
 
     local log = _controller
@@ -170,7 +171,7 @@ function Actions:DeleteBoss(rID, bossNid)
     end
 
     tremove(raid.bossKills, bossIndex)
-    self:Commit(raid)
+    commitRaidSelections(raid)
 
     if Core.GetCurrentRaid() == rID and tonumber(Core.GetLastBoss()) == tonumber(bossNid) then
         Core.SetLastBoss(nil)
@@ -189,7 +190,7 @@ function Actions:DeleteLoot(rID, lootNid)
         return false
     end
     tremove(raid.loot, lootIndex)
-    self:Commit(raid)
+    commitRaidSelections(raid)
     return true
 end
 
@@ -221,7 +222,7 @@ function Actions:DeleteLootMany(rID, lootNids)
     end
 
     if removed > 0 then
-        self:Commit(raid)
+        commitRaidSelections(raid)
     end
     return removed
 end
@@ -281,7 +282,7 @@ function Actions:DeleteRaidAttendee(rID, playerNid)
         end
     end
 
-    self:Commit(raid, { clearPlayers = true })
+    commitRaidSelections(raid, { clearPlayers = true })
     return true
 end
 
@@ -353,7 +354,7 @@ function Actions:DeleteRaidAttendeeMany(rID, playerNids)
         end
     end
 
-    self:Commit(raid, { clearPlayers = true })
+    commitRaidSelections(raid, { clearPlayers = true })
     return removed
 end
 
@@ -500,7 +501,7 @@ function Actions:UpsertBossKill(rID, bossNid, name, ts, mode)
         bossKill.time = ts
         bossKill.mode = (mode == "h") and "h" or "n"
         -- keep existing players/hash; hash is stable per nid
-        self:Commit(raid, { invalidate = false })
+        commitRaidSelections(raid, { invalidate = false })
         return bossKill.bossNid
     end
 
@@ -516,7 +517,7 @@ function Actions:UpsertBossKill(rID, bossNid, name, ts, mode)
         hash = Base64.Encode(rID .. "|" .. name .. "|" .. newNid),
     })
 
-    self:Commit(raid)
+    commitRaidSelections(raid)
     return newNid
 end
 
@@ -559,6 +560,6 @@ function Actions:AddBossAttendee(rID, bossNid, nameRaw)
 
     tinsert(bossKill.players, playerNid)
     addon:info(L.StrAttendeesAddSuccess)
-    self:Commit(raid, { invalidate = false })
+    commitRaidSelections(raid, { invalidate = false })
     return true
 end

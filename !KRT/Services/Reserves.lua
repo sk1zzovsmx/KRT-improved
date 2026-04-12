@@ -29,8 +29,8 @@ local InternalEvents = Events.Internal
 do
     addon.Services.Reserves = addon.Services.Reserves or {}
     local module = addon.Services.Reserves
-    module.Service = module.Service or {}
-    local Service = module.Service
+    module.Service = module
+    local Service = module
     local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
     local reserveListClearedKey = "StrReserve" .. "ListCleared"
 
@@ -50,6 +50,7 @@ do
     local collapsedBossGroups = {}
     local grouped = {}
     local RebuildIndex
+    local hasPendingItem
 
     -- ----- Private helpers ----- --
 
@@ -924,6 +925,8 @@ do
 
     -- Strategy objects to keep Plus/Multi behaviors isolated.
     local importStrategies = {}
+    local getImportStrategy
+    local updateReserveItemData
 
     local function cleanCSVField(field)
         if not field then
@@ -1178,8 +1181,8 @@ do
         end,
     }
 
-    function Service:GetImportStrategy(mode)
-        mode = (mode == "plus" or mode == "multi") and mode or self:GetImportMode()
+    getImportStrategy = function(service, mode)
+        mode = (mode == "plus" or mode == "multi") and mode or service:GetImportMode()
         return importStrategies[mode] or importStrategies.multi
     end
 
@@ -1190,7 +1193,7 @@ do
         end
 
         local resolvedMode = (mode == "plus" or mode == "multi") and mode or self:GetImportMode()
-        local strategy = self:GetImportStrategy(resolvedMode)
+        local strategy = getImportStrategy(self, resolvedMode)
 
         addon:debug(Diag.D.LogReservesParseStart)
 
@@ -1257,20 +1260,6 @@ do
         return true, nPlayers
     end
 
-    function Service:ParseCSV(csv, mode)
-        local parsed, errCode, errData = self:ParseImport(csv, mode)
-        if not parsed then
-            return false, 0, errCode, errData
-        end
-
-        local ok, nPlayersOrErr, applyErrData = self:ApplyImport(parsed, nil, { reason = "import" })
-        if not ok then
-            return false, 0, nPlayersOrErr, applyErrData
-        end
-
-        return true, nPlayersOrErr
-    end
-
     -- ----- Item Info Querying ----- --
     function Service:QueryItemInfo(itemId)
         if not itemId then
@@ -1305,7 +1294,7 @@ do
         hasName = type(name) == "string" and name ~= "" and type(link) == "string" and link ~= ""
         hasIcon = type(icon) == "string" and icon ~= ""
         if hasName then
-            self:UpdateReserveItemData(itemId, name, link, icon)
+            updateReserveItemData(itemId, name, link, icon)
         end
         markPendingItem(itemId, hasName, hasIcon, name, link, icon)
         if hasName and hasIcon then
@@ -1355,7 +1344,7 @@ do
     end
 
     -- Update reserve item data
-    function Service:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
+    updateReserveItemData = function(itemId, itemName, itemLink, itemIcon)
         if not itemId then
             return
         end
@@ -1592,122 +1581,12 @@ do
         return nextState
     end
 
-    function Service:HasPendingItem(itemId)
+    hasPendingItem = function(itemId)
         if not itemId then
             return false
         end
         return pendingItemInfo[itemId] ~= nil
     end
 
-    function module:Save(contextTag)
-        return Service:Save(contextTag)
-    end
-
-    function module:Load()
-        return Service:Load()
-    end
-
-    function module:ResetSaved()
-        return Service:ResetSaved()
-    end
-
-    function module:HasData()
-        return Service:HasData()
-    end
-
-    function module:HasItemReserves(itemId)
-        return Service:HasItemReserves(itemId)
-    end
-
-    function module:GetReserve(playerName)
-        return Service:GetReserve(playerName)
-    end
-
-    function module:FormatReserveItemIdLabel(itemId)
-        return Service:FormatReserveItemIdLabel(itemId)
-    end
-
-    function module:FormatReserveDroppedBy(source)
-        return Service:FormatReserveDroppedBy(source)
-    end
-
-    function module:FormatReserveItemFallback(itemId)
-        return Service:FormatReserveItemFallback(itemId)
-    end
-
-    function module:GetAllReserves()
-        return Service:GetAllReserves()
-    end
-
-    function module:GetImportMode()
-        return Service:GetImportMode()
-    end
-
-    function module:SetImportMode(mode, syncOptions)
-        return Service:SetImportMode(mode, syncOptions)
-    end
-
-    function module:IsPlusSystem()
-        return Service:IsPlusSystem()
-    end
-
-    function module:IsMultiReserve()
-        return Service:IsMultiReserve()
-    end
-
-    function module:GetImportStrategy(mode)
-        return Service:GetImportStrategy(mode)
-    end
-
-    function module:ParseImport(text, mode, opts)
-        return Service:ParseImport(text, mode, opts)
-    end
-
-    function module:ApplyImport(parsed, raidId, opts)
-        return Service:ApplyImport(parsed, raidId, opts)
-    end
-
-    function module:ParseCSV(csv, mode)
-        return Service:ParseCSV(csv, mode)
-    end
-
-    function module:QueryItemInfo(itemId)
-        return Service:QueryItemInfo(itemId)
-    end
-
-    function module:QueryMissingItems(silent)
-        return Service:QueryMissingItems(silent)
-    end
-
-    function module:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
-        return Service:UpdateReserveItemData(itemId, itemName, itemLink, itemIcon)
-    end
-
-    function module:GetReserveCountForItem(itemId, playerName)
-        return Service:GetReserveCountForItem(itemId, playerName)
-    end
-
-    function module:GetReserveEntryForItem(itemId, playerName)
-        return Service:GetReserveEntryForItem(itemId, playerName)
-    end
-
-    function module:GetPlusForItem(itemId, playerName)
-        return Service:GetPlusForItem(itemId, playerName)
-    end
-
-    function module:HasMultiReserveForItem(itemId)
-        return Service:HasMultiReserveForItem(itemId)
-    end
-
-    function module:HasCurrentRaidPlayersForItem(itemId, raidNum)
-        return Service:HasCurrentRaidPlayersForItem(itemId, raidNum)
-    end
-
-    function module:GetPlayersForItem(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
-        return Service:GetPlayersForItem(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
-    end
-
-    function module:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
-        return Service:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
-    end
+    Service._HasPendingItem = hasPendingItem
 end

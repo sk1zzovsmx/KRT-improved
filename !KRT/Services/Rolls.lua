@@ -16,6 +16,7 @@ local Item = feature.Item or addon.Item
 local Strings = feature.Strings or addon.Strings
 local Comms = feature.Comms or addon.Comms
 local Services = feature.Services or addon.Services
+local Chat = Services.Chat
 
 local rollTypes = feature.rollTypes
 
@@ -53,12 +54,8 @@ local function getRaidService()
     return Services.Raid
 end
 
-local function getReservesService()
-    return Services.Reserves
-end
-
 local function getReserveCountForItem(itemId, name)
-    local reserves = getReservesService()
+    local reserves = Services.Reserves
     if reserves and reserves.GetReserveCountForItem then
         return reserves:GetReserveCountForItem(itemId, name) or 0
     end
@@ -66,7 +63,7 @@ local function getReserveCountForItem(itemId, name)
 end
 
 local function getPlusForItem(itemId, name)
-    local reserves = getReservesService()
+    local reserves = Services.Reserves
     if reserves and reserves.GetPlusForItem then
         return reserves:GetPlusForItem(itemId, name) or 0
     end
@@ -74,7 +71,7 @@ local function getPlusForItem(itemId, name)
 end
 
 local function isPlusSystemEnabled()
-    local reserves = getReservesService()
+    local reserves = Services.Reserves
     if reserves and reserves.GetPlusForItem and reserves.GetImportMode and reserves.IsPlusSystem then
         return reserves:IsPlusSystem() == true
     end
@@ -984,7 +981,7 @@ do
             return
         end
 
-        local reserves = getReservesService()
+        local reserves = Services.Reserves
         if not (reserves and reserves.GetPlayersForItem) then
             return
         end
@@ -1430,7 +1427,7 @@ do
         traceEligibility(player, eligibility)
         if not eligibility.ok then
             if eligibility.reason == reasonCodes.SESSION_INACTIVE and not state.warned and not isDebugSource then
-                addon:Announce(L.ChatCountdownBlock)
+                Chat:Announce(L.ChatCountdownBlock)
                 state.warned = true
             end
             denyMessage = getDenialMessage(eligibility.reason)
@@ -1968,7 +1965,7 @@ do
         state.countdownExpired = false
 
         if shouldAnnounceCountdownTick(state.countdownRemaining, countdownDuration) then
-            addon:Announce(L.ChatCountdownTic:format(state.countdownRemaining))
+            Chat:Announce(L.ChatCountdownTic:format(state.countdownRemaining))
         end
         if type(onTick) == "function" then
             onTick(state.countdownRemaining, countdownDuration)
@@ -1981,7 +1978,7 @@ do
             state.countdownRemaining = state.countdownRemaining - 1
             if state.countdownRemaining > 0 then
                 if shouldAnnounceCountdownTick(state.countdownRemaining, countdownDuration) then
-                    addon:Announce(L.ChatCountdownTic:format(state.countdownRemaining))
+                    Chat:Announce(L.ChatCountdownTic:format(state.countdownRemaining))
                 end
                 if type(onTick) == "function" then
                     onTick(state.countdownRemaining, countdownDuration)
@@ -1995,7 +1992,7 @@ do
             end
             module:StopCountdown()
             state.countdownExpired = true
-            addon:Announce(L.ChatCountdownEnd)
+            Chat:Announce(L.ChatCountdownEnd)
             if type(onComplete) == "function" then
                 onComplete()
             end
