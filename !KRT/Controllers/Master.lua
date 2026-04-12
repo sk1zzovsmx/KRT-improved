@@ -186,6 +186,28 @@ do
         return _G[frameName .. suffix]
     end
 
+    -- Module-level helper: wrap a click handler ensuring master-only access.
+    local function wrapMasterOnlyClick(handler)
+        return function(...)
+            if not RaidApi.EnsureMasterOnlyAccess(Raid) then
+                return
+            end
+            return handler(...)
+        end
+    end
+
+    -- Module-level helper: ensure spam-loot access rules.
+    local function ensureSpamLootAccess()
+        if lootState.fromInventory == true then
+            if RaidApi.CanUseCapability(Raid, "ready_check") then
+                return true
+            end
+            addon:warn(L.WarnReadyCheckNotAllowed)
+            return false
+        end
+        return RaidApi.EnsureMasterOnlyAccess(Raid)
+    end
+
     -- ============================================================================
     -- Dropdown / frame helpers
     -- ============================================================================
@@ -414,26 +436,6 @@ do
         end
         if frame._krtBound then
             return
-        end
-
-        local function wrapMasterOnlyClick(handler)
-            return function(...)
-                if not RaidApi.EnsureMasterOnlyAccess(Raid) then
-                    return
-                end
-                return handler(...)
-            end
-        end
-
-        local function ensureSpamLootAccess()
-            if lootState.fromInventory == true then
-                if RaidApi.CanUseCapability(Raid, "ready_check") then
-                    return true
-                end
-                addon:warn(L.WarnReadyCheckNotAllowed)
-                return false
-            end
-            return RaidApi.EnsureMasterOnlyAccess(Raid)
         end
 
         Frames.SafeSetScript(refs.configBtn, "OnClick", function()

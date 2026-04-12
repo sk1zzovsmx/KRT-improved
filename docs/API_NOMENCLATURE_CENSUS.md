@@ -100,10 +100,10 @@ Showing first 80 of 276 non-conformant public methods. See docs/API_REGISTRY_PUB
 | addon.Controllers.Changes:Demand | PascalCase | Demand | Unclassified | True | False | !KRT/Controllers/Changes.lua | 426 |
 | addon.Controllers.Changes:Edit | PascalCase | Edit | Unclassified | True | False | !KRT/Controllers/Changes.lua | 359 |
 | addon.Controllers.Changes:Select | PascalCase | Select | Unclassified | True | False | !KRT/Controllers/Changes.lua | 280 |
-| addon.Controllers.Master:BtnAward | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2419 |
-| addon.Controllers.Master:BtnCountdown | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2391 |
-| addon.Controllers.Master:BtnMS | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2374 |
-| addon.Controllers.Master:BtnSelectItem | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2233 |
+| addon.Controllers.Master:BtnAward | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2421 |
+| addon.Controllers.Master:BtnCountdown | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2393 |
+| addon.Controllers.Master:BtnMS | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2376 |
+| addon.Controllers.Master:BtnSelectItem | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2235 |
 | addon.Controllers.Spammer:Clear | PascalCase | Clear | Unclassified | True | False | !KRT/Controllers/Spammer.lua | 490 |
 | addon.Controllers.Spammer:Pause | PascalCase | Pause | Unclassified | True | False | !KRT/Controllers/Spammer.lua | 455 |
 | addon.Controllers.Spammer:Save | PascalCase | Save | Unclassified | True | False | !KRT/Controllers/Spammer.lua | 354 |
@@ -122,21 +122,21 @@ Showing first 80 of 276 non-conformant public methods. See docs/API_REGISTRY_PUB
 | addon.Core.StripRuntimeRaidCaches | PascalCase | Strip | Unclassified | True | False | !KRT/Init.lua | 1231 |
 | addon.DB.RaidMigrations:ApplyRaidMigrations | PascalCase | Apply | Unclassified | True | False | !KRT/Core/DBRaidMigrations.lua | 235 |
 | addon.DB.RaidMigrations:CompactRaidForPersistence | PascalCase | Compact | Unclassified | True | False | !KRT/Core/DBRaidMigrations.lua | 269 |
-| addon.DB.RaidStore:BuildRuntimeIndexes | PascalCase | Build | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 556 |
-| addon.DB.RaidStore:ClearRaidChanges | PascalCase | Clear | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 396 |
-| addon.DB.RaidStore:CreateRaid | PascalCase | Create | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 720 |
-| addon.DB.RaidStore:CreateRaidRecord | PascalCase | Create | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 673 |
-| addon.DB.RaidStore:InsertRaid | PascalCase | Insert | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 703 |
-| addon.DB.RaidStore:NormalizeAllRaids | PascalCase | Normalize | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 641 |
-| addon.DB.RaidStore:NormalizeRaidRecord | PascalCase | Normalize | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 410 |
-| addon.DB.RaidStore:PrepareAllRaidsForSave | PascalCase | Prepare | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 666 |
-| addon.DB.RaidStore:PrepareRaidForSave | PascalCase | Prepare | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 650 |
-| addon.DB.RaidStore:SaveRaid | PascalCase | Save | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 740 |
-| addon.DB.RaidStore:StripAllRuntime | PascalCase | Strip | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 634 |
-| addon.DB.RaidStore:StripRuntime | PascalCase | Strip | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 626 |
+| addon.DB.RaidStore:BuildRuntimeIndexes | PascalCase | Build | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 558 |
+| addon.DB.RaidStore:ClearRaidChanges | PascalCase | Clear | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 398 |
+| addon.DB.RaidStore:CreateRaid | PascalCase | Create | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 722 |
+| addon.DB.RaidStore:CreateRaidRecord | PascalCase | Create | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 675 |
+| addon.DB.RaidStore:InsertRaid | PascalCase | Insert | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 705 |
+| addon.DB.RaidStore:NormalizeAllRaids | PascalCase | Normalize | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 643 |
+| addon.DB.RaidStore:NormalizeRaidRecord | PascalCase | Normalize | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 412 |
+| addon.DB.RaidStore:PrepareAllRaidsForSave | PascalCase | Prepare | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 668 |
+| addon.DB.RaidStore:PrepareRaidForSave | PascalCase | Prepare | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 652 |
+| addon.DB.RaidStore:SaveRaid | PascalCase | Save | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 742 |
+| addon.DB.RaidStore:StripAllRuntime | PascalCase | Strip | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 636 |
+| addon.DB.RaidStore:StripRuntime | PascalCase | Strip | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 628 |
 | addon.DB.RaidValidator:ValidateAllRaids | PascalCase | Validate | Unclassified | True | False | !KRT/Core/DBRaidValidator.lua | 321 |
-| addon.DB.Syncer:BroadcastLoggerPush | PascalCase | Broadcast | Unclassified | True | False | !KRT/Core/DBSyncer.lua | 1354 |
-| addon.DB.Syncer:OnAddonMessage | PascalCase | On | Unclassified | True | False | !KRT/Core/DBSyncer.lua | 1412 |
+| addon.DB.Syncer:BroadcastLoggerPush | PascalCase | Broadcast | Unclassified | True | False | !KRT/Core/DBSyncer.lua | 1360 |
+| addon.DB.Syncer:OnAddonMessage | PascalCase | On | Unclassified | True | False | !KRT/Core/DBSyncer.lua | 1418 |
 | addon.DBManager.CreateManager | PascalCase | Create | Unclassified | True | False | !KRT/Core/DBManager.lua | 27 |
 | addon.Events.ConfigOptionChanged | PascalCase | Config | Unclassified | True | False | !KRT/Modules/Events.lua | 52 |
 | addon.Events.WowForwarded | PascalCase | Wow | Unclassified | True | False | !KRT/Modules/Events.lua | 59 |
@@ -172,12 +172,12 @@ Showing first 80 of 276 non-conformant public methods. See docs/API_REGISTRY_PUB
 | addon:RAID_ROSTER_UPDATE | !KRT/Init.lua | 1382 |
 | addon:START_LOOT_ROLL | !KRT/Init.lua | 1497 |
 | addon:UPDATE_INSTANCE_INFO | !KRT/Init.lua | 1419 |
-| addon.Controllers.Master:LOOT_CLOSED | !KRT/Controllers/Master.lua | 3169 |
-| addon.Controllers.Master:LOOT_OPENED | !KRT/Controllers/Master.lua | 3142 |
-| addon.Controllers.Master:LOOT_SLOT_CLEARED | !KRT/Controllers/Master.lua | 3184 |
-| addon.Controllers.Master:TRADE_ACCEPT_UPDATE | !KRT/Controllers/Master.lua | 3199 |
-| addon.Controllers.Master:TRADE_CLOSED | !KRT/Controllers/Master.lua | 3251 |
-| addon.Controllers.Master:TRADE_REQUEST_CANCEL | !KRT/Controllers/Master.lua | 3257 |
+| addon.Controllers.Master:LOOT_CLOSED | !KRT/Controllers/Master.lua | 3171 |
+| addon.Controllers.Master:LOOT_OPENED | !KRT/Controllers/Master.lua | 3144 |
+| addon.Controllers.Master:LOOT_SLOT_CLEARED | !KRT/Controllers/Master.lua | 3186 |
+| addon.Controllers.Master:TRADE_ACCEPT_UPDATE | !KRT/Controllers/Master.lua | 3201 |
+| addon.Controllers.Master:TRADE_CLOSED | !KRT/Controllers/Master.lua | 3253 |
+| addon.Controllers.Master:TRADE_REQUEST_CANCEL | !KRT/Controllers/Master.lua | 3259 |
 | addon.Services.Raid:COMBAT_LOG_EVENT_UNFILTERED | !KRT/Services/Raid/State.lua | 1247 |
 | addon.Services.Rolls:CHAT_MSG_SYSTEM | !KRT/Services/Rolls/Service.lua | 461 |
 

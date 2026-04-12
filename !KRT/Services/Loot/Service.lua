@@ -17,6 +17,8 @@ local Strings = feature.Strings or addon.Strings
 local Time = feature.Time or addon.Time
 local IgnoredItems = feature.IgnoredItems or addon.IgnoredItems or {}
 
+local NormalizeName = Strings.NormalizeName
+
 local Services = feature.Services or addon.Services
 
 local itemColors = feature.itemColors
@@ -230,7 +232,7 @@ do
         end
 
         local targetItemKey = PassiveGroupLoot.GetPassiveLootRollItemKey(itemLink)
-        local targetLooter = Strings.NormalizeName(looter, true) or looter
+        local targetLooter = NormalizeName(looter, true) or looter
         local targetSessionId = rollSessionId and tostring(rollSessionId) or nil
         local currentTime = tonumber(Time.GetCurrentTime()) or 0
         local uniqueMatch = nil
@@ -476,7 +478,7 @@ do
             return nil, nil, nil, rollType, rollValue
         end
 
-        return Strings.NormalizeName(player, true) or player, tonumber(itemCount) or 1, itemLink, rollType, rollValue
+        return NormalizeName(player, true) or player, tonumber(itemCount) or 1, itemLink, rollType, rollValue
     end
 
     local function getLootItemDetails(itemLink)
@@ -763,7 +765,7 @@ do
         if not raidNum or not itemLink or not looter or looter == "" then
             return 0
         end
-        looter = Strings.NormalizeName(looter, true) or looter
+        looter = NormalizeName(looter, true) or looter
 
         if not raid then
             return 0

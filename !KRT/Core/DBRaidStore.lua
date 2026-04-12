@@ -11,6 +11,8 @@ local Time = feature.Time or addon.Time
 local Strings = feature.Strings or addon.Strings
 local Diag = feature.Diag
 
+local NormalizeName = (Strings and Strings.NormalizeName) or nil
+
 local tinsert, tremove = table.insert, table.remove
 local pairs, type = pairs, type
 local tostring, tonumber = tostring, tonumber
@@ -151,8 +153,8 @@ do
 
     local function normalizeChangeName(value)
         local out = nil
-        if Strings and Strings.NormalizeName then
-            out = Strings.NormalizeName(value)
+        if NormalizeName then
+            out = NormalizeName(value)
         elseif value ~= nil then
             out = tostring(value)
         end
@@ -167,8 +169,8 @@ do
             return nil
         end
         local out = nil
-        if Strings and Strings.NormalizeName then
-            out = Strings.NormalizeName(value)
+        if NormalizeName then
+            out = NormalizeName(value)
         else
             out = tostring(value)
         end

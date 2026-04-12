@@ -469,13 +469,20 @@ do
         }
         local hasUnknownUnits = false
 
+        -- Localize heavy-used locals for the loop to reduce lookups.
+        local applyUnknown = applyUnknownRosterUnit
+        local applyKnown = applyKnownRosterUnit
+        local getInfo = getRaidRosterInfo
+        local tstr = tostring
+        local isUnknownFn = isUnknownName
+
         for i = 1, n do
-            local unitID = "raid" .. tostring(i)
-            local name, rank, subgroup, level, classL, class = getRaidRosterInfo(i)
-            if isUnknownName(name) then
-                hasUnknownUnits = applyUnknownRosterUnit(ctx, unitID) or hasUnknownUnits
+            local unitID = "raid" .. tstr(i)
+            local name, rank, subgroup, level, classL, class = getInfo(i)
+            if isUnknownFn(name) then
+                hasUnknownUnits = applyUnknown(ctx, unitID) or hasUnknownUnits
             else
-                rosterChanged = applyKnownRosterUnit(ctx, unitID, name, rank, subgroup, level, classL, class) or rosterChanged
+                rosterChanged = applyKnown(ctx, unitID, name, rank, subgroup, level, classL, class) or rosterChanged
             end
         end
 
