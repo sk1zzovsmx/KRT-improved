@@ -33,6 +33,7 @@ do
     local rosterVersion = 0
     local liveUnitsByName = {}
     local liveNamesByUnit = {}
+    local liveOnlineByName = {}
     local pendingUnits = {}
 
     local UNKNOWN_OBJECT = _G.UNKNOWNOBJECT
@@ -45,6 +46,7 @@ do
     local function resetLiveUnitCaches()
         twipe(liveUnitsByName)
         twipe(liveNamesByUnit)
+        twipe(liveOnlineByName)
     end
 
     local function cancelPendingUnitRetryTimer()
@@ -225,6 +227,8 @@ do
             updated = type(delta.updated) == "table" and delta.updated or {},
             left = type(delta.left) == "table" and delta.left or {},
             unresolved = type(delta.unresolved) == "table" and delta.unresolved or {},
+            raidNum = tonumber(delta.raidNum) or tonumber(raidNum),
+            timestamp = tonumber(delta.timestamp) or Time.GetCurrentTime(),
         }
 
         rosterVersion = rosterVersion + 1
@@ -295,24 +299,28 @@ do
             ctx.seen[prevName] = true
             ctx.nextUnitsByName[prevName] = unitID
             ctx.nextNamesByUnit[unitID] = prevName
+            ctx.nextOnlineByName[prevName] = ctx.prevOnlineByName[prevName]
         end
         tinsert(ctx.delta.unresolved, { unitID = unitID, name = prevName })
         return true
     end
 
-    local function buildJoinedRosterPlayer(ctx, name, rank, subgroup, class)
+    local function buildJoinedRosterPlayer(ctx, name, rank, subgroup, class, online)
         local prevPlayer = ctx.playersByName[name]
         local newRank = rank or (prevPlayer and prevPlayer.rank) or 0
         local newSubgroup = subgroup or (prevPlayer and prevPlayer.subgroup) or 1
         local newClass = class or (prevPlayer and prevPlayer.class) or "UNKNOWN"
+        local isOnline = online ~= false
 
-        tinsert(ctx.delta.joined, {
+        local deltaEntry = {
             name = name,
             unitID = ctx.unitID,
             rank = newRank,
             subgroup = newSubgroup,
             class = newClass,
-        })
+            online = isOnline,
+        }
+        tinsert(ctx.delta.joined, deltaEntry)
 
         return {
             playerNid = prevPlayer and prevPlayer.playerNid or nil,
@@ -323,24 +331,29 @@ do
             join = ctx.now,
             leave = nil,
             count = (prevPlayer and prevPlayer.count) or 0,
-        }
+        },
+            deltaEntry
     end
 
-    local function refreshActiveRosterPlayer(ctx, name, rank, subgroup, class)
+    local function refreshActiveRosterPlayer(ctx, name, rank, subgroup, class, online)
         local player = ctx.playersByName[name]
         local oldUnitID = ctx.prevUnitsByName[name]
         local oldRank = player.rank or 0
         local oldSubgroup = player.subgroup or 1
         local oldClass = player.class or "UNKNOWN"
+        local oldOnline = ctx.prevOnlineByName[name]
         local newRank = rank or oldRank
         local newSubgroup = subgroup or oldSubgroup
         local newClass = class or oldClass
+        local newOnline = online ~= false
+        local onlineChanged = oldOnline ~= nil and oldOnline ~= newOnline
         local fieldChanged = (oldRank ~= newRank) or (oldSubgroup ~= newSubgroup) or (oldClass ~= newClass)
         local unitChanged = oldUnitID and (oldUnitID ~= ctx.unitID)
-        local changed = fieldChanged or unitChanged
+        local changed = fieldChanged or unitChanged or onlineChanged
+        local deltaEntry
 
         if changed then
-            tinsert(ctx.delta.updated, {
+            deltaEntry = {
                 name = name,
                 oldUnitID = oldUnitID,
                 unitID = ctx.unitID,
@@ -350,36 +363,44 @@ do
                 subgroup = newSubgroup,
                 oldClass = oldClass,
                 class = newClass,
-            })
+                oldOnline = oldOnline,
+                online = newOnline,
+            }
+            tinsert(ctx.delta.updated, deltaEntry)
         end
 
         player.rank = newRank
         player.subgroup = newSubgroup
         player.class = newClass
-        return player, changed
+        return player, changed, deltaEntry
     end
 
-    local function applyKnownRosterUnit(ctx, unitID, name, rank, subgroup, level, classL, class)
+    local function applyKnownRosterUnit(ctx, unitID, name, rank, subgroup, level, classL, class, online)
         pendingUnits[unitID] = nil
         ctx.unitID = unitID
         ctx.nextUnitsByName[name] = unitID
         ctx.nextNamesByUnit[unitID] = name
+        ctx.nextOnlineByName[name] = online ~= false
 
         local raceL, race = UnitRace(unitID)
         local prevPlayer = ctx.playersByName[name]
         local active = prevPlayer and prevPlayer.leave == nil
         local player
+        local deltaEntry
         local changed = false
 
         if active then
-            player, changed = refreshActiveRosterPlayer(ctx, name, rank, subgroup, class)
+            player, changed, deltaEntry = refreshActiveRosterPlayer(ctx, name, rank, subgroup, class, online)
         else
-            player = buildJoinedRosterPlayer(ctx, name, rank, subgroup, class)
+            player, deltaEntry = buildJoinedRosterPlayer(ctx, name, rank, subgroup, class, online)
             changed = true
         end
 
         -- Keep raid.players consistent even if rows were manually edited.
         module:AddPlayer(player)
+        if deltaEntry then
+            deltaEntry.playerNid = tonumber(player and player.playerNid) or nil
+        end
 
         ctx.seen[name] = true
         upsertPlayerMeta(ctx.realmPlayers, name, unitID, level, race, raceL, class, classL)
@@ -398,9 +419,12 @@ do
                     tinsert(ctx.delta.left, {
                         name = pname,
                         unitID = ctx.prevUnitsByName[pname],
+                        playerNid = tonumber(p.playerNid) or nil,
                         rank = p.rank or 0,
                         subgroup = p.subgroup or 1,
                         class = p.class or "UNKNOWN",
+                        oldOnline = ctx.prevOnlineByName[pname],
+                        online = false,
                     })
                 end
             end
@@ -455,33 +479,46 @@ do
 
         local prevUnitsByName = liveUnitsByName
         local prevNamesByUnit = liveNamesByUnit
+        local prevOnlineByName = liveOnlineByName
         local ctx = {
             currentRaidId = currentRaidId,
             realmPlayers = realmPlayers,
             playersByName = playersByName,
             prevUnitsByName = prevUnitsByName,
             prevNamesByUnit = prevNamesByUnit,
+            prevOnlineByName = prevOnlineByName,
             nextUnitsByName = {},
             nextNamesByUnit = {},
+            nextOnlineByName = {},
             seen = {},
             delta = delta,
             now = Time.GetCurrentTime(),
         }
+        delta.timestamp = ctx.now
+        delta.raidNum = currentRaidId
         local hasUnknownUnits = false
 
+        -- Localize heavy-used locals for the loop to reduce lookups.
+        local applyUnknown = applyUnknownRosterUnit
+        local applyKnown = applyKnownRosterUnit
+        local getInfo = getRaidRosterInfo
+        local tstr = tostring
+        local isUnknownFn = isUnknownName
+
         for i = 1, n do
-            local unitID = "raid" .. tostring(i)
-            local name, rank, subgroup, level, classL, class = getRaidRosterInfo(i)
-            if isUnknownName(name) then
-                hasUnknownUnits = applyUnknownRosterUnit(ctx, unitID) or hasUnknownUnits
+            local unitID = "raid" .. tstr(i)
+            local name, rank, subgroup, level, classL, class, _, online = getInfo(i)
+            if isUnknownFn(name) then
+                hasUnknownUnits = applyUnknown(ctx, unitID) or hasUnknownUnits
             else
-                rosterChanged = applyKnownRosterUnit(ctx, unitID, name, rank, subgroup, level, classL, class) or rosterChanged
+                rosterChanged = applyKnown(ctx, unitID, name, rank, subgroup, level, classL, class, online) or rosterChanged
             end
         end
 
         trimPendingUnits(n)
         liveUnitsByName = ctx.nextUnitsByName
         liveNamesByUnit = ctx.nextNamesByUnit
+        liveOnlineByName = ctx.nextOnlineByName
 
         rosterChanged = markRosterLeavers(ctx) or rosterChanged
 

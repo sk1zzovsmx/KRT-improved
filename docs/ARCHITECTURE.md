@@ -33,7 +33,7 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   Own runtime model/service logic under `addon.Services.*`.
   `addon.Services.Raid` is split across `!KRT/Services/Raid/*.lua` and loaded by TOC order.
   `State.lua` is the state/compat anchor file; the other files extend the same service table by domain
-  (`Capabilities`, `Changes`, `Counts`, `Roster`, `LootRecords`, `Session`, `Boss`).
+  (`Capabilities`, `Counts`, `Roster`, `Attendance`, `LootRecords`, `Session`).
   `addon.Services.Rolls` keeps its public roll/session contract in `!KRT/Services/Rolls/Service.lua` and owns
   internal runtime helpers in `!KRT/Services/Rolls/*.lua` for countdown/session lifecycle,
   raw history/tracker state, response intake/eligibility, resolver policy, and display assembly

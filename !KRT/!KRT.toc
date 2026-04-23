@@ -72,6 +72,7 @@ Services\Raid\State.lua
 Services\Raid\Capabilities.lua
 Services\Raid\Counts.lua
 Services\Raid\Roster.lua
+Services\Raid\Attendance.lua
 Services\Raid\LootRecords.lua
 Services\Raid\Session.lua
 Services\Chat.lua

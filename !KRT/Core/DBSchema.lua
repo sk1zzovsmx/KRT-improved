@@ -12,7 +12,7 @@ addon.DBSchema = addon.DBSchema or {}
 local DBSchema = addon.DBSchema
 
 -- ----- Internal state ----- --
-local DEFAULT_RAID_SCHEMA_VERSION = 3
+local DEFAULT_RAID_SCHEMA_VERSION = 4
 
 -- ----- Private helpers ----- --
 local function normalizeSchemaVersion(value)

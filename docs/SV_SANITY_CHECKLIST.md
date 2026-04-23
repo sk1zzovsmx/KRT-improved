@@ -9,7 +9,7 @@ Use this before releases and before/after schema refactors.
    `KRT_Raids`, `KRT_Players`, `KRT_Reserves`, `KRT_Warnings`, `KRT_Spammer`, `KRT_Options`.
 2. Every raid has a valid `schemaVersion` (number, `>= 1`, `<= current schema`).
 3. Every raid includes canonical keys:
-   `raidNid`, `players`, `bossKills`, `loot`, `changes`,
+   `raidNid`, `players`, `attendance`, `bossKills`, `loot`, `changes`,
    `nextPlayerNid`, `nextBossNid`, `nextLootNid`, `startTime`.
 4. Legacy runtime keys are absent at raid root:
    `_playersByName`, `_playerIdxByNid`, `_bossIdxByNid`, `_lootIdxByNid`.
@@ -22,10 +22,11 @@ Use this before releases and before/after schema refactors.
    `nextLootNid >= max(loot[].lootNid) + 1`.
 7. Canonical references are coherent:
    `bossKills[].players[*]` points to existing `players[].playerNid`,
+   `attendance[].playerNid` points to existing `players[].playerNid`,
    `loot[].bossNid` points to existing `bossKills[].bossNid` (or unknown/trash policy),
    `loot[].looterNid` points to existing `players[].playerNid`.
 8. Schema freeze gate:
-   keep `schemaVersion = 3` unless there is a net structural simplification that requires `v4`.
+   keep `schemaVersion = 4` unless there is a net structural simplification that requires a new version.
 
 ## Tooling
 

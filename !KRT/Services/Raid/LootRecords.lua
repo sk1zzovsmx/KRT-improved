@@ -10,7 +10,6 @@ local Core = feature.Core
 local Strings = feature.Strings or addon.Strings
 local Item = feature.Item or addon.Item
 
-local ITEM_LINK_PATTERN = feature.ITEM_LINK_PATTERN
 local rollTypes = feature.rollTypes
 
 local type = type
@@ -24,6 +23,37 @@ do
 
     -- ----- Private helpers ----- --
     local findRaidPlayerByNid = assert(module._FindRaidPlayerByNid, "Missing Raid._FindRaidPlayerByNid")
+
+    local function buildHeldLootItemQuery(itemLink)
+        if not itemLink then
+            return nil
+        end
+
+        return {
+            itemString = Item.GetItemStringFromLink(itemLink),
+            itemId = tonumber(Item.GetItemIdFromLink(itemLink)) or 0,
+            itemLink = itemLink,
+        }
+    end
+
+    local function matchesHeldLootItem(entry, query, allowDirectLinkMatch)
+        if type(entry) ~= "table" or type(query) ~= "table" then
+            return false
+        end
+
+        local queryItemKey = query.itemString or query.itemLink
+        local entryItemKey = entry.itemString or entry.itemLink
+        if queryItemKey and entryItemKey and queryItemKey == entryItemKey then
+            return true
+        end
+        if query.itemId > 0 and tonumber(entry.itemId) == query.itemId then
+            return true
+        end
+        if allowDirectLinkMatch and entry.itemLink and entry.itemLink == query.itemLink then
+            return true
+        end
+        return false
+    end
 
     local function resolveLootLooterName(raid, loot)
         if type(loot) ~= "table" then
@@ -103,17 +133,8 @@ do
 
         raidNum = raidNum or Core.GetCurrentRaid()
 
-        local queryItemKey = Item.GetItemStringFromLink(itemLink) or itemLink
-        local queryItemId = tonumber(Item.GetItemIdFromLink(itemLink)) or 0
-        local entryItemKey = entry.itemString or entry.itemLink
-        local sameItem = false
-
-        if queryItemKey and entryItemKey and queryItemKey == entryItemKey then
-            sameItem = true
-        elseif queryItemId > 0 and tonumber(entry.itemId) == queryItemId then
-            sameItem = true
-        end
-        if not sameItem then
+        local query = buildHeldLootItemQuery(itemLink)
+        if not matchesHeldLootItem(entry, query, false) then
             return false
         end
 
@@ -160,10 +181,8 @@ do
         Core.EnsureRaidSchema(raid)
         holderName = Strings.NormalizeName(holderName, true)
 
+        local query = buildHeldLootItemQuery(itemLink)
         local queryBossNid = tonumber(bossNid) or 0
-        local _, _, queryItemString = string.find(itemLink, "^|c%x+|H(.+)|h%[.*%]")
-        local _, _, _, _, queryItemId = string.find(itemLink, ITEM_LINK_PATTERN)
-        queryItemId = tonumber(queryItemId)
 
         local loot = raid.loot or {}
         for i = #loot, 1, -1 do
@@ -171,15 +190,7 @@ do
             if entry and tonumber(entry.rollType) == rollTypes.HOLD then
                 local winnerName = resolveLootLooterName(raid, entry)
                 if (not holderName or holderName == "" or winnerName == holderName) and (queryBossNid <= 0 or tonumber(entry.bossNid) == queryBossNid) then
-                    local sameItem = false
-                    if queryItemString and entry.itemString and entry.itemString == queryItemString then
-                        sameItem = true
-                    elseif queryItemId and tonumber(entry.itemId) == queryItemId then
-                        sameItem = true
-                    elseif entry.itemLink and entry.itemLink == itemLink then
-                        sameItem = true
-                    end
-                    if sameItem then
+                    if matchesHeldLootItem(entry, query, true) then
                         return tonumber(entry.lootNid) or 0
                     end
                 end

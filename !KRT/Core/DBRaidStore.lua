@@ -178,6 +178,70 @@ do
         return out
     end
 
+    local function appendNormalizedAttendanceSegment(entry, segment)
+        if type(segment) ~= "table" then
+            return
+        end
+
+        local startTime = tonumber(segment.startTime) or 0
+        if startTime <= 0 then
+            return
+        end
+
+        local out = {
+            startTime = startTime,
+        }
+
+        local endTime = tonumber(segment.endTime) or 0
+        if endTime > startTime then
+            out.endTime = endTime
+        end
+
+        local subgroup = tonumber(segment.subgroup) or 1
+        if subgroup > 1 then
+            out.subgroup = subgroup
+        end
+
+        if segment.online == false then
+            out.online = false
+        end
+
+        entry.segments[#entry.segments + 1] = out
+    end
+
+    local function normalizeAttendance(attendance, validPlayerNids)
+        local out = {}
+        if type(attendance) ~= "table" then
+            return out
+        end
+
+        local seenPlayers = {}
+        for i = 1, #attendance do
+            local rawEntry = attendance[i]
+            local playerNid = type(rawEntry) == "table" and tonumber(rawEntry.playerNid) or 0
+            if playerNid > 0 and validPlayerNids[playerNid] and not seenPlayers[playerNid] then
+                local entry = {
+                    playerNid = playerNid,
+                    segments = {},
+                }
+                seenPlayers[playerNid] = true
+
+                local segments = rawEntry.segments
+                if type(segments) == "table" then
+                    for j = 1, #segments do
+                        appendNormalizedAttendanceSegment(entry, segments[j])
+                    end
+                end
+
+                if #entry.segments > 0 then
+                    out[#out + 1] = entry
+                end
+            end
+        end
+
+        return out
+    end
+
     local normalizeNameLower = Strings.GetNormalizedNameLower
 
     local function isLegacyDiagnosticPhase(contextTag)
@@ -434,6 +498,7 @@ do
         raid.bossKills = (type(raid.bossKills) == "table") and raid.bossKills or {}
         raid.loot = (type(raid.loot) == "table") and raid.loot or {}
         raid.changes = (type(raid.changes) == "table") and raid.changes or {}
+        raid.attendance = (type(raid.attendance) == "table") and raid.attendance or {}
 
         local allocatePlayerNid, getNextPlayerNid = createNidAllocator(raid.nextPlayerNid)
         local assignedByRef = {}
@@ -540,6 +605,8 @@ do
                 loot.looter = nil
             end
         end
+
+        raid.attendance = normalizeAttendance(raid.attendance, validPlayerNids)
 
         raid.nextPlayerNid = getNextPlayerNid()
         raid.nextBossNid = getNextBossNid()
@@ -692,6 +759,7 @@ do
             bossKills = {},
             loot = {},
             changes = {},
+            attendance = {},
             nextBossNid = 1,
             nextLootNid = 1,
             nextPlayerNid = 1,

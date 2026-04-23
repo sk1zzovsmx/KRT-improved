@@ -3,7 +3,7 @@
 This file inventories the SavedVariables keys and args currently read/written by runtime code.
 Scope: `KRT_*` SavedVariables declared in `!KRT/!KRT.toc` and persisted in the
 WoW SavedVariables file for the addon.
-Current raid schema version: `3`.
+Current raid schema version: `4`.
 
 ## Canonical Name Terms
 
@@ -34,9 +34,20 @@ Observed persisted raid role assignees (optional):
 - `banker` (string, Master Loot bank target)
 - `disenchanter` (string, Master Loot disenchant target)
 
-v3 storage optimization:
+Observed persisted attendance fields:
+- `attendance[].playerNid` (required number)
+- `attendance[].segments[].startTime` (required number)
+- `attendance[].segments[].endTime` (optional number)
+- `attendance[].segments[].subgroup` (optional number; group `1` can be omitted)
+- `attendance[].segments[].online` (optional boolean; omitted/`nil` means online, `false` means offline)
+
+v3/v4 storage optimization:
 - optional/default-only fields can be omitted during save compaction,
 - runtime readers resolve defaults when fields are omitted.
+
+v4 attendance ledger:
+- attendance entries are keyed by stable `playerNid`, not player name,
+- v3 raids are initialized from `players[].join`, `players[].leave`, and `players[].subgroup`.
 
 Legacy fields accepted/transient during normalization:
 - `loot[].looter` (legacy winner reference; normalized into `looterNid` then cleared)

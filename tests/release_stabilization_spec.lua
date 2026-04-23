@@ -1867,6 +1867,7 @@ local function newHarness()
     end
 
     _G.time = _G.time or os.time
+    _G.date = _G.date or os.date
 
     addon.Deformat = function()
         return nil
@@ -2151,6 +2152,7 @@ local function newHarness()
                 "!KRT/Services/Raid/Capabilities.lua",
                 "!KRT/Services/Raid/Counts.lua",
                 "!KRT/Services/Raid/Roster.lua",
+                "!KRT/Services/Raid/Attendance.lua",
                 "!KRT/Services/Raid/LootRecords.lua",
                 "!KRT/Services/Raid/Session.lua",
             }
@@ -2945,6 +2947,118 @@ test("raid roster update preserves previous names for temporary unknown units", 
     assertEqual(delta.unresolved[1].name, "Alice", "expected previous live name to be preserved")
     assertTrue(raid.players[1].leave == nil, "expected Alice not to be marked left while unit is unknown")
     assertEqual(h.timerCount(), 1, "expected unknown unit retry to be scheduled")
+end)
+
+test("raid attendance records roster delta segments by player nid", function()
+    local h = newHarness()
+
+    h:installRaidStore({
+        {
+            schemaVersion = 4,
+            raidNid = 1,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            realm = "TestRealm",
+            startTime = 1000,
+            nextPlayerNid = 2,
+            nextBossNid = 1,
+            nextLootNid = 1,
+            players = {
+                { playerNid = 1, name = "Alice", rank = 1, subgroup = 1, class = "MAGE", count = 0 },
+            },
+            attendance = {},
+            bossKills = {},
+            loot = {},
+            changes = {},
+        },
+    })
+    h.addon.State.currentRaid = 1
+
+    h:load("!KRT/Services/Raid.lua")
+
+    h.Bus.TriggerEvent(h.addon.Events.Internal.RaidRosterDelta, {
+        raidNum = 1,
+        timestamp = 1000,
+        joined = {
+            { playerNid = 1, name = "Alice", subgroup = 1, online = true },
+        },
+    }, 1, 1)
+    h.Bus.TriggerEvent(h.addon.Events.Internal.RaidRosterDelta, {
+        raidNum = 1,
+        timestamp = 1010,
+        updated = {
+            { playerNid = 1, name = "Alice", subgroup = 2, online = false },
+        },
+    }, 2, 1)
+    h.Bus.TriggerEvent(h.addon.Events.Internal.RaidRosterDelta, {
+        raidNum = 1,
+        timestamp = 1030,
+        left = {
+            { playerNid = 1, name = "Alice", subgroup = 2, online = false },
+        },
+    }, 3, 1)
+
+    local raid = h.Core.EnsureRaidById(1)
+    local Raid = h.addon.Services.Raid
+    local entry = Raid:GetAttendanceEntry(raid, 1)
+    assertTrue(entry ~= nil, "expected attendance entry to be created for Alice")
+    assertEqual(entry.playerNid, 1, "expected attendance to use playerNid instead of player name keys")
+    assertEqual(#entry.segments, 2, "expected online transition to split attendance segments")
+    assertEqual(entry.segments[1].startTime, 1000, "expected first attendance segment to start on join")
+    assertEqual(entry.segments[1].endTime, 1010, "expected first attendance segment to close on online change")
+    assertTrue(entry.segments[1].online ~= false, "expected omitted online flag to mean online")
+    assertEqual(entry.segments[2].startTime, 1010, "expected second attendance segment to start on update")
+    assertEqual(entry.segments[2].endTime, 1030, "expected second attendance segment to close on leave")
+    assertEqual(entry.segments[2].subgroup, 2, "expected subgroup changes to be stored on the segment")
+    assertEqual(entry.segments[2].online, false, "expected offline state to be stored on the segment")
+end)
+
+test("logger builds attendance csv without replacing raid loot csv", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 4,
+            raidNid = 1,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            realm = "TestRealm",
+            startTime = 1000,
+            nextPlayerNid = 2,
+            nextBossNid = 1,
+            nextLootNid = 1,
+            players = {
+                { playerNid = 1, name = "Alice", rank = 1, subgroup = 1, class = "MAGE", count = 0 },
+            },
+            attendance = {
+                {
+                    playerNid = 1,
+                    segments = {
+                        { startTime = 1000, endTime = 1010 },
+                        { startTime = 1010, endTime = 1030, subgroup = 2, online = false },
+                    },
+                },
+            },
+            bossKills = {},
+            loot = {},
+            changes = {},
+        },
+    })
+
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/View.lua")
+
+    local raid = h.Core.EnsureRaidById(1)
+    local View = h.addon.Services.Logger.View
+    local attendanceCsv = View:GetAttendanceCsv(raid, 1)
+    local raidCsv = View:BuildRaidCsv(raid, 1)
+
+    assertContains({ attendanceCsv }, "PlayerNID,Player,Class", "expected attendance csv to expose player columns")
+    assertContains({ attendanceCsv }, "Alice,MAGE", "expected attendance csv to include the player")
+    assertContains({ attendanceCsv }, "30,10,20,2", "expected attendance csv to summarize online and offline seconds")
+    assertTrue(type(raidCsv) == "string", "expected the existing raid loot csv builder to remain available")
+    assertContains({ raidCsv }, "LootNID,ItemID,ItemName", "expected existing raid csv to keep loot columns")
 end)
 
 test("db syncer routes requests through whisper and group transports", function()
@@ -4116,6 +4230,124 @@ test("loot window mouseover boss resolves boss context without event recovery", 
     local raid = h.Core.EnsureRaidById(1)
     assertEqual(#raid.bossKills, 1, "expected no TrashMob fallback for a boss corpse open")
     assertEqual(raid.loot[1].bossNid, 1, "expected the loot to stay attached to Grand Widow Faerlina")
+end)
+
+test("loot window dead raid target boss creates boss context without event recovery", function()
+    local h = newHarness()
+    local bossLink = h.registerItem(91702, "Raid Target Faerlina Mantle")
+    local bossKey = h.addon.Item.GetItemStringFromLink(bossLink)
+    local currentTime = 1000
+    local bossNpcId = 15953
+    local bossGuid = "Creature-0-0-0-0-15953-0000000000"
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+    _G.GetNumRaidMembers = function()
+        return 3
+    end
+
+    h.addon.BossIDs = {
+        BossIDs = {
+            [bossNpcId] = true,
+        },
+        GetBossName = function(_, npcId)
+            if npcId == bossNpcId then
+                return "Grand Widow Faerlina"
+            end
+            return nil
+        end,
+    }
+    h.addon.GetCreatureId = function(guid)
+        if guid == bossGuid then
+            return bossNpcId
+        end
+        return 0
+    end
+    _G.UnitExists = function(unit)
+        return unit == "raid2target"
+    end
+    _G.UnitGUID = function(unit)
+        if unit == "raid2target" then
+            return bossGuid
+        end
+        return nil
+    end
+    _G.UnitIsDead = function(unit)
+        return unit == "raid2target"
+    end
+    _G.UnitName = function(unit)
+        if unit == "raid2target" then
+            return "Grand Widow Faerlina"
+        end
+        return unit
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "raid-target-boss-loot-self" then
+            return bossLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    h.feature.raidState.bossEventContext = nil
+    h.Core.SetLastBoss(nil)
+    h.feature.lootState.opened = true
+
+    assertEqual(
+        Raid:_EnsureLootWindowItemContext(1, {
+            { itemKey = bossKey, count = 1 },
+        }, {
+            ttlSeconds = 60,
+            source = "LOOT_OPENED",
+        }),
+        1,
+        "expected dead raid target boss fallback to create a boss context"
+    )
+
+    local source = Raid:GetActiveLootSource(1)
+    assertTrue(source ~= nil, "expected an active boss loot source after raid target fallback")
+    assertEqual(source.kind, "boss", "expected raid target fallback to classify the source as boss")
+    assertEqual(source.bossNid, 1, "expected raid target fallback to bind the new boss nid")
+    assertEqual(source.sourceNpcId, bossNpcId, "expected raid target fallback to preserve the boss npc id")
+    assertEqual(source.sourceName, "Grand Widow Faerlina", "expected raid target fallback to preserve the boss name")
+
+    Raid:AddLoot("raid-target-boss-loot-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected raid target fallback to create one boss kill")
+    assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected the fallback boss kill to use the boss name")
+    assertEqual(raid.bossKills[1].sourceNpcId, bossNpcId, "expected the fallback boss kill to preserve the source npc id")
+    assertEqual(#raid.loot, 1, "expected raid target boss loot to log one row")
+    assertEqual(raid.loot[1].bossNid, 1, "expected raid target boss loot to bind to the fallback boss")
+    assertEqual(raid.loot[1].lootSource.kind, "boss", "expected raid target boss loot to persist boss source metadata")
+    assertEqual(raid.loot[1].lootSource.sourceNpcId, bossNpcId, "expected loot source metadata to keep the boss npc id")
 end)
 
 test("loot window source marks context-free openings as object", function()

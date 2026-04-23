@@ -349,36 +349,37 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 45) Services/Raid/Capabilities.lua
 46) Services/Raid/Counts.lua
 47) Services/Raid/Roster.lua
-48) Services/Raid/LootRecords.lua
-49) Services/Raid/Session.lua
-50) Services/Chat.lua
-51) EntryPoints/Minimap.lua
-52) EntryPoints/SlashEvents.lua
-53) Services/Rolls/Countdown.lua
-54) Services/Rolls/Sessions.lua
-55) Services/Rolls/History.lua
-56) Services/Rolls/Responses.lua
-57) Services/Rolls/Resolution.lua
-58) Services/Rolls/Display.lua
-59) Services/Rolls/Service.lua
-60) Services/Loot/Service.lua
-61) Services/Debug.lua
-62) Controllers/Master.lua
-63) Widgets/LootCounter.lua
-64) Services/Reserves/Import.lua
-65) Services/Reserves/Display.lua
-66) Services/Reserves.lua
-67) Widgets/ReservesUI.lua
-68) Services/Logger/Store.lua
-69) Services/Logger/View.lua
-70) Services/Logger/Helpers.lua
-71) Services/Logger/Actions.lua
-72) Controllers/Logger.lua
-73) Widgets/Config.lua
-74) Controllers/Warnings.lua
-75) Controllers/Changes.lua
-76) Controllers/Spammer.lua
-77) KRT.xml
+48) Services/Raid/Attendance.lua
+49) Services/Raid/LootRecords.lua
+50) Services/Raid/Session.lua
+51) Services/Chat.lua
+52) EntryPoints/Minimap.lua
+53) EntryPoints/SlashEvents.lua
+54) Services/Rolls/Countdown.lua
+55) Services/Rolls/Sessions.lua
+56) Services/Rolls/History.lua
+57) Services/Rolls/Responses.lua
+58) Services/Rolls/Resolution.lua
+59) Services/Rolls/Display.lua
+60) Services/Rolls/Service.lua
+61) Services/Loot/Service.lua
+62) Services/Debug.lua
+63) Controllers/Master.lua
+64) Widgets/LootCounter.lua
+65) Services/Reserves/Import.lua
+66) Services/Reserves/Display.lua
+67) Services/Reserves.lua
+68) Widgets/ReservesUI.lua
+69) Services/Logger/Store.lua
+70) Services/Logger/View.lua
+71) Services/Logger/Helpers.lua
+72) Services/Logger/Actions.lua
+73) Controllers/Logger.lua
+74) Widgets/Config.lua
+75) Controllers/Warnings.lua
+76) Controllers/Changes.lua
+77) Controllers/Spammer.lua
+78) KRT.xml
 
 ---
 
@@ -413,6 +414,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
       Capabilities.lua     # raid role/capability policy
       Counts.lua           # loot counter/player count APIs
       Roster.lua           # player lookup/class/rank helper APIs
+      Attendance.lua       # player attendance ledger from roster deltas
       LootRecords.lua      # loot-record lookup/matching/resolution APIs
       Session.lua          # raid/session facade + boss query/icon + changes data APIs
     Chat.lua               # output helpers (Print/Announce)

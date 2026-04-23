@@ -97,6 +97,63 @@ do
         return nil, nil
     end
 
+    local function getAttendanceEntry(raid, playerNid)
+        local attendance = raid and raid.attendance or nil
+        local queryNid = tonumber(playerNid) or 0
+        if type(attendance) ~= "table" or queryNid <= 0 then
+            return nil
+        end
+
+        for i = 1, #attendance do
+            local entry = attendance[i]
+            if type(entry) == "table" and tonumber(entry.playerNid) == queryNid then
+                return entry
+            end
+        end
+        return nil
+    end
+
+    local function summarizeAttendance(entry, fallbackJoin, fallbackLeave)
+        local now = time()
+        local totalSeconds = 0
+        local onlineSeconds = 0
+        local offlineSeconds = 0
+        local segmentCount = 0
+        local segments = entry and entry.segments or nil
+
+        if type(segments) == "table" then
+            for i = 1, #segments do
+                local segment = segments[i]
+                if type(segment) == "table" then
+                    local startTime = tonumber(segment.startTime) or 0
+                    local endTime = tonumber(segment.endTime) or now
+                    if startTime > 0 and endTime >= startTime then
+                        local duration = endTime - startTime
+                        totalSeconds = totalSeconds + duration
+                        if segment.online == false then
+                            offlineSeconds = offlineSeconds + duration
+                        else
+                            onlineSeconds = onlineSeconds + duration
+                        end
+                        segmentCount = segmentCount + 1
+                    end
+                end
+            end
+        end
+
+        if segmentCount == 0 then
+            local joinTime = tonumber(fallbackJoin) or 0
+            local leaveTime = tonumber(fallbackLeave) or now
+            if joinTime > 0 and leaveTime >= joinTime then
+                totalSeconds = leaveTime - joinTime
+                onlineSeconds = totalSeconds
+                segmentCount = 1
+            end
+        end
+
+        return totalSeconds, onlineSeconds, offlineSeconds, segmentCount
+    end
+
     -- ----- Public methods ----- --
     function module:GetRaidSummary(raid)
         raid = normalizeRaid(raid)
@@ -165,6 +222,7 @@ do
             if type(player) == "table" then
                 local joinTime = tonumber(player.join)
                 local leaveTime = tonumber(player.leave)
+                local totalSeconds, onlineSeconds, offlineSeconds, segmentCount = summarizeAttendance(getAttendanceEntry(raid, player.playerNid), joinTime, leaveTime)
                 rows[#rows + 1] = {
                     id = tonumber(player.playerNid),
                     name = player.name,
@@ -173,6 +231,10 @@ do
                     leave = leaveTime,
                     joinFmt = joinTime and date("%H:%M", joinTime) or "",
                     leaveFmt = leaveTime and date("%H:%M", leaveTime) or "",
+                    attendanceSeconds = totalSeconds,
+                    onlineSeconds = onlineSeconds,
+                    offlineSeconds = offlineSeconds,
+                    segmentCount = segmentCount,
                 }
             end
         end

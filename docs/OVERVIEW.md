@@ -62,6 +62,7 @@ Runtime data/model/service modules:
 - `Services/Raid/Capabilities.lua` (role/capability policy + shared master-only guard)
 - `Services/Raid/Counts.lua` (loot counter operations)
 - `Services/Raid/Roster.lua` (live roster tracking and player lookups)
+- `Services/Raid/Attendance.lua` (per-player attendance ledger from roster deltas)
 - `Services/Raid/LootRecords.lua` (loot-record query helpers)
 - `Services/Raid/Session.lua` (raid session checks/scheduling + raid changes CRUD/message builders
   + boss query/icon helpers)

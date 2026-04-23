@@ -15,8 +15,9 @@ local rollTypes = feature.rollTypes
 
 local twipe = table.wipe
 local tconcat = table.concat
-local tostring, tonumber = tostring, tonumber
+local type, tostring, tonumber = type, tostring, tonumber
 local date, time = date, time
+local format = string.format
 
 -- ----- Internal state ----- --
 addon.Services.Logger.View = addon.Services.Logger.View or {}
@@ -199,6 +200,135 @@ function View:BuildRaidCsv(raid, raidIndex)
                 View:GetLootRollTypeLabel(loot.rollType),
                 loot.rollValue or "",
                 lootTime,
+            })
+        end
+    end
+
+    return tconcat(rows, "\n")
+end
+
+function View:GetAttendanceCsv(raid, raidIndex)
+    local rows = {}
+
+    rows[1] = tconcat({
+        "RaidIndex",
+        "RaidNID",
+        "RaidDate",
+        "Zone",
+        "Size",
+        "Difficulty",
+        "PlayerNID",
+        "Player",
+        "Class",
+        "Join",
+        "Leave",
+        "AttendanceSeconds",
+        "OnlineSeconds",
+        "OfflineSeconds",
+        "SegmentCount",
+        "Segments",
+    }, ",")
+
+    if not raid then
+        return rows[1]
+    end
+
+    local attendanceByNid = {}
+    local attendance = raid.attendance or {}
+    for i = 1, #attendance do
+        local entry = attendance[i]
+        local playerNid = type(entry) == "table" and tonumber(entry.playerNid) or nil
+        if playerNid and playerNid > 0 then
+            attendanceByNid[playerNid] = entry
+        end
+    end
+
+    local now = time()
+    local raidDate = raid.startTime and date("%Y-%m-%d %H:%M:%S", raid.startTime) or ""
+
+    local function appendRow(fields)
+        for i = 1, #fields do
+            fields[i] = escapeCsvField(fields[i])
+        end
+        rows[#rows + 1] = tconcat(fields, ",")
+    end
+
+    local function summarizeSegments(entry, fallbackJoin, fallbackLeave)
+        local totalSeconds = 0
+        local onlineSeconds = 0
+        local offlineSeconds = 0
+        local segmentCount = 0
+        local segmentLabels = {}
+        local segments = entry and entry.segments or nil
+
+        if type(segments) == "table" then
+            for i = 1, #segments do
+                local segment = segments[i]
+                if type(segment) == "table" then
+                    local startTime = tonumber(segment.startTime) or 0
+                    local endTime = tonumber(segment.endTime) or now
+                    if startTime > 0 and endTime >= startTime then
+                        local duration = endTime - startTime
+                        local online = segment.online ~= false
+                        totalSeconds = totalSeconds + duration
+                        if online then
+                            onlineSeconds = onlineSeconds + duration
+                        else
+                            offlineSeconds = offlineSeconds + duration
+                        end
+                        segmentCount = segmentCount + 1
+                        segmentLabels[#segmentLabels + 1] = format(
+                            "%s/%s/%s/%s",
+                            date("%Y-%m-%d %H:%M:%S", startTime),
+                            segment.endTime and date("%Y-%m-%d %H:%M:%S", endTime) or "",
+                            tostring(tonumber(segment.subgroup) or 1),
+                            online and "online" or "offline"
+                        )
+                    end
+                end
+            end
+        end
+
+        if segmentCount == 0 then
+            local joinTime = tonumber(fallbackJoin) or 0
+            local leaveTime = tonumber(fallbackLeave) or now
+            if joinTime > 0 and leaveTime >= joinTime then
+                totalSeconds = leaveTime - joinTime
+                onlineSeconds = totalSeconds
+                segmentCount = 1
+                segmentLabels[1] = format("%s/%s/1/online", date("%Y-%m-%d %H:%M:%S", joinTime), fallbackLeave and date("%Y-%m-%d %H:%M:%S", leaveTime) or "")
+            end
+        end
+
+        return totalSeconds, onlineSeconds, offlineSeconds, segmentCount, tconcat(segmentLabels, ";")
+    end
+
+    local players = raid.players or {}
+    for i = 1, #players do
+        local player = players[i]
+        local playerNid = type(player) == "table" and (tonumber(player.playerNid) or 0) or 0
+        if playerNid > 0 then
+            local joinTime = tonumber(player.join) or nil
+            local leaveTime = tonumber(player.leave) or nil
+            local totalSeconds, onlineSeconds, offlineSeconds, segmentCount, segmentText = summarizeSegments(attendanceByNid[playerNid], joinTime, leaveTime)
+
+            appendRow({
+                raidIndex or "",
+                raid.raidNid or "",
+                raidDate,
+                raid.zone or "",
+                raid.size or "",
+                View:GetRaidDifficultyLabel(raid),
+                playerNid,
+                player.name or "",
+                player.class or "",
+                joinTime and date("%Y-%m-%d %H:%M:%S", joinTime) or "",
+                leaveTime and date("%Y-%m-%d %H:%M:%S", leaveTime) or "",
+                totalSeconds,
+                onlineSeconds,
+                offlineSeconds,
+                segmentCount,
+                segmentText,
             })
         end
     end

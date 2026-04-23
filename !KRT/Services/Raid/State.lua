@@ -28,6 +28,7 @@ local pairs, ipairs, type, select = pairs, ipairs, type, select
 local tostring, tonumber = tostring, tonumber
 local UnitExists = UnitExists
 local UnitGUID = UnitGUID
+local UnitIsDead = UnitIsDead
 local UnitName = UnitName
 local UnitRace = UnitRace
 
@@ -184,15 +185,27 @@ do
         return nil
     end
 
-    local function isBossNpcId(npcId)
+    local function classifyNpcLootSource(npcId)
         local resolvedNpcId = tonumber(npcId) or 0
         if resolvedNpcId <= 0 then
-            return false
+            return "unknown", 0
+        end
+
+        if type(IgnoredMobs.Contains) == "function" and IgnoredMobs.Contains(resolvedNpcId) then
+            return "ignored", resolvedNpcId
         end
 
         local bossLib = addon.BossIDs
         local bossIds = bossLib and bossLib.BossIDs
-        return bossIds and bossIds[resolvedNpcId] == true or false
+        if not bossIds then
+            return "unknown", resolvedNpcId
+        end
+        if bossIds[resolvedNpcId] == true then
+            local bossName = type(bossLib.GetBossName) == "function" and bossLib:GetBossName(resolvedNpcId) or nil
+            return "boss", resolvedNpcId, bossName
+        end
+
+        return "trash", resolvedNpcId
     end
 
     local function getLootWindowBossContextState()
@@ -294,10 +307,11 @@ do
             return nil
         end
 
-        local function buildUnitContext(unit, allowBossMatch)
+        local function buildUnitContext(unit, options)
             if not UnitExists(unit) then
                 return nil
             end
+            options = options or {}
 
             local guid = UnitGUID(unit)
             local npcId = guid and addon.GetCreatureId and addon.GetCreatureId(guid) or 0
@@ -305,9 +319,10 @@ do
                 return nil
             end
 
+            local sourceKind, _, sourceBossName = classifyNpcLootSource(npcId)
             local name = type(UnitName) == "function" and UnitName(unit) or nil
-            if isBossNpcId(npcId) then
-                if not allowBossMatch then
+            if sourceKind == "boss" then
+                if not options.allowBossMatch then
                     return nil
                 end
 
@@ -315,7 +330,20 @@ do
                 if not boss and name then
                     boss = findBossByName(raid, name)
                 end
+                if not boss and sourceBossName then
+                    boss = findBossByName(raid, sourceBossName)
+                end
                 if not boss then
+                    local canCreateFromDeadBoss = (not options.requireDeadBossForCreate) or (type(UnitIsDead) == "function" and UnitIsDead(unit))
+                    if options.allowBossCreate and canCreateFromDeadBoss and (name or sourceBossName) then
+                        return {
+                            kind = "boss",
+                            unit = unit,
+                            npcId = npcId,
+                            name = name or sourceBossName,
+                            bossNid = 0,
+                        }
+                    end
                     return nil
                 end
 
@@ -323,26 +351,52 @@ do
                     kind = "boss",
                     unit = unit,
                     npcId = npcId,
-                    name = boss.name or name,
+                    name = boss.name or name or sourceBossName,
                     bossNid = tonumber(boss.bossNid) or 0,
                 }
             end
 
-            return {
-                kind = "nonBoss",
-                unit = unit,
-                npcId = npcId,
-                name = name,
-                bossNid = 0,
-            }
+            if options.allowNonBoss and sourceKind == "trash" then
+                return {
+                    kind = "nonBoss",
+                    unit = unit,
+                    npcId = npcId,
+                    name = name,
+                    bossNid = 0,
+                }
+            end
+
+            return nil
         end
 
-        local mouseoverContext = buildUnitContext("mouseover", true)
+        local function buildCorpseUnitContext(unit, allowNonBoss)
+            return buildUnitContext(unit, {
+                allowBossMatch = true,
+                allowBossCreate = true,
+                allowNonBoss = allowNonBoss == true,
+                requireDeadBossForCreate = true,
+            })
+        end
+
+        local targetContext = buildCorpseUnitContext("target", true)
+        if targetContext then
+            return targetContext
+        end
+
+        local mouseoverContext = buildCorpseUnitContext("mouseover", true)
         if mouseoverContext then
             return mouseoverContext
         end
 
-        return buildUnitContext("target", false)
+        local raidMemberCount = type(GetNumRaidMembers) == "function" and (GetNumRaidMembers() or 0) or 0
+        for i = 1, raidMemberCount do
+            local raidTargetContext = buildCorpseUnitContext("raid" .. tostring(i) .. "target", false)
+            if raidTargetContext then
+                return raidTargetContext
+            end
+        end
+
+        return nil
     end
 
     setActiveLootSource = function(raid, raidNum, kind, bossNid, sourceMeta, now, ttlSeconds, snapshotId)
@@ -556,13 +610,6 @@ do
     module._ResolveRaidDifficultyInternal = resolveRaidDifficulty
     module._GetRaidSizeFromDifficultyInternal = getRaidSizeFromDifficulty
 
-    local function shouldIgnoreBossKillNpcId(npcId)
-        if type(IgnoredMobs.Contains) ~= "function" then
-            return false
-        end
-        return IgnoredMobs.Contains(npcId)
-    end
-
     local function findRecentBossKillByName(raid, bossName, now)
         if not raid or not bossName then
             return nil, nil
@@ -666,11 +713,18 @@ do
         local sourceUnitContext = resolveLootWindowSourceUnitContext(raid)
         if type(sourceUnitContext) == "table" then
             if sourceUnitContext.kind == "boss" then
-                return setLootWindowBossContext(raid, raidNum, sourceUnitContext.bossNid, source or "lootWindowUnit", currentTime, ttlSeconds, sourceUnitContext)
+                local sourceBossNid = tonumber(sourceUnitContext.bossNid) or 0
+                if sourceBossNid <= 0 and sourceUnitContext.name then
+                    sourceBossNid = tonumber(module:AddBoss(sourceUnitContext.name, nil, raidNum, sourceUnitContext.npcId)) or 0
+                    sourceUnitContext.bossNid = sourceBossNid
+                end
+                if sourceBossNid > 0 then
+                    return setLootWindowBossContext(raid, raidNum, sourceBossNid, source or "lootWindowUnit", currentTime, ttlSeconds, sourceUnitContext)
+                end
+            elseif sourceUnitContext.kind == "nonBoss" then
+                setBlockedLootWindowBossContext(raidNum, source or "lootWindowBlocked", currentTime, ttlSeconds, sourceUnitContext)
+                return 0
             end
-
-            setBlockedLootWindowBossContext(raidNum, source or "lootWindowBlocked", currentTime, ttlSeconds, sourceUnitContext)
-            return 0
         end
 
         bossNid = peekBossEventContext(raidNum, currentTime)
@@ -1080,7 +1134,8 @@ do
     -- Adds a boss kill to the active raid log.
     function module:AddBoss(bossName, manDiff, raidNum, sourceNpcId)
         sourceNpcId = tonumber(sourceNpcId)
-        if sourceNpcId and shouldIgnoreBossKillNpcId(sourceNpcId) then
+        local sourceKind = sourceNpcId and classifyNpcLootSource(sourceNpcId) or nil
+        if sourceKind == "ignored" then
             addon:trace(Diag.D.LogBossUnitDiedIgnored:format(sourceNpcId, tostring(bossName)))
             return 0
         end
@@ -1264,19 +1319,19 @@ do
 
         -- LibCompat embeds GetCreatureId with the 3.3.5a GUID parsing rules.
         local npcId = destGUID and addon.GetCreatureId(destGUID)
-        local bossLib = addon.BossIDs
-        local bossIds = bossLib and bossLib.BossIDs
-        if not (npcId and bossIds and bossIds[npcId]) then
+        local sourceKind, sourceNpcId, sourceBossName = classifyNpcLootSource(npcId)
+        if sourceKind == "ignored" then
+            addon:trace(Diag.D.LogBossUnitDiedIgnored:format(tonumber(sourceNpcId) or -1, tostring(destName)))
+            return
+        end
+        if sourceKind ~= "boss" then
             return
         end
 
-        local boss = destName
-        if not boss and bossLib and bossLib.GetBossName then
-            boss = bossLib:GetBossName(npcId)
-        end
+        local boss = destName or sourceBossName
         if boss then
-            addon:trace(Diag.D.LogBossUnitDiedMatched:format(tonumber(npcId) or -1, tostring(boss)))
-            module:AddBoss(boss, nil, nil, npcId)
+            addon:trace(Diag.D.LogBossUnitDiedMatched:format(tonumber(sourceNpcId) or -1, tostring(boss)))
+            module:AddBoss(boss, nil, nil, sourceNpcId)
         end
     end
 end

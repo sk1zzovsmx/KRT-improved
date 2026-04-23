@@ -8,6 +8,13 @@ Release-Version: 0.7.0-beta.1
 
 ### Enhancements
 
+- **Raid attendance ledger** - Added a per-player attendance ledger keyed by
+  `playerNid`, updated from roster deltas, persisted as raid schema v4, and
+  exported through a dedicated attendance CSV builder without replacing the
+  existing loot-oriented raid export.
+- **Loot source recovery** - Added a limited `LOOT_OPENED` boss-source fallback
+  that scans dead target/mouseover/raid-target units by NPC ID classification
+  when no valid loot-window context already exists.
 - **Performance: Bus event dispatch** — Eliminated per-fire table allocation
   in `Bus.TriggerEvent`; reuses a static dispatch buffer to reduce GC pressure
   during active raiding (dozens of events/second).

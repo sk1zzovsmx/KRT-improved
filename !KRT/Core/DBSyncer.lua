@@ -445,6 +445,28 @@ do
             )
         end
 
+        local attendance = sortedByNid(raid.attendance, "playerNid", "playerNid")
+        for i = 1, #attendance do
+            local entry = attendance[i]
+            local playerNid = type(entry) == "table" and (tonumber(entry.playerNid) or 0) or 0
+            local segments = type(entry) == "table" and entry.segments or nil
+            if playerNid > 0 and type(segments) == "table" then
+                for j = 1, #segments do
+                    local segment = segments[j]
+                    if type(segment) == "table" then
+                        lines[#lines + 1] = packFields(
+                            "A",
+                            playerNid,
+                            tonumber(segment.startTime) or 0,
+                            tonumber(segment.endTime) or 0,
+                            tonumber(segment.subgroup) or 1,
+                            segment.online == false and 0 or 1
+                        )
+                    end
+                end
+            end
+        end
+
         local bosses = sortedByNid(raid.bossKills, "bossNid", "name")
         for i = 1, #bosses do
             local b = bosses[i]
@@ -507,6 +529,7 @@ do
             players = {},
             bosses = {},
             loot = {},
+            attendance = {},
             changes = {},
         }
 
@@ -554,6 +577,14 @@ do
                     join = parseNumber(f[7], 0),
                     leave = parseNumber(f[8], 0),
                     count = parseNumber(f[9], 0),
+                })
+            elseif kind == "A" and n >= 6 then
+                tinsert(snapshot.attendance, {
+                    playerNid = parseNumber(f[2], nil),
+                    startTime = parseNumber(f[3], 0),
+                    endTime = parseNumber(f[4], 0),
+                    subgroup = parseNumber(f[5], 1),
+                    online = parseNumber(f[6], 1) ~= 0,
                 })
             elseif kind == "B" and n >= 8 then
                 local name = decodeText(f[3])
@@ -809,6 +840,44 @@ do
         end
 
         local _, playerNidByName, validPlayerNids = buildPlayerNameMaps(raid.players)
+
+        if #(snapshot.attendance or {}) > 0 then
+            local attendance = {}
+            local attendanceByNid = {}
+            for i = 1, #snapshot.attendance do
+                local src = snapshot.attendance[i]
+                local playerNid = tonumber(src and src.playerNid) or 0
+                local startTime = tonumber(src and src.startTime) or 0
+                if playerNid > 0 and validPlayerNids[playerNid] and startTime > 0 then
+                    local entry = attendanceByNid[playerNid]
+                    if not entry then
+                        entry = {
+                            playerNid = playerNid,
+                            segments = {},
+                        }
+                        attendanceByNid[playerNid] = entry
+                        attendance[#attendance + 1] = entry
+                    end
+
+                    local segment = {
+                        startTime = startTime,
+                    }
+                    local endTime = tonumber(src.endTime) or 0
+                    if endTime > startTime then
+                        segment.endTime = endTime
+                    end
+                    local subgroup = tonumber(src.subgroup) or 1
+                    if subgroup > 1 then
+                        segment.subgroup = subgroup
+                    end
+                    if src.online == false then
+                        segment.online = false
+                    end
+                    entry.segments[#entry.segments + 1] = segment
+                end
+            end
+            raid.attendance = attendance
+        end
 
         raid.bossKills = raid.bossKills or {}
         local bossIdx = buildNidIndex(raid.bossKills, "bossNid")

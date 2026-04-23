@@ -91,6 +91,7 @@
 |   |   |   |-- State.lua
 |   |   |   \\-- Tracking.lua
 |   |   |-- Raid
+|   |   |   |-- Attendance.lua
 |   |   |   |-- Capabilities.lua
 |   |   |   |-- Counts.lua
 |   |   |   |-- LootRecords.lua
@@ -253,9 +254,6 @@
 |-- .styluaignore
 |-- AGENTS.md
 |-- CHANGELOG.md
-|-- KRT-0.7.0-beta.4.zip
-|-- KRT-0.7.0-beta.5.zip
-|-- KRT-0.7.0-beta.6.zip
 \\-- README.md
 ```
 

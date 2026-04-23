@@ -1,14 +1,14 @@
 # Raid Schema Contract (`KRT_Raids`)
 
 This document defines the canonical persisted shape of raid history records.
-Current schema version: `3`.
+Current schema version: `4`.
 Legacy sunset status: strict canonical reads are enabled; legacy payload keys are diagnostics-only and stripped.
 
 ## RaidRecord (`KRT_Raids[i]`)
 
 | Field | Type | Req | Default | Notes |
 | --- | --- | --- | --- | --- |
-| `schemaVersion` | number | yes | `3` | Record schema version for normalization/validation. |
+| `schemaVersion` | number | yes | `4` | Record schema version for normalization/validation. |
 | `raidNid` | number | yes | auto | Stable raid identifier (not array index). |
 | `realm` | string | no | `nil` | Realm name when the raid started. |
 | `zone` | string | no | `nil` | Raid zone name. |
@@ -20,6 +20,7 @@ Legacy sunset status: strict canonical reads are enabled; legacy payload keys ar
 | `banker` | string | no | `nil` | Optional current banker target (Master UI target). |
 | `disenchanter` | string | no | `nil` | Optional current disenchanter target (Master UI target). |
 | `players` | table(array) | yes | `{}` | Canonical persisted player records. |
+| `attendance` | table(array) | yes | `{}` | Canonical per-player attendance segments keyed by `playerNid`. |
 | `bossKills` | table(array) | yes | `{}` | Canonical boss kill records. |
 | `loot` | table(array) | yes | `{}` | Canonical loot records. |
 | `changes` | table(map) | yes | `{}` | Player -> spec change map for MS changes UI. |
@@ -39,6 +40,22 @@ Legacy sunset status: strict canonical reads are enabled; legacy payload keys ar
 | `join` | number | no | `nil` | Join timestamp. |
 | `leave` | number/nil | no | `nil` | Leave timestamp, `nil` when active. |
 | `count` | number | yes | `0` | LootCounter value, canonical persisted data. |
+
+## AttendanceRecord (`raid.attendance[i]`)
+
+| Field | Type | Req | Default | Notes |
+| --- | --- | --- | --- | --- |
+| `playerNid` | number | yes | n/a | Stable player identifier inside raid. |
+| `segments` | table(array) | yes | `{}` | Attendance segments for this player. |
+
+## AttendanceSegment (`raid.attendance[i].segments[j]`)
+
+| Field | Type | Req | Default | Notes |
+| --- | --- | --- | --- | --- |
+| `startTime` | number | yes | n/a | Segment start timestamp. |
+| `endTime` | number/nil | no | `nil` | Segment end timestamp, `nil` when still active. |
+| `subgroup` | number | no | `nil` | Raid subgroup when not the default group `1`. |
+| `online` | boolean | no | `nil` | `false` means offline; omitted/`nil` means online. |
 
 ## BossKillRecord (`raid.bossKills[i]`)
 
@@ -72,19 +89,25 @@ Legacy sunset status: strict canonical reads are enabled; legacy payload keys ar
 | `time` | number | no | `nil` | Loot timestamp. |
 | `source` | string | no | `nil` | Optional loot origin marker (for example `TRADE_ONLY`). |
 
-### v3 Persistence Compaction
+### v3/v4 Persistence Compaction
 
-Schema v3 keeps runtime behavior unchanged but stores leaner SV payloads:
+Schema v3 and v4 store lean SV payloads:
 - optional/default-only fields may be omitted from persisted rows,
 - readers must apply defaults at read time (already done by DB/query paths),
 - canonical IDs (`playerNid`, `bossNid`, `lootNid`) remain the source of truth.
 - optional role assignees (`holder`, `banker`, `disenchanter`) persist only when set.
+- attendance `online=true` is represented by omitted `online`; explicit `online=false` is persisted.
+
+### v4 Attendance Ledger
+
+Schema v4 adds `raid.attendance` as the canonical per-player attendance ledger.
+It is keyed by `playerNid`, not by player name, and stores join/leave/online/subgroup changes as segments.
+Existing raids are initialized from `players[].join`, `players[].leave`, and `players[].subgroup` during migration.
 
 ### Legacy Sunset (Strict Mode)
 
 - `loot[].looter` is legacy-only: it is no longer read for winner resolution and is stripped on normalize/save.
 - `bossKills[].attendanceMask` is legacy-only and stripped on normalize/save.
-- Schema remains `v3`; a bump to `v4` is deferred until a net structural simplification is required.
 
 ## ChangeRecord (`raid.changes[playerName] = spec`)
 

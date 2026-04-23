@@ -212,6 +212,53 @@ do
         return maxBossNid, bossByNid, hasTrashBoss
     end
 
+    local function validateAttendance(result, attendance, playerByNid)
+        if type(attendance) ~= "table" then
+            return
+        end
+
+        for i = 1, #attendance do
+            local entry = attendance[i]
+            if type(entry) == "table" then
+                local playerNid = tonumber(entry.playerNid) or 0
+                if playerNid <= 0 then
+                    pushDetail(result, "E", "ATTENDANCE_PLAYER_INVALID", { attendanceIndex = i })
+                elseif not playerByNid[playerNid] then
+                    pushDetail(result, "E", "ATTENDANCE_PLAYER_MISSING", {
+                        attendanceIndex = i,
+                        playerNid = playerNid,
+                    })
+                else
+                    result.ok = result.ok + 1
+                end
+
+                local segments = entry.segments
+                if type(segments) == "table" then
+                    for j = 1, #segments do
+                        local segment = segments[j]
+                        if type(segment) == "table" then
+                            local startTime = tonumber(segment.startTime) or 0
+                            local endTime = tonumber(segment.endTime) or 0
+                            if startTime <= 0 then
+                                pushDetail(result, "E", "ATTENDANCE_SEGMENT_START_INVALID", {
+                                    attendanceIndex = i,
+                                    segmentIndex = j,
+                                })
+                            elseif endTime > 0 and endTime < startTime then
+                                pushDetail(result, "E", "ATTENDANCE_SEGMENT_END_INVALID", {
+                                    attendanceIndex = i,
+                                    segmentIndex = j,
+                                })
+                            else
+                                result.ok = result.ok + 1
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     local function validateLootRows(result, lootRows, bossByNid, playerByNid, hasTrashBoss)
         local maxLootNid = 0
 
@@ -309,8 +356,10 @@ do
         local players = normalized.players
         local bosses = normalized.bossKills
         local lootRows = normalized.loot
+        local attendance = normalized.attendance
 
         local maxPlayerNid, playerByNid = validatePlayers(result, players)
+        validateAttendance(result, attendance, playerByNid)
         local maxBossNid, bossByNid, hasTrashBoss = validateBosses(result, bosses, playerByNid)
         local maxLootNid = validateLootRows(result, lootRows, bossByNid, playerByNid, hasTrashBoss)
         validateNidCounters(result, normalized, maxPlayerNid, maxBossNid, maxLootNid)
