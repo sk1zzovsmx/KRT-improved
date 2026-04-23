@@ -29,6 +29,10 @@ local PENDING_AWARD_TTL_SECONDS = tonumber(C.PENDING_AWARD_TTL_SECONDS) or 8
 local GROUP_LOOT_SESSION_PREFIX = "GL:"
 
 -- ----- Private helpers ----- --
+local function isDebugEnabled()
+    return addon.hasDebug ~= nil
+end
+
 local function normalizePendingAwardItemKey(itemLink)
     local itemKey = Item.GetItemStringFromLink(itemLink)
     if itemKey and itemKey ~= "" then
@@ -113,7 +117,9 @@ local function consumePendingAwardAt(list, key, index, itemLink, looter, ttl)
     if #list == 0 then
         lootState.pendingAwards[key] = nil
     end
-    addon:debug(Diag.D.LogLootPendingAwardConsumed:format(tostring(itemLink), tostring(looter), remaining, ttl))
+    if isDebugEnabled() then
+        addon:debug(Diag.D.LogLootPendingAwardConsumed:format(tostring(itemLink), tostring(looter), remaining, ttl))
+    end
     return pending
 end
 

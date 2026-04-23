@@ -23,6 +23,10 @@ module._Resolution = module._Resolution or {}
 local Resolution = module._Resolution
 
 -- ----- Private helpers ----- --
+local function isDebugEnabled()
+    return addon.hasDebug ~= nil
+end
+
 local function assertContext(ctx)
     assert(type(ctx) == "table", "Rolls resolution context is required")
     assert(type(ctx.state) == "table", "Rolls resolution state is required")
@@ -209,14 +213,16 @@ function Resolution.BuildResolution(ctx, resolvedEntries, usePlus)
         end
     end
 
-    addon:debug(
-        Diag.D.LogRollsResolution:format(
-            tostring(resolution.topRollName),
-            tconcat(resolution.tiedNames, ","),
-            tonumber(resolution.cutoff) or 0,
-            tostring(resolution.requiresManualResolution)
+    if isDebugEnabled() then
+        addon:debug(
+            Diag.D.LogRollsResolution:format(
+                tostring(resolution.topRollName),
+                tconcat(resolution.tiedNames, ","),
+                tonumber(resolution.cutoff) or 0,
+                tostring(resolution.requiresManualResolution)
+            )
         )
-    )
+    end
 
     return resolution
 end

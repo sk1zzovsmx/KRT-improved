@@ -113,6 +113,9 @@ do
     state.itemCounts = newItemCounts and newItemCounts() or {}
 
     -- ----- Private helpers ----- --
+    local function isDebugEnabled()
+        return addon.hasDebug ~= nil
+    end
 
     -- ============================================================================
     -- Session helpers
@@ -404,14 +407,18 @@ do
 
         if used >= allowed then
             addon:info(L.ChatOnlyRollOnce)
-            addon:debug(Diag.D.LogRollsBlockedPlayer:format(name, used, allowed))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogRollsBlockedPlayer:format(name, used, allowed))
+            end
             return
         end
 
         RandomRoll(1, 100)
         incrementLocalPlayerRollCount(itemId)
         updateLocalRollState(itemId, name)
-        addon:debug(Diag.D.LogRollsPlayerRolled:format(name, itemId))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogRollsPlayerRolled:format(name, itemId))
+        end
     end
 
     function module:PlayerPass(name)
@@ -455,7 +462,9 @@ do
         end
         updateSessionRollWindow(on)
 
-        addon:debug(Diag.D.LogRollsRecordState:format(tostring(bool)))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogRollsRecordState:format(tostring(bool)))
+        end
     end
 
     function module:CHAT_MSG_SYSTEM(msg)
@@ -560,7 +569,9 @@ do
             seedTieReroll = true,
         })
 
-        addon:debug(Diag.D.LogRollsTieReroll:format(tostring(itemLink), tconcat(reroll.ordered, ",")))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogRollsTieReroll:format(tostring(itemLink), tconcat(reroll.ordered, ",")))
+        end
         module:GetDisplayModel()
         return true, reroll.ordered
     end
@@ -569,7 +580,9 @@ do
         local session = getRollSession()
         local sessionItemId = session and tonumber(session.itemId) or nil
         if sessionItemId and sessionItemId > 0 then
-            addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(sessionItemId)))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(sessionItemId)))
+            end
             return sessionItemId
         end
 
@@ -585,7 +598,9 @@ do
             session.itemLink = itemLink
             session.itemKey = Item.GetItemStringFromLink(itemLink) or itemLink
         end
-        addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(itemId)))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(itemId)))
+        end
         return itemId
     end
 

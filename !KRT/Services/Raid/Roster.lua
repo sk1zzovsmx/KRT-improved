@@ -43,6 +43,10 @@ do
     local ROSTER_REFRESH_DELAY_SECONDS = 2
 
     -- ----- Private helpers ----- --
+    local function isDebugEnabled()
+        return addon.hasDebug ~= nil
+    end
+
     local function resetLiveUnitCaches()
         twipe(liveUnitsByName)
         twipe(liveNamesByUnit)
@@ -282,7 +286,7 @@ do
         if resetRaidSize then
             numRaid = 0
         end
-        if debugMessage then
+        if debugMessage and isDebugEnabled() then
             addon:debug(debugMessage)
         end
         resetPendingUnitRetry()
@@ -532,7 +536,9 @@ do
 
         if rosterChanged then
             rosterVersion = rosterVersion + 1
-            addon:debug(Diag.D.LogRaidRosterUpdate:format(rosterVersion, n))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogRaidRosterUpdate:format(rosterVersion, n))
+            end
         end
         return rosterChanged, delta
     end

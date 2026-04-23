@@ -23,7 +23,7 @@ local tinsert = table.insert
 local tconcat = table.concat
 local tsort = table.sort
 local pairs, type, select = pairs, type, select
-local strfind, strsub = string.find, string.sub
+local strfind, strsub, strgmatch = string.find, string.sub, string.gmatch
 local tonumber, tostring = tonumber, tostring
 local floor = math.floor
 
@@ -96,11 +96,18 @@ do
         return (a ~= nil and b ~= nil and a == b)
     end
 
+    local function isDebugEnabled()
+        return addon.hasDebug ~= nil
+    end
+
     local function encodeText(value)
         local input = tostring(value or "")
         local ok, out = pcall(Base64.Encode, input)
         if ok and out then
             return out
+        end
+        if isDebugEnabled() then
+            addon:debug("Base64 encode failed for sync payload: " .. tostring(out))
         end
         return ""
     end
@@ -113,6 +120,9 @@ do
         local ok, out = pcall(Base64.Decode, input)
         if ok and out then
             return out
+        end
+        if isDebugEnabled() then
+            addon:debug("Base64 decode failed for sync payload: " .. tostring(out))
         end
         return nil
     end
@@ -537,7 +547,7 @@ do
         local listFields = {}
         local lineCount = 0
 
-        for line in payload:gmatch("[^\n]+") do
+        for line in strgmatch(payload, "[^\n]+") do
             lineCount = lineCount + 1
             local f, n = splitFields(line, FIELD_SEP, fields)
             local kind = f[1]
@@ -1009,7 +1019,9 @@ do
             tonumber(signature.diff) or 0
         )
         sendAddonPayload(target, payload)
-        addon:debug((Diag.D.LogSyncRequestSent):format(tostring(requestId), tostring(raidRef)))
+        if isDebugEnabled() then
+            addon:debug((Diag.D.LogSyncRequestSent):format(tostring(requestId), tostring(raidRef)))
+        end
     end
 
     local function sendSnapshot(target, requestId, mode, raid)
@@ -1034,7 +1046,9 @@ do
             sendAddonPayload(target, msg)
         end
 
-        addon:debug((Diag.D.LogSyncSnapshotSent):format(tostring(target or "GROUP"), tostring(requestId), tostring(raid.raidNid), totalChunks, payloadLen))
+        if isDebugEnabled() then
+            addon:debug((Diag.D.LogSyncSnapshotSent):format(tostring(target or "GROUP"), tostring(requestId), tostring(raid.raidNid), totalChunks, payloadLen))
+        end
     end
 
     local function completeRequest(requestId)
@@ -1100,7 +1114,9 @@ do
         if not sender then
             sender = getSenderKey(rawSender) or tostring(rawSender or "?")
         end
-        addon:debug((Diag.D.LogSyncSyncSenderFailed):format(tostring(sender), tostring(requestId), tostring(reason)))
+        if isDebugEnabled() then
+            addon:debug((Diag.D.LogSyncSyncSenderFailed):format(tostring(sender), tostring(requestId), tostring(reason)))
+        end
     end
 
     local function finalizeSnapshotFailure(isSync, pending, sender, requestId, reason)
@@ -1197,7 +1213,9 @@ do
             return
         end
 
-        addon:debug((Diag.D.LogSyncRequestReceived):format(tostring(sender), tostring(requestId), tostring(raidRef)))
+        if isDebugEnabled() then
+            addon:debug((Diag.D.LogSyncRequestReceived):format(tostring(sender), tostring(requestId), tostring(raidRef)))
+        end
         sendSnapshot(rawSender, requestId, mode, raid)
     end
 
@@ -1221,14 +1239,23 @@ do
             end
 
             local ok, raid = pcall(applySnapshotToRaid, currentRaid, snapshot, false)
-            if not ok or not raid then
+            if not ok then
                 addon:error((Diag.E.LogSyncMergeFailed):format(tostring(sender), tostring(requestId), tostring(snapshot.header.raidNid), tostring(raid)))
+                rejectSyncSender(pending, sender, requestId, "merge_failed")
+                return
+            end
+            if not raid then
+                addon:error((Diag.E.LogSyncMergeFailed):format(tostring(sender), tostring(requestId), tostring(snapshot.header.raidNid), "nil_result"))
                 rejectSyncSender(pending, sender, requestId, "merge_failed")
                 return
             end
 
             addon:info(L.MsgLoggerSyncApplied:format(tonumber(currentId) or 0, tostring(sender)))
-            addon:debug((Diag.D.LogSyncMergeApplied):format(tonumber(raid.raidNid) or 0, tonumber(currentId) or 0, tostring(sender), #(raid.bossKills or {}), #(raid.loot or {})))
+            if isDebugEnabled() then
+                addon:debug(
+                    (Diag.D.LogSyncMergeApplied):format(tonumber(raid.raidNid) or 0, tonumber(currentId) or 0, tostring(sender), #(raid.bossKills or {}), #(raid.loot or {}))
+                )
+            end
 
             cleanupIncomingByRequest(requestId, MODE_SYNC)
             completeRequest(requestId)
@@ -1237,8 +1264,13 @@ do
         end
 
         local ok, raid, raidId = pcall(importSnapshotAsNewRaid, snapshot)
-        if not ok or not raid then
+        if not ok then
             addon:error((Diag.E.LogSyncMergeFailed):format(tostring(sender), tostring(requestId), tostring(snapshot.header.raidNid), tostring(raid)))
+            completeRequest(requestId)
+            return
+        end
+        if not raid then
+            addon:error((Diag.E.LogSyncMergeFailed):format(tostring(sender), tostring(requestId), tostring(snapshot.header.raidNid), "nil_result"))
             completeRequest(requestId)
             return
         end
@@ -1250,7 +1282,9 @@ do
             completeRequest(requestId)
         end
 
-        addon:debug((Diag.D.LogSyncMergeApplied):format(tonumber(raid.raidNid) or 0, tonumber(raidId) or 0, tostring(sender), #(raid.bossKills or {}), #(raid.loot or {})))
+        if isDebugEnabled() then
+            addon:debug((Diag.D.LogSyncMergeApplied):format(tonumber(raid.raidNid) or 0, tonumber(raidId) or 0, tostring(sender), #(raid.bossKills or {}), #(raid.loot or {})))
+        end
 
         refreshLoggerUi(raidId)
     end
@@ -1261,18 +1295,24 @@ do
         end
 
         if not pending or pending.completed or pending.mode ~= mode then
-            addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            if isDebugEnabled() then
+                addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            end
             return true
         end
 
         if isSync and isSyncSenderFailed(pending, sender) then
-            addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            if isDebugEnabled() then
+                addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            end
             return true
         end
 
         local expectedTarget = normalizeSender(pending.target)
         if expectedTarget and expectedTarget ~= "" and not shouldAcceptResponseSender(pending, sender) then
-            addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            if isDebugEnabled() then
+                addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            end
             return true
         end
 
@@ -1287,12 +1327,16 @@ do
         end
 
         if isSync and isSyncSenderUnauthorized(pending, sender) then
-            addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            if isDebugEnabled() then
+                addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            end
             return key, nil
         end
         if isSync and not isAuthorizedSyncResponder(sender, pending) then
             warnSyncSenderNotOfficer(pending, requestId, sender)
-            addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            if isDebugEnabled() then
+                addon:debug((Diag.D.LogSyncChunkIgnored):format(tostring(sender), tostring(requestId), tostring(raidNid)))
+            end
             return key, nil
         end
 
@@ -1342,7 +1386,9 @@ do
             state.got = state.got + 1
         end
 
-        addon:debug((Diag.D.LogSyncChunkReceived):format(tostring(sender), tostring(requestId), partIndex, partCount))
+        if isDebugEnabled() then
+            addon:debug((Diag.D.LogSyncChunkReceived):format(tostring(sender), tostring(requestId), partIndex, partCount))
+        end
 
         if state.got < state.total then
             return
@@ -1375,7 +1421,9 @@ do
         end
 
         if tonumber(snapshot.header.protocolVersion) ~= PROTOCOL_VERSION then
-            addon:debug((Diag.D.LogSyncVersionMismatch):format(tostring(sender), tostring(snapshot.header.protocolVersion), PROTOCOL_VERSION))
+            if isDebugEnabled() then
+                addon:debug((Diag.D.LogSyncVersionMismatch):format(tostring(sender), tostring(snapshot.header.protocolVersion), PROTOCOL_VERSION))
+            end
             finalizeSnapshotFailure(isSync, pending, sender, requestId, "version_mismatch")
             return
         end
@@ -1499,7 +1547,9 @@ do
         local kind = fields[1]
         local version = parseNumber(fields[2], 0)
         if version ~= PROTOCOL_VERSION then
-            addon:debug((Diag.D.LogSyncVersionMismatch):format(tostring(sender), tostring(version), PROTOCOL_VERSION))
+            if isDebugEnabled() then
+                addon:debug((Diag.D.LogSyncVersionMismatch):format(tostring(sender), tostring(version), PROTOCOL_VERSION))
+            end
             return
         end
 
@@ -1520,10 +1570,15 @@ do
                 return
             end
 
+            local sigSize = parseNumber(fields[7], 0)
+            local sigDiff = parseNumber(fields[8], 0)
+            if mode == MODE_SYNC and (sigSize < 1 or sigSize > 40 or sigDiff < 1 or sigDiff > 4) then
+                return
+            end
             local signature = {
                 zone = zone,
-                size = parseNumber(fields[7], 0),
-                diff = parseNumber(fields[8], 0),
+                size = sigSize,
+                diff = sigDiff,
             }
 
             handleIncomingRequest(sender, channel, requestId, mode, raidRef, signature)

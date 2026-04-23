@@ -56,6 +56,10 @@ do
 
     -- ----- Private helpers ----- --
 
+    local function isDebugEnabled()
+        return addon.hasDebug ~= nil
+    end
+
     local function normalizeImportMode(mode)
         return (mode == "plus") and "plus" or "multi"
     end
@@ -274,7 +278,9 @@ do
             }
             pendingItemInfo[itemId] = pending
             pendingItemCount = pendingItemCount + 1
-            addon:debug(Diag.D.LogReservesTrackPending:format(itemId, pendingItemCount))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogReservesTrackPending:format(itemId, pendingItemCount))
+            end
         end
         if type(name) == "string" and name ~= "" then
             pending.name = name
@@ -359,9 +365,13 @@ do
         if pendingItemCount > 0 then
             pendingItemCount = pendingItemCount - 1
         end
-        addon:debug(Diag.D.LogReservesItemReady:format(itemId, pendingItemCount))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesItemReady:format(itemId, pendingItemCount))
+        end
         if pendingItemCount == 0 then
-            addon:debug(Diag.D.LogReservesPendingComplete)
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogReservesPendingComplete)
+            end
             scheduleDisplayRefresh(true)
             return
         end
@@ -450,12 +460,16 @@ do
     function Service:Save(contextTag)
         local canonical = applyRuntimeReservesData(reservesData, contextTag or "save")
         rebuildReserveIndexes()
-        addon:debug(Diag.D.LogReservesSaveEntries:format(addon.tLength(reservesData)))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesSaveEntries:format(addon.tLength(reservesData)))
+        end
         KRT_Reserves = buildSavedReservesData(canonical)
     end
 
     function Service:Load()
-        addon:debug(Diag.D.LogReservesLoadData:format(tostring(KRT_Reserves ~= nil)))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesLoadData:format(tostring(KRT_Reserves ~= nil)))
+        end
         clearDisplayRefreshQueue()
         local savedReserves = (type(KRT_Reserves) == "table") and KRT_Reserves or {}
         applyRuntimeReservesData(savedReserves, "load")
@@ -467,7 +481,9 @@ do
     end
 
     function Service:ResetSaved()
-        addon:debug(Diag.D.LogReservesResetSaved)
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesResetSaved)
+        end
         clearDisplayRefreshQueue()
         KRT_Reserves = nil
         twipe(reservesData)
@@ -500,10 +516,12 @@ do
         local reserve = reservesData[player]
 
         -- Log when the function is called and show the reserve for the player
-        if reserve then
-            addon:debug(Diag.D.LogReservesPlayerFound:format(playerName, tostring(reserve)))
-        else
-            addon:debug(Diag.D.LogReservesPlayerNotFound:format(playerName))
+        if isDebugEnabled() then
+            if reserve then
+                addon:debug(Diag.D.LogReservesPlayerFound:format(playerName, tostring(reserve)))
+            else
+                addon:debug(Diag.D.LogReservesPlayerNotFound:format(playerName))
+            end
         end
 
         return reserve
@@ -511,7 +529,9 @@ do
 
     -- Get all reserves:
     function Service:GetAllReserves()
-        addon:debug(Diag.D.LogReservesFetchAll:format(addon.tLength(reservesData)))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesFetchAll:format(addon.tLength(reservesData)))
+        end
         return reservesData
     end
 
@@ -584,7 +604,9 @@ do
         self:Save()
 
         local nPlayers = tonumber(parsed.nPlayers) or addon.tLength(reservesData)
-        addon:debug(Diag.D.LogReservesParseComplete:format(nPlayers))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesParseComplete:format(nPlayers))
+        end
         if not (opts and opts.silentInfo) then
             addon:info(format(L.SuccessReservesParsed, tostring(nPlayers)))
             local stats = parsed.importStats or {}
@@ -601,7 +623,9 @@ do
         if not itemId then
             return
         end
-        addon:debug(Diag.D.LogReservesQueryItemInfo:format(itemId))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesQueryItemInfo:format(itemId))
+        end
         local pending = pendingItemInfo[itemId]
         local name, link, icon = getPendingItemInfo(pending)
         local hasName = type(name) == "string" and name ~= "" and type(link) == "string" and link ~= ""
@@ -634,12 +658,16 @@ do
         end
         markPendingItem(itemId, hasName, hasIcon, name, link, icon)
         if hasName and hasIcon then
-            addon:debug(Diag.D.LogReservesItemInfoReady:format(itemId, name))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogReservesItemInfoReady:format(itemId, name))
+            end
             completePendingItem(itemId)
             return true
         end
 
-        addon:debug(Diag.D.LogReservesItemInfoPendingQuery:format(itemId))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesItemInfoPendingQuery:format(itemId))
+        end
         return false
     end
 
@@ -648,7 +676,9 @@ do
         local seen = {}
         local count = 0
         local updated = false
-        addon:debug(Diag.D.LogReservesQueryMissingItems)
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesQueryMissingItems)
+        end
         for _, player in pairs(reservesData) do
             if type(player) == "table" and type(player.reserves) == "table" then
                 for _, r in ipairs(player.reserves) do
@@ -674,8 +704,10 @@ do
                 addon:info(L.MsgReserveItemsReady)
             end
         end
-        addon:debug(Diag.D.LogReservesMissingItems:format(count))
-        addon:debug(Diag.D.LogSRQueryMissingItems:format(tostring(updated), count))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesMissingItems:format(count))
+            addon:debug(Diag.D.LogSRQueryMissingItems:format(tostring(updated), count))
+        end
         return updated, count
     end
 
@@ -799,10 +831,14 @@ do
     -- useColor, showPlus, showMulti, onlyCurrentRaidPlayers, and raidNum
     -- follow the same rules as GetPlayersForItem.
     function Service:FormatReservedPlayersLine(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
-        addon:debug(Diag.D.LogReservesFormatPlayers:format(itemId))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesFormatPlayers:format(itemId))
+        end
         local list = self:GetPlayersForItem(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
         -- Log the list of players found for the item
-        addon:debug(Diag.D.LogReservesPlayersList:format(itemId, tconcat(list, ", ")))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesPlayersList:format(itemId, tconcat(list, ", ")))
+        end
         return #list > 0 and tconcat(list, ", ") or ""
     end
 
@@ -823,7 +859,9 @@ do
         end
         local nextState = not (collapsedBossGroups[source] == true)
         collapsedBossGroups[source] = nextState
-        addon:debug(Diag.D.LogReservesToggleCollapse:format(source, tostring(nextState)))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesToggleCollapse:format(source, tostring(nextState)))
+        end
         return nextState
     end
 

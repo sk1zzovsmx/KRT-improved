@@ -20,6 +20,10 @@ module._Import = module._Import or {}
 local Import = module._Import
 
 -- ----- Private helpers ----- --
+local function isDebugEnabled()
+    return addon.hasDebug ~= nil
+end
+
 local function cleanCSVField(field)
     if not field then
         return nil
@@ -118,7 +122,7 @@ local function appendParsedCSVRow(rows, fields, headerMap, line, logSkipped)
         rows[#rows + 1] = row
         return true
     end
-    if logSkipped then
+    if logSkipped and isDebugEnabled() then
         addon:debug(Diag.D.LogSRParseSkippedLine:format(tostring(line)))
     end
     return false
@@ -287,7 +291,9 @@ function Import.BuildParser()
         local resolvedMode = (mode == "plus" or mode == "multi") and mode or service:GetImportMode()
         local strategy = getImportStrategy(service, resolvedMode)
 
-        addon:debug(Diag.D.LogReservesParseStart)
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesParseStart)
+        end
 
         local rows, importStats = parseCSVRows(text)
         if not rows or #rows == 0 then
@@ -296,24 +302,28 @@ function Import.BuildParser()
         end
 
         importStats = importStats or {}
-        addon:debug(
-            Diag.D.LogReservesImportRows:format(
-                tonumber(importStats.validRows) or #rows,
-                tonumber(importStats.skippedRows) or 0,
-                tostring(importStats.headerDetected),
-                tonumber(importStats.dataLines) or 0
+        if isDebugEnabled() then
+            addon:debug(
+                Diag.D.LogReservesImportRows:format(
+                    tonumber(importStats.validRows) or #rows,
+                    tonumber(importStats.skippedRows) or 0,
+                    tostring(importStats.headerDetected),
+                    tonumber(importStats.dataLines) or 0
+                )
             )
-        )
+        end
         if importStats.headerDetected ~= true and (tonumber(importStats.skippedRows) or 0) > 0 then
             addon:warn(L.WarnReservesHeaderHint)
         end
 
         local ok, errCode, errData = strategy.Validate(rows)
         if not ok then
-            addon:debug(
-                Diag.D.LogReservesImportWrongModePlus and Diag.D.LogReservesImportWrongModePlus:format(tostring(errData and errData.player))
-                    or ("Wrong CSV for Plus System: " .. tostring(errData and errData.player))
-            )
+            if isDebugEnabled() then
+                addon:debug(
+                    Diag.D.LogReservesImportWrongModePlus and Diag.D.LogReservesImportWrongModePlus:format(tostring(errData and errData.player))
+                        or ("Wrong CSV for Plus System: " .. tostring(errData and errData.player))
+                )
+            end
             return nil, errCode or "CSV_INVALID", errData
         end
 

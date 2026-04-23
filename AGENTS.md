@@ -186,6 +186,8 @@ Durable preferences learned from recent conversations:
   keep temporary legacy aliases (`addon.Master`, `addon.Raid`, etc.) during soft migrations.
 - Alias lockdown: keep legacy aliases as compatibility only; in debug mode, warn on legacy alias reads
   (`addon.Raid`, `addon.Logger`, etc.) to prevent new call sites from regressing.
+- Prefer callsite guards for debug/trace logging (`if addon.hasDebug then ... end`) when message
+  arguments need `format`/`tostring` work; do not rely on LibLogger level guards to skip evaluation.
 - Prefer fast architecture verification via focused `rg` checks (XML inline scripts, widget facade calls,
   namespacing coverage, and legacy top-level access scans) before closing refactor tasks.
 - Prefer gradual function/API deduplication: remove or consolidate similar helper functions to reduce drift,

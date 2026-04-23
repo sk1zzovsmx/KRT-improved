@@ -25,6 +25,10 @@ do
     local RAID_INSTANCE_CHECK_DELAYS = { 0.3, 0.8, 1.5, 2.5, 3.5 }
 
     -- ----- Private helpers ----- --
+    local function isDebugEnabled()
+        return addon.hasDebug ~= nil
+    end
+
     local function cancelRaidInstanceChecks()
         for idx, handle in pairs(raidInstanceCheckHandles) do
             addon.CancelTimer(handle, true)
@@ -50,7 +54,9 @@ do
         end
         addon:info(L.StrNewRaidSessionChange)
         local template = isCreate and Diag.D.LogRaidSessionCreate or Diag.D.LogRaidSessionChange
-        addon:debug(template:format(tostring(instanceName), newSize, tonumber(instanceDiff) or -1))
+        if isDebugEnabled() then
+            addon:debug(template:format(tostring(instanceName), newSize, tonumber(instanceDiff) or -1))
+        end
         return true
     end
 
@@ -116,7 +122,9 @@ do
     function module:Check(instanceName, instanceDiff)
         instanceDiff = module._ResolveRaidDifficultyInternal(instanceDiff)
         local newSize = module._GetRaidSizeFromDifficultyInternal(instanceDiff)
-        addon:debug(Diag.D.LogRaidCheck:format(tostring(instanceName), tostring(instanceDiff), tostring(Core.GetCurrentRaid())))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogRaidCheck:format(tostring(instanceName), tostring(instanceDiff), tostring(Core.GetCurrentRaid())))
+        end
         if not newSize then
             return
         end

@@ -23,7 +23,7 @@ local InternalEvents = Events.Internal
 local raidState = feature.raidState
 
 local tinsert, twipe = table.insert, table.wipe
-local pairs, ipairs, type, select = pairs, ipairs, type, select
+local ipairs, type, select = ipairs, type, select
 
 local tostring, tonumber = tostring, tonumber
 local UnitExists = UnitExists
@@ -76,7 +76,11 @@ do
 
     -- ----- Private helpers ----- --
     local function isDebugEnabled()
-        return addon.Options and addon.Options.IsDebugEnabled and addon.Options.IsDebugEnabled() == true
+        return addon.hasDebug ~= nil
+    end
+
+    local function isTraceEnabled()
+        return addon.hasTrace ~= nil
     end
 
     local function invalidateMasterLootCandidateCache()
@@ -1044,7 +1048,7 @@ do
                 )
             )
 
-            for _, v in pairs(raid.players) do
+            for _, v in ipairs(raid.players) do
                 if not v.leave then
                     v.leave = currentTime
                 end
@@ -1074,15 +1078,17 @@ do
         end
 
         local instanceName, instanceType, instanceDiff = GetInstanceInfo()
-        addon:debug(
-            Diag.D.LogRaidFirstCheck:format(
-                tostring(addon.IsInGroup()),
-                tostring(Core.GetCurrentRaid() ~= nil),
-                tostring(instanceName),
-                tostring(instanceType),
-                tostring(instanceDiff)
+        if isDebugEnabled() then
+            addon:debug(
+                Diag.D.LogRaidFirstCheck:format(
+                    tostring(addon.IsInGroup()),
+                    tostring(Core.GetCurrentRaid() ~= nil),
+                    tostring(instanceName),
+                    tostring(instanceType),
+                    tostring(instanceDiff)
+                )
             )
-        )
+        end
         if instanceType == "raid" then
             module:Check(instanceName, instanceDiff)
             return
@@ -1124,9 +1130,13 @@ do
             t.playerNid = tonumber(t.playerNid) or nextPlayerNid
             raid.nextPlayerNid = tonumber(t.playerNid) + 1
             tinsert(raid.players, t)
-            addon:trace(Diag.D.LogRaidPlayerJoin:format(tostring(t.name), tonumber(raidNum) or -1))
+            if isTraceEnabled() then
+                addon:trace(Diag.D.LogRaidPlayerJoin:format(tostring(t.name), tonumber(raidNum) or -1))
+            end
         else
-            addon:trace(Diag.D.LogRaidPlayerRefresh:format(tostring(t.name), tonumber(raidNum) or -1))
+            if isTraceEnabled() then
+                addon:trace(Diag.D.LogRaidPlayerRefresh:format(tostring(t.name), tonumber(raidNum) or -1))
+            end
         end
         invalidateRaidRuntime(raid)
     end
@@ -1136,7 +1146,9 @@ do
         sourceNpcId = tonumber(sourceNpcId)
         local sourceKind = sourceNpcId and classifyNpcLootSource(sourceNpcId) or nil
         if sourceKind == "ignored" then
-            addon:trace(Diag.D.LogBossUnitDiedIgnored:format(sourceNpcId, tostring(bossName)))
+            if isTraceEnabled() then
+                addon:trace(Diag.D.LogBossUnitDiedIgnored:format(sourceNpcId, tostring(bossName)))
+            end
             return 0
         end
 
@@ -1146,7 +1158,9 @@ do
 
         raidNum = raidNum or Core.GetCurrentRaid()
         if not raidNum or not bossName then
-            addon:debug(Diag.D.LogBossAddSkipped:format(tostring(raidNum), tostring(bossName)))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogBossAddSkipped:format(tostring(raidNum), tostring(bossName)))
+            end
             return 0
         end
         local isTrashBoss = isTrashMobName(bossName)
@@ -1178,7 +1192,9 @@ do
                     clearBossEventContext()
                 end
             end
-            addon:trace(Diag.D.LogBossDuplicateSuppressed:format(tostring(bossName), sourceNpcId or -1, existingBossNid, tonumber(delta) or -1))
+            if isTraceEnabled() then
+                addon:trace(Diag.D.LogBossDuplicateSuppressed:format(tostring(bossName), sourceNpcId or -1, existingBossNid, tonumber(delta) or -1))
+            end
             return existingBossNid
         end
 
@@ -1221,7 +1237,9 @@ do
             clearBossEventContext()
         end
         addon:info(Diag.I.LogBossLogged:format(tostring(bossName), tonumber(instanceDiff) or -1, tonumber(raidNum) or -1, #players))
-        addon:debug(Diag.D.LogBossLastBossHash:format(tonumber(Core.GetLastBoss()) or -1, tostring(killInfo.hash)))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogBossLastBossHash:format(tonumber(Core.GetLastBoss()) or -1, tostring(killInfo.hash)))
+        end
         return bossNid
     end
 
@@ -1321,7 +1339,9 @@ do
         local npcId = destGUID and addon.GetCreatureId(destGUID)
         local sourceKind, sourceNpcId, sourceBossName = classifyNpcLootSource(npcId)
         if sourceKind == "ignored" then
-            addon:trace(Diag.D.LogBossUnitDiedIgnored:format(tonumber(sourceNpcId) or -1, tostring(destName)))
+            if isTraceEnabled() then
+                addon:trace(Diag.D.LogBossUnitDiedIgnored:format(tonumber(sourceNpcId) or -1, tostring(destName)))
+            end
             return
         end
         if sourceKind ~= "boss" then
@@ -1330,7 +1350,9 @@ do
 
         local boss = destName or sourceBossName
         if boss then
-            addon:trace(Diag.D.LogBossUnitDiedMatched:format(tonumber(sourceNpcId) or -1, tostring(boss)))
+            if isTraceEnabled() then
+                addon:trace(Diag.D.LogBossUnitDiedMatched:format(tonumber(sourceNpcId) or -1, tostring(boss)))
+            end
             module:AddBoss(boss, nil, nil, sourceNpcId)
         end
     end

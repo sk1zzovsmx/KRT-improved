@@ -101,6 +101,10 @@ local RESPONSE_TRANSITIONS = {
 }
 
 -- ----- Private helpers ----- --
+local function isDebugEnabled()
+    return addon.hasDebug ~= nil
+end
+
 local function assertContext(ctx)
     assert(type(ctx) == "table", "Rolls response context is required")
     assert(type(ctx.state) == "table", "Rolls response state is required")
@@ -189,16 +193,18 @@ local function isAwardRollType(rollType)
 end
 
 local function traceEligibility(name, eligibility)
-    addon:debug(
-        Diag.D.LogRollsEligibility:format(
-            tostring(name),
-            tostring(eligibility.ok),
-            tostring(eligibility.bucket),
-            tostring(eligibility.reason),
-            tonumber(eligibility.usedRolls) or 0,
-            tonumber(eligibility.allowedRolls) or 0
+    if isDebugEnabled() then
+        addon:debug(
+            Diag.D.LogRollsEligibility:format(
+                tostring(name),
+                tostring(eligibility.ok),
+                tostring(eligibility.bucket),
+                tostring(eligibility.reason),
+                tonumber(eligibility.usedRolls) or 0,
+                tonumber(eligibility.allowedRolls) or 0
+            )
         )
-    )
+    end
 end
 
 local function getDenialMessage(reason)
@@ -346,7 +352,9 @@ local function applyAcceptedRollResponse(ctx, name, roll, eligibility, source, i
     response.isEligible = true
     response.isOutOfTime = isOutOfTime == true
 
-    addon:debug(Diag.D.LogRollsResponse:format(tostring(name), tostring(response.status), tostring(response.bucket), tostring(response.bestRoll), tostring(response.lastRoll)))
+    if isDebugEnabled() then
+        addon:debug(Diag.D.LogRollsResponse:format(tostring(name), tostring(response.status), tostring(response.bucket), tostring(response.bestRoll), tostring(response.lastRoll)))
+    end
 end
 
 local function applyExplicitResponse(ctx, name, status, eligibility, reason, source)
@@ -366,7 +374,9 @@ local function applyExplicitResponse(ctx, name, status, eligibility, reason, sou
     response.isEligible = eligibility and eligibility.ok == true or false
     response.isOutOfTime = false
 
-    addon:debug(Diag.D.LogRollsResponse:format(tostring(name), tostring(response.status), tostring(response.bucket), tostring(response.bestRoll), tostring(response.lastRoll)))
+    if isDebugEnabled() then
+        addon:debug(Diag.D.LogRollsResponse:format(tostring(name), tostring(response.status), tostring(response.bucket), tostring(response.bestRoll), tostring(response.lastRoll)))
+    end
 
     return response
 end
@@ -588,7 +598,9 @@ function Responses.FinalizeMaterializedResponses(ctx, itemId, itemLink, rollType
             response.status = RESPONSE_STATUS.TIMED_OUT
             response.reason = reasonCodes.TIMED_OUT
             response.updatedAt = GetTime()
-            addon:debug(Diag.D.LogRollsTimedOut:format(tostring(name)))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogRollsTimedOut:format(tostring(name)))
+            end
         end
     end
 end
@@ -670,11 +682,15 @@ function Responses.SubmitIncomingRoll(ctx, player, roll, source)
             Comms.Whisper(player, denyMessage)
             state.deniedReasons[denyKey] = true
         end
-        addon:debug(Diag.D.LogRollsDeniedPlayer:format(player, tonumber(eligibility.usedRolls) or 0, tonumber(eligibility.allowedRolls) or 0))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogRollsDeniedPlayer:format(player, tonumber(eligibility.usedRolls) or 0, tonumber(eligibility.allowedRolls) or 0))
+        end
         return false, eligibility.reason
     end
 
-    addon:debug(Diag.D.LogRollsAcceptedPlayer:format(player, (tonumber(eligibility.usedRolls) or 0) + 1, tonumber(eligibility.allowedRolls) or 0))
+    if isDebugEnabled() then
+        addon:debug(Diag.D.LogRollsAcceptedPlayer:format(player, (tonumber(eligibility.usedRolls) or 0) + 1, tonumber(eligibility.allowedRolls) or 0))
+    end
     if not canTransitionResponseState(state.responsesByPlayer[player] and state.responsesByPlayer[player].status, RESPONSE_STATUS.ROLL) then
         return false, reasonCodes.STATE_TRANSITION_DENIED
     end

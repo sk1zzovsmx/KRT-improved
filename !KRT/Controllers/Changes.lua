@@ -74,6 +74,10 @@ do
     local bindChangeRow
     local controller
 
+    local function isDebugEnabled()
+        return addon.hasDebug ~= nil
+    end
+
     local function markChangesDirty()
         fetched = false
         changesDirty = true
@@ -549,7 +553,9 @@ do
 
     -- Initialize changes table:
     function initChangesTable()
-        addon:debug(Diag.D.LogChangesInitTable)
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogChangesInitTable)
+        end
         local currentRaid = Core.GetCurrentRaid()
         if not currentRaid then
             changesTable = {}

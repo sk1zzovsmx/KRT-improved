@@ -72,6 +72,10 @@ local function isDebugEnabled()
     return state and state.debugEnabled == true
 end
 
+local function isTraceEnabled()
+    return addon.hasTrace ~= nil
+end
+
 local function getLegacyAliasWarnCache()
     local state = addon.State
     state.legacyAliasWarned = state.legacyAliasWarned or {}
@@ -1342,7 +1346,9 @@ do
         for event in pairs(addonEvents) do
             self:RegisterEvent(event)
         end
-        addon:debug(Diag.D.LogCoreEventsRegistered:format(addon.tLength(addonEvents)))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogCoreEventsRegistered:format(addon.tLength(addonEvents)))
+        end
         self:RAID_ROSTER_UPDATE(true)
     end
 
@@ -1357,7 +1363,9 @@ do
             return false
         end
         if emitRecognizedLog then
-            addon:debug(Diag.D.LogRaidInstanceRecognized:format(tostring(instanceName), tostring(instanceDiff)))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogRaidInstanceRecognized:format(tostring(instanceName), tostring(instanceDiff)))
+            end
         end
         raidService:ScheduleInstanceChecks()
         return true
@@ -1399,7 +1407,9 @@ do
         local instanceName, instanceType, instanceDiff = GetInstanceInfo()
         local _, nextReset = ...
         local resolvedNextReset = Core.SetNextReset(nextReset)
-        addon:trace(Diag.D.LogRaidInstanceWelcome:format(tostring(instanceName), tostring(instanceType), tostring(instanceDiff), tostring(resolvedNextReset)))
+        if isTraceEnabled() then
+            addon:trace(Diag.D.LogRaidInstanceWelcome:format(tostring(instanceName), tostring(instanceType), tostring(instanceDiff), tostring(resolvedNextReset)))
+        end
         if instanceType == "raid" and not L.RaidZones[instanceName] then
             addon:warn(Diag.W.LogRaidUnmappedZone:format(tostring(instanceName), tostring(instanceDiff)))
         end
@@ -1428,7 +1438,9 @@ do
         if not module then
             return
         end
-        addon:trace(Diag.D.LogCorePlayerEnteringWorld)
+        if isTraceEnabled() then
+            addon:trace(Diag.D.LogCorePlayerEnteringWorld)
+        end
         module:CancelInstanceChecks()
         -- Restart the first-check timer on login
         addon.CancelTimer(module.firstCheckHandle, true)
@@ -1455,7 +1467,9 @@ do
 
     -- CHAT_MSG_LOOT: Adds looted items to the raid log.
     function addon:CHAT_MSG_LOOT(msg)
-        addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
+        if isTraceEnabled() then
+            addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
+        end
         local currentRaid = Core.GetCurrentRaid()
         local raidService, observedType = observePassiveLootMessage(msg)
         local lootService = getService("Loot")
@@ -1515,7 +1529,9 @@ do
         local text = ...
         local raidService = getRaidService()
         if raidService and L.BossYells[text] and Core.GetCurrentRaid() then
-            addon:trace(Diag.D.LogBossYellMatched:format(tostring(text), tostring(L.BossYells[text])))
+            if isTraceEnabled() then
+                addon:trace(Diag.D.LogBossYellMatched:format(tostring(text), tostring(L.BossYells[text])))
+            end
             raidService:AddBoss(L.BossYells[text])
         end
     end

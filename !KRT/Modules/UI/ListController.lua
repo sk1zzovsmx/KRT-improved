@@ -37,6 +37,10 @@ local function getListDiag(bucketName, keyName)
     return bucket[keyName]
 end
 
+local function isDebugEnabled()
+    return addon.hasDebug ~= nil
+end
+
 -- ----- Public methods ----- --
 function ListController.CreateRowDrawer(fn)
     local rowHeight
@@ -233,7 +237,7 @@ function ListController.MakeListController(cfg)
             end
         end
 
-        if cfg.highlightDebugTag and addon.State and addon.State.debugEnabled and addon.debug then
+        if cfg.highlightDebugTag and isDebugEnabled() then
             local info = (cfg.highlightDebugInfo and cfg.highlightDebugInfo(self)) or ""
             if info ~= "" then
                 info = " " .. info
@@ -309,7 +313,9 @@ function ListController.MakeListController(cfg)
         frame:HookScript("OnShow", function()
             if not self._shownOnce then
                 self._shownOnce = true
-                addon:debug((getListDiag("D", "LogListUIShow")):format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
+                if isDebugEnabled() then
+                    addon:debug((getListDiag("D", "LogListUIShow")):format(tostring(cfg.keyName or "?"), tostring(self.frameName)))
+                end
             end
             setActive(true)
             if not self._loggedWidgets then
@@ -317,17 +323,19 @@ function ListController.MakeListController(cfg)
                 local n = self.frameName
                 local sf = n and _G[n .. "ScrollFrame"]
                 local sc = n and _G[n .. "ScrollFrameScrollChild"]
-                addon:debug(
-                    (getListDiag("D", "LogListUIWidgets")):format(
-                        tostring(cfg.keyName or "?"),
-                        tostring(sf),
-                        tostring(sc),
-                        sf and (sf:GetWidth() or 0) or 0,
-                        sf and (sf:GetHeight() or 0) or 0,
-                        sc and (sc:GetWidth() or 0) or 0,
-                        sc and (sc:GetHeight() or 0) or 0
+                if isDebugEnabled() then
+                    addon:debug(
+                        (getListDiag("D", "LogListUIWidgets")):format(
+                            tostring(cfg.keyName or "?"),
+                            tostring(sf),
+                            tostring(sc),
+                            sf and (sf:GetWidth() or 0) or 0,
+                            sf and (sf:GetHeight() or 0) or 0,
+                            sc and (sc:GetWidth() or 0) or 0,
+                            sc and (sc:GetHeight() or 0) or 0
+                        )
                     )
-                )
+                end
             end
         end)
 
@@ -362,7 +370,9 @@ function ListController.MakeListController(cfg)
         if scrollW < 10 then
             if not self._warnW0 then
                 self._warnW0 = true
-                addon:debug((getListDiag("D", "LogListUIDeferLayout")):format(tostring(cfg.keyName or "?"), scrollW))
+                if isDebugEnabled() then
+                    addon:debug((getListDiag("D", "LogListUIDeferLayout")):format(tostring(cfg.keyName or "?"), scrollW))
+                end
             end
             defer:Show()
             return false
@@ -373,18 +383,20 @@ function ListController.MakeListController(cfg)
 
         if not self._loggedFetch then
             self._loggedFetch = true
-            addon:debug(
-                (getListDiag("D", "LogListUIFetch")):format(
-                    tostring(cfg.keyName or "?"),
-                    #self.data,
-                    sf:GetWidth() or 0,
-                    sf:GetHeight() or 0,
-                    sc:GetWidth() or 0,
-                    sc:GetHeight() or 0,
-                    (_G[n] and _G[n]:GetWidth() or 0),
-                    (_G[n] and _G[n]:GetHeight() or 0)
+            if isDebugEnabled() then
+                addon:debug(
+                    (getListDiag("D", "LogListUIFetch")):format(
+                        tostring(cfg.keyName or "?"),
+                        #self.data,
+                        sf:GetWidth() or 0,
+                        sf:GetHeight() or 0,
+                        sc:GetWidth() or 0,
+                        sc:GetHeight() or 0,
+                        (_G[n] and _G[n]:GetWidth() or 0),
+                        (_G[n] and _G[n]:GetHeight() or 0)
+                    )
                 )
-            )
+            end
         end
 
         local totalH = 0

@@ -56,6 +56,9 @@ do
     local queryCooldownSeconds = tonumber(C.RESERVES_QUERY_COOLDOWN_SECONDS) or 2
 
     -- ----- Private helpers ----- --
+    local function isDebugEnabled()
+        return addon.hasDebug ~= nil
+    end
 
     function UI.AcquireRefs(frame)
         return {
@@ -260,7 +263,9 @@ do
 
     function UI.Localize()
         if UI.Localized then
-            addon:debug(Diag.D.LogReservesUIAlreadyLocalized)
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogReservesUIAlreadyLocalized)
+            end
             return
         end
         local frameName = UI.FrameName
@@ -269,7 +274,9 @@ do
         end
         if frameName then
             Frames.SetFrameTitle(frameName, L.StrRaidReserves)
-            addon:debug(Diag.D.LogReservesUILocalized:format(L.StrRaidReserves))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogReservesUILocalized:format(L.StrRaidReserves))
+            end
         end
         local clearButton = frameName and _G[frameName .. "ClearButton"]
         if clearButton then
@@ -536,14 +543,18 @@ do
             refs.closeButton:SetScript("OnClick", function()
                 module:Hide()
             end)
-            addon:debug(Diag.D.LogReservesBindButton:format("CloseButton", "Hide"))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogReservesBindButton:format("CloseButton", "Hide"))
+            end
         end
 
         if refs.clearButton then
             refs.clearButton:SetScript("OnClick", function()
                 resetSavedFromUI()
             end)
-            addon:debug(Diag.D.LogReservesBindButton:format("ClearButton", "ResetSaved"))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogReservesBindButton:format("ClearButton", "ResetSaved"))
+            end
         end
 
         if refs.queryButton then
@@ -554,19 +565,27 @@ do
                 end
                 module:QueryMissingItems(false)
             end)
-            addon:debug(Diag.D.LogReservesBindButton:format("QueryButton", "QueryMissingItems"))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogReservesBindButton:format("QueryButton", "QueryMissingItems"))
+            end
         end
     end
 
     function module:OnLoad(frame)
-        addon:debug(Diag.D.LogReservesFrameLoaded)
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesFrameLoaded)
+        end
         UI.FrameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
-                addon:debug(Diag.D.LogReservesShowWindow)
+                if isDebugEnabled() then
+                    addon:debug(Diag.D.LogReservesShowWindow)
+                end
             end,
             hookOnHide = function()
-                addon:debug(Diag.D.LogReservesHideWindow)
+                if isDebugEnabled() then
+                    addon:debug(Diag.D.LogReservesHideWindow)
+                end
             end,
         }) or UI.FrameName
         UI.Loaded = UI.FrameName ~= nil
@@ -580,7 +599,9 @@ do
         local refreshFrame = CreateFrame("Frame")
         refreshFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
         refreshFrame:SetScript("OnEvent", function(_, _, itemId)
-            addon:debug(Diag.D.LogReservesItemInfoReceived:format(itemId))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogReservesItemInfoReceived:format(itemId))
+            end
             if not (Reserves and Reserves._HasPendingItem and Reserves._HasPendingItem(itemId)) then
                 return
             end
@@ -901,7 +922,9 @@ do
             return false, 0, "EMPTY"
         end
 
-        addon:debug(Diag.D.LogSRImportRequested:format(#csv))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogSRImportRequested:format(#csv))
+        end
         ensureWrongCSVPopup()
 
         local mode = getImportModeString()

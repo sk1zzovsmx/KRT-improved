@@ -34,6 +34,10 @@ do
     local syntheticByName = {}
 
     -- ----- Private helpers ----- --
+    local function isDebugEnabled()
+        return addon.hasDebug ~= nil
+    end
+
     local function getRaidService()
         return Services.Raid
     end
@@ -233,7 +237,9 @@ do
         end
 
         ok, reason = rolls:SubmitDebugRoll(profile.name, roll)
-        addon:debug(Diag.D.LogDebugRaidRoll:format(tostring(raidId), profile.name, roll, tostring(ok), tostring(reason)))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogDebugRaidRoll:format(tostring(raidId), profile.name, roll, tostring(ok), tostring(reason)))
+        end
 
         return {
             raidId = raidId,
@@ -341,7 +347,9 @@ do
             end
 
             raidService:AddPlayer(player, raidId)
-            addon:debug(Diag.D.LogDebugRaidSeed:format(tostring(raidId), player.name, player.class))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogDebugRaidSeed:format(tostring(raidId), player.name, player.class))
+            end
 
             if not existing or existing.leave ~= nil then
                 added = added + 1
@@ -390,7 +398,9 @@ do
                 local playerNid = tonumber(player.playerNid) or 0
                 if playerNid > 0 and protectedNids[playerNid] then
                     blocked = blocked + 1
-                    addon:debug(Diag.D.LogDebugRaidClearBlocked:format(tostring(raidId), player.name, tostring(playerNid)))
+                    if isDebugEnabled() then
+                        addon:debug(Diag.D.LogDebugRaidClearBlocked:format(tostring(raidId), player.name, tostring(playerNid)))
+                    end
                 else
                     removed = removed + 1
                     tinsert(delta.left, buildRosterDeltaEntry(player))
@@ -398,7 +408,9 @@ do
                     if type(raid.changes) == "table" then
                         raid.changes[player.name] = nil
                     end
-                    addon:debug(Diag.D.LogDebugRaidClearRemoved:format(tostring(raidId), player.name, tostring(playerNid)))
+                    if isDebugEnabled() then
+                        addon:debug(Diag.D.LogDebugRaidClearRemoved:format(tostring(raidId), player.name, tostring(playerNid)))
+                    end
                 end
             end
         end

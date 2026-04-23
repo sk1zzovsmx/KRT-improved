@@ -1578,7 +1578,9 @@ do
                 for i = 1, #ids do
                     local bNid = ids[i]
                     local lootRemoved = Actions:DeleteBoss(rID, bNid)
-                    addon:debug(Diag.D.LogLoggerBossLootRemoved, rID, tonumber(bNid) or -1, lootRemoved)
+                    if addon.hasDebug then
+                        addon:debug(Diag.D.LogLoggerBossLootRemoved, rID, tonumber(bNid) or -1, lootRemoved)
+                    end
                 end
 
                 -- Clear boss-related selections (filters changed / deleted)

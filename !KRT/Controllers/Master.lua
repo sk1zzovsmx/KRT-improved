@@ -45,6 +45,10 @@ local function isDebugEnabled()
     return Options and Options.IsDebugEnabled and Options.IsDebugEnabled() == true
 end
 
+local function isTraceEnabled()
+    return addon.hasTrace ~= nil
+end
+
 local lootState = feature.lootState or {}
 feature.lootState = lootState
 lootState.lootCount = tonumber(lootState.lootCount) or 0
@@ -184,6 +188,28 @@ do
             return nil
         end
         return _G[frameName .. suffix]
+    end
+
+    -- Module-level helper: wrap a click handler ensuring master-only access.
+    local function wrapMasterOnlyClick(handler)
+        return function(...)
+            if not RaidApi.EnsureMasterOnlyAccess(Raid) then
+                return
+            end
+            return handler(...)
+        end
+    end
+
+    -- Module-level helper: ensure spam-loot access rules.
+    local function ensureSpamLootAccess()
+        if lootState.fromInventory == true then
+            if RaidApi.CanUseCapability(Raid, "ready_check") then
+                return true
+            end
+            addon:warn(L.WarnReadyCheckNotAllowed)
+            return false
+        end
+        return RaidApi.EnsureMasterOnlyAccess(Raid)
     end
 
     -- ============================================================================
@@ -414,26 +440,6 @@ do
         end
         if frame._krtBound then
             return
-        end
-
-        local function wrapMasterOnlyClick(handler)
-            return function(...)
-                if not RaidApi.EnsureMasterOnlyAccess(Raid) then
-                    return
-                end
-                return handler(...)
-            end
-        end
-
-        local function ensureSpamLootAccess()
-            if lootState.fromInventory == true then
-                if RaidApi.CanUseCapability(Raid, "ready_check") then
-                    return true
-                end
-                addon:warn(L.WarnReadyCheckNotAllowed)
-                return false
-            end
-            return RaidApi.EnsureMasterOnlyAccess(Raid)
         end
 
         Frames.SafeSetScript(refs.configBtn, "OnClick", function()
@@ -1778,7 +1784,9 @@ do
 
         lootState.multiAward.announceOnWin = addon.options.announceOnWin and true or false
         lootState.multiAward.congratsSent = false
-        addon:debug(Diag.D.LogMLMultiAwardStarted:format(tostring(itemLink), #winners, available, tconcat(candidateSlots, ","), timeout))
+        if addon.hasDebug then
+            addon:debug(Diag.D.LogMLMultiAwardStarted:format(tostring(itemLink), #winners, available, tconcat(candidateSlots, ","), timeout))
+        end
 
         -- Suppress per-copy ChatAward spam during multi-award; announce once on completion.
         announced = true
@@ -1949,7 +1957,9 @@ do
             return
         end
         if lootState.lootCount <= 0 or lootState.rollsCount <= 0 then
-            addon:debug(Diag.D.LogMLAwardBlocked:format(lootState.lootCount or 0, lootState.rollsCount or 0))
+            if addon.hasDebug then
+                addon:debug(Diag.D.LogMLAwardBlocked:format(lootState.lootCount or 0, lootState.rollsCount or 0))
+            end
             return
         end
         if shouldUseTieReroll(model) then
@@ -1965,7 +1975,9 @@ do
             announced = false
             resetRollWinnerSelection(ROLL_SELECTION_MODE.AUTO)
             ChatApi.Announce(Chat, L.ChatTieReroll:format(tconcat(rerollNames or {}, ", "), Loot.GetItemLink() or ""))
-            addon:debug(Diag.I.LogMLTieReroll:format(tostring(Loot.GetItemLink() or ""), tconcat(rerollNames or {}, ",")))
+            if addon.hasDebug then
+                addon:debug(Diag.I.LogMLTieReroll:format(tostring(Loot.GetItemLink() or ""), tconcat(rerollNames or {}, ",")))
+            end
             module:RequestRefresh()
             return true
         end
@@ -1988,7 +2000,9 @@ do
         lootState.winner = winnerName
         stopCountdown()
         local itemLink = Loot.GetItemLink()
-        addon:debug(Diag.D.LogMLAwardRequested:format(tostring(winnerName), tonumber(lootState.currentRollType) or -1, Rolls:HighestRoll(winnerName) or 0, tostring(itemLink)))
+        if addon.hasDebug then
+            addon:debug(Diag.D.LogMLAwardRequested:format(tostring(winnerName), tonumber(lootState.currentRollType) or -1, Rolls:HighestRoll(winnerName) or 0, tostring(itemLink)))
+        end
 
         if lootState.fromInventory == true then
             local targetCount = tonumber(lootState.selectedItemCount) or 1
@@ -2070,7 +2084,9 @@ do
             awarded = 1
         end
 
-        addon:debug(Diag.D.LogTradeAwardedCountResolved:format(awarded, source, tostring(before), tostring(after), selected))
+        if addon.hasDebug then
+            addon:debug(Diag.D.LogTradeAwardedCountResolved:format(awarded, source, tostring(before), tostring(after), selected))
+        end
         return awarded
     end
 
@@ -3041,7 +3057,9 @@ do
             local itemRef = tostring(itemLink or itemId or "unknown")
             if hasMatch then
                 addon:warn(L.ErrMLInventorySoulbound:format(itemRef))
-                addon:debug(Diag.D.LogMLInventorySoulbound:format(itemRef))
+                if addon.hasDebug then
+                    addon:debug(Diag.D.LogMLInventorySoulbound:format(itemRef))
+                end
             else
                 addon:warn(L.ErrMLInventoryItemMissing:format(itemRef))
             end
@@ -3107,7 +3125,9 @@ do
         if frame then
             frame:Hide()
         end
-        addon:debug(Diag.D.LogMLLootWindowEmptied)
+        if addon.hasDebug then
+            addon:debug(Diag.D.LogMLLootWindowEmptied)
+        end
     end
 
     local function completeLootClosedCleanup()
@@ -3158,8 +3178,12 @@ do
             end
             updateSelectionFrame()
             if debugEnabled then
-                addon:trace(Diag.D.LogMLLootOpenedTrace:format(lootState.lootCount or 0, tostring(lootState.fromInventory)))
-                addon:debug(Diag.D.LogMLLootOpenedInfo:format(lootState.lootCount or 0, tostring(lootState.fromInventory), tostring(UnitName("target"))))
+                if isTraceEnabled() then
+                    addon:trace(Diag.D.LogMLLootOpenedTrace:format(lootState.lootCount or 0, tostring(lootState.fromInventory)))
+                end
+                if addon.hasDebug then
+                    addon:debug(Diag.D.LogMLLootOpenedInfo:format(lootState.lootCount or 0, tostring(lootState.fromInventory), tostring(UnitName("target"))))
+                end
             end
             handleLootOpenedVisibility()
         end
@@ -3172,8 +3196,10 @@ do
                 Raid:ClearLootWindowBossContext()
             end
             if isDebugEnabled() then
-                addon:trace(Diag.D.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
-                addon:trace(Diag.D.LogMLLootClosedCleanup)
+                if isTraceEnabled() then
+                    addon:trace(Diag.D.LogMLLootClosed:format(tostring(lootState.opened), lootState.lootCount or 0))
+                    addon:trace(Diag.D.LogMLLootClosedCleanup)
+                end
             end
             clearMultiAwardState(false)
             scheduleLootClosedCleanup()
@@ -3185,7 +3211,9 @@ do
         if Raid:IsMasterLooter() then
             Loot:FetchLoot()
             if isDebugEnabled() then
-                addon:trace(Diag.D.LogMLLootSlotCleared:format(lootState.lootCount or 0))
+                if isTraceEnabled() then
+                    addon:trace(Diag.D.LogMLLootSlotCleared:format(lootState.lootCount or 0))
+                end
             end
             updateSelectionFrame()
             Private.ResetItemCount()
@@ -3198,7 +3226,9 @@ do
 
     function module:TRADE_ACCEPT_UPDATE(tAccepted, pAccepted)
         local tradeWinner = getCurrentTradeWinner()
-        addon:trace(Diag.D.LogTradeAcceptUpdate:format(tostring(lootState.trader), tostring(tradeWinner), tostring(tAccepted), tostring(pAccepted)))
+        if isTraceEnabled() then
+            addon:trace(Diag.D.LogTradeAcceptUpdate:format(tostring(lootState.trader), tostring(tradeWinner), tostring(tAccepted), tostring(pAccepted)))
+        end
         if lootState.trader and tradeWinner and lootState.trader ~= tradeWinner then
             if tAccepted == 1 and pAccepted == 1 then
                 local awardedCount = resolveTradeAwardedCount()
@@ -3222,7 +3252,9 @@ do
                     )
                 end
 
-                addon:debug(Diag.D.LogTradeCompleted:format(tostring(lootState.currentRollItem), tostring(tradeWinner), tonumber(lootState.currentRollType) or -1, rollValue))
+                if addon.hasDebug then
+                    addon:debug(Diag.D.LogTradeCompleted:format(tostring(lootState.currentRollItem), tostring(tradeWinner), tonumber(lootState.currentRollType) or -1, rollValue))
+                end
                 if lootNid > 0 then
                     local ok = requestLoggerLootLog(lootNid, tradeWinner, lootState.currentRollType, rollValue, "TRADE_ACCEPT", addon.Core.GetCurrentRaid())
 
@@ -3291,16 +3323,18 @@ do
             local session = ensureRollSession(itemLink, rollType, lootState.fromInventory and "inventory" or "lootWindow")
             Loot:AddPendingAward(itemLink, playerName, rollType, rollValue, session and session.id or nil)
             GiveMasterLoot(itemIndex, candidateIndex)
-            addon:debug(
-                Diag.D.LogMLAwarded:format(
-                    tostring(itemLink),
-                    tostring(playerName),
-                    tonumber(rollType) or -1,
-                    tonumber(rollValue) or 0,
-                    tonumber(itemIndex) or -1,
-                    tonumber(candidateIndex) or -1
+            if addon.hasDebug then
+                addon:debug(
+                    Diag.D.LogMLAwarded:format(
+                        tostring(itemLink),
+                        tostring(playerName),
+                        tonumber(rollType) or -1,
+                        tonumber(rollValue) or 0,
+                        tonumber(itemIndex) or -1,
+                        tonumber(candidateIndex) or -1
+                    )
                 )
-            )
+            end
             local output, whisper = buildAssignMessages(itemLink, playerName, rollType)
 
             if output and not announced then
@@ -3335,351 +3369,358 @@ do
     -- ============================================================================
     -- Trade / inventory execution helpers
     -- ============================================================================
-    local function buildTradeInitialOutput(itemLink, playerName, rollType, isAwardRoll)
-        if isAwardRoll and addon.options.announceOnWin then
-            return L.ChatAward:format(playerName, itemLink)
-        end
-        if rollType == rollTypes.HOLD and addon.options.announceOnHold then
-            return L.ChatNoneRolledHold:format(itemLink, playerName)
-        end
-        if rollType == rollTypes.BANK and addon.options.announceOnBank then
-            return L.ChatNoneRolledBank:format(itemLink, playerName)
-        end
-        if rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
-            return L.ChatNoneRolledDisenchant:format(itemLink, playerName)
-        end
-        return nil
-    end
-
-    local function buildTradeKeepWhisper(itemLink, rollType)
-        if rollType == rollTypes.HOLD then
-            return L.WhisperHoldTrade:format(itemLink)
-        end
-        if rollType == rollTypes.BANK then
-            return L.WhisperBankTrade:format(itemLink)
-        end
-        if rollType == rollTypes.DISENCHANT then
-            return L.WhisperDisenchantTrade:format(itemLink)
-        end
-        return nil
-    end
-
-    local function resolveInventoryAwardedCount()
-        local awardedCount = tonumber(lootState.selectedItemCount) or 1
-        if awardedCount < 1 then
-            awardedCount = 1
-        end
-        if lootState.fromInventory and awardedCount > 1 then
-            awardedCount = 1
-        end
-        return awardedCount
-    end
-
-    local function resolveTradeExecutionWinner(playerName, isAwardRoll)
-        if not isAwardRoll then
+    do
+        local function buildTradeInitialOutput(itemLink, playerName, rollType, isAwardRoll)
+            if isAwardRoll and addon.options.announceOnWin then
+                return L.ChatAward:format(playerName, itemLink)
+            end
+            if rollType == rollTypes.HOLD and addon.options.announceOnHold then
+                return L.ChatNoneRolledHold:format(itemLink, playerName)
+            end
+            if rollType == rollTypes.BANK and addon.options.announceOnBank then
+                return L.ChatNoneRolledBank:format(itemLink, playerName)
+            end
+            if rollType == rollTypes.DISENCHANT and addon.options.announceOnDisenchant then
+                return L.ChatNoneRolledDisenchant:format(itemLink, playerName)
+            end
             return nil
         end
 
-        local winner = playerName or getResolvedRollWinnerName()
-        local multiInventoryAward = lootState.fromInventory and ((tonumber(lootState.selectedItemCount) or 1) > 1)
-        if multiInventoryAward then
-            local rollModel = buildRollUiModel(true)
-            local picked = getSelectedRollWinnersOrdered(rollModel and rollModel.rows or nil)
-            if picked[1] and picked[1].name then
-                winner = picked[1].name
+        local function buildTradeKeepWhisper(itemLink, rollType)
+            if rollType == rollTypes.HOLD then
+                return L.WhisperHoldTrade:format(itemLink)
             end
-        end
-
-        return winner
-    end
-
-    advanceInventoryWinnerSelection = function(completedWinner)
-        if not lootState.fromInventory then
-            return
-        end
-        if (tonumber(lootState.selectedItemCount) or 1) <= 1 then
-            return
-        end
-
-        local selCount = MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0
-        if selCount <= 0 then
-            lootState.winner = nil
-            return
-        end
-
-        if completedWinner and MultiSelect.MultiSelectIsSelected(ROLL_WINNERS_CTX, completedWinner) then
-            MultiSelect.MultiSelectToggle(ROLL_WINNERS_CTX, completedWinner, true)
-            if MultiSelect.MultiSelectGetAnchor and MultiSelect.MultiSelectGetAnchor(ROLL_WINNERS_CTX) == completedWinner then
-                MultiSelect.MultiSelectSetAnchor(ROLL_WINNERS_CTX, nil)
+            if rollType == rollTypes.BANK then
+                return L.WhisperBankTrade:format(itemLink)
             end
+            if rollType == rollTypes.DISENCHANT then
+                return L.WhisperDisenchantTrade:format(itemLink)
+            end
+            return nil
         end
 
-        invalidateRollUiModel()
-        local rollModel = buildRollUiModel(true)
-        lootState.winner = rollModel and rollModel.winner or nil
-    end
-
-    completeInventoryAwardProgress = function(completedWinner, rollType, awardedCount)
-        if tonumber(rollType) == rollTypes.MAINSPEC and completedWinner and completedWinner ~= "" then
-            Raid:AddPlayerCount(completedWinner, awardedCount, addon.Core.GetCurrentRaid())
+        local function resolveInventoryAwardedCount()
+            local awardedCount = tonumber(lootState.selectedItemCount) or 1
+            if awardedCount < 1 then
+                awardedCount = 1
+            end
+            if lootState.fromInventory and awardedCount > 1 then
+                awardedCount = 1
+            end
+            return awardedCount
         end
 
-        local done = registerAwardedItem(awardedCount)
-        resetTradeState()
-        if not done then
-            advanceInventoryWinnerSelection(completedWinner)
-        end
-        if done then
-            Loot:ClearLoot()
-            Raid:ClearRaidIcons()
-        end
-        screenshotWarn = false
-        module:RequestRefresh()
-        return done
-    end
+        local function resolveTradeExecutionWinner(playerName, isAwardRoll)
+            if not isAwardRoll then
+                return nil
+            end
 
-    local function buildTradeMultiWinnersOutput(currentWinner)
-        Raid:ClearRaidIcons()
-        if lootState.trader ~= currentWinner then
-            SetRaidTarget(lootState.trader, 1)
-        end
-
-        local winners = {}
-        local rollModel = buildRollUiModel(true)
-        local rolls = getSelectedRollWinnersOrdered(rollModel and rollModel.rows or nil)
-        local maxWinners = #rolls
-        if maxWinners <= 0 then
-            rolls = Rolls:GetRolls()
-            maxWinners = tonumber(lootState.selectedItemCount) or 0
-        end
-        for i = 1, maxWinners do
-            local roll = rolls[i]
-            if roll then
-                if roll.name == lootState.trader then
-                    if lootState.trader ~= currentWinner then
-                        tinsert(winners, "{star} " .. roll.name .. "(" .. roll.roll .. ")")
-                    else
-                        tinsert(winners, roll.name .. "(" .. roll.roll .. ")")
-                    end
-                else
-                    SetRaidTarget(roll.name, i + 1)
-                    tinsert(winners, RAID_TARGET_MARKERS[i] .. " " .. roll.name .. "(" .. roll.roll .. ")")
+            local winner = playerName or getResolvedRollWinnerName()
+            local multiInventoryAward = lootState.fromInventory and ((tonumber(lootState.selectedItemCount) or 1) > 1)
+            if multiInventoryAward then
+                local rollModel = buildRollUiModel(true)
+                local picked = getSelectedRollWinnersOrdered(rollModel and rollModel.rows or nil)
+                if picked[1] and picked[1].name then
+                    winner = picked[1].name
                 end
             end
+
+            return winner
         end
 
-        return L.ChatTradeMutiple:format(tconcat(winners, ", "), lootState.trader)
-    end
+        advanceInventoryWinnerSelection = function(completedWinner)
+            if not lootState.fromInventory then
+                return
+            end
+            if (tonumber(lootState.selectedItemCount) or 1) <= 1 then
+                return
+            end
 
-    local function prepareTradeableItem(itemLink)
-        local itemData = Loot:FindTradeableInventoryItem(itemLink, itemInfo.bagID, itemInfo.slotID, lootState.selectedItemCount)
-        if not itemData then
-            addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemLink)))
-            return false
+            local selCount = MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0
+            if selCount <= 0 then
+                lootState.winner = nil
+                return
+            end
+
+            if completedWinner and MultiSelect.MultiSelectIsSelected(ROLL_WINNERS_CTX, completedWinner) then
+                MultiSelect.MultiSelectToggle(ROLL_WINNERS_CTX, completedWinner, true)
+                if MultiSelect.MultiSelectGetAnchor and MultiSelect.MultiSelectGetAnchor(ROLL_WINNERS_CTX) == completedWinner then
+                    MultiSelect.MultiSelectSetAnchor(ROLL_WINNERS_CTX, nil)
+                end
+            end
+
+            invalidateRollUiModel()
+            local rollModel = buildRollUiModel(true)
+            lootState.winner = rollModel and rollModel.winner or nil
         end
 
-        itemInfo.bagID = itemData.bag
-        itemInfo.slotID = itemData.slot
-        itemInfo.slotCount = itemData.slotCount
-        itemInfo.isStack = itemData.slotCount > 1
-        itemInfo.count = itemData.totalCount
+        completeInventoryAwardProgress = function(completedWinner, rollType, awardedCount)
+            if tonumber(rollType) == rollTypes.MAINSPEC and completedWinner and completedWinner ~= "" then
+                Raid:AddPlayerCount(completedWinner, awardedCount, addon.Core.GetCurrentRaid())
+            end
 
-        if itemInfo.isStack and not addon.options.ignoreStacks then
-            addon:debug(Diag.D.LogTradeStackBlocked:format(tostring(addon.options.ignoreStacks), tostring(itemLink)))
-            addon:warn(L.ErrItemStack:format(itemLink))
-            return false
+            local done = registerAwardedItem(awardedCount)
+            resetTradeState()
+            if not done then
+                advanceInventoryWinnerSelection(completedWinner)
+            end
+            if done then
+                Loot:ClearLoot()
+                Raid:ClearRaidIcons()
+            end
+            screenshotWarn = false
+            module:RequestRefresh()
+            return done
         end
 
-        return true
-    end
-
-    local function tryInitiateTrade(itemLink, playerName, isAwardRoll)
-        local unit = Raid:GetUnitID(playerName)
-        if unit == "none" then
-            return true, nil
-        end
-
-        if CheckInteractDistance(unit, 2) ~= 1 then
-            addon:warn(Diag.W.LogTradeDelayedOutOfRange:format(tostring(playerName), tostring(itemLink)))
+        local function buildTradeMultiWinnersOutput(currentWinner)
             Raid:ClearRaidIcons()
-            SetRaidTarget(lootState.trader, 1)
-            if isAwardRoll then
-                SetRaidTarget(playerName, 4)
+            if lootState.trader ~= currentWinner then
+                SetRaidTarget(lootState.trader, 1)
             end
-            return true, L.ChatTrade:format(playerName, itemLink)
-        end
 
-        if not prepareTradeableItem(itemLink) then
-            return false, nil
-        end
-
-        local _, startCount = GetContainerItemInfo(itemInfo.bagID, itemInfo.slotID)
-        itemInfo.tradeStartCount = tonumber(startCount) or tonumber(itemInfo.slotCount) or 1
-        itemInfo.tradeStartBag = itemInfo.bagID
-        itemInfo.tradeStartSlot = itemInfo.slotID
-        itemInfo.tradeStartItemLink = GetContainerItemLink(itemInfo.bagID, itemInfo.slotID)
-
-        ClearCursor()
-        PickupContainerItem(itemInfo.bagID, itemInfo.slotID)
-        if CursorHasItem() then
-            InitiateTrade(playerName)
-            addon:debug(Diag.D.LogTradeInitiated:format(tostring(itemLink), tostring(playerName)))
-            if addon.options.screenReminder and not screenshotWarn then
-                addon:warn(L.ErrScreenReminder)
-                screenshotWarn = true
+            local winners = {}
+            local rollModel = buildRollUiModel(true)
+            local rolls = getSelectedRollWinnersOrdered(rollModel and rollModel.rows or nil)
+            local maxWinners = #rolls
+            if maxWinners <= 0 then
+                rolls = Rolls:GetRolls()
+                maxWinners = tonumber(lootState.selectedItemCount) or 0
             end
+            for i = 1, maxWinners do
+                local roll = rolls[i]
+                if roll then
+                    if roll.name == lootState.trader then
+                        if lootState.trader ~= currentWinner then
+                            tinsert(winners, "{star} " .. roll.name .. "(" .. roll.roll .. ")")
+                        else
+                            tinsert(winners, roll.name .. "(" .. roll.roll .. ")")
+                        end
+                    else
+                        SetRaidTarget(roll.name, i + 1)
+                        tinsert(winners, RAID_TARGET_MARKERS[i] .. " " .. roll.name .. "(" .. roll.roll .. ")")
+                    end
+                end
+            end
+
+            return L.ChatTradeMutiple:format(tconcat(winners, ", "), lootState.trader)
         end
 
-        return true, nil
-    end
+        local function prepareTradeableItem(itemLink)
+            local itemData = Loot:FindTradeableInventoryItem(itemLink, itemInfo.bagID, itemInfo.slotID, lootState.selectedItemCount)
+            if not itemData then
+                addon:warn(L.ErrMLInventoryItemMissing:format(tostring(itemLink)))
+                return false
+            end
 
-    local function finalizeTradeNotifications(itemLink, playerName, rollType, rollValue, output, whisper)
-        if announced then
+            itemInfo.bagID = itemData.bag
+            itemInfo.slotID = itemData.slot
+            itemInfo.slotCount = itemData.slotCount
+            itemInfo.isStack = itemData.slotCount > 1
+            itemInfo.count = itemData.totalCount
+
+            if itemInfo.isStack and not addon.options.ignoreStacks then
+                if addon.hasDebug then
+                    addon:debug(Diag.D.LogTradeStackBlocked:format(tostring(addon.options.ignoreStacks), tostring(itemLink)))
+                end
+                addon:warn(L.ErrItemStack:format(itemLink))
+                return false
+            end
+
             return true
         end
 
-        if output then
-            ChatApi.Announce(Chat, output)
-        end
-        if whisper then
-            if playerName == lootState.trader then
-                clearLootAndResetRecordedRolls()
-            else
-                Comms.Whisper(playerName, whisper)
+        local function tryInitiateTrade(itemLink, playerName, isAwardRoll)
+            local unit = Raid:GetUnitID(playerName)
+            if unit == "none" then
+                return true, nil
             end
+
+            if CheckInteractDistance(unit, 2) ~= 1 then
+                addon:warn(Diag.W.LogTradeDelayedOutOfRange:format(tostring(playerName), tostring(itemLink)))
+                Raid:ClearRaidIcons()
+                SetRaidTarget(lootState.trader, 1)
+                if isAwardRoll then
+                    SetRaidTarget(playerName, 4)
+                end
+                return true, L.ChatTrade:format(playerName, itemLink)
+            end
+
+            if not prepareTradeableItem(itemLink) then
+                return false, nil
+            end
+
+            local _, startCount = GetContainerItemInfo(itemInfo.bagID, itemInfo.slotID)
+            itemInfo.tradeStartCount = tonumber(startCount) or tonumber(itemInfo.slotCount) or 1
+            itemInfo.tradeStartBag = itemInfo.bagID
+            itemInfo.tradeStartSlot = itemInfo.slotID
+            itemInfo.tradeStartItemLink = GetContainerItemLink(itemInfo.bagID, itemInfo.slotID)
+
+            ClearCursor()
+            PickupContainerItem(itemInfo.bagID, itemInfo.slotID)
+            if CursorHasItem() then
+                InitiateTrade(playerName)
+                if addon.hasDebug then
+                    addon:debug(Diag.D.LogTradeInitiated:format(tostring(itemLink), tostring(playerName)))
+                end
+                if addon.options.screenReminder and not screenshotWarn then
+                    addon:warn(L.ErrScreenReminder)
+                    screenshotWarn = true
+                end
+            end
+
+            return true, nil
         end
-        announced = true
-        return true
-    end
 
-    local function beginTradeItemState(itemLink, playerName, rollType, rollValue, isAwardRoll)
-        ensureRollSession(itemLink, rollType, lootState.fromInventory and "inventory" or "lootWindow")
+        local function finalizeTradeNotifications(itemLink, playerName, rollType, rollValue, output, whisper)
+            if announced then
+                return true
+            end
 
-        resetTradeState()
+            if output then
+                ChatApi.Announce(Chat, output)
+            end
+            if whisper then
+                if playerName == lootState.trader then
+                    clearLootAndResetRecordedRolls()
+                else
+                    Comms.Whisper(playerName, whisper)
+                end
+            end
+            announced = true
+            return true
+        end
 
-        lootState.trader = Core.GetPlayerName()
-        local winnerName = resolveTradeExecutionWinner(playerName, isAwardRoll)
-        lootState.tradeItemLink = itemLink
-        lootState.tradeItemId = Item.GetItemIdFromLink(itemLink)
+        local function beginTradeItemState(itemLink, playerName, rollType, rollValue, isAwardRoll)
+            ensureRollSession(itemLink, rollType, lootState.fromInventory and "inventory" or "lootWindow")
 
-        if isAwardRoll and (not winnerName or winnerName == "") then
-            addon:warn(L.ErrNoWinnerSelected)
             resetTradeState()
-            return false, nil
-        end
-        if isAwardRoll then
-            local validation = validateAwardWinner(winnerName, itemLink, rollType)
-            if not (validation and validation.ok == true) then
-                addon:warn((validation and validation.warnMessage) or L.ErrMLWinnerIneligible:format(tostring(winnerName)))
+
+            lootState.trader = Core.GetPlayerName()
+            local winnerName = resolveTradeExecutionWinner(playerName, isAwardRoll)
+            lootState.tradeItemLink = itemLink
+            lootState.tradeItemId = Item.GetItemIdFromLink(itemLink)
+
+            if isAwardRoll and (not winnerName or winnerName == "") then
+                addon:warn(L.ErrNoWinnerSelected)
                 resetTradeState()
                 return false, nil
             end
-        end
-        lootState.tradeWinner = winnerName
-
-        addon:debug(
-            Diag.D.LogTradeStart:format(
-                tostring(itemLink),
-                tostring(lootState.trader),
-                tostring(winnerName or playerName),
-                tonumber(rollType) or -1,
-                tonumber(rollValue) or 0,
-                lootState.selectedItemCount or 1
-            )
-        )
-
-        return true, winnerName
-    end
-
-    local function buildTradeNotificationPlan(itemLink, playerName, winnerName, rollType, isAwardRoll)
-        local output = buildTradeInitialOutput(itemLink, winnerName or playerName, rollType, isAwardRoll)
-        local whisper
-        local keep = not isAwardRoll
-
-        if keep then
-            whisper = buildTradeKeepWhisper(itemLink, rollType)
-        elseif lootState.selectedItemCount > 1 then
-            output = buildTradeMultiWinnersOutput(winnerName)
-        end
-
-        return keep, output, whisper
-    end
-
-    local function completeTraderKeepAward(itemLink, winnerName, rollType, rollValue, output, whisper)
-        addon:debug(Diag.D.LogTradeTraderKeeps:format(tostring(itemLink), tostring(winnerName)))
-        local awardedCount = resolveInventoryAwardedCount()
-        local lootNid, createdTradeOnly = ensureTradeLootContext(itemLink, winnerName, rollType, rollValue, awardedCount, "TRADE_KEEP_NO_CONTEXT")
-        if lootNid <= 0 then
-            addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Core.GetCurrentRaid()), tostring(lootNid), tostring(itemLink)))
-        elseif createdTradeOnly ~= true then
-            local ok = requestLoggerLootLog(lootNid, winnerName, rollType, rollValue, "TRADE_KEEP", addon.Core.GetCurrentRaid())
-            if not ok then
-                addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Core.GetCurrentRaid()), tostring(lootNid), tostring(itemLink)))
+            if isAwardRoll then
+                local validation = validateAwardWinner(winnerName, itemLink, rollType)
+                if not (validation and validation.ok == true) then
+                    addon:warn((validation and validation.warnMessage) or L.ErrMLWinnerIneligible:format(tostring(winnerName)))
+                    resetTradeState()
+                    return false, nil
+                end
             end
+            lootState.tradeWinner = winnerName
+
+            if addon.hasDebug then
+                addon:debug(
+                    Diag.D.LogTradeStart:format(
+                        tostring(itemLink),
+                        tostring(lootState.trader),
+                        tostring(winnerName or playerName),
+                        tonumber(rollType) or -1,
+                        tonumber(rollValue) or 0,
+                        lootState.selectedItemCount or 1
+                    )
+                )
+            end
+
+            return true, winnerName
         end
 
-        finalizeTradeNotifications(itemLink, winnerName, rollType, rollValue, output, whisper)
-        completeInventoryAwardProgress(winnerName, rollType, awardedCount)
-        return true
-    end
+        local function buildTradeNotificationPlan(itemLink, playerName, winnerName, rollType, isAwardRoll)
+            local output = buildTradeInitialOutput(itemLink, winnerName or playerName, rollType, isAwardRoll)
+            local whisper
+            local keep = not isAwardRoll
 
-    local function prepareExternalAwardTrade(itemLink, winnerName, isAwardRoll, output)
-        local ok, outputOverride = tryInitiateTrade(itemLink, winnerName, isAwardRoll)
-        if not ok then
-            return false, output
-        end
-        return true, outputOverride or output
-    end
+            if keep then
+                whisper = buildTradeKeepWhisper(itemLink, rollType)
+            elseif lootState.selectedItemCount > 1 then
+                output = buildTradeMultiWinnersOutput(winnerName)
+            end
 
-    -- Trades an item from inventory to a player.
-    function tradeItem(itemLink, playerName, rollType, rollValue)
-        if itemLink ~= Loot.GetItemLink() then
-            return
-        end
-        local isAwardRoll = (rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE)
-        local ok, winnerName = beginTradeItemState(itemLink, playerName, rollType, rollValue, isAwardRoll)
-        if not ok then
-            return false
+            return keep, output, whisper
         end
 
-        local keep, output, whisper = buildTradeNotificationPlan(itemLink, playerName, winnerName, rollType, isAwardRoll)
+        local function completeTraderKeepAward(itemLink, winnerName, rollType, rollValue, output, whisper)
+            if addon.hasDebug then
+                addon:debug(Diag.D.LogTradeTraderKeeps:format(tostring(itemLink), tostring(winnerName)))
+            end
+            local awardedCount = resolveInventoryAwardedCount()
+            local lootNid, createdTradeOnly = ensureTradeLootContext(itemLink, winnerName, rollType, rollValue, awardedCount, "TRADE_KEEP_NO_CONTEXT")
+            if lootNid <= 0 then
+                addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Core.GetCurrentRaid()), tostring(lootNid), tostring(itemLink)))
+            elseif createdTradeOnly ~= true then
+                local ok = requestLoggerLootLog(lootNid, winnerName, rollType, rollValue, "TRADE_KEEP", addon.Core.GetCurrentRaid())
+                if not ok then
+                    addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Core.GetCurrentRaid()), tostring(lootNid), tostring(itemLink)))
+                end
+            end
 
-        if not keep and lootState.trader == winnerName then
-            return completeTraderKeepAward(itemLink, winnerName, rollType, rollValue, output, whisper)
+            finalizeTradeNotifications(itemLink, winnerName, rollType, rollValue, output, whisper)
+            completeInventoryAwardProgress(winnerName, rollType, awardedCount)
+            return true
         end
 
-        if not keep then
-            ok, output = prepareExternalAwardTrade(itemLink, winnerName, isAwardRoll, output)
+        local function prepareExternalAwardTrade(itemLink, winnerName, isAwardRoll, output)
+            local ok, outputOverride = tryInitiateTrade(itemLink, winnerName, isAwardRoll)
+            if not ok then
+                return false, output
+            end
+            return true, outputOverride or output
+        end
+
+        -- Trades an item from inventory to a player.
+        function tradeItem(itemLink, playerName, rollType, rollValue)
+            if itemLink ~= Loot.GetItemLink() then
+                return
+            end
+            local isAwardRoll = (rollType and rollType >= rollTypes.MAINSPEC and rollType <= rollTypes.FREE)
+            local ok, winnerName = beginTradeItemState(itemLink, playerName, rollType, rollValue, isAwardRoll)
             if not ok then
                 return false
             end
-        end
 
-        return finalizeTradeNotifications(itemLink, winnerName or playerName, rollType, rollValue, output, whisper)
+            local keep, output, whisper = buildTradeNotificationPlan(itemLink, playerName, winnerName, rollType, isAwardRoll)
+
+            if not keep and lootState.trader == winnerName then
+                return completeTraderKeepAward(itemLink, winnerName, rollType, rollValue, output, whisper)
+            end
+
+            if not keep then
+                ok, output = prepareExternalAwardTrade(itemLink, winnerName, isAwardRoll, output)
+                if not ok then
+                    return false
+                end
+            end
+
+            return finalizeTradeNotifications(itemLink, winnerName or playerName, rollType, rollValue, output, whisper)
+        end
     end
 
     -- ============================================================================
     -- Bus callbacks
     -- ============================================================================
-    -- Register some callbacks:
-    local wowForwardEvents = {
-        "LOOT_OPENED",
-        "LOOT_CLOSED",
-        "LOOT_SLOT_CLEARED",
-        "TRADE_ACCEPT_UPDATE",
-        "TRADE_REQUEST_CANCEL",
-        "TRADE_CLOSED",
-    }
+    do
+        local function registerWowForwarded(methodName)
+            Bus.RegisterCallback(Events.WowForwarded and Events.WowForwarded(methodName), function(_, ...)
+                local fn = module[methodName]
+                if fn then
+                    fn(module, ...)
+                end
+            end)
+        end
 
-    for i = 1, #wowForwardEvents do
-        local methodName = wowForwardEvents[i]
-        local wowEventName = Events.WowForwarded and Events.WowForwarded(methodName)
-        Bus.RegisterCallback(wowEventName, function(_, ...)
-            local fn = module[methodName]
-            if fn then
-                fn(module, ...)
-            end
-        end)
+        registerWowForwarded("LOOT_OPENED")
+        registerWowForwarded("LOOT_CLOSED")
+        registerWowForwarded("LOOT_SLOT_CLEARED")
+        registerWowForwarded("TRADE_ACCEPT_UPDATE")
+        registerWowForwarded("TRADE_REQUEST_CANCEL")
+        registerWowForwarded("TRADE_CLOSED")
     end
 
     Bus.RegisterCallback(InternalEvents.SetItem, function(_, itemLink, itemData)

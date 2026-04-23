@@ -70,7 +70,7 @@ do
     local cacheWarmQueued = {}
     local cacheWarmHead = 1
     local cacheWarmHandle
-    local CACHE_WARM_DELAY_SECONDS = 0.05
+    local CACHE_WARM_DELAY_SECONDS = 0.15
 
     -- ----- Private helpers ----- --
     local scheduleCacheWarm
@@ -490,11 +490,15 @@ do
         -- Ignore low-rarity and explicitly ignored items.
         local lootThreshold = GetLootThreshold()
         if itemRarity and itemRarity < lootThreshold then
-            addon:debug(Diag.D.LogLootIgnoredBelowThreshold:format(tostring(itemRarity), tonumber(lootThreshold) or -1, tostring(itemLink)))
+            if addon.hasDebug then
+                addon:debug(Diag.D.LogLootIgnoredBelowThreshold:format(tostring(itemRarity), tonumber(lootThreshold) or -1, tostring(itemLink)))
+            end
             return true
         end
         if itemId and module:IsIgnoredItem(itemId) then
-            addon:debug(Diag.D.LogLootIgnoredItemId:format(tostring(itemId), tostring(itemLink)))
+            if addon.hasDebug then
+                addon:debug(Diag.D.LogLootIgnoredItemId:format(tostring(itemId), tostring(itemLink)))
+            end
             return true
         end
         return false
@@ -558,7 +562,9 @@ do
                 rollValue = 0
 
                 -- Debug marker for manual-tagged loot.
-                addon:debug(Diag.D.LogLootTaggedManual, tostring(itemLink), tostring(player), tostring(lootState.currentRollType))
+                if addon.hasDebug then
+                    addon:debug(Diag.D.LogLootTaggedManual, tostring(itemLink), tostring(player), tostring(lootState.currentRollType))
+                end
             else
                 rollType = lootState.currentRollType
             end
@@ -689,12 +695,16 @@ do
         local itemLink
         player, itemCount, itemLink, rollType, rollValue = parseLootChatMessage(msg, rollType, rollValue)
         if not itemLink then
-            addon:debug(Diag.D.LogLootParseFailed:format(tostring(msg)))
+            if addon.hasDebug then
+                addon:debug(Diag.D.LogLootParseFailed:format(tostring(msg)))
+            end
             return
         end
 
         local itemString, itemName, itemRarity, itemTexture, itemId = getLootItemDetails(itemLink)
-        addon:trace(Diag.D.LogLootParsed:format(tostring(player), tostring(itemLink), itemCount))
+        if addon.hasTrace then
+            addon:trace(Diag.D.LogLootParsed:format(tostring(player), tostring(itemLink), itemCount))
+        end
 
         if shouldSkipLootEntry(itemRarity, itemId, itemLink) then
             return
@@ -724,7 +734,9 @@ do
         local bossNid = resolveBossNidForLoot(raid, currentRaidId, rollSessionId, passiveGroupLoot, currentTime)
         local lootSource = copyLootSourceForRecord(raidService, currentRaidId, bossNid)
         if bossNid <= 0 then
-            addon:debug(Diag.D.LogBossNoContextTrash)
+            if addon.hasDebug then
+                addon:debug(Diag.D.LogBossNoContextTrash)
+            end
         end
 
         local looterNid = 0
@@ -753,7 +765,9 @@ do
         bindLootNidToRollSession(lootNid, rollSessionId, itemId, itemString, itemLink)
         PassiveGroupLoot.ConsumePassiveLootRollEntry(rollSessionId)
         Bus.TriggerEvent(InternalEvents.RaidLootUpdate, currentRaidId, lootInfo)
-        addon:debug(Diag.D.LogLootLogged:format(tonumber(currentRaidId) or -1, tostring(itemId), tostring(lootInfo.bossNid), tostring(player)))
+        if addon.hasDebug then
+            addon:debug(Diag.D.LogLootLogged:format(tonumber(currentRaidId) or -1, tostring(itemId), tostring(lootInfo.bossNid), tostring(player)))
+        end
     end
 
     -- Creates a local raid loot entry for inventory-trade awards when no reliable loot context exists.
@@ -823,7 +837,9 @@ do
         invalidateRaidRuntime(raid)
         bindLootNidToRollSession(lootNid, rollSessionId, itemId, itemString, itemLink)
         Bus.TriggerEvent(InternalEvents.RaidLootUpdate, raidNum, lootInfo)
-        addon:debug(Diag.D.LogLootTradeOnlyLogged:format(tonumber(raidNum) or -1, tostring(itemId), tostring(lootNid), tostring(looter), count, tostring(lootInfo.source)))
+        if addon.hasDebug then
+            addon:debug(Diag.D.LogLootTradeOnlyLogged:format(tonumber(raidNum) or -1, tostring(itemId), tostring(lootNid), tostring(looter), count, tostring(lootInfo.source)))
+        end
         return lootNid
     end
 
@@ -859,7 +875,9 @@ do
             oldItem = getItemLink(lootState.currentItemIndex)
         end
         local lootItemCount = GetNumLootItems() or 0
-        addon:trace(Diag.D.LogLootFetchStart:format(lootItemCount, lootState.currentItemIndex or 0))
+        if addon.hasTrace then
+            addon:trace(Diag.D.LogLootFetchStart:format(lootItemCount, lootState.currentItemIndex or 0))
+        end
         lootState.opened = true
         lootState.fromInventory = false
         self:ClearLoot()
@@ -872,7 +890,9 @@ do
 
         lootState.currentItemIndex = findTrackedLootItemIndex(oldItem) or 1
         self:PrepareItem()
-        addon:trace(Diag.D.LogLootFetchDone:format(lootState.lootCount or 0, lootState.currentItemIndex or 0))
+        if addon.hasTrace then
+            addon:trace(Diag.D.LogLootFetchDone:format(lootState.lootCount or 0, lootState.currentItemIndex or 0))
+        end
     end
 
     -- Adds an item to the loot table.
@@ -930,7 +950,9 @@ do
         end
 
         if not itemName then
-            addon:debug(Diag.D.LogLootItemInfoMissing:format(tostring(itemLink)))
+            if addon.hasDebug then
+                addon:debug(Diag.D.LogLootItemInfoMissing:format(tostring(itemLink)))
+            end
             itemName = tostring(itemLink)
         end
 

@@ -153,6 +153,24 @@
 |       |   \\-- SKILL.md
 |       \\-- s-working
 |           \\-- SKILL.md
+|-- .claude
+|   \\-- skills
+|       |-- k-docs
+|       |   \\-- SKILL.md
+|       |-- s-audit
+|       |   \\-- SKILL.md
+|       |-- s-clean
+|       |   \\-- SKILL.md
+|       |-- s-debug
+|       |   |-- references
+|       |   |   \\-- ...
+|       |   \\-- SKILL.md
+|       |-- s-lint
+|       |   \\-- SKILL.md
+|       |-- s-release
+|       |   \\-- SKILL.md
+|       \\-- s-working
+|           \\-- SKILL.md
 |-- .githooks
 |   |-- pre-commit
 |   \\-- README.md
@@ -250,6 +268,7 @@
 |-- .gitattributes
 |-- .gitignore
 |-- .luacheckrc
+|-- .mcp.json
 |-- .stylua.toml
 |-- .styluaignore
 |-- AGENTS.md

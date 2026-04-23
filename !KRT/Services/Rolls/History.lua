@@ -25,6 +25,10 @@ local History = module._History
 local InternalEvents = Events and Events.Internal or nil
 
 -- ----- Private helpers ----- --
+local function isDebugEnabled()
+    return addon.hasDebug ~= nil
+end
+
 local function assertContext(ctx)
     assert(type(ctx) == "table", "Rolls history context is required")
     assert(type(ctx.state) == "table", "Rolls history state is required")
@@ -132,7 +136,9 @@ function History.AddRoll(ctx, name, roll, itemId)
         itemId = itemId,
     }
 
-    addon:debug(Diag.D.LogRollsAddEntry:format(name, roll, tostring(itemId)))
+    if isDebugEnabled() then
+        addon:debug(Diag.D.LogRollsAddEntry:format(name, roll, tostring(itemId)))
+    end
     if itemId then
         tracker[name] = (tracker[name] or 0) + 1
     end

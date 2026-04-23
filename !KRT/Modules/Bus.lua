@@ -11,6 +11,7 @@ local L = feature.L
 local Diag = feature.Diag
 
 local type, pairs, pcall, tostring = type, pairs, pcall, tostring
+local debugprofilestop = debugprofilestop
 
 addon.Bus = addon.Bus or {}
 local Bus = addon.Bus

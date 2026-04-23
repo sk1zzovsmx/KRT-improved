@@ -37,6 +37,10 @@ local GROUP_LOOT_ROLL_GRACE_SECONDS = tonumber(C.GROUP_LOOT_ROLL_GRACE_SECONDS) 
 local Services = feature.Services or addon.Services
 
 -- ----- Private helpers ----- --
+local function isDebugEnabled()
+    return addon.hasDebug ~= nil
+end
+
 local function getLootMethodName()
     if type(GetLootMethod) ~= "function" then
         return nil
@@ -753,7 +757,9 @@ function PassiveGroupLoot.AddGroupLootMessage(owner, msg)
             if playerName and itemLink then
                 local rollSessionId, expiresAt = PassiveGroupLoot.ResolvePassivePendingAwardContext(itemLink, rollId)
                 owner:AddPendingAward(itemLink, playerName, rule.rollType, 0, rollSessionId, expiresAt)
-                addon:debug(Diag.D.LogLootGroupSelectionQueued:format(rule.label, tostring(playerName), tostring(itemLink)))
+                if isDebugEnabled() then
+                    addon:debug(Diag.D.LogLootGroupSelectionQueued:format(rule.label, tostring(playerName), tostring(itemLink)))
+                end
                 return "selection"
             end
         end
@@ -762,7 +768,9 @@ function PassiveGroupLoot.AddGroupLootMessage(owner, msg)
         if rollPlayer and rollItemLink and rollType then
             local rule = getGroupLootRule(rollType)
             queuePendingPassiveAward(owner, rollItemLink, rollPlayer, rollType, rollValue, rollId, false)
-            addon:debug(Diag.D.LogLootGroupSelectionQueued:format((rule and rule.label) or "?", tostring(rollPlayer), tostring(rollItemLink)))
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogLootGroupSelectionQueued:format((rule and rule.label) or "?", tostring(rollPlayer), tostring(rollItemLink)))
+            end
             return "selection"
         end
     end
@@ -775,7 +783,9 @@ function PassiveGroupLoot.AddGroupLootMessage(owner, msg)
         if canQueuePendingAward and (winnerRollType ~= nil or winnerRollValue ~= nil) then
             queuePendingPassiveAward(owner, itemLink, playerName, winnerRollType, winnerRollValue, winnerRollId, true)
         end
-        addon:debug(Diag.D.LogLootGroupWinnerDetected:format(tostring(playerName), winnerTypeLabel, winnerRollLabel, tostring(itemLink)))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogLootGroupWinnerDetected:format(tostring(playerName), winnerTypeLabel, winnerRollLabel, tostring(itemLink)))
+        end
         return "winner"
     end
 
