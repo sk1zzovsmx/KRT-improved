@@ -301,6 +301,28 @@ function Resolution.BuildResolution(ctx, resolvedEntries, usePlus)
         end
     end
 
+    if resolution.resolvedByTiebreaker and isDebugEnabled() then
+        local counts = {}
+        for _, nm in ipairs(rollTiedNames) do
+            for _, e in ipairs(resolvedEntries) do
+                if e.name == nm then
+                    counts[#counts + 1] = string.format("%s=%d", nm, tonumber(e.tiebreakerCount) or 0)
+                    break
+                end
+            end
+        end
+        local opts = ctx.getTiebreakerMSCountOpts and ctx.getTiebreakerMSCountOpts() or { scope = "?", n = 0 }
+        addon:debug(
+            Diag.D.LogRollsTiebreakerApplied:format(
+                tostring(opts.scope),
+                tonumber(opts.n) or 0,
+                tconcat(rollTiedNames, ","),
+                tconcat(counts, ","),
+                tostring(resolution.tiebreakerWinnerName)
+            )
+        )
+    end
+
     return resolution
 end
 
