@@ -206,6 +206,7 @@
 |-- docs
 |   |-- superpowers
 |   |   |-- plans
+|   |   |   |-- 2026-04-21-packmule.md
 |   |   |   \\-- 2026-04-21-plus-one-tiebreaker.md
 |   |   \\-- specs
 |   |       |-- 2026-04-21-packmule-design.md
