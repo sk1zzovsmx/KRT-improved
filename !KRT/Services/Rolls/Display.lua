@@ -50,6 +50,9 @@ local function getResolutionContext(ctx)
         shouldShowLootCounterDuringMSRoll = ctx.shouldShowLootCounterDuringMSRoll,
         getRaidService = ctx.getRaidService,
         getCurrentRaid = ctx.getCurrentRaid,
+        isTiebreakerByMSCountEnabled = ctx.isTiebreakerByMSCountEnabled,
+        getMSCountsForNames = ctx.getMSCountsForNames,
+        getTiebreakerMSCountOpts = ctx.getTiebreakerMSCountOpts,
     }
     return ctx._resolutionContext
 end
@@ -90,6 +93,10 @@ function Display.BuildModel(ctx)
     resolvedEntries, usePlus, plusGetter = Resolution.BuildResolvedEntries(resolutionContext, itemId, currentRollType)
     tieGroups = Resolution.BuildTieGroups(resolutionContext, resolvedEntries, usePlus)
     resolution = Resolution.BuildResolution(resolutionContext, resolvedEntries, usePlus)
+    local resolvedByName = {}
+    for i = 1, #resolvedEntries do
+        resolvedByName[resolvedEntries[i].name] = resolvedEntries[i]
+    end
     state.resolution = resolution
     lootState.rollWinner = resolution.topRollName
 
@@ -142,6 +149,8 @@ function Display.BuildModel(ctx)
         local response = entry.response
         local name = entry.name
         local roll = entry.roll
+        local resolvedEntry = resolvedByName[name]
+        local tbCount = resolvedEntry and resolvedEntry.tiebreakerCount or 0
 
         rows[i] = {
             id = i,
@@ -149,7 +158,7 @@ function Display.BuildModel(ctx)
             roll = roll,
             class = (raid and raid.GetPlayerClass and raid:GetPlayerClass(name) or "UNKNOWN"):upper(),
             isReserved = response.bucket == "SR",
-            counterText = Resolution.BuildRowCounterText(resolutionContext, itemId, response, currentRollType, plusGetter),
+            counterText = Resolution.GetRowCounterText(resolutionContext, itemId, response, currentRollType, plusGetter, entry.isTied, tbCount),
             infoText = Resolution.BuildRowInfoText(resolutionContext, response, entry.isTied),
             status = response.status,
             explicitStatus = response.explicitStatus,

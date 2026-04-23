@@ -304,10 +304,15 @@ function Resolution.BuildResolution(ctx, resolvedEntries, usePlus)
     return resolution
 end
 
-function Resolution.BuildRowCounterText(ctx, itemId, response, currentRollType, plusGetter)
+function Resolution.GetRowCounterText(ctx, itemId, response, currentRollType, plusGetter, isTied, tiebreakerCount)
     local counterText = ""
     local rollTypes = ctx.rollTypes or feature.rollTypes
     local currentRaid
+
+    if isTied and ctx.isTiebreakerByMSCountEnabled and ctx.isTiebreakerByMSCountEnabled() and response.bucket ~= "SR" and response.bucket ~= "INELIGIBLE" then
+        local count = tonumber(tiebreakerCount) or 0
+        return (feature.L.RollRowMSCountFmt or "(MS %d)"):format(count)
+    end
 
     if response.bucket == "SR" then
         if currentRollType == rollTypes.RESERVED and itemId and ctx.isPlusSystemEnabled and ctx.isPlusSystemEnabled() then
