@@ -236,6 +236,7 @@
 |   |       |-- legacy-duplicates-03.lua
 |   |       |-- legacy-mixed-01.lua
 |   |       \\-- legacy-mixed-02.lua
+|   |-- player_ms_count_spec.lua
 |   \\-- release_stabilization_spec.lua
 |-- tools
 |   |-- agent-skills.manifest.json
