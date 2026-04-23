@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "lua-lsp": {
+      "command": "mcp-language-server",
+      "args": ["--workspace", ".", "--lsp", "lua-language-server"],
+      "cwd": "."
+    }
+  }
+}
