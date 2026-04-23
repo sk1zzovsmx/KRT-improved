@@ -3,7 +3,7 @@
     <!-- ====== Start of Loot Counter Frame ====== -->
     <Frame name="KRTLootCounterFrame" inherits="KRTFrameTemplate" hidden="true" enableMouse="true" registerForDrag="LeftButton">
         <Size>
-            <AbsDimension x="260" y="360" />
+            <AbsDimension x="370" y="360" />
         </Size>
         <Anchors>
             <Anchor point="CENTER" />

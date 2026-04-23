@@ -16,6 +16,22 @@ local tonumber = tonumber
 
 local twipe = table.wipe
 
+-- Maps loot type string to the player field name.
+local LOOT_FIELD = {
+    ms = "countMS",
+    os = "countOs",
+    free = "countFree",
+    sr = "countSR",
+}
+
+-- Maps C.rollTypes values to loot type strings (only countable types).
+local ROLL_TYPE_TO_LOOT_TYPE = {
+    [1] = "ms", -- MAINSPEC
+    [2] = "os", -- OFFSPEC
+    [3] = "sr", -- RESERVED (SR)
+    [4] = "free", -- FREE
+}
+
 local function findRaidPlayerByNid(raid, playerNid)
     local nid = tonumber(playerNid)
     if not nid or nid <= 0 then
@@ -84,7 +100,10 @@ do
                     playerNid = tonumber(p.playerNid),
                     name = p.name,
                     class = p.class,
-                    count = tonumber(p.count) or 0,
+                    msCount = tonumber(p.countMS) or 0,
+                    osCount = tonumber(p.countOs) or 0,
+                    freeCount = tonumber(p.countFree) or 0,
+                    srCount = tonumber(p.countSR) or 0,
                 }
             end
         end
@@ -96,28 +115,30 @@ do
         return rows
     end
 
-    function module:GetPlayerCountByNid(playerNid, raidNum)
+    -- Generic count access by loot type ("ms", "os", "free").
+    function module:GetPlayerLootCountByNid(playerNid, lootType, raidNum)
         local player = resolveRaidPlayerByNid(playerNid, raidNum)
         if not player then
             return 0
         end
-        return tonumber(player.count) or 0
+        local field = LOOT_FIELD[lootType] or "count"
+        return tonumber(player[field]) or 0
     end
 
-    function module:SetPlayerCountByNid(playerNid, value, raidNum)
+    function module:SetPlayerLootCountByNid(playerNid, lootType, value, raidNum)
         local player, resolvedRaidNum = resolveRaidPlayerByNid(playerNid, raidNum)
         if not player then
             return
         end
 
+        local field = LOOT_FIELD[lootType] or "count"
         value = tonumber(value) or 0
-        -- Hard clamp: counts are always non-negative.
         if value < 0 then
             value = 0
         end
 
-        local old = tonumber(player.count) or 0
-        player.count = value
+        local old = tonumber(player[field]) or 0
+        player[field] = value
 
         if old ~= value then
             local bus = feature.Bus or addon.Bus
@@ -125,7 +146,7 @@ do
         end
     end
 
-    function module:AddPlayerCountByNid(playerNid, delta, raidNum)
+    function module:AddPlayerLootCountByNid(playerNid, lootType, delta, raidNum)
         raidNum = raidNum or Core.GetCurrentRaid()
         if not raidNum then
             return
@@ -136,16 +157,29 @@ do
             return
         end
 
-        local current = module:GetPlayerCountByNid(playerNid, raidNum) or 0
+        local current = module:GetPlayerLootCountByNid(playerNid, lootType, raidNum) or 0
         local nextVal = current + delta
         if nextVal < 0 then
             nextVal = 0
         end
 
-        module:SetPlayerCountByNid(playerNid, nextVal, raidNum)
+        module:SetPlayerLootCountByNid(playerNid, lootType, nextVal, raidNum)
     end
 
-    function module:AddPlayerCount(name, delta, raidNum)
+    -- MS-specific aliases kept for backward compatibility.
+    function module:GetPlayerCountByNid(playerNid, raidNum)
+        return module:GetPlayerLootCountByNid(playerNid, "ms", raidNum)
+    end
+
+    function module:SetPlayerCountByNid(playerNid, value, raidNum)
+        module:SetPlayerLootCountByNid(playerNid, "ms", value, raidNum)
+    end
+
+    function module:AddPlayerCountByNid(playerNid, delta, raidNum)
+        module:AddPlayerLootCountByNid(playerNid, "ms", delta, raidNum)
+    end
+
+    function module:AddPlayerLootCount(name, lootType, delta, raidNum)
         raidNum = raidNum or Core.GetCurrentRaid()
         if not raidNum or not name then
             return
@@ -156,7 +190,6 @@ do
             return
         end
 
-        -- Normalize/resolve name if possible.
         if type(module.CheckPlayer) == "function" then
             local ok, fixed = module:CheckPlayer(name, raidNum)
             if ok and fixed then
@@ -181,7 +214,22 @@ do
                 return
             end
         end
-        module:AddPlayerCountByNid(playerNid, delta, raidNum)
+        module:AddPlayerLootCountByNid(playerNid, lootType, delta, raidNum)
+    end
+
+    -- Increments the correct counter based on the C.rollTypes value.
+    -- Only MAINSPEC, OFFSPEC, and FREE are tracked; other types are ignored.
+    function module:AddPlayerCountForRollType(name, rollType, delta, raidNum)
+        local lootType = ROLL_TYPE_TO_LOOT_TYPE[tonumber(rollType)]
+        if not lootType then
+            return
+        end
+        module:AddPlayerLootCount(name, lootType, delta, raidNum)
+    end
+
+    -- MS alias kept for backward compatibility.
+    function module:AddPlayerCount(name, delta, raidNum)
+        module:AddPlayerLootCount(name, "ms", delta, raidNum)
     end
 
     function module:GetPlayerCount(name, raidNum)

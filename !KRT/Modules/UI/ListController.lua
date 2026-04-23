@@ -151,6 +151,13 @@ function ListController.MakeListController(cfg)
             return cfg.rightInset
         end
 
+        if sf and sf.GetVerticalScrollRange then
+            local range = sf:GetVerticalScrollRange()
+            if type(range) == "number" and range <= 0 then
+                return 0
+            end
+        end
+
         local sb = nil
         if sf and sf.GetName then
             sb = _G[sf:GetName() .. "ScrollBar"]
@@ -168,7 +175,7 @@ function ListController.MakeListController(cfg)
             if sbL and scR then
                 local overlap = scR - sbL
                 if overlap > 0 then
-                    return overlap
+                    return math.max(0, overlap - 1)
                 end
                 return 0
             end
@@ -176,7 +183,7 @@ function ListController.MakeListController(cfg)
 
         local width = sb and sb.GetWidth and sb:GetWidth()
         if width and width > 0 then
-            return width
+            return math.max(0, width - 1)
         end
         return 0
     end

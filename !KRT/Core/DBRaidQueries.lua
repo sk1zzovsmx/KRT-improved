@@ -379,7 +379,7 @@ do
                     playerNid = tonumber(player.playerNid),
                     name = player.name,
                     class = player.class,
-                    count = tonumber(player.count) or 0,
+                    count = tonumber(player.countMS) or 0,
                 }
             end
         end

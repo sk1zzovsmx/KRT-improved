@@ -1113,8 +1113,8 @@ do
 
         for i, p in ipairs(players) do
             if t.name == p.name then
-                -- Preserve count if present
-                t.count = t.count or p.count or 0
+                -- Preserve countMS if present (falls back through legacy 'count' field).
+                t.countMS = t.countMS or p.countMS or tonumber(p.count) or 0
                 t.playerNid = tonumber(t.playerNid) or tonumber(p.playerNid) or nextPlayerNid
                 if tonumber(t.playerNid) >= nextPlayerNid then
                     raid.nextPlayerNid = tonumber(t.playerNid) + 1
@@ -1126,7 +1126,7 @@ do
         end
 
         if not found then
-            t.count = t.count or 0
+            t.countMS = t.countMS or 0
             t.playerNid = tonumber(t.playerNid) or nextPlayerNid
             raid.nextPlayerNid = tonumber(t.playerNid) + 1
             tinsert(raid.players, t)

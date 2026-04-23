@@ -747,10 +747,10 @@ do
         local lootInfo, lootNid =
             buildLootRecord(raid, itemId, itemName, itemString, itemLink, itemRarity, itemTexture, itemCount, looterNid, rollType, rollValue, rollSessionId, bossNid, lootSource)
 
-        -- LootCounter (MS only): increment the winner's count when the loot is actually awarded.
-        -- This runs off the authoritative LOOT_ITEM / LOOT_ITEM_MULTIPLE chat event.
-        if tonumber(rollType) == rollTypes.MAINSPEC and raidService then
-            raidService:AddPlayerCount(player, itemCount, currentRaidId)
+        -- LootCounter: increment MS/OS/FREE counter when loot is actually awarded.
+        -- Runs off the authoritative LOOT_ITEM / LOOT_ITEM_MULTIPLE chat event.
+        if raidService then
+            raidService:AddPlayerCountForRollType(player, rollType, itemCount, currentRaidId)
         end
 
         if passiveGroupLoot and isPassiveWinnerMessage then

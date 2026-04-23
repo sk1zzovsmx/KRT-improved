@@ -518,11 +518,30 @@ do
                     assignedByRef[player] = playerNid
                 end
 
-                local count = tonumber(player.count) or 0
-                if count < 0 then
-                    count = 0
+                -- countMS: fall back to legacy 'count' field for pre-v5 saves.
+                local countMS = tonumber(player.countMS) or tonumber(player.count) or 0
+                if countMS < 0 then
+                    countMS = 0
                 end
-                player.count = count
+                player.countMS = countMS
+
+                local countOs = tonumber(player.countOs) or 0
+                if countOs < 0 then
+                    countOs = 0
+                end
+                player.countOs = countOs
+
+                local countFree = tonumber(player.countFree) or 0
+                if countFree < 0 then
+                    countFree = 0
+                end
+                player.countFree = countFree
+
+                local countSR = tonumber(player.countSR) or 0
+                if countSR < 0 then
+                    countSR = 0
+                end
+                player.countSR = countSR
 
                 local playerNid = tonumber(player.playerNid)
                 if playerNid and playerNid > 0 then

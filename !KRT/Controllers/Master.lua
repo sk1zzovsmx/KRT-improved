@@ -3455,8 +3455,8 @@ do
         end
 
         completeInventoryAwardProgress = function(completedWinner, rollType, awardedCount)
-            if tonumber(rollType) == rollTypes.MAINSPEC and completedWinner and completedWinner ~= "" then
-                Raid:AddPlayerCount(completedWinner, awardedCount, addon.Core.GetCurrentRaid())
+            if completedWinner and completedWinner ~= "" then
+                Raid:AddPlayerCountForRollType(completedWinner, rollType, awardedCount, addon.Core.GetCurrentRaid())
             end
 
             local done = registerAwardedItem(awardedCount)

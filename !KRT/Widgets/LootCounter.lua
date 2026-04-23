@@ -49,16 +49,50 @@ do
     local getFrame = makeModuleFrameGetter(module, "KRTLootCounterFrame")
 
     -- Single-line column header.
-    local HEADER_HEIGHT = 18
+    local HEADER_HEIGHT = 20
 
-    -- Layout constants (columns: Name | Count | Actions)
-    local BTN_W, BTN_H = 20, 18
-    local BTN_GAP = 2
-    local COL_GAP = 8
-    local ACTION_COL_W = (BTN_W * 3) + (BTN_GAP * 2) + 2 -- (+/-/R + gaps + right pad)
-    local COUNT_COL_W = 40
+    -- Layout constants (columns: Name | MS | OS | FREE | R)
+    local BTN_W, BTN_H = 18, 18
+    local BTN_GAP = 2 -- gap between +/- buttons within a section
+    local SECTION_GAP = 8 -- gap between MS/OS/FREE section containers (separator lives in the center)
+    local COL_GAP = 6 -- gap between name and first section
+    local COUNT_LABEL_W = 22 -- width of the numeric count display
+    local RESET_BTN_W = 18 -- per-row reset button
+    local RESET_BTN_GAP = 16 -- wide gap between FREE section and reset button (avoids accidental clicks)
+    local RIGHT_EDGE = -2 -- offset from scrollChild right for the reset button
+
+    -- One section = count label + gap + minus button + gap + plus button
+    local SECTION_W = COUNT_LABEL_W + BTN_GAP + BTN_W + BTN_GAP + BTN_W -- 62
+
     local CHAT_MSG_MAX_LEN = 255
     local RESET_ALL_POPUP_KEY = "KRT_LOOTCOUNTER_RESET_ALL"
+    local SOLID_TEX = "Interface\\Buttons\\WHITE8x8"
+
+    local COLOR_HEADER_TEXT = { 0.88, 0.88, 0.88 }
+    local COLOR_ROW_BG_ODD = { 1, 1, 1, 0.06 }
+    local COLOR_ROW_BG_EVEN = { 1, 1, 1, 0.03 }
+    local COLOR_ROW_BG_ACTIVE = { 0.95, 0.74, 0.23, 0.13 }
+    local COLOR_ROW_SEPARATOR = { 1, 1, 1, 0.06 }
+    local COLOR_SEPARATOR = { 1, 1, 1, 0.20 }
+    local COLOR_COUNT_ZERO = { 0.56, 0.56, 0.56 }
+    local COLOR_COUNT_MS = { 0.96, 0.82, 0.32 }
+    local COLOR_COUNT_OS = { 0.63, 0.80, 1.00 }
+    local COLOR_COUNT_FREE = { 0.70, 0.98, 0.72 }
+
+    local function setTextureColor(tex, rgba)
+        if not (tex and rgba) then
+            return
+        end
+        tex:SetTexture(SOLID_TEX)
+        tex:SetVertexColor(rgba[1], rgba[2], rgba[3], rgba[4] or 1)
+    end
+
+    local function setFontColor(fs, rgb)
+        if not (fs and rgb) then
+            return
+        end
+        fs:SetTextColor(rgb[1], rgb[2], rgb[3], 1)
+    end
 
     -- ----- Private helpers ----- --
     function UI.AcquireRefs(frame)
@@ -151,14 +185,14 @@ do
         end
     end
 
-    local function collectAnnounceGroups(players)
+    local function collectAnnounceGroups(players, countField)
         local groupedByCount = {}
         local counts = {}
 
         for i = 1, #players do
             local row = players[i]
             local name = row and row.name
-            local count = (row and tonumber(row.count)) or 0
+            local count = (row and tonumber(row[countField])) or 0
             if name and name ~= "" and count > 0 then
                 local bucket = groupedByCount[count]
                 if not bucket then
@@ -208,6 +242,22 @@ do
         outLines[#outLines + 1] = line
     end
 
+    local function announceCountSection(players, countField, sectionHeader, noneMsg)
+        local groupedByCount, counts = collectAnnounceGroups(players, countField)
+        if #counts <= 0 then
+            announceToRaid(noneMsg)
+            return
+        end
+        announceToRaid(sectionHeader)
+        local outLines = {}
+        for i = 1, #counts do
+            appendBucketLines(outLines, counts[i], groupedByCount[counts[i]])
+        end
+        for i = 1, #outLines do
+            announceToRaid(outLines[i])
+        end
+    end
+
     function UI.Localize()
         local frameName = UI.FrameName
         if not frameName then
@@ -236,8 +286,25 @@ do
         scrollFrame = scrollFrame or frame.ScrollFrame or _G[UI.FrameName .. "ScrollFrame"] or _G["KRTLootCounterFrameScrollFrame"]
 
         scrollChild = scrollChild or (scrollFrame and scrollFrame.ScrollChild) or _G["KRTLootCounterFrameScrollFrameScrollChild"]
-
         return true
+    end
+
+    -- Draws a 1px vertical separator centered in the gap to the LEFT of anchorRef.
+    local function addColumnSeparator(parent, anchorRef, topInset, bottomInset)
+        local tex = parent:CreateTexture(nil, "BACKGROUND")
+        tex:SetWidth(1)
+        tex:SetPoint("TOP", anchorRef, "TOPLEFT", -SECTION_GAP / 2, -topInset)
+        tex:SetPoint("BOTTOM", anchorRef, "BOTTOMLEFT", -SECTION_GAP / 2, bottomInset)
+        setTextureColor(tex, COLOR_SEPARATOR)
+    end
+
+    local function makeHeaderLabel(parent, text)
+        local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetWidth(SECTION_W)
+        fs:SetJustifyH("CENTER")
+        fs:SetText(text)
+        setFontColor(fs, COLOR_HEADER_TEXT)
+        return fs
     end
 
     local function ensureHeader()
@@ -249,28 +316,53 @@ do
         header:SetHeight(HEADER_HEIGHT)
         header:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, 0)
         header:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, 0)
+        header.separator = header:CreateTexture(nil, "BORDER")
+        header.separator:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", 0, 0)
+        header.separator:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", 0, 0)
+        header.separator:SetHeight(1)
+        setTextureColor(header.separator, COLOR_ROW_SEPARATOR)
 
-        -- Column labels: Player | Count | (blank actions column)
-        -- Layout: actions anchored hard-right, count just to its left, name fills remaining space.
-        header.action = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        header.action:SetPoint("RIGHT", header, "RIGHT", -2, 0)
-        header.action:SetWidth(ACTION_COL_W)
-        header.action:SetJustifyH("RIGHT")
-        header.action:SetText("")
+        -- Anchor from right: [reset placeholder] [FREE] [OS] [MS] [Name fills left]
+        header.resetPlaceholder = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        header.resetPlaceholder:SetWidth(RESET_BTN_W)
+        header.resetPlaceholder:SetPoint("RIGHT", header, "RIGHT", RIGHT_EDGE, 0)
+        header.resetPlaceholder:SetText("R")
+        setFontColor(header.resetPlaceholder, COLOR_HEADER_TEXT)
 
-        header.count = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        header.count:SetPoint("RIGHT", header.action, "LEFT", -COL_GAP, 0)
-        header.count:SetWidth(COUNT_COL_W)
-        header.count:SetJustifyH("CENTER")
-        header.count:SetText(L.StrCount)
-        header.count:SetTextColor(0.5, 0.5, 0.5)
+        header.freeLabel = makeHeaderLabel(header, L.StrFREE)
+        header.freeLabel:SetPoint("RIGHT", header.resetPlaceholder, "LEFT", -RESET_BTN_GAP, 0)
+        setFontColor(header.freeLabel, COLOR_COUNT_FREE)
+
+        header.osLabel = makeHeaderLabel(header, L.StrOS)
+        header.osLabel:SetPoint("RIGHT", header.freeLabel, "LEFT", -SECTION_GAP, 0)
+        setFontColor(header.osLabel, COLOR_COUNT_OS)
+
+        header.msLabel = makeHeaderLabel(header, L.StrMS)
+        header.msLabel:SetPoint("RIGHT", header.osLabel, "LEFT", -SECTION_GAP, 0)
+        setFontColor(header.msLabel, COLOR_COUNT_MS)
+
+        -- Vertical separators centered in the gaps between column labels and before reset column.
+        addColumnSeparator(header, header.osLabel, 3, 3)
+        addColumnSeparator(header, header.freeLabel, 3, 3)
+        addColumnSeparator(header, header.resetPlaceholder, 3, 3)
 
         header.name = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         header.name:SetPoint("LEFT", header, "LEFT", 0, 0)
-        header.name:SetPoint("RIGHT", header.count, "LEFT", -COL_GAP, 0)
+        header.name:SetPoint("RIGHT", header.msLabel, "LEFT", -COL_GAP, 0)
         header.name:SetJustifyH("LEFT")
         header.name:SetText(L.StrPlayer)
-        header.name:SetTextColor(0.5, 0.5, 0.5)
+        setFontColor(header.name, COLOR_HEADER_TEXT)
+    end
+
+    local function applyCountLabelColor(fs, count, positiveColor)
+        if not fs then
+            return
+        end
+        if (tonumber(count) or 0) > 0 then
+            setFontColor(fs, positiveColor)
+            return
+        end
+        setFontColor(fs, COLOR_COUNT_ZERO)
     end
 
     local function getCurrentRaidPlayers()
@@ -287,21 +379,6 @@ do
             row = CreateFrame("Frame", nil, scrollChild)
             row:SetHeight(rowHeight)
 
-            -- Actions container: hard-right, next to the scrollbar.
-            row.actions = CreateFrame("Frame", nil, row)
-            row.actions:SetPoint("RIGHT", row, "RIGHT", -2, 0)
-            row.actions:SetSize(ACTION_COL_W, rowHeight)
-
-            row.count = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            row.count:SetPoint("RIGHT", row.actions, "LEFT", -COL_GAP, 0)
-            row.count:SetWidth(COUNT_COL_W)
-            row.count:SetJustifyH("CENTER")
-
-            row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
-            row.name:SetPoint("RIGHT", row.count, "LEFT", -COL_GAP, 0)
-            row.name:SetJustifyH("LEFT")
-
             local function setupTooltip(btn, text)
                 if not text or text == "" then
                     return
@@ -316,40 +393,95 @@ do
                 end)
             end
 
-            local function makeBtn(label, tip)
-                local b = CreateFrame("Button", nil, row.actions, "KRTButtonTemplate")
+            local function makeBtn(parent, label, tip)
+                local b = CreateFrame("Button", nil, parent, "KRTButtonTemplate")
                 b:SetSize(BTN_W, BTN_H)
                 b:SetText(label)
+                local txt = b:GetFontString()
+                if txt then
+                    txt:ClearAllPoints()
+                    txt:SetPoint("CENTER", b, "CENTER", 0, 0)
+                end
                 setupTooltip(b, tip)
                 return b
             end
 
-            row.reset = makeBtn("R", L.TipLootCounterReset)
-            row.minus = makeBtn("-", L.TipLootCounterMinus)
-            row.plus = makeBtn("+", L.TipLootCounterPlus)
+            row.background = row:CreateTexture(nil, "BACKGROUND")
+            row.background:SetAllPoints(row)
+            setTextureColor(row.background, COLOR_ROW_BG_ODD)
 
-            row.reset:SetPoint("RIGHT", row.actions, "RIGHT", 0, 0)
-            row.minus:SetPoint("RIGHT", row.reset, "LEFT", -BTN_GAP, 0)
-            row.plus:SetPoint("RIGHT", row.minus, "LEFT", -BTN_GAP, 0)
+            row.separator = row:CreateTexture(nil, "BORDER")
+            row.separator:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
+            row.separator:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
+            row.separator:SetHeight(1)
+            setTextureColor(row.separator, COLOR_ROW_SEPARATOR)
 
-            row.plus:SetScript("OnClick", function()
-                local playerNid = row._playerNid
-                if playerNid then
-                    Services.Raid:AddPlayerCountByNid(playerNid, 1, addon.Core.GetCurrentRaid())
-                    module:RequestRefresh("count_changed")
-                end
-            end)
-            row.minus:SetScript("OnClick", function()
-                local playerNid = row._playerNid
-                if playerNid then
-                    Services.Raid:AddPlayerCountByNid(playerNid, -1, addon.Core.GetCurrentRaid())
-                    module:RequestRefresh("count_changed")
-                end
-            end)
+            -- Per-row reset: resets all three counts for this player.
+            row.reset = makeBtn(row, "R", L.TipLootCounterReset)
+            row.reset:SetSize(RESET_BTN_W, BTN_H)
+            row.reset:SetPoint("RIGHT", row, "RIGHT", RIGHT_EDGE, 0)
+
+            -- Build one section container per loot type (FREE → OS → MS, right to left).
+            local function makeSection(anchorRight, anchorOffset)
+                local sec = CreateFrame("Frame", nil, row)
+                sec:SetSize(SECTION_W, rowHeight)
+                sec:SetPoint("RIGHT", anchorRight, "LEFT", anchorOffset, 0)
+
+                sec.plus = makeBtn(sec, "+", L.TipLootCounterPlus)
+                sec.minus = makeBtn(sec, "-", L.TipLootCounterMinus)
+                sec.count = sec:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                sec.count:SetWidth(COUNT_LABEL_W)
+                sec.count:SetJustifyH("CENTER")
+
+                -- Inside section from right: [+(16)] [gap] [-(16)] [gap] [count(20)]
+                sec.plus:SetPoint("RIGHT", sec, "RIGHT", 0, 0)
+                sec.minus:SetPoint("RIGHT", sec.plus, "LEFT", -BTN_GAP, 0)
+                sec.count:SetPoint("RIGHT", sec.minus, "LEFT", -BTN_GAP, 0)
+
+                return sec
+            end
+
+            row.freeSection = makeSection(row.reset, -RESET_BTN_GAP)
+            row.osSection = makeSection(row.freeSection, -SECTION_GAP)
+            row.msSection = makeSection(row.osSection, -SECTION_GAP)
+
+            -- Vertical separators between sections and before the reset button.
+            addColumnSeparator(row, row.osSection, 2, 2)
+            addColumnSeparator(row, row.freeSection, 2, 2)
+            addColumnSeparator(row, row.reset, 2, 2)
+
+            row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
+            row.name:SetPoint("RIGHT", row.msSection, "LEFT", -COL_GAP, 0)
+            row.name:SetJustifyH("LEFT")
+
+            -- Button click handlers.
+            local LOOT_TYPES = { ms = row.msSection, os = row.osSection, free = row.freeSection }
+            for lootType, sec in pairs(LOOT_TYPES) do
+                local lt = lootType
+                sec.plus:SetScript("OnClick", function()
+                    local nid = row._playerNid
+                    if nid then
+                        Services.Raid:AddPlayerLootCountByNid(nid, lt, 1, addon.Core.GetCurrentRaid())
+                        module:RequestRefresh("count_changed")
+                    end
+                end)
+                sec.minus:SetScript("OnClick", function()
+                    local nid = row._playerNid
+                    if nid then
+                        Services.Raid:AddPlayerLootCountByNid(nid, lt, -1, addon.Core.GetCurrentRaid())
+                        module:RequestRefresh("count_changed")
+                    end
+                end)
+            end
+
             row.reset:SetScript("OnClick", function()
-                local playerNid = row._playerNid
-                if playerNid then
-                    Services.Raid:SetPlayerCountByNid(playerNid, 0, addon.Core.GetCurrentRaid())
+                local nid = row._playerNid
+                if nid then
+                    local raidNum = addon.Core.GetCurrentRaid()
+                    Services.Raid:SetPlayerLootCountByNid(nid, "ms", 0, raidNum)
+                    Services.Raid:SetPlayerLootCountByNid(nid, "os", 0, raidNum)
+                    Services.Raid:SetPlayerLootCountByNid(nid, "free", 0, raidNum)
                     module:RequestRefresh("count_reset")
                 end
             end)
@@ -388,21 +520,9 @@ do
         end
 
         local players = getCurrentRaidPlayers()
-        local groupedByCount, counts = collectAnnounceGroups(players)
-        if #counts <= 0 then
-            announceToRaid(L.StrLootCounterAnnounceNone)
-            return
-        end
-
-        announceToRaid(L.StrLootCounterAnnounceHeader)
-        local outLines = {}
-        for i = 1, #counts do
-            local count = counts[i]
-            appendBucketLines(outLines, count, groupedByCount[count])
-        end
-        for i = 1, #outLines do
-            announceToRaid(outLines[i])
-        end
+        announceCountSection(players, "msCount", L.StrLootCounterAnnounceHeader, L.StrLootCounterAnnounceNone)
+        announceCountSection(players, "osCount", L.StrLootCounterAnnounceHeaderOs, L.StrLootCounterAnnounceNoneOs)
+        announceCountSection(players, "freeCount", L.StrLootCounterAnnounceHeaderFree, L.StrLootCounterAnnounceNoneFree)
     end
 
     function module:ResetAllCounts()
@@ -416,10 +536,16 @@ do
         for i = 1, #players do
             local data = players[i]
             local playerNid = data and tonumber(data.playerNid)
-            local count = (data and tonumber(data.count)) or 0
-            if playerNid and count ~= 0 then
-                Services.Raid:SetPlayerCountByNid(playerNid, 0, currentRaid)
-                changed = true
+            if playerNid then
+                local ms = (data and tonumber(data.msCount)) or 0
+                local os = (data and tonumber(data.osCount)) or 0
+                local free = (data and tonumber(data.freeCount)) or 0
+                if ms ~= 0 or os ~= 0 or free ~= 0 then
+                    Services.Raid:SetPlayerLootCountByNid(playerNid, "ms", 0, currentRaid)
+                    Services.Raid:SetPlayerLootCountByNid(playerNid, "os", 0, currentRaid)
+                    Services.Raid:SetPlayerLootCountByNid(playerNid, "free", 0, currentRaid)
+                    changed = true
+                end
             end
         end
         if changed then
@@ -452,21 +578,23 @@ do
 
         local contentHeight = HEADER_HEIGHT + (numPlayers * rowHeight)
         local priorScroll = scrollFrame:GetVerticalScroll() or 0
-
-        -- Ensure the scroll child has a valid size (UIPanelScrollFrameTemplate needs this)
-        local contentW = scrollFrame:GetWidth() or 0
-        local sb = scrollFrame.ScrollBar or (scrollFrame.GetName and _G[scrollFrame:GetName() .. "ScrollBar"]) or nil
-        local sbw = (sb and sb.GetWidth and sb:GetWidth()) or 16
-        if sbw <= 0 then
-            sbw = 16
-        end
-        contentW = math.max(1, contentW - sbw - 6)
-        scrollChild:SetWidth(contentW)
-        scrollChild:SetHeight(math.max(contentHeight, scrollFrame:GetHeight()))
-        local maxScroll = contentHeight - scrollFrame:GetHeight()
+        local frameHeight = scrollFrame:GetHeight() or 0
+        local maxScroll = contentHeight - frameHeight
         if maxScroll < 0 then
             maxScroll = 0
         end
+
+        -- Ensure the scroll child has a valid size (UIPanelScrollFrameTemplate needs this)
+        local sb = scrollFrame.ScrollBar or (scrollFrame.GetName and _G[scrollFrame:GetName() .. "ScrollBar"]) or nil
+        local needsScroll = maxScroll > 0
+        scrollChild:ClearAllPoints()
+        scrollChild:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 0, 0)
+        if needsScroll and sb and sb.IsShown and sb:IsShown() then
+            scrollChild:SetPoint("TOPRIGHT", sb, "TOPLEFT", 0, 0)
+        else
+            scrollChild:SetPoint("TOPRIGHT", scrollFrame, "TOPRIGHT", 0, 0)
+        end
+        scrollChild:SetHeight(math.max(contentHeight, frameHeight))
         if priorScroll > maxScroll then
             priorScroll = maxScroll
         end
@@ -500,14 +628,40 @@ do
                 row._lastClass = class
             end
 
-            local cnt = (data and tonumber(data.count)) or (playerNid and Services.Raid:GetPlayerCountByNid(playerNid, addon.Core.GetCurrentRaid())) or 0
-            if row._lastCount ~= cnt then
-                row.count:SetText(tostring(cnt))
-                row._lastCount = cnt
+            local msCount = (data and tonumber(data.msCount)) or 0
+            local osCount = (data and tonumber(data.osCount)) or 0
+            local freeCount = (data and tonumber(data.freeCount)) or 0
+
+            if row._lastMsCount ~= msCount then
+                row.msSection.count:SetText(tostring(msCount))
+                row._lastMsCount = msCount
             end
-            if cnt > 0 then
+            if row._lastOsCount ~= osCount then
+                row.osSection.count:SetText(tostring(osCount))
+                row._lastOsCount = osCount
+            end
+            if row._lastFreeCount ~= freeCount then
+                row.freeSection.count:SetText(tostring(freeCount))
+                row._lastFreeCount = freeCount
+            end
+            local rowHasCount = msCount > 0 or osCount > 0 or freeCount > 0
+            if rowHasCount then
                 hasAnyCount = true
             end
+
+            local rowStyle = COLOR_ROW_BG_ODD
+            if i % 2 == 0 then
+                rowStyle = COLOR_ROW_BG_EVEN
+            end
+            if rowHasCount then
+                rowStyle = COLOR_ROW_BG_ACTIVE
+            end
+            setTextureColor(row.background, rowStyle)
+
+            applyCountLabelColor(row.msSection.count, msCount, COLOR_COUNT_MS)
+            applyCountLabelColor(row.osSection.count, osCount, COLOR_COUNT_OS)
+            applyCountLabelColor(row.freeSection.count, freeCount, COLOR_COUNT_FREE)
+
             row:Show()
         end
 

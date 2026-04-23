@@ -1106,6 +1106,12 @@ local function makeLoggerList(cfg, selField, msCtxField, hlOpts)
     local transform = hlOpts.transform
     local debugTag = hlOpts.debugTag or "LoggerSelect"
 
+    -- Logger XML already reserves a right scrollbar column via ScrollFrame anchors.
+    -- Keep ListController from subtracting a second right inset in Logger tables.
+    if cfg.rightInset == nil then
+        cfg.rightInset = 0
+    end
+
     local function resolve()
         local v = module[selField]
         if v == nil then

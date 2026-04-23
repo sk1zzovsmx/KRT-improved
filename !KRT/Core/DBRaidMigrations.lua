@@ -198,11 +198,31 @@ do
         for i = 1, #players do
             local player = players[i]
             if type(player) == "table" then
-                local count = tonumber(player.count) or 0
-                if count < 0 then
-                    count = 0
+                -- Promote legacy 'count' → 'countMS' (handles pre-v5 saves).
+                local countMS = tonumber(player.countMS) or tonumber(player.count) or 0
+                if countMS < 0 then
+                    countMS = 0
                 end
-                player.count = count
+                player.countMS = (countMS > 0) and countMS or nil
+                player.count = nil -- remove legacy field
+
+                local countOs = tonumber(player.countOs) or 0
+                if countOs < 0 then
+                    countOs = 0
+                end
+                player.countOs = (countOs > 0) and countOs or nil
+
+                local countFree = tonumber(player.countFree) or 0
+                if countFree < 0 then
+                    countFree = 0
+                end
+                player.countFree = (countFree > 0) and countFree or nil
+
+                local countSR = tonumber(player.countSR) or 0
+                if countSR < 0 then
+                    countSR = 0
+                end
+                player.countSR = (countSR > 0) and countSR or nil
 
                 local rank = tonumber(player.rank) or 0
                 player.rank = (rank > 0) and rank or nil
@@ -390,6 +410,12 @@ do
                     count = 0
                 end
                 player.count = count
+
+                local countSR = tonumber(player.countSR) or 0
+                if countSR < 0 then
+                    countSR = 0
+                end
+                player.countSR = countSR
             end
         end
     end
@@ -473,6 +499,43 @@ do
             raid.attendance = buildAttendanceFromPlayers(raid.players)
         else
             raid.attendance = compactAttendance(raid.attendance)
+        end
+    end
+
+    -- v5 loot counter fields:
+    -- - player.count (legacy MS counter) renamed to player.countMS.
+    -- - player.countOs, player.countFree, player.countSR added.
+    -- - Zero-value counts are stored as nil to save space.
+    MIGRATIONS[4] = function(raid)
+        local players = raid.players or {}
+        for i = 1, #players do
+            local player = players[i]
+            if type(player) == "table" then
+                local countMS = tonumber(player.countMS) or tonumber(player.count) or 0
+                if countMS < 0 then
+                    countMS = 0
+                end
+                player.countMS = (countMS > 0) and countMS or nil
+                player.count = nil
+
+                local countOs = tonumber(player.countOs) or 0
+                if countOs < 0 then
+                    countOs = 0
+                end
+                player.countOs = (countOs > 0) and countOs or nil
+
+                local countFree = tonumber(player.countFree) or 0
+                if countFree < 0 then
+                    countFree = 0
+                end
+                player.countFree = (countFree > 0) and countFree or nil
+
+                local countSR = tonumber(player.countSR) or 0
+                if countSR < 0 then
+                    countSR = 0
+                end
+                player.countSR = (countSR > 0) and countSR or nil
+            end
         end
     end
 end

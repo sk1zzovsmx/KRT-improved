@@ -150,13 +150,13 @@ do
                     playerByNid[playerNid] = true
                 end
 
-                local count = tonumber(player.count)
-                if count == nil then
+                local countMS = tonumber(player.countMS)
+                if countMS == nil then
                     pushDetail(result, "E", "PLAYER_COUNT_TYPE", { playerIndex = i })
-                elseif count < 0 then
+                elseif countMS < 0 then
                     pushDetail(result, "E", "PLAYER_COUNT_NEGATIVE", {
                         playerIndex = i,
-                        value = count,
+                        value = countMS,
                     })
                 else
                     result.ok = result.ok + 1

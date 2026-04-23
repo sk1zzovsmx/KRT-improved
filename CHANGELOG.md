@@ -44,6 +44,17 @@ Dates are in YYYY-MM-DD.
   to prevent accidental full counter resets.
 - **Behavior:** Loot Counter grouped-count announce now requires raid lead or
   assistant permission while in raid.
+- **UI:** Loot Counter table styling is now clearer: stronger
+  column header contrast, zebra rows, highlighted non-zero rows, and
+  color-coded `MS/OS/FREE` counters for faster scanning.
+- **UI:** Scroll-list panels now reserve the scrollbar column only when there
+  is real vertical scroll range, removing the apparent right-side truncation
+  on short lists across Loot Counter and other list-controller based frames.
+- **UI:** Fine-tuned scroll-list right inset by 1px when scrollbar space is
+  reserved, removing the residual hairline gap on list/table right edges.
+- **UI:** Logger tables now force `rightInset = 0` in their list-controller
+  config because Logger XML already reserves the scrollbar column; this avoids
+  double right trimming in Logger list rows.
 - **Tooling:** Release channel resolution is now driven by
   `!KRT/CHANGELOG.md` `Release-Version` SemVer values: `x.y.z-alpha.N`
   stays internal, `x.y.z-beta.N` publishes as a GitHub prerelease, and

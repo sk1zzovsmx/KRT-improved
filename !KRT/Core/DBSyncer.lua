@@ -451,7 +451,7 @@ do
                 encodeText(p.class),
                 tonumber(p.join) or 0,
                 tonumber(p.leave) or 0,
-                tonumber(p.count) or 0
+                tonumber(p.countMS) or tonumber(p.count) or 0
             )
         end
 
@@ -845,7 +845,7 @@ do
                 dst.join = tonumber(src.join) or dst.join
                 local leave = tonumber(src.leave) or 0
                 dst.leave = (leave > 0) and leave or nil
-                dst.count = count
+                dst.countMS = count
             end
         end
 
