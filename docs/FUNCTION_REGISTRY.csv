@@ -683,7 +683,7 @@
 "EntryPoints","!KRT/EntryPoints/SlashEvents.lua","619","635","handleLfmCommand","local_function","No","local","","","","structural-pattern","keep","new"
 "EntryPoints","!KRT/EntryPoints/SlashEvents.lua","636","639","module:Register","method_colon","Yes","module","","","","name-collision","rename","new"
 "EntryPoints","!KRT/EntryPoints/SlashEvents.lua","640","686","module:Handle","method_colon","Yes","module","","","","structural-pattern","keep","new"
-"Localization","!KRT/Localization/localization.en.lua","16","537","__index","field_closure","Yes","local","","","","structural-pattern","extract","new"
+"Localization","!KRT/Localization/localization.en.lua","16","550","__index","field_closure","Yes","local","","","","structural-pattern","extract","new"
 "Modules","!KRT/Modules/Base64.lua","24","44","Base64.Encode","method_dot","Yes","Base64","","","","structural-pattern","keep","new"
 "Modules","!KRT/Modules/Base64.lua","45","68","Base64.Decode","method_dot","Yes","Base64","","","","structural-pattern","keep","new"
 "Modules","!KRT/Modules/Bus.lua","27","30","isDebugEnabled","local_function","No","local","","","","name-collision","rename","new"
