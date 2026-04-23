@@ -457,13 +457,8 @@ local function applyTiebreakerDefaults(options)
     if type(opt.enabled) ~= "boolean" then
         opt.enabled = false
     end
-    if opt.scope ~= "CURRENT" and opt.scope ~= "LAST_N" and opt.scope ~= "ALL" then
-        opt.scope = "CURRENT"
-    end
-    local n = tonumber(opt.n)
-    if not n or n < 1 or n > 50 then
-        opt.n = 5
-    end
+    opt.scope = nil
+    opt.n = nil
 end
 
 function Options.LoadOptions()

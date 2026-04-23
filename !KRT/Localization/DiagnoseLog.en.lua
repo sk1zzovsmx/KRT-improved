@@ -146,7 +146,7 @@ Diag.D.LogRollsResponse = "[Rolls] Response name=%s status=%s bucket=%s best=%s 
 Diag.D.LogRollsResolution = "[Rolls] Resolution top=%s tied=%s cutoff=%d manual=%s"
 Diag.D.LogRollsTimedOut = "[Rolls] Timed out name=%s"
 Diag.D.LogRollsTieReroll = "[Rolls] Tie reroll item=%s players=%s"
-Diag.D.LogRollsTiebreakerApplied = "[Rolls] Tiebreaker applied: scope=%s n=%d, tied=%s, counts=%s, resolved=%s"
+Diag.D.LogRollsTiebreakerApplied = "[Rolls] Tiebreaker applied: tied=%s, counts=%s, resolved=%s"
 
 -- Reserves --
 Diag.W.LogReservesLegacyFieldsDetected = "[Reserves] Legacy fields phase=%s original=%d rowPlayer=%d dropped=%d merged=%d"

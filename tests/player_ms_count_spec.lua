@@ -54,55 +54,44 @@ local function loadCounts(addon)
     return addon.Services.Raid
 end
 
--- === Fixture: 3 raids ===
--- Raid 1 (oldest): Alice MS=1, Bob MS=0
--- Raid 2:          Alice MS=2, Bob MS=1, Carol MS=0
--- Raid 3 (newest): Alice MS=0, Bob MS=0, Carol MS=3
+-- === Fixture: current raid with known MS counts ===
+-- Alice MS=2, Bob MS=0, Carol MS=3 in the current raid. Older raids are ignored.
 local raids = {
     [1] = { players = { { name = "Alice", countMS = 1 }, { name = "Bob", countMS = 0 } } },
-    [2] = { players = { { name = "Alice", countMS = 2 }, { name = "Bob", countMS = 1 }, { name = "Carol", countMS = 0 } } },
-    [3] = { players = { { name = "Alice", countMS = 0 }, { name = "Bob", countMS = 0 }, { name = "Carol", countMS = 3 } } },
+    [2] = { players = { { name = "Alice", countMS = 2 }, { name = "Bob", countMS = 0 }, { name = "Carol", countMS = 3 } } },
 }
-local addon = buildHarness(raids, 3)
+local addon = buildHarness(raids, 2)
 local Raid = loadCounts(addon)
 
--- --- GetPlayerMSCount ---
-assertEq(Raid:GetPlayerMSCount("Alice", { scope = "CURRENT" }), 0, "Alice CURRENT")
-assertEq(Raid:GetPlayerMSCount("Alice", { scope = "ALL" }), 3, "Alice ALL")
-assertEq(Raid:GetPlayerMSCount("Bob", { scope = "ALL" }), 1, "Bob ALL")
-assertEq(Raid:GetPlayerMSCount("Carol", { scope = "LAST_N", n = 2 }), 3, "Carol LAST_N=2")
-assertEq(Raid:GetPlayerMSCount("Carol", { scope = "LAST_N", n = 1 }), 3, "Carol LAST_N=1")
-assertEq(Raid:GetPlayerMSCount("Ghost", { scope = "ALL" }), 0, "Ghost absent")
-assertEq(Raid:GetPlayerMSCount(nil, { scope = "ALL" }), 0, "nil name")
-assertEq(Raid:GetPlayerMSCount("Alice", nil), 0, "nil opts defaults to CURRENT")
+-- --- GetPlayerMSCount (current raid only) ---
+assertEq(Raid:GetPlayerMSCount("Alice"), 2, "Alice current")
+assertEq(Raid:GetPlayerMSCount("Bob"), 0, "Bob current")
+assertEq(Raid:GetPlayerMSCount("Carol"), 3, "Carol current")
+assertEq(Raid:GetPlayerMSCount("Ghost"), 0, "Ghost absent")
+assertEq(Raid:GetPlayerMSCount(nil), 0, "nil name")
+assertEq(Raid:GetPlayerMSCount(""), 0, "empty name")
 
 -- --- GetMSCountsForNames (batch) ---
-local map = Raid:GetMSCountsForNames({ "Alice", "Bob", "Ghost" }, { scope = "ALL" })
-assertEq(map.Alice, 3, "batch ALL Alice")
-assertEq(map.Bob, 1, "batch ALL Bob")
-assertEq(map.Ghost, 0, "batch ALL Ghost")
+local map = Raid:GetMSCountsForNames({ "Alice", "Bob", "Carol", "Ghost" })
+assertEq(map.Alice, 2, "batch Alice")
+assertEq(map.Bob, 0, "batch Bob")
+assertEq(map.Carol, 3, "batch Carol")
+assertEq(map.Ghost, 0, "batch Ghost")
 
-local singleAlice = Raid:GetPlayerMSCount("Alice", { scope = "LAST_N", n = 2 })
-local batchAlice = (Raid:GetMSCountsForNames({ "Alice" }, { scope = "LAST_N", n = 2 })).Alice
-assertEq(batchAlice, singleAlice, "batch == single for LAST_N=2")
+-- Batch result must match individual queries for every player.
+assertEq(map.Alice, Raid:GetPlayerMSCount("Alice"), "batch == single for Alice")
+assertEq(map.Carol, Raid:GetPlayerMSCount("Carol"), "batch == single for Carol")
 
--- Regression: LAST_N budget must not be consumed by missing/corrupt raid entries.
-do
-    -- Key 2 exists in pairs() iteration (so it appears in the sorted id list),
-    -- but EnsureRaidById(2) resolves to a falsy value, mirroring a corrupt entry.
-    local gappyRaids = {
-        [1] = { players = { { name = "Alice", countMS = 5 } } },
-        [2] = false, -- present as a key, but EnsureRaidById returns falsy
-        [3] = { players = { { name = "Alice", countMS = 7 } } },
-    }
-    local addon2 = buildHarness(gappyRaids, 3)
-    local Raid2 = loadCounts(addon2)
-    -- With LAST_N=2 and id 2 missing, we should still visit raids 3 and 1 -> 7 + 5 = 12.
-    assertEq(Raid2:GetPlayerMSCount("Alice", { scope = "LAST_N", n = 2 }), 12, "LAST_N skips nil raid entries")
-end
-
-local empty = Raid:GetMSCountsForNames({}, { scope = "ALL" })
+-- Empty names returns empty map.
+local empty = Raid:GetMSCountsForNames({})
 assertEq(next(empty) == nil, true, "empty names returns empty map")
+
+-- Missing current raid returns zeros, not errors.
+local addon2 = buildHarness(raids, nil)
+local Raid2 = loadCounts(addon2)
+assertEq(Raid2:GetPlayerMSCount("Alice"), 0, "nil currentRaid => 0")
+local map2 = Raid2:GetMSCountsForNames({ "Alice" })
+assertEq(map2.Alice, 0, "nil currentRaid batch => 0")
 
 if failures == 0 then
     print("OK")

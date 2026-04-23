@@ -222,13 +222,7 @@ L.StrConfigAbout = "Made with love by |cfff58cbaKader|r B\n|cffffffffhttps://git
 -- ==================== Plus-one Tie-breaker ==================== --
 L.CfgTiebreakerHeader = "Plus-one tie-breaker"
 L.CfgTiebreakerEnabled = "Break ties by MS count"
-L.CfgTiebreakerEnabledTip =
-    "When two rolls tie, the player with fewer MS wins over the selected scope wins. Applies to MS/OS/FREE (not SR). Player renames and server transfers are not merged."
-L.CfgTiebreakerScopeLabel = "Count scope"
-L.CfgTiebreakerScopeCurrent = "Current raid only"
-L.CfgTiebreakerScopeLastN = "Last N raids"
-L.CfgTiebreakerScopeAll = "All saved raids"
-L.CfgTiebreakerNLabel = "N (raids)"
+L.CfgTiebreakerEnabledTip = "When two rolls tie, the player with fewer MS wins in the current raid wins. Applies to MS/OS/FREE (not SR)."
 L.ChatTiebreakResolved = "%s wins the tie on %s (MS: %d vs %d)"
 L.RollRowMSCountFmt = "(MS %d)"
 

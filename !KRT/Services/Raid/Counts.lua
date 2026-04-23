@@ -67,49 +67,17 @@ local function resolveRaidPlayerByNid(playerNid, raidNum)
     return player, resolvedRaidNum
 end
 
-local function iterateRaidsForScope(scope, n, callback)
-    local raids = _G.KRT_Raids
-    if type(raids) ~= "table" then
-        return
+local function getCurrentRaidForCounts()
+    local current = Core.GetCurrentRaid()
+    if not current then
+        return nil
     end
-    local ids = {}
-    for k in pairs(raids) do
-        local num = tonumber(k)
-        if num then
-            ids[#ids + 1] = num
-        end
+    local raid = Core.EnsureRaidById(current)
+    if not raid then
+        return nil
     end
-    table.sort(ids, function(a, b)
-        return a > b
-    end)
-    if scope == "CURRENT" then
-        local current = Core.GetCurrentRaid()
-        if not current then
-            return
-        end
-        local raid = Core.EnsureRaidById(current)
-        if raid then
-            Core.EnsureRaidSchema(raid)
-            callback(raid, current)
-        end
-        return
-    end
-    local limit = (scope == "LAST_N") and (tonumber(n) or 0) or #ids
-    if limit <= 0 then
-        return
-    end
-    local visited = 0
-    for _, raidNum in ipairs(ids) do
-        if visited >= limit then
-            break
-        end
-        local raid = Core.EnsureRaidById(raidNum)
-        if raid then
-            Core.EnsureRaidSchema(raid)
-            callback(raid, raidNum)
-            visited = visited + 1
-        end
-    end
+    Core.EnsureRaidSchema(raid)
+    return raid
 end
 
 local function sumCountMSForName(raid, name)
@@ -302,21 +270,20 @@ do
         return module:GetPlayerCountByNid(playerNid, raidNum)
     end
 
-    -- For multiple players under the same scope, prefer GetMSCountsForNames (single KRT_Raids pass).
-    function module:GetPlayerMSCount(name, opts)
+    -- Sums MS loot count for a player in the current raid. For multiple players,
+    -- prefer GetMSCountsForNames (single KRT_Raids lookup).
+    function module:GetPlayerMSCount(name)
         if type(name) ~= "string" or name == "" then
             return 0
         end
-        local scope = (opts and opts.scope) or "CURRENT"
-        local n = opts and opts.n
-        local total = 0
-        iterateRaidsForScope(scope, n, function(raid)
-            total = total + sumCountMSForName(raid, name)
-        end)
-        return total
+        local raid = getCurrentRaidForCounts()
+        if not raid then
+            return 0
+        end
+        return sumCountMSForName(raid, name)
     end
 
-    function module:GetMSCountsForNames(names, opts, out)
+    function module:GetMSCountsForNames(names, out)
         local result = out or {}
         if out then
             twipe(result)
@@ -334,21 +301,18 @@ do
         if next(nameSet) == nil then
             return result
         end
-        local scope = (opts and opts.scope) or "CURRENT"
-        local n = opts and opts.n
-        iterateRaidsForScope(scope, n, function(raid)
-            if not (raid and raid.players) then
-                return
+        local raid = getCurrentRaidForCounts()
+        if not raid or not raid.players then
+            return result
+        end
+        local seen = {}
+        for i = #raid.players, 1, -1 do
+            local p = raid.players[i]
+            if p and p.name and nameSet[p.name] and not seen[p.name] then
+                seen[p.name] = true
+                result[p.name] = (result[p.name] or 0) + (tonumber(p.countMS) or 0)
             end
-            local seen = {}
-            for i = #raid.players, 1, -1 do
-                local p = raid.players[i]
-                if p and p.name and nameSet[p.name] and not seen[p.name] then
-                    seen[p.name] = true
-                    result[p.name] = (result[p.name] or 0) + (tonumber(p.countMS) or 0)
-                end
-            end
-        end)
+        end
         return result
     end
 

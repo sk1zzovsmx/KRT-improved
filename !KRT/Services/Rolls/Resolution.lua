@@ -311,16 +311,7 @@ function Resolution.BuildResolution(ctx, resolvedEntries, usePlus)
                 end
             end
         end
-        local opts = ctx.getTiebreakerMSCountOpts and ctx.getTiebreakerMSCountOpts() or { scope = "?", n = 0 }
-        addon:debug(
-            Diag.D.LogRollsTiebreakerApplied:format(
-                tostring(opts.scope),
-                tonumber(opts.n) or 0,
-                tconcat(rollTiedNames, ","),
-                tconcat(counts, ","),
-                tostring(resolution.tiebreakerWinnerName)
-            )
-        )
+        addon:debug(Diag.D.LogRollsTiebreakerApplied:format(tconcat(rollTiedNames, ","), tconcat(counts, ","), tostring(resolution.tiebreakerWinnerName)))
     end
 
     return resolution

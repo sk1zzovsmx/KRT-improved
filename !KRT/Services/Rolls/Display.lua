@@ -52,7 +52,6 @@ local function getResolutionContext(ctx)
         getCurrentRaid = ctx.getCurrentRaid,
         isTiebreakerByMSCountEnabled = ctx.isTiebreakerByMSCountEnabled,
         getMSCountsForNames = ctx.getMSCountsForNames,
-        getTiebreakerMSCountOpts = ctx.getTiebreakerMSCountOpts,
     }
     return ctx._resolutionContext
 end
