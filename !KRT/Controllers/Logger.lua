@@ -79,11 +79,6 @@ local selectItem
 local onLootRowEnter
 local onLootRowLeave
 local fillBossBox
-local isCsvVisible
-local markCsvDirty
-local ensureCsvFresh
-local refreshCsv
-
 local function isTrashMobName(name)
     return name == TRASH_MOB_NAME or name == LEGACY_TRASH_MOB_NAME
 end
@@ -192,9 +187,7 @@ do
     function UI.AcquireRefs(frame)
         return {
             historyTabBtn = Frames.Ref(frame, "Tab1"),
-            exportTabBtn = Frames.Ref(frame, "Tab2"),
             history = Frames.Ref(frame, "History"),
-            export = Frames.Ref(frame, "Export"),
             raids = Frames.Ref(frame, "KRTLoggerRaids"),
             bosses = Frames.Ref(frame, "KRTLoggerBosses"),
             loot = Frames.Ref(frame, "KRTLoggerLoot"),
@@ -202,7 +195,6 @@ do
             bossAttendees = Frames.Ref(frame, "KRTLoggerBossAttendees"),
             bossBox = Frames.Ref(frame, "KRTLoggerBossBox"),
             attendeesBox = Frames.Ref(frame, "KRTLoggerPlayerBox"),
-            exportRaids = Frames.Ref(frame, "KRTLoggerExportRaids"),
         }
     end
 
@@ -319,12 +311,6 @@ do
     module.selectedPlayer = nil
     module.selectedBossPlayer = nil
     module.selectedItem = nil
-    local TAB_HISTORY = "history"
-    local TAB_EXPORT = "export"
-    local EXPORT_TAB_ENABLED = false
-
-    module.activeTab = module.activeTab or TAB_HISTORY
-
     SetSelectedRaid = function(raidId)
         if raidId == nil then
             module.selectedRaid = nil
@@ -352,96 +338,22 @@ do
 
     -- Multi-select modifier scopes (input policy by panel/list)
     module._msRaidScopeHistory = module._msRaidScopeHistory or "LoggerRaidsHistory"
-    module._msRaidScopeExport = module._msRaidScopeExport or "LoggerExportRaids"
     module._msBossScope = module._msBossScope or "LoggerBosses"
     module._msBossAttScope = module._msBossAttScope or "LoggerBossAttendees"
     module._msRaidAttScope = module._msRaidAttScope or "LoggerRaidAttendees"
     module._msLootScope = module._msLootScope or "LoggerLoot"
 
     local MS_SCOPE_RAID_HISTORY = module._msRaidScopeHistory
-    local MS_SCOPE_RAID_EXPORT = module._msRaidScopeExport
     local MS_SCOPE_BOSS = module._msBossScope
     local MS_SCOPE_BOSSATT = module._msBossAttScope
     local MS_SCOPE_RAIDATT = module._msRaidAttScope
     local MS_SCOPE_LOOT = module._msLootScope
 
     MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_RAID_HISTORY, { allowMulti = true, allowRange = true })
-    MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_RAID_EXPORT, { allowMulti = false, allowRange = false })
     MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_BOSS, { allowMulti = true, allowRange = true })
     MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_BOSSATT, { allowMulti = true, allowRange = true })
     MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_RAIDATT, { allowMulti = true, allowRange = true })
     MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_LOOT, { allowMulti = true, allowRange = true })
-    local function normalizeTabName(tabName)
-        if tabName == TAB_EXPORT and EXPORT_TAB_ENABLED then
-            return TAB_EXPORT
-        end
-        return TAB_HISTORY
-    end
-
-    local function updateTabUi()
-        local refs = module.refs
-        if not refs then
-            return
-        end
-
-        module.activeTab = normalizeTabName(module.activeTab)
-
-        local isHistory = (module.activeTab ~= TAB_EXPORT)
-        local activeTabId = isHistory and 1 or 2
-
-        local historyFrames = {
-            refs.history,
-        }
-        local exportFrames = {
-            refs.export,
-        }
-
-        if refs.exportTabBtn then
-            Frames.SetShown(refs.exportTabBtn, EXPORT_TAB_ENABLED)
-        end
-
-        -- Hard switch on concrete frames to avoid any residual visual overlap.
-        for i = 1, #historyFrames do
-            Frames.SetShown(historyFrames[i], false)
-        end
-        for i = 1, #exportFrames do
-            Frames.SetShown(exportFrames[i], false)
-        end
-
-        local visibleGroup = isHistory and historyFrames or exportFrames
-        for i = 1, #visibleGroup do
-            Frames.SetShown(visibleGroup[i], true)
-        end
-
-        local frame = module.frame or getFrame()
-        if frame and PanelTemplates_SetTab then
-            PanelTemplates_SetTab(frame, activeTabId)
-        else
-            if refs.historyTabBtn and refs.historyTabBtn.UnlockHighlight then
-                refs.historyTabBtn:UnlockHighlight()
-            end
-            if refs.exportTabBtn and refs.exportTabBtn.UnlockHighlight then
-                refs.exportTabBtn:UnlockHighlight()
-            end
-            if isHistory and refs.historyTabBtn and refs.historyTabBtn.LockHighlight then
-                refs.historyTabBtn:LockHighlight()
-            elseif refs.exportTabBtn and refs.exportTabBtn.LockHighlight then
-                refs.exportTabBtn:LockHighlight()
-            end
-        end
-
-        if not isHistory then
-            if refs.bossBox and refs.bossBox.IsShown and refs.bossBox:IsShown() then
-                refs.bossBox:Hide()
-            end
-            if refs.attendeesBox and refs.attendeesBox.IsShown and refs.attendeesBox:IsShown() then
-                refs.attendeesBox:Hide()
-            end
-            if module.Export then
-                ensureCsvFresh()
-            end
-        end
-    end
 
     -- Clears selections that depend on the currently focused raid (boss/player/loot panels).
     -- Intentionally does NOT clear the raid selection itself.
@@ -549,14 +461,6 @@ do
         clearSelections()
     end
 
-    function module:SetTab(tabName)
-        module.activeTab = normalizeTabName(tabName)
-        updateTabUi()
-        if module.activeTab == TAB_EXPORT and module.Export and module.Export._csvDirty == true then
-            refreshCsv()
-        end
-    end
-
     function module:OnLoad(frame)
         UI.FrameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
@@ -566,7 +470,6 @@ do
                 end
                 clearSelections()
                 triggerSelectionEvent(module, "selectedRaid", "ui")
-                module:SetTab(module.activeTab)
             end,
             hookOnHide = function()
                 SetSelectedRaid(Core.GetCurrentRaid())
@@ -581,32 +484,20 @@ do
     end
 
     local function BindHandlers(_, frame, refs)
-        if refs.historyTabBtn and not refs.historyTabBtn._krtBound then
-            Frames.SafeSetScript(refs.historyTabBtn, "OnClick", function()
-                module:SetTab(TAB_HISTORY)
-            end)
-            refs.historyTabBtn._krtBound = true
+        if refs.historyTabBtn then
             if refs.historyTabBtn.SetID then
                 refs.historyTabBtn:SetID(1)
             end
-        end
-        if refs.exportTabBtn and not refs.exportTabBtn._krtBound then
-            Frames.SafeSetScript(refs.exportTabBtn, "OnClick", function()
-                module:SetTab(TAB_EXPORT)
-            end)
-            refs.exportTabBtn._krtBound = true
-            if refs.exportTabBtn.SetID then
-                refs.exportTabBtn:SetID(2)
+            refs.historyTabBtn:SetText(L.StrHistoryTab)
+            if refs.historyTabBtn.LockHighlight then
+                refs.historyTabBtn:LockHighlight()
             end
         end
-        if refs.historyTabBtn then
-            refs.historyTabBtn:SetText(L.StrHistoryTab)
-        end
-        if refs.exportTabBtn then
-            refs.exportTabBtn:SetText(L.StrExportTab)
-        end
         if PanelTemplates_SetNumTabs then
-            PanelTemplates_SetNumTabs(frame, EXPORT_TAB_ENABLED and 2 or 1)
+            PanelTemplates_SetNumTabs(frame, 1)
+        end
+        if PanelTemplates_SetTab and refs.historyTabBtn then
+            PanelTemplates_SetTab(frame, 1)
         end
 
         local onLoadPairs = {
@@ -622,13 +513,6 @@ do
             local pair = onLoadPairs[i]
             ensureSubmoduleOnLoad(pair.moduleRef, pair.frameRef)
         end
-
-        if EXPORT_TAB_ENABLED then
-            ensureSubmoduleOnLoad(module.ExportRaids, refs.exportRaids)
-            ensureSubmoduleOnLoad(module.Export, refs.export)
-        end
-
-        module:SetTab(module.activeTab)
     end
 
     local function OnLoadFrame(frame)
@@ -654,7 +538,6 @@ do
         end
         clearSelections()
         triggerSelectionEvent(module, "selectedRaid", "ui")
-        module:SetTab(module.activeTab)
     end
 
     function module:Refresh()
@@ -1547,422 +1430,6 @@ do
         end
 
         module.RequestRosterBoundListsRefresh()
-    end)
-end
-
--- Export raids list.
-do
-    module.ExportRaids = module.ExportRaids or {}
-    local ExportRaids = module.ExportRaids
-    local Helpers = module.Helpers
-
-    local controller
-    controller = makeLoggerList(
-        {
-            keyName = "ExportRaidsList",
-            poolTag = "logger-export-raids",
-            _rowParts = { "ID", "Date", "Zone", "Size" },
-
-            localize = function(n)
-                local title = _G[n .. "Title"]
-                if title then
-                    title:SetText(L.StrRaidsList)
-                end
-                _G[n .. "HeaderNum"]:SetText(L.StrNumber)
-                _G[n .. "HeaderDate"]:SetText(L.StrDate)
-                _G[n .. "HeaderZone"]:SetText(L.StrZone)
-                _G[n .. "HeaderSize"]:SetText(L.StrSize)
-                bindRaidSortHeaders(n, ExportRaids)
-            end,
-
-            getData = function(out)
-                fillRaidListData(out, "Logger.ExportRaids.GetData")
-            end,
-
-            rowName = function(n, _, i)
-                return n .. "RaidBtn" .. i
-            end,
-            rowTmpl = "KRTLoggerRaidButton",
-
-            drawRow = ListController.CreateRowDrawer(function(row, it)
-                if not row._krtBound then
-                    Frames.SafeSetScript(row, "OnClick", function(self, button)
-                        selectRaid(self, button, {
-                            ordered = controller.data,
-                            modifierScope = module._msRaidScopeExport,
-                            forceSingle = true,
-                            allowDeselect = false,
-                        })
-                    end)
-                    row._krtBound = true
-                end
-                local ui = row._p
-                ui.ID:SetText(it.seq or it.id)
-                ui.Date:SetText(it.dateFmt)
-                ui.Zone:SetText(it.zone)
-                ui.Size:SetText(it.sizeLabel or it.size)
-            end),
-
-            postUpdate = function(n)
-                local count = controller and controller.data and #controller.data or 0
-                setPanelTitle(n, Helpers.GetCountTitle(L.StrRaidsList, count))
-                setFrameHint(n, "EmptyState", count == 0 and L.StrLoggerEmptyExportRaids or nil)
-            end,
-
-            sorters = {
-                id = function(a, b, asc)
-                    return CompareNumbers(a.seq or a.id, b.seq or b.id, asc, 0)
-                end,
-                date = function(a, b, asc)
-                    return CompareNumbers(a.date, b.date, asc, 0)
-                end,
-                zone = function(a, b, asc)
-                    return CompareStrings(a.zone, b.zone, asc)
-                end,
-                size = function(a, b, asc)
-                    return CompareNumbers(a.size, b.size, asc, 0)
-                end,
-            },
-        },
-        "selectedRaid",
-        nil,
-        {
-            transform = function(id)
-                return Core.GetRaidNidById(id)
-            end,
-            debugTag = "LoggerExportSelect",
-        }
-    )
-
-    ExportRaids._ctrl = controller
-    ListController.BindListController(ExportRaids, controller)
-
-    Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function(_, _, reason)
-        if reason == "sync" then
-            controller:Dirty()
-        else
-            controller:Touch()
-        end
-    end)
-    Bus.RegisterCallback(InternalEvents.RaidCreate, function()
-        controller:Dirty()
-    end)
-end
-
--- Export panel (CSV preview).
-do
-    module.Export = module.Export or {}
-    local Export = module.Export
-    local Store = module.Store
-    local View = module.View
-    local Helpers = module.Helpers
-
-    local function updateCsvTitle(frame)
-        local frameName = frame and frame.GetName and frame:GetName() or nil
-        local titleText = Helpers.GetContextTitle(L.StrRaidCsvTitle, Helpers.GetRaidContextLabel(module.selectedRaid), nil)
-        setFrameLabel(frameName, "CsvTitle", titleText)
-        setFrameHint(frameName, "CsvEmptyState", Helpers.GetCsvEmptyStateText(module.selectedRaid, nil))
-    end
-
-    local function getScrollBarInset(scrollFrame)
-        if not scrollFrame then
-            return 4
-        end
-
-        local scrollBar
-        if scrollFrame.GetName then
-            scrollBar = _G[(scrollFrame:GetName() or "") .. "ScrollBar"]
-        end
-        if not scrollBar then
-            scrollBar = scrollFrame.ScrollBar
-        end
-        if not (scrollBar and scrollBar.GetWidth) then
-            return 4
-        end
-
-        local width = scrollBar:GetWidth() or 0
-        if width < 0 then
-            width = 0
-        end
-        return width + 4
-    end
-
-    local function setCsvEditBoxLayout(editBox, scrollFrame)
-        if not editBox then
-            return
-        end
-
-        local minWidth = 180
-        local rightInset = getScrollBarInset(scrollFrame)
-        if scrollFrame and scrollFrame.GetWidth then
-            local frameWidth = scrollFrame:GetWidth() or 0
-            local desiredWidth = frameWidth - rightInset
-            if desiredWidth > minWidth then
-                minWidth = desiredWidth
-            end
-        end
-        if editBox.SetWidth then
-            editBox:SetWidth(minWidth)
-        end
-
-        local minHeight = 200
-        if scrollFrame and scrollFrame.GetHeight then
-            minHeight = scrollFrame:GetHeight() or minHeight
-        end
-        if minHeight < 120 then
-            minHeight = 120
-        end
-        local textHeight = editBox.GetStringHeight and editBox:GetStringHeight() or 0
-        local desiredHeight = textHeight + 24
-        if desiredHeight < minHeight then
-            desiredHeight = minHeight
-        end
-        if editBox.SetHeight then
-            editBox:SetHeight(desiredHeight)
-        end
-        if scrollFrame and scrollFrame.UpdateScrollChildRect then
-            scrollFrame:UpdateScrollChildRect()
-        end
-    end
-
-    local function setCsvSelectionState(editBox, csvValue)
-        if not editBox then
-            return
-        end
-
-        addon.CancelTimer(module._exportCsvSelectHandle, true)
-        module._exportCsvSelectHandle = nil
-
-        local refs = module.refs
-        local exportFrame = refs and refs.export or nil
-        local isVisible = module.activeTab == "export" and exportFrame and exportFrame.IsShown and exportFrame:IsShown()
-        if not isVisible then
-            if editBox.ClearFocus then
-                editBox:ClearFocus()
-            end
-            return
-        end
-
-        if editBox.EnableKeyboard then
-            editBox:EnableKeyboard(true)
-        end
-
-        local selectEnd = string.len(csvValue or "")
-        local attempts = 0
-        local maxAttempts = 4
-        local delaySeconds = 0.05
-
-        local function applySelection()
-            local nowRefs = module.refs
-            local nowExport = nowRefs and nowRefs.export or nil
-            local stillVisible = module.activeTab == "export" and nowExport and nowExport.IsShown and nowExport:IsShown()
-            if not stillVisible then
-                module._exportCsvSelectHandle = nil
-                return
-            end
-
-            attempts = attempts + 1
-
-            if editBox.SetFocus then
-                editBox:SetFocus()
-            end
-            if editBox.SetCursorPosition then
-                editBox:SetCursorPosition(0)
-            end
-            if editBox.HighlightText then
-                editBox:HighlightText(0, selectEnd)
-            end
-
-            if attempts < maxAttempts then
-                module._exportCsvSelectHandle = addon.NewTimer(delaySeconds, applySelection)
-            else
-                module._exportCsvSelectHandle = nil
-            end
-        end
-
-        applySelection()
-    end
-
-    local function hideCsvEditBoxChrome(editBox)
-        if not (editBox and editBox.GetName) then
-            return
-        end
-
-        local name = editBox:GetName()
-        if not name then
-            return
-        end
-
-        local left = _G[name .. "Left"]
-        if left and left.Hide then
-            left:Hide()
-            if left.SetAlpha then
-                left:SetAlpha(0)
-            end
-        end
-
-        local middle = _G[name .. "Middle"]
-        if middle and middle.Hide then
-            middle:Hide()
-            if middle.SetAlpha then
-                middle:SetAlpha(0)
-            end
-        end
-
-        local right = _G[name .. "Right"]
-        if right and right.Hide then
-            right:Hide()
-            if right.SetAlpha then
-                right:SetAlpha(0)
-            end
-        end
-
-        if editBox.GetRegions then
-            local regionCount = editBox:GetNumRegions() or 0
-            for i = 1, regionCount do
-                local region = select(i, editBox:GetRegions())
-                if region and region.GetObjectType and region:GetObjectType() == "Texture" then
-                    if region.Hide then
-                        region:Hide()
-                    end
-                    if region.SetAlpha then
-                        region:SetAlpha(0)
-                    end
-                end
-            end
-        end
-    end
-
-    local function hideCsvScrollFrameChrome(scrollFrame)
-        if not (scrollFrame and scrollFrame.GetRegions) then
-            return
-        end
-
-        local regionCount = scrollFrame:GetNumRegions() or 0
-        for i = 1, regionCount do
-            local region = select(i, scrollFrame:GetRegions())
-            if region and region.GetObjectType and region:GetObjectType() == "Texture" then
-                if region.Hide then
-                    region:Hide()
-                end
-                if region.SetAlpha then
-                    region:SetAlpha(0)
-                end
-            end
-        end
-    end
-
-    Export._csvDirty = Export._csvDirty ~= false
-
-    isCsvVisible = function()
-        local refs = module.refs
-        local exportFrame = refs and refs.export or nil
-        local parentFrame = module.frame or _G.KRTLogger
-        if not (exportFrame and exportFrame.IsShown and exportFrame:IsShown()) then
-            return false
-        end
-        if not (parentFrame and parentFrame.IsShown and parentFrame:IsShown()) then
-            return false
-        end
-        return module.activeTab == TAB_EXPORT
-    end
-
-    markCsvDirty = function()
-        Export._csvDirty = true
-    end
-
-    ensureCsvFresh = function(force)
-        if not isCsvVisible() then
-            return false
-        end
-        if force ~= true and Export._csvDirty ~= true then
-            return false
-        end
-        refreshCsv()
-        return true
-    end
-
-    function Export:OnLoad(frame)
-        if not frame then
-            return
-        end
-
-        local frameName = frame.GetName and frame:GetName() or nil
-        if not frameName then
-            return
-        end
-
-        updateCsvTitle(frame)
-
-        local csvScrollFrame = _G[frameName .. "CsvScrollFrame"]
-        hideCsvScrollFrameChrome(csvScrollFrame)
-
-        local csvText = _G[frameName .. "CsvText"]
-        if csvText and not csvText._krtBound then
-            csvText:SetAutoFocus(false)
-            csvText:SetMultiLine(true)
-            csvText:SetTextInsets(6, 6, 6, 6)
-            csvText:SetJustifyH("LEFT")
-            csvText:SetJustifyV("TOP")
-            if ChatFontNormal then
-                csvText:SetFontObject(ChatFontNormal)
-            end
-            Frames.SafeSetScript(csvText, "OnEscapePressed", function(self)
-                self:ClearFocus()
-            end)
-            Frames.SafeSetScript(csvText, "OnTextChanged", function(self, userInput)
-                if not userInput then
-                    return
-                end
-                self:SetText(self._krtCsvText or "")
-                if self.HighlightText then
-                    self:HighlightText(0, string.len(self._krtCsvText or ""))
-                end
-            end)
-            Frames.SafeSetScript(csvText, "OnEditFocusGained", function(self)
-                ensureCsvFresh(true)
-                hideCsvEditBoxChrome(self)
-                if self.HighlightText then
-                    self:HighlightText(0, string.len(self._krtCsvText or ""))
-                end
-            end)
-            hideCsvEditBoxChrome(csvText)
-            csvText._krtBound = true
-        end
-    end
-
-    refreshCsv = function()
-        local refs = module.refs
-        updateCsvTitle(refs and refs.export or nil)
-        local csvText = refs and refs.exportCsvText or nil
-        if not csvText then
-            return
-        end
-
-        local raidId = module.selectedRaid
-        local raid = raidId and Store:GetRaid(raidId) or nil
-        local csvValue = View:BuildRaidCsv(raid, raidId) or ""
-        Export._csvDirty = false
-        csvText._krtCsvText = csvValue
-        csvText:SetText(csvValue)
-        setFrameHint(refs and refs.export and refs.export:GetName() or nil, "CsvEmptyState", Helpers.GetCsvEmptyStateText(module.selectedRaid, csvValue))
-        hideCsvEditBoxChrome(csvText)
-        hideCsvScrollFrameChrome(refs and refs.exportCsvScrollFrame or nil)
-        setCsvEditBoxLayout(csvText, refs and refs.exportCsvScrollFrame or nil)
-        setCsvSelectionState(csvText, csvValue)
-    end
-
-    Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function()
-        markCsvDirty()
-        ensureCsvFresh()
-    end)
-    Bus.RegisterCallback(InternalEvents.RaidLootUpdate, function()
-        markCsvDirty()
-        ensureCsvFresh()
-    end)
-    Bus.RegisterCallback(InternalEvents.RaidCreate, function()
-        markCsvDirty()
-        ensureCsvFresh()
     end)
 end
 
@@ -2873,7 +2340,11 @@ do
         end
 
         local currentLooterName = Store._ResolveLootLooterName(raid, it)
-        addon:debug(Diag.D.LogLoggerLootBefore:format(raidID, tostring(lootNid), tostring(it.itemLink), tostring(currentLooterName), tostring(it.rollType), tostring(it.rollValue)))
+        if addon.hasDebug then
+            addon:debug(
+                Diag.D.LogLoggerLootBefore:format(raidID, tostring(lootNid), tostring(it.itemLink), tostring(currentLooterName), tostring(it.rollType), tostring(it.rollValue))
+            )
+        end
         if currentLooterName and currentLooterName ~= "" and looter and looter ~= "" and currentLooterName ~= looter then
             addon:warn(Diag.W.LogLoggerLootOverwrite:format(raidID, tostring(lootNid), tostring(it.itemLink), tostring(currentLooterName), tostring(looter)))
         end
@@ -2919,26 +2390,30 @@ do
             return false
         end
 
-        addon:debug(Diag.D.LogLoggerVerified:format(raidID, tostring(lootNid)))
-        if not Core.GetLastBoss() then
-            addon:debug(Diag.D.LogLoggerRecordedNoBossContext:format(raidID, tostring(lootNid), tostring(it.itemLink)))
+        if addon.hasDebug then
+            addon:debug(Diag.D.LogLoggerVerified:format(raidID, tostring(lootNid)))
+            if not Core.GetLastBoss() then
+                addon:debug(Diag.D.LogLoggerRecordedNoBossContext:format(raidID, tostring(lootNid), tostring(it.itemLink)))
+            end
         end
         return true
     end
 
     function Loot:SetLootEntry(lootNid, looter, rollType, rollValue, source, raidIDOverride)
         local raidID = resolveLoggerLootRaidId(source, raidIDOverride)
-        addon:trace(
-            Diag.D.LogLoggerLootLogAttempt:format(
-                tostring(source),
-                tostring(raidID),
-                tostring(lootNid),
-                tostring(looter),
-                tostring(rollType),
-                tostring(rollValue),
-                tostring(Core.GetLastBoss())
+        if addon.hasTrace then
+            addon:trace(
+                Diag.D.LogLoggerLootLogAttempt:format(
+                    tostring(source),
+                    tostring(raidID),
+                    tostring(lootNid),
+                    tostring(looter),
+                    tostring(rollType),
+                    tostring(rollValue),
+                    tostring(Core.GetLastBoss())
+                )
             )
-        )
+        end
 
         local raid, it = resolveLoggerLootEntry(raidID, lootNid)
         if not raid then
@@ -2952,17 +2427,19 @@ do
         controller:Dirty()
 
         local recordedLooterName = Store._ResolveLootLooterName(raid, it)
-        addon:debug(
-            Diag.D.LogLoggerLootRecorded:format(
-                tostring(source),
-                raidID,
-                tostring(lootNid),
-                tostring(it.itemLink),
-                tostring(recordedLooterName),
-                tostring(it.rollType),
-                tostring(it.rollValue)
+        if addon.hasDebug then
+            addon:debug(
+                Diag.D.LogLoggerLootRecorded:format(
+                    tostring(source),
+                    raidID,
+                    tostring(lootNid),
+                    tostring(it.itemLink),
+                    tostring(recordedLooterName),
+                    tostring(it.rollType),
+                    tostring(it.rollValue)
+                )
             )
-        )
+        end
 
         return verifyLoggerLootMutation(raidID, lootNid, it, recordedLooterName, expectedLooterNid, expectedRollType, expectedRollValue)
     end

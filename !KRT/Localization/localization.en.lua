@@ -304,8 +304,6 @@ L.StrWinner = "Winner"
 L.StrType = "Type"
 L.BtnExport = "Export"
 L.StrHistoryTab = "History"
-L.StrExportTab = "Export"
-L.StrRaidCsvTitle = "Raid CSV"
 L.StrLoggerLabelPlayer = "Player: %s"
 L.StrLoggerEmptyRaids = "No raid logs yet. Enter a raid and log a boss or loot event to start history."
 L.StrLoggerEmptyBossesSelectRaid = "Select a raid to inspect boss kills and trash entries."
@@ -318,9 +316,6 @@ L.StrLoggerEmptyRaidAttendees = "No roster snapshots were recorded for this raid
 L.StrLoggerEmptyLootSelectRaid = "Select a raid to inspect loot history."
 L.StrLoggerEmptyLoot = "No loot was logged for this raid."
 L.StrLoggerEmptyLootFiltered = "No loot matches the current boss or player filter."
-L.StrLoggerEmptyExportRaids = "No raid logs are available for export yet."
-L.StrLoggerEmptyCsvSelectRaid = "Select a raid on the left to preview and copy its CSV export."
-L.StrLoggerEmptyCsv = "No CSV data is available for the selected raid."
 
 -- Raids List:
 L.StrRaidsList = "Raids List"

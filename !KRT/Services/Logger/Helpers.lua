@@ -169,16 +169,6 @@ function Helpers.GetLootEmptyStateText(count, sel)
     return L.StrLoggerEmptyLoot
 end
 
-function Helpers.GetCsvEmptyStateText(selectedRaid, csvValue)
-    if not selectedRaid then
-        return L.StrLoggerEmptyCsvSelectRaid
-    end
-    if not csvValue or csvValue == "" then
-        return L.StrLoggerEmptyCsv
-    end
-    return nil
-end
-
 -- ----- Data lookup helpers ----- --
 
 -- Search raid.loot by itemId (non-NID fallback diagnostic).

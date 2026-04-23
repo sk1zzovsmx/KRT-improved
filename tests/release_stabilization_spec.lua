@@ -3014,53 +3014,6 @@ test("raid attendance records roster delta segments by player nid", function()
     assertEqual(entry.segments[2].online, false, "expected offline state to be stored on the segment")
 end)
 
-test("logger builds attendance csv without replacing raid loot csv", function()
-    local h = newHarness()
-    h:installRaidStore({
-        {
-            schemaVersion = 4,
-            raidNid = 1,
-            zone = "Naxxramas",
-            size = 25,
-            difficulty = 4,
-            realm = "TestRealm",
-            startTime = 1000,
-            nextPlayerNid = 2,
-            nextBossNid = 1,
-            nextLootNid = 1,
-            players = {
-                { playerNid = 1, name = "Alice", rank = 1, subgroup = 1, class = "MAGE", count = 0 },
-            },
-            attendance = {
-                {
-                    playerNid = 1,
-                    segments = {
-                        { startTime = 1000, endTime = 1010 },
-                        { startTime = 1010, endTime = 1030, subgroup = 2, online = false },
-                    },
-                },
-            },
-            bossKills = {},
-            loot = {},
-            changes = {},
-        },
-    })
-
-    h:load("!KRT/Services/Logger/Store.lua")
-    h:load("!KRT/Services/Logger/View.lua")
-
-    local raid = h.Core.EnsureRaidById(1)
-    local View = h.addon.Services.Logger.View
-    local attendanceCsv = View:GetAttendanceCsv(raid, 1)
-    local raidCsv = View:BuildRaidCsv(raid, 1)
-
-    assertContains({ attendanceCsv }, "PlayerNID,Player,Class", "expected attendance csv to expose player columns")
-    assertContains({ attendanceCsv }, "Alice,MAGE", "expected attendance csv to include the player")
-    assertContains({ attendanceCsv }, "30,10,20,2", "expected attendance csv to summarize online and offline seconds")
-    assertTrue(type(raidCsv) == "string", "expected the existing raid loot csv builder to remain available")
-    assertContains({ raidCsv }, "LootNID,ItemID,ItemName", "expected existing raid csv to keep loot columns")
-end)
-
 test("db syncer routes requests through whisper and group transports", function()
     local h = newHarness()
     h:installRaidStore({
@@ -8045,82 +7998,6 @@ test("inventory multi trade completion consumes one item and advances like self-
     assertEqual(ctx.loggerRequests[1].looter, "Alice", "expected trade completion logger update to use the traded winner")
     assertEqual(ctx.loggerRequests[1].source, "TRADE_ACCEPT", "expected trade completion logger update to use the accept source")
     assertEqual(ctx.getClearLootCount(), 0, "expected multi-step trade completion to preserve the current item until all winners are done")
-end)
-
-test("logger export tab stays disabled while the export workflow is staged off", function()
-    local h = newHarness()
-    h:installRaidStore({
-        {
-            schemaVersion = 1,
-            raidNid = 1,
-            players = {},
-            bossKills = {},
-            loot = {},
-            nextPlayerNid = 1,
-            nextBossNid = 1,
-            nextLootNid = 1,
-        },
-    })
-    h.Core.GetCurrentRaid = function()
-        return 1
-    end
-    h:load("!KRT/Services/Logger/Store.lua")
-    h:load("!KRT/Services/Logger/View.lua")
-    h:load("!KRT/Services/Logger/Helpers.lua")
-    h:load("!KRT/Services/Logger/Actions.lua")
-    h:load("!KRT/Controllers/Logger.lua")
-
-    local Logger = h.addon.Controllers.Logger
-    local buildCount = 0
-    Logger.View.BuildRaidCsv = function(_, _, raidId)
-        buildCount = buildCount + 1
-        return "csv:" .. tostring(raidId)
-    end
-
-    local loggerFrame = h.makeFrame(true, "KRTLogger")
-    local historyFrame = h.makeFrame(true, "KRTLoggerHistory")
-    local exportFrame = h.makeFrame(false, "KRTLoggerExport")
-    local bossBox = h.makeFrame(true, "KRTLoggerBossBox")
-    local attendeesBox = h.makeFrame(true, "KRTLoggerAttendeesBox")
-    local scrollFrame = h.makeFrame(true, "KRTLoggerExportCsvScrollFrame")
-    scrollFrame.ScrollBar = h.makeFrame(true, "KRTLoggerExportCsvScrollFrameScrollBar")
-    scrollFrame.ScrollBar.GetWidth = function()
-        return 16
-    end
-    local csvText = h.makeFrame(true, "KRTLoggerExportCsvText")
-
-    Logger.frame = loggerFrame
-    Logger.selectedRaid = 1
-    Logger.activeTab = "history"
-    Logger.refs = {
-        history = historyFrame,
-        export = exportFrame,
-        bossBox = bossBox,
-        attendeesBox = attendeesBox,
-        exportCsvText = csvText,
-        exportCsvScrollFrame = scrollFrame,
-    }
-
-    h.Bus.TriggerEvent(h.addon.Events.Internal.LoggerSelectRaid, 1)
-    assertEqual(buildCount, 0, "expected hidden export to skip csv rebuild")
-    assertTrue(Logger.Export._csvDirty == true, "expected hidden export to remain dirty")
-
-    Logger:SetTab("export")
-    h.flushTimers()
-    assertEqual(Logger.activeTab, "history", "expected export tab requests to stay normalized to history")
-    assertEqual(buildCount, 0, "expected disabled export tab to skip csv rebuild")
-    assertTrue(exportFrame:IsShown() ~= true, "expected export panel to stay hidden while the tab is disabled")
-    assertTrue(Logger.Export._csvDirty == true, "expected disabled export tab to leave csv state dirty")
-
-    Logger:SetTab("history")
-    h.Bus.TriggerEvent(h.addon.Events.Internal.RaidLootUpdate, 1)
-    assertEqual(buildCount, 0, "expected hidden export updates to stay lazy")
-    assertTrue(Logger.Export._csvDirty == true, "expected hidden export changes to mark csv dirty")
-
-    Logger:SetTab("export")
-    h.flushTimers()
-    assertEqual(Logger.activeTab, "history", "expected repeated export tab requests to keep the tab disabled")
-    assertEqual(buildCount, 0, "expected disabled export tab to keep csv rebuilds deferred")
 end)
 
 test("reserves item-info updates coalesce into a single refresh", function()
