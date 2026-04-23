@@ -40,6 +40,12 @@ do
 
     local MIN_COUNTDOWN = 5
     local MAX_COUNTDOWN = 60
+
+    local TIEBREAKER_N_MIN = 1
+    local TIEBREAKER_N_MAX = 50
+    local TIEBREAKER_FRAME_HEIGHT = 560
+
+    local tiebreakerRefs = nil
     local optionSuffixes = {
         "sortAscending",
         "useRaidWarning",
@@ -106,6 +112,201 @@ do
         return loadDefaultOptions()
     end
 
+    local function getTiebreakerOpt()
+        addon.options = addon.options or {}
+        addon.options.tiebreakerMSCount = addon.options.tiebreakerMSCount or {}
+        local opt = addon.options.tiebreakerMSCount
+        if type(opt.enabled) ~= "boolean" then
+            opt.enabled = false
+        end
+        if opt.scope ~= "CURRENT" and opt.scope ~= "LAST_N" and opt.scope ~= "ALL" then
+            opt.scope = "CURRENT"
+        end
+        local n = tonumber(opt.n)
+        if not n or n < TIEBREAKER_N_MIN or n > TIEBREAKER_N_MAX then
+            opt.n = 5
+        end
+        return opt
+    end
+
+    local function scopeToText(scope)
+        if scope == "LAST_N" then
+            return L.CfgTiebreakerScopeLastN
+        elseif scope == "ALL" then
+            return L.CfgTiebreakerScopeAll
+        end
+        return L.CfgTiebreakerScopeCurrent
+    end
+
+    local function syncTiebreakerEnabledState()
+        if not tiebreakerRefs then
+            return
+        end
+        local on = getTiebreakerOpt().enabled == true
+        local scopeDropdown = tiebreakerRefs.scopeDropdown
+        local nSlider = tiebreakerRefs.nSlider
+        if on then
+            if _G.UIDropDownMenu_EnableDropDown then
+                _G.UIDropDownMenu_EnableDropDown(scopeDropdown)
+            end
+            if nSlider.Enable then
+                nSlider:Enable()
+            end
+            tiebreakerRefs.scopeLabel:SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
+            tiebreakerRefs.nLabel:SetTextColor(HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
+        else
+            if _G.UIDropDownMenu_DisableDropDown then
+                _G.UIDropDownMenu_DisableDropDown(scopeDropdown)
+            end
+            if nSlider.Disable then
+                nSlider:Disable()
+            end
+            tiebreakerRefs.scopeLabel:SetTextColor(0.5, 0.5, 0.5)
+            tiebreakerRefs.nLabel:SetTextColor(0.5, 0.5, 0.5)
+        end
+        local nVisible = getTiebreakerOpt().scope == "LAST_N"
+        if nVisible and on then
+            nSlider:Show()
+            tiebreakerRefs.nLabel:Show()
+        else
+            nSlider:Hide()
+            tiebreakerRefs.nLabel:Hide()
+        end
+    end
+
+    local function setTiebreakerScope(value)
+        local opt = getTiebreakerOpt()
+        opt.scope = value
+        if tiebreakerRefs then
+            _G.UIDropDownMenu_SetSelectedValue(tiebreakerRefs.scopeDropdown, value)
+            _G.UIDropDownMenu_SetText(tiebreakerRefs.scopeDropdown, scopeToText(value))
+        end
+        syncTiebreakerEnabledState()
+    end
+
+    local function buildTiebreakerControls(frame)
+        if tiebreakerRefs or not frame then
+            return
+        end
+        local frameName = frame:GetName()
+        if not frameName then
+            return
+        end
+
+        frame:SetHeight(TIEBREAKER_FRAME_HEIGHT)
+
+        local anchorStr = _G[frameName .. "minimapButtonStr"]
+        if not anchorStr then
+            return
+        end
+
+        local header = frame:CreateFontString(frameName .. "TiebreakerHeader", "ARTWORK", "GameFontNormal")
+        header:SetPoint("TOPLEFT", anchorStr, "BOTTOMLEFT", 0, -18)
+
+        local enabledStr = frame:CreateFontString(frameName .. "TiebreakerEnabledStr", "ARTWORK", "KRTConfigFontStringTemplate")
+        enabledStr:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -10)
+
+        local enabledBtn = CreateFrame("CheckButton", frameName .. "TiebreakerEnabled", frame, "KRTConfigCheckButtonTemplate")
+        enabledBtn:SetPoint("TOPRIGHT", enabledStr, "TOPLEFT", -2.5, 5)
+        enabledBtn:SetScript("OnClick", function(self)
+            local checked = (self:GetChecked() == 1) or false
+            getTiebreakerOpt().enabled = checked
+            syncTiebreakerEnabledState()
+            module:RequestRefresh("tiebreaker")
+        end)
+
+        local scopeLabel = frame:CreateFontString(frameName .. "TiebreakerScopeLabel", "ARTWORK", "GameFontHighlightSmall")
+        scopeLabel:SetPoint("TOPLEFT", enabledStr, "BOTTOMLEFT", 0, -18)
+
+        local scopeDropdown = CreateFrame("Frame", frameName .. "TiebreakerScopeDropdown", frame, "UIDropDownMenuTemplate")
+        scopeDropdown:SetPoint("TOPLEFT", scopeLabel, "BOTTOMLEFT", -18, -4)
+        _G.UIDropDownMenu_SetWidth(scopeDropdown, 150)
+
+        _G.UIDropDownMenu_Initialize(scopeDropdown, function()
+            local scopes = { "CURRENT", "LAST_N", "ALL" }
+            for i = 1, #scopes do
+                local value = scopes[i]
+                local info = _G.UIDropDownMenu_CreateInfo()
+                info.text = scopeToText(value)
+                info.value = value
+                info.func = function()
+                    setTiebreakerScope(value)
+                    module:RequestRefresh("tiebreaker")
+                end
+                _G.UIDropDownMenu_AddButton(info)
+            end
+        end)
+
+        local nLabel = frame:CreateFontString(frameName .. "TiebreakerNLabel", "ARTWORK", "GameFontHighlightSmall")
+        nLabel:SetPoint("TOPLEFT", scopeDropdown, "BOTTOMLEFT", 18, -10)
+
+        local nSlider = CreateFrame("Slider", frameName .. "TiebreakerNSlider", frame, "OptionsSliderTemplate")
+        nSlider:SetWidth(180)
+        nSlider:SetHeight(15)
+        nSlider:SetPoint("TOPLEFT", nLabel, "BOTTOMLEFT", 0, -15)
+        nSlider:SetMinMaxValues(TIEBREAKER_N_MIN, TIEBREAKER_N_MAX)
+        nSlider:SetValueStep(1)
+        local lowFs = _G[nSlider:GetName() .. "Low"]
+        if lowFs then
+            lowFs:SetText(tostring(TIEBREAKER_N_MIN))
+        end
+        local highFs = _G[nSlider:GetName() .. "High"]
+        if highFs then
+            highFs:SetText(tostring(TIEBREAKER_N_MAX))
+        end
+        nSlider:SetScript("OnValueChanged", function(self, v)
+            local n = math.floor(tonumber(v) or 5)
+            if n < TIEBREAKER_N_MIN then
+                n = TIEBREAKER_N_MIN
+            elseif n > TIEBREAKER_N_MAX then
+                n = TIEBREAKER_N_MAX
+            end
+            getTiebreakerOpt().n = n
+            local textFs = _G[self:GetName() .. "Text"]
+            if textFs then
+                textFs:SetText(tostring(n))
+            end
+        end)
+
+        tiebreakerRefs = {
+            header = header,
+            enabledBtn = enabledBtn,
+            enabledStr = enabledStr,
+            scopeLabel = scopeLabel,
+            scopeDropdown = scopeDropdown,
+            nLabel = nLabel,
+            nSlider = nSlider,
+        }
+    end
+
+    local function localizeTiebreakerControls()
+        if not tiebreakerRefs then
+            return
+        end
+        tiebreakerRefs.header:SetText(L.CfgTiebreakerHeader)
+        tiebreakerRefs.enabledStr:SetText(L.CfgTiebreakerEnabled)
+        tiebreakerRefs.scopeLabel:SetText(L.CfgTiebreakerScopeLabel)
+        tiebreakerRefs.nLabel:SetText(L.CfgTiebreakerNLabel)
+        local opt = getTiebreakerOpt()
+        _G.UIDropDownMenu_SetText(tiebreakerRefs.scopeDropdown, scopeToText(opt.scope))
+    end
+
+    local function refreshTiebreakerControls()
+        if not tiebreakerRefs then
+            return
+        end
+        local opt = getTiebreakerOpt()
+        tiebreakerRefs.enabledBtn:SetChecked(opt.enabled == true)
+        _G.UIDropDownMenu_SetSelectedValue(tiebreakerRefs.scopeDropdown, opt.scope)
+        _G.UIDropDownMenu_SetText(tiebreakerRefs.scopeDropdown, scopeToText(opt.scope))
+        tiebreakerRefs.nSlider:SetValue(tonumber(opt.n) or 5)
+        local textFs = _G[tiebreakerRefs.nSlider:GetName() .. "Text"]
+        if textFs then
+            textFs:SetText(tostring(tonumber(opt.n) or 5))
+        end
+        syncTiebreakerEnabledState()
+    end
+
     -- OnLoad handler for the configuration frame.
     function module:OnLoad(frame)
         UI.FrameName = Frames.InitModuleFrame(module, frame, {
@@ -117,6 +318,7 @@ do
         if not UI.FrameName then
             return
         end
+        buildTiebreakerControls(frame)
     end
 
     function module:InitCountdownSlider(slider)
@@ -244,6 +446,8 @@ do
         _G[frameName .. "AboutStr"]:SetText(L.StrConfigAbout)
         _G[frameName .. "DefaultsBtn"]:SetText(L.BtnDefaults)
         _G[frameName .. "CloseBtn"]:SetText(L.BtnClose)
+
+        localizeTiebreakerControls()
     end
 
     -- UI refresh handler for the configuration frame.
@@ -292,6 +496,8 @@ do
                 end
             end
         end
+
+        refreshTiebreakerControls()
 
         UI.Dirty = false
     end
