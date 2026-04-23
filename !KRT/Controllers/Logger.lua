@@ -60,6 +60,93 @@ end
 
 local TRASH_MOB_NAME = resolveTrashMobName()
 
+local loggerPanelNames = {
+    "KRTLoggerRaids",
+    "KRTLoggerBosses",
+    "KRTLoggerBossAttendees",
+    "KRTLoggerRaidAttendees",
+    "KRTLoggerLoot",
+}
+
+local loggerHeaderSuffixes = {
+    "HeaderNum",
+    "HeaderDate",
+    "HeaderZone",
+    "HeaderSize",
+    "HeaderName",
+    "HeaderTime",
+    "HeaderMode",
+    "HeaderJoin",
+    "HeaderLeave",
+    "HeaderItem",
+    "HeaderSource",
+    "HeaderWinner",
+    "HeaderType",
+    "HeaderRoll",
+}
+
+local function styleLoggerHeader(header)
+    if not header then
+        return
+    end
+
+    local text = header.GetFontString and header:GetFontString() or nil
+    if text and text.SetTextColor then
+        text:SetTextColor(0.95, 0.95, 0.95)
+    end
+end
+
+local function styleLoggerPanel(frameName)
+    local frame = frameName and _G[frameName] or nil
+    if not frame then
+        return
+    end
+
+    if frame.SetBackdropColor then
+        frame:SetBackdropColor(0.01, 0.01, 0.01, 0.82)
+    end
+    if frame.SetBackdropBorderColor then
+        frame:SetBackdropBorderColor(0.48, 0.48, 0.48, 0.92)
+    end
+
+    local title = _G[frameName .. "Title"]
+    if title then
+        title:SetTextColor(1.00, 0.82, 0.00)
+        title:SetJustifyH("LEFT")
+    end
+
+    for i = 1, #loggerHeaderSuffixes do
+        styleLoggerHeader(_G[frameName .. loggerHeaderSuffixes[i]])
+    end
+end
+
+local function applyLoggerSkin()
+    for i = 1, #loggerPanelNames do
+        styleLoggerPanel(loggerPanelNames[i])
+    end
+end
+
+local function styleLoggerRow(row)
+    if not row then
+        return
+    end
+
+    row._krtRowVisualStyle = "logger"
+    if not row._krtLoggerBg then
+        local bg = row:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints(row)
+        bg:SetTexture(0.01, 0.01, 0.01, 0.58)
+        row._krtLoggerBg = bg
+
+        local line = row:CreateTexture(nil, "BORDER")
+        line:SetHeight(1)
+        line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 2, 0)
+        line:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -2, 0)
+        line:SetTexture(0.35, 0.35, 0.35, 0.30)
+        row._krtLoggerLine = line
+    end
+end
+
 local SetSelectedRaid
 local deleteSelectedAttendees
 local setFrameLabel
@@ -513,6 +600,7 @@ do
             local pair = onLoadPairs[i]
             ensureSubmoduleOnLoad(pair.moduleRef, pair.frameRef)
         end
+        applyLoggerSkin()
     end
 
     local function OnLoadFrame(frame)
@@ -1110,6 +1198,13 @@ local function makeLoggerList(cfg, selField, msCtxField, hlOpts)
     -- Keep ListController from subtracting a second right inset in Logger tables.
     if cfg.rightInset == nil then
         cfg.rightInset = 0
+    end
+    if cfg.drawRow then
+        local drawRow = cfg.drawRow
+        cfg.drawRow = function(row, it)
+            styleLoggerRow(row)
+            return drawRow(row, it)
+        end
     end
 
     local function resolve()
@@ -1996,7 +2091,7 @@ do
     controller = makeLoggerList({
         keyName = "LootList",
         poolTag = "logger-loot",
-        _rowParts = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture" },
+        _rowParts = { "Name", "Source", "Winner", "Type", "Roll", "Time", "ItemIconTexture", "ItemNormalTexture" },
 
         localize = function(n)
             local title = _G[n .. "Title"]
@@ -2116,6 +2211,14 @@ do
                         itemHover:EnableMouse(false)
                     end
                 end
+
+                -- Size the slot background to the button and the icon inset to reveal it.
+                if ui.ItemNormalTexture and ui.ItemNormalTexture.SetSize then
+                    ui.ItemNormalTexture:SetSize(26, 26)
+                end
+                if ui.ItemIconTexture and ui.ItemIconTexture.SetSize then
+                    ui.ItemIconTexture:SetSize(20, 20)
+                end
                 row._krtBound = true
             end
 
@@ -2154,6 +2257,7 @@ do
             else
                 ui.Source:SetText(it.sourceName or "")
             end
+            ui.Source:SetVertexColor(0.86, 0.82, 0.72)
 
             local winnerClass = it.looterClass or Services.Raid:GetPlayerClass(it.looter)
             local r, g, b = Colors.GetClassColor(winnerClass)
@@ -2164,7 +2268,9 @@ do
             it.rollType = rt
             ui.Type:SetText(lootTypesColored[rt] or lootTypesColored[4])
             ui.Roll:SetText(it.rollValue or 0)
+            ui.Roll:SetVertexColor(0.95, 0.95, 0.95)
             ui.Time:SetText(it.timeFmt)
+            ui.Time:SetVertexColor(0.86, 0.82, 0.72)
 
             local icon = it.itemTexture
             if not icon and it.itemId then
@@ -2174,6 +2280,7 @@ do
                 icon = C.RESERVES_ITEM_FALLBACK_ICON
             end
             ui.ItemIconTexture:SetTexture(icon)
+            ui.ItemIconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         end),
 
         postUpdate = function(n)

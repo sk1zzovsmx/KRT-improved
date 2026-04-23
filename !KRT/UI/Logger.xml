@@ -2,9 +2,13 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
 	<!-- ====== Start of Logger Loot ====== -->
 	<Frame name="KRTLoggerFrameTemplate" virtual="true">
-		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" tile="true">
+		<Backdrop bgFile="Interface\Tooltips\UI-Tooltip-Background"
+			edgeFile="Interface\Tooltips\UI-Tooltip-Border" tile="true">
 			<TileSize val="16" />
-			<BackgroundInsets left="3" right="3" top="45" bottom="30" />
+			<EdgeSize>
+				<AbsValue val="8" />
+			</EdgeSize>
+			<BackgroundInsets left="3" right="3" top="3" bottom="3" />
 		</Backdrop>
 	</Frame>
 	<!-- Table header template -->
@@ -14,33 +18,12 @@
 		</Size>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture name="$parentLeft" file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
-					<Size>
-						<AbsDimension x="5" y="19" />
-					</Size>
+				<Texture name="$parentBg">
 					<Anchors>
 						<Anchor point="TOPLEFT" />
+						<Anchor point="BOTTOMRIGHT" />
 					</Anchors>
-					<TexCoords left="0" right="0.078125" top="0" bottom="0.59375" />
-				</Texture>
-				<Texture name="$parentRight" file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
-					<Size>
-						<AbsDimension x="4" y="19" />
-					</Size>
-					<Anchors>
-						<Anchor point="TOPRIGHT" />
-					</Anchors>
-					<TexCoords left="0.90625" right="0.96875" top="0" bottom="0.59375" />
-				</Texture>
-				<Texture name="$parentMiddle" file="Interface\FriendsFrame\WhoFrame-ColumnTabs">
-					<Size>
-						<AbsDimension x="10" y="19" />
-					</Size>
-					<Anchors>
-						<Anchor point="LEFT" relativeTo="$parentLeft" relativePoint="RIGHT" />
-						<Anchor point="RIGHT" relativeTo="$parentRight" relativePoint="LEFT" />
-					</Anchors>
-					<TexCoords left="0.078125" right="0.90625" top="0" bottom="0.59375" />
+					<Color r="0" g="0" b="0" a="0.35" />
 				</Texture>
 			</Layer>
 		</Layers>
@@ -424,7 +407,7 @@
 	</Button>
 	<Button name="KRTLoggerLootButton" virtual="true">
 		<Size>
-			<AbsDimension y="26" />
+			<AbsDimension y="30" />
 		</Size>
 		<NormalFont style="GameFontNormalSmall" />
 		<DisabledFont style="GameFontDisableSmall" />
@@ -445,7 +428,7 @@
 			<Layer level="BACKGROUND">
 				<Texture file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
 					<Size>
-						<AbsDimension x="10" y="28" />
+						<AbsDimension x="10" y="31" />
 					</Size>
 					<Anchors>
 						<Anchor point="TOPLEFT">
@@ -465,19 +448,19 @@
 			<Layer level="ARTWORK">
 				<FontString name="$parentName" font="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
-						<AbsDimension x="162" y="10" />
+						<AbsDimension x="158" y="12" />
 					</Size>
 					<Anchors>
 						<Anchor point="TOPLEFT">
 							<Offset>
-								<AbsDimension x="30" y="-9" />
+								<AbsDimension x="34" y="-9" />
 							</Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
 				<FontString name="$parentSource" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
-						<AbsDimension x="125" y="10" />
+						<AbsDimension x="123" y="12" />
 					</Size>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentName" relativePoint="TOPRIGHT">
@@ -489,7 +472,7 @@
 				</FontString>
 				<FontString name="$parentWinner" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
 					<Size>
-						<AbsDimension x="85" y="10" />
+						<AbsDimension x="85" y="12" />
 					</Size>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentSource" relativePoint="TOPRIGHT">
@@ -499,9 +482,9 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentType" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="MIDDLE">
+				<FontString name="$parentType" inherits="GameFontHighlightSmall" justifyH="CENTER" justifyV="MIDDLE">
 					<Size>
-						<AbsDimension x="45" y="10" />
+						<AbsDimension x="45" y="12" />
 					</Size>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentWinner" relativePoint="TOPRIGHT">
@@ -513,7 +496,7 @@
 				</FontString>
 				<FontString name="$parentRoll" inherits="GameFontHighlightSmall" justifyH="RIGHT" justifyV="MIDDLE">
 					<Size>
-						<AbsDimension x="37" y="10" />
+						<AbsDimension x="37" y="12" />
 					</Size>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentType" relativePoint="TOPRIGHT">
@@ -525,7 +508,7 @@
 				</FontString>
 				<FontString name="$parentTime" inherits="GameFontHighlightSmall" justifyH="CENTER" justifyV="MIDDLE">
 					<Size>
-						<AbsDimension x="35" y="10" />
+						<AbsDimension x="35" y="12" />
 					</Size>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentRoll" relativePoint="TOPRIGHT">
@@ -538,34 +521,18 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<Button name="$parentItem">
+			<Button name="$parentItem" inherits="KRTItemButtonTemplate">
 				<Size>
-					<AbsDimension x="20" y="20" />
+					<AbsDimension x="26" y="26" />
 				</Size>
+				<HitRectInsets left="2" right="2" top="2" bottom="2" />
 				<Anchors>
 					<Anchor point="TOPLEFT">
 						<Offset>
-							<AbsDimension x="3" y="-4" />
+							<AbsDimension x="0" y="-2" />
 						</Offset>
 					</Anchor>
 				</Anchors>
-				<Layers>
-					<Layer level="BORDER">
-						<Texture name="$parentIconTexture" />
-					</Layer>
-				</Layers>
-				<NormalTexture name="$parentNormalTexture" file="Interface\Buttons\UI-Quickslot2">
-					<Size>
-						<AbsDimension x="35" y="35" />
-					</Size>
-					<Anchors>
-						<Anchor point="CENTER">
-							<Offset>
-								<AbsDimension x="0" y="0" />
-							</Offset>
-						</Anchor>
-					</Anchors>
-				</NormalTexture>
 			</Button>
 		</Frames>
 		<HighlightTexture>
@@ -573,13 +540,13 @@
 				<Anchor point="TOPLEFT" />
 				<Anchor point="BOTTOMRIGHT" />
 			</Anchors>
-			<Color r="1" g="0.8" b="0" a="0.1" />
+			<Color r="1" g="0.82" b="0.28" a="0.14" />
 		</HighlightTexture>
 	</Button>
 	<!-- The Frame: Logger -->
 	<Frame name="KRTLogger" inherits="KRTFrameTemplate">
 		<Size>
-			<AbsDimension x="830" y="488" />
+			<AbsDimension x="830" y="570" />
 		</Size>
 		<Frames>
 			<Button name="$parentTab1" inherits="CharacterFrameTabButtonTemplate" id="1">
@@ -649,7 +616,7 @@
 								</Anchor>
 								<Anchor point="BOTTOMRIGHT">
 									<Offset>
-										<AbsDimension x="-30" y="36" />
+										<AbsDimension x="-30" y="8" />
 									</Offset>
 								</Anchor>
 							</Anchors>
@@ -664,7 +631,7 @@
 						<Anchors>
 							<Anchor point="BOTTOM" relativePoint="BOTTOM">
 								<Offset>
-									<AbsDimension x="-34" y="0" />
+									<AbsDimension x="-34" y="-31" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -739,7 +706,7 @@
 							</Anchor>
 							<Anchor point="BOTTOMRIGHT">
 								<Offset>
-									<AbsDimension x="-25" y="30" />
+									<AbsDimension x="-25" y="5" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -787,7 +754,7 @@
 								</Anchor>
 								<Anchor point="BOTTOMRIGHT">
 									<Offset>
-										<AbsDimension x="-30" y="36" />
+										<AbsDimension x="-30" y="8" />
 									</Offset>
 								</Anchor>
 							</Anchors>
@@ -802,7 +769,7 @@
 						<Anchors>
 							<Anchor point="BOTTOM" relativePoint="BOTTOM">
 								<Offset>
-									<AbsDimension x="-70" y="0" />
+									<AbsDimension x="-70" y="-31" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -814,7 +781,7 @@
 						<Anchors>
 							<Anchor point="BOTTOM" relativePoint="BOTTOM">
 								<Offset>
-									<AbsDimension x="0" y="0" />
+									<AbsDimension x="0" y="-31" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -826,7 +793,7 @@
 						<Anchors>
 							<Anchor point="BOTTOM" relativePoint="BOTTOM">
 								<Offset>
-									<AbsDimension x="70" y="0" />
+									<AbsDimension x="70" y="-31" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -889,7 +856,7 @@
 							</Anchor>
 							<Anchor point="BOTTOMRIGHT">
 								<Offset>
-									<AbsDimension x="-25" y="30" />
+									<AbsDimension x="-25" y="5" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -937,7 +904,7 @@
 								</Anchor>
 								<Anchor point="BOTTOMRIGHT">
 									<Offset>
-										<AbsDimension x="-30" y="36" />
+										<AbsDimension x="-30" y="8" />
 									</Offset>
 								</Anchor>
 							</Anchors>
@@ -952,7 +919,7 @@
 						<Anchors>
 							<Anchor point="BOTTOM" relativePoint="BOTTOM">
 								<Offset>
-									<AbsDimension x="-33" y="0" />
+									<AbsDimension x="-33" y="-31" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -964,7 +931,7 @@
 						<Anchors>
 							<Anchor point="BOTTOM" relativePoint="BOTTOM">
 								<Offset>
-									<AbsDimension x="33" y="0" />
+									<AbsDimension x="33" y="-31" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -991,7 +958,7 @@
 							</Anchor>
 							<Anchor point="BOTTOMRIGHT">
 								<Offset>
-									<AbsDimension x="-25" y="30" />
+									<AbsDimension x="-25" y="5" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -1005,7 +972,7 @@
 				<Anchors>
 					<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMLEFT">
 						<Offset>
-							<AbsDimension x="0" y="0" />
+							<AbsDimension x="0" y="35" />
 						</Offset>
 					</Anchor>
 				</Anchors>
@@ -1039,7 +1006,7 @@
 								</Anchor>
 								<Anchor point="BOTTOMRIGHT">
 									<Offset>
-										<AbsDimension x="-30" y="36" />
+										<AbsDimension x="-30" y="8" />
 									</Offset>
 								</Anchor>
 							</Anchors>
@@ -1054,7 +1021,7 @@
 						<Anchors>
 							<Anchor point="BOTTOM" relativePoint="BOTTOM">
 								<Offset>
-									<AbsDimension x="-35" y="0" />
+									<AbsDimension x="-35" y="-31" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -1066,7 +1033,7 @@
 						<Anchors>
 							<Anchor point="BOTTOM" relativePoint="BOTTOM">
 								<Offset>
-									<AbsDimension x="35" y="0" />
+									<AbsDimension x="35" y="-31" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -1117,7 +1084,7 @@
 							</Anchor>
 							<Anchor point="BOTTOMRIGHT">
 								<Offset>
-									<AbsDimension x="-25" y="30" />
+									<AbsDimension x="-25" y="5" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -1165,7 +1132,7 @@
 								</Anchor>
 								<Anchor point="BOTTOMRIGHT">
 									<Offset>
-										<AbsDimension x="-30" y="36" />
+										<AbsDimension x="-30" y="8" />
 									</Offset>
 								</Anchor>
 							</Anchors>
@@ -1180,7 +1147,7 @@
 						<Anchors>
 							<Anchor point="BOTTOM" relativePoint="BOTTOM">
 								<Offset>
-									<AbsDimension x="-163" y="0" />
+									<AbsDimension x="-163" y="-31" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -1204,7 +1171,7 @@
 						<Anchors>
 							<Anchor point="BOTTOM" relativePoint="BOTTOM">
 								<Offset>
-									<AbsDimension x="53" y="0" />
+									<AbsDimension x="53" y="-31" />
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -1315,7 +1282,7 @@
 							</Anchor>
 							<Anchor point="BOTTOMRIGHT">
 								<Offset>
-									<AbsDimension x="-25" y="30" />
+									<AbsDimension x="-25" y="5" />
 								</Offset>
 							</Anchor>
 						</Anchors>

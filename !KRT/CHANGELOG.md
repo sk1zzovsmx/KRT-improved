@@ -8,6 +8,9 @@ Release-Version: 0.7.0-beta.1
 
 ### Enhancements
 
+- **Logger UI polish** - Refreshed the Logger toward a MizusRaidTracker-style
+  Wrath raid-log look with dark compact tables, yellow section titles,
+  out-of-panel controls, and green selected rows.
 - **Raid attendance ledger** - Added a per-player attendance ledger keyed by
   `playerNid`, updated from roster deltas, persisted as raid schema v4, and
   exported through a dedicated attendance CSV builder without replacing the

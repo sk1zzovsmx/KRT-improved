@@ -92,6 +92,11 @@ Durable preferences learned from recent conversations:
 - Keep diagnostic templates in `addon.Diagnose`; use severity buckets `I/W/E/D` (`DiagnoseLog.en.lua`).
 - Prefer local `Diag` wrapper aliases over direct `Diagnose.*` chains in implementation files.
 - For naming/API uniformization, choose the most repeated in-repo pattern and apply it consistently and robustly.
+- For Logger visual refreshes, prefer a MizusRaidTracker-inspired Wrath raid-log look: Blizzard dialog frame,
+  dark compact tables, yellow section titles, default KRT buttons outside list panels, and green selected rows.
+- For Logger loot item icons, preserve an approximately `28x28` click target, a centered `26x26` icon texture,
+  and a centered `32x32` quickslot-like border drawn outside the icon; avoid using button `NormalTexture`
+  when it clips or overlays the item bitmap.
 - For UI function naming, keep explicit `UI` in method names when it improves clarity; prefer readable names
   over ultra-short abbreviations.
 - For module-local UI readability, prefer a local `UI` state/helper table:

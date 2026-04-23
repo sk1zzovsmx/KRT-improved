@@ -46,6 +46,10 @@ local function ensureRowTextures(row)
     row:SetPushedTexture(pushed)
 end
 
+local function isLoggerRow(row)
+    return row and row._krtRowVisualStyle == "logger"
+end
+
 -- ----- Public methods ----- --
 function UIPrimitives.EnableDisable(frame, cond)
     if not frame then
@@ -185,6 +189,11 @@ function UIRowVisuals.SetRowSelected(row, cond)
         return
     end
     if cond then
+        if isLoggerRow(row) then
+            row._krtSelTex:SetVertexColor(0.08, 0.52, 0.10, 0.72)
+        else
+            row._krtSelTex:SetVertexColor(0.20, 0.60, 1.00, 0.52)
+        end
         row._krtSelTex:Show()
     else
         row._krtSelTex:Hide()
@@ -198,6 +207,11 @@ function UIRowVisuals.SetRowFocused(row, cond)
         return
     end
     if cond then
+        if isLoggerRow(row) then
+            texture:SetVertexColor(0.20, 0.85, 0.18, 0.34)
+        else
+            texture:SetVertexColor(0.20, 0.60, 1.00, 0.72)
+        end
         texture:Show()
     else
         texture:Hide()
