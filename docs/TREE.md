@@ -208,6 +208,7 @@
 |   |   |-- plans
 |   |   |   \\-- 2026-04-21-plus-one-tiebreaker.md
 |   |   \\-- specs
+|   |       |-- 2026-04-21-packmule-design.md
 |   |       \\-- 2026-04-21-plus-one-tiebreaker-design.md
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
