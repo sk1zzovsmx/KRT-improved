@@ -37,15 +37,15 @@ local function compareResolvedEntries(a, b, wantLow, usePlus)
     if a.bucketPriority ~= b.bucketPriority then
         return a.bucketPriority < b.bucketPriority
     end
-
     if usePlus and a.bucket == "SR" and b.bucket == "SR" and a.plus ~= b.plus then
         return a.plus > b.plus
     end
-
     if a.roll ~= b.roll then
         return wantLow and (a.roll < b.roll) or (a.roll > b.roll)
     end
-
+    if a.tiebreakerApplies and b.tiebreakerApplies and a.tiebreakerCount ~= b.tiebreakerCount then
+        return a.tiebreakerCount < b.tiebreakerCount
+    end
     return tostring(a.name) < tostring(b.name)
 end
 
@@ -59,7 +59,13 @@ local function areResolvedEntriesTied(a, b, usePlus)
     if usePlus and a.bucket == "SR" and a.plus ~= b.plus then
         return false
     end
-    return a.roll ~= nil and a.roll == b.roll
+    if a.roll == nil or a.roll ~= b.roll then
+        return false
+    end
+    if a.tiebreakerApplies and b.tiebreakerApplies and a.tiebreakerCount ~= b.tiebreakerCount then
+        return false
+    end
+    return true
 end
 
 -- ----- Public methods ----- --
@@ -117,16 +123,33 @@ function Resolution.BuildResolvedEntries(ctx, itemId, currentRollType)
         return ctx.getPlusForItem and ctx.getPlusForItem(itemId, name) or 0
     end or nil
     local wantLow = ctx.isSortAscending and ctx.isSortAscending() or false
-    local resolved = {}
 
+    local tiebreakerEnabled = ctx.isTiebreakerByMSCountEnabled and ctx.isTiebreakerByMSCountEnabled() == true
+    local msCountMap = nil
+    if tiebreakerEnabled and ctx.getMSCountsForNames then
+        local names = {}
+        for name, response in pairs(state.responsesByPlayer) do
+            if ctx.isSelectableRollResponse and ctx.isSelectableRollResponse(response) then
+                names[#names + 1] = name
+            end
+        end
+        if #names > 0 then
+            msCountMap = ctx.getMSCountsForNames(names) or {}
+        end
+    end
+
+    local resolved = {}
     for name, response in pairs(state.responsesByPlayer) do
         if ctx.isSelectableRollResponse and ctx.isSelectableRollResponse(response) then
+            local bucket = response.bucket
             resolved[#resolved + 1] = {
                 name = name,
-                bucket = response.bucket,
-                bucketPriority = Resolution.GetBucketPriority(ctx, response.bucket, currentRollType),
+                bucket = bucket,
+                bucketPriority = Resolution.GetBucketPriority(ctx, bucket, currentRollType),
                 plus = Resolution.GetResponsePlus(ctx, itemId, response, plusGetter),
                 roll = tonumber(response.bestRoll) or 0,
+                tiebreakerCount = (msCountMap and msCountMap[name]) or 0,
+                tiebreakerApplies = tiebreakerEnabled and bucket ~= "SR" and bucket ~= "INELIGIBLE",
             }
         end
     end
@@ -182,6 +205,23 @@ function Resolution.BuildResolution(ctx, resolvedEntries, usePlus)
         return resolution
     end
 
+    -- Roll-tie detection BEFORE tiebreaker criterion differentiates entries.
+    local rollTiedNames = {}
+    if appliedCutoff > 0 and resolvedEntries[appliedCutoff] then
+        local cutoffEntry = resolvedEntries[appliedCutoff]
+        for i = 1, #resolvedEntries do
+            local e = resolvedEntries[i]
+            if
+                e.bucketPriority == cutoffEntry.bucketPriority
+                and e.bucket == cutoffEntry.bucket
+                and e.roll == cutoffEntry.roll
+                and (not usePlus or e.bucket ~= "SR" or e.plus == cutoffEntry.plus)
+            then
+                rollTiedNames[#rollTiedNames + 1] = e.name
+            end
+        end
+    end
+
     local groupStart = appliedCutoff
     local groupEnd = appliedCutoff
     while groupStart > 1 and areResolvedEntriesTied(resolvedEntries[groupStart - 1], resolvedEntries[appliedCutoff], usePlus) do
@@ -222,6 +262,43 @@ function Resolution.BuildResolution(ctx, resolvedEntries, usePlus)
                 tostring(resolution.requiresManualResolution)
             )
         )
+    end
+
+    if #rollTiedNames > 1 and not resolution.requiresManualResolution then
+        local winnerEntry
+        for i = 1, #resolvedEntries do
+            if resolvedEntries[i].name == rollTiedNames[1] then
+                winnerEntry = resolvedEntries[i]
+                break
+            end
+        end
+        if winnerEntry and winnerEntry.tiebreakerApplies then
+            local winnerName = resolution.autoWinners[1] and resolution.autoWinners[1].name
+            if winnerName then
+                local winnerCount
+                local runnerUpCount
+                for _, nm in ipairs(rollTiedNames) do
+                    for _, e in ipairs(resolvedEntries) do
+                        if e.name == nm then
+                            if nm == winnerName then
+                                winnerCount = e.tiebreakerCount
+                            else
+                                if not runnerUpCount or e.tiebreakerCount < runnerUpCount then
+                                    runnerUpCount = e.tiebreakerCount
+                                end
+                            end
+                            break
+                        end
+                    end
+                end
+                if winnerCount ~= nil and runnerUpCount ~= nil and winnerCount ~= runnerUpCount then
+                    resolution.resolvedByTiebreaker = true
+                    resolution.tiebreakerWinnerName = winnerName
+                    resolution.tiebreakerWinnerCount = winnerCount
+                    resolution.tiebreakerRunnerUpCount = runnerUpCount
+                end
+            end
+        end
     end
 
     return resolution
