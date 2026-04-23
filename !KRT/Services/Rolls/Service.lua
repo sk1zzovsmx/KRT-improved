@@ -366,6 +366,38 @@ do
             getCurrentRaid = function()
                 return addon.Core.GetCurrentRaid and addon.Core.GetCurrentRaid() or nil
             end,
+            isTiebreakerByMSCountEnabled = function()
+                local opt = addon.options and addon.options.tiebreakerMSCount
+                return type(opt) == "table" and opt.enabled == true
+            end,
+            getTiebreakerMSCountOpts = function()
+                local opt = (addon.options and addon.options.tiebreakerMSCount) or {}
+                local scope = opt.scope
+                if scope ~= "CURRENT" and scope ~= "LAST_N" and scope ~= "ALL" then
+                    scope = "CURRENT"
+                end
+                local n = tonumber(opt.n)
+                if not n or n < 1 then
+                    n = 5
+                end
+                return { scope = scope, n = n }
+            end,
+            getMSCountsForNames = function(names)
+                local raid = Services.Raid
+                if not (raid and raid.GetMSCountsForNames) then
+                    return {}
+                end
+                local opt = (addon.options and addon.options.tiebreakerMSCount) or {}
+                local scope = opt.scope
+                if scope ~= "CURRENT" and scope ~= "LAST_N" and scope ~= "ALL" then
+                    scope = "CURRENT"
+                end
+                local n = tonumber(opt.n)
+                if not n or n < 1 then
+                    n = 5
+                end
+                return raid:GetMSCountsForNames(names, { scope = scope, n = n })
+            end,
         }
         return displayContext
     end
