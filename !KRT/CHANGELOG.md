@@ -8,6 +8,11 @@ Release-Version: 0.7.0-beta.1
 
 ### Enhancements
 
+- **Plus-one tie-breaker** - Optional tie-break that resolves roll ties by
+  favoring players with fewer MS wins over a configurable scope (current raid
+  / last N raids / all saved raids). Default OFF. Tied rows surface `(MS N)`
+  during roll windows and the resolution is chat-announced when
+  `announceOnWin` is enabled. Does not apply to SR bucket resolutions.
 - **Logger UI polish** - Refreshed the Logger toward a MizusRaidTracker-style
   Wrath raid-log look with dark compact tables, yellow section titles,
   out-of-panel controls, and green selected rows.
