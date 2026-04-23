@@ -86,6 +86,21 @@ local singleAlice = Raid:GetPlayerMSCount("Alice", { scope = "LAST_N", n = 2 })
 local batchAlice = (Raid:GetMSCountsForNames({ "Alice" }, { scope = "LAST_N", n = 2 })).Alice
 assertEq(batchAlice, singleAlice, "batch == single for LAST_N=2")
 
+-- Regression: LAST_N budget must not be consumed by missing/corrupt raid entries.
+do
+    -- Key 2 exists in pairs() iteration (so it appears in the sorted id list),
+    -- but EnsureRaidById(2) resolves to a falsy value, mirroring a corrupt entry.
+    local gappyRaids = {
+        [1] = { players = { { name = "Alice", countMS = 5 } } },
+        [2] = false, -- present as a key, but EnsureRaidById returns falsy
+        [3] = { players = { { name = "Alice", countMS = 7 } } },
+    }
+    local addon2 = buildHarness(gappyRaids, 3)
+    local Raid2 = loadCounts(addon2)
+    -- With LAST_N=2 and id 2 missing, we should still visit raids 3 and 1 -> 7 + 5 = 12.
+    assertEq(Raid2:GetPlayerMSCount("Alice", { scope = "LAST_N", n = 2 }), 12, "LAST_N skips nil raid entries")
+end
+
 local empty = Raid:GetMSCountsForNames({}, { scope = "ALL" })
 assertEq(next(empty) == nil, true, "empty names returns empty map")
 

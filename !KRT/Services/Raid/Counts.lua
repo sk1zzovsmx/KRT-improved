@@ -107,8 +107,8 @@ local function iterateRaidsForScope(scope, n, callback)
         if raid then
             Core.EnsureRaidSchema(raid)
             callback(raid, raidNum)
+            visited = visited + 1
         end
-        visited = visited + 1
     end
 end
 
@@ -302,6 +302,7 @@ do
         return module:GetPlayerCountByNid(playerNid, raidNum)
     end
 
+    -- For multiple players under the same scope, prefer GetMSCountsForNames (single KRT_Raids pass).
     function module:GetPlayerMSCount(name, opts)
         if type(name) ~= "string" or name == "" then
             return 0
