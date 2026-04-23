@@ -32,6 +32,12 @@ C.rollTypes = {
     GREED = 9,
 }
 
+C.TIEBREAKER_SCOPE = {
+    CURRENT = "CURRENT",
+    LAST_N = "LAST_N",
+    ALL = "ALL",
+}
+
 -- Roll Type Colored Display Text
 C.lootTypesColored = {
     [0] = "|cffc0c0c0" .. L.BtnManual .. "|r",

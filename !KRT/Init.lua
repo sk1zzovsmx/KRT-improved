@@ -459,6 +459,23 @@ function Options.LoadOptions()
     KRT_Options = options
     addon.options = options
 
+    if type(addon.options.tiebreakerMSCount) ~= "table" then
+        addon.options.tiebreakerMSCount = {}
+    end
+    do
+        local opt = addon.options.tiebreakerMSCount
+        if type(opt.enabled) ~= "boolean" then
+            opt.enabled = false
+        end
+        if opt.scope ~= "CURRENT" and opt.scope ~= "LAST_N" and opt.scope ~= "ALL" then
+            opt.scope = "CURRENT"
+        end
+        local n = tonumber(opt.n)
+        if not n or n < 1 or n > 50 then
+            opt.n = 5
+        end
+    end
+
     Options.ApplyDebugSetting(false)
     return options
 end
