@@ -1492,6 +1492,106 @@
 			</Frame>
 		</Frames>
 	</Frame>
+	<Frame name="KRTLoggerExportFrame" inherits="KRTFrameTemplate" parent="UIParent" frameStrata="DIALOG" hidden="true">
+		<Size>
+			<AbsDimension x="1000" y="500" />
+		</Size>
+		<Anchors>
+			<Anchor point="CENTER" />
+		</Anchors>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString name="$parentHint" inherits="GameFontHighlightSmall" justifyH="LEFT">
+					<Size>
+						<AbsDimension x="956" y="32" />
+					</Size>
+					<Anchors>
+						<Anchor point="TOPLEFT">
+							<Offset>
+								<AbsDimension x="22" y="-36" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parentLootBtn" inherits="KRTButtonTemplate">
+				<Size>
+					<AbsDimension x="140" y="25" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset>
+							<AbsDimension x="22" y="-74" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parentRaidAttendanceBtn" inherits="KRTButtonTemplate">
+				<Size>
+					<AbsDimension x="170" y="25" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentLootBtn" relativePoint="RIGHT">
+						<Offset>
+							<AbsDimension x="6" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<ScrollFrame name="$parentOutputScroll" inherits="UIPanelScrollFrameTemplate">
+				<Size>
+					<AbsDimension x="956" y="330" />
+				</Size>
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset>
+							<AbsDimension x="22" y="-110" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background-Dark" edgeFile="Interface\Tooltips\UI-Tooltip-Border" tile="true">
+					<TileSize>
+						<AbsValue val="16" />
+					</TileSize>
+					<EdgeSize>
+						<AbsValue val="12" />
+					</EdgeSize>
+					<BackgroundInsets>
+						<AbsInset top="3" right="3" bottom="3" left="3" />
+					</BackgroundInsets>
+				</Backdrop>
+				<ScrollChild>
+					<EditBox name="KRTLoggerExportFrameOutput" multiLine="true" autoFocus="false">
+						<Size>
+							<AbsDimension x="930" y="312" />
+						</Size>
+						<Anchors>
+							<Anchor point="TOPLEFT">
+								<Offset>
+									<AbsDimension x="8" y="-8" />
+								</Offset>
+							</Anchor>
+						</Anchors>
+						<FontString inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="TOP" />
+					</EditBox>
+				</ScrollChild>
+			</ScrollFrame>
+			<Button name="$parentCloseBtn" inherits="KRTButtonTemplate">
+				<Size>
+					<AbsDimension x="92" y="25" />
+				</Size>
+				<Anchors>
+					<Anchor point="BOTTOM">
+						<Offset>
+							<AbsDimension x="0" y="20" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+		</Frames>
+	</Frame>
 	<Frame name="KRTLoggerRollTypePickerFrame" parent="UIParent" frameStrata="DIALOG" hidden="true">
 		<Size>
 			<AbsDimension x="312" y="22" />

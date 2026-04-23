@@ -2305,6 +2305,33 @@ local function assertContains(entries, needle, message)
     error(message or ("expected log entry containing '" .. tostring(needle) .. "'"), 0)
 end
 
+local function assertTextContains(text, needle, message)
+    if not string.find(tostring(text or ""), tostring(needle or ""), 1, true) then
+        error(message or ("expected text containing '" .. tostring(needle) .. "'"), 0)
+    end
+end
+
+local function assertTextNotContains(text, needle, message)
+    if string.find(tostring(text or ""), tostring(needle or ""), 1, true) then
+        error(message or ("expected text not to contain '" .. tostring(needle) .. "'"), 0)
+    end
+end
+
+local function setupLoggerExportHarness(seedRaids)
+    local h = newHarness()
+    h.feature.Sort.GetLootSortName = function(itemName, itemLink, itemId)
+        return tostring(itemName or itemLink or itemId or "")
+    end
+    h:installRaidStore(seedRaids)
+    h:load("!KRT/Core/DBRaidQueries.lua")
+    h.Core.GetRaidQueries = function()
+        return h.addon.DB.RaidQueries
+    end
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/Export.lua")
+    return h, h.Core.EnsureRaidById(1), h.addon.Services.Logger.Export
+end
+
 local function setupInventoryTradeHarness(order, rollsByName)
     local h = newHarness()
     local link = h.registerItem(9304, "Queueblade")
@@ -2424,6 +2451,13 @@ local function setupInventoryTradeHarness(order, rollsByName)
         AddPlayerCount = function(_, playerName, count)
             addCounts[#addCounts + 1] = {
                 name = playerName,
+                count = count,
+            }
+        end,
+        AddPlayerCountForRollType = function(_, playerName, rollType, count)
+            addCounts[#addCounts + 1] = {
+                name = playerName,
+                rollType = rollType,
                 count = count,
             }
         end,
@@ -3256,6 +3290,125 @@ test("db syncer imports push snapshots and merges requested sync chunks", functi
     assertEqual(mergedRaid.loot[1].lootNid, 101, "expected requested sync to merge loot by nid")
     assertEqual(mergedRaid.changes.Alice, "Fire", "expected requested sync to merge changes")
     assertTrue(syncTarget.addon.DB.Syncer._pendingRequests[syncRequestId] == nil, "expected successful sync merge to complete the pending request")
+end)
+
+test("logger export escapes loot CSV fields and filters by boss and player", function()
+    local h, raid, Export = setupLoggerExportHarness({
+        {
+            schemaVersion = 1,
+            raidNid = 42,
+            zone = "Icecrown Citadel",
+            size = 25,
+            difficulty = 4,
+            startTime = 1700000000,
+            players = {
+                { playerNid = 1, name = "Alice", class = "MAGE", join = 1700000000, leave = 1700000300 },
+                { playerNid = 2, name = "Bob", class = "WARRIOR", join = 1700000000, leave = 1700000300 },
+            },
+            bossKills = {
+                { bossNid = 10, name = "Queen, Lana'thel", time = 1700000100, difficulty = 4, players = { 1, 2 } },
+                { bossNid = 11, name = "Sindragosa", time = 1700000200, difficulty = 4, players = { 2 } },
+            },
+            loot = {
+                {
+                    lootNid = 101,
+                    bossNid = 10,
+                    itemId = 9001,
+                    itemName = 'Blade, "Queen"\nHero',
+                    looterNid = 1,
+                    rollType = 1,
+                    rollValue = 99,
+                    time = 1700000110,
+                },
+                {
+                    lootNid = 102,
+                    bossNid = 11,
+                    itemId = 9002,
+                    itemName = "Frost Ring",
+                    looterNid = 2,
+                    rollType = 2,
+                    rollValue = 12,
+                    time = 1700000210,
+                },
+            },
+            nextPlayerNid = 3,
+            nextBossNid = 12,
+            nextLootNid = 103,
+        },
+    })
+
+    local csv = Export:GetLootCSV(raid, { selectedBossNid = 10, selectedPlayerNid = 1 })
+    assertTextContains(csv, "raidNid,raidDate,zone,size,difficulty,bossNid,boss,bossTime,lootNid,itemId,itemName,winner,class,rollType,rollValue,lootTime")
+    assertTextContains(csv, "42," .. date("%Y-%m-%d %H:%M:%S", 1700000000) .. ",Icecrown Citadel,25,4,10")
+    assertTextContains(csv, '"Queen, Lana\'thel"')
+    assertTextContains(csv, '"Blade, ""Queen""\nHero"')
+    assertTextContains(csv, ",Alice,MAGE,1,99,")
+    assertTextNotContains(csv, "Frost Ring", "expected boss/player filter to exclude second loot row")
+end)
+
+test("logger export builds raid attendance CSV from attendance summaries", function()
+    local _, raid, Export = setupLoggerExportHarness({
+        {
+            schemaVersion = 1,
+            raidNid = 43,
+            zone = "Naxxramas",
+            size = 10,
+            difficulty = 1,
+            startTime = 1700001000,
+            players = {
+                { playerNid = 1, name = "Alice", class = "MAGE", join = 1700001000, leave = 1700001120 },
+            },
+            attendance = {
+                {
+                    playerNid = 1,
+                    segments = {
+                        { startTime = 1700001000, endTime = 1700001060 },
+                        { startTime = 1700001060, endTime = 1700001120, online = false, subgroup = 2 },
+                    },
+                },
+            },
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 2,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+
+    local csv = Export:GetRaidAttendanceCSV(raid)
+    assertTextContains(csv, "raidNid,raidDate,zone,size,difficulty,playerNid,player,class,join,leave,attendanceSeconds,onlineSeconds,offlineSeconds,segmentCount")
+    assertTextContains(csv, "43," .. date("%Y-%m-%d %H:%M:%S", 1700001000) .. ",Naxxramas,10,1,1,Alice,MAGE")
+    assertTextContains(csv, ",120,60,60,2")
+end)
+
+test("logger export returns header-only CSV when no rows match", function()
+    local _, raid, Export = setupLoggerExportHarness({
+        {
+            schemaVersion = 1,
+            raidNid = 45,
+            zone = "Trial of the Crusader",
+            size = 10,
+            difficulty = 3,
+            startTime = 1700003000,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+
+    assertEqual(
+        Export:GetLootCSV(raid, {}),
+        "raidNid,raidDate,zone,size,difficulty,bossNid,boss,bossTime,lootNid,itemId,itemName,winner,class,rollType,rollValue,lootTime",
+        "expected empty loot export to keep the CSV header"
+    )
+    assertEqual(
+        Export:GetRaidAttendanceCSV(raid, {}),
+        "raidNid,raidDate,zone,size,difficulty,playerNid,player,class,join,leave,attendanceSeconds,onlineSeconds,offlineSeconds,segmentCount",
+        "expected empty raid-attendance export to keep the CSV header"
+    )
 end)
 
 test("logger updates duplicate item entries by lootNid only", function()

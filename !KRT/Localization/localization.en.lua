@@ -390,6 +390,11 @@ L.ErrLoggerWinnerNotFound = "Winner not found in raid or boss attendees: %s"
 L.ErrLoggerInvalidRollValue = "Invalid roll value. Enter a non-negative number."
 
 -- ==================== Logger: Export Frame ==================== --
+L.StrLoggerExportTitle = "Logger CSV Export"
+L.StrLoggerExportHint = "Select an export type, then press Ctrl+C to copy the CSV data."
+L.BtnLoggerExportLootCSV = "Loot CSV"
+L.BtnLoggerExportRaidAttendanceCSV = "Raid Attendance CSV"
+L.ErrLoggerExportFailed = "Logger export failed: %s"
 
 -- ==================== Slash Commands ==================== --
 L.StrCmdCommands = "Commands: valid subcommands for |caaf49141/%s|r:"

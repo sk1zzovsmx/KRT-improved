@@ -379,14 +379,15 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 68) Widgets/ReservesUI.lua
 69) Services/Logger/Store.lua
 70) Services/Logger/View.lua
-71) Services/Logger/Helpers.lua
-72) Services/Logger/Actions.lua
-73) Controllers/Logger.lua
-74) Widgets/Config.lua
-75) Controllers/Warnings.lua
-76) Controllers/Changes.lua
-77) Controllers/Spammer.lua
-78) KRT.xml
+71) Services/Logger/Export.lua
+72) Services/Logger/Helpers.lua
+73) Services/Logger/Actions.lua
+74) Controllers/Logger.lua
+75) Widgets/Config.lua
+76) Controllers/Warnings.lua
+77) Controllers/Changes.lua
+78) Controllers/Spammer.lua
+79) KRT.xml
 
 ---
 
@@ -448,7 +449,8 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Reserves.lua           # soft reserves service/model + canonical public facade
     Logger/
       Store.lua            # logger stable-ID indexing + data access
-      View.lua             # view-model row builders, label formatters, CSV generation
+      View.lua             # view-model row builders and label formatters
+      Export.lua           # logger CSV export builders
       Helpers.lua          # logger UI label/title formatting helpers
       Actions.lua          # logger mutations + commit/cascade + selection validation
 
@@ -635,12 +637,14 @@ Root-method compatibility exception:
 `addon.Logger` internal structure (pattern for complex modules):
 - `addon.Logger.Store`   - data access helpers + stable-ID indexing (Services/Logger/Store.lua)
 - `addon.Logger.View`    - view-model row builders (UI-friendly data) (Services/Logger/View.lua)
+- `addon.Logger.Export`  - Logger CSV export builders (Services/Logger/Export.lua)
 - `addon.Logger.Helpers` - UI label/title formatting helpers (Services/Logger/Helpers.lua)
 - `addon.Logger.Actions` - mutations + commit/refresh boundaries (Services/Logger/Actions.lua)
 
 Namespaced service modules (loaded before Controller):
 - `addon.Services.Logger.Store`   - canonical Store service table
 - `addon.Services.Logger.View`    - canonical View service table
+- `addon.Services.Logger.Export`  - canonical Export service table
 - `addon.Services.Logger.Helpers` - canonical Helpers service table
 - `addon.Services.Logger.Actions` - canonical Actions service table
 

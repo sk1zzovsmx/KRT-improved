@@ -38,6 +38,7 @@ local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 local rollTypes = feature.rollTypes
 local lootTypesColored = feature.lootTypesColored
 local itemColors = feature.itemColors
+local showLoggerExportFrame
 
 local _G = _G
 local tinsert, tremove, twipe = table.insert, table.remove, table.wipe
@@ -258,11 +259,13 @@ do
     local LoggerSvc = addon.Services.Logger
     local Store = LoggerSvc.Store
     local View = LoggerSvc.View
+    local Export = LoggerSvc.Export
     local Actions = LoggerSvc.Actions
     local Helpers = LoggerSvc.Helpers
 
     module.Store = Store
     module.View = View
+    module.Export = Export
     module.Actions = Actions
     module.Helpers = Helpers
 
@@ -542,6 +545,210 @@ do
         if refreshEvent ~= false then
             Bus.TriggerEvent(refreshEvent or InternalEvents.LoggerSelectRaid, module.selectedRaid)
         end
+    end
+
+    local function getExportFrameRefs()
+        local frame = Frames.Get("KRTLoggerExportFrame")
+        if not frame then
+            return nil
+        end
+
+        return {
+            frame = frame,
+            hint = Frames.Ref(frame, "Hint"),
+            lootBtn = Frames.Ref(frame, "LootBtn"),
+            raidAttendanceBtn = Frames.Ref(frame, "RaidAttendanceBtn"),
+            output = Frames.Ref(frame, "Output"),
+            outputScroll = Frames.Ref(frame, "OutputScroll"),
+            closeBtn = Frames.Ref(frame, "CloseBtn"),
+        }
+    end
+
+    local function setExportModeButtonState(refs, mode)
+        local buttons = {
+            { button = refs and refs.lootBtn, mode = "loot" },
+            { button = refs and refs.raidAttendanceBtn, mode = "raidAttendance" },
+        }
+
+        for i = 1, #buttons do
+            local entry = buttons[i]
+            local button = entry.button
+            if button then
+                if entry.mode == mode then
+                    if button.LockHighlight then
+                        button:LockHighlight()
+                    end
+                elseif button.UnlockHighlight then
+                    button:UnlockHighlight()
+                end
+            end
+        end
+    end
+
+    local function getExportContext()
+        return {
+            raidId = module.selectedRaid,
+            selectedBossNid = module.selectedBoss,
+            selectedPlayerNid = module.selectedBossPlayer or module.selectedPlayer,
+        }
+    end
+
+    local function setExportText(refs, text)
+        local output = refs and refs.output
+        if not output then
+            return
+        end
+
+        if output.SetTextInsets then
+            output:SetTextInsets(8, 8, 8, 8)
+        end
+        if output.SetJustifyH then
+            output:SetJustifyH("LEFT")
+        end
+        if output.SetJustifyV then
+            output:SetJustifyV("TOP")
+        end
+        module._lastExportCSV = text or ""
+        output:SetText(module._lastExportCSV)
+        output:SetCursorPosition(0)
+        output:HighlightText()
+        if output.SetFocus then
+            output:SetFocus()
+        end
+
+        local scroll = refs.outputScroll
+        if scroll and scroll.UpdateScrollChildRect then
+            scroll:UpdateScrollChildRect()
+        end
+        if scroll and scroll.SetVerticalScroll then
+            scroll:SetVerticalScroll(0)
+        end
+    end
+
+    local function adjustExportScrollBar(refs)
+        local scroll = refs and refs.outputScroll
+        if not (scroll and scroll.GetName) then
+            return
+        end
+
+        local scrollName = scroll:GetName()
+        local scrollBar = scroll.ScrollBar or _G[scrollName .. "ScrollBar"]
+        if not scrollBar then
+            return
+        end
+
+        local upButton = _G[scrollBar:GetName() .. "ScrollUpButton"]
+        local downButton = _G[scrollBar:GetName() .. "ScrollDownButton"]
+        if upButton then
+            upButton:ClearAllPoints()
+            upButton:SetPoint("TOP", scroll, "TOPRIGHT", 10, -4)
+        end
+        if downButton then
+            downButton:ClearAllPoints()
+            downButton:SetPoint("BOTTOM", scroll, "BOTTOMRIGHT", 10, 8)
+        end
+
+        scrollBar:ClearAllPoints()
+        scrollBar:SetPoint("TOP", scroll, "TOPRIGHT", 10, -20)
+        scrollBar:SetPoint("BOTTOM", scroll, "BOTTOMRIGHT", 10, 24)
+    end
+
+    local function refreshExportFrame(mode)
+        local refs = getExportFrameRefs()
+        if not refs then
+            return false
+        end
+
+        local raid = needRaid()
+        if not raid then
+            addon:error(L.ErrLoggerInvalidRaid)
+            return false
+        end
+
+        mode = mode or module._loggerExportMode or "loot"
+        module._loggerExportMode = mode
+
+        local csv, errCode = Export:GetCSV(mode, raid, getExportContext())
+        if errCode then
+            addon:error((L.ErrLoggerExportFailed):format(tostring(errCode)))
+            return false
+        end
+
+        setExportModeButtonState(refs, mode)
+        adjustExportScrollBar(refs)
+        setExportText(refs, csv)
+        return true
+    end
+
+    local function bindExportFrame()
+        local refs = getExportFrameRefs()
+        if not refs or refs.frame._krtBound then
+            return refs
+        end
+
+        Frames.SetFrameTitle(refs.frame, L.StrLoggerExportTitle)
+        Frames.EnableDrag(refs.frame)
+
+        if refs.hint then
+            refs.hint:SetText(L.StrLoggerExportHint)
+        end
+        if refs.lootBtn then
+            refs.lootBtn:SetText(L.BtnLoggerExportLootCSV)
+            Frames.SafeSetScript(refs.lootBtn, "OnClick", function()
+                refreshExportFrame("loot")
+            end)
+        end
+        if refs.raidAttendanceBtn then
+            refs.raidAttendanceBtn:SetText(L.BtnLoggerExportRaidAttendanceCSV)
+            Frames.SafeSetScript(refs.raidAttendanceBtn, "OnClick", function()
+                refreshExportFrame("raidAttendance")
+            end)
+        end
+        if refs.output and refs.output.SetTextInsets then
+            refs.output:SetTextInsets(8, 8, 8, 8)
+        end
+        if refs.output and refs.output.SetWordWrap then
+            refs.output:SetWordWrap(true)
+        end
+        if refs.output then
+            Frames.SafeSetScript(refs.output, "OnTextChanged", function(self, userInput)
+                if userInput then
+                    self:SetText(module._lastExportCSV or "")
+                    self:SetCursorPosition(0)
+                    self:HighlightText()
+                end
+            end)
+        end
+        adjustExportScrollBar(refs)
+        if refs.closeBtn then
+            refs.closeBtn:SetText(L.BtnClose)
+            Frames.SafeSetScript(refs.closeBtn, "OnClick", function()
+                refs.frame:Hide()
+            end)
+        end
+
+        refs.frame._krtBound = true
+        return refs
+    end
+
+    showLoggerExportFrame = function()
+        local raid = needRaid()
+        if not raid then
+            addon:error(L.ErrLoggerInvalidRaid)
+            return false
+        end
+
+        local refs = bindExportFrame()
+        if not (refs and refs.frame) then
+            return false
+        end
+
+        module._loggerExportMode = "loot"
+        if not refreshExportFrame(module._loggerExportMode) then
+            return false
+        end
+        refs.frame:Show()
+        return true
     end
 
     resetSelections = function()
@@ -2109,8 +2316,6 @@ do
             _G[n .. "HeaderRoll"]:SetText(L.StrRoll)
             _G[n .. "HeaderTime"]:SetText(L.StrTime)
 
-            -- Disabled until implemented
-            _G[n .. "ExportBtn"]:Disable()
             _G[n .. "ClearBtn"]:Disable()
             _G[n .. "AddBtn"]:Disable()
             local del = _G[n .. "DeleteBtn"]
@@ -2118,10 +2323,14 @@ do
                 del:SetText(L.BtnDelete)
             end
             _G[n .. "EditBtn"]:Disable()
+            UIPrimitives.EnableDisable(_G[n .. "ExportBtn"], module.selectedRaid ~= nil)
             updateSourceHeaderState(n)
 
             local frame = _G[n]
             if frame and not frame._krtBound then
+                Frames.SafeSetScript(_G[n .. "ExportBtn"], "OnClick", function()
+                    showLoggerExportFrame()
+                end)
                 Frames.SafeSetScript(_G[n .. "DeleteBtn"], "OnClick", function(self, button)
                     Loot:Delete(self, button)
                 end)
@@ -2287,8 +2496,10 @@ do
             updateSourceHeaderState(n)
 
             local lootSelCount = MultiSelect.MultiSelectCount(module._msLootCtx)
+            local exportBtn = _G[n .. "ExportBtn"]
             local delBtn = _G[n .. "DeleteBtn"]
             local count = controller and controller.data and #controller.data or 0
+            UIPrimitives.EnableDisable(exportBtn, module.selectedRaid ~= nil)
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, lootSelCount)
             UIPrimitives.EnableDisable(delBtn, (lootSelCount or 0) > 0)
             setPanelTitle(n, Helpers.GetCountContextTitle(L.StrRaidLoot, count, Helpers.GetLootPanelContextLabel(module), nil))

@@ -95,6 +95,7 @@ Services\Reserves.lua
 Widgets\ReservesUI.lua
 Services\Logger\Store.lua
 Services\Logger\View.lua
+Services\Logger\Export.lua
 Services\Logger\Helpers.lua
 Services\Logger\Actions.lua
 Controllers\Logger.lua

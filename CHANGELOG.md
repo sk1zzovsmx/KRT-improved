@@ -4,6 +4,10 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **UI:** Logger now exports copy-ready CSV for loot and raid attendance from
+  the selected raid context.
+- **Bugfix:** Master now loads on Lua 5.1/WoW clients without hitting the
+  chunk-scope local variable limit.
 - **Performance:** Loot-window fetch now defers tooltip-based item cache warming
   through a timer queue, reducing `LOOT_OPENED` frame spikes when many items
   are uncached.

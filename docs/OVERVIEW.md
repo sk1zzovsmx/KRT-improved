@@ -56,6 +56,8 @@ Runtime data/model/service modules:
 - `addon.Services.Debug`
 - `addon.Services.Reserves` (public facade in `Services/Reserves.lua`; internal import and grouped-display
   helpers in `Services/Reserves/{Import,Display}.lua`)
+- `addon.Services.Logger` (Logger Store/View/Export/Helpers/Actions service tables consumed by
+  `Controllers/Logger.lua`)
 
 `addon.Services.Raid` is composed by:
 - `Services/Raid/State.lua` (core raid state + raid-side loot/boss coordination contracts)
