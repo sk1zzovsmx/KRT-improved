@@ -2004,6 +2004,18 @@ do
             addon:debug(Diag.D.LogMLAwardRequested:format(tostring(winnerName), tonumber(lootState.currentRollType) or -1, Rolls:HighestRoll(winnerName) or 0, tostring(itemLink)))
         end
 
+        if resolution.resolvedByTiebreaker and addon.options.announceOnWin then
+            ChatApi.Announce(
+                Chat,
+                L.ChatTiebreakResolved:format(
+                    tostring(resolution.tiebreakerWinnerName or ""),
+                    tostring(itemLink or ""),
+                    tonumber(resolution.tiebreakerWinnerCount) or 0,
+                    tonumber(resolution.tiebreakerRunnerUpCount) or 0
+                )
+            )
+        end
+
         if lootState.fromInventory == true then
             local targetCount = tonumber(lootState.selectedItemCount) or 1
             if targetCount > 1 then
