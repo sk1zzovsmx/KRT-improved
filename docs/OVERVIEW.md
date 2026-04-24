@@ -89,6 +89,7 @@ Runtime data/model/service modules:
 `addon.Services.Reserves` internal runtime helpers are composed by:
 - `Services/Reserves/Import.lua` (CSV parsing plus/multi strategies and import aggregation)
 - `Services/Reserves/Display.lua` (grouped display rows, player formatting, and reserve-list projections)
+- `Services/Reserves/Sync.lua` (runtime-only SoftRes metadata/data sync and chunked addon-message handling)
 
 ### Widgets (`addon.Widgets.*`)
 

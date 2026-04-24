@@ -377,19 +377,20 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 64) Widgets/LootCounter.lua
 65) Services/Reserves/Import.lua
 66) Services/Reserves/Display.lua
-67) Services/Reserves.lua
-68) Widgets/ReservesUI.lua
-69) Services/Logger/Store.lua
-70) Services/Logger/View.lua
-71) Services/Logger/Export.lua
-72) Services/Logger/Helpers.lua
-73) Services/Logger/Actions.lua
-74) Controllers/Logger.lua
-75) Widgets/Config.lua
-76) Controllers/Warnings.lua
-77) Controllers/Changes.lua
-78) Controllers/Spammer.lua
-79) KRT.xml
+67) Services/Reserves/Sync.lua
+68) Services/Reserves.lua
+69) Widgets/ReservesUI.lua
+70) Services/Logger/Store.lua
+71) Services/Logger/View.lua
+72) Services/Logger/Export.lua
+73) Services/Logger/Helpers.lua
+74) Services/Logger/Actions.lua
+75) Controllers/Logger.lua
+76) Widgets/Config.lua
+77) Controllers/Warnings.lua
+78) Controllers/Changes.lua
+79) Controllers/Spammer.lua
+80) KRT.xml
 
 ---
 

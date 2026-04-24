@@ -101,7 +101,8 @@
 |   |   |   \\-- State.lua
 |   |   |-- Reserves
 |   |   |   |-- Display.lua
-|   |   |   \\-- Import.lua
+|   |   |   |-- Import.lua
+|   |   |   \\-- Sync.lua
 |   |   |-- Rolls
 |   |   |   |-- Countdown.lua
 |   |   |   |-- Display.lua

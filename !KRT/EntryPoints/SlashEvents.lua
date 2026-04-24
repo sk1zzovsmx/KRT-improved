@@ -673,14 +673,47 @@ end
 
 local function handleReservesCommand(rest)
     local sub = Strings.SplitArgs(rest)
+    local reserves = Services and Services.Reserves or nil
+    local sync = reserves and reserves._Sync or nil
     if isToggleCommand(sub) then
         callWidget("Reserves", "Toggle")
     elseif sub == "import" then
         callWidget("Reserves", "ToggleImport")
+    elseif sub == "sync" then
+        if sync and sync.RequestMetadata then
+            sync:RequestMetadata()
+        else
+            addon:warn(L.MsgFeatureUnavailable, "Reserves", "sync")
+        end
+    elseif sub == "meta" then
+        if reserves and reserves.GetSyncMetadata then
+            local meta = reserves:GetSyncMetadata()
+            addon:info(
+                L.MsgReservesSyncMetaLocal:format(
+                    tostring(meta.source or L.StrUnknown),
+                    tostring(meta.checksum or L.StrUnknown),
+                    tostring(meta.mode or L.StrUnknown),
+                    tonumber(meta.players) or 0,
+                    tonumber(meta.entries) or 0,
+                    (meta.runtime and L.StrYes or L.StrNo)
+                )
+            )
+        else
+            addon:warn(L.MsgFeatureUnavailable, "Reserves", "meta")
+        end
+    elseif sub == "clearcache" then
+        if reserves and reserves.DeleteSyncedReservesCache and reserves:DeleteSyncedReservesCache() then
+            addon:info(L.MsgReservesSyncCacheCleared)
+        else
+            addon:warn(L.MsgReservesSyncNoRuntimeCache)
+        end
     else
         addon:info(format(L.StrCmdCommands, "krt res"), "KRT")
         printHelp("toggle", L.StrCmdToggle)
         printHelp("import", L.StrCmdReservesImport)
+        printHelp("sync", L.StrCmdReservesSync)
+        printHelp("meta", L.StrCmdReservesMeta)
+        printHelp("clearcache", L.StrCmdReservesClearCache)
     end
 end
 

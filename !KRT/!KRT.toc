@@ -91,6 +91,7 @@ Controllers\Master.lua
 Widgets\LootCounter.lua
 Services\Reserves\Import.lua
 Services\Reserves\Display.lua
+Services\Reserves\Sync.lua
 Services\Reserves.lua
 Widgets\ReservesUI.lua
 Services\Logger\Store.lua

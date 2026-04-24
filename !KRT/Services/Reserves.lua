@@ -38,6 +38,7 @@ do
 
     -- ----- Internal state ----- --
     local reservesData = {}
+    local persistedReservesData = {}
     local reservesByItemID = {}
     local reservesByItemPlayer = {}
     local playerItemsByName = {}
@@ -51,6 +52,8 @@ do
     local pendingDisplayRefreshDelaySeconds = 0.05
     local collapsedBossGroups = {}
     local grouped = {}
+    local syncedCacheMeta = nil
+    local syncedCacheActive = false
     local RebuildIndex
     local hasPendingItem
 
@@ -227,12 +230,16 @@ do
         return normalized
     end
 
-    local function applyRuntimeReservesData(sourceData, phaseTag)
-        local normalized = buildRuntimeReservesData(sourceData, phaseTag)
-        twipe(reservesData)
-        for playerKey, player in pairs(normalized) do
-            reservesData[playerKey] = player
+    local function copyReservesData(sourceData, target)
+        twipe(target)
+        for playerKey, player in pairs(sourceData or {}) do
+            target[playerKey] = player
         end
+    end
+
+    local function applyRuntimeReservesData(sourceData, phaseTag, target)
+        local normalized = buildRuntimeReservesData(sourceData, phaseTag)
+        copyReservesData(normalized, target or reservesData)
         return normalized
     end
 
@@ -309,6 +316,61 @@ do
 
     local function notifyReservesDataChanged(reason, raidId, mode, nPlayers)
         Bus.TriggerEvent(InternalEvents.ReservesDataChanged, reason, raidId, mode, nPlayers)
+    end
+
+    local function countReserves(sourceData)
+        local players = 0
+        local entries = 0
+        for _, player in pairs(sourceData or {}) do
+            if type(player) == "table" then
+                players = players + 1
+                local rows = player.reserves
+                if type(rows) == "table" then
+                    entries = entries + #rows
+                end
+            end
+        end
+        return players, entries
+    end
+
+    local function buildReservesChecksum(sourceData, mode)
+        local parts = { normalizeImportMode(mode) }
+        for playerKey, player in pairs(sourceData or {}) do
+            if type(player) == "table" then
+                parts[#parts + 1] = tostring(playerKey)
+                parts[#parts + 1] = tostring(player.playerNameDisplay or "")
+                local rows = player.reserves
+                if type(rows) == "table" then
+                    for i = 1, #rows do
+                        local row = rows[i]
+                        if type(row) == "table" then
+                            parts[#parts + 1] = tostring(row.rawID or "")
+                            parts[#parts + 1] = tostring(row.quantity or "")
+                            parts[#parts + 1] = tostring(row.plus or "")
+                            parts[#parts + 1] = tostring(row.class or "")
+                        end
+                    end
+                end
+            end
+        end
+        local text = tconcat(parts, "|")
+        local checksum = 0
+        for i = 1, #text do
+            checksum = (checksum + (text:byte(i) * i)) % 1000000007
+        end
+        return tostring(checksum)
+    end
+
+    local function getActiveSyncMetadata()
+        local players, entries = countReserves(reservesData)
+        return {
+            source = syncedCacheActive and (syncedCacheMeta and syncedCacheMeta.source or L.StrUnknown) or "local",
+            checksum = syncedCacheActive and (syncedCacheMeta and syncedCacheMeta.checksum) or buildReservesChecksum(reservesData, importMode),
+            mode = normalizeImportMode(importMode),
+            players = players,
+            entries = entries,
+            runtime = syncedCacheActive == true,
+        }
     end
 
     local function rebuildReserveIndexes(reason, raidId, mode, nPlayers)
@@ -458,7 +520,10 @@ do
     -- ----- Saved Data Management ----- --
 
     function Service:Save(contextTag)
-        local canonical = applyRuntimeReservesData(reservesData, contextTag or "save")
+        local canonical = applyRuntimeReservesData(persistedReservesData, contextTag or "save", persistedReservesData)
+        if not syncedCacheActive then
+            copyReservesData(canonical, reservesData)
+        end
         rebuildReserveIndexes()
         if isDebugEnabled() then
             addon:debug(Diag.D.LogReservesSaveEntries:format(addon.tLength(reservesData)))
@@ -472,7 +537,10 @@ do
         end
         clearDisplayRefreshQueue()
         local savedReserves = (type(KRT_Reserves) == "table") and KRT_Reserves or {}
-        applyRuntimeReservesData(savedReserves, "load")
+        local normalized = applyRuntimeReservesData(savedReserves, "load", persistedReservesData)
+        if not syncedCacheActive then
+            copyReservesData(normalized, reservesData)
+        end
 
         importMode = nil
         setImportMode(self:GetImportMode(), true)
@@ -486,7 +554,10 @@ do
         end
         clearDisplayRefreshQueue()
         KRT_Reserves = nil
+        twipe(persistedReservesData)
         twipe(reservesData)
+        syncedCacheMeta = nil
+        syncedCacheActive = false
         rebuildReserveIndexes("clear")
         local clearMessage = L[reserveListClearedKey]
         if clearMessage then
@@ -496,6 +567,10 @@ do
 
     function Service:HasData()
         return next(reservesData) ~= nil
+    end
+
+    function Service:IsLocalDataAvailable()
+        return next(persistedReservesData) ~= nil
     end
 
     function Service:HasItemReserves(itemId)
@@ -599,7 +674,10 @@ do
 
         clearDisplayRefreshQueue()
         local mode = (parsed.mode == "plus" or parsed.mode == "multi") and parsed.mode or self:GetImportMode()
-        reservesData = parsed.reservesData
+        applyRuntimeReservesData(parsed.reservesData, "import", persistedReservesData)
+        copyReservesData(persistedReservesData, reservesData)
+        syncedCacheMeta = nil
+        syncedCacheActive = false
         setImportMode(mode, true)
         self:Save()
 
@@ -844,6 +922,48 @@ do
 
     function Service:GetDisplayList()
         return DisplayHelpers.GetDisplayList(getDisplayContext())
+    end
+
+    function Service:GetSyncMetadata()
+        return getActiveSyncMetadata()
+    end
+
+    function Service:GetSyncPayload()
+        return persistedReservesData, getActiveSyncMetadata()
+    end
+
+    function Service:SetSyncedReservesData(sourceData, meta)
+        if self:IsLocalDataAvailable() then
+            return false, "local_data_present"
+        end
+
+        local normalized = applyRuntimeReservesData(sourceData, "sync", reservesData)
+        local mode = normalizeImportMode(meta and meta.mode)
+        setImportMode(mode, false)
+
+        local players, entries = countReserves(normalized)
+        syncedCacheMeta = {
+            source = tostring((meta and meta.source) or L.StrUnknown),
+            checksum = tostring((meta and meta.checksum) or buildReservesChecksum(normalized, mode)),
+            mode = mode,
+            players = players,
+            entries = entries,
+            runtime = true,
+        }
+        syncedCacheActive = true
+        rebuildReserveIndexes("sync", nil, mode, players)
+        return true
+    end
+
+    function Service:DeleteSyncedReservesCache()
+        if not syncedCacheActive then
+            return false
+        end
+        syncedCacheMeta = nil
+        syncedCacheActive = false
+        copyReservesData(persistedReservesData, reservesData)
+        rebuildReserveIndexes("sync-clear", nil, importMode, addon.tLength(reservesData))
+        return true
     end
 
     function Service:IsSourceCollapsed(source)

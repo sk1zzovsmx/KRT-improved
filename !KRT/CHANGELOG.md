@@ -12,6 +12,9 @@ Release-Version: 0.7.0-beta.1
   `/krt version` and `/krt bug` local diagnostic summaries for support.
 - **Group version check** - `/krt version` now requests KRT version details
   from grouped addon users through a dedicated addon-message prefix.
+- **SoftRes runtime sync** - Added lightweight `/krt res sync` support for
+  grouped KRT clients to request runtime-only SoftRes metadata/data from an
+  authorized reserve owner without persisting received reserves.
 - **Logger UI polish** - Refreshed the Logger toward a MizusRaidTracker-style
   Wrath raid-log look with dark compact tables, yellow section titles,
   out-of-panel controls, and green selected rows.

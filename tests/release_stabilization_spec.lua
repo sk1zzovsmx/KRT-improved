@@ -767,7 +767,10 @@ local function newHarness()
         pushLog("trace", message)
     end
     addon.Base64.Encode = function(value)
-        return tostring(value)
+        return tostring(value):gsub("%%", "%%25"):gsub("|", "%%7C"):gsub("\n", "%%0A")
+    end
+    addon.Base64["Decode"] = function(value)
+        return tostring(value):gsub("%%0A", "\n"):gsub("%%7C", "|"):gsub("%%25", "%%")
     end
     addon.WrapTextInColorCode = tostring
     addon.Colors.NormalizeHexColor = tostring
@@ -2242,6 +2245,7 @@ local function newHarness()
                 loadFiles({
                     "!KRT/Services/Reserves/Import.lua",
                     "!KRT/Services/Reserves/Display.lua",
+                    "!KRT/Services/Reserves/Sync.lua",
                 })
             end
 
@@ -8478,6 +8482,150 @@ test("comms version check replies to requests by whisper", function()
     assertEqual(sent[1].channel, "WHISPER", "expected direct reply")
     assertEqual(sent[1].target, "Bob", "expected requester target")
     assertTrue(sent[1].msg:match("^ACK|9%.8%.7|30300|5|") ~= nil, "expected local version payload")
+end)
+
+test("reserves synced runtime cache feeds display without persisting", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {}
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Reserves = h.addon.Services.Reserves
+    Reserves:Load()
+
+    local ok = Reserves:SetSyncedReservesData({
+        Alice = {
+            reserves = {
+                { rawID = 1001, quantity = 2, plus = 4, class = "MAGE" },
+            },
+        },
+    }, {
+        source = "Master",
+        checksum = "abc123",
+        mode = "plus",
+    })
+
+    assertTrue(ok == true, "expected synced reserves cache to be accepted without local data")
+    assertTrue(Reserves:HasData() == true, "expected synced runtime cache to count as display data")
+    assertTrue(Reserves:IsLocalDataAvailable() ~= true, "expected synced runtime cache to remain non-local")
+    assertEqual(Reserves:FormatReservedPlayersLine(1001, false, true, true), "Alice (P+4)", "expected synced cache to feed reserve display")
+
+    local meta = Reserves:GetSyncMetadata()
+    assertEqual(meta.source, "Master", "expected sync metadata source")
+    assertEqual(meta.checksum, "abc123", "expected sync metadata checksum")
+    assertEqual(meta.players, 1, "expected sync metadata player count")
+    assertEqual(meta.entries, 1, "expected sync metadata entry count")
+    assertTrue(meta.runtime == true, "expected sync metadata to mark runtime cache")
+
+    Reserves:Save("test")
+    assertEqual(_G.KRT_Reserves.Alice, nil, "expected synced runtime cache to avoid SavedVariables persistence")
+end)
+
+test("reserves local data wins over synced runtime cache", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1001, quantity = 1 },
+            },
+        },
+    }
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Reserves = h.addon.Services.Reserves
+    Reserves:Load()
+
+    local ok, reason = Reserves:SetSyncedReservesData({
+        Bob = {
+            reserves = {
+                { rawID = 2002, quantity = 1 },
+            },
+        },
+    }, {
+        source = "Master",
+        checksum = "synced",
+        mode = "multi",
+    })
+
+    assertTrue(ok ~= true, "expected synced cache to be rejected when local reserves exist")
+    assertEqual(reason, "local_data_present", "expected local-data rejection reason")
+    assertTrue(Reserves:IsLocalDataAvailable() == true, "expected local reserves to remain authoritative")
+    assertEqual(Reserves:FormatReservedPlayersLine(1001, false, true, true), "Alice", "expected local reserve display to remain active")
+    assertEqual(Reserves:FormatReservedPlayersLine(2002, false, true, true), "", "expected rejected synced cache to stay hidden")
+end)
+
+test("reserves sync helper requests metadata and imports chunked runtime data", function()
+    local requester = newHarness()
+    local provider = newHarness()
+    local sent = {}
+    _G.GetNumRaidMembers = function()
+        return 10
+    end
+    _G.SendAddonMessage = function(prefix, msg, channel, target)
+        sent[#sent + 1] = {
+            prefix = prefix,
+            msg = msg,
+            channel = channel,
+            target = target,
+        }
+    end
+
+    _G.KRT_Reserves = {}
+    requester:load("!KRT/Localization/localization.en.lua")
+    requester:load("!KRT/Modules/Comms.lua")
+    requester:load("!KRT/Services/Reserves.lua")
+    requester.addon.Services.Reserves:Load()
+
+    local ok = requester.addon.Services.Reserves._Sync:RequestMetadata()
+
+    assertTrue(ok == true, "expected metadata request to be sent")
+    assertEqual(sent[1].prefix, "KRTResSync", "expected dedicated reserves sync prefix")
+    assertEqual(sent[1].channel, "RAID", "expected group metadata request")
+    assertTrue(sent[1].msg:match("^META_REQ|") ~= nil, "expected metadata request payload")
+
+    sent = {}
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1001, quantity = 1, plus = 2 },
+            },
+        },
+    }
+    provider:load("!KRT/Localization/localization.en.lua")
+    provider:load("!KRT/Modules/Comms.lua")
+    provider:load("!KRT/Services/Reserves.lua")
+    provider.addon.Services.Reserves:Load()
+    provider:setRaidRoleState({ inRaid = true, isLeader = true, isMasterLooter = true })
+
+    local handled = provider.addon.Services.Reserves._Sync:RequestMessageHandling("KRTResSync", "META_REQ|1", "RAID", "Requester")
+
+    assertTrue(handled == true, "expected provider to handle metadata request")
+    assertEqual(sent[1].prefix, "KRTResSync", "expected provider metadata prefix")
+    assertEqual(sent[1].channel, "WHISPER", "expected provider to whisper metadata")
+    assertEqual(sent[1].target, "Requester", "expected provider to target requester")
+    assertTrue(sent[1].msg:match("^META_ACK|") ~= nil, "expected metadata ack")
+
+    local metaAck = sent[1]
+    sent = {}
+    requester.addon.Services.Reserves._Sync:RequestMessageHandling(metaAck.prefix, metaAck.msg, metaAck.channel, "Master")
+
+    assertEqual(sent[1].prefix, "KRTResSync", "expected requester data request prefix")
+    assertEqual(sent[1].channel, "WHISPER", "expected requester to whisper data request")
+    assertEqual(sent[1].target, "Master", "expected requester to target metadata provider")
+    assertTrue(sent[1].msg:match("^DATA_REQ|") ~= nil, "expected metadata ack to trigger data request")
+
+    local dataReq = sent[1]
+    sent = {}
+    provider.addon.Services.Reserves._Sync:RequestMessageHandling(dataReq.prefix, dataReq.msg, dataReq.channel, "Requester")
+
+    assertTrue(#sent >= 2, "expected data chunks and done message after data request")
+    assertTrue(sent[#sent].msg:match("^DATA_DONE|") ~= nil, "expected final data done message")
+
+    for i = 1, #sent do
+        requester.addon.Services.Reserves._Sync:RequestMessageHandling(sent[i].prefix, sent[i].msg, sent[i].channel, "Master")
+    end
+    assertEqual(requester.addon.Services.Reserves:FormatReservedPlayersLine(1001, false, true, true), "Alice", "expected chunked sync payload to populate requester runtime cache")
+    requester.addon.Services.Reserves:Save("test")
+    assertEqual(_G.KRT_Reserves.Alice, nil, "expected chunked sync payload to remain non-persistent")
 end)
 
 local failures = 0

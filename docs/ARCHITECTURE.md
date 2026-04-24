@@ -43,9 +43,9 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   (`Context`, `State`, `Sessions`, `Snapshots`, `PendingAwards`, `PassiveGroupLoot`, `Tracking`) on
   underscore-prefixed internal surfaces.
   `addon.Services.Reserves` keeps its public reserves contract in `!KRT/Services/Reserves.lua` and owns
-  internal import parsing plus grouped-display/player-format helpers in
-  `!KRT/Services/Reserves/{Import,Display}.lua`
-  (`addon.Services.Reserves._Import`, `_Display`).
+  internal import parsing, grouped-display/player-format, and runtime-only sync helpers in
+  `!KRT/Services/Reserves/{Import,Display,Sync}.lua`
+  (`addon.Services.Reserves._Import`, `_Display`, `_Sync`).
   `Services/Raid/Capabilities.lua` owns capability queries and the shared master-only access guard.
   `Services/Chat.lua` owns announce/warn output contracts.
 - `!KRT/Core/DB.lua`

@@ -1345,6 +1345,10 @@ do
         if addon.Comms and addon.Comms.EnsureVersionPrefix then
             addon.Comms:EnsureVersionPrefix()
         end
+        local reservesSync = reservesService and reservesService._Sync or nil
+        if reservesSync and reservesSync.EnsurePrefix then
+            reservesSync:EnsurePrefix()
+        end
         Core.NormalizeSavedVariablesAfterLoad()
         for event in pairs(addonEvents) do
             self:RegisterEvent(event)
@@ -1522,6 +1526,11 @@ do
     -- CHAT_MSG_ADDON: Forwards addon communication messages to the Syncer module.
     function addon:CHAT_MSG_ADDON(prefix, msg, channel, sender)
         if addon.Comms and addon.Comms.RequestVersionMessageHandling and addon.Comms:RequestVersionMessageHandling(prefix, msg, channel, sender) then
+            return
+        end
+        local reservesService = getService("Reserves")
+        local reservesSync = reservesService and reservesService._Sync or nil
+        if reservesSync and reservesSync.RequestMessageHandling and reservesSync:RequestMessageHandling(prefix, msg, channel, sender) then
             return
         end
         local syncer = Core.GetSyncer and Core.GetSyncer() or nil
