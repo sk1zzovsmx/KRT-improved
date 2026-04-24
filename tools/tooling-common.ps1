@@ -216,6 +216,52 @@ function ConvertTo-KrtSearchRelativePath {
     return (Split-Path -Path $fullPath -Leaf)
 }
 
+function Write-KrtUtf8NoBom {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [AllowEmptyCollection()]
+        [string[]]$Value
+    )
+
+    $parent = Split-Path -Path $Path -Parent
+    if (-not [string]::IsNullOrWhiteSpace($parent) -and -not (Test-Path -LiteralPath $parent)) {
+        New-Item -Path $parent -ItemType Directory | Out-Null
+    }
+
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+    $content = [string]::Join([Environment]::NewLine, $Value)
+    if ($Value.Count -gt 0) {
+        $content = $content + [Environment]::NewLine
+    }
+
+    [System.IO.File]::WriteAllText($Path, $content, $encoding)
+}
+
+function Export-KrtCsvUtf8NoBom {
+    param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [object]$InputObject,
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    begin {
+        $rows = New-Object System.Collections.Generic.List[object]
+    }
+
+    process {
+        $rows.Add($InputObject)
+    }
+
+    end {
+        $csv = @($rows | ConvertTo-Csv -NoTypeInformation)
+        Write-KrtUtf8NoBom -Path $Path -Value $csv
+    }
+}
+
 function Get-KrtGlobVariants {
     param([string]$Glob)
 

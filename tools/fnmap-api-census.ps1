@@ -8,6 +8,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$toolingCommonPath = Join-Path $PSScriptRoot "tooling-common.ps1"
+. $toolingCommonPath
+
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $repoRoot
 
@@ -312,7 +315,7 @@ $internalCount = $internalApis.Count
 
 $styleRowsAll = $apis |
     Group-Object MethodStyle |
-    Sort-Object Count -Descending |
+    Sort-Object @{ Expression = "Count"; Descending = $true }, Name |
     ForEach-Object {
         $pct = if ($totalApis -gt 0) {
             [Math]::Round(100.0 * $_.Count / [double]$totalApis, 2)
@@ -328,7 +331,7 @@ $styleRowsAll = $apis |
 
 $styleRowsPublic = $publicApis |
     Group-Object MethodStyle |
-    Sort-Object Count -Descending |
+    Sort-Object @{ Expression = "Count"; Descending = $true }, Name |
     ForEach-Object {
         $pct = if ($publicCount -gt 0) {
             [Math]::Round(100.0 * $_.Count / [double]$publicCount, 2)
@@ -344,7 +347,7 @@ $styleRowsPublic = $publicApis |
 
 $taxonomyRows = $publicApis |
     Group-Object TaxonomyCategory |
-    Sort-Object Count -Descending |
+    Sort-Object @{ Expression = "Count"; Descending = $true }, Name |
     ForEach-Object {
         $pct = if ($publicCount -gt 0) {
             [Math]::Round(100.0 * $_.Count / [double]$publicCount, 2)
@@ -360,7 +363,7 @@ $taxonomyRows = $publicApis |
 
 $topTargets = $publicApis |
     Group-Object Target |
-    Sort-Object Count -Descending |
+    Sort-Object @{ Expression = "Count"; Descending = $true }, Name |
     Select-Object -First 25 |
     ForEach-Object { [pscustomobject]@{ Target = $_.Name; Count = $_.Count } }
 
@@ -393,21 +396,21 @@ $apis |
     Select-Object ApiPath, ApiScope, Target, Method, Separator, MethodStyle, Verb,
         TaxonomyCategory, IsCaseConformant, IsTaxonomyConformant, IsUnderscoreMethod,
         DefinitionCount, Layer, File, Line |
-    Export-Csv -Path $csvOut -NoTypeInformation -Encoding UTF8
+    Export-KrtCsvUtf8NoBom -Path $csvOut
 
 $publicApis |
     Sort-Object ApiPath |
     Select-Object ApiPath, ApiScope, Target, Method, Separator, MethodStyle, Verb,
         TaxonomyCategory, IsCaseConformant, IsTaxonomyConformant, DefinitionCount,
         Layer, File, Line |
-    Export-Csv -Path $publicCsvOut -NoTypeInformation -Encoding UTF8
+    Export-KrtCsvUtf8NoBom -Path $publicCsvOut
 
 $internalApis |
     Sort-Object ApiPath |
     Select-Object ApiPath, ApiScope, Target, Method, Separator, MethodStyle, Verb,
         TaxonomyCategory, IsCaseConformant, IsTaxonomyConformant, DefinitionCount,
         Layer, File, Line |
-    Export-Csv -Path $internalCsvOut -NoTypeInformation -Encoding UTF8
+    Export-KrtCsvUtf8NoBom -Path $internalCsvOut
 
 $md = New-Object System.Collections.Generic.List[string]
 
@@ -500,7 +503,7 @@ $md.Add('- Excludes vendored libraries under `!KRT/Libs`.')
 $md.Add('- Classifies public vs internal APIs using method underscore prefix and `._ui` targets.')
 $md.Add('- Applies a public-API verb taxonomy for readability tracking.')
 
-Set-Content -Path $mdOut -Value $md -Encoding UTF8
+Write-KrtUtf8NoBom -Path $mdOut -Value $md
 
 Write-Host ("API census complete. Unique API surface={0}" -f $totalApis) -ForegroundColor Green
 Write-Host ("CSV: {0}" -f (Normalize-Path $csvOut))

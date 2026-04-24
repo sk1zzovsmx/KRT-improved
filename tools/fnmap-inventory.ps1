@@ -5,6 +5,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$toolingCommonPath = Join-Path $PSScriptRoot "tooling-common.ps1"
+. $toolingCommonPath
+
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $repoRoot
 
@@ -209,7 +212,7 @@ $entries |
     Sort-Object Layer, File, LineStart |
     Select-Object Layer, File, LineStart, LineEnd, Function, Type, Exported, Owner,
         Calls, UsedBy, Cluster, Class, Action, Status |
-    Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
+    Export-KrtCsvUtf8NoBom -Path $csvPath
 
 Write-Host ("Function inventory complete. Entries={0}" -f $entries.Count) -ForegroundColor Green
 Write-Host ("CSV: {0}" -f (Normalize-Path $csvPath))

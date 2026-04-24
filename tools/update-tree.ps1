@@ -7,6 +7,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$toolingCommonPath = Join-Path $PSScriptRoot "tooling-common.ps1"
+. $toolingCommonPath
+
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $repoRoot
 
@@ -92,5 +95,5 @@ $content.Add('```')
 $content.Add("")
 $content.Add("_Regenerate with tools/update-tree.ps1 -MaxDepth $MaxDepth._")
 
-Set-Content -Path $OutputPath -Value $content -Encoding utf8
+Write-KrtUtf8NoBom -Path $OutputPath -Value $content
 Write-Host "Updated $OutputPath"

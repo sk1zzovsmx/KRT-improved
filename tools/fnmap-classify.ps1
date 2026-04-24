@@ -1,6 +1,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$toolingCommonPath = Join-Path $PSScriptRoot "tooling-common.ps1"
+. $toolingCommonPath
+
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $repoRoot
 
@@ -232,7 +235,7 @@ $rows |
     Sort-Object Layer, File, LineStart |
     Select-Object Layer, File, LineStart, LineEnd, Function, Type, Exported, Owner,
         Calls, UsedBy, Cluster, Class, Action, Status |
-    Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
+    Export-KrtCsvUtf8NoBom -Path $csvPath
 
 $clusterPath = Join-Path $repoRoot "docs/FN_CLUSTERS.md"
 $md = New-Object System.Collections.Generic.List[string]
@@ -292,7 +295,7 @@ Add-Section -target $md -title "merge-now" -items $mergeNow
 Add-Section -target $md -title "rename" -items $rename
 Add-Section -target $md -title "keep" -items $keep
 
-Set-Content -Path $clusterPath -Value $md -Encoding UTF8
+Write-KrtUtf8NoBom -Path $clusterPath -Value $md
 
 Write-Host "Function classification complete." -ForegroundColor Green
 Write-Host ("CSV: {0}" -f (Normalize-Path $csvPath))
