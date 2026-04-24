@@ -506,6 +506,17 @@ do
         return false
     end
 
+    local function evaluateAutoLootSuggestion(itemLink, itemRarity)
+        local rules = module._Rules
+        if not (rules and rules.GetItemSuggestion) then
+            return nil
+        end
+        return rules:GetItemSuggestion({
+            itemLink = itemLink,
+            itemRarity = itemRarity,
+        })
+    end
+
     local function resolveLootRollOutcome(itemLink, itemString, itemId, player, rollType, rollValue)
         local passiveGroupLoot = PassiveGroupLoot.IsPassiveGroupLootMethod()
         local preferredRollSessionId = nil
@@ -977,6 +988,7 @@ do
         lootTable[lootState.lootCount].itemLink = itemLink
         lootTable[lootState.lootCount].itemTexture = itemTexture
         lootTable[lootState.lootCount].count = itemCount or 1
+        lootTable[lootState.lootCount].autoLootSuggestion = evaluateAutoLootSuggestion(itemLink, itemRarity)
     end
 
     -- Prepares the currently selected item for display.
@@ -1017,6 +1029,11 @@ do
     function getItem(i)
         i = i or lootState.currentItemIndex
         return lootTable[i]
+    end
+
+    function module:GetAutoLootSuggestion(i)
+        local item = getItem(i)
+        return item and item.autoLootSuggestion or nil
     end
 
     -- Returns the name of the currently selected item.

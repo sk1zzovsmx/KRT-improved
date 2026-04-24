@@ -2178,6 +2178,7 @@ local function newHarness()
                 "!KRT/Services/Loot/PendingAwards.lua",
                 "!KRT/Services/Loot/PassiveGroupLoot.lua",
                 "!KRT/Services/Loot/Tracking.lua",
+                "!KRT/Services/Loot/Rules.lua",
                 "!KRT/Services/Loot/Service.lua",
             }
             local raidServiceFiles = {
@@ -5004,6 +5005,123 @@ test("item link parser ignores non-string values", function()
     assertEqual(h.addon.Item.GetItemIdFromLink(39718), 39718, "expected numeric item ids to pass through unchanged")
 end)
 
+test("auto loot rules suggest disenchant for enchanting materials", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/IgnoredItems.lua")
+    h:load("!KRT/Services/Loot/Rules.lua")
+
+    local Rules = h.addon.Services.Loot._Rules
+    local decision = Rules:GetItemSuggestion({
+        itemId = 34057,
+        itemLink = "|cffa335ee|Hitem:34057:0:0:0:0:0:0:0|h[Abyss Crystal]|h|r",
+        itemRarity = 4,
+    })
+
+    assertEqual(decision.action, "disenchant", "expected enchanting materials to suggest DE")
+    assertEqual(decision.rollType, h.rollTypes.DISENCHANT, "expected DE suggestion to map to disenchant roll type")
+    assertEqual(decision.targetKey, "disenchanter", "expected DE suggestion to target the configured disenchanter")
+    assertEqual(decision.reason, "enchanting_material", "expected explicit enchanting material reason")
+    assertTrue(decision.automatic ~= true, "expected auto-loot rules to suggest only")
+end)
+
+test("auto loot rules keep ignored non-material items as logger skip", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/IgnoredItems.lua")
+    h:load("!KRT/Services/Loot/Rules.lua")
+
+    local Rules = h.addon.Services.Loot._Rules
+    local decision = Rules:GetItemSuggestion({
+        itemId = 40752,
+        itemLink = "|cff0070dd|Hitem:40752:0:0:0:0:0:0:0|h[Emblem of Heroism]|h|r",
+        itemRarity = 4,
+    })
+
+    assertEqual(decision.action, "skipLogger", "expected ignored non-material items to stay logger-only skips")
+    assertEqual(decision.reason, "ignored_item", "expected ignored item reason")
+    assertTrue(decision.skipLogger == true, "expected skipLogger flag")
+    assertTrue(decision.automatic ~= true, "expected ignored decision to suggest only")
+end)
+
+test("auto loot rules suggest bank for quality BoE items", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/IgnoredItems.lua")
+    h:load("!KRT/Services/Loot/Rules.lua")
+
+    local Rules = h.addon.Services.Loot._Rules
+    local decision = Rules:GetItemSuggestion({
+        itemId = 50000,
+        itemLink = "|cffa335ee|Hitem:50000:0:0:0:0:0:0:0|h[BoE Epic]|h|r",
+        itemRarity = 4,
+        itemBind = 2,
+    })
+
+    assertEqual(decision.action, "bank", "expected quality BoE items to suggest Bank")
+    assertEqual(decision.rollType, h.rollTypes.BANK, "expected Bank suggestion to map to bank roll type")
+    assertEqual(decision.targetKey, "banker", "expected Bank suggestion to target configured banker")
+    assertEqual(decision.reason, "boe_quality", "expected BoE quality reason")
+    assertTrue(decision.automatic ~= true, "expected BoE decision to suggest only")
+end)
+
+test("auto loot rules use tooltip bind data for 3.3.5 BoE items", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/IgnoredItems.lua")
+    h.addon.Item.GetItemBindFromTooltip = function(itemLink)
+        if itemLink and itemLink:find("item:39717", 1, true) then
+            return 2
+        end
+        return nil
+    end
+    _G.GetItemInfo = function()
+        return "Inexorable Sabatons", nil, 4, 213
+    end
+    h:load("!KRT/Services/Loot/Rules.lua")
+
+    local Rules = h.addon.Services.Loot._Rules
+    local decision = Rules:GetItemSuggestion({
+        itemId = 39717,
+        itemLink = "|cffa335ee|Hitem:39717:0:0:0:0:0:0:0|h[Inexorable Sabatons]|h|r",
+        itemRarity = 4,
+    })
+
+    assertEqual(decision.action, "bank", "expected tooltip-detected BoE items to suggest Bank")
+    assertEqual(decision.reason, "boe_quality", "expected tooltip BoE quality reason")
+    assertTrue(decision.automatic ~= true, "expected tooltip BoE decision to suggest only")
+end)
+
+test("auto loot rules leave normal non-BoE items undecided", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/IgnoredItems.lua")
+    h:load("!KRT/Services/Loot/Rules.lua")
+
+    local Rules = h.addon.Services.Loot._Rules
+    local decision = Rules:GetItemSuggestion({
+        itemId = 50001,
+        itemLink = "|cffa335ee|Hitem:50001:0:0:0:0:0:0:0|h[Boss Epic]|h|r",
+        itemRarity = 4,
+        itemBind = 1,
+    })
+
+    assertEqual(decision.action, "none", "expected normal non-BoE loot to stay undecided")
+    assertEqual(decision.rollType, nil, "expected no roll type suggestion")
+    assertEqual(decision.targetKey, nil, "expected no assignment target suggestion")
+    assertTrue(decision.automatic ~= true, "expected normal decision to suggest only")
+end)
+
+test("loot service exposes suggestion-only auto loot decisions for tracked items", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/IgnoredItems.lua")
+    h:load("!KRT/Services/Loot.lua")
+
+    local Loot = h.addon.Services.Loot
+    Loot:AddItem("|cffa335ee|Hitem:34057:0:0:0:0:0:0:0|h[Abyss Crystal]|h|r", 1, "Abyss Crystal", 4, "Icon34057")
+
+    local decision = Loot:GetAutoLootSuggestion(1)
+
+    assertEqual(decision.action, "disenchant", "expected tracked enchanting material to expose DE suggestion")
+    assertEqual(decision.rollType, h.rollTypes.DISENCHANT, "expected tracked suggestion to map to DE roll type")
+    assertTrue(decision.automatic ~= true, "expected tracked item suggestion to avoid automatic assignment")
+end)
+
 test("loot service slot lookup works with method-call syntax and itemId fallback", function()
     local h = newHarness()
     local lootLink = h.registerItem(39718, "Corpse Scarab Handguards")
@@ -6660,6 +6778,125 @@ test("master assignment buttons stay disabled until a target is selected", funct
     assertEqual(_G.KRTMasterHoldBtn._enabled, true, "expected Hold to enable when a holder is selected")
     assertEqual(_G.KRTMasterBankBtn._enabled, true, "expected Bank to enable when a banker is selected")
     assertEqual(_G.KRTMasterDisenchantBtn._enabled, false, "expected Disenchant to stay disabled without a target")
+end)
+
+test("master auto loot suggestions stay visual only", function()
+    local h = newHarness()
+    local link = h.registerItem(9400, "Suggestion Dust")
+
+    h.addon.Services.Loot = {
+        GetItem = function()
+            return { itemLink = link, count = 1 }
+        end,
+        GetItemLink = function()
+            return link
+        end,
+        GetAutoLootSuggestion = function()
+            return {
+                action = "disenchant",
+                automatic = false,
+                reason = "enchanting_material",
+                rollType = h.rollTypes.DISENCHANT,
+                targetKey = "disenchanter",
+            }
+        end,
+        ItemExists = function()
+            return true
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Controllers/Master.lua")
+
+    local Master = h.addon.Controllers.Master
+    local frame = h.makeFrame(true, "KRTMaster")
+    local suffixes = {
+        "ConfigBtn",
+        "SelectItemBtn",
+        "SpamLootBtn",
+        "MSBtn",
+        "OSBtn",
+        "SRBtn",
+        "FreeBtn",
+        "CountdownBtn",
+        "AwardBtn",
+        "RollBtn",
+        "ClearBtn",
+        "HoldBtn",
+        "BankBtn",
+        "DisenchantBtn",
+        "Name",
+        "Status",
+        "RollsHeaderPlayer",
+        "RollsHeaderInfo",
+        "RollsHeaderCounter",
+        "RollsHeaderRoll",
+        "ReserveListBtn",
+        "LootCounterBtn",
+        "ItemCount",
+        "HoldDropDown",
+        "BankDropDown",
+        "DisenchantDropDown",
+        "ScrollFrame",
+        "ScrollFrameScrollChild",
+        "ItemBtn",
+    }
+
+    _G.KRTMaster = frame
+    for i = 1, #suffixes do
+        local name = "KRTMaster" .. suffixes[i]
+        _G[name] = h.makeFrame(true, name)
+    end
+    _G.KRTMasterHoldDropDownButton = h.makeFrame(true, "KRTMasterHoldDropDownButton")
+    _G.KRTMasterBankDropDownButton = h.makeFrame(true, "KRTMasterBankDropDownButton")
+    _G.KRTMasterDisenchantDropDownButton = h.makeFrame(true, "KRTMasterDisenchantDropDownButton")
+
+    Master.RequestRefresh = function() end
+    Master:OnLoad(frame)
+
+    h.feature.lootState.lootCount = 1
+    h.feature.lootState.selectedItemCount = 1
+    h.feature.lootState.fromInventory = false
+    h.feature.lootState.holder = "Holder"
+    h.feature.lootState.banker = "Banker"
+    h.feature.lootState.disenchanter = "Shardmaster"
+
+    Master:Refresh()
+
+    assertEqual(_G.KRTMasterStatus:GetText(), "Ready. Suggestion: DE.", "expected status to show the suggested action")
+    assertEqual(_G.KRTMasterHoldBtn._glow, false, "expected Hold to stay unhighlighted")
+    assertEqual(_G.KRTMasterBankBtn._glow, false, "expected Bank to stay unhighlighted")
+    assertEqual(_G.KRTMasterDisenchantBtn._glow, true, "expected Disenchant suggestion to highlight DE only")
 end)
 
 test("master dropdown click uses UIDropDown owner/value arguments", function()

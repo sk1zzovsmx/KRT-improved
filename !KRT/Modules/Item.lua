@@ -17,6 +17,10 @@ local pcall = pcall
 local ITEM_LINK_FORMAT = "|c%s|Hitem:%d:%s|h[%s]|h|r"
 local TOOLTIP_NAME = "KRT_ItemTooltip"
 local tooltip
+local BIND_ON_PICKUP = _G.LE_ITEM_BIND_ON_ACQUIRE or 1
+local BIND_ON_EQUIP = _G.LE_ITEM_BIND_ON_EQUIP or 2
+local BIND_ON_USE = _G.LE_ITEM_BIND_ON_USE or 3
+local BIND_QUEST = _G.LE_ITEM_BIND_QUEST or 4
 
 -- ----- Internal state ----- --
 
@@ -54,6 +58,35 @@ local function scanSoulboundFlag(tip)
     end
 
     return false
+end
+
+local function scanBindType(tip)
+    local numLines = tip:NumLines() or 0
+    local bindOnPickup = _G.ITEM_BIND_ON_PICKUP or "Binds when picked up"
+    local bindOnEquip = _G.ITEM_BIND_ON_EQUIP or "Binds when equipped"
+    local bindOnUse = _G.ITEM_BIND_ON_USE or "Binds when used"
+    local bindQuest = _G.ITEM_BIND_QUEST or "Quest Item"
+
+    for i = 1, numLines do
+        local line = _G[TOOLTIP_NAME .. "TextLeft" .. i]
+        local text = line and line:GetText() or nil
+        if text and text ~= "" then
+            if text == bindOnPickup or text == ITEM_SOULBOUND then
+                return BIND_ON_PICKUP
+            end
+            if text == bindOnEquip then
+                return BIND_ON_EQUIP
+            end
+            if text == bindOnUse then
+                return BIND_ON_USE
+            end
+            if text == bindQuest then
+                return BIND_QUEST
+            end
+        end
+    end
+
+    return nil
 end
 
 -- ----- Public methods ----- --
@@ -103,6 +136,25 @@ function Item.WarmItemCache(itemLink)
     local ok = pcall(tip.SetHyperlink, tip, itemLink)
     tip:Hide()
     return ok == true
+end
+
+function Item.GetItemBindFromTooltip(itemLink)
+    if type(itemLink) ~= "string" or itemLink == "" then
+        return nil
+    end
+
+    local tip = ensureTooltip()
+    setTooltipOwner(tip)
+    tip:ClearLines()
+    local ok = pcall(tip.SetHyperlink, tip, itemLink)
+    if not ok then
+        tip:Hide()
+        return nil
+    end
+
+    local bindType = scanBindType(tip)
+    tip:Hide()
+    return bindType
 end
 
 function Item.IsBagItemSoulbound(bag, slot)

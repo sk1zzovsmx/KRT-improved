@@ -970,7 +970,33 @@ do
         return RollsApi.ShouldUseTieReroll(Rolls, model)
     end
 
-    local function buildMasterStatusText(currentFlowState, rollModel, hasItem, displayedWinner)
+    local function getAutoLootSuggestionLabel(suggestion)
+        if type(suggestion) ~= "table" then
+            return nil
+        end
+        if suggestion.action == "hold" then
+            return L.BtnHold
+        end
+        if suggestion.action == "bank" then
+            return L.BtnBank
+        end
+        if suggestion.action == "disenchant" then
+            return L.BtnDisenchant
+        end
+        if suggestion.action == "skipLogger" then
+            return L.StrAutoLootSuggestionSkipLogger
+        end
+        return nil
+    end
+
+    local function buildAutoLootSuggestionToken(suggestion)
+        if type(suggestion) ~= "table" then
+            return ""
+        end
+        return tostring(suggestion.action or "") .. "|" .. tostring(suggestion.reason or "") .. "|" .. tostring(suggestion.targetKey or "")
+    end
+
+    local function buildMasterStatusText(currentFlowState, rollModel, hasItem, displayedWinner, autoLootSuggestion)
         local resolution = rollModel and rollModel.resolution or {}
         local requiredWinnerCount = tonumber(rollModel and rollModel.requiredWinnerCount) or 1
         local selectedCount = tonumber(rollModel and rollModel.msCount) or 0
@@ -1062,6 +1088,11 @@ do
                 return L.StrMasterStatusAwardTarget:format(displayedWinner)
             end
             return L.StrMasterStatusPickWinner
+        end
+
+        local suggestionLabel = getAutoLootSuggestionLabel(autoLootSuggestion)
+        if suggestionLabel then
+            return L.StrMasterStatusSuggestion:format(suggestionLabel)
         end
 
         return L.StrMasterStatusReady
@@ -1170,6 +1201,8 @@ do
         local tooltipState = opts.tooltipState or {}
         local hasLootAccess = opts.hasLootAccess
         local countdownRunning = opts.countdownRunning
+        local autoLootSuggestion = opts.autoLootSuggestion
+        local suggestedAction = type(autoLootSuggestion) == "table" and autoLootSuggestion.action or nil
 
         return {
             countdownText = countdownRunning and L.BtnStop or L.BtnCountdown,
@@ -1208,6 +1241,9 @@ do
             canRoll = hasLootAccess and opts.record and opts.canRoll and opts.rolled == false and countdownRunning,
             canClear = hasLootAccess and lootState.rollsCount >= 1,
             glowSR = opts.canStartSR,
+            glowHoldSuggestion = hasLootAccess and suggestedAction == "hold" and lootState.holder,
+            glowBankSuggestion = hasLootAccess and suggestedAction == "bank" and lootState.banker,
+            glowDisenchantSuggestion = hasLootAccess and suggestedAction == "disenchant" and lootState.disenchanter,
         }
     end
 
@@ -1477,6 +1513,9 @@ do
         updateEnabled("clear", getNamedPart("ClearBtn"), state.canClear)
         updateItemState(state.canChangeItem)
         updateGlow("sr", getNamedPart("SRBtn"), state.glowSR, 0.20, 0.60, 1.00, "buttonOverlay")
+        updateGlow("holdSuggestion", getNamedPart("HoldBtn"), state.glowHoldSuggestion, 0.85, 0.85, 0.85, "buttonOverlay")
+        updateGlow("bankSuggestion", getNamedPart("BankBtn"), state.glowBankSuggestion, 1.00, 0.65, 0.20, "buttonOverlay")
+        updateGlow("disenchantSuggestion", getNamedPart("DisenchantBtn"), state.glowDisenchantSuggestion, 0.55, 0.75, 1.00, "buttonOverlay")
 
         updateTooltip("config", getNamedPart("ConfigBtn"), L.BtnConfigure, state.configTooltip)
         updateTooltip("selectItem", getNamedPart("SelectItemBtn"), state.selectItemText, state.selectItemTooltip)
@@ -2681,10 +2720,12 @@ do
         if hasItemReserves and reserves and reserves.HasCurrentRaidPlayersForItem and itemId then
             hasEligibleRaidReserve = reserves:HasCurrentRaidPlayersForItem(itemId)
         end
+        local autoLootSuggestion = Loot.GetAutoLootSuggestion and Loot:GetAutoLootSuggestion() or nil
         local countdownRunning = isCountdownRunning()
         flagButtonsOnChange("hasEligibleRaidReserve", hasEligibleRaidReserve)
         flagButtonsOnChange("hasLootAccess", hasLootAccess)
         flagButtonsOnChange("hasReadyCheckAccess", hasReadyCheckAccess)
+        flagButtonsOnChange("autoLootSuggestion", buildAutoLootSuggestionToken(autoLootSuggestion))
         flagButtonsOnChange("countdownRun", countdownRunning)
         flagButtonsOnChange("flowState", currentFlowState)
 
@@ -2692,7 +2733,7 @@ do
         local canStartSR = canStartRolls and hasEligibleRaidReserve
         local isTieReroll = shouldUseTieReroll(rollModel)
         local rollResolution, msCount, canAwardSelection = resolveAwardSelectionState(rollModel, isTieReroll)
-        local statusText = buildMasterStatusText(currentFlowState, rollModel, hasItem, displayedWinner)
+        local statusText = buildMasterStatusText(currentFlowState, rollModel, hasItem, displayedWinner, autoLootSuggestion)
         local selectedItemCount = tonumber(lootState.selectedItemCount) or 1
         local awardTarget = displayedWinner or getCurrentTradeWinner() or getCurrentMultiAwardWinner()
         if selectedItemCount < 1 then
@@ -2722,6 +2763,7 @@ do
                 canRoll = canRoll,
                 canStartRolls = canStartRolls,
                 canStartSR = canStartSR,
+                autoLootSuggestion = autoLootSuggestion,
                 countdownRunning = countdownRunning,
                 currentFlowState = currentFlowState,
                 hasItem = hasItem,

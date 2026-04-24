@@ -187,7 +187,7 @@ Durable preferences learned from recent conversations:
   ingestion/parsing and public loot-service APIs, while `Services/Raid/State.lua` consumes shared helpers instead of
   owning those internals directly.
 - Prefer splitting oversized service hotspots into focused sibling modules (for example
-  `PendingAwards`, `PassiveGroupLoot`, and `Tracking`) while keeping `Services/Loot/Service.lua`
+  `PendingAwards`, `PassiveGroupLoot`, `Tracking`, and `Rules`) while keeping `Services/Loot/Service.lua`
   as the stable public facade.
 - Prefer namespaced module ownership under `addon.Controllers.*`, `addon.Services.*`, `addon.Widgets.*`;
   keep temporary legacy aliases (`addon.Master`, `addon.Raid`, etc.) during soft migrations.
@@ -257,6 +257,8 @@ Durable preferences learned from recent conversations:
   docs/tooling files in distributable ZIP outputs.
 - Keep GitHub release asset download/checksum instructions out of root `README.md`;
   document them in dedicated release/tooling docs under `docs/` or `tools/`.
+- For auto-loot rules, prefer automatic suggestions only; do not auto-award, auto-trade, or auto-assign loot
+  unless explicitly requested.
 
 ---
 
@@ -354,43 +356,44 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 41) Services/Loot/PendingAwards.lua
 42) Services/Loot/PassiveGroupLoot.lua
 43) Services/Loot/Tracking.lua
-44) Services/Raid/State.lua
-45) Services/Raid/Capabilities.lua
-46) Services/Raid/Counts.lua
-47) Services/Raid/Roster.lua
-48) Services/Raid/Attendance.lua
-49) Services/Raid/LootRecords.lua
-50) Services/Raid/Session.lua
-51) Services/Chat.lua
-52) EntryPoints/Minimap.lua
-53) EntryPoints/SlashEvents.lua
-54) Services/Rolls/Countdown.lua
-55) Services/Rolls/Sessions.lua
-56) Services/Rolls/History.lua
-57) Services/Rolls/Responses.lua
-58) Services/Rolls/Resolution.lua
-59) Services/Rolls/Display.lua
-60) Services/Rolls/Service.lua
-61) Services/Loot/Service.lua
-62) Services/Debug.lua
-63) Controllers/Master.lua
-64) Widgets/LootCounter.lua
-65) Services/Reserves/Import.lua
-66) Services/Reserves/Display.lua
-67) Services/Reserves/Sync.lua
-68) Services/Reserves.lua
-69) Widgets/ReservesUI.lua
-70) Services/Logger/Store.lua
-71) Services/Logger/View.lua
-72) Services/Logger/Export.lua
-73) Services/Logger/Helpers.lua
-74) Services/Logger/Actions.lua
-75) Controllers/Logger.lua
-76) Widgets/Config.lua
-77) Controllers/Warnings.lua
-78) Controllers/Changes.lua
-79) Controllers/Spammer.lua
-80) KRT.xml
+44) Services/Loot/Rules.lua
+45) Services/Raid/State.lua
+46) Services/Raid/Capabilities.lua
+47) Services/Raid/Counts.lua
+48) Services/Raid/Roster.lua
+49) Services/Raid/Attendance.lua
+50) Services/Raid/LootRecords.lua
+51) Services/Raid/Session.lua
+52) Services/Chat.lua
+53) EntryPoints/Minimap.lua
+54) EntryPoints/SlashEvents.lua
+55) Services/Rolls/Countdown.lua
+56) Services/Rolls/Sessions.lua
+57) Services/Rolls/History.lua
+58) Services/Rolls/Responses.lua
+59) Services/Rolls/Resolution.lua
+60) Services/Rolls/Display.lua
+61) Services/Rolls/Service.lua
+62) Services/Loot/Service.lua
+63) Services/Debug.lua
+64) Controllers/Master.lua
+65) Widgets/LootCounter.lua
+66) Services/Reserves/Import.lua
+67) Services/Reserves/Display.lua
+68) Services/Reserves/Sync.lua
+69) Services/Reserves.lua
+70) Widgets/ReservesUI.lua
+71) Services/Logger/Store.lua
+72) Services/Logger/View.lua
+73) Services/Logger/Export.lua
+74) Services/Logger/Helpers.lua
+75) Services/Logger/Actions.lua
+76) Controllers/Logger.lua
+77) Widgets/Config.lua
+78) Controllers/Warnings.lua
+79) Controllers/Changes.lua
+80) Controllers/Spammer.lua
+81) KRT.xml
 
 ---
 
@@ -445,6 +448,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
       PendingAwards.lua    # pending-award lifecycle helpers + consume/refresh policy
       PassiveGroupLoot.lua # passive group-loot parser/state/winner helpers
       Tracking.lua         # runtime tracking/debug snapshot builders
+      Rules.lua            # suggestion-only auto-loot rule classifier
     Debug.lua              # synthetic raid/roll test helpers for local addon testing
     Reserves/
       Import.lua           # import parser/strategy helpers (loaded before Reserves.lua)

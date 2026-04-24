@@ -15,6 +15,10 @@ Release-Version: 0.7.0-beta.1
 - **SoftRes runtime sync** - Added lightweight `/krt res sync` support for
   grouped KRT clients to request runtime-only SoftRes metadata/data from an
   authorized reserve owner without persisting received reserves.
+- **Auto-loot suggestions** - Added a lightweight suggestion-only loot rules
+  classifier for ignored items, enchanting materials, and quality BoE loot,
+  including 3.3.5a tooltip-based bind detection; it does not auto-award or
+  auto-trade items.
 - **Logger UI polish** - Refreshed the Logger toward a MizusRaidTracker-style
   Wrath raid-log look with dark compact tables, yellow section titles,
   out-of-panel controls, and green selected rows.

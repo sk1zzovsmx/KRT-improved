@@ -87,6 +87,7 @@
 |   |   |   |-- Context.lua
 |   |   |   |-- PassiveGroupLoot.lua
 |   |   |   |-- PendingAwards.lua
+|   |   |   |-- Rules.lua
 |   |   |   |-- Service.lua
 |   |   |   |-- Snapshots.lua
 |   |   |   |-- State.lua

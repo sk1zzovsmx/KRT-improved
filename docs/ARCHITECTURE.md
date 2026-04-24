@@ -39,8 +39,8 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   raw history/tracker state, response intake/eligibility, resolver policy, and display assembly
   (`addon.Services.Rolls._Countdown`, `_Sessions`, `_History`, `_Responses`, `_Resolution`, `_Display`).
   `addon.Services.Loot` keeps its public ingestion/parsing API in `!KRT/Services/Loot/Service.lua` and owns
-  internal loot-context runtime helpers in `!KRT/Services/Loot/*.lua`
-  (`Context`, `State`, `Sessions`, `Snapshots`, `PendingAwards`, `PassiveGroupLoot`, `Tracking`) on
+  internal loot-context/runtime rule helpers in `!KRT/Services/Loot/*.lua`
+  (`Context`, `State`, `Sessions`, `Snapshots`, `PendingAwards`, `PassiveGroupLoot`, `Tracking`, `Rules`) on
   underscore-prefixed internal surfaces.
   `addon.Services.Reserves` keeps its public reserves contract in `!KRT/Services/Reserves.lua` and owns
   internal import parsing, grouped-display/player-format, and runtime-only sync helpers in

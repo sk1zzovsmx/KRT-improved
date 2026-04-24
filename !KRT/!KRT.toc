@@ -68,6 +68,7 @@ Services\Loot\Snapshots.lua
 Services\Loot\PendingAwards.lua
 Services\Loot\PassiveGroupLoot.lua
 Services\Loot\Tracking.lua
+Services\Loot\Rules.lua
 Services\Raid\State.lua
 Services\Raid\Capabilities.lua
 Services\Raid\Counts.lua

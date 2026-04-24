@@ -51,7 +51,7 @@ Runtime data/model/service modules:
 - `addon.Services.Rolls` (public facade in `Services/Rolls/Service.lua`; internal helpers in
   `Services/Rolls/Countdown.lua`, `Services/Rolls/Sessions.lua`, `Services/Rolls/History.lua`, `Services/Rolls/Responses.lua`,
   `Services/Rolls/Resolution.lua`, `Services/Rolls/Display.lua`)
-- `addon.Services.Loot` (public API in `Services/Loot/Service.lua`; internal loot-context helpers in
+- `addon.Services.Loot` (public API in `Services/Loot/Service.lua`; internal loot-context/rule helpers in
   `Services/Loot/*.lua`)
 - `addon.Services.Debug`
 - `addon.Services.Reserves` (public facade in `Services/Reserves.lua`; internal import and grouped-display
@@ -77,6 +77,7 @@ Runtime data/model/service modules:
 - `Services/Loot/PendingAwards.lua` (pending-award lifecycle and consume/refresh policy)
 - `Services/Loot/PassiveGroupLoot.lua` (passive group-loot parser/state/winner helpers)
 - `Services/Loot/Tracking.lua` (runtime tracking/debug snapshot builders)
+- `Services/Loot/Rules.lua` (suggestion-only auto-loot rule classifier)
 
 `addon.Services.Rolls` internal runtime helpers are composed by:
 - `Services/Rolls/Countdown.lua` (countdown start/stop/tick runtime logic)
