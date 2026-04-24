@@ -8,6 +8,10 @@ Release-Version: 0.7.0-beta.1
 
 ### Enhancements
 
+- **Slash diagnostics** - Added focused `/krt help <command>` pages plus
+  `/krt version` and `/krt bug` local diagnostic summaries for support.
+- **Group version check** - `/krt version` now requests KRT version details
+  from grouped addon users through a dedicated addon-message prefix.
 - **Logger UI polish** - Refreshed the Logger toward a MizusRaidTracker-style
   Wrath raid-log look with dark compact tables, yellow section titles,
   out-of-panel controls, and green selected rows.

@@ -1442,6 +1442,10 @@ do
         return COMM_PREFIX
     end
 
+    function module:GetProtocolVersion()
+        return PROTOCOL_VERSION
+    end
+
     function module:RequestLoggerReq(raidRef, targetName)
         if not ensureGroupSyncAvailable() then
             return false

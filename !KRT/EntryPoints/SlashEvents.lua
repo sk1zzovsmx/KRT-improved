@@ -3,6 +3,7 @@
 -- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
+local addonName = ...
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
@@ -15,6 +16,7 @@ local Strings = feature.Strings or addon.Strings
 local Bus = feature.Bus or addon.Bus
 local Core = feature.Core or addon.Core
 local Services = feature.Services or addon.Services
+local Comms = feature.Comms or addon.Comms
 
 local RT_COLOR = feature.RT_COLOR
 
@@ -23,6 +25,7 @@ local format = string.format
 local upper = string.upper
 local type = type
 local tostring, tonumber = tostring, tonumber
+local _G = _G
 
 local UI = addon.UI
 
@@ -100,6 +103,7 @@ local cmdAchiev, cmdLFM, cmdConfig = { "ach", "achi", "achiev", "achievement" },
 local cmdChanges, cmdWarnings, cmdLogger = { "ms", "changes", "mschanges" }, { "warning", "warnings", "warn", "rw" }, { "logger", "history", "log" }
 local cmdDebug, cmdLoot, cmdCounter = { "debug", "dbg", "debugger" }, { "loot", "ml", "master" }, { "counter", "counters", "counts" }
 local cmdReserves, cmdMinimap, cmdValidate = { "res", "reserves", "reserve" }, { "minimap", "mm" }, { "validate" }
+local cmdHelp, cmdBug, cmdVersion = { "help", "commands" }, { "bug", "report" }, { "version", "ver", "about" }
 local lootOnlySlashCommands = {}
 
 local function markLootOnlyCommands(list)
@@ -123,6 +127,7 @@ end
 
 local function showHelp()
     addon:info(format(L.StrCmdCommands, "krt"), "KRT")
+    printHelp("help [command]", L.StrCmdHelp)
     printHelp("config", L.StrCmdConfig)
     printHelp("lfm", L.StrCmdGrouper)
     printHelp("ach", L.StrCmdAchiev)
@@ -133,6 +138,18 @@ local function showHelp()
     printHelp("counter", L.StrCmdCounter)
     printHelp("reserves", L.StrCmdReserves)
     printHelp("validate", L.StrCmdValidate)
+    printHelp("version", L.StrCmdVersion)
+    printHelp("bug", L.StrCmdBug)
+end
+
+local function showLootHelp()
+    addon:info(format(L.StrCmdCommands, "krt ml"), "KRT")
+    printHelp("toggle", L.StrCmdToggle)
+end
+
+local function showCounterHelp()
+    addon:info(format(L.StrCmdCommands, "krt counter"), "KRT")
+    printHelp("toggle", L.StrCmdToggle)
 end
 
 local function showDebugRaidHelp()
@@ -336,6 +353,120 @@ end
 local function callSyncerMethodWithTarget(methodName, args)
     local raidRefArg, targetArg = Strings.SplitArgs(args)
     callSyncerMethod(methodName, tonumber(raidRefArg), targetArg)
+end
+
+local function getAddonMetadata(key, fallback)
+    local getter = _G.GetAddOnMetadata
+    if type(getter) == "function" then
+        local value = getter(addonName, key)
+        if value ~= nil and value ~= "" then
+            return tostring(value)
+        end
+    end
+    return tostring(fallback or L.StrUnknown)
+end
+
+local function getRaidSchemaVersion()
+    local getter = Core and Core.GetRaidSchemaVersion
+    if type(getter) == "function" then
+        return tostring(getter() or L.StrUnknown)
+    end
+    return tostring(L.StrUnknown)
+end
+
+local function getSyncProtocolVersion()
+    local syncer = getCoreService("GetSyncer")
+    if syncer and type(syncer.GetProtocolVersion) == "function" then
+        return tostring(syncer:GetProtocolVersion() or L.StrUnknown)
+    end
+    return tostring(L.StrUnknown)
+end
+
+local function getLogLevelName()
+    local level = addon.GetLogLevel and addon:GetLogLevel() or nil
+    for name, value in pairs(addon.logLevels or {}) do
+        if value == level then
+            return tostring(name)
+        end
+    end
+    return tostring(level or L.StrUnknown)
+end
+
+local function yesNo(value)
+    if value then
+        return L.StrYes
+    end
+    return L.StrNo
+end
+
+local function countRaidHistory()
+    local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("SlashEvents.BugReport", { "GetAllRaids" }) or nil
+    local raids = raidStore and raidStore:GetAllRaids() or nil
+    if type(raids) ~= "table" then
+        return 0
+    end
+    return #raids
+end
+
+local function countReserves()
+    local reserves = _G.KRT_Reserves
+    local players = 0
+    local entries = 0
+    if type(reserves) ~= "table" then
+        return players, entries
+    end
+
+    for _, record in pairs(reserves) do
+        players = players + 1
+        local list = record and record.reserves
+        if type(list) == "table" then
+            entries = entries + #list
+        end
+    end
+    return players, entries
+end
+
+local function getCurrentRaidSummary()
+    local currentRaid = Core and Core.GetCurrentRaid and Core.GetCurrentRaid() or nil
+    local raidNid
+    local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("SlashEvents.CurrentRaid", { "GetRaidNidByIndex" }) or nil
+    if raidStore and currentRaid and raidStore.GetRaidNidByIndex then
+        raidNid = raidStore:GetRaidNidByIndex(currentRaid)
+    end
+    return tostring(currentRaid or L.StrNone), tostring(raidNid or L.StrNone)
+end
+
+local function getRoleState()
+    local raid = Services and Services.Raid or nil
+    if raid and type(raid.GetPlayerRoleState) == "function" then
+        return raid:GetPlayerRoleState() or {}
+    end
+    return {}
+end
+
+local function showVersion()
+    addon:info(L.MsgVersionTitle)
+    addon:info(L.MsgVersionAddon:format(getAddonMetadata("Version", L.StrUnknown)))
+    addon:info(L.MsgVersionInterface:format(getAddonMetadata("Interface", L.StrUnknown)))
+    addon:info(L.MsgVersionRaidSchema:format(getRaidSchemaVersion()))
+    addon:info(L.MsgVersionSyncProtocol:format(getSyncProtocolVersion()))
+end
+
+local function showBugReport()
+    local reservePlayers, reserveEntries = countReserves()
+    local currentRaid, raidNid = getCurrentRaidSummary()
+    local role = getRoleState()
+
+    addon:info(L.MsgBugReportTitle)
+    addon:info(L.MsgVersionAddon:format(getAddonMetadata("Version", L.StrUnknown)))
+    addon:info(L.MsgVersionInterface:format(getAddonMetadata("Interface", L.StrUnknown)))
+    addon:info(L.MsgVersionRaidSchema:format(getRaidSchemaVersion()))
+    addon:info(L.MsgVersionSyncProtocol:format(getSyncProtocolVersion()))
+    addon:info(L.MsgBugReportLog:format(getLogLevelName(), yesNo(Options.IsDebugEnabled and Options.IsDebugEnabled())))
+    addon:info(L.MsgBugReportCurrentRaid:format(currentRaid, raidNid))
+    addon:info(L.MsgBugReportRaidHistory:format(countRaidHistory()))
+    addon:info(L.MsgBugReportReserves:format(reservePlayers, reserveEntries))
+    addon:info(L.MsgBugReportRole:format(yesNo(role.inRaid), yesNo(role.isLeader), yesNo(role.isAssistant), yesNo(role.isMasterLooter)))
 end
 
 local function handleDebugCommand(rest)
@@ -632,6 +763,62 @@ local function handleLfmCommand(rest)
     end
 end
 
+local function handleHelpCommand(rest)
+    local topic = Strings.SplitArgs(rest)
+    if isBlank(topic) then
+        showHelp()
+        return
+    end
+
+    if topic == "logger" or topic == "history" or topic == "log" then
+        handleLoggerCommand("help")
+    elseif topic == "res" or topic == "reserve" or topic == "reserves" then
+        handleReservesCommand("help")
+    elseif topic == "ml" or topic == "loot" or topic == "master" then
+        showLootHelp()
+    elseif topic == "counter" or topic == "counters" or topic == "counts" then
+        showCounterHelp()
+    elseif topic == "debug" or topic == "dbg" or topic == "debugger" then
+        addon:info(format(L.StrCmdCommands, "krt debug"), "KRT")
+        printHelp("on", L.StrCmdToggle)
+        printHelp("off", L.StrCmdToggle)
+        printHelp("level <name|num>", L.StrCmdDebugLevel)
+        printHelp("raid", L.StrCmdDebugRaid)
+    elseif topic == "rw" or topic == "warn" or topic == "warning" or topic == "warnings" then
+        handleWarningsCommand("help")
+    elseif topic == "ms" or topic == "changes" or topic == "mschanges" then
+        handleChangesCommand("help")
+    elseif topic == "lfm" or topic == "pug" or topic == "group" or topic == "grouper" then
+        handleLfmCommand("help")
+    elseif topic == "config" or topic == "conf" or topic == "options" or topic == "opt" then
+        addon:info(format(L.StrCmdCommands, "krt config"), "KRT")
+        printHelp("toggle", L.StrCmdToggle)
+        printHelp("reset", L.StrCmdConfigReset)
+    elseif topic == "minimap" or topic == "mm" then
+        handleMinimapCommand("help")
+    elseif topic == "validate" then
+        handleValidateCommand("help")
+    elseif topic == "version" or topic == "ver" or topic == "about" then
+        showVersion()
+    elseif topic == "bug" or topic == "report" then
+        showBugReport()
+    else
+        showHelp()
+    end
+end
+
+local function handleBugCommand()
+    showBugReport()
+end
+
+local function handleVersionCommand(rest)
+    showVersion()
+    local sub = Strings.SplitArgs(rest)
+    if sub ~= "local" and Comms and Comms.RequestVersionCheck then
+        Comms:RequestVersionCheck()
+    end
+end
+
 -- ----- Public methods ----- --
 function module:Register(cmd, fn)
     self.sub[cmd] = fn
@@ -666,6 +853,9 @@ function module:Handle(msg)
     showHelp()
 end
 
+registerAliases(cmdHelp, handleHelpCommand)
+registerAliases(cmdBug, handleBugCommand)
+registerAliases(cmdVersion, handleVersionCommand)
 registerAliases(cmdDebug, handleDebugCommand)
 registerAliases(cmdMinimap, handleMinimapCommand)
 registerAliases(cmdAchiev, handleAchievementCommand)

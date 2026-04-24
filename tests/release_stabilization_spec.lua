@@ -659,6 +659,12 @@ local function newHarness()
         return Strings.NormalizeLower(value, true)
     end
 
+    function Strings.SplitArgs(value)
+        value = tostring(value or "")
+        local first, rest = value:match("^%s*(%S+)%s*(.-)%s*$")
+        return first or "", rest or ""
+    end
+
     local Sort = {
         CompareValues = function(a, b)
             if a == b then
@@ -763,6 +769,8 @@ local function newHarness()
     addon.Base64.Encode = function(value)
         return tostring(value)
     end
+    addon.WrapTextInColorCode = tostring
+    addon.Colors.NormalizeHexColor = tostring
     addon.Services.Chat = addon.Services.Chat or {}
     local announceMethod = "Announce"
     addon.Services.Chat[announceMethod] = function(_, message)
@@ -1845,6 +1853,28 @@ local function newHarness()
 
     _G.GetLootThreshold = function()
         return 0
+    end
+
+    _G.IsInInstance = function()
+        return false, "none"
+    end
+
+    _G.GetNumRaidMembers = function()
+        return 0
+    end
+
+    _G.GetNumPartyMembers = function()
+        return 0
+    end
+
+    _G.SendAddonMessage = function() end
+
+    _G.RegisterAddonMessagePrefix = function()
+        return true
+    end
+
+    _G.UnitName = function()
+        return "Tester"
     end
 
     _G.GetItemInfo = function(value)
@@ -8246,6 +8276,208 @@ test("reserves format supports filtering to current raid players", function()
     assertTrue(hasRaidTwoPlayer == true, "expected explicit raid id with roster matches to report eligible reserve players")
     assertTrue(hasUnknownRaidPlayer ~= true, "expected explicit raid id without matches to report no eligible reserve players")
     assertTrue(hasRaidTwoPlayerViaModule == true, "expected module wrapper to forward HasCurrentRaidPlayersForItem args")
+end)
+
+test("slash help supports focused command pages", function()
+    local h = newHarness()
+    _G.SlashCmdList = {}
+    _G.GetAddOnMetadata = function(_, key)
+        if key == "Version" then
+            return "9.8.7"
+        end
+        if key == "Interface" then
+            return "30300"
+        end
+        return nil
+    end
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/EntryPoints/SlashEvents.lua")
+
+    _G.SlashCmdList.KRT("help logger")
+
+    assertContains(h.logs.info, "Commands: valid subcommands for |caaf49141/krt logger|r:", "expected focused logger help header")
+end)
+
+test("slash bug prints local diagnostic summary", function()
+    local h = newHarness()
+    _G.SlashCmdList = {}
+    _G.KRT_Raids = { { raidNid = 10 }, { raidNid = 11 } }
+    _G.KRT_Reserves = {
+        Alice = { reserves = { { rawID = 1001 } } },
+        Bob = { reserves = { { rawID = 1002 }, { rawID = 1003 } } },
+    }
+    _G.GetAddOnMetadata = function(_, key)
+        if key == "Version" then
+            return "9.8.7"
+        end
+        if key == "Interface" then
+            return "30300"
+        end
+        return nil
+    end
+    h.Core.GetRaidSchemaVersion = function()
+        return 5
+    end
+    h.Core.GetRaidStoreOrNil = function()
+        return {
+            GetAllRaids = function()
+                return _G.KRT_Raids
+            end,
+            GetRaidNidByIndex = function(_, index)
+                local raid = _G.KRT_Raids and _G.KRT_Raids[index]
+                return raid and raid.raidNid or nil
+            end,
+        }
+    end
+    h.addon.GetLogLevel = function()
+        return 3
+    end
+    h.addon.logLevels = { INFO = 3 }
+    h.addon.Services.Raid.IsMasterLooter = function()
+        return true
+    end
+    h.addon.Services.Raid.GetPlayerRoleState = function()
+        return {
+            inRaid = true,
+            rank = 2,
+            isLeader = true,
+            isAssistant = false,
+            hasRaidLeadership = true,
+            isMasterLooter = true,
+        }
+    end
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/EntryPoints/SlashEvents.lua")
+
+    _G.SlashCmdList.KRT("bug")
+
+    assertContains(h.logs.info, "KRT bug report:", "expected bug report title")
+    assertContains(h.logs.info, "Addon: 9.8.7", "expected addon version in bug report")
+    assertContains(h.logs.info, "Interface: 30300", "expected interface in bug report")
+    assertContains(h.logs.info, "Raid schema: 5", "expected schema in bug report")
+    assertContains(h.logs.info, "Raid history: 2", "expected raid history count in bug report")
+    assertContains(h.logs.info, "Reserves: players=2 entries=3", "expected reserves summary in bug report")
+    assertContains(h.logs.info, "Role: inRaid=yes leader=yes assistant=no masterLooter=yes", "expected role summary in bug report")
+end)
+
+test("slash version prints local addon compatibility summary", function()
+    local h = newHarness()
+    _G.SlashCmdList = {}
+    _G.GetAddOnMetadata = function(_, key)
+        if key == "Version" then
+            return "9.8.7"
+        end
+        if key == "Interface" then
+            return "30300"
+        end
+        return nil
+    end
+    h.Core.GetRaidSchemaVersion = function()
+        return 5
+    end
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/EntryPoints/SlashEvents.lua")
+
+    _G.SlashCmdList.KRT("version")
+
+    assertContains(h.logs.info, "KRT version:", "expected version command title")
+    assertContains(h.logs.info, "Addon: 9.8.7", "expected addon version")
+    assertContains(h.logs.info, "Interface: 30300", "expected interface version")
+    assertContains(h.logs.info, "Raid schema: 5", "expected raid schema version")
+end)
+
+test("comms version check sends group request and records acknowledgements", function()
+    local h = newHarness()
+    local sent = {}
+    _G.GetNumRaidMembers = function()
+        return 10
+    end
+    _G.GetNumPartyMembers = function()
+        return 0
+    end
+    _G.SendAddonMessage = function(prefix, msg, channel, target)
+        sent[#sent + 1] = {
+            prefix = prefix,
+            msg = msg,
+            channel = channel,
+            target = target,
+        }
+    end
+    _G.GetAddOnMetadata = function(_, key)
+        if key == "Version" then
+            return "9.8.7"
+        end
+        if key == "Interface" then
+            return "30300"
+        end
+        return nil
+    end
+    h.Core.GetRaidSchemaVersion = function()
+        return 5
+    end
+    h.Core.GetSyncer = function()
+        return {
+            GetProtocolVersion = function()
+                return 2
+            end,
+        }
+    end
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
+
+    local ok = h.addon.Comms:RequestVersionCheck()
+
+    assertTrue(ok == true, "expected version request to be sent in raid")
+    assertEqual(#sent, 1, "expected one group version request")
+    assertEqual(sent[1].prefix, "KRTVersion", "expected dedicated version prefix")
+    assertEqual(sent[1].channel, "RAID", "expected raid transport")
+    assertTrue(sent[1].msg:match("^REQ|") ~= nil, "expected version request payload")
+
+    local handled = h.addon.Comms:RequestVersionMessageHandling("KRTVersion", "ACK|9.8.6|30300|5|2", "RAID", "Alice")
+
+    assertTrue(handled == true, "expected version acknowledgement to be handled")
+    assertContains(h.logs.info, "Version: Alice addon=9.8.6 interface=30300 schema=5 sync=2", "expected ack summary")
+end)
+
+test("comms version check replies to requests by whisper", function()
+    local h = newHarness()
+    local sent = {}
+    _G.SendAddonMessage = function(prefix, msg, channel, target)
+        sent[#sent + 1] = {
+            prefix = prefix,
+            msg = msg,
+            channel = channel,
+            target = target,
+        }
+    end
+    _G.GetAddOnMetadata = function(_, key)
+        if key == "Version" then
+            return "9.8.7"
+        end
+        if key == "Interface" then
+            return "30300"
+        end
+        return nil
+    end
+    h.Core.GetRaidSchemaVersion = function()
+        return 5
+    end
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
+
+    local handled = h.addon.Comms:RequestVersionMessageHandling("KRTVersion", "REQ|9.8.5|30300|4|1", "RAID", "Bob")
+
+    assertTrue(handled == true, "expected version request to be handled")
+    assertEqual(#sent, 1, "expected one version acknowledgement")
+    assertEqual(sent[1].prefix, "KRTVersion", "expected dedicated version prefix")
+    assertEqual(sent[1].channel, "WHISPER", "expected direct reply")
+    assertEqual(sent[1].target, "Bob", "expected requester target")
+    assertTrue(sent[1].msg:match("^ACK|9%.8%.7|30300|5|") ~= nil, "expected local version payload")
 end)
 
 local failures = 0
