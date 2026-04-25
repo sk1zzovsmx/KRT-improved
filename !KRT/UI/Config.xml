@@ -99,9 +99,18 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentscreenReminderStr" inherits="KRTConfigFontStringTemplate">
+				<FontString name="$parentsoftResWhisperRepliesStr" inherits="KRTConfigFontStringTemplate">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="$parentcountdownRollsBlockStr" relativePoint="BOTTOMLEFT">
+							<Offset>
+								<AbsDimension x="0" y="-7.5" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentscreenReminderStr" inherits="KRTConfigFontStringTemplate">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentsoftResWhisperRepliesStr" relativePoint="BOTTOMLEFT">
 							<Offset>
 								<AbsDimension x="0" y="-7.5" />
 							</Offset>
@@ -243,6 +252,15 @@
 			<CheckButton name="$parentcountdownRollsBlock" inherits="KRTConfigCheckButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPRIGHT" relativeTo="$parentcountdownRollsBlockStr" relativePoint="TOPLEFT">
+						<Offset>
+							<AbsDimension x="-2.5" y="5" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</CheckButton>
+			<CheckButton name="$parentsoftResWhisperReplies" inherits="KRTConfigCheckButtonTemplate">
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativeTo="$parentsoftResWhisperRepliesStr" relativePoint="TOPLEFT">
 						<Offset>
 							<AbsDimension x="-2.5" y="5" />
 						</Offset>

@@ -15,6 +15,10 @@ Release-Version: 0.7.0-beta.1
 - **SoftRes runtime sync** - Added lightweight `/krt res sync` support for
   grouped KRT clients to request runtime-only SoftRes metadata/data from an
   authorized reserve owner without persisting received reserves.
+- **Whisper SoftRes replies** - Added opt-in `!sr`/`!softres` whisper replies,
+  with `sr`/`softres` fallback aliases for private servers that reserve `!`
+  commands, so ML/leader/assistant clients with reserve data can send a player
+  their current reserves in chat-safe whisper lines.
 - **Auto-loot suggestions** - Added a lightweight suggestion-only loot rules
   classifier for ignored items, enchanting materials, and quality BoE loot,
   including 3.3.5a tooltip-based bind detection; it does not auto-award or

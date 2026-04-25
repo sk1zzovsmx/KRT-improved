@@ -101,6 +101,7 @@
 |   |   |   |-- Session.lua
 |   |   |   \\-- State.lua
 |   |   |-- Reserves
+|   |   |   |-- Chat.lua
 |   |   |   |-- Display.lua
 |   |   |   |-- Import.lua
 |   |   |   \\-- Sync.lua

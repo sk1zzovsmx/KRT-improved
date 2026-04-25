@@ -259,6 +259,10 @@ Durable preferences learned from recent conversations:
   document them in dedicated release/tooling docs under `docs/` or `tools/`.
 - For auto-loot rules, prefer automatic suggestions only; do not auto-award, auto-trade, or auto-assign loot
   unless explicitly requested.
+- For Whisper SoftRes, keep player whisper handling out of `EntryPoints/SlashEvents.lua`; put request parsing
+  and response policy under Reserves/Chat-style service ownership, gate replies behind config, valid reserve
+  data, and ML/leader/assistant authority, and send only chat-safe messages through
+  `addon.Services.Chat`/`addon.Comms`.
 
 ---
 
@@ -382,18 +386,19 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 67) Services/Reserves/Display.lua
 68) Services/Reserves/Sync.lua
 69) Services/Reserves.lua
-70) Widgets/ReservesUI.lua
-71) Services/Logger/Store.lua
-72) Services/Logger/View.lua
-73) Services/Logger/Export.lua
-74) Services/Logger/Helpers.lua
-75) Services/Logger/Actions.lua
-76) Controllers/Logger.lua
-77) Widgets/Config.lua
-78) Controllers/Warnings.lua
-79) Controllers/Changes.lua
-80) Controllers/Spammer.lua
-81) KRT.xml
+70) Services/Reserves/Chat.lua
+71) Widgets/ReservesUI.lua
+72) Services/Logger/Store.lua
+73) Services/Logger/View.lua
+74) Services/Logger/Export.lua
+75) Services/Logger/Helpers.lua
+76) Services/Logger/Actions.lua
+77) Controllers/Logger.lua
+78) Widgets/Config.lua
+79) Controllers/Warnings.lua
+80) Controllers/Changes.lua
+81) Controllers/Spammer.lua
+82) KRT.xml
 
 ---
 
@@ -453,6 +458,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Reserves/
       Import.lua           # import parser/strategy helpers (loaded before Reserves.lua)
       Display.lua          # grouped display/player-format helpers (loaded before Reserves.lua)
+      Chat.lua             # opt-in !sr/!softres whisper response policy
     Reserves.lua           # soft reserves service/model + canonical public facade
     Logger/
       Store.lua            # logger stable-ID indexing + data access

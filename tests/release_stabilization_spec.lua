@@ -5679,6 +5679,70 @@ test("start loot roll dispatch forwards to the loot service", function()
     assertEqual(observed.rollTime, 65000, "expected START_LOOT_ROLL to forward the roll time to the loot service")
 end)
 
+test("chat msg whisper dispatch forwards to the bus", function()
+    local h = newHarness()
+    local observed = {}
+    local oldLibStub = _G.LibStub
+    local mainFrame = h.makeFrame(true, "KRTMainTestFrame")
+
+    function mainFrame:RegisterEvent(eventName)
+        self._events = self._events or {}
+        self._events[eventName] = true
+    end
+
+    function mainFrame:UnregisterEvent(eventName)
+        if self._events then
+            self._events[eventName] = nil
+        end
+    end
+
+    function mainFrame:UnregisterAllEvents()
+        self._events = {}
+    end
+
+    _G.LibStub = function(name)
+        if name == "LibCompat-1.0" then
+            return {
+                Embed = function() end,
+                Print = function() end,
+            }
+        end
+        if name == "LibBossIDs-1.0" then
+            return {}
+        end
+        if name == "LibLogger-1.0" then
+            return {
+                logLevels = {
+                    INFO = 1,
+                    DEBUG = 2,
+                },
+                Embed = function(_, target)
+                    target.SetLogLevel = target.SetLogLevel or function() end
+                end,
+            }
+        end
+        if name == "LibDeformat-3.0" then
+            return function()
+                return nil
+            end
+        end
+        error("unexpected LibStub request: " .. tostring(name), 0)
+    end
+
+    h.addon.State.frames = { main = mainFrame }
+    h:load("!KRT/Init.lua")
+    h.Bus.RegisterCallback(h.addon.Events.Wow.ChatMsgWhisper, function(_, msg, sender)
+        observed.msg = msg
+        observed.sender = sender
+    end)
+
+    h.addon:CHAT_MSG_WHISPER("softres", "Alice")
+    _G.LibStub = oldLibStub
+
+    assertEqual(observed.msg, "softres", "expected CHAT_MSG_WHISPER to forward the whisper text to the bus")
+    assertEqual(observed.sender, "Alice", "expected CHAT_MSG_WHISPER to forward the sender to the bus")
+end)
+
 test("passive loot observation is limited to group-based loot methods", function()
     local h = newHarness()
     local lootMethod = "group"
@@ -8788,6 +8852,158 @@ test("reserves local data wins over synced runtime cache", function()
     assertTrue(Reserves:IsLocalDataAvailable() == true, "expected local reserves to remain authoritative")
     assertEqual(Reserves:FormatReservedPlayersLine(1001, false, true, true), "Alice", "expected local reserve display to remain active")
     assertEqual(Reserves:FormatReservedPlayersLine(2002, false, true, true), "", "expected rejected synced cache to stay hidden")
+end)
+
+test("reserves whisper softres ignores requests while disabled", function()
+    local h = newHarness()
+    local sent = {}
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1001, itemName = "Coldsteel Dagger", itemLink = "|cff0070dd|Hitem:1001:0:0:0:0:0:0:0|h[Coldsteel Dagger]|h|r", quantity = 1 },
+            },
+        },
+    }
+    h.addon.options.softResWhisperReplies = false
+    h.addon.Comms.Whisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h.addon.Services.Reserves:Load()
+
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("!sr", "Alice")
+
+    assertTrue(handled == true, "expected SoftRes request command to be recognized")
+    assertEqual(#sent, 0, "expected disabled whisper replies to stay silent")
+end)
+
+test("reserves whisper softres replies with player reserves for authorized holders", function()
+    local h = newHarness()
+    local sent = {}
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1001, itemName = "Coldsteel Dagger", itemLink = "|cff0070dd|Hitem:1001:0:0:0:0:0:0:0|h[Coldsteel Dagger]|h|r", quantity = 2 },
+                { rawID = 1002, itemName = "Frost Edge", itemLink = "|cffa335ee|Hitem:1002:0:0:0:0:0:0:0|h[Frost Edge]|h|r", plus = 4 },
+            },
+        },
+    }
+    h.addon.options.softResWhisperReplies = true
+    h.addon.Comms.Whisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+    h:setRaidRoleState({ inRaid = true, rank = 2, isMasterLooter = false })
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h.addon.Services.Reserves:Load()
+
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("!softres", "Alice")
+
+    assertTrue(handled == true, "expected !softres command to be recognized")
+    assertTrue(#sent >= 3, "expected header and reserve lines")
+    assertEqual(sent[1].target, "Alice", "expected reply target to be the requester")
+    assertTrue(string.find(sent[1].msg, "Your SoftRes", 1, true) ~= nil, "expected player-facing SoftRes header")
+    assertTrue(string.find(sent[2].msg, "Coldsteel Dagger", 1, true) ~= nil, "expected first reserve item in reply")
+    assertTrue(string.find(sent[2].msg, "x2", 1, true) ~= nil, "expected multi-reserve quantity in reply")
+    assertTrue(string.find(sent[3].msg, "Frost Edge", 1, true) ~= nil, "expected second reserve item in reply")
+    assertTrue(string.find(sent[3].msg, "P+4", 1, true) ~= nil, "expected plus value in reply")
+    for i = 1, #sent do
+        assertTrue(string.len(sent[i].msg) <= 255, "expected whisper line to stay chat-safe")
+    end
+end)
+
+test("reserves whisper softres accepts private-server-safe aliases", function()
+    local h = newHarness()
+    local sent = {}
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1001, itemName = "Coldsteel Dagger", quantity = 1 },
+            },
+        },
+    }
+    h.addon.options.softResWhisperReplies = true
+    h.addon.Comms.Whisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+    h.addon.Events.Wow = { ChatMsgWhisper = "wow.CHAT_MSG_WHISPER" }
+    h:setRaidRoleState({ inRaid = true, rank = 1, isMasterLooter = false })
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h.addon.Services.Reserves:Load()
+
+    local aliases = { "sr", "softres", "krt sr", "krt softres" }
+    for i = 1, #aliases do
+        sent = {}
+        local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply(aliases[i], "Alice")
+        assertTrue(handled == true, "expected SoftRes whisper alias to be recognized")
+        assertTrue(#sent >= 2, "expected alias to send reserve reply")
+        assertTrue(string.find(sent[2].msg, "Coldsteel Dagger", 1, true) ~= nil, "expected reserve item in alias reply")
+    end
+
+    sent = {}
+    h.Bus.TriggerEvent("wow.CHAT_MSG_WHISPER", "sr", "Alice")
+    assertTrue(#sent >= 2, "expected whisper bus event to route to the reserve reply handler")
+end)
+
+test("reserves whisper softres denies normal raiders even with reserve data", function()
+    local h = newHarness()
+    local sent = {}
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1001, itemName = "Coldsteel Dagger", quantity = 1 },
+            },
+        },
+    }
+    h.addon.options.softResWhisperReplies = true
+    h.addon.Comms.Whisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+    h:setRaidRoleState({ inRaid = true, rank = 0, isMasterLooter = false })
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h.addon.Services.Reserves:Load()
+
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("softres", "Alice")
+
+    assertTrue(handled == true, "expected SoftRes request command to be recognized")
+    assertEqual(#sent, 0, "expected normal raiders to stay silent even with reserve data")
+end)
+
+test("reserves whisper softres stays silent without reserve data", function()
+    local h = newHarness()
+    local sent = {}
+    _G.KRT_Reserves = {}
+    h.addon.options.softResWhisperReplies = true
+    h.addon.Comms.Whisper = function(target, msg)
+        sent[#sent + 1] = { target = target, msg = msg }
+        return true
+    end
+    h:setRaidRoleState({ inRaid = true, rank = 0, isMasterLooter = false })
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h:load("!KRT/Services/Reserves/Chat.lua")
+    h.addon.Services.Reserves:Load()
+
+    local handled = h.addon.Services.Reserves._Chat:RequestWhisperReply("!SR", "Alice")
+
+    assertTrue(handled == true, "expected case-insensitive command to be recognized")
+    assertEqual(#sent, 0, "expected clients without reserve data to stay silent")
 end)
 
 test("reserves sync helper requests metadata and imports chunked runtime data", function()

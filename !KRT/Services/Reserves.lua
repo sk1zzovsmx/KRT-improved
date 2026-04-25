@@ -602,6 +602,22 @@ do
         return reserve
     end
 
+    function Service:GetPlayerReserveEntries(playerName)
+        local reserve = self:GetReserve(playerName)
+        if type(reserve) ~= "table" or type(reserve.reserves) ~= "table" then
+            return {}
+        end
+
+        local entries = {}
+        for i = 1, #reserve.reserves do
+            local row = reserve.reserves[i]
+            if type(row) == "table" then
+                entries[#entries + 1] = row
+            end
+        end
+        return entries
+    end
+
     -- Get all reserves:
     function Service:GetAllReserves()
         if isDebugEnabled() then
@@ -653,11 +669,11 @@ do
     end
 
     function Service:IsPlusSystem()
-        return self:GetImportMode() == "plus"
+        return Service:GetImportMode() == "plus"
     end
 
     function Service:IsMultiReserve()
-        return self:GetImportMode() == "multi"
+        return Service:GetImportMode() == "multi"
     end
 
     -- Strategy-based CSV parsing moved to Services/Reserves/Import.lua.

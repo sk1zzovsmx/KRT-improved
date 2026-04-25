@@ -94,6 +94,7 @@ Services\Reserves\Import.lua
 Services\Reserves\Display.lua
 Services\Reserves\Sync.lua
 Services\Reserves.lua
+Services\Reserves\Chat.lua
 Widgets\ReservesUI.lua
 Services\Logger\Store.lua
 Services\Logger\View.lua

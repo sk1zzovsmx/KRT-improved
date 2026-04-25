@@ -54,8 +54,8 @@ Runtime data/model/service modules:
 - `addon.Services.Loot` (public API in `Services/Loot/Service.lua`; internal loot-context/rule helpers in
   `Services/Loot/*.lua`)
 - `addon.Services.Debug`
-- `addon.Services.Reserves` (public facade in `Services/Reserves.lua`; internal import and grouped-display
-  helpers in `Services/Reserves/{Import,Display}.lua`)
+- `addon.Services.Reserves` (public facade in `Services/Reserves.lua`; internal import, grouped-display,
+  runtime sync, and whisper-response helpers in `Services/Reserves/{Import,Display,Sync,Chat}.lua`)
 - `addon.Services.Logger` (Logger Store/View/Export/Helpers/Actions service tables consumed by
   `Controllers/Logger.lua`)
 
@@ -91,6 +91,7 @@ Runtime data/model/service modules:
 - `Services/Reserves/Import.lua` (CSV parsing plus/multi strategies and import aggregation)
 - `Services/Reserves/Display.lua` (grouped display rows, player formatting, and reserve-list projections)
 - `Services/Reserves/Sync.lua` (runtime-only SoftRes metadata/data sync and chunked addon-message handling)
+- `Services/Reserves/Chat.lua` (opt-in `!sr`/`!softres` whisper request parsing and chat-safe replies)
 
 ### Widgets (`addon.Widgets.*`)
 

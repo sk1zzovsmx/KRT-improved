@@ -49,6 +49,7 @@ do
         "announceOnBank",
         "announceOnDisenchant",
         "lootWhispers",
+        "softResWhisperReplies",
         "countdownRollsBlock",
         "screenReminder",
         "ignoreStacks",
@@ -231,6 +232,7 @@ do
         _G[frameName .. "announceOnBankStr"]:SetText(L.StrConfigAnnounceOnBank)
         _G[frameName .. "announceOnDisenchantStr"]:SetText(L.StrConfigAnnounceOnDisenchant)
         _G[frameName .. "lootWhispersStr"]:SetText(L.StrConfigLootWhisper)
+        _G[frameName .. "softResWhisperRepliesStr"]:SetText(L.StrConfigSoftResWhisperReplies)
         _G[frameName .. "countdownRollsBlockStr"]:SetText(L.StrConfigCountdownRollsBlock)
         _G[frameName .. "screenReminderStr"]:SetText(L.StrConfigScreenReminder)
         _G[frameName .. "ignoreStacksStr"]:SetText(L.StrConfigIgnoreStacks)
@@ -263,6 +265,7 @@ do
         _G[frameName .. "announceOnBank"]:SetChecked(addon.options.announceOnBank == true)
         _G[frameName .. "announceOnDisenchant"]:SetChecked(addon.options.announceOnDisenchant == true)
         _G[frameName .. "lootWhispers"]:SetChecked(addon.options.lootWhispers == true)
+        _G[frameName .. "softResWhisperReplies"]:SetChecked(addon.options.softResWhisperReplies == true)
         _G[frameName .. "countdownRollsBlock"]:SetChecked(addon.options.countdownRollsBlock == true)
         _G[frameName .. "screenReminder"]:SetChecked(addon.options.screenReminder == true)
         _G[frameName .. "ignoreStacks"]:SetChecked(addon.options.ignoreStacks == true)
