@@ -10,6 +10,9 @@ Release-Version: 0.7.0-beta.1
 
 - **Slash diagnostics** - Added focused `/krt help <command>` pages plus
   `/krt version` and `/krt bug` local diagnostic summaries for support.
+- **Performance diagnostics** - Added runtime-only `/krt perf on|off` logging
+  with a configurable `/krt perf threshold <ms>` slow-block threshold for loot
+  and group-loot spike investigation.
 - **Group version check** - `/krt version` now requests KRT version details
   from grouped addon users through a dedicated addon-message prefix.
 - **SoftRes runtime sync** - Added lightweight `/krt res sync` support for
@@ -30,9 +33,10 @@ Release-Version: 0.7.0-beta.1
   `playerNid`, updated from roster deltas, persisted as raid schema v4, and
   exported through a dedicated attendance CSV builder without replacing the
   existing loot-oriented raid export.
-- **Loot source recovery** - Added a limited `LOOT_OPENED` boss-source fallback
-  that scans dead target/mouseover/raid-target units by NPC ID classification
-  when no valid loot-window context already exists.
+- **Loot source recovery** - Reworked loot-source recovery to prefer recent
+  `UNIT_DIED` context backed by `LibBossIDs` for loot windows and passive
+  group-loot roll sessions, while removing the raid-target scan that could
+  stall the client during looting.
 - **Performance: Bus event dispatch** — Eliminated per-fire table allocation
   in `Bus.TriggerEvent`; reuses a static dispatch buffer to reduce GC pressure
   during active raiding (dozens of events/second).
@@ -45,7 +49,9 @@ Release-Version: 0.7.0-beta.1
 - **Performance: Loot window item info** — When loot-slot hints are available
   (loot window path), skip the blocking `GetItemInfo` call and defer tooltip-
   based item cache warming through a timer queue, avoiding micro-freezes on
-  `LOOT_OPENED` with many items.
+  `LOOT_OPENED` with many items. Auto-loot suggestion metadata now follows the
+  same deferred path, so BoE tooltip checks no longer run synchronously while
+  the loot window opens.
 - **Performance: Passive group loot** — Reuse a static `numbers` buffer in
   `extractGroupLootPatternValues` instead of allocating a new table per
   parsed loot message.

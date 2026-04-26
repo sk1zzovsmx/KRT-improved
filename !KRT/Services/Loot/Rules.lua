@@ -49,23 +49,25 @@ local function resolveItemId(item)
     return nil
 end
 
-local function resolveItemInfo(item)
+local function resolveItemInfo(item, opts)
     if type(item) ~= "table" then
         return {}
     end
 
+    local allowItemInfo = not (type(opts) == "table" and opts.allowItemInfo == false)
+    local allowTooltip = not (type(opts) == "table" and opts.allowTooltip == false)
     local itemId = resolveItemId(item)
     local itemRarity = tonumber(item.itemRarity or item.rarity or item.quality)
     local itemBind = tonumber(item.itemBind or item.bindType or item.bind)
     local itemLink = item.itemLink or item.link
 
-    if (not itemRarity or not itemBind) and itemLink and _G.GetItemInfo then
+    if allowItemInfo and (not itemRarity or not itemBind) and itemLink and _G.GetItemInfo then
         local _, _, fetchedRarity, _, _, _, _, _, _, _, _, _, _, fetchedBind = _G.GetItemInfo(itemLink)
         itemRarity = itemRarity or tonumber(fetchedRarity)
         itemBind = itemBind or tonumber(fetchedBind)
     end
 
-    if not itemBind and itemLink and Item and Item.GetItemBindFromTooltip then
+    if allowTooltip and not itemBind and itemLink and Item and Item.GetItemBindFromTooltip then
         itemBind = tonumber(Item.GetItemBindFromTooltip(itemLink))
     end
 
@@ -102,8 +104,8 @@ local function isEnchantingMaterial(itemId)
 end
 
 -- ----- Public methods ----- --
-function Rules:GetItemSuggestion(item)
-    local info = resolveItemInfo(item)
+function Rules:GetItemSuggestion(item, opts)
+    local info = resolveItemInfo(item, opts)
     local rollTypes = getRollTypes()
 
     if isEnchantingMaterial(info.itemId) then
@@ -121,6 +123,6 @@ function Rules:GetItemSuggestion(item)
     return buildDecision(ACTION_NONE, REASON_NONE)
 end
 
-function Rules:GetSuggestion(item)
-    return self:GetItemSuggestion(item)
+function Rules:GetSuggestion(item, opts)
+    return self:GetItemSuggestion(item, opts)
 end

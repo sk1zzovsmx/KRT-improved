@@ -4278,6 +4278,211 @@ test("loot window source classifies blocked non-boss opens as trash", function()
     assertEqual(raid.loot[1].lootSource.sourceNpcId, 15989, "expected trash loot rows to keep the source npc id")
 end)
 
+test("loot window recent trash death blocks boss event recovery without unit probes", function()
+    local h = newHarness()
+    local trashLink = h.registerItem(91692, "Recent Death Trash Belt")
+    local trashKey = h.addon.Item.GetItemStringFromLink(trashLink)
+    local currentTime = 1000
+    local trashGuid = "Creature-0-0-0-0-15989-0000000000"
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+    _G.UnitExists = function()
+        return false
+    end
+    _G.bit = {
+        band = function()
+            return 0
+        end,
+    }
+    _G.COMBATLOG_OBJECT_TYPE_PLAYER = 0x00000400
+
+    h.addon.BossIDs = {
+        BossIDs = {
+            [15953] = true,
+        },
+    }
+    h.addon.GetCreatureId = function(guid)
+        if guid == trashGuid then
+            return 15989
+        end
+        return 0
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "recent-trash-loot-self" then
+            return trashLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    assertEqual(Raid:AddBoss("Grand Widow Faerlina", nil, nil, 15953), 1, "expected boss event context")
+    currentTime = 1005
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1005, "UNIT_DIED", nil, nil, 0, trashGuid, "Naxxramas Cultist", 0)
+
+    assertEqual(
+        Raid:_EnsureLootWindowItemContext(1, {
+            { itemKey = trashKey, count = 1 },
+        }, {
+            ttlSeconds = 60,
+            source = "LOOT_OPENED",
+        }),
+        0,
+        "expected recent trash death to block boss event recovery"
+    )
+
+    h.feature.lootState.opened = true
+    Raid:AddLoot("recent-trash-loot-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 2, "expected recent trash loot to create a TrashMob bucket")
+    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected recent trash loot to avoid the boss context")
+    assertEqual(raid.loot[1].bossNid, 2, "expected recent trash loot to bind to TrashMob")
+end)
+
+test("loot source recovery does not load static item source tables", function()
+    local file = assert(io.open("!KRT/!KRT.toc", "r"))
+    local toc = file:read("*a")
+    file:close()
+
+    assertTrue(string.find(toc, "Modules\\LootSources.lua", 1, true) == nil, "expected loot source recovery to avoid static item-to-boss tables")
+end)
+
+test("loot window recent boss death resolves boss context without raid target probes", function()
+    local h = newHarness()
+    local bossLink = h.registerItem(91703, "Recent Death Faerlina Mantle")
+    local bossKey = h.addon.Item.GetItemStringFromLink(bossLink)
+    local currentTime = 1000
+    local bossGuid = "Creature-0-0-0-0-15953-0000000000"
+    local raidTargetProbeCount = 0
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+    _G.GetNumRaidMembers = function()
+        return 40
+    end
+
+    h.addon.BossIDs = {
+        BossIDs = {
+            [15953] = true,
+        },
+    }
+    h.addon.GetCreatureId = function(guid)
+        if guid == bossGuid then
+            return 15953
+        end
+        return 0
+    end
+    _G.bit = {
+        band = function()
+            return 0
+        end,
+    }
+    _G.COMBATLOG_OBJECT_TYPE_PLAYER = 0x00000400
+    _G.UnitExists = function(unit)
+        if type(unit) == "string" and unit:match("^raid%d+target$") then
+            raidTargetProbeCount = raidTargetProbeCount + 1
+        end
+        return false
+    end
+    _G.UnitGUID = function()
+        return nil
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "boss-source-loot-self" then
+            return bossLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1000, "UNIT_DIED", nil, nil, 0, bossGuid, "Grand Widow Faerlina", 0)
+    currentTime = 1005
+
+    assertEqual(
+        Raid:_EnsureLootWindowItemContext(1, {
+            { itemKey = bossKey, count = 1 },
+        }, {
+            ttlSeconds = 60,
+            source = "LOOT_OPENED",
+        }),
+        1,
+        "expected recent boss death to create the boss context"
+    )
+    assertEqual(raidTargetProbeCount, 0, "expected recent boss death resolution to skip raid target probes")
+
+    local source = Raid:GetActiveLootSource(1)
+    assertTrue(source ~= nil, "expected an active boss loot source after recent boss death resolution")
+    assertEqual(source.kind, "boss", "expected recent boss death resolution to classify the source as boss")
+    assertEqual(source.sourceNpcId, 15953, "expected recent boss death resolution to preserve the boss npc id")
+
+    h.feature.lootState.opened = true
+    Raid:AddLoot("boss-source-loot-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected recent boss death resolution to create one boss kill")
+    assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected the boss kill to use the death context boss name")
+    assertEqual(raid.bossKills[1].sourceNpcId, 15953, "expected the boss kill to preserve the death context npc id")
+    assertEqual(#raid.loot, 1, "expected item source boss loot to log one row")
+    assertEqual(raid.loot[1].bossNid, 1, "expected recent boss death loot to bind to the resolved boss")
+    assertEqual(raid.loot[1].lootSource.kind, "boss", "expected recent boss death loot to persist boss source metadata")
+    assertEqual(raid.loot[1].lootSource.sourceNpcId, 15953, "expected loot source metadata to keep the death context npc id")
+end)
+
 test("loot window mouseover boss resolves boss context without event recovery", function()
     local h = newHarness()
     local bossLink = h.registerItem(9170, "Faerlina Mantle")
@@ -4373,13 +4578,14 @@ test("loot window mouseover boss resolves boss context without event recovery", 
     assertEqual(raid.loot[1].bossNid, 1, "expected the loot to stay attached to Grand Widow Faerlina")
 end)
 
-test("loot window dead raid target boss creates boss context without event recovery", function()
+test("loot window does not scan dead raid targets during source recovery", function()
     local h = newHarness()
     local bossLink = h.registerItem(91702, "Raid Target Faerlina Mantle")
     local bossKey = h.addon.Item.GetItemStringFromLink(bossLink)
     local currentTime = 1000
     local bossNpcId = 15953
     local bossGuid = "Creature-0-0-0-0-15953-0000000000"
+    local raidTargetProbeCount = 0
 
     h:installRaidStore({
         {
@@ -4429,6 +4635,9 @@ test("loot window dead raid target boss creates boss context without event recov
         return 0
     end
     _G.UnitExists = function(unit)
+        if type(unit) == "string" and unit:match("^raid%d+target$") then
+            raidTargetProbeCount = raidTargetProbeCount + 1
+        end
         return unit == "raid2target"
     end
     _G.UnitGUID = function(unit)
@@ -4468,27 +4677,24 @@ test("loot window dead raid target boss creates boss context without event recov
             ttlSeconds = 60,
             source = "LOOT_OPENED",
         }),
-        1,
-        "expected dead raid target boss fallback to create a boss context"
+        0,
+        "expected raid target source recovery to stay disabled during loot open"
     )
+    assertEqual(raidTargetProbeCount, 0, "expected loot open to skip raid target probes")
 
     local source = Raid:GetActiveLootSource(1)
-    assertTrue(source ~= nil, "expected an active boss loot source after raid target fallback")
-    assertEqual(source.kind, "boss", "expected raid target fallback to classify the source as boss")
-    assertEqual(source.bossNid, 1, "expected raid target fallback to bind the new boss nid")
-    assertEqual(source.sourceNpcId, bossNpcId, "expected raid target fallback to preserve the boss npc id")
-    assertEqual(source.sourceName, "Grand Widow Faerlina", "expected raid target fallback to preserve the boss name")
+    assertTrue(source ~= nil, "expected an active loot source after context-free loot open")
+    assertEqual(source.kind, "object", "expected raid target-only source recovery to classify as object")
+    assertEqual(source.sourceNpcId, 0, "expected raid target-only source recovery to avoid npc metadata")
 
     Raid:AddLoot("raid-target-boss-loot-self")
 
     local raid = h.Core.EnsureRaidById(1)
-    assertEqual(#raid.bossKills, 1, "expected raid target fallback to create one boss kill")
-    assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected the fallback boss kill to use the boss name")
-    assertEqual(raid.bossKills[1].sourceNpcId, bossNpcId, "expected the fallback boss kill to preserve the source npc id")
+    assertEqual(#raid.bossKills, 1, "expected raid target-only source recovery to avoid creating a boss kill")
+    assertEqual(raid.bossKills[1].name, "_TrashMob_", "expected raid target-only source recovery to fall back to trash")
     assertEqual(#raid.loot, 1, "expected raid target boss loot to log one row")
-    assertEqual(raid.loot[1].bossNid, 1, "expected raid target boss loot to bind to the fallback boss")
-    assertEqual(raid.loot[1].lootSource.kind, "boss", "expected raid target boss loot to persist boss source metadata")
-    assertEqual(raid.loot[1].lootSource.sourceNpcId, bossNpcId, "expected loot source metadata to keep the boss npc id")
+    assertEqual(raid.loot[1].bossNid, 1, "expected raid target-only source recovery loot to bind to trash")
+    assertEqual(raid.loot[1].lootSource.kind, "object", "expected loot source metadata to stay unresolved")
 end)
 
 test("loot window source marks context-free openings as object", function()
@@ -4694,6 +4900,105 @@ test("group loot sessions keep boss association without relying on lastBoss", fu
     local raid = h.Core.EnsureRaidById(1)
     assertEqual(#raid.bossKills, 1, "expected scoped session association to avoid creating TrashMob")
     assertEqual(raid.loot[1].bossNid, 10, "expected scoped session association to preserve original boss context")
+end)
+
+test("group loot trash rolls do not inherit previous boss death context", function()
+    local h = newHarness()
+    local bossLink = h.registerItem(91710, "Group Boss Blade")
+    local trashLink = h.registerItem(91711, "Group Trash Cloak")
+    local currentTime = 1000
+    local bossGuid = "Creature-0-0-0-0-15953-0000000000"
+    local trashGuid = "Creature-0-0-0-0-15989-0000000000"
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+    _G.GetLootRollItemLink = function(rollId)
+        if rollId == 101 then
+            return bossLink
+        end
+        if rollId == 102 then
+            return trashLink
+        end
+        return nil
+    end
+    _G.bit = {
+        band = function()
+            return 0
+        end,
+    }
+    _G.COMBATLOG_OBJECT_TYPE_PLAYER = 0x00000400
+
+    h.addon.BossIDs = {
+        BossIDs = {
+            [15953] = true,
+        },
+    }
+    h.addon.GetCreatureId = function(guid)
+        if guid == bossGuid then
+            return 15953
+        end
+        if guid == trashGuid then
+            return 15989
+        end
+        return 0
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "boss-greed-win-self" then
+            return 101, 88, bossLink
+        end
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "trash-greed-win-self" then
+            return 102, 77, trashLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1000, "UNIT_DIED", nil, nil, 0, bossGuid, "Grand Widow Faerlina", 0)
+    Raid:AddPassiveLootRoll(101, 45000)
+    assertEqual(Raid:AddGroupLootMessage("boss-greed-win-self"), "winner", "expected boss group loot winner to be recognized")
+    Raid:AddLoot("boss-greed-win-self")
+
+    currentTime = 1005
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1005, "UNIT_DIED", nil, nil, 0, trashGuid, "Naxxramas Cultist", 0)
+    Raid:AddPassiveLootRoll(102, 45000)
+    assertEqual(Raid:AddGroupLootMessage("trash-greed-win-self"), "winner", "expected trash group loot winner to be recognized")
+    Raid:AddLoot("trash-greed-win-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 2, "expected boss and trash group loot rows")
+    assertEqual(raid.loot[1].bossNid, 1, "expected first group loot row to bind to the boss")
+    assertEqual(#raid.bossKills, 2, "expected trash group loot to create a TrashMob bucket")
+    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected trash group loot to avoid the previous boss bucket")
+    assertEqual(raid.loot[2].bossNid, 2, "expected trash group loot row to bind to TrashMob")
 end)
 
 test("group loot winner messages log passive GR history directly", function()
@@ -5743,6 +6048,83 @@ test("chat msg whisper dispatch forwards to the bus", function()
     assertEqual(observed.sender, "Alice", "expected CHAT_MSG_WHISPER to forward the sender to the bus")
 end)
 
+test("runtime perf logger reports only slow measured blocks", function()
+    local h = newHarness()
+    local currentTime = 1000
+    local oldLibStub = _G.LibStub
+    local oldGetTime = _G.GetTime
+    local mainFrame = h.makeFrame(true, "KRTMainTestFrame")
+
+    function mainFrame:RegisterEvent(eventName)
+        self._events = self._events or {}
+        self._events[eventName] = true
+    end
+
+    function mainFrame:UnregisterEvent(eventName)
+        if self._events then
+            self._events[eventName] = nil
+        end
+    end
+
+    function mainFrame:UnregisterAllEvents()
+        self._events = {}
+    end
+
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.LibStub = function(name)
+        if name == "LibCompat-1.0" then
+            return {
+                Embed = function() end,
+                Print = function() end,
+            }
+        end
+        if name == "LibBossIDs-1.0" then
+            return {}
+        end
+        if name == "LibLogger-1.0" then
+            return {
+                logLevels = {
+                    INFO = 1,
+                    DEBUG = 2,
+                },
+                Embed = function(_, target)
+                    target.SetLogLevel = target.SetLogLevel or function() end
+                end,
+            }
+        end
+        if name == "LibDeformat-3.0" then
+            return function()
+                return nil
+            end
+        end
+        error("unexpected LibStub request: " .. tostring(name), 0)
+    end
+
+    h.addon.State.frames = { main = mainFrame }
+    h:load("!KRT/Localization/DiagnoseLog.en.lua")
+    h:load("!KRT/Init.lua")
+
+    h.addon:SetPerfMode(true)
+    h.addon:SetPerfThresholdMs(5)
+
+    local start = h.addon:_PerfStart()
+    currentTime = 1000.004
+    h.addon:_PerfFinish("fast block", start, "items=1")
+
+    assertEqual(#h.logs.info, 0, "expected fast perf blocks below threshold to stay silent")
+
+    start = h.addon:_PerfStart()
+    currentTime = 1000.012
+    h.addon:_PerfFinish("slow block", start, "items=2")
+
+    _G.LibStub = oldLibStub
+    _G.GetTime = oldGetTime
+
+    assertContains(h.logs.info, "[Perf] slow block 8.0ms items=2", "expected slow perf block to be logged with context")
+end)
+
 test("passive loot observation is limited to group-based loot methods", function()
     local h = newHarness()
     local lootMethod = "group"
@@ -6315,6 +6697,66 @@ test("loot window fetch defers item cache warming", function()
     assertEqual(#warmed, 1, "expected deferred item cache warming to run after the timer")
     assertEqual(warmed[1], itemLink, "expected deferred item cache warming to preserve the item link")
     assertEqual(h.timerCount(), 0, "expected item cache warm queue to drain")
+end)
+
+test("loot window fetch defers expensive auto loot suggestion metadata", function()
+    local h = newHarness()
+    local itemLink = h.registerItem(9204, "Deferred BoE Blade")
+    local getItemInfoCalls = 0
+    local tooltipCalls = 0
+
+    h.addon.Item.WarmItemCache = function() end
+    h.addon.Item.GetItemBindFromTooltip = function(link)
+        tooltipCalls = tooltipCalls + 1
+        if link == itemLink then
+            return 2
+        end
+        return nil
+    end
+
+    _G.GetItemInfo = function(value)
+        getItemInfoCalls = getItemInfoCalls + 1
+        if value == itemLink then
+            return "Deferred BoE Blade", itemLink, 4, nil, nil, nil, nil, nil, nil, "Icon9204"
+        end
+        return nil
+    end
+    _G.GetItemFamily = function()
+        return 0
+    end
+    _G.GetNumLootItems = function()
+        return 1
+    end
+    _G.LootSlotIsItem = function(slot)
+        return slot == 1
+    end
+    _G.GetLootSlotLink = function(slot)
+        if slot == 1 then
+            return itemLink
+        end
+        return nil
+    end
+    _G.GetLootSlotInfo = function(slot)
+        if slot == 1 then
+            return "Icon9204", "Deferred BoE Blade", 1, 4, false, false, nil, true
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    local Loot = h.addon.Services.Loot
+
+    Loot:FetchLoot()
+
+    assertEqual(getItemInfoCalls, 0, "expected loot fetch to avoid synchronous GetItemInfo for auto loot suggestions")
+    assertEqual(tooltipCalls, 0, "expected loot fetch to avoid synchronous tooltip scans for auto loot suggestions")
+    assertEqual(Loot:GetAutoLootSuggestion(1).action, "none", "expected expensive BoE suggestion to stay pending during loot fetch")
+    assertEqual(h.timerCount(), 1, "expected deferred metadata work to reuse the item cache warm timer")
+
+    h:flushTimers()
+
+    assertEqual(tooltipCalls, 1, "expected deferred metadata work to scan the tooltip after the loot-open path")
+    assertEqual(Loot:GetAutoLootSuggestion(1).action, "bank", "expected deferred metadata work to resolve the BoE bank suggestion")
 end)
 
 test("loot tracking snapshot includes master loot candidates by slot", function()
@@ -8602,6 +9044,44 @@ test("slash help supports focused command pages", function()
     _G.SlashCmdList.KRT("help logger")
 
     assertContains(h.logs.info, "Commands: valid subcommands for |caaf49141/krt logger|r:", "expected focused logger help header")
+end)
+
+test("slash perf toggles runtime performance logging", function()
+    local h = newHarness()
+    _G.SlashCmdList = {}
+
+    h.addon.SetPerfMode = function(_, enabled)
+        h.addon.State.perfEnabled = enabled and true or false
+        h.addon.hasPerf = h.addon.State.perfEnabled and true or nil
+    end
+    h.addon.IsPerfModeEnabled = function()
+        return h.addon.State.perfEnabled == true
+    end
+    h.addon.SetPerfThresholdMs = function(_, value)
+        h.addon.State.perfThresholdMs = tonumber(value) or 0
+        return h.addon.State.perfThresholdMs
+    end
+    h.addon.GetPerfThresholdMs = function()
+        return tonumber(h.addon.State.perfThresholdMs) or 5
+    end
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/EntryPoints/SlashEvents.lua")
+
+    _G.SlashCmdList.KRT("perf on")
+
+    assertTrue(h.addon.State.perfEnabled == true, "expected /krt perf on to enable runtime performance logging")
+    assertContains(h.logs.info, "Performance logging: enabled", "expected perf command to report enabled state")
+
+    _G.SlashCmdList.KRT("perf threshold 12")
+
+    assertEqual(h.addon.State.perfThresholdMs, 12, "expected /krt perf threshold to update the runtime threshold")
+    assertContains(h.logs.info, "Performance logging threshold: 12ms.", "expected perf threshold command to report the new threshold")
+
+    _G.SlashCmdList.KRT("perf off")
+
+    assertTrue(h.addon.State.perfEnabled ~= true, "expected /krt perf off to disable runtime performance logging")
+    assertContains(h.logs.info, "Performance logging: disabled.", "expected perf command to report disabled state")
 end)
 
 test("slash bug prints local diagnostic summary", function()

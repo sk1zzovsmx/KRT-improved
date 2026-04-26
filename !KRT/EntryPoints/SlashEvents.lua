@@ -25,6 +25,7 @@ local format = string.format
 local upper = string.upper
 local type = type
 local tostring, tonumber = tostring, tonumber
+local floor = math.floor
 local _G = _G
 
 local UI = addon.UI
@@ -104,6 +105,7 @@ local cmdChanges, cmdWarnings, cmdLogger = { "ms", "changes", "mschanges" }, { "
 local cmdDebug, cmdLoot, cmdCounter = { "debug", "dbg", "debugger" }, { "loot", "ml", "master" }, { "counter", "counters", "counts" }
 local cmdReserves, cmdMinimap, cmdValidate = { "res", "reserves", "reserve" }, { "minimap", "mm" }, { "validate" }
 local cmdHelp, cmdBug, cmdVersion = { "help", "commands" }, { "bug", "report" }, { "version", "ver", "about" }
+local cmdPerf = { "perf", "performance" }
 local lootOnlySlashCommands = {}
 
 local function markLootOnlyCommands(list)
@@ -138,6 +140,7 @@ local function showHelp()
     printHelp("counter", L.StrCmdCounter)
     printHelp("reserves", L.StrCmdReserves)
     printHelp("validate", L.StrCmdValidate)
+    printHelp("perf", L.StrCmdPerf)
     printHelp("version", L.StrCmdVersion)
     printHelp("bug", L.StrCmdBug)
 end
@@ -560,6 +563,91 @@ local function handleDebugCommand(rest)
     end
 end
 
+local function formatPerfThreshold(value)
+    local n = tonumber(value) or 0
+    if n == floor(n) then
+        return tostring(n)
+    end
+    return format("%.1f", n)
+end
+
+local function getPerfThreshold()
+    if addon.GetPerfThresholdMs then
+        return addon:GetPerfThresholdMs()
+    end
+    return 5
+end
+
+local function isPerfEnabled()
+    if addon.IsPerfModeEnabled then
+        return addon:IsPerfModeEnabled()
+    end
+    return addon.State and addon.State.perfEnabled == true
+end
+
+local function setPerfEnabled(enabled)
+    if addon.SetPerfMode then
+        return addon:SetPerfMode(enabled)
+    end
+    addon.State = addon.State or {}
+    addon.State.perfEnabled = enabled and true or false
+    addon.hasPerf = addon.State.perfEnabled and true or nil
+    return addon.State.perfEnabled
+end
+
+local function setPerfThreshold(value)
+    if addon.SetPerfThresholdMs then
+        return addon:SetPerfThresholdMs(value)
+    end
+    local threshold = tonumber(value)
+    if not threshold or threshold < 0 then
+        return nil
+    end
+    addon.State = addon.State or {}
+    addon.State.perfThresholdMs = threshold
+    return threshold
+end
+
+local function handlePerfCommand(rest)
+    local subCmd, arg = Strings.SplitArgs(rest)
+    if isBlank(subCmd) then
+        subCmd = "status"
+    end
+
+    if subCmd == "on" then
+        setPerfEnabled(true)
+        addon:info(L.MsgPerfOn:format(formatPerfThreshold(getPerfThreshold())))
+        return
+    end
+
+    if subCmd == "off" then
+        setPerfEnabled(false)
+        addon:info(L.MsgPerfOff)
+        return
+    end
+
+    if subCmd == "threshold" or subCmd == "th" or subCmd == "ms" then
+        local threshold = setPerfThreshold(arg)
+        if not threshold then
+            addon:warn(L.MsgPerfThresholdInvalid)
+            return
+        end
+        addon:info(L.MsgPerfThreshold:format(formatPerfThreshold(threshold)))
+        return
+    end
+
+    if subCmd == "status" then
+        local status = isPerfEnabled() and L.StrEnabled or L.StrDisabled
+        addon:info(L.MsgPerfStatus:format(status, formatPerfThreshold(getPerfThreshold())))
+        return
+    end
+
+    addon:info(format(L.StrCmdCommands, "krt perf"), "KRT")
+    printHelp("on", L.StrCmdPerfOn)
+    printHelp("off", L.StrCmdPerfOff)
+    printHelp("threshold <ms>", L.StrCmdPerfThreshold)
+end
+
 local function handleMinimapCommand(rest)
     local sub, arg = Strings.SplitArgs(rest)
     if sub == "on" then
@@ -817,6 +905,8 @@ local function handleHelpCommand(rest)
         printHelp("off", L.StrCmdToggle)
         printHelp("level <name|num>", L.StrCmdDebugLevel)
         printHelp("raid", L.StrCmdDebugRaid)
+    elseif topic == "perf" or topic == "performance" then
+        handlePerfCommand("help")
     elseif topic == "rw" or topic == "warn" or topic == "warning" or topic == "warnings" then
         handleWarningsCommand("help")
     elseif topic == "ms" or topic == "changes" or topic == "mschanges" then
@@ -890,6 +980,7 @@ registerAliases(cmdHelp, handleHelpCommand)
 registerAliases(cmdBug, handleBugCommand)
 registerAliases(cmdVersion, handleVersionCommand)
 registerAliases(cmdDebug, handleDebugCommand)
+registerAliases(cmdPerf, handlePerfCommand)
 registerAliases(cmdMinimap, handleMinimapCommand)
 registerAliases(cmdAchiev, handleAchievementCommand)
 registerAliases(cmdConfig, handleConfigCommand)

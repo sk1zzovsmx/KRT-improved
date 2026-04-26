@@ -28,6 +28,7 @@ Diag.I.LogCoreLoaded = "[Core] Loaded version=%s logLevel=%s perfMode=%s"
 Diag.D.LogCoreEventsRegistered = "[Core] Events registered=%d"
 Diag.D.LogCorePlayerEnteringWorld = "[Core] PLAYER_ENTERING_WORLD -> scheduling FirstCheck"
 Diag.E.LogCoreEventHandlerFailed = "[Core] Event handler failed event=%s err=%s"
+Diag.I.LogPerfBlock = "[Perf] %s %.1fms%s"
 
 -- Utils --
 Diag.E.LogUtilsCallbackExec = "Error while executing callback %s for event %s: %s"

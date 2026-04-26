@@ -73,9 +73,10 @@ do
     local cacheWarmHead = 1
     local cacheWarmHandle
     local CACHE_WARM_DELAY_SECONDS = 0.15
+    local CHEAP_SUGGESTION_OPTS = { allowItemInfo = false, allowTooltip = false }
 
     -- ----- Private helpers ----- --
-    local scheduleCacheWarm
+    local scheduleCacheWarm, refreshDeferredAutoLootSuggestion
 
     local function warmItemCacheNow(itemLink)
         local probe = Item or addon.Item
@@ -103,6 +104,9 @@ do
         cacheWarmHead = cacheWarmHead + 1
         cacheWarmQueued[itemLink] = nil
         warmItemCacheNow(itemLink)
+        if refreshDeferredAutoLootSuggestion then
+            refreshDeferredAutoLootSuggestion(itemLink)
+        end
 
         if cacheWarmQueue[cacheWarmHead] then
             scheduleCacheWarm()
@@ -506,15 +510,55 @@ do
         return false
     end
 
-    local function evaluateAutoLootSuggestion(itemLink, itemRarity)
+    local function evaluateAutoLootSuggestion(itemLink, itemRarity, allowExpensiveMetadata)
         local rules = module._Rules
         if not (rules and rules.GetItemSuggestion) then
             return nil
         end
+        local opts
+        if allowExpensiveMetadata == false then
+            opts = CHEAP_SUGGESTION_OPTS
+        end
         return rules:GetItemSuggestion({
+            itemId = Item.GetItemIdFromLink(itemLink),
             itemLink = itemLink,
             itemRarity = itemRarity,
-        })
+        }, opts)
+    end
+
+    local function suggestionsMatch(a, b)
+        if a == b then
+            return true
+        end
+        if type(a) ~= "table" or type(b) ~= "table" then
+            return false
+        end
+        return a.action == b.action and a.reason == b.reason and a.rollType == b.rollType and a.targetKey == b.targetKey and a.skipLogger == b.skipLogger
+    end
+
+    refreshDeferredAutoLootSuggestion = function(itemLink)
+        if type(itemLink) ~= "string" or itemLink == "" then
+            return
+        end
+
+        local itemKey = Item.GetItemStringFromLink(itemLink) or itemLink
+        local selectedUpdated = false
+        for i = 1, lootState.lootCount do
+            local item = lootTable[i]
+            if item and (item.itemLink == itemLink or item.itemKey == itemKey) then
+                local suggestion = evaluateAutoLootSuggestion(item.itemLink, item.itemRarity, true)
+                if not suggestionsMatch(item.autoLootSuggestion, suggestion) then
+                    item.autoLootSuggestion = suggestion
+                    if i == lootState.currentItemIndex then
+                        selectedUpdated = true
+                    end
+                end
+            end
+        end
+
+        if selectedUpdated then
+            module:SetItem(lootTable[lootState.currentItemIndex])
+        end
     end
 
     local function resolveLootRollOutcome(itemLink, itemString, itemId, player, rollType, rollValue)
@@ -883,6 +927,7 @@ do
 
     -- Fetches items from the currently open loot window.
     function module:FetchLoot()
+        local perfStart = addon.hasPerf and addon:_PerfStart() or nil
         local oldItem
         if lootState.lootCount >= 1 then
             oldItem = getItemLink(lootState.currentItemIndex)
@@ -905,6 +950,9 @@ do
         self:PrepareItem()
         if addon.hasTrace then
             addon:trace(Diag.D.LogLootFetchDone:format(lootState.lootCount or 0, lootState.currentItemIndex or 0))
+        end
+        if perfStart then
+            addon:_PerfFinish("Loot.FetchLoot", perfStart, "slots=" .. tostring(lootItemCount) .. " items=" .. tostring(lootState.lootCount or 0))
         end
     end
 
@@ -987,8 +1035,9 @@ do
         lootTable[lootState.lootCount].itemColor = itemColor
         lootTable[lootState.lootCount].itemLink = itemLink
         lootTable[lootState.lootCount].itemTexture = itemTexture
+        lootTable[lootState.lootCount].itemRarity = itemRarity
         lootTable[lootState.lootCount].count = itemCount or 1
-        lootTable[lootState.lootCount].autoLootSuggestion = evaluateAutoLootSuggestion(itemLink, itemRarity)
+        lootTable[lootState.lootCount].autoLootSuggestion = evaluateAutoLootSuggestion(itemLink, itemRarity, not hasHints)
     end
 
     -- Prepares the currently selected item for display.

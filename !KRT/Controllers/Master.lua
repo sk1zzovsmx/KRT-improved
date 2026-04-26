@@ -3202,6 +3202,7 @@ do
 
     -- LOOT_OPENED: Triggered when the loot window opens.
     function module:LOOT_OPENED()
+        local perfTotal = addon.hasPerf and addon:_PerfStart() or nil
         cancelLootClosedCleanup()
         if Raid:IsMasterLooter() then
             local debugEnabled = isDebugEnabled()
@@ -3211,14 +3212,26 @@ do
             end
             lootState.opened = true
             announced = false
+            local perfStep = addon.hasPerf and addon:_PerfStart() or nil
             Loot:FetchLoot()
+            if perfStep then
+                addon:_PerfFinish("Master.LOOT_OPENED FetchLoot", perfStep, "items=" .. tostring(lootState.lootCount or 0))
+            end
             if raidNum and Raid._EnsureLootWindowItemContext and Loot.GetLootWindowItems then
+                perfStep = addon.hasPerf and addon:_PerfStart() or nil
                 Raid:_EnsureLootWindowItemContext(raidNum, Loot:GetLootWindowItems(), {
                     ttlSeconds = LOOT_CONTEXT_SESSION_TTL_SECONDS,
                     source = "LOOT_OPENED",
                 })
+                if perfStep then
+                    addon:_PerfFinish("Master.LOOT_OPENED LootContext", perfStep, "raid=" .. tostring(raidNum))
+                end
             end
+            perfStep = addon.hasPerf and addon:_PerfStart() or nil
             updateSelectionFrame()
+            if perfStep then
+                addon:_PerfFinish("Master.LOOT_OPENED SelectionFrame", perfStep, "items=" .. tostring(lootState.lootCount or 0))
+            end
             if debugEnabled then
                 if isTraceEnabled() then
                     addon:trace(Diag.D.LogMLLootOpenedTrace:format(lootState.lootCount or 0, tostring(lootState.fromInventory)))
@@ -3227,7 +3240,14 @@ do
                     addon:debug(Diag.D.LogMLLootOpenedInfo:format(lootState.lootCount or 0, tostring(lootState.fromInventory), tostring(UnitName("target"))))
                 end
             end
+            perfStep = addon.hasPerf and addon:_PerfStart() or nil
             handleLootOpenedVisibility()
+            if perfStep then
+                addon:_PerfFinish("Master.LOOT_OPENED Visibility", perfStep, "items=" .. tostring(lootState.lootCount or 0))
+            end
+            if perfTotal then
+                addon:_PerfFinish("Master.LOOT_OPENED Total", perfTotal, "items=" .. tostring(lootState.lootCount or 0))
+            end
         end
     end
 
@@ -3250,19 +3270,31 @@ do
 
     -- LOOT_SLOT_CLEARED: Triggered when an item is looted.
     function module:LOOT_SLOT_CLEARED(clearedSlot)
+        local perfTotal = addon.hasPerf and addon:_PerfStart() or nil
         if Raid:IsMasterLooter() then
+            local perfStep = addon.hasPerf and addon:_PerfStart() or nil
             Loot:FetchLoot()
+            if perfStep then
+                addon:_PerfFinish("Master.LOOT_SLOT_CLEARED FetchLoot", perfStep, "slot=" .. tostring(clearedSlot or "?") .. " items=" .. tostring(lootState.lootCount or 0))
+            end
             if isDebugEnabled() then
                 if isTraceEnabled() then
                     addon:trace(Diag.D.LogMLLootSlotCleared:format(lootState.lootCount or 0))
                 end
             end
+            perfStep = addon.hasPerf and addon:_PerfStart() or nil
             updateSelectionFrame()
+            if perfStep then
+                addon:_PerfFinish("Master.LOOT_SLOT_CLEARED SelectionFrame", perfStep, "slot=" .. tostring(clearedSlot or "?"))
+            end
             Private.ResetItemCount()
             handleLootSlotClearedVisibility()
 
             -- Continue a multi-award sequence (loot window only).
             continueMultiAwardOnLootSlotCleared(clearedSlot)
+            if perfTotal then
+                addon:_PerfFinish("Master.LOOT_SLOT_CLEARED Total", perfTotal, "slot=" .. tostring(clearedSlot or "?") .. " items=" .. tostring(lootState.lootCount or 0))
+            end
         end
     end
 

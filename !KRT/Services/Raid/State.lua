@@ -277,6 +277,51 @@ do
         return LootContextState.GetBossEvent(raidState)
     end
 
+    local function normalizeRecentLootDeathContext(context)
+        if type(context) ~= "table" then
+            return nil
+        end
+
+        context.raidNum = tonumber(context.raidNum) or 0
+        context.kind = (context.kind == "boss" or context.kind == "trash") and context.kind or nil
+        context.bossNid = tonumber(context.bossNid) or 0
+        context.sourceNpcId = tonumber(context.sourceNpcId) or 0
+        context.sourceName = context.sourceName or nil
+        context.source = context.source or nil
+        context.seenAt = tonumber(context.seenAt) or 0
+
+        if context.raidNum <= 0 or not context.kind then
+            return nil
+        end
+        if context.kind == "boss" and context.bossNid <= 0 and not context.sourceName then
+            return nil
+        end
+
+        return context
+    end
+
+    local function getRecentLootDeathContextState()
+        return LootContextState.SyncField(raidState, "recentDeath", "recentLootDeathContext", normalizeRecentLootDeathContext)
+    end
+
+    local function setRecentLootDeathContext(raidNum, kind, sourceName, sourceNpcId, bossNid, source, seenAt)
+        local resolvedRaidNum = tonumber(raidNum) or 0
+        if resolvedRaidNum <= 0 or (kind ~= "boss" and kind ~= "trash") then
+            setLootContextField("recentDeath", "recentLootDeathContext", nil)
+            return nil
+        end
+
+        return setLootContextField("recentDeath", "recentLootDeathContext", {
+            raidNum = resolvedRaidNum,
+            kind = kind,
+            bossNid = tonumber(bossNid) or 0,
+            sourceNpcId = tonumber(sourceNpcId) or 0,
+            sourceName = sourceName,
+            source = source or "UNIT_DIED",
+            seenAt = tonumber(seenAt) or Time.GetCurrentTime(),
+        })
+    end
+
     local function resetLootContextState()
         LootContextState.Reset(raidState)
     end
@@ -390,14 +435,6 @@ do
         local mouseoverContext = buildCorpseUnitContext("mouseover", true)
         if mouseoverContext then
             return mouseoverContext
-        end
-
-        local raidMemberCount = type(GetNumRaidMembers) == "function" and (GetNumRaidMembers() or 0) or 0
-        for i = 1, raidMemberCount do
-            local raidTargetContext = buildCorpseUnitContext("raid" .. tostring(i) .. "target", false)
-            if raidTargetContext then
-                return raidTargetContext
-            end
         end
 
         return nil
@@ -702,6 +739,50 @@ do
         return resolveBossEventContext(raidNum, now, false)
     end
 
+    local function resolveRecentLootDeathContext(raid, raidNum, now, ttlSeconds, source)
+        local context = getRecentLootDeathContextState()
+        if type(context) ~= "table" then
+            return nil
+        end
+
+        local currentTime = tonumber(now) or Time.GetCurrentTime()
+        local contextRaidNum = tonumber(context.raidNum) or 0
+        local delta = currentTime - (tonumber(context.seenAt) or 0)
+        if contextRaidNum ~= (tonumber(raidNum) or 0) or delta < 0 or delta > BOSS_EVENT_CONTEXT_TTL_SECONDS then
+            setLootContextField("recentDeath", "recentLootDeathContext", nil)
+            return nil
+        end
+
+        if context.kind == "trash" then
+            setBlockedLootWindowBossContext(raidNum, source or "lootWindowRecentDeath", currentTime, ttlSeconds, {
+                npcId = tonumber(context.sourceNpcId) or 0,
+                name = context.sourceName,
+            })
+            return "blocked", 0
+        end
+
+        local bossNid = tonumber(context.bossNid) or 0
+        local boss = findBossByNid(raid, bossNid)
+        if not boss and context.sourceName then
+            boss = findBossByName(raid, context.sourceName)
+            bossNid = tonumber(boss and boss.bossNid) or bossNid
+        end
+        if not boss and context.sourceName then
+            local sourceNpcId = tonumber(context.sourceNpcId) or 0
+            local sourceNpcIdArg = sourceNpcId > 0 and sourceNpcId or nil
+            bossNid = tonumber(module:AddBoss(context.sourceName, nil, raidNum, sourceNpcIdArg)) or 0
+        end
+        if bossNid <= 0 then
+            return nil
+        end
+
+        local sourceMeta = {
+            npcId = tonumber(context.sourceNpcId) or 0,
+            name = context.sourceName,
+        }
+        return "boss", setLootWindowBossContext(raid, raidNum, bossNid, source or "lootWindowRecentDeath", currentTime, ttlSeconds, sourceMeta)
+    end
+
     local function ensureLootWindowBossContext(raid, raidNum, now, ttlSeconds, source)
         local currentTime = tonumber(now) or Time.GetCurrentTime()
         local contextState = resolveLootWindowContextState(raid, raidNum, currentTime)
@@ -731,6 +812,14 @@ do
             end
         end
 
+        local recentState, recentBossNid = resolveRecentLootDeathContext(raid, raidNum, currentTime, ttlSeconds, source)
+        if recentState == "blocked" then
+            return 0
+        end
+        if recentState == "boss" and recentBossNid > 0 then
+            return recentBossNid
+        end
+
         bossNid = peekBossEventContext(raidNum, currentTime)
         if bossNid <= 0 then
             setActiveLootSource(raid, raidNum, "object", 0, nil, currentTime, ttlSeconds, nil)
@@ -743,16 +832,27 @@ do
     local function findAndRememberBossContextForLoot(raid, raidNum, rollSessionId, now, ttlSeconds, allowLootWindowContext, allowContextRecovery, applyLastBossOnRecovery)
         local currentTime = tonumber(now) or Time.GetCurrentTime()
         local bossNid = resolveLootBossSession(raid, raidNum, rollSessionId, currentTime)
+        local contextBlocked = false
 
         if bossNid <= 0 and allowLootWindowContext then
             local contextState = resolveLootWindowContextState(raid, raidNum, currentTime)
             if contextState == "blocked" then
+                contextBlocked = true
                 allowContextRecovery = false
             else
                 bossNid = resolveLootWindowBossContext(raid, raidNum, currentTime)
             end
         end
-        if bossNid <= 0 and allowContextRecovery then
+        if bossNid <= 0 and not contextBlocked then
+            local recentState, recentBossNid = resolveRecentLootDeathContext(raid, raidNum, currentTime, ttlSeconds, "lootRecentDeath")
+            if recentState == "blocked" then
+                contextBlocked = true
+                allowContextRecovery = false
+            elseif recentState == "boss" and recentBossNid > 0 then
+                bossNid = recentBossNid
+            end
+        end
+        if bossNid <= 0 and not contextBlocked and allowContextRecovery then
             if applyLastBossOnRecovery then
                 bossNid = recoverBossEventContext(raidNum, currentTime)
             else
@@ -1345,6 +1445,9 @@ do
             return
         end
         if sourceKind ~= "boss" then
+            if sourceKind == "trash" then
+                setRecentLootDeathContext(Core.GetCurrentRaid(), "trash", destName, sourceNpcId, 0, "UNIT_DIED", Time.GetCurrentTime())
+            end
             return
         end
 
@@ -1353,7 +1456,8 @@ do
             if isTraceEnabled() then
                 addon:trace(Diag.D.LogBossUnitDiedMatched:format(tonumber(sourceNpcId) or -1, tostring(boss)))
             end
-            module:AddBoss(boss, nil, nil, sourceNpcId)
+            local bossNid = module:AddBoss(boss, nil, nil, sourceNpcId)
+            setRecentLootDeathContext(Core.GetCurrentRaid(), "boss", boss, sourceNpcId, bossNid, "UNIT_DIED", Time.GetCurrentTime())
         end
     end
 end

@@ -144,6 +144,7 @@ function ContextState.Reset(raidState)
     raidState = ensureRaidState(raidState)
     raidState.lootContext = nil
     raidState.bossEventContext = nil
+    raidState.recentLootDeathContext = nil
     raidState.lootWindowBossContext = nil
     raidState.lootBossSessions = nil
     raidState.lootWindowItemSnapshots = nil

@@ -56,6 +56,7 @@ local strsub, strlen = string.sub, string.len
 
 local Core = addon.Core
 local Diagnose = addon.Diagnose
+local DEFAULT_PERF_THRESHOLD_MS = 5
 
 local Diag = setmetatable({}, {
     __index = Diagnose,
@@ -75,6 +76,14 @@ end
 
 local function isTraceEnabled()
     return addon.hasTrace ~= nil
+end
+
+local function getPerfThresholdMs()
+    local threshold = tonumber(addon.State and addon.State.perfThresholdMs) or DEFAULT_PERF_THRESHOLD_MS
+    if threshold < 0 then
+        threshold = DEFAULT_PERF_THRESHOLD_MS
+    end
+    return threshold
 end
 
 local function getLegacyAliasWarnCache()
@@ -231,6 +240,69 @@ function Core.RegisterLegacyAliasPath(aliasKey, namespaceKey, moduleKey)
 end
 
 installLegacyAliasProxy()
+
+function addon:IsPerfModeEnabled()
+    return self.State and self.State.perfEnabled == true
+end
+
+function addon:SetPerfMode(enabled)
+    local state = self.State or {}
+    self.State = state
+    state.perfEnabled = enabled and true or false
+    self.hasPerf = state.perfEnabled and true or nil
+    return state.perfEnabled
+end
+
+function addon:GetPerfThresholdMs()
+    return getPerfThresholdMs()
+end
+
+function addon:SetPerfThresholdMs(value)
+    local threshold = tonumber(value)
+    if not threshold or threshold < 0 then
+        return nil
+    end
+    local state = self.State or {}
+    self.State = state
+    state.perfThresholdMs = threshold
+    return threshold
+end
+
+addon._PerfStart = function(self)
+    if not self.hasPerf then
+        return nil
+    end
+    local getTime = _G.GetTime
+    if type(getTime) ~= "function" then
+        return nil
+    end
+    return getTime()
+end
+
+addon._PerfFinish = function(self, label, startedAt, details)
+    if not (self.hasPerf and startedAt) then
+        return nil
+    end
+    local getTime = _G.GetTime
+    if type(getTime) ~= "function" then
+        return nil
+    end
+
+    local elapsedMs = (getTime() - startedAt) * 1000
+    if elapsedMs < getPerfThresholdMs() then
+        return elapsedMs
+    end
+
+    local suffix = ""
+    if details and details ~= "" then
+        suffix = " " .. tostring(details)
+    end
+    local template = (Diag.I and Diag.I.LogPerfBlock) or "[Perf] %s %.1fms%s"
+    if self.info then
+        self:info(template:format(tostring(label or "?"), elapsedMs, suffix))
+    end
+    return elapsedMs
+end
 
 local LEGACY_ALIAS_PATHS = {
     { "Master", "Controllers", "Master" },
@@ -1478,6 +1550,7 @@ do
 
     -- CHAT_MSG_LOOT: Adds looted items to the raid log.
     function addon:CHAT_MSG_LOOT(msg)
+        local perfStart = addon.hasPerf and addon:_PerfStart() or nil
         if isTraceEnabled() then
             addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
         end
@@ -1485,6 +1558,9 @@ do
         local raidService, observedType = observePassiveLootMessage(msg)
         local lootService = getService("Loot")
         if not (currentRaid and raidService) then
+            if perfStart then
+                addon:_PerfFinish("CHAT_MSG_LOOT", perfStart, "raid=none")
+            end
             return
         end
 
@@ -1494,10 +1570,14 @@ do
                 lootService:AddLoot(msg)
             end
         end
+        if perfStart then
+            addon:_PerfFinish("CHAT_MSG_LOOT", perfStart, "raid=" .. tostring(currentRaid) .. " observed=" .. tostring(observedType))
+        end
     end
 
     -- CHAT_MSG_SYSTEM: Forwards roll messages to the Rolls module.
     function addon:CHAT_MSG_SYSTEM(msg)
+        local perfStart = addon.hasPerf and addon:_PerfStart() or nil
         local currentRaid = Core.GetCurrentRaid()
         local raidService, observedType = observePassiveLootMessage(msg)
         local lootService = getService("Loot")
@@ -1511,19 +1591,29 @@ do
         end
 
         if Core.GetCurrentRaid() and raidService and raidService.CanUseCapability and not raidService:CanUseCapability("loot") then
+            if perfStart then
+                addon:_PerfFinish("CHAT_MSG_SYSTEM", perfStart, "raid=" .. tostring(currentRaid) .. " observed=" .. tostring(observedType) .. " blocked=loot")
+            end
             return
         end
         local rollsService = getService("Rolls")
         if rollsService and rollsService.CHAT_MSG_SYSTEM then
             rollsService:CHAT_MSG_SYSTEM(msg)
         end
+        if perfStart then
+            addon:_PerfFinish("CHAT_MSG_SYSTEM", perfStart, "raid=" .. tostring(currentRaid) .. " observed=" .. tostring(observedType))
+        end
     end
 
     function addon:START_LOOT_ROLL(rollId, rollTime)
+        local perfStart = addon.hasPerf and addon:_PerfStart() or nil
         local currentRaid = Core.GetCurrentRaid()
         local lootService = getService("Loot")
         if currentRaid and lootService and lootService.AddPassiveLootRoll then
             lootService:AddPassiveLootRoll(rollId, rollTime)
+        end
+        if perfStart then
+            addon:_PerfFinish("START_LOOT_ROLL", perfStart, "raid=" .. tostring(currentRaid) .. " rollId=" .. tostring(rollId))
         end
     end
 
