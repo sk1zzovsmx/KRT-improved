@@ -5319,6 +5319,125 @@ test("item link parser ignores non-string values", function()
     assertEqual(h.addon.Item.GetItemIdFromLink(39718), 39718, "expected numeric item ids to pass through unchanged")
 end)
 
+test("item info request returns cached items immediately", function()
+    local h = newHarness()
+    local link = h.registerItem(39718, "Lost Jewel")
+    local callbackCount = 0
+    local received
+
+    h:load("!KRT/Modules/Item.lua")
+
+    local handle = h.addon.Item.RequestItemInfo(link, function(snapshot, ok)
+        callbackCount = callbackCount + 1
+        received = snapshot
+        assertTrue(ok == true, "expected cached item request to report success")
+    end)
+
+    assertEqual(callbackCount, 1, "expected cached item callback to run immediately")
+    assertEqual(received.itemId, 39718, "expected cached item id")
+    assertEqual(received.itemName, "Lost Jewel", "expected cached item name")
+    assertEqual(handle:IsCancelled(), true, "expected immediate request handle to be inert")
+    assertEqual(h.timerCount(), 0, "expected cached item request to avoid scheduling")
+end)
+
+test("item info request warms uncached items and resolves on retry", function()
+    local h = newHarness()
+    local calls = 0
+    local warmed = {}
+    local callbackCount = 0
+    local received
+
+    _G.GetItemInfo = function(value)
+        calls = calls + 1
+        if calls < 3 then
+            return nil
+        end
+        return "Delayed Jewel", "|cffa335ee|Hitem:40123:0:0:0:0:0:0:0|h[Delayed Jewel]|h|r", 4, nil, nil, nil, nil, nil, nil, "icon"
+    end
+    _G.GameTooltip = nil
+    _G.CreateFrame = function(_, name)
+        local frame = h.makeFrame(true, name)
+        frame.SetOwner = function() end
+        frame.ClearLines = function() end
+        frame.Hide = function() end
+        frame.SetHyperlink = function(_, itemLink)
+            warmed[#warmed + 1] = itemLink
+        end
+        if name then
+            _G[name] = frame
+        end
+        return frame
+    end
+
+    h:load("!KRT/Modules/Item.lua")
+
+    local handle = h.addon.Item.RequestItemInfo(40123, function(snapshot, ok)
+        callbackCount = callbackCount + 1
+        received = snapshot
+        assertTrue(ok == true, "expected delayed item request to report success")
+    end)
+
+    assertEqual(h.timerCount(), 1, "expected uncached item request to schedule one poller")
+    assertEqual(#warmed, 1, "expected uncached item request to warm item data")
+
+    h:flushTimers()
+
+    assertEqual(callbackCount, 1, "expected delayed item callback after retry")
+    assertEqual(received.itemId, 40123, "expected delayed item id")
+    assertEqual(received.itemName, "Delayed Jewel", "expected delayed item name")
+    assertEqual(handle:IsCancelled(), true, "expected resolved request to become cancelled")
+    assertEqual(h.timerCount(), 0, "expected item request poller to stop after resolution")
+end)
+
+test("item info request can be cancelled before retry", function()
+    local h = newHarness()
+    local callbackCount = 0
+
+    _G.GetItemInfo = function()
+        return nil
+    end
+
+    h:load("!KRT/Modules/Item.lua")
+
+    local handle = h.addon.Item.RequestItemInfo(49999, function()
+        callbackCount = callbackCount + 1
+    end)
+    assertEqual(handle:Cancel(), true, "expected pending item request to cancel")
+
+    h:flushTimers()
+
+    assertEqual(callbackCount, 0, "expected cancelled item request to suppress callback")
+    assertEqual(h.timerCount(), 0, "expected cancelled item request to drain poller")
+end)
+
+test("ui primitives expose pixel-aligned sizing helpers", function()
+    local h = newHarness()
+    _G.GetCurrentResolution = function()
+        return 1
+    end
+    _G.GetScreenResolutions = function()
+        return "1920x1080"
+    end
+
+    h:load("!KRT/Modules/UI/Visuals.lua")
+
+    local frame = h.makeFrame(true, "PixelFrame")
+    frame.GetEffectiveScale = function()
+        return 1
+    end
+    frame.SetPoint = function(self, point, relativeTo, relativePoint, x, y)
+        self._point = { point, relativeTo, relativePoint, x, y }
+    end
+
+    h.addon.UIPrimitives.SetPixelSize(frame, 10.2, 10.7, 1, 1)
+    h.addon.UIPrimitives.SetPixelPoint(frame, "TOPLEFT", nil, "TOPLEFT", 2.2, -2.2, 1, 1)
+
+    assertTrue(math.abs(frame:GetWidth() - 9.9555555555556) < 0.0000001, "expected width to align to physical pixels")
+    assertTrue(math.abs(frame:GetHeight() - 10.666666666667) < 0.0000001, "expected height to align to physical pixels")
+    assertTrue(math.abs(frame._point[4] - 2.1333333333333) < 0.0000001, "expected x offset to align to physical pixels")
+    assertTrue(math.abs(frame._point[5] + 2.1333333333333) < 0.0000001, "expected y offset to align to physical pixels")
+end)
+
 test("auto loot rules suggest disenchant for enchanting materials", function()
     local h = newHarness()
     h:load("!KRT/Modules/IgnoredItems.lua")
