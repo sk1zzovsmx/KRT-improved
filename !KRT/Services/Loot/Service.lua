@@ -572,6 +572,7 @@ do
         local outcome = {
             consumedPendingAward = false,
             matchedPassiveRoll = false,
+            pendingCounterApplied = false,
         }
         local pendingAwardTtl = passiveGroupLoot and GROUP_LOOT_PENDING_AWARD_TTL_SECONDS or PENDING_AWARD_TTL_SECONDS
         -- In ML mode, block stale GL:* pending awards only when the current item
@@ -598,6 +599,7 @@ do
             end
             rollSessionId = pendingAward.rollSessionId and tostring(pendingAward.rollSessionId) or nil
             outcome.consumedPendingAward = true
+            outcome.pendingCounterApplied = pendingAward.counterApplied == true
         end
 
         if not rollSessionId then
@@ -804,9 +806,10 @@ do
         local lootInfo, lootNid =
             buildLootRecord(raid, itemId, itemName, itemString, itemLink, itemRarity, itemTexture, itemCount, looterNid, rollType, rollValue, rollSessionId, bossNid, lootSource)
 
-        -- LootCounter: increment MS/OS/FREE counter when loot is actually awarded.
-        -- Runs off the authoritative LOOT_ITEM / LOOT_ITEM_MULTIPLE chat event.
-        if raidService then
+        -- LootCounter: passive/group loot credits on observed loot chat. Master-loot awards
+        -- initiated by KRT may already be credited at GiveMasterLoot time because loot chat
+        -- visibility is range-limited on 3.3.5 clients.
+        if raidService and not (rollOutcome and rollOutcome.consumedPendingAward and rollOutcome.pendingCounterApplied == true) then
             raidService:AddPlayerCountForRollType(player, rollType, itemCount, currentRaidId)
         end
 
@@ -909,8 +912,8 @@ do
     end
 
     -- Pending award helpers (shared with Master/Raid flows).
-    function module:AddPendingAward(itemLink, looter, rollType, rollValue, rollSessionId, expiresAt)
-        return PendingAwards.Add(itemLink, looter, rollType, rollValue, rollSessionId, expiresAt)
+    function module:AddPendingAward(itemLink, looter, rollType, rollValue, rollSessionId, expiresAt, options)
+        return PendingAwards.Add(itemLink, looter, rollType, rollValue, rollSessionId, expiresAt, options)
     end
 
     function module:RemovePendingAward(itemLink, looter, maxAge, rollSessionId, preferResolvedValue, allowGroupLootPendingAwards)

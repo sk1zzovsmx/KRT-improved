@@ -8,6 +8,9 @@ Release-Version: 0.7.0-beta.1
 
 ### Enhancements
 
+- **LootCounter reliability** - Master-loot awards now credit the LootCounter
+  from the KRT award action instead of depending only on range-limited loot
+  chat observation, while avoiding duplicate credits when loot chat is seen.
 - **Slash diagnostics** - Added focused `/krt help <command>` pages plus
   `/krt version` and `/krt bug` local diagnostic summaries for support.
 - **Performance diagnostics** - Added runtime-only `/krt perf on|off` logging

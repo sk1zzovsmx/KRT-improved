@@ -3395,8 +3395,11 @@ do
         if candidateIndex then
             -- Mark this award as addon-driven so AddLoot() won't classify it as MANUAL
             local session = ensureRollSession(itemLink, rollType, lootState.fromInventory and "inventory" or "lootWindow")
-            Loot:AddPendingAward(itemLink, playerName, rollType, rollValue, session and session.id or nil)
+            Loot:AddPendingAward(itemLink, playerName, rollType, rollValue, session and session.id or nil, nil, {
+                counterApplied = true,
+            })
             GiveMasterLoot(itemIndex, candidateIndex)
+            Raid:AddPlayerCountForRollType(playerName, rollType, 1, addon.Core.GetCurrentRaid())
             if addon.hasDebug then
                 addon:debug(
                     Diag.D.LogMLAwarded:format(

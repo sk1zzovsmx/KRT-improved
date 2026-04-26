@@ -2641,6 +2641,7 @@ local function setupMasterAwardHarness(cfg)
     }
     local queuedAwards = {}
     local givenLoot = {}
+    local addCounts = {}
     local validationCalls = {}
     local refreshCount = 0
 
@@ -2745,6 +2746,13 @@ local function setupMasterAwardHarness(cfg)
             end
             return next(cache.indexByName) ~= nil
         end,
+        AddPlayerCountForRollType = function(_, playerName, rollType, count)
+            addCounts[#addCounts + 1] = {
+                name = playerName,
+                rollType = rollType,
+                count = count,
+            }
+        end,
         GetUnitID = function(_, playerName)
             local units = cfg.unitsByName or {}
             if units[playerName] ~= nil then
@@ -2829,6 +2837,7 @@ local function setupMasterAwardHarness(cfg)
         end,
         queuedAwards = queuedAwards,
         givenLoot = givenLoot,
+        addCounts = addCounts,
         validationCalls = validationCalls,
         getRefreshCount = function()
             return refreshCount
@@ -5508,6 +5517,39 @@ test("master award matches loot slots by itemId when hyperlinks differ", functio
     assertEqual(ctx.givenLoot[1].candidateIndex, 1, "expected award flow to resolve the candidate index for the winner")
 end)
 
+test("master loot award credits loot counter without waiting for observed loot chat", function()
+    local ctx = setupMasterAwardHarness({
+        candidates = { "Alice" },
+        rollsByName = {
+            Alice = 88,
+        },
+        model = {
+            rows = {
+                makeMasterRollRow("Alice", 88, "ROLL", true),
+            },
+            selectionAllowed = false,
+            requiredWinnerCount = 1,
+            resolution = {
+                autoWinners = {
+                    { name = "Alice", roll = 88 },
+                },
+                tiedNames = {},
+                requiresManualResolution = false,
+                topRollName = "Alice",
+            },
+        },
+    })
+
+    local ok = ctx.Master:BtnAward()
+
+    assertTrue(ok == true, "expected master loot award to succeed")
+    assertEqual(#ctx.givenLoot, 1, "expected award flow to reach GiveMasterLoot once")
+    assertEqual(#ctx.addCounts, 1, "expected award flow to credit LootCounter immediately")
+    assertEqual(ctx.addCounts[1].name, "Alice", "expected LootCounter credit to use the awarded player")
+    assertEqual(ctx.addCounts[1].rollType, ctx.h.rollTypes.MAINSPEC, "expected LootCounter credit to use the awarded roll type")
+    assertEqual(ctx.addCounts[1].count, 1, "expected LootCounter credit to use the awarded item count")
+end)
+
 test("group loot rolled lines queue winner type before raw won message", function()
     local h = newHarness()
     local link = h.registerItem(9180, "Protector Token")
@@ -6230,6 +6272,59 @@ test("master loot add loot prefers the active roll session pending award", funct
     assertEqual(raid.loot[1].rollType, h.rollTypes.OFFSPEC, "expected master loot receipt to use the pending award from the active roll session")
     assertEqual(raid.loot[1].rollValue, 12, "expected master loot receipt to keep the active roll session rollValue")
     assertEqual(raid.loot[1].rollSessionId, "RS:new", "expected master loot receipt to bind the active roll session id")
+end)
+
+test("master loot receipt does not double credit a pre-counted pending award", function()
+    local h = newHarness()
+    local link = h.registerItem(91901, "Counted Master Sigil")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h.Core.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "master", 0, 0
+    end
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "loot-receive-self" then
+            return link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    local Loot = h.addon.Services.Loot
+    local Raid = h.addon.Services.Raid
+    Loot:AddPendingAward(link, "Tester", h.rollTypes.MAINSPEC, 99, "RS:counted", nil, {
+        counterApplied = true,
+    })
+    Raid:AddPlayerCountForRollType("Tester", h.rollTypes.MAINSPEC, 1, 1)
+
+    Raid:AddLoot("loot-receive-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    local playerNid = Raid:GetPlayerID("Tester", 1)
+    assertEqual(#raid.loot, 1, "expected master loot receipt to still create a loot entry")
+    assertEqual(Raid:GetPlayerCountByNid(playerNid, 1), 1, "expected observed loot chat to avoid double-crediting the pre-counted award")
 end)
 
 test("loot pending awards upgrade the next FIFO duplicate entry", function()

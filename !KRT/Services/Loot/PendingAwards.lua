@@ -159,7 +159,7 @@ local function findUniqueValidPendingAwardIndex(list, now, ttl)
     return uniqueIndex
 end
 
-local function tryUpgradePendingAward(list, rollType, rollValue, rollSessionId, expiresAt, now)
+local function tryUpgradePendingAward(list, rollType, rollValue, rollSessionId, expiresAt, now, counterApplied)
     if not (rollValue and rollValue > 0) then
         return false
     end
@@ -182,6 +182,9 @@ local function tryUpgradePendingAward(list, rollType, rollValue, rollSessionId, 
                 end
                 if expiresAt and ((tonumber(pending.expiresAt) or 0) < expiresAt) then
                     pending.expiresAt = expiresAt
+                end
+                if counterApplied == true then
+                    pending.counterApplied = true
                 end
                 return true
             end
@@ -209,7 +212,7 @@ end
 -- ----- Public methods ----- --
 PendingAwards.NormalizePendingAwardItemKey = normalizePendingAwardItemKey
 
-function PendingAwards.Add(itemLink, looter, rollType, rollValue, rollSessionId, expiresAt)
+function PendingAwards.Add(itemLink, looter, rollType, rollValue, rollSessionId, expiresAt, options)
     if not itemLink or not looter then
         return
     end
@@ -220,8 +223,9 @@ function PendingAwards.Add(itemLink, looter, rollType, rollValue, rollSessionId,
     local resolvedRollValue = tonumber(rollValue)
     local resolvedSessionId = rollSessionId and tostring(rollSessionId) or nil
     local resolvedExpiresAt = tonumber(expiresAt) or nil
+    local counterApplied = type(options) == "table" and options.counterApplied == true or false
 
-    if tryUpgradePendingAward(list, resolvedRollType, resolvedRollValue, resolvedSessionId, resolvedExpiresAt, now) then
+    if tryUpgradePendingAward(list, resolvedRollType, resolvedRollValue, resolvedSessionId, resolvedExpiresAt, now, counterApplied) then
         return
     end
 
@@ -232,6 +236,7 @@ function PendingAwards.Add(itemLink, looter, rollType, rollValue, rollSessionId,
         rollValue = resolvedRollValue or rollValue,
         rollSessionId = resolvedSessionId,
         expiresAt = resolvedExpiresAt,
+        counterApplied = counterApplied,
         ts = now,
     }
 end
