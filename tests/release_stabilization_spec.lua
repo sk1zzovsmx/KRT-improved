@@ -2706,13 +2706,16 @@ local function setupMasterAwardHarness(cfg)
             end
             return nil
         end,
-        AddPendingAward = function(_, itemLinkArg, playerName, rollType, rollValue, sessionId)
+        FetchLoot = function() end,
+        AddPendingAward = function(_, itemLinkArg, playerName, rollType, rollValue, sessionId, expiresAt, options)
             queuedAwards[#queuedAwards + 1] = {
                 itemLink = itemLinkArg,
                 playerName = playerName,
                 rollType = rollType,
                 rollValue = rollValue,
                 sessionId = sessionId,
+                expiresAt = expiresAt,
+                options = options,
             }
         end,
     }
@@ -5058,6 +5061,101 @@ test("group loot winner messages log passive GR history directly", function()
     assertEqual(raid.loot[1].rollValue, 88, "expected self winner message to preserve the greed roll value")
 end)
 
+test("group loot logger skips green gem and recipe drops", function()
+    local h = newHarness()
+    local greenLink = h.registerItem(91720, "Green Disenchant Blade", 2)
+    local gemLink = h.registerItem(91721, "Blue Raid Gem", 3)
+    local recipeLink = h.registerItem(91722, "Epic Raid Recipe", 4)
+    local keepLink = h.registerItem(91723, "Blue Raid Boots", 3)
+    local itemClasses = {
+        [91720] = "Armor",
+        [91721] = "Gem",
+        [91722] = "Recipe",
+        [91723] = "Armor",
+    }
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetLootRollItemLink = function(rollId)
+        if rollId == 201 then
+            return greenLink
+        end
+        if rollId == 202 then
+            return gemLink
+        end
+        if rollId == 203 then
+            return recipeLink
+        end
+        if rollId == 204 then
+            return keepLink
+        end
+        return nil
+    end
+
+    local oldGetItemInfo = _G.GetItemInfo
+    _G.GetItemInfo = function(value)
+        local itemName, itemLink, itemRarity, _, _, _, _, _, _, itemTexture = oldGetItemInfo(value)
+        local itemId = h.addon.Item.GetItemIdFromLink(itemLink or value)
+        return itemName, itemLink, itemRarity, nil, nil, itemClasses[itemId], nil, nil, nil, itemTexture
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "green-win-self" then
+            return 201, 41, greenLink
+        end
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "gem-win-self" then
+            return 202, 42, gemLink
+        end
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "recipe-win-self" then
+            return 203, 43, recipeLink
+        end
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "keep-win-self" then
+            return 204, 88, keepLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    Raid:AddPassiveLootRoll(201, 45000)
+    Raid:AddGroupLootMessage("green-win-self")
+    Raid:AddLoot("green-win-self")
+
+    Raid:AddPassiveLootRoll(202, 45000)
+    Raid:AddGroupLootMessage("gem-win-self")
+    Raid:AddLoot("gem-win-self")
+
+    Raid:AddPassiveLootRoll(203, 45000)
+    Raid:AddGroupLootMessage("recipe-win-self")
+    Raid:AddLoot("recipe-win-self")
+
+    Raid:AddPassiveLootRoll(204, 45000)
+    Raid:AddGroupLootMessage("keep-win-self")
+    Raid:AddLoot("keep-win-self")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected group loot logger to skip green gem and recipe drops")
+    assertEqual(raid.loot[1].itemId, 91723, "expected group loot logger to keep normal blue equipment")
+    assertEqual(raid.loot[1].rollValue, 88, "expected kept group loot to retain roll metadata")
+end)
+
 test("group loot direct winner logs suppress later duplicate loot receipts", function()
     local h = newHarness()
     local link = h.registerItem(9161, "Needblade")
@@ -5410,6 +5508,54 @@ test("item info request can be cancelled before retry", function()
     assertEqual(h.timerCount(), 0, "expected cancelled item request to drain poller")
 end)
 
+test("loot selection refreshes current item when async item cache resolves", function()
+    local h = newHarness()
+    local link = "|cffa335ee|Hitem:1401:0:0:0:0:0:0:0|h[Async Master Blade]|h|r"
+    local views = {}
+    local itemResolved = false
+
+    _G.GetItemInfo = function(value)
+        if not itemResolved then
+            return nil
+        end
+        local itemId = tonumber(tostring(value or ""):match("item:(%d+)")) or value
+        if tonumber(itemId) == 1401 then
+            return "Async Master Blade", link, 4, nil, nil, nil, nil, nil, nil, "Icon1401"
+        end
+        return nil
+    end
+
+    h.Bus.RegisterCallback(h.addon.Events.Internal.SetItem, function(_, itemLink, itemData)
+        views[#views + 1] = {
+            itemLink = itemLink,
+            itemName = itemData and itemData.itemName,
+            itemTexture = itemData and itemData.itemTexture,
+            itemRarity = itemData and itemData.itemRarity,
+        }
+    end)
+
+    h:load("!KRT/Modules/Item.lua")
+    h.feature.Item = h.addon.Item
+    h:load("!KRT/Services/Loot.lua")
+
+    local Loot = h.addon.Services.Loot
+    h.feature.lootState.fromInventory = true
+    Loot:AddItem(link, 1)
+    Loot:PrepareItem()
+
+    assertEqual(views[1].itemTexture, "fallback-icon", "expected initial current item view to use fallback icon")
+    assertEqual(h.timerCount(), 1, "expected missing current item info to schedule async cache polling")
+
+    itemResolved = true
+    h:flushTimers()
+
+    assertEqual(h.timerCount(), 0, "expected async current item cache polling to drain")
+    assertEqual(#views, 2, "expected current item view to refresh after async cache resolves")
+    assertEqual(views[2].itemName, "Async Master Blade", "expected refreshed current item name")
+    assertEqual(views[2].itemTexture, "Icon1401", "expected refreshed current item icon")
+    assertEqual(views[2].itemRarity, 4, "expected refreshed current item rarity")
+end)
+
 test("ui primitives expose pixel-aligned sizing helpers", function()
     local h = newHarness()
     _G.GetCurrentResolution = function()
@@ -5636,7 +5782,7 @@ test("master award matches loot slots by itemId when hyperlinks differ", functio
     assertEqual(ctx.givenLoot[1].candidateIndex, 1, "expected award flow to resolve the candidate index for the winner")
 end)
 
-test("master loot award credits loot counter without waiting for observed loot chat", function()
+test("master loot award credits loot counter after loot slot clear confirmation", function()
     local ctx = setupMasterAwardHarness({
         candidates = { "Alice" },
         rollsByName = {
@@ -5663,10 +5809,80 @@ test("master loot award credits loot counter without waiting for observed loot c
 
     assertTrue(ok == true, "expected master loot award to succeed")
     assertEqual(#ctx.givenLoot, 1, "expected award flow to reach GiveMasterLoot once")
-    assertEqual(#ctx.addCounts, 1, "expected award flow to credit LootCounter immediately")
+    assertEqual(#ctx.addCounts, 0, "expected award flow to wait for loot slot confirmation before crediting LootCounter")
+
+    ctx.Master:LOOT_SLOT_CLEARED(1)
+
+    assertEqual(#ctx.addCounts, 1, "expected loot slot confirmation to credit LootCounter")
     assertEqual(ctx.addCounts[1].name, "Alice", "expected LootCounter credit to use the awarded player")
     assertEqual(ctx.addCounts[1].rollType, ctx.h.rollTypes.MAINSPEC, "expected LootCounter credit to use the awarded roll type")
     assertEqual(ctx.addCounts[1].count, 1, "expected LootCounter credit to use the awarded item count")
+end)
+
+test("master loot award failure error cancels pending loot counter credit", function()
+    local ctx = setupMasterAwardHarness({
+        candidates = { "Alice" },
+        rollsByName = {
+            Alice = 88,
+        },
+        model = {
+            rows = {
+                makeMasterRollRow("Alice", 88, "ROLL", true),
+            },
+            selectionAllowed = false,
+            requiredWinnerCount = 1,
+            resolution = {
+                autoWinners = {
+                    { name = "Alice", roll = 88 },
+                },
+                tiedNames = {},
+                requiresManualResolution = false,
+                topRollName = "Alice",
+            },
+        },
+    })
+
+    assertTrue(ctx.Master:BtnAward() == true, "expected master loot award request to be sent")
+    assertEqual(#ctx.addCounts, 0, "expected pending award to start without LootCounter credit")
+
+    assertTrue(type(ctx.Master.UI_ERROR_MESSAGE) == "function", "expected Master to observe UI_ERROR_MESSAGE failures")
+    ctx.Master:UI_ERROR_MESSAGE("Inventory is full.")
+    ctx.Master:LOOT_SLOT_CLEARED(1)
+
+    assertEqual(#ctx.addCounts, 0, "expected failed award to avoid LootCounter credit even if a later slot event appears")
+end)
+
+test("master loot award timeout leaves unconfirmed loot counter credit unapplied", function()
+    local ctx = setupMasterAwardHarness({
+        candidates = { "Alice" },
+        rollsByName = {
+            Alice = 88,
+        },
+        model = {
+            rows = {
+                makeMasterRollRow("Alice", 88, "ROLL", true),
+            },
+            selectionAllowed = false,
+            requiredWinnerCount = 1,
+            resolution = {
+                autoWinners = {
+                    { name = "Alice", roll = 88 },
+                },
+                tiedNames = {},
+                requiresManualResolution = false,
+                topRollName = "Alice",
+            },
+        },
+    })
+
+    assertTrue(ctx.Master:BtnAward() == true, "expected master loot award request to be sent")
+    assertEqual(#ctx.addCounts, 0, "expected pending award to start without LootCounter credit")
+    assertTrue(ctx.h.timerCount() >= 1, "expected pending award confirmation to schedule a timeout")
+
+    ctx.h:flushTimers()
+    ctx.Master:LOOT_SLOT_CLEARED(1)
+
+    assertEqual(#ctx.addCounts, 0, "expected timed-out award confirmation to avoid late LootCounter credit")
 end)
 
 test("group loot rolled lines queue winner type before raw won message", function()
@@ -9177,6 +9393,42 @@ test("reserves item-info updates coalesce into a single refresh", function()
 
     local displayList = Service:GetDisplayList()
     assertEqual(#displayList, 2, "expected both resolved reserve items in display list")
+end)
+
+test("reserves item-info query refreshes display after async item cache resolves", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1301 },
+            },
+        },
+    }
+
+    h:load("!KRT/Modules/Item.lua")
+    h.feature.Item = h.addon.Item
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Service = h.addon.Services.Reserves
+    Service:Load()
+
+    local updated, missingCount = Service:QueryMissingItems(true)
+    assertTrue(updated ~= true, "expected uncached reserve item to stay pending")
+    assertEqual(missingCount, 1, "expected one uncached reserve item")
+    assertEqual(h.timerCount(), 1, "expected reserves to schedule shared item-cache polling")
+
+    h.registerItem(1301, "Async Reserve Blade")
+    h:flushTimers()
+
+    assertEqual(h.timerCount(), 0, "expected async item-cache polling to drain after resolution")
+    assertEqual(h.Bus._triggered[h.addon.Events.Internal.ReservesDataChanged] or 0, 1, "expected async item data to refresh reserves once")
+
+    local entry = Service:GetReserveEntryForItem(1301, "Alice")
+    assertEqual(entry.itemName, "Async Reserve Blade", "expected async item name to populate reserve entry")
+    assertTrue(type(entry.itemLink) == "string" and entry.itemLink:find("item:1301", 1, true) ~= nil, "expected async item link to populate reserve entry")
+
+    local displayList = Service:GetDisplayList()
+    assertEqual(displayList[1].itemName, "Async Reserve Blade", "expected display list to use async item metadata")
 end)
 
 test("reserves format supports filtering to current raid players", function()

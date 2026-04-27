@@ -259,6 +259,8 @@ Durable preferences learned from recent conversations:
   document them in dedicated release/tooling docs under `docs/` or `tools/`.
 - For auto-loot rules, prefer automatic suggestions only; do not auto-award, auto-trade, or auto-assign loot
   unless explicitly requested.
+- For passive Group Loot logging, prefer filtering low-value DE/Greed drops such as green-quality items,
+  gems, and recipes out of the logger unless explicitly requested.
 - For Whisper SoftRes, keep player whisper handling out of `EntryPoints/SlashEvents.lua`; put request parsing
   and response policy under Reserves/Chat-style service ownership, gate replies behind config, valid reserve
   data, and ML/leader/assistant authority, and send only chat-safe messages through

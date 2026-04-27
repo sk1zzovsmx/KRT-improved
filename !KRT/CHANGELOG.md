@@ -8,9 +8,10 @@ Release-Version: 0.7.0-beta.1
 
 ### Enhancements
 
-- **LootCounter reliability** - Master-loot awards now credit the LootCounter
-  from the KRT award action instead of depending only on range-limited loot
-  chat observation, while avoiding duplicate credits when loot chat is seen.
+- **LootCounter reliability** - Master-loot awards now queue LootCounter
+  credit from the KRT award action, confirm it on loot-slot clear events, and
+  cancel it on visible UI failure messages or timeout instead of depending
+  only on range-limited loot chat observation.
 - **Slash diagnostics** - Added focused `/krt help <command>` pages plus
   `/krt version` and `/krt bug` local diagnostic summaries for support.
 - **Performance diagnostics** - Added runtime-only `/krt perf on|off` logging
@@ -21,6 +22,12 @@ Release-Version: 0.7.0-beta.1
 - **SoftRes runtime sync** - Added lightweight `/krt res sync` support for
   grouped KRT clients to request runtime-only SoftRes metadata/data from an
   authorized reserve owner without persisting received reserves.
+- **SoftRes item metadata** - Reserve item queries now use the shared item
+  cache loader, so missing item names/icons can populate automatically once
+  the 3.3.5a client item cache resolves.
+- **Master item metadata** - Current Master Loot item views now refresh from
+  the shared item cache loader when inventory/manual item metadata resolves
+  after initial selection.
 - **Whisper SoftRes replies** - Added opt-in `!sr`/`!softres` whisper replies,
   with `sr`/`softres` fallback aliases for private servers that reserve `!`
   commands, so ML/leader/assistant clients with reserve data can send a player
@@ -40,6 +47,9 @@ Release-Version: 0.7.0-beta.1
   `UNIT_DIED` context backed by `LibBossIDs` for loot windows and passive
   group-loot roll sessions, while removing the raid-target scan that could
   stall the client during looting.
+- **Passive group-loot logger filter** - Group Loot and Need Before Greed
+  passive logging now skips green-quality drops, gems, and recipes so DE/Greed
+  filler items do not clutter the raid logger.
 - **Performance: Bus event dispatch** — Eliminated per-fire table allocation
   in `Bus.TriggerEvent`; reuses a static dispatch buffer to reduce GC pressure
   during active raiding (dozens of events/second).

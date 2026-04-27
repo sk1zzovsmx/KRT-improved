@@ -15,6 +15,7 @@ local Options = feature.Options or addon.Options
 local Bus = feature.Bus or addon.Bus
 local Strings = feature.Strings or addon.Strings
 local Services = feature.Services or addon.Services
+local Item = feature.Item or addon.Item
 
 local tconcat, twipe = table.concat, table.wipe
 local pairs, ipairs, type, next = pairs, ipairs, type, next
@@ -282,6 +283,7 @@ do
                 name = nil,
                 link = nil,
                 icon = nil,
+                requestHandle = nil,
             }
             pendingItemInfo[itemId] = pending
             pendingItemCount = pendingItemCount + 1
@@ -679,6 +681,60 @@ do
     -- Strategy-based CSV parsing moved to Services/Reserves/Import.lua.
     local updateReserveItemData
 
+    local function requestReserveItemInfo(itemId, pending)
+        if not itemId or not Item or type(Item.RequestItemInfo) ~= "function" then
+            return false
+        end
+        if pending and pending.requestHandle and not pending.requestHandle:IsCancelled() then
+            return true
+        end
+
+        local handle
+        handle = Item.RequestItemInfo(itemId, function(snapshot, ok)
+            local current = pendingItemInfo[itemId]
+            if not current or current.requestHandle ~= handle then
+                return
+            end
+            current.requestHandle = nil
+
+            if ok ~= true or type(snapshot) ~= "table" then
+                return
+            end
+
+            local name = snapshot.itemName
+            local link = snapshot.itemLink
+            local icon = snapshot.itemTexture
+            if (type(icon) ~= "string" or icon == "") and type(GetItemIcon) == "function" then
+                local fetchedIcon = GetItemIcon(itemId)
+                if type(fetchedIcon) == "string" and fetchedIcon ~= "" then
+                    icon = fetchedIcon
+                end
+            end
+
+            local hasName = type(name) == "string" and name ~= "" and type(link) == "string" and link ~= ""
+            local hasIcon = type(icon) == "string" and icon ~= ""
+            if hasName then
+                updateReserveItemData(itemId, name, link, icon)
+            end
+            markPendingItem(itemId, hasName, hasIcon, name, link, icon)
+            if hasName and hasIcon then
+                if isDebugEnabled() then
+                    addon:debug(Diag.D.LogReservesItemInfoReady:format(itemId, name))
+                end
+                completePendingItem(itemId)
+            end
+        end)
+
+        if handle then
+            local current = pendingItemInfo[itemId]
+            if current then
+                current.requestHandle = handle
+            end
+            return true
+        end
+        return false
+    end
+
     function Service:ParseImport(text, mode, opts)
         return importParser.ParseImport(self, text, mode, opts)
     end
@@ -750,7 +806,7 @@ do
         if hasName then
             updateReserveItemData(itemId, name, link, icon)
         end
-        markPendingItem(itemId, hasName, hasIcon, name, link, icon)
+        pending = markPendingItem(itemId, hasName, hasIcon, name, link, icon)
         if hasName and hasIcon then
             if isDebugEnabled() then
                 addon:debug(Diag.D.LogReservesItemInfoReady:format(itemId, name))
@@ -758,6 +814,8 @@ do
             completePendingItem(itemId)
             return true
         end
+
+        requestReserveItemInfo(itemId, pending)
 
         if isDebugEnabled() then
             addon:debug(Diag.D.LogReservesItemInfoPendingQuery:format(itemId))

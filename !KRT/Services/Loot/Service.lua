@@ -48,12 +48,14 @@ local getItemName, getItemLink, getItemTexture
 
 local tinsert, twipe = table.insert, table.wipe
 local type = type
-local strmatch = string.match
+local strmatch, strlower = string.match, string.lower
 
 local tostring, tonumber = tostring, tonumber
 local PENDING_AWARD_TTL_SECONDS = tonumber(C.PENDING_AWARD_TTL_SECONDS) or 8
 local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = tonumber(C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60
 local BOSS_EVENT_CONTEXT_TTL_SECONDS = tonumber(C.BOSS_EVENT_CONTEXT_TTL_SECONDS) or 30
+local UNCOMMON_ITEM_RARITY = 2
+local UNCOMMON_ITEM_LINK_COLOR = "ff1eff00"
 
 -- =========== Loot Helpers Module  =========== --
 -- Manages the loot window items (fetching from loot/inventory).
@@ -76,7 +78,8 @@ do
     local CHEAP_SUGGESTION_OPTS = { allowItemInfo = false, allowTooltip = false }
 
     -- ----- Private helpers ----- --
-    local scheduleCacheWarm, refreshDeferredAutoLootSuggestion
+    local scheduleCacheWarm, refreshDeferredAutoLootSuggestion, evaluateAutoLootSuggestion
+    local requestLootItemInfo
 
     local function warmItemCacheNow(itemLink)
         local probe = Item or addon.Item
@@ -137,6 +140,71 @@ do
         cacheWarmQueued[itemLink] = true
         cacheWarmQueue[#cacheWarmQueue + 1] = itemLink
         scheduleCacheWarm()
+    end
+
+    local function resolveItemColor(itemLink, itemRarity, colorHint)
+        if colorHint then
+            return colorHint
+        end
+        if type(itemLink) == "string" then
+            local color = itemLink:match("|c(%x%x%x%x%x%x%x%x)|Hitem:")
+            if color then
+                return color
+            end
+        end
+
+        local rarity = tonumber(itemRarity) or 1
+        return itemColors[rarity + 1] or itemColors[2]
+    end
+
+    requestLootItemInfo = function(index, itemLink)
+        local probe = Item or addon.Item
+        if not (probe and type(probe.RequestItemInfo) == "function" and type(itemLink) == "string") then
+            return false
+        end
+
+        local item = lootTable[index]
+        if not item or item._itemInfoRequest then
+            return false
+        end
+
+        local expectedKey = probe.GetItemStringFromLink and (probe.GetItemStringFromLink(itemLink) or itemLink) or itemLink
+        local expectedId = probe.GetItemIdFromLink and probe.GetItemIdFromLink(itemLink) or nil
+        local handle
+        handle = probe.RequestItemInfo(itemLink, function(snapshot, ok)
+            local current = lootTable[index]
+            if not current or current._itemInfoRequest ~= handle then
+                return
+            end
+            current._itemInfoRequest = nil
+            if ok ~= true or type(snapshot) ~= "table" then
+                return
+            end
+
+            local currentLink = current.itemLink
+            local currentKey = probe.GetItemStringFromLink and (probe.GetItemStringFromLink(currentLink) or currentLink) or currentLink
+            local currentId = probe.GetItemIdFromLink and probe.GetItemIdFromLink(currentLink) or nil
+            if currentKey ~= expectedKey and not (expectedId and currentId and currentId == expectedId) then
+                return
+            end
+
+            current.itemName = snapshot.itemName or current.itemName
+            current.itemLink = snapshot.itemLink or current.itemLink
+            current.itemRarity = snapshot.itemRarity or current.itemRarity
+            current.itemTexture = snapshot.itemTexture or current.itemTexture or C.RESERVES_ITEM_FALLBACK_ICON
+            current.itemColor = resolveItemColor(current.itemLink, current.itemRarity, current.itemColor)
+            current.autoLootSuggestion = evaluateAutoLootSuggestion(current.itemLink, current.itemRarity, true)
+
+            if index == lootState.currentItemIndex then
+                module:SetItem(current)
+            end
+        end)
+
+        if handle then
+            item._itemInfoRequest = handle
+            return true
+        end
+        return false
     end
 
     local function isBagItemSoulbound(bag, slot)
@@ -487,9 +555,9 @@ do
 
     local function getLootItemDetails(itemLink)
         local itemString = Item.GetItemStringFromLink(itemLink)
-        local itemName, _, itemRarity, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink)
+        local itemName, _, itemRarity, _, _, itemType, _, _, _, itemTexture = GetItemInfo(itemLink)
         local itemId = Item.GetItemIdFromLink(itemLink)
-        return itemString, itemName, itemRarity, itemTexture, tonumber(itemId)
+        return itemString, itemName, itemRarity, itemTexture, tonumber(itemId), itemType
     end
 
     local function shouldSkipLootEntry(itemRarity, itemId, itemLink)
@@ -510,7 +578,34 @@ do
         return false
     end
 
-    local function evaluateAutoLootSuggestion(itemLink, itemRarity, allowExpensiveMetadata)
+    local function normalizeItemClass(value)
+        return Strings.NormalizeLower(value, true) or ""
+    end
+
+    local function itemClassMatches(itemType, globalKey, fallback)
+        local className = normalizeItemClass(itemType)
+        if className == "" then
+            return false
+        end
+
+        local globalName = normalizeItemClass(_G[globalKey])
+        return className == fallback or (globalName ~= "" and className == globalName)
+    end
+
+    local function isUncommonItem(itemRarity, itemLink)
+        if tonumber(itemRarity) == UNCOMMON_ITEM_RARITY then
+            return true
+        end
+
+        local color = type(itemLink) == "string" and itemLink:match("|c(%x%x%x%x%x%x%x%x)|Hitem:") or nil
+        return color and strlower(color) == UNCOMMON_ITEM_LINK_COLOR
+    end
+
+    local function shouldSkipPassiveGroupLootEntry(itemRarity, itemType, itemLink)
+        return isUncommonItem(itemRarity, itemLink) or itemClassMatches(itemType, "ITEM_CLASS_GEM", "gem") or itemClassMatches(itemType, "ITEM_CLASS_RECIPE", "recipe")
+    end
+
+    evaluateAutoLootSuggestion = function(itemLink, itemRarity, allowExpensiveMetadata)
         local rules = module._Rules
         if not (rules and rules.GetItemSuggestion) then
             return nil
@@ -760,7 +855,7 @@ do
             return
         end
 
-        local itemString, itemName, itemRarity, itemTexture, itemId = getLootItemDetails(itemLink)
+        local itemString, itemName, itemRarity, itemTexture, itemId, itemType = getLootItemDetails(itemLink)
         if addon.hasTrace then
             addon:trace(Diag.D.LogLootParsed:format(tostring(player), tostring(itemLink), itemCount))
         end
@@ -780,6 +875,11 @@ do
         local rollSessionId
         local rollOutcome
         rollType, rollValue, rollSessionId, rollOutcome = resolveLootRollOutcome(itemLink, itemString, itemId, player, rollType, rollValue)
+
+        if passiveGroupLoot and shouldSkipPassiveGroupLootEntry(itemRarity, itemType, itemLink) then
+            PassiveGroupLoot.ConsumePassiveLootRollEntry(rollSessionId)
+            return
+        end
 
         if passiveGroupLoot and not (rollOutcome and rollOutcome.consumedPendingAward) then
             local alreadyLogged = PassiveGroupLoot.HasLoggedPassiveLoot(itemLink, player, rollSessionId)
@@ -967,6 +1067,7 @@ do
     function module:AddItem(itemLink, itemCount, nameHint, rarityHint, textureHint, colorHint)
         local itemName, itemRarity, itemTexture
         local hasHints = nameHint and rarityHint and textureHint
+        local needsAsyncItemInfo = false
 
         if hasHints then
             -- Loot-window path: slot data is already available, avoid blocking query.
@@ -985,9 +1086,7 @@ do
             itemRarity = giiRarity
             itemTexture = giiTexture
 
-            if (not itemName or not itemRarity or not itemTexture) and type(itemLink) == "string" then
-                warmItemCache(itemLink)
-            end
+            needsAsyncItemInfo = (not itemName or not itemRarity or not itemTexture) and type(itemLink) == "string"
 
             if not itemName then
                 itemName = nameHint
@@ -1003,15 +1102,7 @@ do
             end
         end
 
-        -- Prefer: explicit hint > link color > rarity color table.
-        local itemColor = colorHint
-        if not itemColor and type(itemLink) == "string" then
-            itemColor = itemLink:match("|c(%x%x%x%x%x%x%x%x)|Hitem:")
-        end
-        if not itemColor then
-            local r = tonumber(itemRarity) or 1
-            itemColor = itemColors[r + 1] or itemColors[2]
-        end
+        local itemColor = resolveItemColor(itemLink, itemRarity, colorHint)
 
         if not itemName then
             if addon.hasDebug then
@@ -1033,14 +1124,21 @@ do
             lootState.lootCount = 1
             lootState.currentItemIndex = 1
         end
-        lootTable[lootState.lootCount] = {}
-        lootTable[lootState.lootCount].itemName = itemName
-        lootTable[lootState.lootCount].itemColor = itemColor
-        lootTable[lootState.lootCount].itemLink = itemLink
-        lootTable[lootState.lootCount].itemTexture = itemTexture
-        lootTable[lootState.lootCount].itemRarity = itemRarity
-        lootTable[lootState.lootCount].count = itemCount or 1
-        lootTable[lootState.lootCount].autoLootSuggestion = evaluateAutoLootSuggestion(itemLink, itemRarity, not hasHints)
+        local itemIndex = lootState.lootCount
+        lootTable[itemIndex] = {}
+        lootTable[itemIndex].itemName = itemName
+        lootTable[itemIndex].itemColor = itemColor
+        lootTable[itemIndex].itemLink = itemLink
+        lootTable[itemIndex].itemTexture = itemTexture
+        lootTable[itemIndex].itemRarity = itemRarity
+        lootTable[itemIndex].count = itemCount or 1
+        lootTable[itemIndex].autoLootSuggestion = evaluateAutoLootSuggestion(itemLink, itemRarity, not hasHints)
+
+        if not hasHints and type(itemLink) == "string" and (needsAsyncItemInfo or itemName == tostring(itemLink)) then
+            if not requestLootItemInfo(itemIndex, itemLink) then
+                warmItemCache(itemLink)
+            end
+        end
     end
 
     -- Prepares the currently selected item for display.

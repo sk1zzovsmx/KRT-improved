@@ -96,6 +96,8 @@ C.CHAT_PREFIX_HEX = C.K_COLOR
 C.ML_MULTI_AWARD_DELAY = 0.2
 -- Safety timeout: abort multi-award if the loot window does not reflect expected decrements.
 C.ML_MULTI_AWARD_TIMEOUT_SECONDS = 4
+-- Safety timeout: abandon unconfirmed Master Loot counter credits if no slot clear/error arrives.
+C.ML_AWARD_CONFIRM_TIMEOUT_SECONDS = 4
 C.PENDING_AWARD_TTL_SECONDS = 8
 -- Passive Group Loot / Need Before Greed falls back to a short fixed window
 -- only when START_LOOT_ROLL metadata is unavailable.

@@ -173,6 +173,9 @@ processItemRequests = function()
 end
 
 local function scanSoulboundFlag(tip)
+    if not tip or type(tip.NumLines) ~= "function" then
+        return false
+    end
     local numLines = tip:NumLines() or 0
     for i = numLines, 1, -1 do
         local line = _G[TOOLTIP_NAME .. "TextLeft" .. i]
@@ -192,6 +195,9 @@ local function scanSoulboundFlag(tip)
 end
 
 local function scanBindType(tip)
+    if not tip or type(tip.NumLines) ~= "function" then
+        return nil
+    end
     local numLines = tip:NumLines() or 0
     local bindOnPickup = _G.ITEM_BIND_ON_PICKUP or "Binds when picked up"
     local bindOnEquip = _G.ITEM_BIND_ON_EQUIP or "Binds when equipped"

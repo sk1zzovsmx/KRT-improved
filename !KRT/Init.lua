@@ -37,6 +37,7 @@ addon.Events.Internal.RaidRosterDelta = addon.Events.Internal.RaidRosterDelta or
 addon.Events.Wow.LootOpened = addon.Events.Wow.LootOpened or "wow.LOOT_OPENED"
 addon.Events.Wow.LootClosed = addon.Events.Wow.LootClosed or "wow.LOOT_CLOSED"
 addon.Events.Wow.LootSlotCleared = addon.Events.Wow.LootSlotCleared or "wow.LOOT_SLOT_CLEARED"
+addon.Events.Wow.UiErrorMessage = addon.Events.Wow.UiErrorMessage or "wow.UI_ERROR_MESSAGE"
 addon.Events.Wow.ChatMsgWhisper = addon.Events.Wow.ChatMsgWhisper or "wow.CHAT_MSG_WHISPER"
 addon.Events.Wow.TradeAcceptUpdate = addon.Events.Wow.TradeAcceptUpdate or "wow.TRADE_ACCEPT_UPDATE"
 addon.Events.Wow.TradeRequestCancel = addon.Events.Wow.TradeRequestCancel or "wow.TRADE_REQUEST_CANCEL"
@@ -1373,6 +1374,7 @@ do
         LOOT_CLOSED = "LOOT_CLOSED",
         LOOT_OPENED = "LOOT_OPENED",
         LOOT_SLOT_CLEARED = "LOOT_SLOT_CLEARED",
+        UI_ERROR_MESSAGE = "UI_ERROR_MESSAGE",
         TRADE_ACCEPT_UPDATE = "TRADE_ACCEPT_UPDATE",
         TRADE_REQUEST_CANCEL = "TRADE_REQUEST_CANCEL",
         TRADE_CLOSED = "TRADE_CLOSED",
@@ -1384,6 +1386,7 @@ do
             LOOT_OPENED = WowEvents.LootOpened,
             LOOT_CLOSED = WowEvents.LootClosed,
             LOOT_SLOT_CLEARED = WowEvents.LootSlotCleared,
+            UI_ERROR_MESSAGE = WowEvents.UiErrorMessage,
             CHAT_MSG_WHISPER = WowEvents.ChatMsgWhisper,
             TRADE_ACCEPT_UPDATE = WowEvents.TradeAcceptUpdate,
             TRADE_REQUEST_CANCEL = WowEvents.TradeRequestCancel,

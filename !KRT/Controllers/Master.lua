@@ -157,6 +157,7 @@ do
         showRollsOnly = true,
         model = nil,
     }
+    local PendingCounter = { Awards = {} }
     local FLOW_STATES = {
         IDLE = "idle",
         LOOT = "loot",
@@ -1582,6 +1583,143 @@ do
         if prepareDropDowns then
             prepareDropDowns()
         end
+    end
+
+    function PendingCounter:CancelAward(pending)
+        if pending and pending.timeoutHandle then
+            addon.CancelTimer(pending.timeoutHandle, true)
+            pending.timeoutHandle = nil
+        end
+    end
+
+    function PendingCounter:Remove(index)
+        local awards = self.Awards
+        local pending = awards[index]
+        self:CancelAward(pending)
+        if pending then
+            awards[index] = nil
+            table.remove(awards, index)
+        end
+        return pending
+    end
+
+    function PendingCounter:Clear(reason)
+        local awards = self.Awards
+        for i = #awards, 1, -1 do
+            local pending = self:Remove(i)
+            if pending and addon.hasDebug then
+                addon:debug(Diag.W.LogMLAwardCounterFailed:format(tostring(pending.itemLink), tostring(pending.playerName), tostring(reason or "clear")))
+            end
+        end
+    end
+
+    function PendingCounter:FindBySlot(clearedSlot)
+        local awards = self.Awards
+        local slot = tonumber(clearedSlot)
+        for i = 1, #awards do
+            local pending = awards[i]
+            if pending and pending.failed ~= true and pending.counterApplied ~= true then
+                if not slot or tonumber(pending.itemIndex) == slot then
+                    return pending, i
+                end
+            end
+        end
+        return nil, nil
+    end
+
+    function PendingCounter:HasPending()
+        return self.Awards[1] ~= nil
+    end
+
+    function PendingCounter:IsFailureMessage(message)
+        local text = string.lower(tostring(message or ""))
+        if text == "" then
+            return false
+        end
+
+        local known = {
+            _G.ERR_INV_FULL,
+            _G.ERR_ITEM_MAX_COUNT,
+            _G.ERR_LOOT_LOCKED,
+            _G.ERR_LOOT_GONE,
+        }
+        for i = 1, #known do
+            local value = known[i]
+            if value and value ~= "" and tostring(message) == tostring(value) then
+                return true
+            end
+        end
+
+        return text:find("inventory is full", 1, true)
+            or text:find("bags are full", 1, true)
+            or text:find("can't carry", 1, true)
+            or text:find("cannot carry", 1, true)
+            or text:find("loot is gone", 1, true)
+            or text:find("loot locked", 1, true)
+            or text:find("item is locked", 1, true)
+            or text:find("player not found", 1, true)
+    end
+
+    function PendingCounter:Fail(reason)
+        local awards = self.Awards
+        local failed = false
+        for i = #awards, 1, -1 do
+            local pending = self:Remove(i)
+            if pending then
+                failed = true
+                addon:warn(Diag.W.LogMLAwardCounterFailed:format(tostring(pending.itemLink), tostring(pending.playerName), tostring(reason or "unknown")))
+            end
+        end
+        return failed
+    end
+
+    function PendingCounter:Confirm(clearedSlot, source)
+        local pending, index = self:FindBySlot(clearedSlot)
+        if not pending then
+            return false
+        end
+
+        Raid:AddPlayerCountForRollType(pending.playerName, pending.rollType, pending.itemCount or 1, addon.Core.GetCurrentRaid())
+        pending.counterApplied = true
+        self:Remove(index)
+        if addon.hasDebug then
+            addon:debug(
+                Diag.D.LogMLAwardCounterConfirmed:format(tostring(pending.itemLink), tostring(pending.playerName), tonumber(pending.rollType) or -1, tostring(source or "unknown"))
+            )
+        end
+        return true
+    end
+
+    function PendingCounter:Queue(itemLink, itemIndex, playerName, rollType, rollValue, sessionId)
+        local pending = {
+            itemLink = itemLink,
+            itemKey = Item.GetItemStringFromLink(itemLink) or itemLink,
+            itemIndex = tonumber(itemIndex) or itemIndex,
+            playerName = playerName,
+            rollType = rollType,
+            rollValue = rollValue,
+            rollSessionId = sessionId and tostring(sessionId) or nil,
+            itemCount = 1,
+            counterApplied = false,
+        }
+
+        local timeout = tonumber(C.ML_AWARD_CONFIRM_TIMEOUT_SECONDS) or 4
+        tinsert(self.Awards, pending)
+        if timeout > 0 then
+            local owner = self
+            pending.timeoutHandle = addon.NewTimer(timeout, function()
+                local awards = owner.Awards
+                for i = #awards, 1, -1 do
+                    if awards[i] == pending then
+                        owner:Remove(i)
+                        addon:warn(Diag.W.LogMLAwardCounterTimeout:format(timeout, tostring(pending.itemLink), tostring(pending.playerName), tostring(pending.itemIndex or "?")))
+                        module:RequestRefresh()
+                        return
+                    end
+                end
+            end)
+        end
+        return pending
     end
 
     -- ============================================================================
@@ -3127,7 +3265,7 @@ do
     local function refreshAndMaybeShowLootFrame(shouldShow)
         local frame
         if shouldShow then
-            frame = module:EnsureUI() or getFrame()
+            frame = (module.EnsureUI and module:EnsureUI()) or getFrame()
         else
             frame = getFrame()
         end
@@ -3272,6 +3410,7 @@ do
     function module:LOOT_SLOT_CLEARED(clearedSlot)
         local perfTotal = addon.hasPerf and addon:_PerfStart() or nil
         if Raid:IsMasterLooter() then
+            PendingCounter:Confirm(clearedSlot, "LOOT_SLOT_CLEARED")
             local perfStep = addon.hasPerf and addon:_PerfStart() or nil
             Loot:FetchLoot()
             if perfStep then
@@ -3295,6 +3434,18 @@ do
             if perfTotal then
                 addon:_PerfFinish("Master.LOOT_SLOT_CLEARED Total", perfTotal, "slot=" .. tostring(clearedSlot or "?") .. " items=" .. tostring(lootState.lootCount or 0))
             end
+        end
+    end
+
+    function module:UI_ERROR_MESSAGE(message)
+        if not PendingCounter:HasPending() then
+            return
+        end
+        if not PendingCounter:IsFailureMessage(message) then
+            return
+        end
+        if PendingCounter:Fail(message) then
+            module:RequestRefresh()
         end
     end
 
@@ -3398,8 +3549,8 @@ do
             Loot:AddPendingAward(itemLink, playerName, rollType, rollValue, session and session.id or nil, nil, {
                 counterApplied = true,
             })
+            PendingCounter:Queue(itemLink, itemIndex, playerName, rollType, rollValue, session and session.id or nil)
             GiveMasterLoot(itemIndex, candidateIndex)
-            Raid:AddPlayerCountForRollType(playerName, rollType, 1, addon.Core.GetCurrentRaid())
             if addon.hasDebug then
                 addon:debug(
                     Diag.D.LogMLAwarded:format(
@@ -3795,6 +3946,7 @@ do
         registerWowForwarded("LOOT_OPENED")
         registerWowForwarded("LOOT_CLOSED")
         registerWowForwarded("LOOT_SLOT_CLEARED")
+        registerWowForwarded("UI_ERROR_MESSAGE")
         registerWowForwarded("TRADE_ACCEPT_UPDATE")
         registerWowForwarded("TRADE_REQUEST_CANCEL")
         registerWowForwarded("TRADE_CLOSED")
