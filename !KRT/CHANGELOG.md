@@ -6,6 +6,8 @@ All notable changes to !KRT will be documented in this file.
 
 Release-Version: 0.7.1-beta.1
 
+## [0.7.1-beta.1] - 2026-04-27
+
 ### Enhancements
 
 - **LootCounter reliability** - Master-loot awards now queue LootCounter

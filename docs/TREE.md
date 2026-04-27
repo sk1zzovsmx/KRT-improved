@@ -206,6 +206,10 @@
 |-- .vscode
 |   |-- mcp.json
 |   \\-- settings.json
+|-- dist
+|   |-- KRT-0.7.1-beta.1.zip
+|   |-- KRT-0.7.1-beta.1.zip.sha256
+|   \\-- release-notes.md
 |-- docs
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
