@@ -66,6 +66,7 @@ do
     local BOSS_KILL_DEDUPE_WINDOW_SECONDS = tonumber(C.BOSS_KILL_DEDUPE_WINDOW_SECONDS) or 30
     local BOSS_EVENT_CONTEXT_TTL_SECONDS = tonumber(C.BOSS_EVENT_CONTEXT_TTL_SECONDS) or BOSS_KILL_DEDUPE_WINDOW_SECONDS
     local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = tonumber(C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60
+    local RECENT_TRASH_DEATH_CONTEXT_THROTTLE_SECONDS = tonumber(C.RECENT_TRASH_DEATH_CONTEXT_THROTTLE_SECONDS) or 1
     local LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS = math.max(BOSS_EVENT_CONTEXT_TTL_SECONDS, GROUP_LOOT_PENDING_AWARD_TTL_SECONDS)
     local LootService = addon.Services and addon.Services.Loot or {}
     local LootContextHelpers = assert(LootService._Context or Core._LootContext, "Loot context helpers are not initialized")
@@ -73,6 +74,8 @@ do
     local LootContextSessions = assert(LootService._Sessions, "Loot session helpers are not initialized")
     local LootContextSnapshots = assert(LootService._Snapshots, "Loot snapshot helpers are not initialized")
     local copyActiveLootSource = assert(LootContextHelpers.CopyLootSource, "Missing LootContext.CopyLootSource")
+    local recentTrashDeathContextRaidNum = 0
+    local recentTrashDeathContextSeenAt = 0
 
     -- ----- Private helpers ----- --
     local function isDebugEnabled()
@@ -308,7 +311,14 @@ do
         local resolvedRaidNum = tonumber(raidNum) or 0
         if resolvedRaidNum <= 0 or (kind ~= "boss" and kind ~= "trash") then
             setLootContextField("recentDeath", "recentLootDeathContext", nil)
+            recentTrashDeathContextRaidNum = 0
+            recentTrashDeathContextSeenAt = 0
             return nil
+        end
+
+        if kind ~= "trash" then
+            recentTrashDeathContextRaidNum = 0
+            recentTrashDeathContextSeenAt = 0
         end
 
         return setLootContextField("recentDeath", "recentLootDeathContext", {
@@ -322,8 +332,23 @@ do
         })
     end
 
+    local function rememberRecentTrashDeathContext(raidNum, sourceName, sourceNpcId, now)
+        local resolvedRaidNum = tonumber(raidNum) or 0
+        local currentTime = tonumber(now) or Time.GetCurrentTime()
+        local elapsed = currentTime - (tonumber(recentTrashDeathContextSeenAt) or 0)
+        if resolvedRaidNum == recentTrashDeathContextRaidNum and elapsed >= 0 and elapsed < RECENT_TRASH_DEATH_CONTEXT_THROTTLE_SECONDS then
+            return nil
+        end
+
+        recentTrashDeathContextRaidNum = resolvedRaidNum
+        recentTrashDeathContextSeenAt = currentTime
+        return setRecentLootDeathContext(resolvedRaidNum, "trash", sourceName, sourceNpcId, 0, "UNIT_DIED", currentTime)
+    end
+
     local function resetLootContextState()
         LootContextState.Reset(raidState)
+        recentTrashDeathContextRaidNum = 0
+        recentTrashDeathContextSeenAt = 0
     end
 
     local function clearActiveLootWindowItemSnapshot()
@@ -1446,7 +1471,7 @@ do
         end
         if sourceKind ~= "boss" then
             if sourceKind == "trash" then
-                setRecentLootDeathContext(Core.GetCurrentRaid(), "trash", destName, sourceNpcId, 0, "UNIT_DIED", Time.GetCurrentTime())
+                rememberRecentTrashDeathContext(Core.GetCurrentRaid(), destName, sourceNpcId, Time.GetCurrentTime())
             end
             return
         end

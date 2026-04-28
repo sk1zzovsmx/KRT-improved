@@ -49,6 +49,9 @@ Release-Version: 0.7.1-beta.1
   `UNIT_DIED` context backed by `LibBossIDs` for loot windows and passive
   group-loot roll sessions, while removing the raid-target scan that could
   stall the client during looting.
+- **Performance: trash death context** - Throttled repeated trash
+  `UNIT_DIED` context updates so large group-loot pulls do not rewrite the
+  same loot-source state for every dying mob.
 - **Passive group-loot logger filter** - Group Loot and Need Before Greed
   passive logging now skips green-quality drops, gems, and recipes so DE/Greed
   filler items do not clutter the raid logger.
