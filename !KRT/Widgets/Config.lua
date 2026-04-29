@@ -35,6 +35,13 @@ do
     module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
+    -- Namespace registration: opzioni UI generiche (tooltip toggle).
+    -- Le altre opzioni esposte in questo widget sono possedute dai rispettivi
+    -- moduli (Master, Loot, Rolls, Reserves, Minimap, LootCounter).
+    Options.AddNamespace("UI", {
+        showTooltips = true,
+    })
+
     local getFrame = makeModuleFrameGetter(module, "KRTConfig")
     -- ----- Internal state ----- --
 
@@ -77,30 +84,15 @@ do
 
     -- Loads the default options into the settings table.
     local function loadDefaultOptions()
-        if Options and Options.RestoreDefaults then
-            Options.RestoreDefaults()
+        if Options and Options.GetNamespaces then
+            for _, ns in pairs(Options.GetNamespaces()) do
+                ns:ResetDefaults()
+            end
+            Options.SetDebugEnabled(false)
         end
         module:RequestRefresh("defaults")
         addon:info(L.MsgDefaultsRestored)
     end
-
-    -- Loads addon options from saved variables, filling in defaults.
-    local function loadOptions()
-        if Options and Options.LoadOptions then
-            Options.LoadOptions()
-        end
-        module:RequestRefresh("options")
-
-        if KRT_MINIMAP_GUI then
-            addon.Minimap:SetPos(addon.options.minimapPos or 325)
-            if addon.options.minimapButton then
-                Frames.SetShown(KRT_MINIMAP_GUI, true)
-            else
-                Frames.SetShown(KRT_MINIMAP_GUI, false)
-            end
-        end
-    end
-    addon.LoadOptions = loadOptions
 
     -- Public method to reset options to default.
     function module:Default()
@@ -207,8 +199,8 @@ do
         end
 
         name = strsub(name, strlen(frameName) + 1)
-        if Options and Options.SetOption then
-            Options.SetOption(name, value)
+        if Options and Options.Set then
+            Options.Set(name, value)
         end
         local eventName = Events.ConfigOptionChanged and Events.ConfigOptionChanged(name)
         if eventName then

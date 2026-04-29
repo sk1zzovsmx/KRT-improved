@@ -24,6 +24,7 @@ Libs\LibLogger-1.0\lib.xml
 # Layer 1 - Unified init/bootstrap/runtime (must load before all addon Lua files)
 Init.lua
 Core\DB.lua
+Core\Options.lua
 Core\DBSchema.lua
 Core\DBManager.lua
 
@@ -36,6 +37,7 @@ UI\Templates\Common.xml
 
 # Layer 4 - Shared modules (helpers/constants)
 Modules\C.lua
+Modules\Timer.lua
 Modules\Events.lua
 Modules\Colors.lua
 Modules\Strings.lua

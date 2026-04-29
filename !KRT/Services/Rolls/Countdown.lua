@@ -18,6 +18,9 @@ module._Countdown = module._Countdown or {}
 
 local Countdown = module._Countdown
 
+-- Timer ownership: i due timer del countdown (ticker per gli annunci, end timer per la chiusura).
+addon.Timer.BindMixin(Countdown, "Rolls.Countdown")
+
 local Chat = Services.Chat
 local tonumber = tonumber
 
@@ -44,8 +47,12 @@ function Countdown.ShouldAnnounceTick(remaining, duration)
 end
 
 function Countdown.Stop(state)
-    addon.CancelTimer(state.countdownTicker, true)
-    addon.CancelTimer(state.countdownEndTimer, true)
+    if state.countdownTicker then
+        Countdown:CancelTimer(state.countdownTicker)
+    end
+    if state.countdownEndTimer then
+        Countdown:CancelTimer(state.countdownEndTimer)
+    end
     state.countdownTicker = nil
     state.countdownEndTimer = nil
     state.countdownRunning = false
@@ -72,7 +79,7 @@ function Countdown.Start(state, duration, onTick, onComplete)
         onTick(state.countdownRemaining, countdownDuration)
     end
 
-    state.countdownTicker = addon.NewTicker(1, function()
+    state.countdownTicker = Countdown:ScheduleRepeatingTimer(function()
         if not state.countdownRunning then
             return
         end
@@ -85,9 +92,9 @@ function Countdown.Start(state, duration, onTick, onComplete)
                 onTick(state.countdownRemaining, countdownDuration)
             end
         end
-    end, countdownDuration)
+    end, 1)
 
-    state.countdownEndTimer = addon.NewTimer(countdownDuration, function()
+    state.countdownEndTimer = Countdown:ScheduleTimer(function()
         if not state.countdownRunning then
             return
         end
@@ -97,7 +104,7 @@ function Countdown.Start(state, duration, onTick, onComplete)
         if type(onComplete) == "function" then
             onComplete()
         end
-    end)
+    end, countdownDuration)
 
     return true
 end

@@ -76,6 +76,14 @@ end
 do
     addon.Services.Rolls = addon.Services.Rolls or {}
     local module = addon.Services.Rolls
+
+    -- Namespace registration: opzioni che governano il countdown e la modalità di voto.
+    addon.Options.AddNamespace("Rolls", {
+        countdownDuration = 5,
+        countdownSimpleRaidMsg = false,
+        countdownRollsBlock = true,
+    })
+
     local Countdown = assert(module._Countdown, "Rolls countdown helpers are not initialized")
     local Sessions = assert(module._Sessions, "Rolls session helpers are not initialized")
     local History = assert(module._History, "Rolls history helpers are not initialized")

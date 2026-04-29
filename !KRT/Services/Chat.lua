@@ -28,6 +28,9 @@ do
     addon.Services.Chat = addon.Services.Chat or {}
     local module = addon.Services.Chat
 
+    -- Timer ownership: ticker per il sistema "spammer" (spam controllato di messaggi LFM).
+    addon.Timer.BindMixin(module, "Chat")
+
     -- ----- Internal state ----- --
     local chatOutputFormat = C.CHAT_OUTPUT_FORMAT
     local chatPrefixShort = C.CHAT_PREFIX_SHORT
@@ -135,8 +138,10 @@ do
     end
 
     local function cancelSpamTicker()
-        addon.CancelTimer(spamRuntime.ticker, true)
-        spamRuntime.ticker = nil
+        if spamRuntime.ticker then
+            module:CancelTimer(spamRuntime.ticker)
+            spamRuntime.ticker = nil
+        end
     end
 
     local function getSpamRuntimeSnapshot()
@@ -383,7 +388,7 @@ do
         spamRuntime.ticking = true
         spamRuntime.paused = false
 
-        spamRuntime.ticker = addon.NewTicker(1, runSpamTick)
+        spamRuntime.ticker = module:ScheduleRepeatingTimer(runSpamTick, 1)
         fireSpamTick()
 
         return true, getSpamRuntimeSnapshot()

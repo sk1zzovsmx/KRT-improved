@@ -28,6 +28,11 @@ do
     addon.Services.Raid = addon.Services.Raid or {}
     local module = addon.Services.Raid
 
+    -- Timer ownership: roster refresh debounce + retry per pending units. Anche
+    -- Raid/State.lua e Raid/Session.lua sono parte dello stesso modulo `addon.Services.Raid`
+    -- e condividono il mixin embedded qui (idempotente sui successivi do-block).
+    addon.Timer.BindMixin(module, "Raid")
+
     -- ----- Internal state ----- --
     local numRaid = 0
     local rosterVersion = 0
@@ -54,21 +59,25 @@ do
     end
 
     local function cancelPendingUnitRetryTimer()
-        addon.CancelTimer(module.pendingUnitRetryHandle, true)
-        module.pendingUnitRetryHandle = nil
+        if module.pendingUnitRetryHandle then
+            module:CancelTimer(module.pendingUnitRetryHandle)
+            module.pendingUnitRetryHandle = nil
+        end
     end
 
     local function cancelScheduledRosterRefresh()
-        addon.CancelTimer(module.updateRosterHandle, true)
-        module.updateRosterHandle = nil
+        if module.updateRosterHandle then
+            module:CancelTimer(module.updateRosterHandle)
+            module.updateRosterHandle = nil
+        end
     end
 
     local function scheduleRosterRefresh()
         cancelScheduledRosterRefresh()
-        module.updateRosterHandle = addon.NewTimer(ROSTER_REFRESH_DELAY_SECONDS, function()
+        module.updateRosterHandle = module:ScheduleTimer(function()
             module.updateRosterHandle = nil
             module:UpdateRaidRoster()
-        end)
+        end, ROSTER_REFRESH_DELAY_SECONDS)
     end
 
     local function resetPendingUnitRetry()
@@ -107,13 +116,13 @@ do
         end
 
         cancelPendingUnitRetryTimer()
-        module.pendingUnitRetryHandle = addon.NewTimer(RETRY_DELAY_SECONDS, function()
+        module.pendingUnitRetryHandle = module:ScheduleTimer(function()
             module.pendingUnitRetryHandle = nil
             if not addon.IsInRaid() then
                 return
             end
             addon:RAID_ROSTER_UPDATE(true)
-        end)
+        end, RETRY_DELAY_SECONDS)
     end
 
     local function finalizeRosterDelta(delta)

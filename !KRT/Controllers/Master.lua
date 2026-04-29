@@ -104,6 +104,26 @@ do
     module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
+    -- Timer ownership: tutti i timer del Master controller (PendingCounter, multi-award timeout/delay, loot close).
+    addon.Timer.BindMixin(module, "Master")
+
+    -- Namespace registrations owned by the Master controller. Stored on `module`
+    -- to evitare upvalue extra (questo file è al limite Lua 5.1 di 200 local/upvalue).
+    -- I lookup avvengono via Options.Get(...) inline ai call sites.
+    Options.AddNamespace("Master", {
+        sortAscending = false,
+        useRaidWarning = true,
+        screenReminder = true,
+        announceOnWin = true,
+        announceOnHold = true,
+        announceOnBank = false,
+        announceOnDisenchant = false,
+    })
+    Options.AddNamespace("Loot", {
+        lootWhispers = false,
+        ignoreStacks = false,
+    })
+
     -- ----- Internal state ----- --
     local getFrame = makeModuleFrameGetter(module, "KRTMaster")
 
@@ -1587,7 +1607,7 @@ do
 
     function PendingCounter:CancelAward(pending)
         if pending and pending.timeoutHandle then
-            addon.CancelTimer(pending.timeoutHandle, true)
+            module:CancelTimer(pending.timeoutHandle)
             pending.timeoutHandle = nil
         end
     end
@@ -1707,7 +1727,7 @@ do
         tinsert(self.Awards, pending)
         if timeout > 0 then
             local owner = self
-            pending.timeoutHandle = addon.NewTimer(timeout, function()
+            pending.timeoutHandle = module:ScheduleTimer(function()
                 local awards = owner.Awards
                 for i = #awards, 1, -1 do
                     if awards[i] == pending then
@@ -1717,7 +1737,7 @@ do
                         return
                     end
                 end
-            end)
+            end, timeout)
         end
         return pending
     end
@@ -1815,14 +1835,14 @@ do
 
     local function cancelMultiAwardTimeout(ma)
         if ma and ma.timeoutHandle then
-            addon.CancelTimer(ma.timeoutHandle, true)
+            module:CancelTimer(ma.timeoutHandle)
             ma.timeoutHandle = nil
         end
     end
 
     local function cancelMultiAwardDelay(ma)
         if ma and ma.delayHandle then
-            addon.CancelTimer(ma.delayHandle, true)
+            module:CancelTimer(ma.delayHandle)
             ma.delayHandle = nil
         end
         if ma then
@@ -1842,7 +1862,7 @@ do
 
         cancelMultiAwardTimeout(ma)
         local expectedLessThan = tonumber(ma.lastCount) or 0
-        ma.timeoutHandle = addon.NewTimer(timeout, function()
+        ma.timeoutHandle = module:ScheduleTimer(function()
             local cur = lootState.multiAward
             if cur ~= ma or not (cur and cur.active and cur.waitingForDecrement and not lootState.fromInventory) then
                 return
@@ -1851,7 +1871,7 @@ do
             addon:warn(Diag.W.ErrMLMultiAwardInterruptedTimeout:format(timeout, tostring(cur.itemLink), expectedLessThan, observed, tostring(cur.lastClearedSlot or "?")))
             clearMultiAwardState(true)
             module:RequestRefresh()
-        end)
+        end, timeout)
     end
 
     clearMultiAwardState = function(resetItemCount)
@@ -2073,7 +2093,7 @@ do
             delay = 0
         end
 
-        ma.delayHandle = addon.After(delay, function()
+        ma.delayHandle = module:ScheduleTimer(function()
             local ma2 = lootState.multiAward
             if not (ma2 and ma2.active and ma2.scheduled and not lootState.fromInventory) then
                 return
@@ -2108,7 +2128,7 @@ do
                 clearMultiAwardState(true)
                 module:RequestRefresh()
             end
-        end)
+        end, delay)
     end
 
     -- ============================================================================
@@ -3323,7 +3343,7 @@ do
 
     local function cancelLootClosedCleanup()
         if lootState.closeTimer then
-            addon.CancelTimer(lootState.closeTimer)
+            module:CancelTimer(lootState.closeTimer)
             lootState.closeTimer = nil
         end
     end
@@ -3332,10 +3352,10 @@ do
         -- Cancel any scheduled close timer and schedule a new one.
         cancelLootClosedCleanup()
 
-        lootState.closeTimer = addon.NewTimer(0.1, function()
+        lootState.closeTimer = module:ScheduleTimer(function()
             lootState.closeTimer = nil
             completeLootClosedCleanup()
-        end)
+        end, 0.1)
     end
 
     -- LOOT_OPENED: Triggered when the loot window opens.

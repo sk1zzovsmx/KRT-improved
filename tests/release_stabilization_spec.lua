@@ -1010,6 +1010,77 @@ local function newHarness()
         return addon.NewTimer(delay, callback)
     end
 
+    -- Stub di addon.Timer (mixin) per i test: usa l'infrastruttura `timers` esistente.
+    -- Mappa ScheduleTimer/ScheduleRepeatingTimer/CancelTimer/CancelAllTimers ai
+    -- meccanismi di test in modo che _flushTimers continui a funzionare.
+    addon.Timer = {
+        BindMixin = function(target)
+            if target.ScheduleTimer then
+                return target
+            end
+            target._timerActive = target._timerActive or {}
+            target.ScheduleTimer = function(self, callback, delay, ...)
+                local n = select("#", ...)
+                local args = (n > 0) and { ... } or nil
+                -- Forward declare handle: la closure interna lo riferisce, e in
+                -- Lua 5.1 `local x = f(function() ... x ... end)` cattura `x`
+                -- come globale (nil) — quindi va dichiarato prima.
+                local handle
+                handle = addon.NewTimer(delay, function()
+                    self._timerActive[handle] = nil
+                    if args then
+                        callback(unpack(args, 1, n))
+                    else
+                        callback()
+                    end
+                end)
+                self._timerActive[handle] = true
+                return handle
+            end
+            target.ScheduleRepeatingTimer = function(self, callback, interval, ...)
+                local n = select("#", ...)
+                local args = (n > 0) and { ... } or nil
+                local handle
+                handle = addon.NewTicker(interval, function()
+                    if args then
+                        callback(unpack(args, 1, n))
+                    else
+                        callback()
+                    end
+                end)
+                self._timerActive[handle] = true
+                return handle
+            end
+            target.CancelTimer = function(self, handle)
+                if handle and self._timerActive[handle] then
+                    self._timerActive[handle] = nil
+                    addon.CancelTimer(handle)
+                    return true
+                end
+                return false
+            end
+            target.CancelAllTimers = function(self)
+                for handle in pairs(self._timerActive) do
+                    addon.CancelTimer(handle)
+                end
+                self._timerActive = {}
+            end
+            target.GetActiveTimerCount = function(self)
+                local n = 0
+                for _ in pairs(self._timerActive) do
+                    n = n + 1
+                end
+                return n
+            end
+            return target
+        end,
+        GetStats = function()
+            return { active = 0, created = 0 }
+        end,
+        RefreshStats = function() end,
+        ShowStats = function() end,
+    }
+
     addon._flushTimers = function()
         local pending = timers
         timers = {}
@@ -1408,14 +1479,94 @@ local function newHarness()
         Events = Events,
         C = C,
         Core = Core,
-        Options = {
-            IsDebugEnabled = function()
+        Options = (function()
+            -- Stub conforme alla nuova API namespace registry. Tutte le opzioni
+            -- registrate vivono in `addon.options` (tabella piatta nei test) e in
+            -- una mappa key→namespace per Options.Set.
+            local namespaces = {}
+            local keyToNs = {}
+            local function getOrInitFlat()
+                addon.options = addon.options or {}
+                return addon.options
+            end
+            local Opts = {}
+            function Opts.IsDebugEnabled()
                 return addon.State.debugEnabled == true
-            end,
-            SetOption = function(key, value)
-                addon.options[key] = value
-            end,
-        },
+            end
+            function Opts.SetDebugEnabled(enabled)
+                addon.State.debugEnabled = enabled and true or false
+            end
+            function Opts.AddNamespace(name, defaults)
+                if namespaces[name] then
+                    return namespaces[name]
+                end
+                local store = getOrInitFlat()
+                local ns = { _name = name, _defaults = defaults or {} }
+                for k, v in pairs(ns._defaults) do
+                    if store[k] == nil then
+                        store[k] = v
+                    end
+                    keyToNs[k] = ns
+                end
+                function ns:Get(key)
+                    local v = getOrInitFlat()[key]
+                    if v == nil then
+                        return self._defaults[key]
+                    end
+                    return v
+                end
+                function ns:Set(key, value)
+                    getOrInitFlat()[key] = value
+                    return true
+                end
+                function ns:GetDefaults()
+                    local out = {}
+                    for k, v in pairs(self._defaults) do
+                        out[k] = v
+                    end
+                    return out
+                end
+                function ns:ResetDefaults()
+                    local store2 = getOrInitFlat()
+                    for k, v in pairs(self._defaults) do
+                        store2[k] = v
+                    end
+                end
+                function ns:All()
+                    local out = {}
+                    for k, v in pairs(self._defaults) do
+                        out[k] = v
+                    end
+                    local store2 = getOrInitFlat()
+                    for k, v in pairs(store2) do
+                        if self._defaults[k] ~= nil then
+                            out[k] = v
+                        end
+                    end
+                    return out
+                end
+                function ns:Name()
+                    return self._name
+                end
+                namespaces[name] = ns
+                return ns
+            end
+            function Opts.Get(name)
+                return namespaces[name]
+            end
+            function Opts.Set(key, value)
+                local ns = keyToNs[key]
+                if not ns then
+                    return false
+                end
+                return ns:Set(key, value)
+            end
+            function Opts.EnsureLoaded() end
+            function Opts.GetNamespaces()
+                return namespaces
+            end
+            return Opts
+        end)(),
         Bus = Bus,
         Strings = Strings,
         Colors = addon.Colors,

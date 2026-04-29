@@ -23,6 +23,12 @@ local UIFacade = addon.UI
 addon.Minimap = addon.Minimap or {}
 local module = addon.Minimap
 
+-- Namespace registration: opzioni minimap (visibilità + posizione angolare).
+local minimapNs = Options.AddNamespace("Minimap", {
+    minimapButton = true,
+    minimapPos = 325,
+})
+
 local function getLootCounterController()
     local widget = Widgets.LootCounter
     if type(widget) == "table" and type(widget.Toggle) == "function" then
@@ -263,7 +269,7 @@ function module:SetPos(angle)
         return
     end
     angle = angle % 360
-    Options.SetOption("minimapPos", angle)
+    minimapNs:Set("minimapPos", angle)
     local r = rad(angle)
     frame:ClearAllPoints()
     frame:SetPoint("CENTER", cos(r) * MINIMAP_RING_RADIUS, sin(r) * MINIMAP_RING_RADIUS)
@@ -374,7 +380,7 @@ function module:ToggleMinimapButton()
     end
     local options = addon.options or KRT_Options or {}
     local nextValue = not options.minimapButton
-    Options.SetOption("minimapButton", nextValue)
+    minimapNs:Set("minimapButton", nextValue)
     setMinimapShown(nextValue)
 end
 

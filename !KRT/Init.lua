@@ -449,104 +449,9 @@ function Core.GetUnitRank(unit, fallback)
     return fallback or 0
 end
 
-addon.Options = addon.Options or {}
-local Options = addon.Options
-
-Options.defaultValues = Options.defaultValues
-    or {
-        sortAscending = false,
-        useRaidWarning = true,
-        announceOnWin = true,
-        announceOnHold = true,
-        announceOnBank = false,
-        announceOnDisenchant = false,
-        lootWhispers = false,
-        softResWhisperReplies = false,
-        screenReminder = true,
-        ignoreStacks = false,
-        showTooltips = true,
-        showLootCounterDuringMSRoll = false,
-        minimapButton = true,
-        countdownSimpleRaidMsg = false,
-        countdownDuration = 5,
-        countdownRollsBlock = true,
-        srImportMode = 0,
-    }
-
-local function copyFlat(dst, src)
-    for key, value in pairs(src or {}) do
-        dst[key] = value
-    end
-    return dst
-end
-
-function Options.NewOptions()
-    return copyFlat({}, Options.defaultValues)
-end
-
-function Options.IsDebugEnabled()
-    return addon and addon.State and addon.State.debugEnabled == true
-end
-
-function Options.ApplyDebugSetting(enabled)
-    local state = addon.State
-    state.debugEnabled = enabled and true or false
-
-    local levels = addon and addon.Debugger and addon.Debugger.logLevels
-    local level = enabled and (levels and levels.DEBUG) or (levels and levels.INFO)
-    if level and addon and addon.SetLogLevel then
-        addon:SetLogLevel(level)
-    end
-end
-
-function Options.SetOption(key, value)
-    if type(key) ~= "string" or key == "" then
-        return false
-    end
-
-    local options = addon and addon.options
-    if type(options) ~= "table" then
-        if type(KRT_Options) == "table" then
-            options = KRT_Options
-        else
-            options = {}
-            KRT_Options = options
-        end
-        addon.options = options
-    end
-
-    options[key] = value
-
-    if type(KRT_Options) == "table" and KRT_Options ~= options then
-        KRT_Options[key] = value
-    end
-
-    return true
-end
-
-function Options.LoadOptions()
-    local options = Options.NewOptions()
-    if type(KRT_Options) == "table" then
-        copyFlat(options, KRT_Options)
-    end
-
-    options.debug = nil
-    KRT_Options = options
-    addon.options = options
-
-    Options.ApplyDebugSetting(false)
-    return options
-end
-
-function Options.RestoreDefaults()
-    local options = Options.NewOptions()
-    KRT_Options = options
-    addon.options = options
-    Options.ApplyDebugSetting(false)
-    return options
-end
-
-addon.LoadOptions = Options.LoadOptions
+-- Options/SavedVariables management lives in Core/Options.lua.
+-- IsDebugEnabled / ApplyDebugSetting are exposed on addon.Options there.
+-- Namespace registrations are owned by the modules that use them.
 
 Core._LootContext = Core._LootContext or {}
 
@@ -823,197 +728,14 @@ do
     Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
     addon.Debugger:Embed(addon)
 
-    -- =========== Timer Debug (optional)  =========== --
-    -- Helps diagnose sporadic FPS drops caused by runaway timers/tickers (LibCompat WaitFrame).
-    -- Usage:
-    --   /krt debug timers        (sorted by age)
-    --   /krt debug timers dur    (sorted by duration)
-    --   /krt debug timers iters  (sorted by iterations)
-    --   /krt debug timers reset
-    -- Tip: enable /krt debug on to include creation call sites.
-    do
-        local TD = addon.TimerDebug or {}
-        addon.TimerDebug = TD
-
-        TD.stats = TD.stats or { created = 0, cancelled = 0, after = 0, active = 0, maxActive = 0 }
-        -- Weak keys so we don't keep tickers alive.
-        TD.active = TD.active or setmetatable({}, { __mode = "k" })
-
-        local _After = addon.After
-        local _NewTimer = addon.NewTimer
-        local _NewTicker = addon.NewTicker
-        local _CancelTimer = addon.CancelTimer
-
-        local function now()
-            return (GetTime and GetTime()) or 0
-        end
-
-        local function captureStack()
-            -- Only capture when debug is enabled (avoid overhead in normal use).
-            if addon.State and addon.State.debugEnabled and debugstack then
-                return debugstack(3, 1, 0)
-            end
-            return nil
-        end
-
-        local function track(ticker, kind, duration, iterations)
-            if not ticker then
-                return
-            end
-            TD.active[ticker] = {
-                kind = kind,
-                createdAt = now(),
-                duration = tonumber(duration) or 0,
-                iterations = (iterations == nil) and -1 or iterations,
-                by = captureStack(),
-            }
-            TD.stats.created = (TD.stats.created or 0) + 1
-            TD.stats.active = (TD.stats.active or 0) + 1
-            if TD.stats.active > (TD.stats.maxActive or 0) then
-                TD.stats.maxActive = TD.stats.active
-            end
-        end
-
-        local function untrack(ticker, reason)
-            if not ticker then
-                return
-            end
-            if TD.active[ticker] then
-                TD.active[ticker] = nil
-                if (TD.stats.active or 0) > 0 then
-                    TD.stats.active = TD.stats.active - 1
-                end
-                if reason == "cancel" then
-                    TD.stats.cancelled = (TD.stats.cancelled or 0) + 1
-                end
-            end
-        end
-
-        if type(_After) == "function" then
-            addon.After = function(duration, callback)
-                TD.stats.after = (TD.stats.after or 0) + 1
-                return _After(duration, callback)
-            end
-        end
-
-        if type(_NewTimer) == "function" then
-            addon.NewTimer = function(duration, callback)
-                local ticker
-                local wrapped = function(selfTicker, ...)
-                    local t = selfTicker or ticker
-                    if callback then
-                        callback(selfTicker, ...)
-                    end
-                    untrack(t, "done")
-                end
-                ticker = _NewTimer(duration, wrapped)
-                track(ticker, "timer", duration, 1)
-                return ticker
-            end
-        end
-
-        if type(_NewTicker) == "function" then
-            addon.NewTicker = function(duration, callback, iterations)
-                local ticker
-                local wrapped = function(selfTicker, ...)
-                    local t = selfTicker or ticker
-                    if callback then
-                        callback(selfTicker, ...)
-                    end
-                    -- LibCompat calls callback before decrementing _iterations, so 1 means "last tick".
-                    if t and t._iterations == 1 then
-                        untrack(t, "done")
-                    end
-                end
-                ticker = _NewTicker(duration, wrapped, iterations)
-                track(ticker, "ticker", duration, iterations)
-                return ticker
-            end
-        end
-
-        if type(_CancelTimer) == "function" then
-            addon.CancelTimer = function(ticker, silent)
-                untrack(ticker, "cancel")
-                return _CancelTimer(ticker, silent)
-            end
-        end
-
-        function addon:ResetTimerDebug()
-            if not self.TimerDebug then
-                return
-            end
-            for k in pairs(self.TimerDebug.active or {}) do
-                self.TimerDebug.active[k] = nil
-            end
-            self.TimerDebug.stats = { created = 0, cancelled = 0, after = 0, active = 0, maxActive = 0 }
-        end
-
-        -- sortBy: age|dur|iters
-        function addon:DumpTimerDebug(sortBy)
-            local tdbg = self.TimerDebug
-            if not tdbg then
-                if self.warn then
-                    self:warn("Timer debug not available.")
-                end
-                return
-            end
-
-            local rows = {}
-            local nowT = now()
-            for _, info in pairs(tdbg.active) do
-                local age = nowT - (info.createdAt or nowT)
-                rows[#rows + 1] = {
-                    kind = info.kind or "?",
-                    age = age,
-                    duration = info.duration or 0,
-                    iterations = info.iterations,
-                    by = info.by,
-                }
-            end
-
-            local key = "age"
-            local k = tostring(sortBy or ""):lower()
-            if k == "duration" or k == "dur" then
-                key = "duration"
-            elseif k == "iters" or k == "iter" then
-                key = "iterations"
-            else
-                key = "age"
-            end
-
-            table.sort(rows, function(a, b)
-                local av = a[key] or 0
-                local bv = b[key] or 0
-                if av == bv then
-                    return (a.age or 0) > (b.age or 0)
-                end
-                return av > bv
-            end)
-
-            local s = tdbg.stats or {}
-            if self.info then
-                self:info("Timers: active=%d (max=%d) created=%d cancelled=%d after=%d", s.active or 0, s.maxActive or 0, s.created or 0, s.cancelled or 0, s.after or 0)
-            end
-
-            local limit = 15
-            if #rows < limit then
-                limit = #rows
-            end
-            for i = 1, limit do
-                local r = rows[i]
-                if self.info then
-                    self:info("%2d) %s | age:%.1fs dur:%.2fs iters:%s", i, r.kind, r.age, r.duration, (r.iterations == nil and "?" or tostring(r.iterations)))
-                end
-                if r.by and (addon.State and addon.State.debugEnabled) and self.debug then
-                    self:debug("    created at: %s", tostring(r.by))
-                end
-            end
-
-            if self.info then
-                self:info("Tip: /krt debug timers reset  |  /krt debug on (to include call sites)")
-            end
-        end
-    end
+    -- Rimuovi le API timer globali iniettate da LibCompat:Embed: i moduli devono
+    -- usare il mixin addon.Timer (Timer.BindMixin + self:ScheduleTimer/...). Module
+    -- Timer è in Layer 4 e non è disponibile qui (Layer 1); l'embed di addon
+    -- avviene in ADDON_LOADED, prima che gli handler di evento siano registrati.
+    addon.After = nil
+    addon.NewTimer = nil
+    addon.NewTicker = nil
+    addon.CancelTimer = nil
 
     -- =========== LibCompat  =========== --
 
@@ -1410,7 +1132,14 @@ do
         ensureDBManager()
         local lvl = addon.GetLogLevel and addon:GetLogLevel()
         addon:info(Diag.I.LogCoreLoaded:format(tostring(GetAddOnMetadata(addonName, "Version")), tostring(lvl), tostring(true)))
-        addon.LoadOptions()
+        if addon.Options and addon.Options.EnsureLoaded then
+            addon.Options.EnsureLoaded()
+            addon.Options.SetDebugEnabled(false)
+        end
+        -- Bind Timer mixin sull'addon (Layer 4 ora disponibile) per i timer di Init.
+        if addon.Timer and addon.Timer.BindMixin then
+            addon.Timer.BindMixin(addon, "Core")
+        end
         local minimap = addon.Minimap
         if minimap and minimap.EnsureUI then
             minimap:EnsureUI()
@@ -1474,18 +1203,20 @@ do
 
     -- RAID_ROSTER_UPDATE: Updates the raid roster when it changes.
     function addon:RAID_ROSTER_UPDATE(forceImmediate)
-        addon.CancelTimer(self._raidRosterUpdateHandle, true)
-        self._raidRosterUpdateHandle = nil
+        if self._raidRosterUpdateHandle then
+            self:CancelTimer(self._raidRosterUpdateHandle)
+            self._raidRosterUpdateHandle = nil
+        end
 
         if forceImmediate then
             processRaidRosterUpdate()
             return
         end
 
-        self._raidRosterUpdateHandle = addon.NewTimer(rosterUpdateDebounceSeconds, function()
+        self._raidRosterUpdateHandle = self:ScheduleTimer(function()
             self._raidRosterUpdateHandle = nil
             processRaidRosterUpdate()
-        end)
+        end, rosterUpdateDebounceSeconds)
     end
 
     -- RAID_INSTANCE_WELCOME: Triggered when entering a raid instance.
@@ -1528,12 +1259,14 @@ do
             addon:trace(Diag.D.LogCorePlayerEnteringWorld)
         end
         module:CancelInstanceChecks()
-        -- Restart the first-check timer on login
-        addon.CancelTimer(module.firstCheckHandle, true)
-        module.firstCheckHandle = nil
-        module.firstCheckHandle = addon.NewTimer(3, function()
+        -- Restart the first-check timer on login (timer owned by raid service module).
+        if module.firstCheckHandle then
+            module:CancelTimer(module.firstCheckHandle)
+            module.firstCheckHandle = nil
+        end
+        module.firstCheckHandle = module:ScheduleTimer(function()
             module:FirstCheck()
-        end)
+        end, 3)
     end
 
     local function observePassiveLootMessage(msg)

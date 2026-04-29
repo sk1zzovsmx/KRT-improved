@@ -43,6 +43,11 @@ do
     module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
+    -- Namespace registration: opzioni del LootCounter widget.
+    addon.Options.AddNamespace("LootCounter", {
+        showLootCounterDuringMSRoll = false,
+    })
+
     -- ----- Internal state ----- --
     local rows, raidPlayers = {}, {}
     local scrollFrame, scrollChild, header

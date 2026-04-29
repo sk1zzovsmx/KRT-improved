@@ -797,7 +797,10 @@ do
         if Reserves and Reserves.SetImportMode then
             Reserves:SetImportMode(mode, true)
         else
-            Options.SetOption("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
+            local reservesNs = Options.Get("Reserves")
+            if reservesNs then
+                reservesNs:Set("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
+            end
         end
 
         if suppressSlider then

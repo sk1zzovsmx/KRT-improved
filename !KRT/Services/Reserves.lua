@@ -31,6 +31,16 @@ do
     addon.Services.Reserves = addon.Services.Reserves or {}
     local module = addon.Services.Reserves
     local Service = module
+
+    -- Timer ownership: debounce per il refresh display reserves.
+    addon.Timer.BindMixin(module, "Reserves")
+
+    -- Namespace registration: opzioni reserves (whisper replies + import mode).
+    local reservesNs = Options.AddNamespace("Reserves", {
+        softResWhisperReplies = false,
+        srImportMode = 0,
+    })
+
     local ImportHelpers = assert(module._Import, "Reserves import helpers are not initialized")
     local DisplayHelpers = assert(module._Display, "Reserves display helpers are not initialized")
     local importParser = assert(ImportHelpers.BuildParser and ImportHelpers.BuildParser(), "Missing Reserves import parser")
@@ -78,7 +88,7 @@ do
 
         if syncOptions ~= false then
             local value = importModeToOptionValue(resolved)
-            Options.SetOption("srImportMode", value)
+            reservesNs:Set("srImportMode", value)
         end
 
         return importMode
@@ -388,7 +398,7 @@ do
 
     local function clearDisplayRefreshQueue()
         if pendingDisplayRefreshHandle then
-            addon.CancelTimer(pendingDisplayRefreshHandle, true)
+            module:CancelTimer(pendingDisplayRefreshHandle)
             pendingDisplayRefreshHandle = nil
         end
         pendingDisplayRefreshQueued = false
@@ -396,7 +406,7 @@ do
 
     local function flushDisplayRefresh()
         if pendingDisplayRefreshHandle then
-            addon.CancelTimer(pendingDisplayRefreshHandle, true)
+            module:CancelTimer(pendingDisplayRefreshHandle)
             pendingDisplayRefreshHandle = nil
         end
         if pendingDisplayRefreshQueued ~= true or not RebuildIndex then
@@ -414,10 +424,10 @@ do
         if pendingDisplayRefreshHandle then
             return false
         end
-        pendingDisplayRefreshHandle = addon.NewTimer(pendingDisplayRefreshDelaySeconds, function()
+        pendingDisplayRefreshHandle = module:ScheduleTimer(function()
             pendingDisplayRefreshHandle = nil
             flushDisplayRefresh()
-        end)
+        end, pendingDisplayRefreshDelaySeconds)
         return false
     end
 

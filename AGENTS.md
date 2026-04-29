@@ -575,7 +575,7 @@ Lua method call depends on whether the function expects `self`:
 - Use `:` for true methods (first parameter is `self`):
   - `addon:info(...)`, `addon:ADDON_LOADED(...)`, `module:Toggle()`, `Store:GetRaid(...)`
 - Use `.` for plain functions (no `self`):
-  - `Utils.getRaid(...)`, `addon.NewTimer(...)`, `addon.CancelTimer(...)`, `addon.After(...)`, `addon.LoadOptions()`
+  - `Utils.getRaid(...)`, `addon.Options.EnsureLoaded()`, `addon.Options.Set(key, value)`, `addon.Timer.BindMixin(target, name)`
 
 Rule: do not mechanically convert `.` <-> `:` unless you verified the function signature.
 
@@ -603,13 +603,21 @@ For scroll lists:
 
 ## 10) Options access pattern
 
-- SV table is `KRT_Options`.
-- Runtime options are mirrored on `addon.options` by `addon.LoadOptions()` (called on ADDON_LOADED).
-- When changing an option:
-  - update `KRT_Options[key]`,
-  - update `addon.options[key]` (if present),
-  - request a refresh of the owning UI module.
-- Exception: `debug` is runtime-only state and must not be persisted in `KRT_Options`.
+- SV table is `KRT_Options`, structured as nested namespaces (schema 2).
+- Each module owns a namespace and registers its defaults at file load:
+  ```lua
+  local cfg = addon.Options.AddNamespace("Rolls", { countdownDuration = 5, ... })
+  cfg:Get("countdownDuration")          -- read
+  cfg:Set("countdownDuration", 10)       -- write (emits OptionChanged via Bus)
+  cfg:ResetDefaults()                    -- per-namespace reset
+  ```
+- Read-only flat shortcut: `addon.options.<key>` resolves O(1) through `keyToNamespace`.
+  Writes via `addon.options.x = v` are forbidden (raises) — use `namespace:Set` or
+  `addon.Options.Set(key, value)` (dispatcher).
+- `addon.Options.EnsureLoaded()` runs on ADDON_LOADED and migrates legacy flat schema 1 → nested schema 2 once.
+- Bus events emitted: `addon.Events.Internal.OptionChanged(namespace, key, old, new)`,
+  `OptionsReset(namespace)`, `OptionsLoaded`.
+- Exception: `debug` is runtime-only state on `addon.State.debugEnabled` and must not be persisted.
 
 ---
 

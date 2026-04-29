@@ -62,6 +62,10 @@ local UNCOMMON_ITEM_LINK_COLOR = "ff1eff00"
 do
     addon.Services.Loot = addon.Services.Loot or {}
     local module = addon.Services.Loot
+
+    -- Timer ownership: cache warm scheduling per gli item del loot.
+    addon.Timer.BindMixin(module, "Loot")
+
     local PendingAwards = assert(module._PendingAwards, "Loot pending-award helpers are not initialized")
     local PassiveGroupLoot = assert(module._PassiveGroupLoot, "Loot passive group-loot helpers are not initialized")
     local Tracking = assert(module._Tracking, "Loot tracking helpers are not initialized")
@@ -119,10 +123,10 @@ do
     end
 
     scheduleCacheWarm = function()
-        if cacheWarmHandle or type(addon.NewTimer) ~= "function" then
+        if cacheWarmHandle then
             return
         end
-        cacheWarmHandle = addon.NewTimer(CACHE_WARM_DELAY_SECONDS, processCacheWarmQueue)
+        cacheWarmHandle = module:ScheduleTimer(processCacheWarmQueue, CACHE_WARM_DELAY_SECONDS)
     end
 
     local function warmItemCache(itemLink)
@@ -130,10 +134,6 @@ do
             return
         end
         if cacheWarmQueued[itemLink] then
-            return
-        end
-        if type(addon.NewTimer) ~= "function" then
-            warmItemCacheNow(itemLink)
             return
         end
 

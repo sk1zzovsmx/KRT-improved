@@ -10,6 +10,9 @@ local feature = addon.Core.GetFeatureShared()
 addon.Item = addon.Item or feature.Item or {}
 local Item = addon.Item
 
+-- Timer ownership: ticker per il polling delle item-cache requests.
+addon.Timer.BindMixin(Item, "Item")
+
 local _G = _G
 local type, tostring = type, tostring
 local tonumber = tonumber
@@ -116,7 +119,7 @@ end
 
 local function cancelItemRequestTicker()
     if itemRequestTicker then
-        addon.CancelTimer(itemRequestTicker, true)
+        Item:CancelTimer(itemRequestTicker)
         itemRequestTicker = nil
         itemRequestRepeats = false
     end
@@ -128,13 +131,8 @@ local function ensureItemRequestTicker()
     if itemRequestTicker then
         return
     end
-    if type(addon.NewTicker) == "function" then
-        itemRequestTicker = addon.NewTicker(ITEM_CACHE_POLL_SECONDS, processItemRequests)
-        itemRequestRepeats = true
-    elseif type(addon.NewTimer) == "function" then
-        itemRequestTicker = addon.NewTimer(ITEM_CACHE_POLL_SECONDS, processItemRequests)
-        itemRequestRepeats = false
-    end
+    itemRequestTicker = Item:ScheduleRepeatingTimer(processItemRequests, ITEM_CACHE_POLL_SECONDS)
+    itemRequestRepeats = true
 end
 
 processItemRequests = function()
@@ -167,7 +165,7 @@ processItemRequests = function()
     pendingItemRequests = nextRequests
     if #pendingItemRequests == 0 then
         cancelItemRequestTicker()
-    elseif type(addon.NewTimer) == "function" and not itemRequestTicker then
+    elseif not itemRequestTicker then
         ensureItemRequestTicker()
     end
 end

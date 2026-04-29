@@ -21,7 +21,8 @@
 |   |   |-- DBRaidStore.lua
 |   |   |-- DBRaidValidator.lua
 |   |   |-- DBSchema.lua
-|   |   \\-- DBSyncer.lua
+|   |   |-- DBSyncer.lua
+|   |   \\-- Options.lua
 |   |-- EntryPoints
 |   |   |-- Minimap.lua
 |   |   |-- README.md
@@ -75,7 +76,8 @@
 |   |   |-- Item.lua
 |   |   |-- Sort.lua
 |   |   |-- Strings.lua
-|   |   \\-- Time.lua
+|   |   |-- Time.lua
+|   |   \\-- Timer.lua
 |   |-- Services
 |   |   |-- Logger
 |   |   |   |-- Actions.lua
@@ -207,6 +209,9 @@
 |   |-- mcp.json
 |   \\-- settings.json
 |-- docs
+|   |-- superpowers
+|   |   \\-- specs
+|   |       \\-- 2026-04-28-options-timer-refactor-design.md
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
 |   |-- API_REGISTRY_INTERNAL.csv

@@ -254,6 +254,9 @@ addon.Controllers.Logger = addon.Controllers.Logger or {}
 local module = addon.Controllers.Logger
 module._ui = UIScaffold.EnsureModuleUi(module)
 
+-- Timer ownership: debounce per il refresh delle roster-bound list.
+addon.Timer.BindMixin(module, "Logger")
+
 -- Logger frame module.
 do
     -- ----- Internal state ----- --
@@ -499,14 +502,17 @@ do
     end
 
     module.RequestRosterBoundListsRefresh = function()
-        addon.CancelTimer(module._rosterUiHandle, true)
-        module._rosterUiHandle = addon.NewTimer(rosterUiRefreshDebounceSeconds, function()
+        if module._rosterUiHandle then
+            module:CancelTimer(module._rosterUiHandle)
+            module._rosterUiHandle = nil
+        end
+        module._rosterUiHandle = module:ScheduleTimer(function()
             module._rosterUiHandle = nil
             if not module.IsLoggerViewingCurrentRaid() then
                 return
             end
             refreshRosterBoundLists()
-        end)
+        end, rosterUiRefreshDebounceSeconds)
     end
 
     -- Logger helpers: resolve current raid/boss/loot and run raid actions with a single refresh.

@@ -1188,8 +1188,10 @@ do
     -- Performs an initial raid check on player login.
     function module:FirstCheck()
         -- Cancel any pending first-check timer before starting a new one
-        addon.CancelTimer(module.firstCheckHandle, true)
-        module.firstCheckHandle = nil
+        if module.firstCheckHandle then
+            module:CancelTimer(module.firstCheckHandle)
+            module.firstCheckHandle = nil
+        end
         if not addon.IsInGroup() then
             return
         end

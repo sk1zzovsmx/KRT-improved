@@ -31,7 +31,7 @@ do
 
     local function cancelRaidInstanceChecks()
         for idx, handle in pairs(raidInstanceCheckHandles) do
-            addon.CancelTimer(handle, true)
+            module:CancelTimer(handle)
             raidInstanceCheckHandles[idx] = nil
         end
     end
@@ -111,10 +111,10 @@ do
         for i = 1, #RAID_INSTANCE_CHECK_DELAYS do
             local idx = i
             local delaySeconds = RAID_INSTANCE_CHECK_DELAYS[idx]
-            raidInstanceCheckHandles[idx] = addon.NewTimer(delaySeconds, function()
+            raidInstanceCheckHandles[idx] = module:ScheduleTimer(function()
                 raidInstanceCheckHandles[idx] = nil
                 runLiveRaidInstanceCheck()
-            end)
+            end, delaySeconds)
         end
     end
 

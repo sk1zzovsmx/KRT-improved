@@ -529,15 +529,15 @@ local function handleDebugCommand(rest)
 
     if subCmd == "timers" or subCmd == "timer" then
         if arg == "reset" then
-            if addon.ResetTimerDebug then
-                addon:ResetTimerDebug()
+            if addon.Timer and addon.Timer.RefreshStats then
+                addon.Timer.RefreshStats()
+                addon:info("Timer stats reset.")
             end
-            addon:info("Timer debug stats reset.")
         else
-            if addon.DumpTimerDebug then
-                addon:DumpTimerDebug(arg)
+            if addon.Timer and addon.Timer.ShowStats then
+                addon.Timer.ShowStats(arg)
             else
-                addon:warn("Timer debug not available in this build.")
+                addon:warn("Timer module not available.")
             end
         end
         return
@@ -549,11 +549,11 @@ local function handleDebugCommand(rest)
     end
 
     if subCmd == "on" then
-        Options.ApplyDebugSetting(true)
+        Options.SetDebugEnabled(true)
     elseif subCmd == "off" then
-        Options.ApplyDebugSetting(false)
+        Options.SetDebugEnabled(false)
     else
-        Options.ApplyDebugSetting(not Options.IsDebugEnabled())
+        Options.SetDebugEnabled(not Options.IsDebugEnabled())
     end
 
     if Options.IsDebugEnabled() then
@@ -651,10 +651,10 @@ end
 local function handleMinimapCommand(rest)
     local sub, arg = Strings.SplitArgs(rest)
     if sub == "on" then
-        Options.SetOption("minimapButton", true)
+        Options.Set("minimapButton", true)
         Frames.SetShown(KRT_MINIMAP_GUI, true)
     elseif sub == "off" then
-        Options.SetOption("minimapButton", false)
+        Options.Set("minimapButton", false)
         Frames.SetShown(KRT_MINIMAP_GUI, false)
     elseif sub == "pos" and arg ~= "" then
         local angle = tonumber(arg)
