@@ -42,7 +42,7 @@ end
 local function getState(self)
     local s = rawget(self, "_timerState")
     if not s then
-        -- Embed deve essere chiamato prima dell'uso, ma facciamo fallback safe.
+        -- Embed should run before use, but keep a safe fallback state.
         s = { name = tostring(self), active = {}, count = 0, totalCreated = 0 }
         rawset(self, "_timerState", s)
     end

@@ -8,7 +8,6 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
-local Base64 = feature.Base64 or addon.Base64
 local Comms = feature.Comms or addon.Comms
 local Services = feature.Services or addon.Services
 local Strings = feature.Strings or addon.Strings
@@ -27,6 +26,7 @@ local module = addon.Services.Reserves
 module._Sync = module._Sync or {}
 
 local Sync = module._Sync
+local Payload = Comms and Comms._Payload or nil
 
 local PREFIX = "KRTResSync"
 local FIELD_SEP = "|"
@@ -42,59 +42,25 @@ Sync._incoming = Sync._incoming or {}
 Sync._nextRequestId = Sync._nextRequestId or 0
 
 -- ----- Private helpers ----- --
+local function getPayload()
+    Payload = Payload or (Comms and Comms._Payload)
+    return assert(Payload, "Comms payload helpers are not initialized")
+end
+
 local function encodeText(value)
-    local input = tostring(value or "")
-    local ok, out = pcall(Base64.Encode, input)
-    if ok and out then
-        return out
-    end
-    return ""
+    return getPayload()._EncodeText(value)
 end
 
 local function decodeText(value)
-    local input = tostring(value or "")
-    if input == "" then
-        return ""
-    end
-    local ok, out = pcall(Base64.Decode, input)
-    if ok and out then
-        return out
-    end
-    return nil
+    return getPayload()._DecodeText(value)
 end
 
 local function splitFields(text, out)
-    local fields = out or {}
-    local n = 0
-    local startPos = 1
-    local input = tostring(text or "")
-
-    while true do
-        local fromPos, toPos = input:find(FIELD_SEP, startPos, true)
-        if not fromPos then
-            n = n + 1
-            fields[n] = input:sub(startPos)
-            break
-        end
-        n = n + 1
-        fields[n] = input:sub(startPos, fromPos - 1)
-        startPos = toPos + 1
-    end
-
-    for i = n + 1, #fields do
-        fields[i] = nil
-    end
-
-    return fields, n
+    return getPayload()._SplitFields(text, FIELD_SEP, out)
 end
 
 local function packFields(...)
-    local n = select("#", ...)
-    local out = {}
-    for i = 1, n do
-        out[i] = tostring(select(i, ...) or "")
-    end
-    return tconcat(out, FIELD_SEP)
+    return getPayload()._PackFields(FIELD_SEP, ...)
 end
 
 local function normalizeSender(sender)

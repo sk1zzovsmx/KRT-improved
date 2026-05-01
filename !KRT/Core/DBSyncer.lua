@@ -13,7 +13,6 @@ local Events = feature.Events or addon.Events
 local Core = feature.Core
 local Bus = feature.Bus or addon.Bus
 local Strings = feature.Strings or addon.Strings
-local Base64 = feature.Base64 or addon.Base64
 local Time = feature.Time or addon.Time
 local Comms = feature.Comms or addon.Comms
 local Services = feature.Services or addon.Services
@@ -23,7 +22,7 @@ local tinsert = table.insert
 local tconcat = table.concat
 local tsort = table.sort
 local pairs, type, select = pairs, type, select
-local strfind, strsub, strgmatch = string.find, string.sub, string.gmatch
+local strsub, strgmatch = string.sub, string.gmatch
 local tonumber, tostring = tonumber, tostring
 local floor = math.floor
 
@@ -37,6 +36,7 @@ local NormalizeLower = Strings.NormalizeLower
 local TrimText = Strings.TrimText
 
 local InternalEvents = Events.Internal
+local Payload = assert(Comms and Comms._Payload, "Comms payload helpers are not initialized")
 
 -- Logger synchronization module.
 do
@@ -50,6 +50,8 @@ do
     local FIELD_SEP = "\t"
     local RECORD_SEP = "\n"
     local LIST_SEP = "\031"
+    local splitFields = Payload._SplitFields
+    local packFields = Payload._PackFields
 
     local MSG_REQUEST = "RQ"
     local MSG_SNAPSHOT = "SN"
@@ -108,14 +110,11 @@ do
 
     local function encodeText(value)
         local input = tostring(value or "")
-        local ok, out = pcall(Base64.Encode, input)
-        if ok and out then
-            return out
+        local out = Payload._EncodeText(input)
+        if out == "" and input ~= "" and isDebugEnabled() then
+            addon:debug("Base64 encode failed for sync payload")
         end
-        if isDebugEnabled() then
-            addon:debug("Base64 encode failed for sync payload: " .. tostring(out))
-        end
-        return ""
+        return out
     end
 
     local function decodeText(value)
@@ -123,48 +122,11 @@ do
         if input == "" then
             return ""
         end
-        local ok, out = pcall(Base64.Decode, input)
-        if ok and out then
-            return out
+        local out = Payload._DecodeText(input)
+        if out == nil and isDebugEnabled() then
+            addon:debug("Base64 decode failed for sync payload")
         end
-        if isDebugEnabled() then
-            addon:debug("Base64 decode failed for sync payload: " .. tostring(out))
-        end
-        return nil
-    end
-
-    local function splitFields(text, sep, out)
-        local delimiter = sep or FIELD_SEP
-        local fields = out or {}
-        local n = 0
-        local startPos = 1
-
-        while true do
-            local fromPos, toPos = strfind(text, delimiter, startPos, true)
-            if not fromPos then
-                n = n + 1
-                fields[n] = strsub(text, startPos)
-                break
-            end
-            n = n + 1
-            fields[n] = strsub(text, startPos, fromPos - 1)
-            startPos = toPos + 1
-        end
-
-        for i = n + 1, #fields do
-            fields[i] = nil
-        end
-
-        return fields, n
-    end
-
-    local function packFields(...)
-        local n = select("#", ...)
-        local out = {}
-        for i = 1, n do
-            out[i] = tostring(select(i, ...) or "")
-        end
-        return tconcat(out, FIELD_SEP)
+        return out
     end
 
     local function buildPlayerNameMaps(players)
@@ -422,6 +384,7 @@ do
         local schemaVersion = tonumber(raid.schemaVersion) or tonumber(Core.GetRaidSchemaVersion and Core.GetRaidSchemaVersion()) or 1
 
         lines[#lines + 1] = packFields(
+            FIELD_SEP,
             "H",
             PROTOCOL_VERSION,
             schemaVersion,
@@ -449,6 +412,7 @@ do
         for i = 1, #players do
             local p = players[i]
             lines[#lines + 1] = packFields(
+                FIELD_SEP,
                 "P",
                 tonumber(p.playerNid) or 0,
                 encodeText(p.name),
@@ -471,6 +435,7 @@ do
                     local segment = segments[j]
                     if type(segment) == "table" then
                         lines[#lines + 1] = packFields(
+                            FIELD_SEP,
                             "A",
                             playerNid,
                             tonumber(segment.startTime) or 0,
@@ -487,6 +452,7 @@ do
         for i = 1, #bosses do
             local b = bosses[i]
             lines[#lines + 1] = packFields(
+                FIELD_SEP,
                 "B",
                 tonumber(b.bossNid) or 0,
                 encodeText(b.name),
@@ -502,6 +468,7 @@ do
         for i = 1, #lootRows do
             local loot = lootRows[i]
             lines[#lines + 1] = packFields(
+                FIELD_SEP,
                 "L",
                 tonumber(loot.lootNid) or 0,
                 tonumber(loot.itemId) or 0,
@@ -529,7 +496,7 @@ do
         end)
         for i = 1, #names do
             local name = names[i]
-            lines[#lines + 1] = packFields("C", encodeText(name), encodeText(changes[name]))
+            lines[#lines + 1] = packFields(FIELD_SEP, "C", encodeText(name), encodeText(changes[name]))
         end
 
         return tconcat(lines, RECORD_SEP)
@@ -1015,6 +982,7 @@ do
     local function sendRequest(mode, requestId, raidRef, signature, target)
         signature = signature or {}
         local payload = packFields(
+            FIELD_SEP,
             MSG_REQUEST,
             PROTOCOL_VERSION,
             requestId,
@@ -1047,7 +1015,7 @@ do
             local fromPos = ((idx - 1) * MAX_CHUNK_SIZE) + 1
             local toPos = fromPos + MAX_CHUNK_SIZE - 1
             local chunk = strsub(encodedPayload, fromPos, toPos)
-            local msg = packFields(MSG_SNAPSHOT, PROTOCOL_VERSION, requestId, mode, tonumber(raid.raidNid) or 0, idx, totalChunks, chunk)
+            local msg = packFields(FIELD_SEP, MSG_SNAPSHOT, PROTOCOL_VERSION, requestId, mode, tonumber(raid.raidNid) or 0, idx, totalChunks, chunk)
 
             sendAddonPayload(target, msg)
         end

@@ -104,12 +104,12 @@ do
     module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
-    -- Timer ownership: tutti i timer del Master controller (PendingCounter, multi-award timeout/delay, loot close).
+    -- Timer ownership: all Master controller timers (PendingCounter, multi-award timeout/delay, loot close).
     addon.Timer.BindMixin(module, "Master")
 
     -- Namespace registrations owned by the Master controller. Stored on `module`
-    -- to evitare upvalue extra (questo file è al limite Lua 5.1 di 200 local/upvalue).
-    -- I lookup avvengono via Options.Get(...) inline ai call sites.
+    -- to avoid extra upvalues because this file is near Lua 5.1's 200 local/upvalue limit.
+    -- Lookups happen through inline Options.Get(...) calls at call sites.
     Options.AddNamespace("Master", {
         sortAscending = false,
         useRaidWarning = true,

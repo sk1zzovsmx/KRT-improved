@@ -28,7 +28,7 @@ do
     addon.Services.Chat = addon.Services.Chat or {}
     local module = addon.Services.Chat
 
-    -- Timer ownership: ticker per il sistema "spammer" (spam controllato di messaggi LFM).
+    -- Timer ownership: ticker for controlled LFM spammer output.
     addon.Timer.BindMixin(module, "Chat")
 
     -- ----- Internal state ----- --

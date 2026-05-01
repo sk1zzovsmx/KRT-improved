@@ -327,6 +327,8 @@ Dates are in YYYY-MM-DD.
   `DoReadyCheck()`.
 - **Bugfix:** `Comms.Sync(...)` now supports cores without `GetRealNumRaidMembers/GetRealNumPartyMembers`
   by falling back to `GetNumRaidMembers/GetNumPartyMembers`.
+- **Bugfix:** `Comms.Sync(...)` now reports `false` when no group addon-message
+  transport is available, so SoftRes sync no longer reports a sent request while solo.
 - **Behavior:** Reserve list `Query Item` button now has a short cooldown to avoid rapid repeated queries.
 - **Refactor:** Removed unused `LFM period` localization keys that no longer had a slash-command handler.
 - **Behavior:** Slash commands that target optional widgets now print a clear message when the widget is

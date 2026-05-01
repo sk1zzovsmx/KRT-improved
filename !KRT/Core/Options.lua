@@ -114,7 +114,7 @@ local function migrateFlatToNested()
         end
     end
 
-    -- Pulisci eventuali chiavi legacy non mappate (es. "debug" rimosso in passato).
+    -- Remove unmapped legacy keys, such as the former persisted "debug" flag.
     saved.debug = nil
 
     saved._schema = SCHEMA_VERSION
@@ -251,9 +251,9 @@ function Options.EnsureLoaded()
 end
 
 -- ----- Read-only flat proxy ----- --
--- `addon.options.<key>` risolve attraverso il namespace che possiede la chiave
--- (lookup O(1) via keyToNamespace). I writes devono passare per namespace:Set.
--- Esiste per evitare di aggiungere upvalue extra in file ai limiti (es. Master.lua).
+-- `addon.options.<key>` resolves through the namespace that owns the key
+-- (O(1) lookup via keyToNamespace). Writes must go through namespace:Set.
+-- This avoids adding extra upvalues in files near Lua 5.1 limits (for example Master.lua).
 addon.options = setmetatable({}, {
     __index = function(_, key)
         local ns = keyToNamespace[key]

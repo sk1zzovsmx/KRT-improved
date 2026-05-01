@@ -3,7 +3,6 @@
 -- shared: local feature = addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
-local addonName = ...
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
@@ -358,31 +357,23 @@ local function callSyncerMethodWithTarget(methodName, args)
     callSyncerMethod(methodName, tonumber(raidRefArg), targetArg)
 end
 
-local function getAddonMetadata(key, fallback)
-    local getter = _G.GetAddOnMetadata
+local function getVersionInfo()
+    local getter = Comms and Comms.GetVersionInfo
     if type(getter) == "function" then
-        local value = getter(addonName, key)
-        if value ~= nil and value ~= "" then
-            return tostring(value)
-        end
+        return getter()
     end
-    return tostring(fallback or L.StrUnknown)
-end
 
-local function getRaidSchemaVersion()
-    local getter = Core and Core.GetRaidSchemaVersion
-    if type(getter) == "function" then
-        return tostring(getter() or L.StrUnknown)
-    end
-    return tostring(L.StrUnknown)
-end
-
-local function getSyncProtocolVersion()
+    local unknown = tostring(L.StrUnknown)
+    local schemaGetter = Core and Core.GetRaidSchemaVersion
     local syncer = getCoreService("GetSyncer")
-    if syncer and type(syncer.GetProtocolVersion) == "function" then
-        return tostring(syncer:GetProtocolVersion() or L.StrUnknown)
-    end
-    return tostring(L.StrUnknown)
+    local syncGetter = syncer and syncer.GetProtocolVersion
+
+    return {
+        addonVersion = unknown,
+        interfaceVersion = unknown,
+        raidSchemaVersion = type(schemaGetter) == "function" and tostring(schemaGetter() or unknown) or unknown,
+        syncProtocolVersion = type(syncGetter) == "function" and tostring(syncGetter(syncer) or unknown) or unknown,
+    }
 end
 
 local function getLogLevelName()
@@ -448,23 +439,25 @@ local function getRoleState()
 end
 
 local function showVersion()
+    local info = getVersionInfo()
     addon:info(L.MsgVersionTitle)
-    addon:info(L.MsgVersionAddon:format(getAddonMetadata("Version", L.StrUnknown)))
-    addon:info(L.MsgVersionInterface:format(getAddonMetadata("Interface", L.StrUnknown)))
-    addon:info(L.MsgVersionRaidSchema:format(getRaidSchemaVersion()))
-    addon:info(L.MsgVersionSyncProtocol:format(getSyncProtocolVersion()))
+    addon:info(L.MsgVersionAddon:format(info.addonVersion))
+    addon:info(L.MsgVersionInterface:format(info.interfaceVersion))
+    addon:info(L.MsgVersionRaidSchema:format(info.raidSchemaVersion))
+    addon:info(L.MsgVersionSyncProtocol:format(info.syncProtocolVersion))
 end
 
 local function showBugReport()
     local reservePlayers, reserveEntries = countReserves()
     local currentRaid, raidNid = getCurrentRaidSummary()
     local role = getRoleState()
+    local info = getVersionInfo()
 
     addon:info(L.MsgBugReportTitle)
-    addon:info(L.MsgVersionAddon:format(getAddonMetadata("Version", L.StrUnknown)))
-    addon:info(L.MsgVersionInterface:format(getAddonMetadata("Interface", L.StrUnknown)))
-    addon:info(L.MsgVersionRaidSchema:format(getRaidSchemaVersion()))
-    addon:info(L.MsgVersionSyncProtocol:format(getSyncProtocolVersion()))
+    addon:info(L.MsgVersionAddon:format(info.addonVersion))
+    addon:info(L.MsgVersionInterface:format(info.interfaceVersion))
+    addon:info(L.MsgVersionRaidSchema:format(info.raidSchemaVersion))
+    addon:info(L.MsgVersionSyncProtocol:format(info.syncProtocolVersion))
     addon:info(L.MsgBugReportLog:format(getLogLevelName(), yesNo(Options.IsDebugEnabled and Options.IsDebugEnabled())))
     addon:info(L.MsgBugReportCurrentRaid:format(currentRaid, raidNid))
     addon:info(L.MsgBugReportRaidHistory:format(countRaidHistory()))

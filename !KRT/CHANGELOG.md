@@ -16,6 +16,9 @@ Release-Version: 0.7.1-beta.1
 
 - **LootCounter scrolling** - Fixed the Loot Counter frame so moving the
   scrollbar also scrolls the player list instead of only moving the thumb.
+- **SoftRes sync transport** - SoftRes sync now warns when no group
+  addon-message transport is available instead of reporting a sent request
+  while solo.
 
 ## [0.7.1-beta.1] - 2026-04-27
 

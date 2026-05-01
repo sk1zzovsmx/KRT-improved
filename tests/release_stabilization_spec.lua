@@ -1011,9 +1011,9 @@ local function newHarness()
         return addon.NewTimer(delay, callback)
     end
 
-    -- Stub di addon.Timer (mixin) per i test: usa l'infrastruttura `timers` esistente.
-    -- Mappa ScheduleTimer/ScheduleRepeatingTimer/CancelTimer/CancelAllTimers ai
-    -- meccanismi di test in modo che _flushTimers continui a funzionare.
+    -- Test stub for addon.Timer mixins: reuse the existing `timers` infrastructure.
+    -- Map ScheduleTimer/ScheduleRepeatingTimer/CancelTimer/CancelAllTimers so
+    -- _flushTimers continues to work.
     addon.Timer = {
         BindMixin = function(target)
             if target.ScheduleTimer then
@@ -3288,14 +3288,15 @@ test("db syncer routes requests through whisper and group transports", function(
             target = target,
         }
     end
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/Modules/Base64.lua")
+    h:load("!KRT/Core/DBSyncer.lua")
     h.addon.Comms.Sync = function(prefix, payload)
         groupMessages[#groupMessages + 1] = {
             prefix = prefix,
             payload = payload,
         }
     end
-
-    h:load("!KRT/Core/DBSyncer.lua")
     local syncer = h.addon.DB.Syncer
 
     assertTrue(syncer:RequestLoggerReq(42, " Alice ") == true, "expected targeted logger request to send")
@@ -3309,7 +3310,7 @@ test("db syncer routes requests through whisper and group transports", function(
     assertTrue(syncer:RequestLoggerSync() == true, "expected current raid sync request to send")
     assertEqual(#groupMessages, 1, "expected one group transport message")
     assertEqual(groupMessages[1].prefix, "KRTLogSync", "expected sync prefix on group message")
-    local syncPrefix = table.concat({ "RQ", "1", "2", "SYNC", "77", "Naxxramas", "25", "4" }, "\t")
+    local syncPrefix = table.concat({ "RQ", "1", "2", "SYNC", "77", h.addon.Base64.Encode("Naxxramas"), "25", "4" }, "\t")
     assertEqual(groupMessages[1].payload:sub(1, #syncPrefix), syncPrefix, "expected sync payload header to stay stable")
 end)
 
@@ -3377,6 +3378,7 @@ test("db syncer imports push snapshots and merges requested sync chunks", functi
         }
     end
 
+    source:load("!KRT/Modules/Comms.lua")
     source:load("!KRT/Modules/Base64.lua")
     source:load("!KRT/Core/DBSyncer.lua")
     assertTrue(source.addon.DB.Syncer:BroadcastLoggerPush(77, "Bob") == true, "expected source push snapshot to send")
@@ -3402,6 +3404,7 @@ test("db syncer imports push snapshots and merges requested sync chunks", functi
     pushTarget.addon.IsInRaid = function()
         return false
     end
+    pushTarget:load("!KRT/Modules/Comms.lua")
     pushTarget:load("!KRT/Modules/Base64.lua")
     pushTarget:load("!KRT/Core/DBSyncer.lua")
 
@@ -3456,6 +3459,7 @@ test("db syncer imports push snapshots and merges requested sync chunks", functi
     syncTarget.addon.IsInRaid = function()
         return false
     end
+    syncTarget:load("!KRT/Modules/Comms.lua")
     syncTarget:load("!KRT/Modules/Base64.lua")
     syncTarget:load("!KRT/Core/DBSyncer.lua")
 
@@ -9912,6 +9916,7 @@ test("slash help supports focused command pages", function()
     end
 
     h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
     h:load("!KRT/EntryPoints/SlashEvents.lua")
 
     _G.SlashCmdList.KRT("help logger")
@@ -9939,6 +9944,7 @@ test("slash perf toggles runtime performance logging", function()
     end
 
     h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
     h:load("!KRT/EntryPoints/SlashEvents.lua")
 
     _G.SlashCmdList.KRT("perf on")
@@ -10007,6 +10013,7 @@ test("slash bug prints local diagnostic summary", function()
     end
 
     h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
     h:load("!KRT/EntryPoints/SlashEvents.lua")
 
     _G.SlashCmdList.KRT("bug")
@@ -10037,6 +10044,7 @@ test("slash version prints local addon compatibility summary", function()
     end
 
     h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
     h:load("!KRT/EntryPoints/SlashEvents.lua")
 
     _G.SlashCmdList.KRT("version")
@@ -10136,6 +10144,84 @@ test("comms version check replies to requests by whisper", function()
     assertEqual(sent[1].channel, "WHISPER", "expected direct reply")
     assertEqual(sent[1].target, "Bob", "expected requester target")
     assertTrue(sent[1].msg:match("^ACK|9%.8%.7|30300|5|") ~= nil, "expected local version payload")
+end)
+
+test("comms exposes shared version metadata", function()
+    local h = newHarness()
+    _G.GetAddOnMetadata = function(_, key)
+        if key == "Version" then
+            return "9.8.7"
+        end
+        if key == "Interface" then
+            return "30300"
+        end
+        return nil
+    end
+    h.Core.GetRaidSchemaVersion = function()
+        return 5
+    end
+    h.Core.GetSyncer = function()
+        return {
+            GetProtocolVersion = function()
+                return 2
+            end,
+        }
+    end
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
+
+    local info = h.addon.Comms.GetVersionInfo()
+
+    assertEqual(info.addonVersion, "9.8.7", "expected addon version from shared comms metadata")
+    assertEqual(info.interfaceVersion, "30300", "expected interface version from shared comms metadata")
+    assertEqual(info.raidSchemaVersion, "5", "expected raid schema from shared comms metadata")
+    assertEqual(info.syncProtocolVersion, "2", "expected sync protocol from shared comms metadata")
+end)
+
+test("comms payload helpers encode split and pack addon-message fields", function()
+    local h = newHarness()
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/Modules/Base64.lua")
+
+    local payload = h.addon.Comms._Payload
+    local encoded = payload._EncodeText("Alpha|Beta")
+    local packed = payload._PackFields("|", "ROW", encoded, nil, "tail")
+    local fields, n = payload._SplitFields(packed, "|")
+
+    assertEqual(n, 4, "expected packed field count")
+    assertEqual(fields[1], "ROW", "expected first payload field")
+    assertEqual(payload._DecodeText(fields[2]), "Alpha|Beta", "expected encoded delimiter text to round-trip")
+    assertEqual(fields[3], "", "expected nil payload fields to pack as empty strings")
+    assertEqual(fields[4], "tail", "expected final payload field")
+end)
+
+test("comms sync reports unavailable group transport", function()
+    local h = newHarness()
+    local sent = {}
+    _G.GetNumRaidMembers = function()
+        return 0
+    end
+    _G.GetNumPartyMembers = function()
+        return 0
+    end
+    _G.SendAddonMessage = function(prefix, msg, channel, target)
+        sent[#sent + 1] = {
+            prefix = prefix,
+            msg = msg,
+            channel = channel,
+            target = target,
+        }
+    end
+
+    h:load("!KRT/Modules/Comms.lua")
+
+    local ok = h.addon.Comms.Sync("KRTTest", "payload")
+
+    assertTrue(ok == false, "expected sync to report missing group transport")
+    assertEqual(#sent, 0, "expected no addon message outside party, raid, or battleground")
 end)
 
 test("reserves synced runtime cache feeds display without persisting", function()

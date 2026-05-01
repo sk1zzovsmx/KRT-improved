@@ -9,14 +9,16 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local type, tostring = type, tostring
-local format = string.format
+local pcall = pcall
 local select = select
-local strmatch = string.match
+local strfind, strsub = string.find, string.sub
 local tconcat = table.concat
 local _G = _G
 
 addon.Comms = addon.Comms or feature.Comms or {}
 local Comms = addon.Comms
+Comms._Payload = Comms._Payload or {}
+local Payload = Comms._Payload
 local L = feature.L
 local Core = feature.Core or addon.Core
 
@@ -28,9 +30,94 @@ local MSG_VERSION_ACK = "ACK"
 
 -- ----- Private helpers ----- --
 
+local function getUnknownText()
+    return tostring((L and L.StrUnknown) or "unknown")
+end
+
+local function getBase64()
+    return addon.Base64 or feature.Base64
+end
+
+Payload._EncodeText = function(value)
+    local base64 = getBase64()
+    local encode = base64 and base64.Encode
+    if type(encode) ~= "function" then
+        return ""
+    end
+
+    local ok, out = pcall(encode, tostring(value or ""))
+    if ok and out then
+        return out
+    end
+    return ""
+end
+
+Payload._DecodeText = function(value)
+    local input = tostring(value or "")
+    if input == "" then
+        return ""
+    end
+
+    local base64 = getBase64()
+    local decode = base64 and base64.Decode
+    if type(decode) ~= "function" then
+        return nil
+    end
+
+    local ok, out = pcall(decode, input)
+    if ok and out then
+        return out
+    end
+    return nil
+end
+
+Payload._SplitFields = function(text, sep, out)
+    local fields = out or {}
+    local delimiter = tostring(sep or "|")
+    local input = tostring(text or "")
+    local n = 0
+
+    if delimiter == "" then
+        fields[1] = input
+        for i = 2, #fields do
+            fields[i] = nil
+        end
+        return fields, 1
+    end
+
+    local startPos = 1
+    while true do
+        local fromPos, toPos = strfind(input, delimiter, startPos, true)
+        if not fromPos then
+            n = n + 1
+            fields[n] = strsub(input, startPos)
+            break
+        end
+        n = n + 1
+        fields[n] = strsub(input, startPos, fromPos - 1)
+        startPos = toPos + 1
+    end
+
+    for i = n + 1, #fields do
+        fields[i] = nil
+    end
+
+    return fields, n
+end
+
+Payload._PackFields = function(sep, ...)
+    local delimiter = tostring(sep or "|")
+    local n = select("#", ...)
+    local out = {}
+    for i = 1, n do
+        out[i] = tostring(select(i, ...) or "")
+    end
+    return tconcat(out, delimiter)
+end
+
 local function splitVersionPayload(msg)
-    local kind, addonVersion, interfaceVersion, schemaVersion, syncProtocol = strmatch(tostring(msg or ""), "^([^|]*)|([^|]*)|([^|]*)|([^|]*)|?(.*)$")
-    return kind, addonVersion, interfaceVersion, schemaVersion, syncProtocol
+    local fields = Payload._SplitFields(msg, "|")
+    return fields[1], fields[2], fields[3], fields[4], fields[5]
 end
 
 local function getAddonMetadata(key, fallback)
@@ -41,32 +128,33 @@ local function getAddonMetadata(key, fallback)
             return tostring(value)
         end
     end
-    return tostring(fallback or (L and L.StrUnknown) or "unknown")
+    return tostring(fallback or getUnknownText())
 end
 
 local function getRaidSchemaVersion()
     local getter = Core and Core.GetRaidSchemaVersion
     if type(getter) == "function" then
-        return tostring(getter() or (L and L.StrUnknown) or "unknown")
+        return tostring(getter() or getUnknownText())
     end
-    return tostring((L and L.StrUnknown) or "unknown")
+    return getUnknownText()
 end
 
 local function getSyncProtocolVersion()
     local syncer = Core and Core.GetSyncer and Core.GetSyncer() or nil
     if syncer and type(syncer.GetProtocolVersion) == "function" then
-        return tostring(syncer:GetProtocolVersion() or (L and L.StrUnknown) or "unknown")
+        return tostring(syncer:GetProtocolVersion() or getUnknownText())
     end
-    return tostring((L and L.StrUnknown) or "unknown")
+    return getUnknownText()
 end
 
 local function buildVersionPayload(kind)
+    local info = Comms.GetVersionInfo()
     return tconcat({
         kind,
-        getAddonMetadata("Version", "unknown"),
-        getAddonMetadata("Interface", "unknown"),
-        getRaidSchemaVersion(),
-        getSyncProtocolVersion(),
+        info.addonVersion,
+        info.interfaceVersion,
+        info.raidSchemaVersion,
+        info.syncProtocolVersion,
     }, "|")
 end
 
@@ -104,17 +192,7 @@ end
 -- ----- Public methods ----- --
 
 function Comms.Sync(prefix, msg)
-    local zone = select(2, IsInInstance())
-    local raidCount = (GetRealNumRaidMembers and GetRealNumRaidMembers()) or (GetNumRaidMembers and GetNumRaidMembers()) or 0
-    local partyCount = (GetRealNumPartyMembers and GetRealNumPartyMembers()) or (GetNumPartyMembers and GetNumPartyMembers()) or 0
-
-    if zone == "pvp" or zone == "arena" then
-        SendAddonMessage(prefix, msg, "BATTLEGROUND")
-    elseif raidCount > 0 then
-        SendAddonMessage(prefix, msg, "RAID")
-    elseif partyCount > 0 then
-        SendAddonMessage(prefix, msg, "PARTY")
-    end
+    return sendGroupMessage(prefix, msg)
 end
 
 function Comms.Chat(msg, channel, language, target, bypass)
@@ -140,6 +218,15 @@ end
 
 function Comms.GetVersionPrefix()
     return VERSION_PREFIX
+end
+
+function Comms.GetVersionInfo()
+    return {
+        addonVersion = getAddonMetadata("Version", getUnknownText()),
+        interfaceVersion = getAddonMetadata("Interface", getUnknownText()),
+        raidSchemaVersion = getRaidSchemaVersion(),
+        syncProtocolVersion = getSyncProtocolVersion(),
+    }
 end
 
 function Comms:RequestVersionCheck()
