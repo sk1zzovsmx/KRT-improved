@@ -66,6 +66,7 @@ do
     local BOSS_KILL_DEDUPE_WINDOW_SECONDS = tonumber(C.BOSS_KILL_DEDUPE_WINDOW_SECONDS) or 30
     local BOSS_EVENT_CONTEXT_TTL_SECONDS = tonumber(C.BOSS_EVENT_CONTEXT_TTL_SECONDS) or BOSS_KILL_DEDUPE_WINDOW_SECONDS
     local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = tonumber(C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60
+    local RECENT_LOOT_DEATH_CONTEXT_TTL_SECONDS = tonumber(C.RECENT_LOOT_DEATH_CONTEXT_TTL_SECONDS) or 8
     local RECENT_TRASH_DEATH_CONTEXT_THROTTLE_SECONDS = tonumber(C.RECENT_TRASH_DEATH_CONTEXT_THROTTLE_SECONDS) or 1
     local LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS = math.max(BOSS_EVENT_CONTEXT_TTL_SECONDS, GROUP_LOOT_PENDING_AWARD_TTL_SECONDS)
     local LootService = addon.Services and addon.Services.Loot or {}
@@ -76,6 +77,7 @@ do
     local copyActiveLootSource = assert(LootContextHelpers.CopyLootSource, "Missing LootContext.CopyLootSource")
     local recentTrashDeathContextRaidNum = 0
     local recentTrashDeathContextSeenAt = 0
+    local recentTrashDeathContextActivityAt = 0
 
     -- ----- Private helpers ----- --
     local function isDebugEnabled()
@@ -230,14 +232,15 @@ do
         return LootContextState.ResolveExpiry(now, ttlSeconds, defaultTtl, minTtl)
     end
 
-    local function setBlockedLootWindowBossContext(raidNum, source, now, ttlSeconds, sourceMeta)
+    local function setBlockedLootWindowBossContext(raidNum, source, now, ttlSeconds, sourceMeta, minTtlSeconds)
         local resolvedRaidNum = tonumber(raidNum) or 0
         if resolvedRaidNum <= 0 then
             clearLootWindowBossContext()
             return 0
         end
 
-        local resolvedNow, _, expiresAt = resolveContextExpiry(now, ttlSeconds, LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS, LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS)
+        local minTtl = tonumber(minTtlSeconds) or LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS
+        local resolvedNow, _, expiresAt = resolveContextExpiry(now, ttlSeconds, LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS, minTtl)
         local activeLoot = syncActiveLootContextState() or {}
         activeLoot.raidNum = resolvedRaidNum
         activeLoot.kind = "trash"
@@ -313,12 +316,14 @@ do
             setLootContextField("recentDeath", "recentLootDeathContext", nil)
             recentTrashDeathContextRaidNum = 0
             recentTrashDeathContextSeenAt = 0
+            recentTrashDeathContextActivityAt = 0
             return nil
         end
 
         if kind ~= "trash" then
             recentTrashDeathContextRaidNum = 0
             recentTrashDeathContextSeenAt = 0
+            recentTrashDeathContextActivityAt = 0
         end
 
         return setLootContextField("recentDeath", "recentLootDeathContext", {
@@ -337,11 +342,13 @@ do
         local currentTime = tonumber(now) or Time.GetCurrentTime()
         local elapsed = currentTime - (tonumber(recentTrashDeathContextSeenAt) or 0)
         if resolvedRaidNum == recentTrashDeathContextRaidNum and elapsed >= 0 and elapsed < RECENT_TRASH_DEATH_CONTEXT_THROTTLE_SECONDS then
+            recentTrashDeathContextActivityAt = currentTime
             return nil
         end
 
         recentTrashDeathContextRaidNum = resolvedRaidNum
         recentTrashDeathContextSeenAt = currentTime
+        recentTrashDeathContextActivityAt = currentTime
         return setRecentLootDeathContext(resolvedRaidNum, "trash", sourceName, sourceNpcId, 0, "UNIT_DIED", currentTime)
     end
 
@@ -349,6 +356,7 @@ do
         LootContextState.Reset(raidState)
         recentTrashDeathContextRaidNum = 0
         recentTrashDeathContextSeenAt = 0
+        recentTrashDeathContextActivityAt = 0
     end
 
     local function clearActiveLootWindowItemSnapshot()
@@ -764,6 +772,10 @@ do
         return resolveBossEventContext(raidNum, now, false)
     end
 
+    local function hasRecoverableBossEventContext(raidNum, now)
+        return peekBossEventContext(raidNum, now) > 0
+    end
+
     local function resolveRecentLootDeathContext(raid, raidNum, now, ttlSeconds, source)
         local context = getRecentLootDeathContextState()
         if type(context) ~= "table" then
@@ -772,17 +784,21 @@ do
 
         local currentTime = tonumber(now) or Time.GetCurrentTime()
         local contextRaidNum = tonumber(context.raidNum) or 0
-        local delta = currentTime - (tonumber(context.seenAt) or 0)
-        if contextRaidNum ~= (tonumber(raidNum) or 0) or delta < 0 or delta > BOSS_EVENT_CONTEXT_TTL_SECONDS then
+        local contextSeenAt = tonumber(context.seenAt) or 0
+        if context.kind == "trash" and contextRaidNum == recentTrashDeathContextRaidNum and recentTrashDeathContextActivityAt > contextSeenAt then
+            contextSeenAt = recentTrashDeathContextActivityAt
+        end
+        local delta = currentTime - contextSeenAt
+        if contextRaidNum ~= (tonumber(raidNum) or 0) or delta < 0 or delta > RECENT_LOOT_DEATH_CONTEXT_TTL_SECONDS then
             setLootContextField("recentDeath", "recentLootDeathContext", nil)
             return nil
         end
 
         if context.kind == "trash" then
-            setBlockedLootWindowBossContext(raidNum, source or "lootWindowRecentDeath", currentTime, ttlSeconds, {
+            setBlockedLootWindowBossContext(raidNum, source or "lootWindowRecentDeath", currentTime, RECENT_LOOT_DEATH_CONTEXT_TTL_SECONDS, {
                 npcId = tonumber(context.sourceNpcId) or 0,
                 name = context.sourceName,
-            })
+            }, RECENT_LOOT_DEATH_CONTEXT_TTL_SECONDS)
             return "blocked", 0
         end
 
@@ -1473,7 +1489,11 @@ do
         end
         if sourceKind ~= "boss" then
             if sourceKind == "trash" then
-                rememberRecentTrashDeathContext(Core.GetCurrentRaid(), destName, sourceNpcId, Time.GetCurrentTime())
+                local currentRaid = Core.GetCurrentRaid()
+                local currentTime = Time.GetCurrentTime()
+                if hasRecoverableBossEventContext(currentRaid, currentTime) then
+                    rememberRecentTrashDeathContext(currentRaid, destName, sourceNpcId, currentTime)
+                end
             end
             return
         end

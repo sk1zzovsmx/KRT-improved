@@ -622,6 +622,7 @@ local function newHarness()
         PENDING_AWARD_TTL_SECONDS = 8,
         GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = 60,
         GROUP_LOOT_ROLL_GRACE_SECONDS = 10,
+        RECENT_LOOT_DEATH_CONTEXT_TTL_SECONDS = 8,
         RESERVES_ITEM_FALLBACK_ICON = "fallback-icon",
         RESERVES_QUERY_COOLDOWN_SECONDS = 2,
         CLASS_COLORS = {},
@@ -5227,6 +5228,8 @@ test("trash UNIT_DIED context throttles repeated trash updates", function()
     h:load("!KRT/Services/Raid.lua")
     local Raid = h.addon.Services.Raid
 
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(currentTime, "UNIT_DIED", nil, nil, 0, bossGuid, "Grand Widow Faerlina", 0)
+
     Raid:COMBAT_LOG_EVENT_UNFILTERED(currentTime, "UNIT_DIED", nil, nil, 0, trashGuidA, "Trash A", 0)
     assertEqual(h.feature.raidState.recentLootDeathContext.sourceName, "Trash A", "expected first trash death to seed recent context")
 
@@ -5246,6 +5249,175 @@ test("trash UNIT_DIED context throttles repeated trash updates", function()
     Raid:COMBAT_LOG_EVENT_UNFILTERED(currentTime, "UNIT_DIED", nil, nil, 0, trashGuidB, "Trash B", 0)
     assertEqual(h.feature.raidState.recentLootDeathContext.kind, "trash", "expected trash after boss to bypass the previous trash throttle")
     assertEqual(h.feature.raidState.recentLootDeathContext.sourceName, "Trash B", "expected post-boss trash death to refresh context immediately")
+end)
+
+local function newRecentDeathContextHarness()
+    local h = newHarness()
+    local trashLink = h.registerItem(91740, "Recent Trash Cloak")
+    local currentTime = 1000
+    local bossGuid = "Creature-0-0-0-0-15953-0000000000"
+    local trashGuid = "Creature-0-0-0-0-15989-0000000000"
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+    _G.GetLootRollItemLink = function(rollId)
+        if rollId == 240 then
+            return trashLink
+        end
+        return nil
+    end
+    _G.bit = {
+        band = function()
+            return 0
+        end,
+    }
+    _G.COMBATLOG_OBJECT_TYPE_PLAYER = 0x00000400
+
+    h.addon.BossIDs = {
+        BossIDs = {
+            [15953] = true,
+        },
+    }
+    h.addon.GetCreatureId = function(guid)
+        if guid == bossGuid then
+            return 15953
+        end
+        if guid == trashGuid then
+            return 15989
+        end
+        return 0
+    end
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "recent-trash-greed-win-self" then
+            return 240, 77, trashLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+
+    return {
+        h = h,
+        Raid = h.addon.Services.Raid,
+        setTime = function(value)
+            currentTime = value
+        end,
+        bossGuid = bossGuid,
+        trashGuid = trashGuid,
+    }
+end
+
+test("trash UNIT_DIED without recent boss context is ignored", function()
+    local ctx = newRecentDeathContextHarness()
+    local Raid = ctx.Raid
+
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1000, "UNIT_DIED", nil, nil, 0, ctx.trashGuid, "Naxxramas Cultist", 0)
+
+    assertEqual(ctx.h.feature.raidState.recentLootDeathContext, nil, "expected irrelevant trash death to avoid seeding recent context")
+    assertEqual(#ctx.h.Core.EnsureRaidById(1).bossKills, 0, "expected irrelevant trash death to avoid creating boss kills")
+end)
+
+test("trash UNIT_DIED after expired boss context is ignored", function()
+    local ctx = newRecentDeathContextHarness()
+    local Raid = ctx.Raid
+
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1000, "UNIT_DIED", nil, nil, 0, ctx.bossGuid, "Grand Widow Faerlina", 0)
+    ctx.setTime(1031)
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1031, "UNIT_DIED", nil, nil, 0, ctx.trashGuid, "Naxxramas Cultist", 0)
+
+    local recent = ctx.h.feature.raidState.recentLootDeathContext
+    assertTrue(recent == nil or recent.kind ~= "trash", "expected trash death after expired boss context to avoid seeding trash context")
+    assertEqual(#ctx.h.Core.EnsureRaidById(1).bossKills, 1, "expected expired boss context check to avoid creating TrashMob")
+end)
+
+test("recent trash death blocks boss context within the short ttl", function()
+    local ctx = newRecentDeathContextHarness()
+    local Raid = ctx.Raid
+
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1000, "UNIT_DIED", nil, nil, 0, ctx.bossGuid, "Grand Widow Faerlina", 0)
+    ctx.setTime(1005)
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1005, "UNIT_DIED", nil, nil, 0, ctx.trashGuid, "Naxxramas Cultist", 0)
+    ctx.setTime(1010)
+
+    Raid:AddPassiveLootRoll(240, 45000)
+    local windowContext = ctx.h.feature.raidState.lootWindowBossContext
+    assertEqual(windowContext and windowContext.expiresAt, 1018, "expected recent trash blocked context to use the short ttl")
+    assertEqual(Raid:AddGroupLootMessage("recent-trash-greed-win-self"), "winner", "expected trash group loot winner to be recognized")
+    Raid:AddLoot("recent-trash-greed-win-self")
+
+    local raid = ctx.h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected one recent trash group-loot row")
+    assertEqual(#raid.bossKills, 2, "expected recent trash context to create a TrashMob bucket")
+    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected recent trash context to block the boss context")
+    assertEqual(raid.loot[1].bossNid, 2, "expected recent trash loot to avoid the prior boss")
+end)
+
+test("trash burst ttl follows the latest throttled death", function()
+    local ctx = newRecentDeathContextHarness()
+    local Raid = ctx.Raid
+
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1000, "UNIT_DIED", nil, nil, 0, ctx.bossGuid, "Grand Widow Faerlina", 0)
+    ctx.setTime(1005)
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1005, "UNIT_DIED", nil, nil, 0, ctx.trashGuid, "Naxxramas Cultist", 0)
+    ctx.setTime(1005.5)
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1005.5, "UNIT_DIED", nil, nil, 0, ctx.trashGuid, "Naxxramas Cultist", 0)
+    ctx.setTime(1013.2)
+
+    Raid:AddPassiveLootRoll(240, 45000)
+    assertEqual(Raid:AddGroupLootMessage("recent-trash-greed-win-self"), "winner", "expected throttled burst winner to be recognized")
+    Raid:AddLoot("recent-trash-greed-win-self")
+
+    local raid = ctx.h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected one throttled burst group-loot row")
+    assertEqual(#raid.bossKills, 2, "expected latest throttled trash death to keep trash context alive")
+    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected throttled burst loot to stay classified as trash")
+    assertEqual(raid.loot[1].bossNid, 2, "expected throttled burst loot to avoid the prior boss")
+end)
+
+test("recent trash death expires before boss event context", function()
+    local ctx = newRecentDeathContextHarness()
+    local Raid = ctx.Raid
+
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1000, "UNIT_DIED", nil, nil, 0, ctx.bossGuid, "Grand Widow Faerlina", 0)
+    ctx.setTime(1005)
+    Raid:COMBAT_LOG_EVENT_UNFILTERED(1005, "UNIT_DIED", nil, nil, 0, ctx.trashGuid, "Naxxramas Cultist", 0)
+    ctx.setTime(1014)
+
+    Raid:AddPassiveLootRoll(240, 45000)
+    assertEqual(Raid:AddGroupLootMessage("recent-trash-greed-win-self"), "winner", "expected delayed group loot winner to be recognized")
+    Raid:AddLoot("recent-trash-greed-win-self")
+
+    local raid = ctx.h.Core.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected one delayed group-loot row")
+    assertEqual(#raid.bossKills, 1, "expected expired recent trash context to avoid creating TrashMob")
+    assertEqual(raid.loot[1].bossNid, 1, "expected boss event context to remain recoverable within 30 seconds")
+    assertEqual(ctx.h.feature.raidState.recentLootDeathContext, nil, "expected expired recent trash context to be cleared")
 end)
 
 test("group loot winner messages log passive GR history directly", function()

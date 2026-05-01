@@ -52,6 +52,13 @@ Release-Version: 0.7.1-beta.1
 - **Performance: trash death context** - Throttled repeated trash
   `UNIT_DIED` context updates so large group-loot pulls do not rewrite the
   same loot-source state for every dying mob.
+- **Performance: recent death TTL** - Shortened the `UNIT_DIED`
+  recent-death context window used by group-loot source recovery without
+  reducing group-loot roll/session TTLs.
+- **Performance: trash death filtering** - Trash `UNIT_DIED` events now seed
+  recent-death loot context only while a boss context is still recoverable,
+  with a lightweight activity timestamp keeping burst TTLs anchored to the
+  latest trash death without repeated full context writes.
 - **Passive group-loot logger filter** - Group Loot and Need Before Greed
   passive logging now skips green-quality drops, gems, and recipes so DE/Greed
   filler items do not clutter the raid logger.
