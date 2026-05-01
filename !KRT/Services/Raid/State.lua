@@ -70,7 +70,7 @@ do
     local RECENT_TRASH_DEATH_CONTEXT_THROTTLE_SECONDS = tonumber(C.RECENT_TRASH_DEATH_CONTEXT_THROTTLE_SECONDS) or 1
     local LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS = math.max(BOSS_EVENT_CONTEXT_TTL_SECONDS, GROUP_LOOT_PENDING_AWARD_TTL_SECONDS)
     local LootService = addon.Services and addon.Services.Loot or {}
-    local LootContextHelpers = assert(LootService._Context or Core._LootContext, "Loot context helpers are not initialized")
+    local LootContextHelpers = assert(LootService._Context, "Loot context helpers are not initialized")
     local LootContextState = assert(LootService._State, "Loot state helpers are not initialized")
     local LootContextSessions = assert(LootService._Sessions, "Loot session helpers are not initialized")
     local LootContextSnapshots = assert(LootService._Snapshots, "Loot snapshot helpers are not initialized")

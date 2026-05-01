@@ -14,7 +14,7 @@ module._Snapshots = module._Snapshots or {}
 
 local Snapshots = module._Snapshots
 local ContextState = assert(module._State, "Loot state helpers are not initialized")
-local ContextHelpers = assert(module._Context or addon.Core._LootContext, "Loot context helpers are not initialized")
+local ContextHelpers = assert(module._Context, "Loot context helpers are not initialized")
 local Item = addon.Item
 
 local normalizeLootSnapshotState = assert(ContextHelpers.NormalizeLootSnapshotState, "Missing LootContext.NormalizeLootSnapshotState")

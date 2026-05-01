@@ -74,12 +74,12 @@ Showing first 80 of 266 non-conformant public methods. See docs/API_REGISTRY_PUB
 
 | API | Style | Verb | Taxonomy | Case OK | Taxonomy OK | File | Line |
 | --- | --- | --- | --- | --- | --- | --- | ---: |
-| addon:Print | PascalCase | Print | Unclassified | True | False | !KRT/Init.lua | 743 |
-| addon:RegisterEvent | PascalCase | Register | Unclassified | True | False | !KRT/Init.lua | 862 |
-| addon:RegisterEvents | PascalCase | Register | Unclassified | True | False | !KRT/Init.lua | 866 |
-| addon:UnregisterAllEvents | PascalCase | Unregister | Unclassified | True | False | !KRT/Init.lua | 886 |
-| addon:UnregisterEvent | PascalCase | Unregister | Unclassified | True | False | !KRT/Init.lua | 872 |
-| addon:UnregisterEvents | PascalCase | Unregister | Unclassified | True | False | !KRT/Init.lua | 876 |
+| addon:Print | PascalCase | Print | Unclassified | True | False | !KRT/Init.lua | 741 |
+| addon:RegisterEvent | PascalCase | Register | Unclassified | True | False | !KRT/Init.lua | 860 |
+| addon:RegisterEvents | PascalCase | Register | Unclassified | True | False | !KRT/Init.lua | 864 |
+| addon:UnregisterAllEvents | PascalCase | Unregister | Unclassified | True | False | !KRT/Init.lua | 884 |
+| addon:UnregisterEvent | PascalCase | Unregister | Unclassified | True | False | !KRT/Init.lua | 870 |
+| addon:UnregisterEvents | PascalCase | Unregister | Unclassified | True | False | !KRT/Init.lua | 874 |
 | addon.Base64.Decode | PascalCase | Decode | Unclassified | True | False | !KRT/Modules/Base64.lua | 45 |
 | addon.Base64.Encode | PascalCase | Encode | Unclassified | True | False | !KRT/Modules/Base64.lua | 24 |
 | addon.Bus.DumpInternalCallbackStats | PascalCase | Dump | Unclassified | True | False | !KRT/Modules/Bus.lua | 167 |
@@ -111,12 +111,12 @@ Showing first 80 of 266 non-conformant public methods. See docs/API_REGISTRY_PUB
 | addon.Controllers.Warnings:Announce | PascalCase | Announce | Unclassified | True | False | !KRT/Controllers/Warnings.lua | 278 |
 | addon.Controllers.Warnings:Edit | PascalCase | Edit | Unclassified | True | False | !KRT/Controllers/Warnings.lua | 218 |
 | addon.Controllers.Warnings:Select | PascalCase | Select | Unclassified | True | False | !KRT/Controllers/Warnings.lua | 199 |
-| addon.Core.NormalizeSavedVariablesAfterLoad | PascalCase | Normalize | Unclassified | True | False | !KRT/Init.lua | 1048 |
-| addon.Core.PrepareSavedVariablesForSave | PascalCase | Prepare | Unclassified | True | False | !KRT/Init.lua | 1062 |
+| addon.Core.NormalizeSavedVariablesAfterLoad | PascalCase | Normalize | Unclassified | True | False | !KRT/Init.lua | 1046 |
+| addon.Core.PrepareSavedVariablesForSave | PascalCase | Prepare | Unclassified | True | False | !KRT/Init.lua | 1060 |
 | addon.Core.RegisterLegacyAlias | PascalCase | Register | Unclassified | True | False | !KRT/Init.lua | 191 |
 | addon.Core.RegisterLegacyAliasPath | PascalCase | Register | Unclassified | True | False | !KRT/Init.lua | 215 |
-| addon.Core.RequireServiceMethod | PascalCase | Require | Unclassified | True | False | !KRT/Init.lua | 931 |
-| addon.Core.StripRuntimeRaidCaches | PascalCase | Strip | Unclassified | True | False | !KRT/Init.lua | 1032 |
+| addon.Core.RequireServiceMethod | PascalCase | Require | Unclassified | True | False | !KRT/Init.lua | 929 |
+| addon.Core.StripRuntimeRaidCaches | PascalCase | Strip | Unclassified | True | False | !KRT/Init.lua | 1030 |
 | addon.DB.RaidMigrations:ApplyRaidMigrations | PascalCase | Apply | Unclassified | True | False | !KRT/Core/DBRaidMigrations.lua | 345 |
 | addon.DB.RaidMigrations:CompactRaidForPersistence | PascalCase | Compact | Unclassified | True | False | !KRT/Core/DBRaidMigrations.lua | 379 |
 | addon.DB.RaidStore:BuildRuntimeIndexes | PascalCase | Build | Unclassified | True | False | !KRT/Core/DBRaidStore.lua | 644 |
@@ -159,19 +159,19 @@ Showing first 80 of 266 non-conformant public methods. See docs/API_REGISTRY_PUB
 
 | API | File | Line |
 | --- | --- | ---: |
-| addon:ADDON_LOADED | !KRT/Init.lua | 1127 |
-| addon:CHAT_MSG_ADDON | !KRT/Init.lua | 1357 |
-| addon:CHAT_MSG_LOOT | !KRT/Init.lua | 1288 |
-| addon:CHAT_MSG_MONSTER_YELL | !KRT/Init.lua | 1373 |
-| addon:CHAT_MSG_SYSTEM | !KRT/Init.lua | 1315 |
-| addon:COMBAT_LOG_EVENT_UNFILTERED | !KRT/Init.lua | 1385 |
-| addon:PLAYER_DIFFICULTY_CHANGED | !KRT/Init.lua | 1240 |
-| addon:PLAYER_ENTERING_WORLD | !KRT/Init.lua | 1252 |
-| addon:PLAYER_LOGOUT | !KRT/Init.lua | 1393 |
-| addon:RAID_INSTANCE_WELCOME | !KRT/Init.lua | 1223 |
-| addon:RAID_ROSTER_UPDATE | !KRT/Init.lua | 1205 |
-| addon:START_LOOT_ROLL | !KRT/Init.lua | 1344 |
-| addon:UPDATE_INSTANCE_INFO | !KRT/Init.lua | 1246 |
+| addon:ADDON_LOADED | !KRT/Init.lua | 1125 |
+| addon:CHAT_MSG_ADDON | !KRT/Init.lua | 1355 |
+| addon:CHAT_MSG_LOOT | !KRT/Init.lua | 1286 |
+| addon:CHAT_MSG_MONSTER_YELL | !KRT/Init.lua | 1371 |
+| addon:CHAT_MSG_SYSTEM | !KRT/Init.lua | 1313 |
+| addon:COMBAT_LOG_EVENT_UNFILTERED | !KRT/Init.lua | 1383 |
+| addon:PLAYER_DIFFICULTY_CHANGED | !KRT/Init.lua | 1238 |
+| addon:PLAYER_ENTERING_WORLD | !KRT/Init.lua | 1250 |
+| addon:PLAYER_LOGOUT | !KRT/Init.lua | 1391 |
+| addon:RAID_INSTANCE_WELCOME | !KRT/Init.lua | 1221 |
+| addon:RAID_ROSTER_UPDATE | !KRT/Init.lua | 1203 |
+| addon:START_LOOT_ROLL | !KRT/Init.lua | 1342 |
+| addon:UPDATE_INSTANCE_INFO | !KRT/Init.lua | 1244 |
 | addon.Controllers.Master:LOOT_CLOSED | !KRT/Controllers/Master.lua | 3415 |
 | addon.Controllers.Master:LOOT_OPENED | !KRT/Controllers/Master.lua | 3364 |
 | addon.Controllers.Master:LOOT_SLOT_CLEARED | !KRT/Controllers/Master.lua | 3432 |

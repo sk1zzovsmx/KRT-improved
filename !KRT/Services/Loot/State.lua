@@ -13,7 +13,7 @@ local module = addon.Services.Loot
 module._State = module._State or {}
 
 local ContextState = module._State
-local ContextHelpers = assert(module._Context or addon.Core._LootContext, "Loot context helpers are not initialized")
+local ContextHelpers = assert(module._Context, "Loot context helpers are not initialized")
 
 local normalizeBossEventContext = assert(ContextHelpers.NormalizeBossEventContext, "Missing LootContext.NormalizeBossEventContext")
 local normalizeLootSessionState = assert(ContextHelpers.NormalizeLootSessionState, "Missing LootContext.NormalizeLootSessionState")

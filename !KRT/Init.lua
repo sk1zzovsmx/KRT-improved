@@ -453,8 +453,6 @@ end
 -- IsDebugEnabled / ApplyDebugSetting are exposed on addon.Options there.
 -- Namespace registrations are owned by the modules that use them.
 
-Core._LootContext = Core._LootContext or {}
-
 function Core.EnsureLootRuntimeState()
     local state = addon.State
     state.loot = state.loot or {}
@@ -490,7 +488,7 @@ function Core.EnsureLootRuntimeState()
         lootContext = LootStateHelpers.SyncRuntimeState(raidState)
         raidState.lootContext = lootContext
     else
-        local LootContext = addon.Services and addon.Services.Loot and addon.Services.Loot._Context or Core._LootContext
+        local LootContext = addon.Services and addon.Services.Loot and addon.Services.Loot._Context
         local normalizeBossEventContext = LootContext and LootContext.NormalizeBossEventContext
         local normalizeLootSessionState = LootContext and LootContext.NormalizeLootSessionState
         local normalizeLootSnapshotState = LootContext and LootContext.NormalizeLootSnapshotState

@@ -1,7 +1,7 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
 -- shared: bootstrap-sensitive internal loot helpers
--- exports: addon.Services.Loot._Context, addon.Core._LootContext (compat)
+-- exports: addon.Services.Loot._Context
 
 local addon = select(2, ...)
 
@@ -13,8 +13,6 @@ local module = addon.Services.Loot
 module._Context = module._Context or {}
 
 local LootContext = module._Context
-
-addon.Core._LootContext = LootContext
 
 -- ----- Private helpers ----- --
 local function isValidLootSourceKind(kind)
