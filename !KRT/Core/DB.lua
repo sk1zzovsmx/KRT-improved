@@ -6,7 +6,7 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local Core = feature.Core or addon.Core
+local Core = feature.Core
 local Diag = feature.Diag
 
 assert(type(addon.DB) == "table", "KRT DB bootstrap missing addon.DB")

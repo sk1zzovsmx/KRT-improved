@@ -7,17 +7,15 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local Diag = feature.Diag
-local Events = feature.Events or addon.Events
-local Bus = feature.Bus or addon.Bus
+local Events = feature.Events
+local Bus = feature.Bus
 
 local rollTypes = feature.rollTypes
 local twipe = table.wipe
 local tostring, tonumber = tostring, tonumber
 
-addon.Services = addon.Services or {}
-addon.Services.Rolls = addon.Services.Rolls or {}
-
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Rolls")
 local module = addon.Services.Rolls
 module._History = module._History or {}
 

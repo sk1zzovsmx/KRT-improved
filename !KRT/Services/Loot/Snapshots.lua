@@ -4,18 +4,17 @@
 -- exports: addon.Services.Loot._Snapshots
 
 local addon = select(2, ...)
-
-addon.Services = addon.Services or {}
-addon.Services.Loot = addon.Services.Loot or {}
+local feature = addon.Core.GetFeatureShared()
 
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Loot")
 local module = addon.Services.Loot
 module._Snapshots = module._Snapshots or {}
 
 local Snapshots = module._Snapshots
 local ContextState = assert(module._State, "Loot state helpers are not initialized")
 local ContextHelpers = assert(module._Context, "Loot context helpers are not initialized")
-local Item = addon.Item
+local Item = feature.Item
 
 local normalizeLootSnapshotState = assert(ContextHelpers.NormalizeLootSnapshotState, "Missing LootContext.NormalizeLootSnapshotState")
 

@@ -8,12 +8,12 @@ local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 
-local Options = feature.Options or addon.Options
-local Frames = feature.Frames or addon.Frames
-local Colors = feature.Colors or addon.Colors
-local Core = feature.Core or addon.Core
-local Services = feature.Services or addon.Services
-local Widgets = feature.Widgets or addon.Widgets
+local Options = feature.Options
+local Frames = feature.Frames
+local Colors = feature.Colors
+local Core = feature.Core
+local Services = feature.Services
+local Widgets = feature.Widgets
 
 local K_COLOR = feature.K_COLOR
 

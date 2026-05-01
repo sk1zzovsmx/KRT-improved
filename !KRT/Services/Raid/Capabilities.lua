@@ -34,7 +34,7 @@ local function isPassiveGroupLootMethod(method)
 end
 
 do
-    addon.Services.Raid = addon.Services.Raid or {}
+    feature.EnsureServiceNamespace("Raid")
     local module = addon.Services.Raid
 
     -- ----- Internal state ----- --

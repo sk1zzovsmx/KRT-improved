@@ -8,18 +8,18 @@ local feature = addon.Core.GetFeatureShared()
 
 local Diag = feature.Diag
 
-local Events = feature.Events or addon.Events
+local Events = feature.Events
 local C = feature.C
 local Core = feature.Core
-local Bus = feature.Bus or addon.Bus
-local Item = feature.Item or addon.Item
-local Strings = feature.Strings or addon.Strings
-local Time = feature.Time or addon.Time
-local IgnoredItems = feature.IgnoredItems or addon.IgnoredItems or {}
+local Bus = feature.Bus
+local Item = feature.Item
+local Strings = feature.Strings
+local Time = feature.Time
+local IgnoredItems = feature.IgnoredItems or {}
 
 local NormalizeName = Strings.NormalizeName
 
-local Services = feature.Services or addon.Services
+local Services = feature.Services
 
 local itemColors = feature.itemColors
 
@@ -60,7 +60,7 @@ local UNCOMMON_ITEM_LINK_COLOR = "ff1eff00"
 -- =========== Loot Helpers Module  =========== --
 -- Manages the loot window items (fetching from loot/inventory).
 do
-    addon.Services.Loot = addon.Services.Loot or {}
+    feature.EnsureServiceNamespace("Loot")
     local module = addon.Services.Loot
 
     -- Timer ownership: cache warm scheduling per gli item del loot.

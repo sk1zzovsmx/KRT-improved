@@ -8,14 +8,14 @@ local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 
-local Frames = feature.Frames or addon.Frames
-local Colors = feature.Colors or addon.Colors
+local Frames = feature.Frames
+local Colors = feature.Colors
 local UIScaffold = addon.UIScaffold
-local Events = feature.Events or addon.Events
+local Events = feature.Events
 local C = feature.C
-local Core = feature.Core or addon.Core
-local Bus = feature.Bus or addon.Bus
-local Services = feature.Services or addon.Services
+local Core = feature.Core
+local Bus = feature.Bus
+local Services = feature.Services
 local Chat = Services.Chat
 local Raid = Services.Raid
 

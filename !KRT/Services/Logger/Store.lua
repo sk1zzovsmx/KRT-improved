@@ -6,15 +6,13 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local Strings = feature.Strings or addon.Strings
+local Strings = feature.Strings
 local Core = feature.Core
 
 local type, tostring, tonumber = type, tostring, tonumber
 
 -- ----- Internal state ----- --
-addon.Services.Logger = addon.Services.Logger or {}
-addon.Services.Logger.Store = addon.Services.Logger.Store or {}
-
+feature.EnsureServiceNamespace("Logger", "Store")
 local Store = addon.Services.Logger.Store
 local bossIdx
 local lootIdx

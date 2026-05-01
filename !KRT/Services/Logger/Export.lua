@@ -12,9 +12,7 @@ local tostring, tonumber, type = tostring, tonumber, type
 local date = date
 
 -- ----- Internal state ----- --
-addon.Services.Logger = addon.Services.Logger or {}
-addon.Services.Logger.Export = addon.Services.Logger.Export or {}
-
+feature.EnsureServiceNamespace("Logger", "Export")
 local Export = addon.Services.Logger.Export
 local Store = addon.Services.Logger.Store
 

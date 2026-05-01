@@ -44,7 +44,7 @@ addon.Events.Wow.TradeRequestCancel = addon.Events.Wow.TradeRequestCancel or "wo
 addon.Events.Wow.TradeClosed = addon.Events.Wow.TradeClosed or "wow.TRADE_CLOSED"
 
 local _G = _G
-local pairs, type = pairs, type
+local pairs, select, type = pairs, select, type
 local rawget, rawset = rawget, rawset
 local getmetatable, setmetatable = getmetatable, setmetatable
 local tostring, tonumber = tostring, tonumber
@@ -420,6 +420,33 @@ function Core.RequestControllerMethod(name, methodName, ...)
     return method(controller, ...)
 end
 
+function Core.EnsureNamespace(root, ...)
+    assert(type(root) == "table", "Core.EnsureNamespace requires a root table")
+
+    local target = root
+    for i = 1, select("#", ...) do
+        local key = select(i, ...)
+        assert(type(key) == "string" and key ~= "", "Core.EnsureNamespace requires non-empty string keys")
+
+        local child = target[key]
+        if type(child) ~= "table" then
+            child = {}
+            target[key] = child
+        end
+        target = child
+    end
+
+    return target
+end
+
+function Core.EnsureAddonNamespace(...)
+    return Core.EnsureNamespace(addon, ...)
+end
+
+function Core.EnsureServiceNamespace(...)
+    return Core.EnsureNamespace(addon.Services, ...)
+end
+
 function Core.GetPlayerName()
     local state = addon.State
     state.player = state.player or {}
@@ -648,6 +675,9 @@ function Core.GetFeatureShared()
         Controllers = addon.Controllers,
         Widgets = addon.Widgets,
 
+        EnsureNamespace = core.EnsureNamespace,
+        EnsureAddonNamespace = core.EnsureAddonNamespace,
+        EnsureServiceNamespace = core.EnsureServiceNamespace,
         BindModuleRequestRefresh = core.BindModuleRequestRefresh,
         BindModuleToggleHide = core.BindModuleToggleHide,
         MakeModuleFrameGetter = core.MakeModuleFrameGetter,
@@ -689,10 +719,10 @@ do
     local L = feature.L
     local Diag = feature.Diag
 
-    local Bus = feature.Bus or addon.Bus
-    local Frames = feature.Frames or addon.Frames
-    local Time = feature.Time or addon.Time
-    local Events = feature.Events or addon.Events
+    local Bus = feature.Bus
+    local Frames = feature.Frames
+    local Time = feature.Time
+    local Events = feature.Events
     local C = feature.C
 
     local InternalEvents = Events.Internal

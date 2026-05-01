@@ -9,19 +9,17 @@ local feature = addon.Core.GetFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Core = feature.Core
-local Strings = feature.Strings or addon.Strings
-local Comms = feature.Comms or addon.Comms
-local Services = feature.Services or addon.Services
+local Strings = feature.Strings
+local Comms = feature.Comms
+local Services = feature.Services
 local Chat = Services.Chat
 
 local twipe = table.wipe
 local pairs, next = pairs, next
 local tostring, tonumber = tostring, tonumber
 
-addon.Services = addon.Services or {}
-addon.Services.Rolls = addon.Services.Rolls or {}
-
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Rolls")
 local module = addon.Services.Rolls
 module._Responses = module._Responses or {}
 local Responses = module._Responses

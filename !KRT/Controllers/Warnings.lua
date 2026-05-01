@@ -7,12 +7,12 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
-local Core = feature.Core or addon.Core
+local Core = feature.Core
 
-local ListController = feature.ListController or addon.ListController
-local Frames = feature.Frames or addon.Frames
-local Strings = feature.Strings or addon.Strings
-local Services = feature.Services or addon.Services
+local ListController = feature.ListController
+local Frames = feature.Frames
+local Strings = feature.Strings
+local Services = feature.Services
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
 

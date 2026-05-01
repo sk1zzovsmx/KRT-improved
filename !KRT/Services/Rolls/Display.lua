@@ -12,10 +12,8 @@ local sort = table.sort
 local pairs = pairs
 local tostring, tonumber = tostring, tonumber
 
-addon.Services = addon.Services or {}
-addon.Services.Rolls = addon.Services.Rolls or {}
-
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Rolls")
 local module = addon.Services.Rolls
 module._Display = module._Display or {}
 

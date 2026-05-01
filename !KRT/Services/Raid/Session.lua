@@ -17,7 +17,7 @@ local tonumber = tonumber
 local type = type
 
 do
-    addon.Services.Raid = addon.Services.Raid or {}
+    feature.EnsureServiceNamespace("Raid")
     local module = addon.Services.Raid
 
     -- ----- Internal state ----- --

@@ -8,9 +8,9 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
-local Comms = feature.Comms or addon.Comms
-local Services = feature.Services or addon.Services
-local Strings = feature.Strings or addon.Strings
+local Comms = feature.Comms
+local Services = feature.Services
+local Strings = feature.Strings
 
 local floor = math.floor
 local sort = table.sort
@@ -18,10 +18,8 @@ local tconcat = table.concat
 local pairs, tostring, tonumber, type = pairs, tostring, tonumber, type
 local _G = _G
 
-addon.Services = addon.Services or {}
-addon.Services.Reserves = addon.Services.Reserves or {}
-
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Reserves")
 local module = addon.Services.Reserves
 module._Sync = module._Sync or {}
 

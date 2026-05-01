@@ -13,10 +13,8 @@ local tconcat = table.concat
 local pairs = pairs
 local tostring, tonumber = tostring, tonumber
 
-addon.Services = addon.Services or {}
-addon.Services.Rolls = addon.Services.Rolls or {}
-
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Rolls")
 local module = addon.Services.Rolls
 module._Resolution = module._Resolution or {}
 

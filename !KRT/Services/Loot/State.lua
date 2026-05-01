@@ -4,11 +4,10 @@
 -- exports: addon.Services.Loot._State
 
 local addon = select(2, ...)
-
-addon.Services = addon.Services or {}
-addon.Services.Loot = addon.Services.Loot or {}
+local feature = addon.Core.GetFeatureShared()
 
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Loot")
 local module = addon.Services.Loot
 module._State = module._State or {}
 

@@ -30,6 +30,11 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 ```
 
+`Core.GetFeatureShared()` is the canonical bootstrap contract for shared addon
+dependencies. Prefer direct `feature.X` locals over `feature.X or addon.X`
+fallbacks. For service-table bootstrap, use `feature.EnsureServiceNamespace(...)`
+instead of open-coded `addon.Services.* = addon.Services.* or {}` guards.
+
 Feature files under `Controllers/`, `Services/`, `Widgets/`, `EntryPoints/` should keep this section order:
 
 1. `-- ----- Internal state ----- --`

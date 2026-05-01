@@ -172,6 +172,9 @@ Durable preferences learned from recent conversations:
 - Prefer explicit canonical contracts and deterministic initialization over scattered defensive guards;
   when a dependency must exist, normalize it once at the module boundary/bootstrap rather than adding
   many per-call fallback branches.
+- Treat `feature.X or addon.X` locals and `addon.Services.* = addon.Services.* or {}` guards as intentional
+  test/bootstrap wiring until a dedicated `Core.GetFeatureShared()` and namespace-bootstrap stage replaces
+  them coherently; do not remove those patterns piecemeal.
 - Prefer `addon.Core` as the canonical public accessor surface for DB-backed contracts
   (`GetRaidStore`, `GetRaidStoreOrNil`, `GetRaidQueries`, `GetRaidMigrations`,
   `GetRaidValidator`, `GetSyncer`, `GetRaidSchemaVersion`); keep `addon.DB`/`addon.DBSchema`

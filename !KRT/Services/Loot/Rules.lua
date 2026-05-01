@@ -7,16 +7,14 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local C = feature.C or addon.C
-local IgnoredItems = feature.IgnoredItems or addon.IgnoredItems or {}
-local Item = feature.Item or addon.Item
+local C = feature.C
+local IgnoredItems = feature.IgnoredItems or {}
+local Item = feature.Item
 
 local tonumber, tostring, type = tonumber, tostring, type
 
-addon.Services = addon.Services or {}
-addon.Services.Loot = addon.Services.Loot or {}
-
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Loot")
 local module = addon.Services.Loot
 module._Rules = module._Rules or {}
 

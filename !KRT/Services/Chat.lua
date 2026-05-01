@@ -9,9 +9,9 @@ local feature = addon.Core.GetFeatureShared()
 local L = feature.L
 
 local C = feature.C
-local Strings = feature.Strings or addon.Strings
-local Comms = feature.Comms or addon.Comms
-local Services = feature.Services or addon.Services
+local Strings = feature.Strings
+local Comms = feature.Comms
+local Services = feature.Services
 
 local find = string.find
 local len = string.len
@@ -25,7 +25,7 @@ local ipairs = ipairs
 
 -- =========== Chat Output Helpers  =========== --
 do
-    addon.Services.Chat = addon.Services.Chat or {}
+    feature.EnsureServiceNamespace("Chat")
     local module = addon.Services.Chat
 
     -- Timer ownership: ticker for controlled LFM spammer output.

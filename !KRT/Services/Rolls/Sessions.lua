@@ -6,17 +6,15 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local Item = feature.Item or addon.Item
-local Strings = feature.Strings or addon.Strings
+local Item = feature.Item
+local Strings = feature.Strings
 
 local rollTypes = feature.rollTypes
 local tostring, tonumber = tostring, tonumber
 local next = next
 
-addon.Services = addon.Services or {}
-addon.Services.Rolls = addon.Services.Rolls or {}
-
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Rolls")
 local module = addon.Services.Rolls
 module._Sessions = module._Sessions or {}
 

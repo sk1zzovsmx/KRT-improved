@@ -20,7 +20,7 @@ local Comms = addon.Comms
 Comms._Payload = Comms._Payload or {}
 local Payload = Comms._Payload
 local L = feature.L
-local Core = feature.Core or addon.Core
+local Core = feature.Core
 
 -- ----- Internal state ----- --
 

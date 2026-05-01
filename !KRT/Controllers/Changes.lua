@@ -9,16 +9,16 @@ local feature = addon.Core.GetFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 
-local ListController = feature.ListController or addon.ListController
-local Frames = feature.Frames or addon.Frames
-local Colors = feature.Colors or addon.Colors
-local Strings = feature.Strings or addon.Strings
+local ListController = feature.ListController
+local Frames = feature.Frames
+local Colors = feature.Colors
+local Strings = feature.Strings
 local UIScaffold = addon.UIScaffold
 local UIPrimitives = addon.UIPrimitives
-local Events = feature.Events or addon.Events
-local Bus = feature.Bus or addon.Bus
-local Core = feature.Core or addon.Core
-local Services = feature.Services or addon.Services
+local Events = feature.Events
+local Bus = feature.Bus
+local Core = feature.Core
+local Services = feature.Services
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 

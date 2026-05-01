@@ -6,8 +6,8 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local Core = feature.Core or addon.Core
-local Strings = feature.Strings or addon.Strings
+local Core = feature.Core
+local Strings = feature.Strings
 
 -- Raid schema migrations service.
 do

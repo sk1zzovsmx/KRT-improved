@@ -8,13 +8,11 @@ local feature = addon.Core.GetFeatureShared()
 
 local Diag = feature.Diag
 local C = feature.C
-local Item = feature.Item or addon.Item
+local Item = feature.Item
 local lootState = feature.lootState
 
-addon.Services = addon.Services or {}
-addon.Services.Loot = addon.Services.Loot or {}
-
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Loot")
 local module = addon.Services.Loot
 module._PendingAwards = module._PendingAwards or {}
 

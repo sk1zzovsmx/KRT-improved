@@ -8,17 +8,15 @@ local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 local C = feature.C
-local Strings = feature.Strings or addon.Strings
+local Strings = feature.Strings
 
 local format = string.format
 local sort = table.sort
 local tconcat, twipe = table.concat, table.wipe
 local pairs, tostring, tonumber, type = pairs, tostring, tonumber, type
 
-addon.Services = addon.Services or {}
-addon.Services.Reserves = addon.Services.Reserves or {}
-
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Reserves")
 local module = addon.Services.Reserves
 module._Display = module._Display or {}
 

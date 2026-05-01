@@ -8,11 +8,11 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
-local Strings = feature.Strings or addon.Strings
-local Comms = feature.Comms or addon.Comms
-local Services = feature.Services or addon.Services
-local Events = feature.Events or addon.Events
-local Bus = feature.Bus or addon.Bus
+local Strings = feature.Strings
+local Comms = feature.Comms
+local Services = feature.Services
+local Events = feature.Events
+local Bus = feature.Bus
 
 local format = string.format
 local len = string.len
@@ -21,10 +21,8 @@ local tostring = tostring
 local tonumber = tonumber
 local type = type
 
-addon.Services = addon.Services or {}
-addon.Services.Reserves = addon.Services.Reserves or {}
-
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Reserves")
 local module = addon.Services.Reserves
 module._Chat = module._Chat or {}
 

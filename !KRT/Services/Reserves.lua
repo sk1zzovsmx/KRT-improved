@@ -9,13 +9,13 @@ local feature = addon.Core.GetFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 
-local Events = feature.Events or addon.Events
+local Events = feature.Events
 local C = feature.C
-local Options = feature.Options or addon.Options
-local Bus = feature.Bus or addon.Bus
-local Strings = feature.Strings or addon.Strings
-local Services = feature.Services or addon.Services
-local Item = feature.Item or addon.Item
+local Options = feature.Options
+local Bus = feature.Bus
+local Strings = feature.Strings
+local Services = feature.Services
+local Item = feature.Item
 
 local tconcat, twipe = table.concat, table.wipe
 local pairs, ipairs, type, next = pairs, ipairs, type, next
@@ -28,7 +28,7 @@ local InternalEvents = Events.Internal
 -- =========== Reserves Module  =========== --
 -- Manages item reserves, import, and display.
 do
-    addon.Services.Reserves = addon.Services.Reserves or {}
+    feature.EnsureServiceNamespace("Reserves")
     local module = addon.Services.Reserves
     local Service = module
 

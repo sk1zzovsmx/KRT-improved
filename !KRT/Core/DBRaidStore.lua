@@ -6,9 +6,9 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local Core = feature.Core or addon.Core
-local Time = feature.Time or addon.Time
-local Strings = feature.Strings or addon.Strings
+local Core = feature.Core
+local Time = feature.Time
+local Strings = feature.Strings
 local Diag = feature.Diag
 
 local NormalizeName = (Strings and Strings.NormalizeName) or nil

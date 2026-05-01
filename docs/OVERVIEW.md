@@ -29,6 +29,9 @@ For architecture guardrails, see `docs/ARCHITECTURE.md`.
 - compatibility alias proxy (`addon.Master`, `addon.Logger`, `addon.Raid`, ...)
 
 `Init.lua` also owns global WoW event wiring and bus forwarding.
+Modules consume shared dependencies through `addon.Core.GetFeatureShared()`.
+Service submodules bootstrap owner tables through `feature.EnsureServiceNamespace(...)`
+so namespace creation stays centralized with the rest of bootstrap.
 
 ## Runtime Module Map
 

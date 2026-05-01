@@ -9,13 +9,13 @@ local feature = addon.Core.GetFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 
-local Events = feature.Events or addon.Events
+local Events = feature.Events
 local Core = feature.Core
-local Bus = feature.Bus or addon.Bus
-local Strings = feature.Strings or addon.Strings
-local Time = feature.Time or addon.Time
-local Comms = feature.Comms or addon.Comms
-local Services = feature.Services or addon.Services
+local Bus = feature.Bus
+local Strings = feature.Strings
+local Time = feature.Time
+local Comms = feature.Comms
+local Services = feature.Services
 
 local _G = _G
 local tinsert = table.insert

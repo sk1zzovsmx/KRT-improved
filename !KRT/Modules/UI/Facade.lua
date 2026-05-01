@@ -7,7 +7,7 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local Bus = feature.Bus or addon.Bus
+local Bus = feature.Bus
 local type = type
 
 addon.UI = addon.UI or {}

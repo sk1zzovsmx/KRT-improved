@@ -7,9 +7,9 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local Core = feature.Core
-local Events = feature.Events or addon.Events
-local Bus = feature.Bus or addon.Bus
-local Time = feature.Time or addon.Time
+local Events = feature.Events
+local Bus = feature.Bus
+local Time = feature.Time
 
 local InternalEvents = Events.Internal
 
@@ -17,7 +17,7 @@ local tinsert = table.insert
 local type, tonumber = type, tonumber
 
 do
-    addon.Services.Raid = addon.Services.Raid or {}
+    feature.EnsureServiceNamespace("Raid")
     local module = addon.Services.Raid
 
     -- ----- Internal state ----- --

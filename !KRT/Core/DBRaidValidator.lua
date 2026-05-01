@@ -7,7 +7,7 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
-local Core = feature.Core or addon.Core
+local Core = feature.Core
 
 local pairs, type, tonumber = pairs, type, tonumber
 local tostring = tostring

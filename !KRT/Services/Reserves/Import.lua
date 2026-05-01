@@ -8,12 +8,10 @@ local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
-local Strings = feature.Strings or addon.Strings
-
-addon.Services = addon.Services or {}
-addon.Services.Reserves = addon.Services.Reserves or {}
+local Strings = feature.Strings
 
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Reserves")
 local module = addon.Services.Reserves
 module._Import = module._Import or {}
 

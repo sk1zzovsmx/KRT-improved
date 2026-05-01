@@ -6,7 +6,7 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local Sort = feature.Sort or addon.Sort
+local Sort = feature.Sort
 local Core = feature.Core
 
 local GetLootSortName = Sort.GetLootSortName
@@ -16,8 +16,7 @@ local tostring, tonumber = tostring, tonumber
 local date, time = date, time
 
 -- ----- Internal state ----- --
-addon.Services.Logger.View = addon.Services.Logger.View or {}
-
+feature.EnsureServiceNamespace("Logger", "View")
 local View = addon.Services.Logger.View
 local Store = addon.Services.Logger.Store
 local buildRows

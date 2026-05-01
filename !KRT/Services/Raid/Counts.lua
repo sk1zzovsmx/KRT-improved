@@ -6,7 +6,7 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local Events = feature.Events or addon.Events
+local Events = feature.Events
 local Core = feature.Core
 
 local InternalEvents = Events.Internal
@@ -68,7 +68,7 @@ local function resolveRaidPlayerByNid(playerNid, raidNum)
 end
 
 do
-    addon.Services.Raid = addon.Services.Raid or {}
+    feature.EnsureServiceNamespace("Raid")
     local module = addon.Services.Raid
     module._FindRaidPlayerByNid = findRaidPlayerByNid
 
@@ -141,7 +141,7 @@ do
         player[field] = value
 
         if old ~= value then
-            local bus = feature.Bus or addon.Bus
+            local bus = feature.Bus
             bus.TriggerEvent(InternalEvents.PlayerCountChanged, player.name, value, old, resolvedRaidNum)
         end
     end
@@ -197,7 +197,7 @@ do
             end
         end
 
-        name = (feature.Strings or addon.Strings).NormalizeName(name, true)
+        name = feature.Strings.NormalizeName(name, true)
         if not name then
             return
         end

@@ -9,14 +9,14 @@ local feature = addon.Core.GetFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 
-local Events = feature.Events or addon.Events
+local Events = feature.Events
 local C = feature.C
 local Core = feature.Core
-local Bus = feature.Bus or addon.Bus
-local Strings = feature.Strings or addon.Strings
-local Time = feature.Time or addon.Time
-local Base64 = feature.Base64 or addon.Base64
-local IgnoredMobs = feature.IgnoredMobs or addon.IgnoredMobs or {}
+local Bus = feature.Bus
+local Strings = feature.Strings
+local Time = feature.Time
+local Base64 = feature.Base64
+local IgnoredMobs = feature.IgnoredMobs or {}
 
 local InternalEvents = Events.Internal
 
@@ -49,7 +49,7 @@ local TRASH_MOB_NAME = resolveTrashMobName()
 -- Raid helper module.
 -- Manages raid state, roster, boss kills, and loot logging.
 do
-    addon.Services.Raid = addon.Services.Raid or {}
+    feature.EnsureServiceNamespace("Raid")
     local module = addon.Services.Raid
     -- ----- Internal state ----- --
     local getRaidRosterInfo = GetRaidRosterInfo

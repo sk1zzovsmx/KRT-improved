@@ -7,8 +7,8 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
-local Strings = feature.Strings or addon.Strings
-local Base64 = feature.Base64 or addon.Base64
+local Strings = feature.Strings
+local Base64 = feature.Base64
 local Core = feature.Core
 local Services = feature.Services
 
@@ -19,8 +19,7 @@ local tonumber, tostring = tonumber, tostring
 local time = time
 
 -- ----- Internal state ----- --
-addon.Services.Logger.Actions = addon.Services.Logger.Actions or {}
-
+feature.EnsureServiceNamespace("Logger", "Actions")
 local Actions = addon.Services.Logger.Actions
 local Store = addon.Services.Logger.Store
 

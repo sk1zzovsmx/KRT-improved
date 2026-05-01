@@ -1473,6 +1473,26 @@ local function newHarness()
     }
 
     local Core = {}
+
+    local function ensureNamespace(root, ...)
+        assert(type(root) == "table", "Core.EnsureNamespace requires a root table")
+
+        local target = root
+        for i = 1, select("#", ...) do
+            local key = select(i, ...)
+            assert(type(key) == "string" and key ~= "", "Core.EnsureNamespace requires non-empty string keys")
+
+            local child = target[key]
+            if type(child) ~= "table" then
+                child = {}
+                target[key] = child
+            end
+            target = child
+        end
+
+        return target
+    end
+
     local feature = {
         L = L,
         Diag = Diag,
@@ -1618,12 +1638,49 @@ local function newHarness()
         OptionsTable = {},
     }
 
+    Core.EnsureNamespace = ensureNamespace
+    Core.EnsureAddonNamespace = function(...)
+        return ensureNamespace(addon, ...)
+    end
+    Core.EnsureServiceNamespace = function(...)
+        return ensureNamespace(addon.Services, ...)
+    end
+
+    local function hydrateFeatureShared()
+        feature.L = addon.L or feature.L
+        feature.Diag = addon.Diag or feature.Diag
+        feature.Frames = addon.Frames or feature.Frames
+        feature.Events = addon.Events or feature.Events
+        feature.C = addon.C or feature.C
+        feature.Core = addon.Core or Core
+        feature.Options = addon.Options or feature.Options
+        feature.Bus = addon.Bus or feature.Bus
+        feature.Strings = addon.Strings or feature.Strings
+        feature.Colors = addon.Colors or feature.Colors
+        feature.Base64 = addon.Base64 or feature.Base64
+        feature.Sort = addon.Sort or feature.Sort
+        feature.ListController = addon.ListController or feature.ListController
+        feature.MultiSelect = addon.MultiSelect or feature.MultiSelect
+        feature.Comms = addon.Comms or feature.Comms
+        feature.Item = addon.Item or feature.Item
+        feature.IgnoredItems = addon.IgnoredItems or feature.IgnoredItems
+        feature.IgnoredMobs = addon.IgnoredMobs or feature.IgnoredMobs
+        feature.Services = addon.Services or feature.Services
+        feature.Controllers = addon.Controllers or feature.Controllers
+        feature.Widgets = addon.Widgets or feature.Widgets
+        feature.Time = addon.Time or feature.Time
+        feature.EnsureNamespace = Core.EnsureNamespace
+        feature.EnsureAddonNamespace = Core.EnsureAddonNamespace
+        feature.EnsureServiceNamespace = Core.EnsureServiceNamespace
+        return feature
+    end
+
     addon.Options = feature.Options
     addon.Time = feature.Time
     addon.Bus = Bus
     addon.Core = Core
     addon.Core.GetFeatureShared = function()
-        return feature
+        return hydrateFeatureShared()
     end
     Core.GetFeatureShared = addon.Core.GetFeatureShared
     Core.GetCurrentRaid = function()
@@ -2785,6 +2842,22 @@ test("runtime cache reuses runtime until invalidated", function()
     local runtime3 = store:EnsureRaidRuntime(raid)
     assertTrue(runtime3 ~= runtime1, "expected invalidation to rebuild runtime table")
     assertEqual(runtime3.lootIdxByNid[2], 2, "expected rebuilt loot index to include new loot")
+end)
+
+test("feature shared hydrates addon dependencies and namespace helpers", function()
+    local h = newHarness()
+    local strings = { marker = true }
+
+    h.addon.Strings = strings
+    h.feature.Strings = nil
+    h.addon.Services.Rolls = nil
+
+    local feature = h.Core.GetFeatureShared()
+    local rolls = feature.EnsureServiceNamespace("Rolls")
+
+    assertTrue(feature.Strings == strings, "expected shared feature table to hydrate addon dependency")
+    assertTrue(rolls == h.addon.Services.Rolls, "expected service namespace helper to create addon.Services.Rolls")
+    assertTrue(h.Core.EnsureServiceNamespace("Rolls") == rolls, "expected Core helper to return the same service namespace")
 end)
 
 test("raid roster update records joins leaves and player metadata", function()

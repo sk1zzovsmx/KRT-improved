@@ -10,9 +10,9 @@ local L = feature.L
 local Diag = feature.Diag
 
 local Core = feature.Core
-local Item = feature.Item or addon.Item
-local Strings = feature.Strings or addon.Strings
-local Services = feature.Services or addon.Services
+local Item = feature.Item
+local Strings = feature.Strings
+local Services = feature.Services
 
 local rollTypes = feature.rollTypes
 
@@ -74,7 +74,7 @@ end
 -- =========== Rolls Helpers Module  =========== --
 -- Manages roll tracking, response state, and winner determination.
 do
-    addon.Services.Rolls = addon.Services.Rolls or {}
+    feature.EnsureServiceNamespace("Rolls")
     local module = addon.Services.Rolls
 
     -- Namespace registration: opzioni che governano il countdown e la modalità di voto.

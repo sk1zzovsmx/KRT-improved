@@ -15,7 +15,7 @@ local lower, upper = string.lower, string.upper
 
 local GetAchievementLink = GetAchievementLink
 
-local Colors = feature.Colors or addon.Colors or {}
+local Colors = feature.Colors or {}
 
 addon.Strings = addon.Strings or feature.Strings or {}
 local Strings = addon.Strings

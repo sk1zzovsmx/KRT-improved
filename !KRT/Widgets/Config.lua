@@ -8,11 +8,11 @@ local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
 
-local Options = feature.Options or addon.Options
-local Frames = feature.Frames or addon.Frames
+local Options = feature.Options
+local Frames = feature.Frames
 local UIScaffold = addon.UIScaffold
-local Events = feature.Events or addon.Events
-local Bus = feature.Bus or addon.Bus
+local Events = feature.Events
+local Bus = feature.Bus
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 

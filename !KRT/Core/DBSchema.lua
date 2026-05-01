@@ -6,7 +6,7 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local Core = feature.Core or addon.Core
+local Core = feature.Core
 
 addon.DBSchema = addon.DBSchema or {}
 local DBSchema = addon.DBSchema

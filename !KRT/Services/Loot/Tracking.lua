@@ -6,14 +6,12 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local Item = feature.Item or addon.Item
+local Item = feature.Item
 local lootState = feature.lootState
 local raidState = feature.raidState
 
-addon.Services = addon.Services or {}
-addon.Services.Loot = addon.Services.Loot or {}
-
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Loot")
 local module = addon.Services.Loot
 module._Tracking = module._Tracking or {}
 
@@ -28,7 +26,7 @@ local strmatch = string.match
 local tostring, tonumber = tostring, tonumber
 local type, pairs = type, pairs
 
-local Services = feature.Services or addon.Services
+local Services = feature.Services
 
 -- ----- Private helpers ----- --
 local function copyRollSessionSnapshot(session)

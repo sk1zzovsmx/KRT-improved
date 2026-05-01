@@ -7,15 +7,14 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
-local Strings = feature.Strings or addon.Strings
+local Strings = feature.Strings
 
 local tconcat = table.concat
 local tostring, tonumber = tostring, tonumber
 local ipairs = ipairs
 
 -- ----- Internal state ----- --
-addon.Services.Logger.Helpers = addon.Services.Logger.Helpers or {}
-
+feature.EnsureServiceNamespace("Logger", "Helpers")
 local Helpers = addon.Services.Logger.Helpers
 local Store = addon.Services.Logger.Store
 local View = addon.Services.Logger.View

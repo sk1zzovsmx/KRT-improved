@@ -9,17 +9,15 @@ local feature = addon.Core.GetFeatureShared()
 local Diag = feature.Diag
 local C = feature.C
 local Core = feature.Core
-local Item = feature.Item or addon.Item
-local Strings = feature.Strings or addon.Strings
+local Item = feature.Item
+local Strings = feature.Strings
 local raidState = feature.raidState
 local lootState = feature.lootState
 local ITEM_LINK_PATTERN = feature.ITEM_LINK_PATTERN
 local rollTypes = feature.rollTypes
 
-addon.Services = addon.Services or {}
-addon.Services.Loot = addon.Services.Loot or {}
-
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Loot")
 local module = addon.Services.Loot
 module._PassiveGroupLoot = module._PassiveGroupLoot or {}
 
@@ -34,7 +32,7 @@ local type, pairs, select = type, pairs, select
 local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = tonumber(C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60
 local GROUP_LOOT_ROLL_GRACE_SECONDS = tonumber(C.GROUP_LOOT_ROLL_GRACE_SECONDS) or 10
 
-local Services = feature.Services or addon.Services
+local Services = feature.Services
 
 -- ----- Private helpers ----- --
 local function isDebugEnabled()

@@ -26,7 +26,9 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
 
 - `!KRT/Init.lua`
   Owns shared bootstrap namespaces (`addon.Core`, `addon.State`, `addon.Events`, ...)
-  and global WoW event wiring.
+  and global WoW event wiring. `Core.GetFeatureShared()` is the module-facing
+  shared dependency contract, and `feature.EnsureServiceNamespace(...)` owns
+  service namespace bootstrap for split service files.
 - `!KRT/Controllers/*.lua`
   Own top-level parent feature modules under `addon.Controllers.*`.
 - `!KRT/Services/*.lua`

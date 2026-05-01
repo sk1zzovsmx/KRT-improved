@@ -6,8 +6,8 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local Core = feature.Core or addon.Core
-local Sort = feature.Sort or addon.Sort
+local Core = feature.Core
+local Sort = feature.Sort
 local GetLootSortName = Sort and Sort.GetLootSortName
 
 local pairs, type = pairs, type

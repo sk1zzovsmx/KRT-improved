@@ -7,8 +7,8 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local Core = feature.Core
-local Strings = feature.Strings or addon.Strings
-local Item = feature.Item or addon.Item
+local Strings = feature.Strings
+local Item = feature.Item
 
 local rollTypes = feature.rollTypes
 
@@ -16,7 +16,7 @@ local type = type
 local tostring, tonumber = tostring, tonumber
 
 do
-    addon.Services.Raid = addon.Services.Raid or {}
+    feature.EnsureServiceNamespace("Raid")
     local module = addon.Services.Raid
 
     -- ----- Internal state ----- --

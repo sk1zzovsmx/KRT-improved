@@ -9,10 +9,10 @@ local feature = addon.Core.GetFeatureShared()
 local Diag = feature.Diag
 
 local Core = feature.Core
-local Events = feature.Events or addon.Events
-local Bus = feature.Bus or addon.Bus
-local Strings = feature.Strings or addon.Strings
-local Time = feature.Time or addon.Time
+local Events = feature.Events
+local Bus = feature.Bus
+local Strings = feature.Strings
+local Time = feature.Time
 
 local InternalEvents = Events.Internal
 
@@ -25,7 +25,7 @@ local getRaidRosterInfo = GetRaidRosterInfo
 local UnitRace, UnitSex = UnitRace, UnitSex
 
 do
-    addon.Services.Raid = addon.Services.Raid or {}
+    feature.EnsureServiceNamespace("Raid")
     local module = addon.Services.Raid
 
     -- Timer ownership: roster refresh debounce + retry per pending units. Anche

@@ -7,12 +7,10 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local L = feature.L
-local Services = feature.Services or addon.Services
-
-addon.Services = addon.Services or {}
-addon.Services.Rolls = addon.Services.Rolls or {}
+local Services = feature.Services
 
 -- ----- Internal state ----- --
+feature.EnsureServiceNamespace("Rolls")
 local module = addon.Services.Rolls
 module._Countdown = module._Countdown or {}
 
