@@ -589,17 +589,22 @@ do
             maxScroll = 0
         end
 
-        -- Ensure the scroll child has a valid size (UIPanelScrollFrameTemplate needs this)
+        -- Ensure the scroll child has a valid size (UIPanelScrollFrameTemplate needs this).
+        -- Do not re-anchor it during refresh: SetVerticalScroll owns the child offset.
         local sb = scrollFrame.ScrollBar or (scrollFrame.GetName and _G[scrollFrame:GetName() .. "ScrollBar"]) or nil
         local needsScroll = maxScroll > 0
-        scrollChild:ClearAllPoints()
-        scrollChild:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 0, 0)
+        local childWidth = scrollFrame:GetWidth() or 0
         if needsScroll and sb and sb.IsShown and sb:IsShown() then
-            scrollChild:SetPoint("TOPRIGHT", sb, "TOPLEFT", 0, 0)
-        else
-            scrollChild:SetPoint("TOPRIGHT", scrollFrame, "TOPRIGHT", 0, 0)
+            local sbWidth = sb.GetWidth and sb:GetWidth() or 0
+            childWidth = childWidth - sbWidth
+        end
+        if childWidth > 0 then
+            scrollChild:SetWidth(childWidth)
         end
         scrollChild:SetHeight(math.max(contentHeight, frameHeight))
+        if scrollFrame.UpdateScrollChildRect then
+            scrollFrame:UpdateScrollChildRect()
+        end
         if priorScroll > maxScroll then
             priorScroll = maxScroll
         end

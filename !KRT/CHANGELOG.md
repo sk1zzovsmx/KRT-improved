@@ -12,6 +12,11 @@ Release-Version: 0.7.1-beta.1
   be opened while the raid uses Group Loot or Need Before Greed, while
   master-loot-only actions remain gated behind Master Looter access.
 
+### Fixes
+
+- **LootCounter scrolling** - Fixed the Loot Counter frame so moving the
+  scrollbar also scrolls the player list instead of only moving the thumb.
+
 ## [0.7.1-beta.1] - 2026-04-27
 
 ### Enhancements

@@ -659,7 +659,7 @@
 "addon.Widgets.LootCounter:AttachToMaster","Public","addon.Widgets.LootCounter","AttachToMaster",":","PascalCase","Attach","Unclassified","True","False","1","Widgets","!KRT/Widgets/LootCounter.lua","508"
 "addon.Widgets.LootCounter:ConfirmResetAllCounts","Public","addon.Widgets.LootCounter","ConfirmResetAllCounts",":","PascalCase","Confirm","Unclassified","True","False","1","Widgets","!KRT/Widgets/LootCounter.lua","561"
 "addon.Widgets.LootCounter:OnLoad","Public","addon.Widgets.LootCounter","OnLoad",":","PascalCase","OnLoad","Lifecycle","True","True","1","Widgets","!KRT/Widgets/LootCounter.lua","500"
-"addon.Widgets.LootCounter:Refresh","Public","addon.Widgets.LootCounter","Refresh",":","PascalCase","Refresh","Lifecycle","True","True","1","Widgets","!KRT/Widgets/LootCounter.lua","699"
+"addon.Widgets.LootCounter:Refresh","Public","addon.Widgets.LootCounter","Refresh",":","PascalCase","Refresh","Lifecycle","True","True","1","Widgets","!KRT/Widgets/LootCounter.lua","704"
 "addon.Widgets.LootCounter:RefreshUI","Public","addon.Widgets.LootCounter","RefreshUI",":","PascalCase","RefreshUI","Lifecycle","True","True","1","Widgets","!KRT/Widgets/LootCounter.lua","569"
 "addon.Widgets.LootCounter:ResetAllCounts","Public","addon.Widgets.LootCounter","ResetAllCounts",":","PascalCase","Reset","Unclassified","True","False","1","Widgets","!KRT/Widgets/LootCounter.lua","533"
 "addon.Widgets.ReservesUI:CreateReserveHeader","Public","addon.Widgets.ReservesUI","CreateReserveHeader",":","PascalCase","Create","Unclassified","True","False","1","Widgets","!KRT/Widgets/ReservesUI.lua","352"
