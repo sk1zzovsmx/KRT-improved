@@ -117,7 +117,7 @@ local function markLootOnlyCommands(list)
     end
 end
 
-for _, commandList in ipairs({ cmdLoot, cmdCounter, cmdReserves }) do
+for _, commandList in ipairs({ cmdReserves }) do
     markLootOnlyCommands(commandList)
 end
 
@@ -959,7 +959,7 @@ function module:Handle(msg)
         return
     end
 
-    local requiresLootAccess = (cmd == "show" or cmd == "toggle" or lootOnlySlashCommands[cmd] == true)
+    local requiresLootAccess = (lootOnlySlashCommands[cmd] == true)
     local raid = Services and Services.Raid or nil
     if requiresLootAccess and raid and raid.EnsureMasterOnlyAccess and not raid:EnsureMasterOnlyAccess() then
         return

@@ -233,6 +233,13 @@ do
         return RaidApi.EnsureMasterOnlyAccess(Raid)
     end
 
+    local function canHandleLootWindow()
+        if Raid.IsMasterLooter and Raid:IsMasterLooter() then
+            return true
+        end
+        return Raid.CanObservePassiveLoot and Raid:CanObservePassiveLoot() or false
+    end
+
     -- ============================================================================
     -- Dropdown / frame helpers
     -- ============================================================================
@@ -572,13 +579,9 @@ do
                 Private.BtnReserveList(self, button)
             end)
         )
-        Frames.SafeSetScript(
-            refs.lootCounterBtn,
-            "OnClick",
-            wrapMasterOnlyClick(function(self, button)
-                Private.BtnLootCounter(self, button)
-            end)
-        )
+        Frames.SafeSetScript(refs.lootCounterBtn, "OnClick", function(self, button)
+            Private.BtnLootCounter(self, button)
+        end)
 
         frame._krtBound = true
     end
@@ -1195,7 +1198,6 @@ do
             tooltipState.bank = L.WarnMLOnlyMode
             tooltipState.disenchant = L.WarnMLOnlyMode
             tooltipState.reserveList = L.WarnMLOnlyMode
-            tooltipState.lootCounter = L.WarnMLOnlyMode
         end
 
         return tooltipState
@@ -3362,7 +3364,7 @@ do
     function module:LOOT_OPENED()
         local perfTotal = addon.hasPerf and addon:_PerfStart() or nil
         cancelLootClosedCleanup()
-        if Raid:IsMasterLooter() then
+        if canHandleLootWindow() then
             local debugEnabled = isDebugEnabled()
             local raidNum = Core.GetCurrentRaid()
             if Raid.ClearLootWindowBossContext then
@@ -3411,7 +3413,7 @@ do
 
     -- LOOT_CLOSED: Triggered when the loot window closes.
     function module:LOOT_CLOSED()
-        if Raid:IsMasterLooter() then
+        if canHandleLootWindow() or lootState.opened == true then
             if Raid.ClearLootWindowBossContext then
                 Raid:ClearLootWindowBossContext()
             end
@@ -3429,7 +3431,7 @@ do
     -- LOOT_SLOT_CLEARED: Triggered when an item is looted.
     function module:LOOT_SLOT_CLEARED(clearedSlot)
         local perfTotal = addon.hasPerf and addon:_PerfStart() or nil
-        if Raid:IsMasterLooter() then
+        if canHandleLootWindow() then
             PendingCounter:Confirm(clearedSlot, "LOOT_SLOT_CLEARED")
             local perfStep = addon.hasPerf and addon:_PerfStart() or nil
             Loot:FetchLoot()

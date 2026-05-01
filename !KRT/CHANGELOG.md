@@ -6,6 +6,12 @@ All notable changes to !KRT will be documented in this file.
 
 Release-Version: 0.7.1-beta.1
 
+### Enhancements
+
+- **Group Loot frame access** - Loot Counter and the Master Looter frame can
+  be opened while the raid uses Group Loot or Need Before Greed, while
+  master-loot-only actions remain gated behind Master Looter access.
+
 ## [0.7.1-beta.1] - 2026-04-27
 
 ### Enhancements

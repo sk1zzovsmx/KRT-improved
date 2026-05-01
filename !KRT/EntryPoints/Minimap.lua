@@ -94,8 +94,12 @@ local function buildMenu()
     local hasLootAccess = raid and raid.CanUseCapability and raid:CanUseCapability("loot") or false
     local hasRaidIconsAccess = raid and raid.CanUseCapability and raid:CanUseCapability("raid_icons") or false
     local hasChangesBroadcastAccess = raid and raid.CanUseCapability and raid:CanUseCapability("changes_broadcast") or false
+    local canOpenLootFrame = (not hasRaidGroup) or hasLootAccess
+    if hasRaidGroup and raid and raid.CanObservePassiveLoot and raid:CanObservePassiveLoot() then
+        canOpenLootFrame = true
+    end
     local disableLootActions = nil
-    if not hasLootAccess then
+    if not canOpenLootFrame then
         disableLootActions = 1
     end
     local disableRaidActions = nil
@@ -103,7 +107,7 @@ local function buildMenu()
         disableRaidActions = 1
     end
     local disableLootRaidActions = 1
-    if hasRaidGroup and hasLootAccess then
+    if hasRaidGroup then
         disableLootRaidActions = nil
     end
     local disableChangesBroadcastActions = nil
