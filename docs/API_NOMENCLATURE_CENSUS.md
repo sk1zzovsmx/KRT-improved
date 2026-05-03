@@ -97,10 +97,10 @@ Showing first 80 of 266 non-conformant public methods. See docs/API_REGISTRY_PUB
 | addon.Controllers.Changes:Demand | PascalCase | Demand | Unclassified | True | False | !KRT/Controllers/Changes.lua | 430 |
 | addon.Controllers.Changes:Edit | PascalCase | Edit | Unclassified | True | False | !KRT/Controllers/Changes.lua | 363 |
 | addon.Controllers.Changes:Select | PascalCase | Select | Unclassified | True | False | !KRT/Controllers/Changes.lua | 284 |
-| addon.Controllers.Master:BtnAward | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2634 |
-| addon.Controllers.Master:BtnCountdown | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2606 |
-| addon.Controllers.Master:BtnMS | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2589 |
-| addon.Controllers.Master:BtnSelectItem | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2448 |
+| addon.Controllers.Master:BtnAward | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2638 |
+| addon.Controllers.Master:BtnCountdown | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2610 |
+| addon.Controllers.Master:BtnMS | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2593 |
+| addon.Controllers.Master:BtnSelectItem | PascalCase | Btn | Unclassified | True | False | !KRT/Controllers/Master.lua | 2452 |
 | addon.Controllers.Spammer:Clear | PascalCase | Clear | Unclassified | True | False | !KRT/Controllers/Spammer.lua | 490 |
 | addon.Controllers.Spammer:Pause | PascalCase | Pause | Unclassified | True | False | !KRT/Controllers/Spammer.lua | 455 |
 | addon.Controllers.Spammer:Save | PascalCase | Save | Unclassified | True | False | !KRT/Controllers/Spammer.lua | 354 |
@@ -172,13 +172,13 @@ Showing first 80 of 266 non-conformant public methods. See docs/API_REGISTRY_PUB
 | addon:RAID_ROSTER_UPDATE | !KRT/Init.lua | 1233 |
 | addon:START_LOOT_ROLL | !KRT/Init.lua | 1372 |
 | addon:UPDATE_INSTANCE_INFO | !KRT/Init.lua | 1274 |
-| addon.Controllers.Master:LOOT_CLOSED | !KRT/Controllers/Master.lua | 3415 |
-| addon.Controllers.Master:LOOT_OPENED | !KRT/Controllers/Master.lua | 3364 |
-| addon.Controllers.Master:LOOT_SLOT_CLEARED | !KRT/Controllers/Master.lua | 3432 |
-| addon.Controllers.Master:TRADE_ACCEPT_UPDATE | !KRT/Controllers/Master.lua | 3474 |
-| addon.Controllers.Master:TRADE_CLOSED | !KRT/Controllers/Master.lua | 3530 |
-| addon.Controllers.Master:TRADE_REQUEST_CANCEL | !KRT/Controllers/Master.lua | 3536 |
-| addon.Controllers.Master:UI_ERROR_MESSAGE | !KRT/Controllers/Master.lua | 3462 |
+| addon.Controllers.Master:LOOT_CLOSED | !KRT/Controllers/Master.lua | 3423 |
+| addon.Controllers.Master:LOOT_OPENED | !KRT/Controllers/Master.lua | 3368 |
+| addon.Controllers.Master:LOOT_SLOT_CLEARED | !KRT/Controllers/Master.lua | 3440 |
+| addon.Controllers.Master:TRADE_ACCEPT_UPDATE | !KRT/Controllers/Master.lua | 3486 |
+| addon.Controllers.Master:TRADE_CLOSED | !KRT/Controllers/Master.lua | 3542 |
+| addon.Controllers.Master:TRADE_REQUEST_CANCEL | !KRT/Controllers/Master.lua | 3548 |
+| addon.Controllers.Master:UI_ERROR_MESSAGE | !KRT/Controllers/Master.lua | 3474 |
 | addon.Services.Raid:COMBAT_LOG_EVENT_UNFILTERED | !KRT/Services/Raid/State.lua | 1463 |
 | addon.Services.Rolls:CHAT_MSG_SYSTEM | !KRT/Services/Rolls/Service.lua | 478 |
 

@@ -8478,6 +8478,94 @@ test("master item selection popup stays clickable", function()
     assertEqual(selectedIndex, 1, "expected clicking the selection popup button to pick the corresponding loot index")
 end)
 
+test("master loot opened stays hidden while passively observing group loot", function()
+    local h = newHarness()
+    local link = h.registerItem(9441, "Passive Blade")
+    local items = {
+        [1] = { itemLink = link, itemName = "Passive Blade", itemTexture = "IconPassive", count = 1 },
+    }
+
+    h.addon.Services.Loot = {
+        FetchLoot = function()
+            h.feature.lootState.lootCount = 1
+            h.feature.lootState.currentItemIndex = 1
+        end,
+        GetLootWindowItems = function()
+            return items
+        end,
+        GetItem = function(index)
+            return items[index]
+        end,
+        GetItemName = function(index)
+            return items[index] and items[index].itemName or nil
+        end,
+        GetItemTexture = function(index)
+            return items[index] and items[index].itemTexture or nil
+        end,
+        GetCurrentItemCount = function()
+            return 1
+        end,
+        ItemExists = function(_, index)
+            return items[index] ~= nil
+        end,
+    }
+    h.addon.Services.Raid = {
+        IsMasterLooter = function()
+            return false
+        end,
+        CanObservePassiveLoot = function()
+            return true
+        end,
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+        _EnsureLootWindowItemContext = function()
+            return nil
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = false,
+    })
+
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Controllers/Master.lua")
+
+    local Master = h.addon.Controllers.Master
+    local frame = h.makeFrame(false, "KRTMaster")
+
+    _G.KRTMaster = frame
+    Master.RequestRefresh = function() end
+    Master.EnsureUI = function()
+        return frame
+    end
+
+    Master:LOOT_OPENED()
+
+    assertTrue(not frame:IsShown(), "expected passive group loot observation not to auto-open the Master frame")
+end)
+
 test("master roll rows stay clickable through the shared list controller", function()
     local h = newHarness()
 

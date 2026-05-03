@@ -240,6 +240,10 @@ do
         return Raid.CanObservePassiveLoot and Raid:CanObservePassiveLoot() or false
     end
 
+    local function canAutoManageLootFrame()
+        return Raid.IsMasterLooter and Raid:IsMasterLooter() or false
+    end
+
     -- ============================================================================
     -- Dropdown / frame helpers
     -- ============================================================================
@@ -3388,7 +3392,9 @@ do
                 end
             end
             perfStep = addon.hasPerf and addon:_PerfStart() or nil
-            updateSelectionFrame()
+            if canAutoManageLootFrame() then
+                updateSelectionFrame()
+            end
             if perfStep then
                 addon:_PerfFinish("Master.LOOT_OPENED SelectionFrame", perfStep, "items=" .. tostring(lootState.lootCount or 0))
             end
@@ -3401,7 +3407,9 @@ do
                 end
             end
             perfStep = addon.hasPerf and addon:_PerfStart() or nil
-            handleLootOpenedVisibility()
+            if canAutoManageLootFrame() then
+                handleLootOpenedVisibility()
+            end
             if perfStep then
                 addon:_PerfFinish("Master.LOOT_OPENED Visibility", perfStep, "items=" .. tostring(lootState.lootCount or 0))
             end
@@ -3444,12 +3452,16 @@ do
                 end
             end
             perfStep = addon.hasPerf and addon:_PerfStart() or nil
-            updateSelectionFrame()
+            if canAutoManageLootFrame() then
+                updateSelectionFrame()
+            end
             if perfStep then
                 addon:_PerfFinish("Master.LOOT_SLOT_CLEARED SelectionFrame", perfStep, "slot=" .. tostring(clearedSlot or "?"))
             end
             Private.ResetItemCount()
-            handleLootSlotClearedVisibility()
+            if canAutoManageLootFrame() then
+                handleLootSlotClearedVisibility()
+            end
 
             -- Continue a multi-award sequence (loot window only).
             continueMultiAwardOnLootSlotCleared(clearedSlot)
