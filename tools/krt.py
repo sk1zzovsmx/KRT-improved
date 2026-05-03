@@ -586,6 +586,7 @@ def require_git_stdout(args: list[str], *, operation: str) -> str:
 def find_previous_release_tag(current_version: str, current_tag: str) -> str | None:
     current_info = parse_release_version(current_version)
     tag_lines = require_git_stdout(["tag", "--list", "v*"], operation="list release tags").splitlines()
+    changelog_text = read_addon_changelog_text()
 
     previous: tuple[tuple[int, int, int, int, int], str] | None = None
     for raw_tag in tag_lines:
@@ -598,6 +599,10 @@ def find_previous_release_tag(current_version: str, current_tag: str) -> str | N
         try:
             tag_info = parse_release_version(tag[1:])
         except CliError:
+            continue
+
+        documented_heading = f"## [{tag_info['normalized_semver']}]"
+        if documented_heading not in changelog_text:
             continue
 
         if not tag_info["publishable"]:
@@ -1438,9 +1443,9 @@ def release_prepare(args: argparse.Namespace) -> int:
     if args.github_output:
         github_payload = {
             **metadata,
-            "notes_path": Path(payload["notes_path"]).relative_to(REPO_ROOT).as_posix(),
-            "asset_path": Path(payload["asset_path"]).relative_to(REPO_ROOT).as_posix(),
-            "checksum_path": Path(payload["checksum_path"]).relative_to(REPO_ROOT).as_posix(),
+            "notes_path": Path(payload["notes_path"]).as_posix(),
+            "asset_path": Path(payload["asset_path"]).as_posix(),
+            "checksum_path": Path(payload["checksum_path"]).as_posix(),
         }
         write_github_output(args.github_output, github_payload)
 
