@@ -214,9 +214,9 @@
 |   |       \\-- 2026-04-28-options-timer-refactor-design.md
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
+|   |-- API_REGISTRY.csv
 |   |-- API_REGISTRY_INTERNAL.csv
 |   |-- API_REGISTRY_PUBLIC.csv
-|   |-- API_REGISTRY.csv
 |   |-- ARCHITECTURE.md
 |   |-- DEV_CHECKS.md
 |   |-- FN_CLUSTERS.md
@@ -256,8 +256,8 @@
 |   |-- fnmap-classify.ps1
 |   |-- fnmap-inventory.ps1
 |   |-- install-hooks.ps1
-|   |-- krt_mcp_server.py
 |   |-- krt.py
+|   |-- krt_mcp_server.py
 |   |-- mech-bootstrap.ps1
 |   |-- mech-krt.ps1
 |   |-- pre-commit.ps1

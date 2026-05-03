@@ -870,11 +870,17 @@ def api_catalog_refresh(_: argparse.Namespace) -> int:
     return 0
 
 
+def normalize_catalog_bytes(content: bytes | None) -> bytes | None:
+    if content is None:
+        return None
+    return content.replace(b"\r\n", b"\n")
+
+
 def api_catalog_check(args: argparse.Namespace) -> int:
     before = {}
     for path_text in API_CATALOG_FILES:
         path = REPO_ROOT / path_text
-        before[path_text] = path.read_bytes() if path.is_file() else None
+        before[path_text] = normalize_catalog_bytes(path.read_bytes()) if path.is_file() else None
 
     exit_code = api_catalog_refresh(args)
     if exit_code != 0:
@@ -883,7 +889,7 @@ def api_catalog_check(args: argparse.Namespace) -> int:
     changed = []
     for path_text in API_CATALOG_FILES:
         path = REPO_ROOT / path_text
-        after = path.read_bytes() if path.is_file() else None
+        after = normalize_catalog_bytes(path.read_bytes()) if path.is_file() else None
         if before[path_text] != after:
             changed.append(path_text)
 

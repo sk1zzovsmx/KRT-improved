@@ -15,9 +15,27 @@ Set-Location $repoRoot
 
 function Get-Children {
     param([string]$Path)
+
+    $children = New-Object System.Collections.Generic.List[System.IO.FileSystemInfo]
     Get-ChildItem -LiteralPath $Path -Force |
         Where-Object { $_.Name -ne ".git" } |
-        Sort-Object @{ Expression = { -not $_.PSIsContainer } }, Name
+        ForEach-Object { [void]$children.Add($_) }
+
+    $comparison = [System.Comparison[System.IO.FileSystemInfo]] {
+        param($left, $right)
+
+        if ($left.PSIsContainer -and -not $right.PSIsContainer) {
+            return -1
+        }
+        if (-not $left.PSIsContainer -and $right.PSIsContainer) {
+            return 1
+        }
+
+        return [System.StringComparer]::OrdinalIgnoreCase.Compare($left.Name, $right.Name)
+    }
+    $children.Sort($comparison)
+
+    return @($children)
 }
 
 function Get-TreeLines {
