@@ -32,6 +32,7 @@ For architecture guardrails, see `docs/ARCHITECTURE.md`.
 Modules consume shared dependencies through `addon.Core.GetFeatureShared()`.
 Service submodules bootstrap owner tables through `feature.EnsureServiceNamespace(...)`
 so namespace creation stays centralized with the rest of bootstrap.
+`Core/Options.lua` owns `addon.Options`, namespaced defaults, and flat-option migration.
 
 ## Runtime Module Map
 
@@ -116,7 +117,7 @@ Entrypoints stay narrow:
 
 Common infra under `!KRT/Modules/`:
 
-- Data/utility: `Events`, `Strings`, `Item`, `Time`, `Sort`, `Comms`, `Base64`, `Colors`
+- Data/utility: `Timer`, `Events`, `Strings`, `Item`, `Time`, `Sort`, `Comms`, `Base64`, `Colors`
 - UI infra: `Frames`, `UIScaffold`, `ListController`, `MultiSelect`, `UI` facade, `UIEffects`
 - Messaging: `Bus`
 - Feature toggles: `Features`

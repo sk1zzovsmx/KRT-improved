@@ -9,7 +9,7 @@ Status date: 2026-04-06
 Completed in this pass:
 
 - Confirmed post-split `Raid` service topology:
-  `!KRT/Services/Raid/{State,Capabilities,Changes,Counts,Roster,LootRecords,Session,Boss}.lua`
+  `!KRT/Services/Raid/{State,Capabilities,Counts,Roster,Attendance,LootRecords,Session}.lua`
   now owns `addon.Services.Raid` end-to-end.
 - Kept bootstrap ownership centralized: there is no standalone `!KRT/Services/Raid.lua`.
   The service table is anchored directly by the split modules.
@@ -382,7 +382,7 @@ What this means:
 
 - `!KRT/Services/Raid/State.lua`: wave S1/S1b plus internal-surface ownership
   cleanup completed, monitor only
-- `!KRT/Services/Raid/{Capabilities,Changes,Counts,Roster,LootRecords,Session,Boss}.lua`:
+- `!KRT/Services/Raid/{Capabilities,Counts,Roster,Attendance,LootRecords,Session}.lua`:
   split completed; Chat/Raid contract wave completed in `Capabilities`; `Roster`
   internal helper exposure reduced, monitor only
 - `!KRT/Services/Rolls/Service.lua`: reviewed in the ownership wave; no safe contract

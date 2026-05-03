@@ -9,14 +9,14 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
 
 1. `Libs/*`
    Third-party runtime libraries loaded first.
-2. `Init.lua` + `Core/DB*.lua`
-   Unified bootstrap, shared namespaces, legacy alias proxy, DB bootstrap.
+2. `Init.lua` + `Core/{DB,Options,DBSchema,DBManager}.lua`
+   Unified bootstrap, shared namespaces, legacy alias proxy, DB/options bootstrap.
 3. `Localization/*`
    User strings (`addon.L`) and diagnose templates (`addon.Diagnose`).
 4. `UI/Templates/Common.xml`
    Shared XML templates only.
 5. `Modules/*`
-   Shared infra (`Events`, `Bus`, `Item`, `Sort`, `Frames`, `UIScaffold`, `UI` facade, ...).
+   Shared infra (`Timer`, `Events`, `Bus`, `Item`, `Sort`, `Frames`, `UIScaffold`, `UI` facade, ...).
 6. `Core/DBRaid*.lua`, `Services/*`, `Controllers/*`, `Widgets/*`, `EntryPoints/*`
    Runtime feature implementation and entrypoints.
 7. `KRT.xml` -> `UI/*.xml`
@@ -54,6 +54,8 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   Owns the canonical public accessor facade for DB-manager-backed services on
   `addon.Core.*`; `addon.DB` remains the concrete namespace for DB submodules and
   manager state, not a parallel getter surface.
+- `!KRT/Core/Options.lua`
+  Owns `addon.Options`, nested option namespaces, and the legacy flat-option migration.
 - `!KRT/Core/DBSchema.lua`
   Owns schema-version state while exposing the canonical public accessor on
   `addon.Core.GetRaidSchemaVersion`; `addon.DBSchema` is not a second parallel getter facade.

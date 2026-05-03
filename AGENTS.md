@@ -322,88 +322,90 @@ Rules:
 
 WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 
-1) LibStub
-2) CallbackHandler-1.0
-3) LibBossIDs-1.0
-4) LibDeformat-3.0
-5) LibCompat-1.0
-6) LibLogger-1.0
+1) Libs/LibStub/LibStub.lua
+2) Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua
+3) Libs/LibBossIDs-1.0/lib.xml
+4) Libs/LibDeformat-3.0/lib.xml
+5) Libs/LibCompat-1.0/lib.xml
+6) Libs/LibLogger-1.0/lib.xml
 7) Init.lua
 8) Core/DB.lua
-9) Core/DBSchema.lua
-10) Core/DBManager.lua
-11) Localization/localization.en.lua
-12) Localization/DiagnoseLog.en.lua
-13) UI/Templates/Common.xml
-14) Modules/C.lua
-15) Modules/Events.lua
-16) Modules/Colors.lua
-17) Modules/Strings.lua
-18) Modules/Item.lua
-19) Modules/IgnoredItems.lua
-20) Modules/IgnoredMobs.lua
-21) Modules/Comms.lua
-22) Modules/Time.lua
-23) Modules/Base64.lua
-24) Modules/Sort.lua
-25) Modules/Features.lua
-26) Modules/UI/Facade.lua
-27) Modules/UI/Effects.lua
-28) Modules/UI/Visuals.lua
-29) Modules/UI/Frames.lua
-30) Modules/UI/ListController.lua
-31) Modules/UI/MultiSelect.lua
-32) Modules/Bus.lua
-33) Core/DBRaidMigrations.lua
-34) Core/DBRaidStore.lua
-35) Core/DBRaidQueries.lua
-36) Core/DBRaidValidator.lua
-37) Core/DBSyncer.lua
-38) Services/Loot/Context.lua
-39) Services/Loot/State.lua
-40) Services/Loot/Snapshots.lua
-41) Services/Loot/PendingAwards.lua
-42) Services/Loot/PassiveGroupLoot.lua
-43) Services/Loot/Tracking.lua
-44) Services/Loot/Rules.lua
-45) Services/Raid/State.lua
-46) Services/Raid/Capabilities.lua
-47) Services/Raid/Counts.lua
-48) Services/Raid/Roster.lua
-49) Services/Raid/Attendance.lua
-50) Services/Raid/LootRecords.lua
-51) Services/Raid/Session.lua
-52) Services/Chat.lua
-53) EntryPoints/Minimap.lua
-54) EntryPoints/SlashEvents.lua
-55) Services/Rolls/Countdown.lua
-56) Services/Rolls/Sessions.lua
-57) Services/Rolls/History.lua
-58) Services/Rolls/Responses.lua
-59) Services/Rolls/Resolution.lua
-60) Services/Rolls/Display.lua
-61) Services/Rolls/Service.lua
-62) Services/Loot/Service.lua
-63) Services/Debug.lua
-64) Controllers/Master.lua
-65) Widgets/LootCounter.lua
-66) Services/Reserves/Import.lua
-67) Services/Reserves/Display.lua
-68) Services/Reserves/Sync.lua
-69) Services/Reserves.lua
-70) Services/Reserves/Chat.lua
-71) Widgets/ReservesUI.lua
-72) Services/Logger/Store.lua
-73) Services/Logger/View.lua
-74) Services/Logger/Export.lua
-75) Services/Logger/Helpers.lua
-76) Services/Logger/Actions.lua
-77) Controllers/Logger.lua
-78) Widgets/Config.lua
-79) Controllers/Warnings.lua
-80) Controllers/Changes.lua
-81) Controllers/Spammer.lua
-82) KRT.xml
+9) Core/Options.lua
+10) Core/DBSchema.lua
+11) Core/DBManager.lua
+12) Localization/localization.en.lua
+13) Localization/DiagnoseLog.en.lua
+14) UI/Templates/Common.xml
+15) Modules/C.lua
+16) Modules/Timer.lua
+17) Modules/Events.lua
+18) Modules/Colors.lua
+19) Modules/Strings.lua
+20) Modules/Item.lua
+21) Modules/IgnoredItems.lua
+22) Modules/IgnoredMobs.lua
+23) Modules/Comms.lua
+24) Modules/Time.lua
+25) Modules/Base64.lua
+26) Modules/Sort.lua
+27) Modules/Features.lua
+28) Modules/UI/Facade.lua
+29) Modules/UI/Effects.lua
+30) Modules/UI/Visuals.lua
+31) Modules/UI/Frames.lua
+32) Modules/UI/ListController.lua
+33) Modules/UI/MultiSelect.lua
+34) Modules/Bus.lua
+35) Core/DBRaidMigrations.lua
+36) Core/DBRaidStore.lua
+37) Core/DBRaidQueries.lua
+38) Core/DBRaidValidator.lua
+39) Core/DBSyncer.lua
+40) Services/Loot/Context.lua
+41) Services/Loot/State.lua
+42) Services/Loot/Snapshots.lua
+43) Services/Loot/PendingAwards.lua
+44) Services/Loot/PassiveGroupLoot.lua
+45) Services/Loot/Tracking.lua
+46) Services/Loot/Rules.lua
+47) Services/Raid/State.lua
+48) Services/Raid/Capabilities.lua
+49) Services/Raid/Counts.lua
+50) Services/Raid/Roster.lua
+51) Services/Raid/Attendance.lua
+52) Services/Raid/LootRecords.lua
+53) Services/Raid/Session.lua
+54) Services/Chat.lua
+55) EntryPoints/Minimap.lua
+56) EntryPoints/SlashEvents.lua
+57) Services/Rolls/Countdown.lua
+58) Services/Rolls/Sessions.lua
+59) Services/Rolls/History.lua
+60) Services/Rolls/Responses.lua
+61) Services/Rolls/Resolution.lua
+62) Services/Rolls/Display.lua
+63) Services/Rolls/Service.lua
+64) Services/Loot/Service.lua
+65) Services/Debug.lua
+66) Controllers/Master.lua
+67) Widgets/LootCounter.lua
+68) Services/Reserves/Import.lua
+69) Services/Reserves/Display.lua
+70) Services/Reserves/Sync.lua
+71) Services/Reserves.lua
+72) Services/Reserves/Chat.lua
+73) Widgets/ReservesUI.lua
+74) Services/Logger/Store.lua
+75) Services/Logger/View.lua
+76) Services/Logger/Export.lua
+77) Services/Logger/Helpers.lua
+78) Services/Logger/Actions.lua
+79) Controllers/Logger.lua
+80) Widgets/Config.lua
+81) Controllers/Warnings.lua
+82) Controllers/Changes.lua
+83) Controllers/Spammer.lua
+84) KRT.xml
 
 ---
 
@@ -417,6 +419,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 
   Core/
     DB.lua                 # DB facade/bootstrap
+    Options.lua            # options namespace/defaults + flat-schema migration
     DBSchema.lua           # canonical raid schema
     DBManager.lua          # DB manager/factory
     DBRaidMigrations.lua   # raid SV migrations
@@ -501,6 +504,7 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 
   Modules/
     C.lua                  # constants/enums/patterns (addon.C)
+    Timer.lua              # timer mixin/stat helpers backed by LibCompat (addon.Timer)
     Events.lua             # centralized event-name registry (addon.Events)
     Colors.lua             # color normalization/class-color helpers (addon.Colors)
     Strings.lua            # text normalization and chat parsing helpers (addon.Strings)
@@ -680,6 +684,7 @@ Implementation placement (current wave):
 
 External modules:
 - `addon.C`     (Modules/C.lua)
+- `addon.Timer` (Modules/Timer.lua)
 - `addon.Events` (Modules/Events.lua)
 - `addon.Colors` (Modules/Colors.lua)
 - `addon.Strings` (Modules/Strings.lua)

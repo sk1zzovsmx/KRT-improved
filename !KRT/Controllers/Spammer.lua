@@ -32,7 +32,6 @@ local ChatApi = {
     StartSpamCycle = requireServiceMethod("Chat", Chat, "StartSpamCycle"),
     StopSpamCycle = requireServiceMethod("Chat", Chat, "StopSpamCycle"),
     PauseSpamCycle = requireServiceMethod("Chat", Chat, "PauseSpamCycle"),
-    SendSpamOutput = requireServiceMethod("Chat", Chat, "SendSpamOutput"),
     BuildSpammerOutput = requireServiceMethod("Chat", Chat, "BuildSpammerOutput"),
 }
 
@@ -125,6 +124,12 @@ do
     local updateControls
     local updateTickDisplay
     local setInputsLocked
+    local saveSpammer
+    local startSpam
+    local stopSpam
+    local pauseSpam
+    local focusTab
+    local clearSpammer
 
     -- ----- Private helpers ----- --
     function UI.AcquireRefs(frame)
@@ -280,57 +285,57 @@ do
 
     local function BindHandlers(_, _, refs)
         Frames.SafeSetScript(refs.clearBtn, "OnClick", function()
-            module:Clear()
+            clearSpammer()
         end)
         Frames.SafeSetScript(refs.startBtn, "OnClick", function()
-            module:Start()
+            startSpam()
         end)
 
         Frames.SafeSetScript(refs.duration, "OnTabPressed", function()
-            module:Tab("Tank", "Name")
+            focusTab("Tank", "Name")
         end)
         Frames.SafeSetScript(refs.healer, "OnTabPressed", function()
-            module:Tab("HealerClass", "TankClass")
+            focusTab("HealerClass", "TankClass")
         end)
         Frames.SafeSetScript(refs.healerClass, "OnTabPressed", function()
-            module:Tab("Melee", "Healer")
+            focusTab("Melee", "Healer")
         end)
         Frames.SafeSetScript(refs.melee, "OnTabPressed", function()
-            module:Tab("MeleeClass", "HealerClass")
+            focusTab("MeleeClass", "HealerClass")
         end)
         Frames.SafeSetScript(refs.meleeClass, "OnTabPressed", function()
-            module:Tab("Ranged", "Melee")
+            focusTab("Ranged", "Melee")
         end)
         Frames.SafeSetScript(refs.message, "OnTabPressed", function()
-            module:Tab("Name", "RangedClass")
+            focusTab("Name", "RangedClass")
         end)
         Frames.SafeSetScript(refs.name, "OnTabPressed", function()
-            module:Tab("Duration", "Message")
+            focusTab("Duration", "Message")
         end)
         Frames.SafeSetScript(refs.ranged, "OnTabPressed", function()
-            module:Tab("RangedClass", "MeleeClass")
+            focusTab("RangedClass", "MeleeClass")
         end)
         Frames.SafeSetScript(refs.rangedClass, "OnTabPressed", function()
-            module:Tab("Message", "Ranged")
+            focusTab("Message", "Ranged")
         end)
         Frames.SafeSetScript(refs.tank, "OnTabPressed", function()
-            module:Tab("TankClass", "Duration")
+            focusTab("TankClass", "Duration")
         end)
         Frames.SafeSetScript(refs.tankClass, "OnTabPressed", function()
-            module:Tab("Healer", "Tank")
+            focusTab("Healer", "Tank")
         end)
 
         for i = 1, #refs.channels do
             local channelBox = refs.channels[i]
             Frames.SafeSetScript(channelBox, "OnClick", function(self, button)
-                module:Save(self, button)
+                saveSpammer(self, button)
             end)
         end
         Frames.SafeSetScript(refs.chatGuild, "OnClick", function(self, button)
-            module:Save(self, button)
+            saveSpammer(self, button)
         end)
         Frames.SafeSetScript(refs.chatYell, "OnClick", function(self, button)
-            module:Save(self, button)
+            saveSpammer(self, button)
         end)
     end
 
@@ -351,7 +356,7 @@ do
     })
 
     -- Save (EditBox / Checkbox)
-    function module:Save(box)
+    saveSpammer = function(box)
         if not box then
             return
         end
@@ -398,7 +403,7 @@ do
     end
 
     -- Start/Stop/Pause
-    function module:Start()
+    startSpam = function()
         ensureReadyForStart()
 
         if not addon.WithinRange(strlen(finalOutput), 4, 255) then
@@ -446,13 +451,13 @@ do
         module:RequestRefresh()
     end
 
-    function module:Stop()
+    stopSpam = function()
         ChatApi.StopSpamCycle(Chat, true, true)
         setInputsLocked(false)
         module:RequestRefresh()
     end
 
-    function module:Pause()
+    pauseSpam = function()
         local pausedOk = ChatApi.PauseSpamCycle(Chat)
         if not pausedOk then
             return
@@ -462,19 +467,8 @@ do
         module:RequestRefresh()
     end
 
-    -- Spam
-    function module:Spam()
-        if strlen(finalOutput) > 255 then
-            addon:error(L.StrSpammerErrLength)
-            module:Stop()
-            return false
-        end
-
-        return ChatApi.SendSpamOutput(Chat, tostring(finalOutput), KRT_Spammer.Channels)
-    end
-
     -- Tab
-    function module:Tab(a, b)
+    focusTab = function(a, b)
         local target
         if IsShiftKeyDown() and getNamedPart(b) ~= nil then
             target = getNamedPart(b)
@@ -487,7 +481,7 @@ do
     end
 
     -- Clear
-    function module:Clear()
+    clearSpammer = function()
         for k, _ in pairs(KRT_Spammer) do
             if k ~= "Channels" then
                 KRT_Spammer[k] = nil
@@ -497,7 +491,7 @@ do
         finalOutput = DEFAULT_OUTPUT
         resetLastState()
 
-        module:Stop()
+        stopSpam()
 
         for _, field in ipairs(resetFields) do
             Frames.ResetEditBox(getNamedPart(field))
@@ -577,7 +571,7 @@ do
             box:SetScript("OnEditFocusGained", function()
                 local runtime = getSpamRuntimeState()
                 if runtime.ticking and not runtime.paused then
-                    module:Pause()
+                    pauseSpam()
                 end
             end)
 
@@ -596,7 +590,7 @@ do
             end)
 
             box:SetScript("OnEditFocusLost", function(self)
-                module:Save(self)
+                saveSpammer(self)
             end)
         end
 
@@ -611,7 +605,7 @@ do
     end
 
     -- Tick display
-    function updateTickDisplay()
+    updateTickDisplay = function()
         local runtime = getSpamRuntimeState()
         local countdownRemaining = tonumber(runtime.countdownRemaining) or 0
         local tickText = getNamedPart("Tick")
