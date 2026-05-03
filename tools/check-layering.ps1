@@ -136,7 +136,7 @@ Add-RgCheck `
     -Name "Item tooltip hack leakage outside module" `
     -Pattern 'KRT_ItemTooltip|Set(Bag|Inventory|Loot)Item' `
     -Path "!KRT" `
-    -ExtraArgs @("--glob", "*.lua", "--glob", "!Modules/Item.lua", "--glob", "!**/Modules/Item.lua")
+    -ExtraArgs @("--glob", "*.lua", "--glob", "!Item.lua", "--glob", "!Modules/Item.lua", "--glob", "!**/Modules/Item.lua")
 
 Add-RgRequireMatch `
     -Name "Item module tooltip implementation missing" `
