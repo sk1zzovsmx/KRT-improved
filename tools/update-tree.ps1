@@ -13,12 +13,50 @@ $toolingCommonPath = Join-Path $PSScriptRoot "tooling-common.ps1"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $repoRoot
 
+$trackedFiles = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
+$trackedDirs = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
+$tracked = & git ls-files
+foreach ($path in $tracked) {
+    $normalized = $path.Replace("\", "/")
+    [void]$trackedFiles.Add($normalized)
+
+    $parts = @($normalized -split "/")
+    for ($i = 1; $i -lt $parts.Count; $i = $i + 1) {
+        $dir = ($parts[0..($i - 1)] -join "/")
+        [void]$trackedDirs.Add($dir)
+    }
+}
+
+function Get-RepoRelativePath {
+    param([System.IO.FileSystemInfo]$Item)
+
+    $root = $repoRoot.ProviderPath.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    $fullName = $Item.FullName
+    if ($fullName.Length -le $root.Length) {
+        return ""
+    }
+
+    $relative = $fullName.Substring($root.Length + 1)
+    return $relative.Replace("\", "/")
+}
+
+function Test-IsTrackedTreeItem {
+    param([System.IO.FileSystemInfo]$Item)
+
+    $relative = Get-RepoRelativePath -Item $Item
+    if ($Item.PSIsContainer) {
+        return $trackedDirs.Contains($relative)
+    }
+
+    return $trackedFiles.Contains($relative)
+}
+
 function Get-Children {
     param([string]$Path)
 
     $children = New-Object System.Collections.Generic.List[System.IO.FileSystemInfo]
     Get-ChildItem -LiteralPath $Path -Force |
-        Where-Object { $_.Name -ne ".git" } |
+        Where-Object { $_.Name -ne ".git" -and (Test-IsTrackedTreeItem -Item $_) } |
         ForEach-Object { [void]$children.Add($_) }
 
     $comparison = [System.Comparison[System.IO.FileSystemInfo]] {
