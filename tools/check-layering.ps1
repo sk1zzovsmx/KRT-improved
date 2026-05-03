@@ -136,7 +136,7 @@ Add-RgCheck `
     -Name "Item tooltip hack leakage outside module" `
     -Pattern 'KRT_ItemTooltip|Set(Bag|Inventory|Loot)Item' `
     -Path "!KRT" `
-    -ExtraArgs @("--glob", "*.lua", "--glob", "!**/Modules/Item.lua")
+    -ExtraArgs @("--glob", "*.lua", "--glob", "!Modules/Item.lua", "--glob", "!**/Modules/Item.lua")
 
 Add-RgRequireMatch `
     -Name "Item module tooltip implementation missing" `
@@ -152,13 +152,13 @@ Add-RgCheck `
     -Name "Core.GetFeatureShared outside Init.lua" `
     -Pattern 'function\s+Core\.(GetFeatureShared|getFeatureShared)' `
     -Path "!KRT" `
-    -ExtraArgs @("--glob", "*.lua", "--glob", "!**/Init.lua")
+    -ExtraArgs @("--glob", "*.lua", "--glob", "!Init.lua", "--glob", "!**/Init.lua")
 
 Add-RgCheck `
     -Name "Core.EnsureLootRuntimeState outside Init.lua" `
     -Pattern 'function\s+Core\.(EnsureLootRuntimeState|ensureLootRuntimeState)' `
     -Path "!KRT" `
-    -ExtraArgs @("--glob", "*.lua", "--glob", "!**/Init.lua")
+    -ExtraArgs @("--glob", "*.lua", "--glob", "!Init.lua", "--glob", "!**/Init.lua")
 
 Add-RgCheck `
     -Name "Reserves formatter duplicate in widget" `
@@ -175,7 +175,7 @@ Add-RgCheck `
     -Name "Legacy parent alias usage (addon.Parent)" `
     -Pattern '\baddon\.(Master|Logger|Warnings|Changes|Spammer)\b' `
     -Path "!KRT" `
-    -ExtraArgs @("--glob", "*.lua", "--glob", "!**/Init.lua")
+    -ExtraArgs @("--glob", "*.lua", "--glob", "!Init.lua", "--glob", "!**/Init.lua")
 
 Add-RgCheck `
     -Name "UI back-edge: Frames -> Utils" `
