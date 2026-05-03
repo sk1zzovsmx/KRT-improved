@@ -553,7 +553,10 @@ def compact_release_note_entry(entry: str) -> str:
 def get_release_note_sections(changelog_sections: dict[str, list[str]]) -> list[tuple[str, list[str]]]:
     ordered_sections = (
         ("New Functionality", ("New Functionality", "Added")),
-        ("Enhancements/Improvement", ("Enhancements/Improvement", "Changed", "Fixed", "Removed")),
+        (
+            "Enhancements/Improvement",
+            ("Enhancements/Improvement", "Enhancements", "Changed", "Fixes", "Fixed", "Removed"),
+        ),
     )
 
     selected: list[tuple[str, list[str]]] = []

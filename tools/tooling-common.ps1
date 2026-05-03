@@ -232,9 +232,9 @@ function Write-KrtUtf8NoBom {
     }
 
     $encoding = New-Object System.Text.UTF8Encoding($false)
-    $content = [string]::Join([Environment]::NewLine, $Value)
+    $content = [string]::Join("`n", $Value)
     if ($Value.Count -gt 0) {
-        $content = $content + [Environment]::NewLine
+        $content = $content + "`n"
     }
 
     [System.IO.File]::WriteAllText($Path, $content, $encoding)
