@@ -17,9 +17,16 @@ function Normalize-TocEntry {
     return ($Entry.Trim() -replace "/", "\")
 }
 
+function Test-IsVendoredTocPath {
+    param([string]$Path)
+
+    $normalized = ([System.IO.Path]::GetFullPath($Path) -replace "\\", "/")
+    return ($normalized -match "/Libs/")
+}
+
 $tocFiles = @(
     Get-ChildItem -LiteralPath $repoRoot -Recurse -File -Filter "*.toc" |
-        Where-Object { $_.FullName -notmatch [regex]::Escape("\Libs\") } |
+        Where-Object { -not (Test-IsVendoredTocPath -Path $_.FullName) } |
         Sort-Object FullName
 )
 if ($tocFiles.Count -eq 0) {
