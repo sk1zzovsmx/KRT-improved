@@ -17,6 +17,7 @@ local Strings = feature.Strings
 local Time = feature.Time
 local Base64 = feature.Base64
 local IgnoredMobs = feature.IgnoredMobs or {}
+local LootSources = addon.LootSources or feature.LootSources
 
 local InternalEvents = Events.Internal
 
@@ -308,6 +309,56 @@ do
 
     local function getRecentLootDeathContextState()
         return LootContextState.SyncField(raidState, "recentDeath", "recentLootDeathContext", normalizeRecentLootDeathContext)
+    end
+
+    local function getRaidSourceContext(raid, raidNum, now)
+        local instanceName, instanceDifficulty, maxPlayers
+        if type(GetInstanceInfo) == "function" then
+            local liveName, _, liveDifficulty, _, liveMaxPlayers = GetInstanceInfo()
+            if type(liveName) == "string" and liveName ~= "" then
+                instanceName = liveName
+            end
+            liveDifficulty = tonumber(liveDifficulty) or 0
+            liveMaxPlayers = tonumber(liveMaxPlayers) or 0
+            if liveDifficulty > 0 then
+                instanceDifficulty = liveDifficulty
+            end
+            if liveMaxPlayers > 0 then
+                maxPlayers = liveMaxPlayers
+            end
+        end
+
+        local zoneName = instanceName or (raid and raid.zone) or nil
+        local difficulty = instanceDifficulty or tonumber(raid and raid.difficulty) or nil
+        local raidSize = maxPlayers or tonumber(raid and raid.size) or nil
+        local recentContext = getRecentLootDeathContextState()
+        local recentSourceNpcId
+        local recentSourceName
+
+        if type(recentContext) == "table" then
+            local resolvedRaidNum = tonumber(raidNum) or 0
+            local contextRaidNum = tonumber(recentContext.raidNum) or 0
+            local seenAt = tonumber(recentContext.seenAt) or 0
+            local currentTime = tonumber(now) or Time.GetCurrentTime()
+            local isCurrentRaid = resolvedRaidNum <= 0 or contextRaidNum == resolvedRaidNum
+            local isRecent = seenAt <= 0 or currentTime - seenAt <= RECENT_LOOT_DEATH_CONTEXT_TTL_SECONDS
+
+            if isCurrentRaid and isRecent then
+                recentSourceNpcId = tonumber(recentContext.sourceNpcId) or nil
+                recentSourceName = recentContext.sourceName
+            end
+        end
+
+        return {
+            raid = zoneName,
+            zoneName = zoneName,
+            difficulty = difficulty,
+            raidSize = raidSize,
+            recentSourceNpcId = recentSourceNpcId,
+            recentSourceName = recentSourceName,
+            now = tonumber(now) or Time.GetCurrentTime(),
+            raidNum = tonumber(raidNum) or 0,
+        }
     end
 
     local function setRecentLootDeathContext(raidNum, kind, sourceName, sourceNpcId, bossNid, source, seenAt)
@@ -908,6 +959,127 @@ do
         return tonumber(bossNid) or 0
     end
 
+    local function findOrCreateLootSourceBossNid(raid, raidNum, source, now)
+        if type(raid) ~= "table" or type(source) ~= "table" then
+            return 0
+        end
+
+        local sourceNpcId = tonumber(source.npcId) or 0
+        local sourceName = Strings.TrimText(source.npcName, true)
+        if sourceNpcId <= 0 or not sourceName or sourceName == "" then
+            return 0
+        end
+
+        local existingBoss = findBossBySourceNpcId(raid, sourceNpcId) or findBossByName(raid, sourceName)
+        if existingBoss then
+            local existingBossNid = tonumber(existingBoss.bossNid) or 0
+            if existingBossNid > 0 then
+                if source.kind == "boss" then
+                    Core.SetLastBoss(existingBossNid)
+                    setBossEventContext(raidNum, existingBossNid, sourceName, "LootSources", now)
+                end
+                return existingBossNid
+            end
+        end
+
+        Core.EnsureRaidSchema(raid)
+
+        local instanceDiff = resolveRaidDifficulty()
+        if not instanceDiff then
+            instanceDiff = tonumber(raid.difficulty) or nil
+        end
+
+        local currentTime = tonumber(now) or Time.GetCurrentTime()
+        local players = {}
+        local seenPlayers = {}
+        for unit in addon.UnitIterator(true) do
+            if UnitIsConnected(unit) then
+                local name = UnitName(unit)
+                if name then
+                    local resolvedName = Strings.NormalizeName(name, true) or name
+                    local playerNid = ensureRaidPlayerNid(resolvedName, raidNum)
+                    if playerNid > 0 and not seenPlayers[playerNid] then
+                        seenPlayers[playerNid] = true
+                        tinsert(players, playerNid)
+                    end
+                end
+            end
+        end
+
+        local bossNid = tonumber(raid.nextBossNid) or 1
+        raid.nextBossNid = bossNid + 1
+
+        local killInfo = {
+            bossNid = bossNid,
+            name = sourceName,
+            sourceNpcId = sourceNpcId,
+            sourceKind = source.kind,
+            source = "LootSources",
+            difficulty = instanceDiff,
+            mode = (instanceDiff == 3 or instanceDiff == 4) and "h" or "n",
+            players = players,
+            time = currentTime,
+            hash = Base64.Encode(raidNum .. "|" .. sourceName .. "|" .. bossNid),
+        }
+
+        tinsert(raid.bossKills, killInfo)
+        invalidateRaidRuntime(raid)
+
+        if source.kind == "boss" then
+            Core.SetLastBoss(bossNid)
+            setBossEventContext(raidNum, bossNid, sourceName, "LootSources", killInfo.time)
+        end
+
+        return bossNid
+    end
+
+    local function findOrCreateBossNidFromLootSource(raid, raidNum, itemId, rollSessionId, now, ttlSeconds)
+        local numericItemId = tonumber(itemId) or 0
+        if type(LootSources) ~= "table" or type(LootSources.FindSource) ~= "function" or numericItemId <= 0 then
+            return 0
+        end
+
+        local currentTime = tonumber(now) or Time.GetCurrentTime()
+        local context = getRaidSourceContext(raid, raidNum, currentTime)
+        local source = LootSources.FindSource(numericItemId, context)
+        local reason = type(source) == "table" and source.reason or nil
+
+        if reason == "missing" then
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogLootSourceMissing:format(tostring(numericItemId), tostring(context.raid)))
+            end
+            return 0
+        end
+
+        if reason == "ambiguous" then
+            local candidates = type(source.candidates) == "table" and #source.candidates or 0
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogLootSourceAmbiguous:format(tostring(numericItemId), tostring(context.raid), candidates))
+            end
+            return 0
+        end
+
+        local bossNid = findOrCreateLootSourceBossNid(raid, raidNum, source, currentTime)
+        if bossNid > 0 and rollSessionId then
+            rememberLootBossSession(raidNum, rollSessionId, bossNid, ttlSeconds)
+        end
+
+        if bossNid > 0 and isDebugEnabled() then
+            addon:debug(
+                Diag.D.LogLootSourceResolved:format(
+                    tostring(numericItemId),
+                    tostring(context.raid),
+                    tostring(source.npcName),
+                    tonumber(source.npcId) or 0,
+                    tostring(source.kind),
+                    tostring(source.confidence)
+                )
+            )
+        end
+
+        return bossNid
+    end
+
     local function findOrCreateTrashBossNid(raidNum, raid)
         local bossKills = raid and raid.bossKills or {}
         for i = #bossKills, 1, -1 do
@@ -1040,6 +1212,9 @@ do
         local ttlSeconds = options.ttlSeconds
 
         local bossNid = findAndRememberBossContextForLoot(raid, raidNum, rollSessionId, currentTime, ttlSeconds, allowLootWindowContext, allowContextRecovery, true)
+        if bossNid <= 0 then
+            bossNid = findOrCreateBossNidFromLootSource(raid, raidNum, options.itemId, rollSessionId, currentTime, ttlSeconds)
+        end
         if bossNid <= 0 and allowTrashFallback then
             bossNid = findOrCreateTrashBossNid(raidNum, raid)
         end
