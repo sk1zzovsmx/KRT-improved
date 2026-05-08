@@ -64,6 +64,16 @@ do
         return name == TRASH_MOB_NAME or name == LEGACY_TRASH_MOB_NAME
     end
 
+    local function trimText(value, allowNil)
+        if Strings and type(Strings.TrimText) == "function" then
+            return Strings.TrimText(value, allowNil)
+        end
+        if value == nil then
+            return allowNil and nil or ""
+        end
+        return tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
+    end
+
     local BOSS_KILL_DEDUPE_WINDOW_SECONDS = tonumber(C.BOSS_KILL_DEDUPE_WINDOW_SECONDS) or 30
     local BOSS_EVENT_CONTEXT_TTL_SECONDS = tonumber(C.BOSS_EVENT_CONTEXT_TTL_SECONDS) or BOSS_KILL_DEDUPE_WINDOW_SECONDS
     local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = tonumber(C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60
@@ -965,7 +975,7 @@ do
         end
 
         local sourceNpcId = tonumber(source.npcId) or 0
-        local sourceName = Strings.TrimText(source.npcName, true)
+        local sourceName = trimText(source.npcName, true)
         if sourceNpcId <= 0 or not sourceName or sourceName == "" then
             return 0
         end

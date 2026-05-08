@@ -737,7 +737,7 @@ do
         return rollType, rollValue, rollSessionId, outcome
     end
 
-    local function resolveBossNidForLoot(raid, raidNum, rollSessionId, passiveGroupLoot, now)
+    local function resolveBossNidForLoot(raid, raidNum, rollSessionId, passiveGroupLoot, now, itemId)
         local raidService = Services.Raid
         if not raidService then
             return 0
@@ -746,6 +746,7 @@ do
         local allowLootWindowContext = lootState.opened == true and lootState.fromInventory ~= true
         return tonumber(raidService:FindOrCreateBossNidForLoot(raid, raidNum, rollSessionId, {
             now = tonumber(now) or Time.GetCurrentTime(),
+            itemId = itemId,
             allowContextRecovery = not passiveGroupLoot,
             allowLootWindowContext = allowLootWindowContext,
             allowTrashFallback = true,
@@ -890,7 +891,7 @@ do
 
         local currentTime = Time.GetCurrentTime()
         local raidService = Services.Raid
-        local bossNid = resolveBossNidForLoot(raid, currentRaidId, rollSessionId, passiveGroupLoot, currentTime)
+        local bossNid = resolveBossNidForLoot(raid, currentRaidId, rollSessionId, passiveGroupLoot, currentTime, itemId)
         local lootSource = copyLootSourceForRecord(raidService, currentRaidId, bossNid)
         if bossNid <= 0 then
             if addon.hasDebug then
@@ -967,6 +968,7 @@ do
         if resolvedBossNid <= 0 and raidService then
             resolvedBossNid = raidService:FindOrCreateBossNidForLoot(raid, raidNum, rollSessionId, {
                 now = currentTime,
+                itemId = itemId,
                 allowContextRecovery = false,
                 allowTrashFallback = true,
                 ttlSeconds = GROUP_LOOT_PENDING_AWARD_TTL_SECONDS,
