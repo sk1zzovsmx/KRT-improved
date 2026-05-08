@@ -1073,6 +1073,12 @@ do
         end
 
         local bossNid = findOrCreateLootSourceBossNid(raid, raidNum, source, currentTime)
+        if bossNid > 0 then
+            setActiveLootSource(raid, raidNum, source.kind, bossNid, {
+                npcId = tonumber(source.npcId) or 0,
+                name = source.npcName,
+            }, currentTime, ttlSeconds, nil)
+        end
         if bossNid > 0 and rollSessionId then
             rememberLootBossSession(raidNum, rollSessionId, bossNid, ttlSeconds)
         end
@@ -1230,6 +1236,11 @@ do
         end
         if bossNid <= 0 and allowTrashFallback then
             bossNid = findOrCreateTrashBossNid(raidNum, raid)
+            if bossNid > 0 and not module:GetActiveLootSource(raidNum, bossNid) then
+                setActiveLootSource(raid, raidNum, "trash", bossNid, {
+                    name = TRASH_MOB_NAME,
+                }, currentTime, ttlSeconds, nil)
+            end
         end
         if bossNid > 0 then
             if allowLootWindowContext then

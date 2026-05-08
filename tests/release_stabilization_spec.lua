@@ -5115,6 +5115,12 @@ test("group loot source resolver assigns boss item without timing context", func
     assertEqual(raid.bossKills[1].sourceNpcId, 15953, "expected boss item to preserve the source npc id")
     assertEqual(#raid.loot, 1, "expected boss item to create one loot row")
     assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected loot row to bind to boss source")
+    local lootSource = raid.loot[1].lootSource
+    assertTrue(lootSource ~= nil, "expected boss item to persist loot source provenance")
+    assertEqual(lootSource.kind, "boss", "expected boss item provenance kind")
+    assertEqual(lootSource.bossNid, raid.bossKills[1].bossNid, "expected boss item provenance boss nid")
+    assertEqual(lootSource.sourceNpcId, 15953, "expected boss item provenance npc id")
+    assertEqual(lootSource.sourceName, "Grand Widow Faerlina", "expected boss item provenance source name")
 end)
 
 test("group loot source resolver assigns named trash without timing context", function()
@@ -5144,6 +5150,12 @@ test("group loot source resolver assigns named trash without timing context", fu
     assertEqual(h.Core.GetLastBoss(), nil, "expected named trash source not to become lastBoss")
     assertEqual(#raid.loot, 1, "expected trash item to create one loot row")
     assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected loot row to bind to trash source")
+    local lootSource = raid.loot[1].lootSource
+    assertTrue(lootSource ~= nil, "expected trash item to persist loot source provenance")
+    assertEqual(lootSource.kind, "trash", "expected trash item provenance kind")
+    assertEqual(lootSource.bossNid, raid.bossKills[1].bossNid, "expected trash item provenance boss nid")
+    assertEqual(lootSource.sourceNpcId, 15989, "expected trash item provenance npc id")
+    assertEqual(lootSource.sourceName, "Naxxramas Cultist", "expected trash item provenance source name")
 end)
 
 test("group loot source resolver falls back when item source is ambiguous", function()
@@ -5176,6 +5188,11 @@ test("group loot source resolver falls back when item source is ambiguous", func
     assertEqual(raid.bossKills[1].name, "_TrashMob_", "expected ambiguous source to fall back to TrashMob")
     assertEqual(#raid.loot, 1, "expected ambiguous item source to create one loot row")
     assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected loot row to bind to fallback source")
+    local lootSource = raid.loot[1].lootSource
+    assertTrue(lootSource ~= nil, "expected ambiguous item source to persist fallback provenance")
+    assertEqual(lootSource.kind, "trash", "expected ambiguous item provenance to stay on fallback trash")
+    assertEqual(lootSource.bossNid, raid.bossKills[1].bossNid, "expected fallback provenance boss nid")
+    assertEqual(lootSource.sourceName, "_TrashMob_", "expected fallback provenance source name")
 end)
 
 test("group loot trash rolls do not inherit previous boss death context", function()
