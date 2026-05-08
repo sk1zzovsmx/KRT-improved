@@ -5031,6 +5031,127 @@ test("group loot sessions keep boss association without relying on lastBoss", fu
     assertEqual(raid.loot[1].bossNid, 10, "expected scoped session association to preserve original boss context")
 end)
 
+local function newGroupLootSourceResolverHarness(itemId, itemName, rollId, message, sourceData)
+    local h = newHarness()
+    local link = h.registerItem(itemId, itemName)
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h.addon.State.lastBoss = nil
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    _G.GetInstanceInfo = function()
+        return "Naxxramas", "raid", 3
+    end
+    _G.GetLootRollItemLink = function(activeRollId)
+        if activeRollId == rollId then
+            return link
+        end
+        return nil
+    end
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == message then
+            return rollId, 88, link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.addon.LootSources.SetDataForTests({
+        [itemId] = sourceData,
+    })
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+    h.addon.Loot = h.addon.Services.Loot
+
+    return h, h.addon.Services.Raid
+end
+
+test("group loot source resolver assigns boss item without timing context", function()
+    local h, Raid = newGroupLootSourceResolverHarness(91730, "Resolver Boss Blade", 301, "resolver-boss-win", {
+        {
+            npcId = 15953,
+            npcName = "Grand Widow Faerlina",
+            raid = "Naxxramas",
+            kind = "boss",
+        },
+    })
+
+    Raid:AddPassiveLootRoll(301, 45000)
+    assertEqual(h.addon.Loot:AddGroupLootMessage("resolver-boss-win"), "winner", "expected winner message")
+    Raid:AddLoot("resolver-boss-win")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected item source resolver to create one boss source record")
+    assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected boss item to bind to Faerlina")
+    assertEqual(raid.bossKills[1].sourceNpcId, 15953, "expected boss item to preserve the source npc id")
+    assertEqual(#raid.loot, 1, "expected boss item to create one loot row")
+    assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected loot row to bind to boss source")
+end)
+
+test("group loot source resolver assigns named trash without timing context", function()
+    local h, Raid = newGroupLootSourceResolverHarness(91731, "Resolver Trash Relic", 302, "resolver-trash-win", {
+        {
+            npcId = 15989,
+            npcName = "Naxxramas Cultist",
+            raid = "Naxxramas",
+            kind = "trash",
+        },
+    })
+
+    Raid:AddPassiveLootRoll(302, 45000)
+    assertEqual(h.addon.Loot:AddGroupLootMessage("resolver-trash-win"), "winner", "expected winner message")
+    Raid:AddLoot("resolver-trash-win")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected item source resolver to create one trash source record")
+    assertEqual(raid.bossKills[1].name, "Naxxramas Cultist", "expected trash item to bind to named source")
+    assertEqual(raid.bossKills[1].sourceNpcId, 15989, "expected trash item to preserve the source npc id")
+    assertEqual(raid.bossKills[1].sourceKind, "trash", "expected trash item to preserve source kind")
+    assertEqual(h.Core.GetLastBoss(), nil, "expected named trash source not to become lastBoss")
+    assertEqual(#raid.loot, 1, "expected trash item to create one loot row")
+    assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected loot row to bind to trash source")
+end)
+
+test("group loot source resolver falls back when item source is ambiguous", function()
+    local h, Raid = newGroupLootSourceResolverHarness(91732, "Resolver Ambiguous Charm", 303, "resolver-ambiguous-win", {
+        {
+            npcId = 15953,
+            npcName = "Grand Widow Faerlina",
+            raid = "Naxxramas",
+            kind = "boss",
+        },
+        {
+            npcId = 15954,
+            npcName = "Noth the Plaguebringer",
+            raid = "Naxxramas",
+            kind = "boss",
+        },
+    })
+
+    Raid:AddPassiveLootRoll(303, 45000)
+    assertEqual(h.addon.Loot:AddGroupLootMessage("resolver-ambiguous-win"), "winner", "expected winner message")
+    Raid:AddLoot("resolver-ambiguous-win")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(#raid.bossKills, 1, "expected ambiguous item source to create one fallback record")
+    assertEqual(raid.bossKills[1].name, "_TrashMob_", "expected ambiguous source to fall back to TrashMob")
+    assertEqual(#raid.loot, 1, "expected ambiguous item source to create one loot row")
+    assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected loot row to bind to fallback source")
+end)
+
 test("group loot trash rolls do not inherit previous boss death context", function()
     local h = newHarness()
     local bossLink = h.registerItem(91710, "Group Boss Blade")
