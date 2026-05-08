@@ -3559,6 +3559,63 @@ test("trade-only loot creates a reusable lootNid", function()
     assertEqual(raid.loot[1].rollValue, 77, "expected logger update to keep same entry")
 end)
 
+test("loot source resolver filters candidates by raid and mode", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/LootSources.lua")
+
+    h.addon.LootSources._SetDataForTests({
+        [91710] = {
+            {
+                npcId = 15953,
+                npcName = "Grand Widow Faerlina",
+                raid = "Naxxramas",
+                kind = "boss",
+                modes = { normal10 = true },
+            },
+            {
+                npcId = 36612,
+                npcName = "Lord Marrowgar",
+                raid = "Icecrown Citadel",
+                kind = "boss",
+                modes = { normal10 = true },
+            },
+        },
+    })
+
+    local resolved = h.addon.LootSources.Resolve(91710, {
+        raid = "Naxxramas",
+        difficulty = 3,
+        raidSize = 10,
+    })
+
+    assertEqual(resolved.reason, nil, "expected a resolved source")
+    assertEqual(resolved.npcId, 15953, "expected the Naxxramas source to match")
+    assertEqual(resolved.npcName, "Grand Widow Faerlina", "expected resolved boss name")
+    assertEqual(resolved.kind, "boss", "expected boss source kind")
+    assertEqual(resolved.confidence, "exact", "expected exact source confidence")
+end)
+
+test("loot source resolver refuses ambiguous candidates without context", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/LootSources.lua")
+
+    h.addon.LootSources._SetDataForTests({
+        [91712] = {
+            { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "boss" },
+            { npcId = 15954, npcName = "Noth the Plaguebringer", raid = "Naxxramas", kind = "boss" },
+        },
+    })
+
+    local resolved = h.addon.LootSources.Resolve(91712, {
+        raid = "Naxxramas",
+        difficulty = 3,
+        raidSize = 10,
+    })
+
+    assertEqual(resolved.reason, "ambiguous", "expected shared boss item to stay ambiguous")
+    assertEqual(#resolved.candidates, 2, "expected both candidates to be reported")
+end)
+
 test("group loot need selections log passive NE history on loot receipt", function()
     local h = newHarness()
     local link = h.registerItem(9150, "Needblade")
