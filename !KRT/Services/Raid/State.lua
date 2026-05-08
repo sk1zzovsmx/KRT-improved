@@ -970,7 +970,10 @@ do
             return 0
         end
 
-        local existingBoss = findBossBySourceNpcId(raid, sourceNpcId) or findBossByName(raid, sourceName)
+        local existingBoss = findBossBySourceNpcId(raid, sourceNpcId)
+        if not existingBoss and source.kind == "boss" then
+            existingBoss = findBossByName(raid, sourceName)
+        end
         if existingBoss then
             local existingBossNid = tonumber(existingBoss.bossNid) or 0
             if existingBossNid > 0 then
