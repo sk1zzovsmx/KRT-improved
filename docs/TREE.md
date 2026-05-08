@@ -190,6 +190,8 @@
 |   \\-- settings.json
 |-- docs
 |   |-- superpowers
+|   |   |-- plans
+|   |   |   \\-- 2026-05-08-raid-loot-source-resolver.md
 |   |   \\-- specs
 |   |       |-- 2026-04-28-options-timer-refactor-design.md
 |   |       \\-- 2026-05-08-raid-loot-source-resolver-design.md
