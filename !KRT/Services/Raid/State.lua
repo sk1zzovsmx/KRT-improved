@@ -1236,7 +1236,7 @@ do
         end
         if bossNid <= 0 and allowTrashFallback then
             bossNid = findOrCreateTrashBossNid(raidNum, raid)
-            if bossNid > 0 and not module:GetActiveLootSource(raidNum, bossNid) then
+            if bossNid > 0 then
                 setActiveLootSource(raid, raidNum, "trash", bossNid, {
                     name = TRASH_MOB_NAME,
                 }, currentTime, ttlSeconds, nil)
