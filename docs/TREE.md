@@ -191,7 +191,8 @@
 |-- docs
 |   |-- superpowers
 |   |   \\-- specs
-|   |       \\-- 2026-04-28-options-timer-refactor-design.md
+|   |       |-- 2026-04-28-options-timer-refactor-design.md
+|   |       \\-- 2026-05-08-raid-loot-source-resolver-design.md
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
 |   |-- API_REGISTRY.csv
