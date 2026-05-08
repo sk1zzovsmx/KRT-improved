@@ -246,6 +246,6 @@ function LootSources.FindSource(itemId, context)
     return { reason = "ambiguous", candidates = candidates }
 end
 
-function LootSources._SetDataForTests(byItemId)
+function LootSources.SetDataForTests(byItemId)
     addon.LootSourcesData.ByItemId = byItemId or {}
 end

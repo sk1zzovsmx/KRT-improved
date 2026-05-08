@@ -3563,7 +3563,7 @@ test("loot source resolver filters candidates by raid and mode", function()
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
-    h.addon.LootSources._SetDataForTests({
+    h.addon.LootSources.SetDataForTests({
         [91710] = {
             {
                 npcId = 15953,
@@ -3606,7 +3606,7 @@ test("loot source resolver refuses ambiguous candidates without context", functi
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
-    h.addon.LootSources._SetDataForTests({
+    h.addon.LootSources.SetDataForTests({
         [91712] = {
             { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "boss" },
             { npcId = 15954, npcName = "Noth the Plaguebringer", raid = "Naxxramas", kind = "boss" },
