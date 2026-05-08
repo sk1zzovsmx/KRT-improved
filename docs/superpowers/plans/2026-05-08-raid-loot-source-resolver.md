@@ -24,7 +24,7 @@ PowerShell repo gates through `tools/krt.py`.
 
 - Create `!KRT/Modules/LootSources.lua`
   Pure resolver facade. It exports `addon.LootSources.GetCandidates`,
-  `addon.LootSources.Resolve`, and `_SetDataForTests`.
+  `addon.LootSources.FindSource`, and `_SetDataForTests`.
 
 - Modify `!KRT/!KRT.toc`
   Load `Modules\LootSourcesData.lua` and `Modules\LootSources.lua` after `Modules\Item.lua`.
@@ -83,7 +83,7 @@ test("loot source resolver filters candidates by raid and mode", function()
         },
     })
 
-    local resolved = h.addon.LootSources.Resolve(91710, {
+    local resolved = h.addon.LootSources.FindSource(91710, {
         raid = "Naxxramas",
         difficulty = 3,
         raidSize = 10,
@@ -107,7 +107,7 @@ test("loot source resolver refuses ambiguous candidates without context", functi
         },
     })
 
-    local resolved = h.addon.LootSources.Resolve(91712, {
+    local resolved = h.addon.LootSources.FindSource(91712, {
         raid = "Naxxramas",
         difficulty = 3,
         raidSize = 10,
@@ -353,7 +353,7 @@ function LootSources.GetCandidates(itemId)
     return candidates
 end
 
-function LootSources.Resolve(itemId, context)
+function LootSources.FindSource(itemId, context)
     local candidates = filterCandidates(LootSources.GetCandidates(itemId), context or {})
     if #candidates == 0 then
         return { reason = "missing", candidates = candidates }
@@ -839,7 +839,7 @@ Add this helper near `findAndRememberBossContextForLoot`:
 
 ```lua
 local function findOrCreateBossNidFromLootSource(raid, raidNum, itemId, rollSessionId, now, ttlSeconds)
-    if not (LootSources and LootSources.Resolve) then
+    if not (LootSources and LootSources.FindSource) then
         return 0
     end
 
@@ -849,7 +849,7 @@ local function findOrCreateBossNidFromLootSource(raid, raidNum, itemId, rollSess
     end
 
     local context = getRaidSourceContext(raid, raidNum, now)
-    local source = LootSources.Resolve(resolvedItemId, context)
+    local source = LootSources.FindSource(resolvedItemId, context)
     if type(source) ~= "table" then
         return 0
     end

@@ -3589,7 +3589,7 @@ test("loot source resolver filters candidates by raid and mode", function()
         },
     })
 
-    local resolved = h.addon.LootSources.Resolve(91710, {
+    local resolved = h.addon.LootSources.FindSource(91710, {
         raid = "Naxxramas",
         difficulty = 3,
         raidSize = 10,
@@ -3613,7 +3613,7 @@ test("loot source resolver refuses ambiguous candidates without context", functi
         },
     })
 
-    local resolved = h.addon.LootSources.Resolve(91712)
+    local resolved = h.addon.LootSources.FindSource(91712)
 
     assertEqual(resolved.reason, "ambiguous", "expected shared boss item to stay ambiguous")
     assertEqual(#resolved.candidates, 2, "expected both candidates to be reported")

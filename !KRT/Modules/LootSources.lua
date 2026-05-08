@@ -223,7 +223,7 @@ function LootSources.GetCandidates(itemId)
     return candidates
 end
 
-function LootSources.Resolve(itemId, context)
+function LootSources.FindSource(itemId, context)
     local candidates = filterCandidates(LootSources.GetCandidates(itemId), context)
     if #candidates == 0 then
         return { reason = "missing", candidates = candidates }

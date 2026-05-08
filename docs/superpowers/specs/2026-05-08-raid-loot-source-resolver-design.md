@@ -52,12 +52,12 @@ Initial public API:
 
 ```lua
 addon.LootSources.GetCandidates(itemId)
-addon.LootSources.Resolve(itemId, context)
+addon.LootSources.FindSource(itemId, context)
 ```
 
 `GetCandidates(itemId)` returns every known raid source for the item.
 
-`Resolve(itemId, context)` returns either a single resolved source or an unresolved reason. The API should
+`FindSource(itemId, context)` returns either a single resolved source or an unresolved reason. The API should
 avoid choosing randomly when multiple candidates remain plausible.
 
 Candidate shape:
@@ -146,7 +146,7 @@ New flow:
 1. Keep the existing session and pending-award behavior unchanged.
 2. When `Loot:AddLoot` has parsed `itemId`, call a loot-source resolver before timing-based fallback.
 3. If a `GL:*` roll session already has a remembered `bossNid`, keep using it.
-4. If `LootSources.Resolve(itemId, context)` returns one compatible source, create or reuse the matching
+4. If `LootSources.FindSource(itemId, context)` returns one compatible source, create or reuse the matching
    boss/trash record and bind the roll session to that `bossNid`.
 5. If the resolver returns `ambiguous` or `missing`, keep the current fallback path.
 
