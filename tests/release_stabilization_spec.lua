@@ -3579,6 +3579,13 @@ test("loot source resolver filters candidates by raid and mode", function()
                 kind = "boss",
                 modes = { normal10 = true },
             },
+            {
+                npcId = 15954,
+                npcName = "Noth the Plaguebringer",
+                raid = "Naxxramas",
+                kind = "boss",
+                modes = { normal25 = true },
+            },
         },
     })
 
