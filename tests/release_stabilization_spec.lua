@@ -3619,6 +3619,52 @@ test("loot source resolver refuses ambiguous candidates without context", functi
     assertEqual(#resolved.candidates, 2, "expected both candidates to be reported")
 end)
 
+test("loot source resolver ignores malformed candidates", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/LootSources.lua")
+
+    h.addon.LootSources.SetDataForTests({
+        [91713] = {
+            { kind = "boss" },
+            { npcId = 0, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "boss" },
+            { npcId = 15953, npcName = "", raid = "Naxxramas", kind = "boss" },
+            { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "", kind = "boss" },
+            { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "unknown" },
+        },
+    })
+
+    local resolved = h.addon.LootSources.FindSource(91713)
+
+    assertEqual(resolved.reason, "missing", "expected malformed candidates to be ignored")
+    assertEqual(#resolved.candidates, 0, "expected no malformed candidates to be reported")
+end)
+
+test("loot source candidates do not expose mutable mode data", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/LootSources.lua")
+
+    h.addon.LootSources.SetDataForTests({
+        [91714] = {
+            {
+                npcId = 15953,
+                npcName = "Grand Widow Faerlina",
+                raid = "Naxxramas",
+                kind = "boss",
+                modes = { normal10 = true },
+            },
+        },
+    })
+
+    local candidates = h.addon.LootSources.GetCandidates(91714)
+    candidates[1].modes.normal10 = false
+    candidates[1].modes.heroic25 = true
+
+    local freshCandidates = h.addon.LootSources.GetCandidates(91714)
+
+    assertTrue(freshCandidates[1].modes.normal10 == true, "expected mode flags to be copied from backing data")
+    assertTrue(freshCandidates[1].modes.heroic25 == nil, "expected returned mode mutations not to affect backing data")
+end)
+
 test("group loot need selections log passive NE history on loot receipt", function()
     local h = newHarness()
     local link = h.registerItem(9150, "Needblade")

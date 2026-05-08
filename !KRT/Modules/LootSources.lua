@@ -43,18 +43,39 @@ local function normalizeText(value)
     return strlower(text)
 end
 
+local function copyModes(modes)
+    if type(modes) ~= "table" then
+        return nil
+    end
+
+    local copied = {}
+    for key, value in pairs(modes) do
+        copied[key] = value
+    end
+    return copied
+end
+
 local function copyCandidate(candidate)
     return {
         npcId = tonumber(candidate.npcId),
         npcName = candidate.npcName,
         raid = candidate.raid,
         kind = candidate.kind,
-        modes = candidate.modes,
+        modes = copyModes(candidate.modes),
     }
 end
 
 local function isValidCandidate(candidate)
-    return type(candidate) == "table" and VALID_SOURCE_KINDS[candidate.kind] == true
+    if type(candidate) ~= "table" or VALID_SOURCE_KINDS[candidate.kind] ~= true then
+        return false
+    end
+
+    local npcId = tonumber(candidate.npcId)
+    if not npcId or npcId <= 0 then
+        return false
+    end
+
+    return normalizeText(candidate.npcName) ~= nil and normalizeText(candidate.raid) ~= nil
 end
 
 local function getModeKey(context)
