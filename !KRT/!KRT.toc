@@ -42,6 +42,8 @@ Modules\Events.lua
 Modules\Colors.lua
 Modules\Strings.lua
 Modules\Item.lua
+Modules\LootSourcesData.lua
+Modules\LootSources.lua
 Modules\IgnoredItems.lua
 Modules\IgnoredMobs.lua
 Modules\Comms.lua

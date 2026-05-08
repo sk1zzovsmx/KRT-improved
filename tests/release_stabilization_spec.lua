@@ -2139,6 +2139,10 @@ local function newHarness()
                 "!KRT/Services/Loot/Rules.lua",
                 "!KRT/Services/Loot/Service.lua",
             }
+            local lootSourceFiles = {
+                "!KRT/Modules/LootSourcesData.lua",
+                "!KRT/Modules/LootSources.lua",
+            }
             local raidServiceFiles = {
                 "!KRT/Services/Raid/State.lua",
                 "!KRT/Services/Raid/Capabilities.lua",
@@ -2159,12 +2163,22 @@ local function newHarness()
                 end
             end
 
+            if path == "!KRT/Modules/LootSources.lua" then
+                loadFiles(lootSourceFiles)
+                feature.LootSources = addon.LootSources
+                return addon.LootSources
+            end
+
             if path == "!KRT/Services/Loot.lua" then
+                loadFiles(lootSourceFiles)
+                feature.LootSources = addon.LootSources
                 loadFiles(lootServiceFiles)
                 return addon.Services.Loot
             end
 
             if path == "!KRT/Services/Raid.lua" then
+                loadFiles(lootSourceFiles)
+                feature.LootSources = addon.LootSources
                 loadFiles(lootServiceFiles)
                 loadFiles(raidServiceFiles)
                 local raid = addon.Services.Raid
@@ -4471,12 +4485,23 @@ test("loot window recent trash death blocks boss event recovery without unit pro
     assertEqual(raid.loot[1].bossNid, 2, "expected recent trash loot to bind to TrashMob")
 end)
 
-test("loot source recovery does not load static item source tables", function()
+test("loot source modules load after item helpers and before ignored item tables", function()
     local file = assert(io.open("!KRT/!KRT.toc", "r"))
     local toc = file:read("*a")
     file:close()
 
-    assertTrue(string.find(toc, "Modules\\LootSources.lua", 1, true) == nil, "expected loot source recovery to avoid static item-to-boss tables")
+    local itemIndex = string.find(toc, "Modules\\Item.lua", 1, true)
+    local dataIndex = string.find(toc, "Modules\\LootSourcesData.lua", 1, true)
+    local resolverIndex = string.find(toc, "Modules\\LootSources.lua", 1, true)
+    local ignoredIndex = string.find(toc, "Modules\\IgnoredItems.lua", 1, true)
+
+    assertTrue(itemIndex ~= nil, "expected Item module in TOC")
+    assertTrue(dataIndex ~= nil, "expected LootSourcesData module in TOC")
+    assertTrue(resolverIndex ~= nil, "expected LootSources module in TOC")
+    assertTrue(ignoredIndex ~= nil, "expected IgnoredItems module in TOC")
+    assertTrue(itemIndex < dataIndex, "expected LootSourcesData to load after Item")
+    assertTrue(dataIndex < resolverIndex, "expected LootSources to load after LootSourcesData")
+    assertTrue(resolverIndex < ignoredIndex, "expected LootSources to load before IgnoredItems")
 end)
 
 test("loot window recent boss death resolves boss context without raid target probes", function()

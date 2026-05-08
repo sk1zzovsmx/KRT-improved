@@ -117,7 +117,10 @@ Entrypoints stay narrow:
 
 Common infra under `!KRT/Modules/`:
 
-- Data/utility: `Timer`, `Events`, `Strings`, `Item`, `Time`, `Sort`, `Comms`, `Base64`, `Colors`
+- Data/utility: `Timer`, `Events`, `Strings`, `Item`, `LootSourcesData`, `LootSources`, `Time`,
+  `Sort`, `Comms`, `Base64`, `Colors`
+- `Modules/LootSourcesData.lua` - static raid item-source data
+- `Modules/LootSources.lua` - itemId -> raid source resolver
 - UI infra: `Frames`, `UIScaffold`, `ListController`, `MultiSelect`, `UI` facade, `UIEffects`
 - Messaging: `Bus`
 - Feature toggles: `Features`
