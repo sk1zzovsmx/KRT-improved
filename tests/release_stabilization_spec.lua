@@ -5078,9 +5078,11 @@ local function newGroupLootSourceResolverHarness(itemId, itemName, rollId, messa
     local resolverCalls = {}
     local findSource = h.addon.LootSources.FindSource
     h.addon.LootSources.FindSource = function(activeItemId, context)
+        local raid = h.Core.EnsureRaidById(1)
         resolverCalls[#resolverCalls + 1] = {
             itemId = activeItemId,
             context = context,
+            bossKillCountBeforeResolver = raid and #raid.bossKills or nil,
         }
         return findSource(activeItemId, context)
     end
@@ -5107,6 +5109,7 @@ test("group loot source resolver assigns boss item without timing context", func
     assertEqual(#resolverCalls, 1, "expected item source resolver to be invoked once")
     assertEqual(resolverCall.itemId, 91730, "expected resolver to receive the boss item id")
     assertEqual(resolverCall.context.raid, "Naxxramas", "expected resolver to receive raid context")
+    assertEqual(resolverCall.bossKillCountBeforeResolver, 0, "expected resolver to run before source creation")
     assertEqual(#raid.bossKills, 1, "expected item source resolver to create one boss source record")
     assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected boss item to bind to Faerlina")
     assertEqual(raid.bossKills[1].sourceNpcId, 15953, "expected boss item to preserve the source npc id")
@@ -5133,6 +5136,7 @@ test("group loot source resolver assigns named trash without timing context", fu
     assertEqual(#resolverCalls, 1, "expected item source resolver to be invoked once")
     assertEqual(resolverCall.itemId, 91731, "expected resolver to receive the trash item id")
     assertEqual(resolverCall.context.raid, "Naxxramas", "expected resolver to receive raid context")
+    assertEqual(resolverCall.bossKillCountBeforeResolver, 0, "expected resolver to run before source creation")
     assertEqual(#raid.bossKills, 1, "expected item source resolver to create one trash source record")
     assertEqual(raid.bossKills[1].name, "Naxxramas Cultist", "expected trash item to bind to named source")
     assertEqual(raid.bossKills[1].sourceNpcId, 15989, "expected trash item to preserve the source npc id")
@@ -5167,6 +5171,7 @@ test("group loot source resolver falls back when item source is ambiguous", func
     assertEqual(#resolverCalls, 1, "expected item source resolver to be invoked once before fallback")
     assertEqual(resolverCall.itemId, 91732, "expected resolver to receive the ambiguous item id")
     assertEqual(resolverCall.context.raid, "Naxxramas", "expected resolver to receive raid context")
+    assertEqual(resolverCall.bossKillCountBeforeResolver, 0, "expected resolver to run before fallback source creation")
     assertEqual(#raid.bossKills, 1, "expected ambiguous item source to create one fallback record")
     assertEqual(raid.bossKills[1].name, "_TrashMob_", "expected ambiguous source to fall back to TrashMob")
     assertEqual(#raid.loot, 1, "expected ambiguous item source to create one loot row")
