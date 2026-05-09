@@ -24,6 +24,15 @@ local VALID_SOURCE_KINDS = {
     trash = true,
 }
 
+local VALID_MODE_KEYS = {
+    normal10 = true,
+    normal20 = true,
+    normal25 = true,
+    normal40 = true,
+    heroic10 = true,
+    heroic25 = true,
+}
+
 -- ----- Private helpers ----- --
 local function trimText(value)
     if Strings and Strings.TrimText then
@@ -85,14 +94,14 @@ local function getModeKey(context)
 
     if type(context.mode) == "string" then
         local mode = normalizeText(context.mode)
-        if mode == "normal10" or mode == "normal25" or mode == "heroic10" or mode == "heroic25" then
+        if VALID_MODE_KEYS[mode] == true then
             return mode
         end
     end
 
     local raidSize = tonumber(context.raidSize)
     local difficulty = tonumber(context.difficulty)
-    if raidSize ~= 10 and raidSize ~= 25 then
+    if raidSize ~= 10 and raidSize ~= 20 and raidSize ~= 25 and raidSize ~= 40 then
         if difficulty == 3 or difficulty == 5 then
             raidSize = 10
         elseif difficulty == 4 or difficulty == 6 then
@@ -100,13 +109,17 @@ local function getModeKey(context)
         end
     end
 
-    if raidSize ~= 10 and raidSize ~= 25 then
+    if raidSize ~= 10 and raidSize ~= 20 and raidSize ~= 25 and raidSize ~= 40 then
         return nil
     end
 
     local heroic = difficulty == 5 or difficulty == 6
     if context.isHeroic == true or context.heroic == true then
         heroic = true
+    end
+
+    if raidSize == 20 or raidSize == 40 then
+        return "normal" .. tostring(raidSize)
     end
 
     return (heroic and "heroic" or "normal") .. tostring(raidSize)

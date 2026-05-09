@@ -3679,6 +3679,41 @@ test("loot source candidates do not expose mutable mode data", function()
     assertTrue(freshCandidates[1].modes.heroic25 == nil, "expected returned mode mutations not to affect backing data")
 end)
 
+test("loot source resolver filters legacy raid sizes by mode", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/LootSources.lua")
+
+    h.addon.LootSources.SetDataForTests({
+        [91715] = {
+            {
+                npcId = 10184,
+                npcName = "Onyxia",
+                raid = "Onyxia's Lair",
+                kind = "boss",
+                modes = { normal40 = true },
+            },
+            {
+                npcId = 10184,
+                npcName = "Onyxia",
+                raid = "Onyxia's Lair",
+                kind = "boss",
+                modes = { normal25 = true },
+            },
+        },
+    })
+
+    local resolved = h.addon.LootSources.FindSource(91715, {
+        raid = "Onyxia's Lair",
+        difficulty = 1,
+        raidSize = 40,
+    })
+
+    assertEqual(resolved.reason, nil, "expected a resolved legacy-size source")
+    assertEqual(resolved.npcId, 10184, "expected Onyxia source to match")
+    assertTrue(resolved.modes.normal40 == true, "expected the 40-player source to match")
+    assertTrue(resolved.modes.normal25 == nil, "expected the 25-player source to be filtered out")
+end)
+
 test("group loot need selections log passive NE history on loot receipt", function()
     local h = newHarness()
     local link = h.registerItem(9150, "Needblade")
