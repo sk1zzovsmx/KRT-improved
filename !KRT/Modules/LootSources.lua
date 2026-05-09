@@ -176,40 +176,6 @@ local function withConfidence(candidate, confidence)
     return resolved
 end
 
-local function findUniqueRecentCandidate(candidates, context)
-    if type(context) ~= "table" then
-        return nil
-    end
-
-    local recentNpcId = tonumber(context.recentSourceNpcId)
-    local recentName = normalizeText(context.recentSourceName)
-    if not recentNpcId and not recentName then
-        return nil
-    end
-
-    local matched
-    local matchedCount = 0
-    for i = 1, #candidates do
-        local candidate = candidates[i]
-        local isMatch = false
-        if recentNpcId and tonumber(candidate.npcId) == recentNpcId then
-            isMatch = true
-        elseif recentName and normalizeText(candidate.npcName) == recentName then
-            isMatch = true
-        end
-
-        if isMatch then
-            matched = candidate
-            matchedCount = matchedCount + 1
-        end
-    end
-
-    if matchedCount == 1 then
-        return matched
-    end
-    return nil
-end
-
 local function findSharedTrashCandidate(candidates)
     local sharedNpcId
     local sharedCandidate
@@ -233,6 +199,10 @@ local function findSharedTrashCandidate(candidates)
     end
 
     return sharedCandidate
+end
+
+local function setDataForTests(byItemId)
+    addon.LootSourcesData.ByItemId = byItemId or {}
 end
 
 -- ----- Public methods ----- --
@@ -267,11 +237,6 @@ function LootSources.FindSource(itemId, context)
         return withConfidence(candidates[1], "exact")
     end
 
-    local recentCandidate = findUniqueRecentCandidate(candidates, context)
-    if recentCandidate then
-        return withConfidence(recentCandidate, "context")
-    end
-
     local sharedTrashCandidate = findSharedTrashCandidate(candidates)
     if sharedTrashCandidate then
         return withConfidence(sharedTrashCandidate, "shared-trash")
@@ -280,6 +245,4 @@ function LootSources.FindSource(itemId, context)
     return { reason = "ambiguous", candidates = candidates }
 end
 
-function LootSources.SetDataForTests(byItemId)
-    addon.LootSourcesData.ByItemId = byItemId or {}
-end
+LootSources._SetDataForTests = setDataForTests

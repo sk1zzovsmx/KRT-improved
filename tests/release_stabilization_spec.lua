@@ -3577,7 +3577,7 @@ test("loot source resolver filters candidates by raid and mode", function()
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
-    h.addon.LootSources.SetDataForTests({
+    h.addon.LootSources._SetDataForTests({
         [91710] = {
             {
                 npcId = 15953,
@@ -3620,7 +3620,7 @@ test("loot source resolver refuses ambiguous candidates without context", functi
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
-    h.addon.LootSources.SetDataForTests({
+    h.addon.LootSources._SetDataForTests({
         [91712] = {
             { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "boss" },
             { npcId = 15954, npcName = "Noth the Plaguebringer", raid = "Naxxramas", kind = "boss" },
@@ -3633,11 +3633,32 @@ test("loot source resolver refuses ambiguous candidates without context", functi
     assertEqual(#resolved.candidates, 2, "expected both candidates to be reported")
 end)
 
+test("loot source resolver refuses recent context disambiguation for shared boss items", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/LootSources.lua")
+
+    h.addon.LootSources._SetDataForTests({
+        [91716] = {
+            { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "boss" },
+            { npcId = 15954, npcName = "Noth the Plaguebringer", raid = "Naxxramas", kind = "boss" },
+        },
+    })
+
+    local resolved = h.addon.LootSources.FindSource(91716, {
+        raid = "Naxxramas",
+        recentSourceNpcId = 15953,
+        recentSourceName = "Grand Widow Faerlina",
+    })
+
+    assertEqual(resolved.reason, "ambiguous", "expected recent context not to pick one boss from shared loot")
+    assertEqual(#resolved.candidates, 2, "expected all shared boss candidates to remain visible")
+end)
+
 test("loot source resolver ignores malformed candidates", function()
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
-    h.addon.LootSources.SetDataForTests({
+    h.addon.LootSources._SetDataForTests({
         [91713] = {
             { kind = "boss" },
             { npcId = 0, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "boss" },
@@ -3657,7 +3678,7 @@ test("loot source candidates do not expose mutable mode data", function()
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
-    h.addon.LootSources.SetDataForTests({
+    h.addon.LootSources._SetDataForTests({
         [91714] = {
             {
                 npcId = 15953,
@@ -3683,7 +3704,7 @@ test("loot source resolver filters legacy raid sizes by mode", function()
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
-    h.addon.LootSources.SetDataForTests({
+    h.addon.LootSources._SetDataForTests({
         [91715] = {
             {
                 npcId = 10184,
@@ -5107,7 +5128,7 @@ local function newGroupLootSourceResolverHarness(itemId, itemName, rollId, messa
     end
 
     h:load("!KRT/Services/Loot.lua")
-    h.addon.LootSources.SetDataForTests({
+    h.addon.LootSources._SetDataForTests({
         [itemId] = sourceData,
     })
     h.feature.Services = h.addon.Services
@@ -5159,6 +5180,52 @@ test("group loot source resolver assigns boss item without timing context", func
     assertEqual(lootSource.bossNid, raid.bossKills[1].bossNid, "expected boss item provenance boss nid")
     assertEqual(lootSource.sourceNpcId, 15953, "expected boss item provenance npc id")
     assertEqual(lootSource.sourceName, "Grand Widow Faerlina", "expected boss item provenance source name")
+end)
+
+test("group loot source resolver exact item beats recent boss context", function()
+    local h, Raid, Loot, resolverCalls = newGroupLootSourceResolverHarness(91734, "Resolver Conflict Blade", 305, "resolver-conflict-win", {
+        {
+            npcId = 15953,
+            npcName = "Grand Widow Faerlina",
+            raid = "Naxxramas",
+            kind = "boss",
+        },
+    })
+    local currentTime = 1000
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+
+    local raid = h.Core.EnsureRaidById(1)
+    raid.bossKills = {
+        { bossNid = 10, name = "Sapphiron", time = 990 },
+    }
+    raid.nextBossNid = 11
+    h.feature.raidState.bossEventContext = {
+        raidNum = 1,
+        bossNid = 10,
+        name = "Sapphiron",
+        source = "UNIT_DIED",
+        seenAt = currentTime,
+    }
+    h.Core.SetLastBoss(nil)
+
+    Raid:AddPassiveLootRoll(305, 45000)
+    assertEqual(Loot:AddGroupLootMessage("resolver-conflict-win"), "winner", "expected winner message")
+    Raid:AddLoot("resolver-conflict-win")
+
+    raid = h.Core.EnsureRaidById(1)
+    local resolverCall = resolverCalls[1]
+    assertEqual(#resolverCalls, 1, "expected item source resolver to be invoked despite recent context")
+    assertEqual(resolverCall.itemId, 91734, "expected resolver to receive the exact item id")
+    assertEqual(resolverCall.bossKillCountBeforeResolver, 1, "expected resolver to run before creating the static source boss")
+    assertEqual(#raid.bossKills, 2, "expected exact item source to create a second boss source record")
+    assertEqual(raid.bossKills[1].name, "Sapphiron", "expected stale context boss to stay intact")
+    assertEqual(raid.bossKills[2].name, "Grand Widow Faerlina", "expected exact item source to beat recent Sapphiron context")
+    assertEqual(raid.loot[1].bossNid, raid.bossKills[2].bossNid, "expected loot row to bind to static item source")
 end)
 
 test("group loot source resolver assigns named trash without timing context", function()
@@ -5238,7 +5305,7 @@ test("group loot source resolver falls back when item source is ambiguous", func
         end
         return nil
     end
-    h.addon.LootSources.SetDataForTests({
+    h.addon.LootSources._SetDataForTests({
         [91732] = ambiguousSourceData,
         [91733] = {
             {
@@ -5275,6 +5342,58 @@ test("group loot source resolver falls back when item source is ambiguous", func
     assertEqual(lootSource.bossNid, raid.bossKills[2].bossNid, "expected fallback provenance boss nid")
     assertEqual(lootSource.sourceName, "_TrashMob_", "expected fallback provenance source name")
     assertTrue(lootSource.sourceName ~= "Grand Widow Faerlina", "expected fallback provenance not to retain stale boss source name")
+end)
+
+test("group loot source resolver ambiguous source blocks recent context fallback", function()
+    local h, Raid, Loot, resolverCalls = newGroupLootSourceResolverHarness(91735, "Resolver Ambiguous Context Charm", 306, "resolver-ambiguous-context-win", {
+        {
+            npcId = 15953,
+            npcName = "Grand Widow Faerlina",
+            raid = "Naxxramas",
+            kind = "boss",
+        },
+        {
+            npcId = 15954,
+            npcName = "Noth the Plaguebringer",
+            raid = "Naxxramas",
+            kind = "boss",
+        },
+    })
+    local currentTime = 1000
+    h.feature.Time.GetCurrentTime = function()
+        return currentTime
+    end
+    _G.GetTime = function()
+        return currentTime
+    end
+
+    local raid = h.Core.EnsureRaidById(1)
+    raid.bossKills = {
+        { bossNid = 10, name = "Grand Widow Faerlina", sourceNpcId = 15953, time = 990 },
+    }
+    raid.nextBossNid = 11
+    h.feature.raidState.bossEventContext = {
+        raidNum = 1,
+        bossNid = 10,
+        name = "Grand Widow Faerlina",
+        source = "UNIT_DIED",
+        seenAt = currentTime,
+    }
+    h.Core.SetLastBoss(nil)
+
+    Raid:AddPassiveLootRoll(306, 45000)
+    assertEqual(Loot:AddGroupLootMessage("resolver-ambiguous-context-win"), "winner", "expected winner message")
+    Raid:AddLoot("resolver-ambiguous-context-win")
+
+    raid = h.Core.EnsureRaidById(1)
+    local resolverCall = resolverCalls[1]
+    assertEqual(#resolverCalls, 1, "expected item source resolver to be invoked before context fallback")
+    assertEqual(resolverCall.itemId, 91735, "expected resolver to receive the ambiguous item id")
+    assertEqual(resolverCall.bossKillCountBeforeResolver, 1, "expected resolver to run before fallback creation")
+    assertEqual(#raid.bossKills, 2, "expected ambiguous item source to create one fallback record")
+    assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected recent context boss to stay intact")
+    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected ambiguous source to fall back to TrashMob")
+    assertEqual(raid.loot[1].bossNid, raid.bossKills[2].bossNid, "expected ambiguous loot row not to bind to recent context")
 end)
 
 test("group loot trash rolls do not inherit previous boss death context", function()

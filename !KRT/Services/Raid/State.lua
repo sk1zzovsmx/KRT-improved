@@ -1049,7 +1049,7 @@ do
     local function findOrCreateBossNidFromLootSource(raid, raidNum, itemId, rollSessionId, now, ttlSeconds)
         local numericItemId = tonumber(itemId) or 0
         if type(LootSources) ~= "table" or type(LootSources.FindSource) ~= "function" or numericItemId <= 0 then
-            return 0
+            return 0, "unavailable"
         end
 
         local currentTime = tonumber(now) or Time.GetCurrentTime()
@@ -1061,7 +1061,7 @@ do
             if isDebugEnabled() then
                 addon:debug(Diag.D.LogLootSourceMissing:format(tostring(numericItemId), tostring(context.raid)))
             end
-            return 0
+            return 0, "missing"
         end
 
         if reason == "ambiguous" then
@@ -1069,7 +1069,7 @@ do
             if isDebugEnabled() then
                 addon:debug(Diag.D.LogLootSourceAmbiguous:format(tostring(numericItemId), tostring(context.raid), candidates))
             end
-            return 0
+            return 0, "ambiguous"
         end
 
         local bossNid = findOrCreateLootSourceBossNid(raid, raidNum, source, currentTime)
@@ -1096,7 +1096,10 @@ do
             )
         end
 
-        return bossNid
+        if bossNid > 0 then
+            return bossNid
+        end
+        return 0, "unresolved"
     end
 
     local function findOrCreateTrashBossNid(raidNum, raid)
@@ -1230,9 +1233,9 @@ do
         local allowTrashFallback = options.allowTrashFallback == true
         local ttlSeconds = options.ttlSeconds
 
-        local bossNid = findAndRememberBossContextForLoot(raid, raidNum, rollSessionId, currentTime, ttlSeconds, allowLootWindowContext, allowContextRecovery, true)
-        if bossNid <= 0 then
-            bossNid = findOrCreateBossNidFromLootSource(raid, raidNum, options.itemId, rollSessionId, currentTime, ttlSeconds)
+        local bossNid, lootSourceReason = findOrCreateBossNidFromLootSource(raid, raidNum, options.itemId, rollSessionId, currentTime, ttlSeconds)
+        if bossNid <= 0 and lootSourceReason ~= "ambiguous" then
+            bossNid = findAndRememberBossContextForLoot(raid, raidNum, rollSessionId, currentTime, ttlSeconds, allowLootWindowContext, allowContextRecovery, true)
         end
         if bossNid <= 0 and allowTrashFallback then
             bossNid = findOrCreateTrashBossNid(raidNum, raid)

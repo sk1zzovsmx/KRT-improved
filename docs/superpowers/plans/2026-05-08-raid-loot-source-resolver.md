@@ -24,7 +24,7 @@ PowerShell repo gates through `tools/krt.py`.
 
 - Create `!KRT/Modules/LootSources.lua`
   Pure resolver facade. It exports `addon.LootSources.GetCandidates`,
-  `addon.LootSources.FindSource`, and `SetDataForTests`.
+  `addon.LootSources.FindSource`, and `_SetDataForTests`.
 
 - Modify `!KRT/!KRT.toc`
   Load `Modules\LootSourcesData.lua` and `Modules\LootSources.lua` after `Modules\Item.lua`.
@@ -64,7 +64,7 @@ test("loot source resolver filters candidates by raid and mode", function()
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
-    h.addon.LootSources.SetDataForTests({
+    h.addon.LootSources._SetDataForTests({
         [91710] = {
             {
                 npcId = 15953,
@@ -100,7 +100,7 @@ test("loot source resolver refuses ambiguous candidates without context", functi
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
-    h.addon.LootSources.SetDataForTests({
+    h.addon.LootSources._SetDataForTests({
         [91712] = {
             { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "boss" },
             { npcId = 15954, npcName = "Noth the Plaguebringer", raid = "Naxxramas", kind = "boss" },
@@ -375,9 +375,11 @@ function LootSources.FindSource(itemId, context)
     return { reason = "ambiguous", candidates = candidates }
 end
 
-function LootSources.SetDataForTests(byItemId)
+local function setDataForTests(byItemId)
     Data = { ByItemId = byItemId or {} }
 end
+
+LootSources._SetDataForTests = setDataForTests
 ```
 
 - [ ] **Step 3: Run resolver tests and verify they pass**
@@ -550,7 +552,7 @@ test("group loot source resolver assigns boss item without timing context", func
     end
 
     h:load("!KRT/Services/Loot.lua")
-    h.addon.LootSources.SetDataForTests({
+    h.addon.LootSources._SetDataForTests({
         [91730] = {
             { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "boss" },
         },
@@ -614,7 +616,7 @@ test("group loot source resolver assigns named trash without timing context", fu
     end
 
     h:load("!KRT/Services/Loot.lua")
-    h.addon.LootSources.SetDataForTests({
+    h.addon.LootSources._SetDataForTests({
         [91731] = {
             { npcId = 15989, npcName = "Naxxramas Cultist", raid = "Naxxramas", kind = "trash" },
         },
@@ -680,7 +682,7 @@ test("group loot source resolver falls back when item source is ambiguous", func
     end
 
     h:load("!KRT/Services/Loot.lua")
-    h.addon.LootSources.SetDataForTests({
+    h.addon.LootSources._SetDataForTests({
         [91732] = {
             { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "boss" },
             { npcId = 15954, npcName = "Noth the Plaguebringer", raid = "Naxxramas", kind = "boss" },
