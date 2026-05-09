@@ -25,7 +25,7 @@ timing-based fallbacks are considered. AtlasLoot and DataStore are not required 
 
 ## Current Coverage
 
-Current generated coverage includes: Vanilla, The Burning Crusade.
+Current generated coverage includes: Vanilla, The Burning Crusade, Wrath of the Lich King.
 
 The table is intentionally conservative for trash. Boss and encounter loot is generated from
 static guide tables, while generic trash sections without a unique NPC are omitted unless a
@@ -33,12 +33,12 @@ specific NPC mapping has been reviewed. This avoids replacing timing ambiguity w
 attribution.
 
 - Molten Core: 138 item IDs, 220 source edges, 11 NPC/encounter sources
-- Onyxia's Lair: 16 item IDs, 16 source edges, 1 NPC/encounter sources
+- Onyxia's Lair: 86 item IDs, 86 source edges, 1 NPC/encounter sources
 - Blackwing Lair: 78 item IDs, 92 source edges, 8 NPC/encounter sources
 - Zul'Gurub: 105 item IDs, 107 source edges, 13 NPC/encounter sources
 - Ruins of Ahn'Qiraj: 64 item IDs, 66 source edges, 7 NPC/encounter sources
 - Temple of Ahn'Qiraj: 121 item IDs, 123 source edges, 12 NPC/encounter sources
-- Naxxramas: 136 item IDs, 166 source edges, 14 NPC/encounter sources
+- Naxxramas: 492 item IDs, 630 source edges, 18 NPC/encounter sources
 - Karazhan: 146 item IDs, 200 source edges, 16 NPC/encounter sources
 - Gruul's Lair: 25 item IDs, 25 source edges, 2 NPC/encounter sources
 - Magtheridon's Lair: 18 item IDs, 18 source edges, 1 NPC/encounter sources
@@ -48,6 +48,13 @@ attribution.
 - Black Temple: 110 item IDs, 128 source edges, 11 NPC/encounter sources
 - Zul'Aman: 56 item IDs, 61 source edges, 6 NPC/encounter sources
 - Sunwell Plateau: 92 item IDs, 131 source edges, 7 NPC/encounter sources
+- The Obsidian Sanctum: 44 item IDs, 44 source edges, 1 NPC/encounter sources
+- The Eye of Eternity: 32 item IDs, 32 source edges, 1 NPC/encounter sources
+- Vault of Archavon: 701 item IDs, 797 source edges, 4 NPC/encounter sources
+- Ulduar: 421 item IDs, 545 source edges, 16 NPC/encounter sources
+- Trial of the Crusader: 561 item IDs, 3676 source edges, 36 NPC/encounter sources
+- Icecrown Citadel: 501 item IDs, 609 source edges, 14 NPC/encounter sources
+- The Ruby Sanctum: 56 item IDs, 56 source edges, 1 NPC/encounter sources
 
 ## Reference Sources
 
@@ -66,3 +73,14 @@ attribution.
 - https://www.wowhead.com/tbc/guide/sunwell-plateau-raid-gear-loot-burning-crusade-classic
 - https://www.wowhead.com/tbc/guide/the-eye-raid-gear-loot-burning-crusade-classic-wow
 - https://www.wowhead.com/tbc/guide/zulaman-za-loot-gear-guide-burning-crusade-classic
+- https://www.wowhead.com/wotlk/guide/raids/eye-of-eternity-loot
+- https://www.wowhead.com/wotlk/guide/raids/icecrown-citadel/loot
+- https://www.wowhead.com/wotlk/guide/raids/naxxramas/loot
+- https://www.wowhead.com/wotlk/guide/raids/obsidian-sanctum/loot
+- https://www.wowhead.com/wotlk/guide/raids/onyxias-lair-80/loot
+- https://www.wowhead.com/wotlk/guide/raids/ruby-sanctum/loot
+- https://www.wowhead.com/wotlk/guide/raids/trial-of-the-crusader/loot
+- https://www.wowhead.com/wotlk/guide/raids/trial-of-the-grand-crusader/loot
+- https://www.wowhead.com/wotlk/guide/raids/ulduar/loot
+- https://www.wowhead.com/wotlk/guide/raids/vault-of-archavon/loot
+- https://www.wowhead.com/wotlk/npc=38433/toravon-the-ice-watcher
