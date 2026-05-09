@@ -6,6 +6,13 @@ All notable changes to !KRT will be documented in this file.
 
 Release-Version: 0.7.1-beta.3
 
+### Enhancements
+
+- **Raid loot-source database** - Added a static item-to-NPC loot source
+  resolver for Vanilla, The Burning Crusade, and Wrath raid boss/encounter
+  drops so passive Group Loot and Need Before Greed logging can attribute
+  items by item ID before timing-based fallbacks run.
+
 ## [0.7.1-beta.3] - 2026-05-03
 
 ### Enhancements
