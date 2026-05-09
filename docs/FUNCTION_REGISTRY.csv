@@ -820,7 +820,7 @@
 "Modules","!KRT/Modules/LootSources.lua","239","259","LootSources.GetCandidates","method_dot","Yes","LootSources","","","","structural-pattern","keep","new"
 "Modules","!KRT/Modules/LootSources.lua","260","282","LootSources.FindSource","method_dot","Yes","LootSources","","","","structural-pattern","keep","new"
 "Modules","!KRT/Modules/LootSources.lua","283","285","LootSources.SetDataForTests","method_dot","Yes","LootSources","","","","structural-pattern","keep","new"
-"Modules","!KRT/Modules/LootSourcesData.lua","15","901","addSource","local_function","No","local","","","","structural-pattern","keep","new"
+"Modules","!KRT/Modules/LootSourcesData.lua","15","1766","addSource","local_function","No","local","","","","structural-pattern","keep","new"
 "Modules","!KRT/Modules/Sort.lua","22","28","Sort.CompareValues","method_dot","Yes","Sort","","","","structural-pattern","keep","new"
 "Modules","!KRT/Modules/Sort.lua","29","41","Sort.CompareNumbers","method_dot","Yes","Sort","","","","structural-pattern","keep","new"
 "Modules","!KRT/Modules/Sort.lua","42","45","Sort.CompareStrings","method_dot","Yes","Sort","","","","structural-pattern","keep","new"

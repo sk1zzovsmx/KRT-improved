@@ -25,7 +25,7 @@ timing-based fallbacks are considered. AtlasLoot and DataStore are not required 
 
 ## Current Coverage
 
-Current generated coverage includes: Vanilla.
+Current generated coverage includes: Vanilla, The Burning Crusade.
 
 The table is intentionally conservative for trash. Boss and encounter loot is generated from
 static guide tables, while generic trash sections without a unique NPC are omitted unless a
@@ -39,6 +39,15 @@ attribution.
 - Ruins of Ahn'Qiraj: 64 item IDs, 66 source edges, 7 NPC/encounter sources
 - Temple of Ahn'Qiraj: 121 item IDs, 123 source edges, 12 NPC/encounter sources
 - Naxxramas: 136 item IDs, 166 source edges, 14 NPC/encounter sources
+- Karazhan: 146 item IDs, 200 source edges, 16 NPC/encounter sources
+- Gruul's Lair: 25 item IDs, 25 source edges, 2 NPC/encounter sources
+- Magtheridon's Lair: 18 item IDs, 18 source edges, 1 NPC/encounter sources
+- Serpentshrine Cavern: 70 item IDs, 71 source edges, 6 NPC/encounter sources
+- The Eye: 54 item IDs, 54 source edges, 4 NPC/encounter sources
+- Hyjal Summit: 69 item IDs, 101 source edges, 5 NPC/encounter sources
+- Black Temple: 110 item IDs, 128 source edges, 11 NPC/encounter sources
+- Zul'Aman: 56 item IDs, 61 source edges, 6 NPC/encounter sources
+- Sunwell Plateau: 92 item IDs, 131 source edges, 7 NPC/encounter sources
 
 ## Reference Sources
 
@@ -49,3 +58,11 @@ attribution.
 - https://www.wowhead.com/classic/guide/temple-ahnqiraj-aq40-loot-classic-wow
 - https://www.wowhead.com/classic/guide/wow-classic-naxxramas-raid-loot-bosses-atiesh-frozen-runes
 - https://www.wowhead.com/classic/guide/wow-classic-zulgurub-loot-guide
+- https://www.wowhead.com/tbc/guide/black-temple-loot-gear-guide-burning-crusade-classic
+- https://www.wowhead.com/tbc/guide/gruuls-lair-and-magtheridons-lair-loot-guide-for-world-of-warcraft-burning-13462
+- https://www.wowhead.com/tbc/guide/hyjal-summit-loot-gear-guide-burning-crusade-classic
+- https://www.wowhead.com/tbc/guide/karazhan-raid-loot-gear-tier-tokens-burning-crusade-classic
+- https://www.wowhead.com/tbc/guide/serpentshrine-cavern-ssc-loot-gear-guide-burning-crusade-classic
+- https://www.wowhead.com/tbc/guide/sunwell-plateau-raid-gear-loot-burning-crusade-classic
+- https://www.wowhead.com/tbc/guide/the-eye-raid-gear-loot-burning-crusade-classic-wow
+- https://www.wowhead.com/tbc/guide/zulaman-za-loot-gear-guide-burning-crusade-classic
