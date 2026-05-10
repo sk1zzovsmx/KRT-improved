@@ -272,6 +272,9 @@ end
 local function reservesApi(tbl)
     return wrapServiceMethods(tbl, {
         "GetReserveCountForItem",
+        "GetItemReserveContext",
+        "GetRosterReserveMatchReport",
+        "GetNameMatchReport",
         "GetPlusForItem",
         "GetPlayersForItem",
         "HasCurrentRaidPlayersForItem",
@@ -600,6 +603,8 @@ local function newHarness()
     L.StrRollTimedOutTag = "OOT"
     L.StrRollOutTag = "OUT"
     L.StrRollBlockedTag = "BLK"
+    L.StrRollDuplicateTag = "DUP"
+    L.StrRollRerollOnlyTag = "REROLL"
     Diag.E.LogLoggerLootNidExpected = "[Logger] Loot:SetLootEntry expected lootNid but got raw itemId raidId=%s value=%s link=%s matches=%d"
     local InternalEvents = keyTable("Event")
     local Events = { Internal = InternalEvents }
@@ -1023,9 +1028,9 @@ local function newHarness()
             target.ScheduleTimer = function(self, callback, delay, ...)
                 local n = select("#", ...)
                 local args = (n > 0) and { ... } or nil
-                -- Forward declare handle: la closure interna lo riferisce, e in
-                -- Lua 5.1 `local x = f(function() ... x ... end)` cattura `x`
-                -- come globale (nil) — quindi va dichiarato prima.
+                -- Forward declare handle: the inner closure references it, and in
+                -- Lua 5.1 `local x = f(function() ... x ... end)` captures `x`
+                -- as a global (nil), so it must be declared first.
                 local handle
                 handle = addon.NewTimer(delay, function()
                     self._timerActive[handle] = nil
@@ -1501,9 +1506,9 @@ local function newHarness()
         C = C,
         Core = Core,
         Options = (function()
-            -- Stub conforme alla nuova API namespace registry. Tutte le opzioni
-            -- registrate vivono in `addon.options` (tabella piatta nei test) e in
-            -- una mappa key→namespace per Options.Set.
+            -- Stub matching the namespace registry API. Registered options live
+            -- in `addon.options` (a flat table in tests) and in a key-to-namespace
+            -- map for Options.Set.
             local namespaces = {}
             local keyToNs = {}
             local function getOrInitFlat()
@@ -8106,6 +8111,110 @@ test("accepted roll stays eligible after using the last allowed roll", function(
     assertTrue(first.isEligible == true, "expected recorded response to stay eligible in the UI model")
 end)
 
+test("reserved rolls exclude non-reservers and expose softres context in the display model", function()
+    local h = newHarness()
+    local link = h.registerItem(9305, "Reservedcontextblade")
+
+    h.addon.Services.Loot = {
+        GetItem = function(index)
+            if index ~= 1 then
+                return nil
+            end
+            return { itemLink = link }
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            if playerName == "Alice" or playerName == "Cara" then
+                return "raid1"
+            end
+            return "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        GetReserveCountForItem = function(itemId, name)
+            if itemId == 9305 and (name == "Alice" or name == "Bob") then
+                return 1
+            end
+            return 0
+        end,
+        GetPlayersForItem = function(itemId)
+            if itemId == 9305 then
+                return { "Alice", "Bob" }
+            end
+            return {}
+        end,
+        GetItemReserveContext = function(itemId)
+            if itemId == 9305 then
+                return {
+                    itemId = 9305,
+                    hasReserves = true,
+                    hasPresentReserve = true,
+                    totalReserveCount = 2,
+                    presentReserveCount = 1,
+                    missingReserveCount = 1,
+                    presentPlayers = { "Alice" },
+                    missingPlayers = { "Bob" },
+                    presentPlayersText = "Alice",
+                    missingPlayersText = "Bob",
+                    rosterFilterApplied = true,
+                }
+            end
+            return nil
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Services/Rolls/Service.lua")
+
+    local Rolls = h.addon.Services.Rolls
+    h.feature.lootState.lootCount = 1
+    h.feature.lootState.selectedItemCount = 1
+    h.feature.lootState.currentRollType = h.rollTypes.RESERVED
+    h.feature.lootState.fromInventory = false
+
+    Rolls:RecordRolls(true)
+    assertTrue(Rolls:SubmitDebugRoll("Cara", 99) ~= true, "expected a non-reserver to be denied during SR roll intake")
+    assertTrue(Rolls:SubmitDebugRoll("Alice", 88) == true, "expected an in-raid reserver to be accepted during SR roll intake")
+    Rolls:RecordRolls(false)
+
+    local model = Rolls:FetchRolls()
+    local alice
+    local bob
+    local cara
+
+    for i = 1, #(model.rows or {}) do
+        local row = model.rows[i]
+        if row.name == "Alice" then
+            alice = row
+        elseif row.name == "Bob" then
+            bob = row
+        elseif row.name == "Cara" then
+            cara = row
+        end
+    end
+
+    assertTrue(model ~= nil and model.srContext ~= nil, "expected SR display model to expose softres context")
+    assertEqual(model.srContext.totalReserveCount, 2, "expected SR model context to count all reservers")
+    assertEqual(model.srContext.eligibleReserveCount, 1, "expected SR model context to count in-raid reservers")
+    assertEqual(model.srContext.missingReserveCount, 1, "expected SR model context to count reservers outside raid")
+    assertEqual(model.srContext.eligibleReserveNames[1], "Alice", "expected SR model context to list eligible reservers")
+    assertEqual(model.srContext.missingReserveNames[1], "Bob", "expected SR model context to list missing reservers")
+    assertEqual(model.resolution.autoWinners[1].name, "Alice", "expected resolver to pick only the eligible SR roller")
+    assertTrue(alice ~= nil and alice.isReserved == true and alice.isEligible == true, "expected Alice to remain an eligible SR row")
+    assertTrue(bob ~= nil and bob.isReserved == true and bob.isEligible ~= true, "expected out-of-raid reserver to stay visible but ineligible")
+    assertEqual(bob.reason, "not_in_raid", "expected out-of-raid reserver to carry not-in-raid reason")
+    assertTrue(cara == nil, "expected non-reserver roll attempts to stay out of the SR display model")
+end)
+
 test("late accepted rolls show OOT info when intake remains open", function()
     local h = newHarness()
     local link = h.registerItem(9306, "Outoftimeblade")
@@ -8570,6 +8679,245 @@ test("master auto loot suggestions stay visual only", function()
     assertEqual(_G.KRTMasterHoldBtn._glow, false, "expected Hold to stay unhighlighted")
     assertEqual(_G.KRTMasterBankBtn._glow, false, "expected Bank to stay unhighlighted")
     assertEqual(_G.KRTMasterDisenchantBtn._glow, true, "expected Disenchant suggestion to highlight DE only")
+end)
+
+test("master workflow model names rolling and ready states without changing status text", function()
+    local h = newHarness()
+
+    h.addon.Services.Loot = {
+        GetItem = function()
+            return nil
+        end,
+        ItemExists = function()
+            return false
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Controllers/Master.lua")
+
+    local Master = h.addon.Controllers.Master
+    local Private = Master._Private
+
+    local idle = Private.BuildMasterWorkflowState({
+        currentFlowState = "idle",
+        hasItem = false,
+        rollModel = {},
+    })
+    local ready = Private.BuildMasterWorkflowState({
+        currentFlowState = "loot",
+        hasItem = true,
+        rollModel = {},
+    })
+    local srReady = Private.BuildMasterWorkflowState({
+        currentFlowState = "loot",
+        hasItem = true,
+        rollModel = {},
+        reserveContext = {
+            hasReserves = true,
+            totalReserveCount = 2,
+            presentReserveCount = 1,
+        },
+    })
+    local srRolling = Private.BuildMasterWorkflowState({
+        currentFlowState = "rolling",
+        hasItem = true,
+        rollModel = {
+            isSR = true,
+            selectionAllowed = false,
+            srContext = {
+                hasReserves = true,
+                eligibleReserveCount = 1,
+                totalReserveCount = 2,
+            },
+        },
+    })
+    local tie = Private.BuildMasterWorkflowState({
+        currentFlowState = "rolling",
+        hasItem = true,
+        rollModel = {
+            selectionAllowed = true,
+            requiredWinnerCount = 1,
+            msCount = 0,
+            resolution = {
+                requiresManualResolution = true,
+            },
+        },
+    })
+
+    assertEqual(idle.name, "idle", "expected no-item state to be named idle")
+    assertEqual(idle.statusText, "Select or drag an item to start.", "expected idle status text to stay unchanged")
+    assertEqual(ready.name, "ready", "expected normal loot state to be named ready")
+    assertEqual(ready.statusText, "Ready. Start a roll or use Hold, Bank, or DE.", "expected ready status text to stay unchanged")
+    assertEqual(srReady.name, "ready", "expected SoftRes context to avoid changing the ready workflow name")
+    assertEqual(srReady.statusText, "Ready. Start a roll or use Hold, Bank, or DE.", "expected SoftRes context to avoid changing ready status text")
+    assertEqual(srRolling.name, "rolling", "expected SR rolling context to keep the normal rolling workflow name")
+    assertEqual(srRolling.statusText, "Rolls are open. Responses: 0.", "expected SR rolling context to avoid adding row/status clutter")
+    assertEqual(tie.name, "resolve_tie", "expected manual tie state to be named explicitly")
+    assertEqual(tie.statusText, "Tie at the cutoff. Select winners manually before awarding.", "expected tie status text to stay unchanged")
+end)
+
+test("master workflow model centralizes button capabilities without changing gating", function()
+    local h = newHarness()
+
+    h.addon.Services.Loot = {
+        GetItem = function()
+            return nil
+        end,
+        ItemExists = function()
+            return false
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        HasData = function()
+            return false
+        end,
+        HasItemReserves = function()
+            return false
+        end,
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h:setRaidRoleState({
+        inRaid = true,
+        rank = 2,
+        isMasterLooter = true,
+    })
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Controllers/Master.lua")
+
+    local Master = h.addon.Controllers.Master
+    local Private = Master._Private
+
+    h.feature.lootState.lootCount = 1
+    h.feature.lootState.rollsCount = 0
+    h.feature.lootState.fromInventory = false
+
+    local ready = Private.BuildMasterWorkflowState({
+        canAwardSelection = false,
+        canRoll = false,
+        countdownRunning = false,
+        currentFlowState = "loot",
+        hasEligibleRaidReserve = true,
+        hasItem = true,
+        hasLootAccess = true,
+        hasReadyCheckAccess = true,
+        record = false,
+        rollModel = {},
+        rolled = false,
+    })
+    local countdown = Private.BuildMasterWorkflowState({
+        canAwardSelection = false,
+        canRoll = true,
+        countdownRunning = true,
+        currentFlowState = "countdown",
+        hasEligibleRaidReserve = true,
+        hasItem = true,
+        hasLootAccess = true,
+        hasReadyCheckAccess = true,
+        record = true,
+        rollModel = {},
+        rolled = false,
+    })
+    h.feature.lootState.rollsCount = 1
+    local awardReady = Private.BuildMasterWorkflowState({
+        canAwardSelection = true,
+        canRoll = false,
+        countdownRunning = false,
+        currentFlowState = "rolling",
+        displayedWinner = "Alice",
+        hasEligibleRaidReserve = true,
+        hasItem = true,
+        hasLootAccess = true,
+        hasReadyCheckAccess = true,
+        record = false,
+        rollModel = {
+            selectionAllowed = true,
+            requiredWinnerCount = 1,
+            resolution = {},
+        },
+        rolled = false,
+    })
+    local noAccess = Private.BuildMasterWorkflowState({
+        canAwardSelection = true,
+        canRoll = true,
+        countdownRunning = false,
+        currentFlowState = "loot",
+        hasEligibleRaidReserve = true,
+        hasItem = true,
+        hasLootAccess = false,
+        hasReadyCheckAccess = true,
+        record = true,
+        rollModel = {},
+        rolled = false,
+    })
+
+    assertEqual(ready.canStartRolls, true, "expected ready workflow to enable normal roll starts")
+    assertEqual(ready.canStartSR, true, "expected ready workflow to enable SR when raid reserves are eligible")
+    assertEqual(ready.canChangeItem, true, "expected ready workflow to allow item changes")
+    assertEqual(ready.canAward, false, "expected ready workflow to block award before rolls exist")
+    assertEqual(ready.canRollSelf, false, "expected ready workflow to block self-roll before countdown")
+    assertEqual(ready.canReserveList, true, "expected ready workflow to allow reserve list access")
+    assertEqual(ready.canSpamLoot, true, "expected ready workflow to allow spam loot")
+
+    assertEqual(countdown.canStartRolls, false, "expected countdown workflow to block starting new rolls")
+    assertEqual(countdown.canStartSR, false, "expected countdown workflow to block starting SR")
+    assertEqual(countdown.canChangeItem, false, "expected countdown workflow to lock item changes")
+    assertEqual(countdown.canAward, false, "expected countdown workflow to block awards")
+    assertEqual(countdown.canRollSelf, true, "expected countdown workflow to allow local roll submission")
+
+    assertEqual(awardReady.name, "award_ready", "expected winner-selected rolling workflow to be award-ready")
+    assertEqual(awardReady.canAward, true, "expected award-ready workflow to allow awarding")
+
+    assertTrue(noAccess.canStartRolls ~= true, "expected no-access workflow to block roll starts")
+    assertTrue(noAccess.canReserveList ~= true, "expected no-access workflow to block reserves UI")
+    assertTrue(noAccess.canSpamLoot ~= true, "expected no-access workflow to block spam loot")
 end)
 
 test("master dropdown click uses UIDropDown owner/value arguments", function()
@@ -9739,6 +10087,76 @@ test("tie reroll resets intake to tied players only", function()
     assertEqual(#Rolls:GetRolls(), 1, "expected tied players to remain eligible during the reroll")
 end)
 
+test("duplicate roll attempts stay visible on the accepted response row", function()
+    local h = newHarness()
+    local link = h.registerItem(9309, "Duplicateblade")
+
+    h.addon.Services.Loot = {
+        GetItem = function(index)
+            if index ~= 1 then
+                return nil
+            end
+            return { itemLink = link }
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.addon.Deformat = function(msg)
+        local name, roll = string.match(msg or "", "^(%a+)%s+(%d+)$")
+        if not name then
+            return nil
+        end
+        return name, tonumber(roll), 1, 100
+    end
+    _G.RANDOM_ROLL_RESULT = "%s %d"
+
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Services/Rolls/Service.lua")
+
+    local Rolls = h.addon.Services.Rolls
+    h.feature.lootState.lootCount = 1
+    h.feature.lootState.selectedItemCount = 1
+    h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
+
+    Rolls:RecordRolls(true)
+    assertTrue(Rolls:SubmitDebugRoll("Alice", 98) == true, "expected the first roll to be accepted")
+    local ok, reason = Rolls:SubmitDebugRoll("Alice", 77)
+    assertTrue(ok ~= true, "expected the duplicate roll to be denied")
+    assertEqual(reason, "roll_limit", "expected duplicate roll denial to carry the roll-limit reason")
+
+    local model = Rolls:FetchRolls()
+    local alice = model.rows[1]
+
+    assertEqual(#Rolls:GetRolls(), 1, "expected duplicate attempts to stay out of raw roll intake")
+    assertEqual(alice.name, "Alice", "expected accepted roller to stay visible")
+    assertEqual(alice.roll, 98, "expected accepted best roll to remain unchanged")
+    assertEqual(alice.outOfFlowReason, "roll_limit", "expected row to expose the duplicate denial reason")
+    assertEqual(alice.outOfFlowCount, 1, "expected row to count duplicate attempts")
+    assertEqual(alice.outOfFlowLastRoll, 77, "expected row to expose the last ignored duplicate roll")
+    assertEqual(alice.outOfFlowLastReason, "roll_limit", "expected row to expose the last ignored duplicate reason")
+    assertEqual(alice.outOfFlowLastSource, "debug_roll", "expected row to expose the last ignored duplicate source")
+    assertEqual(alice.outOfFlowText, nil, "expected duplicate detail text to stay out of the display model")
+    assertEqual(alice.infoText, "DUP", "expected row info to flag duplicate attempts")
+    assertEqual(model.outOfFlowCount, 1, "expected model to summarize out-of-flow attempts")
+end)
+
 test("master award button triggers reroll for single-select ties", function()
     local h = newHarness()
     local link = h.registerItem(9308, "Mastertieblade")
@@ -10316,6 +10734,287 @@ test("reserves format supports filtering to current raid players", function()
     assertTrue(hasRaidTwoPlayerViaModule == true, "expected module wrapper to forward HasCurrentRaidPlayersForItem args")
 end)
 
+test("reserves expose item and roster match context for master loot", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {
+        Alice = {
+            reserves = {
+                { rawID = 1201, plus = 4 },
+            },
+        },
+        Bob = {
+            reserves = {
+                { rawID = 1201, plus = 2 },
+            },
+        },
+        Cara = {
+            reserves = {
+                { rawID = 1301 },
+            },
+        },
+    }
+    h.addon.options.srImportMode = 1
+    h.addon.Services.Raid = {
+        GetPlayerID = function(_, name, raidNum)
+            local rid = tonumber(raidNum) or 0
+            if rid == 1 and name == "Alice" then
+                return 100
+            end
+            if rid == 2 and name == "Bob" then
+                return 200
+            end
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Reserves = h.addon.Services.Reserves
+    Reserves:Load()
+
+    local itemContext = Reserves:GetItemReserveContext(1201)
+    assertTrue(itemContext.hasReserves == true, "expected item context to report reserve data")
+    assertTrue(itemContext.hasPresentReserve == true, "expected item context to report a current-raid reserve")
+    assertEqual(itemContext.mode, "plus", "expected item context to expose import mode")
+    assertEqual(itemContext.totalReserveCount, 2, "expected item context to count all reservers")
+    assertEqual(itemContext.presentReserveCount, 1, "expected item context to count current-raid reservers")
+    assertEqual(itemContext.missingReserveCount, 1, "expected item context to count reserve names outside current raid")
+    assertEqual(itemContext.presentPlayersText, "Alice (P+4)", "expected present reserve text to keep plus data")
+    assertEqual(itemContext.missingPlayersText, "Bob (P+2)", "expected missing reserve text to keep plus data")
+
+    local report = Reserves:GetRosterReserveMatchReport()
+    assertEqual(report.totalReservePlayers, 3, "expected report to count unique imported reserve players")
+    assertEqual(report.presentReservePlayers, 1, "expected report to count reserve players in current raid")
+    assertEqual(report.missingReservePlayers, 2, "expected report to count reserve players outside current raid")
+    assertEqual(report.presentPlayersText, "Alice", "expected report to list current-raid reserve players")
+    assertEqual(report.missingPlayersText, "Bob, Cara", "expected report to list imported names missing from current raid")
+end)
+
+test("reserves name match report suggests read-only softres roster name fixes", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {
+        Alicee = {
+            reserves = {
+                { rawID = 1201 },
+            },
+        },
+        Bbo = {
+            reserves = {
+                { rawID = 1202 },
+            },
+        },
+        Cara = {
+            reserves = {
+                { rawID = 1203 },
+            },
+        },
+    }
+    h.addon.Services.Raid = {
+        GetPlayerID = function(_, name, raidNum)
+            local rid = tonumber(raidNum) or 0
+            if rid == 1 and (name == "Alice" or name == "Bob" or name == "Dan") then
+                return 100
+            end
+            return 0
+        end,
+        GetPlayers = function(_, raidNum)
+            if tonumber(raidNum) ~= 1 then
+                return {}
+            end
+            return {
+                { name = "Alice" },
+                { name = "Bob" },
+                { name = "Dan" },
+            }
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Reserves = h.addon.Services.Reserves
+    Reserves:Load()
+
+    local report = Reserves:GetNameMatchReport()
+
+    assertEqual(report.reservePlayersOutsideRaidText, "Alicee, Bbo, Cara", "expected all misspelled reserve names to be reported outside raid")
+    assertEqual(report.raidPlayersWithoutReserveText, "Alice, Bob, Dan", "expected all unmatched raid names to be reported without exact reserves")
+    assertEqual(#report.strongMatches, 1, "expected one strong name suggestion")
+    assertEqual(report.strongMatches[1].reserveName, "Alicee", "expected Alicee to be the strong reserve-side match")
+    assertEqual(report.strongMatches[1].raidName, "Alice", "expected Alice to be the strong raid-side match")
+    assertEqual(#report.weakMatches, 1, "expected one weak name suggestion")
+    assertEqual(report.weakMatches[1].reserveName, "Bbo", "expected Bbo to be the weak reserve-side match")
+    assertEqual(report.weakMatches[1].raidName, "Bob", "expected Bob to be the weak raid-side match")
+    assertEqual(report.unmatchedReservePlayersText, "Cara", "expected Cara to remain unmatched")
+    assertEqual(report.unmatchedRaidPlayersText, "Dan", "expected Dan to remain unmatched")
+    assertTrue(_G.KRT_Reserves.Alicee ~= nil, "expected name report to avoid mutating imported reserves")
+    assertTrue(_G.KRT_Reserves.Alice == nil, "expected name report to avoid writing corrected reserve names")
+end)
+
+test("reserves readiness report consolidates item roster and name-match context", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {
+        Alicee = {
+            reserves = {
+                { rawID = 1201 },
+            },
+        },
+        Bob = {
+            reserves = {
+                { rawID = 1201 },
+            },
+        },
+        Cara = {
+            reserves = {
+                { rawID = 1203 },
+            },
+        },
+    }
+    h.addon.Services.Raid = {
+        GetPlayerID = function(_, name, raidNum)
+            local rid = tonumber(raidNum) or 0
+            if rid == 1 and name == "Bob" then
+                return 100
+            end
+            return 0
+        end,
+        GetPlayers = function(_, raidNum)
+            if tonumber(raidNum) ~= 1 then
+                return {}
+            end
+            return {
+                { name = "Alice" },
+                { name = "Bob" },
+                { name = "Dan" },
+            }
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Reserves = h.addon.Services.Reserves
+    Reserves:Load()
+
+    local report = Reserves:GetReadinessReport(1201)
+
+    assertTrue(report ~= nil, "expected readiness report to be returned")
+    assertEqual(report.itemId, 1201, "expected readiness report to keep the current item id")
+    assertTrue(report.hasReserveData == true, "expected readiness report to detect imported SoftRes data")
+    assertTrue(report.hasItemReserves == true, "expected readiness report to detect current-item reserves")
+    assertTrue(report.hasEligibleItemReserve == true, "expected readiness report to detect an in-raid item reserver")
+    assertEqual(report.itemContext.totalReserveCount, 2, "expected readiness item context to count current-item reservers")
+    assertEqual(report.rosterReport.totalReservePlayers, 3, "expected readiness roster report to count imported players")
+    assertEqual(report.rosterReport.presentReservePlayers, 1, "expected readiness roster report to count exact in-raid SoftRes names")
+    assertEqual(report.nameMatchReport.strongMatches[1].reserveName, "Alicee", "expected readiness name report to include strong suggestions")
+    assertEqual(report.nameMatchReport.strongMatches[1].raidName, "Alice", "expected readiness name report to include the raid-side suggestion")
+    assertEqual(report.nameMatchReport.unmatchedReservePlayersText, "Cara", "expected readiness report to preserve unmatched reserve names")
+    assertEqual(report.summaryToken, "1201|1|1|2|3|1|2|1|0|Cara", "expected readiness token to summarize UI-relevant report changes")
+    assertTrue(_G.KRT_Reserves.Alicee ~= nil, "expected readiness report to avoid mutating imported reserves")
+    assertTrue(_G.KRT_Reserves.Alice == nil, "expected readiness report to avoid writing corrected reserve names")
+end)
+
+test("reserves readiness report exposes read-only health audit signals", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {
+        Alicee = {
+            reserves = {
+                { rawID = 1201 },
+            },
+        },
+        Bob = {
+            reserves = {
+                { rawID = 1201 },
+            },
+        },
+        Cara = {
+            reserves = {
+                { rawID = 1203 },
+            },
+        },
+    }
+    h.addon.Services.Raid = {
+        GetPlayerID = function(_, name, raidNum)
+            local rid = tonumber(raidNum) or 0
+            if rid == 1 and name == "Bob" then
+                return 100
+            end
+            return 0
+        end,
+        GetPlayers = function(_, raidNum)
+            if tonumber(raidNum) ~= 1 then
+                return {}
+            end
+            return {
+                { name = "Alice" },
+                { name = "Bob" },
+                { name = "Dan" },
+            }
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Reserves = h.addon.Services.Reserves
+    Reserves:Load()
+
+    local report = Reserves:GetReadinessReport(1201)
+    local health = report.health
+
+    assertTrue(type(health) == "table", "expected readiness report to expose health audit data")
+    assertEqual(health.severity, "warning", "expected mixed roster/import issues to produce warning severity")
+    assertEqual(health.issueCount, 4, "expected health audit to count issue categories")
+    assertEqual(health.importedPlayersOutsideRaidCount, 2, "expected health audit to count imported names outside raid")
+    assertEqual(health.raidPlayersWithoutReserveCount, 2, "expected health audit to count raid players without exact SoftRes")
+    assertEqual(health.suggestedNameMatchCount, 1, "expected health audit to count suggested name matches")
+    assertEqual(health.unmatchedReserveCount, 1, "expected health audit to count unmatched imported names after suggestions")
+    assertEqual(health.unmatchedRaidCount, 1, "expected health audit to count unmatched raid names after suggestions")
+    assertTrue(health.hasCurrentItemIssue ~= true, "expected current item with eligible reservers to avoid item issue")
+    assertTrue(_G.KRT_Reserves.Alicee ~= nil, "expected health audit to avoid mutating imported reserves")
+    assertTrue(_G.KRT_Reserves.Alice == nil, "expected health audit to avoid writing corrected reserve names")
+end)
+
+test("reserves readiness report marks no-data health as error", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {}
+    h.addon.Services.Raid = {
+        GetPlayerID = function()
+            return 0
+        end,
+        GetPlayers = function()
+            return {
+                { name = "Alice" },
+            }
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+    h:load("!KRT/Services/Reserves.lua")
+
+    local Reserves = h.addon.Services.Reserves
+    Reserves:Load()
+
+    local report = Reserves:GetReadinessReport(1201)
+    local health = report.health
+
+    assertEqual(health.severity, "error", "expected missing SoftRes data to produce error severity")
+    assertEqual(health.issueCount, 1, "expected no-data health to report one issue category")
+    assertTrue(health.hasNoData == true, "expected no-data health flag")
+    assertTrue(health.hasCurrentItemIssue ~= true, "expected no-data health to avoid duplicate current-item issue")
+end)
+
 test("slash help supports focused command pages", function()
     local h = newHarness()
     _G.SlashCmdList = {}
@@ -10336,6 +11035,157 @@ test("slash help supports focused command pages", function()
     _G.SlashCmdList.KRT("help logger")
 
     assertContains(h.logs.info, "Commands: valid subcommands for |caaf49141/krt logger|r:", "expected focused logger help header")
+end)
+
+test("slash reserves check prints current item softres readiness", function()
+    local h = newHarness()
+    local link = h.registerItem(1201, "Readiness Blade")
+    _G.SlashCmdList = {}
+
+    h.addon.Services.Raid = {
+        EnsureMasterOnlyAccess = function()
+            return true
+        end,
+    }
+    h.addon.Services.Loot = {
+        GetItemLink = function()
+            return link
+        end,
+    }
+    h.addon.Services.Reserves = {
+        GetReadinessReport = function(_, itemId)
+            assertEqual(itemId, 1201, "expected slash readiness check to pass the current item id")
+            return {
+                itemId = 1201,
+                hasReserveData = true,
+                hasItemReserves = true,
+                hasEligibleItemReserve = true,
+                itemContext = {
+                    totalReserveCount = 2,
+                    presentReserveCount = 1,
+                    missingReserveCount = 1,
+                    presentPlayersText = "Alice",
+                    missingPlayersText = "Bob",
+                },
+                rosterReport = {
+                    totalReservePlayers = 3,
+                    presentReservePlayers = 1,
+                    missingReservePlayers = 2,
+                    presentPlayersText = "Alice",
+                    missingPlayersText = "Bob, Cara",
+                },
+                nameMatchReport = {
+                    strongMatches = {
+                        { reserveName = "Alicee", raidName = "Alice" },
+                    },
+                    weakMatches = {},
+                    unmatchedReservePlayersText = "Cara",
+                    unmatchedRaidPlayersText = "Dan",
+                },
+                health = {
+                    severity = "warning",
+                    issueCount = 4,
+                    importedPlayersOutsideRaidCount = 2,
+                    raidPlayersWithoutReserveCount = 2,
+                    suggestedNameMatchCount = 1,
+                    unmatchedReserveCount = 1,
+                    unmatchedRaidCount = 1,
+                    hasCurrentItemIssue = false,
+                },
+            }
+        end,
+    }
+    h.feature.Services = h.addon.Services
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/EntryPoints/SlashEvents.lua")
+
+    _G.SlashCmdList.KRT("res check")
+
+    assertContains(h.logs.info, "SoftRes readiness:", "expected readiness report title")
+    assertContains(h.logs.info, "Current item: " .. link, "expected current item link in readiness report")
+    assertContains(h.logs.info, "Current item SoftRes: 1/2 players in raid.", "expected current item reserve summary")
+    assertContains(h.logs.info, "Item in raid: Alice", "expected current item present players")
+    assertContains(h.logs.info, "Item outside raid: Bob", "expected current item missing players")
+    assertContains(h.logs.info, "Imported SoftRes: 3 players, 1 in raid, 2 outside raid.", "expected roster summary")
+    assertContains(h.logs.info, "Health: Warning", "expected health severity in readiness report")
+    assertContains(h.logs.info, "Issues: 4", "expected health issue count in readiness report")
+    assertContains(h.logs.info, "Imported names outside raid: 2", "expected imported-outside-raid health signal")
+    assertContains(h.logs.info, "Raid players without exact SoftRes: 2", "expected raid-without-softres health signal")
+    assertContains(h.logs.info, "Suggested name matches: 1", "expected name-match health signal")
+    assertContains(h.logs.info, "Possible name matches: Alicee -> Alice", "expected name-match suggestions")
+    assertContains(h.logs.info, "Unmatched SoftRes names: Cara", "expected unmatched reserve names")
+    assertContains(h.logs.info, "Raid players without exact SoftRes: Dan", "expected unmatched raid names")
+end)
+
+test("slash softres check prints roster readiness without current item", function()
+    local h = newHarness()
+    _G.SlashCmdList = {}
+
+    h.addon.Services.Raid = {
+        EnsureMasterOnlyAccess = function()
+            return true
+        end,
+    }
+    h.addon.Services.Loot = {
+        GetItemLink = function()
+            return nil
+        end,
+    }
+    h.addon.Services.Reserves = {
+        GetReadinessReport = function(_, itemId)
+            assertEqual(itemId, nil, "expected slash readiness check to omit item id without current item")
+            return {
+                hasReserveData = true,
+                hasItemReserves = false,
+                hasEligibleItemReserve = false,
+                itemContext = {
+                    totalReserveCount = 0,
+                    presentReserveCount = 0,
+                    missingReserveCount = 0,
+                },
+                rosterReport = {
+                    totalReservePlayers = 2,
+                    presentReservePlayers = 2,
+                    missingReservePlayers = 0,
+                    presentPlayersText = "Alice, Bob",
+                    missingPlayersText = "",
+                },
+                nameMatchReport = {
+                    strongMatches = {},
+                    weakMatches = {},
+                    unmatchedReservePlayersText = "",
+                    unmatchedRaidPlayersText = "Cara",
+                },
+                health = {
+                    severity = "warning",
+                    issueCount = 1,
+                    importedPlayersOutsideRaidCount = 0,
+                    raidPlayersWithoutReserveCount = 1,
+                    suggestedNameMatchCount = 0,
+                    unmatchedReserveCount = 0,
+                    unmatchedRaidCount = 1,
+                    hasCurrentItemIssue = false,
+                },
+            }
+        end,
+    }
+    h.feature.Services = h.addon.Services
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/EntryPoints/SlashEvents.lua")
+
+    _G.SlashCmdList.KRT("sr check")
+
+    assertContains(h.logs.info, "SoftRes readiness:", "expected readiness report title")
+    assertContains(h.logs.info, "Current item: None", "expected no-current-item line")
+    assertContains(h.logs.info, "Imported SoftRes: 2 players, 2 in raid, 0 outside raid.", "expected roster summary")
+    assertContains(h.logs.info, "Health: Warning", "expected health severity for raid players without exact reserves")
+    assertContains(h.logs.info, "Issues: 1", "expected health issue count for raid players without exact reserves")
+    assertContains(h.logs.info, "In raid: Alice, Bob", "expected in-raid reserve players")
+    assertContains(h.logs.info, "Raid players without exact SoftRes: Cara", "expected raid players without exact reserves")
 end)
 
 test("slash perf toggles runtime performance logging", function()
