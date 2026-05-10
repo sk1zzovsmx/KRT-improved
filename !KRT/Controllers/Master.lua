@@ -1024,27 +1024,52 @@ do
         return tostring(suggestion.action or "") .. "|" .. tostring(suggestion.reason or "") .. "|" .. tostring(suggestion.targetKey or "")
     end
 
-    local function buildMasterStatusText(currentFlowState, rollModel, hasItem, displayedWinner, autoLootSuggestion)
-        local resolution = rollModel and rollModel.resolution or {}
-        local requiredWinnerCount = tonumber(rollModel and rollModel.requiredWinnerCount) or 1
-        local selectedCount = tonumber(rollModel and rollModel.msCount) or 0
-        local selectionAllowed = rollModel and rollModel.selectionAllowed == true
+    module._Private = Private
+
+    Private.BuildMasterWorkflowState = function(opts)
+        local currentFlowState = opts.currentFlowState
+        local rollModel = opts.rollModel or {}
+        local resolution = rollModel.resolution or {}
+        local requiredWinnerCount = tonumber(rollModel.requiredWinnerCount) or 1
+        local selectedCount = tonumber(rollModel.msCount) or 0
+        local selectionAllowed = rollModel.selectionAllowed == true
         local multiAward = lootState.multiAward
-        local currentTradeWinner = getCurrentTradeWinner()
-        local currentMultiWinner = getCurrentMultiAwardWinner()
+        local displayedWinner = opts.displayedWinner
+        local currentTradeWinner = opts.currentTradeWinner
+        local currentMultiWinner = opts.currentMultiWinner
+        local autoLootSuggestion = opts.autoLootSuggestion
+        local hasLootAccess = opts.hasLootAccess == true
+        local countdownRunning = opts.countdownRunning == true
+        local lootCount = tonumber(lootState.lootCount) or 0
+        local rollsCount = tonumber(lootState.rollsCount) or 0
+        local state = {
+            name = "ready",
+            statusText = L.StrMasterStatusReady,
+        }
 
         if requiredWinnerCount < 1 then
             requiredWinnerCount = 1
         end
 
-        if not hasItem then
-            return L.StrMasterStatusIdle
+        state.canStartRolls = hasLootAccess and lootCount >= 1 and not countdownRunning
+        state.canStartSR = state.canStartRolls and opts.hasEligibleRaidReserve == true
+        state.canChangeItem = hasLootAccess and currentFlowState ~= FLOW_STATES.COUNTDOWN
+        state.canAward = hasLootAccess and lootCount >= 1 and rollsCount >= 1 and not countdownRunning and opts.canAwardSelection == true
+        state.canReserveList = hasLootAccess
+        state.canRollSelf = hasLootAccess and opts.record == true and opts.canRoll == true and opts.rolled == false and countdownRunning
+        state.canSpamLoot = lootCount >= 1 and ((lootState.fromInventory and opts.hasReadyCheckAccess == true) or ((not lootState.fromInventory) and hasLootAccess))
+
+        if not opts.hasItem then
+            state.name = "idle"
+            state.statusText = L.StrMasterStatusIdle
+            return state
         end
 
         if currentFlowState == FLOW_STATES.MULTI_AWARD then
             local total = tonumber(multiAward and multiAward.total) or (multiAward and multiAward.winners and #multiAward.winners) or requiredWinnerCount
             local position = tonumber(multiAward and multiAward.index) or 1
             local currentWinner = currentMultiWinner or displayedWinner
+            state.name = "multi_award"
             if total < 1 then
                 total = requiredWinnerCount
             end
@@ -1052,78 +1077,118 @@ do
                 position = 1
             end
             if currentWinner and currentWinner ~= "" then
-                return L.StrMasterStatusMultiAward:format(position, total, currentWinner)
+                state.statusText = L.StrMasterStatusMultiAward:format(position, total, currentWinner)
+                return state
             end
             if selectedCount >= requiredWinnerCount and requiredWinnerCount > 1 then
-                return L.StrMasterStatusAwardSelection:format(selectedCount)
+                state.name = "award_ready"
+                state.statusText = L.StrMasterStatusAwardSelection:format(selectedCount)
+                return state
             end
-            return L.StrMasterStatusSelectWinners:format(requiredWinnerCount)
+            state.name = "select_winners"
+            state.statusText = L.StrMasterStatusSelectWinners:format(requiredWinnerCount)
+            return state
         end
 
         if currentFlowState == FLOW_STATES.TRADE then
+            state.name = "trade"
             if currentTradeWinner and currentTradeWinner ~= "" then
-                return L.StrMasterStatusTrade:format(currentTradeWinner)
+                state.statusText = L.StrMasterStatusTrade:format(currentTradeWinner)
+                return state
             end
-            return L.StrMasterStatusInventory
+            state.statusText = L.StrMasterStatusInventory
+            return state
         end
 
         if currentFlowState == FLOW_STATES.INVENTORY then
+            state.name = "inventory"
             if selectionAllowed and requiredWinnerCount > 1 then
                 if selectedCount >= requiredWinnerCount then
-                    return L.StrMasterStatusInventorySelection:format(selectedCount)
+                    state.name = "award_ready"
+                    state.statusText = L.StrMasterStatusInventorySelection:format(selectedCount)
+                    return state
                 end
-                return L.StrMasterStatusSelectWinners:format(requiredWinnerCount)
+                state.name = "select_winners"
+                state.statusText = L.StrMasterStatusSelectWinners:format(requiredWinnerCount)
+                return state
             end
             if displayedWinner and displayedWinner ~= "" then
-                return L.StrMasterStatusInventoryTarget:format(displayedWinner)
+                state.name = "award_ready"
+                state.statusText = L.StrMasterStatusInventoryTarget:format(displayedWinner)
+                return state
             end
             if selectionAllowed then
-                return L.StrMasterStatusPickWinner
+                state.name = "select_winner"
+                state.statusText = L.StrMasterStatusPickWinner
+                return state
             end
-            return L.StrMasterStatusInventory
+            state.statusText = L.StrMasterStatusInventory
+            return state
         end
 
         if currentFlowState == FLOW_STATES.COUNTDOWN then
-            return L.StrMasterStatusCountdown
+            state.name = "countdown"
+            state.statusText = L.StrMasterStatusCountdown
+            return state
         end
 
         if currentFlowState == FLOW_STATES.ROLLING then
+            state.name = "rolling"
             if not selectionAllowed then
-                if rollModel and rollModel.countdownExpired == true then
-                    return L.StrMasterStatusRollingBypassed:format(tonumber(lootState.rollsCount) or 0)
+                if rollModel.countdownExpired == true then
+                    state.name = "countdown_bypassed"
+                    state.statusText = L.StrMasterStatusRollingBypassed:format(tonumber(lootState.rollsCount) or 0)
+                    return state
                 end
-                return L.StrMasterStatusRolling:format(tonumber(lootState.rollsCount) or 0)
+                state.statusText = L.StrMasterStatusRolling:format(tonumber(lootState.rollsCount) or 0)
+                return state
             end
 
             if resolution.requiresManualResolution then
                 if requiredWinnerCount > 1 then
                     if selectedCount >= requiredWinnerCount then
-                        return L.StrMasterStatusAwardSelection:format(selectedCount)
+                        state.name = "award_ready"
+                        state.statusText = L.StrMasterStatusAwardSelection:format(selectedCount)
+                        return state
                     end
-                    return L.StrMasterStatusSelectWinners:format(requiredWinnerCount)
+                    state.name = "select_winners"
+                    state.statusText = L.StrMasterStatusSelectWinners:format(requiredWinnerCount)
+                    return state
                 end
-                return L.StrMasterStatusResolveTie
+                state.name = "resolve_tie"
+                state.statusText = L.StrMasterStatusResolveTie
+                return state
             end
 
             if requiredWinnerCount > 1 then
                 if selectedCount >= requiredWinnerCount then
-                    return L.StrMasterStatusAwardSelection:format(selectedCount)
+                    state.name = "award_ready"
+                    state.statusText = L.StrMasterStatusAwardSelection:format(selectedCount)
+                    return state
                 end
-                return L.StrMasterStatusSelectWinners:format(requiredWinnerCount)
+                state.name = "select_winners"
+                state.statusText = L.StrMasterStatusSelectWinners:format(requiredWinnerCount)
+                return state
             end
 
             if displayedWinner and displayedWinner ~= "" then
-                return L.StrMasterStatusAwardTarget:format(displayedWinner)
+                state.name = "award_ready"
+                state.statusText = L.StrMasterStatusAwardTarget:format(displayedWinner)
+                return state
             end
-            return L.StrMasterStatusPickWinner
+            state.name = "select_winner"
+            state.statusText = L.StrMasterStatusPickWinner
+            return state
         end
 
         local suggestionLabel = getAutoLootSuggestionLabel(autoLootSuggestion)
         if suggestionLabel then
-            return L.StrMasterStatusSuggestion:format(suggestionLabel)
+            state.name = "suggestion"
+            state.statusText = L.StrMasterStatusSuggestion:format(suggestionLabel)
+            return state
         end
 
-        return L.StrMasterStatusReady
+        return state
     end
 
     local function buildRollModeTooltip(label, needsReserves, selectedItemCount, hasEligibleRaidReserve)
@@ -1226,6 +1291,7 @@ do
 
     local function buildMasterButtonState(opts)
         local tooltipState = opts.tooltipState or {}
+        local workflowState = opts.workflowState or {}
         local hasLootAccess = opts.hasLootAccess
         local countdownRunning = opts.countdownRunning
         local autoLootSuggestion = opts.autoLootSuggestion
@@ -1254,20 +1320,20 @@ do
             reserveListTooltip = tooltipState.reserveList,
             lootCounterTooltip = tooltipState.lootCounter,
             canSelectItem = hasLootAccess and (lootState.lootCount > 1 or (lootState.fromInventory and lootState.lootCount >= 1)) and not countdownRunning,
-            canChangeItem = hasLootAccess and (opts.currentFlowState ~= FLOW_STATES.COUNTDOWN),
-            canSpamLoot = lootState.lootCount >= 1 and ((lootState.fromInventory and opts.hasReadyCheckAccess) or ((not lootState.fromInventory) and hasLootAccess)),
-            canStartRolls = opts.canStartRolls,
-            canStartSR = opts.canStartSR,
+            canChangeItem = workflowState.canChangeItem == true,
+            canSpamLoot = workflowState.canSpamLoot == true,
+            canStartRolls = workflowState.canStartRolls == true,
+            canStartSR = workflowState.canStartSR == true,
             canCountdown = hasLootAccess and lootState.lootCount >= 1 and opts.hasItem and (lootState.rollStarted or countdownRunning),
             canHold = hasLootAccess and lootState.lootCount >= 1 and lootState.holder,
             canBank = hasLootAccess and lootState.lootCount >= 1 and lootState.banker,
             canDisenchant = hasLootAccess and lootState.lootCount >= 1 and lootState.disenchanter,
-            canAward = hasLootAccess and lootState.lootCount >= 1 and lootState.rollsCount >= 1 and not countdownRunning and opts.canAwardSelection,
+            canAward = workflowState.canAward == true,
             reserveListText = opts.hasReserves and L.BtnOpenList or L.BtnInsertList,
-            canReserveList = hasLootAccess,
-            canRoll = hasLootAccess and opts.record and opts.canRoll and opts.rolled == false and countdownRunning,
+            canReserveList = workflowState.canReserveList == true,
+            canRoll = workflowState.canRollSelf == true,
             canClear = hasLootAccess and lootState.rollsCount >= 1,
-            glowSR = opts.canStartSR,
+            glowSR = workflowState.canStartSR == true,
             glowHoldSuggestion = hasLootAccess and suggestedAction == "hold" and lootState.holder,
             glowBankSuggestion = hasLootAccess and suggestedAction == "bank" and lootState.banker,
             glowDisenchantSuggestion = hasLootAccess and suggestedAction == "disenchant" and lootState.disenchanter,
@@ -2893,11 +2959,26 @@ do
         flagButtonsOnChange("countdownRun", countdownRunning)
         flagButtonsOnChange("flowState", currentFlowState)
 
-        local canStartRolls = hasLootAccess and lootState.lootCount >= 1 and not countdownRunning
-        local canStartSR = canStartRolls and hasEligibleRaidReserve
         local isTieReroll = shouldUseTieReroll(rollModel)
         local rollResolution, msCount, canAwardSelection = resolveAwardSelectionState(rollModel, isTieReroll)
-        local statusText = buildMasterStatusText(currentFlowState, rollModel, hasItem, displayedWinner, autoLootSuggestion)
+        local workflowState = Private.BuildMasterWorkflowState({
+            autoLootSuggestion = autoLootSuggestion,
+            canAwardSelection = canAwardSelection,
+            canRoll = canRoll,
+            countdownRunning = countdownRunning,
+            currentFlowState = currentFlowState,
+            currentMultiWinner = getCurrentMultiAwardWinner(),
+            currentTradeWinner = getCurrentTradeWinner(),
+            displayedWinner = displayedWinner,
+            hasEligibleRaidReserve = hasEligibleRaidReserve,
+            hasItem = hasItem,
+            hasLootAccess = hasLootAccess,
+            hasReadyCheckAccess = hasReadyCheckAccess,
+            record = record,
+            rollModel = rollModel,
+            rolled = rolled,
+        })
+        local statusText = workflowState.statusText
         local selectedItemCount = tonumber(lootState.selectedItemCount) or 1
         local awardTarget = displayedWinner or getCurrentTradeWinner() or getCurrentMultiAwardWinner()
         if selectedItemCount < 1 then
@@ -2915,18 +2996,18 @@ do
             msCount = msCount,
             rollModel = rollModel,
             selectedItemCount = selectedItemCount,
+            workflowState = workflowState,
         })
 
         flagButtonsOnChange("msCount", msCount)
         flagButtonsOnChange("manualResolution", rollResolution.requiresManualResolution == true)
+        flagButtonsOnChange("workflowState", workflowState.name)
         flagButtonsOnChange("statusText", statusText)
 
         if dirtyFlags.buttons then
             updateMasterButtonsIfChanged(buildMasterButtonState({
                 canAwardSelection = canAwardSelection,
                 canRoll = canRoll,
-                canStartRolls = canStartRolls,
-                canStartSR = canStartSR,
                 autoLootSuggestion = autoLootSuggestion,
                 countdownRunning = countdownRunning,
                 currentFlowState = currentFlowState,
@@ -2939,6 +3020,7 @@ do
                 rolled = rolled,
                 statusText = statusText,
                 tooltipState = tooltipState,
+                workflowState = workflowState,
             }))
             dirtyFlags.buttons = false
         end
