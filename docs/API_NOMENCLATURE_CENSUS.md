@@ -179,7 +179,7 @@ Showing first 80 of 259 non-conformant public methods. See docs/API_REGISTRY_PUB
 | addon.Controllers.Master:TRADE_CLOSED | !KRT/Controllers/Master.lua | 3624 |
 | addon.Controllers.Master:TRADE_REQUEST_CANCEL | !KRT/Controllers/Master.lua | 3630 |
 | addon.Controllers.Master:UI_ERROR_MESSAGE | !KRT/Controllers/Master.lua | 3556 |
-| addon.Services.Raid:COMBAT_LOG_EVENT_UNFILTERED | !KRT/Services/Raid/State.lua | 1665 |
+| addon.Services.Raid:COMBAT_LOG_EVENT_UNFILTERED | !KRT/Services/Raid/State.lua | 1686 |
 | addon.Services.Rolls:CHAT_MSG_SYSTEM | !KRT/Services/Rolls/Service.lua | 487 |
 
 ## Extraction Rules

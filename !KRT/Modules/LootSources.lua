@@ -12,6 +12,7 @@ local type, tonumber, tostring = type, tonumber, tostring
 local pairs = pairs
 local strlower = string.lower
 local gsub = string.gsub
+local concat = table.concat
 
 addon.LootSourcesData = addon.LootSourcesData or {}
 addon.LootSourcesData.ByItemId = addon.LootSourcesData.ByItemId or {}
@@ -71,7 +72,17 @@ local function copyCandidate(candidate)
         raid = candidate.raid,
         kind = candidate.kind,
         modes = copyModes(candidate.modes),
+        shared = candidate.shared == true,
+        note = candidate.note,
     }
+end
+
+local function copyCandidates(candidates)
+    local copied = {}
+    for i = 1, #candidates do
+        copied[#copied + 1] = copyCandidate(candidates[i])
+    end
+    return copied
 end
 
 local function isValidCandidate(candidate)
@@ -176,6 +187,71 @@ local function withConfidence(candidate, confidence)
     return resolved
 end
 
+local function withSharedContext(candidate, candidates)
+    local resolved = withConfidence(candidate, "shared-context")
+    resolved.shared = true
+    resolved.note = "Shared"
+    resolved.candidates = copyCandidates(candidates)
+    return resolved
+end
+
+local function buildSharedSourceName(candidates)
+    local names = {}
+    local seen = {}
+    for i = 1, #candidates do
+        local name = trimText(candidates[i].npcName)
+        if name ~= "" and not seen[name] then
+            names[#names + 1] = name
+            seen[name] = true
+        end
+    end
+
+    if #names == 0 then
+        return "Shared"
+    end
+    return "Shared: " .. concat(names, " / ")
+end
+
+local function buildSharedSource(candidates)
+    return {
+        reason = "shared",
+        npcId = 0,
+        npcName = buildSharedSourceName(candidates),
+        raid = candidates[1] and candidates[1].raid or nil,
+        kind = "shared",
+        confidence = "shared",
+        shared = true,
+        note = "Shared",
+        candidates = copyCandidates(candidates),
+    }
+end
+
+local function findRecentSourceCandidate(candidates, context)
+    if type(context) ~= "table" then
+        return nil
+    end
+
+    local recentSourceNpcId = tonumber(context.recentSourceNpcId) or 0
+    if recentSourceNpcId > 0 then
+        for i = 1, #candidates do
+            if tonumber(candidates[i].npcId) == recentSourceNpcId then
+                return candidates[i]
+            end
+        end
+    end
+
+    local recentSourceName = normalizeText(context.recentSourceName)
+    if recentSourceName then
+        for i = 1, #candidates do
+            if normalizeText(candidates[i].npcName) == recentSourceName then
+                return candidates[i]
+            end
+        end
+    end
+
+    return nil
+end
+
 local function findSharedTrashCandidate(candidates)
     local sharedNpcId
     local sharedCandidate
@@ -242,7 +318,12 @@ function LootSources.FindSource(itemId, context)
         return withConfidence(sharedTrashCandidate, "shared-trash")
     end
 
-    return { reason = "ambiguous", candidates = candidates }
+    local recentSourceCandidate = findRecentSourceCandidate(candidates, context)
+    if recentSourceCandidate then
+        return withSharedContext(recentSourceCandidate, candidates)
+    end
+
+    return buildSharedSource(candidates)
 end
 
 LootSources._SetDataForTests = setDataForTests

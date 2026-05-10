@@ -300,7 +300,7 @@ do
         end
 
         context.raidNum = tonumber(context.raidNum) or 0
-        context.kind = (context.kind == "boss" or context.kind == "trash") and context.kind or nil
+        context.kind = (context.kind == "boss" or context.kind == "trash" or context.kind == "shared") and context.kind or nil
         context.bossNid = tonumber(context.bossNid) or 0
         context.sourceNpcId = tonumber(context.sourceNpcId) or 0
         context.sourceName = context.sourceName or nil
@@ -356,6 +356,21 @@ do
             if isCurrentRaid and isRecent then
                 recentSourceNpcId = tonumber(recentContext.sourceNpcId) or nil
                 recentSourceName = recentContext.sourceName
+            end
+        end
+        if not recentSourceName then
+            local bossEventContext = getBossEventContextState()
+            if type(bossEventContext) == "table" then
+                local resolvedRaidNum = tonumber(raidNum) or 0
+                local contextRaidNum = tonumber(bossEventContext.raidNum) or 0
+                local seenAt = tonumber(bossEventContext.seenAt) or 0
+                local currentTime = tonumber(now) or Time.GetCurrentTime()
+                local isCurrentRaid = resolvedRaidNum <= 0 or contextRaidNum == resolvedRaidNum
+                local isRecent = seenAt <= 0 or currentTime - seenAt <= BOSS_EVENT_CONTEXT_TTL_SECONDS
+
+                if isCurrentRaid and isRecent then
+                    recentSourceName = bossEventContext.name
+                end
             end
         end
 
@@ -536,7 +551,7 @@ do
 
     setActiveLootSource = function(raid, raidNum, kind, bossNid, sourceMeta, now, ttlSeconds, snapshotId)
         local resolvedRaidNum = tonumber(raidNum) or 0
-        local resolvedKind = (kind == "boss" or kind == "trash" or kind == "object") and kind or nil
+        local resolvedKind = (kind == "boss" or kind == "trash" or kind == "shared" or kind == "object") and kind or nil
         if resolvedRaidNum <= 0 or not resolvedKind then
             clearLootSourceState()
             return nil
@@ -976,12 +991,18 @@ do
 
         local sourceNpcId = tonumber(source.npcId) or 0
         local sourceName = trimText(source.npcName, true)
-        if sourceNpcId <= 0 or not sourceName or sourceName == "" then
+        if not sourceName or sourceName == "" then
+            return 0
+        end
+        if source.kind ~= "shared" and sourceNpcId <= 0 then
             return 0
         end
 
-        local existingBoss = findBossBySourceNpcId(raid, sourceNpcId)
-        if not existingBoss and source.kind == "boss" then
+        local existingBoss
+        if sourceNpcId > 0 then
+            existingBoss = findBossBySourceNpcId(raid, sourceNpcId)
+        end
+        if not existingBoss and (source.kind == "boss" or source.kind == "shared") then
             existingBoss = findBossByName(raid, sourceName)
         end
         if existingBoss then

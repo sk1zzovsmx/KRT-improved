@@ -3621,7 +3621,7 @@ test("loot source resolver filters candidates by raid and mode", function()
     assertEqual(resolved.confidence, "exact", "expected exact source confidence")
 end)
 
-test("loot source resolver refuses ambiguous candidates without context", function()
+test("loot source resolver returns shared candidates without context", function()
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
@@ -3634,11 +3634,14 @@ test("loot source resolver refuses ambiguous candidates without context", functi
 
     local resolved = h.addon.LootSources.FindSource(91712)
 
-    assertEqual(resolved.reason, "ambiguous", "expected shared boss item to stay ambiguous")
+    assertEqual(resolved.reason, "shared", "expected shared boss item to return structured shared context")
+    assertEqual(resolved.kind, "shared", "expected shared boss item kind")
+    assertEqual(resolved.npcName, "Shared: Grand Widow Faerlina / Noth the Plaguebringer", "expected shared display label")
+    assertTrue(resolved.shared == true, "expected shared marker")
     assertEqual(#resolved.candidates, 2, "expected both candidates to be reported")
 end)
 
-test("loot source resolver refuses recent context disambiguation for shared boss items", function()
+test("loot source resolver uses recent context for shared boss items", function()
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
@@ -3655,7 +3658,12 @@ test("loot source resolver refuses recent context disambiguation for shared boss
         recentSourceName = "Grand Widow Faerlina",
     })
 
-    assertEqual(resolved.reason, "ambiguous", "expected recent context not to pick one boss from shared loot")
+    assertEqual(resolved.reason, nil, "expected recent context to resolve shared loot")
+    assertEqual(resolved.npcId, 15953, "expected recent source npc id to select Faerlina")
+    assertEqual(resolved.npcName, "Grand Widow Faerlina", "expected recent source name to select Faerlina")
+    assertEqual(resolved.kind, "boss", "expected resolved shared loot to bind to a boss")
+    assertEqual(resolved.confidence, "shared-context", "expected shared context confidence")
+    assertTrue(resolved.shared == true, "expected shared marker to stay visible")
     assertEqual(#resolved.candidates, 2, "expected all shared boss candidates to remain visible")
 end)
 
@@ -5268,7 +5276,7 @@ test("group loot source resolver assigns named trash without timing context", fu
     assertEqual(lootSource.sourceName, "Naxxramas Cultist", "expected trash item provenance source name")
 end)
 
-test("group loot source resolver falls back when item source is ambiguous", function()
+test("group loot source resolver records shared source when item source has no context match", function()
     local ambiguousSourceData = {
         {
             npcId = 15953,
@@ -5336,20 +5344,21 @@ test("group loot source resolver falls back when item source is ambiguous", func
     assertEqual(resolverCall.itemId, 91732, "expected resolver to receive the ambiguous item id")
     assertEqual(resolverCall.context.raid, "Naxxramas", "expected resolver to receive raid context")
     assertEqual(resolverCall.bossKillCountBeforeResolver, 1, "expected resolver to run after the stale boss seed but before fallback source creation")
-    assertEqual(#raid.bossKills, 2, "expected ambiguous item source to create one fallback record after the seeded boss")
+    assertEqual(#raid.bossKills, 2, "expected shared item source to create one shared record after the seeded boss")
     assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected stale boss seed to stay intact")
-    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected ambiguous source to fall back to TrashMob")
+    assertEqual(raid.bossKills[2].name, "Shared: Grand Widow Faerlina / Noth the Plaguebringer", "expected shared source label")
+    assertEqual(raid.bossKills[2].sourceKind, "shared", "expected shared source kind")
     assertEqual(#raid.loot, 2, "expected seed and ambiguous item sources to create loot rows")
-    assertEqual(raid.loot[2].bossNid, raid.bossKills[2].bossNid, "expected ambiguous loot row to bind to fallback source")
+    assertEqual(raid.loot[2].bossNid, raid.bossKills[2].bossNid, "expected shared loot row to bind to shared source")
     local lootSource = raid.loot[2].lootSource
-    assertTrue(lootSource ~= nil, "expected ambiguous item source to persist fallback provenance")
-    assertEqual(lootSource.kind, "trash", "expected ambiguous item provenance to stay on fallback trash")
-    assertEqual(lootSource.bossNid, raid.bossKills[2].bossNid, "expected fallback provenance boss nid")
-    assertEqual(lootSource.sourceName, "_TrashMob_", "expected fallback provenance source name")
-    assertTrue(lootSource.sourceName ~= "Grand Widow Faerlina", "expected fallback provenance not to retain stale boss source name")
+    assertTrue(lootSource ~= nil, "expected shared item source to persist provenance")
+    assertEqual(lootSource.kind, "shared", "expected shared item provenance kind")
+    assertEqual(lootSource.bossNid, raid.bossKills[2].bossNid, "expected shared provenance boss nid")
+    assertEqual(lootSource.sourceName, "Shared: Grand Widow Faerlina / Noth the Plaguebringer", "expected shared provenance source name")
+    assertTrue(lootSource.sourceName ~= "Grand Widow Faerlina", "expected shared provenance not to retain stale boss source name")
 end)
 
-test("group loot source resolver ambiguous source blocks recent context fallback", function()
+test("group loot source resolver shared source uses recent context match", function()
     local h, Raid, Loot, resolverCalls = newGroupLootSourceResolverHarness(91735, "Resolver Ambiguous Context Charm", 306, "resolver-ambiguous-context-win", {
         {
             npcId = 15953,
@@ -5392,13 +5401,14 @@ test("group loot source resolver ambiguous source blocks recent context fallback
 
     raid = h.Core.EnsureRaidById(1)
     local resolverCall = resolverCalls[1]
-    assertEqual(#resolverCalls, 1, "expected item source resolver to be invoked before context fallback")
-    assertEqual(resolverCall.itemId, 91735, "expected resolver to receive the ambiguous item id")
-    assertEqual(resolverCall.bossKillCountBeforeResolver, 1, "expected resolver to run before fallback creation")
-    assertEqual(#raid.bossKills, 2, "expected ambiguous item source to create one fallback record")
+    assertEqual(#resolverCalls, 1, "expected item source resolver to be invoked before source binding")
+    assertEqual(resolverCall.itemId, 91735, "expected resolver to receive the shared item id")
+    assertEqual(resolverCall.bossKillCountBeforeResolver, 1, "expected resolver to run before source binding")
+    assertEqual(#raid.bossKills, 1, "expected shared item source to reuse recent context boss")
     assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected recent context boss to stay intact")
-    assertEqual(raid.bossKills[2].name, "_TrashMob_", "expected ambiguous source to fall back to TrashMob")
-    assertEqual(raid.loot[1].bossNid, raid.bossKills[2].bossNid, "expected ambiguous loot row not to bind to recent context")
+    assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected shared loot row to bind to recent context")
+    assertEqual(raid.loot[1].lootSource.kind, "boss", "expected shared context provenance to bind as boss")
+    assertEqual(raid.loot[1].lootSource.sourceNpcId, 15953, "expected shared context provenance npc id")
 end)
 
 test("group loot trash rolls do not inherit previous boss death context", function()
