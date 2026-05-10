@@ -149,6 +149,11 @@ local function getOrCreateResponse(state, name)
         updatedAt = nil,
         isEligible = false,
         isOutOfTime = false,
+        outOfFlowReason = nil,
+        outOfFlowCount = 0,
+        outOfFlowLastRoll = nil,
+        outOfFlowLastReason = nil,
+        outOfFlowLastSource = nil,
     }
     state.responsesByPlayer[name] = response
     return response
@@ -379,6 +384,23 @@ local function applyExplicitResponse(ctx, name, status, eligibility, reason, sou
     return response
 end
 
+local function recordOutOfFlowAttempt(state, player, reason, roll, source)
+    local response = state.responsesByPlayer[player]
+    if not response then
+        return
+    end
+    if response.bestRoll == nil and not Responses.IsExplicitResponseStatus(response.explicitStatus) then
+        return
+    end
+
+    response.outOfFlowReason = reason
+    response.outOfFlowCount = (tonumber(response.outOfFlowCount) or 0) + 1
+    response.outOfFlowLastRoll = tonumber(roll)
+    response.outOfFlowLastReason = reason
+    response.outOfFlowLastSource = source
+    response.updatedAt = GetTime()
+end
+
 -- ----- Public methods ----- --
 function Responses.IsExplicitResponseStatus(status)
     return status == RESPONSE_STATUS.PASS or status == RESPONSE_STATUS.CANCELLED
@@ -428,6 +450,8 @@ function Responses.BuildCandidateEligibility(ctx, name, itemId, itemLink, rollTy
     local allowedRolls = 1
     local usedRolls = 0
     local bucket = ctx.getRollTypeBucket and ctx.getRollTypeBucket(currentRollType) or "FREE"
+    local isReservedRoll = false
+    local hasItemReserve = false
 
     if not currentItemId and currentItemLink then
         currentItemId = feature.Item.GetItemIdFromLink(currentItemLink)
@@ -440,12 +464,15 @@ function Responses.BuildCandidateEligibility(ctx, name, itemId, itemLink, rollTy
     end
 
     if currentRollType == feature.rollTypes.RESERVED and currentItemId then
+        isReservedRoll = true
         local reserveCount = ctx.getReserveCountForItem and ctx.getReserveCountForItem(currentItemId, name) or 0
         if reserveCount and reserveCount > 0 then
             bucket = "SR"
             allowedRolls = reserveCount
+            hasItemReserve = true
         else
-            bucket = "FREE"
+            bucket = "INELIGIBLE"
+            allowedRolls = 0
         end
     end
 
@@ -509,6 +536,10 @@ function Responses.BuildCandidateEligibility(ctx, name, itemId, itemLink, rollTy
             false,
             reasonCodes.MANUAL_EXCLUSION
         )
+    end
+
+    if isReservedRoll and not hasItemReserve then
+        return buildEligibilityResult(opts, false, bucket, reasonCodes.INELIGIBLE, allowedRolls, usedRolls, currentItemId, currentItemLink, false, reasonCodes.INELIGIBLE)
     end
 
     if ctx.isTieRerollRestricted and ctx.isTieRerollRestricted(name) then
@@ -670,6 +701,7 @@ function Responses.SubmitIncomingRoll(ctx, player, roll, source)
     })
     traceEligibility(player, eligibility)
     if not eligibility.ok then
+        recordOutOfFlowAttempt(state, player, eligibility.reason, roll, source)
         if eligibility.reason == reasonCodes.SESSION_INACTIVE and not state.warned and not isDebugSource then
             Chat:Announce(L.ChatCountdownBlock)
             state.warned = true

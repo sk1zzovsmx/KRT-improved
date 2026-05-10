@@ -52,6 +52,39 @@ local function getResolutionContext(ctx)
     return ctx._resolutionContext
 end
 
+local function copyNames(names)
+    local out = {}
+    for i = 1, #(names or {}) do
+        out[i] = names[i]
+    end
+    return out
+end
+
+local function buildSrContext(ctx, itemId, currentRollType)
+    if currentRollType ~= rollTypes.RESERVED or not itemId or not ctx.getItemReserveContext then
+        return nil
+    end
+
+    local reserveContext = ctx.getItemReserveContext(itemId)
+    if type(reserveContext) ~= "table" then
+        return nil
+    end
+
+    return {
+        itemId = reserveContext.itemId or itemId,
+        hasReserves = reserveContext.hasReserves == true,
+        hasEligibleReserve = reserveContext.hasPresentReserve == true,
+        totalReserveCount = tonumber(reserveContext.totalReserveCount) or 0,
+        eligibleReserveCount = tonumber(reserveContext.presentReserveCount) or 0,
+        missingReserveCount = tonumber(reserveContext.missingReserveCount) or 0,
+        eligibleReserveNames = copyNames(reserveContext.presentPlayers),
+        missingReserveNames = copyNames(reserveContext.missingPlayers),
+        eligibleReserveText = reserveContext.presentPlayersText or "",
+        missingReserveText = reserveContext.missingPlayersText or "",
+        rosterFilterApplied = reserveContext.rosterFilterApplied == true,
+    }
+end
+
 -- ----- Public methods ----- --
 function Display.BuildModel(ctx)
     local _, state, lootState = assertContext(ctx)
@@ -72,6 +105,8 @@ function Display.BuildModel(ctx)
     local multiAward
     local selectionAllowed
     local raid = ctx.getRaidService and ctx.getRaidService() or nil
+    local srContext = buildSrContext(ctx, itemId, currentRollType)
+    local outOfFlowCount = 0
 
     if ctx.prepareResponseState then
         ctx.prepareResponseState(context, {
@@ -154,11 +189,17 @@ function Display.BuildModel(ctx)
             hasExplicitResponse = Responses.IsExplicitResponseStatus(response.explicitStatus),
             bucket = response.bucket,
             reason = response.reason,
+            outOfFlowReason = response.outOfFlowReason,
+            outOfFlowCount = tonumber(response.outOfFlowCount) or 0,
+            outOfFlowLastRoll = tonumber(response.outOfFlowLastRoll),
+            outOfFlowLastReason = response.outOfFlowLastReason,
+            outOfFlowLastSource = response.outOfFlowLastSource,
             isEligible = response.isEligible == true,
             isTied = entry.isTied and true or false,
             tieGroup = entry.tieGroup,
             selectionAllowed = Responses.IsSelectableRollResponse(response),
         }
+        outOfFlowCount = outOfFlowCount + (tonumber(response.outOfFlowCount) or 0)
     end
 
     return {
@@ -171,6 +212,8 @@ function Display.BuildModel(ctx)
         requiredWinnerCount = ctx.getExpectedWinnerCount and ctx.getExpectedWinnerCount() or 1,
         winnerSuggestions = resolution.autoWinners,
         countdownExpired = state.countdownExpired == true,
+        srContext = srContext,
+        outOfFlowCount = outOfFlowCount,
     }
 end
 

@@ -54,6 +54,14 @@ local function getPlusForItem(itemId, name)
     return 0
 end
 
+local function getItemReserveContext(itemId)
+    local reserves = Services.Reserves
+    if reserves and reserves.GetItemReserveContext then
+        return reserves:GetItemReserveContext(itemId)
+    end
+    return nil
+end
+
 local function isPlusSystemEnabled()
     local reserves = Services.Reserves
     if reserves and reserves.GetPlusForItem and reserves.GetImportMode and reserves.IsPlusSystem then
@@ -371,6 +379,7 @@ do
                 return addon.options.showLootCounterDuringMSRoll == true
             end,
             getRaidService = getRaidService,
+            getItemReserveContext = getItemReserveContext,
             getCurrentRaid = function()
                 return addon.Core.GetCurrentRaid and addon.Core.GetCurrentRaid() or nil
             end,
