@@ -505,3 +505,11 @@ function ListController.BindListController(module, controller)
         controller:Sort(key)
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Modules/UI/ListController", {
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Visuals" },
+    })
+    registry.SetLoaded("Modules/UI/ListController")
+end

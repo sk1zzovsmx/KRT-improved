@@ -24,6 +24,7 @@ REPO_CHECKS = {
     "lua_syntax": "check-lua-syntax.ps1",
     "ui_binding": "check-ui-binding.ps1",
     "layering": "check-layering.ps1",
+    "legacy_aliases": "check-legacy-aliases.ps1",
     "raid_hardening": "check-raid-hardening.ps1",
     "lua_uniformity": "check-lua-uniformity.ps1",
 }

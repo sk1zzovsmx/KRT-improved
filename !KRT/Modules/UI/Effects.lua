@@ -604,3 +604,9 @@ function UIEffects.SetButtonGlow(button, enabled, r, g, b, methodName, options)
         startBaseGlow(glow)
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Modules/UI/Effects", { deps = { "Init", "Modules/ModuleRegistry" } })
+    registry.SetLoaded("Modules/UI/Effects")
+end

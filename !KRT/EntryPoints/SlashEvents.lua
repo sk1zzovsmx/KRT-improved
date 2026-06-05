@@ -665,7 +665,7 @@ local function handleWarningsCommand(rest)
         printHelp("toggle", L.StrCmdToggle)
         printHelp("[ID]", L.StrCmdWarningAnnounce)
     else
-        Core.RequestControllerMethod("Warnings", "Announce", sub)
+        Core.RequestControllerMethod("Warnings", "RequestAnnounce", sub)
     end
 end
 
@@ -985,9 +985,9 @@ local function handleLfmCommand(rest)
     if isToggleCommand(sub) or sub == "show" then
         Core.RequestControllerMethod("Spammer", "Toggle")
     elseif sub == "start" then
-        Core.RequestControllerMethod("Spammer", "Start")
+        Core.RequestControllerMethod("Spammer", "RequestStart")
     elseif sub == "stop" then
-        Core.RequestControllerMethod("Spammer", "Stop")
+        Core.RequestControllerMethod("Spammer", "RequestStop")
     else
         addon:info(format(L.StrCmdCommands, "krt pug"), "KRT")
         printHelp("toggle", L.StrCmdToggle)
@@ -1106,4 +1106,23 @@ registerAliases(cmdLFM, handleLfmCommand)
 SLASH_KRT1, SLASH_KRT2 = "/krt", "/kraidtools"
 SlashCmdList["KRT"] = function(msg)
     handleSlashCommand(msg)
+end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("EntryPoints/SlashEvents", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Core/Options",
+            "Modules/C",
+            "Modules/Colors",
+            "Modules/Strings",
+            "Modules/Comms",
+            "Modules/Item",
+            "Modules/UI/Frames",
+            "Modules/UI/Facade",
+        },
+    })
+    registry.SetLoaded("EntryPoints/SlashEvents")
 end

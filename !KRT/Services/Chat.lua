@@ -370,3 +370,18 @@ do
         return true, getSpamRuntimeSnapshot()
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Chat", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/C",
+            "Modules/Timer",
+            "Modules/Strings",
+            "Modules/Comms",
+        },
+    })
+    registry.SetLoaded("Services/Chat")
+end

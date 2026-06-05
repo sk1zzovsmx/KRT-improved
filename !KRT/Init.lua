@@ -43,6 +43,20 @@ local Core = addon.Core
 local Diagnose = addon.Diagnose
 local DEFAULT_PERF_THRESHOLD_MS = 5
 
+local function markBootstrapModuleLoaded()
+    local registry = addon.ModuleRegistry
+    if registry and type(registry.SetLoaded) == "function" then
+        registry.SetLoaded("Init")
+        return
+    end
+
+    addon.ModuleRegistryPendingLoads = addon.ModuleRegistryPendingLoads or {}
+    local pending = addon.ModuleRegistryPendingLoads
+    pending[#pending + 1] = "Init"
+end
+
+markBootstrapModuleLoaded()
+
 local Diag = setmetatable({}, {
     __index = Diagnose,
     __newindex = function(_, key, value)
@@ -880,8 +894,6 @@ do
         local minimap = addon.Minimap
         if minimap and minimap.EnsureUI then
             minimap:EnsureUI()
-        elseif minimap and minimap.OnLoad then
-            minimap:OnLoad()
         end
         local reservesService = getService("Reserves")
         if reservesService and reservesService.Load then

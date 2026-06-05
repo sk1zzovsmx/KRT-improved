@@ -214,3 +214,17 @@ do
         Bus.RegisterCallback(InternalEvents.RaidRosterDelta, handleRosterDelta)
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Raid/Attendance", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Events",
+            "Modules/Bus",
+            "Modules/Time",
+        },
+    })
+    registry.SetLoaded("Services/Raid/Attendance")
+end

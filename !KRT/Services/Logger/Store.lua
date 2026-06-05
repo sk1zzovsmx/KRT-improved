@@ -206,3 +206,15 @@ function Store:FindRaidPlayerByNormName(raid, normalizedLower)
     end
     return nil
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Logger/Store", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Strings",
+        },
+    })
+    registry.SetLoaded("Services/Logger/Store")
+end

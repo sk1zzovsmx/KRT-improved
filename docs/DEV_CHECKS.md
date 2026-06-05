@@ -19,6 +19,7 @@ python3 tools/krt.py repo-quality-check --check lua_syntax
 python3 tools/krt.py repo-quality-check --check lua_uniformity
 python3 tools/krt.py repo-quality-check --check api_nomenclature
 python3 tools/krt.py repo-quality-check --check layering
+python3 tools/krt.py repo-quality-check --check legacy_aliases
 python3 tools/krt.py repo-quality-check --check ui_binding
 python3 tools/krt.py repo-quality-check --check raid_hardening
 ```
@@ -32,6 +33,7 @@ py -3 tools/krt.py repo-quality-check --check lua_syntax
 py -3 tools/krt.py repo-quality-check --check lua_uniformity
 py -3 tools/krt.py repo-quality-check --check api_nomenclature
 py -3 tools/krt.py repo-quality-check --check layering
+py -3 tools/krt.py repo-quality-check --check legacy_aliases
 py -3 tools/krt.py repo-quality-check --check ui_binding
 py -3 tools/krt.py repo-quality-check --check raid_hardening
 py -3 tools/krt.py api-catalog-check
@@ -68,7 +70,8 @@ Preferred one-command refresh:
 py -3 tools/krt.py api-catalog-refresh
 ```
 
-CI/read-only drift check:
+CI drift check. It may regenerate identical catalog outputs before comparing, but should leave no
+tracked diff when the repo is already up to date:
 
 ```powershell
 py -3 tools/krt.py api-catalog-check
@@ -94,6 +97,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-syntax.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-uniformity.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-api-nomenclature.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-layering.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-legacy-aliases.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-ui-binding.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-raid-hardening.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-release-targeted-tests.ps1
@@ -115,6 +119,8 @@ stylua --check !KRT tools tests
 
 ```powershell
 rg "addon\.(Master|Logger|Warnings|Changes|Spammer)" -n !KRT/Services -g "*.lua"
+rg "addon\.(Raid|Chat|Master|Logger|LootCounter|ReservesUI|Config|Warnings|Changes|Spammer|Loot|Rolls)" `
+  -n !KRT -g "*.lua" -g "!Libs/**"
 rg "CreateFrame|SetScript|:Show\(|:Hide\(" -n !KRT/Services -g "*.lua" -g "!Loot.lua"
 rg "<Scripts>|<On[A-Za-z]+>" -n !KRT/UI -g "*.xml"
 ```

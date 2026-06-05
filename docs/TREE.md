@@ -57,6 +57,12 @@
 |   |   |-- DiagnoseLog.en.lua
 |   |   \\-- localization.en.lua
 |   |-- Modules
+|   |   |-- Dataset
+|   |   |   |-- LootSources
+|   |   |   |   \\-- ...
+|   |   |   |-- IgnoredItems.lua
+|   |   |   |-- IgnoredMobs.lua
+|   |   |   \\-- LootSourcesData.lua
 |   |   |-- UI
 |   |   |   |-- Effects.lua
 |   |   |   |-- Facade.lua
@@ -71,11 +77,9 @@
 |   |   |-- Comms.lua
 |   |   |-- Events.lua
 |   |   |-- Features.lua
-|   |   |-- IgnoredItems.lua
-|   |   |-- IgnoredMobs.lua
 |   |   |-- Item.lua
 |   |   |-- LootSources.lua
-|   |   |-- LootSourcesData.lua
+|   |   |-- ModuleRegistry.lua
 |   |   |-- Sort.lua
 |   |   |-- Strings.lua
 |   |   |-- Time.lua
@@ -162,24 +166,6 @@
 |       |   \\-- SKILL.md
 |       \\-- s-working
 |           \\-- SKILL.md
-|-- .claude
-|   \\-- skills
-|       |-- k-docs
-|       |   \\-- SKILL.md
-|       |-- s-audit
-|       |   \\-- SKILL.md
-|       |-- s-clean
-|       |   \\-- SKILL.md
-|       |-- s-debug
-|       |   |-- references
-|       |   |   \\-- ...
-|       |   \\-- SKILL.md
-|       |-- s-lint
-|       |   \\-- SKILL.md
-|       |-- s-release
-|       |   \\-- SKILL.md
-|       \\-- s-working
-|           \\-- SKILL.md
 |-- .githooks
 |   |-- pre-commit
 |   \\-- README.md
@@ -196,7 +182,8 @@
 |   |   |-- plans
 |   |   |   |-- 2026-05-08-raid-loot-source-resolver.md
 |   |   |   |-- 2026-05-18-passive-group-loot-rollid-first.md
-|   |   |   \\-- 2026-05-23-logger-list-visual-refresh.md
+|   |   |   |-- 2026-05-23-logger-list-visual-refresh.md
+|   |   |   \\-- 2026-05-25-total-rework-foundation.md
 |   |   \\-- specs
 |   |       |-- 2026-04-28-options-timer-refactor-design.md
 |   |       |-- 2026-05-08-raid-loot-source-resolver-design.md
@@ -222,6 +209,7 @@
 |   |-- SV_SCHEMA.md
 |   |-- TECH_CLEANUP_BACKLOG.md
 |   |-- TECH_CLEANUP_WORKFLOW.md
+|   |-- TOTAL_REWORK_REPORT.md
 |   \\-- TREE.md
 |-- tests
 |   |-- fixtures
@@ -231,6 +219,12 @@
 |   |       |-- legacy-mixed-01.lua
 |   |       \\-- legacy-mixed-02.lua
 |   |-- logger_visual_refresh_spec.lua
+|   |-- module_registry_core_spec.lua
+|   |-- module_registry_modules_spec.lua
+|   |-- module_registry_services_spec.lua
+|   |-- module_registry_spec.lua
+|   |-- module_registry_ui_entrypoints_spec.lua
+|   |-- module_registry_ui_spec.lua
 |   \\-- release_stabilization_spec.lua
 |-- tools
 |   |-- agent-skills.manifest.json
@@ -238,6 +232,7 @@
 |   |-- build-release-zip.ps1
 |   |-- check-api-nomenclature.ps1
 |   |-- check-layering.ps1
+|   |-- check-legacy-aliases.ps1
 |   |-- check-lua-syntax.ps1
 |   |-- check-lua-uniformity.ps1
 |   |-- check-raid-hardening.ps1

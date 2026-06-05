@@ -361,3 +361,9 @@ do
         return rows
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Core/DBRaidQueries", { deps = { "Init", "Modules/ModuleRegistry", "Core/DB", "Core/DBRaidStore", "Modules/Sort" } })
+    registry.SetLoaded("Core/DBRaidQueries")
+end

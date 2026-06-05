@@ -221,3 +221,15 @@ function Export:GetRaidAttendanceCSV(raid)
 
     return buildCSV(HEADER_RAID_ATTENDANCE, rows)
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Logger/Export", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Services/Logger/Store",
+        },
+    })
+    registry.SetLoaded("Services/Logger/Export")
+end

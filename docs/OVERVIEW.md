@@ -148,9 +148,9 @@ Common infra under `!KRT/Modules/`:
   `addon.DB` remains the concrete DB namespace (`RaidStore`, `RaidQueries`,
   `RaidMigrations`, `RaidValidator`, `Syncer`) plus manager state, and
   `addon.DBSchema` remains the concrete schema namespace.
-- For `Logger`, keep public controller methods focused on controller lifecycle/state and
-  cross-module operations. Selection handlers, popup save/fill helpers, row hover glue,
-  and other file-local UI mechanics should stay private inside `Controllers/Logger.lua`.
+- For `Logger`, controller UI-local lifecycle/state glue stays private inside
+  `Controllers/Logger.lua`. External runtime behavior should go through `Services/Logger/*`,
+  bus events, and action contracts.
 - Package-internal cross-file helpers should live on underscore-prefixed owner-table fields
   (`addon.Services.Raid._...`, `addon.Services.Logger.Store._...`,
   `addon.Services.Reserves._...`) instead of public `*Internal` methods.

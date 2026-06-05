@@ -35,3 +35,17 @@ DBSchema.RAID_SCHEMA_VERSION = normalizeSchemaVersion(DBSchema.RAID_SCHEMA_VERSI
 function Core.GetRaidSchemaVersion()
     return getCanonicalRaidSchemaVersion()
 end
+
+do
+    local name = "Core/DBSchema"
+    local deps = { "Init" }
+    local registry = addon.ModuleRegistry
+    if registry then
+        registry.AddModule(name, { deps = deps })
+        registry.SetLoaded(name)
+    else
+        addon.ModuleRegistryPendingRegistrations = addon.ModuleRegistryPendingRegistrations or {}
+        local pending = addon.ModuleRegistryPendingRegistrations
+        pending[#pending + 1] = { name = name, deps = deps, loaded = true }
+    end
+end

@@ -1582,3 +1582,23 @@ do
         end
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Core/DBSyncer", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Core/DB",
+            "Core/DBSchema",
+            "Core/DBRaidStore",
+            "Core/DBRaidQueries",
+            "Modules/Events",
+            "Modules/Bus",
+            "Modules/Strings",
+            "Modules/Time",
+            "Modules/Comms",
+        },
+    })
+    registry.SetLoaded("Core/DBSyncer")
+end

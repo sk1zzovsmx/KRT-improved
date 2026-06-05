@@ -42,3 +42,17 @@ function Colors.GetClassColor(className)
     local r, g, b = addon.GetClassColor(className)
     return (r or 1), (g or 1), (b or 1)
 end
+
+do
+    local name = "Modules/Colors"
+    local deps = { "Init" }
+    local registry = addon.ModuleRegistry
+    if registry then
+        registry.AddModule(name, { deps = deps })
+        registry.SetLoaded(name)
+    else
+        addon.ModuleRegistryPendingRegistrations = addon.ModuleRegistryPendingRegistrations or {}
+        local pending = addon.ModuleRegistryPendingRegistrations
+        pending[#pending + 1] = { name = name, deps = deps, loaded = true }
+    end
+end

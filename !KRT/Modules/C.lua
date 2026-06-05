@@ -114,3 +114,17 @@ C.RESERVES_ROW_HEIGHT = 42
 C.RESERVE_HEADER_HEIGHT = 24
 C.RESERVES_ITEM_FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 C.RESERVES_QUERY_COOLDOWN_SECONDS = 2
+
+do
+    local name = "Modules/C"
+    local deps = { "Init" }
+    local registry = addon.ModuleRegistry
+    if registry then
+        registry.AddModule(name, { deps = deps })
+        registry.SetLoaded(name)
+    else
+        addon.ModuleRegistryPendingRegistrations = addon.ModuleRegistryPendingRegistrations or {}
+        local pending = addon.ModuleRegistryPendingRegistrations
+        pending[#pending + 1] = { name = name, deps = deps, loaded = true }
+    end
+end

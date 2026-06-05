@@ -263,3 +263,17 @@ function Comms:RequestVersionMessageHandling(prefix, msg, channel, sender)
     end
     return true
 end
+
+do
+    local name = "Modules/Comms"
+    local deps = { "Init" }
+    local registry = addon.ModuleRegistry
+    if registry then
+        registry.AddModule(name, { deps = deps })
+        registry.SetLoaded(name)
+    else
+        addon.ModuleRegistryPendingRegistrations = addon.ModuleRegistryPendingRegistrations or {}
+        local pending = addon.ModuleRegistryPendingRegistrations
+        pending[#pending + 1] = { name = name, deps = deps, loaded = true }
+    end
+end

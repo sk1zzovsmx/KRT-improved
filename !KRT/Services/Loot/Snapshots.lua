@@ -356,3 +356,17 @@ function Snapshots.ConsumeActive(raidState, itemLink, now)
 
     return tonumber(snapshot.bossNid) or 0
 end
+
+local registry = addon.ModuleRegistry
+if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Loot/Snapshots", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Item",
+            "Services/Loot/State",
+            "Services/Loot/Context",
+        },
+    })
+    registry.SetLoaded("Services/Loot/Snapshots")
+end

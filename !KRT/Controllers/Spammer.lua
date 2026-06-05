@@ -318,8 +318,7 @@ do
     end
 
     -- ----- Public methods ----- --
-    -- OnLoad frame
-    function module:OnLoad(frame)
+    local function loadSpammerFrame(frame)
         UI.FrameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
@@ -393,7 +392,7 @@ do
     end
 
     local function OnLoadFrame(frame)
-        module:OnLoad(frame)
+        loadSpammerFrame(frame)
         return UI.FrameName
     end
 
@@ -406,6 +405,12 @@ do
             UI.Localize()
         end,
         onLoad = OnLoadFrame,
+        refresh = function()
+            if not UI.Localized then
+                UI.Localize()
+            end
+            UI.Refresh()
+        end,
     })
 
     -- Save (EditBox / Checkbox)
@@ -508,6 +513,14 @@ do
         ChatApi.StopSpamCycle(Chat, true, true)
         setInputsLocked(false)
         module:RequestRefresh()
+    end
+
+    function module:RequestStart()
+        return startSpam()
+    end
+
+    function module:RequestStop()
+        return stopSpam()
     end
 
     pauseSpam = function()
@@ -859,15 +872,19 @@ do
             updateTickDisplay()
         end
     end
+end
 
-    function module:RefreshUI()
-        if not UI.Localized then
-            UI.Localize()
-        end
-        UI.Refresh()
-    end
-
-    function module:Refresh()
-        return self:RefreshUI()
-    end
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Controllers/Spammer", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Strings",
+            "Modules/UI/Frames",
+            "Modules/UI/Visuals",
+            "Services/Chat",
+        },
+    })
+    registry.SetLoaded("Controllers/Spammer")
 end

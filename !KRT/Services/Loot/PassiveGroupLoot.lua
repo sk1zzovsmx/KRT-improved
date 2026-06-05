@@ -914,3 +914,17 @@ end
 function PassiveGroupLoot.ObserveGroupLootWinnerMessage(owner, msg)
     return observeGroupLootWinnerMessage(owner, msg)
 end
+
+local registry = addon.ModuleRegistry
+if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Loot/PassiveGroupLoot", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/C",
+            "Modules/Item",
+            "Modules/Strings",
+        },
+    })
+    registry.SetLoaded("Services/Loot/PassiveGroupLoot")
+end

@@ -406,3 +406,11 @@ do
         return report
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Core/DBRaidValidator", {
+        deps = { "Init", "Modules/ModuleRegistry", "Core/DB", "Core/DBSchema", "Core/DBRaidMigrations", "Core/DBRaidStore", "Modules/Dataset/IgnoredMobs" },
+    })
+    registry.SetLoaded("Core/DBRaidValidator")
+end

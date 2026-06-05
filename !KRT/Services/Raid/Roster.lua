@@ -220,10 +220,6 @@ do
         return rosterVersion
     end
 
-    function module:GetNumRaid()
-        return numRaid
-    end
-
     local function publishRosterDeltaInternal(delta, raidNum)
         local payload
 
@@ -609,50 +605,6 @@ do
         return name
     end
 
-    function module:GetPlayerLoot(name, raidNum, bossNid)
-        local items = {}
-        local loot = module:GetLoot(raidNum, bossNid)
-        local playerNid
-        if type(name) == "number" then
-            playerNid = tonumber(name)
-        else
-            local resolvedName = Strings.NormalizeName(name, true)
-            playerNid = module:GetPlayerID(resolvedName, raidNum)
-        end
-        if not playerNid or playerNid <= 0 then
-            return items
-        end
-        for _, v in ipairs(loot) do
-            if tonumber(v.looterNid) == playerNid then
-                table.insert(items, v)
-            end
-        end
-        return items
-    end
-
-    function module:GetPlayerRank(name, raidNum)
-        local raid = raidNum and Core.EnsureRaidById(raidNum)
-        local players = raid and raid.players or {}
-        local rank = 0
-        name = name or Core.GetPlayerName() or UnitName("player")
-        if #players == 0 then
-            if addon.IsInGroup() then
-                local unit = module:GetUnitID(name)
-                if unit and unit ~= "none" then
-                    rank = Core.GetUnitRank(unit) or 0
-                end
-            end
-        else
-            for _, p in ipairs(players) do
-                if p.name == name then
-                    rank = p.rank or 0
-                    break
-                end
-            end
-        end
-        return rank
-    end
-
     function module:GetPlayerClass(name)
         local class = "UNKNOWN"
         local realm = Core.GetRealmName()
@@ -735,4 +687,20 @@ do
         end
         return "none"
     end
+end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Raid/Roster", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Timer",
+            "Modules/Events",
+            "Modules/Bus",
+            "Modules/Strings",
+            "Modules/Time",
+        },
+    })
+    registry.SetLoaded("Services/Raid/Roster")
 end

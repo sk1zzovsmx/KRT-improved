@@ -270,3 +270,14 @@ function LootContext.CopyLootSource(context, bossNidOverride)
         snapshotId = tonumber(source.snapshotId) or nil,
     }
 end
+
+local registry = addon.ModuleRegistry
+if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Loot/Context", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+        },
+    })
+    registry.SetLoaded("Services/Loot/Context")
+end

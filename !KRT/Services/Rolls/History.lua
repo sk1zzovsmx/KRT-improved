@@ -212,3 +212,16 @@ function History.GetUsedReserveCount(ctx, itemId, name)
     local tracker = History.AcquireItemTracker(ctx, itemId)
     return tracker[name] or 0
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Rolls/History", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Events",
+            "Modules/Bus",
+        },
+    })
+    registry.SetLoaded("Services/Rolls/History")
+end

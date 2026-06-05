@@ -240,3 +240,16 @@ function Sessions.Resolve(raidState, raid, raidNum, rollSessionId, now, findBoss
     state.bySessionId[sessionId] = nil
     return 0
 end
+
+local registry = addon.ModuleRegistry
+if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Loot/State", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/C",
+            "Services/Loot/Context",
+        },
+    })
+    registry.SetLoaded("Services/Loot/State")
+end

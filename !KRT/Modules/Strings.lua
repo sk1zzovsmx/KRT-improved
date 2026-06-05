@@ -94,3 +94,17 @@ function Strings.SplitArgs(msg)
     local cmd, rest = msg:match("^(%S+)%s*(.-)$")
     return Strings.NormalizeLower(cmd), Strings.TrimText(rest)
 end
+
+do
+    local name = "Modules/Strings"
+    local deps = { "Init", "Modules/Colors" }
+    local registry = addon.ModuleRegistry
+    if registry then
+        registry.AddModule(name, { deps = deps })
+        registry.SetLoaded(name)
+    else
+        addon.ModuleRegistryPendingRegistrations = addon.ModuleRegistryPendingRegistrations or {}
+        local pending = addon.ModuleRegistryPendingRegistrations
+        pending[#pending + 1] = { name = name, deps = deps, loaded = true }
+    end
+end

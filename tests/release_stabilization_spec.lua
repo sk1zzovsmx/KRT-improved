@@ -582,7 +582,7 @@ local function newHarness()
     L.StrRollBlockedTag = "BLK"
     L.StrRollDuplicateTag = "DUP"
     L.StrRollRerollOnlyTag = "REROLL"
-    Diag.E.LogLoggerLootNidExpected = "[Logger] Loot:SetLootEntry expected lootNid but got raw itemId raidId=%s value=%s link=%s matches=%d"
+    Diag.E.LogLoggerLootNidExpected = "[Logger] loot entry expected lootNid but got raw itemId raidId=%s value=%s link=%s matches=%d"
     local InternalEvents = keyTable("Event")
     local Events = { Internal = InternalEvents }
     local rollTypes = {
@@ -2307,6 +2307,14 @@ local function loadMasterController(h)
     h:load("!KRT/Controllers/Master.lua")
 end
 
+local function loadMasterFrameForTest(Master, frame)
+    return Master._Private.LoadFrame(frame)
+end
+
+local function refreshMasterFrameForTest(Master)
+    return Master._Private.RefreshFrame()
+end
+
 local function setupInventoryTradeHarness(order, rollsByName)
     local h = newHarness()
     local link = h.registerItem(9304, "Queueblade")
@@ -3731,10 +3739,18 @@ test("logger updates duplicate item entries by lootNid only", function()
     h:load("!KRT/Services/Logger/Actions.lua")
     h:load("!KRT/Controllers/Logger.lua")
 
-    local Logger = h.addon.Controllers.Logger
     local raid = h.Core.EnsureRaidById(1)
 
-    local ok = Logger.Loot:SetLootEntry(102, "Alice", h.rollTypes.OFFSPEC, 22, "TEST_DUPLICATE", 1)
+    local request = {
+        lootNid = 102,
+        looter = "Alice",
+        rollType = h.rollTypes.OFFSPEC,
+        rollValue = 22,
+        source = "TEST_DUPLICATE",
+        raidId = 1,
+    }
+    h.Bus.TriggerEvent(h.addon.Events.Internal.LoggerLootLogRequest, request)
+    local ok = request.ok
     assertTrue(ok == true, "expected loot log update to succeed")
     assertEqual(raid.loot[1].looterNid, 1, "expected first duplicate entry to remain untouched")
     assertEqual(raid.loot[1].rollValue, 80, "expected first duplicate roll to remain untouched")
@@ -3743,7 +3759,16 @@ test("logger updates duplicate item entries by lootNid only", function()
     assertEqual(raid.loot[2].rollValue, 22, "expected second duplicate roll value to update")
 
     h.logs.error = {}
-    local bad = Logger.Loot:SetLootEntry(9001, "Bob", h.rollTypes.FREE, 1, "TEST_RAW_ITEM_ID", 1)
+    request = {
+        lootNid = 9001,
+        looter = "Bob",
+        rollType = h.rollTypes.FREE,
+        rollValue = 1,
+        source = "TEST_RAW_ITEM_ID",
+        raidId = 1,
+    }
+    h.Bus.TriggerEvent(h.addon.Events.Internal.LoggerLootLogRequest, request)
+    local bad = request.ok
     assertTrue(bad == false, "expected raw itemId logger update to fail")
     assertContains(h.logs.error, "expected lootNid but got raw itemId", "expected explicit raw itemId guard-rail log")
 end)
@@ -3828,12 +3853,20 @@ test("trade-only loot creates a reusable lootNid", function()
     h:load("!KRT/Controllers/Logger.lua")
 
     local Raid = h.addon.Services.Raid
-    local Logger = h.addon.Controllers.Logger
     local lootNid = Raid:LogTradeOnlyLoot(link, "Alice", h.rollTypes.MAINSPEC, 98, 1, "TRADE_ONLY_TEST", 1, 10, "roll-session-1")
     assertTrue((tonumber(lootNid) or 0) > 0, "expected trade-only path to create a lootNid")
     assertEqual(Raid:GetLootNidByRollSessionId("roll-session-1", 1, "Alice", 10), lootNid, "expected rollSessionId lookup to resolve trade-only loot")
 
-    local ok = Logger.Loot:SetLootEntry(lootNid, "Alice", h.rollTypes.RESERVED, 77, "TEST_TRADE_ONLY", 1)
+    local request = {
+        lootNid = lootNid,
+        looter = "Alice",
+        rollType = h.rollTypes.RESERVED,
+        rollValue = 77,
+        source = "TEST_TRADE_ONLY",
+        raidId = 1,
+    }
+    h.Bus.TriggerEvent(h.addon.Events.Internal.LoggerLootLogRequest, request)
+    local ok = request.ok
     assertTrue(ok == true, "expected logger update to reuse trade-only lootNid")
 
     local raid = h.Core.EnsureRaidById(1)
@@ -7046,7 +7079,7 @@ test("master award matches loot slots by itemId when hyperlinks differ", functio
         },
     })
 
-    local ok = ctx.Master:BtnAward()
+    local ok = ctx.Master._Private.BtnAward()
 
     assertTrue(ok == true, "expected award flow to succeed when the live loot slot link differs but the itemId matches")
     assertEqual(#ctx.givenLoot, 1, "expected award flow to reach GiveMasterLoot once")
@@ -7077,7 +7110,7 @@ test("master loot award credits loot counter after loot slot clear confirmation"
         },
     })
 
-    local ok = ctx.Master:BtnAward()
+    local ok = ctx.Master._Private.BtnAward()
 
     assertTrue(ok == true, "expected master loot award to succeed")
     assertEqual(#ctx.givenLoot, 1, "expected award flow to reach GiveMasterLoot once")
@@ -7114,7 +7147,7 @@ test("master loot award failure error cancels pending loot counter credit", func
         },
     })
 
-    assertTrue(ctx.Master:BtnAward() == true, "expected master loot award request to be sent")
+    assertTrue(ctx.Master._Private.BtnAward() == true, "expected master loot award request to be sent")
     assertEqual(#ctx.addCounts, 0, "expected pending award to start without LootCounter credit")
 
     assertTrue(type(ctx.Master.UI_ERROR_MESSAGE) == "function", "expected Master to observe UI_ERROR_MESSAGE failures")
@@ -7378,7 +7411,7 @@ test("master loot award timeout leaves unconfirmed loot counter credit unapplied
         },
     })
 
-    assertTrue(ctx.Master:BtnAward() == true, "expected master loot award request to be sent")
+    assertTrue(ctx.Master._Private.BtnAward() == true, "expected master loot award request to be sent")
     assertEqual(#ctx.addCounts, 0, "expected pending award to start without LootCounter credit")
     assertTrue(ctx.h.timerCount() >= 1, "expected pending award confirmation to schedule a timeout")
 
@@ -9387,21 +9420,22 @@ test("master roll intake reopens after announcing rolls with service-owned sessi
     loadMasterController(h)
 
     local Master = h.addon.Controllers.Master
+    local Private = Master._Private
     local frame = h.makeFrame(true, "KRTMaster")
     _G.KRTMasterItemCount = h.makeFrame(true, "KRTMasterItemCount")
     Master.RequestRefresh = function() end
-    Master:OnLoad(frame)
+    loadMasterFrameForTest(Master, frame)
 
     h.feature.lootState.lootCount = 1
     h.feature.lootState.selectedItemCount = 1
     h.feature.lootState.fromInventory = false
 
-    Master:BtnMS()
+    Private.BtnMS()
 
     assertEqual(h.feature.lootState.rollStarted, true, "expected MS announce to reopen the roll-started state")
     assertEqual(h.timerCount(), 0, "expected no countdown timer before clicking the countdown button")
 
-    Master:BtnCountdown(nil, "LeftButton")
+    Private.BtnCountdown(nil, "LeftButton")
 
     assertEqual(h.timerCount(), 2, "expected countdown click to schedule ticker and end timer")
 end)
@@ -9493,7 +9527,7 @@ test("master assignment buttons stay disabled until a target is selected", funct
     _G.KRTMasterDisenchantDropDownButton = h.makeFrame(true, "KRTMasterDisenchantDropDownButton")
 
     Master.RequestRefresh = function() end
-    Master:OnLoad(frame)
+    loadMasterFrameForTest(Master, frame)
 
     h.feature.lootState.lootCount = 1
     h.feature.lootState.selectedItemCount = 1
@@ -9502,7 +9536,7 @@ test("master assignment buttons stay disabled until a target is selected", funct
     h.feature.lootState.banker = nil
     h.feature.lootState.disenchanter = nil
 
-    Master:Refresh()
+    refreshMasterFrameForTest(Master)
 
     assertEqual(_G.KRTMasterHoldBtn._enabled, false, "expected Hold to disable when no holder is selected")
     assertEqual(_G.KRTMasterBankBtn._enabled, false, "expected Bank to disable when no banker is selected")
@@ -9512,7 +9546,7 @@ test("master assignment buttons stay disabled until a target is selected", funct
     h.feature.lootState.banker = "Bob"
     h.feature.lootState.disenchanter = nil
 
-    Master:Refresh()
+    refreshMasterFrameForTest(Master)
 
     assertEqual(_G.KRTMasterHoldBtn._enabled, true, "expected Hold to enable when a holder is selected")
     assertEqual(_G.KRTMasterBankBtn._enabled, true, "expected Bank to enable when a banker is selected")
@@ -9621,7 +9655,7 @@ test("master auto loot suggestions stay visual only", function()
     _G.KRTMasterDisenchantDropDownButton = h.makeFrame(true, "KRTMasterDisenchantDropDownButton")
 
     Master.RequestRefresh = function() end
-    Master:OnLoad(frame)
+    loadMasterFrameForTest(Master, frame)
 
     h.feature.lootState.lootCount = 1
     h.feature.lootState.selectedItemCount = 1
@@ -9630,7 +9664,7 @@ test("master auto loot suggestions stay visual only", function()
     h.feature.lootState.banker = "Banker"
     h.feature.lootState.disenchanter = "Shardmaster"
 
-    Master:Refresh()
+    refreshMasterFrameForTest(Master)
 
     assertEqual(_G.KRTMasterStatus:GetText(), "Ready. Suggestion: DE.", "expected status to show the suggested action")
     assertEqual(_G.KRTMasterHoldBtn._glow, false, "expected Hold to stay unhighlighted")
@@ -10013,8 +10047,8 @@ test("master dropdown click uses UIDropDown owner/value arguments", function()
     _G.KRTMasterDisenchantDropDownButton = h.makeFrame(true, "KRTMasterDisenchantDropDownButton")
 
     Master.RequestRefresh = function() end
-    Master:OnLoad(frame)
-    Master:Refresh()
+    loadMasterFrameForTest(Master, frame)
+    refreshMasterFrameForTest(Master)
 
     local holdDropDown = _G.KRTMasterHoldDropDown
     assertTrue(type(holdDropDown._initialize) == "function", "expected Hold dropdown to be initialized")
@@ -10124,8 +10158,8 @@ test("master item count bindings use shared edit-box handlers", function()
     Master.RequestRefresh = function()
         refreshCount = refreshCount + 1
     end
-    Master:OnLoad(frame)
-    Master:Refresh()
+    loadMasterFrameForTest(Master, frame)
+    refreshMasterFrameForTest(Master)
 
     local itemCountBox = _G.KRTMasterItemCount
     assertTrue(type(itemCountBox.OnTextChanged) == "function", "expected OnTextChanged to be bound through Frames.BindEditBoxHandlers")
@@ -10260,12 +10294,12 @@ test("master item selection popup stays clickable", function()
     _G.KRTMasterDisenchantDropDownButton = h.makeFrame(true, "KRTMasterDisenchantDropDownButton")
 
     Master.RequestRefresh = function() end
-    Master:OnLoad(frame)
+    loadMasterFrameForTest(Master, frame)
     Master.EnsureUI = function()
         return frame
     end
     Master:LOOT_OPENED()
-    Master:BtnSelectItem(h.makeFrame(true, "ItemSelectInvoker"))
+    Master._Private.BtnSelectItem(h.makeFrame(true, "ItemSelectInvoker"))
 
     local firstButton = _G.KRTMasterItemSelectionBtn1
     local secondButton = _G.KRTMasterItemSelectionBtn2
@@ -10481,8 +10515,8 @@ test("master roll rows stay clickable through the shared list controller", funct
     _G.KRTMasterDisenchantDropDownButton = h.makeFrame(true, "KRTMasterDisenchantDropDownButton")
 
     Master.RequestRefresh = function() end
-    Master:OnLoad(frame)
-    Master:Refresh()
+    loadMasterFrameForTest(Master, frame)
+    refreshMasterFrameForTest(Master)
 
     local row = _G.KRTMasterPlayerBtn1
     assertTrue(row ~= nil, "expected the shared list controller to create the first roll row")
@@ -11173,7 +11207,7 @@ test("master award button triggers reroll for single-select ties", function()
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
     h.feature.lootState.fromInventory = false
 
-    assertTrue(Master:BtnAward() == true, "expected single-select tie to trigger a reroll flow")
+    assertTrue(Master._Private.BtnAward() == true, "expected single-select tie to trigger a reroll flow")
     assertEqual(rerollNames[1], "Alice", "expected tie reroll to receive the tied players in order")
     assertEqual(rerollNames[2], "Bob", "expected tie reroll to receive the tied players in order")
     assertEqual(refreshCount, 1, "expected tie reroll to request a UI refresh")
@@ -11198,7 +11232,7 @@ test("master blocks award when manual resolution selection is incomplete", funct
         },
     })
 
-    local ok = ctx.Master:BtnAward()
+    local ok = ctx.Master._Private.BtnAward()
 
     assertTrue(ok ~= true, "expected award to stay blocked until manual multi-pick is complete")
     assertEqual(#ctx.givenLoot, 0, "expected blocked award flow to avoid calling GiveMasterLoot")
@@ -11226,7 +11260,7 @@ test("master does not synthesize winners from PASS CANCELLED or TIMED_OUT rows",
         },
     })
 
-    local ok = ctx.Master:BtnAward()
+    local ok = ctx.Master._Private.BtnAward()
 
     assertTrue(ok ~= true, "expected non-roll rows to stay outside the award path")
     assertEqual(#ctx.givenLoot, 0, "expected PASS/CANCELLED/TIMED_OUT rows to never award loot")
@@ -11266,7 +11300,7 @@ test("master revalidates the suggested winner before awarding loot", function()
         },
     })
 
-    local ok = ctx.Master:BtnAward()
+    local ok = ctx.Master._Private.BtnAward()
 
     assertTrue(ok ~= true, "expected controller to reject ineligible suggested winners at award time")
     assertEqual(#ctx.validationCalls, 1, "expected controller to consult Rolls:ValidateWinner before awarding")
@@ -11303,7 +11337,7 @@ test("master honors row selectionAllowed from the rolls service contract", funct
         },
     })
 
-    local ok = ctx.Master:BtnAward()
+    local ok = ctx.Master._Private.BtnAward()
 
     assertTrue(ok ~= true, "expected controller to treat service-disabled rows as not selectable")
     assertEqual(#ctx.givenLoot, 0, "expected unselectable rows to stay out of the award flow")
@@ -11516,7 +11550,7 @@ test("inventory multi self-keep consumes one item and advances to the next winne
         Alice = 77,
     })
 
-    assertTrue(ctx.Master:BtnAward() == true, "expected self-keep trade step to complete")
+    assertTrue(ctx.Master._Private.BtnAward() == true, "expected self-keep trade step to complete")
     assertEqual(#ctx.initiatedTrades, 0, "expected self-keep to avoid opening a trade window")
     assertEqual(ctx.h.feature.lootState.itemTraded, 1, "expected self-keep to consume exactly one inventory copy")
     assertEqual(ctx.h.feature.lootState.winner, "Alice", "expected self-keep to advance to the next selected winner")
@@ -11540,7 +11574,7 @@ test("inventory multi trade completion consumes one item and advances like self-
         Tester = 77,
     })
 
-    assertTrue(ctx.Master:BtnAward() == true, "expected trade step to be accepted")
+    assertTrue(ctx.Master._Private.BtnAward() == true, "expected trade step to be accepted")
     assertEqual(#ctx.initiatedTrades, 1, "expected non-trader winner to open a trade")
     assertEqual(ctx.initiatedTrades[1], "Alice", "expected the first selected non-trader winner to receive the trade")
     assertEqual(ctx.h.feature.lootState.itemTraded, nil, "expected trade progress to wait for TRADE_ACCEPT_UPDATE before consuming")

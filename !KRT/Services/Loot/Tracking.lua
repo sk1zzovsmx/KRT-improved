@@ -331,3 +331,18 @@ function Tracking.GetSnapshot(raidNum, lootTable, findLootSlotIndex)
         masterLoot = buildMasterLootSnapshot(windowItems, findLootSlotIndex),
     }
 end
+
+local registry = addon.ModuleRegistry
+if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Loot/Tracking", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Item",
+            "Services/Loot/Context",
+            "Services/Loot/PendingAwards",
+            "Services/Loot/PassiveGroupLoot",
+        },
+    })
+    registry.SetLoaded("Services/Loot/Tracking")
+end

@@ -347,17 +347,20 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
 18) Modules/Colors.lua
 19) Modules/Strings.lua
 20) Modules/Item.lua
-21) Modules/LootSourcesData.lua
-22) Modules/LootSources.lua
-23) Modules/IgnoredItems.lua
-24) Modules/IgnoredMobs.lua
-25) Modules/Comms.lua
-26) Modules/Time.lua
-27) Modules/Base64.lua
-28) Modules/Sort.lua
-29) Modules/Features.lua
-30) Modules/UI/Facade.lua
-31) Modules/UI/Effects.lua
+21) Modules/Dataset/LootSources/Vanilla.lua
+22) Modules/Dataset/LootSources/BurningCrusade.lua
+23) Modules/Dataset/LootSources/Wrath.lua
+24) Modules/Dataset/LootSourcesData.lua
+25) Modules/LootSources.lua
+26) Modules/Dataset/IgnoredItems.lua
+27) Modules/Dataset/IgnoredMobs.lua
+26) Modules/Comms.lua
+27) Modules/Time.lua
+28) Modules/Base64.lua
+29) Modules/Sort.lua
+30) Modules/Features.lua
+31) Modules/UI/Facade.lua
+32) Modules/UI/Effects.lua
 32) Modules/UI/Visuals.lua
 33) Modules/UI/Frames.lua
 34) Modules/UI/ListController.lua
@@ -518,8 +521,14 @@ WoW file load order matters. Keep (or restore) this order in `!KRT/!KRT.toc`:
     Colors.lua             # color normalization/class-color helpers (addon.Colors)
     Strings.lua            # text normalization and chat parsing helpers (addon.Strings)
     Item.lua               # item-link parsing + tooltip probe helpers (addon.Item)
-    IgnoredItems.lua       # canonical item-ignore lookup used by loot logging
-    IgnoredMobs.lua        # canonical raid add/phase-ignore lookup + generic trash-name helpers
+    Dataset/
+    LootSources/
+      Vanilla.lua            # static loot source dataset for Classic Vanilla
+      BurningCrusade.lua    # static loot source dataset for The Burning Crusade
+      Wrath.lua             # static loot source dataset for Wrath of the Lich King
+    LootSourcesData.lua      # normalized lookup index by item ID
+    IgnoredItems.lua         # canonical item-ignore lookup used by loot logging
+    IgnoredMobs.lua          # canonical raid add/phase-ignore lookup + generic trash-name helpers
     Comms.lua              # addon chat/whisper/sync helpers (addon.Comms)
     Time.lua               # time/difficulty helpers (addon.Time)
     Base64.lua             # base64 codec helpers (addon.Base64)
@@ -699,8 +708,8 @@ External modules:
 - `addon.Strings` (Modules/Strings.lua)
 - `addon.Item` (Modules/Item.lua)
 - `addon.LootSources` (Modules/LootSources.lua)
-- `addon.IgnoredItems` (Modules/IgnoredItems.lua)
-- `addon.IgnoredMobs` (Modules/IgnoredMobs.lua; add/phase-ignore lookup + generic trash-name helpers)
+- `addon.IgnoredItems` (Modules/Dataset/IgnoredItems.lua)
+- `addon.IgnoredMobs` (Modules/Dataset/IgnoredMobs.lua; add/phase-ignore lookup + generic trash-name helpers)
 - `addon.Comms` (Modules/Comms.lua)
 - `addon.Time` (Modules/Time.lua)
 - `addon.Base64` (Modules/Base64.lua)

@@ -259,16 +259,16 @@ function module:SetPos(angle)
     frame:SetPoint("CENTER", cos(r) * MINIMAP_RING_RADIUS, sin(r) * MINIMAP_RING_RADIUS)
 end
 
-function module:OnLoad(frame)
+local function loadMinimapFrame(frame)
     frame = frame or Frames.Get("KRT_MINIMAP_GUI") or KRT_MINIMAP_GUI
     if not frame then
         return nil
     end
 
-    self.frame = frame
+    module.frame = frame
     local options = addon.options or KRT_Options or {}
     frame:SetUserPlaced(true)
-    self:SetPos(options.minimapPos or 325)
+    module:SetPos(options.minimapPos or 325)
     setMinimapShown(options.minimapButton ~= false)
     frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     frame:SetScript("OnMouseDown", function(self, button)
@@ -344,7 +344,7 @@ function module:BindUI()
     local refs = UI.AcquireRefs(frame)
     self.refs = refs
 
-    self:OnLoad(frame)
+    loadMinimapFrame(frame)
 
     UI.Bound = true
     return frame, refs
@@ -368,10 +368,18 @@ function module:ToggleMinimapButton()
     setMinimapShown(nextValue)
 end
 
--- Hides the minimap button.
-function module:HideMinimapButton()
-    if not self:EnsureUI() then
-        return
-    end
-    return Frames.SetShown(KRT_MINIMAP_GUI, false)
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("EntryPoints/Minimap", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Core/Options",
+            "Modules/C",
+            "Modules/Colors",
+            "Modules/UI/Frames",
+            "Modules/UI/Facade",
+        },
+    })
+    registry.SetLoaded("EntryPoints/Minimap")
 end

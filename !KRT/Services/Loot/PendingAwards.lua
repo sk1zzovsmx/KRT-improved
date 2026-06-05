@@ -365,3 +365,16 @@ function PendingAwards.Purge(maxAge)
         end
     end
 end
+
+local registry = addon.ModuleRegistry
+if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Loot/PendingAwards", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/C",
+            "Modules/Item",
+        },
+    })
+    registry.SetLoaded("Services/Loot/PendingAwards")
+end

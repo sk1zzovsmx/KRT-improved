@@ -80,3 +80,9 @@ function Bus.TriggerEvent(eventName, ...)
 
     dispatchDepth = depth - 1
 end
+
+local registry = addon.ModuleRegistry
+if registry then
+    registry.AddModule("Modules/Bus", { deps = { "Init", "Modules/ModuleRegistry" } })
+    registry.SetLoaded("Modules/Bus")
+end

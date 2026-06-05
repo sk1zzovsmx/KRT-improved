@@ -161,3 +161,14 @@ do
         return state and state.allowed == true, state and state.reason or "missing_state"
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Raid/Capabilities", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+        },
+    })
+    registry.SetLoaded("Services/Raid/Capabilities")
+end

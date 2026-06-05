@@ -106,3 +106,16 @@ end
 function Countdown.IsRunning(state)
     return state.countdownRunning == true
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Rolls/Countdown", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Timer",
+            "Services/Chat",
+        },
+    })
+    registry.SetLoaded("Services/Rolls/Countdown")
+end

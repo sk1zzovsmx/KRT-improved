@@ -16,6 +16,19 @@ local L = feature.L
 
 -- ----- Internal state ----- --
 local LEGACY_TRASH_MOB_NAME = "_TrashMob_"
+local cachedTrashMobName
+
+-- ----- Private helpers ----- --
+local function resolveTrashMobName()
+    local localizedName = L and L.StrTrashMobName
+    if type(localizedName) ~= "string" or localizedName == "" then
+        return LEGACY_TRASH_MOB_NAME
+    end
+    if localizedName == "StrTrashMobName" or localizedName == "L.StrTrashMobName" then
+        return LEGACY_TRASH_MOB_NAME
+    end
+    return localizedName
+end
 
 IgnoredMobs.Ids = {
     -- Classic raids
@@ -129,14 +142,11 @@ IgnoredMobs.Ids = {
 
 -- ----- Public methods ----- --
 function IgnoredMobs.GetTrashMobName()
-    local localizedName = L and L.StrTrashMobName
-    if type(localizedName) ~= "string" or localizedName == "" then
-        return LEGACY_TRASH_MOB_NAME
+    if cachedTrashMobName == nil then
+        cachedTrashMobName = resolveTrashMobName()
     end
-    if localizedName == "StrTrashMobName" or localizedName == "L.StrTrashMobName" then
-        return LEGACY_TRASH_MOB_NAME
-    end
-    return localizedName
+
+    return cachedTrashMobName
 end
 
 function IgnoredMobs.IsTrashMobName(name)
@@ -145,4 +155,18 @@ end
 
 function IgnoredMobs.Contains(npcId)
     return IgnoredMobs.Ids[tonumber(npcId)] == true
+end
+
+do
+    local name = "Modules/Dataset/IgnoredMobs"
+    local deps = { "Init" }
+    local registry = addon.ModuleRegistry
+    if registry then
+        registry.AddModule(name, { deps = deps })
+        registry.SetLoaded(name)
+    else
+        addon.ModuleRegistryPendingRegistrations = addon.ModuleRegistryPendingRegistrations or {}
+        local pending = addon.ModuleRegistryPendingRegistrations
+        pending[#pending + 1] = { name = name, deps = deps, loaded = true }
+    end
 end

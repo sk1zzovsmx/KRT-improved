@@ -238,3 +238,16 @@ function Display.ShouldUseTieReroll(ctx, model)
 
     return resolution and resolution.requiresManualResolution == true and requiredWinnerCount == 1 and selectedCount <= 0
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Rolls/Display", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Services/Rolls/Responses",
+            "Services/Rolls/Resolution",
+        },
+    })
+    registry.SetLoaded("Services/Rolls/Display")
+end

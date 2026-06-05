@@ -769,3 +769,17 @@ function Responses.ValidateWinner(ctx, playerName, itemLink, rollType)
     end
     return buildWinnerValidationResult(true, nil, playerName, eligibility, response)
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Rolls/Responses", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Strings",
+            "Modules/Comms",
+            "Services/Chat",
+        },
+    })
+    registry.SetLoaded("Services/Rolls/Responses")
+end

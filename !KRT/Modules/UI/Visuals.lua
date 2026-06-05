@@ -309,3 +309,9 @@ function UIRowVisuals.SetRowFocused(row, cond)
         texture:Hide()
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Modules/UI/Visuals", { deps = { "Init", "Modules/ModuleRegistry" } })
+    registry.SetLoaded("Modules/UI/Visuals")
+end

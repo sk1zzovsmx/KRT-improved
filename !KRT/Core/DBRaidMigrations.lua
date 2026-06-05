@@ -539,3 +539,9 @@ do
         end
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Core/DBRaidMigrations", { deps = { "Init", "Modules/ModuleRegistry", "Core/DB", "Core/DBSchema", "Modules/Strings" } })
+    registry.SetLoaded("Core/DBRaidMigrations")
+end

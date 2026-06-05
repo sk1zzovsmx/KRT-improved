@@ -1063,3 +1063,22 @@ do
 
     Service._HasPendingItem = hasPendingItem
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Reserves", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/C",
+            "Modules/Timer",
+            "Modules/Events",
+            "Modules/Bus",
+            "Modules/Strings",
+            "Modules/Item",
+            "Services/Reserves/Import",
+            "Services/Reserves/Display",
+        },
+    })
+    registry.SetLoaded("Services/Reserves")
+end

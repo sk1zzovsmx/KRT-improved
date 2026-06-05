@@ -28,6 +28,24 @@ local tostring, tonumber = tostring, tonumber
 local InternalEvents = Events.Internal
 local UIFacade = addon.UI
 
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Widgets/ReservesUI", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/C",
+            "Modules/Events",
+            "Modules/Bus",
+            "Modules/UI/Facade",
+            "Modules/UI/Frames",
+            "Modules/UI/Visuals",
+            "Services/Reserves",
+        },
+    })
+    registry.SetLoaded("Widgets/ReservesUI")
+end
+
 do
     if not UIFacade:IsEnabled("Reserves") then
         return
@@ -516,16 +534,12 @@ do
 
     -- ----- Public methods ----- --
 
-    function module:RefreshUI()
+    local function refreshReservesUi()
         if not UI.Localized then
             UI.Localize()
         end
         UI.Refresh()
         renderReserveListUI()
-    end
-
-    function module:Refresh()
-        return self:RefreshUI()
     end
 
     local function BindHandlers(_, _, refs)
@@ -564,7 +578,7 @@ do
         end
     end
 
-    function module:OnLoad(frame)
+    local function loadReservesFrame(frame)
         if isDebugEnabled() then
             addon:debug(Diag.D.LogReservesFrameLoaded)
         end
@@ -607,7 +621,7 @@ do
     end
 
     local function OnLoadFrame(frame)
-        module:OnLoad(frame)
+        loadReservesFrame(frame)
         return UI.FrameName
     end
 
@@ -620,6 +634,9 @@ do
             UI.Localize()
         end,
         onLoad = OnLoadFrame,
+        refresh = function()
+            refreshReservesUi()
+        end,
     })
 
     -- ----- Import widget controller ----- --
@@ -668,6 +685,8 @@ do
     local function getModeSlider()
         return _G["KRTImportWindowModeSlider"]
     end
+
+    local setImportMode, onModeSliderLoad, onModeSliderChanged, importFromEditBox
 
     local function setImportStatus(text, r, g, b)
         local status = _G["KRTImportWindowStatus"]
@@ -720,7 +739,7 @@ do
                 if type(data) ~= "table" or type(data.csv) ~= "string" then
                     return
                 end
-                Import:SetImportMode(MODE_MULTI)
+                setImportMode(MODE_MULTI)
                 local parsed = Reserves and Reserves.ParseImport and Reserves:ParseImport(data.csv, "multi")
                 if not parsed then
                     setImportStatus(L.ErrImportReservesEmpty, 1, 0.2, 0.2)
@@ -774,18 +793,18 @@ do
             Import:Hide()
         end)
         Frames.SafeSetScript(refs.confirmButton, "OnClick", function()
-            Import:ImportFromEditBox()
+            importFromEditBox()
         end)
         Frames.SafeSetScript(refs.editBox, "OnEscapePressed", function()
             Import:Hide()
         end)
         Frames.SafeSetScript(refs.modeSlider, "OnValueChanged", function(self, value)
-            Import:OnModeSliderChanged(self, value)
+            onModeSliderChanged(self, value)
         end)
-        Import:OnModeSliderLoad(refs.modeSlider)
+        onModeSliderLoad(refs.modeSlider)
     end
 
-    function Import:SetImportMode(modeValue, suppressSlider)
+    setImportMode = function(modeValue, suppressSlider)
         local mode = (modeValue == MODE_PLUS) and "plus" or "multi"
         if Reserves and Reserves.SetImportMode then
             Reserves:SetImportMode(mode, true)
@@ -806,7 +825,7 @@ do
         end
     end
 
-    function Import:OnModeSliderLoad(slider)
+    onModeSliderLoad = function(slider)
         if not slider then
             return
         end
@@ -832,7 +851,7 @@ do
         slider:SetValue(getImportModeValue())
     end
 
-    function Import:OnModeSliderChanged(slider, value)
+    onModeSliderChanged = function(slider, value)
         if not slider then
             return
         end
@@ -842,10 +861,10 @@ do
         else
             modeValue = MODE_MULTI
         end
-        self:SetImportMode(modeValue, true)
+        setImportMode(modeValue, true)
     end
 
-    function Import:RefreshUI()
+    local function refreshImportFrame()
         if not ImportUI.Localized then
             ImportUI.Localize()
         end
@@ -861,11 +880,7 @@ do
         end
     end
 
-    function Import:Refresh()
-        return self:RefreshUI()
-    end
-
-    function Import:OnLoad(frame)
+    local function loadImportFrame(frame)
         ImportUI.FrameName = Frames.InitModuleFrame(Import, frame, {
             enableDrag = true,
             hookOnShow = function()
@@ -888,7 +903,7 @@ do
     end
 
     local function onLoadImportFrame(frame)
-        Import:OnLoad(frame)
+        loadImportFrame(frame)
         return ImportUI.FrameName
     end
 
@@ -901,9 +916,12 @@ do
             ImportUI.Localize()
         end,
         onLoad = onLoadImportFrame,
+        refresh = function()
+            refreshImportFrame()
+        end,
     })
 
-    function Import:ImportFromEditBox()
+    importFromEditBox = function()
         local editBox = _G["KRTImportEditBox"]
         setImportStatus("")
         if not editBox then

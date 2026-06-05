@@ -98,6 +98,11 @@ Release-Version: 0.7.1-beta.3
   LibCompat bootstrap includes, feature override hooks, unused Time helpers,
   a redundant Bus registration helper, and the callback-statistics debug command.
 
+### Fixes
+
+- **Slash controller dispatch** - Slash warning announce and LFM start/stop
+  commands now resolve through their controller dispatch contracts correctly.
+
 ## [0.7.1-beta.3] - 2026-05-03
 
 ### Enhancements

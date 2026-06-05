@@ -226,3 +226,17 @@ do
         return module:GetPlayerLootCountByNid(playerNid, "ms", raidNum)
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Raid/Counts", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Events",
+            "Modules/Bus",
+            "Modules/Strings",
+        },
+    })
+    registry.SetLoaded("Services/Raid/Counts")
+end

@@ -497,3 +497,16 @@ do
         }
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Debug", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Strings",
+            "Modules/Time",
+        },
+    })
+    registry.SetLoaded("Services/Debug")
+end

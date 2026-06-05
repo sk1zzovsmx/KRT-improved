@@ -67,7 +67,8 @@ Do not introduce new snake_case private names.
 - WoW event handlers stay UPPER (`ADDON_LOADED`, `RAID_ROSTER_UPDATE`, ...)
 - constants stay `UPPER_SNAKE_CASE`
 - Lua metamethods stay unchanged (`__index`, `__call`, ...)
-- canonical UI hook names remain valid (`AcquireRefs`, `BindHandlers`, `Localize`, `OnLoadFrame`, `RefreshUI`)
+- canonical UI hook names remain valid as scaffold/local callback names (`AcquireRefs`, `BindHandlers`,
+  `Localize`, `OnLoadFrame`, `RefreshUI`)
 
 ### Public API verb taxonomy (new/renamed APIs)
 
@@ -75,7 +76,8 @@ Do not introduce new snake_case private names.
 - Mutations: `Set*`, `Add*`, `Remove*`, `Delete*`, `Upsert*`
 - Lifecycle/UI: `Ensure*`, `Bind*`, `Localize*`, `Request*`, `RequestRefresh*`, `Refresh*`,
   `Toggle*`, `Show*`, `Hide*`
-- Exact lifecycle hooks: `OnLoad`, `OnLoadFrame`, `AcquireRefs`, `BindHandlers`, `RefreshUI`, `Refresh`
+- Exact UI hook names are naming-valid, but should stay scaffold/local unless deliberately exported by an
+  architecture wave.
 
 ## 3) `:` vs `.` Call Style
 
@@ -108,6 +110,8 @@ Prefer stable, scoped diffs over mass reformatting untouched legacy code.
 - For Controllers/Widgets, prefer `UIScaffold.DefineModuleUi(cfg)` as canonical UI contract.
 - Keep module-local UI state under `module._ui` with uniform fields.
 - Prefer event-driven redraw (`RequestRefresh`/`Refresh`) over polling `OnUpdate` loops.
+- Do not add new public Controller/Widget `OnLoad`, `RefreshUI`, or `Refresh` exports without an
+  architecture change. Prefer scaffold callbacks or local hooks.
 
 ## 6) Local Quality Gates
 

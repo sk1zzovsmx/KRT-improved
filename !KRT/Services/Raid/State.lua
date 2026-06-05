@@ -1715,3 +1715,25 @@ do
         end
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Raid/State", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/C",
+            "Modules/Events",
+            "Modules/Bus",
+            "Modules/Strings",
+            "Modules/Time",
+            "Modules/Base64",
+            "Modules/Dataset/IgnoredMobs",
+            "Modules/LootSources",
+            "Services/Loot/Context",
+            "Services/Loot/State",
+            "Services/Loot/Snapshots",
+        },
+    })
+    registry.SetLoaded("Services/Raid/State")
+end

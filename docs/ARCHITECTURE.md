@@ -104,6 +104,36 @@ compatibility exception is `addon:Print` for `LibLogger-1.0`.
 - Cross-file helpers that are still package-internal should move to underscore internal surfaces
   on the owner table, not remain public `*Internal` methods.
 
+## Intentional Controller/EntryPoint Public Contracts
+
+After the API/lifecycle cleanup, the remaining public Controller/EntryPoint surface is intentional.
+Do not internalize these methods without changing the caller architecture and updating the matching
+tests. They are public because the current runtime dispatch uses method-name lookup, slash/minimap
+entrypoints, or scaffold/minimap ownership.
+
+| Contract | Type | Current reason |
+| --- | --- | --- |
+| `Master:LOOT_OPENED` | WoW-forwarded event handler | Called by Master event forwarding through method-name dispatch. |
+| `Master:LOOT_CLOSED` | WoW-forwarded event handler | Called by Master event forwarding through method-name dispatch. |
+| `Master:LOOT_SLOT_CLEARED` | WoW-forwarded event handler | Called by Master event forwarding through method-name dispatch. |
+| `Master:UI_ERROR_MESSAGE` | WoW-forwarded event handler | Called by Master event forwarding through method-name dispatch. |
+| `Master:TRADE_ACCEPT_UPDATE` | WoW-forwarded event handler | Called by Master trade forwarding through method-name dispatch. |
+| `Master:TRADE_CLOSED` | WoW-forwarded event handler | Called by Master trade forwarding through method-name dispatch. |
+| `Master:TRADE_REQUEST_CANCEL` | WoW-forwarded event handler | Called by Master trade forwarding through method-name dispatch. |
+| `Changes:Demand` | Slash/minimap command endpoint | Used by `/krt ms demand` and minimap menu routing. |
+| `Changes:Announce` | Slash/minimap command endpoint | Used by `/krt ms announce` and minimap menu routing. |
+| `Warnings:RequestAnnounce` | Slash command endpoint | Used by `/krt rw ...` through `Core.RequestControllerMethod`. |
+| `Spammer:RequestStart` | Slash command endpoint | Used by `/krt pug start` through `Core.RequestControllerMethod`. |
+| `Spammer:RequestStop` | Slash command endpoint | Used by `/krt pug stop` through `Core.RequestControllerMethod`. |
+| `Minimap:SetPos` | Slash/minimap state endpoint | Used by `/krt minimap pos` and minimap drag/load positioning. |
+| `Minimap:BindUI` | Minimap lifecycle endpoint | Owned by `EntryPoints/Minimap.lua` for minimap frame binding. |
+| `Minimap:EnsureUI` | Minimap lifecycle endpoint | Used by bootstrap/config paths to ensure minimap state. |
+| `Minimap:ToggleMinimapButton` | Config/minimap endpoint | Used by config and minimap visibility flows. |
+
+The registry may classify some `Request*` or minimap methods as `Lifecycle` because of their verb.
+Semantically, `Warnings:RequestAnnounce` and `Spammer:RequestStart/RequestStop` are command
+endpoints, while `Minimap:*` methods are entrypoint-owned minimap lifecycle/state endpoints.
+
 ## UI/XML Binding and Template Policy
 
 - XML is layout-only:

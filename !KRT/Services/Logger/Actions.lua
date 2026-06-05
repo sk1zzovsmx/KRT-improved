@@ -731,3 +731,18 @@ function Actions:AddBossAttendee(rID, bossNid, nameRaw)
     commitRaidSelections(raid, { invalidate = false })
     return true
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Logger/Actions", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Strings",
+            "Modules/Base64",
+            "Services/Logger/Store",
+            "Services/Logger/Helpers",
+        },
+    })
+    registry.SetLoaded("Services/Logger/Actions")
+end

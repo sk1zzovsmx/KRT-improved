@@ -47,3 +47,17 @@ end
 function DBManager.GetDefaultManager()
     return SavedVariablesManager
 end
+
+do
+    local name = "Core/DBManager"
+    local deps = { "Init", "Core/DB" }
+    local registry = addon.ModuleRegistry
+    if registry then
+        registry.AddModule(name, { deps = deps })
+        registry.SetLoaded(name)
+    else
+        addon.ModuleRegistryPendingRegistrations = addon.ModuleRegistryPendingRegistrations or {}
+        local pending = addon.ModuleRegistryPendingRegistrations
+        pending[#pending + 1] = { name = name, deps = deps, loaded = true }
+    end
+end

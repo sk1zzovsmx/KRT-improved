@@ -63,6 +63,7 @@ do
     local changesTable = {}
     local tmpNames = {}
     local saveChanges, cancelChanges, initChangesTable
+    local clearChanges, selectChange, addChange, editChange, deleteChange
     local fetched = false
     local changesDirty = false
     local selectedID, tempSelectedID
@@ -178,10 +179,10 @@ do
             return
         end
         Frames.SafeSetScript(row, "OnClick", function(self, button)
-            module:Select(self, button)
+            selectChange(self, button)
         end)
         Frames.SafeSetScript(row, "OnDoubleClick", function(self)
-            module:Edit(self)
+            editChange(self)
         end)
         row._krtBound = true
     end
@@ -212,19 +213,19 @@ do
 
     local function BindHandlers(_, _, refs)
         Frames.SafeSetScript(refs.addBtn, "OnClick", function(self, button)
-            module:Add(self, button)
+            addChange(self, button)
         end)
         Frames.SafeSetScript(refs.announceBtn, "OnClick", function()
             module:Announce()
         end)
         Frames.SafeSetScript(refs.clearBtn, "OnClick", function()
-            module:Clear()
+            clearChanges()
         end)
         Frames.SafeSetScript(refs.demandBtn, "OnClick", function()
             module:Demand()
         end)
         Frames.SafeSetScript(refs.editBtn, "OnClick", function(self, button)
-            module:Edit(self, button)
+            editChange(self, button)
         end)
         Frames.SafeSetScript(refs.name, "OnTabPressed", function(self)
             local spec = Frames.Ref(self:GetParent(), "Spec")
@@ -256,15 +257,13 @@ do
             UI.Localize()
         end,
         onLoad = OnLoadFrame,
+        refresh = function()
+            panelScaffold:Refresh()
+        end,
     })
 
-    -- OnLoad frame:
-    function module:OnLoad(frame)
-        return OnLoadFrame(frame)
-    end
-
     -- Clear module:
-    function module:Clear()
+    function clearChanges()
         local currentRaid = Core.GetCurrentRaid()
         if not currentRaid then
             return
@@ -281,7 +280,7 @@ do
     end
 
     -- Selecting Player:
-    function module:Select(btn)
+    function selectChange(btn)
         -- No selection.
         if not btn then
             return
@@ -317,7 +316,7 @@ do
         -- Quick announce?
         if IsControlKeyDown() then
             tempSelectedID = (name ~= selectedID) and name or nil
-            self:Announce()
+            module:Announce()
             return
         end
         -- Selection:
@@ -328,7 +327,7 @@ do
     end
 
     -- Add / Delete:
-    function module:Add(btn)
+    function addChange(btn)
         if not addon.Core.GetCurrentRaid() or not btn then
             return
         end
@@ -360,7 +359,7 @@ do
     end
 
     -- Edit / Save
-    function module:Edit()
+    function editChange()
         if not addon.Core.GetCurrentRaid() then
             return
         end
@@ -387,7 +386,7 @@ do
     end
 
     -- Remove player's change:
-    function module:Delete(name)
+    function deleteChange(name)
         local currentRaid = Core.GetCurrentRaid()
         if not currentRaid or not name then
             return
@@ -401,7 +400,7 @@ do
     end
 
     Bus.RegisterCallback(InternalEvents.RaidLeave, function(_, name)
-        module:Delete(name)
+        deleteChange(name)
         cancelChanges()
     end)
 
@@ -494,8 +493,8 @@ do
         end
         Frames.SetFrameTitle(frameName, L.StrChanges)
         Frames.BindEditBoxHandlers(frameName, {
-            { suffix = "Name", onEscape = cancelChanges, onEnter = module.Edit },
-            { suffix = "Spec", onEscape = cancelChanges, onEnter = module.Edit },
+            { suffix = "Name", onEscape = cancelChanges, onEnter = editChange },
+            { suffix = "Spec", onEscape = cancelChanges, onEnter = editChange },
         }, function()
             module:RequestRefresh()
         end)
@@ -537,14 +536,6 @@ do
         local hasRaid = addon.Core.GetCurrentRaid()
         UIPrimitives.EnableDisableNamedPart(frameName, "AddBtn", hasRaid)
         UIPrimitives.EnableDisableNamedPart(frameName, "DemandBtn", canBroadcast)
-    end
-
-    function module:RefreshUI()
-        panelScaffold:Refresh()
-    end
-
-    function module:Refresh()
-        return self:RefreshUI()
     end
 
     -- Initialize changes table:
@@ -609,4 +600,26 @@ do
         end
         module:RequestRefresh()
     end
+end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Controllers/Changes", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Events",
+            "Modules/Bus",
+            "Modules/Colors",
+            "Modules/Strings",
+            "Modules/UI/Frames",
+            "Modules/UI/Visuals",
+            "Modules/UI/ListController",
+            "Services/Chat",
+            "Services/Raid/Roster",
+            "Services/Raid/Capabilities",
+            "Services/Raid/Session",
+        },
+    })
+    registry.SetLoaded("Controllers/Changes")
 end

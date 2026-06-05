@@ -1824,3 +1824,26 @@ do
         return buildMultiAwardState(args)
     end
 end
+
+local registry = addon.ModuleRegistry
+if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Loot/Service", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/C",
+            "Modules/Timer",
+            "Modules/Events",
+            "Modules/Bus",
+            "Modules/Item",
+            "Modules/Strings",
+            "Modules/Time",
+            "Modules/Dataset/IgnoredItems",
+            "Services/Loot/Context",
+            "Services/Loot/PendingAwards",
+            "Services/Loot/PassiveGroupLoot",
+            "Services/Loot/Tracking",
+        },
+    })
+    registry.SetLoaded("Services/Loot/Service")
+end

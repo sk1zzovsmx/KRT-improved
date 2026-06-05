@@ -76,3 +76,9 @@ function UI:Call(widgetId, methodName, ...)
     end
     return fn(...)
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Modules/UI/Facade", { deps = { "Init", "Modules/ModuleRegistry" } })
+    registry.SetLoaded("Modules/UI/Facade")
+end

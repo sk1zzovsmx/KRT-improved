@@ -31,6 +31,29 @@ local strlen = string.len
 local InternalEvents = Events.Internal
 local UIFacade = addon.UI
 
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Widgets/LootCounter", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Core/Options",
+            "Modules/C",
+            "Modules/Colors",
+            "Modules/Events",
+            "Modules/Bus",
+            "Modules/UI/Facade",
+            "Modules/UI/Frames",
+            "Services/Chat",
+            "Services/Raid/State",
+            "Services/Raid/Capabilities",
+            "Services/Raid/Counts",
+            "Services/Raid/Roster",
+        },
+    })
+    registry.SetLoaded("Widgets/LootCounter")
+end
+
 -- Loot counter module.
 -- Tracks and edits item distribution counts (MS wins).
 do
@@ -65,6 +88,7 @@ do
     local RESET_BTN_W = 18 -- per-row reset button
     local RESET_BTN_GAP = 16 -- wide gap between FREE section and reset button (avoids accidental clicks)
     local RIGHT_EDGE = -2 -- offset from scrollChild right for the reset button
+    local resetAllCounts
 
     -- One section = count label + gap + minus button + gap + plus button
     local SECTION_W = COUNT_LABEL_W + BTN_GAP + BTN_W + BTN_GAP + BTN_W -- 62
@@ -142,9 +166,7 @@ do
             return true
         end
 
-        Frames.MakeConfirmPopup(RESET_ALL_POPUP_KEY, L.StrConfirmLootCounterResetAll, function()
-            module:ResetAllCounts()
-        end)
+        Frames.MakeConfirmPopup(RESET_ALL_POPUP_KEY, L.StrConfirmLootCounterResetAll, resetAllCounts)
 
         local popup = StaticPopupDialogs[RESET_ALL_POPUP_KEY]
         if popup then
@@ -485,16 +507,7 @@ do
         return row
     end
 
-    -- ----- Public methods ----- --
-    function module:OnLoad(frame)
-        local f = frame or getFrame()
-        UI.FrameName = Frames.InitModuleFrame(module, f, { enableDrag = true }) or UI.FrameName
-        if not ensureFrames() then
-            return
-        end
-    end
-
-    function module:AttachToMaster(masterFrame)
+    local function attachToMaster(masterFrame)
         local frame = masterFrame
         if not frame or frame._krtAttached then
             return
@@ -506,7 +519,7 @@ do
         end)
     end
 
-    function module:AnnounceCounts()
+    local function announceCounts()
         local ok, reason = canBroadcastCounter()
         if not ok then
             warnBroadcastDenied(reason)
@@ -519,7 +532,7 @@ do
         announceCountSection(players, "freeCount", L.StrLootCounterAnnounceHeaderFree, L.StrLootCounterAnnounceNoneFree)
     end
 
-    function module:ResetAllCounts()
+    resetAllCounts = function()
         local currentRaid = addon.Core.GetCurrentRaid()
         if not currentRaid then
             return
@@ -547,15 +560,24 @@ do
         end
     end
 
+    -- ----- Public methods ----- --
+    local function loadLootCounterFrame(frame)
+        local f = frame or getFrame()
+        UI.FrameName = Frames.InitModuleFrame(module, f, { enableDrag = true }) or UI.FrameName
+        if not ensureFrames() then
+            return
+        end
+    end
+
     local function confirmResetAllCounts()
         if not ensureResetAllPopup() or type(StaticPopup_Show) ~= "function" then
-            module:ResetAllCounts()
+            resetAllCounts()
             return
         end
         StaticPopup_Show(RESET_ALL_POPUP_KEY)
     end
 
-    function module:RefreshUI()
+    local function refreshLootCounter()
         if not ensureFrames() then
             return
         end
@@ -690,15 +712,11 @@ do
         end
     end
 
-    function module:Refresh()
-        return self:RefreshUI()
-    end
-
     local function BindHandlers(_, _, refs)
         scrollFrame = refs.scrollFrame or scrollFrame
         scrollChild = refs.scrollChild or scrollChild
         Frames.SafeSetScript(refs.announceBtn, "OnClick", function()
-            module:AnnounceCounts()
+            announceCounts()
         end)
         Frames.SafeSetScript(refs.resetAllBtn, "OnClick", function()
             confirmResetAllCounts()
@@ -706,7 +724,7 @@ do
     end
 
     local function OnLoadFrame(frame)
-        module:OnLoad(frame)
+        loadLootCounterFrame(frame)
         return UI.FrameName
     end
 
@@ -719,6 +737,9 @@ do
             UI.Localize()
         end,
         onLoad = OnLoadFrame,
+        refresh = function()
+            refreshLootCounter()
+        end,
     })
 
     local function requestRefresh()
@@ -739,7 +760,7 @@ do
         "LootCounter",
         UIScaffold.MakeStandardWidgetApi(module, {
             AttachToMaster = function(masterFrame)
-                module:AttachToMaster(masterFrame)
+                attachToMaster(masterFrame)
             end,
         })
     )

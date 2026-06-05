@@ -567,3 +567,18 @@ function DistributionSession.GetDisplayModel()
 end
 
 ensurePrefix()
+
+local registry = addon.ModuleRegistry
+if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Loot/DistributionSession", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Events",
+            "Modules/Bus",
+            "Modules/Comms",
+            "Modules/Item",
+        },
+    })
+    registry.SetLoaded("Services/Loot/DistributionSession")
+end

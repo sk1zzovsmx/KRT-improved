@@ -161,3 +161,18 @@ function Chat:RequestWhisperReply(msg, sender)
 end
 
 registerWhisperHandler()
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Reserves/Chat", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Strings",
+            "Modules/Comms",
+            "Modules/Events",
+            "Modules/Bus",
+        },
+    })
+    registry.SetLoaded("Services/Reserves/Chat")
+end

@@ -24,6 +24,22 @@ local type, tostring = type, tostring
 
 local UIFacade = addon.UI
 
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Widgets/Config", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Core/Options",
+            "Modules/Events",
+            "Modules/Bus",
+            "Modules/UI/Facade",
+            "Modules/UI/Frames",
+        },
+    })
+    registry.SetLoaded("Widgets/Config")
+end
+
 -- =========== Configuration Frame Module  =========== --
 do
     if not UIFacade:IsEnabled("Config") then
@@ -94,8 +110,7 @@ do
         addon:info(L.MsgDefaultsRestored)
     end
 
-    -- OnLoad handler for the configuration frame.
-    function module:OnLoad(frame)
+    local function loadConfigFrame(frame)
         UI.FrameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
@@ -190,7 +205,7 @@ do
     end
 
     local function OnLoadFrame(frame)
-        module:OnLoad(frame)
+        loadConfigFrame(frame)
         return UI.FrameName
     end
 
@@ -203,6 +218,9 @@ do
             UI.Localize()
         end,
         onLoad = OnLoadFrame,
+        refresh = function(_, _, _, dirty)
+            UI.Refresh(dirty)
+        end,
     })
 
     -- Localizes UI elements.
@@ -284,14 +302,6 @@ do
         end
 
         UI.Dirty = false
-    end
-
-    function module:RefreshUI(_, _, _, dirty)
-        UI.Refresh(dirty)
-    end
-
-    function module:Refresh()
-        return self:RefreshUI(nil, nil, nil, true)
     end
 
     UIFacade:Register(

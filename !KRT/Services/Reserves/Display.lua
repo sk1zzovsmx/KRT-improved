@@ -1012,3 +1012,16 @@ function Display.GetDisplayList(ctx)
     end
     return ctx.reservesDisplayList
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Reserves/Display", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/C",
+            "Modules/Strings",
+        },
+    })
+    registry.SetLoaded("Services/Reserves/Display")
+end

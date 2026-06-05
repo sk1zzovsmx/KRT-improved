@@ -9,12 +9,11 @@ local feature = addon.Core.GetFeatureShared()
 
 local tonumber = tonumber
 
-addon.IgnoredItems = addon.IgnoredItems or feature.IgnoredItems or {}
-local IgnoredItems = addon.IgnoredItems
+local IgnoredItems = addon.IgnoredItems or feature.IgnoredItems or {}
+addon.IgnoredItems = IgnoredItems
 
 -- ----- Internal state ----- --
-IgnoredItems.EnchantingMaterialIds = {
-    -- Enchanting materials - Classic
+local ENCHANTING_MATERIAL_IDS = {
     [10940] = true, -- Strange Dust
     [10938] = true, -- Lesser Magic Essence
     [10939] = true, -- Greater Magic Essence
@@ -39,16 +38,12 @@ IgnoredItems.EnchantingMaterialIds = {
     [16203] = true, -- Greater Eternal Essence
     [16204] = true, -- Illusion Dust
     [20725] = true, -- Nexus Crystal
-
-    -- Enchanting materials - The Burning Crusade
     [22445] = true, -- Arcane Dust
     [22446] = true, -- Greater Planar Essence
     [22447] = true, -- Lesser Planar Essence
     [22448] = true, -- Small Prismatic Shard
     [22449] = true, -- Large Prismatic Shard
     [22450] = true, -- Void Crystal
-
-    -- Enchanting materials - Wrath of the Lich King
     [34052] = true, -- Dream Shard
     [34053] = true, -- Small Dream Shard
     [34054] = true, -- Infinite Dust
@@ -57,7 +52,7 @@ IgnoredItems.EnchantingMaterialIds = {
     [34057] = true, -- Abyss Crystal
 }
 
-IgnoredItems.Ids = {
+local IGNORED_ITEM_IDS = {
     -- Emblems (Wrath of the Lich King)
     [40752] = true, -- Emblem of Heroism
     [40753] = true, -- Emblem of Valor
@@ -81,49 +76,22 @@ IgnoredItems.Ids = {
     [36934] = true, -- Eye of Zul
     [36922] = true, -- King's Amber
     [36925] = true, -- Majestic Zircon
-
-    -- Enchanting materials - Classic
-    [10940] = true, -- Strange Dust
-    [10938] = true, -- Lesser Magic Essence
-    [10939] = true, -- Greater Magic Essence
-    [10978] = true, -- Small Glimmering Shard
-    [10998] = true, -- Lesser Astral Essence
-    [11082] = true, -- Greater Astral Essence
-    [11083] = true, -- Soul Dust
-    [11084] = true, -- Large Glimmering Shard
-    [11134] = true, -- Lesser Mystic Essence
-    [11135] = true, -- Greater Mystic Essence
-    [11137] = true, -- Vision Dust
-    [11138] = true, -- Small Glowing Shard
-    [11139] = true, -- Large Glowing Shard
-    [11174] = true, -- Lesser Nether Essence
-    [11175] = true, -- Greater Nether Essence
-    [11176] = true, -- Dream Dust
-    [11177] = true, -- Small Radiant Shard
-    [11178] = true, -- Large Radiant Shard
-    [14343] = true, -- Small Brilliant Shard
-    [14344] = true, -- Large Brilliant Shard
-    [16202] = true, -- Lesser Eternal Essence
-    [16203] = true, -- Greater Eternal Essence
-    [16204] = true, -- Illusion Dust
-    [20725] = true, -- Nexus Crystal
-
-    -- Enchanting materials - The Burning Crusade
-    [22445] = true, -- Arcane Dust
-    [22446] = true, -- Greater Planar Essence
-    [22447] = true, -- Lesser Planar Essence
-    [22448] = true, -- Small Prismatic Shard
-    [22449] = true, -- Large Prismatic Shard
-    [22450] = true, -- Void Crystal
-
-    -- Enchanting materials - Wrath of the Lich King
-    [34052] = true, -- Dream Shard
-    [34053] = true, -- Small Dream Shard
-    [34054] = true, -- Infinite Dust
-    [34055] = true, -- Greater Cosmic Essence
-    [34056] = true, -- Lesser Cosmic Essence
-    [34057] = true, -- Abyss Crystal
 }
+
+local function copyLookup(source)
+    local result = {}
+    for itemId in pairs(source) do
+        result[itemId] = true
+    end
+    return result
+end
+
+IgnoredItems.EnchantingMaterialIds = copyLookup(ENCHANTING_MATERIAL_IDS)
+IgnoredItems.Ids = copyLookup(IGNORED_ITEM_IDS)
+
+for itemId in pairs(ENCHANTING_MATERIAL_IDS) do
+    IgnoredItems.Ids[itemId] = true
+end
 
 -- ----- Private helpers ----- --
 
@@ -134,4 +102,18 @@ end
 
 function IgnoredItems.IsEnchantingMaterial(itemId)
     return IgnoredItems.EnchantingMaterialIds[tonumber(itemId)] == true
+end
+
+do
+    local name = "Modules/Dataset/IgnoredItems"
+    local deps = { "Init" }
+    local registry = addon.ModuleRegistry
+    if registry then
+        registry.AddModule(name, { deps = deps })
+        registry.SetLoaded(name)
+    else
+        addon.ModuleRegistryPendingRegistrations = addon.ModuleRegistryPendingRegistrations or {}
+        local pending = addon.ModuleRegistryPendingRegistrations
+        pending[#pending + 1] = { name = name, deps = deps, loaded = true }
+    end
 end

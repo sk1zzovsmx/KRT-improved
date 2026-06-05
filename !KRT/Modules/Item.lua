@@ -376,3 +376,17 @@ function Item.IsBagItemSoulbound(bag, slot)
     end
     return isSoulbound
 end
+
+do
+    local name = "Modules/Item"
+    local deps = { "Init", "Modules/Timer", "Modules/Strings" }
+    local registry = addon.ModuleRegistry
+    if registry then
+        registry.AddModule(name, { deps = deps })
+        registry.SetLoaded(name)
+    else
+        addon.ModuleRegistryPendingRegistrations = addon.ModuleRegistryPendingRegistrations or {}
+        local pending = addon.ModuleRegistryPendingRegistrations
+        pending[#pending + 1] = { name = name, deps = deps, loaded = true }
+    end
+end

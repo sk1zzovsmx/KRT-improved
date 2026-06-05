@@ -120,3 +120,17 @@ function Rules:GetItemSuggestion(item, opts)
 
     return buildDecision(ACTION_NONE, REASON_NONE)
 end
+
+local registry = addon.ModuleRegistry
+if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Loot/Rules", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/C",
+            "Modules/Item",
+            "Modules/Dataset/IgnoredItems",
+        },
+    })
+    registry.SetLoaded("Services/Loot/Rules")
+end

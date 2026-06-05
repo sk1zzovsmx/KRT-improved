@@ -883,3 +883,9 @@ function Frames.BindEditBoxHandlers(frameName, specs, requestRefreshFn)
         end
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Modules/UI/Frames", { deps = { "Init", "Modules/ModuleRegistry" } })
+    registry.SetLoaded("Modules/UI/Frames")
+end

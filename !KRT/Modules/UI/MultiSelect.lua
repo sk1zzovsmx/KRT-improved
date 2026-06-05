@@ -327,3 +327,9 @@ function MultiSelect.MultiSelectGetSelected(contextKey)
     end)
     return out
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Modules/UI/MultiSelect", { deps = { "Init", "Modules/ModuleRegistry" } })
+    registry.SetLoaded("Modules/UI/MultiSelect")
+end

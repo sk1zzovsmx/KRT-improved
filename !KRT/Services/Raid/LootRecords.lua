@@ -228,3 +228,18 @@ do
         return 0
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Raid/LootRecords", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/C",
+            "Modules/Item",
+            "Modules/Strings",
+            "Services/Raid/Counts",
+        },
+    })
+    registry.SetLoaded("Services/Raid/LootRecords")
+end

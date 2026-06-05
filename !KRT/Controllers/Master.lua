@@ -488,7 +488,7 @@ do
             refs.selectItemBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
-                module:BtnSelectItem(self, button)
+                Private.BtnSelectItem(self, button)
             end)
         )
         Frames.SafeSetScript(refs.spamLootBtn, "OnClick", function(self, button)
@@ -501,7 +501,7 @@ do
             refs.msBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
-                module:BtnMS(self, button)
+                Private.BtnMS(self, button)
             end)
         )
         Frames.SafeSetScript(
@@ -538,14 +538,14 @@ do
             refs.countdownBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
-                module:BtnCountdown(self, button)
+                Private.BtnCountdown(self, button)
             end)
         )
         Frames.SafeSetScript(
             refs.awardBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
-                module:BtnAward(self, button)
+                Private.BtnAward(self, button)
             end)
         )
         Frames.SafeSetScript(
@@ -2325,15 +2325,11 @@ do
         return true
     end
 
-    -- ----- Public methods ----- --
-
-    function module:RefreshUI()
+    local function refreshMasterFrame()
         UI.Refresh()
     end
 
-    function module:Refresh()
-        return self:RefreshUI()
-    end
+    Private.RefreshFrame = refreshMasterFrame
 
     Private.ClearCurrentItemView = function(focusItemCount)
         local frame = getFrame()
@@ -2376,8 +2372,7 @@ do
         setItemCountValue(Loot:GetCurrentItemCount() or 1, focus)
     end
 
-    -- OnLoad frame:
-    function module:OnLoad(frame)
+    local function loadMasterFrame(frame)
         UI.FrameName = Frames.InitModuleFrame(module, frame, {
             enableDrag = true,
             hookOnHide = function()
@@ -2398,6 +2393,8 @@ do
         end
     end
 
+    Private.LoadFrame = loadMasterFrame
+
     local function BindHandlers(_, frame, refs)
         bindMainControlScripts(frame, refs)
     end
@@ -2410,7 +2407,7 @@ do
     end
 
     local function OnLoadFrame(frame)
-        module:OnLoad(frame)
+        loadMasterFrame(frame)
         return UI.FrameName
     end
 
@@ -2421,13 +2418,16 @@ do
         bind = BindHandlers,
         localize = Localize,
         onLoad = OnLoadFrame,
+        refresh = function()
+            refreshMasterFrame()
+        end,
     })
 
     -- ============================================================================
     -- Button handlers
     -- ============================================================================
     -- Button: Select/Remove Item
-    function module:BtnSelectItem(btn, _button)
+    Private.BtnSelectItem = function(btn, _button)
         if btn == nil or lootState.lootCount <= 0 then
             return
         end
@@ -2572,7 +2572,7 @@ do
         return ok
     end
 
-    function module:BtnMS(_btn, _button)
+    Private.BtnMS = function(_btn, _button)
         return announceRoll(rollTypes.MAINSPEC, rollAnnouncementKeys[rollTypes.MAINSPEC])
     end
 
@@ -2589,7 +2589,7 @@ do
     end
 
     -- Button: left click starts/stops countdown, right click finalizes rolls immediately.
-    function module:BtnCountdown(_btn, button)
+    Private.BtnCountdown = function(_btn, button)
         if isCountdownRunning() then
             finalizeRollSession()
         elseif not lootState.rollStarted then
@@ -2617,7 +2617,7 @@ do
     end
 
     -- Button: Award/Trade
-    function module:BtnAward(_btn, _button)
+    Private.BtnAward = function(_btn, _button)
         return handleAwardRequest()
     end
 
@@ -3374,6 +3374,8 @@ do
         end, 0.1)
     end
 
+    -- ----- Public methods ----- --
+
     -- LOOT_OPENED: Triggered when the loot window opens.
     function module:LOOT_OPENED()
         local perfTotal = addon.hasPerf and addon:_PerfStart() or nil
@@ -4049,4 +4051,35 @@ do
     Bus.RegisterCallback(InternalEvents.ConfigShowLootCounterDuringMSRoll, function()
         module:RequestRefresh()
     end)
+end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Controllers/Master", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Core/Options",
+            "Modules/C",
+            "Modules/Timer",
+            "Modules/Events",
+            "Modules/Bus",
+            "Modules/Item",
+            "Modules/Colors",
+            "Modules/Comms",
+            "Modules/UI/Facade",
+            "Modules/UI/Frames",
+            "Modules/UI/Visuals",
+            "Modules/UI/ListController",
+            "Modules/UI/MultiSelect",
+            "Services/Chat",
+            "Services/Loot/Service",
+            "Services/Rolls/Service",
+            "Services/Raid/State",
+            "Services/Raid/Capabilities",
+            "Services/Raid/Roster",
+            "Services/Raid/LootRecords",
+        },
+    })
+    registry.SetLoaded("Controllers/Master")
 end

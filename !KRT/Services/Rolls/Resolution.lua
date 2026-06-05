@@ -289,3 +289,14 @@ function Resolution.BuildRowInfoText(ctx, response, isTied)
 
     return ""
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Rolls/Resolution", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+        },
+    })
+    registry.SetLoaded("Services/Rolls/Resolution")
+end

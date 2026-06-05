@@ -712,3 +712,22 @@ do
         module:GetDisplayModel()
     end
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Rolls/Service", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Item",
+            "Modules/Strings",
+            "Services/Rolls/Countdown",
+            "Services/Rolls/Sessions",
+            "Services/Rolls/History",
+            "Services/Rolls/Responses",
+            "Services/Rolls/Resolution",
+            "Services/Rolls/Display",
+        },
+    })
+    registry.SetLoaded("Services/Rolls/Service")
+end

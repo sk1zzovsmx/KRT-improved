@@ -375,3 +375,16 @@ function Sync:RequestMessageHandling(prefix, msg, channel, sender)
 
     return true
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Reserves/Sync", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Comms",
+            "Modules/Strings",
+        },
+    })
+    registry.SetLoaded("Services/Reserves/Sync")
+end

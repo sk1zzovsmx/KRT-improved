@@ -339,3 +339,15 @@ function Import.BuildParser()
         ParseImport = parseImport,
     }
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Reserves/Import", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Strings",
+        },
+    })
+    registry.SetLoaded("Services/Reserves/Import")
+end

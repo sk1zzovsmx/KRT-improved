@@ -48,7 +48,7 @@ do
     local lastEditBtnMode
 
     local tempName, tempContent
-    local saveWarning
+    local saveWarning, editWarning, deleteWarning, announceWarning
     local isEdit = false
 
     -- ----- Private helpers ----- --
@@ -87,7 +87,7 @@ do
         if IsControlKeyDown() then
             selectedID = nil
             tempSelectedID = wID
-            return module:Announce(tempSelectedID)
+            return announceWarning(tempSelectedID)
         end
         selectedID = (wID ~= selectedID) and wID or nil
         module:RequestRefresh()
@@ -182,13 +182,13 @@ do
             end)
         end
         Frames.SafeSetScript(refs.announceBtn, "OnClick", function()
-            module:Announce()
+            announceWarning()
         end)
         Frames.SafeSetScript(refs.deleteBtn, "OnClick", function(self, button)
-            module:Delete(self, button)
+            deleteWarning(self, button)
         end)
         Frames.SafeSetScript(refs.editBtn, "OnClick", function(self, button)
-            module:Edit(self, button)
+            editWarning(self, button)
         end)
         Frames.SafeSetScript(refs.name, "OnTabPressed", function(self)
             local content = Frames.Ref(self:GetParent(), "Content")
@@ -219,15 +219,13 @@ do
             UI.Localize()
         end,
         onLoad = OnLoadFrame,
+        refresh = function()
+            panelScaffold:Refresh()
+        end,
     })
 
-    -- OnLoad frame:
-    function module:OnLoad(frame)
-        return OnLoadFrame(frame)
-    end
-
     -- Edit/Save warning:
-    function module:Edit()
+    function editWarning()
         local wName, wContent
         local frameName = UI.FrameName
         if not frameName then
@@ -262,7 +260,7 @@ do
     end
 
     -- Delete Warning:
-    function module:Delete(btn)
+    function deleteWarning(btn)
         if btn == nil or selectedID == nil then
             return
         end
@@ -287,7 +285,7 @@ do
     end
 
     -- Announce Warning:
-    function module:Announce(wID)
+    function announceWarning(wID)
         if KRT_Warnings == nil then
             return
         end
@@ -303,6 +301,10 @@ do
         tempSelectedID = nil -- Always clear temporary selected id:
 
         return ChatApi.AnnounceWarningMessage(Chat, KRT_Warnings[wID].content)
+    end
+
+    function module:RequestAnnounce(wID)
+        return announceWarning(wID)
     end
 
     -- Localizing UI frame:
@@ -322,8 +324,8 @@ do
         _G[frameName .. "OutputName"]:SetText(L.StrWarningsHelpTitle)
         Frames.SetFrameTitle(frameName, RAID_WARNING)
         Frames.BindEditBoxHandlers(frameName, {
-            { suffix = "Name", onEscape = cancelWarning, onEnter = module.Edit },
-            { suffix = "Content", onEscape = cancelWarning, onEnter = module.Edit },
+            { suffix = "Name", onEscape = cancelWarning, onEnter = editWarning },
+            { suffix = "Content", onEscape = cancelWarning, onEnter = editWarning },
         }, function()
             module:RequestRefresh()
         end)
@@ -371,14 +373,6 @@ do
         lastEditBtnMode = UIPrimitives.UpdateModeTextNamedPart(frameName, "EditBtn", L.BtnSave, L.BtnEdit, editBtnMode, lastEditBtnMode)
     end
 
-    function module:RefreshUI()
-        panelScaffold:Refresh()
-    end
-
-    function module:Refresh()
-        return self:RefreshUI()
-    end
-
     -- Saving a Warning:
     function saveWarning(wContent, wName, wID)
         local frameName = UI.FrameName
@@ -421,4 +415,20 @@ do
         controller:Dirty()
         module:RequestRefresh()
     end
+end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Controllers/Warnings", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Strings",
+            "Modules/UI/Frames",
+            "Modules/UI/Visuals",
+            "Modules/UI/ListController",
+            "Services/Chat",
+        },
+    })
+    registry.SetLoaded("Controllers/Warnings")
 end

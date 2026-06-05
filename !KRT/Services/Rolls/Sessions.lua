@@ -359,3 +359,16 @@ function Sessions.GetCurrentRollContext(ctx, itemLink, rollType)
         rollType = tonumber(rollType) or Sessions.GetActiveRollType(ctx),
     }
 end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Rolls/Sessions", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Item",
+            "Modules/Strings",
+        },
+    })
+    registry.SetLoaded("Services/Rolls/Sessions")
+end

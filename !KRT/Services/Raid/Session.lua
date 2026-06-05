@@ -76,19 +76,6 @@ do
 
     -- ----- Public methods ----- --
 
-    function module:GetRaid(raidNum)
-        raidNum = resolveRaidNum(raidNum)
-        if not raidNum then
-            return nil, nil
-        end
-
-        local raidStore = Core.GetRaidStoreOrNil("Raid.GetRaid", { "GetRaidByIndex" })
-        if raidStore then
-            return raidStore:GetRaidByIndex(raidNum)
-        end
-        return nil, raidNum
-    end
-
     function module:InvalidateRaidRuntime(raidNum)
         local raid = Core.EnsureRaidById(raidNum)
         if raid then
@@ -171,33 +158,6 @@ do
             end
         end
         return nil
-    end
-
-    function module:GetBosses(raidNum, out)
-        raidNum = raidNum or Core.GetCurrentRaid()
-        local raid = raidNum and Core.EnsureRaidById(raidNum)
-        if not raid or not raid.bossKills then
-            return {}
-        end
-
-        Core.EnsureRaidSchema(raid)
-
-        local bosses = out or {}
-        if out then
-            table.wipe(bosses)
-        end
-
-        for i = 1, #raid.bossKills do
-            local boss = raid.bossKills[i]
-            bosses[#bosses + 1] = {
-                id = tonumber(boss.bossNid), -- stable selection id
-                seq = i, -- display order
-                name = boss.name,
-                time = boss.time,
-                mode = boss.mode or ((boss.difficulty == 3 or boss.difficulty == 4) and "h" or "n"),
-            }
-        end
-        return bosses
     end
 
     function module:ClearRaidIcons()
@@ -309,4 +269,15 @@ do
         end
         return msg, count
     end
+end
+
+local registry = addon.ModuleRegistry
+if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
+    registry.AddModule("Services/Raid/Session", {
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+        },
+    })
+    registry.SetLoaded("Services/Raid/Session")
 end
