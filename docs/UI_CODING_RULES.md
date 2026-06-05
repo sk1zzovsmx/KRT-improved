@@ -49,12 +49,14 @@ because WoW XML template names are global, but prefer semantic role names for ne
 | Item or icon button | `KRTIconButtonTemplate` or `KRTItemIconButtonTemplate` |
 | Ordinary list scroll area | `KRTListScrollFrameTemplate` |
 | Output/import text scroll area | `KRTTextScrollFrameTemplate` |
+| Interface options scroll area | `KRTOptionsScrollFrameTemplate` |
 | Single-line text input | `KRTTextInputTemplate` |
 | Numeric input | `KRTNumericInputTemplate` |
 | Repeated table row | `KRTTableRowTemplate` |
 | Table/list header row | `KRTHeaderRowTemplate` |
 
-Current historical templates remain valid compatibility surfaces:
+KRT-owned XML and Lua should use semantic template names directly. Retired historical template
+names should not be used or reintroduced:
 
 - `KRTFrameTemplate`
 - `KRTSimpleFrameTemplate`
@@ -64,19 +66,8 @@ Current historical templates remain valid compatibility surfaces:
 - `KRTEditBoxTemplate`
 - `KRTEditBoxSimpleTemplate`
 
-Do not mass-rename existing XML templates in normal feature work. Introduce semantic templates as
-compatibility-safe wrappers or replacements during a controlled UI migration, then update callers in
-small batches with focused verification.
-
-For example, a migration can keep old names alive while moving new code to semantic names:
-
-```xml
-<Frame name="KRTWindowTemplate" inherits="UIPanelDialogTemplate" virtual="true">
-    ...
-</Frame>
-
-<Frame name="KRTFrameTemplate" inherits="KRTWindowTemplate" virtual="true" />
-```
+When a shared template changes role or name, update all KRT-owned XML and Lua callers in the same
+change and run focused verification.
 
 Add a new XML template only when at least two feature surfaces will reuse it, or when a single
 surface has enough repeated child widgets that a template reduces real duplication. If a visual
@@ -324,8 +315,8 @@ Standard scrollframe naming:
 </ScrollFrame>
 ```
 
-Use `KRTScrollFrameTemplate` only as the current compatibility fallback until semantic scrollframe
-templates exist in the addon.
+Feature XML should inherit a semantic KRT scrollframe template. Direct
+`UIPanelScrollFrameTemplate` inheritance belongs in shared templates only.
 
 Expected runtime names:
 
@@ -373,8 +364,7 @@ Sorting:
 
 XML:
 
-- use `KRTTextInputTemplate` or `KRTNumericInputTemplate` when available
-- use `KRTEditBoxTemplate` or `KRTEditBoxSimpleTemplate` only as compatibility fallbacks
+- use `KRTTextInputTemplate` or `KRTNumericInputTemplate`
 - set `autoFocus="false"` unless the field is an intentional popup primary input
 - set `letters` or `numeric` when the input contract is known
 - for multiline output/import boxes, make the scrollframe and editbox dimensions explicit
@@ -447,7 +437,7 @@ Before finishing a UI change, check:
 
 - XML has no `<Scripts>` and no `<On...>` handlers.
 - New frames inherit a semantic shared KRT template when one exists.
-- Historical templates are kept as compatibility surfaces until a planned migration replaces them.
+- Retired historical template names are absent from KRT-owned XML and Lua.
 - Controller/Widget frame lifecycle uses `UI.Scaffold.DefineModule(cfg)` or documents an exception.
 - ScrollFrame child width and height are explicitly set before refresh ends.
 - Repeated tables/lists use `UI.Lists` unless the UI is static or documents an exception.

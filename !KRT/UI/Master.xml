@@ -80,7 +80,7 @@
 		</HighlightTexture>
 	</Button>
 	<!-- The Frame: Loot Manager -->
-	<Frame name="KRTMaster" inherits="KRTFrameTemplate">
+	<Frame name="KRTMaster" inherits="KRTWindowTemplate">
 		<Size>
 			<AbsDimension x="250" y="480" />
 		</Size>
@@ -163,7 +163,7 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<Button name="$parentConfigBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentConfigBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="70" y="19" />
 				</Size>
@@ -175,7 +175,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentSelectItemBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentSelectItemBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="113" y="25" />
 				</Size>
@@ -187,7 +187,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentSpamLootBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentSpamLootBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="113" y="25" />
 				</Size>
@@ -199,7 +199,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentItemBtn" inherits="KRTItemButtonTemplate">
+			<Button name="$parentItemBtn" inherits="KRTItemIconButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="$parentSelectItemBtn" relativePoint="BOTTOMLEFT">
 						<Offset>
@@ -208,7 +208,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<EditBox name="$parentItemCount" inherits="KRTEditBoxTemplate" numeric="true" letters="2" hidden="true">
+			<EditBox name="$parentItemCount" inherits="KRTNumericInputTemplate" letters="2" hidden="true">
 				<Size>
 					<AbsDimension x="20" y="18" />
 				</Size>
@@ -221,7 +221,7 @@
 				</Anchors>
 				<FontString inherits="GameFontHighlightSmall" justifyH="LEFT" />
 			</EditBox>
-			<Button name="$parentMSBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentMSBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="30" y="25" />
 				</Size>
@@ -233,7 +233,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentOSBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentOSBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="30" y="25" />
 				</Size>
@@ -245,7 +245,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentSRBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentSRBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="30" y="25" />
 				</Size>
@@ -257,7 +257,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentFreeBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentFreeBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="38" y="25" />
 				</Size>
@@ -269,7 +269,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentCountdownBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentCountdownBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="84" y="25" />
 				</Size>
@@ -281,7 +281,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+			<ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT">
 						<Offset>
@@ -295,7 +295,7 @@
 					</Anchor>
 				</Anchors>
 			</ScrollFrame>
-			<Button name="$parentAwardBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentAwardBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="25" />
 				</Size>
@@ -307,7 +307,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentRollBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentRollBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="77" y="25" />
 				</Size>
@@ -319,7 +319,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentClearBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentClearBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="68" y="25" />
 				</Size>
@@ -331,7 +331,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentHoldBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentHoldBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="25" />
 				</Size>
@@ -352,7 +352,7 @@
 					</Anchor>
 				</Anchors>
 			</Frame>
-			<Button name="$parentBankBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentBankBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="25" />
 				</Size>
@@ -373,7 +373,7 @@
 					</Anchor>
 				</Anchors>
 			</Frame>
-			<Button name="$parentDisenchantBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentDisenchantBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="25" />
 				</Size>
@@ -395,7 +395,7 @@
 				</Anchors>
 			</Frame>
 			<!-- First row: Reserve List (contextual) -->
-			<Button name="$parentReserveListBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentReserveListBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="113" y="25" />
 				</Size>
@@ -408,7 +408,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentLootCounterBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentLootCounterBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="113" y="25" />
 				</Size>

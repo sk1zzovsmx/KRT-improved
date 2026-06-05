@@ -25,7 +25,7 @@
 		</Size>
 	</FontString>
     <!-- Config frame -->
-	<Frame name="KRTConfig" inherits="KRTFrameTemplate">
+	<Frame name="KRTConfig" inherits="KRTWindowTemplate">
 		<Size>
 			<AbsDimension x="245" y="485" />
 		</Size>
@@ -363,7 +363,7 @@
 					</Anchor>
 				</Anchors>
             </Slider>
-			<Button name="$parentDefaultsBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentDefaultsBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
 				</Size>
@@ -375,7 +375,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentCloseBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentCloseBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="105" y="25" />
 				</Size>
@@ -499,7 +499,7 @@
 			<AbsDimension x="560" y="560" />
 		</Size>
 		<Frames>
-			<ScrollFrame name="$parentScrollFrame" inherits="UIPanelScrollFrameTemplate">
+			<ScrollFrame name="$parentScrollFrame" inherits="KRTOptionsScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" />
 					<Anchor point="BOTTOMRIGHT">
@@ -1223,7 +1223,7 @@
 					</Anchor>
 				</Anchors>
 			</CheckButton>
-			<EditBox name="$parentautoMasterLootNoticeSecondsEditBox" inherits="KRTEditBoxTemplate" letters="5">
+			<EditBox name="$parentautoMasterLootNoticeSecondsEditBox" inherits="KRTTextInputTemplate" letters="5">
 				<Size>
 					<AbsDimension x="105" y="20" />
 				</Size>
@@ -1275,7 +1275,7 @@
 					</Anchor>
 				</Anchors>
 			</Slider>
-			<Button name="$parentDefaultsBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentDefaultsBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="125" y="25" />
 				</Size>
@@ -1287,7 +1287,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentQuietPresetBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentQuietPresetBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="125" y="25" />
 				</Size>
@@ -1299,7 +1299,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentStandardPresetBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentStandardPresetBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="125" y="25" />
 				</Size>
@@ -1311,7 +1311,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentVerbosePresetBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentVerbosePresetBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="125" y="25" />
 				</Size>
@@ -1335,7 +1335,7 @@
 			<AbsDimension x="560" y="560" />
 		</Size>
 		<Frames>
-			<ScrollFrame name="$parentScrollFrame" inherits="UIPanelScrollFrameTemplate">
+			<ScrollFrame name="$parentScrollFrame" inherits="KRTOptionsScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" />
 					<Anchor point="BOTTOMRIGHT">
@@ -1690,7 +1690,7 @@
 									</Anchor>
 								</Anchors>
 							</Frame>
-							<EditBox name="$parentRequireDatabaseEditBox" inherits="KRTEditBoxTemplate" letters="32">
+							<EditBox name="$parentRequireDatabaseEditBox" inherits="KRTTextInputTemplate" letters="32">
 								<Size>
 									<AbsDimension x="105" y="20" />
 								</Size>
@@ -1702,7 +1702,7 @@
 									</Anchor>
 								</Anchors>
 							</EditBox>
-							<Button name="$parentRequireDatabaseBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentRequireDatabaseBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -1714,7 +1714,7 @@
 									</Anchor>
 								</Anchors>
 							</Button>
-							<EditBox name="$parentPushDatabaseEditBox" inherits="KRTEditBoxTemplate" letters="32">
+							<EditBox name="$parentPushDatabaseEditBox" inherits="KRTTextInputTemplate" letters="32">
 								<Size>
 									<AbsDimension x="105" y="20" />
 								</Size>
@@ -1726,7 +1726,7 @@
 									</Anchor>
 								</Anchors>
 							</EditBox>
-							<Button name="$parentPushDatabaseBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentPushDatabaseBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -1738,7 +1738,7 @@
 									</Anchor>
 								</Anchors>
 							</Button>
-							<Button name="$parentSyncNowBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentSyncNowBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -1750,7 +1750,7 @@
 									</Anchor>
 								</Anchors>
 							</Button>
-							<Button name="$parentScanHistoryBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentScanHistoryBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -1762,7 +1762,7 @@
 									</Anchor>
 								</Anchors>
 							</Button>
-							<Button name="$parentPurgeHistoryBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentPurgeHistoryBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -1774,7 +1774,7 @@
 									</Anchor>
 								</Anchors>
 							</Button>
-							<Button name="$parentRebuildSourcesBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentRebuildSourcesBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -1786,7 +1786,7 @@
 									</Anchor>
 								</Anchors>
 							</Button>
-							<Button name="$parentCleanUpBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentCleanUpBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -1810,7 +1810,7 @@
 			<AbsDimension x="560" y="560" />
 		</Size>
 		<Frames>
-			<ScrollFrame name="$parentScrollFrame" inherits="UIPanelScrollFrameTemplate">
+			<ScrollFrame name="$parentScrollFrame" inherits="KRTOptionsScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" />
 					<Anchor point="BOTTOMRIGHT">
@@ -1880,7 +1880,7 @@
 							</Layer>
 						</Layers>
 						<Frames>
-							<Button name="$parentRefreshPreviewBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentRefreshPreviewBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -1892,7 +1892,7 @@
 									</Anchor>
 								</Anchors>
 							</Button>
-							<Button name="$parentClearPreviewBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentClearPreviewBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -1904,7 +1904,7 @@
 									</Anchor>
 								</Anchors>
 							</Button>
-							<Button name="$parentOpenBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentOpenBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -1916,7 +1916,7 @@
 									</Anchor>
 								</Anchors>
 							</Button>
-							<Button name="$parentStartBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentStartBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -1928,7 +1928,7 @@
 									</Anchor>
 								</Anchors>
 							</Button>
-							<Button name="$parentStopBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentStopBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -1952,7 +1952,7 @@
 			<AbsDimension x="560" y="560" />
 		</Size>
 		<Frames>
-			<ScrollFrame name="$parentScrollFrame" inherits="UIPanelScrollFrameTemplate">
+			<ScrollFrame name="$parentScrollFrame" inherits="KRTOptionsScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" />
 					<Anchor point="BOTTOMRIGHT">
@@ -2073,7 +2073,7 @@
 							</Layer>
 						</Layers>
 						<Frames>
-							<Button name="$parentPreviewBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentPreviewBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -2085,7 +2085,7 @@
 									</Anchor>
 								</Anchors>
 							</Button>
-							<Button name="$parentOpenBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentOpenBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -2097,7 +2097,7 @@
 									</Anchor>
 								</Anchors>
 							</Button>
-							<Button name="$parentClearSavedBtn" inherits="KRTButtonTemplate">
+							<Button name="$parentClearSavedBtn" inherits="KRTActionButtonTemplate">
 								<Size>
 									<AbsDimension x="105" y="25" />
 								</Size>
@@ -2121,7 +2121,7 @@
 			<AbsDimension x="560" y="560" />
 		</Size>
 		<Frames>
-			<ScrollFrame name="$parentScrollFrame" inherits="UIPanelScrollFrameTemplate">
+			<ScrollFrame name="$parentScrollFrame" inherits="KRTOptionsScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" />
 					<Anchor point="BOTTOMRIGHT">
@@ -2285,7 +2285,7 @@
 			</ScrollFrame>
 		</Frames>
 	</Frame>
-	<Frame name="KRTLootHistoryCleanupPopup" inherits="KRTSimpleFrameTemplate" parent="UIParent" hidden="true"
+	<Frame name="KRTLootHistoryCleanupPopup" inherits="KRTDialogTemplate" parent="UIParent" hidden="true"
 		frameStrata="DIALOG" toplevel="true">
 		<Size>
 			<AbsDimension x="380" y="340" />
@@ -2427,7 +2427,7 @@
 					</Anchor>
 				</Anchors>
 			</CheckButton>
-			<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentDeleteBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="110" y="25" />
 				</Size>
@@ -2439,7 +2439,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentCancelBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentCancelBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="110" y="25" />
 				</Size>

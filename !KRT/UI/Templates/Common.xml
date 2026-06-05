@@ -1,7 +1,7 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
-	<!-- Default Frames Template -->
-	<Frame name="KRTFrameTemplate" inherits="UIPanelDialogTemplate" parent="UIParent" movable="true" enableMouse="true" frameStrata="MEDIUM" toplevel="true" hidden="true" clampedToScreen="true" virtual="true">
+	<!-- Standard top-level window template -->
+	<Frame name="KRTWindowTemplate" inherits="UIPanelDialogTemplate" parent="UIParent" movable="true" enableMouse="true" frameStrata="MEDIUM" toplevel="true" hidden="true" clampedToScreen="true" virtual="true">
 		<Size>
 			<AbsDimension x="230" y="385" />
 		</Size>
@@ -22,8 +22,8 @@
 			</Layer>
 		</Layers>
 	</Frame>
-	<!-- Simple almost border-less frame template -->
-	<Frame name="KRTSimpleFrameTemplate" parent="UIParent" movable="true" enableMouse="true" hidden="true" clampedToScreen="true" virtual="true">
+	<!-- Compact dialog template -->
+	<Frame name="KRTDialogTemplate" parent="UIParent" movable="true" enableMouse="true" hidden="true" clampedToScreen="true" virtual="true">
 		<Size>
 			<AbsDimension x="230" y="385" />
 		</Size>
@@ -42,8 +42,8 @@
 			</BackgroundInsets>
 		</Backdrop>
 	</Frame>
-	<!-- Default buttons template -->
-	<Button name="KRTButtonTemplate" virtual="true">
+	<!-- Standard action button template -->
+	<Button name="KRTActionButtonTemplate" virtual="true">
 		<Size>
 			<AbsDimension x="25" y="25" />
 		</Size>
@@ -111,7 +111,7 @@
 		<DisabledTexture inherits="UIPanelButtonDisabledTexture" />
 	</Button>
 	<!-- Item icon button template -->
-	<Button name="KRTItemButtonTemplate" virtual="true">
+	<Button name="KRTItemIconButtonTemplate" virtual="true">
 		<Size>
 			<AbsDimension x="32" y="32" />
 		</Size>
@@ -142,8 +142,8 @@
 	<FontString name="KRTFontStringGray" inherits="GameFontNormalSmall" justifyH="LEFT" justifyV="MIDDLE" virtual="true">
 		<Color r="0.5" g="0.5" b="0.5" a="1" />
 	</FontString>
-	<!-- ScrollFrame template -->
-	<ScrollFrame name="KRTScrollFrameTemplate" inherits="UIPanelScrollFrameTemplate" virtual="true">
+	<!-- List scrollframe template -->
+	<ScrollFrame name="KRTListScrollFrameTemplate" inherits="UIPanelScrollFrameTemplate" virtual="true">
 		<ScrollChild>
 			<Frame name="$parentScrollChild">
 				<Anchors>
@@ -153,34 +153,16 @@
 			</Frame>
 		</ScrollChild>
 	</ScrollFrame>
-	<!-- EditBox Template -->
-	<EditBox name="KRTEditBoxTemplate" inherits="InputBoxTemplate" autoFocus="false" virtual="true">
+	<!-- Text scrollframe template -->
+	<ScrollFrame name="KRTTextScrollFrameTemplate" inherits="UIPanelScrollFrameTemplate" virtual="true" />
+	<!-- Interface options scrollframe template -->
+	<ScrollFrame name="KRTOptionsScrollFrameTemplate" inherits="UIPanelScrollFrameTemplate" virtual="true" />
+	<!-- Text input template -->
+	<EditBox name="KRTTextInputTemplate" inherits="InputBoxTemplate" autoFocus="false" virtual="true">
 		<FontString inherits="GameFontHighlight" />
 	</EditBox>
-	<!-- Simple borderless EditBox template -->
-	<EditBox name="KRTEditBoxSimpleTemplate" font="GameFontHighlightSmall" autoFocus="false" virtual="true">
-		<Layers>
-			<Layer level="BACKGROUND">
-				<Texture file="Interface\DialogFrame\UI-DialogBox-Background">
-					<Size>
-						<AbsDimension x="10" y="22" />
-					</Size>
-					<Anchors>
-						<Anchor point="TOPLEFT">
-							<Offset>
-								<AbsDimension x="-5" y="0" />
-							</Offset>
-						</Anchor>
-						<Anchor point="BOTTOMRIGHT">
-							<Offset>
-								<AbsDimension x="5" y="0" />
-							</Offset>
-						</Anchor>
-					</Anchors>
-				</Texture>
-			</Layer>
-		</Layers>
-	</EditBox>
+	<!-- Numeric input template -->
+	<EditBox name="KRTNumericInputTemplate" inherits="KRTTextInputTemplate" numeric="true" virtual="true" />
 	<!-- Player Selection Button -->
 	<Button name="KRTSelectPlayerTemplate" virtual="true">
 		<Size>

@@ -182,7 +182,7 @@ Options:
 - Use shared KRT semantic XML templates and `Modules/UI/*` helpers before feature-local UI styling.
 - New shared XML templates keep the `KRT` prefix and use role names such as `Window`, `Panel`,
   `Dialog`, `ActionButton`, `ListScrollFrame`, `TextInput`, `TableRow`, or `HeaderRow`.
-- Historical templates remain compatibility surfaces; do not mass-rename them without a migration plan.
+- Historical template names are retired; use semantic KRT templates in KRT-owned XML and Lua.
 - New repeated list/table UIs should prefer `addon.UI.Lists`.
 - Selectable row selected/focused visuals should use `addon.UI.Rows`.
 - ScrollFrame tables use stable names: `FrameNameScrollFrame` and `FrameNameScrollFrameScrollChild`.

@@ -1,7 +1,7 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
     <!-- ====== Start of Loot Counter Frame ====== -->
-    <Frame name="KRTLootCounterFrame" inherits="KRTFrameTemplate" hidden="true" enableMouse="true" registerForDrag="LeftButton">
+    <Frame name="KRTLootCounterFrame" inherits="KRTWindowTemplate" hidden="true" enableMouse="true" registerForDrag="LeftButton">
         <Size>
             <AbsDimension x="370" y="360" />
         </Size>
@@ -9,7 +9,7 @@
             <Anchor point="CENTER" />
         </Anchors>
         <Frames>
-            <ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+            <ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">
                 <Anchors>
 					<Anchor point="TOPLEFT">
 						<Offset>
@@ -23,7 +23,7 @@
 					</Anchor>
                 </Anchors>
             </ScrollFrame>
-            <Button name="$parentAnnounceBtn" inherits="KRTButtonTemplate">
+            <Button name="$parentAnnounceBtn" inherits="KRTActionButtonTemplate">
                 <Size>
                     <AbsDimension y="24" />
                 </Size>
@@ -40,7 +40,7 @@
                     </Anchor>
                 </Anchors>
             </Button>
-            <Button name="$parentResetAllBtn" inherits="KRTButtonTemplate">
+            <Button name="$parentResetAllBtn" inherits="KRTActionButtonTemplate">
                 <Size>
                     <AbsDimension y="24" />
                 </Size>

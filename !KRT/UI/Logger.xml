@@ -529,7 +529,7 @@
 					<Anchor point="CENTER" relativeTo="$parentSource" relativePoint="CENTER" />
 				</Anchors>
 			</Frame>
-			<Button name="$parentItem" inherits="KRTItemButtonTemplate">
+			<Button name="$parentItem" inherits="KRTItemIconButtonTemplate">
 				<Size>
 					<AbsDimension x="26" y="26" />
 				</Size>
@@ -552,7 +552,7 @@
 		</HighlightTexture>
 	</Button>
 	<!-- The Frame: Logger -->
-	<Frame name="KRTLogger" inherits="KRTFrameTemplate">
+	<Frame name="KRTLogger" inherits="KRTWindowTemplate">
 		<Size>
 			<AbsDimension x="980" y="515" />
 		</Size>
@@ -644,7 +644,7 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button name="$parentCurrentBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentCurrentBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="75" y="25" />
 						</Size>
@@ -656,7 +656,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentDeleteBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -717,7 +717,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -782,7 +782,7 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentAddBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -794,7 +794,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentEditBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -806,7 +806,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentDeleteBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -867,7 +867,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -932,7 +932,7 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentAddBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -944,7 +944,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentRemoveBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentRemoveBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -969,7 +969,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -1034,7 +1034,7 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentAddBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -1046,7 +1046,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentDeleteBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -1095,7 +1095,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -1160,7 +1160,7 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button name="$parentExportBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentExportBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -1172,7 +1172,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentClearBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentClearBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -1184,7 +1184,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentAddBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -1196,7 +1196,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentEditBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -1208,7 +1208,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentDeleteBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -1293,7 +1293,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -1310,7 +1310,7 @@
 				</Frames>
 			</Frame>
 			<!-- Add/Edit Boss: -->
-			<Frame name="KRTLoggerBossBox" inherits="KRTSimpleFrameTemplate" frameStrata="HIGH" parent="KRTLogger">
+			<Frame name="KRTLoggerBossBox" inherits="KRTDialogTemplate" frameStrata="HIGH" parent="KRTLogger">
 				<Size>
 					<AbsDimension x="185" y="145" />
 				</Size>
@@ -1379,28 +1379,28 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<EditBox name="$parentName" inherits="KRTEditBoxTemplate">
+					<EditBox name="$parentName" inherits="KRTTextInputTemplate">
 						<Size x="100" y="25" />
 						<Anchors>
 							<Anchor point="TOPLEFT" x="15" y="-40" />
 							<Anchor point="RIGHT" x="-10" />
 						</Anchors>
 					</EditBox>
-					<EditBox name="$parentDifficulty" inherits="KRTEditBoxTemplate" letters="1">
+					<EditBox name="$parentDifficulty" inherits="KRTTextInputTemplate" letters="1">
 						<Size x="100" y="25" />
 						<Anchors>
 							<Anchor point="TOPLEFT" x="15" y="-85" />
 							<Anchor point="RIGHT" x="-100" />
 						</Anchors>
 					</EditBox>
-					<EditBox name="$parentTime" inherits="KRTEditBoxTemplate">
+					<EditBox name="$parentTime" inherits="KRTTextInputTemplate">
 						<Size x="100" y="25" />
 						<Anchors>
 							<Anchor point="TOPLEFT" x="100" y="-85" />
 							<Anchor point="RIGHT" x="-10" />
 						</Anchors>
 					</EditBox>
-					<Button name="$parentSaveBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentSaveBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -1412,7 +1412,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentCancelBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentCancelBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -1427,7 +1427,7 @@
 				</Frames>
 			</Frame>
 			<!-- Add/Edit Boss Attendee: -->
-			<Frame name="$parentPlayerBox" inherits="KRTSimpleFrameTemplate" frameStrata="HIGH" hidden="true" parent="KRTLogger">
+			<Frame name="$parentPlayerBox" inherits="KRTDialogTemplate" frameStrata="HIGH" hidden="true" parent="KRTLogger">
 				<Size>
 					<AbsDimension x="185" y="100" />
 				</Size>
@@ -1477,14 +1477,14 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<EditBox name="$parentName" inherits="KRTEditBoxTemplate">
+					<EditBox name="$parentName" inherits="KRTTextInputTemplate">
 						<Size x="100" y="25" />
 						<Anchors>
 							<Anchor point="TOPLEFT" x="15" y="-40" />
 							<Anchor point="RIGHT" x="-10" />
 						</Anchors>
 					</EditBox>
-					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentAddBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -1496,7 +1496,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentCancelBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentCancelBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -1512,7 +1512,7 @@
 			</Frame>
 		</Frames>
 	</Frame>
-	<Frame name="KRTRaidAttendance" inherits="KRTFrameTemplate">
+	<Frame name="KRTRaidAttendance" inherits="KRTWindowTemplate">
 		<Size>
 			<AbsDimension x="980" y="515" />
 		</Size>
@@ -1609,7 +1609,7 @@
 							<Anchor point="TOPLEFT" relativeTo="$parentHeaderZone" relativePoint="TOPRIGHT" />
 						</Anchors>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -1671,7 +1671,7 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button name="$parentAddBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentAddBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -1683,7 +1683,7 @@
 							</Anchor>
 						</Anchors>
 					</Button>
-					<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
+					<Button name="$parentDeleteBtn" inherits="KRTActionButtonTemplate">
 						<Size>
 							<AbsDimension x="65" y="25" />
 						</Size>
@@ -1723,7 +1723,7 @@
 							<Anchor point="TOPLEFT" relativeTo="$parentHeaderJoin" relativePoint="TOPRIGHT" />
 						</Anchors>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -1821,7 +1821,7 @@
 							<Anchor point="TOPLEFT" relativeTo="$parentHeaderTime" relativePoint="TOPRIGHT" />
 						</Anchors>
 					</Button>
-					<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+					<ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
 								<Offset>
@@ -1839,7 +1839,7 @@
 			</Frame>
 		</Frames>
 	</Frame>
-	<Frame name="KRTLoggerExportFrame" inherits="KRTFrameTemplate" parent="UIParent" frameStrata="DIALOG" hidden="true">
+	<Frame name="KRTLoggerExportFrame" inherits="KRTWindowTemplate" parent="UIParent" frameStrata="DIALOG" hidden="true">
 		<Size>
 			<AbsDimension x="1000" y="500" />
 		</Size>
@@ -1863,7 +1863,7 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<Button name="$parentLootBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentLootBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="140" y="25" />
 				</Size>
@@ -1875,7 +1875,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentRaidAttendanceBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentRaidAttendanceBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="170" y="25" />
 				</Size>
@@ -1887,7 +1887,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<ScrollFrame name="$parentOutputScroll" inherits="UIPanelScrollFrameTemplate">
+			<ScrollFrame name="$parentOutputScroll" inherits="KRTTextScrollFrameTemplate">
 				<Size>
 					<AbsDimension x="956" y="330" />
 				</Size>
@@ -1925,7 +1925,7 @@
 					</EditBox>
 				</ScrollChild>
 			</ScrollFrame>
-			<Button name="$parentCloseBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentCloseBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="92" y="25" />
 				</Size>

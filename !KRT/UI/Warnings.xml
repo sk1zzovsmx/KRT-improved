@@ -76,7 +76,7 @@
 		</HighlightTexture>
 	</Button>
 	<!-- Raid warnings frame -->
-	<Frame name="KRTWarnings" inherits="KRTFrameTemplate">
+	<Frame name="KRTWarnings" inherits="KRTWindowTemplate">
 		<Size>
 			<AbsDimension x="595" y="245" />
 		</Size>
@@ -138,7 +138,7 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+			<ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT">
 						<Offset>
@@ -152,7 +152,7 @@
 					</Anchor>
 				</Anchors>
 			</ScrollFrame>
-			<EditBox name="$parentName" inherits="KRTEditBoxTemplate" letters="50">
+			<EditBox name="$parentName" inherits="KRTTextInputTemplate" letters="50">
 				<Size>
 					<AbsDimension x="225" y="20" />
 				</Size>
@@ -165,7 +165,7 @@
 				</Anchors>
 				<FontString inherits="GameFontHighlight" />
 			</EditBox>
-			<EditBox name="$parentContent" inherits="KRTEditBoxTemplate" letters="255">
+			<EditBox name="$parentContent" inherits="KRTTextInputTemplate" letters="255">
 				<Size>
 					<AbsDimension x="225" y="20" />
 				</Size>
@@ -177,7 +177,7 @@
 					</Anchor>
 				</Anchors>
 			</EditBox>
-			<Button name="$parentEditBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentEditBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
 				</Size>
@@ -189,7 +189,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentDeleteBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentDeleteBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="25" />
 				</Size>
@@ -201,7 +201,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentAnnounceBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentAnnounceBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="85" y="25" />
 				</Size>

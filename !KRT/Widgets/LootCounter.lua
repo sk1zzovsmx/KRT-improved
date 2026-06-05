@@ -413,7 +413,7 @@ do
             end
 
             local function makeBtn(parent, label, tip)
-                local b = CreateFrame("Button", nil, parent, "KRTButtonTemplate")
+                local b = CreateFrame("Button", nil, parent, "KRTActionButtonTemplate")
                 b:SetSize(BTN_W, BTN_H)
                 b:SetText(label)
                 local txt = b:GetFontString()
@@ -603,7 +603,7 @@ do
             maxScroll = 0
         end
 
-        -- Ensure the scroll child has a valid size (UIPanelScrollFrameTemplate needs this).
+        -- Ensure the scroll child has a valid size before the scrollframe updates.
         -- Do not re-anchor it during refresh: SetVerticalScroll owns the child offset.
         local sb = scrollFrame.ScrollBar or (scrollFrame.GetName and _G[scrollFrame:GetName() .. "ScrollBar"]) or nil
         local needsScroll = maxScroll > 0

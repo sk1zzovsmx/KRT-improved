@@ -1,7 +1,7 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
 	<Include file="ReservesTemplates.xml" />
-	<Frame name="KRTReserveListFrame" inherits="KRTFrameTemplate" toplevel="true" hidden="true" frameStrata="MEDIUM">
+	<Frame name="KRTReserveListFrame" inherits="KRTWindowTemplate" toplevel="true" hidden="true" frameStrata="MEDIUM">
 		<Size>
 			<AbsDimension x="368" y="520" />
 		</Size>
@@ -10,7 +10,7 @@
 		</Anchors>
 		<Frames>
 			<!-- Scroll frame with scroll child -->
-			<ScrollFrame name="$parentScrollFrame" inherits="KRTScrollFrameTemplate">
+			<ScrollFrame name="$parentScrollFrame" inherits="KRTListScrollFrameTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT">
 						<Offset>
@@ -31,7 +31,7 @@
 					</Frame>
 				</ScrollChild>
 			</ScrollFrame>
-			<Button name="$parentClearButton" inherits="KRTButtonTemplate">
+			<Button name="$parentClearButton" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="100" y="24" />
 				</Size>
@@ -43,7 +43,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentQueryButton" inherits="KRTButtonTemplate">
+			<Button name="$parentQueryButton" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="120" y="24" />
 				</Size>
@@ -55,7 +55,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentCloseButton" inherits="KRTButtonTemplate">
+			<Button name="$parentCloseButton" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="80" y="24" />
 				</Size>
@@ -70,7 +70,7 @@
 		</Frames>
 	</Frame>
 	<!-- ====== Start of Reserve Import Window ====== -->
-	<Frame name="KRTImportWindow" inherits="KRTFrameTemplate" toplevel="true" hidden="true" frameStrata="DIALOG">
+	<Frame name="KRTImportWindow" inherits="KRTWindowTemplate" toplevel="true" hidden="true" frameStrata="DIALOG">
 		<Size>
 			<AbsDimension x="400" y="390" />
 		</Size>
@@ -144,7 +144,7 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<Button name="$parentModeMultiButton" inherits="KRTButtonTemplate">
+			<Button name="$parentModeMultiButton" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="120" y="24" />
 				</Size>
@@ -156,7 +156,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentModePlusButton" inherits="KRTButtonTemplate">
+			<Button name="$parentModePlusButton" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="120" y="24" />
 				</Size>
@@ -168,7 +168,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentFormatJsonButton" inherits="KRTButtonTemplate">
+			<Button name="$parentFormatJsonButton" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="96" y="24" />
 				</Size>
@@ -180,7 +180,7 @@
 					</Anchor>
 				</Anchors>
 			</Button>
-			<Button name="$parentFormatCsvButton" inherits="KRTButtonTemplate">
+			<Button name="$parentFormatCsvButton" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="96" y="24" />
 				</Size>
@@ -213,7 +213,7 @@
 				</Backdrop>
 			</Frame>
 			<!-- Multiline EditBox for CSV or encoded JSON -->
-			<ScrollFrame name="KRTImportScrollFrame" inherits="KRTScrollFrameTemplate">
+			<ScrollFrame name="KRTImportScrollFrame" inherits="KRTTextScrollFrameTemplate">
 				<Size>
 					<AbsDimension x="276" y="114" />
 				</Size>
@@ -233,7 +233,7 @@
 				</ScrollChild>
 			</ScrollFrame>
 			<!-- Import Button -->
-			<Button name="KRTImportConfirmButton" inherits="KRTButtonTemplate">
+			<Button name="KRTImportConfirmButton" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="100" y="24" />
 				</Size>
@@ -246,7 +246,7 @@
 				</Anchors>
 			</Button>
 			<!-- Cancel Button -->
-			<Button name="KRTImportCancelButton" inherits="KRTButtonTemplate">
+			<Button name="KRTImportCancelButton" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="100" y="24" />
 				</Size>

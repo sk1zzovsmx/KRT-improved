@@ -1,6 +1,6 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
-	<EditBox name="KRTSpammerEditBox" inherits="KRTEditBoxTemplate" virtual="true">
+	<EditBox name="KRTSpammerEditBox" inherits="KRTTextInputTemplate" virtual="true">
 		<FontString inherits="GameFontHighlightSmall" />
 	</EditBox>
 	<!-- CheckBox Template -->
@@ -10,7 +10,7 @@
 		</Size>
 	</CheckButton>
 	<!-- LFM spam frame -->
-	<Frame name="KRTSpammer" inherits="KRTFrameTemplate">
+	<Frame name="KRTSpammer" inherits="KRTWindowTemplate">
 		<Size>
 			<AbsDimension x="260" y="380" />
 		</Size>
@@ -344,7 +344,7 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<Button name="$parentClearBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentClearBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="65" y="19" />
 				</Size>
@@ -368,7 +368,7 @@
 					</Anchor>
 				</Anchors>
 			</EditBox>
-			<Button name="$parentStartBtn" inherits="KRTButtonTemplate">
+			<Button name="$parentStartBtn" inherits="KRTActionButtonTemplate">
 				<Size>
 					<AbsDimension x="75" y="26" />
 				</Size>

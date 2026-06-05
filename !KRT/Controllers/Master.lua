@@ -3596,7 +3596,7 @@ do
             if not frame then
                 return
             end
-            selectionFrame = CreateFrame("Frame", nil, frame, "KRTSimpleFrameTemplate")
+            selectionFrame = CreateFrame("Frame", nil, frame, "KRTDialogTemplate")
             selectionFrame:Hide()
         end
         for i = 1, #selectionButtons do
