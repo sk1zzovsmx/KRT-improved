@@ -288,6 +288,8 @@ If XML frame names change, update `.luacheckrc` globals in the same change.
 - Package only the addon folder `!KRT/`.
 - Do not include repo-level docs/tooling files in release ZIPs.
 - Keep release asset download/checksum instructions out of root `README.md`.
+- Published `Included Commits` must always be computed from previous release tag to current release tag.
+- Do not list release commits from branch tips, arbitrary SHAs, partial ranges, or non-tag refs.
 
 ---
 

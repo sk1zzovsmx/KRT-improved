@@ -629,18 +629,16 @@ def resolve_release_note_context(
     current_ref: str,
     previous_tag: str | None,
 ) -> dict[str, Any]:
+    range_ref = current_tag
     commit_entries: list[dict[str, str]] = []
     if previous_tag:
-        commit_entries = [
-            entry
-            for entry in git_commit_entries(f"{previous_tag}..{current_ref}")
-            if not entry["subject"].lower().startswith("release: prepare ")
-        ]
+        commit_entries = git_commit_entries(f"{previous_tag}..{range_ref}")
 
     return {
         "current_version": current_version,
         "current_tag": current_tag,
         "current_ref": current_ref,
+        "commit_range": f"{previous_tag}..{range_ref}" if previous_tag else None,
         "previous_tag": previous_tag,
         "commit_entries": commit_entries,
     }
@@ -738,6 +736,7 @@ def prepare_release_artifacts(
         "current_tag": current_tag,
         "current_ref": current_ref,
         "previous_tag": previous_tag,
+        "commit_range": context["commit_range"],
         "release_date": release_date,
         "output_dir": str(output_dir),
         "notes_path": str(notes_path),
@@ -1359,7 +1358,7 @@ def release_metadata(args: argparse.Namespace) -> int:
 def release_notes(args: argparse.Namespace) -> int:
     payload = resolve_release_metadata()
     current_tag = args.current_tag.strip() or payload["tag"]
-    current_ref = args.current_ref.strip() or "HEAD"
+    current_ref = args.current_ref.strip() or current_tag
     previous_tag = args.previous_tag.strip() or find_previous_release_tag(payload["version"], current_tag) or ""
 
     changelog_text = read_addon_changelog_text()
@@ -1387,6 +1386,7 @@ def release_notes(args: argparse.Namespace) -> int:
         "version": payload["version"],
         "current_tag": current_tag,
         "current_ref": current_ref,
+        "commit_range": note_context["commit_range"],
         "previous_tag": previous_tag or None,
         "release_date": release_date,
         "included_commits": note_context["commit_entries"],
@@ -1416,7 +1416,7 @@ def release_notes(args: argparse.Namespace) -> int:
 def release_prepare(args: argparse.Namespace) -> int:
     metadata = resolve_release_metadata(args.expected_channel or None)
     current_tag = args.current_tag.strip() or metadata["tag"]
-    current_ref = args.current_ref.strip() or "HEAD"
+    current_ref = args.current_ref.strip() or current_tag
     previous_tag = args.previous_tag.strip() or find_previous_release_tag(metadata["version"], current_tag) or ""
     payload = prepare_release_artifacts(
         output_dir_text=args.output_dir,
@@ -1437,6 +1437,7 @@ def release_prepare(args: argparse.Namespace) -> int:
         "asset_path": payload["asset_path"],
         "checksum_path": payload["checksum_path"],
         "previous_tag": payload["previous_tag"],
+        "commit_range": payload["commit_range"],
         "included_commits": payload["included_commits"],
     }
 
@@ -1578,7 +1579,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     release_notes_parser = subparsers.add_parser(
         "release-notes",
-        help="Build GitHub release notes from the changelog section and commit range",
+        help="Build GitHub release notes from changelog and previous-tag..current-tag commits",
     )
     release_notes_parser.add_argument("--repository", default="")
     release_notes_parser.add_argument("--current-tag", default="")

@@ -172,8 +172,9 @@ Use this manual checklist for Controller, Widget, XML, and shared UI changes:
 ```powershell
 py -3 tools/krt.py release-metadata --json
 py -3 tools/krt.py release-publish-gate --previous-ref HEAD^ --json
-py -3 tools/krt.py release-prepare --current-ref HEAD --output-dir dist --json
-py -3 tools/krt.py release-notes --current-ref HEAD --output-file dist/release-notes.md
+$release = py -3 tools/krt.py release-metadata --json | ConvertFrom-Json
+py -3 tools/krt.py release-prepare --current-tag $release.tag --output-dir dist --json
+py -3 tools/krt.py release-notes --current-tag $release.tag --output-file dist/release-notes.md
 py -3 tools/krt.py build-release-zip --output-dir dist --write-checksum
 ```
 
@@ -184,6 +185,7 @@ Expected:
 - `release-prepare` emits the standard release bundle used by CI
 - release notes render concise `Included Commits`, `New Functionality`,
   and `Enhancements/Improvement` sections, with commit short hashes included
+- `Included Commits` comes from previous release tag to current release tag, never from `HEAD`
 - archive contains only `!KRT/`
 
 ## 6) Hook Setup

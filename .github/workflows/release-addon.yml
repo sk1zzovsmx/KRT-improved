@@ -92,7 +92,7 @@ jobs:
                   python3 ./repo/tools/krt.py release-prepare \
                       --expected-channel "${EXPECTED_CHANNEL}" \
                       --current-tag "${DERIVED_TAG}" \
-                      --current-ref HEAD \
+                      --current-ref "${DERIVED_TAG}" \
                       --output-dir ../dist \
                       --github-output "$GITHUB_OUTPUT"
 
