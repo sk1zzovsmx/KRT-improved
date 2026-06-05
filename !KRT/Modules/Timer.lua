@@ -115,12 +115,12 @@ function mixin:ScheduleTimer(callback, delay, ...)
     end
 
     local handle
-    local wrapped = function()
+    local oneShotCallback = function()
         unregisterHandle(state, handle, "done")
         invokeCallback(callback, args, n, state.name)
     end
 
-    handle = lcNewTimer(delay, wrapped)
+    handle = lcNewTimer(delay, oneShotCallback)
     if handle then
         registerHandle(state, handle, "timer", delay)
     end
@@ -143,15 +143,15 @@ function mixin:ScheduleRepeatingTimer(callback, interval, ...)
     end
 
     local handle
-    local wrapped = function(t)
+    local repeatingCallback = function(t)
         invokeCallback(callback, args, n, state.name)
-        -- LibCompat decrementa _iterations DOPO la callback; 1 = ultimo tick.
+        -- LibCompat decrements _iterations after the callback; 1 means last tick.
         if t and t._iterations == 1 then
             unregisterHandle(state, handle, "done")
         end
     end
 
-    handle = lcNewTicker(interval, wrapped)
+    handle = lcNewTicker(interval, repeatingCallback)
     if handle then
         registerHandle(state, handle, "ticker", interval)
     end

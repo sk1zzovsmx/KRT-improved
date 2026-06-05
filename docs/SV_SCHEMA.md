@@ -3,7 +3,7 @@
 This file inventories the SavedVariables keys and args currently read/written by runtime code.
 Scope: `KRT_*` SavedVariables declared in `!KRT/!KRT.toc` and persisted in the
 WoW SavedVariables file for the addon.
-Current raid schema version: `4`.
+Current raid schema version: `5`.
 
 ## Canonical Name Terms
 
@@ -41,18 +41,18 @@ Observed persisted attendance fields:
 - `attendance[].segments[].subgroup` (optional number; group `1` can be omitted)
 - `attendance[].segments[].online` (optional boolean; omitted/`nil` means online, `false` means offline)
 
-v3/v4 storage optimization:
+v5 storage policy:
 - optional/default-only fields can be omitted during save compaction,
 - runtime readers resolve defaults when fields are omitted.
 
-v4 attendance ledger:
+v5 attendance ledger:
 - attendance entries are keyed by stable `playerNid`, not player name,
-- v3 raids are initialized from `players[].join`, `players[].leave`, and `players[].subgroup`.
+- lower schema versions are stamped to the current version at the DB boundary.
 
-Legacy fields accepted/transient during normalization:
-- `loot[].looter` (legacy winner reference; normalized into `looterNid` then cleared)
-- `bossKills[].attendanceMask` (legacy; cleared)
-- Load/save hardening emits diagnostics when these legacy fields are detected.
+Retired/transient fields stripped during normalization:
+- `players[].count` (old LootCounter field; `countMS` is canonical)
+- `loot[].looter` (old winner reference; `looterNid` is canonical)
+- `bossKills[].attendanceMask` (old attendance representation; `attendance[]` is canonical)
 
 Runtime-only keys (must not persist):
 - `raid._runtime`
@@ -99,11 +99,8 @@ Notes:
 - Persisted `PlayerName` keys in this store use readable display casing.
 - Example: `"  FeRRa  "` is normalized and persisted as `PlayerName = "Ferra"`.
 - Runtime lookup keys are derived with `Strings.NormalizeLower` and are not persisted.
-- Legacy load compatibility migrates old lowercase-key + `playerNameDisplay`,
-  old `original`, and `reserve.player` fields to the canonical saved shape.
-- `playerNameDisplay` is runtime/transient only and is stripped from SavedVariables on save.
-- Load/save hardening emits diagnostics when legacy `original` / row `player`
-  fields are detected.
+- `playerNameDisplay` is runtime-only and is stripped from SavedVariables on save.
+- Old `original` fields and reserve-row `player` fields are not part of the current saved shape.
 - Import mode is not stored here; it is mirrored in `KRT_Options.srImportMode`.
 
 ## KRT_Warnings
@@ -138,28 +135,22 @@ Notes:
 
 ## KRT_Options
 
-Type: `map<string, boolean|number|string|nil>`
+Type: strict nested schema-2 table.
 
-Default keys (`Options.defaultValues`):
-- `sortAscending` (boolean)
-- `useRaidWarning` (boolean)
-- `announceOnWin` (boolean)
-- `announceOnHold` (boolean)
-- `announceOnBank` (boolean)
-- `announceOnDisenchant` (boolean)
-- `lootWhispers` (boolean)
-- `screenReminder` (boolean)
-- `ignoreStacks` (boolean)
-- `showTooltips` (boolean)
-- `showLootCounterDuringMSRoll` (boolean)
-- `minimapButton` (boolean)
-- `countdownSimpleRaidMsg` (boolean)
-- `countdownDuration` (number)
-- `countdownRollsBlock` (boolean)
-- `srImportMode` (number: `0` multi, `1` plus)
+Canonical shape:
+- `_schema = 2`
+- `Master.sortAscending`, `Master.useRaidWarning`, `Master.screenReminder`,
+  `Master.announceOnWin`, `Master.announceOnHold`, `Master.announceOnBank`,
+  `Master.announceOnDisenchant`
+- `Loot.lootWhispers`, `Loot.ignoreStacks`
+- `Rolls.countdownDuration`, `Rolls.countdownSimpleRaidMsg`, `Rolls.countdownRollsBlock`
+- `Reserves.softResWhisperReplies`, `Reserves.srImportMode`, `Reserves.nameAliases`
+- `Minimap.minimapButton`, `Minimap.minimapPos`
+- `LootCounter.showLootCounterDuringMSRoll`
+- `UI.showTooltips`
 
-Additional persisted key used by minimap:
-- `minimapPos` (number angle)
+Unknown top-level namespaces are removed during `Options.EnsureLoaded()`. Unknown keys inside a
+registered namespace are ignored by normal accessors and rejected by namespace setters.
 
 Runtime-only option state:
 - `debug` is explicitly excluded from persistence.

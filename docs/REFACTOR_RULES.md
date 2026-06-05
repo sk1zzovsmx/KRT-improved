@@ -14,7 +14,7 @@ Permanent guardrails for function mapping and unification work.
 
 1. Compat wrappers must be marked `@compat`.
 2. Deprecated compat wrappers must be marked `@deprecated use addon.<Owner>.X`.
-3. New code should target owner modules directly, not legacy aliases/facades.
+3. New code should target owner modules directly, not retired aliases/facades.
 4. `addon:Print` is the only accepted root-method compatibility hook; do not reintroduce
    root addon method facades for chat/capability contracts.
 5. Keep Logger UI-local selection/edit/popup glue private; do not expose it as public

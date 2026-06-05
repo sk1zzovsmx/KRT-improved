@@ -27,7 +27,7 @@ local tremove = table.remove
 local strmatch = string.match
 local strlen = string.len
 local tonumber, tostring = tonumber, tostring
-local type, pairs, select = type, pairs, select
+local type, pairs, select, next = type, pairs, select, next
 
 local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = tonumber(C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60
 local GROUP_LOOT_ROLL_GRACE_SECONDS = tonumber(C.GROUP_LOOT_ROLL_GRACE_SECONDS) or 10
@@ -111,6 +111,74 @@ local function purgeExpiredPassiveLootRolls(now)
             end
         end
     end
+end
+
+local function purgePassiveLootRollEntry(state, entry, currentTime)
+    local resolvedState = state or getPassiveLootRollState()
+    local resolvedNow = tonumber(currentTime) or GetTime()
+    if type(entry) ~= "table" then
+        return false
+    end
+
+    local expiresAt = tonumber(entry.expiresAt) or 0
+    if expiresAt <= resolvedNow then
+        removePassiveLootRollEntry(resolvedState, entry)
+        return true
+    end
+
+    return false
+end
+
+local function getActivePassiveLootRollByItemKey(itemKey)
+    local state = getPassiveLootRollState()
+    local list = state.byItemKey[itemKey]
+    if type(list) ~= "table" then
+        return nil
+    end
+
+    local currentTime = GetTime()
+    local activeEntry = nil
+
+    for i = #list, 1, -1 do
+        local candidate = list[i]
+        local expired = purgePassiveLootRollEntry(state, candidate, currentTime)
+        if not expired then
+            if activeEntry ~= nil then
+                return nil
+            end
+            activeEntry = candidate
+        end
+    end
+
+    return activeEntry
+end
+
+local function getActivePassiveLootRollByRollId(rollId)
+    local state = getPassiveLootRollState()
+    local resolvedRollId = tonumber(rollId)
+    if not resolvedRollId then
+        return nil
+    end
+
+    local entry = state.byRollId[resolvedRollId]
+    if not entry then
+        return nil
+    end
+
+    if purgePassiveLootRollEntry(state, entry) then
+        return nil
+    end
+
+    return entry
+end
+
+local function hasPassiveLootRollEntries()
+    local state = raidState.passiveLootRolls
+    if type(state) ~= "table" or type(state.byRollId) ~= "table" then
+        return false
+    end
+
+    return next(state.byRollId) ~= nil
 end
 
 local function getLoggedPassiveLootState()
@@ -668,37 +736,11 @@ end
 
 function PassiveGroupLoot.GetPassiveLootRollEntry(itemLink)
     local itemKey = PassiveGroupLoot.GetPassiveLootRollItemKey(itemLink)
-    purgeExpiredPassiveLootRolls()
-
-    local state = getPassiveLootRollState()
-    local list = state.byItemKey[itemKey]
-    if type(list) ~= "table" then
-        return nil
-    end
-
-    local entry = nil
-    for i = 1, #list do
-        local candidate = list[i]
-        if candidate then
-            if entry then
-                return nil
-            end
-            entry = candidate
-        end
-    end
-
-    return entry
+    return getActivePassiveLootRollByItemKey(itemKey)
 end
 
 function PassiveGroupLoot.GetPassiveLootRollEntryByRollId(rollId)
-    local resolvedRollId = tonumber(rollId)
-    if not resolvedRollId then
-        return nil
-    end
-
-    purgeExpiredPassiveLootRolls()
-    local state = getPassiveLootRollState()
-    return state.byRollId[resolvedRollId]
+    return getActivePassiveLootRollByRollId(rollId)
 end
 
 function PassiveGroupLoot.ConsumePassiveLootRollEntry(sessionId)
@@ -706,10 +748,12 @@ function PassiveGroupLoot.ConsumePassiveLootRollEntry(sessionId)
         return nil
     end
 
-    purgeExpiredPassiveLootRolls()
     local state = getPassiveLootRollState()
     local entry = state.bySessionId[sessionId]
     if not entry then
+        return nil
+    end
+    if purgePassiveLootRollEntry(state, entry) then
         return nil
     end
 
@@ -777,13 +821,13 @@ function PassiveGroupLoot.HasLoggedPassiveLoot(itemLink, looter, rollSessionId)
     return #list == 1
 end
 
-function PassiveGroupLoot.ParseGroupLootWinner(msg)
-    return parseGroupLootWinnerCached(msg)
-end
-
 function PassiveGroupLoot.IsPassiveLootWinnerMessage(msg)
     local _, itemLink = parseGroupLootWinnerCached(msg)
     return itemLink ~= nil
+end
+
+function PassiveGroupLoot.ParseGroupLootWinner(msg)
+    return parseGroupLootWinnerCached(msg)
 end
 
 function PassiveGroupLoot.ResolvePassivePendingAwardContext(itemLink, rollId)
@@ -897,7 +941,7 @@ function PassiveGroupLoot.ObserveGroupLootMessage(owner, msg)
             if isDebugEnabled() then
                 addon:debug(Diag.D.LogLootGroupSelectionQueued:format((rule and rule.label) or "?", tostring(rollPlayer), tostring(rollItemLink)))
             end
-            local parsed = buildParsedGroupLootResult("selection", msg, rollPlayer, rollItemLink, rollType, rollValue, rollId)
+            local parsed = buildParsedGroupLootResult("roll", msg, rollPlayer, rollItemLink, rollType, rollValue, rollId)
             rememberParsedGroupLootResult(parsed)
             return "selection", parsed
         end
@@ -906,13 +950,13 @@ function PassiveGroupLoot.ObserveGroupLootMessage(owner, msg)
     return observeGroupLootWinnerMessage(owner, msg)
 end
 
+function PassiveGroupLoot.ObserveGroupLootWinnerMessage(owner, msg)
+    return observeGroupLootWinnerMessage(owner, msg)
+end
+
 function PassiveGroupLoot.AddGroupLootMessage(owner, msg)
     local observedType = PassiveGroupLoot.ObserveGroupLootMessage(owner, msg)
     return observedType
-end
-
-function PassiveGroupLoot.ObserveGroupLootWinnerMessage(owner, msg)
-    return observeGroupLootWinnerMessage(owner, msg)
 end
 
 local registry = addon.ModuleRegistry

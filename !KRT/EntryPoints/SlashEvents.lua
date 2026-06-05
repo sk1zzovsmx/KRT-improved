@@ -21,6 +21,7 @@ local RT_COLOR = feature.RT_COLOR
 
 local pairs, ipairs = pairs, ipairs
 local tconcat = table.concat
+local sort = table.sort
 local format = string.format
 local upper = string.upper
 local type = type
@@ -87,9 +88,6 @@ local function formatValidateRaidDetail(entry)
     end
     if code == "RUNTIME_OUTSIDE" then
         return L.MsgValidateDetailRuntimeOutside:format(index, raidNid, tostring(data.key or "?"))
-    end
-    if code == "LEGACY_RUNTIME" then
-        return L.MsgValidateDetailLegacyRuntime:format(index, raidNid, tostring(data.key or "?"))
     end
 
     return L.MsgValidateDetailUnknown:format(index, raidNid, tostring(code or "UNKNOWN"))
@@ -298,8 +296,8 @@ end
 
 local function getFeatureProfile()
     local features = addon.Features
-    if type(features) == "table" and type(features.GetProfile) == "function" then
-        return features:GetProfile()
+    if type(features) == "table" then
+        return features.Profile or "full"
     end
     return "full"
 end
@@ -400,18 +398,24 @@ local function countRaidHistory()
 end
 
 local function countReserves()
-    local reserves = _G.KRT_Reserves
-    local players = 0
-    local entries = 0
-    if type(reserves) ~= "table" then
-        return players, entries
+    local reserves = Services and Services.Reserves
+    if type(reserves) == "table" and type(reserves.GetCounts) == "function" then
+        return reserves:GetCounts()
     end
 
-    for _, record in pairs(reserves) do
-        players = players + 1
-        local list = record and record.reserves
-        if type(list) == "table" then
-            entries = entries + #list
+    local saved = _G.KRT_Reserves
+    if type(saved) ~= "table" then
+        return 0, 0
+    end
+
+    local players = 0
+    local entries = 0
+    for _, player in pairs(saved) do
+        if type(player) == "table" then
+            players = players + 1
+            if type(player.reserves) == "table" then
+                entries = entries + #player.reserves
+            end
         end
     end
     return players, entries
@@ -848,6 +852,9 @@ local function printSoftResReadinessReport()
     if type(rosterReport.missingPlayersText) == "string" and rosterReport.missingPlayersText ~= "" then
         printReadinessLine(L.MsgSoftResReadinessRosterMissing, rosterReport.missingPlayersText)
     end
+    if type(nameMatchReport.aliasMatchesText) == "string" and nameMatchReport.aliasMatchesText ~= "" then
+        printReadinessLine(L.MsgSoftResReadinessAliases, nameMatchReport.aliasMatchesText)
+    end
 
     printSoftResHealthReport(report.health)
 
@@ -869,7 +876,7 @@ local function printSoftResReadinessReport()
 end
 
 local function handleReservesCommand(rest)
-    local sub = Strings.SplitArgs(rest)
+    local sub, arg = Strings.SplitArgs(rest)
     local reserves = Services and Services.Reserves or nil
     local sync = reserves and reserves._Sync or nil
     if isToggleCommand(sub) then
@@ -878,6 +885,36 @@ local function handleReservesCommand(rest)
         callWidget("Reserves", "ToggleImport")
     elseif sub == "check" or sub == "readiness" then
         printSoftResReadinessReport()
+    elseif sub == "alias" then
+        local reserveName, raidName = Strings.SplitArgs(arg)
+        if reserves and reserves.SetNameAlias and reserves:SetNameAlias(reserveName, raidName) then
+            addon:info(L.MsgReservesAliasSet:format(tostring(reserveName), tostring(raidName)))
+        else
+            addon:warn(L.MsgReservesAliasInvalid)
+        end
+    elseif sub == "unalias" then
+        local reserveName = Strings.SplitArgs(arg)
+        if reserves and reserves.RemoveNameAlias and reserves:RemoveNameAlias(reserveName) then
+            addon:info(L.MsgReservesAliasCleared:format(tostring(reserveName)))
+        else
+            addon:warn(L.MsgReservesAliasInvalid)
+        end
+    elseif sub == "aliases" then
+        if reserves and reserves.GetNameAliases then
+            local aliases = reserves:GetNameAliases()
+            local lines = {}
+            for reserveKey, raidName in pairs(aliases) do
+                lines[#lines + 1] = tostring(reserveKey) .. " -> " .. tostring(raidName)
+            end
+            sort(lines)
+            addon:info(L.MsgReservesAliasesTitle)
+            for i = 1, #lines do
+                addon:info(lines[i])
+            end
+            if #lines == 0 then
+                addon:info(L.MsgReservesAliasesEmpty)
+            end
+        end
     elseif sub == "sync" then
         if sync and sync.RequestMetadata then
             sync:RequestMetadata()
@@ -911,6 +948,9 @@ local function handleReservesCommand(rest)
         printHelp("toggle", L.StrCmdToggle)
         printHelp("import", L.StrCmdReservesImport)
         printHelp("check", L.StrCmdReservesCheck)
+        printHelp("alias <softres-name> <raid-name>", L.StrCmdReservesAlias)
+        printHelp("unalias <softres-name>", L.StrCmdReservesUnalias)
+        printHelp("aliases", L.StrCmdReservesAliases)
         printHelp("sync", L.StrCmdReservesSync)
         printHelp("meta", L.StrCmdReservesMeta)
         printHelp("clearcache", L.StrCmdReservesClearCache)

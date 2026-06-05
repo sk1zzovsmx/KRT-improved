@@ -20,6 +20,7 @@ module._Display = module._Display or {}
 local Display = module._Display
 local Resolution = assert(module._Resolution, "Rolls resolution helpers are not initialized")
 local Responses = assert(module._Responses, "Rolls response helpers are not initialized")
+local Strategies = assert(module._Strategies, "Rolls strategy helpers are not initialized")
 
 -- ----- Private helpers ----- --
 local function assertContext(ctx)
@@ -60,6 +61,14 @@ local function copyNames(names)
     return out
 end
 
+local function buildResolvedEntries(ctx, itemId, currentRollType)
+    return Resolution.BuildResolvedEntries(ctx, itemId, currentRollType)
+end
+
+local function getResponsePlus(strategy, itemId, response, plusGetter)
+    return Strategies.GetResponsePlus(strategy, itemId, response, plusGetter)
+end
+
 local function buildSrContext(ctx, itemId, currentRollType)
     if currentRollType ~= rollTypes.RESERVED or not itemId or not ctx.getItemReserveContext then
         return nil
@@ -98,6 +107,7 @@ function Display.BuildModel(ctx)
     local display = {}
     local rows = {}
     local resolvedEntries
+    local strategy
     local usePlus
     local plusGetter
     local tieGroups
@@ -120,9 +130,10 @@ function Display.BuildModel(ctx)
         ctx.finalizeMaterializedResponses(itemId, itemLink, currentRollType)
     end
 
-    resolvedEntries, usePlus, plusGetter = Resolution.BuildResolvedEntries(resolutionContext, itemId, currentRollType)
-    tieGroups = Resolution.BuildTieGroups(resolutionContext, resolvedEntries, usePlus)
-    resolution = Resolution.BuildResolution(resolutionContext, resolvedEntries, usePlus)
+    resolvedEntries, strategy, plusGetter = buildResolvedEntries(resolutionContext, itemId, currentRollType)
+    usePlus = strategy and strategy.usePlus == true
+    tieGroups = Resolution.BuildTieGroups(resolutionContext, resolvedEntries, strategy)
+    resolution = Resolution.BuildResolution(resolutionContext, resolvedEntries, strategy)
     state.resolution = resolution
     lootState.rollWinner = resolution.topRollName
 
@@ -131,8 +142,8 @@ function Display.BuildModel(ctx)
             name = name,
             response = response,
             bucket = response.bucket,
-            bucketPriority = Resolution.GetBucketPriority(resolutionContext, response.bucket, currentRollType),
-            plus = Resolution.GetResponsePlus(resolutionContext, itemId, response, plusGetter),
+            bucketPriority = Resolution.GetBucketPriority(strategy, response.bucket, currentRollType),
+            plus = getResponsePlus(strategy, itemId, response, plusGetter),
             roll = tonumber(response.bestRoll),
             isTied = tieGroups[name] ~= nil,
             tieGroup = tieGroups[name],
@@ -220,14 +231,10 @@ end
 function Display.GetResolvedWinner(ctx, model)
     local _, _, lootState = assertContext(ctx)
     local activeModel = model or Display.BuildModel(ctx)
-    return activeModel and activeModel.winner or lootState.winner
-end
-
-function Display.GetDisplayedWinner(ctx, preferredWinner, model)
-    if preferredWinner and preferredWinner ~= "" then
-        return preferredWinner
+    if activeModel then
+        return activeModel.winner or activeModel.rollWinner or (activeModel.resolution and activeModel.resolution.topRollName) or lootState.winner
     end
-    return Display.GetResolvedWinner(ctx, model)
+    return lootState.winner
 end
 
 function Display.ShouldUseTieReroll(ctx, model)

@@ -125,7 +125,7 @@ Stage 1 completed:
 
 - collapsed `Services/Reserves.lua` to one canonical public owner table
   (`addon.Services.Reserves` / `addon.Reserves`)
-- retained `.Service` only as a compatibility alias to the same table
+- retained `.Service` only as an internal bridge to the same table
 - migrated `ReservesUI` to the canonical reserves owner
 - replaced duplicated entrypoint controller-routing helpers with
   `addon.Core.RequestControllerMethod(...)`
@@ -536,7 +536,7 @@ Owner files:
 Scope:
 - separate import parsing, runtime indexes, display-list building, and pending
   item-info refresh logic
-- reduce legacy-payload handling drift where safe
+- reduce retired-payload handling drift where safe
 - keep service-only ownership with no UI leakage
 
 Current worktree progress:
@@ -687,7 +687,7 @@ Scope:
 Current worktree progress:
 - raid-store access now shares one helper path across core schema and SavedVariables boundaries
 - raid and service lookups in WoW event handlers now share helpers and no
-  longer route boss logging through legacy `self.Raid`
+  longer route boss logging through retired `self.Raid`
 
 Non-goals:
 - no speculative splitting
@@ -780,3 +780,47 @@ This pass applied code changes and re-ran validation/catalog generation.
 
 - No additional safe hard-delete candidates were identified in this pass.
 - Remaining work is mainly dedup/API contraction, not deadcode purge.
+
+## 9. Sequential Uniformization Follow-Up (2026-05-29)
+
+Scope:
+
+- Start from the refreshed function/API census after the sequential runtime pass.
+- Prefer API contraction only where the catalog points to a concrete duplicate
+  public runtime surface.
+
+Completed:
+
+- Removed the remaining production `Raid -> Loot` passive group-loot wrappers
+  from `!KRT/Services/Raid/State.lua`:
+  `AddPassiveLootRoll` and `AddGroupLootMessage`.
+- Confirmed runtime event wiring already targets `addon.Services.Loot` directly
+  for `CHAT_MSG_LOOT` and `START_LOOT_ROLL`.
+- Left test-harness compatibility shims in `tests/release_stabilization_spec.lua`
+  so older stabilization scenarios keep exercising the same behavior while the
+  production public surface contracts.
+- Collapsed the two non-conformant public roll-response methods
+  `PlayerPass`/`PlayerCancel` into `SetPlayerResponse(name, status)`, removing
+  the last `Unclassified` public API entries from the nomenclature census.
+- Contracted `Services/Reserves.lua` by removing test-only public reserve lookup
+  wrappers and moving sync-only payload/cache intake helpers to the
+  package-internal `_Sync` surface.
+- Renamed the Master private planner adapters around inventory trade selection
+  and trade notification planning so they are cataloged as UI adapter helpers
+  rather than duplicate service-level planner contracts.
+- Collapsed repeated same-file helper noise in Logger/Spammer/Timer/LootCounter
+  where the change was behavior-neutral and reduced catalog drift.
+- Updated `tools/fnmap-classify.ps1` to classify ListController,
+  UIScaffold, popup, and EasyMenu callbacks as `framework-hook` instead of
+  rename/extract candidates. This keeps intentional `getData`, `rowName`,
+  `localize`, `postUpdate`, `func`, `Box._doSave`, `OnShow`, and `OnHide`
+  callbacks out of the actionable duplicate queue.
+
+Next candidates:
+
+1. Continue deeper `Services/Reserves.lua` facade review only for proven
+   package-internal contracts; alias, collapse, readiness, and display methods
+   are currently real slash/UI/controller contracts.
+2. Leave remaining `getData`/`rowName`/`localize`/`postUpdate` entries alone
+   unless ListController/UIScaffold contract names change; those names are
+   configuration hooks, not duplicated runtime ownership.

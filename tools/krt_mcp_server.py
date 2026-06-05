@@ -24,7 +24,7 @@ REPO_CHECKS = {
     "lua_syntax": "check-lua-syntax.ps1",
     "ui_binding": "check-ui-binding.ps1",
     "layering": "check-layering.ps1",
-    "legacy_aliases": "check-legacy-aliases.ps1",
+    "retired_aliases": "check-retired-aliases.ps1",
     "raid_hardening": "check-raid-hardening.ps1",
     "lua_uniformity": "check-lua-uniformity.ps1",
 }
@@ -68,7 +68,7 @@ class ToolSpec:
 
 
 class McpIo:
-    """Handles MCP stdio framing, with support for current and legacy styles."""
+    """Handles MCP stdio framing, with support for line and header styles."""
 
     def __init__(self) -> None:
         self._mode: str | None = None

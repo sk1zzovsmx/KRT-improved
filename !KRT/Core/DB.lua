@@ -66,6 +66,7 @@ function DB.SetManager(manager)
         DB._manager = manager
         return true
     end
+
     return false
 end
 

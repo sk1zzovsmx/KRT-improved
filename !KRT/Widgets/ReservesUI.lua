@@ -80,9 +80,9 @@ do
 
     function UI.AcquireRefs(frame)
         return {
-            closeButton = Frames.Ref(frame, "CloseButton"),
-            clearButton = Frames.Ref(frame, "ClearButton"),
-            queryButton = Frames.Ref(frame, "QueryButton"),
+            closeButton = Frames.GetRef(frame, "CloseButton"),
+            clearButton = Frames.GetRef(frame, "ClearButton"),
+            queryButton = Frames.GetRef(frame, "QueryButton"),
             scrollFrame = frame.ScrollFrame or _G["KRTReserveListFrameScrollFrame"],
             scrollChild = (frame.ScrollFrame and frame.ScrollFrame.ScrollChild) or _G["KRTReserveListFrameScrollChild"],
         }
@@ -522,10 +522,10 @@ do
         return false
     end
 
-    local function resetSavedFromUI()
+    local function clearSavedReservesFromUI()
         local out
-        if Reserves and Reserves.ResetSaved then
-            out = Reserves:ResetSaved()
+        if Reserves and Reserves.ClearSavedReserves then
+            out = Reserves:ClearSavedReserves()
         end
         module:Hide()
         module:RequestRefresh("reset_saved")
@@ -557,10 +557,10 @@ do
 
         if refs.clearButton then
             refs.clearButton:SetScript("OnClick", function()
-                resetSavedFromUI()
+                clearSavedReservesFromUI()
             end)
             if isDebugEnabled() then
-                addon:debug(Diag.D.LogReservesBindButton:format("ClearButton", "ResetSaved"))
+                addon:debug(Diag.D.LogReservesBindButton:format("ClearButton", "ClearSavedReserves"))
             end
         end
 
@@ -582,7 +582,7 @@ do
         if isDebugEnabled() then
             addon:debug(Diag.D.LogReservesFrameLoaded)
         end
-        UI.FrameName = Frames.InitModuleFrame(module, frame, {
+        UI.FrameName = Frames.BindModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 if isDebugEnabled() then
@@ -789,16 +789,16 @@ do
     end
 
     local function bindImportHandlers(_, _, refs)
-        Frames.SafeSetScript(refs.cancelButton, "OnClick", function()
+        Frames.SetScriptSafely(refs.cancelButton, "OnClick", function()
             Import:Hide()
         end)
-        Frames.SafeSetScript(refs.confirmButton, "OnClick", function()
+        Frames.SetScriptSafely(refs.confirmButton, "OnClick", function()
             importFromEditBox()
         end)
-        Frames.SafeSetScript(refs.editBox, "OnEscapePressed", function()
+        Frames.SetScriptSafely(refs.editBox, "OnEscapePressed", function()
             Import:Hide()
         end)
-        Frames.SafeSetScript(refs.modeSlider, "OnValueChanged", function(self, value)
+        Frames.SetScriptSafely(refs.modeSlider, "OnValueChanged", function(self, value)
             onModeSliderChanged(self, value)
         end)
         onModeSliderLoad(refs.modeSlider)
@@ -881,7 +881,7 @@ do
     end
 
     local function loadImportFrame(frame)
-        ImportUI.FrameName = Frames.InitModuleFrame(Import, frame, {
+        ImportUI.FrameName = Frames.BindModuleFrame(Import, frame, {
             enableDrag = true,
             hookOnShow = function()
                 Frames.ResetEditBox(_G["KRTImportEditBox"])

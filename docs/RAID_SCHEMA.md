@@ -1,14 +1,14 @@
 # Raid Schema Contract (`KRT_Raids`)
 
 This document defines the canonical persisted shape of raid history records.
-Current schema version: `4`.
-Legacy sunset status: strict canonical reads are enabled; legacy payload keys are diagnostics-only and stripped.
+Current schema version: `5`.
+Strict mode status: current-schema reads are enabled; retired payload keys are stripped.
 
 ## RaidRecord (`KRT_Raids[i]`)
 
 | Field | Type | Req | Default | Notes |
 | --- | --- | --- | --- | --- |
-| `schemaVersion` | number | yes | `4` | Record schema version for normalization/validation. |
+| `schemaVersion` | number | yes | `5` | Record schema version for normalization/validation. |
 | `raidNid` | number | yes | auto | Stable raid identifier (not array index). |
 | `realm` | string | no | `nil` | Realm name when the raid started. |
 | `zone` | string | no | `nil` | Raid zone name. |
@@ -39,7 +39,10 @@ Legacy sunset status: strict canonical reads are enabled; legacy payload keys ar
 | `class` | string | no | `"UNKNOWN"` | Class token. |
 | `join` | number | no | `nil` | Join timestamp. |
 | `leave` | number/nil | no | `nil` | Leave timestamp, `nil` when active. |
-| `count` | number | yes | `0` | LootCounter value, canonical persisted data. |
+| `countMS` | number | no | `0` | Main-spec LootCounter value. |
+| `countOs` | number | no | `0` | Off-spec LootCounter value. |
+| `countFree` | number | no | `0` | Free-roll LootCounter value. |
+| `countSR` | number | no | `0` | SoftRes LootCounter value. |
 
 ## AttendanceRecord (`raid.attendance[i]`)
 
@@ -89,25 +92,26 @@ Legacy sunset status: strict canonical reads are enabled; legacy payload keys ar
 | `time` | number | no | `nil` | Loot timestamp. |
 | `source` | string | no | `nil` | Optional loot origin marker (for example `TRADE_ONLY`). |
 
-### v3/v4 Persistence Compaction
+### v5 Persistence Compaction
 
-Schema v3 and v4 store lean SV payloads:
+Schema v5 stores lean SV payloads:
 - optional/default-only fields may be omitted from persisted rows,
 - readers must apply defaults at read time (already done by DB/query paths),
 - canonical IDs (`playerNid`, `bossNid`, `lootNid`) remain the source of truth.
 - optional role assignees (`holder`, `banker`, `disenchanter`) persist only when set.
 - attendance `online=true` is represented by omitted `online`; explicit `online=false` is persisted.
+- zero LootCounter values may be omitted from persisted player rows and resolve to `0` at load time.
 
-### v4 Attendance Ledger
+### Attendance Ledger
 
-Schema v4 adds `raid.attendance` as the canonical per-player attendance ledger.
+`raid.attendance` is the canonical per-player attendance ledger.
 It is keyed by `playerNid`, not by player name, and stores join/leave/online/subgroup changes as segments.
-Existing raids are initialized from `players[].join`, `players[].leave`, and `players[].subgroup` during migration.
 
-### Legacy Sunset (Strict Mode)
+### Retired Fields (Strict Mode)
 
-- `loot[].looter` is legacy-only: it is no longer read for winner resolution and is stripped on normalize/save.
-- `bossKills[].attendanceMask` is legacy-only and stripped on normalize/save.
+- `players[].count` is not read; `countMS` is the canonical MS counter.
+- `loot[].looter` is not read for winner resolution and is stripped on normalize/save.
+- `bossKills[].attendanceMask` is stripped on normalize/save.
 
 ## ChangeRecord (`raid.changes[playerName] = spec`)
 
@@ -130,7 +134,7 @@ Allowed runtime keys:
 - `raid._runtime.bossByNid`
 - `raid._runtime.lootByNid`
 
-Legacy top-level runtime keys must not be persisted and are removed on normalize/strip:
+Retired root runtime cache keys must not be persisted and are removed on normalize/strip:
 - `raid._playersByName`
 - `raid._playerIdxByNid`
 - `raid._bossIdxByNid`

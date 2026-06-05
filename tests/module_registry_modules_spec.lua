@@ -56,23 +56,23 @@ local expectedModules = {
         deps = { "Init", "Modules/Timer", "Modules/Strings" },
     },
     {
-        name = "Modules/LootSourcesData",
-        path = "!KRT/Modules/LootSourcesData.lua",
+        name = "Modules/Dataset/LootSourcesData",
+        path = "!KRT/Modules/Dataset/LootSourcesData.lua",
         deps = { "Init" },
     },
     {
         name = "Modules/LootSources",
         path = "!KRT/Modules/LootSources.lua",
-        deps = { "Init", "Modules/Strings", "Modules/LootSourcesData" },
+        deps = { "Init", "Modules/Strings", "Modules/Dataset/LootSourcesData" },
     },
     {
-        name = "Modules/IgnoredItems",
-        path = "!KRT/Modules/IgnoredItems.lua",
+        name = "Modules/Dataset/IgnoredItems",
+        path = "!KRT/Modules/Dataset/IgnoredItems.lua",
         deps = { "Init" },
     },
     {
-        name = "Modules/IgnoredMobs",
-        path = "!KRT/Modules/IgnoredMobs.lua",
+        name = "Modules/Dataset/IgnoredMobs",
+        path = "!KRT/Modules/Dataset/IgnoredMobs.lua",
         deps = { "Init" },
     },
     {
@@ -88,6 +88,11 @@ local expectedModules = {
     {
         name = "Modules/Base64",
         path = "!KRT/Modules/Base64.lua",
+        deps = { "Init" },
+    },
+    {
+        name = "Modules/Json",
+        path = "!KRT/Modules/Json.lua",
         deps = { "Init" },
     },
     {
@@ -178,9 +183,9 @@ assert(timerStatus.LoadOrder < itemStatus.LoadOrder, "Modules/Timer must load be
 assert(stringsStatus.LoadOrder < itemStatus.LoadOrder, "Modules/Strings must load before Modules/Item")
 
 local lootSourcesStatus = registry.GetStatus("Modules/LootSources")
-local lootSourcesDataStatus = registry.GetStatus("Modules/LootSourcesData")
+local lootSourcesDataStatus = registry.GetStatus("Modules/Dataset/LootSourcesData")
 assert(stringsStatus.LoadOrder < lootSourcesStatus.LoadOrder, "Modules/Strings must load before Modules/LootSources")
-assert(lootSourcesDataStatus.LoadOrder < lootSourcesStatus.LoadOrder, "Modules/LootSourcesData must load before Modules/LootSources")
+assert(lootSourcesDataStatus.LoadOrder < lootSourcesStatus.LoadOrder, "Modules/Dataset/LootSourcesData must load before Modules/LootSources")
 
 local ok, issues = registry.GetLoadOrderStatus()
 assert(ok == true, "pre-registry utility module sequence must validate in TOC order")

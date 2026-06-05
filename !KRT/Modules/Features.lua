@@ -47,10 +47,6 @@ function Features:IsEnabled(widgetId)
     return flag == true
 end
 
-function Features:GetProfile()
-    return self.Profile or "full"
-end
-
 applyDefaultProfile()
 
 do

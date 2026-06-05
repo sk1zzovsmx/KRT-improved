@@ -1,6 +1,6 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: local feature = addon.Core.GetFeatureShared()
+-- shared: defines addon.Core.GetFeatureShared()
 -- exports: publish module APIs on addon.*
 -- events: document inbound/outbound events in module body
 
@@ -259,53 +259,6 @@ function Core.EnsureLootRuntimeState()
     if LootStateHelpers and LootStateHelpers.SyncRuntimeState then
         lootContext = LootStateHelpers.SyncRuntimeState(raidState)
         raidState.lootContext = lootContext
-    else
-        local LootContext = addon.Services and addon.Services.Loot and addon.Services.Loot._Context
-        local normalizeBossEventContext = LootContext and LootContext.NormalizeBossEventContext
-        local normalizeLootSessionState = LootContext and LootContext.NormalizeLootSessionState
-        local normalizeLootSnapshotState = LootContext and LootContext.NormalizeLootSnapshotState
-        local buildActiveLootContext = LootContext and LootContext.BuildActiveLootContext
-        local projectLootWindowBossContext = LootContext and LootContext.ProjectLootWindowBossContext
-        local projectLootSourceState = LootContext and LootContext.ProjectLootSourceState
-
-        if
-            normalizeBossEventContext
-            and normalizeLootSessionState
-            and normalizeLootSnapshotState
-            and buildActiveLootContext
-            and projectLootWindowBossContext
-            and projectLootSourceState
-        then
-            lootContext.eventBoss = normalizeBossEventContext(raidState.bossEventContext or lootContext.eventBoss)
-            raidState.bossEventContext = lootContext.eventBoss
-            lootContext.activeLoot =
-                buildActiveLootContext(lootContext.activeLoot, raidState.lootWindowBossContext or lootContext.activeWindow, raidState.lootSource or lootContext.source)
-            lootContext.activeWindow = projectLootWindowBossContext(lootContext.activeLoot)
-            raidState.lootWindowBossContext = lootContext.activeWindow
-            lootContext.sessions = normalizeLootSessionState(raidState.lootBossSessions or lootContext.sessions)
-            raidState.lootBossSessions = lootContext.sessions
-            lootContext.snapshots = normalizeLootSnapshotState(raidState.lootWindowItemSnapshots or lootContext.snapshots)
-            raidState.lootWindowItemSnapshots = lootContext.snapshots
-            lootContext.source = projectLootSourceState(lootContext.activeLoot)
-            raidState.lootSource = lootContext.source
-        else
-            -- During early bootstrap, Loot context services may not be loaded yet.
-            -- Keep runtime/legacy state mirrored without hard-failing load.
-            lootContext.eventBoss = raidState.bossEventContext or lootContext.eventBoss or nil
-            raidState.bossEventContext = lootContext.eventBoss
-
-            lootContext.activeWindow = raidState.lootWindowBossContext or lootContext.activeWindow or nil
-            raidState.lootWindowBossContext = lootContext.activeWindow
-
-            lootContext.sessions = raidState.lootBossSessions or lootContext.sessions or nil
-            raidState.lootBossSessions = lootContext.sessions
-
-            lootContext.snapshots = raidState.lootWindowItemSnapshots or lootContext.snapshots or nil
-            raidState.lootWindowItemSnapshots = lootContext.snapshots
-
-            lootContext.source = raidState.lootSource or lootContext.source or nil
-            raidState.lootSource = lootContext.source
-        end
     end
 
     lootState.lootCount = tonumber(lootState.lootCount) or 0
@@ -402,6 +355,7 @@ function Core.GetFeatureShared()
         Colors = addon.Colors,
         Time = addon.Time,
         Base64 = addon.Base64,
+        Json = addon.Json,
         Comms = addon.Comms,
         Sort = addon.Sort,
         Item = addon.Item,
@@ -499,10 +453,10 @@ do
     Compat:Embed(addon) -- mixin: After, UnitIterator, GetCreatureId, etc.
     addon.Debugger:Embed(addon)
 
-    -- Rimuovi le API timer globali iniettate da LibCompat:Embed: i moduli devono
-    -- usare il mixin addon.Timer (Timer.BindMixin + self:ScheduleTimer/...). Module
-    -- Timer è in Layer 4 e non è disponibile qui (Layer 1); l'embed di addon
-    -- avviene in ADDON_LOADED, prima che gli handler di evento siano registrati.
+    -- Remove global timer APIs injected by LibCompat:Embed. Modules must use
+    -- the addon.Timer mixin (Timer.BindMixin + self:ScheduleTimer/...).
+    -- Timer loads later than this bootstrap block, and addon embedding happens
+    -- in ADDON_LOADED before event handlers are registered.
     addon.After = nil
     addon.NewTimer = nil
     addon.NewTicker = nil
@@ -887,7 +841,7 @@ do
             addon.Options.EnsureLoaded()
             addon.Options.SetDebugEnabled(false)
         end
-        -- Bind Timer mixin sull'addon (Layer 4 ora disponibile) per i timer di Init.
+        -- Bind the Timer mixin after its module has loaded so Init-owned timers use the canonical API.
         if addon.Timer and addon.Timer.BindMixin then
             addon.Timer.BindMixin(addon, "Core")
         end
@@ -901,10 +855,6 @@ do
         end
         if addon.Comms and addon.Comms.EnsureVersionPrefix then
             addon.Comms:EnsureVersionPrefix()
-        end
-        local reservesSync = reservesService and reservesService._Sync or nil
-        if reservesSync and reservesSync.EnsurePrefix then
-            reservesSync:EnsurePrefix()
         end
         Core.NormalizeSavedVariablesAfterLoad()
         for event in pairs(addonEvents) do
@@ -1009,12 +959,12 @@ do
         end
         module:CancelInstanceChecks()
         -- Restart the first-check timer on login (timer owned by raid service module).
-        if module.firstCheckHandle then
-            module:CancelTimer(module.firstCheckHandle)
-            module.firstCheckHandle = nil
+        if module.CheckInitialRaidStateHandle then
+            module:CancelTimer(module.CheckInitialRaidStateHandle)
+            module.CheckInitialRaidStateHandle = nil
         end
-        module.firstCheckHandle = module:ScheduleTimer(function()
-            module:FirstCheck()
+        module.CheckInitialRaidStateHandle = module:ScheduleTimer(function()
+            module:CheckInitialRaidState()
         end, 3)
     end
 
@@ -1045,7 +995,7 @@ do
             addon:trace(Diag.D.LogLootChatMsgLootRaw:format(tostring(msg)))
         end
         local currentRaid = Core.GetCurrentRaid()
-        local raidService, observedType, parsedLoot = observePassiveLootMessage(msg, true)
+        local raidService, observedType, parsedLoot = observePassiveLootMessage(msg)
         local lootService = getService("Loot")
         if not (currentRaid and raidService) then
             if perfStart then
@@ -1109,16 +1059,16 @@ do
 
     -- CHAT_MSG_ADDON: Forwards addon communication messages to service-specific handlers, then Syncer.
     function addon:CHAT_MSG_ADDON(prefix, msg, channel, sender)
-        if addon.Comms and addon.Comms.RequestVersionMessageHandling and addon.Comms:RequestVersionMessageHandling(prefix, msg, channel, sender) then
+        if addon.Comms and addon.Comms.HandleVersionMessage and addon.Comms:HandleVersionMessage(prefix, msg, channel, sender) then
             return
         end
         local reservesService = getService("Reserves")
         local reservesSync = reservesService and reservesService._Sync or nil
-        if reservesSync and reservesSync.RequestMessageHandling and reservesSync:RequestMessageHandling(prefix, msg, channel, sender) then
+        if reservesSync and reservesSync.HandleMessage and reservesSync:HandleMessage(prefix, msg, channel, sender) then
             return
         end
         local lootService = getService("Loot")
-        if lootService and lootService.RequestDistributionMessageHandling and lootService:RequestDistributionMessageHandling(prefix, msg, channel, sender) then
+        if lootService and lootService.HandleDistributionMessage and lootService:HandleDistributionMessage(prefix, msg, channel, sender) then
             return
         end
         local syncer = Core.GetSyncer and Core.GetSyncer() or nil

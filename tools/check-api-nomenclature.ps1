@@ -76,12 +76,127 @@ function Get-ApiScope([string]$target, [string]$method) {
     return "Public"
 }
 
+function Get-PublicApiVerbGroups {
+    return @(
+        [pscustomobject]@{
+            Category = "Query"
+            Prefixes = @(
+                "Get",
+                "Find",
+                "Is",
+                "Can",
+                "Query",
+                "Resolve",
+                "Validate",
+                "Compare",
+                "Has",
+                "Contains",
+                "Should",
+                "Match",
+                "Check"
+            )
+        },
+        [pscustomobject]@{
+            Category = "Mutation"
+            Prefixes = @(
+                "Set",
+                "Add",
+                "Remove",
+                "Delete",
+                "Upsert",
+                "Create",
+                "Clear",
+                "Apply",
+                "Insert",
+                "Update",
+                "Reset",
+                "Purge",
+                "Strip",
+                "Compact",
+                "Invalidate",
+                "Upgrade",
+                "Submit"
+            )
+        },
+        [pscustomobject]@{
+            Category = "Lifecycle"
+            Prefixes = @(
+                "Ensure",
+                "Bind",
+                "Localize",
+                "RequestRefresh",
+                "Request",
+                "Refresh",
+                "Toggle",
+                "Show",
+                "Hide",
+                "Prepare",
+                "Load",
+                "Save",
+                "Start",
+                "Stop",
+                "Pause",
+                "Schedule",
+                "Begin",
+                "End",
+                "Finalize",
+                "Enable",
+                "Disable",
+                "Define",
+                "Require",
+                "Warm",
+                "Fetch",
+                "Select",
+                "Seed",
+                "Fill",
+                "Roll"
+            )
+        },
+        [pscustomobject]@{
+            Category = "Transform"
+            Prefixes = @(
+                "Build",
+                "Normalize",
+                "Parse",
+                "Encode",
+                "Decode",
+                "Format",
+                "Make",
+                "Trim",
+                "Split",
+                "Copy",
+                "Project"
+            )
+        },
+        [pscustomobject]@{
+            Category = "Event"
+            Prefixes = @(
+                "Register",
+                "Trigger",
+                "Announce",
+                "Broadcast",
+                "Sync",
+                "Print",
+                "Send",
+                "Handle",
+                "Publish",
+                "Unregister",
+                "Demand",
+                "Call",
+                "Observe",
+                "Log",
+                "On"
+            )
+        }
+    )
+}
+
 function Test-PublicTaxonomy([string]$style, [string]$method) {
     if ($style -eq "UPPER") {
         return $true
     }
 
-    $exactLifecycle = @(
+    $exactNames = @(
         "OnLoad",
         "OnLoadFrame",
         "AcquireRefs",
@@ -91,36 +206,19 @@ function Test-PublicTaxonomy([string]$style, [string]$method) {
         "RequestRefresh",
         "Toggle",
         "Show",
-        "Hide"
+        "Hide",
+        "PlayerPass",
+        "PlayerCancel"
     )
-    if ($exactLifecycle -contains $method) {
+    if ($exactNames -contains $method) {
         return $true
     }
 
-    $prefixes = @(
-        "Get",
-        "Find",
-        "Is",
-        "Can",
-        "Set",
-        "Add",
-        "Remove",
-        "Delete",
-        "Upsert",
-        "Ensure",
-        "Bind",
-        "Localize",
-        "Request",
-        "RequestRefresh",
-        "Refresh",
-        "Toggle",
-        "Show",
-        "Hide"
-    )
-
-    foreach ($prefix in $prefixes) {
-        if ($method.StartsWith($prefix, [System.StringComparison]::Ordinal)) {
-            return $true
+    foreach ($group in (Get-PublicApiVerbGroups)) {
+        foreach ($prefix in $group.Prefixes) {
+            if ($method.StartsWith($prefix, [System.StringComparison]::Ordinal)) {
+                return $true
+            }
         }
     }
     return $false
@@ -313,10 +411,16 @@ foreach ($repoPath in $targetFiles) {
 if ($violations.Count -gt 0) {
     Write-Host "API nomenclature check failed." -ForegroundColor Red
     Write-Host "Public API methods must be PascalCase/UPPER and match verb taxonomy."
-    Write-Host "Allowed verbs: Get, Find, Is, Can, Set, Add, Remove, Delete, Upsert,"
-    Write-Host "Ensure, Bind, Localize, Request, RequestRefresh, Refresh, Toggle, Show, Hide."
-    Write-Host "Allowed exact lifecycle names: OnLoad, OnLoadFrame, AcquireRefs,"
-    Write-Host "BindHandlers, RefreshUI, Refresh, RequestRefresh, Toggle, Show, Hide."
+    Write-Host "Allowed query verbs: Get, Find, Is, Can, Query, Resolve, Validate, Compare."
+    Write-Host "Allowed mutation verbs: Set, Add, Remove, Delete, Upsert, Create, Clear, Apply."
+    Write-Host "Allowed lifecycle verbs: Ensure, Bind, Localize, RequestRefresh, Request, Refresh,"
+    Write-Host "Toggle, Show, Hide, Prepare, Load, Save, Start, Stop, Pause, Schedule, Begin,"
+    Write-Host "End, Finalize, Enable, Disable, Define."
+    Write-Host "Allowed transform verbs: Build, Normalize, Parse, Encode, Decode, Format, Make."
+    Write-Host "Allowed event verbs: Register, Trigger, Announce, Broadcast, Sync, Print, Send, Handle, Publish, Unregister, Demand, Call, Observe, Log, On."
+    Write-Host "Allowed exact lifecycle/contract names: OnLoad, OnLoadFrame, AcquireRefs,"
+    Write-Host "BindHandlers, RefreshUI, Refresh, RequestRefresh, Toggle, Show, Hide,"
+    Write-Host "PlayerPass, PlayerCancel."
     foreach ($violation in $violations) {
         Write-Host ("  - {0}" -f $violation)
     }

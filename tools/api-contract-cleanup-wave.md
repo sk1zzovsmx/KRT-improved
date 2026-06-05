@@ -21,7 +21,7 @@ Process requirements:
    reference and classify it:
    - canonical public contract
    - package-internal helper
-   - compatibility alias
+   - retired alias or redundant facade
    - dead or redundant surface
    - stale documentation or generated-catalog drift
 3. Only land high-confidence changes:

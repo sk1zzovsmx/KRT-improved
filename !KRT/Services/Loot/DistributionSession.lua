@@ -8,6 +8,7 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local Core = feature.Core
+local Diag = feature.Diag
 local Events = feature.Events
 local Bus = feature.Bus
 local Comms = feature.Comms
@@ -29,17 +30,27 @@ local DistributionSession = module._DistributionSession
 
 local PREFIX = "KRTDist"
 local SEP = "|"
+local PROTOCOL_VERSION = 2
 
 local MSG_ITEM = "ITEM"
 local MSG_ROLL_START = "ROLL_START"
 local MSG_ROLL_END = "ROLL_END"
 local MSG_ITEM_DONE = "ITEM_DONE"
 local MSG_CLEAR = "CLEAR"
+local MSG_HELLO = "HELLO"
+local MSG_SNAPSHOT_REQ = "SNAP_REQ"
+local MSG_SNAPSHOT = "SNAP"
+local MSG_ROLL_TICK = "ROLL_TICK"
+local MSG_TIE_START = "TIE_START"
+local MSG_AWARDED = "AWARDED"
+
+local SNAP_ROW_SEP = "~"
 
 local STATE_ACTIVE = "active"
 local STATE_ROLLING = "rolling"
 local STATE_WINNER = "winner"
 local STATE_DONE = "done"
+local STATE_AWARDED = "awarded"
 
 local state = DistributionSession._state
 if type(state) ~= "table" then
@@ -103,6 +114,38 @@ local function packFields(...)
     return tconcat(out, SEP)
 end
 
+local function splitText(text, sep, out)
+    local input = tostring(text or "")
+    local delimiter = tostring(sep or "")
+    local fields = out or {}
+    local startPos = 1
+    local n = 0
+
+    if delimiter == "" then
+        fields[1] = input
+        for i = 2, #fields do
+            fields[i] = nil
+        end
+        return fields, 1
+    end
+
+    while true do
+        local fromPos, toPos = strfind(input, delimiter, startPos, true)
+        if not fromPos then
+            n = n + 1
+            fields[n] = strsub(input, startPos)
+            break
+        end
+        n = n + 1
+        fields[n] = strsub(input, startPos, fromPos - 1)
+        startPos = toPos + 1
+    end
+    for i = n + 1, #fields do
+        fields[i] = nil
+    end
+    return fields, n
+end
+
 local splitScratch = {}
 local function splitFields(text)
     local payload = getPayload()
@@ -129,6 +172,9 @@ local function splitFields(text)
     end
     return splitScratch, n
 end
+
+local snapshotRowsScratch = {}
+local snapshotFieldScratch = {}
 
 local function normalizeNumber(value)
     local numeric = tonumber(value)
@@ -250,6 +296,9 @@ local function copyRow(row)
         winnerName = row.winnerName,
         rollValue = row.rollValue,
         reason = row.reason,
+        remaining = row.remaining,
+        tieNamesText = row.tieNamesText,
+        protocolVersion = row.protocolVersion or PROTOCOL_VERSION,
         sessionId = row.sessionId or state.sessionId,
         sender = row.sender,
     }
@@ -276,6 +325,7 @@ local function upsertRow(data, reason)
     row.count = normalizeNumber(data.count or data.itemCount) or row.count or 1
     row.slot = normalizeNumber(data.slot or data.index) or row.slot
     row.sender = normalizeText(data.sender) or row.sender
+    row.protocolVersion = normalizeNumber(data.protocolVersion) or row.protocolVersion or PROTOCOL_VERSION
 
     if data.rollType ~= nil then
         row.rollType = normalizeNumber(data.rollType) or data.rollType
@@ -291,6 +341,12 @@ local function upsertRow(data, reason)
     end
     if data.reason ~= nil then
         row.reason = normalizeText(data.reason)
+    end
+    if data.remaining ~= nil then
+        row.remaining = normalizeNumber(data.remaining)
+    end
+    if data.tieNamesText ~= nil then
+        row.tieNamesText = normalizeText(data.tieNamesText)
     end
 
     if data.state then
@@ -328,9 +384,67 @@ local function publishMessage(...)
     return sendMessage(...)
 end
 
+local function sendDirect(channel, target, ...)
+    ensurePrefix()
+    if type(_G.SendAddonMessage) ~= "function" then
+        return false
+    end
+    _G.SendAddonMessage(PREFIX, packFields(...), channel, target)
+    return true
+end
+
+local function isSupportedVersion(version)
+    local numeric = tonumber(version)
+    if numeric == PROTOCOL_VERSION then
+        return true
+    end
+    if addon.hasDebug and Diag and Diag.W and Diag.W.LogDistributionUnsupportedVersion then
+        addon:warn(Diag.W.LogDistributionUnsupportedVersion:format(tostring(version)))
+    end
+    return false
+end
+
+local function encodeSnapshot()
+    local rows = {}
+    for i = 1, #state.order do
+        local row = state.itemsByKey[state.order[i]]
+        if row then
+            rows[#rows + 1] = packFields(
+                row.itemKey,
+                row.count or 1,
+                row.quality or "",
+                encodeText(row.itemLink),
+                encodeText(row.itemName),
+                encodeText(row.itemTexture),
+                row.slot or "",
+                row.state or "",
+                row.rollType or "",
+                row.duration or "",
+                encodeText(row.winnerName),
+                row.rollValue or "",
+                encodeText(row.reason),
+                row.remaining or "",
+                encodeText(row.tieNamesText)
+            )
+        end
+    end
+    return encodeText(tconcat(rows, SNAP_ROW_SEP))
+end
+
+local function countSnapshotRows()
+    local count = 0
+    for i = 1, #state.order do
+        if state.itemsByKey[state.order[i]] then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 local function publishItemRow(row)
     return publishMessage(
         MSG_ITEM,
+        PROTOCOL_VERSION,
         ensureSessionId(),
         row.itemKey,
         row.count or 1,
@@ -343,28 +457,31 @@ local function publishItemRow(row)
 end
 
 local function publishRollStartRow(row)
-    return publishMessage(MSG_ROLL_START, ensureSessionId(), row.itemKey, row.rollType or "", row.duration or "")
+    return publishMessage(MSG_ROLL_START, PROTOCOL_VERSION, ensureSessionId(), row.itemKey, row.rollType or "", row.duration or "")
 end
 
 local function publishRollEndRow(row)
-    return publishMessage(MSG_ROLL_END, ensureSessionId(), row.itemKey, encodeText(row.winnerName), row.rollValue or "", encodeText(row.reason))
+    return publishMessage(MSG_ROLL_END, PROTOCOL_VERSION, ensureSessionId(), row.itemKey, encodeText(row.winnerName), row.rollValue or "", encodeText(row.reason))
 end
 
 local function publishItemDoneRow(row)
-    return publishMessage(MSG_ITEM_DONE, ensureSessionId(), row.itemKey, encodeText(row.winnerName))
+    return publishMessage(MSG_ITEM_DONE, PROTOCOL_VERSION, ensureSessionId(), row.itemKey, encodeText(row.winnerName))
 end
 
 local function handleItemMessage(fields, sender)
-    local sessionId = setSessionId(fields[2])
+    if not isSupportedVersion(fields[2]) then
+        return true
+    end
+    local sessionId = setSessionId(fields[3])
     local row = upsertRow({
         sessionId = sessionId,
-        itemKey = fields[3],
-        count = fields[4],
-        quality = fields[5],
-        itemLink = decodeText(fields[6]),
-        itemName = decodeText(fields[7]),
-        itemTexture = decodeText(fields[8]),
-        slot = fields[9],
+        itemKey = fields[4],
+        count = fields[5],
+        quality = fields[6],
+        itemLink = decodeText(fields[7]),
+        itemName = decodeText(fields[8]),
+        itemTexture = decodeText(fields[9]),
+        slot = fields[10],
         state = STATE_ACTIVE,
         sender = sender,
     }, "item")
@@ -372,12 +489,15 @@ local function handleItemMessage(fields, sender)
 end
 
 local function handleRollStartMessage(fields, sender)
-    local sessionId = setSessionId(fields[2])
+    if not isSupportedVersion(fields[2]) then
+        return true
+    end
+    local sessionId = setSessionId(fields[3])
     local row = upsertRow({
         sessionId = sessionId,
-        itemKey = fields[3],
-        rollType = fields[4],
-        duration = fields[5],
+        itemKey = fields[4],
+        rollType = fields[5],
+        duration = fields[6],
         state = STATE_ROLLING,
         sender = sender,
     }, "roll_start")
@@ -385,14 +505,17 @@ local function handleRollStartMessage(fields, sender)
 end
 
 local function handleRollEndMessage(fields, sender)
-    local sessionId = setSessionId(fields[2])
-    local winnerName = decodeText(fields[4])
+    if not isSupportedVersion(fields[2]) then
+        return true
+    end
+    local sessionId = setSessionId(fields[3])
+    local winnerName = decodeText(fields[5])
     local row = upsertRow({
         sessionId = sessionId,
-        itemKey = fields[3],
+        itemKey = fields[4],
         winnerName = winnerName,
-        rollValue = fields[5],
-        reason = decodeText(fields[6]),
+        rollValue = fields[6],
+        reason = decodeText(fields[7]),
         state = normalizeText(winnerName) and STATE_WINNER or STATE_ACTIVE,
         sender = sender,
     }, "roll_end")
@@ -400,21 +523,117 @@ local function handleRollEndMessage(fields, sender)
 end
 
 local function handleItemDoneMessage(fields, sender)
-    local sessionId = setSessionId(fields[2])
+    if not isSupportedVersion(fields[2]) then
+        return true
+    end
+    local sessionId = setSessionId(fields[3])
     local row = upsertRow({
         sessionId = sessionId,
-        itemKey = fields[3],
-        winnerName = decodeText(fields[4]),
+        itemKey = fields[4],
+        winnerName = decodeText(fields[5]),
         state = STATE_DONE,
         sender = sender,
     }, "item_done")
     return row ~= nil
 end
 
--- ----- Public methods ----- --
-function DistributionSession.GetPrefix()
-    return PREFIX
+local function handleRollTickMessage(fields, sender)
+    if not isSupportedVersion(fields[2]) then
+        return true
+    end
+    local sessionId = setSessionId(fields[3])
+    local row = upsertRow({
+        protocolVersion = fields[2],
+        sessionId = sessionId,
+        itemKey = fields[4],
+        remaining = fields[5],
+        state = STATE_ROLLING,
+        sender = sender,
+    }, "roll_tick")
+    return row ~= nil
 end
+
+local function handleTieStartMessage(fields, sender)
+    if not isSupportedVersion(fields[2]) then
+        return true
+    end
+    local sessionId = setSessionId(fields[3])
+    local row = upsertRow({
+        protocolVersion = fields[2],
+        sessionId = sessionId,
+        itemKey = fields[4],
+        tieNamesText = decodeText(fields[5]),
+        state = STATE_WINNER,
+        sender = sender,
+    }, "tie_start")
+    return row ~= nil
+end
+
+local function handleAwardedMessage(fields, sender)
+    if not isSupportedVersion(fields[2]) then
+        return true
+    end
+    local sessionId = setSessionId(fields[3])
+    local row = upsertRow({
+        protocolVersion = fields[2],
+        sessionId = sessionId,
+        itemKey = fields[4],
+        winnerName = decodeText(fields[5]),
+        rollValue = fields[6],
+        state = STATE_AWARDED,
+        sender = sender,
+    }, "awarded")
+    return row ~= nil
+end
+
+local function handleSnapshotMessage(fields, sender)
+    if not isSupportedVersion(fields[2]) then
+        return true
+    end
+
+    local sessionId = normalizeText(fields[4]) or buildSessionId()
+    local snapshotText = decodeText(fields[5])
+    local rows, rowCount = splitText(snapshotText, SNAP_ROW_SEP, snapshotRowsScratch)
+    local applied = 0
+
+    clearState(sessionId)
+    for i = 1, rowCount do
+        local rowText = rows[i]
+        if rowText and rowText ~= "" then
+            local rowFields = splitText(rowText, SEP, snapshotFieldScratch)
+            local row = upsertRow({
+                protocolVersion = fields[2],
+                sessionId = sessionId,
+                itemKey = rowFields[1],
+                count = rowFields[2],
+                quality = rowFields[3],
+                itemLink = decodeText(rowFields[4]),
+                itemName = decodeText(rowFields[5]),
+                itemTexture = decodeText(rowFields[6]),
+                slot = rowFields[7],
+                state = normalizeText(rowFields[8]) or STATE_ACTIVE,
+                rollType = rowFields[9],
+                duration = rowFields[10],
+                winnerName = decodeText(rowFields[11]),
+                rollValue = rowFields[12],
+                reason = decodeText(rowFields[13]),
+                remaining = rowFields[14],
+                tieNamesText = decodeText(rowFields[15]),
+                sender = sender,
+            }, "snapshot")
+            if row then
+                applied = applied + 1
+            end
+        end
+    end
+
+    if addon.hasDebug and Diag and Diag.D and Diag.D.LogDistributionSnapshotApplied then
+        addon:debug(Diag.D.LogDistributionSnapshotApplied:format(applied, tostring(sender or "?")))
+    end
+    return true
+end
+
+-- ----- Public methods ----- --
 
 function DistributionSession.Clear()
     if not canPublish() then
@@ -422,7 +641,7 @@ function DistributionSession.Clear()
     end
     local sessionId = buildSessionId()
     clearState(sessionId)
-    return publishMessage(MSG_CLEAR, sessionId)
+    return publishMessage(MSG_CLEAR, PROTOCOL_VERSION, sessionId)
 end
 
 function DistributionSession.PublishItem(item)
@@ -516,7 +735,80 @@ function DistributionSession.PublishItemDone(itemKeyOrLink, winnerName)
     return publishItemDoneRow(row)
 end
 
-function DistributionSession.RequestMessageHandling(prefix, msg, _channel, sender)
+function DistributionSession.RequestSnapshot()
+    return publishMessage(MSG_SNAPSHOT_REQ, PROTOCOL_VERSION, ensureSessionId())
+end
+
+function DistributionSession.PublishSnapshot(target, requestId)
+    if not canPublish() then
+        return false
+    end
+
+    local sessionId = ensureSessionId()
+    local snapshot = encodeSnapshot()
+    local sent
+    if target and target ~= "" then
+        sent = sendDirect("WHISPER", target, MSG_SNAPSHOT, PROTOCOL_VERSION, requestId or "", sessionId, snapshot)
+    else
+        sent = publishMessage(MSG_SNAPSHOT, PROTOCOL_VERSION, requestId or "", sessionId, snapshot)
+    end
+    if sent and addon.hasDebug and Diag and Diag.D and Diag.D.LogDistributionSnapshotSent then
+        addon:debug(Diag.D.LogDistributionSnapshotSent:format(countSnapshotRows(), tostring(target or "group")))
+    end
+    return sent == true
+end
+
+function DistributionSession.PublishRollTick(itemKeyOrLink, remaining)
+    if not canPublish() then
+        return false
+    end
+    local itemKey = resolveItemKey(itemKeyOrLink, itemKeyOrLink)
+    local row = upsertRow({
+        itemKey = itemKey,
+        remaining = remaining,
+        state = STATE_ROLLING,
+    }, "roll_tick")
+    if not row then
+        return false
+    end
+    return publishMessage(MSG_ROLL_TICK, PROTOCOL_VERSION, ensureSessionId(), row.itemKey, row.remaining or "")
+end
+
+function DistributionSession.PublishTieStart(itemKeyOrLink, names)
+    if not canPublish() then
+        return false
+    end
+    local itemKey = resolveItemKey(itemKeyOrLink, itemKeyOrLink)
+    local tieNamesText = type(names) == "table" and tconcat(names, ",") or tostring(names or "")
+    local row = upsertRow({
+        itemKey = itemKey,
+        tieNamesText = tieNamesText,
+        state = STATE_WINNER,
+    }, "tie_start")
+    if not row then
+        return false
+    end
+    return publishMessage(MSG_TIE_START, PROTOCOL_VERSION, ensureSessionId(), row.itemKey, encodeText(tieNamesText))
+end
+
+function DistributionSession.PublishAwarded(itemKeyOrLink, winnerName, rollValue)
+    if not canPublish() then
+        return false
+    end
+    local itemKey = resolveItemKey(itemKeyOrLink, itemKeyOrLink)
+    local row = upsertRow({
+        itemKey = itemKey,
+        winnerName = winnerName,
+        rollValue = rollValue,
+        state = STATE_AWARDED,
+    }, "awarded")
+    if not row then
+        return false
+    end
+    return publishMessage(MSG_AWARDED, PROTOCOL_VERSION, ensureSessionId(), row.itemKey, encodeText(winnerName), row.rollValue or "")
+end
+
+function DistributionSession.HandleMessage(prefix, msg, _channel, sender)
     if prefix ~= PREFIX then
         return false
     end
@@ -524,7 +816,10 @@ function DistributionSession.RequestMessageHandling(prefix, msg, _channel, sende
     local fields = splitFields(msg)
     local kind = fields[1]
     if kind == MSG_CLEAR then
-        clearState(fields[2])
+        if not isSupportedVersion(fields[2]) then
+            return true
+        end
+        clearState(fields[3])
         return true
     end
     if kind == MSG_ITEM then
@@ -538,6 +833,27 @@ function DistributionSession.RequestMessageHandling(prefix, msg, _channel, sende
     end
     if kind == MSG_ITEM_DONE then
         return handleItemDoneMessage(fields, sender)
+    end
+    if kind == MSG_HELLO then
+        return isSupportedVersion(fields[2])
+    end
+    if kind == MSG_SNAPSHOT_REQ then
+        if not isSupportedVersion(fields[2]) then
+            return true
+        end
+        return DistributionSession.PublishSnapshot(sender, fields[3])
+    end
+    if kind == MSG_SNAPSHOT then
+        return handleSnapshotMessage(fields, sender)
+    end
+    if kind == MSG_ROLL_TICK then
+        return handleRollTickMessage(fields, sender)
+    end
+    if kind == MSG_TIE_START then
+        return handleTieStartMessage(fields, sender)
+    end
+    if kind == MSG_AWARDED then
+        return handleAwardedMessage(fields, sender)
     end
     return true
 end
@@ -561,6 +877,7 @@ function DistributionSession.GetDisplayModel()
     end)
     return {
         prefix = PREFIX,
+        protocolVersion = PROTOCOL_VERSION,
         sessionId = state.sessionId,
         rows = rows,
     }

@@ -7,10 +7,9 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local type = type
-local tonumber = tonumber
 local floor = math.floor
-local _G = _G
+local strmatch = string.match
+local tonumber, type = tonumber, type
 
 addon.UIPrimitives = addon.UIPrimitives or {}
 local UIPrimitives = addon.UIPrimitives
@@ -21,43 +20,6 @@ local UIRowVisuals = addon.UIRowVisuals
 -- ----- Internal state ----- --
 
 -- ----- Private helpers ----- --
-local function round(value)
-    if value >= 0 then
-        return floor(value + 0.5)
-    end
-    return -floor(-value + 0.5)
-end
-
-local function getEffectiveScale(region)
-    if region and type(region.GetEffectiveScale) == "function" then
-        return tonumber(region:GetEffectiveScale()) or 1
-    end
-    return 1
-end
-
-local function getPhysicalScreenHeight()
-    local currentResolution = _G.GetCurrentResolution
-    local screenResolutions = _G.GetScreenResolutions
-    if type(currentResolution) == "function" and type(screenResolutions) == "function" then
-        local selected = ({ screenResolutions() })[currentResolution()]
-        local height = selected and selected:match("%d+.-(%d+)")
-        height = tonumber(height)
-        if height and height > 0 then
-            return height
-        end
-    end
-
-    local screenHeight = _G.GetScreenHeight
-    if type(screenHeight) == "function" then
-        local height = tonumber(screenHeight())
-        if height and height > 0 then
-            return height
-        end
-    end
-
-    return 768
-end
-
 local function ensureRowTextures(row)
     if not row or row._krtSelTex then
         return
@@ -89,7 +51,76 @@ local function isLoggerRow(row)
     return row and row._krtRowVisualStyle == "logger"
 end
 
+local function getNamedFramePart(frameName, suffix)
+    if type(frameName) ~= "string" or frameName == "" then
+        return nil
+    end
+    if type(suffix) ~= "string" or suffix == "" then
+        return nil
+    end
+    return _G[frameName .. suffix]
+end
+
+local function setTextNamedPart(frameName, suffix, str1, str2, cond)
+    local frame = getNamedFramePart(frameName, suffix)
+    if frame then
+        UIPrimitives.SetText(frame, str1, str2, cond)
+    end
+    return frame
+end
+
+local function getScreenPixelScale(frame, scaleX, scaleY)
+    local uiScale = frame and frame.GetEffectiveScale and frame:GetEffectiveScale() or 1
+    local resolvedScaleX = tonumber(scaleX) or 1
+    local resolvedScaleY = tonumber(scaleY) or resolvedScaleX
+    local resolutionIndex = GetCurrentResolution and GetCurrentResolution() or nil
+    local resolution = resolutionIndex and GetScreenResolutions and select(resolutionIndex, GetScreenResolutions()) or nil
+    local _, height = strmatch(resolution or "", "^(%d+)x(%d+)$")
+    local physicalHeight = tonumber(height) or 768
+    local baseScale = (physicalHeight / 768) / (tonumber(uiScale) or 1)
+    return baseScale * resolvedScaleX, baseScale * resolvedScaleY
+end
+
+local function alignToPixel(value, pixelScale)
+    local scale = tonumber(pixelScale) or 1
+    if scale <= 0 then
+        scale = 1
+    end
+    return floor((tonumber(value) or 0) * scale + 0.5) / scale
+end
+
 -- ----- Public methods ----- --
+function UIPrimitives.SetPixelSize(frame, width, height, scaleX, scaleY)
+    if not frame then
+        return false
+    end
+
+    local pixelScaleX, pixelScaleY = getScreenPixelScale(frame, scaleX, scaleY)
+    local alignedWidth = alignToPixel(width, pixelScaleX)
+    local alignedHeight = alignToPixel(height, pixelScaleY)
+    if frame.SetSize then
+        frame:SetSize(alignedWidth, alignedHeight)
+    else
+        if frame.SetWidth then
+            frame:SetWidth(alignedWidth)
+        end
+        if frame.SetHeight then
+            frame:SetHeight(alignedHeight)
+        end
+    end
+    return true
+end
+
+function UIPrimitives.SetPixelPoint(frame, point, relativeTo, relativePoint, x, y, scaleX, scaleY)
+    if not (frame and frame.SetPoint) then
+        return false
+    end
+
+    local pixelScaleX, pixelScaleY = getScreenPixelScale(frame, scaleX, scaleY)
+    frame:SetPoint(point, relativeTo, relativePoint, alignToPixel(x, pixelScaleX), alignToPixel(y, pixelScaleY))
+    return true
+end
+
 function UIPrimitives.EnableDisable(frame, cond)
     if not frame then
         return
@@ -156,68 +187,6 @@ function UIPrimitives.SetButtonGlow(button, enabled, r, g, b, style, options)
     end
 end
 
-function UIPrimitives.GetPixelToUIUnitFactor()
-    return 768 / getPhysicalScreenHeight()
-end
-
-function UIPrimitives.GetNearestPixelSize(uiUnitSize, layoutScale, minPixels)
-    local size = tonumber(uiUnitSize) or 0
-    local scale = tonumber(layoutScale) or 1
-    if scale <= 0 then
-        scale = 1
-    end
-    local minimum = tonumber(minPixels)
-    if size == 0 and (not minimum or minimum == 0) then
-        return 0
-    end
-
-    local uiUnitFactor = UIPrimitives.GetPixelToUIUnitFactor()
-    local pixels = round((size * scale) / uiUnitFactor)
-    if minimum then
-        if size < 0 then
-            if pixels > -minimum then
-                pixels = -minimum
-            end
-        elseif pixels < minimum then
-            pixels = minimum
-        end
-    end
-
-    return pixels * uiUnitFactor / scale
-end
-
-function UIPrimitives.SetPixelWidth(region, width, minPixels)
-    if region and type(region.SetWidth) == "function" then
-        region:SetWidth(UIPrimitives.GetNearestPixelSize(width, getEffectiveScale(region), minPixels))
-    end
-end
-
-function UIPrimitives.SetPixelHeight(region, height, minPixels)
-    if region and type(region.SetHeight) == "function" then
-        region:SetHeight(UIPrimitives.GetNearestPixelSize(height, getEffectiveScale(region), minPixels))
-    end
-end
-
-function UIPrimitives.SetPixelSize(region, width, height, minWidthPixels, minHeightPixels)
-    UIPrimitives.SetPixelWidth(region, width, minWidthPixels)
-    UIPrimitives.SetPixelHeight(region, height, minHeightPixels)
-end
-
-function UIPrimitives.SetPixelPoint(region, point, relativeTo, relativePoint, offsetX, offsetY, minOffsetXPixels, minOffsetYPixels)
-    if not region or type(region.SetPoint) ~= "function" then
-        return
-    end
-
-    local scale = getEffectiveScale(region)
-    region:SetPoint(
-        point,
-        relativeTo,
-        relativePoint,
-        UIPrimitives.GetNearestPixelSize(offsetX, scale, minOffsetXPixels),
-        UIPrimitives.GetNearestPixelSize(offsetY, scale, minOffsetYPixels)
-    )
-end
-
 function UIPrimitives.SetText(frame, str1, str2, cond)
     if not frame then
         return
@@ -229,18 +198,8 @@ function UIPrimitives.SetText(frame, str1, str2, cond)
     end
 end
 
-function UIPrimitives.GetNamedFramePart(frameName, suffix)
-    if type(frameName) ~= "string" or frameName == "" then
-        return nil
-    end
-    if type(suffix) ~= "string" or suffix == "" then
-        return nil
-    end
-    return _G[frameName .. suffix]
-end
-
 function UIPrimitives.EnableDisableNamedPart(frameName, suffix, cond)
-    local frame = UIPrimitives.GetNamedFramePart(frameName, suffix)
+    local frame = getNamedFramePart(frameName, suffix)
     if frame then
         UIPrimitives.EnableDisable(frame, cond)
     end
@@ -248,24 +207,16 @@ function UIPrimitives.EnableDisableNamedPart(frameName, suffix, cond)
 end
 
 function UIPrimitives.ShowHideNamedPart(frameName, suffix, cond)
-    local frame = UIPrimitives.GetNamedFramePart(frameName, suffix)
+    local frame = getNamedFramePart(frameName, suffix)
     if frame then
         UIPrimitives.ShowHide(frame, cond)
     end
     return frame
 end
 
-function UIPrimitives.SetTextNamedPart(frameName, suffix, str1, str2, cond)
-    local frame = UIPrimitives.GetNamedFramePart(frameName, suffix)
-    if frame then
-        UIPrimitives.SetText(frame, str1, str2, cond)
-    end
-    return frame
-end
-
 function UIPrimitives.UpdateModeTextNamedPart(frameName, suffix, str1, str2, mode, lastMode)
     if mode ~= lastMode then
-        UIPrimitives.SetTextNamedPart(frameName, suffix, str1, str2, mode)
+        setTextNamedPart(frameName, suffix, str1, str2, mode)
         return mode
     end
     return lastMode

@@ -29,9 +29,9 @@ do
     feature.EnsureServiceNamespace("Raid")
     local module = addon.Services.Raid
 
-    -- Timer ownership: roster refresh debounce + retry per pending units. Anche
-    -- Raid/State.lua e Raid/Session.lua sono parte dello stesso modulo `addon.Services.Raid`
-    -- e condividono il mixin embedded qui (idempotente sui successivi do-block).
+    -- Timer ownership: roster refresh debounce plus retry for pending units.
+    -- Raid/State.lua and Raid/Session.lua share the same `addon.Services.Raid`
+    -- table and reuse the mixin embedded here.
     addon.Timer.BindMixin(module, "Raid")
 
     -- ----- Internal state ----- --
@@ -216,10 +216,6 @@ do
         resetLiveUnitCaches()
     end
 
-    function module:GetRosterVersion()
-        return rosterVersion
-    end
-
     local function publishRosterDeltaInternal(delta, raidNum)
         local payload
 
@@ -340,7 +336,7 @@ do
             class = newClass,
             join = ctx.now,
             leave = nil,
-            count = (prevPlayer and prevPlayer.count) or 0,
+            countMS = (prevPlayer and prevPlayer.countMS) or 0,
         },
             deltaEntry
     end
@@ -440,6 +436,10 @@ do
             end
         end
         return changed
+    end
+
+    function module:GetRosterVersion()
+        return rosterVersion
     end
 
     -- Updates the current raid roster, adding new players and marking those who left.

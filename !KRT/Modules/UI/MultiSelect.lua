@@ -108,7 +108,13 @@ local function findIndex(ordered, key)
 end
 
 -- ----- Public methods ----- --
-function MultiSelect.MultiSelectInit(contextKey)
+local function getModifierPolicy(scopeKey)
+    local key = normalizeScopeKey(scopeKey)
+    local policy = modifierPolicyByScope[key] or modifierPolicyByScope._default or normalizeModifierPolicy(nil)
+    return policy.allowMulti ~= false, policy.allowRange ~= false
+end
+
+function MultiSelect.EnsureState(contextKey)
     local st, key = ensureContext(contextKey)
     st.set = {}
     st.count = 0
@@ -117,11 +123,7 @@ function MultiSelect.MultiSelectInit(contextKey)
     return st
 end
 
-function MultiSelect.MultiSelectClear(contextKey)
-    return MultiSelect.MultiSelectInit(contextKey)
-end
-
-function MultiSelect.MultiSelectSetModifierPolicy(scopeKey, policy)
+function MultiSelect.SetModifierPolicy(scopeKey, policy)
     local key = normalizeScopeKey(scopeKey)
 
     if policy == nil then
@@ -136,14 +138,8 @@ function MultiSelect.MultiSelectSetModifierPolicy(scopeKey, policy)
     modifierPolicyByScope[key] = normalizeModifierPolicy(policy)
 end
 
-function MultiSelect.MultiSelectGetModifierPolicy(scopeKey)
-    local key = normalizeScopeKey(scopeKey)
-    local policy = modifierPolicyByScope[key] or modifierPolicyByScope._default or normalizeModifierPolicy(nil)
-    return policy.allowMulti ~= false, policy.allowRange ~= false
-end
-
-function MultiSelect.MultiSelectResolveModifiers(scopeKey, opts)
-    local policyAllowMulti, policyAllowRange = MultiSelect.MultiSelectGetModifierPolicy(scopeKey)
+function MultiSelect.ResolveModifiers(scopeKey, opts)
+    local policyAllowMulti, policyAllowRange = getModifierPolicy(scopeKey)
     local allowMulti = policyAllowMulti
     local allowRange = policyAllowRange
 
@@ -174,7 +170,7 @@ function MultiSelect.MultiSelectResolveModifiers(scopeKey, opts)
     return isMulti, isRange
 end
 
-function MultiSelect.MultiSelectToggle(contextKey, id, isMulti, allowDeselect)
+function MultiSelect.Toggle(contextKey, id, isMulti, allowDeselect)
     local st, key = ensureContext(contextKey)
     local k = msKey(id)
     if k == nil then
@@ -222,7 +218,7 @@ function MultiSelect.MultiSelectToggle(contextKey, id, isMulti, allowDeselect)
     return action, st.count or 0
 end
 
-function MultiSelect.MultiSelectSetAnchor(contextKey, id)
+function MultiSelect.SetAnchor(contextKey, id)
     local st, key = ensureContext(contextKey)
     local before = st.anchor
     local k = msKey(id)
@@ -232,12 +228,12 @@ function MultiSelect.MultiSelectSetAnchor(contextKey, id)
     return st.anchor
 end
 
-function MultiSelect.MultiSelectGetAnchor(contextKey)
+function MultiSelect.GetAnchor(contextKey)
     local st = stateByContext[contextKey or "_default"]
     return st and st.anchor or nil
 end
 
-function MultiSelect.MultiSelectRange(contextKey, ordered, id, isAdd)
+function MultiSelect.SelectRange(contextKey, ordered, id, isAdd)
     local st, key = ensureContext(contextKey)
     local k = msKey(id)
     if k == nil then
@@ -286,7 +282,7 @@ function MultiSelect.MultiSelectRange(contextKey, ordered, id, isAdd)
     return action, st.count or 0
 end
 
-function MultiSelect.MultiSelectIsSelected(contextKey, id)
+function MultiSelect.IsSelected(contextKey, id)
     local st = stateByContext[contextKey or "_default"]
     if not st or not st.set then
         return false
@@ -295,17 +291,17 @@ function MultiSelect.MultiSelectIsSelected(contextKey, id)
     return (k ~= nil) and (st.set[k] == true) or false
 end
 
-function MultiSelect.MultiSelectCount(contextKey)
+function MultiSelect.GetCount(contextKey)
     local st = stateByContext[contextKey or "_default"]
     return (st and st.count) or 0
 end
 
-function MultiSelect.MultiSelectGetVersion(contextKey)
+function MultiSelect.GetVersion(contextKey)
     local st = stateByContext[contextKey or "_default"]
     return (st and st.ver) or 0
 end
 
-function MultiSelect.MultiSelectGetSelected(contextKey)
+function MultiSelect.GetSelected(contextKey)
     local st = stateByContext[contextKey or "_default"]
     local out = {}
     if not st or not st.set then

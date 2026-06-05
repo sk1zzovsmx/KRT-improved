@@ -43,14 +43,14 @@ Internal.ConfigShowLootCounterDuringMSRoll = "ConfigshowLootCounterDuringMSRoll"
 -- ----- Private helpers ----- --
 
 -- ----- Public methods ----- --
-function Events.ConfigOptionChanged(optionName)
+function Events.GetConfigOptionChanged(optionName)
     if type(optionName) ~= "string" or optionName == "" then
         return nil
     end
     return "Config" .. optionName
 end
 
-function Events.WowForwarded(eventName)
+function Events.GetWowForwarded(eventName)
     if type(eventName) ~= "string" or eventName == "" then
         return nil
     end

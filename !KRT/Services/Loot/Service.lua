@@ -64,12 +64,16 @@ do
     feature.EnsureServiceNamespace("Loot")
     local module = addon.Services.Loot
 
-    -- Timer ownership: cache warm scheduling per gli item del loot.
+    -- Timer ownership: cache-warm scheduling for loot items.
     addon.Timer.BindMixin(module, "Loot")
 
     local PendingAwards = assert(module._PendingAwards, "Loot pending-award helpers are not initialized")
     local PassiveGroupLoot = assert(module._PassiveGroupLoot, "Loot passive group-loot helpers are not initialized")
     local Tracking = assert(module._Tracking, "Loot tracking helpers are not initialized")
+    local Workflow = assert(module._Workflow, "Loot workflow helpers are not initialized")
+    local Receipts = assert(module._Receipts, "Loot receipt helpers are not initialized")
+    local Records = assert(module._Records, "Loot record helpers are not initialized")
+    local Reconcile = assert(module._Reconcile, "Loot reconcile helpers are not initialized")
     local ContextHelpers = assert(module._Context, "Loot context helpers are not initialized")
     local resolveRaidRecord = assert(ContextHelpers.ResolveRaidRecord, "Missing LootContext.ResolveRaidRecord")
 
@@ -86,10 +90,12 @@ do
     local DISTRIBUTION_ROLL_START = "roll_start"
     local DISTRIBUTION_ROLL_END = "roll_end"
     local DISTRIBUTION_ITEM_DONE = "item_done"
+    local workflowContext = lootState.workflowShadow or {}
+    lootState.workflowShadow = workflowContext
 
     -- ----- Private helpers ----- --
     local scheduleCacheWarm, refreshDeferredAutoLootSuggestion, evaluateAutoLootSuggestion
-    local requestLootItemInfo
+    local requestLootItemInfo, setSelectedItem
 
     local function noopFalse()
         return false
@@ -98,6 +104,7 @@ do
     local function buildEmptyDistributionModel()
         return {
             prefix = "KRTDist",
+            protocolVersion = 2,
             sessionId = nil,
             rows = {},
         }
@@ -111,13 +118,18 @@ do
 
         -- Runtime guard for stale installs/packages that load Service.lua before the new helper file.
         distribution = {
-            RequestMessageHandling = noopFalse,
+            HandleMessage = noopFalse,
             GetDisplayModel = buildEmptyDistributionModel,
             PublishWindowItems = noopFalse,
             Clear = noopFalse,
             PublishRollStart = noopFalse,
             PublishRollEnd = noopFalse,
             PublishItemDone = noopFalse,
+            RequestSnapshot = noopFalse,
+            PublishSnapshot = noopFalse,
+            PublishRollTick = noopFalse,
+            PublishTieStart = noopFalse,
+            PublishAwarded = noopFalse,
         }
         module._DistributionSession = distribution
         return distribution
@@ -254,7 +266,7 @@ do
             current.autoLootSuggestion = evaluateAutoLootSuggestion(current.itemLink, current.itemRarity, true)
 
             if index == lootState.currentItemIndex then
-                module:SetItem(current)
+                setSelectedItem(current)
             end
         end)
 
@@ -1003,6 +1015,13 @@ do
         return itemString, itemName, itemRarity, itemTexture, tonumber(itemId), itemType
     end
 
+    local function isIgnoredItem(itemId)
+        if type(IgnoredItems.Contains) ~= "function" then
+            return false
+        end
+        return IgnoredItems.Contains(itemId)
+    end
+
     local function shouldSkipLootEntry(itemRarity, itemId, itemLink)
         -- Ignore low-rarity and explicitly ignored items.
         local lootThreshold = GetLootThreshold()
@@ -1012,7 +1031,7 @@ do
             end
             return true
         end
-        if itemId and module:IsIgnoredItem(itemId) then
+        if itemId and isIgnoredItem(itemId) then
             if addon.hasDebug then
                 addon:debug(Diag.D.LogLootIgnoredItemId:format(tostring(itemId), tostring(itemLink)))
             end
@@ -1100,7 +1119,7 @@ do
         end
 
         if selectedUpdated then
-            module:SetItem(lootTable[lootState.currentItemIndex])
+            setSelectedItem(lootTable[lootState.currentItemIndex])
         end
     end
 
@@ -1153,6 +1172,55 @@ do
                     or PassiveGroupLoot.GetPassiveLootRollEntry(itemLink)
                 rollSessionId = passiveRoll and passiveRoll.sessionId or nil
                 outcome.matchedPassiveRoll = passiveRoll ~= nil
+                if passiveRoll then
+                    local winner = type(passiveRoll.winner) == "table" and passiveRoll.winner or nil
+                    local winnerName = winner and NormalizeName(winner.playerName, true) or nil
+                    local playerName = NormalizeName(player, true) or player
+                    local winnerMatches = winner and (not winnerName or not playerName or winnerName == playerName)
+                    if winnerMatches then
+                        if not rollType then
+                            rollType = winner.rollType
+                        end
+                        if rollValue == nil then
+                            rollValue = winner.rollValue
+                        end
+                    end
+
+                    local rollsByPlayer = type(passiveRoll.rollsByPlayer) == "table" and passiveRoll.rollsByPlayer or nil
+                    local playerRoll
+                    if rollsByPlayer then
+                        if playerName then
+                            playerRoll = rollsByPlayer[playerName]
+                        end
+                        if not playerRoll and player then
+                            playerRoll = rollsByPlayer[player]
+                        end
+                    end
+                    if type(playerRoll) == "table" then
+                        if not rollType then
+                            rollType = playerRoll.rollType
+                        end
+                        local currentRollValue = tonumber(rollValue) or 0
+                        local playerRollValue = tonumber(playerRoll.rollValue) or 0
+                        if rollValue == nil or (currentRollValue <= 0 and playerRollValue > 0) then
+                            rollValue = playerRoll.rollValue
+                        end
+                    end
+
+                    local choicesByPlayer = type(passiveRoll.choicesByPlayer) == "table" and passiveRoll.choicesByPlayer or nil
+                    local playerChoice
+                    if choicesByPlayer then
+                        if playerName then
+                            playerChoice = choicesByPlayer[playerName]
+                        end
+                        if not playerChoice and player then
+                            playerChoice = choicesByPlayer[player]
+                        end
+                    end
+                    if type(playerChoice) == "table" and not rollType then
+                        rollType = playerChoice.rollType
+                    end
+                end
             else
                 rollSessionId = preferredRollSessionId
             end
@@ -1160,18 +1228,22 @@ do
 
         -- Resolve award source: pending award/group-loot choice -> manual ML tag -> current roll type.
         if not rollType then
-            local raidService = Services.Raid
-            local isMasterLooter = raidService and raidService:IsMasterLooter()
-            if isMasterLooter and not lootState.fromInventory then
-                rollType = rollTypes.MANUAL
-                rollValue = 0
-
-                -- Debug marker for manual-tagged loot.
-                if addon.hasDebug then
-                    addon:debug(Diag.D.LogLootTaggedManual, tostring(itemLink), tostring(player), tostring(lootState.currentRollType))
-                end
+            if passiveGroupLoot then
+                rollValue = rollValue or 0
             else
-                rollType = lootState.currentRollType
+                local raidService = Services.Raid
+                local isMasterLooter = raidService and raidService:IsMasterLooter()
+                if isMasterLooter and not lootState.fromInventory then
+                    rollType = rollTypes.MANUAL
+                    rollValue = 0
+
+                    -- Debug marker for manual-tagged loot.
+                    if addon.hasDebug then
+                        addon:debug(Diag.D.LogLootTaggedManual, tostring(itemLink), tostring(player), tostring(lootState.currentRollType))
+                    end
+                else
+                    rollType = lootState.currentRollType
+                end
             end
         end
 
@@ -1180,9 +1252,13 @@ do
         end
 
         if not rollValue then
-            local services = addon.Services
-            local rollsService = services and services.Rolls or nil
-            rollValue = rollsService and rollsService:HighestRoll() or 0
+            if passiveGroupLoot then
+                rollValue = 0
+            else
+                local services = addon.Services
+                local rollsService = services and services.Rolls or nil
+                rollValue = rollsService and rollsService:GetHighestRoll() or 0
+            end
         end
 
         return rollType, rollValue, rollSessionId, outcome
@@ -1199,8 +1275,9 @@ do
             now = tonumber(now) or Time.GetCurrentTime(),
             itemId = itemId,
             allowContextRecovery = not passiveGroupLoot,
-            allowLootWindowContext = allowLootWindowContext,
-            allowTrashFallback = true,
+            allowContextFallback = not passiveGroupLoot,
+            allowLootWindowContext = allowLootWindowContext and not passiveGroupLoot,
+            allowTrashFallback = not passiveGroupLoot,
             ttlSeconds = ttlSeconds,
         })) or 0
     end
@@ -1228,10 +1305,7 @@ do
         bossNid,
         lootSource
     )
-        local lootNid = tonumber(raid.nextLootNid) or 1
-        raid.nextLootNid = lootNid + 1
-
-        local lootInfo = {
+        return Records.Build(raid, {
             itemId = itemId,
             itemName = itemName,
             itemString = itemString,
@@ -1239,30 +1313,59 @@ do
             itemRarity = itemRarity,
             itemTexture = itemTexture,
             itemCount = itemCount,
-            looterNid = (looterNid > 0) and looterNid or nil,
+            looterNid = looterNid,
             rollType = rollType,
             rollValue = rollValue,
             rollSessionId = rollSessionId,
-            lootNid = lootNid,
-            bossNid = tonumber(bossNid) or 0,
-            time = Time.GetCurrentTime(),
+            bossNid = bossNid,
             lootSource = lootSource,
-        }
+        })
+    end
 
-        return lootInfo, lootNid
+    local function appendLootRecord(raid, raidNum, lootInfo, options)
+        if not (raid and lootInfo) then
+            return nil, 0
+        end
+        options = options or {}
+        local appended, lootNid, index = Records.Append(raid, lootInfo)
+        if not appended then
+            return nil, 0
+        end
+        local itemLink = appended.itemLink
+        local raidService = options.raidService
+        if options.consumeLootWindow and lootState.opened == true and lootState.fromInventory ~= true and raidService and raidService._ConsumeLootWindowItemContext then
+            raidService:_ConsumeLootWindowItemContext(itemLink)
+        end
+        indexAppendedLootRuntime(raid, appended, index or #raid.loot)
+        bindLootNidToRollSession(lootNid, appended.rollSessionId, appended.itemId, appended.itemString, itemLink)
+        if options.consumePassiveRoll then
+            PassiveGroupLoot.ConsumePassiveLootRollEntry(appended.rollSessionId)
+        end
+        Bus.TriggerEvent(InternalEvents.RaidLootUpdate, raidNum, appended)
+        return appended, lootNid
+    end
+
+    setSelectedItem = function(i)
+        if not i then
+            Bus.TriggerEvent(InternalEvents.SetItem, nil, nil)
+            return
+        end
+        if not (i.itemName and i.itemLink and i.itemTexture and i.itemColor) then
+            return
+        end
+        Workflow.SelectItem(workflowContext, i)
+        Bus.TriggerEvent(InternalEvents.SetItem, i.itemLink, i)
     end
 
     -- ----- Public methods ----- --
 
-    -- Structured runtime snapshot for debug/export callers.
-    function module:GetTrackingSnapshot(raidNum)
-        return Tracking.GetSnapshot(raidNum, lootTable, findLootSlotIndex)
-    end
-
     function module:UpgradeLoggedPassiveLootRoll(itemLink, looter, rollType, rollValue, rollSessionId)
+        local resolvedRollType = tonumber(rollType) or rollType
         local resolvedRollValue = tonumber(rollValue) or 0
+        local hasRollType = resolvedRollType ~= nil
+        local hasRollValue = resolvedRollValue > 0
         local currentRaidId, raid = resolveRaidRecord()
-        if resolvedRollValue <= 0 or not currentRaidId then
+        if (not hasRollType and not hasRollValue) or not currentRaidId then
             return false
         end
 
@@ -1275,8 +1378,12 @@ do
             return false
         end
 
-        loot.rollType = rollType or loot.rollType
-        loot.rollValue = resolvedRollValue
+        if hasRollType then
+            loot.rollType = resolvedRollType
+        end
+        if hasRollValue or (tonumber(loot.rollValue) or 0) <= 0 then
+            loot.rollValue = resolvedRollValue
+        end
         if rollSessionId and (not loot.rollSessionId or loot.rollSessionId == "") then
             loot.rollSessionId = tostring(rollSessionId)
         end
@@ -1285,14 +1392,6 @@ do
         Bus.TriggerEvent(InternalEvents.RaidLootUpdate, currentRaidId, loot)
         return true
     end
-
-    function module:IsIgnoredItem(itemId)
-        if type(IgnoredItems.Contains) ~= "function" then
-            return false
-        end
-        return IgnoredItems.Contains(itemId)
-    end
-
     -- Adds a loot item to the active raid log.
     function module:AddLoot(msg, rollType, rollValue, parsedGroupLoot)
         local player
@@ -1300,6 +1399,12 @@ do
         local itemLink
         player, itemCount, itemLink, rollType, rollValue = parseLootChatMessage(msg, rollType, rollValue, parsedGroupLoot)
         if not itemLink then
+            Workflow.RecordReceipt(
+                workflowContext,
+                Receipts.FromParsedLoot({
+                    msg = msg,
+                })
+            )
             if addon.hasDebug then
                 addon:debug(Diag.D.LogLootParseFailed:format(tostring(msg)))
             end
@@ -1326,30 +1431,58 @@ do
         local rollSessionId
         local rollOutcome
         rollType, rollValue, rollSessionId, rollOutcome = resolveLootRollOutcome(itemLink, itemString, itemId, player, rollType, rollValue, parsedGroupLoot)
+        local receipt = Receipts.FromParsedLoot({
+            msg = msg,
+            playerName = player,
+            itemLink = itemLink,
+            itemString = itemString,
+            itemCount = itemCount,
+            itemId = itemId,
+            itemName = itemName,
+            itemRarity = itemRarity,
+            itemTexture = itemTexture,
+            itemType = itemType,
+            rollType = rollType,
+            rollValue = rollValue,
+            rollSessionId = rollSessionId,
+            passiveGroupLoot = passiveGroupLoot,
+            parsedGroupLoot = parsedGroupLoot,
+        })
+        Workflow.RecordReceipt(workflowContext, receipt)
+        if not Receipts.ShouldCreateRecord(receipt) then
+            return
+        end
 
         if passiveGroupLoot and shouldSkipPassiveGroupLootEntry(itemRarity, itemType, itemLink) then
             PassiveGroupLoot.ConsumePassiveLootRollEntry(rollSessionId)
             return
         end
 
-        if passiveGroupLoot and not (rollOutcome and rollOutcome.consumedPendingAward) then
-            local alreadyLogged = PassiveGroupLoot.HasLoggedPassiveLoot(itemLink, player, rollSessionId)
-            if alreadyLogged then
-                return
-            end
+        if
+            Reconcile.ShouldSkipPassiveDuplicate({
+                PassiveGroupLoot = PassiveGroupLoot,
+                passiveGroupLoot = passiveGroupLoot,
+                rollOutcome = rollOutcome,
+                isPassiveWinnerMessage = isPassiveWinnerMessage,
+                itemLink = itemLink,
+                playerName = player,
+                rollSessionId = rollSessionId,
+            })
+        then
+            return
         end
 
         local raidService = Services.Raid
         local bossNid = 0
         local lootSource
-        if not passiveGroupLoot and isParsedGroupLootResult(parsedGroupLoot, msg, "winner") then
+        if isParsedGroupLootResult(parsedGroupLoot, msg, "winner") then
             bossNid = tonumber(parsedGroupLoot.bossNid) or 0
         end
-        if not passiveGroupLoot and bossNid <= 0 then
+        if bossNid <= 0 then
             local currentTime = Time.GetCurrentTime()
             bossNid = resolveBossNidForLoot(raid, currentRaidId, rollSessionId, passiveGroupLoot, currentTime, itemId)
         end
-        if not passiveGroupLoot then
+        if bossNid > 0 or not passiveGroupLoot then
             lootSource = copyLootSourceForRecord(raidService, currentRaidId, bossNid)
         end
         if bossNid <= 0 then
@@ -1363,7 +1496,7 @@ do
             looterNid, player = raidService:EnsureRaidPlayerNid(player, currentRaidId)
         end
 
-        local lootInfo, lootNid =
+        local lootInfo =
             buildLootRecord(raid, itemId, itemName, itemString, itemLink, itemRarity, itemTexture, itemCount, looterNid, rollType, rollValue, rollSessionId, bossNid, lootSource)
 
         -- LootCounter: passive/group loot credits on observed loot chat. Master-loot awards
@@ -1377,18 +1510,20 @@ do
             raidService:AddPlayerCountForRollType(player, rollType, itemCount, currentRaidId)
         end
 
-        if passiveGroupLoot and isPassiveWinnerMessage then
-            PassiveGroupLoot.RememberLoggedPassiveLoot(itemLink, player, rollSessionId)
-        end
+        Reconcile.MarkPassiveLogged({
+            PassiveGroupLoot = PassiveGroupLoot,
+            passiveGroupLoot = passiveGroupLoot,
+            isPassiveWinnerMessage = isPassiveWinnerMessage,
+            itemLink = itemLink,
+            playerName = player,
+            rollSessionId = rollSessionId,
+        })
 
-        tinsert(raid.loot, lootInfo)
-        if lootState.opened == true and lootState.fromInventory ~= true and raidService and raidService._ConsumeLootWindowItemContext then
-            raidService:_ConsumeLootWindowItemContext(itemLink)
-        end
-        indexAppendedLootRuntime(raid, lootInfo, #raid.loot)
-        bindLootNidToRollSession(lootNid, rollSessionId, itemId, itemString, itemLink)
-        PassiveGroupLoot.ConsumePassiveLootRollEntry(rollSessionId)
-        Bus.TriggerEvent(InternalEvents.RaidLootUpdate, currentRaidId, lootInfo)
+        lootInfo = appendLootRecord(raid, currentRaidId, lootInfo, {
+            raidService = raidService,
+            consumeLootWindow = true,
+            consumePassiveRoll = true,
+        })
         if addon.hasDebug then
             addon:debug(Diag.D.LogLootLogged:format(tonumber(currentRaidId) or -1, tostring(itemId), tostring(lootInfo.bossNid), tostring(player)))
         end
@@ -1423,9 +1558,6 @@ do
             itemName = strmatch(itemLink, "%[(.-)%]") or tostring(itemLink)
         end
 
-        local lootNid = tonumber(raid.nextLootNid) or 1
-        raid.nextLootNid = lootNid + 1
-
         local currentTime = Time.GetCurrentTime()
         local resolvedBossNid = tonumber(bossNid) or 0
         if resolvedBossNid <= 0 and raidService then
@@ -1447,25 +1579,48 @@ do
             itemRarity = itemRarity,
             itemTexture = itemTexture,
             itemCount = count,
-            looterNid = (looterNid > 0) and looterNid or nil,
+            looter = looter,
+            looterNid = looterNid,
             rollType = tonumber(rollType),
             rollValue = tonumber(rollValue) or 0,
             rollSessionId = rollSessionId and tostring(rollSessionId) or nil,
-            lootNid = lootNid,
             bossNid = resolvedBossNid,
             time = currentTime,
             source = source or "TRADE_ONLY",
             lootSource = lootSource,
         }
 
-        tinsert(raid.loot, lootInfo)
-        indexAppendedLootRuntime(raid, lootInfo, #raid.loot)
-        bindLootNidToRollSession(lootNid, rollSessionId, itemId, itemString, itemLink)
-        Bus.TriggerEvent(InternalEvents.RaidLootUpdate, raidNum, lootInfo)
+        local existing, existingIndex = Reconcile.FindTradeOnlyFallback(raid, lootInfo)
+        if existing then
+            Reconcile.MergeTradeOnlyFallback(existing, lootInfo)
+            local existingLootNid = tonumber(existing.lootNid) or 0
+            indexAppendedLootRuntime(raid, existing, existingIndex)
+            bindLootNidToRollSession(existingLootNid, existing.rollSessionId, existing.itemId, existing.itemString, existing.itemLink)
+            Bus.TriggerEvent(InternalEvents.RaidLootUpdate, raidNum, existing)
+            return existingLootNid
+        end
+
+        local appended, lootNid = appendLootRecord(raid, raidNum, lootInfo)
         if addon.hasDebug then
-            addon:debug(Diag.D.LogLootTradeOnlyLogged:format(tonumber(raidNum) or -1, tostring(itemId), tostring(lootNid), tostring(looter), count, tostring(lootInfo.source)))
+            addon:debug(
+                Diag.D.LogLootTradeOnlyLogged:format(
+                    tonumber(raidNum) or -1,
+                    tostring(itemId),
+                    tostring(lootNid),
+                    tostring(looter),
+                    count,
+                    tostring(appended and appended.source or lootInfo.source)
+                )
+            )
         end
         return lootNid
+    end
+
+    function module:ObservePassiveLootMessage(msg, winnerOnly)
+        if winnerOnly then
+            return PassiveGroupLoot.ObserveGroupLootWinnerMessage(self, msg)
+        end
+        return PassiveGroupLoot.ObserveGroupLootMessage(self, msg)
     end
 
     function module:AddPassiveLootRoll(rollId, rollTime)
@@ -1480,24 +1635,21 @@ do
         return PassiveGroupLoot.ObserveGroupLootMessage(self, msg)
     end
 
-    function module:ObservePassiveLootMessage(msg, winnerOnly)
-        if winnerOnly then
-            return PassiveGroupLoot.ObserveGroupLootWinnerMessage(self, msg)
-        end
-        return PassiveGroupLoot.ObserveGroupLootMessage(self, msg)
-    end
-
     -- Pending award helpers (shared with Master/Raid flows).
+
     function module:AddPendingAward(itemLink, looter, rollType, rollValue, rollSessionId, expiresAt, options)
+        Workflow.QueueAward(workflowContext, {
+            itemLink = itemLink,
+            playerName = looter,
+            rollType = rollType,
+            rollValue = rollValue,
+            rollSessionId = rollSessionId,
+        })
         return PendingAwards.Add(itemLink, looter, rollType, rollValue, rollSessionId, expiresAt, options)
     end
 
     function module:RemovePendingAward(itemLink, looter, maxAge, rollSessionId, preferResolvedValue, allowGroupLootPendingAwards)
         return PendingAwards.Remove(itemLink, looter, maxAge, rollSessionId, preferResolvedValue, allowGroupLootPendingAwards)
-    end
-
-    function module:RefreshPendingAward(itemLink, looter, maxAge, rollSessionId, expiresAt)
-        return PendingAwards.Refresh(itemLink, looter, maxAge, rollSessionId, expiresAt)
     end
 
     function module:PurgePendingAwards(maxAge)
@@ -1509,12 +1661,9 @@ do
     end
 
     -- Master-owned distribution session facade.
-    function module:RequestDistributionMessageHandling(prefix, msg, channel, sender)
-        return getDistributionSession().RequestMessageHandling(prefix, msg, channel, sender)
-    end
 
-    function module:GetDistributionSessionModel()
-        return getDistributionSession().GetDisplayModel()
+    function module:HandleDistributionMessage(prefix, msg, channel, sender)
+        return getDistributionSession().HandleMessage(prefix, msg, channel, sender)
     end
 
     function module:SetDistributionState(kind, payload)
@@ -1534,6 +1683,21 @@ do
         if kind == DISTRIBUTION_ITEM_DONE then
             return distribution.PublishItemDone(payload and payload.itemLink, payload and payload.winnerName)
         end
+        if kind == "snapshot_request" then
+            return distribution.RequestSnapshot()
+        end
+        if kind == "snapshot" then
+            return distribution.PublishSnapshot(payload and payload.target, payload and payload.requestId)
+        end
+        if kind == "roll_tick" then
+            return distribution.PublishRollTick(payload and payload.itemLink, payload and payload.remaining)
+        end
+        if kind == "tie_start" then
+            return distribution.PublishTieStart(payload and payload.itemLink, payload and payload.names)
+        end
+        if kind == "awarded" then
+            return distribution.PublishAwarded(payload and payload.itemLink, payload and payload.winnerName, payload and payload.rollValue)
+        end
         return false
     end
 
@@ -1550,6 +1714,10 @@ do
         end
         lootState.opened = true
         lootState.fromInventory = false
+        Workflow.BeginLootWindow(workflowContext, {
+            raidNum = Core.GetCurrentRaid and Core.GetCurrentRaid() or nil,
+            source = "LOOT_OPENED",
+        })
         self:ClearLoot()
 
         local indexByItemKey = {}
@@ -1654,20 +1822,8 @@ do
     -- Prepares the currently selected item for display.
     function module:PrepareItem()
         if itemExists(lootState.currentItemIndex) then
-            self:SetItem(lootTable[lootState.currentItemIndex])
+            setSelectedItem(lootTable[lootState.currentItemIndex])
         end
-    end
-
-    -- Sets the main item display in the UI.
-    function module:SetItem(i)
-        if not i then
-            Bus.TriggerEvent(InternalEvents.SetItem, nil, nil)
-            return
-        end
-        if not (i.itemName and i.itemLink and i.itemTexture and i.itemColor) then
-            return
-        end
-        Bus.TriggerEvent(InternalEvents.SetItem, i.itemLink, i)
     end
 
     -- Selects an item from the loot list by its index.
@@ -1740,6 +1896,18 @@ do
         return items
     end
 
+    function module:GetTrackingSnapshot(raidNum)
+        return Tracking.GetSnapshot(raidNum, lootTable, findLootSlotIndex)
+    end
+
+    function module:GetDistributionSessionModel()
+        return getDistributionSession().GetDisplayModel()
+    end
+
+    function module:GetWorkflowSnapshot()
+        return Workflow.BuildSnapshot(workflowContext)
+    end
+
     -- Checks if a loot item exists at the given index.
     function itemExists(i)
         i = i or lootState.currentItemIndex
@@ -1793,15 +1961,15 @@ do
         return resolveTradeableInventoryItem(itemLink, cachedBag, cachedSlot, selectedItemCount)
     end
 
-    function module:ResolveTradeAwardedCount()
-        return resolveTradeAwardedCount()
-    end
-
     function module:ResolveInventoryAwardedCount(selectedItemCount, fromInventory)
         if selectedItemCount ~= nil or fromInventory ~= nil then
             return resolveInventoryAwardedCountFromArgs(selectedItemCount, fromInventory)
         end
         return resolveInventoryAwardedCount()
+    end
+
+    function module:ResolveTradeAwardedCount()
+        return resolveTradeAwardedCount()
     end
 
     function module:BuildTradeNotificationPlan(args)
@@ -1843,6 +2011,10 @@ if registry and type(registry.AddModule) == "function" and type(registry.SetLoad
             "Services/Loot/PendingAwards",
             "Services/Loot/PassiveGroupLoot",
             "Services/Loot/Tracking",
+            "Services/Loot/Workflow",
+            "Services/Loot/Receipts",
+            "Services/Loot/Records",
+            "Services/Loot/Reconcile",
         },
     })
     registry.SetLoaded("Services/Loot/Service")

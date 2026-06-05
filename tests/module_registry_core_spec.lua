@@ -124,7 +124,7 @@ local preRegistryUtilityModules = {
     { name = "Modules/LootSourcesData", deps = { "Init" } },
     { name = "Modules/LootSources", deps = { "Init", "Modules/Strings", "Modules/LootSourcesData" } },
     { name = "Modules/IgnoredItems", deps = { "Init" } },
-    { name = "Modules/IgnoredMobs", deps = { "Init" } },
+    { name = "Modules/Dataset/IgnoredMobs", deps = { "Init" } },
     { name = "Modules/Comms", deps = { "Init" } },
     { name = "Modules/Time", deps = { "Init" } },
     { name = "Modules/Base64", deps = { "Init" } },
@@ -168,7 +168,7 @@ local postRegistryCoreModules = {
         name = "Core/DBRaidValidator",
         path = "!KRT/Core/DBRaidValidator.lua",
         toc = "Core\\DBRaidValidator.lua",
-        deps = { "Init", "Modules/ModuleRegistry", "Core/DB", "Core/DBSchema", "Core/DBRaidMigrations", "Core/DBRaidStore", "Modules/IgnoredMobs" },
+        deps = { "Init", "Modules/ModuleRegistry", "Core/DB", "Core/DBSchema", "Core/DBRaidMigrations", "Core/DBRaidStore", "Modules/Dataset/IgnoredMobs" },
         exports = { "function%s+module:[%w_]+%s*%(" },
     },
     {

@@ -28,7 +28,7 @@ Examples:
 - API catalog refresh: `python3 tools/krt.py api-catalog-refresh`
 - API catalog drift check: `python3 tools/krt.py api-catalog-check`
 
-The legacy `*.ps1` scripts remain available for compatibility and for lower-level/script-specific
+The direct `*.ps1` scripts remain available for lower-level/script-specific
 control.
 
 ## Checks
@@ -36,7 +36,7 @@ control.
 - `tools/krt.py repo-quality-check --check all`: runs the canonical full quality sweep in repo order
 - `check-toc-files.ps1`: validates TOC naming, file entries, and SavedVariables declarations
 - `check-layering.ps1`: repo architecture and ownership guardrails
-- `check-legacy-aliases.ps1`: rejects retired top-level `addon.*` aliases in KRT-owned Lua
+- `check-retired-aliases.ps1`: rejects retired top-level `addon.*` aliases in KRT-owned Lua
 - `check-ui-binding.ps1`: binder absence and XML layout-only policy
 - `check-lua-syntax.ps1`: syntax-only validation for all Lua files
 - `check-lua-uniformity.ps1`: repo-specific naming, headers, whitespace, and line-ending checks

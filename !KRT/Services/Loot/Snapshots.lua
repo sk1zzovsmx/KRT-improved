@@ -27,7 +27,7 @@ local rebuildSnapshotIndex
 
 -- ----- Private helpers ----- --
 local function getSnapshotState(raidState)
-    local state = ContextState.SyncField(raidState, "snapshots", "lootWindowItemSnapshots", normalizeLootSnapshotState)
+    local state = ContextState.SyncField(raidState, "snapshots", normalizeLootSnapshotState)
     if type(state) ~= "table" then
         state = {
             byId = {},
@@ -37,7 +37,7 @@ local function getSnapshotState(raidState)
             nextPurgeAt = 0,
             signatureIndexVersion = SIGNATURE_INDEX_VERSION,
         }
-        ContextState.SetField(raidState, "snapshots", "lootWindowItemSnapshots", state)
+        ContextState.SetField(raidState, "snapshots", state)
     elseif tonumber(state.signatureIndexVersion) ~= SIGNATURE_INDEX_VERSION then
         rebuildSnapshotIndex(state)
     end

@@ -61,16 +61,16 @@ Add-MatchesOutsideAllowed `
     -Lines $krtRaidsMatches `
     -AllowedPaths @("!KRT\Init.lua", "!KRT\Core\DBRaidStore.lua")
 
-Write-Host "Check 2/8: legacy runtime cache keys only cleaned in !KRT/Core/DBRaidStore.lua..."
-$legacyCacheMatches = @(Get-KrtPatternMatches `
+Write-Host "Check 2/8: root runtime cache keys only cleaned in !KRT/Core/DBRaidStore.lua..."
+$rootRuntimeCacheMatches = @(Get-KrtPatternMatches `
     -RepoRoot $repoRoot `
     -Pattern "_playersByName|_playerIdxByNid|_bossIdxByNid|_lootIdxByNid" `
     -Path "!KRT" `
     -ExtraArgs @("-g", "*.lua", "-g", "!Libs/**"))
 
 Add-MatchesOutsideAllowed `
-    -Header "[Legacy runtime keys used outside cleanup layer]" `
-    -Lines $legacyCacheMatches `
+    -Header "[Root runtime keys used outside cleanup layer]" `
+    -Lines $rootRuntimeCacheMatches `
     -AllowedPaths @("!KRT\Init.lua", "!KRT\Core\DBRaidStore.lua")
 
 Write-Host "Check 3/8: XML stays layout-only..."
@@ -183,7 +183,7 @@ if ($violations.Count -gt 0) {
 Write-Host "Raid hardening checks passed." -ForegroundColor Green
 Write-Host "Confirmed:"
 Write-Host "  1) KRT_Raids confined to Init.lua + Core/DBRaidStore.lua"
-Write-Host "  2) Legacy runtime cache keys only in cleanup layer"
+Write-Host "  2) Root runtime cache keys only in cleanup layer"
 Write-Host "  3) !KRT/UI XML has no <Scripts>/<On...> blocks"
 Write-Host "  4) RaidStore access routed through DB facade (except DB layer)"
 Write-Host "  5) RaidQueries/RaidMigrations/RaidValidator/Syncer access routed through DB facade"

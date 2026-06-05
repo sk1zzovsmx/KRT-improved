@@ -542,6 +542,7 @@ end
 
 local function newHarness()
     installTableHelpers()
+    _G.KRT_Options = nil
 
     local logs = {
         error = {},
@@ -638,6 +639,17 @@ local function newHarness()
         return out and string.lower(out) or nil
     end
 
+    function Strings.TrimText(value, nilIfEmpty)
+        if value == nil then
+            return nil
+        end
+        local out = tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
+        if nilIfEmpty and out == "" then
+            return nil
+        end
+        return out
+    end
+
     function Strings.GetNormalizedNameLower(value)
         return Strings.NormalizeLower(value, true)
     end
@@ -702,13 +714,13 @@ local function newHarness()
         end,
     }
     services.Rolls = {
-        HighestRoll = function()
+        GetHighestRoll = function()
             return 0
         end,
         GetRollSession = function()
             return nil
         end,
-        RollStatus = function()
+        GetRollStatus = function()
             return nil, false, false, false
         end,
         SyncSessionState = function() end,
@@ -1173,12 +1185,12 @@ local function newHarness()
                 frame._shown = shown and true or false
             end
         end,
-        InitModuleFrame = function(module, frame)
+        BindModuleFrame = function(module, frame)
             module.frame = frame
             return frame and frame.GetName and frame:GetName() or "TestFrame"
         end,
         SetFrameTitle = function() end,
-        SafeSetScript = function(frame, scriptType, callback)
+        SetScriptSafely = function(frame, scriptType, callback)
             if frame then
                 frame[scriptType] = callback
             end
@@ -1420,19 +1432,19 @@ local function newHarness()
     }
 
     addon.MultiSelect = {
-        MultiSelectSetModifierPolicy = function() end,
-        MultiSelectSetAnchor = function() end,
-        MultiSelectCount = function()
+        SetModifierPolicy = function() end,
+        SetAnchor = function() end,
+        GetCount = function()
             return 0
         end,
-        MultiSelectGetSelected = function()
+        GetSelected = function()
             return {}
         end,
-        MultiSelectClear = function() end,
-        MultiSelectToggle = function(_, id)
+        EnsureState = function() end,
+        Toggle = function(_, id)
             return "toggle", (id and 1 or 0)
         end,
-        MultiSelectGetAnchor = function()
+        GetAnchor = function()
             return nil
         end,
     }
@@ -1475,6 +1487,15 @@ local function newHarness()
                 addon.options = addon.options or {}
                 return addon.options
             end
+            local function getOrInitNamespaceStore(name)
+                _G.KRT_Options = type(_G.KRT_Options) == "table" and _G.KRT_Options or {}
+                local store = _G.KRT_Options[name]
+                if type(store) ~= "table" then
+                    store = {}
+                    _G.KRT_Options[name] = store
+                end
+                return store
+            end
             local Opts = {}
             function Opts.IsDebugEnabled()
                 return addon.State.debugEnabled == true
@@ -1487,15 +1508,22 @@ local function newHarness()
                     return namespaces[name]
                 end
                 local store = getOrInitFlat()
+                local namespaceStore = getOrInitNamespaceStore(name)
                 local ns = { _name = name, _defaults = defaults or {} }
                 for k, v in pairs(ns._defaults) do
-                    if store[k] == nil then
+                    if namespaceStore[k] ~= nil then
+                        store[k] = namespaceStore[k]
+                    elseif store[k] == nil then
                         store[k] = v
+                        namespaceStore[k] = v
+                    else
+                        namespaceStore[k] = store[k]
                     end
                     keyToNs[k] = ns
                 end
                 function ns:Get(key)
-                    local v = getOrInitFlat()[key]
+                    local namespaceValue = getOrInitNamespaceStore(self._name)[key]
+                    local v = namespaceValue ~= nil and namespaceValue or getOrInitFlat()[key]
                     if v == nil then
                         return self._defaults[key]
                     end
@@ -1503,6 +1531,7 @@ local function newHarness()
                 end
                 function ns:Set(key, value)
                     getOrInitFlat()[key] = value
+                    getOrInitNamespaceStore(self._name)[key] = value
                     return true
                 end
                 function ns:GetDefaults()
@@ -1514,8 +1543,10 @@ local function newHarness()
                 end
                 function ns:ResetDefaults()
                     local store2 = getOrInitFlat()
+                    local namespaceStore2 = getOrInitNamespaceStore(self._name)
                     for k, v in pairs(self._defaults) do
                         store2[k] = v
+                        namespaceStore2[k] = v
                     end
                 end
                 function ns:All()
@@ -1525,6 +1556,12 @@ local function newHarness()
                     end
                     local store2 = getOrInitFlat()
                     for k, v in pairs(store2) do
+                        if self._defaults[k] ~= nil then
+                            out[k] = v
+                        end
+                    end
+                    local namespaceStore2 = getOrInitNamespaceStore(self._name)
+                    for k, v in pairs(namespaceStore2) do
                         if self._defaults[k] ~= nil then
                             out[k] = v
                         end
@@ -1619,6 +1656,7 @@ local function newHarness()
         feature.Strings = addon.Strings or feature.Strings
         feature.Colors = addon.Colors or feature.Colors
         feature.Base64 = addon.Base64 or feature.Base64
+        feature.Json = addon.Json or feature.Json
         feature.Sort = addon.Sort or feature.Sort
         feature.ListController = addon.ListController or feature.ListController
         feature.MultiSelect = addon.MultiSelect or feature.MultiSelect
@@ -2095,13 +2133,17 @@ local function newHarness()
                 "!KRT/Services/Loot/PendingAwards.lua",
                 "!KRT/Services/Loot/PassiveGroupLoot.lua",
                 "!KRT/Services/Loot/Tracking.lua",
+                "!KRT/Services/Loot/Workflow.lua",
+                "!KRT/Services/Loot/Receipts.lua",
+                "!KRT/Services/Loot/Records.lua",
+                "!KRT/Services/Loot/Reconcile.lua",
                 "!KRT/Services/Loot/Rules.lua",
                 "!KRT/Services/Loot/DistributionSession.lua",
                 "!KRT/Services/Loot/Service.lua",
             }
             local lootSourceFiles = {
-                "!KRT/Modules/IgnoredMobs.lua",
-                "!KRT/Modules/LootSourcesData.lua",
+                "!KRT/Modules/Dataset/IgnoredMobs.lua",
+                "!KRT/Modules/Dataset/LootSourcesData.lua",
                 "!KRT/Modules/LootSources.lua",
             }
             local raidServiceFiles = {
@@ -2146,7 +2188,7 @@ local function newHarness()
                 local loot = addon.Services.Loot
                 if raid and loot then
                     -- Test harness compatibility: production moved passive/trade loot ingestion
-                    -- to Services.Loot; keep legacy Raid call sites in existing tests functional.
+                    -- to Services.Loot; keep existing Raid call sites in tests functional.
                     raid.AddLoot = raid.AddLoot or function(_, ...)
                         return loot:AddLoot(...)
                     end
@@ -2169,6 +2211,7 @@ local function newHarness()
                     "!KRT/Services/Rolls/Sessions.lua",
                     "!KRT/Services/Rolls/History.lua",
                     "!KRT/Services/Rolls/Responses.lua",
+                    "!KRT/Services/Rolls/Strategies.lua",
                     "!KRT/Services/Rolls/Resolution.lua",
                     "!KRT/Services/Rolls/Display.lua",
                 })
@@ -2177,13 +2220,14 @@ local function newHarness()
             if path == "!KRT/Services/Reserves.lua" then
                 loadFiles({
                     "!KRT/Services/Reserves/Import.lua",
+                    "!KRT/Services/Reserves/Aliases.lua",
                     "!KRT/Services/Reserves/Display.lua",
                     "!KRT/Services/Reserves/Sync.lua",
                 })
             end
 
             if path == "!KRT/Controllers/Logger.lua" or path == "!KRT/Core/DBRaidValidator.lua" then
-                loadFiles({ "!KRT/Modules/IgnoredMobs.lua" })
+                loadFiles({ "!KRT/Modules/Dataset/IgnoredMobs.lua" })
             end
 
             local chunk, err = loadfile(path)
@@ -2363,7 +2407,7 @@ local function setupInventoryTradeHarness(order, rollsByName)
         local selected = {}
         for i = 1, #order do
             local name = order[i]
-            if h.addon.MultiSelect.MultiSelectIsSelected("MLRollWinners", name) then
+            if h.addon.MultiSelect.IsSelected("MLRollWinners", name) then
                 selected[#selected + 1] = {
                     name = name,
                     roll = rollsByName[name] or 0,
@@ -2550,7 +2594,7 @@ local function setupInventoryTradeHarness(order, rollsByName)
         SyncSessionState = function(_, session)
             h.feature.lootState.rollSession = session
         end,
-        HighestRoll = function(_, winnerName)
+        GetHighestRoll = function(_, winnerName)
             local winner = winnerName or h.feature.lootState.winner
             return rollsByName[winner] or 0
         end,
@@ -2591,7 +2635,7 @@ local function setupInventoryTradeHarness(order, rollsByName)
             return getSelectedWinners()
         end,
         ClearRolls = function() end,
-        RecordRolls = function() end,
+        SetRollRecordingEnabled = function() end,
     }
     h:setRaidRoleState({
         inRaid = true,
@@ -2624,9 +2668,9 @@ local function setupInventoryTradeHarness(order, rollsByName)
     h.feature.lootState.fromInventory = true
     h.feature.lootState.winner = order[1]
 
-    h.addon.MultiSelect.MultiSelectClear("MLRollWinners")
+    h.addon.MultiSelect.EnsureState("MLRollWinners")
     for i = 1, #order do
-        h.addon.MultiSelect.MultiSelectToggle("MLRollWinners", order[i], true)
+        h.addon.MultiSelect.Toggle("MLRollWinners", order[i], true)
     end
 
     return {
@@ -2907,7 +2951,7 @@ local function setupMasterAwardHarness(cfg)
         SyncSessionState = function(_, session)
             h.feature.lootState.rollSession = session
         end,
-        HighestRoll = function(_, winnerName)
+        GetHighestRoll = function(_, winnerName)
             local rollsByName = cfg.rollsByName or {}
             return rollsByName[winnerName] or 0
         end,
@@ -2939,7 +2983,7 @@ local function setupMasterAwardHarness(cfg)
             return result
         end,
         ClearRolls = function() end,
-        RecordRolls = function() end,
+        SetRollRecordingEnabled = function() end,
     }
     h:setRaidRoleState({
         inRaid = true,
@@ -2997,7 +3041,7 @@ test("runtime cache reuses runtime until invalidated", function()
         schemaVersion = 1,
         raidNid = 1,
         players = {
-            { playerNid = 1, name = "Alice", count = 0 },
+            { playerNid = 1, name = "Alice", countMS = 0 },
         },
         bossKills = {
             { bossNid = 1, boss = "Boss" },
@@ -3030,7 +3074,7 @@ test("runtime cache indexes appended loot without rebuilding runtime", function(
         schemaVersion = 1,
         raidNid = 1,
         players = {
-            { playerNid = 1, name = "Alice", count = 0 },
+            { playerNid = 1, name = "Alice", countMS = 0 },
         },
         bossKills = {
             { bossNid = 1, boss = "Boss" },
@@ -3054,6 +3098,205 @@ test("runtime cache indexes appended loot without rebuilding runtime", function(
     assertTrue(runtime3 == runtime1, "expected runtime lookup to avoid a full rebuild after indexed append")
     assertEqual(runtime1.lootIdxByNid[2], 2, "expected appended loot index to be patched")
     assertTrue(runtime1.lootByNid[2] == appended, "expected appended loot row to be indexed by nid")
+end)
+
+test("runtime cache rebuilds when signature changes without explicit strip", function()
+    local h = newHarness()
+    h:load("!KRT/Core/DBRaidStore.lua")
+    local store = h.addon.DB.RaidStore
+    local raid = {
+        schemaVersion = 1,
+        raidNid = 1,
+        players = {
+            { playerNid = 1, name = "Alice", countMS = 0 },
+        },
+        bossKills = {
+            { bossNid = 1, boss = "Boss" },
+        },
+        loot = {
+            { lootNid = 1, itemId = 9001, looterNid = 1 },
+        },
+        nextPlayerNid = 2,
+        nextBossNid = 2,
+        nextLootNid = 2,
+    }
+
+    local runtime1 = store:EnsureRaidRuntime(raid)
+    raid.loot[#raid.loot + 1] = { lootNid = 2, itemId = 9002, looterNid = 1 }
+    raid.nextLootNid = 3
+
+    local runtime2 = store:EnsureRaidRuntime(raid)
+
+    assertTrue(runtime2 == runtime1, "expected runtime table to be reused while rebuilding maps")
+    assertEqual(runtime2.lootIdxByNid[2], 2, "expected signature mismatch to rebuild stale loot index")
+
+    raid.nextLootNid = 4
+    runtime2.signature = "stale"
+    local runtime3 = store:EnsureRaidRuntime(raid)
+    assertTrue(runtime3 == runtime1, "expected counter-only signature drift to rebuild in place")
+    assertTrue(runtime3.signature ~= "stale", "expected runtime signature to be refreshed")
+end)
+
+test("raid insert preserves unique raid nid and replaces duplicate raid nid", function()
+    local h = newHarness()
+    _G.KRT_Raids = {
+        {
+            schemaVersion = 1,
+            raidNid = 10,
+            players = {},
+            bossKills = {},
+            loot = {},
+            changes = {},
+            attendance = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    }
+    h:load("!KRT/Core/DBRaidStore.lua")
+    local store = h.addon.DB.RaidStore
+
+    local uniqueRaid = store:CreateRaidRecord({ raidNid = 42 })
+    local insertedUnique, uniqueIndex = store:InsertRaid(uniqueRaid)
+    assertEqual(insertedUnique.raidNid, 42, "expected unique positive raid nid to be preserved")
+    assertEqual(uniqueIndex, 2, "expected unique raid to append after existing raid")
+
+    local duplicateRaid = {
+        schemaVersion = 1,
+        raidNid = 42,
+        players = {},
+        bossKills = {},
+        loot = {},
+        changes = {},
+        attendance = {},
+        nextPlayerNid = 1,
+        nextBossNid = 1,
+        nextLootNid = 1,
+    }
+    local insertedDuplicate, duplicateIndex = store:InsertRaid(duplicateRaid)
+    assertTrue(insertedDuplicate.raidNid ~= 42, "expected duplicate raid nid to be replaced")
+    assertTrue(tonumber(insertedDuplicate.raidNid) > 0, "expected replacement raid nid to stay positive")
+    assertEqual(duplicateIndex, 3, "expected duplicate raid to append after replacement")
+    assertEqual(_G.KRT_Raids[2].raidNid, 42, "expected original unique raid nid to remain unchanged")
+
+    local invalidRaid = {
+        schemaVersion = 1,
+        raidNid = 0,
+        players = {},
+        bossKills = {},
+        loot = {},
+        changes = {},
+        attendance = {},
+        nextPlayerNid = 1,
+        nextBossNid = 1,
+        nextLootNid = 1,
+    }
+    local insertedInvalid, invalidIndex = store:InsertRaid(invalidRaid)
+    assertTrue(tonumber(insertedInvalid.raidNid) > 0, "expected invalid raid nid to be replaced")
+    assertEqual(invalidIndex, 4, "expected invalid-nid raid to append after replacement")
+end)
+
+test("raid nid index cache repairs same-count duplicate drift", function()
+    local h = newHarness()
+    local store = h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            changes = {},
+            attendance = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+        {
+            schemaVersion = 1,
+            raidNid = 2,
+            players = {},
+            bossKills = {},
+            loot = {},
+            changes = {},
+            attendance = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+
+    assertTrue(store:GetRaidByNid(1) ~= nil, "expected initial lookup to warm raid nid index")
+    _G.KRT_Raids[2].raidNid = 1
+
+    local firstRaid, firstIndex = store:GetRaidByNid(1)
+    local secondRaid, secondIndex = store:GetRaidByIndex(2)
+
+    assertEqual(firstIndex, 1, "expected original raid nid lookup to remain stable")
+    assertTrue(firstRaid == _G.KRT_Raids[1], "expected first raid to remain indexed by nid 1")
+    assertEqual(secondIndex, 2, "expected second raid to remain addressable by index")
+    assertTrue(tonumber(secondRaid.raidNid) ~= 1, "expected duplicate raid nid drift to be repaired")
+end)
+
+test("raid validator skips runtime clone and reports root runtime keys", function()
+    local h = newHarness()
+    local normalizedRuntime = nil
+    local fakeStore = {
+        NormalizeRaidRecord = function(_, raid)
+            normalizedRuntime = raid._runtime
+            raid.players = (type(raid.players) == "table") and raid.players or {}
+            raid.bossKills = (type(raid.bossKills) == "table") and raid.bossKills or {}
+            raid.loot = (type(raid.loot) == "table") and raid.loot or {}
+            raid.changes = (type(raid.changes) == "table") and raid.changes or {}
+            raid.attendance = (type(raid.attendance) == "table") and raid.attendance or {}
+            raid.nextPlayerNid = tonumber(raid.nextPlayerNid) or 2
+            raid.nextBossNid = tonumber(raid.nextBossNid) or 1
+            raid.nextLootNid = tonumber(raid.nextLootNid) or 1
+            return raid
+        end,
+    }
+    h.Core.GetRaidStoreOrNil = function()
+        return fakeStore
+    end
+    h:load("!KRT/Core/DBRaidValidator.lua")
+
+    local result = h.addon.DB.RaidValidator:GetRaidRecordValidation({
+        schemaVersion = 1,
+        raidNid = 1,
+        _runtime = {
+            playersByName = {
+                Alice = true,
+            },
+        },
+        _playersByName = {
+            Alice = true,
+        },
+        players = {
+            { playerNid = 1, name = "Alice", countMS = 0 },
+        },
+        bossKills = {},
+        loot = {},
+        changes = {},
+        attendance = {},
+        nextPlayerNid = 2,
+        nextBossNid = 1,
+        nextLootNid = 1,
+    }, 1, 1)
+
+    local sawRootRuntime = false
+    local sawRuntimeCloneError = false
+    for i = 1, #result.details do
+        local detail = result.details[i]
+        local key = detail.data and detail.data.key
+        if detail.code == "RUNTIME_OUTSIDE" and key == "_playersByName" then
+            sawRootRuntime = true
+        elseif detail.code == "RUNTIME_OUTSIDE" and key == "_runtime" then
+            sawRuntimeCloneError = true
+        end
+    end
+
+    assertTrue(normalizedRuntime == nil, "expected validator clone to omit derived runtime maps")
+    assertTrue(sawRootRuntime == true, "expected validator to report root runtime keys")
+    assertTrue(sawRuntimeCloneError ~= true, "expected validator to allow current runtime clone key")
 end)
 
 test("feature shared hydrates addon dependencies and namespace helpers", function()
@@ -3086,8 +3329,8 @@ test("raid roster update records joins leaves and player metadata", function()
             startTime = 1000,
             nextPlayerNid = 3,
             players = {
-                { playerNid = 1, name = "Alice", rank = 1, subgroup = 1, class = "MAGE", join = 900, count = 2 },
-                { playerNid = 2, name = "Bob", rank = 0, subgroup = 2, class = "WARRIOR", join = 900, count = 0 },
+                { playerNid = 1, name = "Alice", rank = 1, subgroup = 1, class = "MAGE", join = 900, countMS = 2 },
+                { playerNid = 2, name = "Bob", rank = 0, subgroup = 2, class = "WARRIOR", join = 900, countMS = 0 },
             },
             bossKills = {},
             loot = {},
@@ -3143,7 +3386,7 @@ test("raid roster update records joins leaves and player metadata", function()
     assertEqual(delta.left[1].name, "Bob", "expected Bob to be reported as left")
     assertTrue(delta.updated == nil, "expected unchanged Alice to avoid an update delta")
     assertEqual(raid.players[1].name, "Alice", "expected Alice to stay in roster")
-    assertEqual(raid.players[1].count, 2, "expected existing loot count to be preserved")
+    assertEqual(raid.players[1].countMS, 2, "expected existing loot count to be preserved")
     assertEqual(raid.players[2].name, "Bob", "expected Bob row to stay persisted")
     assertTrue(tonumber(raid.players[2].leave) == 1000, "expected Bob to be marked left")
     assertEqual(raid.players[3].name, "Cara", "expected Cara to be added to roster")
@@ -3164,7 +3407,7 @@ test("raid roster update preserves previous names for temporary unknown units", 
             startTime = 1000,
             nextPlayerNid = 2,
             players = {
-                { playerNid = 1, name = "Alice", rank = 1, subgroup = 1, class = "MAGE", join = 900, count = 1 },
+                { playerNid = 1, name = "Alice", rank = 1, subgroup = 1, class = "MAGE", join = 900, countMS = 1 },
             },
             bossKills = {},
             loot = {},
@@ -3231,7 +3474,7 @@ test("raid attendance records roster delta segments by player nid", function()
             nextBossNid = 1,
             nextLootNid = 1,
             players = {
-                { playerNid = 1, name = "Alice", rank = 1, subgroup = 1, class = "MAGE", count = 0 },
+                { playerNid = 1, name = "Alice", rank = 1, subgroup = 1, class = "MAGE", countMS = 0 },
             },
             attendance = {},
             bossKills = {},
@@ -3347,6 +3590,210 @@ test("db syncer routes requests through whisper and group transports", function(
     assertEqual(groupMessages[1].payload:sub(1, #syncPrefix), syncPrefix, "expected sync payload header to stay stable")
 end)
 
+test("db syncer skips base64 work for empty snapshot text fields", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 77,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            realm = "",
+            startTime = 1000,
+            players = {
+                { playerNid = 1, name = "Alice", rank = 0, subgroup = 1, class = "", join = 1000, countMS = 0 },
+            },
+            bossKills = {},
+            loot = {},
+            changes = {
+                Alice = "",
+            },
+        },
+    })
+    h.addon.IsInGroup = function()
+        return true
+    end
+    h.addon.IsInRaid = function()
+        return false
+    end
+    h.addon.Strings.TrimText = function(value)
+        return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    end
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/Modules/Base64.lua")
+
+    local originalEncode = h.addon.Base64.Encode
+    local emptyEncodeCalls = 0
+    h.addon.Base64.Encode = function(value)
+        if value == nil or value == "" then
+            emptyEncodeCalls = emptyEncodeCalls + 1
+        end
+        return originalEncode(value)
+    end
+
+    h:load("!KRT/Core/DBSyncer.lua")
+
+    assertTrue(h.addon.DB.Syncer:BroadcastLoggerPush(77, "Alice") == true, "expected snapshot push to send")
+    assertEqual(emptyEncodeCalls, 0, "expected empty snapshot fields to avoid Base64 encoding work")
+end)
+
+test("db syncer throttles passive cleanup but keeps request setup cleanup immediate", function()
+    local now = 1000
+    _G.GetTime = function()
+        return now
+    end
+
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 77,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            realm = "TestRealm",
+            startTime = 1000,
+            players = {},
+            bossKills = {},
+            loot = {},
+            changes = {},
+        },
+    })
+    h.addon.IsInGroup = function()
+        return true
+    end
+    h.addon.IsInRaid = function()
+        return false
+    end
+    h.addon.Strings.TrimText = function(value)
+        return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    end
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/Modules/Base64.lua")
+    h:load("!KRT/Core/DBSyncer.lua")
+
+    local syncer = h.addon.DB.Syncer
+    syncer:OnAddonMessage("KRTLogSync", table.concat({ "RQ", "1", "prime", "BAD" }, "\t"), "WHISPER", "Alice")
+
+    syncer._incoming.stale = { createdAt = 0, requestId = "stale", mode = "PUSH" }
+    syncer:OnAddonMessage("KRTLogSync", table.concat({ "RQ", "1", "second", "BAD" }, "\t"), "WHISPER", "Alice")
+    assertTrue(syncer._incoming.stale ~= nil, "expected passive addon-message cleanup to be throttled")
+
+    assertTrue(syncer:RequestLoggerReq(77, "Alice") == true, "expected request setup to continue after forced cleanup")
+    assertTrue(syncer._incoming.stale == nil, "expected request setup path to force stale sync cleanup")
+end)
+
+test("db syncer rejects malformed snapshot payloads without importing", function()
+    local cases = {
+        {
+            name = "first row not header",
+            lines = function(enc)
+                return {
+                    table.concat({ "P", "1", enc("Alice"), "0", "1", enc("MAGE"), "1000", "0", "0" }, "\t"),
+                    table.concat({ "H", "1", "1", "77", enc("Naxxramas"), "25", "4", enc("TestRealm"), "1000", "0", "2", "1", "1" }, "\t"),
+                }
+            end,
+        },
+        {
+            name = "missing header",
+            lines = function(enc)
+                return {
+                    table.concat({ "P", "1", enc("Alice"), "0", "1", enc("MAGE"), "1000", "0", "0" }, "\t"),
+                }
+            end,
+        },
+        {
+            name = "duplicate header",
+            lines = function(enc)
+                return {
+                    table.concat({ "H", "1", "1", "77", enc("Naxxramas"), "25", "4", enc("TestRealm"), "1000", "0", "1", "1", "1" }, "\t"),
+                    table.concat({ "H", "1", "1", "78", enc("Naxxramas"), "25", "4", enc("TestRealm"), "1000", "0", "1", "1", "1" }, "\t"),
+                }
+            end,
+        },
+        {
+            name = "unknown row kind",
+            lines = function(enc)
+                return {
+                    table.concat({ "H", "1", "1", "77", enc("Naxxramas"), "25", "4", enc("TestRealm"), "1000", "0", "1", "1", "1" }, "\t"),
+                    table.concat({ "X", "1" }, "\t"),
+                }
+            end,
+        },
+        {
+            name = "future schema",
+            lines = function(enc)
+                return {
+                    table.concat({ "H", "1", "2", "77", enc("Naxxramas"), "25", "4", enc("TestRealm"), "1000", "0", "1", "1", "1" }, "\t"),
+                }
+            end,
+        },
+        {
+            name = "truncated known row",
+            lines = function(enc)
+                return {
+                    table.concat({ "H", "1", "1", "77", enc("Naxxramas"), "25", "4", enc("TestRealm"), "1000", "0", "1", "1", "1" }, "\t"),
+                    table.concat({ "P", "1" }, "\t"),
+                }
+            end,
+        },
+        {
+            name = "invalid required nid",
+            lines = function(enc)
+                return {
+                    table.concat({ "H", "1", "1", "77", enc("Naxxramas"), "25", "4", enc("TestRealm"), "1000", "0", "1", "1", "1" }, "\t"),
+                    table.concat({ "P", "bad", enc("Alice"), "0", "1", enc("MAGE"), "1000", "0", "0" }, "\t"),
+                }
+            end,
+        },
+    }
+
+    for i = 1, #cases do
+        local case = cases[i]
+        local h = newHarness()
+        h:installRaidStore({
+            {
+                schemaVersion = 1,
+                raidNid = 900,
+                zone = "Existing",
+                size = 10,
+                difficulty = 1,
+                realm = "TestRealm",
+                startTime = 500,
+                players = {},
+                bossKills = {},
+                loot = {},
+                changes = {},
+            },
+        })
+        h.addon.IsInGroup = function()
+            return true
+        end
+        h.addon.IsInRaid = function()
+            return false
+        end
+        h:load("!KRT/Modules/Comms.lua")
+        h:load("!KRT/Modules/Base64.lua")
+        h:load("!KRT/Core/DBSyncer.lua")
+
+        local function enc(value)
+            return h.addon.Base64.Encode(value)
+        end
+
+        local payload = table.concat(case.lines(enc), "\n")
+        local encodedPayload = h.addon.Base64.Encode(payload)
+        local msg = table.concat({ "SN", "1", "malformed-" .. i, "PUSH", "77", "1", "1", encodedPayload }, "\t")
+
+        h.addon.DB.Syncer:OnAddonMessage("KRTLogSync", msg, "WHISPER", "Alice")
+
+        assertEqual(#_G.KRT_Raids, 1, "expected malformed snapshot to avoid importing: " .. case.name)
+        assertEqual(_G.KRT_Raids[1].raidNid, 900, "expected malformed snapshot to preserve existing raid nid: " .. case.name)
+        assertEqual(_G.KRT_Raids[1].zone, "Existing", "expected malformed snapshot to preserve existing raid zone: " .. case.name)
+        assertContains(h.logs.warn, "Diag.W.LogSyncParseFailed", "expected parse failure warning for malformed snapshot: " .. case.name)
+    end
+end)
+
 test("db syncer imports push snapshots and merges requested sync chunks", function()
     local source = newHarness()
     local itemLink = source.registerItem(9001, "Sync Blade")
@@ -3361,7 +3808,7 @@ test("db syncer imports push snapshots and merges requested sync chunks", functi
             realm = "TestRealm",
             startTime = 1000,
             players = {
-                { playerNid = 1, name = "Alice", rank = 1, subgroup = 2, class = "MAGE", join = 1000, count = 3 },
+                { playerNid = 1, name = "Alice", rank = 1, subgroup = 2, class = "MAGE", join = 1000, countMS = 3 },
             },
             bossKills = {
                 { bossNid = 10, name = "Patchwerk", mode = "n", difficulty = 4, time = 1010, hash = "patchwerk-1010", players = { 1 } },
@@ -3696,8 +4143,8 @@ test("logger updates duplicate item entries by lootNid only", function()
             schemaVersion = 1,
             raidNid = 1,
             players = {
-                { playerNid = 1, name = "Alice", count = 0 },
-                { playerNid = 2, name = "Bob", count = 0 },
+                { playerNid = 1, name = "Alice", countMS = 0 },
+                { playerNid = 2, name = "Bob", countMS = 0 },
             },
             bossKills = {
                 { bossNid = 10, boss = "Patchwerk" },
@@ -3811,13 +4258,143 @@ test("logger actions resolve edit winner against boss attendees", function()
     assertEqual(winner, "Bob", "expected editor winner resolution to use boss attendees")
 end)
 
-test("loot context helpers stay service-owned without Core compatibility alias", function()
+test("loot context helpers stay service-owned without Core backdoor", function()
     local h = newHarness()
 
     h:load("!KRT/Services/Loot.lua")
 
     assertTrue(type(h.addon.Services.Loot._Context) == "table", "expected service-owned loot context helpers")
-    assertTrue(h.addon.Core._LootContext == nil, "expected no Core loot context compatibility alias")
+    assertTrue(h.addon.Core._LootContext == nil, "expected no Core loot context backdoor")
+end)
+
+test("loot workflow shadow state records transitions and recent receipts", function()
+    local h = newHarness()
+    h:load("!KRT/Services/Loot/Workflow.lua")
+    local Workflow = h.addon.Services.Loot._Workflow
+    local ctx = {}
+
+    Workflow.BeginLootWindow(ctx, {
+        raidNum = 1,
+        source = "LOOT_OPENED",
+    })
+    Workflow.SelectItem(ctx, {
+        itemLink = "|cff0070dd|Hitem:92001::::::::|h[Workflow Blade]|h|r",
+        itemKey = "item:92001",
+    })
+    Workflow.BeginRoll(ctx, {
+        itemLink = "|cff0070dd|Hitem:92001::::::::|h[Workflow Blade]|h|r",
+        rollType = h.rollTypes.MAINSPEC,
+        sessionId = "ROLL:1",
+        source = "lootWindow",
+    })
+    Workflow.QueueAward(ctx, {
+        itemLink = "|cff0070dd|Hitem:92001::::::::|h[Workflow Blade]|h|r",
+        playerName = "Tester",
+        rollType = h.rollTypes.MAINSPEC,
+        rollValue = 97,
+        rollSessionId = "ROLL:1",
+    })
+
+    for i = 1, 22 do
+        Workflow.RecordReceipt(ctx, {
+            kind = "loot_received",
+            msg = "receipt-" .. i,
+            itemLink = "|cff0070dd|Hitem:" .. tostring(92000 + i) .. "::::::::|h[Workflow Loot]|h|r",
+        })
+    end
+
+    local snapshot = Workflow.BuildSnapshot(ctx)
+    assertEqual(snapshot.phase, "award_pending", "expected workflow to expose pending-award phase")
+    assertEqual(snapshot.raidNum, 1, "expected workflow to retain loot-window raid")
+    assertEqual(snapshot.selectedItemKey, "item:92001", "expected workflow to retain selected item key")
+    assertEqual(snapshot.rollSessionId, "ROLL:1", "expected workflow to retain roll session")
+    assertEqual(snapshot.pendingAward.playerName, "Tester", "expected workflow to retain queued award target")
+    assertEqual(#snapshot.recentReceipts, 20, "expected recent receipt diagnostics to be bounded")
+    assertEqual(snapshot.recentReceipts[1].msg, "receipt-3", "expected oldest diagnostics to be dropped first")
+    assertEqual(snapshot.recentReceipts[20].msg, "receipt-22", "expected newest receipt to be retained")
+end)
+
+test("loot receipts classify normal receipts passive winners and ignored messages", function()
+    local h = newHarness()
+    h:load("!KRT/Services/Loot/Receipts.lua")
+    local Receipts = h.addon.Services.Loot._Receipts
+    local link = "|cff0070dd|Hitem:92011::::::::|h[Receipt Blade]|h|r"
+
+    local normal = Receipts.FromParsedLoot({
+        msg = "normal-loot",
+        playerName = "Tester",
+        itemLink = link,
+        itemCount = 1,
+        passiveGroupLoot = false,
+    })
+    assertEqual(normal.kind, "loot_received", "expected ordinary loot receipts to create loot records")
+    assertEqual(Receipts.ShouldCreateRecord(normal), true, "expected ordinary loot receipts to be recordable")
+
+    local passive = Receipts.FromParsedLoot({
+        msg = "passive-winner",
+        playerName = "Tester",
+        itemLink = link,
+        itemCount = 1,
+        rollType = h.rollTypes.GREED,
+        rollValue = 88,
+        passiveGroupLoot = true,
+        parsedGroupLoot = {
+            kind = "winner",
+            sessionId = "GL:7",
+            rollId = 91,
+        },
+    })
+    assertEqual(passive.kind, "group_winner", "expected passive winner receipts to be classified explicitly")
+    assertEqual(passive.rollSessionId, "GL:7", "expected passive winner receipt to retain session id")
+    assertEqual(passive.rollId, 91, "expected passive winner receipt to retain native roll id")
+    assertEqual(Receipts.ShouldCreateRecord(passive), true, "expected passive winners to be recordable")
+
+    local ignored = Receipts.FromParsedLoot({
+        msg = "no-item",
+        playerName = "Tester",
+        passiveGroupLoot = true,
+    })
+    assertEqual(ignored.kind, "ignored", "expected itemless messages to be classified as ignored")
+    assertEqual(Receipts.ShouldCreateRecord(ignored), false, "expected itemless messages to avoid record creation")
+end)
+
+test("loot record builder appends canonical rows with stable loot nids", function()
+    local h = newHarness()
+    h:load("!KRT/Services/Loot/Records.lua")
+    local Records = h.addon.Services.Loot._Records
+    local raid = {
+        loot = {},
+        nextLootNid = 7,
+    }
+
+    local row, lootNid = Records.Append(raid, {
+        itemId = 92021,
+        itemName = "Record Blade",
+        itemString = "item:92021",
+        itemLink = "|cff0070dd|Hitem:92021::::::::|h[Record Blade]|h|r",
+        itemRarity = 3,
+        itemTexture = "record-icon",
+        itemCount = 2,
+        looterNid = 4,
+        rollType = h.rollTypes.MAINSPEC,
+        rollValue = 99,
+        rollSessionId = "ROLL:7",
+        bossNid = 11,
+        lootSource = {
+            kind = "boss",
+            bossNid = 11,
+        },
+        time = 1234,
+    })
+
+    assertEqual(lootNid, 7, "expected append to allocate current nextLootNid")
+    assertEqual(raid.nextLootNid, 8, "expected append to advance nextLootNid")
+    assertEqual(#raid.loot, 1, "expected append to insert exactly one row")
+    assertEqual(raid.loot[1], row, "expected append to return inserted row")
+    assertEqual(row.lootNid, 7, "expected inserted row to preserve allocated lootNid")
+    assertEqual(row.itemCount, 2, "expected inserted row to preserve item count")
+    assertEqual(row.looterNid, 4, "expected inserted row to preserve looter nid")
+    assertEqual(row.lootSource.kind, "boss", "expected inserted row to preserve source provenance")
 end)
 
 test("trade-only loot creates a reusable lootNid", function()
@@ -3873,6 +4450,37 @@ test("trade-only loot creates a reusable lootNid", function()
     assertEqual(raid.loot[1].lootNid, lootNid, "expected trade-only entry to keep its lootNid")
     assertEqual(raid.loot[1].rollType, h.rollTypes.RESERVED, "expected logger update to mutate same entry")
     assertEqual(raid.loot[1].rollValue, 77, "expected logger update to keep same entry")
+end)
+
+test("trade-only loot reuses matching fallback rows instead of duplicating", function()
+    local h = newHarness()
+    local link = h.registerItem(90012, "Trade Merge Blade")
+
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {},
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 1
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+    local Loot = h.addon.Services.Loot
+
+    local first = Loot:LogTradeOnlyLoot(link, "Trader", h.rollTypes.MAINSPEC, 91, 1, "TRADE_ONLY", 1, 0, "ROLL:MERGE")
+    local second = Loot:LogTradeOnlyLoot(link, "Trader", h.rollTypes.MAINSPEC, 97, 1, "TRADE_ONLY", 1, 0, "ROLL:MERGE")
+
+    local raid = h.Core.EnsureRaidById(1)
+    assertEqual(first, second, "expected matching trade-only fallback to reuse the original lootNid")
+    assertEqual(#raid.loot, 1, "expected matching trade-only fallback to avoid duplicate records")
+    assertEqual(raid.loot[1].rollValue, 97, "expected reused fallback row to keep the stronger resolved roll value")
 end)
 
 test("trade-only loot append patches runtime without full cache invalidation", function()
@@ -4043,7 +4651,7 @@ test("loot source candidates do not expose mutable mode data", function()
     assertTrue(freshCandidates[1].modes.heroic25 == nil, "expected returned mode mutations not to affect backing data")
 end)
 
-test("loot source resolver filters legacy raid sizes by mode", function()
+test("loot source resolver filters classic raid sizes by mode", function()
     local h = newHarness()
     h:load("!KRT/Modules/LootSources.lua")
 
@@ -4072,10 +4680,106 @@ test("loot source resolver filters legacy raid sizes by mode", function()
         raidSize = 40,
     })
 
-    assertEqual(resolved.reason, nil, "expected a resolved legacy-size source")
+    assertEqual(resolved.reason, nil, "expected a resolved classic-size source")
     assertEqual(resolved.npcId, 10184, "expected Onyxia source to match")
     assertTrue(resolved.modes.normal40 == true, "expected the 40-player source to match")
     assertTrue(resolved.modes.normal25 == nil, "expected the 25-player source to be filtered out")
+end)
+
+local function loadRealLootSourceDataset(h)
+    local files = {
+        "!KRT/Modules/Dataset/LootSources/Vanilla.lua",
+        "!KRT/Modules/Dataset/LootSources/BurningCrusade.lua",
+        "!KRT/Modules/Dataset/LootSources/Wrath.lua",
+        "!KRT/Modules/Dataset/LootSourcesData.lua",
+        "!KRT/Modules/LootSources.lua",
+    }
+
+    for i = 1, #files do
+        local chunk, err = loadfile(files[i])
+        if not chunk then
+            error(err, 0)
+        end
+        chunk("!KRT", h.addon)
+    end
+end
+
+test("real loot source dataset includes AtlasLoot Naxxramas 25 Anub'Rekhan drops", function()
+    local h = newHarness()
+    loadRealLootSourceDataset(h)
+
+    local expectations = {
+        [39701] = "Dawnwalkers",
+        [39703] = "Rescinding Grips",
+        [39719] = "Mantle of the Locusts",
+    }
+
+    for itemId, itemName in pairs(expectations) do
+        local resolved = h.addon.LootSources.FindSource(itemId, {
+            raid = "Naxxramas",
+            difficulty = 4,
+            raidSize = 25,
+        })
+
+        assertEqual(resolved.reason, nil, "expected " .. itemName .. " to resolve from real Naxxramas dataset")
+        assertEqual(resolved.npcId, 15956, "expected " .. itemName .. " to resolve to Anub'Rekhan")
+        assertEqual(resolved.npcName, "Anub'Rekhan", "expected " .. itemName .. " source name")
+        assertEqual(resolved.kind, "boss", "expected " .. itemName .. " to resolve as boss loot")
+    end
+end)
+
+test("real loot source dataset preserves AtlasLoot Naxxramas 25 shared drops", function()
+    local h = newHarness()
+    loadRealLootSourceDataset(h)
+
+    local resolved = h.addon.LootSources.FindSource(40080, {
+        raid = "Naxxramas",
+        difficulty = 4,
+        raidSize = 25,
+    })
+
+    assertEqual(resolved.reason, "shared", "expected Lost Jewel to remain shared without recent context")
+    assertEqual(resolved.kind, "shared", "expected Lost Jewel to resolve as shared loot")
+    assertTrue(#resolved.candidates >= 3, "expected Lost Jewel to keep multiple Naxxramas 25 source candidates")
+end)
+
+test("real loot source dataset keeps Onyxia classic and level 80 modes separate", function()
+    local h = newHarness()
+    loadRealLootSourceDataset(h)
+
+    local classic = h.addon.LootSources.FindSource(17064, {
+        raid = "Onyxia's Lair",
+        difficulty = 1,
+        raidSize = 40,
+    })
+
+    assertEqual(classic.reason, nil, "expected classic Onyxia loot to resolve in 40-player mode")
+    assertEqual(classic.npcId, 10184, "expected classic Onyxia source to match")
+    assertTrue(classic.modes.normal40 == true, "expected classic Onyxia loot to stay in normal40 mode")
+    assertTrue(classic.modes.normal10 == nil, "expected classic Onyxia loot not to inherit level 80 10-player mode")
+    assertTrue(classic.modes.normal25 == nil, "expected classic Onyxia loot not to inherit level 80 25-player mode")
+
+    local level80Ten = h.addon.LootSources.FindSource(49307, {
+        raid = "Onyxia's Lair",
+        difficulty = 3,
+        raidSize = 10,
+    })
+
+    assertEqual(level80Ten.reason, nil, "expected AtlasLoot Onyxia level 80 10-player loot to resolve")
+    assertEqual(level80Ten.npcId, 10184, "expected level 80 10-player Onyxia source to match")
+    assertTrue(level80Ten.modes.normal10 == true, "expected level 80 Onyxia 10-player loot to use normal10 mode")
+    assertTrue(level80Ten.modes.normal40 == nil, "expected level 80 Onyxia 10-player loot not to use classic mode")
+
+    local level80TwentyFive = h.addon.LootSources.FindSource(49491, {
+        raid = "Onyxia's Lair",
+        difficulty = 4,
+        raidSize = 25,
+    })
+
+    assertEqual(level80TwentyFive.reason, nil, "expected AtlasLoot Onyxia level 80 25-player loot to resolve")
+    assertEqual(level80TwentyFive.npcId, 10184, "expected level 80 25-player Onyxia source to match")
+    assertTrue(level80TwentyFive.modes.normal25 == true, "expected level 80 Onyxia 25-player loot to use normal25 mode")
+    assertTrue(level80TwentyFive.modes.normal40 == nil, "expected level 80 Onyxia 25-player loot not to use classic mode")
 end)
 
 test("group loot need selections log passive NE history on loot receipt", function()
@@ -4891,9 +5595,9 @@ test("loot source modules load after item helpers and before ignored item tables
     file:close()
 
     local itemIndex = string.find(toc, "Modules\\Item.lua", 1, true)
-    local dataIndex = string.find(toc, "Modules\\LootSourcesData.lua", 1, true)
+    local dataIndex = string.find(toc, "Modules\\Dataset\\LootSourcesData.lua", 1, true)
     local resolverIndex = string.find(toc, "Modules\\LootSources.lua", 1, true)
-    local ignoredIndex = string.find(toc, "Modules\\IgnoredItems.lua", 1, true)
+    local ignoredIndex = string.find(toc, "Modules\\Dataset\\IgnoredItems.lua", 1, true)
 
     assertTrue(itemIndex ~= nil, "expected Item module in TOC")
     assertTrue(dataIndex ~= nil, "expected LootSourcesData module in TOC")
@@ -5753,7 +6457,7 @@ local function newGroupLootSourceResolverHarness(itemId, itemName, rollId, messa
     return h, h.addon.Services.Raid, h.addon.Services.Loot, resolverCalls
 end
 
-test("group loot source resolver is skipped for passive boss item", function()
+test("group loot source resolver attributes passive boss item from static source", function()
     local h, Raid, Loot, resolverCalls = newGroupLootSourceResolverHarness(91730, "Resolver Boss Blade", 301, "resolver-boss-win", {
         {
             npcId = 15953,
@@ -5768,16 +6472,19 @@ test("group loot source resolver is skipped for passive boss item", function()
     Raid:AddLoot("resolver-boss-win")
 
     local raid = h.Core.EnsureRaidById(1)
-    assertEqual(#resolverCalls, 0, "expected passive group loot to avoid item source resolver")
-    assertEqual(#raid.bossKills, 0, "expected passive group loot to avoid source boss creation")
+    assertEqual(#resolverCalls, 1, "expected passive group loot to use the static item source resolver")
+    assertEqual(#raid.bossKills, 1, "expected passive group loot to create the static source boss")
+    assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected static source boss name")
     assertEqual(#raid.loot, 1, "expected boss item to create one loot row")
-    assertEqual(raid.loot[1].bossNid, 0, "expected passive loot row to avoid boss binding")
-    assertEqual(raid.loot[1].lootSource, nil, "expected passive loot row to avoid source provenance")
+    assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected passive loot row to bind the static source boss")
+    assertTrue(type(raid.loot[1].lootSource) == "table", "expected passive loot row to persist static source provenance")
+    assertEqual(raid.loot[1].lootSource.kind, "boss", "expected passive loot source kind")
+    assertEqual(raid.loot[1].lootSource.sourceName, "Grand Widow Faerlina", "expected passive loot source name")
     assertEqual(raid.loot[1].rollType, h.rollTypes.GREED, "expected passive loot row to keep roll type")
     assertEqual(raid.loot[1].rollValue, 88, "expected passive loot row to keep roll score")
 end)
 
-test("group loot source resolver is skipped despite recent boss context", function()
+test("group loot source resolver prefers static source over recent boss context", function()
     local h, Raid, Loot, resolverCalls = newGroupLootSourceResolverHarness(91734, "Resolver Conflict Blade", 305, "resolver-conflict-win", {
         {
             npcId = 15953,
@@ -5813,14 +6520,17 @@ test("group loot source resolver is skipped despite recent boss context", functi
     Raid:AddLoot("resolver-conflict-win")
 
     raid = h.Core.EnsureRaidById(1)
-    assertEqual(#resolverCalls, 0, "expected passive group loot to avoid item source resolver despite recent context")
-    assertEqual(#raid.bossKills, 1, "expected passive group loot to avoid creating a static source boss")
+    assertEqual(#resolverCalls, 1, "expected passive group loot to use the static item source resolver")
+    assertEqual(#raid.bossKills, 2, "expected passive group loot to add the static source boss")
     assertEqual(raid.bossKills[1].name, "Sapphiron", "expected stale context boss to stay intact")
-    assertEqual(raid.loot[1].bossNid, 0, "expected passive loot row to avoid recent boss binding")
-    assertEqual(raid.loot[1].lootSource, nil, "expected passive loot row to avoid source provenance")
+    assertEqual(raid.bossKills[2].name, "Grand Widow Faerlina", "expected static source boss to be added separately")
+    assertEqual(raid.loot[1].bossNid, raid.bossKills[2].bossNid, "expected passive loot row to avoid stale recent boss binding")
+    assertTrue(type(raid.loot[1].lootSource) == "table", "expected passive loot row to persist static source provenance")
+    assertEqual(raid.loot[1].lootSource.kind, "boss", "expected passive loot source kind")
+    assertEqual(raid.loot[1].lootSource.sourceName, "Grand Widow Faerlina", "expected passive loot source name")
 end)
 
-test("group loot source resolver is skipped for passive trash item", function()
+test("group loot source resolver attributes passive trash item from static source", function()
     local h, Raid, Loot, resolverCalls = newGroupLootSourceResolverHarness(91731, "Resolver Trash Relic", 302, "resolver-trash-win", {
         {
             npcId = 15989,
@@ -5835,15 +6545,19 @@ test("group loot source resolver is skipped for passive trash item", function()
     Raid:AddLoot("resolver-trash-win")
 
     local raid = h.Core.EnsureRaidById(1)
-    assertEqual(#resolverCalls, 0, "expected passive group loot to avoid item source resolver")
-    assertEqual(#raid.bossKills, 0, "expected passive group loot to avoid trash source creation")
+    assertEqual(#resolverCalls, 1, "expected passive group loot to use the static item source resolver")
+    assertEqual(#raid.bossKills, 1, "expected passive group loot to create the static trash source")
+    assertEqual(raid.bossKills[1].name, "Naxxramas Cultist", "expected static trash source name")
+    assertEqual(raid.bossKills[1].sourceKind, "trash", "expected static trash source kind")
     assertEqual(h.Core.GetLastBoss(), nil, "expected named trash source not to become lastBoss")
     assertEqual(#raid.loot, 1, "expected trash item to create one loot row")
-    assertEqual(raid.loot[1].bossNid, 0, "expected passive loot row to avoid trash binding")
-    assertEqual(raid.loot[1].lootSource, nil, "expected passive loot row to avoid source provenance")
+    assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected passive loot row to bind the static trash source")
+    assertTrue(type(raid.loot[1].lootSource) == "table", "expected passive loot row to persist static source provenance")
+    assertEqual(raid.loot[1].lootSource.kind, "trash", "expected passive loot source kind")
+    assertEqual(raid.loot[1].lootSource.sourceName, "Naxxramas Cultist", "expected passive loot source name")
 end)
 
-test("group loot source resolver skips shared source for passive item", function()
+test("group loot source resolver records shared static source for passive item", function()
     local ambiguousSourceData = {
         {
             npcId = 15953,
@@ -5906,14 +6620,16 @@ test("group loot source resolver skips shared source for passive item", function
     Raid:AddLoot("resolver-ambiguous-win")
 
     local raid = h.Core.EnsureRaidById(1)
-    assertEqual(#resolverCalls, 0, "expected passive group loot to avoid item source resolver")
-    assertEqual(#raid.bossKills, 0, "expected passive group loot to avoid shared source creation")
+    assertEqual(#resolverCalls, 2, "expected passive group loot to resolve both static source items")
+    assertEqual(#raid.bossKills, 2, "expected passive group loot to create static source records")
     assertEqual(#raid.loot, 2, "expected seed and ambiguous item sources to create loot rows")
-    assertEqual(raid.loot[2].bossNid, 0, "expected passive shared loot row to avoid source binding")
-    assertEqual(raid.loot[2].lootSource, nil, "expected passive shared loot row to avoid source provenance")
+    assertEqual(raid.loot[2].bossNid, raid.bossKills[2].bossNid, "expected passive shared loot row to bind the shared source")
+    assertTrue(type(raid.loot[2].lootSource) == "table", "expected passive shared loot row to persist source provenance")
+    assertEqual(raid.loot[2].lootSource.kind, "shared", "expected passive shared loot source kind")
+    assertEqual(raid.loot[2].lootSource.sourceName, "Shared: Grand Widow Faerlina / Noth the Plaguebringer", "expected passive shared source label")
 end)
 
-test("group loot source resolver skips shared source despite recent context match", function()
+test("group loot source resolver records shared passive source despite recent context", function()
     local h, Raid, Loot, resolverCalls = newGroupLootSourceResolverHarness(91735, "Resolver Ambiguous Context Charm", 306, "resolver-ambiguous-context-win", {
         {
             npcId = 15953,
@@ -5955,11 +6671,13 @@ test("group loot source resolver skips shared source despite recent context matc
     Raid:AddLoot("resolver-ambiguous-context-win")
 
     raid = h.Core.EnsureRaidById(1)
-    assertEqual(#resolverCalls, 0, "expected passive group loot to avoid item source resolver")
-    assertEqual(#raid.bossKills, 1, "expected passive group loot to avoid creating source records")
+    assertEqual(#resolverCalls, 1, "expected passive group loot to use the static item source resolver")
+    assertEqual(#raid.bossKills, 2, "expected passive group loot to add a shared static source record")
     assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected recent context boss to stay intact")
-    assertEqual(raid.loot[1].bossNid, 0, "expected passive shared loot row to avoid recent context binding")
-    assertEqual(raid.loot[1].lootSource, nil, "expected passive shared loot row to avoid source provenance")
+    assertEqual(raid.loot[1].bossNid, raid.bossKills[2].bossNid, "expected passive shared loot row to avoid recent context binding")
+    assertTrue(type(raid.loot[1].lootSource) == "table", "expected passive shared loot row to persist source provenance")
+    assertEqual(raid.loot[1].lootSource.kind, "shared", "expected passive shared loot source kind")
+    assertEqual(raid.loot[1].lootSource.sourceName, "Shared: Grand Widow Faerlina / Noth the Plaguebringer", "expected passive shared source label")
 end)
 
 test("group loot trash rolls do not inherit previous boss death context", function()
@@ -6125,28 +6843,31 @@ test("trash UNIT_DIED context throttles repeated trash updates", function()
     h.feature.Services = h.addon.Services
     h:load("!KRT/Services/Raid.lua")
     local Raid = h.addon.Services.Raid
+    local function getRecentDeathContext()
+        return h.feature.raidState.lootContext and h.feature.raidState.lootContext.recentDeath or nil
+    end
 
     Raid:COMBAT_LOG_EVENT_UNFILTERED(currentTime, "UNIT_DIED", nil, nil, 0, bossGuid, "Grand Widow Faerlina", 0)
 
     Raid:COMBAT_LOG_EVENT_UNFILTERED(currentTime, "UNIT_DIED", nil, nil, 0, trashGuidA, "Trash A", 0)
-    assertEqual(h.feature.raidState.recentLootDeathContext.sourceName, "Trash A", "expected first trash death to seed recent context")
+    assertEqual(getRecentDeathContext().sourceName, "Trash A", "expected first trash death to seed recent context")
 
     currentTime = 1000.25
     Raid:COMBAT_LOG_EVENT_UNFILTERED(currentTime, "UNIT_DIED", nil, nil, 0, trashGuidB, "Trash B", 0)
-    assertEqual(h.feature.raidState.recentLootDeathContext.sourceName, "Trash A", "expected rapid trash deaths to reuse recent context")
+    assertEqual(getRecentDeathContext().sourceName, "Trash A", "expected rapid trash deaths to reuse recent context")
 
     currentTime = 1001.1
     Raid:COMBAT_LOG_EVENT_UNFILTERED(currentTime, "UNIT_DIED", nil, nil, 0, trashGuidC, "Trash C", 0)
-    assertEqual(h.feature.raidState.recentLootDeathContext.sourceName, "Trash C", "expected throttle window expiry to refresh trash context")
+    assertEqual(getRecentDeathContext().sourceName, "Trash C", "expected throttle window expiry to refresh trash context")
 
     currentTime = 1001.2
     Raid:COMBAT_LOG_EVENT_UNFILTERED(currentTime, "UNIT_DIED", nil, nil, 0, bossGuid, "Grand Widow Faerlina", 0)
-    assertEqual(h.feature.raidState.recentLootDeathContext.kind, "boss", "expected boss death to replace trash context")
+    assertEqual(getRecentDeathContext().kind, "boss", "expected boss death to replace trash context")
 
     currentTime = 1001.3
     Raid:COMBAT_LOG_EVENT_UNFILTERED(currentTime, "UNIT_DIED", nil, nil, 0, trashGuidB, "Trash B", 0)
-    assertEqual(h.feature.raidState.recentLootDeathContext.kind, "trash", "expected trash after boss to bypass the previous trash throttle")
-    assertEqual(h.feature.raidState.recentLootDeathContext.sourceName, "Trash B", "expected post-boss trash death to refresh context immediately")
+    assertEqual(getRecentDeathContext().kind, "trash", "expected trash after boss to bypass the previous trash throttle")
+    assertEqual(getRecentDeathContext().sourceName, "Trash B", "expected post-boss trash death to refresh context immediately")
 end)
 
 local function newRecentDeathContextHarness()
@@ -6891,7 +7612,7 @@ end)
 
 test("auto loot rules suggest disenchant for enchanting materials", function()
     local h = newHarness()
-    h:load("!KRT/Modules/IgnoredItems.lua")
+    h:load("!KRT/Modules/Dataset/IgnoredItems.lua")
     h:load("!KRT/Services/Loot/Rules.lua")
 
     local Rules = h.addon.Services.Loot._Rules
@@ -6910,7 +7631,7 @@ end)
 
 test("auto loot rules keep ignored non-material items as logger skip", function()
     local h = newHarness()
-    h:load("!KRT/Modules/IgnoredItems.lua")
+    h:load("!KRT/Modules/Dataset/IgnoredItems.lua")
     h:load("!KRT/Services/Loot/Rules.lua")
 
     local Rules = h.addon.Services.Loot._Rules
@@ -6928,7 +7649,7 @@ end)
 
 test("auto loot rules suggest bank for quality BoE items", function()
     local h = newHarness()
-    h:load("!KRT/Modules/IgnoredItems.lua")
+    h:load("!KRT/Modules/Dataset/IgnoredItems.lua")
     h:load("!KRT/Services/Loot/Rules.lua")
 
     local Rules = h.addon.Services.Loot._Rules
@@ -6948,7 +7669,7 @@ end)
 
 test("auto loot rules use tooltip bind data for 3.3.5 BoE items", function()
     local h = newHarness()
-    h:load("!KRT/Modules/IgnoredItems.lua")
+    h:load("!KRT/Modules/Dataset/IgnoredItems.lua")
     h.addon.Item.GetItemBindFromTooltip = function(itemLink)
         if itemLink and itemLink:find("item:39717", 1, true) then
             return 2
@@ -6974,7 +7695,7 @@ end)
 
 test("auto loot rules leave normal non-BoE items undecided", function()
     local h = newHarness()
-    h:load("!KRT/Modules/IgnoredItems.lua")
+    h:load("!KRT/Modules/Dataset/IgnoredItems.lua")
     h:load("!KRT/Services/Loot/Rules.lua")
 
     local Rules = h.addon.Services.Loot._Rules
@@ -6993,7 +7714,7 @@ end)
 
 test("loot service exposes suggestion-only auto loot decisions for tracked items", function()
     local h = newHarness()
-    h:load("!KRT/Modules/IgnoredItems.lua")
+    h:load("!KRT/Modules/Dataset/IgnoredItems.lua")
     h:load("!KRT/Services/Loot.lua")
 
     local Loot = h.addon.Services.Loot
@@ -7808,7 +8529,7 @@ test("loot winner dispatch forwards passive winners immediately", function()
             else
                 broadParserCalls = broadParserCalls + 1
             end
-            if (winnerOnly and msg == "winner-loot") or ((not winnerOnly) and msg == "winner-system") then
+            if (not winnerOnly) and (msg == "winner-loot" or msg == "winner-system") then
                 return "winner",
                     {
                         kind = "winner",
@@ -7845,8 +8566,8 @@ test("loot winner dispatch forwards passive winners immediately", function()
     assertEqual(addLootCalls[2].msg, "winner-system", "expected system winner messages to materialize immediately")
     assertEqual(addLootCalls[1].parsedLoot.sessionId, "GL:test", "expected loot winner parsed context to reach AddLoot")
     assertEqual(addLootCalls[2].parsedLoot.sessionId, "GL:test", "expected system winner parsed context to reach AddLoot")
-    assertEqual(winnerOnlyCalls, 1, "expected CHAT_MSG_LOOT to use the winner-only passive parser")
-    assertEqual(broadParserCalls, 2, "expected CHAT_MSG_SYSTEM to keep using the full passive parser")
+    assertEqual(winnerOnlyCalls, 0, "expected passive loot dispatch to use the full parser")
+    assertEqual(broadParserCalls, 3, "expected loot and system channels to use the full passive parser")
     assertEqual(#rollsMessages, 2, "expected system messages to keep flowing to the rolls service")
     assertEqual(rollsMessages[1], "winner-system", "expected winner system messages to keep flowing to the rolls service")
     assertEqual(rollsMessages[2], "roll-system", "expected the rolls service to receive unrelated system messages")
@@ -7973,7 +8694,7 @@ test("chat msg addon dispatch gives loot distribution messages to the loot servi
     h.addon.State.frames = { main = mainFrame }
     h:load("!KRT/Init.lua")
     h.addon.Services.Loot = {
-        RequestDistributionMessageHandling = function(_, prefix, msg, channel, sender)
+        HandleDistributionMessage = function(_, prefix, msg, channel, sender)
             observed.prefix = prefix
             observed.msg = msg
             observed.channel = channel
@@ -7989,11 +8710,11 @@ test("chat msg addon dispatch gives loot distribution messages to the loot servi
         }
     end
 
-    h.addon:CHAT_MSG_ADDON("KRTDist", "ITEM|1", "RAID", "Alice")
+    h.addon:CHAT_MSG_ADDON("KRTDist", "ITEM|2|session-1|item:1", "RAID", "Alice")
     _G.LibStub = oldLibStub
 
     assertEqual(observed.prefix, "KRTDist", "expected distribution prefix to reach loot service")
-    assertEqual(observed.msg, "ITEM|1", "expected distribution payload to reach loot service")
+    assertEqual(observed.msg, "ITEM|2|session-1|item:1", "expected distribution payload to reach loot service")
     assertEqual(observed.channel, "RAID", "expected distribution channel to reach loot service")
     assertEqual(observed.sender, "Alice", "expected distribution sender to reach loot service")
     assertEqual(syncerCalls, 0, "expected handled distribution messages to skip logger syncer fallback")
@@ -8637,7 +9358,7 @@ test("held loot lookup skips consumed duplicates and returns the next matching h
             schemaVersion = 1,
             raidNid = 1,
             players = {
-                { playerNid = 1, name = "Tester", count = 0 },
+                { playerNid = 1, name = "Tester", countMS = 0 },
             },
             bossKills = {
                 { bossNid = 10, boss = "Sapphiron" },
@@ -8692,7 +9413,7 @@ test("loot tracking snapshot exposes runtime and authoritative loot state", func
             schemaVersion = 1,
             raidNid = 1,
             players = {
-                { playerNid = 1, name = "Alice", count = 0 },
+                { playerNid = 1, name = "Alice", countMS = 0 },
             },
             bossKills = {
                 { bossNid = 10, boss = "Sapphiron" },
@@ -9025,14 +9746,75 @@ test("single winner ctrl-click clears and replaces the prefilled multiselect win
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
     h.feature.lootState.fromInventory = false
 
-    Rolls:RecordRolls(true)
+    Rolls:SetRollRecordingEnabled(true)
     Rolls:CHAT_MSG_SYSTEM("Alice 98")
     Rolls:CHAT_MSG_SYSTEM("Bob 77")
-    Rolls:RecordRolls(false)
+    Rolls:SetRollRecordingEnabled(false)
     Rolls:GetDisplayModel()
 
-    assertEqual(h.addon.MultiSelect.MultiSelectCount("MLRollWinners"), 0, "expected Rolls service to stop owning prefilled single-award multiselect state")
+    assertEqual(h.addon.MultiSelect.GetCount("MLRollWinners"), 0, "expected Rolls service to stop owning prefilled single-award multiselect state")
     assertEqual(h.feature.lootState.winner, nil, "expected Rolls service to stop mutating the selected winner mirror directly")
+end)
+
+test("roll strategies preserve reserved plus ordering at cutoff", function()
+    local h = newHarness()
+    h:load("!KRT/Services/Rolls/Strategies.lua")
+    h:load("!KRT/Services/Rolls/Resolution.lua")
+
+    local state = {
+        responsesByPlayer = {
+            Alice = { status = "ROLL", bestRoll = 90, bucket = "SR", isEligible = true },
+            Bob = { status = "ROLL", bestRoll = 90, bucket = "SR", isEligible = true },
+            Cara = { status = "ROLL", bestRoll = 95, bucket = "FREE", isEligible = true },
+        },
+    }
+    local ctx = {
+        state = state,
+        rollTypes = h.rollTypes,
+        isSelectableRollResponse = function(response)
+            return response.status == "ROLL" and response.isEligible == true
+        end,
+        getPlusForItem = function(_, name)
+            return name == "Alice" and 4 or 1
+        end,
+        isPlusSystemEnabled = function()
+            return true
+        end,
+        isSortAscending = function()
+            return false
+        end,
+        getExpectedWinnerCount = function()
+            return 1
+        end,
+    }
+
+    local resolved = h.addon.Services.Rolls._Resolution.BuildResolvedEntries(ctx, 1201, h.rollTypes.RESERVED)
+    assertEqual(resolved[1].name, "Alice", "expected reserved plus to beat equal roll")
+    assertEqual(resolved[2].name, "Bob", "expected lower plus to sort second")
+    assertEqual(resolved[3].name, "Cara", "expected non-SR fallback after SR bucket")
+end)
+
+test("roll strategies keep multi-copy partial winners before cutoff tie", function()
+    local h = newHarness()
+    h:load("!KRT/Services/Rolls/Strategies.lua")
+    h:load("!KRT/Services/Rolls/Resolution.lua")
+
+    local entries = {
+        { name = "Alice", bucket = "FREE", bucketPriority = 1, roll = 99 },
+        { name = "Bob", bucket = "FREE", bucketPriority = 1, roll = 88 },
+        { name = "Cara", bucket = "FREE", bucketPriority = 1, roll = 88 },
+    }
+    local ctx = {
+        getExpectedWinnerCount = function()
+            return 2
+        end,
+    }
+
+    local resolution = h.addon.Services.Rolls._Resolution.BuildResolution(ctx, entries, false)
+    assertEqual(#resolution.autoWinners, 1, "expected one automatic winner before cutoff tie")
+    assertEqual(resolution.autoWinners[1].name, "Alice", "expected top roll to stay auto winner")
+    assertEqual(#resolution.tiedNames, 2, "expected cutoff tie candidates")
+    assertTrue(resolution.requiresManualResolution == true, "expected manual resolution for cutoff tie")
 end)
 
 test("accepted roll stays eligible after using the last allowed roll", function()
@@ -9084,9 +9866,9 @@ test("accepted roll stays eligible after using the last allowed roll", function(
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
     h.feature.lootState.fromInventory = false
 
-    Rolls:RecordRolls(true)
+    Rolls:SetRollRecordingEnabled(true)
     Rolls:CHAT_MSG_SYSTEM("Alice 98")
-    Rolls:RecordRolls(false)
+    Rolls:SetRollRecordingEnabled(false)
 
     local eligibility = Rolls:GetCandidateEligibility("Alice", link, h.rollTypes.MAINSPEC)
     local model = Rolls:GetDisplayModel()
@@ -9099,6 +9881,65 @@ test("accepted roll stays eligible after using the last allowed roll", function(
     assertTrue(first ~= nil, "expected an eligible winner row in the display model")
     assertEqual(first.status, "ROLL", "expected recorded response to stay in ROLL status")
     assertTrue(first.isEligible == true, "expected recorded response to stay eligible in the UI model")
+end)
+
+test("resolved winner uses rollWinner from the raw display model", function()
+    local h = newHarness()
+    local link = h.registerItem(9305, "Resolvedwinnerblade")
+
+    h.addon.Services.Loot = {
+        GetItem = function(index)
+            if index ~= 1 then
+                return nil
+            end
+            return { itemLink = link }
+        end,
+    }
+    h.addon.Services.Raid = {
+        ClearRaidIcons = function() end,
+        GetPlayerCount = function()
+            return 0
+        end,
+        GetPlayerClass = function()
+            return "MAGE"
+        end,
+        GetUnitID = function(_, playerName)
+            return playerName and "raid1" or "none"
+        end,
+    }
+    h.addon.Services.Reserves = {
+        GetReserveCountForItem = function()
+            return 0
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.addon.Deformat = function(msg)
+        local name, roll = string.match(msg or "", "^(%a+)%s+(%d+)$")
+        if not name then
+            return nil
+        end
+        return name, tonumber(roll), 1, 100
+    end
+    _G.RANDOM_ROLL_RESULT = "%s %d"
+
+    h:load("!KRT/Modules/UI/MultiSelect.lua")
+    h.feature.MultiSelect = h.addon.MultiSelect
+    h:load("!KRT/Services/Rolls/Service.lua")
+
+    local Rolls = h.addon.Services.Rolls
+    h.feature.lootState.lootCount = 1
+    h.feature.lootState.selectedItemCount = 1
+    h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
+    h.feature.lootState.fromInventory = false
+
+    Rolls:SetRollRecordingEnabled(true)
+    Rolls:CHAT_MSG_SYSTEM("Alice 98")
+    Rolls:SetRollRecordingEnabled(false)
+
+    local model = Rolls:GetDisplayModel()
+
+    assertEqual(model.rollWinner, "Alice", "expected the raw display model to expose the roll winner")
+    assertEqual(Rolls:GetResolvedWinner(model), "Alice", "expected resolved winner to read rollWinner")
 end)
 
 test("reserved rolls exclude non-reservers and expose softres context in the display model", function()
@@ -9171,10 +10012,10 @@ test("reserved rolls exclude non-reservers and expose softres context in the dis
     h.feature.lootState.currentRollType = h.rollTypes.RESERVED
     h.feature.lootState.fromInventory = false
 
-    Rolls:RecordRolls(true)
+    Rolls:SetRollRecordingEnabled(true)
     assertTrue(Rolls:SubmitDebugRoll("Cara", 99) ~= true, "expected a non-reserver to be denied during SR roll intake")
     assertTrue(Rolls:SubmitDebugRoll("Alice", 88) == true, "expected an in-raid reserver to be accepted during SR roll intake")
-    Rolls:RecordRolls(false)
+    Rolls:SetRollRecordingEnabled(false)
 
     local model = Rolls:GetDisplayModel()
     local alice
@@ -9246,7 +10087,7 @@ test("late accepted rolls show OOT info when intake remains open", function()
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
     h.feature.lootState.fromInventory = false
 
-    Rolls:RecordRolls(true)
+    Rolls:SetRollRecordingEnabled(true)
     assertTrue(Rolls:StartCountdown(5) == true, "expected countdown to start")
     h:flushTimers()
 
@@ -9308,7 +10149,7 @@ test("late tied OOT rolls stay excluded from manual resolution and reroll", func
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
     h.feature.lootState.fromInventory = false
 
-    Rolls:RecordRolls(true)
+    Rolls:SetRollRecordingEnabled(true)
     assertTrue(Rolls:StartCountdown(5) == true, "expected countdown to start")
     h:flushTimers()
 
@@ -10444,7 +11285,7 @@ test("master roll rows stay clickable through the shared list controller", funct
         GetRollSession = function()
             return { id = "session-1" }
         end,
-        RollStatus = function()
+        GetRollStatus = function()
             return h.rollTypes.MAINSPEC, true, false, false
         end,
     }
@@ -10525,7 +11366,7 @@ test("master roll rows stay clickable through the shared list controller", funct
 
     row:OnClick()
 
-    assertTrue(h.addon.MultiSelect.MultiSelectIsSelected("MLRollWinners", "Alice"), "expected clicking the rendered row to select the winner")
+    assertTrue(h.addon.MultiSelect.IsSelected("MLRollWinners", "Alice"), "expected clicking the rendered row to select the winner")
 end)
 
 test("manual exclusion blocks candidate eligibility and roll intake", function()
@@ -10582,7 +11423,7 @@ test("manual exclusion blocks candidate eligibility and roll intake", function()
     assertTrue(eligibility ~= nil and eligibility.ok ~= true, "expected manually excluded player to fail candidate eligibility")
     assertEqual(eligibility.reason, "manual_exclusion", "expected manual exclusion to surface through the eligibility reason")
 
-    Rolls:RecordRolls(true)
+    Rolls:SetRollRecordingEnabled(true)
     Rolls:CHAT_MSG_SYSTEM("Alice 98")
     assertEqual(#Rolls:GetRolls(), 0, "expected manually excluded player to be blocked before raw roll intake")
 end)
@@ -10635,10 +11476,10 @@ test("explicit pass stays visible without entering winner resolution", function(
     h.feature.lootState.selectedItemCount = 1
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
 
-    Rolls:RecordRolls(true)
-    assertTrue(Rolls:PlayerPass("Alice") == true, "expected explicit pass to be accepted during an open roll")
+    Rolls:SetRollRecordingEnabled(true)
+    assertTrue(Rolls:SetPlayerResponse("Alice", "PASS") == true, "expected explicit pass to be accepted during an open roll")
     Rolls:CHAT_MSG_SYSTEM("Bob 77")
-    Rolls:RecordRolls(false)
+    Rolls:SetRollRecordingEnabled(false)
 
     local model = Rolls:GetDisplayModel()
     local alice
@@ -10703,10 +11544,10 @@ test("explicit pass can transition back into a valid roll while the session stay
     h.feature.lootState.selectedItemCount = 1
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
 
-    Rolls:RecordRolls(true)
-    assertTrue(Rolls:PlayerPass("Alice") == true, "expected pass to be accepted while the session is open")
+    Rolls:SetRollRecordingEnabled(true)
+    assertTrue(Rolls:SetPlayerResponse("Alice", "PASS") == true, "expected pass to be accepted while the session is open")
     assertTrue(Rolls:SubmitDebugRoll("Alice", 88) == true, "expected pass responses to remain reversible into a valid roll")
-    Rolls:RecordRolls(false)
+    Rolls:SetRollRecordingEnabled(false)
 
     local model = Rolls:GetDisplayModel()
     local alice = model.rows[1]
@@ -10757,9 +11598,9 @@ test("validate winner rejects explicit pass with a service-owned denial reason",
     h.feature.lootState.selectedItemCount = 1
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
 
-    Rolls:RecordRolls(true)
-    assertTrue(Rolls:PlayerPass("Alice") == true, "expected explicit pass to be accepted during an open roll")
-    Rolls:RecordRolls(false)
+    Rolls:SetRollRecordingEnabled(true)
+    assertTrue(Rolls:SetPlayerResponse("Alice", "PASS") == true, "expected explicit pass to be accepted during an open roll")
+    Rolls:SetRollRecordingEnabled(false)
 
     local validation = Rolls:ValidateWinner("Alice", link, h.rollTypes.MAINSPEC)
 
@@ -10816,11 +11657,11 @@ test("cancelled response keeps raw roll history but leaves current resolution", 
     h.feature.lootState.selectedItemCount = 1
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
 
-    Rolls:RecordRolls(true)
+    Rolls:SetRollRecordingEnabled(true)
     Rolls:CHAT_MSG_SYSTEM("Alice 98")
     Rolls:CHAT_MSG_SYSTEM("Bob 77")
-    assertTrue(Rolls:PlayerCancel("Alice") == true, "expected cancel to retract an earlier explicit roll response")
-    Rolls:RecordRolls(false)
+    assertTrue(Rolls:SetPlayerResponse("Alice", "CANCELLED") == true, "expected cancel to retract an earlier explicit roll response")
+    Rolls:SetRollRecordingEnabled(false)
 
     local model = Rolls:GetDisplayModel()
     local alice
@@ -10927,11 +11768,11 @@ test("cancelled responses can roll again while the session stays open", function
     h.feature.lootState.selectedItemCount = 1
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
 
-    Rolls:RecordRolls(true)
+    Rolls:SetRollRecordingEnabled(true)
     assertTrue(Rolls:SubmitDebugRoll("Alice", 98) == true, "expected the initial roll to be accepted")
-    assertTrue(Rolls:PlayerCancel("Alice") == true, "expected cancel to retract the current roll response")
+    assertTrue(Rolls:SetPlayerResponse("Alice", "CANCELLED") == true, "expected cancel to retract the current roll response")
     assertTrue(Rolls:SubmitDebugRoll("Alice", 91) == true, "expected cancelled responses to remain reversible into a valid roll")
-    Rolls:RecordRolls(false)
+    Rolls:SetRollRecordingEnabled(false)
 
     local model = Rolls:GetDisplayModel()
     local alice = model.rows[1]
@@ -10991,8 +11832,8 @@ test("timed out responses stay terminal for the current session", function()
     h.feature.lootState.selectedItemCount = 1
     h.feature.lootState.currentRollType = h.rollTypes.RESERVED
 
-    Rolls:RecordRolls(true)
-    Rolls:RecordRolls(false)
+    Rolls:SetRollRecordingEnabled(true)
+    Rolls:SetRollRecordingEnabled(false)
 
     local model = Rolls:GetDisplayModel()
     local alice = model.rows[1]
@@ -11051,11 +11892,11 @@ test("tie reroll resets intake to tied players only", function()
     h.feature.lootState.selectedItemCount = 1
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
 
-    Rolls:RecordRolls(true)
+    Rolls:SetRollRecordingEnabled(true)
     Rolls:CHAT_MSG_SYSTEM("Alice 98")
     Rolls:CHAT_MSG_SYSTEM("Bob 98")
     Rolls:CHAT_MSG_SYSTEM("Cara 77")
-    Rolls:RecordRolls(false)
+    Rolls:SetRollRecordingEnabled(false)
 
     local model = Rolls:GetDisplayModel()
     assertTrue(model.resolution.requiresManualResolution == true, "expected a first-place tie to require manual resolution before reroll")
@@ -11126,7 +11967,7 @@ test("duplicate roll attempts stay visible on the accepted response row", functi
     h.feature.lootState.selectedItemCount = 1
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
 
-    Rolls:RecordRolls(true)
+    Rolls:SetRollRecordingEnabled(true)
     assertTrue(Rolls:SubmitDebugRoll("Alice", 98) == true, "expected the first roll to be accepted")
     local ok, reason = Rolls:SubmitDebugRoll("Alice", 77)
     assertTrue(ok ~= true, "expected the duplicate roll to be denied")
@@ -11179,7 +12020,7 @@ test("master award button triggers reroll for single-select ties", function()
             rerollNames = names
             return true, names
         end,
-        HighestRoll = function()
+        GetHighestRoll = function()
             return 98
         end,
         GetRollSession = function()
@@ -11401,9 +12242,9 @@ test("row info tags stay separate from counter values", function()
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
     h.addon.options.showLootCounterDuringMSRoll = true
 
-    Rolls:RecordRolls(true)
+    Rolls:SetRollRecordingEnabled(true)
     Rolls:CHAT_MSG_SYSTEM("Alice 98")
-    Rolls:RecordRolls(false)
+    Rolls:SetRollRecordingEnabled(false)
 
     playerInRaid = false
     local model = Rolls:GetDisplayModel()
@@ -11463,15 +12304,15 @@ test("inventory winner stays undecorated in the pure rolls service model", funct
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
     h.feature.lootState.fromInventory = true
 
-    Rolls:RecordRolls(true)
+    Rolls:SetRollRecordingEnabled(true)
     Rolls:CHAT_MSG_SYSTEM("Alice 98")
     Rolls:CHAT_MSG_SYSTEM("Bob 77")
-    Rolls:RecordRolls(false)
+    Rolls:SetRollRecordingEnabled(false)
 
     local model = Rolls:GetDisplayModel()
     local first = model and model.rows and model.rows[1]
 
-    assertEqual(h.addon.MultiSelect.MultiSelectCount("MLRollWinners"), 0, "expected inventory flow to keep the winner outside the loot-window multiselect")
+    assertEqual(h.addon.MultiSelect.GetCount("MLRollWinners"), 0, "expected inventory flow to keep the winner outside the loot-window multiselect")
     assertTrue(first ~= nil, "expected at least one rendered roll row")
     assertEqual(first.name, "Alice", "expected the top roller to stay first in the display model")
     assertTrue(first.displayName == nil, "expected the pure rolls service model to stop applying UI selection markers")
@@ -11528,14 +12369,14 @@ test("inventory multi winners stay undecorated in the pure rolls service model",
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
     h.feature.lootState.fromInventory = true
 
-    Rolls:RecordRolls(true)
+    Rolls:SetRollRecordingEnabled(true)
     Rolls:CHAT_MSG_SYSTEM("Alice 98")
     Rolls:CHAT_MSG_SYSTEM("Bob 77")
     Rolls:CHAT_MSG_SYSTEM("Cara 45")
-    Rolls:RecordRolls(false)
+    Rolls:SetRollRecordingEnabled(false)
 
     local model = Rolls:GetDisplayModel()
-    assertEqual(h.addon.MultiSelect.MultiSelectCount("MLRollWinners"), 0, "expected Rolls service to stop prefiling inventory multi-copy multiselect state")
+    assertEqual(h.addon.MultiSelect.GetCount("MLRollWinners"), 0, "expected Rolls service to stop prefiling inventory multi-copy multiselect state")
     assertTrue(model.rows[1].displayName == nil, "expected the pure rolls service model to omit UI display-name decoration")
     assertTrue(model.rows[2].displayName == nil, "expected the pure rolls service model to omit UI display-name decoration")
     assertEqual(h.feature.lootState.winner, nil, "expected Rolls service to stop mutating the primary inventory winner directly")
@@ -11554,7 +12395,7 @@ test("inventory multi self-keep consumes one item and advances to the next winne
     assertEqual(#ctx.initiatedTrades, 0, "expected self-keep to avoid opening a trade window")
     assertEqual(ctx.h.feature.lootState.itemTraded, 1, "expected self-keep to consume exactly one inventory copy")
     assertEqual(ctx.h.feature.lootState.winner, "Alice", "expected self-keep to advance to the next selected winner")
-    assertEqual(ctx.h.addon.MultiSelect.MultiSelectCount("MLRollWinners"), 1, "expected self-keep to remove the completed winner from multiselect")
+    assertEqual(ctx.h.addon.MultiSelect.GetCount("MLRollWinners"), 1, "expected self-keep to remove the completed winner from multiselect")
     assertEqual(#ctx.addCounts, 1, "expected one LootCounter increment for the completed winner")
     assertEqual(ctx.addCounts[1].name, "Tester", "expected self-keep to credit the trader as the completed winner")
     assertEqual(ctx.addCounts[1].count, 1, "expected self-keep to credit exactly one awarded item")
@@ -11584,7 +12425,7 @@ test("inventory multi trade completion consumes one item and advances like self-
 
     assertEqual(ctx.h.feature.lootState.itemTraded, 1, "expected trade completion to consume exactly one inventory copy")
     assertEqual(ctx.h.feature.lootState.winner, "Tester", "expected trade completion to advance to the remaining selected winner")
-    assertEqual(ctx.h.addon.MultiSelect.MultiSelectCount("MLRollWinners"), 1, "expected trade completion to remove the completed winner from multiselect")
+    assertEqual(ctx.h.addon.MultiSelect.GetCount("MLRollWinners"), 1, "expected trade completion to remove the completed winner from multiselect")
     assertEqual(#ctx.addCounts, 1, "expected one LootCounter increment after trade completion")
     assertEqual(ctx.addCounts[1].name, "Alice", "expected trade completion to credit the traded winner")
     assertEqual(ctx.addCounts[1].count, 1, "expected trade completion to credit exactly one awarded item")
@@ -11592,6 +12433,58 @@ test("inventory multi trade completion consumes one item and advances like self-
     assertEqual(ctx.loggerRequests[1].looter, "Alice", "expected trade completion logger update to use the traded winner")
     assertEqual(ctx.loggerRequests[1].source, "TRADE_ACCEPT", "expected trade completion logger update to use the accept source")
     assertEqual(ctx.getClearLootCount(), 0, "expected multi-step trade completion to preserve the current item until all winners are done")
+end)
+
+test("reserves import accepts Base64 encoded RaidRes JSON", function()
+    local h = newHarness()
+    local json = table.concat({
+        '{"metadata":{"id":"ABC123","origin":"raidres"},',
+        '"softreserves":[',
+        '{"name":"Alice","role":"caster","items":[{"id":1201,"quality":4,"sr_plus":2},{"id":1201,"quality":4,"sr_plus":2}]},',
+        '{"name":"Bob","role":"melee","items":[{"id":1301,"quality":3}]}',
+        '],"hardreserves":[{"id":1401,"quality":4}]}',
+    })
+
+    _G.KRT_Reserves = {}
+    h:load("!KRT/Modules/Base64.lua")
+    h:load("!KRT/Modules/Json.lua")
+    h:load("!KRT/Services/Reserves/Import.lua")
+    h:load("!KRT/Services/Reserves/Display.lua")
+    h:load("!KRT/Services/Reserves.lua")
+
+    local encoded = h.addon.Base64.Encode(json)
+    local parsed = h.addon.Services.Reserves:ParseImport(encoded, "multi")
+
+    assertTrue(type(parsed) == "table", "expected encoded JSON import to parse")
+    assertEqual(parsed.format, "encoded-json", "expected encoded import format marker")
+    assertEqual(parsed.nPlayers, 2, "expected two reserve players")
+    assertEqual(parsed.reservesData.alice.reserves[1].rawID, 1201, "expected Alice item id")
+    assertEqual(parsed.reservesData.alice.reserves[1].quantity, 2, "expected duplicate item to aggregate quantity")
+    assertEqual(parsed.reservesData.alice.reserves[1].plus, 2, "expected sr_plus to map to plus")
+    assertEqual(parsed.reservesData.alice.reserves[1].spec, "caster", "expected role to map to spec")
+    assertEqual(parsed.reservesData.bob.reserves[1].rawID, 1301, "expected Bob item id")
+end)
+
+test("reserves import keeps plain CSV behavior before encoded fallback", function()
+    local h = newHarness()
+    _G.KRT_Reserves = {}
+    h:load("!KRT/Modules/Base64.lua")
+    h:load("!KRT/Modules/Json.lua")
+    h:load("!KRT/Services/Reserves/Import.lua")
+    h:load("!KRT/Services/Reserves/Display.lua")
+    h:load("!KRT/Services/Reserves.lua")
+
+    local csv = table.concat({
+        '"item","itemid","from","name","class","spec","note","plus"',
+        '"Coldsteel",1201,"Naxx","Alice","MAGE","Arcane","main",4',
+    }, "\n")
+    local parsed = h.addon.Services.Reserves:ParseImport(csv, "plus")
+
+    assertTrue(type(parsed) == "table", "expected CSV import to still parse")
+    assertEqual(parsed.format, nil, "expected CSV import not to be marked encoded JSON")
+    assertEqual(parsed.mode, "plus", "expected CSV-selected mode to remain intact")
+    assertEqual(parsed.reservesData.alice.reserves[1].rawID, 1201, "expected CSV row item id")
+    assertEqual(parsed.reservesData.alice.reserves[1].plus, 4, "expected CSV plus value")
 end)
 
 test("reserves item-info updates coalesce into a single refresh", function()
@@ -11657,12 +12550,9 @@ test("reserves item-info query refreshes display after async item cache resolves
     assertEqual(h.timerCount(), 0, "expected async item-cache polling to drain after resolution")
     assertEqual(h.Bus._triggered[h.addon.Events.Internal.ReservesDataChanged] or 0, 1, "expected async item data to refresh reserves once")
 
-    local entry = Service:GetReserveEntryForItem(1301, "Alice")
-    assertEqual(entry.itemName, "Async Reserve Blade", "expected async item name to populate reserve entry")
-    assertTrue(type(entry.itemLink) == "string" and entry.itemLink:find("item:1301", 1, true) ~= nil, "expected async item link to populate reserve entry")
-
     local displayList = Service:GetDisplayList()
     assertEqual(displayList[1].itemName, "Async Reserve Blade", "expected display list to use async item metadata")
+    assertTrue(type(displayList[1].itemLink) == "string" and displayList[1].itemLink:find("item:1301", 1, true) ~= nil, "expected display list to use async item link")
 end)
 
 test("reserves format supports filtering to current raid players", function()
@@ -11847,6 +12737,91 @@ test("reserves name match report suggests read-only softres roster name fixes", 
     assertTrue(_G.KRT_Reserves.Alice == nil, "expected name report to avoid writing corrected reserve names")
 end)
 
+test("reserves manual aliases resolve SoftRes eligibility without mutating imported names", function()
+    local h = newHarness()
+    _G.KRT_Options = {
+        Reserves = {
+            srImportMode = 1,
+            nameAliases = {
+                alicee = "Alice",
+            },
+        },
+    }
+    _G.KRT_Reserves = {
+        Alicee = {
+            playerNameDisplay = "Alicee",
+            reserves = {
+                { rawID = 1201, quantity = 1, plus = 3 },
+            },
+        },
+    }
+    h.addon.Services.Raid = {
+        GetPlayerID = function(_, name)
+            return name == "Alice" and 100 or 0
+        end,
+        GetPlayers = function()
+            return { { name = "Alice" } }
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+
+    h:load("!KRT/Services/Reserves/Import.lua")
+    h:load("!KRT/Services/Reserves/Aliases.lua")
+    h:load("!KRT/Services/Reserves/Display.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h.addon.Services.Reserves:Load()
+
+    local Reserves = h.addon.Services.Reserves
+    assertEqual(Reserves:GetReserveCountForItem(1201, "Alice"), 1, "expected alias to feed SR count")
+    assertEqual(Reserves:GetPlusForItem(1201, "Alice"), 3, "expected alias to feed plus value")
+    assertTrue(Reserves:HasCurrentRaidPlayersForItem(1201, 1) == true, "expected alias to match a present raid player")
+    assertTrue(_G.KRT_Reserves.Alicee ~= nil, "expected source reserve key to remain unchanged")
+    assertTrue(_G.KRT_Reserves.Alice == nil, "expected alias to avoid mutating imported reserve names")
+end)
+
+test("reserves alias readiness report reports applied aliases separately from suggestions", function()
+    local h = newHarness()
+    _G.KRT_Options = {
+        Reserves = {
+            nameAliases = {
+                alicee = "Alice",
+            },
+        },
+    }
+    _G.KRT_Reserves = {
+        Alicee = { playerNameDisplay = "Alicee", reserves = { { rawID = 1201 } } },
+        Bbo = { playerNameDisplay = "Bbo", reserves = { { rawID = 1202 } } },
+    }
+    h.addon.Services.Raid = {
+        GetPlayerID = function(_, name)
+            return (name == "Alice" or name == "Bob") and 100 or 0
+        end,
+        GetPlayers = function()
+            return { { name = "Alice" }, { name = "Bob" } }
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.Core.GetCurrentRaid = function()
+        return 1
+    end
+
+    h:load("!KRT/Services/Reserves/Import.lua")
+    h:load("!KRT/Services/Reserves/Aliases.lua")
+    h:load("!KRT/Services/Reserves/Display.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h.addon.Services.Reserves:Load()
+
+    local report = h.addon.Services.Reserves:GetReadinessReport()
+
+    assertEqual(report.nameMatchReport.aliasMatchesText, "Alicee -> Alice", "expected applied alias text")
+    assertEqual(report.nameMatchReport.weakMatches[1].reserveName, "Bbo", "expected unmatched typo to stay suggested")
+    assertEqual(report.nameMatchReport.weakMatches[1].raidName, "Bob", "expected remaining suggestion")
+    assertEqual(report.rosterReport.presentReservePlayers, 1, "expected alias to count as present reserve")
+end)
+
 test("reserves readiness report consolidates item roster and name-match context", function()
     local h = newHarness()
     _G.KRT_Reserves = {
@@ -12026,6 +13001,32 @@ test("slash help supports focused command pages", function()
     _G.SlashCmdList.KRT("help logger")
 
     assertContains(h.logs.info, "Commands: valid subcommands for |caaf49141/krt logger|r:", "expected focused logger help header")
+end)
+
+test("slash reserves alias commands persist aliases and print list", function()
+    local h = newHarness()
+    _G.SlashCmdList = {}
+    _G.KRT_Options = {}
+    _G.KRT_Reserves = {}
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/Services/Reserves/Import.lua")
+    h:load("!KRT/Services/Reserves/Aliases.lua")
+    h:load("!KRT/Services/Reserves/Display.lua")
+    h:load("!KRT/Services/Reserves.lua")
+    h.addon.Services.Reserves:Load()
+    h:load("!KRT/EntryPoints/SlashEvents.lua")
+
+    SlashCmdList.KRT("sr alias Alicee Alice")
+    assertEqual(_G.KRT_Options.Reserves.nameAliases.alicee, "Alice", "expected alias to persist")
+    assertContains(h.logs.info, "SoftRes alias set: Alicee -> Alice.", "expected set message")
+
+    SlashCmdList.KRT("sr aliases")
+    assertContains(h.logs.info, "alicee -> Alice", "expected alias list entry")
+
+    SlashCmdList.KRT("sr unalias Alicee")
+    assertTrue(_G.KRT_Options.Reserves.nameAliases.alicee == nil, "expected alias to be cleared")
 end)
 
 test("slash reserves check prints current item softres readiness", function()
@@ -12343,7 +13344,7 @@ test("comms version check sends group request and records acknowledgements", fun
     assertEqual(sent[1].channel, "RAID", "expected raid transport")
     assertTrue(sent[1].msg:match("^REQ|") ~= nil, "expected version request payload")
 
-    local handled = h.addon.Comms:RequestVersionMessageHandling("KRTVersion", "ACK|9.8.6|30300|5|2", "RAID", "Alice")
+    local handled = h.addon.Comms:HandleVersionMessage("KRTVersion", "ACK|9.8.6|30300|5|2", "RAID", "Alice")
 
     assertTrue(handled == true, "expected version acknowledgement to be handled")
     assertContains(h.logs.info, "Version: Alice addon=9.8.6 interface=30300 schema=5 sync=2", "expected ack summary")
@@ -12376,7 +13377,7 @@ test("comms version check replies to requests by whisper", function()
     h:load("!KRT/Localization/localization.en.lua")
     h:load("!KRT/Modules/Comms.lua")
 
-    local handled = h.addon.Comms:RequestVersionMessageHandling("KRTVersion", "REQ|9.8.5|30300|4|1", "RAID", "Bob")
+    local handled = h.addon.Comms:HandleVersionMessage("KRTVersion", "REQ|9.8.5|30300|4|1", "RAID", "Bob")
 
     assertTrue(handled == true, "expected version request to be handled")
     assertEqual(#sent, 1, "expected one version acknowledgement")
@@ -12417,6 +13418,30 @@ test("comms exposes shared version metadata", function()
     assertEqual(info.interfaceVersion, "30300", "expected interface version from shared comms metadata")
     assertEqual(info.raidSchemaVersion, "5", "expected raid schema from shared comms metadata")
     assertEqual(info.syncProtocolVersion, "2", "expected sync protocol from shared comms metadata")
+end)
+
+test("json decoder parses softres export primitives and arrays", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/Json.lua")
+
+    local parsed =
+        h.addon.Json.GetDecoded('{"metadata":{"id":"ABC123","origin":"raidres"},"softreserves":[{"name":"Alice","items":[{"id":1201,"quality":4,"sr_plus":2}]}],"hardreserves":[]}')
+
+    assertEqual(parsed.metadata.id, "ABC123", "expected object string field")
+    assertEqual(parsed.metadata.origin, "raidres", "expected nested metadata field")
+    assertEqual(parsed.softreserves[1].name, "Alice", "expected array object field")
+    assertEqual(parsed.softreserves[1].items[1].id, 1201, "expected numeric item id")
+    assertEqual(parsed.softreserves[1].items[1].sr_plus, 2, "expected plus value")
+end)
+
+test("json decoder rejects malformed softres payloads", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/Json.lua")
+
+    local parsed, reason = h.addon.Json.GetDecoded('{"softreserves":[')
+
+    assertEqual(parsed, nil, "expected malformed JSON to fail")
+    assertTrue(type(reason) == "string" and reason ~= "", "expected decoder failure reason")
 end)
 
 test("comms payload helpers encode split and pack addon-message fields", function()
@@ -12472,6 +13497,10 @@ test("loot distribution session publishes item roll and done messages", function
     local model = Distribution.GetDisplayModel()
     assertEqual(#sent, 4, "expected compact item roll and done messages")
     assertEqual(sent[1].prefix, "KRTDist", "expected dedicated distribution prefix")
+    assertTrue(sent[1].msg:match("^ITEM|2|") ~= nil, "expected versioned item message")
+    assertTrue(sent[2].msg:match("^ROLL_START|2|") ~= nil, "expected versioned roll-start message")
+    assertTrue(sent[3].msg:match("^ROLL_END|2|") ~= nil, "expected versioned roll-end message")
+    assertTrue(sent[4].msg:match("^ITEM_DONE|2|") ~= nil, "expected versioned item-done message")
     assertEqual(#model.rows, 1, "expected one distribution display row")
     assertEqual(model.rows[1].itemKey, itemKey, "expected item key to stay stable")
     assertEqual(model.rows[1].itemLink, itemLink, "expected item link to stay visible")
@@ -12479,6 +13508,94 @@ test("loot distribution session publishes item roll and done messages", function
     assertEqual(model.rows[1].winnerName, "Alice", "expected final winner to be retained")
     assertEqual(model.rows[1].rollValue, 98, "expected final roll value to be retained")
     assertEqual(model.rows[1].rollType, h.rollTypes.MAINSPEC, "expected roll type to be retained")
+end)
+
+test("loot distribution session answers snapshot requests with versioned state", function()
+    local source = newHarness()
+    local target = newHarness()
+    local sent = {}
+    local itemLink = source.registerItem(9401, "Snapshot Blade", 4, "Icon9401")
+    local itemKey = source.addon.Item.GetItemStringFromLink(itemLink)
+
+    _G.SendAddonMessage = function(prefix, msg, channel, targetName)
+        sent[#sent + 1] = {
+            prefix = prefix,
+            msg = msg,
+            channel = channel,
+            target = targetName,
+        }
+    end
+
+    source:setRaidRoleState({ inRaid = true, isMasterLooter = true })
+    source:load("!KRT/Modules/Comms.lua")
+    source.addon.Comms.Sync = function(prefix, msg)
+        sent[#sent + 1] = { prefix = prefix, msg = msg, channel = "RAID" }
+        return true
+    end
+    source:load("!KRT/Services/Loot/DistributionSession.lua")
+
+    local Distribution = source.addon.Services.Loot._DistributionSession
+    Distribution.PublishItem({
+        itemKey = itemKey,
+        itemLink = itemLink,
+        itemName = "Snapshot Blade",
+        itemTexture = "Icon9401",
+        quality = 4,
+        count = 1,
+        slot = 1,
+    })
+    Distribution.PublishRollStart(itemKey, source.rollTypes.RESERVED, 30)
+    Distribution.PublishRollTick(itemKey, 19)
+
+    sent = {}
+    local handled = Distribution.HandleMessage("KRTDist", "SNAP_REQ|2|req-1", "WHISPER", "Raider")
+
+    assertTrue(handled == true, "expected snapshot request to be handled")
+    assertEqual(#sent, 1, "expected one snapshot reply")
+    assertEqual(sent[1].prefix, "KRTDist", "expected distribution prefix")
+    assertEqual(sent[1].channel, "WHISPER", "expected snapshot reply to whisper requester")
+    assertEqual(sent[1].target, "Raider", "expected snapshot target")
+    assertTrue(sent[1].msg:match("^SNAP|2|") ~= nil, "expected versioned snapshot payload")
+
+    target:load("!KRT/Modules/Comms.lua")
+    target:load("!KRT/Services/Loot/DistributionSession.lua")
+    target.addon.Services.Loot._DistributionSession.HandleMessage(sent[1].prefix, sent[1].msg, sent[1].channel, "ML")
+
+    local model = target.addon.Services.Loot._DistributionSession.GetDisplayModel()
+    assertEqual(model.protocolVersion, 2, "expected protocol version in display model")
+    assertEqual(#model.rows, 1, "expected snapshot to restore one row")
+    assertEqual(model.rows[1].itemKey, itemKey, "expected snapshot item key")
+    assertEqual(model.rows[1].state, "rolling", "expected rolling state")
+    assertEqual(model.rows[1].remaining, 19, "expected tick state to survive snapshot")
+end)
+
+test("loot distribution session publishes tie and awarded state with versioned messages", function()
+    local h = newHarness()
+    local sent = {}
+    local itemLink = h.registerItem(9402, "Tie Blade", 4, "Icon9402")
+    local itemKey = h.addon.Item.GetItemStringFromLink(itemLink)
+
+    h:setRaidRoleState({ inRaid = true, isMasterLooter = true })
+    h:load("!KRT/Modules/Comms.lua")
+    h.addon.Comms.Sync = function(prefix, msg)
+        sent[#sent + 1] = { prefix = prefix, msg = msg }
+        return true
+    end
+    h:load("!KRT/Services/Loot/DistributionSession.lua")
+
+    local Distribution = h.addon.Services.Loot._DistributionSession
+    assertTrue(Distribution.PublishItem({ itemKey = itemKey, itemLink = itemLink, slot = 1 }) == true, "expected versioned item")
+    assertTrue(Distribution.PublishTieStart(itemKey, { "Alice", "Bob" }) == true, "expected tie state")
+    assertTrue(Distribution.PublishAwarded(itemKey, "Alice", 98) == true, "expected awarded state")
+
+    local model = Distribution.GetDisplayModel()
+    assertEqual(model.rows[1].state, "awarded", "expected awarded state")
+    assertEqual(model.rows[1].winnerName, "Alice", "expected awarded winner")
+    assertEqual(model.rows[1].rollValue, 98, "expected awarded roll")
+    assertEqual(model.rows[1].tieNamesText, "Alice,Bob", "expected tie names to be retained")
+    assertTrue(sent[1].msg:match("^ITEM|2|") ~= nil, "expected versioned item message to remain first")
+    assertTrue(sent[2].msg:match("^TIE_START|2|") ~= nil, "expected versioned tie message")
+    assertTrue(sent[3].msg:match("^AWARDED|2|") ~= nil, "expected versioned awarded message")
 end)
 
 test("loot service consumes distribution addon messages into a raider display model", function()
@@ -12521,7 +13638,7 @@ test("loot service consumes distribution addon messages into a raider display mo
     target:load("!KRT/Services/Loot.lua")
 
     for i = 1, #sent do
-        local handled = target.addon.Services.Loot:RequestDistributionMessageHandling(sent[i].prefix, sent[i].msg, "RAID", "ML")
+        local handled = target.addon.Services.Loot:HandleDistributionMessage(sent[i].prefix, sent[i].msg, "RAID", "ML")
         assertTrue(handled == true, "expected distribution message to be consumed")
     end
 
@@ -12545,6 +13662,10 @@ test("loot service keeps booting when the distribution helper file is missing", 
     h:load("!KRT/Services/Loot/PendingAwards.lua")
     h:load("!KRT/Services/Loot/PassiveGroupLoot.lua")
     h:load("!KRT/Services/Loot/Tracking.lua")
+    h:load("!KRT/Services/Loot/Workflow.lua")
+    h:load("!KRT/Services/Loot/Receipts.lua")
+    h:load("!KRT/Services/Loot/Records.lua")
+    h:load("!KRT/Services/Loot/Reconcile.lua")
     h:load("!KRT/Services/Loot/Rules.lua")
     h:load("!KRT/Services/Loot/Service.lua")
 
@@ -12553,7 +13674,7 @@ test("loot service keeps booting when the distribution helper file is missing", 
 
     assertTrue(loot._DistributionSession ~= nil, "expected service fallback to install a distribution helper table")
     assertEqual(#model.rows, 0, "expected fallback display model to be empty")
-    assertTrue(loot:RequestDistributionMessageHandling("KRTDist", "ITEM|1", "RAID", "ML") == false, "expected fallback to ignore distribution messages")
+    assertTrue(loot:HandleDistributionMessage("KRTDist", "ITEM|2|session-1|item:1", "RAID", "ML") == false, "expected fallback to ignore distribution messages")
     assertTrue(loot:SetDistributionState("session") == false, "expected fallback session reset to be a no-op")
     assertTrue(loot:SetDistributionState("roll_start", {
         itemLink = "item:1",
@@ -12607,7 +13728,7 @@ test("reserves synced runtime cache feeds display without persisting", function(
     local Reserves = h.addon.Services.Reserves
     Reserves:Load()
 
-    local ok = Reserves:SetSyncedReservesData({
+    local ok = Reserves._Sync:SetSyncedData({
         Alice = {
             reserves = {
                 { rawID = 1001, quantity = 2, plus = 4, class = "MAGE" },
@@ -12649,7 +13770,7 @@ test("reserves local data wins over synced runtime cache", function()
     local Reserves = h.addon.Services.Reserves
     Reserves:Load()
 
-    local ok, reason = Reserves:SetSyncedReservesData({
+    local ok, reason = Reserves._Sync:SetSyncedData({
         Bob = {
             reserves = {
                 { rawID = 2002, quantity = 1 },
@@ -12679,7 +13800,7 @@ test("reserves whisper softres ignores requests while disabled", function()
         },
     }
     h.addon.options.softResWhisperReplies = false
-    h.addon.Comms.Whisper = function(target, msg)
+    h.addon.Comms.SendWhisper = function(target, msg)
         sent[#sent + 1] = { target = target, msg = msg }
         return true
     end
@@ -12707,7 +13828,7 @@ test("reserves whisper softres replies with player reserves for authorized holde
         },
     }
     h.addon.options.softResWhisperReplies = true
-    h.addon.Comms.Whisper = function(target, msg)
+    h.addon.Comms.SendWhisper = function(target, msg)
         sent[#sent + 1] = { target = target, msg = msg }
         return true
     end
@@ -12744,7 +13865,7 @@ test("reserves whisper softres accepts private-server-safe aliases", function()
         },
     }
     h.addon.options.softResWhisperReplies = true
-    h.addon.Comms.Whisper = function(target, msg)
+    h.addon.Comms.SendWhisper = function(target, msg)
         sent[#sent + 1] = { target = target, msg = msg }
         return true
     end
@@ -12781,7 +13902,7 @@ test("reserves whisper softres denies normal raiders even with reserve data", fu
         },
     }
     h.addon.options.softResWhisperReplies = true
-    h.addon.Comms.Whisper = function(target, msg)
+    h.addon.Comms.SendWhisper = function(target, msg)
         sent[#sent + 1] = { target = target, msg = msg }
         return true
     end
@@ -12803,7 +13924,7 @@ test("reserves whisper softres stays silent without reserve data", function()
     local sent = {}
     _G.KRT_Reserves = {}
     h.addon.options.softResWhisperReplies = true
-    h.addon.Comms.Whisper = function(target, msg)
+    h.addon.Comms.SendWhisper = function(target, msg)
         sent[#sent + 1] = { target = target, msg = msg }
         return true
     end
@@ -12863,7 +13984,7 @@ test("reserves sync helper requests metadata and imports chunked runtime data", 
     provider.addon.Services.Reserves:Load()
     provider:setRaidRoleState({ inRaid = true, isLeader = true, isMasterLooter = true })
 
-    local handled = provider.addon.Services.Reserves._Sync:RequestMessageHandling("KRTResSync", "META_REQ|1", "RAID", "Requester")
+    local handled = provider.addon.Services.Reserves._Sync:HandleMessage("KRTResSync", "META_REQ|1", "RAID", "Requester")
 
     assertTrue(handled == true, "expected provider to handle metadata request")
     assertEqual(sent[1].prefix, "KRTResSync", "expected provider metadata prefix")
@@ -12873,7 +13994,7 @@ test("reserves sync helper requests metadata and imports chunked runtime data", 
 
     local metaAck = sent[1]
     sent = {}
-    requester.addon.Services.Reserves._Sync:RequestMessageHandling(metaAck.prefix, metaAck.msg, metaAck.channel, "Master")
+    requester.addon.Services.Reserves._Sync:HandleMessage(metaAck.prefix, metaAck.msg, metaAck.channel, "Master")
 
     assertEqual(sent[1].prefix, "KRTResSync", "expected requester data request prefix")
     assertEqual(sent[1].channel, "WHISPER", "expected requester to whisper data request")
@@ -12882,13 +14003,13 @@ test("reserves sync helper requests metadata and imports chunked runtime data", 
 
     local dataReq = sent[1]
     sent = {}
-    provider.addon.Services.Reserves._Sync:RequestMessageHandling(dataReq.prefix, dataReq.msg, dataReq.channel, "Requester")
+    provider.addon.Services.Reserves._Sync:HandleMessage(dataReq.prefix, dataReq.msg, dataReq.channel, "Requester")
 
     assertTrue(#sent >= 2, "expected data chunks and done message after data request")
     assertTrue(sent[#sent].msg:match("^DATA_DONE|") ~= nil, "expected final data done message")
 
     for i = 1, #sent do
-        requester.addon.Services.Reserves._Sync:RequestMessageHandling(sent[i].prefix, sent[i].msg, sent[i].channel, "Master")
+        requester.addon.Services.Reserves._Sync:HandleMessage(sent[i].prefix, sent[i].msg, sent[i].channel, "Master")
     end
     assertEqual(requester.addon.Services.Reserves:FormatReservedPlayersLine(1001, false, true, true), "Alice", "expected chunked sync payload to populate requester runtime cache")
     requester.addon.Services.Reserves:Save("test")

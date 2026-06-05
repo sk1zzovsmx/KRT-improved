@@ -43,16 +43,7 @@ trimText = function(value)
     return Strings.NormalizeName(value) or ""
 end
 
--- ----- Public methods ----- --
-
---- Bind the owning controller and its triggerSelectionEvent helper.
---- Called once from Controllers/Logger.lua after all files are loaded.
-function Actions:BindController(ctrl, triggerFn)
-    _controller = ctrl
-    _triggerSelectionEvent = triggerFn
-end
-
-function Actions:RemoveAll(list, value)
+local function removeFromList(list, value)
     if not (list and value) then
         return
     end
@@ -61,6 +52,15 @@ function Actions:RemoveAll(list, value)
         tremove(list, i)
         i = addon.tIndexOf(list, value)
     end
+end
+
+-- ----- Public methods ----- --
+
+--- Bind the owning controller and its triggerSelectionEvent helper.
+--- Called once from Controllers/Logger.lua after all files are loaded.
+function Actions:BindController(ctrl, triggerFn)
+    _controller = ctrl
+    _triggerSelectionEvent = triggerFn
 end
 
 commitRaidSelections = function(raid, opts)
@@ -348,20 +348,6 @@ function Actions:DeleteBoss(rID, bossNid)
     return removed
 end
 
-function Actions:DeleteLoot(rID, lootNid)
-    local raid = Store:GetRaid(rID)
-    if not (raid and lootNid) then
-        return false
-    end
-    local _, lootIndex = Store:GetLoot(raid, lootNid)
-    if not lootIndex then
-        return false
-    end
-    tremove(raid.loot, lootIndex)
-    commitRaidSelections(raid)
-    return true
-end
-
 -- Bulk delete: removes multiple loot entries (by nid) with a single Commit()
 -- Returns: number of removed entries
 function Actions:DeleteLootMany(rID, lootNids)
@@ -408,49 +394,7 @@ function Actions:DeleteBossAttendee(rID, bossNid, playerNid)
     if not queryNid or queryNid <= 0 then
         return false
     end
-    self:RemoveAll(bossKill.players, queryNid)
-    return true
-end
-
-function Actions:DeleteRaidAttendee(rID, playerNid)
-    local raid = Store:GetRaid(rID)
-    if not (raid and raid.players and playerNid) then
-        return false
-    end
-
-    local queryNid = tonumber(playerNid)
-    if not queryNid or queryNid <= 0 then
-        return false
-    end
-
-    local _, playerIdx = Store:GetPlayer(raid, queryNid)
-    if not playerIdx then
-        return false
-    end
-
-    tremove(raid.players, playerIdx)
-
-    -- Remove from all boss attendee lists.
-    if raid.bossKills then
-        for _, boss in ipairs(raid.bossKills) do
-            if boss and boss.players then
-                self:RemoveAll(boss.players, queryNid)
-            end
-        end
-    end
-
-    -- Remove loot won by removed player.
-    if raid.loot then
-        for i = #raid.loot, 1, -1 do
-            local loot = raid.loot[i]
-            local looterNid = loot and tonumber(loot.looterNid) or nil
-            if looterNid and looterNid == queryNid then
-                tremove(raid.loot, i)
-            end
-        end
-    end
-
-    commitRaidSelections(raid, { clearPlayers = true })
+    removeFromList(bossKill.players, queryNid)
     return true
 end
 
@@ -632,7 +576,7 @@ function Actions:SetCurrentRaid(rID)
         return false
     end
 
-    if Services.Raid:Expired(sel) then
+    if Services.Raid:IsRaidExpired(sel) then
         addon:error(L.ErrCannotSetCurrentRaidReset)
         return false
     end

@@ -402,13 +402,6 @@ local function recordOutOfFlowAttempt(state, player, reason, roll, source)
 end
 
 -- ----- Public methods ----- --
-function Responses.IsExplicitResponseStatus(status)
-    return status == RESPONSE_STATUS.PASS or status == RESPONSE_STATUS.CANCELLED
-end
-
-function Responses.IsSelectableRollResponse(response)
-    return response and response.status == RESPONSE_STATUS.ROLL and response.bestRoll ~= nil and response.isEligible == true and response.isOutOfTime ~= true
-end
 
 function Responses.ClearResponseState(ctx, opts)
     local _, state = assertContext(ctx)
@@ -424,6 +417,14 @@ function Responses.ClearResponseState(ctx, opts)
     end
     state.resolution = nil
     state.sessionId = nil
+end
+
+function Responses.IsExplicitResponseStatus(status)
+    return status == RESPONSE_STATUS.PASS or status == RESPONSE_STATUS.CANCELLED
+end
+
+function Responses.IsSelectableRollResponse(response)
+    return response and response.status == RESPONSE_STATUS.ROLL and response.bestRoll ~= nil and response.isEligible == true and response.isOutOfTime ~= true
 end
 
 function Responses.EnsureResponseSession(ctx)
@@ -708,8 +709,8 @@ function Responses.SubmitIncomingRoll(ctx, player, roll, source)
         end
         denyMessage = getDenialMessage(eligibility.reason)
         denyKey = tostring(player) .. ":" .. tostring(eligibility.reason)
-        if denyMessage and not state.deniedReasons[denyKey] and not isDebugSource then
-            Comms.Whisper(player, denyMessage)
+        if denyMessage and not state.deniedReasons[denyKey] and not isDebugSource and Comms and type(Comms.SendWhisper) == "function" then
+            Comms.SendWhisper(player, denyMessage)
             state.deniedReasons[denyKey] = true
         end
         if isDebugEnabled() then

@@ -40,9 +40,6 @@ local function normalizeCandidateKey(name)
 end
 
 -- ----- Public methods ----- --
-function Sessions.NormalizeCandidateKey(name)
-    return normalizeCandidateKey(name)
-end
 
 function Sessions.GetRollSession(ctx)
     local _, lootState = assertContext(ctx)
@@ -171,7 +168,7 @@ function Sessions.AllocateRollSessionId(ctx)
     return "RS:" .. tostring(nextId)
 end
 
-function Sessions.GetRollSessionItemKey(itemLink)
+local function getRollSessionItemKey(itemLink)
     if not itemLink then
         return nil
     end
@@ -190,7 +187,7 @@ function Sessions.OpenRollSession(ctx, itemLink, rollType, source)
     itemId = Item.GetItemIdFromLink(itemLink)
     session = {
         id = Sessions.AllocateRollSessionId(ctx),
-        itemKey = Sessions.GetRollSessionItemKey(itemLink),
+        itemKey = getRollSessionItemKey(itemLink),
         itemId = tonumber(itemId) or nil,
         itemLink = itemLink,
         rollType = tonumber(rollType) or tonumber(lootState.currentRollType) or rollTypes.FREE,
@@ -227,7 +224,7 @@ function Sessions.EnsureAdHocRollSession(ctx)
 
     session = {
         id = Sessions.AllocateRollSessionId(ctx),
-        itemKey = Sessions.GetRollSessionItemKey(itemLink),
+        itemKey = getRollSessionItemKey(itemLink),
         itemId = itemId,
         itemLink = itemLink,
         rollType = tonumber(lootState.currentRollType) or rollTypes.FREE,
@@ -255,7 +252,7 @@ function Sessions.EnsureRollSession(ctx, itemLink, rollType, source)
     if itemLink then
         local previousItemKey = session.itemKey
         local previousItemId = tonumber(session.itemId) or nil
-        local nextItemKey = Sessions.GetRollSessionItemKey(itemLink)
+        local nextItemKey = getRollSessionItemKey(itemLink)
         local itemId = Item.GetItemIdFromLink(itemLink)
         local nextItemId = tonumber(itemId) or nil
         local isSameItem = false

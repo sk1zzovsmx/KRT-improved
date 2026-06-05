@@ -52,6 +52,7 @@ Modules\Dataset\IgnoredMobs.lua
 Modules\Comms.lua
 Modules\Time.lua
 Modules\Base64.lua
+Modules\Json.lua
 Modules\Sort.lua
 Modules\Features.lua
 Modules\ModuleRegistry.lua
@@ -76,6 +77,10 @@ Services\Loot\Snapshots.lua
 Services\Loot\PendingAwards.lua
 Services\Loot\PassiveGroupLoot.lua
 Services\Loot\Tracking.lua
+Services\Loot\Workflow.lua
+Services\Loot\Receipts.lua
+Services\Loot\Records.lua
+Services\Loot\Reconcile.lua
 Services\Loot\Rules.lua
 Services\Loot\DistributionSession.lua
 Services\Raid\State.lua
@@ -92,6 +97,7 @@ Services\Rolls\Countdown.lua
 Services\Rolls\Sessions.lua
 Services\Rolls\History.lua
 Services\Rolls\Responses.lua
+Services\Rolls\Strategies.lua
 Services\Rolls\Resolution.lua
 Services\Rolls\Display.lua
 Services\Rolls\Service.lua
@@ -100,6 +106,7 @@ Services\Debug.lua
 Controllers\Master.lua
 Widgets\LootCounter.lua
 Services\Reserves\Import.lua
+Services\Reserves\Aliases.lua
 Services\Reserves\Display.lua
 Services\Reserves\Sync.lua
 Services\Reserves.lua

@@ -319,6 +319,42 @@ local function getReserveSource(source)
     return L.StrUnknown
 end
 
+local function normalizeAliasKey(name)
+    local key = Strings and Strings.NormalizeLower and Strings.NormalizeLower(name, true) or nil
+    if key and key ~= "" then
+        return key
+    end
+    if type(name) == "string" and name ~= "" then
+        return string.lower(name)
+    end
+    return nil
+end
+
+local function getAliasRaidNameForReserve(ctx, reserveName)
+    local state = ctx.getAliasState and ctx.getAliasState() or nil
+    local reserveKey = normalizeAliasKey(reserveName)
+    if not (state and state.byReserveKey and reserveKey) then
+        return nil
+    end
+    return state.byReserveKey[reserveKey]
+end
+
+local function getPlayerIdWithAlias(ctx, raidService, playerName, raidNum)
+    local playerNid = raidService:GetPlayerID(playerName, raidNum)
+    if tonumber(playerNid) and playerNid > 0 then
+        return playerNid
+    end
+
+    local aliasRaidName = getAliasRaidNameForReserve(ctx, playerName)
+    if aliasRaidName and aliasRaidName ~= playerName then
+        playerNid = raidService:GetPlayerID(aliasRaidName, raidNum)
+        if tonumber(playerNid) and playerNid > 0 then
+            return playerNid
+        end
+    end
+    return 0
+end
+
 local function filterPlayersByCurrentRaid(ctx, players, raidNum)
     local raidService = ctx.getRaidService()
     if not (raidService and raidService.GetPlayerID) then
@@ -337,7 +373,7 @@ local function filterPlayersByCurrentRaid(ctx, players, raidNum)
     for i = 1, #players do
         local name = players[i]
         if type(name) == "string" and name ~= "" then
-            local playerNid = raidService:GetPlayerID(name, targetRaidNum)
+            local playerNid = getPlayerIdWithAlias(ctx, raidService, name, targetRaidNum)
             if tonumber(playerNid) and playerNid > 0 then
                 filteredPlayers[#filteredPlayers + 1] = name
             end
@@ -365,7 +401,7 @@ local function hasCurrentRaidPlayer(ctx, list, raidNum)
         local reserveEntry = list[i]
         local name = reserveEntry and reserveEntry.playerNameDisplay
         if type(name) == "string" and name ~= "" then
-            local playerNid = raidService:GetPlayerID(name, targetRaidNum)
+            local playerNid = getPlayerIdWithAlias(ctx, raidService, name, targetRaidNum)
             if tonumber(playerNid) and playerNid > 0 then
                 return true, true
             end
@@ -419,17 +455,6 @@ local function splitPresentAndMissingPlayers(ctx, players, raidNum)
     end
 
     return presentPlayers, missingPlayers, true
-end
-
-local function normalizeNameKey(name)
-    local key = Strings and Strings.NormalizeLower and Strings.NormalizeLower(name, true) or nil
-    if key and key ~= "" then
-        return key
-    end
-    if type(name) == "string" and name ~= "" then
-        return string.lower(name)
-    end
-    return nil
 end
 
 local function levenshteinDistance(left, right)
@@ -515,6 +540,29 @@ local function compareNameMatch(a, b)
     return tostring(a.raidName) < tostring(b.raidName)
 end
 
+local function formatAliasMatches(aliasMatches)
+    local out = {}
+    for i = 1, #(aliasMatches or {}) do
+        local match = aliasMatches[i]
+        if match and match.reserveName and match.raidName then
+            out[#out + 1] = tostring(match.reserveName) .. " -> " .. tostring(match.raidName)
+        end
+    end
+    return tconcat(out, ", ")
+end
+
+local function filterAliasMatchedNames(names, matchedKeys)
+    local out = {}
+    for i = 1, #(names or {}) do
+        local name = names[i]
+        local key = normalizeAliasKey(name)
+        if not (key and matchedKeys[key]) then
+            out[#out + 1] = name
+        end
+    end
+    return sortPlayerNames(out)
+end
+
 local function getReservePlayerNames(ctx)
     local players = {}
     for playerKey, player in pairs(ctx.reservesData or {}) do
@@ -555,14 +603,14 @@ local function splitExactNameMatches(reservePlayers, raidPlayers)
 
     for i = 1, #reservePlayers do
         local name = reservePlayers[i]
-        local key = normalizeNameKey(name)
+        local key = normalizeAliasKey(name)
         if key then
             reserveByKey[key] = true
         end
     end
     for i = 1, #raidPlayers do
         local name = raidPlayers[i]
-        local key = normalizeNameKey(name)
+        local key = normalizeAliasKey(name)
         if key then
             raidByKey[key] = true
         end
@@ -570,14 +618,14 @@ local function splitExactNameMatches(reservePlayers, raidPlayers)
 
     for i = 1, #reservePlayers do
         local name = reservePlayers[i]
-        local key = normalizeNameKey(name)
+        local key = normalizeAliasKey(name)
         if key and not raidByKey[key] then
             reserveMissing[#reserveMissing + 1] = name
         end
     end
     for i = 1, #raidPlayers do
         local name = raidPlayers[i]
-        local key = normalizeNameKey(name)
+        local key = normalizeAliasKey(name)
         if key and not reserveByKey[key] then
             raidMissing[#raidMissing + 1] = name
         end
@@ -587,7 +635,7 @@ local function splitExactNameMatches(reservePlayers, raidPlayers)
 end
 
 local function findBestNameCandidate(reserveName, raidPlayers, usedRaidNames)
-    local reserveKey = normalizeNameKey(reserveName)
+    local reserveKey = normalizeAliasKey(reserveName)
     local best
 
     if not reserveKey then
@@ -596,7 +644,7 @@ local function findBestNameCandidate(reserveName, raidPlayers, usedRaidNames)
 
     for i = 1, #raidPlayers do
         local raidName = raidPlayers[i]
-        local raidKey = normalizeNameKey(raidName)
+        local raidKey = normalizeAliasKey(raidName)
         if raidKey and not usedRaidNames[raidName] then
             local distance = levenshteinDistance(reserveKey, raidKey)
             local similarity = nameSimilarity(reserveKey, raidKey, distance)
@@ -644,6 +692,7 @@ local function buildReadinessHealth(report)
         currentItemIssue = nil,
         importedPlayersOutsideRaidCount = tonumber(rosterReport.missingReservePlayers) or 0,
         raidPlayersWithoutReserveCount = #(nameMatchReport.raidPlayersWithoutReserve or {}),
+        aliasMatchCount = #(nameMatchReport.aliasMatches or {}),
         suggestedNameMatchCount = #(nameMatchReport.strongMatches or {}) + #(nameMatchReport.weakMatches or {}),
         unmatchedReserveCount = #(nameMatchReport.unmatchedReservePlayers or {}),
         unmatchedRaidCount = #(nameMatchReport.unmatchedRaidPlayers or {}),
@@ -922,12 +971,30 @@ function Display.GetNameMatchReport(ctx, raidNum)
     local reservePlayers = getReservePlayerNames(ctx)
     local raidPlayers, rosterFilterApplied = getRaidPlayerNames(ctx, raidNum)
     local reserveMissing, raidMissing = splitExactNameMatches(reservePlayers, raidPlayers)
+    local aliasMatches = ctx.getAliasMatches and ctx.getAliasMatches(reservePlayers, raidPlayers) or {}
+    local aliasReserveKeys = {}
+    local aliasRaidKeys = {}
     local usedRaidNames = {}
     local usedReserveNames = {}
     local strongMatches = {}
     local weakMatches = {}
     local unmatchedReservePlayers = {}
     local unmatchedRaidPlayers = {}
+
+    for i = 1, #aliasMatches do
+        local match = aliasMatches[i]
+        local reserveKey = normalizeAliasKey(match and match.reserveName)
+        local raidKey = normalizeAliasKey(match and match.raidName)
+        if reserveKey then
+            aliasReserveKeys[reserveKey] = true
+        end
+        if raidKey then
+            aliasRaidKeys[raidKey] = true
+        end
+    end
+
+    reserveMissing = filterAliasMatchedNames(reserveMissing, aliasReserveKeys)
+    raidMissing = filterAliasMatchedNames(raidMissing, aliasRaidKeys)
 
     for i = 1, #reserveMissing do
         local reserveName = reserveMissing[i]
@@ -964,6 +1031,8 @@ function Display.GetNameMatchReport(ctx, raidNum)
     return {
         reservePlayersOutsideRaid = reserveMissing,
         raidPlayersWithoutReserve = raidMissing,
+        aliasMatches = aliasMatches,
+        aliasMatchesText = formatAliasMatches(aliasMatches),
         strongMatches = strongMatches,
         weakMatches = weakMatches,
         unmatchedReservePlayers = unmatchedReservePlayers,

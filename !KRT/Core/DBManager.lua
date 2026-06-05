@@ -12,7 +12,6 @@ local DBManager = addon.DBManager
 -- ----- Internal state ----- --
 DBManager.SavedVariables = DBManager.SavedVariables or {}
 local SavedVariablesManager = DBManager.SavedVariables
-DBManager.Default = SavedVariablesManager
 
 -- ----- Private helpers ----- --
 local function getAddonDbStore(storeKey)

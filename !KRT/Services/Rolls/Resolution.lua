@@ -19,6 +19,7 @@ local module = addon.Services.Rolls
 module._Resolution = module._Resolution or {}
 
 local Resolution = module._Resolution
+local Strategies = assert(module._Strategies, "Rolls strategy helpers are not initialized")
 
 -- ----- Private helpers ----- --
 local function isDebugEnabled()
@@ -31,49 +32,34 @@ local function assertContext(ctx)
     return ctx, ctx.state
 end
 
-local function compareResolvedEntries(a, b, wantLow, usePlus)
-    if a.bucketPriority ~= b.bucketPriority then
-        return a.bucketPriority < b.bucketPriority
-    end
+local normalizeStrategy
 
-    if usePlus and a.bucket == "SR" and b.bucket == "SR" and a.plus ~= b.plus then
-        return a.plus > b.plus
-    end
-
-    if a.roll ~= b.roll then
-        return wantLow and (a.roll < b.roll) or (a.roll > b.roll)
-    end
-
-    return tostring(a.name) < tostring(b.name)
+local function getResponsePlus(ctx, itemId, response, plusGetter)
+    local strategy = normalizeStrategy(ctx, type(ctx) == "table" and ctx.id and ctx or nil)
+    return Strategies.GetResponsePlus(strategy, itemId, response, plusGetter)
 end
 
-local function areResolvedEntriesTied(a, b, usePlus)
-    if not (a and b) then
-        return false
+normalizeStrategy = function(ctx, strategyOrUsePlus)
+    if type(strategyOrUsePlus) == "table" and strategyOrUsePlus.id then
+        return strategyOrUsePlus
     end
-    if a.bucketPriority ~= b.bucketPriority or a.bucket ~= b.bucket then
-        return false
+
+    local strategy = Strategies.GetStrategy(ctx or {}, nil)
+    if strategyOrUsePlus == true then
+        strategy.usePlus = true
+    elseif strategyOrUsePlus == false then
+        strategy.usePlus = false
     end
-    if usePlus and a.bucket == "SR" and a.plus ~= b.plus then
-        return false
-    end
-    return a.roll ~= nil and a.roll == b.roll
+    return strategy
 end
 
 -- ----- Public methods ----- --
 function Resolution.GetBucketPriority(ctx, bucket, rollType)
-    local rollTypes = ctx.rollTypes or feature.rollTypes
-
-    if bucket == "INELIGIBLE" then
-        return 99
+    local strategy = normalizeStrategy(ctx, type(ctx) == "table" and ctx.id and ctx or nil)
+    if not (type(ctx) == "table" and ctx.id) then
+        strategy = Strategies.GetStrategy(ctx or {}, rollType)
     end
-    if rollType == rollTypes.RESERVED then
-        if bucket == "SR" then
-            return 1
-        end
-        return 2
-    end
-    return 1
+    return Strategies.GetBucketPriority(strategy, bucket)
 end
 
 function Resolution.GetDisplayTier(ctx, response)
@@ -100,50 +86,47 @@ function Resolution.GetDisplayTier(ctx, response)
     return 7
 end
 
-function Resolution.GetResponsePlus(ctx, itemId, response, plusGetter)
-    if not itemId or response.bucket ~= "SR" or not plusGetter then
-        return 0
-    end
-    return plusGetter(response.name)
-end
-
 function Resolution.BuildResolvedEntries(ctx, itemId, currentRollType)
     local _, state = assertContext(ctx)
-    local rollTypes = ctx.rollTypes or feature.rollTypes
-    local usePlus = currentRollType == rollTypes.RESERVED and itemId and ctx.isPlusSystemEnabled and ctx.isPlusSystemEnabled()
+    local strategy = Strategies.GetStrategy(ctx, currentRollType)
     local plusGetter = itemId and function(name)
         return ctx.getPlusForItem and ctx.getPlusForItem(itemId, name) or 0
     end or nil
-    local wantLow = ctx.isSortAscending and ctx.isSortAscending() or false
     local resolved = {}
 
     for name, response in pairs(state.responsesByPlayer) do
         if ctx.isSelectableRollResponse and ctx.isSelectableRollResponse(response) then
+            local responseName = response.name or name
             resolved[#resolved + 1] = {
-                name = name,
+                name = responseName,
                 bucket = response.bucket,
-                bucketPriority = Resolution.GetBucketPriority(ctx, response.bucket, currentRollType),
-                plus = Resolution.GetResponsePlus(ctx, itemId, response, plusGetter),
+                bucketPriority = Strategies.GetBucketPriority(strategy, response.bucket),
+                plus = Strategies.GetResponsePlus(strategy, itemId, {
+                    name = responseName,
+                    bucket = response.bucket,
+                }, plusGetter),
                 roll = tonumber(response.bestRoll) or 0,
+                strategy = strategy.id,
             }
         end
     end
 
     table.sort(resolved, function(a, b)
-        return compareResolvedEntries(a, b, wantLow, usePlus)
+        return Strategies.CompareEntries(strategy, a, b)
     end)
 
-    return resolved, usePlus, plusGetter
+    return resolved, strategy, plusGetter
 end
 
-function Resolution.BuildTieGroups(_ctx, resolvedEntries, usePlus)
+function Resolution.BuildTieGroups(ctx, resolvedEntries, strategyOrUsePlus)
+    local strategy = normalizeStrategy(ctx, strategyOrUsePlus)
     local tieGroupByName = {}
     local groupId = 0
     local i = 1
 
     while i <= #resolvedEntries do
         local j = i
-        while j < #resolvedEntries and areResolvedEntriesTied(resolvedEntries[j], resolvedEntries[j + 1], usePlus) do
+        while j < #resolvedEntries and Strategies.AreEntriesTied(strategy, resolvedEntries[j], resolvedEntries[j + 1]) do
             j = j + 1
         end
 
@@ -160,7 +143,8 @@ function Resolution.BuildTieGroups(_ctx, resolvedEntries, usePlus)
     return tieGroupByName
 end
 
-function Resolution.BuildResolution(ctx, resolvedEntries, usePlus)
+function Resolution.BuildResolution(ctx, resolvedEntries, strategyOrUsePlus)
+    local strategy = normalizeStrategy(ctx, strategyOrUsePlus)
     local resolution = {
         autoWinners = {},
         tiedNames = {},
@@ -182,10 +166,10 @@ function Resolution.BuildResolution(ctx, resolvedEntries, usePlus)
 
     local groupStart = appliedCutoff
     local groupEnd = appliedCutoff
-    while groupStart > 1 and areResolvedEntriesTied(resolvedEntries[groupStart - 1], resolvedEntries[appliedCutoff], usePlus) do
+    while groupStart > 1 and Strategies.AreEntriesTied(strategy, resolvedEntries[groupStart - 1], resolvedEntries[appliedCutoff]) do
         groupStart = groupStart - 1
     end
-    while groupEnd < #resolvedEntries and areResolvedEntriesTied(resolvedEntries[groupEnd + 1], resolvedEntries[appliedCutoff], usePlus) do
+    while groupEnd < #resolvedEntries and Strategies.AreEntriesTied(strategy, resolvedEntries[groupEnd + 1], resolvedEntries[appliedCutoff]) do
         groupEnd = groupEnd + 1
     end
 
@@ -232,7 +216,7 @@ function Resolution.BuildRowCounterText(ctx, itemId, response, currentRollType, 
 
     if response.bucket == "SR" then
         if currentRollType == rollTypes.RESERVED and itemId and ctx.isPlusSystemEnabled and ctx.isPlusSystemEnabled() then
-            local plus = Resolution.GetResponsePlus(ctx, itemId, response, plusGetter)
+            local plus = getResponsePlus(ctx, itemId, response, plusGetter)
             if plus and plus > 0 then
                 counterText = string.format("(P+%d)", plus)
             end
@@ -296,6 +280,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
         deps = {
             "Init",
             "Modules/ModuleRegistry",
+            "Services/Rolls/Strategies",
         },
     })
     registry.SetLoaded("Services/Rolls/Resolution")

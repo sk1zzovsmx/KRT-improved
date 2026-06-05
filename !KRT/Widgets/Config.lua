@@ -51,9 +51,9 @@ do
     module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
-    -- Namespace registration: opzioni UI generiche (tooltip toggle).
-    -- Le altre opzioni esposte in questo widget sono possedute dai rispettivi
-    -- moduli (Master, Loot, Rolls, Reserves, Minimap, LootCounter).
+    -- Namespace registration: generic UI options (tooltip toggle).
+    -- Other options exposed by this widget are owned by their source modules
+    -- (Master, Loot, Rolls, Reserves, Minimap, LootCounter).
     Options.AddNamespace("UI", {
         showTooltips = true,
     })
@@ -84,14 +84,14 @@ do
     -- ----- Private helpers ----- --
     function UI.AcquireRefs(frame)
         local refs = {
-            closeBtn = Frames.Ref(frame, "CloseBtn"),
-            defaultsBtn = Frames.Ref(frame, "DefaultsBtn"),
-            countdownDuration = Frames.Ref(frame, "countdownDuration"),
+            closeBtn = Frames.GetRef(frame, "CloseBtn"),
+            defaultsBtn = Frames.GetRef(frame, "DefaultsBtn"),
+            countdownDuration = Frames.GetRef(frame, "countdownDuration"),
             options = {},
         }
         for i = 1, #optionSuffixes do
             local suffix = optionSuffixes[i]
-            refs.options[suffix] = Frames.Ref(frame, suffix)
+            refs.options[suffix] = Frames.GetRef(frame, suffix)
         end
         return refs
     end
@@ -111,7 +111,7 @@ do
     end
 
     local function loadConfigFrame(frame)
-        UI.FrameName = Frames.InitModuleFrame(module, frame, {
+        UI.FrameName = Frames.BindModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 module:MarkDirty("show")
@@ -175,7 +175,7 @@ do
         if Options and Options.Set then
             Options.Set(name, value)
         end
-        local eventName = Events.ConfigOptionChanged and Events.ConfigOptionChanged(name)
+        local eventName = Events.GetConfigOptionChanged and Events.GetConfigOptionChanged(name)
         if eventName then
             Bus.TriggerEvent(eventName, value)
         end
@@ -184,13 +184,13 @@ do
     end
 
     local function BindHandlers(_, _, refs)
-        Frames.SafeSetScript(refs.closeBtn, "OnClick", function()
+        Frames.SetScriptSafely(refs.closeBtn, "OnClick", function()
             module:Hide()
         end)
-        Frames.SafeSetScript(refs.defaultsBtn, "OnClick", function()
+        Frames.SetScriptSafely(refs.defaultsBtn, "OnClick", function()
             loadDefaultOptions()
         end)
-        Frames.SafeSetScript(refs.countdownDuration, "OnValueChanged", function(self)
+        Frames.SetScriptSafely(refs.countdownDuration, "OnValueChanged", function(self)
             onOptionClick(self)
         end)
         initCountdownSlider(refs.countdownDuration)
@@ -198,7 +198,7 @@ do
         for i = 1, #optionSuffixes do
             local suffix = optionSuffixes[i]
             local optionBtn = refs.options[suffix]
-            Frames.SafeSetScript(optionBtn, "OnClick", function(self, button)
+            Frames.SetScriptSafely(optionBtn, "OnClick", function(self, button)
                 onOptionClick(self, button)
             end)
         end

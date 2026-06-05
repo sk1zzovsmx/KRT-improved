@@ -166,48 +166,29 @@ do
     end
 
     -- ----- Public methods ----- --
+
     function module:GetAttendanceEntry(raid, playerNid)
-        local attendance = raid and raid.attendance or nil
-        local resolvedPlayerNid = tonumber(playerNid) or 0
-        if type(attendance) ~= "table" or resolvedPlayerNid <= 0 then
+        if type(raid) ~= "table" then
             return nil
         end
 
+        local resolvedPlayerNid = tonumber(playerNid) or 0
+        if resolvedPlayerNid <= 0 then
+            return nil
+        end
+
+        local attendance = ensureAttendanceTable(raid)
         for i = 1, #attendance do
             local entry = attendance[i]
             if type(entry) == "table" and tonumber(entry.playerNid) == resolvedPlayerNid then
+                if type(entry.segments) ~= "table" then
+                    entry.segments = {}
+                end
+                entry.playerNid = resolvedPlayerNid
                 return entry
             end
         end
         return nil
-    end
-
-    function module:GetAttendanceSegments(raid, playerNid)
-        local entry = self:GetAttendanceEntry(raid, playerNid)
-        if not entry or type(entry.segments) ~= "table" then
-            return {}
-        end
-        return entry.segments
-    end
-
-    function module:AddAttendanceDelta(raidNum, delta, timestamp)
-        if type(delta) ~= "table" then
-            return false
-        end
-
-        local resolvedRaidNum = tonumber(raidNum) or tonumber(delta.raidNum) or Core.GetCurrentRaid()
-        local raid = resolvedRaidNum and Core.EnsureRaidById(resolvedRaidNum) or nil
-        if not raid then
-            return false
-        end
-        Core.EnsureRaidSchema(raid)
-
-        local resolvedTimestamp = tonumber(timestamp) or tonumber(delta.timestamp) or Time.GetCurrentTime()
-        local changed = false
-        changed = applyRosterList(raid, delta.joined, resolvedTimestamp, false) or changed
-        changed = applyRosterList(raid, delta.updated, resolvedTimestamp, false) or changed
-        changed = applyRosterList(raid, delta.left, resolvedTimestamp, true) or changed
-        return changed
     end
 
     if Bus and Bus.RegisterCallback and InternalEvents and InternalEvents.RaidRosterDelta then

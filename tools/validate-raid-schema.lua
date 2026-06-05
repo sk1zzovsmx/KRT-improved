@@ -29,11 +29,8 @@ local function normalizeRaidFallback(raid, currentSchemaVersion)
         return nil
     end
 
-    local schemaVersion = toNumber(raid.schemaVersion, 0)
-    if schemaVersion < 1 then
-        schemaVersion = 1
-    end
-    if schemaVersion > currentSchemaVersion then
+    local schemaVersion = toNumber(raid.schemaVersion, currentSchemaVersion)
+    if schemaVersion < currentSchemaVersion then
         schemaVersion = currentSchemaVersion
     end
     raid.schemaVersion = schemaVersion
@@ -68,11 +65,12 @@ local function normalizeRaidFallback(raid, currentSchemaVersion)
         local player = raid.players[i]
         if type(player) == "table" then
             player.playerNid = allocatePlayerNid(player.playerNid)
-            local count = toNumber(player.count, 0)
-            if count < 0 then
-                count = 0
+            local countMS = toNumber(player.countMS, 0)
+            if countMS < 0 then
+                countMS = 0
             end
-            player.count = count
+            player.countMS = countMS
+            player.count = nil
         end
     end
 
@@ -143,11 +141,6 @@ local function normalizeRaid(raid, currentSchemaVersion)
     local addonRoot = rawget(_G, "KRT")
     if type(addonRoot) == "table" then
         local services = addonRoot.Services
-        local migrations = services and services.RaidMigrations or nil
-        if migrations and type(migrations.ApplyRaidMigrations) == "function" then
-            migrations:ApplyRaidMigrations(raid, currentSchemaVersion)
-        end
-
         local raidStore = services and services.RaidStore or nil
         if raidStore and type(raidStore.NormalizeRaidRecord) == "function" then
             local normalized = raidStore:NormalizeRaidRecord(raid)
@@ -203,11 +196,11 @@ local function validateRaid(raid, index, currentSchemaVersion)
             if playerNid > maxPlayerNid then
                 maxPlayerNid = playerNid
             end
-            local count = toNumber(player.count, nil)
-            if count == nil then
-                add("E", "players[" .. i .. "].count is not a number")
-            elseif count < 0 then
-                add("E", "players[" .. i .. "].count is negative")
+            local countMS = toNumber(player.countMS, nil)
+            if countMS == nil then
+                add("E", "players[" .. i .. "].countMS is not a number")
+            elseif countMS < 0 then
+                add("E", "players[" .. i .. "].countMS is negative")
             end
         end
     end
@@ -312,7 +305,7 @@ local function loadRaidsFromPath(path)
 end
 
 local function run()
-    local currentSchemaVersion = 3
+    local currentSchemaVersion = 5
     local addonRoot = rawget(_G, "KRT")
     if type(addonRoot) == "table" and type(addonRoot.Core) == "table" and type(addonRoot.Core.GetRaidSchemaVersion) == "function" then
         currentSchemaVersion = toNumber(addonRoot.Core.GetRaidSchemaVersion(), 1)

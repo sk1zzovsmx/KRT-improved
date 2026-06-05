@@ -67,11 +67,13 @@ do
     local REQUEST_RATE_MAX_PER_SENDER = 6
     local REQUEST_RATE_PRUNE_SECONDS = REQUEST_RATE_WINDOW_SECONDS * 2
     local SYNC_OFFICER_LOOKUP_GRACE_SECONDS = 2
+    local PASSIVE_CLEANUP_INTERVAL_SECONDS = 5
 
     module._incoming = module._incoming or {}
     module._pendingRequests = module._pendingRequests or {}
     module._requestRate = module._requestRate or {}
     module._nextRequestId = tonumber(module._nextRequestId) or 0
+    module._nextPassiveCleanupAt = tonumber(module._nextPassiveCleanupAt) or 0
 
     -- ----- Private helpers ----- --
     local function nowSec()
@@ -109,6 +111,9 @@ do
     end
 
     local function encodeText(value)
+        if value == nil or value == "" then
+            return ""
+        end
         local input = tostring(value or "")
         local out = Payload._EncodeText(input)
         if out == "" and input ~= "" and isDebugEnabled() then
@@ -230,6 +235,16 @@ do
                 module._requestRate[sender] = nil
             end
         end
+    end
+
+    local function cleanupExpiredStatePassive()
+        local now = nowSec()
+        if now < (tonumber(module._nextPassiveCleanupAt) or 0) then
+            return
+        end
+
+        module._nextPassiveCleanupAt = now + PASSIVE_CLEANUP_INTERVAL_SECONDS
+        cleanupExpiredState()
     end
 
     local function cleanupIncomingByRequest(requestId, mode)
@@ -421,7 +436,7 @@ do
                 encodeText(p.class),
                 tonumber(p.join) or 0,
                 tonumber(p.leave) or 0,
-                tonumber(p.countMS) or tonumber(p.count) or 0
+                tonumber(p.countMS) or 0
             )
         end
 
@@ -507,6 +522,12 @@ do
             return nil
         end
 
+        local currentSchemaVersion = Core.GetRaidSchemaVersion and Core.GetRaidSchemaVersion() or 1
+        currentSchemaVersion = tonumber(currentSchemaVersion) or 1
+        if currentSchemaVersion < 1 then
+            currentSchemaVersion = 1
+        end
+
         local snapshot = {
             header = nil,
             players = {},
@@ -525,34 +546,56 @@ do
             local f, n = splitFields(line, FIELD_SEP, fields)
             local kind = f[1]
 
-            if kind == "H" and n >= 13 then
+            if kind == "H" then
+                if lineCount ~= 1 or snapshot.header or n < 13 then
+                    return nil
+                end
                 local zone = decodeText(f[5])
                 local realm = decodeText(f[8])
                 if zone == nil or realm == nil then
                     return nil
                 end
+                local protocolVersion = parseNumber(f[2], 0)
+                local schemaVersion = parseNumber(f[3], 1)
+                local raidNid = parseNumber(f[4], nil)
+                local nextPlayerNid = parseNumber(f[11], 1)
+                local nextBossNid = parseNumber(f[12], 1)
+                local nextLootNid = parseNumber(f[13], 1)
+                if not raidNid or raidNid <= 0 or schemaVersion > currentSchemaVersion then
+                    return nil
+                end
+                if nextPlayerNid < 1 or nextBossNid < 1 or nextLootNid < 1 then
+                    return nil
+                end
                 snapshot.header = {
-                    protocolVersion = parseNumber(f[2], 0),
-                    schemaVersion = parseNumber(f[3], 1),
-                    raidNid = parseNumber(f[4], nil),
+                    protocolVersion = protocolVersion,
+                    schemaVersion = schemaVersion,
+                    raidNid = raidNid,
                     zone = zone,
                     size = parseNumber(f[6], 0),
                     difficulty = parseNumber(f[7], 0),
                     realm = realm,
                     startTime = parseNumber(f[9], 0),
                     endTime = parseNumber(f[10], 0),
-                    nextPlayerNid = parseNumber(f[11], 1),
-                    nextBossNid = parseNumber(f[12], 1),
-                    nextLootNid = parseNumber(f[13], 1),
+                    nextPlayerNid = nextPlayerNid,
+                    nextBossNid = nextBossNid,
+                    nextLootNid = nextLootNid,
                 }
-            elseif kind == "P" and n >= 9 then
+            elseif kind == "P" then
+                if not snapshot.header or n < 9 then
+                    return nil
+                end
                 local name = decodeText(f[3])
                 local className = decodeText(f[6])
                 if name == nil or className == nil then
                     return nil
                 end
+                local playerNid = parseNumber(f[2], nil)
+                if not playerNid or playerNid <= 0 then
+                    return nil
+                end
                 tinsert(snapshot.players, {
-                    playerNid = parseNumber(f[2], nil),
+                    playerNid = playerNid,
                     name = name,
                     rank = parseNumber(f[4], 0),
                     subgroup = parseNumber(f[5], 1),
@@ -561,20 +604,34 @@ do
                     leave = parseNumber(f[8], 0),
                     count = parseNumber(f[9], 0),
                 })
-            elseif kind == "A" and n >= 6 then
+            elseif kind == "A" then
+                if not snapshot.header or n < 6 then
+                    return nil
+                end
+                local playerNid = parseNumber(f[2], nil)
+                if not playerNid or playerNid <= 0 then
+                    return nil
+                end
                 tinsert(snapshot.attendance, {
-                    playerNid = parseNumber(f[2], nil),
+                    playerNid = playerNid,
                     startTime = parseNumber(f[3], 0),
                     endTime = parseNumber(f[4], 0),
                     subgroup = parseNumber(f[5], 1),
                     online = parseNumber(f[6], 1) ~= 0,
                 })
-            elseif kind == "B" and n >= 8 then
+            elseif kind == "B" then
+                if not snapshot.header or n < 8 then
+                    return nil
+                end
                 local name = decodeText(f[3])
                 local mode = decodeText(f[4])
                 local hash = decodeText(f[7])
                 local playersRaw = decodeText(f[8])
                 if name == nil or mode == nil or hash == nil or playersRaw == nil then
+                    return nil
+                end
+                local bossNid = parseNumber(f[2], nil)
+                if not bossNid or bossNid <= 0 then
                     return nil
                 end
 
@@ -587,7 +644,7 @@ do
                 end
 
                 tinsert(snapshot.bosses, {
-                    bossNid = parseNumber(f[2], nil),
+                    bossNid = bossNid,
                     name = name,
                     mode = mode,
                     difficulty = parseNumber(f[5], 0),
@@ -595,7 +652,10 @@ do
                     hash = hash,
                     players = players,
                 })
-            elseif kind == "L" and n >= 14 then
+            elseif kind == "L" then
+                if not snapshot.header or n < 14 then
+                    return nil
+                end
                 local itemName = decodeText(f[4])
                 local itemString = decodeText(f[5])
                 local itemLink = decodeText(f[6])
@@ -608,8 +668,12 @@ do
                 if itemTexture == nil or looterName == nil then
                     return nil
                 end
+                local lootNid = parseNumber(f[2], nil)
+                if not lootNid or lootNid <= 0 then
+                    return nil
+                end
                 tinsert(snapshot.loot, {
-                    lootNid = parseNumber(f[2], nil),
+                    lootNid = lootNid,
                     itemId = parseNumber(f[3], 0),
                     itemName = itemName,
                     itemString = itemString,
@@ -624,7 +688,10 @@ do
                     bossNid = parseNumber(f[13], 0),
                     time = parseNumber(f[14], 0),
                 })
-            elseif kind == "C" and n >= 3 then
+            elseif kind == "C" then
+                if not snapshot.header or n < 3 then
+                    return nil
+                end
                 local name = decodeText(f[2])
                 local spec = decodeText(f[3])
                 if name == nil or spec == nil then
@@ -633,6 +700,8 @@ do
                 if name ~= "" then
                     snapshot.changes[name] = spec
                 end
+            else
+                return nil
             end
         end
 
@@ -1368,18 +1437,16 @@ do
             return
         end
 
-        local ordered = {}
         for i = 1, state.total do
             local piece = state.parts[i]
             if piece == nil then
                 module._incoming[key] = nil
                 return
             end
-            ordered[i] = piece
         end
         module._incoming[key] = nil
 
-        local encodedPayload = tconcat(ordered, "")
+        local encodedPayload = tconcat(state.parts, "")
         local payload = decodeText(encodedPayload)
         if payload == nil then
             addon:warn((Diag.W.LogSyncDecodeFailed):format(tostring(sender), tostring(requestId), tostring(raidNid)))
@@ -1515,7 +1582,7 @@ do
             return
         end
 
-        cleanupExpiredState()
+        cleanupExpiredStatePassive()
 
         local fields, n = splitFields(msg, FIELD_SEP)
         if n < 4 then

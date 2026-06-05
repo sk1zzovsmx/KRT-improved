@@ -6,9 +6,9 @@
 local tonumber, tostring, type = tonumber, tostring, type
 local pairs = pairs
 
-local CURRENT_SCHEMA_VERSION = 3
+local CURRENT_SCHEMA_VERSION = 5
 
-local LEGACY_RUNTIME_KEYS = {
+local ROOT_RUNTIME_CACHE_KEYS = {
     "_playersByName",
     "_playerIdxByNid",
     "_bossIdxByNid",
@@ -229,11 +229,30 @@ local function compactRaidForPersistence(raid)
     for i = 1, #players do
         local player = players[i]
         if type(player) == "table" then
-            local count = tonumber(player.count) or 0
-            if count < 0 then
-                count = 0
+            local countMS = tonumber(player.countMS) or 0
+            if countMS < 0 then
+                countMS = 0
             end
-            player.count = count
+            player.countMS = (countMS > 0) and countMS or nil
+            player.count = nil
+
+            local countOs = tonumber(player.countOs) or 0
+            if countOs < 0 then
+                countOs = 0
+            end
+            player.countOs = (countOs > 0) and countOs or nil
+
+            local countFree = tonumber(player.countFree) or 0
+            if countFree < 0 then
+                countFree = 0
+            end
+            player.countFree = (countFree > 0) and countFree or nil
+
+            local countSR = tonumber(player.countSR) or 0
+            if countSR < 0 then
+                countSR = 0
+            end
+            player.countSR = (countSR > 0) and countSR or nil
 
             local rank = tonumber(player.rank) or 0
             player.rank = (rank > 0) and rank or nil
@@ -364,7 +383,6 @@ local function normalizeRaidRecord(rawRaid, currentSchemaVersion)
         nextPlayerNid = 1
     end
 
-    local playerNidByName = {}
     local validPlayerNids = {}
     for i = 1, #raid.players do
         local player = raid.players[i]
@@ -374,19 +392,16 @@ local function normalizeRaidRecord(rawRaid, currentSchemaVersion)
             player.playerNid = playerNid
             validPlayerNids[playerNid] = true
 
-            local count = tonumber(player.count) or 0
-            if count < 0 then
-                count = 0
+            local countMS = tonumber(player.countMS) or 0
+            if countMS < 0 then
+                countMS = 0
             end
-            player.count = count
+            player.countMS = countMS
+            player.count = nil
 
             local name = normalizeName(player.name)
             if name then
                 player.name = name
-                local lower = normalizeLower(name)
-                if lower and playerNidByName[lower] == nil then
-                    playerNidByName[lower] = playerNid
-                end
             end
         end
     end
@@ -411,9 +426,6 @@ local function normalizeRaidRecord(rawRaid, currentSchemaVersion)
                 for j = 1, #rawPlayers do
                     local rawPlayer = rawPlayers[j]
                     local playerNid = tonumber(rawPlayer)
-                    if not playerNid and type(rawPlayer) == "string" then
-                        playerNid = playerNidByName[normalizeLower(rawPlayer)]
-                    end
                     if playerNid and playerNid > 0 and validPlayerNids[playerNid] and not seen[playerNid] then
                         seen[playerNid] = true
                         attendees[#attendees + 1] = playerNid
@@ -454,8 +466,8 @@ local function normalizeRaidRecord(rawRaid, currentSchemaVersion)
     raid.raidNid = tonumber(raid.raidNid)
 
     raid._runtime = nil
-    for i = 1, #LEGACY_RUNTIME_KEYS do
-        raid[LEGACY_RUNTIME_KEYS[i]] = nil
+    for i = 1, #ROOT_RUNTIME_CACHE_KEYS do
+        raid[ROOT_RUNTIME_CACHE_KEYS[i]] = nil
     end
 
     compactRaidForPersistence(raid)
@@ -484,7 +496,7 @@ end
 local function resolvePlayerNameDisplay(playerKey, player)
     local candidate = nil
     if type(player) == "table" then
-        candidate = player.playerNameDisplay or player.original
+        candidate = player.playerNameDisplay
     end
     candidate = normalizeReservePlayerDisplayName(candidate or playerKey)
     if not candidate or candidate == "" then

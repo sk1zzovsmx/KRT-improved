@@ -41,21 +41,10 @@ do
 
     -- ----- Private helpers ----- --
     local function showMasterOnlyWarning()
-        local services = addon.Services
-        local chat = services and services.Chat or nil
-        if chat and type(chat.ShowMasterOnlyWarning) == "function" then
-            chat:ShowMasterOnlyWarning()
-            return
-        end
         addon:warn(L.WarnMLOnlyMode or L.WarnMLNoPermission)
     end
 
     -- ----- Public methods ----- --
-
-    function module:IsMasterLoot()
-        local method = select(1, getLootMethod())
-        return (method == "master")
-    end
 
     function module:IsMasterLooter()
         local method, partyMaster, raidMaster = getLootMethod()

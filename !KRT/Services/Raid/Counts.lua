@@ -121,7 +121,7 @@ do
         if not player then
             return 0
         end
-        local field = LOOT_FIELD[lootType] or "count"
+        local field = LOOT_FIELD[lootType] or "countMS"
         return tonumber(player[field]) or 0
     end
 
@@ -131,7 +131,7 @@ do
             return
         end
 
-        local field = LOOT_FIELD[lootType] or "count"
+        local field = LOOT_FIELD[lootType] or "countMS"
         value = tonumber(value) or 0
         if value < 0 then
             value = 0
@@ -166,7 +166,7 @@ do
         module:SetPlayerLootCountByNid(playerNid, lootType, nextVal, raidNum)
     end
 
-    function module:AddPlayerLootCount(name, lootType, delta, raidNum)
+    local function addPlayerLootCount(name, lootType, delta, raidNum)
         raidNum = raidNum or Core.GetCurrentRaid()
         if not raidNum or not name then
             return
@@ -211,7 +211,7 @@ do
         if not lootType then
             return
         end
-        module:AddPlayerLootCount(name, lootType, delta, raidNum)
+        addPlayerLootCount(name, lootType, delta, raidNum)
     end
 
     function module:GetPlayerCount(name, raidNum)

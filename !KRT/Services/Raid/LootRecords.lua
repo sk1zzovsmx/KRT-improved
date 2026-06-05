@@ -93,39 +93,6 @@ do
         return nil
     end
 
-    -- Retrieves the position of a specific loot item within the raid's loot table.
-    function module:GetLootID(itemID, raidNum, holderName, bossNid)
-        raidNum = raidNum or Core.GetCurrentRaid()
-        local raid = Core.EnsureRaidById(raidNum)
-        if not raid then
-            return 0
-        end
-
-        Core.EnsureRaidSchema(raid)
-        holderName = Strings.NormalizeName(holderName, true)
-
-        itemID = tonumber(itemID)
-        if not itemID then
-            return 0
-        end
-
-        local queryBossNid = tonumber(bossNid) or 0
-        local loot = raid.loot or {}
-
-        for i = #loot, 1, -1 do
-            local v = loot[i]
-            if v and tonumber(v.itemId) == itemID then
-                local winnerName = resolveLootLooterName(raid, v)
-                if not holderName or holderName == "" or winnerName == holderName then
-                    if queryBossNid <= 0 or tonumber(v.bossNid) == queryBossNid then
-                        return tonumber(v.lootNid) or 0
-                    end
-                end
-            end
-        end
-        return 0
-    end
-
     function module:MatchHeldInventoryLoot(entry, raidNum, itemLink, holderName)
         if type(entry) ~= "table" or tonumber(entry.rollType) ~= rollTypes.HOLD or not itemLink then
             return false

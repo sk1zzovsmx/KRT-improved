@@ -15,17 +15,17 @@ local IgnoredMobs = addon.IgnoredMobs
 local L = feature.L
 
 -- ----- Internal state ----- --
-local LEGACY_TRASH_MOB_NAME = "_TrashMob_"
+local DEFAULT_TRASH_MOB_NAME = "_TrashMob_"
 local cachedTrashMobName
 
 -- ----- Private helpers ----- --
 local function resolveTrashMobName()
     local localizedName = L and L.StrTrashMobName
     if type(localizedName) ~= "string" or localizedName == "" then
-        return LEGACY_TRASH_MOB_NAME
+        return DEFAULT_TRASH_MOB_NAME
     end
     if localizedName == "StrTrashMobName" or localizedName == "L.StrTrashMobName" then
-        return LEGACY_TRASH_MOB_NAME
+        return DEFAULT_TRASH_MOB_NAME
     end
     return localizedName
 end
@@ -150,7 +150,7 @@ function IgnoredMobs.GetTrashMobName()
 end
 
 function IgnoredMobs.IsTrashMobName(name)
-    return name == IgnoredMobs.GetTrashMobName() or name == LEGACY_TRASH_MOB_NAME
+    return name == IgnoredMobs.GetTrashMobName()
 end
 
 function IgnoredMobs.Contains(npcId)

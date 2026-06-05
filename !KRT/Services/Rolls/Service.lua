@@ -37,6 +37,7 @@ local GetItemIndex = feature.GetItemIndex
 local tconcat = table.concat
 
 local tostring, tonumber = tostring, tonumber
+local upper = string.upper
 
 local function getReserveCountForItem(itemId, name)
     local reserves = Services.Reserves
@@ -85,7 +86,7 @@ do
     feature.EnsureServiceNamespace("Rolls")
     local module = addon.Services.Rolls
 
-    -- Namespace registration: opzioni che governano il countdown e la modalità di voto.
+    -- Namespace registration: options that control countdown and roll-response policy.
     addon.Options.AddNamespace("Rolls", {
         countdownDuration = 5,
         countdownSimpleRaidMsg = false,
@@ -96,8 +97,8 @@ do
     local Sessions = assert(module._Sessions, "Rolls session helpers are not initialized")
     local History = assert(module._History, "Rolls history helpers are not initialized")
     local Responses = assert(module._Responses, "Rolls response helpers are not initialized")
+    local Strategies = assert(module._Strategies, "Rolls strategy helpers are not initialized")
     local Display = assert(module._Display, "Rolls display helpers are not initialized")
-    local RESPONSE_STATUS = Responses.STATUS
     local reasonCodes = Responses.REASONS
     -- ----- Internal state ----- --
     local state = {
@@ -137,6 +138,7 @@ do
     -- Session helpers
     -- ============================================================================
     local sessionsContext
+    local getCurrentRollItemID
 
     local function getSessionsContext()
         if sessionsContext then
@@ -149,7 +151,7 @@ do
             getItem = GetItem,
             getItemIndex = GetItemIndex,
             getCurrentRollItemID = function()
-                return module:GetCurrentRollItemID()
+                return getCurrentRollItemID()
             end,
         }
         return sessionsContext
@@ -175,6 +177,17 @@ do
         return Sessions.GetManualExclusionEntry(getSessionsContext(), name)
     end
 
+    local function getManualExclusionKey(name)
+        local normalized = Strings and Strings.NormalizeLower and Strings.NormalizeLower(name) or nil
+        if normalized and normalized ~= "" then
+            return normalized
+        end
+        if type(name) == "string" and name ~= "" then
+            return string.lower(name)
+        end
+        return nil
+    end
+
     local function getActiveRollType()
         return Sessions.GetActiveRollType(getSessionsContext())
     end
@@ -189,10 +202,6 @@ do
 
     local function normalizeExpectedWinners(count)
         return Sessions.NormalizeExpectedWinners(getSessionsContext(), count)
-    end
-
-    local function getRollSessionItemKey(itemLink)
-        return Sessions.GetRollSessionItemKey(itemLink)
     end
 
     local function ensureAdHocRollSession()
@@ -223,6 +232,33 @@ do
     -- Eligibility helpers
     -- ============================================================================
     local historyContext
+    getCurrentRollItemID = function()
+        local session = getRollSession()
+        local sessionItemId = session and tonumber(session.itemId) or nil
+        if sessionItemId and sessionItemId > 0 then
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(sessionItemId)))
+            end
+            return sessionItemId
+        end
+
+        local index = GetItemIndex()
+        local item = GetItem and GetItem(index)
+        local itemLink = item and item.itemLink
+        if not itemLink then
+            return nil
+        end
+        local itemId = Item.GetItemIdFromLink(itemLink)
+        if itemId and session then
+            session.itemId = itemId
+            session.itemLink = itemLink
+            session.itemKey = Item.GetItemStringFromLink(itemLink) or itemLink
+        end
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(itemId)))
+        end
+        return itemId
+    end
 
     local function getHistoryContext()
         if historyContext then
@@ -240,7 +276,7 @@ do
                 return lootState.winner
             end,
             getCurrentRollItemID = function()
-                return module:GetCurrentRollItemID()
+                return getCurrentRollItemID()
             end,
             getResponseBestRoll = function(name)
                 local response = state.responsesByPlayer[name]
@@ -300,7 +336,7 @@ do
             getActiveRollType = getActiveRollType,
             getCurrentItemLink = getCurrentItemLink,
             getCurrentRollItemID = function()
-                return module:GetCurrentRollItemID()
+                return getCurrentRollItemID()
             end,
             getReserveCountForItem = getReserveCountForItem,
             getRollTypeBucket = getRollTypeBucket,
@@ -369,6 +405,7 @@ do
             prepareResponseState = prepareResponseState,
             refreshMaterializedResponses = refreshMaterializedResponses,
             finalizeMaterializedResponses = finalizeMaterializedResponses,
+            strategyHelpers = Strategies,
             getExpectedWinnerCount = getExpectedWinnerCount,
             getPlusForItem = getPlusForItem,
             isPlusSystemEnabled = isPlusSystemEnabled,
@@ -382,6 +419,9 @@ do
             getItemReserveContext = getItemReserveContext,
             getCurrentRaid = function()
                 return addon.Core.GetCurrentRaid and addon.Core.GetCurrentRaid() or nil
+            end,
+            getSourceRollType = function()
+                return state.tieReroll and state.tieReroll.sourceRollType or getActiveRollType()
             end,
         }
         return displayContext
@@ -413,7 +453,7 @@ do
 
     -- ----- Public methods ----- --
     function module:Roll(_btn)
-        local itemId = self:GetCurrentRollItemID()
+        local itemId = getCurrentRollItemID()
         if not itemId then
             return
         end
@@ -438,22 +478,14 @@ do
         end
     end
 
-    function module:PlayerPass(name)
-        return submitExplicitResponse(name, RESPONSE_STATUS.PASS, reasonCodes.PLAYER_PASS, reasonCodes.PLAYER_PASS)
-    end
-
-    function module:PlayerCancel(name)
-        return submitExplicitResponse(name, RESPONSE_STATUS.CANCELLED, reasonCodes.PLAYER_CANCEL, reasonCodes.PLAYER_CANCEL)
-    end
-
-    function module:RollStatus()
-        local itemId = self:GetCurrentRollItemID()
+    function module:GetRollStatus()
+        local itemId = getCurrentRollItemID()
         local name = Core.GetPlayerName()
         updateLocalRollState(itemId, name)
         return getActiveRollType(), state.record, state.canRoll, state.rolled
     end
 
-    function module:RecordRolls(bool)
+    function module:SetRollRecordingEnabled(bool)
         local on = (bool == true)
         state.canRoll = on
         state.record = on
@@ -509,16 +541,46 @@ do
         return submitIncomingRoll(player, value, "debug_roll")
     end
 
+    function module:GetCandidateEligibility(name, itemLink, rollType, opts)
+        local itemId = Item and Item.GetItemIdFromLink and Item.GetItemIdFromLink(itemLink) or nil
+        return buildCandidateEligibility(name, itemId, itemLink, rollType, opts)
+    end
+
+    function module:SetManualExclusion(name, excluded, reason)
+        local key = getManualExclusionKey(name)
+        if not key then
+            return false
+        end
+
+        if excluded == false or excluded == nil then
+            state.manualExclusions[key] = nil
+            return true
+        end
+
+        state.manualExclusions[key] = {
+            name = Strings.NormalizeName and Strings.NormalizeName(name, true) or name,
+            reason = reason or reasonCodes.MANUAL_EXCLUSION,
+        }
+        return true
+    end
+
+    function module:SetPlayerResponse(name, status)
+        local responseStatus = type(status) == "string" and upper(status) or status
+        if responseStatus == Responses.STATUS.PASS then
+            return submitExplicitResponse(name, Responses.STATUS.PASS, reasonCodes.PLAYER_PASS, "player_pass")
+        end
+        if responseStatus == Responses.STATUS.CANCELLED or responseStatus == "CANCEL" then
+            return submitExplicitResponse(name, Responses.STATUS.CANCELLED, reasonCodes.PLAYER_CANCEL, "player_cancel")
+        end
+        return false, reasonCodes.STATE_TRANSITION_DENIED
+    end
+
     function module:GetRolls()
         return History.GetRolls(getHistoryContext())
     end
 
-    function module:DidRoll(itemId, name)
-        return History.DidRoll(getHistoryContext(), itemId, name)
-    end
-
-    function module:HighestRoll(name)
-        return History.HighestRoll(getHistoryContext(), name)
+    function module:GetHighestRoll(name)
+        return History.GetHighestRoll(getHistoryContext(), name)
     end
 
     function module:ClearRolls(_rec)
@@ -546,9 +608,10 @@ do
             return false
         end
 
-        itemId = self:GetCurrentRollItemID()
+        itemId = getCurrentRollItemID()
         itemLink = getCurrentItemLink()
         currentRollType = getActiveRollType()
+        reroll.sourceRollType = currentRollType
 
         clearRollEntries()
         clearResponseState({
@@ -587,68 +650,8 @@ do
         return true, reroll.ordered
     end
 
-    function module:GetCurrentRollItemID()
-        local session = getRollSession()
-        local sessionItemId = session and tonumber(session.itemId) or nil
-        if sessionItemId and sessionItemId > 0 then
-            if isDebugEnabled() then
-                addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(sessionItemId)))
-            end
-            return sessionItemId
-        end
-
-        local index = GetItemIndex()
-        local item = GetItem and GetItem(index)
-        local itemLink = item and item.itemLink
-        if not itemLink then
-            return nil
-        end
-        local itemId = Item.GetItemIdFromLink(itemLink)
-        if itemId and session then
-            session.itemId = itemId
-            session.itemLink = itemLink
-            session.itemKey = Item.GetItemStringFromLink(itemLink) or itemLink
-        end
-        if isDebugEnabled() then
-            addon:debug(Diag.D.LogRollsCurrentItemId:format(tostring(itemId)))
-        end
-        return itemId
-    end
-
-    function module:GetCandidateEligibility(name, itemLink, rollType)
-        return buildCandidateEligibility(name, nil, itemLink, rollType)
-    end
-
     function module:ValidateWinner(playerName, itemLink, rollType)
         return Responses.ValidateWinner(getResponsesContext(), playerName, itemLink, rollType)
-    end
-
-    function module:SetManualExclusion(name, excluded)
-        local key = Sessions.NormalizeCandidateKey(name)
-        if not key then
-            return false
-        end
-
-        if excluded == false then
-            state.manualExclusions[key] = nil
-        else
-            state.manualExclusions[key] = true
-        end
-        return true
-    end
-
-    function module:IsManuallyExcluded(name)
-        return getManualExclusionEntry(name) ~= nil
-    end
-
-    -- Checks if a player has reserved the specified item.
-    function module:IsReserved(itemId, name)
-        return getReserveCountForItem(itemId, name) > 0
-    end
-
-    -- Gets the number of reserves a player has used for an item.
-    function module:GetUsedReserveCount(itemId, name)
-        return History.GetUsedReserveCount(getHistoryContext(), itemId, name)
     end
 
     -- Public display-model contract for controller/UI consumers. The returned
@@ -659,10 +662,6 @@ do
 
     function module:GetRollSession()
         return getRollSession()
-    end
-
-    function module:GetRollSessionItemKey(itemLink)
-        return getRollSessionItemKey(itemLink)
     end
 
     function module:SetExpectedWinners(count)
@@ -686,10 +685,6 @@ do
         return Display.GetResolvedWinner(getDisplayContext(), model)
     end
 
-    function module:GetDisplayedWinner(preferredWinner, model)
-        return Display.GetDisplayedWinner(getDisplayContext(), preferredWinner, model)
-    end
-
     function module:ShouldUseTieReroll(model)
         return Display.ShouldUseTieReroll(getDisplayContext(), model)
     end
@@ -707,7 +702,7 @@ do
     end
 
     function module:FinalizeRollSession()
-        module:RecordRolls(false)
+        module:SetRollRecordingEnabled(false)
         module:StopCountdown()
         module:GetDisplayModel()
     end
@@ -725,6 +720,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Services/Rolls/Sessions",
             "Services/Rolls/History",
             "Services/Rolls/Responses",
+            "Services/Rolls/Strategies",
             "Services/Rolls/Resolution",
             "Services/Rolls/Display",
         },

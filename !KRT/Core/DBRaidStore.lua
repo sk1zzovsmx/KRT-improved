@@ -9,7 +9,6 @@ local feature = addon.Core.GetFeatureShared()
 local Core = feature.Core
 local Time = feature.Time
 local Strings = feature.Strings
-local Diag = feature.Diag
 
 local NormalizeName = (Strings and Strings.NormalizeName) or nil
 
@@ -24,7 +23,7 @@ do
     local module = addon.DB.RaidStore
 
     -- ----- Internal state ----- --
-    local LEGACY_RUNTIME_KEYS = {
+    local ROOT_RUNTIME_CACHE_KEYS = {
         _playersByName = true,
         _playerIdxByNid = true,
         _bossIdxByNid = true,
@@ -106,8 +105,8 @@ do
         return nil
     end
 
-    local function removeLegacyRuntimeCaches(raid)
-        for key in pairs(LEGACY_RUNTIME_KEYS) do
+    local function removeRootRuntimeCaches(raid)
+        for key in pairs(ROOT_RUNTIME_CACHE_KEYS) do
             raid[key] = nil
         end
     end
@@ -244,77 +243,17 @@ do
         return out
     end
 
-    local normalizeNameLower = Strings.GetNormalizedNameLower
-
-    local function isLegacyDiagnosticPhase(contextTag)
-        return contextTag == "load" or contextTag == "save"
+    local function markRaidNidIndexDirty()
+        storeState.raidNidIndexDirty = true
     end
 
-    local function scanLegacyRaidPayload(raid)
-        local legacyRuntimeKeys = {}
-        for key in pairs(LEGACY_RUNTIME_KEYS) do
-            if raid[key] ~= nil then
-                legacyRuntimeKeys[#legacyRuntimeKeys + 1] = key
-            end
+    local function buildRaidNidIndexSignature(raids)
+        local parts = {}
+        for i = 1, #raids do
+            local raid = raids[i]
+            parts[i] = tostring(type(raid) == "table" and tonumber(raid.raidNid) or "")
         end
-
-        local legacyAttendanceMaskCount = 0
-        local bosses = (type(raid.bossKills) == "table") and raid.bossKills or nil
-        if bosses then
-            for i = 1, #bosses do
-                local boss = bosses[i]
-                if type(boss) == "table" and boss.attendanceMask ~= nil then
-                    legacyAttendanceMaskCount = legacyAttendanceMaskCount + 1
-                end
-            end
-        end
-
-        local legacyLootLooterCount = 0
-        local lootRows = (type(raid.loot) == "table") and raid.loot or nil
-        if lootRows then
-            for i = 1, #lootRows do
-                local loot = lootRows[i]
-                if type(loot) == "table" and loot.looter ~= nil then
-                    legacyLootLooterCount = legacyLootLooterCount + 1
-                end
-            end
-        end
-
-        return {
-            legacyRuntimeKeys = legacyRuntimeKeys,
-            legacyAttendanceMaskCount = legacyAttendanceMaskCount,
-            legacyLootLooterCount = legacyLootLooterCount,
-        }
-    end
-
-    local function warnLegacyRaidPayload(contextTag, raid, raidIndex, legacy)
-        local runtimeKeys = legacy.legacyRuntimeKeys or {}
-        local runtimeKeysCount = #runtimeKeys
-        local lootLooterCount = tonumber(legacy.legacyLootLooterCount) or 0
-        local attendanceMaskCount = tonumber(legacy.legacyAttendanceMaskCount) or 0
-        if runtimeKeysCount == 0 and lootLooterCount == 0 and attendanceMaskCount == 0 then
-            return
-        end
-
-        local runtimeText = (runtimeKeysCount > 0) and tconcat(runtimeKeys, ";") or "-"
-        local raidNid = tostring(tonumber(raid and raid.raidNid) or "?")
-        local idxText = tostring(tonumber(raidIndex) or "?")
-        local template = Diag.W and Diag.W.LogRaidLegacyFieldsDetected
-        if type(template) == "string" then
-            addon:warn(template:format(contextTag, raidNid, idxText, runtimeText, lootLooterCount, attendanceMaskCount))
-            return
-        end
-
-        addon:warn(
-            ("[RaidStore] Legacy fields detected phase=%s raidNid=%s idx=%s runtime=%s looter=%d mask=%d"):format(
-                tostring(contextTag or "?"),
-                raidNid,
-                idxText,
-                runtimeText,
-                lootLooterCount,
-                attendanceMaskCount
-            )
-        )
+        return tconcat(parts, "|")
     end
 
     local function rebuildRaidNidIndex()
@@ -333,43 +272,137 @@ do
 
         storeState.raidIdxByNid = raidIdxByNid
         storeState.nextRaidNid = getNextRaidNidValue()
+        storeState.raidNidIndexCount = #raids
+        storeState.raidNidIndexSignature = buildRaidNidIndexSignature(raids)
+        storeState.raidNidIndexDirty = nil
+        return raids, raidIdxByNid
+    end
+
+    local function ensureRaidNidIndex()
+        local raids = ensureRaidsTable()
+        local signature = buildRaidNidIndexSignature(raids)
+        if
+            storeState.raidNidIndexDirty ~= true
+            and type(storeState.raidIdxByNid) == "table"
+            and tonumber(storeState.raidNidIndexCount) == #raids
+            and storeState.raidNidIndexSignature == signature
+        then
+            return raids, storeState.raidIdxByNid
+        end
+        return rebuildRaidNidIndex()
+    end
+
+    local function hasRawRaidNid(raids, raidNid)
+        for i = 1, #raids do
+            local raid = raids[i]
+            if type(raid) == "table" and tonumber(raid.raidNid) == raidNid then
+                return true, i
+            end
+        end
+        return false, nil
     end
 
     local function getNextRaidNid(preferred)
-        rebuildRaidNidIndex()
-
-        local raidIdxByNid = storeState.raidIdxByNid or {}
+        local raids, raidIdxByNid = ensureRaidNidIndex()
         local raidNid = tonumber(preferred)
-        if raidNid and raidNid > 0 and not raidIdxByNid[raidNid] then
-            if raidNid >= (tonumber(storeState.nextRaidNid) or 1) then
-                storeState.nextRaidNid = raidNid + 1
+        if raidNid and raidNid > 0 then
+            local cachedIdx = raidIdxByNid[raidNid]
+            if cachedIdx and tonumber(raids[cachedIdx] and raids[cachedIdx].raidNid) ~= raidNid then
+                markRaidNidIndexDirty()
+                raids, raidIdxByNid = rebuildRaidNidIndex()
+                cachedIdx = raidIdxByNid[raidNid]
+            elseif not cachedIdx then
+                local exists = hasRawRaidNid(raids, raidNid)
+                if exists then
+                    markRaidNidIndexDirty()
+                    raids, raidIdxByNid = rebuildRaidNidIndex()
+                    cachedIdx = raidIdxByNid[raidNid]
+                end
             end
-            return raidNid
+
+            if not cachedIdx then
+                if raidNid >= (tonumber(storeState.nextRaidNid) or 1) then
+                    storeState.nextRaidNid = raidNid + 1
+                end
+                return raidNid
+            end
         end
 
         local nextRaidNid = tonumber(storeState.nextRaidNid) or 1
         if nextRaidNid < 1 then
             nextRaidNid = 1
         end
-        while raidIdxByNid[nextRaidNid] do
+        while raidIdxByNid[nextRaidNid] or hasRawRaidNid(raids, nextRaidNid) do
             nextRaidNid = nextRaidNid + 1
         end
         storeState.nextRaidNid = nextRaidNid + 1
         return nextRaidNid
     end
 
+    local function buildRuntimeIndexesForNormalizedRaid(raid)
+        if not raid then
+            return nil
+        end
+
+        local runtime = ensureRuntimeTable(raid)
+        local playersByName = acquireRuntimeIndexMap(runtime, "playersByName")
+        local playerIdxByNid = acquireRuntimeIndexMap(runtime, "playerIdxByNid")
+        local bossIdxByNid = acquireRuntimeIndexMap(runtime, "bossIdxByNid")
+        local bossByNid = acquireRuntimeIndexMap(runtime, "bossByNid")
+        local lootIdxByNid = acquireRuntimeIndexMap(runtime, "lootIdxByNid")
+        local lootByNid = acquireRuntimeIndexMap(runtime, "lootByNid")
+
+        local players = raid.players or {}
+        for i = 1, #players do
+            local player = players[i]
+            if type(player) == "table" then
+                if player.name then
+                    playersByName[player.name] = player
+                end
+                local playerNid = tonumber(player.playerNid)
+                if playerNid then
+                    playerIdxByNid[playerNid] = i
+                end
+            end
+        end
+
+        local bosses = raid.bossKills or {}
+        for i = 1, #bosses do
+            local boss = bosses[i]
+            if type(boss) == "table" then
+                local bossNid = tonumber(boss.bossNid)
+                if bossNid then
+                    bossIdxByNid[bossNid] = i
+                    bossByNid[bossNid] = boss
+                end
+            end
+        end
+
+        local lootRows = raid.loot or {}
+        for i = 1, #lootRows do
+            local loot = lootRows[i]
+            if type(loot) == "table" then
+                local lootNid = tonumber(loot.lootNid)
+                if lootNid then
+                    lootIdxByNid[lootNid] = i
+                    lootByNid[lootNid] = loot
+                end
+            end
+        end
+
+        runtime.signature = buildRuntimeSignature(raid, players, bosses, lootRows)
+
+        return runtime
+    end
+
     -- ----- Public methods ----- --
     function module:GetAllRaids()
-        rebuildRaidNidIndex()
-        return ensureRaidsTable()
+        local raids = ensureRaidNidIndex()
+        return raids
     end
 
     function module:GetRawRaids()
         return ensureRaidsTable()
-    end
-
-    function module:IsLegacyRuntimeKey(key)
-        return LEGACY_RUNTIME_KEYS[key] == true
     end
 
     function module:GetRaidByIndex(index)
@@ -378,8 +411,7 @@ do
             return nil, nil
         end
 
-        rebuildRaidNidIndex()
-        local raids = ensureRaidsTable()
+        local raids = ensureRaidNidIndex()
         local raid = raids[idx]
         if not raid then
             return nil, idx
@@ -393,14 +425,24 @@ do
             return nil, nil, nil
         end
 
-        rebuildRaidNidIndex()
-        local raidIdxByNid = storeState.raidIdxByNid or {}
+        local raids, raidIdxByNid = ensureRaidNidIndex()
         local idx = raidIdxByNid[nid]
+        if idx and tonumber(raids[idx] and raids[idx].raidNid) ~= nid then
+            markRaidNidIndexDirty()
+            raids, raidIdxByNid = rebuildRaidNidIndex()
+            idx = raidIdxByNid[nid]
+        elseif not idx then
+            local exists = hasRawRaidNid(raids, nid)
+            if exists then
+                markRaidNidIndexDirty()
+                raids, raidIdxByNid = rebuildRaidNidIndex()
+                idx = raidIdxByNid[nid]
+            end
+        end
         if not idx then
             return nil, nil, nid
         end
 
-        local raids = ensureRaidsTable()
         local raid = raids[idx]
         if not raid then
             return nil, nil, nid
@@ -478,22 +520,12 @@ do
             return nil
         end
 
-        if isLegacyDiagnosticPhase(contextTag) then
-            local legacy = scanLegacyRaidPayload(raid)
-            warnLegacyRaidPayload(contextTag, raid, raidIndex, legacy)
-        end
-
         local schemaVersion = getSchemaVersion()
-        local migrations = getMigrations()
-        if migrations and migrations.ApplyRaidMigrations then
-            migrations:ApplyRaidMigrations(raid, schemaVersion)
-        else
-            raid.schemaVersion = tonumber(raid.schemaVersion) or schemaVersion
-        end
-
-        raid.schemaVersion = tonumber(raid.schemaVersion) or schemaVersion
-        if raid.schemaVersion < 1 then
+        local storedSchemaVersion = tonumber(raid.schemaVersion)
+        if not storedSchemaVersion or storedSchemaVersion < schemaVersion then
             raid.schemaVersion = schemaVersion
+        else
+            raid.schemaVersion = storedSchemaVersion
         end
 
         raid.players = (type(raid.players) == "table") and raid.players or {}
@@ -506,7 +538,6 @@ do
         local assignedByRef = {}
 
         local players = raid.players
-        local playerNidByName = {}
         local validPlayerNids = {}
         for i = 1, #players do
             local player = players[i]
@@ -520,12 +551,12 @@ do
                     assignedByRef[player] = playerNid
                 end
 
-                -- countMS: fall back to legacy 'count' field for pre-v5 saves.
-                local countMS = tonumber(player.countMS) or tonumber(player.count) or 0
+                local countMS = tonumber(player.countMS) or 0
                 if countMS < 0 then
                     countMS = 0
                 end
                 player.countMS = countMS
+                player.count = nil
 
                 local countOs = tonumber(player.countOs) or 0
                 if countOs < 0 then
@@ -548,10 +579,6 @@ do
                 local playerNid = tonumber(player.playerNid)
                 if playerNid and playerNid > 0 then
                     validPlayerNids[playerNid] = true
-                    local normalizedName = normalizeNameLower(player.name)
-                    if normalizedName and playerNidByName[normalizedName] == nil then
-                        playerNidByName[normalizedName] = playerNid
-                    end
                 end
             end
         end
@@ -571,9 +598,6 @@ do
                     for j = 1, #rawPlayers do
                         local rawPlayer = rawPlayers[j]
                         local playerNid = tonumber(rawPlayer)
-                        if not playerNid and type(rawPlayer) == "string" then
-                            playerNid = playerNidByName[normalizeNameLower(rawPlayer)]
-                        end
                         if playerNid and playerNid > 0 and validPlayerNids[playerNid] and not seen[playerNid] then
                             seen[playerNid] = true
                             attendees[#attendees + 1] = playerNid
@@ -637,65 +661,8 @@ do
         if type(raid._runtime) ~= "table" then
             raid._runtime = nil
         end
-        removeLegacyRuntimeCaches(raid)
+        removeRootRuntimeCaches(raid)
         return raid
-    end
-
-    function module:BuildRuntimeIndexes(raid)
-        raid = self:NormalizeRaidRecord(raid)
-        if not raid then
-            return nil
-        end
-
-        local runtime = ensureRuntimeTable(raid)
-        local playersByName = acquireRuntimeIndexMap(runtime, "playersByName")
-        local playerIdxByNid = acquireRuntimeIndexMap(runtime, "playerIdxByNid")
-        local bossIdxByNid = acquireRuntimeIndexMap(runtime, "bossIdxByNid")
-        local bossByNid = acquireRuntimeIndexMap(runtime, "bossByNid")
-        local lootIdxByNid = acquireRuntimeIndexMap(runtime, "lootIdxByNid")
-        local lootByNid = acquireRuntimeIndexMap(runtime, "lootByNid")
-
-        local players = raid.players or {}
-        for i = 1, #players do
-            local player = players[i]
-            if type(player) == "table" then
-                if player.name then
-                    playersByName[player.name] = player
-                end
-                local playerNid = tonumber(player.playerNid)
-                if playerNid then
-                    playerIdxByNid[playerNid] = i
-                end
-            end
-        end
-
-        local bosses = raid.bossKills or {}
-        for i = 1, #bosses do
-            local boss = bosses[i]
-            if type(boss) == "table" then
-                local bossNid = tonumber(boss.bossNid)
-                if bossNid then
-                    bossIdxByNid[bossNid] = i
-                    bossByNid[bossNid] = boss
-                end
-            end
-        end
-
-        local lootRows = raid.loot or {}
-        for i = 1, #lootRows do
-            local loot = lootRows[i]
-            if type(loot) == "table" then
-                local lootNid = tonumber(loot.lootNid)
-                if lootNid then
-                    lootIdxByNid[lootNid] = i
-                    lootByNid[lootNid] = loot
-                end
-            end
-        end
-
-        runtime.signature = buildRuntimeSignature(raid, players, bosses, lootRows)
-
-        return runtime
     end
 
     function module:EnsureRaidRuntime(raid)
@@ -705,10 +672,14 @@ do
         end
 
         local runtime = raid._runtime
-        if isRuntimeIndexReady(runtime) then
+        local players = raid.players or {}
+        local bosses = raid.bossKills or {}
+        local lootRows = raid.loot or {}
+        local signature = buildRuntimeSignature(raid, players, bosses, lootRows)
+        if isRuntimeIndexReady(runtime) and runtime.signature == signature then
             return runtime
         end
-        return self:BuildRuntimeIndexes(raid)
+        return buildRuntimeIndexesForNormalizedRaid(raid)
     end
 
     function module:UpsertLootIndex(raid, loot, index)
@@ -740,7 +711,7 @@ do
         if type(raid) ~= "table" then
             return
         end
-        removeLegacyRuntimeCaches(raid)
+        removeRootRuntimeCaches(raid)
         raid._runtime = nil
     end
 
@@ -753,6 +724,7 @@ do
 
     function module:NormalizeAllRaids(contextTag)
         local raids = ensureRaidsTable()
+        markRaidNidIndexDirty()
         for i = 1, #raids do
             self:NormalizeRaidRecord(raids[i], contextTag, i)
         end
@@ -825,18 +797,11 @@ do
 
         local raids = ensureRaidsTable()
         tinsert(raids, raid)
+        markRaidNidIndexDirty()
         rebuildRaidNidIndex()
 
         local idx = (storeState.raidIdxByNid and storeState.raidIdxByNid[raidNid]) or #raids
         return raid, idx
-    end
-
-    function module:CreateRaid(args)
-        local raid = self:CreateRaidRecord(args)
-        if not raid then
-            return nil, nil
-        end
-        return self:InsertRaid(raid)
     end
 
     function module:DeleteRaid(raidNid)
@@ -847,16 +812,9 @@ do
 
         local raids = ensureRaidsTable()
         tremove(raids, idx)
+        markRaidNidIndexDirty()
         rebuildRaidNidIndex()
         return true, idx
-    end
-
-    function module:SaveRaid(raid)
-        raid = self:NormalizeRaidRecord(raid, "save")
-        if not raid then
-            return false, nil
-        end
-        return true, raid
     end
 end
 

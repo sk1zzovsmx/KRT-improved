@@ -76,6 +76,14 @@ resolveLootLooterName = function(raid, loot)
     return nil
 end
 
+local function ensureRaid(raid)
+    local raidStore = Core.GetRaidStoreOrNil("Logger.Store.EnsureRaid", { "NormalizeRaidRecord" })
+    if raidStore then
+        return raidStore:NormalizeRaidRecord(raid)
+    end
+    return Core.EnsureRaidSchema(raid)
+end
+
 resolveLootLooterClass = function(raid, loot)
     if type(loot) ~= "table" then
         return nil
@@ -87,26 +95,18 @@ resolveLootLooterClass = function(raid, loot)
     return nil
 end
 
-function Store:EnsureRaid(raid)
-    local raidStore = Core.GetRaidStoreOrNil("Logger.Store.EnsureRaid", { "NormalizeRaidRecord" })
-    if raidStore then
-        return raidStore:NormalizeRaidRecord(raid)
-    end
-    return Core.EnsureRaidSchema(raid)
-end
-
 function Store:GetRaid(rID)
     local raidStore = Core.GetRaidStoreOrNil("Logger.Store.GetRaid", { "GetRaidByIndex" })
     if raidStore then
         local raid = rID and raidStore:GetRaidByIndex(rID) or nil
         if raid then
-            self:EnsureRaid(raid)
+            ensureRaid(raid)
         end
         return raid
     end
     local raid = rID and Core.EnsureRaidById(rID) or nil
     if raid then
-        self:EnsureRaid(raid)
+        ensureRaid(raid)
     end
     return raid
 end
@@ -116,13 +116,13 @@ function Store:GetRaidByNid(raidNid)
     if raidStore then
         local raid = raidNid and raidStore:GetRaidByNid(raidNid) or nil
         if raid then
-            self:EnsureRaid(raid)
+            ensureRaid(raid)
         end
         return raid
     end
     local raid = raidNid and Core.EnsureRaidByNid(raidNid) or nil
     if raid then
-        self:EnsureRaid(raid)
+        ensureRaid(raid)
     end
     return raid
 end

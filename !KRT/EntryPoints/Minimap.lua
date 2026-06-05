@@ -21,7 +21,7 @@ local UIFacade = addon.UI
 addon.Minimap = addon.Minimap or {}
 local module = addon.Minimap
 
--- Namespace registration: opzioni minimap (visibilità + posizione angolare).
+-- Namespace registration: minimap options (visibility and angular position).
 local minimapNs = Options.AddNamespace("Minimap", {
     minimapButton = true,
     minimapPos = 325,

@@ -279,6 +279,8 @@ function ListController.MakeListController(cfg)
         defer:Show()
     end
 
+    local fetchRows
+
     local function runUpdate()
         if not self._active or not self.frameName then
             return
@@ -286,7 +288,7 @@ function ListController.MakeListController(cfg)
 
         if self._dirty then
             refreshData()
-            local okFetch = self:Fetch()
+            local okFetch = fetchRows()
             if okFetch ~= false then
                 self._dirty = false
             end
@@ -366,7 +368,7 @@ function ListController.MakeListController(cfg)
         end
     end
 
-    function self:Fetch()
+    fetchRows = function()
         local n = self.frameName
         if not n then
             return
@@ -481,7 +483,7 @@ function ListController.MakeListController(cfg)
         table.sort(self.data, function(a, b)
             return cmp(a, b, self._asc)
         end)
-        self:Fetch()
+        fetchRows()
         applyHighlight()
         postUpdate()
     end
@@ -497,9 +499,6 @@ end
 function ListController.BindListController(module, controller)
     module.OnLoad = function(_, frame)
         controller:OnLoad(frame)
-    end
-    module.Fetch = function()
-        controller:Fetch()
     end
     module.Sort = function(_, key)
         controller:Sort(key)

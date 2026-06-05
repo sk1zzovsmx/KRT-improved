@@ -31,17 +31,21 @@ do
     feature.EnsureServiceNamespace("Reserves")
     local module = addon.Services.Reserves
     local Service = module
+    module._Sync = module._Sync or {}
+    local Sync = module._Sync
 
-    -- Timer ownership: debounce per il refresh display reserves.
+    -- Timer ownership: display refresh debounce for reserves.
     addon.Timer.BindMixin(module, "Reserves")
 
-    -- Namespace registration: opzioni reserves (whisper replies + import mode).
+    -- Namespace registration: reserve options (whisper replies and import mode).
     local reservesNs = Options.AddNamespace("Reserves", {
         softResWhisperReplies = false,
         srImportMode = 0,
+        nameAliases = {},
     })
 
     local ImportHelpers = assert(module._Import, "Reserves import helpers are not initialized")
+    local AliasHelpers = assert(module._Aliases, "Reserves alias helpers are not initialized")
     local DisplayHelpers = assert(module._Display, "Reserves display helpers are not initialized")
     local importParser = assert(ImportHelpers.BuildParser and ImportHelpers.BuildParser(), "Missing Reserves import parser")
     local fallbackIcon = C.RESERVES_ITEM_FALLBACK_ICON
@@ -65,6 +69,7 @@ do
     local grouped = {}
     local syncedCacheMeta = nil
     local syncedCacheActive = false
+    local aliasState = nil
     local RebuildIndex
     local hasPendingItem
 
@@ -94,6 +99,60 @@ do
         return importMode
     end
 
+    local function getNameAliasMap()
+        local value = reservesNs:Get("nameAliases")
+        return type(value) == "table" and value or {}
+    end
+
+    local function getAliasState()
+        if aliasState == nil then
+            aliasState = AliasHelpers.BuildAliasState(getNameAliasMap())
+        end
+        return aliasState
+    end
+
+    local function invalidateAliasState()
+        aliasState = nil
+    end
+
+    local function resolveReservePlayerKey(playerName)
+        local exact = Strings.NormalizeLower(playerName, true)
+        if exact and reservesData[exact] then
+            return exact
+        end
+        return AliasHelpers.ResolveReserveKey(getAliasState(), reservesData, playerName)
+    end
+
+    local function getReserveEntryForItem(itemId, playerName)
+        if not itemId or not playerName then
+            return nil
+        end
+        local playerKey = resolveReservePlayerKey(playerName)
+        if not playerKey then
+            return nil
+        end
+
+        local byP = reservesByItemPlayer[itemId]
+        if type(byP) == "table" then
+            local r = byP[playerKey]
+            if r then
+                return r
+            end
+        end
+
+        -- Fallback (should be rare if indices are up to date)
+        local entry = reservesData[playerKey]
+        if not entry then
+            return nil
+        end
+        for _, r in ipairs(entry.reserves or {}) do
+            if r and r.rawID == itemId then
+                return r
+            end
+        end
+        return nil
+    end
+
     local RESERVE_ENTRY_PERSISTED_FIELDS = {
         "rawID",
         "itemLink",
@@ -110,7 +169,7 @@ do
     local function resolvePlayerNameDisplay(playerKey, player, fallbackName)
         local candidate = fallbackName
         if type(player) == "table" then
-            candidate = player.playerNameDisplay or player.original or candidate
+            candidate = player.playerNameDisplay or candidate
         end
         if candidate == nil or candidate == "" then
             candidate = playerKey
@@ -150,40 +209,8 @@ do
         return dst
     end
 
-    local function warnLegacyReservesPayload(phaseTag, stats)
-        local originalCount = tonumber(stats.playersWithLegacyOriginal) or 0
-        local rowPlayerCount = tonumber(stats.rowsWithLegacyPlayerField) or 0
-        local droppedRows = tonumber(stats.droppedRows) or 0
-        local mergedPlayers = tonumber(stats.mergedPlayerKeys) or 0
-        if originalCount == 0 and rowPlayerCount == 0 and droppedRows == 0 and mergedPlayers == 0 then
-            return
-        end
-
-        local template = Diag.W and Diag.W.LogReservesLegacyFieldsDetected
-        if type(template) == "string" then
-            addon:warn(template:format(tostring(phaseTag or "?"), originalCount, rowPlayerCount, droppedRows, mergedPlayers))
-            return
-        end
-
-        addon:warn(
-            ("[Reserves] Legacy fields phase=%s original=%d rowPlayer=%d dropped=%d merged=%d"):format(
-                tostring(phaseTag or "?"),
-                originalCount,
-                rowPlayerCount,
-                droppedRows,
-                mergedPlayers
-            )
-        )
-    end
-
     local function buildRuntimeReservesData(sourceData, phaseTag)
         local normalized = {}
-        local stats = {
-            playersWithLegacyOriginal = 0,
-            rowsWithLegacyPlayerField = 0,
-            droppedRows = 0,
-            mergedPlayerKeys = 0,
-        }
 
         for rawPlayerKey, player in pairs(sourceData or {}) do
             if type(player) == "table" then
@@ -197,7 +224,6 @@ do
                 end
 
                 local container = normalized[playerKey]
-                local hadContainer = (container ~= nil)
                 if not container then
                     container = {
                         playerNameDisplay = displayName,
@@ -208,34 +234,17 @@ do
                     container.playerNameDisplay = displayName
                 end
 
-                if player.original ~= nil then
-                    stats.playersWithLegacyOriginal = stats.playersWithLegacyOriginal + 1
-                end
-                if hadContainer and rawPlayerKey ~= playerKey then
-                    stats.mergedPlayerKeys = stats.mergedPlayerKeys + 1
-                end
-
                 local rows = player.reserves
                 if type(rows) == "table" then
                     for i = 1, #rows do
                         local row = rows[i]
-                        if type(row) == "table" and row.player ~= nil then
-                            stats.rowsWithLegacyPlayerField = stats.rowsWithLegacyPlayerField + 1
-                        end
-
                         local copied = copyReserveEntryForSave(row)
                         if copied then
                             container.reserves[#container.reserves + 1] = copied
-                        else
-                            stats.droppedRows = stats.droppedRows + 1
                         end
                     end
                 end
             end
-        end
-
-        if phaseTag == "load" or phaseTag == "save" then
-            warnLegacyReservesPayload(phaseTag, stats)
         end
 
         return normalized
@@ -496,23 +505,25 @@ do
             grouped = grouped,
             collapsedBossGroups = collapsedBossGroups,
             resolvePlayerNameDisplay = resolvePlayerNameDisplay,
-            getReserveEntryForItem = function(itemId, playerName)
-                return Service:GetReserveEntryForItem(itemId, playerName)
-            end,
+            getReserveEntryForItem = getReserveEntryForItem,
             getPlusForItem = function(itemId, playerName)
                 return Service:GetPlusForItem(itemId, playerName)
             end,
             isPlusSystem = function()
-                return Service:IsPlusSystem()
+                return Service:GetImportMode() == "plus"
             end,
             isMultiReserve = function()
-                return Service:IsMultiReserve()
+                return Service:GetImportMode() == "multi"
             end,
             getRaidService = function()
                 return Services.Raid
             end,
             getCurrentRaid = function()
                 return addon.Core and addon.Core.GetCurrentRaid and addon.Core.GetCurrentRaid() or nil
+            end,
+            getAliasState = getAliasState,
+            getAliasMatches = function(reservePlayers, raidPlayers)
+                return AliasHelpers.GetAliasMatches(getAliasState(), reservePlayers, raidPlayers)
             end,
             setDirty = function(value)
                 reservesDirty = value == true
@@ -556,13 +567,14 @@ do
 
         importMode = nil
         setImportMode(self:GetImportMode(), true)
+        invalidateAliasState()
 
         rebuildReserveIndexes()
     end
 
-    function Service:ResetSaved()
+    function Service:ClearSavedReserves()
         if isDebugEnabled() then
-            addon:debug(Diag.D.LogReservesResetSaved)
+            addon:debug(Diag.D.LogReservesClearSavedReserves)
         end
         clearDisplayRefreshQueue()
         KRT_Reserves = nil
@@ -595,12 +607,12 @@ do
 
     -- ----- Reserve Data Handling ----- --
 
-    function Service:GetReserve(playerName)
+    local function getReserve(playerName)
         if type(playerName) ~= "string" then
             return nil
         end
-        local player = Strings.NormalizeLower(playerName)
-        local reserve = reservesData[player]
+        local player = resolveReservePlayerKey(playerName)
+        local reserve = player and reservesData[player] or nil
 
         -- Log when the function is called and show the reserve for the player
         if isDebugEnabled() then
@@ -614,8 +626,42 @@ do
         return reserve
     end
 
+    function Service:GetNameAliases()
+        return AliasHelpers.CopyAliasMap(getNameAliasMap())
+    end
+
+    function Service:SetNameAlias(reserveName, raidName)
+        local nextMap = AliasHelpers.CopyAliasMap(getNameAliasMap())
+        local ok, reason = AliasHelpers.SetAlias(nextMap, reserveName, raidName)
+        if not ok then
+            return false, reason
+        end
+        reservesNs:Set("nameAliases", nextMap)
+        invalidateAliasState()
+        rebuildReserveIndexes("alias", nil, self:GetImportMode(), addon.tLength(reservesData))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesAliasSet:format(tostring(reserveName), tostring(raidName)))
+        end
+        return true
+    end
+
+    function Service:RemoveNameAlias(reserveName)
+        local nextMap = AliasHelpers.CopyAliasMap(getNameAliasMap())
+        local ok, reason = AliasHelpers.ClearAlias(nextMap, reserveName)
+        if not ok then
+            return false, reason
+        end
+        reservesNs:Set("nameAliases", nextMap)
+        invalidateAliasState()
+        rebuildReserveIndexes("alias", nil, self:GetImportMode(), addon.tLength(reservesData))
+        if isDebugEnabled() then
+            addon:debug(Diag.D.LogReservesAliasCleared:format(tostring(reserveName)))
+        end
+        return true
+    end
+
     function Service:GetPlayerReserveEntries(playerName)
-        local reserve = self:GetReserve(playerName)
+        local reserve = getReserve(playerName)
         if type(reserve) ~= "table" or type(reserve.reserves) ~= "table" then
             return {}
         end
@@ -668,17 +714,7 @@ do
         return importMode
     end
 
-    function Service:SetImportMode(mode, syncOptions)
-        return setImportMode(mode, syncOptions)
-    end
-
-    function Service:IsPlusSystem()
-        return Service:GetImportMode() == "plus"
-    end
-
-    function Service:IsMultiReserve()
-        return Service:GetImportMode() == "multi"
-    end
+    -- Count of players and total reserve entries currently loaded in-memory.
 
     -- Strategy-based CSV parsing moved to Services/Reserves/Import.lua.
     local updateReserveItemData
@@ -735,6 +771,14 @@ do
             return true
         end
         return false
+    end
+
+    function Service:SetImportMode(mode, syncOptions)
+        return setImportMode(mode, syncOptions)
+    end
+
+    function Service:IsPlusSystem()
+        return self:GetImportMode() == "plus"
     end
 
     function Service:ParseImport(text, mode, opts)
@@ -888,44 +932,12 @@ do
         return icon
     end
 
-    -- Get reserve count for a specific item for a player
     function Service:GetReserveCountForItem(itemId, playerName)
-        local r = self:GetReserveEntryForItem(itemId, playerName)
+        local r = getReserveEntryForItem(itemId, playerName)
         if not r then
             return 0
         end
         return tonumber(r.quantity) or 1
-    end
-
-    -- Gets the reserve entry table for a specific item for a player (or nil).
-    function Service:GetReserveEntryForItem(itemId, playerName)
-        if not itemId or not playerName then
-            return nil
-        end
-        local playerKey = Strings.NormalizeLower(playerName, true)
-        if not playerKey then
-            return nil
-        end
-
-        local byP = reservesByItemPlayer[itemId]
-        if type(byP) == "table" then
-            local r = byP[playerKey]
-            if r then
-                return r
-            end
-        end
-
-        -- Fallback (should be rare if indices are up to date)
-        local entry = reservesData[playerKey]
-        if not entry then
-            return nil
-        end
-        for _, r in ipairs(entry.reserves or {}) do
-            if r and r.rawID == itemId then
-                return r
-            end
-        end
-        return nil
     end
 
     -- Gets the "Plus" value for a reserved item for a player (0 if missing).
@@ -934,7 +946,7 @@ do
         if self:GetImportMode() ~= "plus" then
             return 0
         end
-        local r = self:GetReserveEntryForItem(itemId, playerName)
+        local r = getReserveEntryForItem(itemId, playerName)
         return (r and tonumber(r.plus)) or 0
     end
 
@@ -942,6 +954,7 @@ do
     -- the current raid (or in raidNum when provided).
     -- If raid context is unavailable, keeps backward-compatible behavior and
     -- treats any reserve entry as eligible.
+
     function Service:HasCurrentRaidPlayersForItem(itemId, raidNum)
         return DisplayHelpers.HasCurrentRaidPlayersForItem(getDisplayContext(), itemId, raidNum)
     end
@@ -952,6 +965,10 @@ do
 
     function Service:GetReadinessReport(itemId, raidNum)
         return DisplayHelpers.GetReadinessReport(getDisplayContext(), itemId, raidNum)
+    end
+
+    function Service:GetPlayersForItem(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
+        return DisplayHelpers.GetPlayersForItem(getDisplayContext(), itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
     end
 
     -- ----- SR Announcement Formatting ----- --
@@ -970,9 +987,6 @@ do
     --   true -> include only players present in the current raid (or raidNum if provided)
     -- raidNum:
     --   optional explicit raid id used when onlyCurrentRaidPlayers is true
-    function Service:GetPlayersForItem(itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
-        return DisplayHelpers.GetPlayersForItem(getDisplayContext(), itemId, useColor, showPlus, showMulti, onlyCurrentRaidPlayers, raidNum)
-    end
 
     -- Returns the formatted player list for an item (comma-separated).
     -- useColor, showPlus, showMulti, onlyCurrentRaidPlayers, and raidNum
@@ -997,12 +1011,12 @@ do
         return getActiveSyncMetadata()
     end
 
-    function Service:GetSyncPayload()
+    function Sync:GetPayload()
         return persistedReservesData, getActiveSyncMetadata()
     end
 
-    function Service:SetSyncedReservesData(sourceData, meta)
-        if self:IsLocalDataAvailable() then
+    function Sync:SetSyncedData(sourceData, meta)
+        if Service:IsLocalDataAvailable() then
             return false, "local_data_present"
         end
 
@@ -1077,6 +1091,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Modules/Strings",
             "Modules/Item",
             "Services/Reserves/Import",
+            "Services/Reserves/Aliases",
             "Services/Reserves/Display",
         },
     })

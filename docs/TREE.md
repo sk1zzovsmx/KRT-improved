@@ -78,6 +78,7 @@
 |   |   |-- Events.lua
 |   |   |-- Features.lua
 |   |   |-- Item.lua
+|   |   |-- Json.lua
 |   |   |-- LootSources.lua
 |   |   |-- ModuleRegistry.lua
 |   |   |-- Sort.lua
@@ -96,11 +97,15 @@
 |   |   |   |-- DistributionSession.lua
 |   |   |   |-- PassiveGroupLoot.lua
 |   |   |   |-- PendingAwards.lua
+|   |   |   |-- Receipts.lua
+|   |   |   |-- Reconcile.lua
+|   |   |   |-- Records.lua
 |   |   |   |-- Rules.lua
 |   |   |   |-- Service.lua
 |   |   |   |-- Snapshots.lua
 |   |   |   |-- State.lua
-|   |   |   \\-- Tracking.lua
+|   |   |   |-- Tracking.lua
+|   |   |   \\-- Workflow.lua
 |   |   |-- Raid
 |   |   |   |-- Attendance.lua
 |   |   |   |-- Capabilities.lua
@@ -110,6 +115,7 @@
 |   |   |   |-- Session.lua
 |   |   |   \\-- State.lua
 |   |   |-- Reserves
+|   |   |   |-- Aliases.lua
 |   |   |   |-- Chat.lua
 |   |   |   |-- Display.lua
 |   |   |   |-- Import.lua
@@ -121,7 +127,8 @@
 |   |   |   |-- Resolution.lua
 |   |   |   |-- Responses.lua
 |   |   |   |-- Service.lua
-|   |   |   \\-- Sessions.lua
+|   |   |   |-- Sessions.lua
+|   |   |   \\-- Strategies.lua
 |   |   |-- Chat.lua
 |   |   |-- Debug.lua
 |   |   |-- README.md
@@ -183,12 +190,18 @@
 |   |   |   |-- 2026-05-08-raid-loot-source-resolver.md
 |   |   |   |-- 2026-05-18-passive-group-loot-rollid-first.md
 |   |   |   |-- 2026-05-23-logger-list-visual-refresh.md
-|   |   |   \\-- 2026-05-25-total-rework-foundation.md
+|   |   |   |-- 2026-05-25-total-rework-foundation.md
+|   |   |   |-- 2026-05-27-core-persistence-sync-performance.md
+|   |   |   |-- 2026-05-27-legacy-sunset-cleanup.md
+|   |   |   |-- 2026-05-27-softres-roll-sync-scavenging.md
+|   |   |   \\-- 2026-05-29-whole-addon-sequential-uniformization.md
 |   |   \\-- specs
 |   |       |-- 2026-04-28-options-timer-refactor-design.md
 |   |       |-- 2026-05-08-raid-loot-source-resolver-design.md
 |   |       |-- 2026-05-18-passive-group-loot-rollid-first-design.md
-|   |       \\-- 2026-05-23-logger-list-visual-refresh-design.md
+|   |       |-- 2026-05-23-logger-list-visual-refresh-design.md
+|   |       |-- 2026-05-27-core-persistence-sync-performance-design.md
+|   |       \\-- 2026-05-29-whole-addon-sequential-uniformization-design.md
 |   |-- AGENT_SKILLS.md
 |   |-- API_NOMENCLATURE_CENSUS.md
 |   |-- API_REGISTRY.csv
@@ -214,10 +227,7 @@
 |-- tests
 |   |-- fixtures
 |   |   \\-- sv
-|   |       |-- canonical-minimal-01.lua
-|   |       |-- legacy-duplicates-03.lua
-|   |       |-- legacy-mixed-01.lua
-|   |       \\-- legacy-mixed-02.lua
+|   |       \\-- canonical-minimal-01.lua
 |   |-- logger_visual_refresh_spec.lua
 |   |-- module_registry_core_spec.lua
 |   |-- module_registry_modules_spec.lua
@@ -232,10 +242,10 @@
 |   |-- build-release-zip.ps1
 |   |-- check-api-nomenclature.ps1
 |   |-- check-layering.ps1
-|   |-- check-legacy-aliases.ps1
 |   |-- check-lua-syntax.ps1
 |   |-- check-lua-uniformity.ps1
 |   |-- check-raid-hardening.ps1
+|   |-- check-retired-aliases.ps1
 |   |-- check-toc-files.ps1
 |   |-- check-ui-binding.ps1
 |   |-- dev-stack-status.ps1

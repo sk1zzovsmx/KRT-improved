@@ -232,7 +232,6 @@ do
         local ok, removed = raidStore:ClearRaidChanges(raidNum)
         return ok == true, tonumber(removed) or 0
     end
-
     function module:BuildRaidChangesDemandText()
         return L.StrChangesDemand
     end

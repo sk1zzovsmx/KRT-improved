@@ -8,7 +8,6 @@ local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
 local type, tonumber, tostring = type, tonumber, tostring
-local strlower = string.lower
 
 addon.Sort = addon.Sort or feature.Sort or {}
 local Sort = addon.Sort
@@ -39,10 +38,6 @@ function Sort.CompareNumbers(aValue, bValue, asc, fallback)
     return Sort.CompareValues(aNum, bNum, asc)
 end
 
-function Sort.CompareStrings(aValue, bValue, asc)
-    return Sort.CompareValues(tostring(aValue or ""), tostring(bValue or ""), asc)
-end
-
 function Sort.GetLootSortName(itemName, itemLink, itemId)
     local name = itemName
     if (not name or name == "") and type(itemLink) == "string" then
@@ -56,22 +51,6 @@ function Sort.GetLootSortName(itemName, itemLink, itemId)
         return ("Item %d"):format(id)
     end
     return "Item ?"
-end
-
-function Sort.CompareLootTie(a, b, asc)
-    local aName = strlower(tostring((a and a.sortName) or ""))
-    local bName = strlower(tostring((b and b.sortName) or ""))
-    if aName ~= bName then
-        return Sort.CompareValues(aName, bName, asc)
-    end
-
-    local aItemId = tonumber(a and a.itemId) or 0
-    local bItemId = tonumber(b and b.itemId) or 0
-    if aItemId ~= bItemId then
-        return Sort.CompareValues(aItemId, bItemId, asc)
-    end
-
-    return Sort.CompareNumbers(a and a.id, b and b.id, asc, 0)
 end
 
 do

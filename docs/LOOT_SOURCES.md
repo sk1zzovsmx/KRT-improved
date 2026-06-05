@@ -11,7 +11,7 @@ timing-based fallbacks are considered. AtlasLoot and DataStore are not required 
 - Exact source matches create or reuse boss and trash records.
 - Ambiguous or missing static data falls back to the existing context resolver.
 - AtlasLoot and DataStore are not runtime dependencies for source resolution.
-- Legacy raid sizes use `normal20` and `normal40`; Wrath raids use `normal10`, `normal25`,
+- Classic-era raid sizes use `normal20` and `normal40`; Wrath raids use `normal10`, `normal25`,
   `heroic10`, and `heroic25` when mode-specific data differs.
 
 ## Data Rules
@@ -19,7 +19,7 @@ timing-based fallbacks are considered. AtlasLoot and DataStore are not required 
 - Prefer item IDs and NPC IDs over names.
 - Use `kind = "trash"` for trash sources.
 - Use `kind = "boss"` for boss and encounter sources backed by raid boss NPC IDs.
-- Add mode metadata when raid size, normal/heroic, or legacy raid availability differs.
+- Add mode metadata when raid size, normal/heroic, or classic-era raid availability differs.
 - Exclude non-raid, vendor, crafted, PvP-only, reputation, and quest-only reward sources.
 - Do not bulk-map generic trash tables that do not identify a specific NPC source.
 

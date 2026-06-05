@@ -30,8 +30,7 @@ local function trimRaw(value)
     return gsub(tostring(value), "^%s*(.-)%s*$", "%1")
 end
 
--- ----- Public methods ----- --
-function Strings.UpperFirst(value)
+local function upperFirst(value)
     if type(value) ~= "string" then
         value = tostring(value or "")
     end
@@ -39,6 +38,7 @@ function Strings.UpperFirst(value)
     return gsub(value, "%a", upper, 1)
 end
 
+-- ----- Public methods ----- --
 function Strings.TrimText(value, allowNil)
     if value == nil then
         return allowNil and nil or ""
@@ -51,7 +51,7 @@ function Strings.NormalizeName(value, allowNil)
     if text == nil then
         return nil
     end
-    return Strings.UpperFirst(text)
+    return upperFirst(text)
 end
 
 function Strings.NormalizeLower(value, allowNil)
@@ -60,10 +60,6 @@ function Strings.NormalizeLower(value, allowNil)
         return nil
     end
     return lower(text)
-end
-
-function Strings.GetNormalizedNameLower(value)
-    return Strings.NormalizeLower(value, true)
 end
 
 function Strings.FindAchievement(inp)

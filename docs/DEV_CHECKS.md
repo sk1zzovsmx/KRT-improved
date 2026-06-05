@@ -19,7 +19,7 @@ python3 tools/krt.py repo-quality-check --check lua_syntax
 python3 tools/krt.py repo-quality-check --check lua_uniformity
 python3 tools/krt.py repo-quality-check --check api_nomenclature
 python3 tools/krt.py repo-quality-check --check layering
-python3 tools/krt.py repo-quality-check --check legacy_aliases
+python3 tools/krt.py repo-quality-check --check retired_aliases
 python3 tools/krt.py repo-quality-check --check ui_binding
 python3 tools/krt.py repo-quality-check --check raid_hardening
 ```
@@ -33,7 +33,7 @@ py -3 tools/krt.py repo-quality-check --check lua_syntax
 py -3 tools/krt.py repo-quality-check --check lua_uniformity
 py -3 tools/krt.py repo-quality-check --check api_nomenclature
 py -3 tools/krt.py repo-quality-check --check layering
-py -3 tools/krt.py repo-quality-check --check legacy_aliases
+py -3 tools/krt.py repo-quality-check --check retired_aliases
 py -3 tools/krt.py repo-quality-check --check ui_binding
 py -3 tools/krt.py repo-quality-check --check raid_hardening
 py -3 tools/krt.py api-catalog-check
@@ -97,7 +97,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-syntax.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-uniformity.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-api-nomenclature.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-layering.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-legacy-aliases.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-retired-aliases.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-ui-binding.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-raid-hardening.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/run-release-targeted-tests.ps1
@@ -123,6 +123,8 @@ rg "addon\.(Raid|Chat|Master|Logger|LootCounter|ReservesUI|Config|Warnings|Chang
   -n !KRT -g "*.lua" -g "!Libs/**"
 rg "CreateFrame|SetScript|:Show\(|:Hide\(" -n !KRT/Services -g "*.lua" -g "!Loot.lua"
 rg "<Scripts>|<On[A-Za-z]+>" -n !KRT/UI -g "*.xml"
+rg "PROTOCOL_VERSION|MSG_SNAPSHOT|MSG_ROLL_TICK|MSG_TIE_START|MSG_AWARDED" `
+  -n !KRT/Services/Loot/DistributionSession.lua
 ```
 
 Fallback when `rg` is unavailable:

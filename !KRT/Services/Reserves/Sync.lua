@@ -45,22 +45,6 @@ local function getPayload()
     return assert(Payload, "Comms payload helpers are not initialized")
 end
 
-local function encodeText(value)
-    return getPayload()._EncodeText(value)
-end
-
-local function decodeText(value)
-    return getPayload()._DecodeText(value)
-end
-
-local function splitFields(text, out)
-    return getPayload()._SplitFields(text, FIELD_SEP, out)
-end
-
-local function packFields(...)
-    return getPayload()._PackFields(FIELD_SEP, ...)
-end
-
 local function normalizeSender(sender)
     local name = tostring(sender or "")
     local normalized = Strings and Strings.NormalizeName and Strings.NormalizeName(name, true) or name
@@ -69,6 +53,12 @@ end
 
 local function getReservesService()
     return Services and Services.Reserves or module
+end
+
+local function ensurePrefix()
+    if _G.RegisterAddonMessagePrefix then
+        _G.RegisterAddonMessagePrefix(PREFIX)
+    end
 end
 
 local function canProvideReserves()
@@ -96,7 +86,8 @@ local function sendWhisper(target, msg)
 end
 
 local function sendError(target, reason)
-    sendWhisper(target, packFields(MSG_DATA_ERR, tostring(reason or "unknown")))
+    local payload = getPayload()
+    sendWhisper(target, payload._PackFields(FIELD_SEP, MSG_DATA_ERR, tostring(reason or "unknown")))
 end
 
 local function shouldRequestRemoteData(remoteChecksum)
@@ -118,7 +109,8 @@ local function requestDataFrom(target, requestId, checksum)
     if target == "" then
         return false
     end
-    sendWhisper(target, packFields(MSG_DATA_REQ, requestId, checksum or ""))
+    local payload = getPayload()
+    sendWhisper(target, payload._PackFields(FIELD_SEP, MSG_DATA_REQ, requestId, checksum or ""))
     addon:info(L.MsgReservesSyncDataRequested)
     return true
 end
@@ -133,7 +125,8 @@ local function sortedPlayerKeys(data)
 end
 
 local function buildPayload(data, mode)
-    local lines = { packFields("H", mode or "multi") }
+    local payload = getPayload()
+    local lines = { payload._PackFields(FIELD_SEP, "H", mode or "multi") }
     local keys = sortedPlayerKeys(data)
 
     for i = 1, #keys do
@@ -144,16 +137,17 @@ local function buildPayload(data, mode)
             for j = 1, #player.reserves do
                 local row = player.reserves[j]
                 if type(row) == "table" and row.rawID then
-                    lines[#lines + 1] = packFields(
+                    lines[#lines + 1] = payload._PackFields(
+                        FIELD_SEP,
                         "R",
-                        encodeText(playerName),
+                        payload._EncodeText(playerName),
                         tonumber(row.rawID) or 0,
                         tonumber(row.quantity) or 1,
                         tonumber(row.plus) or 0,
-                        encodeText(row.class),
-                        encodeText(row.spec),
-                        encodeText(row.note),
-                        encodeText(row.source)
+                        payload._EncodeText(row.class),
+                        payload._EncodeText(row.spec),
+                        payload._EncodeText(row.note),
+                        payload._EncodeText(row.source)
                     )
                 end
             end
@@ -164,16 +158,17 @@ local function buildPayload(data, mode)
 end
 
 local function parsePayload(payload)
+    local payloadCodec = getPayload()
     local reserves = {}
     local mode = "multi"
     local fields = {}
 
     for line in tostring(payload or ""):gmatch("[^\n]+") do
-        splitFields(line, fields)
+        payloadCodec._SplitFields(line, FIELD_SEP, fields)
         if fields[1] == "H" then
             mode = (fields[2] == "plus") and "plus" or "multi"
         elseif fields[1] == "R" then
-            local playerName = decodeText(fields[2])
+            local playerName = payloadCodec._DecodeText(fields[2])
             local itemId = tonumber(fields[3])
             if playerName and playerName ~= "" and itemId and itemId > 0 then
                 local playerKey = Strings and Strings.NormalizeLower and Strings.NormalizeLower(playerName, true) or playerName
@@ -189,10 +184,10 @@ local function parsePayload(payload)
                     rawID = itemId,
                     quantity = tonumber(fields[4]) or 1,
                     plus = tonumber(fields[5]) or 0,
-                    class = decodeText(fields[6]),
-                    spec = decodeText(fields[7]),
-                    note = decodeText(fields[8]),
-                    source = decodeText(fields[9]),
+                    class = payloadCodec._DecodeText(fields[6]),
+                    spec = payloadCodec._DecodeText(fields[7]),
+                    note = payloadCodec._DecodeText(fields[8]),
+                    source = payloadCodec._DecodeText(fields[9]),
                 }
             end
         end
@@ -202,22 +197,24 @@ local function parsePayload(payload)
 end
 
 local function getLocalPayload()
-    local service = getReservesService()
-    local data, meta = service:GetSyncPayload()
+    local data, meta = Sync:GetPayload()
     local payload = buildPayload(data, meta and meta.mode or "multi")
     return payload, meta
 end
 
 local function sendMetadata(target, requestId)
     if not canProvideReserves() then
-        sendWhisper(target, packFields(MSG_DATA_ERR, requestId, "no_data"))
+        local payload = getPayload()
+        sendWhisper(target, payload._PackFields(FIELD_SEP, MSG_DATA_ERR, requestId, "no_data"))
         return false
     end
 
     local _, meta = getLocalPayload()
+    local payload = getPayload()
     sendWhisper(
         target,
-        packFields(
+        payload._PackFields(
+            FIELD_SEP,
             MSG_META_ACK,
             requestId,
             meta and meta.checksum or "",
@@ -237,7 +234,8 @@ local function sendData(target, requestId)
     end
 
     local payload, meta = getLocalPayload()
-    local encoded = encodeText(payload)
+    local payloadCodec = getPayload()
+    local encoded = payloadCodec._EncodeText(payload)
     local payloadLen = #encoded
     local totalChunks = floor((payloadLen + MAX_CHUNK_SIZE - 1) / MAX_CHUNK_SIZE)
     if totalChunks < 1 then
@@ -248,10 +246,10 @@ local function sendData(target, requestId)
         local fromPos = ((idx - 1) * MAX_CHUNK_SIZE) + 1
         local toPos = fromPos + MAX_CHUNK_SIZE - 1
         local chunk = encoded:sub(fromPos, toPos)
-        sendWhisper(target, packFields(MSG_DATA_CHUNK, requestId, idx, totalChunks, chunk))
+        sendWhisper(target, payloadCodec._PackFields(FIELD_SEP, MSG_DATA_CHUNK, requestId, idx, totalChunks, chunk))
     end
 
-    sendWhisper(target, packFields(MSG_DATA_DONE, requestId, meta and meta.checksum or ""))
+    sendWhisper(target, payloadCodec._PackFields(FIELD_SEP, MSG_DATA_DONE, requestId, meta and meta.checksum or ""))
     return true
 end
 
@@ -270,14 +268,14 @@ local function applyIncoming(sender, requestId, checksum)
         parts[i] = pending.chunks[i]
     end
 
-    local payload = decodeText(tconcat(parts, ""))
-    if not payload then
+    local payloadCodec = getPayload()
+    local decodedPayload = payloadCodec._DecodeText(tconcat(parts, ""))
+    if not decodedPayload then
         return false, "decode_failed"
     end
 
-    local reserves, mode = parsePayload(payload)
-    local service = getReservesService()
-    local ok, reason = service:SetSyncedReservesData(reserves, {
+    local reserves, mode = parsePayload(decodedPayload)
+    local ok, reason = Sync:SetSyncedData(reserves, {
         source = sender,
         checksum = checksum,
         mode = mode,
@@ -287,20 +285,12 @@ local function applyIncoming(sender, requestId, checksum)
 end
 
 -- ----- Public methods ----- --
-function Sync:GetPrefix()
-    return PREFIX
-end
-
-function Sync:EnsurePrefix()
-    if _G.RegisterAddonMessagePrefix then
-        _G.RegisterAddonMessagePrefix(PREFIX)
-    end
-end
 
 function Sync:RequestMetadata()
-    self:EnsurePrefix()
+    ensurePrefix()
     local requestId = nextRequestId()
-    local ok = Comms and Comms.Sync and Comms.Sync(PREFIX, packFields(MSG_META_REQ, requestId))
+    local payload = getPayload()
+    local ok = Comms and Comms.Sync and Comms.Sync(PREFIX, payload._PackFields(FIELD_SEP, MSG_META_REQ, requestId))
     if ok == false then
         addon:warn(L.MsgReservesSyncNotInGroup)
         return false
@@ -309,13 +299,13 @@ function Sync:RequestMetadata()
     return true
 end
 
-function Sync:RequestMessageHandling(prefix, msg, channel, sender)
+function Sync:HandleMessage(prefix, msg, channel, sender)
     if prefix ~= PREFIX then
         return false
     end
 
     local fields = {}
-    splitFields(msg, fields)
+    getPayload()._SplitFields(msg, FIELD_SEP, fields)
     local kind = fields[1]
     local requestId = fields[2]
     local source = normalizeSender(sender)

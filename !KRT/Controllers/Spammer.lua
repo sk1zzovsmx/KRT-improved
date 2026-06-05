@@ -133,25 +133,25 @@ do
     -- ----- Private helpers ----- --
     function UI.AcquireRefs(frame)
         local refs = {
-            clearBtn = Frames.Ref(frame, "ClearBtn"),
-            startBtn = Frames.Ref(frame, "StartBtn"),
-            duration = Frames.Ref(frame, "Duration"),
-            healer = Frames.Ref(frame, "Healer"),
-            healerClass = Frames.Ref(frame, "HealerClass"),
-            melee = Frames.Ref(frame, "Melee"),
-            meleeClass = Frames.Ref(frame, "MeleeClass"),
-            message = Frames.Ref(frame, "Message"),
-            name = Frames.Ref(frame, "Name"),
-            ranged = Frames.Ref(frame, "Ranged"),
-            rangedClass = Frames.Ref(frame, "RangedClass"),
-            tank = Frames.Ref(frame, "Tank"),
-            tankClass = Frames.Ref(frame, "TankClass"),
-            chatGuild = Frames.Ref(frame, "ChatGuild"),
-            chatYell = Frames.Ref(frame, "ChatYell"),
+            clearBtn = Frames.GetRef(frame, "ClearBtn"),
+            startBtn = Frames.GetRef(frame, "StartBtn"),
+            duration = Frames.GetRef(frame, "Duration"),
+            healer = Frames.GetRef(frame, "Healer"),
+            healerClass = Frames.GetRef(frame, "HealerClass"),
+            melee = Frames.GetRef(frame, "Melee"),
+            meleeClass = Frames.GetRef(frame, "MeleeClass"),
+            message = Frames.GetRef(frame, "Message"),
+            name = Frames.GetRef(frame, "Name"),
+            ranged = Frames.GetRef(frame, "Ranged"),
+            rangedClass = Frames.GetRef(frame, "RangedClass"),
+            tank = Frames.GetRef(frame, "Tank"),
+            tankClass = Frames.GetRef(frame, "TankClass"),
+            chatGuild = Frames.GetRef(frame, "ChatGuild"),
+            chatYell = Frames.GetRef(frame, "ChatYell"),
             channels = {},
         }
         for i = 1, 8 do
-            refs.channels[i] = Frames.Ref(frame, "Chat" .. i)
+            refs.channels[i] = Frames.GetRef(frame, "Chat" .. i)
         end
         return refs
     end
@@ -319,7 +319,7 @@ do
 
     -- ----- Public methods ----- --
     local function loadSpammerFrame(frame)
-        UI.FrameName = Frames.InitModuleFrame(module, frame, {
+        UI.FrameName = Frames.BindModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 module:RequestRefresh()
@@ -336,57 +336,57 @@ do
     end
 
     local function BindHandlers(_, _, refs)
-        Frames.SafeSetScript(refs.clearBtn, "OnClick", function()
+        Frames.SetScriptSafely(refs.clearBtn, "OnClick", function()
             clearSpammer()
         end)
-        Frames.SafeSetScript(refs.startBtn, "OnClick", function()
+        Frames.SetScriptSafely(refs.startBtn, "OnClick", function()
             startSpam()
         end)
 
-        Frames.SafeSetScript(refs.duration, "OnTabPressed", function()
+        Frames.SetScriptSafely(refs.duration, "OnTabPressed", function()
             focusTab("Tank", "Name")
         end)
-        Frames.SafeSetScript(refs.healer, "OnTabPressed", function()
+        Frames.SetScriptSafely(refs.healer, "OnTabPressed", function()
             focusTab("HealerClass", "TankClass")
         end)
-        Frames.SafeSetScript(refs.healerClass, "OnTabPressed", function()
+        Frames.SetScriptSafely(refs.healerClass, "OnTabPressed", function()
             focusTab("Melee", "Healer")
         end)
-        Frames.SafeSetScript(refs.melee, "OnTabPressed", function()
+        Frames.SetScriptSafely(refs.melee, "OnTabPressed", function()
             focusTab("MeleeClass", "HealerClass")
         end)
-        Frames.SafeSetScript(refs.meleeClass, "OnTabPressed", function()
+        Frames.SetScriptSafely(refs.meleeClass, "OnTabPressed", function()
             focusTab("Ranged", "Melee")
         end)
-        Frames.SafeSetScript(refs.message, "OnTabPressed", function()
+        Frames.SetScriptSafely(refs.message, "OnTabPressed", function()
             focusTab("Name", "RangedClass")
         end)
-        Frames.SafeSetScript(refs.name, "OnTabPressed", function()
+        Frames.SetScriptSafely(refs.name, "OnTabPressed", function()
             focusTab("Duration", "Message")
         end)
-        Frames.SafeSetScript(refs.ranged, "OnTabPressed", function()
+        Frames.SetScriptSafely(refs.ranged, "OnTabPressed", function()
             focusTab("RangedClass", "MeleeClass")
         end)
-        Frames.SafeSetScript(refs.rangedClass, "OnTabPressed", function()
+        Frames.SetScriptSafely(refs.rangedClass, "OnTabPressed", function()
             focusTab("Message", "Ranged")
         end)
-        Frames.SafeSetScript(refs.tank, "OnTabPressed", function()
+        Frames.SetScriptSafely(refs.tank, "OnTabPressed", function()
             focusTab("TankClass", "Duration")
         end)
-        Frames.SafeSetScript(refs.tankClass, "OnTabPressed", function()
+        Frames.SetScriptSafely(refs.tankClass, "OnTabPressed", function()
             focusTab("Healer", "Tank")
         end)
 
         for i = 1, #refs.channels do
             local channelBox = refs.channels[i]
-            Frames.SafeSetScript(channelBox, "OnClick", function(self, button)
+            Frames.SetScriptSafely(channelBox, "OnClick", function(self, button)
                 saveSpammer(self, button)
             end)
         end
-        Frames.SafeSetScript(refs.chatGuild, "OnClick", function(self, button)
+        Frames.SetScriptSafely(refs.chatGuild, "OnClick", function(self, button)
             saveSpammer(self, button)
         end)
-        Frames.SafeSetScript(refs.chatYell, "OnClick", function(self, button)
+        Frames.SetScriptSafely(refs.chatYell, "OnClick", function(self, button)
             saveSpammer(self, button)
         end)
     end
@@ -461,6 +461,15 @@ do
     end
 
     -- Start/Stop/Pause
+    local function refreshSpamUi()
+        module:RequestRefresh()
+    end
+
+    local function unlockSpamInputsAndRefresh()
+        setInputsLocked(false)
+        module:RequestRefresh()
+    end
+
     startSpam = function()
         ensureReadyForStart()
 
@@ -477,13 +486,8 @@ do
                 channels = KRT_Spammer.Channels,
                 resetCountdown = false,
                 resetRun = false,
-                onTick = function()
-                    module:RequestRefresh()
-                end,
-                onAutoStop = function()
-                    setInputsLocked(false)
-                    module:RequestRefresh()
-                end,
+                onTick = refreshSpamUi,
+                onAutoStop = unlockSpamInputsAndRefresh,
             })
         elseif runtime.ticking then
             ChatApi.StopSpamCycle(Chat, true, true)
@@ -496,13 +500,8 @@ do
                 channels = KRT_Spammer.Channels,
                 resetCountdown = true,
                 resetRun = true,
-                onTick = function()
-                    module:RequestRefresh()
-                end,
-                onAutoStop = function()
-                    setInputsLocked(false)
-                    module:RequestRefresh()
-                end,
+                onTick = refreshSpamUi,
+                onAutoStop = unlockSpamInputsAndRefresh,
             })
         end
 

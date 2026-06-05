@@ -28,7 +28,7 @@ local function ensureRaidState(raidState)
 end
 
 local function syncActiveContext(raidState, lootContext)
-    local value = buildActiveLootContext(lootContext.activeLoot, raidState.lootWindowBossContext or lootContext.activeWindow, raidState.lootSource or lootContext.source)
+    local value = buildActiveLootContext(lootContext.activeLoot, lootContext.activeWindow, lootContext.source)
     return ContextState.SetActive(raidState, value)
 end
 
@@ -54,29 +54,21 @@ function ContextState.EnsureState(raidState)
     return lootContext
 end
 
-function ContextState.SetField(raidState, slotKey, legacyKey, value)
+function ContextState.SetField(raidState, slotKey, value)
     raidState = ensureRaidState(raidState)
     local lootContext = ContextState.EnsureState(raidState)
     lootContext[slotKey] = value
-    raidState[legacyKey] = value
     return value
 end
 
-function ContextState.SyncField(raidState, slotKey, legacyKey, normalizeFn)
+function ContextState.SyncField(raidState, slotKey, normalizeFn)
     raidState = ensureRaidState(raidState)
     local lootContext = ContextState.EnsureState(raidState)
-    local legacyValue = raidState[legacyKey]
     local value = lootContext[slotKey]
 
-    if legacyValue == nil then
-        value = nil
-    elseif legacyValue ~= value then
-        value = normalizeFn(legacyValue)
-    else
-        value = normalizeFn(value)
-    end
+    value = normalizeFn(value)
 
-    return ContextState.SetField(raidState, slotKey, legacyKey, value)
+    return ContextState.SetField(raidState, slotKey, value)
 end
 
 function ContextState.SetActive(raidState, activeLoot)
@@ -86,8 +78,6 @@ function ContextState.SetActive(raidState, activeLoot)
     lootContext.activeLoot = value
     lootContext.activeWindow = projectLootWindowBossContext(value)
     lootContext.source = projectLootSourceState(value)
-    raidState.lootWindowBossContext = lootContext.activeWindow
-    raidState.lootSource = lootContext.source
     return value
 end
 
@@ -98,7 +88,7 @@ function ContextState.SyncActive(raidState)
 end
 
 function ContextState.GetBossEvent(raidState)
-    return ContextState.SyncField(raidState, "eventBoss", "bossEventContext", normalizeBossEventContext)
+    return ContextState.SyncField(raidState, "eventBoss", normalizeBossEventContext)
 end
 
 function ContextState.GetWindow(raidState)
@@ -142,23 +132,17 @@ end
 function ContextState.Reset(raidState)
     raidState = ensureRaidState(raidState)
     raidState.lootContext = nil
-    raidState.bossEventContext = nil
-    raidState.recentLootDeathContext = nil
-    raidState.lootWindowBossContext = nil
-    raidState.lootBossSessions = nil
-    raidState.lootWindowItemSnapshots = nil
-    raidState.lootSource = nil
 end
 
 function ContextState.SyncRuntimeState(raidState)
     raidState = ensureRaidState(raidState)
     local lootContext = ContextState.EnsureState(raidState)
 
-    lootContext.eventBoss = ContextState.SyncField(raidState, "eventBoss", "bossEventContext", normalizeBossEventContext)
+    lootContext.eventBoss = ContextState.SyncField(raidState, "eventBoss", normalizeBossEventContext)
     lootContext.activeLoot = syncActiveContext(raidState, lootContext)
     lootContext = ContextState.EnsureState(raidState)
-    lootContext.sessions = ContextState.SyncField(raidState, "sessions", "lootBossSessions", normalizeLootSessionState)
-    lootContext.snapshots = ContextState.SyncField(raidState, "snapshots", "lootWindowItemSnapshots", normalizeLootSnapshotState)
+    lootContext.sessions = ContextState.SyncField(raidState, "sessions", normalizeLootSessionState)
+    lootContext.snapshots = ContextState.SyncField(raidState, "snapshots", normalizeLootSnapshotState)
     lootContext = ContextState.EnsureState(raidState)
     return lootContext
 end
@@ -171,12 +155,12 @@ local Sessions = module._Sessions
 local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS_SESSION = tonumber(addon.C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60
 
 local function getSessionState(raidState)
-    local state = ContextState.SyncField(raidState, "sessions", "lootBossSessions", normalizeLootSessionState)
+    local state = ContextState.SyncField(raidState, "sessions", normalizeLootSessionState)
     if type(state) ~= "table" then
         state = {
             bySessionId = {},
         }
-        ContextState.SetField(raidState, "sessions", "lootBossSessions", state)
+        ContextState.SetField(raidState, "sessions", state)
     end
     return state
 end

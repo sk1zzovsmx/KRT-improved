@@ -96,6 +96,7 @@ end
 -- ----- Private helpers ----- --
 
 -- ----- Public methods ----- --
+
 function IgnoredItems.Contains(itemId)
     return IgnoredItems.Ids[tonumber(itemId)] == true
 end

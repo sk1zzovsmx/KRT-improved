@@ -66,7 +66,7 @@ do
     module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
-    -- Namespace registration: opzioni del LootCounter widget.
+    -- Namespace registration: LootCounter widget options.
     addon.Options.AddNamespace("LootCounter", {
         showLootCounterDuringMSRoll = false,
     })
@@ -127,8 +127,8 @@ do
     function UI.AcquireRefs(frame)
         local refs = {
             scrollFrame = frame and (frame.ScrollFrame or _G[(frame.GetName and frame:GetName() or "KRTLootCounterFrame") .. "ScrollFrame"]) or nil,
-            announceBtn = Frames.Ref(frame, "AnnounceBtn"),
-            resetAllBtn = Frames.Ref(frame, "ResetAllBtn"),
+            announceBtn = Frames.GetRef(frame, "AnnounceBtn"),
+            resetAllBtn = Frames.GetRef(frame, "ResetAllBtn"),
         }
         refs.scrollChild = (refs.scrollFrame and refs.scrollFrame.ScrollChild) or _G["KRTLootCounterFrameScrollFrameScrollChild"]
         return refs
@@ -507,7 +507,7 @@ do
         return row
     end
 
-    local function attachToMaster(masterFrame)
+    local function attachCounterToMaster(masterFrame)
         local frame = masterFrame
         if not frame or frame._krtAttached then
             return
@@ -563,7 +563,7 @@ do
     -- ----- Public methods ----- --
     local function loadLootCounterFrame(frame)
         local f = frame or getFrame()
-        UI.FrameName = Frames.InitModuleFrame(module, f, { enableDrag = true }) or UI.FrameName
+        UI.FrameName = Frames.BindModuleFrame(module, f, { enableDrag = true }) or UI.FrameName
         if not ensureFrames() then
             return
         end
@@ -715,10 +715,10 @@ do
     local function BindHandlers(_, _, refs)
         scrollFrame = refs.scrollFrame or scrollFrame
         scrollChild = refs.scrollChild or scrollChild
-        Frames.SafeSetScript(refs.announceBtn, "OnClick", function()
+        Frames.SetScriptSafely(refs.announceBtn, "OnClick", function()
             announceCounts()
         end)
-        Frames.SafeSetScript(refs.resetAllBtn, "OnClick", function()
+        Frames.SetScriptSafely(refs.resetAllBtn, "OnClick", function()
             confirmResetAllCounts()
         end)
     end
@@ -760,7 +760,7 @@ do
         "LootCounter",
         UIScaffold.MakeStandardWidgetApi(module, {
             AttachToMaster = function(masterFrame)
-                attachToMaster(masterFrame)
+                attachCounterToMaster(masterFrame)
             end,
         })
     )

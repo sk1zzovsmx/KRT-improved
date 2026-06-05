@@ -1,7 +1,7 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Core.GetFeatureShared()
--- exports: publish module APIs on addon.*
+-- exports: publish module APIs on addon.DB.RaidMigrations
 -- events: none
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
@@ -9,21 +9,17 @@ local feature = addon.Core.GetFeatureShared()
 local Core = feature.Core
 local Strings = feature.Strings
 
--- Raid schema migrations service.
+-- Current-schema raid persistence helpers.
 do
     addon.DB.RaidMigrations = addon.DB.RaidMigrations or {}
     local module = addon.DB.RaidMigrations
 
     -- ----- Internal state ----- --
-    local MIGRATIONS = {}
+    local EMPTY_MIGRATIONS = {}
 
     -- ----- Private helpers ----- --
-    local function normalizeNonNegativeNumber(value, fallback)
-        local num = tonumber(value) or fallback or 0
-        if num < 0 then
-            num = fallback or 0
-        end
-        return num
+    local normalizeNameLower = function(value)
+        return Strings.NormalizeLower(value, true)
     end
 
     local function ensureTableField(raid, key, emptyAsMap)
@@ -37,8 +33,6 @@ do
             return
         end
     end
-
-    local normalizeNameLower = Strings.GetNormalizedNameLower
 
     local function normalizeName(name)
         if Strings and Strings.NormalizeName then
@@ -95,56 +89,35 @@ do
         return out
     end
 
-    local function appendAttendanceSegment(entry, startTime, endTime, subgroup, online)
-        local resolvedStart = tonumber(startTime) or 0
-        if resolvedStart <= 0 then
+    local function appendAttendanceSegment(entry, segment)
+        if type(segment) ~= "table" then
             return
         end
 
-        local segment = {
-            startTime = resolvedStart,
+        local startTime = tonumber(segment.startTime) or 0
+        if startTime <= 0 then
+            return
+        end
+
+        local out = {
+            startTime = startTime,
         }
 
-        local resolvedEnd = tonumber(endTime) or 0
-        if resolvedEnd > resolvedStart then
-            segment.endTime = resolvedEnd
+        local endTime = tonumber(segment.endTime) or 0
+        if endTime > startTime then
+            out.endTime = endTime
         end
 
-        local resolvedSubgroup = tonumber(subgroup) or 1
-        if resolvedSubgroup > 1 then
-            segment.subgroup = resolvedSubgroup
+        local subgroup = tonumber(segment.subgroup) or 1
+        if subgroup > 1 then
+            out.subgroup = subgroup
         end
 
-        if online == false then
-            segment.online = false
+        if segment.online == false then
+            out.online = false
         end
 
-        entry.segments[#entry.segments + 1] = segment
-    end
-
-    local function buildAttendanceFromPlayers(players)
-        local attendance = {}
-        if type(players) ~= "table" then
-            return attendance
-        end
-
-        for i = 1, #players do
-            local player = players[i]
-            local playerNid = type(player) == "table" and tonumber(player.playerNid) or nil
-            local joinTime = type(player) == "table" and (tonumber(player.join) or 0) or 0
-            if playerNid and playerNid > 0 and joinTime > 0 then
-                local entry = {
-                    playerNid = playerNid,
-                    segments = {},
-                }
-                appendAttendanceSegment(entry, joinTime, player.leave, player.subgroup, true)
-                if #entry.segments > 0 then
-                    attendance[#attendance + 1] = entry
-                end
-            end
-        end
-
-        return attendance
+        entry.segments[#entry.segments + 1] = out
     end
 
     local function compactAttendance(attendance)
@@ -167,10 +140,7 @@ do
                 local segments = entry.segments
                 if type(segments) == "table" then
                     for j = 1, #segments do
-                        local segment = segments[j]
-                        if type(segment) == "table" then
-                            appendAttendanceSegment(normalizedEntry, segment.startTime, segment.endTime, segment.subgroup, segment.online)
-                        end
+                        appendAttendanceSegment(normalizedEntry, segments[j])
                     end
                 end
 
@@ -198,13 +168,12 @@ do
         for i = 1, #players do
             local player = players[i]
             if type(player) == "table" then
-                -- Promote legacy 'count' → 'countMS' (handles pre-v5 saves).
-                local countMS = tonumber(player.countMS) or tonumber(player.count) or 0
+                local countMS = tonumber(player.countMS) or 0
                 if countMS < 0 then
                     countMS = 0
                 end
                 player.countMS = (countMS > 0) and countMS or nil
-                player.count = nil -- remove legacy field
+                player.count = nil
 
                 local countOs = tonumber(player.countOs) or 0
                 if countOs < 0 then
@@ -329,10 +298,6 @@ do
     end
 
     -- ----- Public methods ----- --
-    function module:GetMigrations()
-        return MIGRATIONS
-    end
-
     function module:GetCurrentVersion()
         local version = Core.GetRaidSchemaVersion and Core.GetRaidSchemaVersion() or 1
         version = tonumber(version) or 1
@@ -342,201 +307,8 @@ do
         return version
     end
 
-    function module:ApplyRaidMigrations(raid, currentVersion)
-        if type(raid) ~= "table" then
-            return nil
-        end
-
-        local targetVersion = tonumber(currentVersion)
-        if targetVersion == nil then
-            targetVersion = self:GetCurrentVersion()
-        end
-        if targetVersion < 1 then
-            targetVersion = 1
-        end
-
-        local version = tonumber(raid.schemaVersion) or 0
-        if version < 0 then
-            version = 0
-        end
-
-        while version < targetVersion do
-            local migrateFn = MIGRATIONS[version]
-            if type(migrateFn) == "function" then
-                migrateFn(raid)
-            end
-            version = version + 1
-            raid.schemaVersion = version
-        end
-
-        if version > targetVersion then
-            raid.schemaVersion = targetVersion
-        end
-
-        return raid
-    end
-
     function module:CompactRaidForPersistence(raid)
         return compactRaidForPersistence(raid)
-    end
-
-    MIGRATIONS[0] = function(raid)
-        ensureTableField(raid, "players", false)
-        ensureTableField(raid, "bossKills", false)
-        ensureTableField(raid, "loot", false)
-        ensureTableField(raid, "changes", true)
-
-        raid.nextPlayerNid = normalizeNonNegativeNumber(raid.nextPlayerNid, 1)
-        if raid.nextPlayerNid < 1 then
-            raid.nextPlayerNid = 1
-        end
-
-        raid.nextBossNid = normalizeNonNegativeNumber(raid.nextBossNid, 1)
-        if raid.nextBossNid < 1 then
-            raid.nextBossNid = 1
-        end
-
-        raid.nextLootNid = normalizeNonNegativeNumber(raid.nextLootNid, 1)
-        if raid.nextLootNid < 1 then
-            raid.nextLootNid = 1
-        end
-
-        local players = raid.players
-        for i = 1, #players do
-            local player = players[i]
-            if type(player) == "table" then
-                local count = tonumber(player.count) or 0
-                if count < 0 then
-                    count = 0
-                end
-                player.count = count
-
-                local countSR = tonumber(player.countSR) or 0
-                if countSR < 0 then
-                    countSR = 0
-                end
-                player.countSR = countSR
-            end
-        end
-    end
-
-    -- v2 canonicalization:
-    -- - raid.bossKills[].players stores playerNid numbers (not names)
-    -- - raid.loot[].looterNid stores winner playerNid (legacy loot.looter removed)
-    MIGRATIONS[1] = function(raid)
-        ensureTableField(raid, "players", false)
-        ensureTableField(raid, "bossKills", false)
-        ensureTableField(raid, "loot", false)
-
-        local playerNidByName = {}
-        local players = raid.players
-        for i = 1, #players do
-            local player = players[i]
-            if type(player) == "table" then
-                local playerNid = tonumber(player.playerNid)
-                local key = normalizeNameLower(player.name)
-                if key and playerNid and playerNid > 0 and playerNidByName[key] == nil then
-                    playerNidByName[key] = playerNid
-                end
-            end
-        end
-
-        local bosses = raid.bossKills
-        for i = 1, #bosses do
-            local boss = bosses[i]
-            if type(boss) == "table" then
-                local rawPlayers = boss.players
-                local attendees = {}
-                local seen = {}
-                if type(rawPlayers) == "table" then
-                    for j = 1, #rawPlayers do
-                        local rawPlayer = rawPlayers[j]
-                        local playerNid = tonumber(rawPlayer)
-                        if not playerNid and type(rawPlayer) == "string" then
-                            playerNid = playerNidByName[normalizeNameLower(rawPlayer)]
-                        end
-                        if playerNid and playerNid > 0 and not seen[playerNid] then
-                            seen[playerNid] = true
-                            attendees[#attendees + 1] = playerNid
-                        end
-                    end
-                end
-                boss.players = attendees
-            end
-        end
-
-        local lootRows = raid.loot
-        for i = 1, #lootRows do
-            local loot = lootRows[i]
-            if type(loot) == "table" then
-                local looterNid = tonumber(loot.looterNid)
-                if looterNid and looterNid > 0 then
-                    loot.looterNid = looterNid
-                else
-                    loot.looterNid = nil
-                end
-                loot.looter = nil
-            end
-        end
-    end
-
-    -- v3 canonicalization and lean persistence:
-    -- - compact default-only values from persisted rows
-    -- - trim empty optional fields
-    -- - canonicalize changes map keys/values
-    MIGRATIONS[2] = function(raid)
-        compactRaidForPersistence(raid)
-    end
-
-    -- v4 attendance ledger:
-    -- - raid.attendance[] stores per-playerNid attendance segments.
-    -- - segment online=true is the default and is omitted during compaction.
-    MIGRATIONS[3] = function(raid)
-        ensureTableField(raid, "players", false)
-        ensureTableField(raid, "attendance", false)
-
-        if #raid.attendance == 0 then
-            raid.attendance = buildAttendanceFromPlayers(raid.players)
-        else
-            raid.attendance = compactAttendance(raid.attendance)
-        end
-    end
-
-    -- v5 loot counter fields:
-    -- - player.count (legacy MS counter) renamed to player.countMS.
-    -- - player.countOs, player.countFree, player.countSR added.
-    -- - Zero-value counts are stored as nil to save space.
-    MIGRATIONS[4] = function(raid)
-        local players = raid.players or {}
-        for i = 1, #players do
-            local player = players[i]
-            if type(player) == "table" then
-                local countMS = tonumber(player.countMS) or tonumber(player.count) or 0
-                if countMS < 0 then
-                    countMS = 0
-                end
-                player.countMS = (countMS > 0) and countMS or nil
-                player.count = nil
-
-                local countOs = tonumber(player.countOs) or 0
-                if countOs < 0 then
-                    countOs = 0
-                end
-                player.countOs = (countOs > 0) and countOs or nil
-
-                local countFree = tonumber(player.countFree) or 0
-                if countFree < 0 then
-                    countFree = 0
-                end
-                player.countFree = (countFree > 0) and countFree or nil
-
-                local countSR = tonumber(player.countSR) or 0
-                if countSR < 0 then
-                    countSR = 0
-                end
-                player.countSR = (countSR > 0) and countSR or nil
-            end
-        end
     end
 end
 

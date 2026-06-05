@@ -7,7 +7,7 @@
 local addon = select(2, ...)
 local feature = addon.Core.GetFeatureShared()
 
-local type, pairs = type, pairs
+local type = type
 
 addon.ModuleRegistry = addon.ModuleRegistry or feature.ModuleRegistry or {}
 local ModuleRegistry = addon.ModuleRegistry
@@ -63,18 +63,10 @@ local function copyRecord(record)
     }
 end
 
-local function clearTable(tbl)
-    for key in pairs(tbl) do
-        tbl[key] = nil
+local function clearArray(out)
+    for i = #out, 1, -1 do
+        out[i] = nil
     end
-end
-
-local function addIssue(issues, moduleName, dependency, reason)
-    issues[#issues + 1] = {
-        module = moduleName,
-        dependency = dependency,
-        reason = reason,
-    }
 end
 
 -- ----- Public methods ----- --
@@ -102,37 +94,48 @@ function ModuleRegistry.SetLoaded(name)
     return copyRecord(record)
 end
 
-function ModuleRegistry.GetModules(out)
-    out = out or {}
-    clearTable(out)
+function ModuleRegistry.GetStatus(name)
+    if type(name) ~= "string" or name == "" then
+        return nil
+    end
+    return copyRecord(modulesByName[name])
+end
 
+function ModuleRegistry.GetModules(out)
+    out = type(out) == "table" and out or {}
+    clearArray(out)
     for i = 1, #modules do
         out[i] = copyRecord(modules[i])
     end
     return out
 end
 
-function ModuleRegistry.GetStatus(name)
-    return copyRecord(modulesByName[name])
-end
-
 function ModuleRegistry.GetLoadOrderStatus()
-    local issues = {}
-
+    local issues
     for i = 1, #modules do
         local record = modules[i]
-        for depIndex = 1, #record.Deps do
-            local dependency = record.Deps[depIndex]
-            local depRecord = modulesByName[dependency]
-            if not depRecord or not depRecord.Loaded then
-                addIssue(issues, record.Name, dependency, "missing")
-            elseif record.LoadOrder and depRecord.LoadOrder and depRecord.LoadOrder > record.LoadOrder then
-                addIssue(issues, record.Name, dependency, "out_of_order")
+        for j = 1, #record.Deps do
+            local depName = record.Deps[j]
+            local dep = modulesByName[depName]
+            if not dep or dep.Loaded ~= true then
+                issues = issues or {}
+                issues[#issues + 1] = {
+                    module = record.Name,
+                    dependency = depName,
+                    reason = "missing",
+                }
+            elseif record.Loaded == true and record.LoadOrder and dep.LoadOrder and dep.LoadOrder > record.LoadOrder then
+                issues = issues or {}
+                issues[#issues + 1] = {
+                    module = record.Name,
+                    dependency = depName,
+                    reason = "out_of_order",
+                }
             end
         end
     end
 
-    if #issues > 0 then
+    if issues then
         return false, issues
     end
     return true, nil

@@ -54,11 +54,11 @@ do
     -- ----- Private helpers ----- --
     function UI.AcquireRefs(frame)
         return {
-            name = Frames.Ref(frame, "Name"),
-            content = Frames.Ref(frame, "Content"),
-            editBtn = Frames.Ref(frame, "EditBtn"),
-            deleteBtn = Frames.Ref(frame, "DeleteBtn"),
-            announceBtn = Frames.Ref(frame, "AnnounceBtn"),
+            name = Frames.GetRef(frame, "Name"),
+            content = Frames.GetRef(frame, "Content"),
+            editBtn = Frames.GetRef(frame, "EditBtn"),
+            deleteBtn = Frames.GetRef(frame, "DeleteBtn"),
+            announceBtn = Frames.GetRef(frame, "AnnounceBtn"),
         }
     end
 
@@ -100,7 +100,7 @@ do
         if row.RegisterForClicks then
             row:RegisterForClicks("LeftButtonUp")
         end
-        Frames.SafeSetScript(row, "OnClick", function(self, button)
+        Frames.SetScriptSafely(row, "OnClick", function(self, button)
             selectWarning(self, button)
         end)
         row._krtBound = true
@@ -174,30 +174,30 @@ do
                 cancelWarning()
             end)
         else
-            Frames.SafeSetScript(frame, "OnShow", function()
+            Frames.SetScriptSafely(frame, "OnShow", function()
                 cancelWarning()
             end)
-            Frames.SafeSetScript(frame, "OnHide", function()
+            Frames.SetScriptSafely(frame, "OnHide", function()
                 cancelWarning()
             end)
         end
-        Frames.SafeSetScript(refs.announceBtn, "OnClick", function()
+        Frames.SetScriptSafely(refs.announceBtn, "OnClick", function()
             announceWarning()
         end)
-        Frames.SafeSetScript(refs.deleteBtn, "OnClick", function(self, button)
+        Frames.SetScriptSafely(refs.deleteBtn, "OnClick", function(self, button)
             deleteWarning(self, button)
         end)
-        Frames.SafeSetScript(refs.editBtn, "OnClick", function(self, button)
+        Frames.SetScriptSafely(refs.editBtn, "OnClick", function(self, button)
             editWarning(self, button)
         end)
-        Frames.SafeSetScript(refs.name, "OnTabPressed", function(self)
-            local content = Frames.Ref(self:GetParent(), "Content")
+        Frames.SetScriptSafely(refs.name, "OnTabPressed", function(self)
+            local content = Frames.GetRef(self:GetParent(), "Content")
             if content and content.SetFocus then
                 content:SetFocus()
             end
         end)
-        Frames.SafeSetScript(refs.content, "OnTabPressed", function(self)
-            local name = Frames.Ref(self:GetParent(), "Name")
+        Frames.SetScriptSafely(refs.content, "OnTabPressed", function(self)
+            local name = Frames.GetRef(self:GetParent(), "Name")
             if name and name.SetFocus then
                 name:SetFocus()
             end

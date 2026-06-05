@@ -109,7 +109,7 @@
 		<HighlightTexture inherits="UIPanelButtonHighlightTexture" mod="ADD" />
 		<PushedTexture inherits="UIPanelButtonPushedTexture" mod="ADD" />
 		<DisabledTexture inherits="UIPanelButtonDisabledTexture" />
-</Button>
+	</Button>
 	<!-- Item icon button template -->
 	<Button name="KRTItemButtonTemplate" virtual="true">
 		<Size>
@@ -156,8 +156,8 @@
 	<!-- EditBox Template -->
 	<EditBox name="KRTEditBoxTemplate" inherits="InputBoxTemplate" autoFocus="false" virtual="true">
 		<FontString inherits="GameFontHighlight" />
-</EditBox>
-	<!-- Simple Border-less EdtiBox Template -->
+	</EditBox>
+	<!-- Simple borderless EditBox template -->
 	<EditBox name="KRTEditBoxSimpleTemplate" font="GameFontHighlightSmall" autoFocus="false" virtual="true">
 		<Layers>
 			<Layer level="BACKGROUND">
@@ -180,7 +180,7 @@
 				</Texture>
 			</Layer>
 		</Layers>
-</EditBox>
+	</EditBox>
 	<!-- Player Selection Button -->
 	<Button name="KRTSelectPlayerTemplate" virtual="true">
 		<Size>

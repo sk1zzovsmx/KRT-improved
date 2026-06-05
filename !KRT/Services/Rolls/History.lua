@@ -170,7 +170,7 @@ function History.DidRoll(ctx, itemId, name)
     return used >= History.GetAllowedRolls(ctx, itemId, name)
 end
 
-function History.HighestRoll(ctx, name)
+function History.GetHighestRoll(ctx, name)
     local _, state, lootState = assertContext(ctx)
     local winnerName = name or (ctx.getCurrentWinner and ctx.getCurrentWinner()) or lootState.winner
     local responseBestRoll
@@ -206,11 +206,6 @@ function History.HighestRoll(ctx, name)
     end
 
     return bestRoll or 0
-end
-
-function History.GetUsedReserveCount(ctx, itemId, name)
-    local tracker = History.AcquireItemTracker(ctx, itemId)
-    return tracker[name] or 0
 end
 
 local registry = addon.ModuleRegistry

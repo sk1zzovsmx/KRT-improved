@@ -24,29 +24,6 @@ local namespaces = {}
 local keyToNamespace = {}
 local loaded = false
 
--- Hardcoded mapping per la migrazione one-shot dalla struttura flat (schema 1) a nested (schema 2).
--- Ogni chiave flat conosciuta viene spostata nel suo namespace di destinazione.
-local MIGRATION_MAP = {
-    sortAscending = "Master",
-    useRaidWarning = "Master",
-    screenReminder = "Master",
-    announceOnWin = "Master",
-    announceOnHold = "Master",
-    announceOnBank = "Master",
-    announceOnDisenchant = "Master",
-    lootWhispers = "Loot",
-    ignoreStacks = "Loot",
-    countdownDuration = "Rolls",
-    countdownSimpleRaidMsg = "Rolls",
-    countdownRollsBlock = "Rolls",
-    softResWhisperReplies = "Reserves",
-    srImportMode = "Reserves",
-    minimapButton = "Minimap",
-    minimapPos = "Minimap",
-    showLootCounterDuringMSRoll = "LootCounter",
-    showTooltips = "UI",
-}
-
 -- ----- Private helpers ----- --
 local function shallowCopy(src)
     local dst = {}
@@ -89,36 +66,19 @@ local function applyDefaultsToStorage(name, defaults)
     return store
 end
 
-local function migrateFlatToNested()
+local function prepareStrictStorage()
     local saved = ensureSavedTable()
-    if saved._schema == SCHEMA_VERSION then
-        return false
-    end
 
-    -- Vecchia struttura flat: chiavi conosciute sparse al top level.
-    local migrated = false
-    for flatKey, namespaceName in pairs(MIGRATION_MAP) do
-        local value = saved[flatKey]
-        if value ~= nil then
-            local store = saved[namespaceName]
-            if type(store) ~= "table" then
-                store = {}
-                saved[namespaceName] = store
-            end
-            -- Non sovrascrivere se il namespace ha già il valore (caso edge: doppio reload).
-            if store[flatKey] == nil then
-                store[flatKey] = value
-            end
-            saved[flatKey] = nil
-            migrated = true
+    for key in pairs(saved) do
+        if key == "debug" then
+            saved[key] = nil
+        elseif type(key) == "string" and key ~= "_schema" and namespaces[key] == nil then
+            saved[key] = nil
         end
     end
 
-    -- Remove unmapped legacy keys, such as the former persisted "debug" flag.
-    saved.debug = nil
-
     saved._schema = SCHEMA_VERSION
-    return migrated
+    return saved
 end
 
 -- ----- Namespace prototype ----- --
@@ -196,7 +156,7 @@ function Options.AddNamespace(name, defaults)
 
     local existing = namespaces[name]
     if existing then
-        -- Permetti re-register idempotente con stessi defaults (no-op safe).
+        -- Allow idempotent re-registration with the same defaults.
         return existing
     end
 
@@ -208,8 +168,8 @@ function Options.AddNamespace(name, defaults)
     }, namespaceMt)
 
     namespaces[name] = ns
-    -- Indice inverso key → namespace per il proxy `addon.options` (lookup O(1)).
-    -- Se la stessa chiave è registrata in due namespace, l'ultima registrazione vince.
+    -- Reverse key-to-namespace index for the read-only `addon.options` proxy.
+    -- If the same key is registered in two namespaces, the last registration wins.
     for key in pairs(defaults) do
         keyToNamespace[key] = ns
     end
@@ -224,19 +184,16 @@ function Options.EnsureLoaded()
     if loaded then
         return
     end
-    ensureSavedTable()
-    migrateFlatToNested()
+    local saved = prepareStrictStorage()
 
-    -- Re-bind storage references per i namespace registrati prima del load.
-    -- (Caso normale: i moduli registrano in fase di file load, prima di ADDON_LOADED.)
-    local saved = ensureSavedTable()
+    -- Rebind storage references for namespaces registered before ADDON_LOADED.
     for name, ns in pairs(namespaces) do
         local store = saved[name]
         if type(store) ~= "table" then
             store = shallowCopy(ns._defaults)
             saved[name] = store
         else
-            -- Riempi defaults mancanti su store esistente.
+            -- Fill missing defaults on existing namespace storage.
             for key, defaultValue in pairs(ns._defaults) do
                 if store[key] == nil then
                     store[key] = defaultValue
@@ -250,7 +207,7 @@ function Options.EnsureLoaded()
     emit(Events.OptionsLoaded)
 end
 
--- ----- Read-only flat proxy ----- --
+-- ----- Read-only option proxy ----- --
 -- `addon.options.<key>` resolves through the namespace that owns the key
 -- (O(1) lookup via keyToNamespace). Writes must go through namespace:Set.
 -- This avoids adding extra upvalues in files near Lua 5.1 limits (for example Master.lua).
@@ -273,9 +230,9 @@ function Options.GetNamespaces()
     return namespaces
 end
 
--- Convenience write quando il chiamante non conosce il namespace (es. Config UI):
--- risolve `key` via keyToNamespace e delega a namespace:Set. Restituisce false se
--- la chiave non è registrata in alcun namespace.
+-- Convenience write when the caller does not know the namespace (for example Config UI).
+-- Resolves `key` through keyToNamespace and delegates to namespace:Set. Returns false
+-- when no registered namespace owns the key.
 function Options.Set(key, value)
     local ns = keyToNamespace[key]
     if not ns then
@@ -284,9 +241,9 @@ function Options.Set(key, value)
     return ns:Set(key, value)
 end
 
--- ----- Debug toggle (non legato a un namespace) ----- --
--- Gestisce solo il flag runtime addon.State.debugEnabled e il log level.
--- Non viene persistito su SavedVariables (resettato a false ad ogni load).
+-- ----- Debug toggle (not namespace-backed) ----- --
+-- Controls only the runtime addon.State.debugEnabled flag and the log level.
+-- This is not persisted to SavedVariables and resets to false on each load.
 function Options.IsDebugEnabled()
     return addon and addon.State and addon.State.debugEnabled == true
 end

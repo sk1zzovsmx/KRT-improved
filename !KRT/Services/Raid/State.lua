@@ -123,8 +123,8 @@ do
         return masterLootCandidateCache
     end
 
-    local function setLootContextField(slotKey, legacyKey, value)
-        return LootContextState.SetField(raidState, slotKey, legacyKey, value)
+    local function setLootContextField(slotKey, value)
+        return LootContextState.SetField(raidState, slotKey, value)
     end
 
     local function setActiveLootContextState(activeLoot)
@@ -302,7 +302,7 @@ do
     end
 
     local function getRecentLootDeathContextState()
-        return LootContextState.SyncField(raidState, "recentDeath", "recentLootDeathContext", normalizeRecentLootDeathContext)
+        return LootContextState.SyncField(raidState, "recentDeath", normalizeRecentLootDeathContext)
     end
 
     local function getRaidSourceContext(raid, raidNum, now)
@@ -373,7 +373,7 @@ do
     local function setRecentLootDeathContext(raidNum, kind, sourceName, sourceNpcId, bossNid, source, seenAt)
         local resolvedRaidNum = tonumber(raidNum) or 0
         if resolvedRaidNum <= 0 or (kind ~= "boss" and kind ~= "trash") then
-            setLootContextField("recentDeath", "recentLootDeathContext", nil)
+            setLootContextField("recentDeath", nil)
             recentTrashDeathContextRaidNum = 0
             recentTrashDeathContextSeenAt = 0
             recentTrashDeathContextActivityAt = 0
@@ -386,7 +386,7 @@ do
             recentTrashDeathContextActivityAt = 0
         end
 
-        return setLootContextField("recentDeath", "recentLootDeathContext", {
+        return setLootContextField("recentDeath", {
             raidNum = resolvedRaidNum,
             kind = kind,
             bossNid = tonumber(bossNid) or 0,
@@ -690,7 +690,7 @@ do
             class = "UNKNOWN",
             join = Time.GetCurrentTime(),
             leave = nil,
-            count = 0,
+            countMS = 0,
         }
     end
 
@@ -765,7 +765,7 @@ do
     end
 
     local function clearBossEventContext()
-        setLootContextField("eventBoss", "bossEventContext", nil)
+        setLootContextField("eventBoss", nil)
     end
 
     local function setBossEventContext(raidNum, bossNid, bossName, source, seenAt)
@@ -776,7 +776,7 @@ do
             return nil
         end
 
-        local bossEventContext = setLootContextField("eventBoss", "bossEventContext", {
+        local bossEventContext = setLootContextField("eventBoss", {
             raidNum = raidNum,
             bossNid = bossNid,
             name = bossName,
@@ -850,7 +850,7 @@ do
         end
         local delta = currentTime - contextSeenAt
         if contextRaidNum ~= (tonumber(raidNum) or 0) or delta < 0 or delta > RECENT_LOOT_DEATH_CONTEXT_TTL_SECONDS then
-            setLootContextField("recentDeath", "recentLootDeathContext", nil)
+            setLootContextField("recentDeath", nil)
             return nil
         end
 
@@ -1234,12 +1234,13 @@ do
         options = options or {}
         local currentTime = tonumber(options.now) or Time.GetCurrentTime()
         local allowContextRecovery = options.allowContextRecovery == true
+        local allowContextFallback = options.allowContextFallback ~= false
         local allowLootWindowContext = options.allowLootWindowContext == true
         local allowTrashFallback = options.allowTrashFallback == true
         local ttlSeconds = options.ttlSeconds
 
         local bossNid, lootSourceReason = findOrCreateBossNidFromLootSource(raid, raidNum, options.itemId, rollSessionId, currentTime, ttlSeconds)
-        if bossNid <= 0 and lootSourceReason ~= "ambiguous" then
+        if bossNid <= 0 and lootSourceReason ~= "ambiguous" and allowContextFallback then
             bossNid = findAndRememberBossContextForLoot(raid, raidNum, rollSessionId, currentTime, ttlSeconds, allowLootWindowContext, allowContextRecovery, true)
         end
         if bossNid <= 0 and allowTrashFallback then
@@ -1318,7 +1319,7 @@ do
                     class = class or "UNKNOWN",
                     join = Time.GetCurrentTime(),
                     leave = nil,
-                    count = 0,
+                    countMS = 0,
                 }
                 raidInfo.nextPlayerNid = (tonumber(raidInfo.nextPlayerNid) or 1) + 1
 
@@ -1353,17 +1354,6 @@ do
             module._ScheduleRosterRefreshInternal()
         end
         return true
-    end
-
-    -- Stable-ID helpers (bossNid / lootNid).
-    -- Fresh SavedVariables only. Schema is normalized by Core.EnsureRaidSchema().
-
-    function module:EnsureStableIds(raidNum)
-        local raid = Core.EnsureRaidById(raidNum)
-        if not raid then
-            return
-        end
-        Core.EnsureRaidSchema(raid)
     end
 
     -- Ends the current raid log entry, marking end time.
@@ -1409,11 +1399,11 @@ do
     end
 
     -- Performs an initial raid check on player login.
-    function module:FirstCheck()
+    function module:CheckInitialRaidState()
         -- Cancel any pending first-check timer before starting a new one
-        if module.firstCheckHandle then
-            module:CancelTimer(module.firstCheckHandle)
-            module.firstCheckHandle = nil
+        if module.CheckInitialRaidStateHandle then
+            module:CancelTimer(module.CheckInitialRaidStateHandle)
+            module.CheckInitialRaidStateHandle = nil
         end
         if not addon.IsInGroup() then
             return
@@ -1430,7 +1420,7 @@ do
         local instanceName, instanceType, instanceDiff = GetInstanceInfo()
         if isDebugEnabled() then
             addon:debug(
-                Diag.D.LogRaidFirstCheck:format(
+                Diag.D.LogRaidInitialCheck:format(
                     tostring(addon.IsInGroup()),
                     tostring(Core.GetCurrentRaid() ~= nil),
                     tostring(instanceName),
@@ -1463,8 +1453,7 @@ do
 
         for i, p in ipairs(players) do
             if t.name == p.name then
-                -- Preserve countMS if present (falls back through legacy 'count' field).
-                t.countMS = t.countMS or p.countMS or tonumber(p.count) or 0
+                t.countMS = t.countMS or p.countMS or 0
                 t.playerNid = tonumber(t.playerNid) or tonumber(p.playerNid) or nextPlayerNid
                 if tonumber(t.playerNid) >= nextPlayerNid then
                     raid.nextPlayerNid = tonumber(t.playerNid) + 1
@@ -1625,7 +1614,7 @@ do
     end
 
     -- Checks if a raid log is expired (older than the weekly reset).
-    function module:Expired(rID)
+    function module:IsRaidExpired(rID)
         local raid = Core.EnsureRaidById(rID)
         if not raid then
             return true

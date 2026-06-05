@@ -35,27 +35,17 @@ do
         local out = {}
         seen[value] = out
         for key, item in pairs(value) do
-            out[deepCopy(key, seen)] = deepCopy(item, seen)
+            if key ~= "_runtime" then
+                out[deepCopy(key, seen)] = deepCopy(item, seen)
+            end
         end
         return out
     end
 
-    local function getMigrations()
-        if Core.GetRaidMigrations then
-            return Core.GetRaidMigrations()
-        end
-        return nil
-    end
-
-    local function ensureNormalizedClone(raid, currentSchemaVersion)
+    local function ensureNormalizedClone(raid)
         local clone = deepCopy(raid)
         if type(clone) ~= "table" then
             return nil
-        end
-
-        local migrations = getMigrations()
-        if migrations and migrations.ApplyRaidMigrations then
-            migrations:ApplyRaidMigrations(clone, currentSchemaVersion)
         end
 
         local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("DBRaidValidator.EnsureNormalizedClone", { "NormalizeRaidRecord" }) or nil
@@ -93,14 +83,9 @@ do
     end
 
     local function validateRaidSourceKeys(result, raid)
-        local raidStore = Core.GetRaidStoreOrNil and Core.GetRaidStoreOrNil("DBRaidValidator.ValidateRaid", { "IsLegacyRuntimeKey" }) or nil
         for key in pairs(raid) do
             if type(key) == "string" and key:sub(1, 1) == "_" and key ~= "_runtime" then
                 pushDetail(result, "E", "RUNTIME_OUTSIDE", { key = key })
-            end
-            local isLegacyRuntime = raidStore and raidStore:IsLegacyRuntimeKey(key)
-            if isLegacyRuntime then
-                pushDetail(result, "E", "LEGACY_RUNTIME", { key = key })
             end
         end
     end
@@ -287,26 +272,23 @@ do
         return maxLootNid
     end
 
-    local function validateNidCounters(result, normalized, maxPlayerNid, maxBossNid, maxLootNid)
-        local checks = {
-            { field = "nextPlayerNid", required = maxPlayerNid + 1 },
-            { field = "nextBossNid", required = maxBossNid + 1 },
-            { field = "nextLootNid", required = maxLootNid + 1 },
-        }
-
-        for i = 1, #checks do
-            local check = checks[i]
-            local actual = tonumber(normalized[check.field]) or 0
-            if actual < check.required then
-                pushDetail(result, "E", "COUNTER_TOO_LOW", {
-                    field = check.field,
-                    actual = actual,
-                    required = check.required,
-                })
-            else
-                result.ok = result.ok + 1
-            end
+    local function validateNidCounter(result, normalized, field, required)
+        local actual = tonumber(normalized[field]) or 0
+        if actual < required then
+            pushDetail(result, "E", "COUNTER_TOO_LOW", {
+                field = field,
+                actual = actual,
+                required = required,
+            })
+        else
+            result.ok = result.ok + 1
         end
+    end
+
+    local function validateNidCounters(result, normalized, maxPlayerNid, maxBossNid, maxLootNid)
+        validateNidCounter(result, normalized, "nextPlayerNid", maxPlayerNid + 1)
+        validateNidCounter(result, normalized, "nextBossNid", maxBossNid + 1)
+        validateNidCounter(result, normalized, "nextLootNid", maxLootNid + 1)
     end
 
     -- ----- Public methods ----- --
@@ -329,7 +311,7 @@ do
         -- Validate source keys directly (without normalization side effects).
         validateRaidSourceKeys(result, raid)
 
-        local normalized = ensureNormalizedClone(raid, currentSchemaVersion)
+        local normalized = ensureNormalizedClone(raid)
         if type(normalized) ~= "table" then
             pushDetail(result, "E", "NORMALIZE_FAILED")
             return result

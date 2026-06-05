@@ -10,7 +10,7 @@ local feature = addon.Core.GetFeatureShared()
 addon.Item = addon.Item or feature.Item or {}
 local Item = addon.Item
 
--- Timer ownership: ticker per il polling delle item-cache requests.
+-- Timer ownership: ticker for polling item-cache requests.
 addon.Timer.BindMixin(Item, "Item")
 
 local _G = _G

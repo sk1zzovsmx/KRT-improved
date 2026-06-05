@@ -6,8 +6,48 @@ All notable changes to !KRT will be documented in this file.
 
 Release-Version: 0.7.1-beta.3
 
+### Fixes
+
+- **Wrath raid loot-source recognition** - Expanded the Naxxramas 10/25
+  and Onyxia level 80 loot-source tables from the AtlasLoot WotLK database
+  so Logger source attribution recognizes missing boss drops such as
+  Dawnwalkers, Rescinding Grips, Mantle of the Locusts, and Flowing
+  Sapphiron Drape, while keeping classic Onyxia data separated from Wrath
+  raid-size modes and shared Naxxramas drops ambiguous until recent boss
+  context can disambiguate them.
+- **Loot record reconciliation** - Trade-only fallback records now merge into
+  matching loot-session rows instead of creating duplicate Logger entries for
+  the same item, source, and looter.
+- **Group Loot logger attribution** - Passive Group Loot entries now observe
+  Need, Greed, and Disenchant selection/roll metadata before final loot is
+  saved and resolve their source through the static raid loot-source table, so
+  the Logger Type, Roll, and Source columns are populated for attributed raid
+  drops. Late roll metadata can upgrade the already-saved winner row, and
+  passive Group Loot no longer falls back to the current manual roll mode or
+  displays unknown roll metadata as Manual when no roll metadata is available.
+
 ### Enhancements
 
+- **Loot workflow hardening** - Loot ingestion now uses focused internal
+  workflow, receipt, record, and reconciliation helpers so parsed loot events,
+  canonical record creation, and passive/trade duplicate handling are easier
+  to audit without changing Master Looter award policy.
+- **SoftRes imports** - Reserve import now accepts encoded SoftRes JSON
+  exports in addition to the existing CSV flow, preserving the same Multi
+  and Plus aggregation rules after parsing.
+- **SoftRes aliases** - Added manual SoftRes name aliases for cases where
+  imported reserve names differ from raid roster names, including local
+  readiness reporting and `/krt sr alias` management commands.
+- **Roll resolution policy** - Extracted roll resolver ordering into
+  dedicated strategy helpers for normal, SoftRes, tie, and raid-roll flows
+  while preserving the existing display model fields.
+- **Distribution sync protocol** - Extended the `KRTDist` session protocol
+  with versioned snapshots, roll countdown ticks, tie state, and awarded
+  state plus versioned item, roll, done, clear, snapshot, tick, tie, and
+  awarded messages.
+- **Strict schema cleanup** - Removed retired runtime aliases, old SavedVariables
+  fallbacks, flat option migration, and stale compatibility fixtures so fresh
+  installs use the current strict SavedVariables schema directly.
 - **Master Loot distribution session** - Master Loot now maintains a compact
   loot distribution session and syncs item, roll-start, winner, and done state
   through addon messages so raiders can consume a read-only corpse/session
@@ -97,11 +137,36 @@ Release-Version: 0.7.1-beta.3
   obsolete global helper injections, dead Bus/UI/Timer APIs, duplicate
   LibCompat bootstrap includes, feature override hooks, unused Time helpers,
   a redundant Bus registration helper, and the callback-statistics debug command.
+- **API reduction pass 2** - Removed orphan Roll-Service wrappers in
+  `Services/Rolls/Service.lua` (`DidRoll`, `GetCandidateEligibility`,
+  `SetManualExclusion`, `IsManuallyExcluded`,
+  `GetUsedReserveCount`, `GetRollSessionItemKey`, `GetDisplayedWinner`) and
+  corrected a reserve readiness exact-match path in `Services/Reserves/Display.lua`
+  (`normalizeAliasKey` in `splitExactNameMatches`).
+- **Roll response API cleanup** - Collapsed the explicit pass/cancel roll
+  response helpers into the canonical `SetPlayerResponse(name, status)`
+  contract using `PASS` and `CANCELLED` statuses.
+- **SoftRes contract cleanup** - Kept slash/UI-facing SoftRes facade methods
+  public, moved sync-only payload/cache intake helpers to the package-internal
+  `_Sync` surface, and removed test-only reserve lookup wrappers from the
+  public service surface.
+- **Master planner adapter naming** - Renamed private Master helpers that adapt
+  Loot service planner output to UI/trade side effects so they no longer look
+  like duplicate pure planner contracts.
+- **Internal helper deduplication** - Collapsed repeated Logger multiselect
+  focus adapters, reused Spammer cycle callbacks, and renamed generic timer
+  callback helpers so the function inventory better reflects real ownership.
 
 ### Fixes
 
 - **Slash controller dispatch** - Slash warning announce and LFM start/stop
   commands now resolve through their controller dispatch contracts correctly.
+- **Group Loot passive state cleanup** - Removed per-message full scans of the
+  passive Group Loot roll table from hot parser paths by purging only entries
+  touched by the current message, reducing frame-time spikes during roll/chat
+  bursts. System-chat Group Loot parsing now also exits early when no native
+  passive roll session is active, avoiding pattern scans on unrelated system
+  messages.
 
 ## [0.7.1-beta.3] - 2026-05-03
 
@@ -387,7 +452,7 @@ Release-Version: 0.7.1-beta.3
   held-inventory loot slot matching/resolution moved to `Services/Raid.lua`
   (`MatchHeldInventoryLoot`, `ResolveHeldLootNid`), while winner/tie helpers
   and countdown lifecycle APIs are now exposed by `Services/Rolls/Service.lua`
-  (`GetDisplayedWinner`, `GetResolvedWinner`, `ShouldUseTieReroll`,
+  (`GetResolvedWinner`, `ShouldUseTieReroll`,
   `StartCountdown`, `StopCountdown`, `FinalizeRollSession`).
   `Controllers/Master.lua` now delegates to those services with local
   compatibility fallbacks. No behavior changes.

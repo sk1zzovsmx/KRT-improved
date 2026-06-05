@@ -116,6 +116,63 @@ function Get-BodyHash([object]$row, [hashtable]$cache) {
     }
 }
 
+function Test-FrameworkHook([object]$row, [string]$functionKey) {
+    $fn = $row.Function
+    $type = $row.Type
+    $file = $row.File
+    $isUiOwnedFile = $file -match "^!KRT/(Controllers|Widgets|EntryPoints|Modules/UI)/"
+    $isCallbackShape = $type -in @("anonymous_callback", "field_closure", "local_closure")
+
+    $configHooks = @(
+        "getData",
+        "rowName",
+        "drawRow",
+        "postUpdate",
+        "highlightFn",
+        "highlightKey",
+        "highlightId",
+        "highlightDebugInfo",
+        "localize",
+        "refresh",
+        "update",
+        "onShow",
+        "onHide",
+        "OnShow",
+        "OnHide",
+        "OnAccept",
+        "func"
+    )
+    if ($configHooks -contains $functionKey) {
+        return ($isUiOwnedFile -or $isCallbackShape)
+    }
+
+    $scaffoldHooks = @(
+        "AcquireRefs",
+        "BindHandlers",
+        "Localize",
+        "LocalizeUI",
+        "OnLoadFrame",
+        "RefreshUI"
+    )
+    if ($scaffoldHooks -contains $functionKey) {
+        return ($isUiOwnedFile -or $isCallbackShape)
+    }
+
+    if ($functionKey -eq "_doSave" -and $fn -match "\._doSave$") {
+        return $true
+    }
+
+    if ($fn -match "^(UI|ImportUI|Box)\.(AcquireRefs|Localize|LocalizeUI|RefreshUI)$") {
+        return $true
+    }
+
+    if ($type -eq "anonymous_callback" -and $row.File -match "^!KRT/(Controllers|Widgets|EntryPoints)/") {
+        return $true
+    }
+
+    return $false
+}
+
 $rows = Import-Csv -Path $csvPath
 $fileCache = @{}
 $allowPoly = @(
@@ -146,22 +203,28 @@ foreach ($group in $groups) {
 
     foreach ($row in $groupRows) {
         if ($row.Function -match "^anonymous@") {
-            $row.Class = "structural-pattern"
-            $row.Action = "extract"
+            if (Test-FrameworkHook $row $functionKey) {
+                $row.Class = "framework-hook"
+                $row.Action = "keep"
+                $row.Cluster = "framework.callback"
+            } else {
+                $row.Class = "structural-pattern"
+                $row.Action = "extract"
+            }
+            continue
+        }
+
+        if (Test-FrameworkHook $row $functionKey) {
+            $row.Class = "framework-hook"
+            $row.Action = "keep"
+            if ([string]::IsNullOrWhiteSpace($row.Cluster)) {
+                $row.Cluster = "framework.hook"
+            }
             continue
         }
 
         if ($allowPoly -contains $functionKey) {
             $row.Class = "api-polymorphic"
-            $row.Action = "keep"
-            continue
-        }
-
-        if (
-            $row.Function -eq "Core.registerLegacyAlias" -or
-            $row.Function -eq "Core.registerLegacyAliasPath"
-        ) {
-            $row.Class = "legacy-alias"
             $row.Action = "keep"
             continue
         }

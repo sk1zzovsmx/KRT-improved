@@ -9,6 +9,14 @@ local feature = addon.Core.GetFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Strings = feature.Strings
+local Base64 = feature.Base64 or addon.Base64
+local Json = feature.Json or addon.Json
+local _G = _G
+local pcall = pcall
+local tostring = tostring
+local tonumber = tonumber
+local type = type
+local byte = string.byte
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Reserves")
@@ -22,11 +30,33 @@ local function isDebugEnabled()
     return addon.hasDebug ~= nil
 end
 
+local function trimText(value, nilIfEmpty)
+    if value == nil then
+        return nil
+    end
+    if Strings and type(Strings.TrimText) == "function" then
+        return Strings.TrimText(value, nilIfEmpty)
+    end
+    local out = tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
+    if nilIfEmpty and out == "" then
+        return nil
+    end
+    return out
+end
+
+local function normalizeLower(value)
+    if Strings and type(Strings.NormalizeLower) == "function" then
+        return Strings.NormalizeLower(value, true)
+    end
+    local normalized = trimText(value, true)
+    return normalized and string.lower(normalized) or nil
+end
+
 local function cleanCSVField(field)
     if not field then
         return nil
     end
-    return Strings.TrimText(field:gsub('^"(.-)"$', "%1"), true)
+    return trimText(field:gsub('^"(.-)"$', "%1"), true)
 end
 
 local function splitCSVLine(line)
@@ -60,7 +90,7 @@ local function buildHeaderMap(fields)
     for i = 1, #fields do
         local key = cleanCSVField(fields[i])
         if key and key ~= "" then
-            map[Strings.NormalizeLower(key)] = i
+            map[normalizeLower(key)] = i
         end
     end
     if map["itemid"] and map["name"] then
@@ -76,10 +106,6 @@ local function getField(fields, headerMap, key, fallbackIndex)
     return fields[fallbackIndex]
 end
 
-local function readCSVField(fields, headerMap, key, fallbackIndex)
-    return cleanCSVField(getField(fields, headerMap, key, fallbackIndex))
-end
-
 local function normalizeOptionalCSVField(value)
     if value == nil or value == "" then
         return nil
@@ -88,16 +114,16 @@ local function normalizeOptionalCSVField(value)
 end
 
 local function buildParsedCSVRow(fields, headerMap)
-    local itemIdStr = readCSVField(fields, headerMap, "itemid", 2)
-    local source = readCSVField(fields, headerMap, "from", 3)
-    local playerName = readCSVField(fields, headerMap, "name", 4)
-    local className = readCSVField(fields, headerMap, "class", 5)
-    local spec = readCSVField(fields, headerMap, "spec", 6)
-    local note = readCSVField(fields, headerMap, "note", 7)
-    local plus = readCSVField(fields, headerMap, "plus", 8)
+    local itemIdStr = cleanCSVField(getField(fields, headerMap, "itemid", 2))
+    local source = cleanCSVField(getField(fields, headerMap, "from", 3))
+    local playerName = cleanCSVField(getField(fields, headerMap, "name", 4))
+    local className = cleanCSVField(getField(fields, headerMap, "class", 5))
+    local spec = cleanCSVField(getField(fields, headerMap, "spec", 6))
+    local note = cleanCSVField(getField(fields, headerMap, "note", 7))
+    local plus = cleanCSVField(getField(fields, headerMap, "plus", 8))
 
     local itemId = tonumber(itemIdStr)
-    local playerKey = Strings.NormalizeLower(playerName, true)
+    local playerKey = normalizeLower(playerName)
     if not itemId or not playerKey then
         return nil
     end
@@ -168,6 +194,207 @@ local function parseCSVRows(csv)
     end
 
     return rows, stats
+end
+
+local function getBase64()
+    Base64 = Base64 or feature.Base64 or addon.Base64
+    return Base64
+end
+
+local function getJson()
+    Json = Json or feature.Json or addon.Json
+    return Json
+end
+
+local function looksLikeCSV(text)
+    return type(text) == "string" and (text:find(",", 1, true) ~= nil or text:find("\n", 1, true) ~= nil)
+end
+
+local function looksLikeZlibPayload(text)
+    if type(text) ~= "string" or #text < 2 then
+        return false
+    end
+    local first, second = byte(text, 1, 2)
+    return first == 0x78 and second ~= nil
+end
+
+local function decodeBase64Text(text)
+    local codec = getBase64()
+    if not (codec and type(codec.Decode) == "function") then
+        return nil, "BASE64_UNAVAILABLE"
+    end
+    local ok, decoded = pcall(codec.Decode, tostring(text or ""))
+    if ok and type(decoded) == "string" and decoded ~= "" then
+        return decoded
+    end
+    return nil, "BASE64_FAILED"
+end
+
+local function maybeDecompressZlib(text)
+    local libstub = _G and _G.LibStub
+    if type(libstub) ~= "function" then
+        return nil, "DEFLATE_UNAVAILABLE"
+    end
+    local ok, lib = pcall(libstub, "LibDeflate")
+    if not ok or type(lib) ~= "table" or type(lib.DecompressZlib) ~= "function" then
+        return nil, "DEFLATE_UNAVAILABLE"
+    end
+    local okDecompress, decompressed = pcall(lib.DecompressZlib, lib, text)
+    if okDecompress and type(decompressed) == "string" and decompressed ~= "" then
+        return decompressed
+    end
+    return nil, "DEFLATE_FAILED"
+end
+
+local function parseJsonText(text)
+    local decoder = getJson()
+    if not (decoder and type(decoder.GetDecoded) == "function") then
+        return nil, "JSON_UNAVAILABLE"
+    end
+    local data, reason = decoder.GetDecoded(text)
+    if type(data) == "table" then
+        return data
+    end
+    return nil, reason or "JSON_INVALID"
+end
+
+local function getSoftResArray(data)
+    if type(data) ~= "table" then
+        return nil
+    end
+    return data.softreserves or data.softReserves or data.reserves or data.players
+end
+
+local function getJsonPlayerName(entry)
+    if type(entry) ~= "table" then
+        return nil
+    end
+    return entry.name or entry.player or entry.character or entry.characterName or entry.playerName
+end
+
+local function getJsonItems(entry)
+    if type(entry) ~= "table" then
+        return nil
+    end
+    local items = entry.items or entry.reserves or entry.softreserves or entry.softReserves
+    if type(items) == "table" then
+        return items
+    end
+    if entry.id or entry.itemId or entry.itemID or entry.item_id then
+        return { entry }
+    end
+    return nil
+end
+
+local function getJsonItemId(item)
+    if type(item) ~= "table" then
+        return nil
+    end
+    return tonumber(item.id or item.itemId or item.itemID or item.item_id)
+end
+
+local function getJsonPlus(item, entry)
+    if type(item) == "table" then
+        local value = tonumber(item.sr_plus or item.srPlus or item.plus)
+        if value then
+            return value
+        end
+    end
+    if type(entry) == "table" then
+        return tonumber(entry.sr_plus or entry.srPlus or entry.plus) or 0
+    end
+    return 0
+end
+
+local function appendSoftResJsonRows(rows, data)
+    local softreserves = getSoftResArray(data)
+    if type(softreserves) ~= "table" then
+        return false, "JSON_NO_SOFTRESERVES"
+    end
+
+    local playerKeys = {}
+    local playerCount = 0
+    for i = 1, #softreserves do
+        local entry = softreserves[i]
+        local playerName = getJsonPlayerName(entry)
+        local playerKey = normalizeLower(playerName)
+        local items = getJsonItems(entry)
+        if playerKey and type(items) == "table" then
+            if not playerKeys[playerKey] then
+                playerKeys[playerKey] = true
+                playerCount = playerCount + 1
+            end
+
+            for j = 1, #items do
+                local item = items[j]
+                local itemId = getJsonItemId(item)
+                if itemId and itemId > 0 then
+                    rows[#rows + 1] = {
+                        itemId = itemId,
+                        player = playerName,
+                        playerKey = playerKey,
+                        source = "encoded-json",
+                        class = entry.class,
+                        spec = entry.role or entry.spec,
+                        note = item.note or entry.note,
+                        plus = getJsonPlus(item, entry),
+                    }
+                end
+            end
+        end
+    end
+
+    if #rows <= 0 then
+        return false, "JSON_NO_ROWS"
+    end
+    return true, nil, playerCount
+end
+
+local function parseDecodedJsonPayload(decoded)
+    local data, reason = parseJsonText(decoded)
+    if data then
+        return data
+    end
+
+    local decompressed, decompressReason = maybeDecompressZlib(decoded)
+    if not decompressed then
+        return nil, reason or decompressReason, decompressReason
+    end
+
+    data, reason = parseJsonText(decompressed)
+    if data then
+        return data
+    end
+    return nil, reason or "JSON_INVALID", decompressReason
+end
+
+local function parseEncodedRows(text)
+    local decoded, decodeReason = decodeBase64Text(text)
+    if not decoded then
+        return nil, nil, nil, decodeReason
+    end
+
+    local data, jsonReason, decompressReason = parseDecodedJsonPayload(decoded)
+    if not data then
+        return nil, nil, nil, jsonReason or "JSON_INVALID", decompressReason, decoded
+    end
+
+    local rows = {}
+    local ok, rowReason, playerCount = appendSoftResJsonRows(rows, data)
+    if not ok then
+        return nil, nil, nil, rowReason or "JSON_NO_ROWS", nil, decoded
+    end
+
+    local stats = {
+        headerDetected = false,
+        totalLines = 1,
+        dataLines = 1,
+        validRows = #rows,
+        skippedRows = 0,
+        format = "encoded-json",
+        players = playerCount or 0,
+    }
+    return rows, stats, data, nil, nil, decoded
 end
 
 local function validatePlusRows(rows)
@@ -293,10 +520,45 @@ function Import.BuildParser()
             addon:debug(Diag.D.LogReservesParseStart)
         end
 
-        local rows, importStats = parseCSVRows(text)
+        local csvAttempted = looksLikeCSV(text)
+        local rows, importStats
+        local encodedData
+        if csvAttempted then
+            rows, importStats = parseCSVRows(text)
+        end
         if not rows or #rows == 0 then
-            addon:warn(L.WarnNoValidRows)
-            return nil, "NO_ROWS"
+            if isDebugEnabled() then
+                addon:debug(Diag.D.LogReservesEncodedImportStart)
+            end
+
+            local encodedReason, decompressionReason, decodedText
+            rows, importStats, encodedData, encodedReason, decompressionReason, decodedText = parseEncodedRows(text)
+            if not rows or #rows == 0 then
+                if csvAttempted then
+                    addon:warn(L.WarnNoValidRows)
+                    return nil, "NO_ROWS"
+                end
+                if decompressionReason == "DEFLATE_UNAVAILABLE" and looksLikeZlibPayload(decodedText) then
+                    addon:warn(L.WarnReservesEncodedImportCompressed)
+                else
+                    addon:warn(L.WarnReservesEncodedImportInvalid)
+                end
+                if isDebugEnabled() then
+                    addon:warn(Diag.W.LogReservesEncodedImportFailed:format(tostring(encodedReason or "NO_ROWS")))
+                end
+                return nil, encodedReason or "NO_ROWS"
+            end
+
+            if isDebugEnabled() then
+                local metadata = type(encodedData) == "table" and encodedData.metadata or nil
+                addon:debug(
+                    Diag.D.LogReservesEncodedImportRows:format(
+                        tonumber(importStats.validRows) or #rows,
+                        tonumber(importStats.players) or 0,
+                        tostring(metadata and (metadata.origin or metadata.source) or "?")
+                    )
+                )
+            end
         end
 
         importStats = importStats or {}
@@ -326,13 +588,20 @@ function Import.BuildParser()
         end
 
         local newReservesData = strategy.Aggregate(rows)
-        return {
+        local result = {
             mode = resolvedMode,
             reservesData = newReservesData,
             nPlayers = addon.tLength(newReservesData),
             opts = opts,
             importStats = importStats,
         }
+        if importStats.format == "encoded-json" then
+            local metadata = type(encodedData) == "table" and encodedData.metadata or nil
+            result.format = "encoded-json"
+            result.sourceId = type(metadata) == "table" and (metadata.id or metadata.raidId or metadata.uuid) or nil
+            result.sourceOrigin = type(metadata) == "table" and (metadata.origin or metadata.source) or nil
+        end
+        return result
     end
 
     return {
@@ -347,6 +616,8 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Init",
             "Modules/ModuleRegistry",
             "Modules/Strings",
+            "Modules/Base64",
+            "Modules/Json",
         },
     })
     registry.SetLoaded("Services/Reserves/Import")

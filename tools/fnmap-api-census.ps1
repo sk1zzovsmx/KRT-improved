@@ -81,6 +81,121 @@ function Get-ApiScope([string]$target, [string]$method) {
     return "Public"
 }
 
+function Get-PublicApiVerbGroups {
+    return @(
+        [pscustomobject]@{
+            Category = "Query"
+            Prefixes = @(
+                "Get",
+                "Find",
+                "Is",
+                "Can",
+                "Query",
+                "Resolve",
+                "Validate",
+                "Compare",
+                "Has",
+                "Contains",
+                "Should",
+                "Match",
+                "Check"
+            )
+        },
+        [pscustomobject]@{
+            Category = "Mutation"
+            Prefixes = @(
+                "Set",
+                "Add",
+                "Remove",
+                "Delete",
+                "Upsert",
+                "Create",
+                "Clear",
+                "Apply",
+                "Insert",
+                "Update",
+                "Reset",
+                "Purge",
+                "Strip",
+                "Compact",
+                "Invalidate",
+                "Upgrade",
+                "Submit"
+            )
+        },
+        [pscustomobject]@{
+            Category = "Lifecycle"
+            Prefixes = @(
+                "Ensure",
+                "Bind",
+                "Localize",
+                "RequestRefresh",
+                "Request",
+                "Refresh",
+                "Toggle",
+                "Show",
+                "Hide",
+                "Prepare",
+                "Load",
+                "Save",
+                "Start",
+                "Stop",
+                "Pause",
+                "Schedule",
+                "Begin",
+                "End",
+                "Finalize",
+                "Enable",
+                "Disable",
+                "Define",
+                "Require",
+                "Warm",
+                "Fetch",
+                "Select",
+                "Seed",
+                "Fill",
+                "Roll"
+            )
+        },
+        [pscustomobject]@{
+            Category = "Transform"
+            Prefixes = @(
+                "Build",
+                "Normalize",
+                "Parse",
+                "Encode",
+                "Decode",
+                "Format",
+                "Make",
+                "Trim",
+                "Split",
+                "Copy",
+                "Project"
+            )
+        },
+        [pscustomobject]@{
+            Category = "Event"
+            Prefixes = @(
+                "Register",
+                "Trigger",
+                "Announce",
+                "Broadcast",
+                "Sync",
+                "Print",
+                "Send",
+                "Handle",
+                "Publish",
+                "Unregister",
+                "Demand",
+                "Call",
+                "Observe",
+                "Log",
+                "On"
+            )
+        }
+    )
+}
+
 function Get-TaxonomyInfo([string]$scope, [string]$style, [string]$method) {
     if ($scope -ne "Public") {
         return [pscustomobject]@{
@@ -118,16 +233,7 @@ function Get-TaxonomyInfo([string]$scope, [string]$style, [string]$method) {
         }
     }
 
-    $prefixGroups = @(
-        [pscustomobject]@{ Prefixes = @("Get", "Find", "Is", "Can"); Category = "Query" },
-        [pscustomobject]@{ Prefixes = @("Set", "Add", "Remove", "Delete", "Upsert"); Category = "Mutation" },
-        [pscustomobject]@{
-            Prefixes = @("Ensure", "Bind", "Localize", "Request", "RequestRefresh", "Refresh", "Toggle", "Show", "Hide")
-            Category = "Lifecycle"
-        }
-    )
-
-    foreach ($group in $prefixGroups) {
+    foreach ($group in (Get-PublicApiVerbGroups)) {
         foreach ($prefix in $group.Prefixes) {
             if ($method.StartsWith($prefix, [System.StringComparison]::Ordinal)) {
                 return [pscustomobject]@{

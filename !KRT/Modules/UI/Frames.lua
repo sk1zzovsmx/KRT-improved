@@ -187,7 +187,7 @@ function Frames.Get(frameName)
     return _G[frameName]
 end
 
-function Frames.Ref(frameOrName, childName)
+function Frames.GetRef(frameOrName, childName)
     local frameName = resolveFrameName(frameOrName)
     if type(frameName) ~= "string" or frameName == "" then
         return nil
@@ -230,7 +230,7 @@ function Frames.GetNamedParts(widget, parts, cacheField)
     return refs
 end
 
-function Frames.SafeSetScript(widget, scriptType, handler)
+function Frames.SetScriptSafely(widget, scriptType, handler)
     if not widget or not widget.SetScript then
         return false
     end
@@ -239,138 +239,13 @@ function Frames.SafeSetScript(widget, scriptType, handler)
     end
     if handler ~= nil and type(handler) ~= "function" then
         if addon.State and addon.State.debugEnabled then
-            error("Frames.SafeSetScript: handler must be a function or nil")
+            error("Frames.SetScriptSafely: handler must be a function or nil")
         end
         return false
     end
 
     widget:SetScript(scriptType, handler)
     return true
-end
-
-function Frames.GetButtonPopup(cfg)
-    cfg = cfg or {}
-
-    local popup = {
-        frame = nil,
-        buttons = {},
-    }
-
-    local function resolveParent()
-        if type(cfg.getParent) == "function" then
-            return cfg.getParent()
-        end
-        return cfg.parent
-    end
-
-    local function ensureFrame()
-        if popup.frame then
-            return popup.frame
-        end
-
-        local parent = resolveParent()
-        if not parent then
-            return nil
-        end
-
-        popup.frame = CreateFrame("Frame", cfg.frameName, parent, cfg.frameTemplate or "KRTSimpleFrameTemplate")
-        popup.frame:Hide()
-        return popup.frame
-    end
-
-    local function ensureButton(index)
-        local frame = ensureFrame()
-        if not frame then
-            return nil
-        end
-
-        local button = popup.buttons[index]
-        if button then
-            return button
-        end
-
-        local buttonName = cfg.buttonName and cfg.buttonName(index) or nil
-        button = CreateFrame("Button", buttonName, frame, cfg.buttonTemplate)
-        button:SetID(index)
-        if button.RegisterForClicks then
-            button:RegisterForClicks(cfg.clickRegistration or "AnyUp")
-        end
-        if cfg.onButtonClick then
-            Frames.SafeSetScript(button, "OnClick", cfg.onButtonClick)
-        end
-        if cfg.initButton then
-            cfg.initButton(button, index)
-        end
-
-        popup.buttons[index] = button
-        return button
-    end
-
-    function popup:GetFrame()
-        return self.frame or ensureFrame()
-    end
-
-    function popup:Hide()
-        if self.frame then
-            self.frame:Hide()
-        end
-    end
-
-    function popup:Toggle()
-        local frame = ensureFrame()
-        if not frame then
-            return false
-        end
-
-        if frame:IsShown() then
-            frame:Hide()
-        else
-            frame:Show()
-        end
-
-        return frame:IsShown()
-    end
-
-    function popup:Refresh(count)
-        local frame = ensureFrame()
-        local rowCount = tonumber(count) or 0
-        local height = tonumber(cfg.topInset) or 5
-        local rowStep = tonumber(cfg.rowStep) or 37
-        local leftInset = tonumber(cfg.leftInset) or 0
-
-        if not frame then
-            return nil
-        end
-
-        for index = 1, rowCount do
-            local button = ensureButton(index)
-            if button then
-                if cfg.drawButton then
-                    cfg.drawButton(button, index)
-                end
-                button:ClearAllPoints()
-                button:SetPoint("TOPLEFT", frame, "TOPLEFT", leftInset, -height)
-                button:Show()
-                height = height + rowStep
-            end
-        end
-
-        for index = rowCount + 1, #self.buttons do
-            local button = self.buttons[index]
-            if button then
-                button:Hide()
-            end
-        end
-
-        frame:SetHeight(height)
-        if rowCount <= 0 then
-            frame:Hide()
-        end
-
-        return frame
-    end
-
-    return popup
 end
 
 local function showTooltip(frame)
@@ -501,7 +376,7 @@ function Frames.MakeFrameGetter(globalFrameName)
     end
 end
 
-function Frames.InitModuleFrame(module, frame, opts)
+function Frames.BindModuleFrame(module, frame, opts)
     if not frame then
         return nil
     end
@@ -561,7 +436,7 @@ local function makeUIFrameController(getFrame, requestRefreshFn)
     }
 end
 
-function UIScaffold.BootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
+local function bootstrapModuleUi(module, getFrame, requestRefreshFn, opts)
     local uiController = makeUIFrameController(getFrame, requestRefreshFn)
     if opts then
         if opts.bindToggleHide then
@@ -678,7 +553,7 @@ function UIScaffold.DefineModuleUi(cfg)
             if onLoadFrame then
                 frameName = onLoadFrame(frame)
             else
-                frameName = Frames.InitModuleFrame(module, frame, initFrameOpts)
+                frameName = Frames.BindModuleFrame(module, frame, initFrameOpts)
             end
             UI.FrameName = frameName or (frame.GetName and frame:GetName()) or UI.FrameName
             UI.Loaded = UI.FrameName ~= nil
@@ -726,13 +601,6 @@ function UIScaffold.DefineModuleUi(cfg)
             return
         end
         return uiController:Hide()
-    end
-
-    function module:Show()
-        if not self:EnsureUI() then
-            return
-        end
-        return uiController:Show()
     end
 
     return UI
@@ -813,13 +681,13 @@ function UIScaffold.CreateListPanelScaffold(cfg)
         end,
     }
 
-    UIScaffold.BootstrapModuleUi(module, getFrame, requestRefresh, {
+    bootstrapModuleUi(module, getFrame, requestRefresh, {
         bindToggleHide = cfg.bindToggleHide,
         bindRequestRefresh = cfg.bindRequestRefresh,
     })
 
     function scaffold:OnLoad(frame)
-        frameName = Frames.InitModuleFrame(module, frame, frameInitOpts)
+        frameName = Frames.BindModuleFrame(module, frame, frameInitOpts)
         if not frameName then
             return nil
         end
@@ -841,14 +709,6 @@ function UIScaffold.CreateListPanelScaffold(cfg)
             cfg.update(frameName, frame, dirty)
         end
         dirty = false
-    end
-
-    function scaffold:MarkDirty()
-        markDirty()
-    end
-
-    function scaffold:GetFrameName()
-        return frameName
     end
 
     return scaffold

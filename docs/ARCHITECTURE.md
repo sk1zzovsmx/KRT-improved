@@ -10,7 +10,7 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
 1. `Libs/*`
    Third-party runtime libraries loaded first.
 2. `Init.lua` + `Core/{DB,Options,DBSchema,DBManager}.lua`
-   Unified bootstrap, shared namespaces, legacy alias proxy, DB/options bootstrap.
+   Unified bootstrap, shared namespaces, controller dispatch, DB/options bootstrap.
 3. `Localization/*`
    User strings (`addon.L`) and diagnose templates (`addon.Diagnose`).
 4. `UI/Templates/Common.xml`
@@ -34,20 +34,26 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
 - `!KRT/Services/*.lua`
   Own runtime model/service logic under `addon.Services.*`.
   `addon.Services.Raid` is split across `!KRT/Services/Raid/*.lua` and loaded by TOC order.
-  `State.lua` is the state/compat anchor file; the other files extend the same service table by domain
+  `State.lua` is the state anchor file; the other files extend the same service table by domain
   (`Capabilities`, `Counts`, `Roster`, `Attendance`, `LootRecords`, `Session`).
   `addon.Services.Rolls` keeps its public roll/session contract in `!KRT/Services/Rolls/Service.lua` and owns
   internal runtime helpers in `!KRT/Services/Rolls/*.lua` for countdown/session lifecycle,
-  raw history/tracker state, response intake/eligibility, resolver policy, and display assembly
-  (`addon.Services.Rolls._Countdown`, `_Sessions`, `_History`, `_Responses`, `_Resolution`, `_Display`).
+  raw history/tracker state, response intake/eligibility, strategy policy, resolver policy, and display assembly
+  (`addon.Services.Rolls._Countdown`, `_Sessions`, `_History`, `_Responses`, `_Strategies`,
+  `_Resolution`, `_Display`).
   `addon.Services.Loot` keeps its public ingestion/parsing API in `!KRT/Services/Loot/Service.lua` and owns
   internal loot-context/runtime rule helpers in `!KRT/Services/Loot/*.lua`
-  (`Context`, `State`, `Sessions`, `Snapshots`, `PendingAwards`, `PassiveGroupLoot`, `Tracking`, `Rules`) on
-  underscore-prefixed internal surfaces.
+  (`Context`, `State`, `Snapshots`, `PendingAwards`, `PassiveGroupLoot`, `Tracking`, `Workflow`, `Receipts`,
+  `Records`, `Reconcile`, `Rules`, `DistributionSession`) on underscore-prefixed internal surfaces.
+  `Workflow` owns transient loot-flow diagnostics, `Receipts` classifies parsed loot events, `Records`
+  materializes canonical loot rows, and `Reconcile` owns trade-only/passive duplicate reconciliation.
+  `DistributionSession` owns the compact
+  `KRTDist` session-sync protocol; protocol v2 adds snapshots, roll ticks, tie state, and awarded state while
+  using versioned item, roll, done, clear, snapshot, tick, tie, and awarded messages.
   `addon.Services.Reserves` keeps its public reserves contract in `!KRT/Services/Reserves.lua` and owns
-  internal import parsing, grouped-display/player-format, runtime-only sync, and whisper-response helpers in
-  `!KRT/Services/Reserves/{Import,Display,Sync,Chat}.lua`
-  (`addon.Services.Reserves._Import`, `_Display`, `_Sync`, `_Chat`).
+  internal import parsing, SoftRes name alias policy, grouped-display/player-format, runtime-only sync, and
+  whisper-response helpers in `!KRT/Services/Reserves/{Import,Aliases,Display,Sync,Chat}.lua`
+  (`addon.Services.Reserves._Import`, `_Aliases`, `_Display`, `_Sync`, `_Chat`).
   `Services/Raid/Capabilities.lua` owns capability queries and the shared master-only access guard.
   `Services/Chat.lua` owns announce/warn output contracts.
 - `!KRT/Core/DB.lua`
@@ -55,7 +61,7 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   `addon.Core.*`; `addon.DB` remains the concrete namespace for DB submodules and
   manager state, not a parallel getter surface.
 - `!KRT/Core/Options.lua`
-  Owns `addon.Options`, nested option namespaces, and the legacy flat-option migration.
+  Owns `addon.Options`, strict nested option namespaces, and the read-only `addon.options` proxy.
 - `!KRT/Core/DBSchema.lua`
   Owns schema-version state while exposing the canonical public accessor on
   `addon.Core.GetRaidSchemaVersion`; `addon.DBSchema` is not a second parallel getter facade.
@@ -65,13 +71,14 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   Own slash/minimap entrypoints.
 - `!KRT/Modules/*.lua`
   Own reusable infra only, not parent feature logic.
+  `Modules/Json.lua` owns the small native JSON decoder used by encoded SoftRes import parsing.
   `Modules/LootSourcesData.lua` owns static raid item-source data.
   `Modules/LootSources.lua` owns the itemId -> raid source resolver.
-  `Modules/IgnoredMobs.lua` owns raid add/phase-ignore lookup and the canonical generic trash-mob
+  `Modules/Dataset/IgnoredMobs.lua` owns raid add/phase-ignore lookup and the canonical generic trash-mob
   name helpers consumed by Raid state, Logger, and raid validation.
 
-Compatibility aliases (`addon.Master`, `addon.Logger`, `addon.Raid`, ...) are legacy adapters.
-New call sites should use namespaced owners (`addon.Controllers.*`, `addon.Services.*`, `addon.Widgets.*`).
+Retired root aliases (`addon.Master`, `addon.Logger`, `addon.Raid`, ...) are blocked for new code.
+Call sites should use namespaced owners (`addon.Controllers.*`, `addon.Services.*`, `addon.Widgets.*`).
 Avoid root addon method facades for chat/capability contracts; the only intentional root-method
 compatibility exception is `addon:Print` for `LibLogger-1.0`.
 

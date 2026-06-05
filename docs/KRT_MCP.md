@@ -80,4 +80,4 @@ python3 tools/krt.py mech AddonValidate --json
 
 - MCP tool operations do not patch vendored skill content directly.
 - `skills_sync` and `mechanic_bootstrap` are intentionally marked as destructive operations.
-- The server supports both newline-delimited JSON-RPC framing and legacy `Content-Length` framing.
+- The server supports both newline-delimited JSON-RPC framing and `Content-Length` framing.

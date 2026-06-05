@@ -99,10 +99,10 @@ local function buildItemText(entry)
 end
 
 local function sendWhisper(target, text)
-    if not (Comms and Comms.Whisper) then
+    if not (Comms and Comms.SendWhisper) then
         return false
     end
-    return Comms.Whisper(target, text)
+    return Comms.SendWhisper(target, text)
 end
 
 local function sendReserveMessages(target, entries)
@@ -116,6 +116,8 @@ local function sendReserveMessages(target, entries)
     end
 end
 
+local requestWhisperReply
+
 local function registerWhisperHandler()
     local eventName = Events and Events.Wow and Events.Wow.ChatMsgWhisper
     if not (eventName and Bus and Bus.RegisterCallback) then
@@ -123,12 +125,12 @@ local function registerWhisperHandler()
     end
 
     Bus.RegisterCallback(eventName, function(_, msg, sender)
-        Chat:RequestWhisperReply(msg, sender)
+        requestWhisperReply(msg, sender)
     end)
 end
 
--- ----- Public methods ----- --
-function Chat:RequestWhisperReply(msg, sender)
+-- ----- Private helpers ----- --
+requestWhisperReply = function(msg, sender)
     if not isRequest(msg) then
         return false
     end
@@ -158,6 +160,12 @@ function Chat:RequestWhisperReply(msg, sender)
 
     sendReserveMessages(target, entries)
     return true
+end
+
+-- ----- Public methods ----- --
+
+function Chat:RequestWhisperReply(msg, sender)
+    return requestWhisperReply(msg, sender)
 end
 
 registerWhisperHandler()

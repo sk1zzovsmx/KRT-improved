@@ -26,13 +26,12 @@ For architecture guardrails, see `docs/ARCHITECTURE.md`.
 - `addon.C`
 - `addon.Events` (`Internal` + forwarded `Wow` names)
 - `addon.Controllers`, `addon.Services`, `addon.Widgets`
-- compatibility alias proxy (`addon.Master`, `addon.Logger`, `addon.Raid`, ...)
 
 `Init.lua` also owns global WoW event wiring and bus forwarding.
 Modules consume shared dependencies through `addon.Core.GetFeatureShared()`.
 Service submodules bootstrap owner tables through `feature.EnsureServiceNamespace(...)`
 so namespace creation stays centralized with the rest of bootstrap.
-`Core/Options.lua` owns `addon.Options`, namespaced defaults, and flat-option migration.
+`Core/Options.lua` owns `addon.Options`, namespaced defaults, and strict schema-2 storage.
 
 ## Runtime Module Map
 
@@ -53,13 +52,15 @@ Runtime data/model/service modules:
 - `addon.Services.Raid` (split owner across `Services/Raid/*.lua`)
 - `addon.Services.Chat`
 - `addon.Services.Rolls` (public facade in `Services/Rolls/Service.lua`; internal helpers in
-  `Services/Rolls/Countdown.lua`, `Services/Rolls/Sessions.lua`, `Services/Rolls/History.lua`, `Services/Rolls/Responses.lua`,
-  `Services/Rolls/Resolution.lua`, `Services/Rolls/Display.lua`)
+  `Services/Rolls/Countdown.lua`, `Services/Rolls/Sessions.lua`, `Services/Rolls/History.lua`,
+  `Services/Rolls/Responses.lua`, `Services/Rolls/Strategies.lua`, `Services/Rolls/Resolution.lua`,
+  `Services/Rolls/Display.lua`)
 - `addon.Services.Loot` (public API in `Services/Loot/Service.lua`; internal loot-context/rule helpers in
   `Services/Loot/*.lua`)
 - `addon.Services.Debug`
-- `addon.Services.Reserves` (public facade in `Services/Reserves.lua`; internal import, grouped-display,
-  runtime sync, and whisper-response helpers in `Services/Reserves/{Import,Display,Sync,Chat}.lua`)
+- `addon.Services.Reserves` (public facade in `Services/Reserves.lua`; internal import, alias,
+  grouped-display, runtime sync, and whisper-response helpers in
+  `Services/Reserves/{Import,Aliases,Display,Sync,Chat}.lua`)
 - `addon.Services.Logger` (Logger Store/View/Export/Helpers/Actions service tables consumed by
   `Controllers/Logger.lua`)
 
@@ -75,25 +76,32 @@ Runtime data/model/service modules:
 
 `addon.Services.Loot` internal runtime helpers are composed by:
 - `Services/Loot/Context.lua` (`LootContext` normalization/projection helpers)
-- `Services/Loot/State.lua` (`activeLoot` + legacy mirror synchronization helpers + loot
+- `Services/Loot/State.lua` (`activeLoot` + `lootContext` session helpers + loot
   roll-session boss-context state)
 - `Services/Loot/Snapshots.lua` (loot-window item snapshot state)
 - `Services/Loot/PendingAwards.lua` (pending-award lifecycle and consume/refresh policy)
 - `Services/Loot/PassiveGroupLoot.lua` (passive group-loot parser/state/winner helpers)
 - `Services/Loot/Tracking.lua` (runtime tracking/debug snapshot builders)
+- `Services/Loot/Workflow.lua` (transient loot-flow state and diagnostic snapshots)
+- `Services/Loot/Receipts.lua` (parsed loot event classification)
+- `Services/Loot/Records.lua` (canonical loot-record materialization)
+- `Services/Loot/Reconcile.lua` (trade-only fallback merge and passive duplicate reconciliation)
 - `Services/Loot/Rules.lua` (suggestion-only auto-loot rule classifier)
-- `Services/Loot/DistributionSession.lua` (Master-owned compact item/roll/done session sync)
+- `Services/Loot/DistributionSession.lua` (Master-owned compact `KRTDist` item/roll/done session sync;
+  protocol v2 adds snapshots, ticks, tie state, and awarded state)
 
 `addon.Services.Rolls` internal runtime helpers are composed by:
 - `Services/Rolls/Countdown.lua` (countdown start/stop/tick runtime logic)
 - `Services/Rolls/Sessions.lua` (roll-session lifecycle, tie-reroll state, and current-roll context helpers)
 - `Services/Rolls/History.lua` (raw roll entries, per-item trackers, and local roll-state helpers)
 - `Services/Rolls/Responses.lua` (response lifecycle, eligibility, and incoming-roll materialization)
+- `Services/Rolls/Strategies.lua` (package-internal normal/SR/tie/raid-roll strategy policy)
 - `Services/Rolls/Resolution.lua` (resolver ordering, tie-cutoff handling, and row-policy helpers)
 - `Services/Rolls/Display.lua` (display-model assembly and winner/display contract helpers)
 
 `addon.Services.Reserves` internal runtime helpers are composed by:
-- `Services/Reserves/Import.lua` (CSV parsing plus/multi strategies and import aggregation)
+- `Services/Reserves/Import.lua` (CSV and encoded SoftRes JSON parsing plus/multi strategies)
+- `Services/Reserves/Aliases.lua` (package-internal SoftRes name alias resolution policy)
 - `Services/Reserves/Display.lua` (grouped display rows, player formatting, and reserve-list projections)
 - `Services/Reserves/Sync.lua` (runtime-only SoftRes metadata/data sync and chunked addon-message handling)
 - `Services/Reserves/Chat.lua` (opt-in `!sr`/`!softres` whisper request parsing and chat-safe replies)
@@ -119,10 +127,10 @@ Entrypoints stay narrow:
 Common infra under `!KRT/Modules/`:
 
 - Data/utility: `Timer`, `Events`, `Strings`, `Item`, `LootSourcesData`, `LootSources`, `Time`,
-  `Sort`, `Comms`, `Base64`, `Colors`, `IgnoredItems`, `IgnoredMobs`
+  `Sort`, `Comms`, `Base64`, `Json`, `Colors`, `IgnoredItems`, `IgnoredMobs`
 - `Modules/LootSourcesData.lua` - static raid item-source data
 - `Modules/LootSources.lua` - itemId -> raid source resolver
-- `Modules/IgnoredMobs.lua` - raid add/phase-ignore lookup plus canonical trash-mob name helpers
+- `Modules/Dataset/IgnoredMobs.lua` - raid add/phase-ignore lookup plus canonical trash-mob name helpers
 - UI infra: `Frames`, `UIScaffold`, `ListController`, `MultiSelect`, `UI` facade, `UIEffects`
 - Messaging: `Bus`
 - Feature toggles: `Features`
@@ -130,16 +138,16 @@ Common infra under `!KRT/Modules/`:
 ## Public API Notes
 
 - Canonical owners are namespaced (`addon.Controllers.*`, `addon.Services.*`, `addon.Widgets.*`).
-- Legacy top-level aliases (`addon.Master`, `addon.Logger`, ...) are compatibility shims.
-- For announce and shared warning output, use `addon.Services.Chat` / `addon.Chat`.
+- Retired top-level aliases (`addon.Master`, `addon.Logger`, ...) must not be reintroduced.
+- For announce and shared warning output, use `addon.Services.Chat`.
   For capability queries and shared master-only access guards, use
-  `addon.Services.Raid` / `addon.Raid`.
+  `addon.Services.Raid`.
   Root addon method facades such as `addon:Announce`,
   `addon:GetRaidCapabilityState`, and `addon:EnsureMasterOnlyAccess`
   are intentionally absent.
 - `addon:Print` remains a compatibility hook for `LibLogger-1.0`.
-- For reserves, use `addon.Services.Reserves` / `addon.Reserves` as the canonical public surface.
-  Do not rely on `addon.Services.Reserves.Service` / `addon.Reserves.Service` alias surfaces.
+- For reserves, use `addon.Services.Reserves` as the canonical public surface.
+  Do not rely on nested `.Service` alias surfaces.
 - For DB-manager-backed accessors, use `addon.Core.GetRaidStore`,
   `addon.Core.GetRaidStoreOrNil`, `addon.Core.GetRaidQueries`,
   `addon.Core.GetRaidMigrations`, `addon.Core.GetRaidValidator`, and
@@ -156,7 +164,7 @@ Common infra under `!KRT/Modules/`:
   `addon.Services.Reserves._...`) instead of public `*Internal` methods.
 - For `Master`, keep only explicitly consumed button handlers public. Dropdown, cursor,
   and other frame-local glue should stay private inside `Controllers/Master.lua`.
-- In debug mode, alias reads are intentionally warned to prevent new alias call sites.
+- Retired alias usage is blocked by local gates to prevent new root call sites.
 
 ## Event and Refresh Flow
 
@@ -176,7 +184,7 @@ Declared in `!KRT/!KRT.toc`:
 - `KRT_Spammer`
 - `KRT_Options`
 
-Avoid key/shape breaks without migration and changelog notes.
+Avoid key/shape breaks without explicit release notes and a deliberate schema-version decision.
 
 ## Placement Guide for New Code
 

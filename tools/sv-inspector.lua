@@ -8,7 +8,7 @@ local tonumber, tostring, type = tonumber, tostring, type
 local pairs = pairs
 local concat = table.concat
 
-local CURRENT_SCHEMA_VERSION = 3
+local CURRENT_SCHEMA_VERSION = 5
 
 local REQUIRED_SV_KEYS = {
     "KRT_Raids",
@@ -32,7 +32,7 @@ local CANONICAL_RAID_KEYS = {
     "startTime",
 }
 
-local LEGACY_RAID_KEYS = {
+local ROOT_RUNTIME_CACHE_KEYS = {
     "_playersByName",
     "_playerIdxByNid",
     "_bossIdxByNid",
@@ -222,10 +222,10 @@ local function inspectRaid(raid, raidIndex)
             disenchanter = "",
             missingCanonicalCount = #CANONICAL_RAID_KEYS,
             missingCanonicalKeys = concat(CANONICAL_RAID_KEYS, ";"),
-            legacyRuntimeCount = 0,
-            legacyRuntimeKeys = "",
-            legacyLootLooterCount = 0,
-            legacyAttendanceMaskCount = 0,
+            rootRuntimeCount = 0,
+            rootRuntimeKeys = "",
+            lootLooterCount = 0,
+            attendanceMaskCount = 0,
             schemaOk = false,
             countersOk = false,
             referencesOk = false,
@@ -247,11 +247,11 @@ local function inspectRaid(raid, raidIndex)
         end
     end
 
-    local legacyRuntimeKeys = {}
-    for i = 1, #LEGACY_RAID_KEYS do
-        local key = LEGACY_RAID_KEYS[i]
+    local rootRuntimeKeys = {}
+    for i = 1, #ROOT_RUNTIME_CACHE_KEYS do
+        local key = ROOT_RUNTIME_CACHE_KEYS[i]
         if raid[key] ~= nil then
-            legacyRuntimeKeys[#legacyRuntimeKeys + 1] = key
+            rootRuntimeKeys[#rootRuntimeKeys + 1] = key
         end
     end
 
@@ -275,7 +275,7 @@ local function inspectRaid(raid, raidIndex)
     end
 
     local missingBossAttendeeRefs = 0
-    local legacyAttendanceMaskCount = 0
+    local attendanceMaskCount = 0
     for i = 1, #bosses do
         local boss = bosses[i]
         if type(boss) == "table" then
@@ -288,7 +288,7 @@ local function inspectRaid(raid, raidIndex)
             end
 
             if boss.attendanceMask ~= nil then
-                legacyAttendanceMaskCount = legacyAttendanceMaskCount + 1
+                attendanceMaskCount = attendanceMaskCount + 1
             end
 
             local attendees = boss.players
@@ -305,7 +305,7 @@ local function inspectRaid(raid, raidIndex)
 
     local missingLootBossRefs = 0
     local missingLootLooterRefs = 0
-    local legacyLootLooterCount = 0
+    local lootLooterCount = 0
     for i = 1, #lootRows do
         local loot = lootRows[i]
         if type(loot) == "table" then
@@ -315,7 +315,7 @@ local function inspectRaid(raid, raidIndex)
             end
 
             if loot.looter ~= nil then
-                legacyLootLooterCount = legacyLootLooterCount + 1
+                lootLooterCount = lootLooterCount + 1
             end
 
             local bossNid = tonumber(loot.bossNid) or 0
@@ -347,7 +347,7 @@ local function inspectRaid(raid, raidIndex)
 
     local schemaVersion = tonumber(raid.schemaVersion)
     local schemaOk = false
-    if schemaVersion and schemaVersion >= 1 and schemaVersion <= CURRENT_SCHEMA_VERSION then
+    if schemaVersion and schemaVersion == CURRENT_SCHEMA_VERSION then
         schemaOk = true
     end
 
@@ -369,10 +369,10 @@ local function inspectRaid(raid, raidIndex)
         disenchanter = disenchanter,
         missingCanonicalCount = #missingCanonicalKeys,
         missingCanonicalKeys = concat(missingCanonicalKeys, ";"),
-        legacyRuntimeCount = #legacyRuntimeKeys,
-        legacyRuntimeKeys = concat(legacyRuntimeKeys, ";"),
-        legacyLootLooterCount = legacyLootLooterCount,
-        legacyAttendanceMaskCount = legacyAttendanceMaskCount,
+        rootRuntimeCount = #rootRuntimeKeys,
+        rootRuntimeKeys = concat(rootRuntimeKeys, ";"),
+        lootLooterCount = lootLooterCount,
+        attendanceMaskCount = attendanceMaskCount,
         schemaOk = schemaOk,
         countersOk = countersOk,
         referencesOk = referencesOk,
@@ -425,9 +425,9 @@ local function buildReport(env, sourcePath)
 
     sanity.raidsWithSchemaIssue = 0
     sanity.raidsWithMissingCanonical = 0
-    sanity.raidsWithLegacyRuntime = 0
-    sanity.raidsWithLegacyLootLooter = 0
-    sanity.raidsWithLegacyAttendanceMask = 0
+    sanity.raidsWithRootRuntime = 0
+    sanity.raidsWithLootLooter = 0
+    sanity.raidsWithAttendanceMask = 0
     sanity.raidsWithCounterIssue = 0
     sanity.raidsWithReferenceIssue = 0
 
@@ -445,14 +445,14 @@ local function buildReport(env, sourcePath)
         if row.missingCanonicalCount > 0 then
             sanity.raidsWithMissingCanonical = sanity.raidsWithMissingCanonical + 1
         end
-        if row.legacyRuntimeCount > 0 then
-            sanity.raidsWithLegacyRuntime = sanity.raidsWithLegacyRuntime + 1
+        if row.rootRuntimeCount > 0 then
+            sanity.raidsWithRootRuntime = sanity.raidsWithRootRuntime + 1
         end
-        if row.legacyLootLooterCount > 0 then
-            sanity.raidsWithLegacyLootLooter = sanity.raidsWithLegacyLootLooter + 1
+        if row.lootLooterCount > 0 then
+            sanity.raidsWithLootLooter = sanity.raidsWithLootLooter + 1
         end
-        if row.legacyAttendanceMaskCount > 0 then
-            sanity.raidsWithLegacyAttendanceMask = sanity.raidsWithLegacyAttendanceMask + 1
+        if row.attendanceMaskCount > 0 then
+            sanity.raidsWithAttendanceMask = sanity.raidsWithAttendanceMask + 1
         end
         if not row.countersOk then
             sanity.raidsWithCounterIssue = sanity.raidsWithCounterIssue + 1
@@ -597,16 +597,16 @@ local function emitRaidsTable(writeLine, report)
             raid.lootCount,
             (raid.holder ~= "" and raid.holder or "-"),
             raid.missingCanonicalCount,
-            raid.legacyRuntimeCount,
-            raid.legacyLootLooterCount,
-            raid.legacyAttendanceMaskCount,
+            raid.rootRuntimeCount,
+            raid.lootLooterCount,
+            raid.attendanceMaskCount,
             (raid.countersOk and "ok" or "bad"),
             (raid.referencesOk and "ok" or "bad"),
         }
     end
 
     writeLine("Raid Snapshot")
-    renderAsciiTable(writeLine, { "idx", "raidNid", "schema", "players", "bossKills", "loot", "holder", "miss", "legacy", "looter", "mask", "ctr", "refs" }, rows)
+    renderAsciiTable(writeLine, { "idx", "raidNid", "schema", "players", "bossKills", "loot", "holder", "miss", "root", "looter", "mask", "ctr", "refs" }, rows)
 end
 
 local function emitSanityTable(writeLine, report)
@@ -625,16 +625,16 @@ local function emitSanityTable(writeLine, report)
             boolText(sanity.raidsWithMissingCanonical == 0),
             sanity.raidsWithMissingCanonical,
         },
-        { "legacyRuntimeKeys", boolText(sanity.raidsWithLegacyRuntime == 0), sanity.raidsWithLegacyRuntime },
+        { "rootRuntimeKeys", boolText(sanity.raidsWithRootRuntime == 0), sanity.raidsWithRootRuntime },
         {
-            "legacyLootLooter",
-            boolText(sanity.raidsWithLegacyLootLooter == 0),
-            sanity.raidsWithLegacyLootLooter,
+            "lootLooter",
+            boolText(sanity.raidsWithLootLooter == 0),
+            sanity.raidsWithLootLooter,
         },
         {
-            "legacyAttendanceMask",
-            boolText(sanity.raidsWithLegacyAttendanceMask == 0),
-            sanity.raidsWithLegacyAttendanceMask,
+            "attendanceMask",
+            boolText(sanity.raidsWithAttendanceMask == 0),
+            sanity.raidsWithAttendanceMask,
         },
         { "nidCounters", boolText(sanity.raidsWithCounterIssue == 0), sanity.raidsWithCounterIssue },
         { "nidReferences", boolText(sanity.raidsWithReferenceIssue == 0), sanity.raidsWithReferenceIssue },
@@ -675,10 +675,10 @@ local function emitRaidsCsv(writeLine, report)
         "disenchanter",
         "missingCanonicalCount",
         "missingCanonicalKeys",
-        "legacyRuntimeCount",
-        "legacyRuntimeKeys",
-        "legacyLootLooterCount",
-        "legacyAttendanceMaskCount",
+        "rootRuntimeCount",
+        "rootRuntimeKeys",
+        "lootLooterCount",
+        "attendanceMaskCount",
         "countersOk",
         "referencesOk",
         "missingLootBossRefs",
@@ -700,10 +700,10 @@ local function emitRaidsCsv(writeLine, report)
             raid.disenchanter,
             raid.missingCanonicalCount,
             raid.missingCanonicalKeys,
-            raid.legacyRuntimeCount,
-            raid.legacyRuntimeKeys,
-            raid.legacyLootLooterCount,
-            raid.legacyAttendanceMaskCount,
+            raid.rootRuntimeCount,
+            raid.rootRuntimeKeys,
+            raid.lootLooterCount,
+            raid.attendanceMaskCount,
             boolText(raid.countersOk),
             boolText(raid.referencesOk),
             raid.missingLootBossRefs,
@@ -728,16 +728,16 @@ local function emitSanityCsv(writeLine, report)
         boolText(sanity.raidsWithMissingCanonical == 0),
         sanity.raidsWithMissingCanonical,
     })
-    writeCsvRow(writeLine, { "legacyRuntimeKeys", boolText(sanity.raidsWithLegacyRuntime == 0), sanity.raidsWithLegacyRuntime })
+    writeCsvRow(writeLine, { "rootRuntimeKeys", boolText(sanity.raidsWithRootRuntime == 0), sanity.raidsWithRootRuntime })
     writeCsvRow(writeLine, {
-        "legacyLootLooter",
-        boolText(sanity.raidsWithLegacyLootLooter == 0),
-        sanity.raidsWithLegacyLootLooter,
+        "lootLooter",
+        boolText(sanity.raidsWithLootLooter == 0),
+        sanity.raidsWithLootLooter,
     })
     writeCsvRow(writeLine, {
-        "legacyAttendanceMask",
-        boolText(sanity.raidsWithLegacyAttendanceMask == 0),
-        sanity.raidsWithLegacyAttendanceMask,
+        "attendanceMask",
+        boolText(sanity.raidsWithAttendanceMask == 0),
+        sanity.raidsWithAttendanceMask,
     })
     writeCsvRow(writeLine, { "nidCounters", boolText(sanity.raidsWithCounterIssue == 0), sanity.raidsWithCounterIssue })
     writeCsvRow(writeLine, { "nidReferences", boolText(sanity.raidsWithReferenceIssue == 0), sanity.raidsWithReferenceIssue })

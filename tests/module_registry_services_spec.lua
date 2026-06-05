@@ -101,13 +101,14 @@ local preRegistryUtilityModules = {
     { name = "Modules/Colors", deps = { "Init" } },
     { name = "Modules/Strings", deps = { "Init", "Modules/Colors" } },
     { name = "Modules/Item", deps = { "Init", "Modules/Timer", "Modules/Strings" } },
-    { name = "Modules/LootSourcesData", deps = { "Init" } },
-    { name = "Modules/LootSources", deps = { "Init", "Modules/Strings", "Modules/LootSourcesData" } },
-    { name = "Modules/IgnoredItems", deps = { "Init" } },
-    { name = "Modules/IgnoredMobs", deps = { "Init" } },
+    { name = "Modules/Dataset/LootSourcesData", deps = { "Init" } },
+    { name = "Modules/LootSources", deps = { "Init", "Modules/Strings", "Modules/Dataset/LootSourcesData" } },
+    { name = "Modules/Dataset/IgnoredItems", deps = { "Init" } },
+    { name = "Modules/Dataset/IgnoredMobs", deps = { "Init" } },
     { name = "Modules/Comms", deps = { "Init" } },
     { name = "Modules/Time", deps = { "Init" } },
     { name = "Modules/Base64", deps = { "Init" } },
+    { name = "Modules/Json", deps = { "Init" } },
     { name = "Modules/Sort", deps = { "Init" } },
     { name = "Modules/Features", deps = { "Init" } },
 }
@@ -152,7 +153,7 @@ local postRegistryCoreModules = {
             "Core/DBSchema",
             "Core/DBRaidMigrations",
             "Core/DBRaidStore",
-            "Modules/IgnoredMobs",
+            "Modules/Dataset/IgnoredMobs",
         },
     },
     {
@@ -219,11 +220,18 @@ local expectedRollServices = {
         forbiddenDeps = { "Services/Raid", "Services/Reserves", "Services/Loot" },
     },
     {
+        name = "Services/Rolls/Strategies",
+        path = "!KRT/Services/Rolls/Strategies.lua",
+        owner = "Strategies",
+        separator = ".",
+        deps = { "Init", "Modules/ModuleRegistry" },
+    },
+    {
         name = "Services/Rolls/Resolution",
         path = "!KRT/Services/Rolls/Resolution.lua",
         owner = "Resolution",
         separator = ".",
-        deps = { "Init", "Modules/ModuleRegistry" },
+        deps = { "Init", "Modules/ModuleRegistry", "Services/Rolls/Strategies" },
     },
     {
         name = "Services/Rolls/Display",
@@ -246,6 +254,7 @@ local expectedRollServices = {
             "Services/Rolls/Sessions",
             "Services/Rolls/History",
             "Services/Rolls/Responses",
+            "Services/Rolls/Strategies",
             "Services/Rolls/Resolution",
             "Services/Rolls/Display",
         },
@@ -302,10 +311,38 @@ local expectedLootServices = {
         forbiddenDeps = { "Services/Raid" },
     },
     {
+        name = "Services/Loot/Workflow",
+        path = "!KRT/Services/Loot/Workflow.lua",
+        owners = { { owner = "Workflow", separator = "." } },
+        deps = { "Init", "Modules/ModuleRegistry" },
+        forbiddenDeps = { "Services/Raid" },
+    },
+    {
+        name = "Services/Loot/Receipts",
+        path = "!KRT/Services/Loot/Receipts.lua",
+        owners = { { owner = "Receipts", separator = "." } },
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Item" },
+        forbiddenDeps = { "Services/Raid" },
+    },
+    {
+        name = "Services/Loot/Records",
+        path = "!KRT/Services/Loot/Records.lua",
+        owners = { { owner = "Records", separator = "." } },
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Time" },
+        forbiddenDeps = { "Services/Raid" },
+    },
+    {
+        name = "Services/Loot/Reconcile",
+        path = "!KRT/Services/Loot/Reconcile.lua",
+        owners = { { owner = "Reconcile", separator = "." } },
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Item", "Modules/Strings" },
+        forbiddenDeps = { "Services/Raid" },
+    },
+    {
         name = "Services/Loot/Rules",
         path = "!KRT/Services/Loot/Rules.lua",
         owners = { { owner = "Rules", separator = ":" } },
-        deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Item", "Modules/IgnoredItems" },
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Item", "Modules/Dataset/IgnoredItems" },
     },
     {
         name = "Services/Loot/DistributionSession",
@@ -328,11 +365,15 @@ local expectedLootServices = {
             "Modules/Item",
             "Modules/Strings",
             "Modules/Time",
-            "Modules/IgnoredItems",
+            "Modules/Dataset/IgnoredItems",
             "Services/Loot/Context",
             "Services/Loot/PendingAwards",
             "Services/Loot/PassiveGroupLoot",
             "Services/Loot/Tracking",
+            "Services/Loot/Workflow",
+            "Services/Loot/Receipts",
+            "Services/Loot/Records",
+            "Services/Loot/Reconcile",
         },
         forbiddenDeps = {
             "Services/Raid",
@@ -358,7 +399,7 @@ local expectedRaidServices = {
             "Modules/Strings",
             "Modules/Time",
             "Modules/Base64",
-            "Modules/IgnoredMobs",
+            "Modules/Dataset/IgnoredMobs",
             "Modules/LootSources",
             "Services/Loot/Context",
             "Services/Loot/State",
@@ -470,8 +511,16 @@ local expectedReservesServices = {
         name = "Services/Reserves/Import",
         path = "!KRT/Services/Reserves/Import.lua",
         metadataAfterNeedle = "ParseImport = parseImport,",
-        deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" },
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Modules/Base64", "Modules/Json" },
         forbiddenDeps = { "Services/Raid" },
+    },
+    {
+        name = "Services/Reserves/Aliases",
+        path = "!KRT/Services/Reserves/Aliases.lua",
+        owner = "Aliases",
+        separator = ".",
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" },
+        forbiddenDeps = { "Services/Raid", "Services/Reserves" },
     },
     {
         name = "Services/Reserves/Display",
@@ -504,6 +553,7 @@ local expectedReservesServices = {
             "Modules/Strings",
             "Modules/Item",
             "Services/Reserves/Import",
+            "Services/Reserves/Aliases",
             "Services/Reserves/Display",
         },
         forbiddenDeps = { "Services/Reserves/Sync", "Services/Reserves/Chat", "Core/Options" },
@@ -539,11 +589,12 @@ local moduleTocPaths = {
     ["Modules/Strings"] = "Modules\\Strings.lua",
     ["Modules/Time"] = "Modules\\Time.lua",
     ["Modules/Base64"] = "Modules\\Base64.lua",
+    ["Modules/Json"] = "Modules\\Json.lua",
     ["Modules/Sort"] = "Modules\\Sort.lua",
-    ["Modules/IgnoredMobs"] = "Modules\\IgnoredMobs.lua",
-    ["Modules/LootSourcesData"] = "Modules\\LootSourcesData.lua",
+    ["Modules/Dataset/IgnoredMobs"] = "Modules\\Dataset\\IgnoredMobs.lua",
+    ["Modules/Dataset/LootSourcesData"] = "Modules\\Dataset\\LootSourcesData.lua",
     ["Modules/LootSources"] = "Modules\\LootSources.lua",
-    ["Modules/IgnoredItems"] = "Modules\\IgnoredItems.lua",
+    ["Modules/Dataset/IgnoredItems"] = "Modules\\Dataset\\IgnoredItems.lua",
     ["Modules/ModuleRegistry"] = "Modules\\ModuleRegistry.lua",
     ["Services/Loot/Context"] = "Services\\Loot\\Context.lua",
     ["Services/Loot/State"] = "Services\\Loot\\State.lua",
@@ -551,6 +602,10 @@ local moduleTocPaths = {
     ["Services/Loot/PendingAwards"] = "Services\\Loot\\PendingAwards.lua",
     ["Services/Loot/PassiveGroupLoot"] = "Services\\Loot\\PassiveGroupLoot.lua",
     ["Services/Loot/Tracking"] = "Services\\Loot\\Tracking.lua",
+    ["Services/Loot/Workflow"] = "Services\\Loot\\Workflow.lua",
+    ["Services/Loot/Receipts"] = "Services\\Loot\\Receipts.lua",
+    ["Services/Loot/Records"] = "Services\\Loot\\Records.lua",
+    ["Services/Loot/Reconcile"] = "Services\\Loot\\Reconcile.lua",
     ["Services/Loot/Rules"] = "Services\\Loot\\Rules.lua",
     ["Services/Loot/DistributionSession"] = "Services\\Loot\\DistributionSession.lua",
     ["Services/Loot/Service"] = "Services\\Loot\\Service.lua",
@@ -568,6 +623,7 @@ local moduleTocPaths = {
     ["Services/Logger/Actions"] = "Services\\Logger\\Actions.lua",
     ["Controllers/Logger"] = "Controllers\\Logger.lua",
     ["Services/Reserves/Import"] = "Services\\Reserves\\Import.lua",
+    ["Services/Reserves/Aliases"] = "Services\\Reserves\\Aliases.lua",
     ["Services/Reserves/Display"] = "Services\\Reserves\\Display.lua",
     ["Services/Reserves/Sync"] = "Services\\Reserves\\Sync.lua",
     ["Services/Reserves"] = "Services\\Reserves.lua",
@@ -582,6 +638,9 @@ assertBefore(toc, "Services\\Chat.lua", "Services\\Rolls\\Countdown.lua")
 assertBefore(toc, "Services\\Rolls\\Countdown.lua", "Services\\Rolls\\Service.lua")
 assertBefore(toc, "Services\\Rolls\\Sessions.lua", "Services\\Rolls\\Service.lua")
 assertBefore(toc, "Services\\Rolls\\History.lua", "Services\\Rolls\\Service.lua")
+assertBefore(toc, "Services\\Rolls\\Responses.lua", "Services\\Rolls\\Strategies.lua")
+assertBefore(toc, "Services\\Rolls\\Strategies.lua", "Services\\Rolls\\Resolution.lua")
+assertBefore(toc, "Services\\Rolls\\Strategies.lua", "Services\\Rolls\\Service.lua")
 assertBefore(toc, "Services\\Rolls\\Responses.lua", "Services\\Rolls\\Display.lua")
 assertBefore(toc, "Services\\Rolls\\Resolution.lua", "Services\\Rolls\\Display.lua")
 assertBefore(toc, "Services\\Rolls\\Display.lua", "Services\\Rolls\\Service.lua")
@@ -595,6 +654,10 @@ assertBefore(toc, "Services\\Loot\\PendingAwards.lua", "Services\\Loot\\Service.
 assertBefore(toc, "Services\\Loot\\PassiveGroupLoot.lua", "Services\\Loot\\Tracking.lua")
 assertBefore(toc, "Services\\Loot\\PassiveGroupLoot.lua", "Services\\Loot\\Service.lua")
 assertBefore(toc, "Services\\Loot\\Tracking.lua", "Services\\Loot\\Service.lua")
+assertBefore(toc, "Services\\Loot\\Workflow.lua", "Services\\Loot\\Service.lua")
+assertBefore(toc, "Services\\Loot\\Receipts.lua", "Services\\Loot\\Service.lua")
+assertBefore(toc, "Services\\Loot\\Records.lua", "Services\\Loot\\Service.lua")
+assertBefore(toc, "Services\\Loot\\Reconcile.lua", "Services\\Loot\\Service.lua")
 assertBefore(toc, "Services\\Loot\\Context.lua", "Services\\Raid\\State.lua")
 assertBefore(toc, "Services\\Loot\\State.lua", "Services\\Raid\\State.lua")
 assertBefore(toc, "Services\\Loot\\Snapshots.lua", "Services\\Raid\\State.lua")
@@ -1070,6 +1133,7 @@ local function findExpectedSpec(name)
     local expectedLists = {
         preRegistryUtilityModules,
         directRegistryModules,
+        expectedRollServices,
         expectedLoggerServices,
         expectedReservesServices,
         expectedDebugServices,
@@ -1124,7 +1188,9 @@ end
 
 assertOutOfOrder("Services/Logger/View", "Services/Logger/Store")
 assertOutOfOrder("Services/Logger/Actions", "Services/Logger/Helpers")
+assertOutOfOrder("Services/Rolls/Resolution", "Services/Rolls/Strategies")
 assertOutOfOrder("Services/Reserves", "Services/Reserves/Import")
+assertOutOfOrder("Services/Reserves", "Services/Reserves/Aliases")
 assertOutOfOrder("Services/Reserves", "Services/Reserves/Display")
 assertOutOfOrder("Services/Reserves/Sync", "Modules/Comms")
 assertOutOfOrder("Services/Reserves/Chat", "Modules/Bus")

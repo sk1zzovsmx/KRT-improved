@@ -7,15 +7,16 @@ Use this before releases and before/after schema refactors.
 
 1. Top-level SV keys are present and tables:
    `KRT_Raids`, `KRT_Players`, `KRT_Reserves`, `KRT_Warnings`, `KRT_Spammer`, `KRT_Options`.
-2. Every raid has a valid `schemaVersion` (number, `>= 1`, `<= current schema`).
+2. Every raid has canonical `schemaVersion = 5`.
 3. Every raid includes canonical keys:
    `raidNid`, `players`, `attendance`, `bossKills`, `loot`, `changes`,
    `nextPlayerNid`, `nextBossNid`, `nextLootNid`, `startTime`.
-4. Legacy runtime keys are absent at raid root:
+4. Root runtime cache keys are absent at raid root:
    `_playersByName`, `_playerIdxByNid`, `_bossIdxByNid`, `_lootIdxByNid`.
-5. Legacy/transient payload keys are absent after save compaction:
-   `loot[].looter`, `bossKills[].attendanceMask`, `KRT_Reserves[*].playerNameDisplay`,
-   `KRT_Reserves[*].original`, and reserve rows `KRT_Reserves[*].reserves[*].player`.
+5. Retired/transient payload keys are absent after save compaction:
+   `players[].count`, `loot[].looter`, `bossKills[].attendanceMask`,
+   `KRT_Reserves[*].playerNameDisplay`, `KRT_Reserves[*].original`,
+   and reserve rows `KRT_Reserves[*].reserves[*].player`.
 6. Canonical ID counters are coherent:
    `nextPlayerNid >= max(players[].playerNid) + 1`,
    `nextBossNid >= max(bossKills[].bossNid) + 1`,
@@ -26,7 +27,7 @@ Use this before releases and before/after schema refactors.
    `loot[].bossNid` points to existing `bossKills[].bossNid` (or unknown/trash policy),
    `loot[].looterNid` points to existing `players[].playerNid`.
 8. Schema freeze gate:
-   keep `schemaVersion = 4` unless there is a net structural simplification that requires a new version.
+   keep `schemaVersion = 5` unless there is a net structural simplification that requires a new version.
 
 ## Tooling
 
@@ -52,10 +53,9 @@ written relative to the folder you are currently in.
   `lua tools/sv-inspector.lua "<path>\\!KRT.lua" --format csv --section raids`
 - Round-trip no-drift validation (single SV file):
   `lua tools/sv-roundtrip.lua "<path>\\!KRT.lua"`
-- Round-trip compatibility suite on legacy/mixed fixtures:
+- Round-trip canonical fixture suite:
    `py -3 tools/krt.py run-sv-roundtrip --fixtures`
-- Round-trip compatibility suite on legacy/mixed fixtures (PowerShell wrapper on Windows):
+- Round-trip canonical fixture suite (PowerShell wrapper on Windows):
   `powershell -ExecutionPolicy Bypass -File tools/run-sv-roundtrip.ps1 -Fixtures`
-- Note: the bundled `legacy-mixed-*` fixtures are compatibility inputs for round-trip checks; they are not expected to pass the canonical validator unchanged.
 - Composite hardening check (DB boundary + XML layout + validator + fixtures):
   `powershell -ExecutionPolicy Bypass -File tools/check-raid-hardening.ps1`

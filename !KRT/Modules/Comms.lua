@@ -195,14 +195,14 @@ function Comms.Sync(prefix, msg)
     return sendGroupMessage(prefix, msg)
 end
 
-function Comms.Chat(msg, channel, language, target, bypass)
+function Comms.SendChat(msg, channel, language, target, bypass)
     if not msg then
         return
     end
     SendChatMessage(tostring(msg), channel, language, target)
 end
 
-function Comms.Whisper(target, msg)
+function Comms.SendWhisper(target, msg)
     if type(target) == "string" and msg then
         SendChatMessage(msg, "WHISPER", nil, target)
         return true
@@ -236,7 +236,7 @@ function Comms:RequestVersionCheck()
     return false
 end
 
-function Comms:RequestVersionMessageHandling(prefix, msg, channel, sender)
+function Comms:HandleVersionMessage(prefix, msg, channel, sender)
     if prefix ~= VERSION_PREFIX then
         return false
     end

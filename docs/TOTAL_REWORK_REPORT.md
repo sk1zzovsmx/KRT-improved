@@ -56,7 +56,7 @@ runtime toccati sono concentrati su `Services` (`35`), `Modules` (`23`), `Core` 
 | XML inline lifecycle scripts | `0` | `0` | Layout-only gia rispettato e preservato. |
 | ModuleRegistry | assente | presente | Grafo metadata-first per load order e deps dichiarate. |
 | Registry specs | assenti | `6` spec dedicati | Regressioni su load order, deps, UI/entrypoint dispatch ora coperte. |
-| Legacy alias guard | assente | presente | Nuovi riferimenti diretti ad alias legacy vengono bloccati. |
+| Retired alias guard | assente | presente | Nuovi riferimenti diretti ad alias ritirati vengono bloccati. |
 | Release readiness docs | parziali | Wave AC | Readiness locale, blocco publish e gap manuali espliciti. |
 
 Benefici principali:
@@ -145,7 +145,7 @@ se stesso. Il percorso diretto `registry.AddModule(...)` resta usato dai moduli 
 | `Modules/LootSourcesData` | `Init` |
 | `Modules/LootSources` | `Init`, `Modules/Strings`, `Modules/LootSourcesData` |
 | `Modules/IgnoredItems` | `Init` |
-| `Modules/IgnoredMobs` | `Init` |
+| `Modules/Dataset/IgnoredMobs` | `Init` |
 | `Modules/Comms` | `Init` |
 | `Modules/Time` | `Init` |
 | `Modules/Base64` | `Init` |
@@ -177,7 +177,7 @@ usano registrazione diretta. La shape SavedVariables e il comportamento runtime 
 | `Core/DBRaidMigrations` | `Init`, `Modules/ModuleRegistry`, `Core/DB`, `Core/DBSchema`, `Modules/Strings` |
 | `Core/DBRaidStore` | `Init`, `Modules/ModuleRegistry`, `Core/DB`, `Core/DBSchema`, `Core/DBRaidMigrations`, `Modules/Time`, `Modules/Strings` |
 | `Core/DBRaidQueries` | `Init`, `Modules/ModuleRegistry`, `Core/DB`, `Core/DBRaidStore`, `Modules/Sort` |
-| `Core/DBRaidValidator` | `Init`, `Modules/ModuleRegistry`, `Core/DB`, `Core/DBSchema`, `Core/DBRaidMigrations`, `Core/DBRaidStore`, `Modules/IgnoredMobs` |
+| `Core/DBRaidValidator` | `Init`, `Modules/ModuleRegistry`, `Core/DB`, `Core/DBSchema`, `Core/DBRaidMigrations`, `Core/DBRaidStore`, `Modules/Dataset/IgnoredMobs` |
 | `Core/DBSyncer` | `Init`, `Modules/ModuleRegistry`, `Core/DB`, `Core/DBSchema`, `Core/DBRaidStore`, `Core/DBRaidQueries`, `Modules/Events`, `Modules/Bus`, `Modules/Strings`, `Modules/Time`, `Modules/Comms` |
 
 ## Wave C.0 completata: Services/Chat
@@ -225,9 +225,13 @@ distribution-session sync e facade pubblico `Services/Loot/Service.lua`. La veri
 | `Services/Loot/PendingAwards` | `Init`, `Modules/ModuleRegistry`, `Modules/C`, `Modules/Item` |
 | `Services/Loot/PassiveGroupLoot` | `Init`, `Modules/ModuleRegistry`, `Modules/C`, `Modules/Item`, `Modules/Strings` |
 | `Services/Loot/Tracking` | `Init`, `Modules/ModuleRegistry`, `Modules/Item`, `Services/Loot/Context`, `Services/Loot/PendingAwards`, `Services/Loot/PassiveGroupLoot` |
+| `Services/Loot/Workflow` | `Init`, `Modules/ModuleRegistry` |
+| `Services/Loot/Receipts` | `Init`, `Modules/ModuleRegistry`, `Modules/Item` |
+| `Services/Loot/Records` | `Init`, `Modules/ModuleRegistry`, `Modules/Time` |
+| `Services/Loot/Reconcile` | `Init`, `Modules/ModuleRegistry`, `Modules/Item`, `Modules/Strings` |
 | `Services/Loot/Rules` | `Init`, `Modules/ModuleRegistry`, `Modules/C`, `Modules/Item`, `Modules/IgnoredItems` |
 | `Services/Loot/DistributionSession` | `Init`, `Modules/ModuleRegistry`, `Modules/Events`, `Modules/Bus`, `Modules/Comms`, `Modules/Item` |
-| `Services/Loot/Service` | `Init`, `Modules/ModuleRegistry`, `Modules/C`, `Modules/Timer`, `Modules/Events`, `Modules/Bus`, `Modules/Item`, `Modules/Strings`, `Modules/Time`, `Modules/IgnoredItems`, `Services/Loot/Context`, `Services/Loot/PendingAwards`, `Services/Loot/PassiveGroupLoot`, `Services/Loot/Tracking` |
+| `Services/Loot/Service` | `Init`, `Modules/ModuleRegistry`, `Modules/C`, `Modules/Timer`, `Modules/Events`, `Modules/Bus`, `Modules/Item`, `Modules/Strings`, `Modules/Time`, `Modules/IgnoredItems`, `Services/Loot/Context`, `Services/Loot/PendingAwards`, `Services/Loot/PassiveGroupLoot`, `Services/Loot/Tracking`, `Services/Loot/Workflow`, `Services/Loot/Receipts`, `Services/Loot/Records`, `Services/Loot/Reconcile` |
 
 Omissione intenzionale: `Services/Loot/Service.lua` non dichiara `Services/Raid/*`,
 `Services/Chat` o `Services/Rolls/*` tra le dipendenze registry perche questi accessi restano lazy
@@ -243,7 +247,7 @@ fallback, hard deps, forbidden deps, ordine TOC e casi negativi.
 
 | Modulo | Dipendenze |
 | --- | --- |
-| `Services/Raid/State` | `Init`, `Modules/ModuleRegistry`, `Modules/C`, `Modules/Events`, `Modules/Bus`, `Modules/Strings`, `Modules/Time`, `Modules/Base64`, `Modules/IgnoredMobs`, `Modules/LootSources`, `Services/Loot/Context`, `Services/Loot/State`, `Services/Loot/Snapshots` |
+| `Services/Raid/State` | `Init`, `Modules/ModuleRegistry`, `Modules/C`, `Modules/Events`, `Modules/Bus`, `Modules/Strings`, `Modules/Time`, `Modules/Base64`, `Modules/Dataset/IgnoredMobs`, `Modules/LootSources`, `Services/Loot/Context`, `Services/Loot/State`, `Services/Loot/Snapshots` |
 | `Services/Raid/Capabilities` | `Init`, `Modules/ModuleRegistry` |
 | `Services/Raid/Counts` | `Init`, `Modules/ModuleRegistry`, `Modules/Events`, `Modules/Bus`, `Modules/Strings` |
 | `Services/Raid/Roster` | `Init`, `Modules/ModuleRegistry`, `Modules/Timer`, `Modules/Events`, `Modules/Bus`, `Modules/Strings`, `Modules/Time` |
@@ -306,7 +310,7 @@ Controllers:
 | Modulo | Dipendenze |
 | --- | --- |
 | `Controllers/Master` | `Init`, `Modules/ModuleRegistry`, `Core/Options`, `Modules/C`, `Modules/Timer`, `Modules/Events`, `Modules/Bus`, `Modules/Item`, `Modules/Colors`, `Modules/Comms`, `Modules/UI/Facade`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Modules/UI/ListController`, `Modules/UI/MultiSelect`, `Services/Chat`, `Services/Loot/Service`, `Services/Rolls/Service`, `Services/Raid/State`, `Services/Raid/Capabilities`, `Services/Raid/Roster`, `Services/Raid/LootRecords` |
-| `Controllers/Logger` | `Init`, `Modules/ModuleRegistry`, `Core/Options`, `Modules/C`, `Modules/Timer`, `Modules/Events`, `Modules/Bus`, `Modules/Strings`, `Modules/Colors`, `Modules/Base64`, `Modules/Sort`, `Modules/IgnoredMobs`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Modules/UI/ListController`, `Modules/UI/MultiSelect`, `Services/Logger/Store`, `Services/Logger/View`, `Services/Logger/Export`, `Services/Logger/Helpers`, `Services/Logger/Actions` |
+| `Controllers/Logger` | `Init`, `Modules/ModuleRegistry`, `Core/Options`, `Modules/C`, `Modules/Timer`, `Modules/Events`, `Modules/Bus`, `Modules/Strings`, `Modules/Colors`, `Modules/Base64`, `Modules/Sort`, `Modules/Dataset/IgnoredMobs`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Modules/UI/ListController`, `Modules/UI/MultiSelect`, `Services/Logger/Store`, `Services/Logger/View`, `Services/Logger/Export`, `Services/Logger/Helpers`, `Services/Logger/Actions` |
 | `Controllers/Warnings` | `Init`, `Modules/ModuleRegistry`, `Modules/Strings`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Modules/UI/ListController`, `Services/Chat` |
 | `Controllers/Changes` | `Init`, `Modules/ModuleRegistry`, `Modules/Events`, `Modules/Bus`, `Modules/Colors`, `Modules/Strings`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Modules/UI/ListController`, `Services/Chat`, `Services/Raid/Roster`, `Services/Raid/Capabilities`, `Services/Raid/Session` |
 | `Controllers/Spammer` | `Init`, `Modules/ModuleRegistry`, `Modules/Strings`, `Modules/UI/Frames`, `Modules/UI/Visuals`, `Services/Chat` |
@@ -344,9 +348,9 @@ No SavedVariables shape, TOC order, gameplay behavior, or `Raid:GetBossByNid` co
 The canonical API catalog refresh has been run after the removal, so the public/internal surface
 catalogs now reflect this Wave G baseline.
 
-## Wave H completed: legacy alias guard
+## Wave H completed: retired alias guard
 
-Wave H added `tools/check-legacy-aliases.ps1` and wired it into `tools/krt.py repo-quality-check`,
+Wave H added `tools/check-retired-aliases.ps1` and wired it into `tools/krt.py repo-quality-check`,
 the repo-local MCP check inventory, and pre-commit. The guard scans KRT-owned Lua under `!KRT`,
 excludes vendored `!KRT/Libs`, and fails if retired top-level aliases such as `addon.Raid`,
 `addon.Master`, or bracket forms are reintroduced.
@@ -470,7 +474,7 @@ Wave Y removed the remaining public lifecycle exceptions from Controllers, Widge
 Master frame load/refresh testing now goes through `Master._Private.LoadFrame` and
 `Master._Private.RefreshFrame`, while runtime continues to use the scaffold callbacks. Minimap no
 longer exposes `OnLoad`; `Init.lua` now uses the canonical `Minimap:EnsureUI()` path without the
-legacy `OnLoad` fallback.
+old `OnLoad` fallback.
 
 The refreshed catalogs after this wave reported `609` unique APIs and `443` public APIs. The public
 surface now has zero `OnLoad`, `RefreshUI`, or `Refresh` methods in Controllers, Widgets, and
@@ -634,7 +638,7 @@ lua tests/module_registry_ui_entrypoints_spec.lua
 lua tests/release_stabilization_spec.lua
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-lua-syntax.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-toc-files.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-legacy-aliases.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-retired-aliases.ps1
 py -3 tools/krt.py repo-quality-check --check all
 py -3 tools/krt.py api-catalog-check
 py -3 tools/krt.py release-metadata

@@ -72,10 +72,14 @@ Do not introduce new snake_case private names.
 
 ### Public API verb taxonomy (new/renamed APIs)
 
-- Queries: `Get*`, `Find*`, `Is*`, `Can*`
-- Mutations: `Set*`, `Add*`, `Remove*`, `Delete*`, `Upsert*`
-- Lifecycle/UI: `Ensure*`, `Bind*`, `Localize*`, `Request*`, `RequestRefresh*`, `Refresh*`,
-  `Toggle*`, `Show*`, `Hide*`
+- Queries: `Get*`, `Find*`, `Is*`, `Can*`, `Query*`, `Resolve*`, `Validate*`, `Compare*`
+- Mutations: `Set*`, `Add*`, `Remove*`, `Delete*`, `Upsert*`, `Create*`, `Clear*`, `Apply*`
+- Lifecycle/UI: `Ensure*`, `Bind*`, `Localize*`, `RequestRefresh*`, `Request*`, `Refresh*`,
+  `Toggle*`, `Show*`, `Hide*`, `Prepare*`, `Load*`, `Save*`, `Start*`, `Stop*`, `Pause*`,
+  `Schedule*`, `Begin*`, `End*`, `Finalize*`, `Enable*`, `Disable*`, `Define*`
+- Transforms/builders: `Build*`, `Normalize*`, `Parse*`, `Encode*`, `Decode*`, `Format*`, `Make*`
+- Events/output: `Register*`, `Trigger*`, `Announce*`, `Broadcast*`, `Sync*`, `Print*`, `Send*`,
+  `Handle*`, `Publish*`, `Unregister*`, `Demand*`, `Call*`, `Observe*`, `Log*`, `On*`
 - Exact UI hook names are naming-valid, but should stay scaffold/local unless deliberately exported by an
   architecture wave.
 
@@ -101,7 +105,7 @@ function UIScaffold.DefineModuleUi(cfg) ... end
 - line width: keep edited lines around 120 when practical
 - formatter hard limit remains 180 (see `.stylua.toml`)
 
-Prefer stable, scoped diffs over mass reformatting untouched legacy code.
+Prefer stable, scoped diffs over mass reformatting untouched code.
 
 ## 5) UI and Layering Expectations
 

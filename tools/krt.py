@@ -86,25 +86,19 @@ SEMVER_RELEASE_RE = re.compile(
     r"(?P<patch>0|[1-9]\d*)"
     r"(?:-(?P<channel>alpha|beta)\.(?P<prerelease_number>0|[1-9]\d*))?$"
 )
-LEGACY_RELEASE_RE = re.compile(r"^(\d+\.\d+\.\d+)([A-Za-z])$")
 RELEASE_CHANNEL_ORDER = {
     "alpha": 0,
     "beta": 1,
     "release": 2,
 }
-LEGACY_RELEASE_CHANNELS = {
-    "A": "alpha",
-    "B": "beta",
-    "R": "release",
-}
 
 REPO_CHECK_SCRIPTS = {
     "api_nomenclature": "check-api-nomenclature.ps1",
     "layering": "check-layering.ps1",
-    "legacy_aliases": "check-legacy-aliases.ps1",
     "lua_syntax": "check-lua-syntax.ps1",
     "lua_uniformity": "check-lua-uniformity.ps1",
     "raid_hardening": "check-raid-hardening.ps1",
+    "retired_aliases": "check-retired-aliases.ps1",
     "toc_files": "check-toc-files.ps1",
     "ui_binding": "check-ui-binding.ps1",
 }
@@ -328,7 +322,6 @@ def build_release_version_info(
     patch: int,
     channel: str,
     prerelease_number: int | None,
-    legacy_suffix: str | None = None,
 ) -> dict[str, Any]:
     version_core = f"{major}.{minor}.{patch}"
     normalized_semver = version_core
@@ -352,7 +345,6 @@ def build_release_version_info(
         "prerelease": channel != "release",
         "prerelease_number": prerelease_number,
         "publishable": channel != "alpha",
-        "legacy_suffix": legacy_suffix,
         "precedence": precedence,
     }
 
@@ -371,27 +363,6 @@ def parse_release_version(version: str) -> dict[str, Any]:
             patch=int(match.group("patch")),
             channel=channel,
             prerelease_number=int(prerelease_number) if prerelease_number else None,
-        )
-
-    legacy_match = LEGACY_RELEASE_RE.fullmatch(value)
-    if legacy_match:
-        version_core, legacy_suffix = legacy_match.groups()
-        channel = LEGACY_RELEASE_CHANNELS.get(legacy_suffix.upper())
-        if not channel:
-            raise CliError(
-                f"Legacy release version '{version}' must end with A, B, or R."
-            )
-        major, minor, patch = [int(part) for part in version_core.split(".")]
-        prerelease_number = 1 if channel != "release" else None
-        return build_release_version_info(
-            raw_version=value,
-            version_format="legacy",
-            major=major,
-            minor=minor,
-            patch=patch,
-            channel=channel,
-            prerelease_number=prerelease_number,
-            legacy_suffix=legacy_suffix.upper(),
         )
 
     raise CliError(
@@ -1189,7 +1160,7 @@ def dev_stack_status(args: argparse.Namespace) -> int:
         {
             "name": "powershell",
             "required": False,
-            "purpose": "legacy scripts and pre-commit wrapper",
+            "purpose": "direct scripts and pre-commit wrapper",
             "requested": ["pwsh", "pwsh.exe", "powershell", "powershell.exe"],
             "available": bool(powershell),
             "status": "ready" if powershell else "warning",
@@ -1223,7 +1194,7 @@ def dev_stack_status(args: argparse.Namespace) -> int:
         path_status("addonDir", ADDON_DIR, True, directory=True),
         path_status("skillsManifest", TOOLS_DIR / "agent-skills.manifest.json", True),
         path_status("mcpServer", TOOLS_DIR / "krt_mcp_server.py", True),
-        path_status("legacyPreCommit", TOOLS_DIR / "pre-commit.ps1", True),
+        path_status("directPreCommit", TOOLS_DIR / "pre-commit.ps1", True),
         path_status("localSkillsRoot", local_skills_root(), False, directory=True),
         path_status("mechanicRoot", default_mechanic_root(), False, directory=True),
     ]
@@ -1237,7 +1208,7 @@ def dev_stack_status(args: argparse.Namespace) -> int:
         warnings.append(
             {
                 "code": "powershell_missing",
-                "message": "Some legacy scripts still require PowerShell. Core flows now use tools/krt.py.",
+                "message": "Some direct scripts still require PowerShell. Core flows now use tools/krt.py.",
             }
         )
     if verification and verification.get("status") == "unavailable":
@@ -1548,7 +1519,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sv_roundtrip = subparsers.add_parser(
         "run-sv-roundtrip",
-        help="Run sv-roundtrip.lua on one file or on the legacy fixture directory",
+        help="Run sv-roundtrip.lua on one file or on the fixture directory",
     )
     sv_roundtrip.add_argument("--target-path", default="")
     sv_roundtrip.add_argument("--fixtures", action="store_true")

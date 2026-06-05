@@ -90,8 +90,8 @@ Write-Host "Running TOC file checks..."
 Write-Host "Running layering checks..."
 & (Join-Path $repoRoot "tools/check-layering.ps1")
 
-Write-Host "Running legacy alias checks..."
-& (Join-Path $repoRoot "tools/check-legacy-aliases.ps1")
+Write-Host "Running retired alias checks..."
+& (Join-Path $repoRoot "tools/check-retired-aliases.ps1")
 
 Write-Host "Running UI binding checks..."
 & (Join-Path $repoRoot "tools/check-ui-binding.ps1")

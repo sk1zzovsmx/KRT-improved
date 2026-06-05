@@ -66,7 +66,7 @@ python3 tools/krt.py mech AddonValidate --json
 python3 tools/krt.py run-krt-mcp
 ```
 
-## Legacy Script Equivalents
+## Direct Script Equivalents
 
 These remain valid and are what `krt.py` wraps:
 

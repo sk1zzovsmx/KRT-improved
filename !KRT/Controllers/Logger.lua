@@ -32,9 +32,26 @@ local TrimText = Strings.TrimText
 
 local CompareValues = Sort.CompareValues
 local CompareNumbers = Sort.CompareNumbers
-local CompareStrings = Sort.CompareStrings
+local function compareStrings(aValue, bValue, asc)
+    return CompareValues(tostring(aValue or ""), tostring(bValue or ""), asc)
+end
 local GetLootSortName = Sort.GetLootSortName
-local CompareLootTie = Sort.CompareLootTie
+
+local function compareLootTie(a, b, asc)
+    local aName = strlower(tostring((a and a.sortName) or ""))
+    local bName = strlower(tostring((b and b.sortName) or ""))
+    if aName ~= bName then
+        return CompareValues(aName, bName, asc)
+    end
+
+    local aItemId = tonumber(a and a.itemId) or 0
+    local bItemId = tonumber(b and b.itemId) or 0
+    if aItemId ~= bItemId then
+        return CompareValues(aItemId, bItemId, asc)
+    end
+
+    return CompareNumbers(a and a.id, b and b.id, asc, 0)
+end
 
 local InternalEvents = Events.Internal
 
@@ -576,7 +593,7 @@ local function bindRaidSortHeaders(frameName, listRef)
         local sortKey = header.key
         local headerButton = _G[frameName .. header.suffix]
         if headerButton then
-            Frames.SafeSetScript(headerButton, "OnClick", function()
+            Frames.SetScriptSafely(headerButton, "OnClick", function()
                 listRef:Sort(sortKey)
             end)
         end
@@ -770,7 +787,7 @@ local function isValidRollValue(text)
     return true, value
 end
 
--- Timer ownership: debounce per il refresh delle roster-bound list.
+-- Timer ownership: refresh debounce for roster-bound lists.
 addon.Timer.BindMixin(module, "Logger")
 
 -- Logger frame module.
@@ -797,16 +814,16 @@ do
 
     function UI.AcquireRefs(frame)
         return {
-            historyTabBtn = Frames.Ref(frame, "Tab1"),
-            attendanceTabBtn = Frames.Ref(frame, "Tab2"),
-            history = Frames.Ref(frame, "History"),
-            raids = Frames.Ref(frame, "KRTLoggerRaids"),
-            bosses = Frames.Ref(frame, "KRTLoggerBosses"),
-            loot = Frames.Ref(frame, "KRTLoggerLoot"),
-            raidAttendees = Frames.Ref(frame, "KRTLoggerRaidAttendees"),
-            bossAttendees = Frames.Ref(frame, "KRTLoggerBossAttendees"),
-            bossBox = Frames.Ref(frame, "KRTLoggerBossBox"),
-            attendeesBox = Frames.Ref(frame, "KRTLoggerPlayerBox"),
+            historyTabBtn = Frames.GetRef(frame, "Tab1"),
+            attendanceTabBtn = Frames.GetRef(frame, "Tab2"),
+            history = Frames.GetRef(frame, "History"),
+            raids = Frames.GetRef(frame, "KRTLoggerRaids"),
+            bosses = Frames.GetRef(frame, "KRTLoggerBosses"),
+            loot = Frames.GetRef(frame, "KRTLoggerLoot"),
+            raidAttendees = Frames.GetRef(frame, "KRTLoggerRaidAttendees"),
+            bossAttendees = Frames.GetRef(frame, "KRTLoggerBossAttendees"),
+            bossBox = Frames.GetRef(frame, "KRTLoggerBossBox"),
+            attendeesBox = Frames.GetRef(frame, "KRTLoggerPlayerBox"),
         }
     end
 
@@ -830,7 +847,7 @@ do
     local function clearSelection(target, key, multiSelectCtx)
         target[key] = nil
         if multiSelectCtx then
-            MultiSelect.MultiSelectClear(multiSelectCtx)
+            MultiSelect.EnsureState(multiSelectCtx)
         end
     end
 
@@ -884,7 +901,7 @@ do
         end
 
         if opts.isRange then
-            local action, count = MultiSelect.MultiSelectRange(ctx, opts.ordered, id, opts.isMulti)
+            local action, count = MultiSelect.SelectRange(ctx, opts.ordered, id, opts.isMulti)
             setFocusFromSelected(id)
             return action, count
         end
@@ -894,7 +911,7 @@ do
             allowDeselect = true
         end
 
-        local action, count = MultiSelect.MultiSelectToggle(ctx, id, opts.isMulti, allowDeselect)
+        local action, count = MultiSelect.Toggle(ctx, id, opts.isMulti, allowDeselect)
         if action == "SINGLE_DESELECT" then
             opts.setFocus(nil)
         elseif action == "TOGGLE_OFF" then
@@ -906,7 +923,7 @@ do
             end
 
             if clickedWasFocused then
-                local selected = MultiSelect.MultiSelectGetSelected(ctx)
+                local selected = MultiSelect.GetSelected(ctx)
                 setFocusFromSelected(selected[1])
             end
         else
@@ -914,12 +931,28 @@ do
         end
 
         if (tonumber(count) or 0) > 0 then
-            MultiSelect.MultiSelectSetAnchor(ctx, id)
+            MultiSelect.SetAnchor(ctx, id)
         else
-            MultiSelect.MultiSelectSetAnchor(ctx, nil)
+            MultiSelect.SetAnchor(ctx, nil)
         end
 
         return action, count
+    end
+
+    local function applyModuleFocusedMultiSelect(id, context, ordered, isMulti, isRange, focusKey)
+        return applyFocusedMultiSelect({
+            id = id,
+            context = context,
+            ordered = ordered,
+            isMulti = isMulti,
+            isRange = isRange,
+            getFocus = function()
+                return module[focusKey]
+            end,
+            setFocus = function(value)
+                module[focusKey] = value
+            end,
+        })
     end
 
     -- ----- Public methods ----- --
@@ -968,11 +1001,11 @@ do
     local MS_SCOPE_RAIDATT = module._msRaidAttScope
     local MS_SCOPE_LOOT = module._msLootScope
 
-    MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_RAID_HISTORY, { allowMulti = true, allowRange = true })
-    MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_BOSS, { allowMulti = true, allowRange = true })
-    MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_BOSSATT, { allowMulti = true, allowRange = true })
-    MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_RAIDATT, { allowMulti = true, allowRange = true })
-    MultiSelect.MultiSelectSetModifierPolicy(MS_SCOPE_LOOT, { allowMulti = true, allowRange = true })
+    MultiSelect.SetModifierPolicy(MS_SCOPE_RAID_HISTORY, { allowMulti = true, allowRange = true })
+    MultiSelect.SetModifierPolicy(MS_SCOPE_BOSS, { allowMulti = true, allowRange = true })
+    MultiSelect.SetModifierPolicy(MS_SCOPE_BOSSATT, { allowMulti = true, allowRange = true })
+    MultiSelect.SetModifierPolicy(MS_SCOPE_RAIDATT, { allowMulti = true, allowRange = true })
+    MultiSelect.SetModifierPolicy(MS_SCOPE_LOOT, { allowMulti = true, allowRange = true })
 
     -- Clears selections that depend on the currently focused raid (boss/player/loot panels).
     -- Intentionally does NOT clear the raid selection itself.
@@ -1066,7 +1099,7 @@ do
 
     deleteSelectedAttendees = function(ctx, deleteFn, onRemoved)
         runWithSelectedRaid(function(_, rID)
-            local ids = MultiSelect.MultiSelectGetSelected(ctx)
+            local ids = MultiSelect.GetSelected(ctx)
             if not (ids and #ids > 0) then
                 return
             end
@@ -1076,7 +1109,7 @@ do
                 return
             end
 
-            MultiSelect.MultiSelectClear(ctx)
+            MultiSelect.EnsureState(ctx)
             if type(onRemoved) == "function" then
                 onRemoved(removed, ids)
             end
@@ -1168,12 +1201,12 @@ do
 
         return {
             frame = frame,
-            hint = Frames.Ref(frame, "Hint"),
-            lootBtn = Frames.Ref(frame, "LootBtn"),
-            raidAttendanceBtn = Frames.Ref(frame, "RaidAttendanceBtn"),
-            output = Frames.Ref(frame, "Output"),
-            outputScroll = Frames.Ref(frame, "OutputScroll"),
-            closeBtn = Frames.Ref(frame, "CloseBtn"),
+            hint = Frames.GetRef(frame, "Hint"),
+            lootBtn = Frames.GetRef(frame, "LootBtn"),
+            raidAttendanceBtn = Frames.GetRef(frame, "RaidAttendanceBtn"),
+            output = Frames.GetRef(frame, "Output"),
+            outputScroll = Frames.GetRef(frame, "OutputScroll"),
+            closeBtn = Frames.GetRef(frame, "CloseBtn"),
         }
     end
 
@@ -1307,13 +1340,13 @@ do
         end
         if refs.lootBtn then
             refs.lootBtn:SetText(L.BtnLoggerExportLootCSV)
-            Frames.SafeSetScript(refs.lootBtn, "OnClick", function()
+            Frames.SetScriptSafely(refs.lootBtn, "OnClick", function()
                 refreshExportFrame("loot")
             end)
         end
         if refs.raidAttendanceBtn then
             refs.raidAttendanceBtn:SetText(L.BtnLoggerExportRaidAttendanceCSV)
-            Frames.SafeSetScript(refs.raidAttendanceBtn, "OnClick", function()
+            Frames.SetScriptSafely(refs.raidAttendanceBtn, "OnClick", function()
                 refreshExportFrame("raidAttendance")
             end)
         end
@@ -1324,7 +1357,7 @@ do
             refs.output:SetWordWrap(true)
         end
         if refs.output then
-            Frames.SafeSetScript(refs.output, "OnTextChanged", function(self, userInput)
+            Frames.SetScriptSafely(refs.output, "OnTextChanged", function(self, userInput)
                 if userInput then
                     self:SetText(module._lastExportCSV or "")
                     self:SetCursorPosition(0)
@@ -1335,7 +1368,7 @@ do
         adjustExportScrollBar(refs)
         if refs.closeBtn then
             refs.closeBtn:SetText(L.BtnClose)
-            Frames.SafeSetScript(refs.closeBtn, "OnClick", function()
+            Frames.SetScriptSafely(refs.closeBtn, "OnClick", function()
                 refs.frame:Hide()
             end)
         end
@@ -1369,7 +1402,7 @@ do
     end
 
     local function loadLoggerFrame(frame)
-        UI.FrameName = Frames.InitModuleFrame(module, frame, {
+        UI.FrameName = Frames.BindModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
                 if not module.selectedRaid then
@@ -1410,7 +1443,7 @@ do
                 refs.historyTabBtn:SetID(1)
             end
             refs.historyTabBtn:SetText(L.StrLootTab)
-            Frames.SafeSetScript(refs.historyTabBtn, "OnClick", function()
+            Frames.SetScriptSafely(refs.historyTabBtn, "OnClick", function()
                 setActiveLoggerTab("loot")
             end)
         end
@@ -1419,7 +1452,7 @@ do
                 refs.attendanceTabBtn:SetID(2)
             end
             refs.attendanceTabBtn:SetText(L.StrAttendanceTab)
-            Frames.SafeSetScript(refs.attendanceTabBtn, "OnClick", function()
+            Frames.SetScriptSafely(refs.attendanceTabBtn, "OnClick", function()
                 setActiveLoggerTab("attendance")
             end)
         end
@@ -1475,7 +1508,7 @@ do
         end
 
         local modifierScope = (opts and opts.modifierScope) or module._msRaidScopeHistory or MS_SCOPE_RAID_HISTORY
-        local isMulti, isRange = MultiSelect.MultiSelectResolveModifiers(modifierScope, opts)
+        local isMulti, isRange = MultiSelect.ResolveModifiers(modifierScope, opts)
         local prevFocus = module.selectedRaid
 
         local ordered = opts and opts.ordered or nil
@@ -1529,23 +1562,11 @@ do
             return
         end
 
-        local isMulti, isRange = MultiSelect.MultiSelectResolveModifiers(MS_SCOPE_BOSS)
+        local isMulti, isRange = MultiSelect.ResolveModifiers(MS_SCOPE_BOSS)
         local prevFocus = module.selectedBoss
 
         local ordered = module.Boss and module.Boss._ctrl and module.Boss._ctrl.data or nil
-        local action, count = applyFocusedMultiSelect({
-            id = id,
-            context = MS_CTX_BOSS,
-            ordered = ordered,
-            isMulti = isMulti,
-            isRange = isRange,
-            getFocus = function()
-                return module.selectedBoss
-            end,
-            setFocus = function(v)
-                module.selectedBoss = v
-            end,
-        })
+        local action, count = applyModuleFocusedMultiSelect(id, MS_CTX_BOSS, ordered, isMulti, isRange, "selectedBoss")
 
         if Options.IsDebugEnabled() and addon.debug then
             addon:debug(
@@ -1581,26 +1602,14 @@ do
             return
         end
 
-        local isMulti, isRange = MultiSelect.MultiSelectResolveModifiers(MS_SCOPE_BOSSATT)
+        local isMulti, isRange = MultiSelect.ResolveModifiers(MS_SCOPE_BOSSATT)
         local prevFocus = module.selectedBossPlayer
 
         -- Mutual exclusion: selecting a boss-attendee filter clears the raid-attendee filter (and its multi-select).
         clearSelection(module, "selectedPlayer", MS_CTX_RAIDATT)
 
         local ordered = module.BossAttendees and module.BossAttendees._ctrl and module.BossAttendees._ctrl.data or nil
-        local action, count = applyFocusedMultiSelect({
-            id = id,
-            context = MS_CTX_BOSSATT,
-            ordered = ordered,
-            isMulti = isMulti,
-            isRange = isRange,
-            getFocus = function()
-                return module.selectedBossPlayer
-            end,
-            setFocus = function(v)
-                module.selectedBossPlayer = v
-            end,
-        })
+        local action, count = applyModuleFocusedMultiSelect(id, MS_CTX_BOSSATT, ordered, isMulti, isRange, "selectedBossPlayer")
 
         if Options.IsDebugEnabled() and addon.debug then
             addon:debug(
@@ -1634,26 +1643,14 @@ do
             return
         end
 
-        local isMulti, isRange = MultiSelect.MultiSelectResolveModifiers(MS_SCOPE_RAIDATT)
+        local isMulti, isRange = MultiSelect.ResolveModifiers(MS_SCOPE_RAIDATT)
         local prevFocus = module.selectedPlayer
 
         -- Mutual exclusion: selecting a raid-attendee filter clears the boss-attendee filter (and its multi-select).
         clearSelection(module, "selectedBossPlayer", MS_CTX_BOSSATT)
 
         local ordered = module.RaidAttendees and module.RaidAttendees._ctrl and module.RaidAttendees._ctrl.data or nil
-        local action, count = applyFocusedMultiSelect({
-            id = id,
-            context = MS_CTX_RAIDATT,
-            ordered = ordered,
-            isMulti = isMulti,
-            isRange = isRange,
-            getFocus = function()
-                return module.selectedPlayer
-            end,
-            setFocus = function(v)
-                module.selectedPlayer = v
-            end,
-        })
+        local action, count = applyModuleFocusedMultiSelect(id, MS_CTX_RAIDATT, ordered, isMulti, isRange, "selectedPlayer")
 
         if Options.IsDebugEnabled() and addon.debug then
             addon:debug(
@@ -1913,22 +1910,10 @@ do
 
             -- NOTE: Multi-select is maintained in MultiSelect module (context = MS_CTX_LOOT).
             if button == "LeftButton" then
-                local isMulti, isRange = MultiSelect.MultiSelectResolveModifiers(MS_SCOPE_LOOT)
+                local isMulti, isRange = MultiSelect.ResolveModifiers(MS_SCOPE_LOOT)
 
                 local ordered = module.Loot and module.Loot._ctrl and module.Loot._ctrl.data or nil
-                local action, count = applyFocusedMultiSelect({
-                    id = id,
-                    context = MS_CTX_LOOT,
-                    ordered = ordered,
-                    isMulti = isMulti,
-                    isRange = isRange,
-                    getFocus = function()
-                        return module.selectedItem
-                    end,
-                    setFocus = function(v)
-                        module.selectedItem = v
-                    end,
-                })
+                local action, count = applyModuleFocusedMultiSelect(id, MS_CTX_LOOT, ordered, isMulti, isRange, "selectedItem")
 
                 if Options.IsDebugEnabled() and addon.debug then
                     addon:debug(
@@ -1946,7 +1931,7 @@ do
                 triggerSelectionEvent(module, "selectedItem")
             elseif button == "RightButton" then
                 -- Context menu works on a single focused row.
-                local action, count = MultiSelect.MultiSelectToggle(MS_CTX_LOOT, id, false)
+                local action, count = MultiSelect.Toggle(MS_CTX_LOOT, id, false)
                 module.selectedItem = id
 
                 if Options.IsDebugEnabled() and addon.debug then
@@ -2031,13 +2016,13 @@ local function makeLoggerList(cfg, selField, msCtxField, hlOpts)
 
     if msCtxField then
         cfg.highlightFn = function(id)
-            return MultiSelect.MultiSelectIsSelected(module[msCtxField], id)
+            return MultiSelect.IsSelected(module[msCtxField], id)
         end
         cfg.highlightKey = function()
-            return MultiSelect.MultiSelectGetVersion(module[msCtxField])
+            return MultiSelect.GetVersion(module[msCtxField])
         end
         cfg.highlightDebugInfo = function()
-            return ("ctx=%s selectedCount=%d"):format(tostring(module[msCtxField]), MultiSelect.MultiSelectCount(module[msCtxField]))
+            return ("ctx=%s selectedCount=%d"):format(tostring(module[msCtxField]), MultiSelect.GetCount(module[msCtxField]))
         end
     else
         cfg.highlightId = resolve
@@ -2087,10 +2072,10 @@ do
 
                 local frame = _G[n]
                 if frame and not frame._krtBound then
-                    Frames.SafeSetScript(_G[n .. "CurrentBtn"], "OnClick", function(self, button)
+                    Frames.SetScriptSafely(_G[n .. "CurrentBtn"], "OnClick", function(self, button)
                         setCurrentRaidFromLogger(self, button)
                     end)
-                    Frames.SafeSetScript(_G[n .. "DeleteBtn"], "OnClick", function(self, button)
+                    Frames.SetScriptSafely(_G[n .. "DeleteBtn"], "OnClick", function(self, button)
                         confirmDeleteSelectedRaids(self, button)
                     end)
                     bindRaidSortHeaders(n, Raids)
@@ -2108,7 +2093,7 @@ do
 
             drawRow = ListController.CreateRowDrawer(function(row, it)
                 if not row._krtBound then
-                    Frames.SafeSetScript(row, "OnClick", function(self, button)
+                    Frames.SetScriptSafely(row, "OnClick", function(self, button)
                         selectRaid(self, button)
                     end)
                     row._krtBound = true
@@ -2133,7 +2118,7 @@ do
                     -- This button is intended to resolve duplicate raid creation while actively raiding.
                     if not addon.IsInRaid() then
                         canSetCurrent = false
-                    elseif Services.Raid:Expired(sel) then
+                    elseif Services.Raid:IsRaidExpired(sel) then
                         canSetCurrent = false
                     else
                         local instanceName, instanceType, instanceDiff, _, _, dynDiff, isDyn = GetInstanceInfo()
@@ -2155,11 +2140,11 @@ do
                 UIPrimitives.EnableDisable(_G[n .. "CurrentBtn"], canSetCurrent)
 
                 local ctx = module._msRaidCtx
-                local selCount = MultiSelect.MultiSelectCount(ctx)
+                local selCount = MultiSelect.GetCount(ctx)
                 local canDelete = (selCount and selCount > 0) or false
                 if canDelete and Core.GetCurrentRaid() then
                     local currentRaidNid = Core.GetRaidNidById(Core.GetCurrentRaid())
-                    local ids = MultiSelect.MultiSelectGetSelected(ctx)
+                    local ids = MultiSelect.GetSelected(ctx)
                     for i = 1, #ids do
                         if currentRaidNid and tonumber(ids[i]) == tonumber(currentRaidNid) then
                             canDelete = false
@@ -2182,7 +2167,7 @@ do
                     return CompareNumbers(a.date, b.date, asc, 0)
                 end,
                 zone = function(a, b, asc)
-                    return CompareStrings(a.zone, b.zone, asc)
+                    return compareStrings(a.zone, b.zone, asc)
                 end,
                 size = function(a, b, asc)
                     return CompareNumbers(a.size, b.size, asc, 0)
@@ -2220,7 +2205,7 @@ do
     do
         local function deleteRaids()
             local ctx = module._msRaidCtx
-            local ids = MultiSelect.MultiSelectGetSelected(ctx)
+            local ids = MultiSelect.GetSelected(ctx)
             if not (ids and #ids > 0) then
                 return
             end
@@ -2254,7 +2239,7 @@ do
                 module.Actions:DeleteRaidByNid(raidNids[i])
             end
 
-            MultiSelect.MultiSelectClear(ctx)
+            MultiSelect.EnsureState(ctx)
 
             local raidStore = Core.GetRaidStoreOrNil("Logger.Raids.DeleteRaids", { "GetAllRaids" })
             local raids = raidStore and raidStore:GetAllRaids() or {}
@@ -2282,7 +2267,7 @@ do
 
         function confirmDeleteSelectedRaids(btn)
             local ctx = module._msRaidCtx
-            if btn and MultiSelect.MultiSelectCount(ctx) > 0 then
+            if btn and MultiSelect.GetCount(ctx) > 0 then
                 StaticPopup_Show("KRTLOGGER_DELETE_RAID")
             end
         end
@@ -2390,25 +2375,25 @@ do
 
             local frame = _G[n]
             if frame and not frame._krtBound then
-                Frames.SafeSetScript(_G[n .. "AddBtn"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "AddBtn"], "OnClick", function()
                     showBossBoxFromLogger()
                 end)
-                Frames.SafeSetScript(_G[n .. "EditBtn"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "EditBtn"], "OnClick", function()
                     editSelectedBoss()
                 end)
-                Frames.SafeSetScript(_G[n .. "DeleteBtn"], "OnClick", function(self, button)
+                Frames.SetScriptSafely(_G[n .. "DeleteBtn"], "OnClick", function(self, button)
                     confirmDeleteSelectedBosses(self, button)
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderNum"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderNum"], "OnClick", function()
                     Boss:Sort("id")
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderName"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderName"], "OnClick", function()
                     Boss:Sort("name")
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderTime"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderTime"], "OnClick", function()
                     Boss:Sort("time")
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderMode"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderMode"], "OnClick", function()
                     Boss:Sort("mode")
                 end)
                 frame._krtBound = true
@@ -2434,7 +2419,7 @@ do
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
             if not row._krtBound then
-                Frames.SafeSetScript(row, "OnClick", function(self, button)
+                Frames.SetScriptSafely(row, "OnClick", function(self, button)
                     if module.activeTab ~= "attendance" then
                         selectBoss(self, button)
                     end
@@ -2463,7 +2448,7 @@ do
             UIPrimitives.ShowHide(_G[n .. "DeleteBtn"], not isAttendanceTab)
             UIPrimitives.EnableDisable(_G[n .. "AddBtn"], hasRaid ~= nil)
             UIPrimitives.EnableDisable(_G[n .. "EditBtn"], hasBoss ~= nil)
-            local bossSelCount = MultiSelect.MultiSelectCount(module._msBossCtx)
+            local bossSelCount = MultiSelect.GetCount(module._msBossCtx)
             local delBtn = _G[n .. "DeleteBtn"]
             UIPrimitives.SetButtonCount(delBtn, L.BtnDelete, bossSelCount)
             UIPrimitives.EnableDisable(delBtn, (bossSelCount and bossSelCount > 0) or false)
@@ -2489,13 +2474,13 @@ do
                 return CompareNumbers(a.seq, b.seq, asc, 0)
             end,
             name = function(a, b, asc)
-                return CompareStrings(a.name, b.name, asc)
+                return compareStrings(a.name, b.name, asc)
             end,
             time = function(a, b, asc)
                 return CompareNumbers(a.time, b.time, asc, 0)
             end,
             mode = function(a, b, asc)
-                return CompareStrings(a.mode, b.mode, asc)
+                return compareStrings(a.mode, b.mode, asc)
             end,
         },
     }, "selectedBoss", "_msBossCtx")
@@ -2517,7 +2502,7 @@ do
         local function deleteBosses()
             runWithSelectedRaid(function(_, rID)
                 local ctx = module._msBossCtx
-                local ids = MultiSelect.MultiSelectGetSelected(ctx)
+                local ids = MultiSelect.GetSelected(ctx)
                 if not (ids and #ids > 0) then
                     return
                 end
@@ -2531,20 +2516,20 @@ do
                 end
 
                 -- Clear boss-related selections (filters changed / deleted)
-                MultiSelect.MultiSelectClear(ctx)
+                MultiSelect.EnsureState(ctx)
                 module.selectedBoss = nil
 
                 module.selectedBossPlayer = nil
-                MultiSelect.MultiSelectClear(module._msBossAttCtx)
+                MultiSelect.EnsureState(module._msBossAttCtx)
 
                 module.selectedItem = nil
-                MultiSelect.MultiSelectClear(module._msLootCtx)
+                MultiSelect.EnsureState(module._msLootCtx)
             end)
         end
 
         confirmDeleteSelectedBosses = function()
             local ctx = module._msBossCtx
-            if MultiSelect.MultiSelectCount(ctx) > 0 then
+            if MultiSelect.GetCount(ctx) > 0 then
                 StaticPopup_Show("KRTLOGGER_DELETE_BOSS")
             end
         end
@@ -2598,13 +2583,13 @@ do
 
             local frame = _G[n]
             if frame and not frame._krtBound then
-                Frames.SafeSetScript(_G[n .. "AddBtn"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "AddBtn"], "OnClick", function()
                     showBossAttendeesBoxFromLogger()
                 end)
-                Frames.SafeSetScript(_G[n .. "RemoveBtn"], "OnClick", function(self, button)
+                Frames.SetScriptSafely(_G[n .. "RemoveBtn"], "OnClick", function(self, button)
                     confirmDeleteSelectedBossAttendees(self, button)
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderName"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderName"], "OnClick", function()
                     BossAtt:Sort("name")
                 end)
                 frame._krtBound = true
@@ -2628,7 +2613,7 @@ do
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
             if not row._krtBound then
-                Frames.SafeSetScript(row, "OnClick", function(self, button)
+                Frames.SetScriptSafely(row, "OnClick", function(self, button)
                     selectBossPlayer(self, button)
                 end)
                 row._krtBound = true
@@ -2643,7 +2628,7 @@ do
             local bSel = module.selectedBoss
             local addBtn = _G[n .. "AddBtn"]
             local removeBtn = _G[n .. "RemoveBtn"]
-            local attSelCount = MultiSelect.MultiSelectCount(module._msBossAttCtx)
+            local attSelCount = MultiSelect.GetCount(module._msBossAttCtx)
             local count = controller and controller.data and #controller.data or 0
             setPanelTitle(n, getCountContextTitle(L.StrBossAttendees, count, getBossContextLabel(module.selectedRaid, module.selectedBoss), nil))
             setFrameHint(n, "EmptyState", getBossAttendeesEmptyStateText(count, module.selectedRaid, module.selectedBoss))
@@ -2658,7 +2643,7 @@ do
 
         sorters = {
             name = function(a, b, asc)
-                return CompareStrings(a.name, b.name, asc)
+                return compareStrings(a.name, b.name, asc)
             end,
         },
     }, "selectedBossPlayer", "_msBossAttCtx")
@@ -2671,7 +2656,7 @@ do
     end
 
     do
-        local function deleteAttendees()
+        local function deleteSelectedBossAttendees()
             deleteSelectedAttendees(module._msBossAttCtx, function(rID, ids)
                 local bNid = module.selectedBoss
                 if not bNid then
@@ -2689,12 +2674,12 @@ do
 
         function confirmDeleteSelectedBossAttendees()
             local ctx = module._msBossAttCtx
-            if MultiSelect.MultiSelectCount(ctx) > 0 then
+            if MultiSelect.GetCount(ctx) > 0 then
                 StaticPopup_Show("KRTLOGGER_DELETE_ATTENDEE")
             end
         end
 
-        controller._makeConfirmPopup("KRTLOGGER_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, deleteAttendees)
+        controller._makeConfirmPopup("KRTLOGGER_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, deleteSelectedBossAttendees)
     end
 
     local refreshEvents = {
@@ -2747,19 +2732,19 @@ do
 
             local frame = _G[n]
             if frame and not frame._krtBound then
-                Frames.SafeSetScript(_G[n .. "AddBtn"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "AddBtn"], "OnClick", function()
                     updateRaidAttendeesFromRoster()
                 end)
-                Frames.SafeSetScript(_G[n .. "DeleteBtn"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "DeleteBtn"], "OnClick", function()
                     confirmDeleteSelectedRaidAttendees()
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderName"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderName"], "OnClick", function()
                     RaidAtt:Sort("name")
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderJoin"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderJoin"], "OnClick", function()
                     RaidAtt:Sort("join")
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderLeave"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderLeave"], "OnClick", function()
                     RaidAtt:Sort("leave")
                 end)
                 frame._krtBound = true
@@ -2781,7 +2766,7 @@ do
 
         drawRow = ListController.CreateRowDrawer(function(row, it)
             if not row._krtBound then
-                Frames.SafeSetScript(row, "OnClick", function(self, button)
+                Frames.SetScriptSafely(row, "OnClick", function(self, button)
                     selectPlayer(self, button)
                 end)
                 row._krtBound = true
@@ -2803,7 +2788,7 @@ do
             setPanelTitle(n, getCountContextTitle(L.StrRaidAttendees, count, getRaidContextLabel(module.selectedRaid), nil))
             setFrameHint(n, "EmptyState", getRaidAttendeesEmptyStateText(count, module.selectedRaid))
             if deleteBtn then
-                local attSelCount = MultiSelect.MultiSelectCount(module._msRaidAttCtx)
+                local attSelCount = MultiSelect.GetCount(module._msRaidAttCtx)
                 UIPrimitives.SetButtonCount(deleteBtn, L.BtnDelete, attSelCount)
                 UIPrimitives.EnableDisable(deleteBtn, (attSelCount and attSelCount > 0) or false)
             end
@@ -2818,7 +2803,7 @@ do
 
         sorters = {
             name = function(a, b, asc)
-                return CompareStrings(a.name, b.name, asc)
+                return compareStrings(a.name, b.name, asc)
             end,
             join = function(a, b, asc)
                 return CompareNumbers(a.join, b.join, asc, 0)
@@ -2856,9 +2841,9 @@ do
             Services.Raid:UpdateRaidRoster()
 
             -- Clear dependent selections after roster sync.
-            MultiSelect.MultiSelectClear(module._msRaidAttCtx)
-            MultiSelect.MultiSelectClear(module._msBossAttCtx)
-            MultiSelect.MultiSelectClear(module._msLootCtx)
+            MultiSelect.EnsureState(module._msRaidAttCtx)
+            MultiSelect.EnsureState(module._msBossAttCtx)
+            MultiSelect.EnsureState(module._msLootCtx)
             module.selectedPlayer = nil
             module.selectedBossPlayer = nil
             module.selectedItem = nil
@@ -2868,7 +2853,7 @@ do
     end
 
     do
-        local function deleteAttendees()
+        local function deleteSelectedRaidAttendees()
             deleteSelectedAttendees(module._msRaidAttCtx, function(rID, ids)
                 local removed = Actions:DeleteRaidAttendeeMany(rID, ids)
                 return tonumber(removed) or 0
@@ -2877,22 +2862,22 @@ do
 
                 -- Player filters changed: clear boss-attendees selection too.
                 module.selectedBossPlayer = nil
-                MultiSelect.MultiSelectClear(module._msBossAttCtx)
+                MultiSelect.EnsureState(module._msBossAttCtx)
 
                 -- Filters changed: reset loot selection.
                 module.selectedItem = nil
-                MultiSelect.MultiSelectClear(module._msLootCtx)
+                MultiSelect.EnsureState(module._msLootCtx)
             end)
         end
 
         function confirmDeleteSelectedRaidAttendees()
             local ctx = module._msRaidAttCtx
-            if MultiSelect.MultiSelectCount(ctx) > 0 then
+            if MultiSelect.GetCount(ctx) > 0 then
                 StaticPopup_Show("KRTLOGGER_DELETE_RAIDATTENDEE")
             end
         end
 
-        controller._makeConfirmPopup("KRTLOGGER_DELETE_RAIDATTENDEE", L.StrConfirmDeleteAttendee, deleteAttendees)
+        controller._makeConfirmPopup("KRTLOGGER_DELETE_RAIDATTENDEE", L.StrConfirmDeleteAttendee, deleteSelectedRaidAttendees)
     end
 
     Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function()
@@ -2963,28 +2948,28 @@ do
 
             local frame = _G[n]
             if frame and not frame._krtBound then
-                Frames.SafeSetScript(_G[n .. "ExportBtn"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "ExportBtn"], "OnClick", function()
                     showLoggerExportFrame()
                 end)
-                Frames.SafeSetScript(_G[n .. "DeleteBtn"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "DeleteBtn"], "OnClick", function()
                     confirmDeleteSelectedLootItems()
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderItem"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderItem"], "OnClick", function()
                     sortLoot("id")
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderSource"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderSource"], "OnClick", function()
                     sortLoot("source")
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderWinner"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderWinner"], "OnClick", function()
                     sortLoot("winner")
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderType"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderType"], "OnClick", function()
                     sortLoot("type")
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderRoll"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderRoll"], "OnClick", function()
                     sortLoot("roll")
                 end)
-                Frames.SafeSetScript(_G[n .. "HeaderTime"], "OnClick", function()
+                Frames.SetScriptSafely(_G[n .. "HeaderTime"], "OnClick", function()
                     sortLoot("time")
                 end)
                 frame._krtBound = true
@@ -3012,13 +2997,13 @@ do
                 if row.RegisterForClicks then
                     row:RegisterForClicks("AnyUp")
                 end
-                Frames.SafeSetScript(row, "OnClick", function(self, button)
+                Frames.SetScriptSafely(row, "OnClick", function(self, button)
                     selectItem(self, button)
                 end)
-                Frames.SafeSetScript(row, "OnEnter", function(self)
+                Frames.SetScriptSafely(row, "OnEnter", function(self)
                     onLootRowEnter(self)
                 end)
-                Frames.SafeSetScript(row, "OnLeave", function(self)
+                Frames.SetScriptSafely(row, "OnLeave", function(self)
                     onLootRowLeave(self)
                 end)
                 local itemButton = row.GetName and _G[row:GetName() .. "Item"] or nil
@@ -3030,13 +3015,13 @@ do
                 end
                 if itemButton then
                     itemButton._krtRow = row
-                    Frames.SafeSetScript(itemButton, "OnClick", function(_, button)
+                    Frames.SetScriptSafely(itemButton, "OnClick", function(_, button)
                         selectItem(row, button)
                     end)
-                    Frames.SafeSetScript(itemButton, "OnEnter", function(self)
+                    Frames.SetScriptSafely(itemButton, "OnEnter", function(self)
                         showLootTooltip(self)
                     end)
-                    Frames.SafeSetScript(itemButton, "OnLeave", function()
+                    Frames.SetScriptSafely(itemButton, "OnLeave", function()
                         GameTooltip:Hide()
                     end)
                 end
@@ -3083,9 +3068,9 @@ do
             ui.Winner:SetText(it.looter or "")
             ui.Winner:SetVertexColor(r, g, b)
 
-            local rt = tonumber(it.rollType) or 0
+            local rt = tonumber(it.rollType)
             it.rollType = rt
-            ui.Type:SetText(lootTypesColored[rt] or lootTypesColored[4])
+            ui.Type:SetText((rt and lootTypesColored[rt]) or "")
             ui.Roll:SetText(it.rollValue or 0)
             ui.Roll:SetVertexColor(0.95, 0.95, 0.95)
             ui.Time:SetText(it.timeFmt)
@@ -3106,7 +3091,7 @@ do
             applyLootListColumnWidths(n)
             updateSourceHeaderState(n)
 
-            local lootSelCount = MultiSelect.MultiSelectCount(module._msLootCtx)
+            local lootSelCount = MultiSelect.GetCount(module._msLootCtx)
             local exportBtn = _G[n .. "ExportBtn"]
             local delBtn = _G[n .. "DeleteBtn"]
             local count = controller and controller.data and #controller.data or 0
@@ -3119,7 +3104,7 @@ do
 
         sorters = {
             id = function(a, b, asc)
-                return CompareLootTie(a, b, asc)
+                return compareLootTie(a, b, asc)
             end,
             source = function(a, b, asc)
                 local aSource = strlower(tostring((a and a.sourceName) or ""))
@@ -3127,7 +3112,7 @@ do
                 if aSource ~= bSource then
                     return CompareValues(aSource, bSource, asc)
                 end
-                return CompareLootTie(a, b, asc)
+                return compareLootTie(a, b, asc)
             end,
             winner = function(a, b, asc)
                 local aWinner = strlower(tostring((a and a.looter) or ""))
@@ -3135,7 +3120,7 @@ do
                 if aWinner ~= bWinner then
                     return CompareValues(aWinner, bWinner, asc)
                 end
-                return CompareLootTie(a, b, asc)
+                return compareLootTie(a, b, asc)
             end,
             type = function(a, b, asc)
                 local aType = tonumber(a and a.rollType) or 0
@@ -3143,7 +3128,7 @@ do
                 if aType ~= bType then
                     return CompareValues(aType, bType, asc)
                 end
-                return CompareLootTie(a, b, asc)
+                return compareLootTie(a, b, asc)
             end,
             roll = function(a, b, asc)
                 local aRoll = tonumber(a and a.rollValue) or 0
@@ -3151,7 +3136,7 @@ do
                 if aRoll ~= bRoll then
                     return CompareValues(aRoll, bRoll, asc)
                 end
-                return CompareLootTie(a, b, asc)
+                return compareLootTie(a, b, asc)
             end,
             time = function(a, b, asc)
                 local aTime = tonumber(a and a.time) or 0
@@ -3159,7 +3144,7 @@ do
                 if aTime ~= bTime then
                     return CompareValues(aTime, bTime, asc)
                 end
-                return CompareLootTie(a, b, asc)
+                return compareLootTie(a, b, asc)
             end,
         },
     }, "selectedItem", "_msLootCtx")
@@ -3204,14 +3189,14 @@ do
         local function deleteItem()
             runWithSelectedRaid(function(_, rID)
                 local ctx = module._msLootCtx
-                local selected = MultiSelect.MultiSelectGetSelected(ctx)
+                local selected = MultiSelect.GetSelected(ctx)
                 if not selected or #selected == 0 then
                     return
                 end
 
                 local removed = Actions:DeleteLootMany(rID, selected)
                 if removed > 0 then
-                    MultiSelect.MultiSelectClear(ctx)
+                    MultiSelect.EnsureState(ctx)
                     module.selectedItem = nil
                     triggerSelectionEvent(module, "selectedItem")
 
@@ -3223,7 +3208,7 @@ do
         end
 
         confirmDeleteSelectedLootItems = function()
-            if MultiSelect.MultiSelectCount(module._msLootCtx) > 0 then
+            if MultiSelect.GetCount(module._msLootCtx) > 0 then
                 StaticPopup_Show("KRTLOGGER_DELETE_ITEM")
             end
         end
@@ -3339,7 +3324,7 @@ local function makePopupBox(moduleName, frameName, cfg)
         local refs = {}
         for i = 1, #suffixes do
             local s = suffixes[i]
-            refs[s:sub(1, 1):lower() .. s:sub(2)] = Frames.Ref(frame, s)
+            refs[s:sub(1, 1):lower() .. s:sub(2)] = Frames.GetRef(frame, s)
         end
         return refs
     end
@@ -3349,18 +3334,18 @@ local function makePopupBox(moduleName, frameName, cfg)
             return
         end
         if refs[saveRef] then
-            Frames.SafeSetScript(refs[saveRef], "OnClick", function()
+            Frames.SetScriptSafely(refs[saveRef], "OnClick", function()
                 Box._doSave()
             end)
         end
         if refs[cancelRef] then
-            Frames.SafeSetScript(refs[cancelRef], "OnClick", function()
+            Frames.SetScriptSafely(refs[cancelRef], "OnClick", function()
                 Box:Hide()
             end)
         end
         for i = 1, #enterRefs do
             if refs[enterRefs[i]] then
-                Frames.SafeSetScript(refs[enterRefs[i]], "OnEnterPressed", function()
+                Frames.SetScriptSafely(refs[enterRefs[i]], "OnEnterPressed", function()
                     Box._doSave()
                 end)
             end
@@ -3377,7 +3362,7 @@ local function makePopupBox(moduleName, frameName, cfg)
     end
 
     local function loadBoxFrame(frame)
-        BoxUI.FrameName = Frames.InitModuleFrame(Box, frame, {
+        BoxUI.FrameName = Frames.BindModuleFrame(Box, frame, {
             enableDrag = true,
             hookOnShow = onShow and function()
                 onShow(Box)

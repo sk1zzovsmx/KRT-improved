@@ -164,13 +164,13 @@ do
     -- ----- Private helpers ----- --
     function UI.AcquireRefs(frame)
         return {
-            addBtn = Frames.Ref(frame, "AddBtn"),
-            announceBtn = Frames.Ref(frame, "AnnounceBtn"),
-            clearBtn = Frames.Ref(frame, "ClearBtn"),
-            demandBtn = Frames.Ref(frame, "DemandBtn"),
-            editBtn = Frames.Ref(frame, "EditBtn"),
-            name = Frames.Ref(frame, "Name"),
-            spec = Frames.Ref(frame, "Spec"),
+            addBtn = Frames.GetRef(frame, "AddBtn"),
+            announceBtn = Frames.GetRef(frame, "AnnounceBtn"),
+            clearBtn = Frames.GetRef(frame, "ClearBtn"),
+            demandBtn = Frames.GetRef(frame, "DemandBtn"),
+            editBtn = Frames.GetRef(frame, "EditBtn"),
+            name = Frames.GetRef(frame, "Name"),
+            spec = Frames.GetRef(frame, "Spec"),
         }
     end
 
@@ -178,10 +178,10 @@ do
         if not row or row._krtBound then
             return
         end
-        Frames.SafeSetScript(row, "OnClick", function(self, button)
+        Frames.SetScriptSafely(row, "OnClick", function(self, button)
             selectChange(self, button)
         end)
-        Frames.SafeSetScript(row, "OnDoubleClick", function(self)
+        Frames.SetScriptSafely(row, "OnDoubleClick", function(self)
             editChange(self)
         end)
         row._krtBound = true
@@ -212,29 +212,29 @@ do
     end
 
     local function BindHandlers(_, _, refs)
-        Frames.SafeSetScript(refs.addBtn, "OnClick", function(self, button)
+        Frames.SetScriptSafely(refs.addBtn, "OnClick", function(self, button)
             addChange(self, button)
         end)
-        Frames.SafeSetScript(refs.announceBtn, "OnClick", function()
+        Frames.SetScriptSafely(refs.announceBtn, "OnClick", function()
             module:Announce()
         end)
-        Frames.SafeSetScript(refs.clearBtn, "OnClick", function()
+        Frames.SetScriptSafely(refs.clearBtn, "OnClick", function()
             clearChanges()
         end)
-        Frames.SafeSetScript(refs.demandBtn, "OnClick", function()
+        Frames.SetScriptSafely(refs.demandBtn, "OnClick", function()
             module:Demand()
         end)
-        Frames.SafeSetScript(refs.editBtn, "OnClick", function(self, button)
+        Frames.SetScriptSafely(refs.editBtn, "OnClick", function(self, button)
             editChange(self, button)
         end)
-        Frames.SafeSetScript(refs.name, "OnTabPressed", function(self)
-            local spec = Frames.Ref(self:GetParent(), "Spec")
+        Frames.SetScriptSafely(refs.name, "OnTabPressed", function(self)
+            local spec = Frames.GetRef(self:GetParent(), "Spec")
             if spec and spec.SetFocus then
                 spec:SetFocus()
             end
         end)
-        Frames.SafeSetScript(refs.spec, "OnTabPressed", function(self)
-            local name = Frames.Ref(self:GetParent(), "Name")
+        Frames.SetScriptSafely(refs.spec, "OnTabPressed", function(self)
+            local name = Frames.GetRef(self:GetParent(), "Name")
             if name and name.SetFocus then
                 name:SetFocus()
             end

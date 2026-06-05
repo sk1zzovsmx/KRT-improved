@@ -188,9 +188,9 @@ do
         if #channelList <= 0 then
             local groupType = addon.GetGroupTypeAndCount()
             if groupType == "raid" then
-                Comms.Chat(text, "RAID", nil, nil, true)
+                Comms.SendChat(text, "RAID", nil, nil, true)
             elseif groupType == "party" then
-                Comms.Chat(text, "PARTY", nil, nil, true)
+                Comms.SendChat(text, "PARTY", nil, nil, true)
             else
                 module:Print(text)
             end
@@ -199,9 +199,9 @@ do
 
         for _, channel in ipairs(channelList) do
             if type(channel) == "number" then
-                Comms.Chat(text, "CHANNEL", nil, channel, true)
+                Comms.SendChat(text, "CHANNEL", nil, channel, true)
             else
-                Comms.Chat(text, upper(channel), nil, nil, true)
+                Comms.SendChat(text, upper(channel), nil, nil, true)
             end
         end
 
@@ -275,11 +275,7 @@ do
         if not selectedChannel or selectedChannel == "" then
             return module:Print(msg)
         end
-        Comms.Chat(msg, selectedChannel)
-    end
-
-    function module:ShowMasterOnlyWarning()
-        addon:warn(L.WarnMLOnlyMode or L.WarnMLNoPermission)
+        Comms.SendChat(msg, selectedChannel)
     end
 
     function module:AnnounceWarningMessage(content)

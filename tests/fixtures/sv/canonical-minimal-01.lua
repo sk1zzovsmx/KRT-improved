@@ -1,6 +1,6 @@
 KRT_Raids = {
     {
-        schemaVersion = 3,
+        schemaVersion = 5,
         raidNid = 1,
         zone = "Naxxramas",
         size = 10,
@@ -11,7 +11,7 @@ KRT_Raids = {
                 playerNid = 1,
                 name = "Valider",
                 class = "WARRIOR",
-                count = 0,
+                countMS = 0,
             },
         },
         bossKills = {

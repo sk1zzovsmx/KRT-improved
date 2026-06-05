@@ -85,7 +85,6 @@ local ChatApi = {
 }
 
 local RollsApi = {
-    GetDisplayedWinner = requireServiceMethod("Rolls", Rolls, "GetDisplayedWinner"),
     GetResolvedWinner = requireServiceMethod("Rolls", Rolls, "GetResolvedWinner"),
     ShouldUseTieReroll = requireServiceMethod("Rolls", Rolls, "ShouldUseTieReroll"),
     SetExpectedWinners = requireServiceMethod("Rolls", Rolls, "SetExpectedWinners"),
@@ -161,6 +160,7 @@ do
     local completeInventoryAwardProgress
     local updateRollSessionExpectedWinners
     local Private = {}
+    local awardFlow = {}
     local screenshotWarn = false
 
     local announced = false
@@ -274,8 +274,8 @@ do
     -- Roll selection / UI model helpers
     -- ============================================================================
     local function resetRollWinnerSelection(mode)
-        MultiSelect.MultiSelectClear(ROLL_WINNERS_CTX)
-        MultiSelect.MultiSelectSetAnchor(ROLL_WINNERS_CTX, nil)
+        MultiSelect.EnsureState(ROLL_WINNERS_CTX)
+        MultiSelect.SetAnchor(ROLL_WINNERS_CTX, nil)
         rollUiState.mode = mode or ROLL_SELECTION_MODE.AUTO
         rollUiState.model = nil
     end
@@ -311,7 +311,7 @@ do
 
         for i = 1, #rows do
             local row = rows[i]
-            if row and row.name and isSelectableRollRow(row) and MultiSelect.MultiSelectIsSelected(ROLL_WINNERS_CTX, row.name) then
+            if row and row.name and isSelectableRollRow(row) and MultiSelect.IsSelected(ROLL_WINNERS_CTX, row.name) then
                 selected[#selected + 1] = {
                     name = row.name,
                     roll = tonumber(row.roll) or 0,
@@ -333,18 +333,18 @@ do
         for i = 1, #names do
             local name = names[i]
             if type(name) == "string" and name ~= "" then
-                MultiSelect.MultiSelectToggle(ROLL_WINNERS_CTX, name, true)
+                MultiSelect.Toggle(ROLL_WINNERS_CTX, name, true)
                 lastName = name
             end
         end
 
-        MultiSelect.MultiSelectSetAnchor(ROLL_WINNERS_CTX, lastName)
-        return MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0
+        MultiSelect.SetAnchor(ROLL_WINNERS_CTX, lastName)
+        return MultiSelect.GetCount(ROLL_WINNERS_CTX) or 0
     end
 
     local function pruneRollWinnerSelection(rows)
         local valid = {}
-        local selected = MultiSelect.MultiSelectGetSelected(ROLL_WINNERS_CTX) or {}
+        local selected = MultiSelect.GetSelected(ROLL_WINNERS_CTX) or {}
         local changed = false
         local ordered
 
@@ -362,17 +362,17 @@ do
         for i = 1, #selected do
             local name = selected[i]
             if not valid[name] then
-                MultiSelect.MultiSelectToggle(ROLL_WINNERS_CTX, name, true)
+                MultiSelect.Toggle(ROLL_WINNERS_CTX, name, true)
                 changed = true
             end
         end
 
         if changed then
             ordered = getSelectedRollWinnersOrdered(rows)
-            MultiSelect.MultiSelectSetAnchor(ROLL_WINNERS_CTX, ordered[#ordered] and ordered[#ordered].name or nil)
+            MultiSelect.SetAnchor(ROLL_WINNERS_CTX, ordered[#ordered] and ordered[#ordered].name or nil)
         end
 
-        return MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0
+        return MultiSelect.GetCount(ROLL_WINNERS_CTX) or 0
     end
 
     local buildRollUiModel, selectRollWinnerRow, getRollRowRefs
@@ -387,16 +387,16 @@ do
         end
 
         if not pickMode then
-            MultiSelect.MultiSelectToggle(ROLL_WINNERS_CTX, name, false, false)
-            MultiSelect.MultiSelectSetAnchor(ROLL_WINNERS_CTX, name)
+            MultiSelect.Toggle(ROLL_WINNERS_CTX, name, false, false)
+            MultiSelect.SetAnchor(ROLL_WINNERS_CTX, name)
             rollUiState.mode = ROLL_SELECTION_MODE.MANUAL_SINGLE
             return true
         end
 
-        isMulti = MultiSelect.MultiSelectResolveModifiers and select(1, MultiSelect.MultiSelectResolveModifiers(ROLL_WINNERS_CTX, { allowRange = false }))
+        isMulti = MultiSelect.ResolveModifiers and select(1, MultiSelect.ResolveModifiers(ROLL_WINNERS_CTX, { allowRange = false }))
             or ((IsControlKeyDown and IsControlKeyDown()) or false)
-        isSelected = MultiSelect.MultiSelectIsSelected(ROLL_WINNERS_CTX, name)
-        currentCount = MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0
+        isSelected = MultiSelect.IsSelected(ROLL_WINNERS_CTX, name)
+        currentCount = MultiSelect.GetCount(ROLL_WINNERS_CTX) or 0
 
         if isMulti then
             if (not isSelected) and currentCount >= maxSel then
@@ -407,16 +407,16 @@ do
                 addon:warn(Diag.W.ErrMLMultiSelectTooMany:format(maxSel))
                 return false
             end
-            MultiSelect.MultiSelectToggle(ROLL_WINNERS_CTX, name, true, true)
+            MultiSelect.Toggle(ROLL_WINNERS_CTX, name, true, true)
         else
-            MultiSelect.MultiSelectToggle(ROLL_WINNERS_CTX, name, false, false)
+            MultiSelect.Toggle(ROLL_WINNERS_CTX, name, false, false)
         end
 
         rollUiState.mode = ROLL_SELECTION_MODE.MANUAL_MULTI
-        if (MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0) > 0 then
-            MultiSelect.MultiSelectSetAnchor(ROLL_WINNERS_CTX, name)
+        if (MultiSelect.GetCount(ROLL_WINNERS_CTX) or 0) > 0 then
+            MultiSelect.SetAnchor(ROLL_WINNERS_CTX, name)
         else
-            MultiSelect.MultiSelectSetAnchor(ROLL_WINNERS_CTX, nil)
+            MultiSelect.SetAnchor(ROLL_WINNERS_CTX, nil)
         end
         return true
     end
@@ -426,22 +426,22 @@ do
     -- ============================================================================
     function UI.AcquireRefs(frame)
         return {
-            configBtn = Frames.Ref(frame, "ConfigBtn"),
-            selectItemBtn = Frames.Ref(frame, "SelectItemBtn"),
-            spamLootBtn = Frames.Ref(frame, "SpamLootBtn"),
-            msBtn = Frames.Ref(frame, "MSBtn"),
-            osBtn = Frames.Ref(frame, "OSBtn"),
-            srBtn = Frames.Ref(frame, "SRBtn"),
-            freeBtn = Frames.Ref(frame, "FreeBtn"),
-            countdownBtn = Frames.Ref(frame, "CountdownBtn"),
-            awardBtn = Frames.Ref(frame, "AwardBtn"),
-            rollBtn = Frames.Ref(frame, "RollBtn"),
-            clearBtn = Frames.Ref(frame, "ClearBtn"),
-            holdBtn = Frames.Ref(frame, "HoldBtn"),
-            bankBtn = Frames.Ref(frame, "BankBtn"),
-            disenchantBtn = Frames.Ref(frame, "DisenchantBtn"),
-            reserveListBtn = Frames.Ref(frame, "ReserveListBtn"),
-            lootCounterBtn = Frames.Ref(frame, "LootCounterBtn"),
+            configBtn = Frames.GetRef(frame, "ConfigBtn"),
+            selectItemBtn = Frames.GetRef(frame, "SelectItemBtn"),
+            spamLootBtn = Frames.GetRef(frame, "SpamLootBtn"),
+            msBtn = Frames.GetRef(frame, "MSBtn"),
+            osBtn = Frames.GetRef(frame, "OSBtn"),
+            srBtn = Frames.GetRef(frame, "SRBtn"),
+            freeBtn = Frames.GetRef(frame, "FreeBtn"),
+            countdownBtn = Frames.GetRef(frame, "CountdownBtn"),
+            awardBtn = Frames.GetRef(frame, "AwardBtn"),
+            rollBtn = Frames.GetRef(frame, "RollBtn"),
+            clearBtn = Frames.GetRef(frame, "ClearBtn"),
+            holdBtn = Frames.GetRef(frame, "HoldBtn"),
+            bankBtn = Frames.GetRef(frame, "BankBtn"),
+            disenchantBtn = Frames.GetRef(frame, "DisenchantBtn"),
+            reserveListBtn = Frames.GetRef(frame, "ReserveListBtn"),
+            lootCounterBtn = Frames.GetRef(frame, "LootCounterBtn"),
         }
     end
 
@@ -481,44 +481,44 @@ do
             return
         end
 
-        Frames.SafeSetScript(refs.configBtn, "OnClick", function()
+        Frames.SetScriptSafely(refs.configBtn, "OnClick", function()
             UIFacade:Call("Config", "Toggle")
         end)
-        Frames.SafeSetScript(
+        Frames.SetScriptSafely(
             refs.selectItemBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnSelectItem(self, button)
             end)
         )
-        Frames.SafeSetScript(refs.spamLootBtn, "OnClick", function(self, button)
+        Frames.SetScriptSafely(refs.spamLootBtn, "OnClick", function(self, button)
             if not ensureSpamLootAccess() then
                 return
             end
             Private.BtnSpamLoot(self, button)
         end)
-        Frames.SafeSetScript(
+        Frames.SetScriptSafely(
             refs.msBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnMS(self, button)
             end)
         )
-        Frames.SafeSetScript(
+        Frames.SetScriptSafely(
             refs.osBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnOS(self, button)
             end)
         )
-        Frames.SafeSetScript(
+        Frames.SetScriptSafely(
             refs.srBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnSR(self, button)
             end)
         )
-        Frames.SafeSetScript(
+        Frames.SetScriptSafely(
             refs.freeBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
@@ -534,63 +534,63 @@ do
                 refs.countdownBtn:RegisterForClicks("LeftButtonUp")
             end
         end
-        Frames.SafeSetScript(
+        Frames.SetScriptSafely(
             refs.countdownBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnCountdown(self, button)
             end)
         )
-        Frames.SafeSetScript(
+        Frames.SetScriptSafely(
             refs.awardBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnAward(self, button)
             end)
         )
-        Frames.SafeSetScript(
+        Frames.SetScriptSafely(
             refs.rollBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Rolls:Roll(self, button)
             end)
         )
-        Frames.SafeSetScript(
+        Frames.SetScriptSafely(
             refs.clearBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnClear(self, button)
             end)
         )
-        Frames.SafeSetScript(
+        Frames.SetScriptSafely(
             refs.holdBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnHold(self, button)
             end)
         )
-        Frames.SafeSetScript(
+        Frames.SetScriptSafely(
             refs.bankBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnBank(self, button)
             end)
         )
-        Frames.SafeSetScript(
+        Frames.SetScriptSafely(
             refs.disenchantBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnDisenchant(self, button)
             end)
         )
-        Frames.SafeSetScript(
+        Frames.SetScriptSafely(
             refs.reserveListBtn,
             "OnClick",
             wrapMasterOnlyClick(function(self, button)
                 Private.BtnReserveList(self, button)
             end)
         )
-        Frames.SafeSetScript(refs.lootCounterBtn, "OnClick", function(self, button)
+        Frames.SetScriptSafely(refs.lootCounterBtn, "OnClick", function(self, button)
             Private.BtnLootCounter(self, button)
         end)
 
@@ -716,7 +716,7 @@ do
     Private.syncRollWinnerSelectionState = function(baseRows, resolution, selectionAllowed, requiredWinnerCount)
         if selectionAllowed then
             pruneRollWinnerSelection(baseRows)
-        elseif (MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0) > 0 then
+        elseif (MultiSelect.GetCount(ROLL_WINNERS_CTX) or 0) > 0 then
             resetRollWinnerSelection(ROLL_SELECTION_MODE.AUTO)
         end
 
@@ -732,7 +732,7 @@ do
                 end
             end
             replaceRollWinnerSelection(prefillNames, ROLL_SELECTION_MODE.AUTO)
-        elseif not pickMode and rollUiState.mode ~= ROLL_SELECTION_MODE.MANUAL_SINGLE and (MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0) > 0 then
+        elseif not pickMode and rollUiState.mode ~= ROLL_SELECTION_MODE.MANUAL_SINGLE and (MultiSelect.GetCount(ROLL_WINNERS_CTX) or 0) > 0 then
             resetRollWinnerSelection(ROLL_SELECTION_MODE.AUTO)
         end
 
@@ -925,6 +925,22 @@ do
         return nil
     end
 
+    Private.ShowHideFrame = function(frame, shown)
+        local primitives = addon.UIPrimitives or UIPrimitives
+        if primitives and primitives.ShowHide then
+            primitives.ShowHide(frame, shown)
+            return
+        end
+        if not frame then
+            return
+        end
+        if shown and frame.Show then
+            frame:Show()
+        elseif not shown and frame.Hide then
+            frame:Hide()
+        end
+    end
+
     local function drawRollRow(row, data)
         if not row.krtHasOnClick then
             row:SetScript("OnClick", function(self)
@@ -970,7 +986,39 @@ do
             infoStr:Show()
         end
 
-        UIPrimitives.ShowHide(star, data.showStar == true)
+        Private.ShowHideFrame(star, data.showStar == true)
+    end
+
+    Private.RenderRollRowsFallback = function(frameName)
+        local model = rollUiState.model
+        local visibleRows = model and model.visibleRows or nil
+        if type(visibleRows) ~= "table" or #visibleRows <= 0 or type(frameName) ~= "string" or frameName == "" then
+            return false
+        end
+
+        local parent = _G[frameName .. "ScrollFrameScrollChild"] or _G[frameName]
+        local createFrame = _G.CreateFrame
+        if not parent and type(createFrame) ~= "function" then
+            return false
+        end
+
+        for i = 1, #visibleRows do
+            local btnName = frameName .. "PlayerBtn" .. i
+            local row = _G[btnName]
+            if not row and type(createFrame) == "function" then
+                row = createFrame("Button", btnName, parent, "KRTSelectPlayerTemplate")
+            end
+            if row then
+                if row.SetID then
+                    row:SetID(i)
+                end
+                drawRollRow(row, visibleRows[i])
+                if row.Show then
+                    row:Show()
+                end
+            end
+        end
+        return true
     end
 
     if ListController and ListController.MakeListController and ListController.CreateRowDrawer then
@@ -992,8 +1040,11 @@ do
 
     local function getDisplayedWinnerName(model)
         local currentWinner = getCurrentTradeWinner() or getCurrentMultiAwardWinner()
+        if currentWinner and currentWinner ~= "" then
+            return currentWinner
+        end
         local activeModel = model or (buildRollUiModel and buildRollUiModel(true)) or nil
-        return RollsApi.GetDisplayedWinner(Rolls, currentWinner, activeModel)
+        return RollsApi.GetResolvedWinner(Rolls, activeModel)
     end
 
     local function getResolvedRollWinnerName(model)
@@ -1499,7 +1550,7 @@ do
 
     local function resetRecordedRolls()
         Rolls:ClearRolls()
-        Rolls:RecordRolls(false)
+        Rolls:SetRollRecordingEnabled(false)
     end
 
     local function clearLootAndResetRecordedRolls()
@@ -1515,7 +1566,7 @@ do
         RollsApi.StartCountdown(Rolls, duration, nil, function()
             -- At zero: either block late rolls or keep intake open and tag late responses as OOT.
             if blockAfterCountdown then
-                Rolls:RecordRolls(false)
+                Rolls:SetRollRecordingEnabled(false)
             end
             refreshRollDisplay()
         end)
@@ -1962,7 +2013,7 @@ do
     end
 
     local function buildMultiAwardWinners(target)
-        local selCount = MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0
+        local selCount = MultiSelect.GetCount(ROLL_WINNERS_CTX) or 0
         local rollModel
         local picked
 
@@ -1977,8 +2028,8 @@ do
             pickedWinners = picked,
         })
         if plan and plan.clearSelection then
-            MultiSelect.MultiSelectClear(ROLL_WINNERS_CTX)
-            MultiSelect.MultiSelectSetAnchor(ROLL_WINNERS_CTX, nil)
+            MultiSelect.EnsureState(ROLL_WINNERS_CTX)
+            MultiSelect.SetAnchor(ROLL_WINNERS_CTX, nil)
         end
         if plan and plan.errType then
             return nil, plan.errType, plan.wantedCount, plan.pickedCount
@@ -1987,8 +2038,8 @@ do
         return plan and plan.winners
     end
 
-    local function validateInventoryTradeSelection(target)
-        local selCount = MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0
+    local function validateInventoryTradeUiSelection(target)
+        local selCount = MultiSelect.GetCount(ROLL_WINNERS_CTX) or 0
         local rollModel
         local picked
 
@@ -2029,7 +2080,7 @@ do
         return assignItem(itemLink, winners[1].name, lootState.currentRollType, winners[1].roll)
     end
 
-    local function computeAwardTargetAndAvailability()
+    local function computeTargetAndAvailability()
         local plan = Loot:BuildAwardTargetPlan({
             selectedItemCount = lootState.selectedItemCount,
             availableItemCount = Loot:GetCurrentItemCount(),
@@ -2074,7 +2125,7 @@ do
 
     local function tryAwardSingleCopy(itemLink, winnerName)
         local selectedWinner = winnerName or lootState.winner
-        local result = assignItem(itemLink, selectedWinner, lootState.currentRollType, Rolls:HighestRoll(selectedWinner))
+        local result = assignItem(itemLink, selectedWinner, lootState.currentRollType, Rolls:GetHighestRoll(selectedWinner))
         if result then
             registerAwardedItem(1)
         end
@@ -2232,13 +2283,15 @@ do
         stopCountdown()
         local itemLink = Loot.GetItemLink()
         if addon.hasDebug then
-            addon:debug(Diag.D.LogMLAwardRequested:format(tostring(winnerName), tonumber(lootState.currentRollType) or -1, Rolls:HighestRoll(winnerName) or 0, tostring(itemLink)))
+            addon:debug(
+                Diag.D.LogMLAwardRequested:format(tostring(winnerName), tonumber(lootState.currentRollType) or -1, Rolls:GetHighestRoll(winnerName) or 0, tostring(itemLink))
+            )
         end
 
         if lootState.fromInventory == true then
             local targetCount = tonumber(lootState.selectedItemCount) or 1
             if targetCount > 1 then
-                local okSelection, errType, wantedCount, pickedCount = validateInventoryTradeSelection(targetCount)
+                local okSelection, errType, wantedCount, pickedCount = validateInventoryTradeUiSelection(targetCount)
                 if not okSelection then
                     if errType == "not_enough_selection" then
                         addon:warn(Diag.W.ErrMLMultiSelectNotEnough:format(wantedCount or 0, pickedCount or 0))
@@ -2249,18 +2302,23 @@ do
                     return false
                 end
             end
-            local result = tradeItem(itemLink, winnerName, lootState.currentRollType, Rolls:HighestRoll(winnerName))
+            local result = tradeItem(itemLink, winnerName, lootState.currentRollType, Rolls:GetHighestRoll(winnerName))
             resetItemCountAndRefresh()
             return result
         end
 
-        local target, available = computeAwardTargetAndAvailability()
+        local target, available = awardFlow.computeTargetAndAvailability()
         if available > 1 then
-            return tryAwardMultipleCopies(itemLink, target, available)
+            return awardFlow.tryMultipleCopies(itemLink, target, available)
         end
 
-        return tryAwardSingleCopy(itemLink, winnerName)
+        return awardFlow.trySingleCopy(itemLink, winnerName)
     end
+
+    awardFlow.computeTargetAndAvailability = computeTargetAndAvailability
+    awardFlow.tryMultipleCopies = tryAwardMultipleCopies
+    awardFlow.trySingleCopy = tryAwardSingleCopy
+    awardFlow.handleRequest = handleAwardRequest
 
     local function resetTradeState()
         lootState.trader = nil
@@ -2373,7 +2431,7 @@ do
     end
 
     local function loadMasterFrame(frame)
-        UI.FrameName = Frames.InitModuleFrame(module, frame, {
+        UI.FrameName = Frames.BindModuleFrame(module, frame, {
             enableDrag = true,
             hookOnHide = function()
                 if selectionFrame then
@@ -2508,7 +2566,7 @@ do
             announced = false
             lootState.currentRollType = rollType
             Rolls:ClearRolls()
-            Rolls:RecordRolls(true)
+            Rolls:SetRollRecordingEnabled(true)
             lootState.itemTraded = 0
 
             local itemLink = Loot.GetItemLink()
@@ -2602,7 +2660,7 @@ do
                 finalizeRollSession()
                 return
             end
-            Rolls:RecordRolls(true)
+            Rolls:SetRollRecordingEnabled(true)
             announced = false
             startCountdown()
             module:RequestRefresh()
@@ -2618,7 +2676,7 @@ do
 
     -- Button: Award/Trade
     Private.BtnAward = function(_btn, _button)
-        return handleAwardRequest()
+        return awardFlow.handleRequest()
     end
 
     -- Button: Hold item
@@ -2783,7 +2841,7 @@ do
     end
 
     local function updateRollStatusState()
-        local rollType, record, canRoll, rolled = Rolls:RollStatus()
+        local rollType, record, canRoll, rolled = Rolls:GetRollStatus()
         local rollStatus = lastUIState.rollStatus
         if rollStatus.record ~= record or rollStatus.canRoll ~= canRoll or rollStatus.rolled ~= rolled or rollStatus.rollType ~= rollType then
             rollStatus.record = record
@@ -2957,8 +3015,13 @@ do
             if rollListController.Dirty then
                 rollListController:Dirty()
             end
+            local updated
             if rollListController.UpdateNow then
-                rollListController:UpdateNow()
+                updated = rollListController:UpdateNow()
+            end
+            local frameName = getFrameName and getFrameName() or UI.FrameName
+            if updated == false or not (frameName and _G[frameName .. "PlayerBtn1"]) then
+                Private.RenderRollRowsFallback(frameName)
             end
         end
 
@@ -3146,7 +3209,7 @@ do
         if btn.RegisterForClicks then
             btn:RegisterForClicks("AnyUp")
         end
-        Frames.SafeSetScript(btn, "OnClick", function(self, button)
+        Frames.SetScriptSafely(btn, "OnClick", function(self, button)
             Private.BtnSelectedItem(self, button)
         end)
         selectionButtons[index] = btn
@@ -3501,7 +3564,7 @@ do
         if lootState.trader and tradeWinner and lootState.trader ~= tradeWinner then
             if tAccepted == 1 and pAccepted == 1 then
                 local awardedCount = Loot:ResolveTradeAwardedCount()
-                local rollValue = Rolls:HighestRoll(tradeWinner)
+                local rollValue = Rolls:GetHighestRoll(tradeWinner)
                 local lootNid, createdTradeOnly = ensureTradeLootContext(
                     lootState.tradeItemLink or Loot.GetItemLink(),
                     tradeWinner,
@@ -3624,7 +3687,7 @@ do
                 announced = true
             end
             if whisper then
-                Comms.Whisper(playerName, whisper)
+                Comms.SendWhisper(playerName, whisper)
             end
             -- IMPORTANT:
             -- Do NOT force-update an existing raid.loot entry here.
@@ -3633,7 +3696,7 @@ do
             -- from the LOOT_ITEM / LOOT_ITEM_MULTIPLE chat event, where we also apply the pending rollType/rollValue.
             --
             -- If multiple identical items are distributed across different roll types ("partial award" workflow),
-            -- using a pre-resolved lootNid can overwrite previous entries because GetLootID() matches by itemId.
+            -- using a pre-resolved lootNid can overwrite previous entries when matching by itemId only.
             -- Keeping the logging entirely event-driven avoids that class of data corruption.
             return true
         end
@@ -3678,16 +3741,16 @@ do
                 return
             end
 
-            local selCount = MultiSelect.MultiSelectCount(ROLL_WINNERS_CTX) or 0
+            local selCount = MultiSelect.GetCount(ROLL_WINNERS_CTX) or 0
             if selCount <= 0 then
                 lootState.winner = nil
                 return
             end
 
-            if completedWinner and MultiSelect.MultiSelectIsSelected(ROLL_WINNERS_CTX, completedWinner) then
-                MultiSelect.MultiSelectToggle(ROLL_WINNERS_CTX, completedWinner, true)
-                if MultiSelect.MultiSelectGetAnchor and MultiSelect.MultiSelectGetAnchor(ROLL_WINNERS_CTX) == completedWinner then
-                    MultiSelect.MultiSelectSetAnchor(ROLL_WINNERS_CTX, nil)
+            if completedWinner and MultiSelect.IsSelected(ROLL_WINNERS_CTX, completedWinner) then
+                MultiSelect.Toggle(ROLL_WINNERS_CTX, completedWinner, true)
+                if MultiSelect.GetAnchor and MultiSelect.GetAnchor(ROLL_WINNERS_CTX) == completedWinner then
+                    MultiSelect.SetAnchor(ROLL_WINNERS_CTX, nil)
                 end
             end
 
@@ -3793,7 +3856,7 @@ do
                 if playerName == lootState.trader then
                     clearLootAndResetRecordedRolls()
                 else
-                    Comms.Whisper(playerName, whisper)
+                    Comms.SendWhisper(playerName, whisper)
                 end
             end
             announced = true
@@ -3868,7 +3931,7 @@ do
             end
         end
 
-        local function buildTradeNotificationPlan(itemLink, playerName, winnerName, rollType, isAwardRoll)
+        local function buildTradeUiNotificationPlan(itemLink, playerName, winnerName, rollType, isAwardRoll)
             local selectedWinners
             local fallbackRolls
             if isAwardRoll and (tonumber(lootState.selectedItemCount) or 1) > 1 then
@@ -3943,7 +4006,7 @@ do
                 return false
             end
 
-            local keep, output, whisper = buildTradeNotificationPlan(itemLink, playerName, winnerName, rollType, isAwardRoll)
+            local keep, output, whisper = buildTradeUiNotificationPlan(itemLink, playerName, winnerName, rollType, isAwardRoll)
 
             if not keep and lootState.trader == winnerName then
                 return completeTraderKeepAward(itemLink, winnerName, rollType, rollValue, output, whisper)
@@ -3965,7 +4028,7 @@ do
     -- ============================================================================
     do
         local function registerWowForwarded(methodName)
-            Bus.RegisterCallback(Events.WowForwarded and Events.WowForwarded(methodName), function(_, ...)
+            Bus.RegisterCallback(Events.GetWowForwarded and Events.GetWowForwarded(methodName), function(_, ...)
                 local fn = module[methodName]
                 if fn then
                     fn(module, ...)
