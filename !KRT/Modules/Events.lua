@@ -34,6 +34,7 @@ Internal.RaidCreate = "RaidCreate"
 Internal.RaidLeave = "RaidLeave"
 Internal.RaidLootUpdate = "RaidLootUpdate"
 Internal.ReservesDataChanged = "ReservesDataChanged"
+Internal.RequestGroupLootRestorePrompt = "RequestGroupLootRestorePrompt"
 Internal.ScreenNotice = "ScreenNotice"
 Internal.SetItem = "SetItem"
 

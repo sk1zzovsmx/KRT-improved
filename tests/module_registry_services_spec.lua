@@ -520,6 +520,20 @@ local expectedRaidServices = {
         owners = { { owner = "module", separator = ":" } },
         deps = { "Init", "Modules/ModuleRegistry" },
     },
+    {
+        name = "Services/Raid/LootMethod",
+        path = "!KRT/Services/Raid/LootMethod.lua",
+        owners = { { owner = "module", separator = ":" } },
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Events",
+            "Modules/Bus",
+            "Database/DBOptions",
+            "Services/Raid/Capabilities",
+        },
+        events = "-- events: listens forwarded PLAYER_TARGET_CHANGED through Master; emits RequestGroupLootRestorePrompt",
+    },
 }
 
 local expectedLoggerServices = {
@@ -697,6 +711,7 @@ local moduleTocPaths = {
     ["Services/Raid/Attendance"] = "Services\\Raid\\Attendance.lua",
     ["Services/Raid/LootRecords"] = "Services\\Raid\\LootRecords.lua",
     ["Services/Raid/Session"] = "Services\\Raid\\Session.lua",
+    ["Services/Raid/LootMethod"] = "Services\\Raid\\LootMethod.lua",
     ["Services/Logger/Store"] = "Services\\Logger\\Store.lua",
     ["Services/Logger/View"] = "Services\\Logger\\View.lua",
     ["Services/Logger/Export"] = "Services\\Logger\\Export.lua",
@@ -937,6 +952,7 @@ local raidNamespaceFiles = {
     "!KRT/Services/Raid/Attendance.lua",
     "!KRT/Services/Raid/LootRecords.lua",
     "!KRT/Services/Raid/Session.lua",
+    "!KRT/Services/Raid/LootMethod.lua",
 }
 for i = 1, #raidNamespaceFiles do
     local source = read(raidNamespaceFiles[i])

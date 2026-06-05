@@ -12,6 +12,8 @@ local Diag = feature.Diag
 local Controllers = feature.Controllers
 local coreState = feature.coreState
 local UI = feature.UI
+local Rows = UI.Rows
+local Popups = UI.Popups
 local Events = feature.Events
 local C = feature.C
 local Database = feature.Database
@@ -83,23 +85,6 @@ local loggerPanelNames = {
     "KRTRaidAttendanceBosses",
 }
 
-local loggerHeaderSuffixes = {
-    "HeaderNum",
-    "HeaderDate",
-    "HeaderZone",
-    "HeaderSize",
-    "HeaderName",
-    "HeaderTime",
-    "HeaderMode",
-    "HeaderJoin",
-    "HeaderLeave",
-    "HeaderItem",
-    "HeaderSource",
-    "HeaderWinner",
-    "HeaderType",
-    "HeaderRoll",
-}
-
 local LOGGER_COMPACT_ROW_HEIGHT = 22
 local LOGGER_LOOT_ROW_HEIGHT = 32
 
@@ -109,7 +94,6 @@ local LOGGER_ROW_LEFT_INSET = 3
 local LOGGER_ROW_COLUMN_GAP = 6
 local LOGGER_HEADER_COLUMN_GAP = LOGGER_ROW_COLUMN_GAP
 local LOGGER_LOOT_NAME_LEFT_OFFSET = 34
-local LOGGER_HEADER_TAB_INSET = 1
 local LOGGER_PANEL_SCROLL_LEFT_OFFSET = 3
 local LOGGER_HEADER_TOP_OFFSET = -25
 local LOGGER_ATTENDANCE_TIME_COLUMN_MIN_WIDTH = 56
@@ -157,145 +141,6 @@ local LOGGER_BOSS_COLUMN_RATIOS = {
     time = 0.13,
     mode = 0.15,
 }
-
-local function setTextureColor(texture, r, g, b, a)
-    if texture and texture.SetTexture then
-        texture:SetTexture(r, g, b, a)
-    end
-end
-
-local function ensureLoggerHeaderTab(header)
-    if not header or header._krtHeaderTab then
-        return
-    end
-
-    local fill = header:CreateTexture(nil, "BACKGROUND")
-    fill:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
-    fill:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
-    header._krtHeaderFill = fill
-
-    local top = header:CreateTexture(nil, "BORDER")
-    top:SetHeight(1)
-    top:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
-    top:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
-    header._krtHeaderTop = top
-
-    local bottom = header:CreateTexture(nil, "BORDER")
-    bottom:SetHeight(1)
-    bottom:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
-    bottom:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
-    header._krtHeaderBottom = bottom
-
-    local left = header:CreateTexture(nil, "BORDER")
-    left:SetWidth(1)
-    left:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
-    left:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
-    header._krtHeaderLeft = left
-
-    local right = header:CreateTexture(nil, "BORDER")
-    right:SetWidth(1)
-    right:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
-    right:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
-    header._krtHeaderRight = right
-
-    header._krtHeaderTab = true
-end
-
-local function styleLoggerHeader(header)
-    if not header then
-        return
-    end
-
-    ensureLoggerHeaderTab(header)
-
-    local text = header.GetFontString and header:GetFontString() or nil
-    if text and text.SetTextColor then
-        text:SetTextColor(1.00, 0.86, 0.20)
-    end
-    if text and text.SetJustifyH then
-        text:SetJustifyH("LEFT")
-    end
-
-    local bg = header.GetName and _G[header:GetName() .. "Bg"] or nil
-    if bg and bg.SetTexture then
-        bg:SetTexture(0.02, 0.02, 0.02, 0.00)
-    end
-
-    setTextureColor(header._krtHeaderFill, 0.015, 0.014, 0.012, 0.88)
-    setTextureColor(header._krtHeaderTop, 0.72, 0.62, 0.38, 0.92)
-    setTextureColor(header._krtHeaderBottom, 0.25, 0.22, 0.16, 0.95)
-    setTextureColor(header._krtHeaderLeft, 0.38, 0.34, 0.24, 0.72)
-    setTextureColor(header._krtHeaderRight, 0.38, 0.34, 0.24, 0.72)
-end
-
-local function styleLoggerPanel(frameName)
-    local frame = frameName and _G[frameName] or nil
-    if not frame then
-        return
-    end
-
-    if frame.SetBackdropColor then
-        frame:SetBackdropColor(0.01, 0.01, 0.01, 0.88)
-    end
-    if frame.SetBackdropBorderColor then
-        frame:SetBackdropBorderColor(0.56, 0.52, 0.45, 0.95)
-    end
-
-    local title = _G[frameName .. "Title"]
-    if title then
-        title:SetTextColor(1.00, 0.82, 0.00)
-        title:SetJustifyH("LEFT")
-    end
-
-    for i = 1, #loggerHeaderSuffixes do
-        styleLoggerHeader(_G[frameName .. loggerHeaderSuffixes[i]])
-    end
-end
-
-local function applyLoggerSkin()
-    for i = 1, #loggerPanelNames do
-        styleLoggerPanel(loggerPanelNames[i])
-    end
-end
-
-local function styleLoggerRow(row)
-    if not row then
-        return
-    end
-
-    row._krtRowVisualStyle = "logger"
-    if not row._krtLoggerBg then
-        local bg = row:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints(row)
-        row._krtLoggerBg = bg
-
-        local line = row:CreateTexture(nil, "BORDER")
-        line:SetHeight(1)
-        line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 2, 0)
-        line:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -2, 0)
-        row._krtLoggerLine = line
-    end
-
-    if row._krtLoggerLine then
-        row._krtLoggerLine:SetTexture(0.32, 0.30, 0.25, 0.42)
-    end
-end
-
-local function setLoggerRowIndex(row, index)
-    if not row then
-        return
-    end
-
-    styleLoggerRow(row)
-    local isAlt = index and index % 2 == 0
-    if row._krtLoggerBg then
-        if isAlt then
-            row._krtLoggerBg:SetTexture(0.07, 0.07, 0.07, 0.74)
-        else
-            row._krtLoggerBg:SetTexture(0.025, 0.025, 0.025, 0.76)
-        end
-    end
-end
 
 local SetSelectedRaid
 local deleteSelectedAttendees
@@ -1471,7 +1316,7 @@ do
             local pair = onLoadPairs[i]
             ensureSubmoduleOnLoad(pair.moduleRef, pair.frameRef)
         end
-        applyLoggerSkin()
+        Rows.ApplyLoggerSkin(loggerPanelNames)
         refreshLoggerTabLayout()
     end
 
@@ -1736,7 +1581,9 @@ do
                     UI.Frames.SetScriptSafely(button, "OnClick", function(btn)
                         local parent = btn and btn.GetParent and btn:GetParent() or nil
                         applySelectedLootRollType(parent and parent.lootNid, rollType)
-                        StaticPopup_Hide(ROLLTYPE_POPUP_KEY)
+                        if Popups then
+                            Popups.Hide(ROLLTYPE_POPUP_KEY)
+                        end
                     end)
                 end
                 frame._buttons[i] = button
@@ -1792,16 +1639,16 @@ do
         end
 
         local function ensureRollTypePopup()
-            if not StaticPopupDialogs then
+            if not (Popups and Popups.Define and Popups.IsDefined) then
                 return false
             end
-            if StaticPopupDialogs[ROLLTYPE_POPUP_KEY] then
+            if Popups.IsDefined(ROLLTYPE_POPUP_KEY) then
                 return true
             end
 
             ensureRollTypeInsertedFrame()
 
-            StaticPopupDialogs[ROLLTYPE_POPUP_KEY] = {
+            return Popups.Define(ROLLTYPE_POPUP_KEY, {
                 text = L.StrEditItemRollType,
                 button1 = L.BtnCancel,
                 timeout = 0,
@@ -1832,9 +1679,7 @@ do
                     if self.text then
                         self.text:SetWidth(self:GetWidth() - 36)
                     end
-                    if StaticPopup_Resize then
-                        StaticPopup_Resize(self, self.which)
-                    end
+                    Popups.Resize(self, self.which)
                     layoutRollTypeInsertedFrame(self, picker)
 
                     picker.lootNid = itemId
@@ -1861,8 +1706,7 @@ do
                         picker:SetParent(UIParent)
                     end
                 end,
-            }
-            return true
+            })
         end
 
         local function openItemRollTypePopup()
@@ -1877,10 +1721,13 @@ do
             end
 
             CloseDropDownMenus()
-            StaticPopup_Show(ROLLTYPE_POPUP_KEY, nil, nil, {
+            Popups.Show(ROLLTYPE_POPUP_KEY, nil, nil, {
                 itemId = lootNid,
             })
         end
+
+        local openItemWinnerPopup
+        local openItemRollValuePopup
 
         local function openItemMenu()
             local f = getItemMenuFrame()
@@ -1889,9 +1736,7 @@ do
                 {
                     text = L.StrEditItemLooter,
                     notCheckable = 1,
-                    func = function()
-                        StaticPopup_Show("KRTLOGGER_ITEM_EDIT_WINNER")
-                    end,
+                    func = openItemWinnerPopup,
                 },
                 {
                     text = L.StrEditItemRollType,
@@ -1901,9 +1746,7 @@ do
                 {
                     text = L.StrEditItemRollValue,
                     notCheckable = 1,
-                    func = function()
-                        StaticPopup_Show("KRTLOGGER_ITEM_EDIT_VALUE")
-                    end,
+                    func = openItemRollValuePopup,
                 },
             }, f, "cursor", 0, 0, "MENU")
         end
@@ -1967,24 +1810,34 @@ do
             return true, value
         end
 
-        UI.Popups.DefineEditBox("KRTLOGGER_ITEM_EDIT_WINNER", L.StrEditItemLooterHelp, function(self, text)
-            local winner, err = Actions:ResolveLootEditWinner(self.raidId, self.lootNid, text)
-            if not winner then
-                addon:error(err or L.ErrLoggerWinnerEmpty)
+        openItemWinnerPopup = function()
+            if not Popups then
                 return
             end
+            Popups.ShowEditBox("KRTLOGGER_ITEM_EDIT_WINNER", L.StrEditItemLooterHelp, function(self, text)
+                local winner, err = Actions:ResolveLootEditWinner(self.raidId, self.lootNid, text)
+                if not winner then
+                    addon:error(err or L.ErrLoggerWinnerEmpty)
+                    return
+                end
 
-            setLootEntry(self.lootNid, winner, nil, nil, "LOGGER_EDIT_WINNER")
-        end, function(self)
-            self.raidId = module.selectedRaid
-            self.lootNid = module.selectedItem
-        end)
+                setLootEntry(self.lootNid, winner, nil, nil, "LOGGER_EDIT_WINNER")
+            end, function(self)
+                self.raidId = module.selectedRaid
+                self.lootNid = module.selectedItem
+            end)
+        end
 
-        UI.Popups.DefineEditBox("KRTLOGGER_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp, function(self, text)
-            setLootEntry(self.lootNid, nil, nil, text, "LOGGER_EDIT_ROLLVALUE")
-        end, function(self)
-            self.lootNid = module.selectedItem
-        end, validateRollValue)
+        openItemRollValuePopup = function()
+            if not Popups then
+                return
+            end
+            Popups.ShowEditBox("KRTLOGGER_ITEM_EDIT_VALUE", L.StrEditItemRollValueHelp, function(self, text)
+                setLootEntry(self.lootNid, nil, nil, text, "LOGGER_EDIT_ROLLVALUE")
+            end, function(self)
+                self.lootNid = module.selectedItem
+            end, validateRollValue)
+        end
     end
 end
 
@@ -2003,7 +1856,7 @@ local function makeLoggerList(cfg, selField, msCtxField, hlOpts)
         local drawRow = cfg.drawRow
         local rowHeight = cfg.rowHeight or (cfg.poolTag == "logger-loot" and LOGGER_LOOT_ROW_HEIGHT or LOGGER_COMPACT_ROW_HEIGHT)
         cfg.drawRow = function(row, it, visibleIndex)
-            setLoggerRowIndex(row, visibleIndex)
+            Rows.SetLoggerRowIndex(row, visibleIndex)
             if row.SetHeight then
                 row:SetHeight(rowHeight)
             end
@@ -2273,12 +2126,10 @@ do
 
         function confirmDeleteSelectedRaids(btn)
             local ctx = module._msRaidCtx
-            if btn and UI.Selection.GetCount(ctx) > 0 then
-                StaticPopup_Show("KRTLOGGER_DELETE_RAID")
+            if btn and UI.Selection.GetCount(ctx) > 0 and Popups then
+                Popups.ShowConfirm("KRTLOGGER_DELETE_RAID", L.StrConfirmDeleteRaid, deleteRaids)
             end
         end
-
-        UI.Popups.DefineConfirm("KRTLOGGER_DELETE_RAID", L.StrConfirmDeleteRaid, deleteRaids)
     end
 
     Bus.RegisterCallback(InternalEvents.RaidCreate, function(_, num)
@@ -2540,12 +2391,10 @@ do
 
         confirmDeleteSelectedBosses = function()
             local ctx = module._msBossCtx
-            if UI.Selection.GetCount(ctx) > 0 then
-                StaticPopup_Show("KRTLOGGER_DELETE_BOSS")
+            if UI.Selection.GetCount(ctx) > 0 and Popups then
+                Popups.ShowConfirm("KRTLOGGER_DELETE_BOSS", L.StrConfirmDeleteBoss, deleteBosses)
             end
         end
-
-        UI.Popups.DefineConfirm("KRTLOGGER_DELETE_BOSS", L.StrConfirmDeleteBoss, deleteBosses)
     end
 
     Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function()
@@ -2685,12 +2534,10 @@ do
 
         function confirmDeleteSelectedBossAttendees()
             local ctx = module._msBossAttCtx
-            if UI.Selection.GetCount(ctx) > 0 then
-                StaticPopup_Show("KRTLOGGER_DELETE_ATTENDEE")
+            if UI.Selection.GetCount(ctx) > 0 and Popups then
+                Popups.ShowConfirm("KRTLOGGER_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, deleteSelectedBossAttendees)
             end
         end
-
-        UI.Popups.DefineConfirm("KRTLOGGER_DELETE_ATTENDEE", L.StrConfirmDeleteAttendee, deleteSelectedBossAttendees)
     end
 
     local refreshEvents = {
@@ -2883,12 +2730,10 @@ do
 
         function confirmDeleteSelectedRaidAttendees()
             local ctx = module._msRaidAttCtx
-            if UI.Selection.GetCount(ctx) > 0 then
-                StaticPopup_Show("KRTLOGGER_DELETE_RAIDATTENDEE")
+            if UI.Selection.GetCount(ctx) > 0 and Popups then
+                Popups.ShowConfirm("KRTLOGGER_DELETE_RAIDATTENDEE", L.StrConfirmDeleteAttendee, deleteSelectedRaidAttendees)
             end
         end
-
-        UI.Popups.DefineConfirm("KRTLOGGER_DELETE_RAIDATTENDEE", L.StrConfirmDeleteAttendee, deleteSelectedRaidAttendees)
     end
 
     Bus.RegisterCallback(InternalEvents.LoggerSelectRaid, function()
@@ -3219,12 +3064,10 @@ do
         end
 
         confirmDeleteSelectedLootItems = function()
-            if UI.Selection.GetCount(module._msLootCtx) > 0 then
-                StaticPopup_Show("KRTLOGGER_DELETE_ITEM")
+            if UI.Selection.GetCount(module._msLootCtx) > 0 and Popups then
+                Popups.ShowConfirm("KRTLOGGER_DELETE_ITEM", L.StrConfirmDeleteItem, deleteItem)
             end
         end
-
-        UI.Popups.DefineConfirm("KRTLOGGER_DELETE_ITEM", L.StrConfirmDeleteItem, deleteItem)
     end
 
     local function resolveLoggerLootRaidId(source, raidIDOverride)
@@ -3804,7 +3647,7 @@ local function initializeRaidAttendanceFrame()
         attendancePlayersController:OnLoad(attendanceUi.refs.raidAttendees)
         attendanceBossesController:OnLoad(attendanceUi.refs.bosses)
 
-        applyLoggerSkin()
+        Rows.ApplyLoggerSkin(loggerPanelNames)
         refreshRaidAttendanceLayout()
         attendanceUi.Bound = true
         return frame

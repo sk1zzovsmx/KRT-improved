@@ -9,9 +9,10 @@ local feature = addon.Database.GetFeatureShared()
 
 local floor = math.floor
 local strmatch = string.match
-local tonumber, type = tonumber, type
+local tostring, tonumber, type = tostring, tonumber, type
 
 local UI = feature.UI or {}
+local Colors = feature.Colors
 local Effects = UI.Effects
 
 local Primitives = UI.Primitives or {}
@@ -21,8 +22,31 @@ local Rows = UI.Rows or {}
 UI.Rows = Rows
 
 -- ----- Internal state ----- --
+local LOGGER_HEADER_TAB_INSET = 1
+local loggerHeaderSuffixes = {
+    "HeaderNum",
+    "HeaderDate",
+    "HeaderZone",
+    "HeaderSize",
+    "HeaderName",
+    "HeaderTime",
+    "HeaderMode",
+    "HeaderJoin",
+    "HeaderLeave",
+    "HeaderItem",
+    "HeaderSource",
+    "HeaderWinner",
+    "HeaderType",
+    "HeaderRoll",
+}
 
 -- ----- Private helpers ----- --
+local function setTextureColor(texture, r, g, b, a)
+    if texture and texture.SetTexture then
+        texture:SetTexture(r, g, b, a)
+    end
+end
+
 local function ensureRowTextures(row)
     if not row or row._krtSelTex then
         return
@@ -52,6 +76,70 @@ end
 
 local function isLoggerRow(row)
     return row and row._krtRowVisualStyle == "logger"
+end
+
+local function ensureLoggerHeaderTab(header)
+    if not header or header._krtHeaderTab then
+        return
+    end
+
+    local fill = header:CreateTexture(nil, "BACKGROUND")
+    fill:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
+    fill:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+    header._krtHeaderFill = fill
+
+    local top = header:CreateTexture(nil, "BORDER")
+    top:SetHeight(1)
+    top:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
+    top:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
+    header._krtHeaderTop = top
+
+    local bottom = header:CreateTexture(nil, "BORDER")
+    bottom:SetHeight(1)
+    bottom:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
+    bottom:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+    header._krtHeaderBottom = bottom
+
+    local left = header:CreateTexture(nil, "BORDER")
+    left:SetWidth(1)
+    left:SetPoint("TOPLEFT", header, "TOPLEFT", LOGGER_HEADER_TAB_INSET, -1)
+    left:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", LOGGER_HEADER_TAB_INSET, 1)
+    header._krtHeaderLeft = left
+
+    local right = header:CreateTexture(nil, "BORDER")
+    right:SetWidth(1)
+    right:SetPoint("TOPRIGHT", header, "TOPRIGHT", -LOGGER_HEADER_TAB_INSET, -1)
+    right:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -LOGGER_HEADER_TAB_INSET, 1)
+    header._krtHeaderRight = right
+
+    header._krtHeaderTab = true
+end
+
+local function styleLoggerHeader(header)
+    if not header then
+        return
+    end
+
+    ensureLoggerHeaderTab(header)
+
+    local text = header.GetFontString and header:GetFontString() or nil
+    if text and text.SetTextColor then
+        text:SetTextColor(1.00, 0.86, 0.20)
+    end
+    if text and text.SetJustifyH then
+        text:SetJustifyH("LEFT")
+    end
+
+    local bg = header.GetName and _G[header:GetName() .. "Bg"] or nil
+    if bg and bg.SetTexture then
+        bg:SetTexture(0.02, 0.02, 0.02, 0.00)
+    end
+
+    setTextureColor(header._krtHeaderFill, 0.015, 0.014, 0.012, 0.88)
+    setTextureColor(header._krtHeaderTop, 0.72, 0.62, 0.38, 0.92)
+    setTextureColor(header._krtHeaderBottom, 0.25, 0.22, 0.16, 0.95)
+    setTextureColor(header._krtHeaderLeft, 0.38, 0.34, 0.24, 0.72)
+    setTextureColor(header._krtHeaderRight, 0.38, 0.34, 0.24, 0.72)
 end
 
 local function getNamedFramePart(frameName, suffix)
@@ -90,6 +178,26 @@ local function alignToPixel(value, pixelScale)
         scale = 1
     end
     return floor((tonumber(value) or 0) * scale + 0.5) / scale
+end
+
+local function getMasterRollRowRefs(row)
+    if not row then
+        return nil
+    end
+    if row._p then
+        return row._p
+    end
+    local Frames = UI.Frames
+    if Frames and Frames.GetNamedParts then
+        return Frames.GetNamedParts(row, {
+            name = "Name",
+            roll = "Roll",
+            counter = "Counter",
+            info = "Info",
+            star = "Star",
+        })
+    end
+    return nil
 end
 
 -- ----- Public methods ----- --
@@ -263,8 +371,136 @@ function Rows.SetFocused(row, cond)
     end
 end
 
+function Rows.StyleLoggerRow(row)
+    if not row then
+        return
+    end
+
+    row._krtRowVisualStyle = "logger"
+    if not row._krtLoggerBg then
+        local bg = row:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints(row)
+        row._krtLoggerBg = bg
+    end
+    if not row._krtLoggerLine then
+        local line = row:CreateTexture(nil, "BORDER")
+        line:SetHeight(1)
+        line:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 2, 0)
+        line:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -2, 0)
+        row._krtLoggerLine = line
+    end
+
+    if row._krtLoggerLine then
+        row._krtLoggerLine:SetTexture(0.32, 0.30, 0.25, 0.42)
+    end
+end
+
+function Rows.SetLoggerRowIndex(row, index)
+    if not row then
+        return
+    end
+
+    Rows.StyleLoggerRow(row)
+    row._krtLoggerRowIndex = index
+    if row._krtLoggerBg then
+        if (tonumber(index) or 0) % 2 == 0 then
+            row._krtLoggerBg:SetTexture(0.07, 0.07, 0.07, 0.74)
+        else
+            row._krtLoggerBg:SetTexture(0.025, 0.025, 0.025, 0.76)
+        end
+    end
+end
+
+function Rows.StyleLoggerPanel(frameName)
+    local frame = frameName and _G[frameName] or nil
+    if not frame then
+        return
+    end
+
+    if frame.SetBackdropColor then
+        frame:SetBackdropColor(0.01, 0.01, 0.01, 0.88)
+    end
+    if frame.SetBackdropBorderColor then
+        frame:SetBackdropBorderColor(0.56, 0.52, 0.45, 0.95)
+    end
+
+    local title = _G[frameName .. "Title"]
+    if title then
+        title:SetTextColor(1.00, 0.82, 0.00)
+        title:SetJustifyH("LEFT")
+    end
+
+    for i = 1, #loggerHeaderSuffixes do
+        styleLoggerHeader(_G[frameName .. loggerHeaderSuffixes[i]])
+    end
+end
+
+function Rows.ApplyLoggerSkin(panelNames)
+    if type(panelNames) ~= "table" then
+        return
+    end
+    for i = 1, #panelNames do
+        Rows.StyleLoggerPanel(panelNames[i])
+    end
+end
+
+function Rows.DrawMasterRollRow(row, data, onClick)
+    if not row or not data then
+        return
+    end
+
+    if onClick and not row.krtHasOnClick then
+        local Frames = UI.Frames
+        if Frames and Frames.SetScriptSafely then
+            Frames.SetScriptSafely(row, "OnClick", onClick)
+        elseif row.SetScript then
+            row:SetScript("OnClick", onClick)
+        end
+        row.krtHasOnClick = true
+    end
+
+    row.playerName = data.name
+    if row.EnableMouse then
+        row:EnableMouse(data.canClick == true)
+    end
+
+    local ui = getMasterRollRowRefs(row)
+    local nameStr = ui and (ui.name or ui.Name) or nil
+    local rollStr = ui and (ui.roll or ui.Roll) or nil
+    local counterStr = ui and (ui.counter or ui.Counter) or nil
+    local infoStr = ui and (ui.info or ui.Info) or nil
+    local star = ui and (ui.star or ui.Star) or nil
+
+    if nameStr then
+        local class = data.class or "UNKNOWN"
+        if data.isReserved then
+            nameStr:SetVertexColor(0.4, 0.6, 1.0)
+        else
+            local r, g, b = Colors.GetClassColor(class)
+            nameStr:SetVertexColor(r, g, b)
+        end
+        nameStr:SetText(data.displayName or data.name or "")
+        nameStr:Show()
+    end
+
+    if rollStr then
+        rollStr:SetText(tostring(data.roll or ""))
+        rollStr:Show()
+    end
+    if counterStr then
+        counterStr:SetText(data.counterText or "")
+        counterStr:Show()
+    end
+    if infoStr then
+        infoStr:SetText(data.infoText or "")
+        infoStr:Show()
+    end
+
+    Primitives.SetShown(star, data.showStar == true)
+end
+
 local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
-    registry.AddModule("Modules/UI/Visuals", { deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Effects" } })
+    registry.AddModule("Modules/UI/Visuals", { deps = { "Init", "Modules/ModuleRegistry", "Modules/Colors", "Modules/UI/Effects" } })
     registry.SetLoaded("Modules/UI/Visuals")
 end

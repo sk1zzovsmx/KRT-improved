@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Raid loot-method automation APIs
--- events: listens forwarded PLAYER_TARGET_CHANGED through Master; shows StaticPopup confirmation
+-- events: listens forwarded PLAYER_TARGET_CHANGED through Master; emits RequestGroupLootRestorePrompt
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
@@ -18,7 +18,6 @@ local tostring, tonumber, type = tostring, tonumber, type
 local GetTime = GetTime
 local GetLootMethod = GetLootMethod
 local SetLootMethod = SetLootMethod
-local StaticPopup_Show = StaticPopup_Show
 local UnitExists = UnitExists
 local UnitGUID = UnitGUID
 local UnitInRaid = UnitInRaid
@@ -29,7 +28,6 @@ local AUTO_MASTER_LOOT_COOLDOWN_SECONDS = 3
 local DEFAULT_AUTO_MASTER_LOOT_NOTICE_SECONDS = 1.25
 local MIN_AUTO_MASTER_LOOT_NOTICE_SECONDS = 0.1
 local MAX_AUTO_MASTER_LOOT_NOTICE_SECONDS = 5
-local GROUP_LOOT_RESTORE_POPUP_KEY = "KRT_CONFIRM_GROUP_LOOT_RESTORE"
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Raid")
@@ -123,28 +121,6 @@ local function getTargetBossInfo(allowDead)
     }
 end
 
-local function ensureGroupLootRestorePopup()
-    if type(StaticPopupDialogs) ~= "table" then
-        return false
-    end
-    if StaticPopupDialogs[GROUP_LOOT_RESTORE_POPUP_KEY] then
-        return true
-    end
-
-    StaticPopupDialogs[GROUP_LOOT_RESTORE_POPUP_KEY] = {
-        text = L.PopupGroupLootRestoreText,
-        button1 = L.BtnGroupLoot,
-        button2 = L.BtnKeepMasterLoot,
-        OnAccept = function()
-            module:RestoreGroupLoot("popup")
-        end,
-        timeout = 0,
-        whileDead = 1,
-        hideOnEscape = 1,
-    }
-    return true
-end
-
 local function showCenterNotice(message)
     if not message or message == "" then
         return false
@@ -152,6 +128,15 @@ local function showCenterNotice(message)
     local InternalEvents = Events and Events.Internal
     if Bus and Bus.TriggerEvent and InternalEvents and InternalEvents.ScreenNotice then
         Bus.TriggerEvent(InternalEvents.ScreenNotice, message, getAutoMasterLootNoticeSeconds())
+        return true
+    end
+    return false
+end
+
+local function requestGroupLootRestorePrompt()
+    local InternalEvents = Events and Events.Internal
+    if Bus and Bus.TriggerEvent and InternalEvents and InternalEvents.RequestGroupLootRestorePrompt then
+        Bus.TriggerEvent(InternalEvents.RequestGroupLootRestorePrompt)
         return true
     end
     return false
@@ -226,12 +211,11 @@ function module:NotifyLootWindowCleared()
         clearLootWindowPromptState()
         return false
     end
-    if not ensureGroupLootRestorePopup() or type(StaticPopup_Show) ~= "function" then
+    if not requestGroupLootRestorePrompt() then
         return false
     end
 
     state.lootWindowPromptShown = true
-    StaticPopup_Show(GROUP_LOOT_RESTORE_POPUP_KEY)
     return true
 end
 
@@ -260,6 +244,8 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
         deps = {
             "Init",
             "Modules/ModuleRegistry",
+            "Modules/Events",
+            "Modules/Bus",
             "Database/DBOptions",
             "Services/Raid/Capabilities",
         },

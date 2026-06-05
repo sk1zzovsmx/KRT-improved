@@ -94,6 +94,7 @@ local expectedControllers = {
             "Services/Raid/Capabilities",
             "Services/Raid/Roster",
             "Services/Raid/LootRecords",
+            "Services/Raid/LootMethod",
         },
         forbiddenDeps = {
             "Services/Reserves",
@@ -319,7 +320,7 @@ local preRegistryUtilityModules = {
 local directRegistryModules = {
     { name = "Modules/UI/Facade", deps = { "Init", "Modules/ModuleRegistry" } },
     { name = "Modules/UI/Effects", deps = { "Init", "Modules/ModuleRegistry" } },
-    { name = "Modules/UI/Visuals", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Effects" } },
+    { name = "Modules/UI/Visuals", deps = { "Init", "Modules/ModuleRegistry", "Modules/Colors", "Modules/UI/Effects" } },
     { name = "Modules/UI/Frames", deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Strings" } },
     { name = "Modules/UI/ListController", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames", "Modules/UI/Visuals" } },
     { name = "Modules/UI/MultiSelect", deps = { "Init", "Modules/ModuleRegistry" } },
@@ -483,6 +484,17 @@ local expectedRaidServices = {
         deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Item", "Modules/Strings", "Services/Raid/Counts" },
     },
     { name = "Services/Raid/Session", deps = { "Init", "Modules/ModuleRegistry" } },
+    {
+        name = "Services/Raid/LootMethod",
+        deps = {
+            "Init",
+            "Modules/ModuleRegistry",
+            "Modules/Events",
+            "Modules/Bus",
+            "Database/DBOptions",
+            "Services/Raid/Capabilities",
+        },
+    },
 }
 
 local expectedRollServices = {
@@ -624,6 +636,7 @@ local moduleTocPaths = {
     ["Services/Raid/Attendance"] = "Services\\Raid\\Attendance.lua",
     ["Services/Raid/LootRecords"] = "Services\\Raid\\LootRecords.lua",
     ["Services/Raid/Session"] = "Services\\Raid\\Session.lua",
+    ["Services/Raid/LootMethod"] = "Services\\Raid\\LootMethod.lua",
     ["Services/Rolls/Countdown"] = "Services\\Rolls\\Countdown.lua",
     ["Services/Rolls/Sessions"] = "Services\\Rolls\\Sessions.lua",
     ["Services/Rolls/History"] = "Services\\Rolls\\History.lua",

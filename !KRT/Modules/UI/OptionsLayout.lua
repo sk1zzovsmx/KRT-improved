@@ -11,7 +11,7 @@ local Frames = UI.Frames
 
 local _G = _G
 
-local type, tonumber = type, tonumber
+local pairs, type, tonumber = pairs, type, tonumber
 local max = math.max
 
 local Layout = UI.Layout or {}
@@ -303,7 +303,88 @@ local function applyRow(frame, row, cfg, cursorY)
     return cursorY - numberOrDefault(height, 0) - rowGap(row, cfg)
 end
 
+local function copyRow(base, attrs)
+    local row = {}
+    for key, value in pairs(base or {}) do
+        row[key] = value
+    end
+    for key, value in pairs(attrs or {}) do
+        row[key] = value
+    end
+    return row
+end
+
 -- ----- Public methods ----- --
+function Layout.TextRow(title, body, attrs)
+    return copyRow({
+        type = "text",
+        title = title,
+        body = body,
+    }, attrs)
+end
+
+function Layout.CheckRow(prefix, attrs)
+    return copyRow({
+        type = "check",
+        check = prefix,
+        label = prefix .. "Str",
+        desc = prefix .. "Desc",
+    }, attrs)
+end
+
+function Layout.SliderRow(prefix, control, attrs)
+    return copyRow({
+        type = "slider",
+        title = prefix .. "Str",
+        desc = prefix .. "Desc",
+        control = control or prefix,
+    }, attrs)
+end
+
+function Layout.CommandRow(prefix, button, attrs)
+    return copyRow({
+        type = "command",
+        title = prefix .. "Title",
+        desc = prefix .. "Desc",
+        button = button or (prefix .. "Btn"),
+    }, attrs)
+end
+
+function Layout.EditCommandRow(prefix, editBox, button, attrs)
+    return copyRow({
+        type = "editCommand",
+        title = prefix .. "Title",
+        desc = prefix .. "Desc",
+        editBox = editBox or (prefix .. "EditBox"),
+        button = button or (prefix .. "Btn"),
+    }, attrs)
+end
+
+function Layout.EditRow(prefix, editBox, attrs)
+    return copyRow({
+        type = "edit",
+        title = prefix .. "Str",
+        desc = prefix .. "Desc",
+        editBox = editBox or (prefix .. "EditBox"),
+    }, attrs)
+end
+
+function Layout.DropDownRow(prefix, dropdown, attrs)
+    return copyRow({
+        type = "dropdown",
+        title = prefix .. "Title",
+        desc = prefix .. "Desc",
+        dropdown = dropdown or (prefix .. "DropDown"),
+    }, attrs)
+end
+
+function Layout.ButtonRow(buttons, attrs)
+    return copyRow({
+        type = "buttonRow",
+        buttons = buttons,
+    }, attrs)
+end
+
 function Layout.ApplyRows(frameOrName, rows, cfg)
     local frame = resolveFrame(frameOrName)
     if not (frame and type(rows) == "table") then

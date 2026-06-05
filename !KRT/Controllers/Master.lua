@@ -10,6 +10,9 @@ local L = feature.L
 local Diag = feature.Diag
 
 local UI = feature.UI
+local Primitives = UI.Primitives
+local Rows = UI.Rows
+local Popups = UI.Popups
 local Item = feature.Item
 local Colors = feature.Colors
 local Comms = feature.Comms
@@ -376,7 +379,7 @@ do
         return UI.Selection.GetCount(ROLL_WINNERS_CTX) or 0
     end
 
-    local buildRollUiModel, selectRollWinnerRow, getRollRowRefs
+    local buildRollUiModel, selectRollWinnerRow
 
     local function applyRollWinnerSelection(name, pickMode, maxSel)
         local isMulti
@@ -926,68 +929,14 @@ do
         return nil
     end
 
-    Private.ShowHideFrame = function(frame, shown)
-        local primitives = UI.Primitives
-        if primitives and primitives.SetShown then
-            primitives.SetShown(frame, shown)
-            return
-        end
-        if not frame then
-            return
-        end
-        if shown and frame.Show then
-            frame:Show()
-        elseif not shown and frame.Hide then
-            frame:Hide()
+    local function onRollRowClick(self)
+        if selectRollWinnerRow(self.playerName) then
+            module:RequestRefresh()
         end
     end
 
     local function drawRollRow(row, data)
-        if not row.krtHasOnClick then
-            UI.Frames.SetScriptSafely(row, "OnClick", function(self)
-                if selectRollWinnerRow(self.playerName) then
-                    module:RequestRefresh()
-                end
-            end)
-            row.krtHasOnClick = true
-        end
-
-        row.playerName = data.name
-        row:EnableMouse(data.canClick == true)
-
-        local ui = getRollRowRefs(row)
-        local nameStr = ui and ui.name or nil
-        local rollStr = ui and ui.roll or nil
-        local counterStr = ui and ui.counter or nil
-        local infoStr = ui and ui.info or nil
-        local star = ui and ui.star or nil
-
-        if nameStr then
-            local class = data.class or "UNKNOWN"
-            if data.isReserved then
-                nameStr:SetVertexColor(0.4, 0.6, 1.0)
-            else
-                local r, g, b = Colors.GetClassColor(class)
-                nameStr:SetVertexColor(r, g, b)
-            end
-            nameStr:SetText(data.displayName or data.name or "")
-            nameStr:Show()
-        end
-
-        if rollStr then
-            rollStr:SetText(tostring(data.roll or ""))
-            rollStr:Show()
-        end
-        if counterStr then
-            counterStr:SetText(data.counterText or "")
-            counterStr:Show()
-        end
-        if infoStr then
-            infoStr:SetText(data.infoText or "")
-            infoStr:Show()
-        end
-
-        Private.ShowHideFrame(star, data.showStar == true)
+        Rows.DrawMasterRollRow(row, data, onRollRowClick)
     end
 
     Private.RenderRollRowsFallback = function(frameName)
@@ -1965,7 +1914,7 @@ do
         local function updateEnabled(key, frame, enabled)
             enabled = enabled and true or false
             if buttons[key] ~= enabled then
-                UI.Primitives.SetEnabled(frame, enabled)
+                Primitives.SetEnabled(frame, enabled)
                 buttons[key] = enabled
             end
         end
@@ -1978,7 +1927,7 @@ do
                 token = "0"
             end
             if glows[key] ~= token then
-                UI.Primitives.SetButtonGlow(frame, enabled, r, g, b, style)
+                Primitives.SetButtonGlow(frame, enabled, r, g, b, style)
                 glows[key] = token
             end
         end
@@ -1986,7 +1935,7 @@ do
         local function updateItemState(enabled)
             local itemBtn = getNamedPart("ItemBtn")
             if itemBtn and buttons.itemBtn ~= enabled then
-                UI.Primitives.SetEnabled(itemBtn, enabled)
+                Primitives.SetEnabled(itemBtn, enabled)
                 local texture = itemBtn:GetNormalTexture()
                 if texture and texture.SetDesaturated then
                     texture:SetDesaturated(not enabled)
@@ -2884,7 +2833,7 @@ do
                 Loot:FetchLoot()
             end
         elseif selectionFrame then
-            UI.Primitives.Toggle(selectionFrame)
+            Primitives.Toggle(selectionFrame)
         end
         module:RequestRefresh()
     end
@@ -3290,16 +3239,6 @@ do
             dirtyFlags.buttons = true
         end
         return record, canRoll, rolled
-    end
-
-    getRollRowRefs = function(btn)
-        return UI.Frames.GetNamedParts(btn, {
-            name = "Name",
-            roll = "Roll",
-            counter = "Counter",
-            info = "Info",
-            star = "Star",
-        })
     end
 
     local function flagButtonsOnChange(key, value)
@@ -4481,6 +4420,14 @@ do
     -- Bus callbacks
     -- ============================================================================
     do
+        local GROUP_LOOT_RESTORE_POPUP_KEY = "KRT_CONFIRM_GROUP_LOOT_RESTORE"
+
+        local function restoreGroupLootFromPopup()
+            if Raid and Raid.RestoreGroupLoot then
+                Raid:RestoreGroupLoot("popup")
+            end
+        end
+
         local function registerWowForwarded(methodName)
             Bus.RegisterCallback(Events.GetWowForwarded and Events.GetWowForwarded(methodName), function(_, ...)
                 local fn = module[methodName]
@@ -4498,6 +4445,15 @@ do
         registerWowForwarded("TRADE_ACCEPT_UPDATE")
         registerWowForwarded("TRADE_REQUEST_CANCEL")
         registerWowForwarded("TRADE_CLOSED")
+
+        Bus.RegisterCallback(InternalEvents.RequestGroupLootRestorePrompt, function()
+            if Popups and Popups.ShowConfirm then
+                Popups.ShowConfirm(GROUP_LOOT_RESTORE_POPUP_KEY, L.PopupGroupLootRestoreText, restoreGroupLootFromPopup, GROUP_LOOT_RESTORE_POPUP_KEY, {
+                    button1 = L.BtnGroupLoot,
+                    button2 = L.BtnKeepMasterLoot,
+                })
+            end
+        end)
     end
 
     Bus.RegisterCallback(InternalEvents.SetItem, function(_, itemLink, itemData)
@@ -4598,6 +4554,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Services/Raid/Capabilities",
             "Services/Raid/Roster",
             "Services/Raid/LootRecords",
+            "Services/Raid/LootMethod",
         },
     })
     registry.SetLoaded("Controllers/Master")

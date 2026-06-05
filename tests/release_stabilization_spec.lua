@@ -1131,6 +1131,22 @@ local function newHarness()
         EnsureVisuals = function() end,
         SetSelected = function() end,
         SetFocused = function() end,
+        DrawMasterRollRow = function(row, data, onClick)
+            if not row or not data then
+                return
+            end
+            row.playerName = data.name
+            if row.EnableMouse then
+                row:EnableMouse(data.canClick == true)
+            end
+            if type(onClick) == "function" then
+                if row.SetScript then
+                    row:SetScript("OnClick", onClick)
+                else
+                    row.OnClick = onClick
+                end
+            end
+        end,
     }
 
     addon.Comms = {
@@ -3503,12 +3519,12 @@ test("auto master loot and group loot restore default off", function()
     _G.UnitName = function(unit)
         return unit == "player" and "Tester" or nil
     end
-    h.addon.BossIDs = {
+    h.feature.BossIDs = {
         BossIDs = {
             [15956] = true,
         },
     }
-    h.addon.GetCreatureId = function()
+    h.feature.GetCreatureId = function()
         return 15956
     end
     h:setRaidRoleState({
@@ -3526,6 +3542,72 @@ test("auto master loot and group loot restore default off", function()
     assertEqual(masterCfg:GetDefaults().askGroupLootAfterBossLoot, false, "expected Group Loot restore default contract to be off")
     assertEqual(h.addon.Services.Raid:HandleAutoMasterLootTargetChanged(), false, "expected default-off Auto Master Loot to stay inert")
     assertEqual(#setLootMethodCalls, 0, "expected default-off Auto Master Loot not to call SetLootMethod")
+end)
+
+test("group loot restore prompt is emitted through the master ui event", function()
+    local h = newHarness()
+    local lootMethod = "master"
+    local promptCount = 0
+    local popupCount = 0
+
+    _G.GetLootMethod = function()
+        return lootMethod
+    end
+    _G.SetLootMethod = function(method)
+        lootMethod = method
+    end
+    _G.StaticPopup_Show = function()
+        popupCount = popupCount + 1
+    end
+    _G.UnitExists = function(unit)
+        return unit == "target"
+    end
+    _G.UnitGUID = function(unit)
+        return unit == "target" and "Creature-0-0-0-0-15956-0000000000" or nil
+    end
+    _G.UnitInRaid = function(unit)
+        return unit == "player"
+    end
+    _G.UnitIsDead = function()
+        return true
+    end
+    _G.UnitName = function(unit)
+        return unit == "player" and "Tester" or "Anub'Rekhan"
+    end
+    h.addon.IsInRaid = function()
+        return true
+    end
+    h.Database.GetUnitRank = function(unit)
+        return unit == "player" and 2 or 0
+    end
+    h.feature.BossIDs = {
+        BossIDs = {
+            [15956] = true,
+        },
+    }
+    h.feature.GetCreatureId = function()
+        return 15956
+    end
+    h:setRaidRoleState({
+        isLeader = true,
+        isMasterLooter = true,
+        inRaid = true,
+    })
+
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+    local masterCfg = h.addon.Options.Get("Master")
+    masterCfg:Set("askGroupLootAfterBossLoot", true)
+    h.Bus.RegisterCallback(h.addon.Events.Internal.RequestGroupLootRestorePrompt, function()
+        promptCount = promptCount + 1
+    end)
+
+    assertEqual(Raid:NotifyLootWindowOpened(), true, "expected boss Master Loot window to arm restore prompt")
+    assertEqual(Raid:NotifyLootWindowCleared(), true, "expected cleared boss loot to request restore prompt")
+    assertEqual(promptCount, 1, "expected service to publish the UI-owned restore prompt event")
+    assertEqual(popupCount, 0, "expected service not to call StaticPopup_Show directly")
+    assertEqual(Raid:NotifyLootWindowCleared(), false, "expected prompt request to stay single-shot")
+    assertEqual(promptCount, 1, "expected duplicate cleared notifications not to publish another prompt")
 end)
 
 test("raid roster update preserves previous names for temporary unknown units", function()

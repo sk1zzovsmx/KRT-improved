@@ -31,7 +31,7 @@ local expectedModules = {
     {
         name = "Modules/UI/Visuals",
         path = "!KRT/Modules/UI/Visuals.lua",
-        deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Effects" },
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Colors", "Modules/UI/Effects" },
     },
     {
         name = "Modules/UI/Frames",
@@ -181,6 +181,7 @@ assert(not multiSelectSource:find("addon and addon.State and addon.State.debugEn
 
 local visualsSource = read("!KRT/Modules/UI/Visuals.lua")
 assertContains(visualsSource, "local Effects = UI.Effects", "Visuals must localize UI effects from UI root")
+assertContains(visualsSource, "local Colors = feature.Colors", "Visuals must localize shared class colors for row rendering")
 assert(not visualsSource:find("addon.UIEffects", 1, true), "Visuals must not read UI effects from addon root")
 
 local optionsLayoutSource = read("!KRT/Modules/UI/OptionsLayout.lua")

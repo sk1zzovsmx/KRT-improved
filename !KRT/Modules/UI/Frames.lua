@@ -159,21 +159,70 @@ function Frames.EnableDrag(frame, dragButton)
     frame:RegisterForDrag(dragButton or "LeftButton")
 end
 
-function Popups.DefineConfirm(key, text, onAccept, cancels)
-    StaticPopupDialogs[key] = {
+function Popups.DefineConfirm(key, text, onAccept, cancels, options)
+    options = options or {}
+    return Popups.Define(key, {
         text = text,
-        button1 = OKAY,
-        button2 = CANCEL,
+        button1 = options.button1 or OKAY,
+        button2 = options.button2 or CANCEL,
+        button3 = options.button3,
         OnAccept = onAccept,
+        OnCancel = options.onCancel,
         cancels = cancels or key,
         timeout = 0,
         whileDead = 1,
         hideOnEscape = 1,
-    }
+    })
+end
+
+function Popups.Define(key, dialog)
+    if type(StaticPopupDialogs) ~= "table" or type(dialog) ~= "table" then
+        return false
+    end
+    StaticPopupDialogs[key] = dialog
+    return true
+end
+
+function Popups.IsDefined(key)
+    return type(StaticPopupDialogs) == "table" and StaticPopupDialogs[key] ~= nil
+end
+
+function Popups.Show(key, textArg1, textArg2, data)
+    if type(StaticPopup_Show) ~= "function" then
+        return false
+    end
+    StaticPopup_Show(key, textArg1, textArg2, data)
+    return true
+end
+
+function Popups.Hide(key)
+    if type(StaticPopup_Hide) ~= "function" then
+        return false
+    end
+    StaticPopup_Hide(key)
+    return true
+end
+
+function Popups.Resize(dialog, key)
+    if type(StaticPopup_Resize) ~= "function" then
+        return false
+    end
+    StaticPopup_Resize(dialog, key)
+    return true
+end
+
+function Popups.ShowConfirm(key, text, onAccept, cancels, options)
+    if type(StaticPopupDialogs) ~= "table" then
+        return false
+    end
+    if not StaticPopupDialogs[key] then
+        Popups.DefineConfirm(key, text, onAccept, cancels, options)
+    end
+    return Popups.Show(key)
 end
 
 function Popups.DefineEditBox(key, text, onAccept, onShow, validate)
-    StaticPopupDialogs[key] = {
+    return Popups.Define(key, {
         text = text,
         button1 = SAVE,
         button2 = CANCEL,
@@ -205,7 +254,17 @@ function Popups.DefineEditBox(key, text, onAccept, onShow, validate)
             end
             onAccept(self, value)
         end,
-    }
+    })
+end
+
+function Popups.ShowEditBox(key, text, onAccept, onShow, validate)
+    if type(StaticPopupDialogs) ~= "table" then
+        return false
+    end
+    if not StaticPopupDialogs[key] then
+        Popups.DefineEditBox(key, text, onAccept, onShow, validate)
+    end
+    return Popups.Show(key)
 end
 
 function Frames.SetFrameTitle(frameOrName, titleText, titleFormat)

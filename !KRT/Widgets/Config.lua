@@ -388,10 +388,10 @@ do
     local function layoutRootPanel()
         applyOptionsLayout(interfacePanelFrameName, {
             { type = "title", suffix = "Title", gap = 18 },
-            { type = "text", title = "OverviewTitle", body = "OverviewBody", bodyHeight = 46, gap = 18 },
-            { type = "text", title = "WhatTitle", body = "WhatBody", bodyHeight = 58, gap = 18 },
-            { type = "text", title = "HowTitle", body = "HowBody", bodyHeight = 58, gap = 18 },
-            { type = "text", title = "WhyTitle", body = "WhyBody", bodyHeight = 58, gap = 0 },
+            Layout.TextRow("OverviewTitle", "OverviewBody", { bodyHeight = 46, gap = 18 }),
+            Layout.TextRow("WhatTitle", "WhatBody", { bodyHeight = 58, gap = 18 }),
+            Layout.TextRow("HowTitle", "HowBody", { bodyHeight = 58, gap = 18 }),
+            Layout.TextRow("WhyTitle", "WhyBody", { bodyHeight = 58, gap = 0 }),
         }, {
             contentWidth = 440,
             scrollChildWidth = 560,
@@ -418,252 +418,165 @@ do
         }
         for i = 1, #optionSuffixes do
             local suffix = optionSuffixes[i]
-            rows[#rows + 1] = {
-                type = "check",
-                check = suffix,
-                label = suffix .. "Str",
-                desc = suffix .. "Desc",
+            rows[#rows + 1] = Layout.CheckRow(suffix, {
                 descHeight = 22,
                 height = 40,
                 gap = 4,
-            }
+            })
         end
-        rows[#rows + 1] = {
-            type = "edit",
-            title = "autoMasterLootNoticeSecondsStr",
-            desc = "autoMasterLootNoticeSecondsDesc",
-            editBox = "autoMasterLootNoticeSecondsEditBox",
+        rows[#rows + 1] = Layout.EditRow("autoMasterLootNoticeSeconds", "autoMasterLootNoticeSecondsEditBox", {
             descHeight = 22,
             height = 40,
             gap = 10,
-        }
-        rows[#rows + 1] = {
-            type = "slider",
-            title = "countdownDurationStr",
-            desc = "countdownDurationDesc",
-            control = "countdownDuration",
+        })
+        rows[#rows + 1] = Layout.SliderRow("countdownDuration", "countdownDuration", {
             descHeight = 20,
             height = 74,
             gap = 12,
-        }
+        })
         rows[#rows + 1] = { type = "section", suffix = "PresetsTitle", gap = 10 }
-        rows[#rows + 1] = {
-            type = "command",
-            title = "DefaultsPresetTitle",
-            desc = "DefaultsPresetDesc",
-            button = "DefaultsBtn",
+        rows[#rows + 1] = Layout.CommandRow("DefaultsPreset", "DefaultsBtn", {
             descHeight = 34,
             height = 52,
             gap = 4,
-        }
-        rows[#rows + 1] = {
-            type = "command",
-            title = "QuietPresetTitle",
-            desc = "QuietPresetDesc",
-            button = "QuietPresetBtn",
+        })
+        rows[#rows + 1] = Layout.CommandRow("QuietPreset", "QuietPresetBtn", {
             descHeight = 34,
             height = 52,
             gap = 4,
-        }
-        rows[#rows + 1] = {
-            type = "command",
-            title = "StandardPresetTitle",
-            desc = "StandardPresetDesc",
-            button = "StandardPresetBtn",
+        })
+        rows[#rows + 1] = Layout.CommandRow("StandardPreset", "StandardPresetBtn", {
             descHeight = 34,
             height = 52,
             gap = 4,
-        }
-        rows[#rows + 1] = {
-            type = "command",
-            title = "VerbosePresetTitle",
-            desc = "VerbosePresetDesc",
-            button = "VerbosePresetBtn",
+        })
+        rows[#rows + 1] = Layout.CommandRow("VerbosePreset", "VerbosePresetBtn", {
             descHeight = 34,
             height = 52,
             gap = 10,
-        }
-        rows[#rows + 1] = {
-            type = "text",
-            title = "AnnouncementPreviewTitle",
-            body = "AnnouncementPreviewBody",
+        })
+        rows[#rows + 1] = Layout.TextRow("AnnouncementPreviewTitle", "AnnouncementPreviewBody", {
             bodyHeight = 88,
             gap = 0,
-        }
+        })
         applyOptionsLayout(masterLootContentFrameName, rows, getOptionsPanelLayoutCfg())
     end
 
     local function layoutLootHistoryPanel()
         applyOptionsLayout(lootHistoryContentFrameName, {
             { type = "title", suffix = "Title", gap = 16 },
-            { type = "text", title = "ReportTitle", body = "ReportSummary", bodyHeight = 116, gap = 16 },
+            Layout.TextRow("ReportTitle", "ReportSummary", { bodyHeight = 116, gap = 16 }),
             { type = "section", suffix = "SyncTitle", gap = 10 },
-            {
-                type = "check",
+            Layout.CheckRow("PersistentSync", {
                 check = "PersistentSyncCheck",
-                label = "PersistentSyncStr",
-                desc = "PersistentSyncDesc",
                 height = 42,
                 gap = 6,
-            },
-            {
-                type = "check",
+            }),
+            Layout.CheckRow("IgnoreGroupLoot", {
                 check = "IgnoreGroupLootCheck",
-                label = "IgnoreGroupLootStr",
-                desc = "IgnoreGroupLootDesc",
                 height = 42,
                 gap = 6,
-            },
-            {
-                type = "check",
+            }),
+            Layout.CheckRow("IgnoreSelectionThreshold", {
                 check = "IgnoreSelectionThresholdCheck",
-                label = "IgnoreSelectionThresholdStr",
-                desc = "IgnoreSelectionThresholdDesc",
                 height = 42,
                 gap = 8,
-            },
-            {
-                type = "dropdown",
-                title = "LoggerLootQualityTitle",
-                desc = "LoggerLootQualityDesc",
-                dropdown = "LoggerLootQualityDropDown",
+            }),
+            Layout.DropDownRow("LoggerLootQuality", "LoggerLootQualityDropDown", {
                 descHeight = 34,
                 height = 56,
                 gap = 8,
-            },
-            {
-                type = "editCommand",
-                title = "RequireDatabaseTitle",
-                desc = "RequireDatabaseDesc",
-                editBox = "RequireDatabaseEditBox",
-                button = "RequireDatabaseBtn",
+            }),
+            Layout.EditCommandRow("RequireDatabase", "RequireDatabaseEditBox", "RequireDatabaseBtn", {
                 descHeight = 34,
                 height = 60,
                 gap = 8,
-            },
-            {
-                type = "editCommand",
-                title = "PushDatabaseTitle",
-                desc = "PushDatabaseDesc",
-                editBox = "PushDatabaseEditBox",
-                button = "PushDatabaseBtn",
+            }),
+            Layout.EditCommandRow("PushDatabase", "PushDatabaseEditBox", "PushDatabaseBtn", {
                 descHeight = 34,
                 height = 60,
                 gap = 8,
-            },
-            {
-                type = "command",
-                title = "SyncNowTitle",
-                desc = "SyncNowDesc",
-                button = "SyncNowBtn",
+            }),
+            Layout.CommandRow("SyncNow", "SyncNowBtn", {
                 descHeight = 34,
                 height = 54,
                 gap = 14,
-            },
+            }),
             { type = "section", suffix = "DataHealthTitle", gap = 10 },
-            {
-                type = "command",
-                title = "ScanHistoryTitle",
-                desc = "ScanHistoryDesc",
-                button = "ScanHistoryBtn",
+            Layout.CommandRow("ScanHistory", "ScanHistoryBtn", {
                 descHeight = 54,
                 height = 74,
                 gap = 14,
-            },
+            }),
             { type = "section", suffix = "MaintenanceTitle", gap = 10 },
-            {
-                type = "command",
-                title = "PurgeHistoryTitle",
-                desc = "PurgeHistoryDesc",
-                button = "PurgeHistoryBtn",
+            Layout.CommandRow("PurgeHistory", "PurgeHistoryBtn", {
                 descHeight = 54,
                 height = 74,
                 gap = 8,
-            },
-            {
-                type = "command",
-                title = "RebuildSourcesTitle",
-                desc = "RebuildSourcesDesc",
-                button = "RebuildSourcesBtn",
+            }),
+            Layout.CommandRow("RebuildSources", "RebuildSourcesBtn", {
                 descHeight = 54,
                 height = 74,
                 gap = 8,
-            },
-            {
-                type = "command",
-                title = "CleanUpTitle",
-                desc = "CleanUpDesc",
-                button = "CleanUpBtn",
+            }),
+            Layout.CommandRow("CleanUp", "CleanUpBtn", {
                 descHeight = 54,
                 height = 74,
                 gap = 0,
-            },
+            }),
         }, getOptionsPanelLayoutCfg())
     end
 
     local function layoutLFMSpamPanel()
         applyOptionsLayout(lfmSpamContentFrameName, {
             { type = "title", suffix = "Title", gap = 16 },
-            { type = "text", title = "MessagePreviewTitle", body = "MessagePreviewBody", bodyHeight = 66, gap = 8 },
-            {
-                type = "buttonRow",
-                buttons = { "RefreshPreviewBtn", "ClearPreviewBtn" },
+            Layout.TextRow("MessagePreviewTitle", "MessagePreviewBody", { bodyHeight = 66, gap = 8 }),
+            Layout.ButtonRow({ "RefreshPreviewBtn", "ClearPreviewBtn" }, {
                 buttonWidth = 105,
                 buttonGap = 12,
                 gap = 14,
-            },
-            { type = "text", title = "SafetyTitle", body = "SafetyBody", bodyHeight = 86, gap = 10 },
-            {
-                type = "buttonRow",
-                buttons = { "OpenBtn", "StartBtn", "StopBtn" },
+            }),
+            Layout.TextRow("SafetyTitle", "SafetyBody", { bodyHeight = 86, gap = 10 }),
+            Layout.ButtonRow({ "OpenBtn", "StartBtn", "StopBtn" }, {
                 buttonWidth = 105,
                 buttonGap = 12,
                 gap = 0,
-            },
+            }),
         }, getOptionsPanelLayoutCfg())
     end
 
     local function layoutRaidWarningPanel()
         applyOptionsLayout(raidWarningContentFrameName, {
             { type = "title", suffix = "Title", gap = 16 },
-            { type = "text", title = "TemplatesTitle", body = "TemplatesBody", bodyHeight = 44, gap = 8 },
-            {
-                type = "buttonRow",
-                buttons = { "PreviewBtn", "OpenBtn" },
+            Layout.TextRow("TemplatesTitle", "TemplatesBody", { bodyHeight = 44, gap = 8 }),
+            Layout.ButtonRow({ "PreviewBtn", "OpenBtn" }, {
                 buttonWidth = 105,
                 buttonGap = 12,
                 gap = 14,
-            },
-            { type = "text", title = "PreviewTitle", body = "PreviewBody", bodyHeight = 112, gap = 12 },
-            { type = "text", title = "PermissionTitle", body = "PermissionBody", bodyHeight = 54, gap = 14 },
+            }),
+            Layout.TextRow("PreviewTitle", "PreviewBody", { bodyHeight = 112, gap = 12 }),
+            Layout.TextRow("PermissionTitle", "PermissionBody", { bodyHeight = 54, gap = 14 }),
             { type = "section", suffix = "MaintenanceTitle", gap = 10 },
-            {
-                type = "command",
-                title = "ClearSavedTitle",
-                desc = "ClearSavedDesc",
-                button = "ClearSavedBtn",
+            Layout.CommandRow("ClearSaved", "ClearSavedBtn", {
                 descHeight = 42,
                 height = 62,
                 gap = 0,
-            },
+            }),
         }, getOptionsPanelLayoutCfg())
     end
 
     local function layoutHelpPanel()
         applyOptionsLayout(helpContentFrameName, {
             { type = "title", suffix = "Title", gap = 16 },
-            { type = "text", title = "MasterLootTitle", body = "MasterLootBody", bodyHeight = 76, gap = 12 },
-            { type = "text", title = "LootHistoryTitle", body = "LootHistoryBody", bodyHeight = 94, gap = 12 },
-            { type = "text", title = "LFMSpamTitle", body = "LFMSpamBody", bodyHeight = 86, gap = 12 },
-            { type = "text", title = "RaidWarningTitle", body = "RaidWarningBody", bodyHeight = 64, gap = 12 },
-            {
-                type = "text",
-                title = "CommandPermissionsTitle",
-                body = "CommandPermissionsBody",
+            Layout.TextRow("MasterLootTitle", "MasterLootBody", { bodyHeight = 76, gap = 12 }),
+            Layout.TextRow("LootHistoryTitle", "LootHistoryBody", { bodyHeight = 94, gap = 12 }),
+            Layout.TextRow("LFMSpamTitle", "LFMSpamBody", { bodyHeight = 86, gap = 12 }),
+            Layout.TextRow("RaidWarningTitle", "RaidWarningBody", { bodyHeight = 64, gap = 12 }),
+            Layout.TextRow("CommandPermissionsTitle", "CommandPermissionsBody", {
                 bodyHeight = 80,
                 gap = 12,
-            },
-            { type = "text", title = "DiagnosticsTitle", body = "DiagnosticsBody", bodyHeight = 68, gap = 0 },
+            }),
+            Layout.TextRow("DiagnosticsTitle", "DiagnosticsBody", { bodyHeight = 68, gap = 0 }),
         }, {
             contentWidth = 380,
             scrollChildWidth = 420,
@@ -677,47 +590,39 @@ do
         applyOptionsLayout(cleanupPopupFrameName, {
             { type = "title", suffix = "Title", leftX = 20, width = 340, height = 20, gap = 10 },
             { type = "body", suffix = "Body", leftX = 30, width = 320, height = 34, gap = 12 },
-            {
-                type = "check",
+            Layout.CheckRow("EmptyRaids", {
                 check = "EmptyRaidsCheck",
                 label = "EmptyRaidsLabel",
-                desc = "EmptyRaidsDesc",
                 leftX = 30,
                 textWidth = 292,
                 descHeight = 34,
                 height = 54,
                 gap = 8,
-            },
-            {
-                type = "check",
+            }),
+            Layout.CheckRow("NonEpicLoot", {
                 check = "NonEpicLootCheck",
                 label = "NonEpicLootLabel",
-                desc = "NonEpicLootDesc",
                 leftX = 30,
                 textWidth = 292,
                 descHeight = 34,
                 height = 54,
                 gap = 8,
-            },
-            {
-                type = "check",
+            }),
+            Layout.CheckRow("NoBossEncounter", {
                 check = "NoBossEncounterCheck",
                 label = "NoBossEncounterLabel",
-                desc = "NoBossEncounterDesc",
                 leftX = 30,
                 textWidth = 292,
                 descHeight = 34,
                 height = 54,
                 gap = 12,
-            },
-            {
-                type = "buttonRow",
-                buttons = { "DeleteBtn", "CancelBtn" },
+            }),
+            Layout.ButtonRow({ "DeleteBtn", "CancelBtn" }, {
                 leftX = 62,
                 buttonWidth = 110,
                 buttonGap = 40,
                 gap = 0,
-            },
+            }),
         }, {
             contentWidth = 340,
             scrollChildWidth = 380,
@@ -1337,21 +1242,14 @@ do
         return result
     end
 
-    local function ensureLootHistoryConfirmPopups()
-        if type(StaticPopupDialogs) ~= "table" or not (Popups and Popups.DefineConfirm) then
-            return false
-        end
-        if not StaticPopupDialogs["KRT_CONFIG_PURGE_LOOT_HISTORY"] then
-            Popups.DefineConfirm("KRT_CONFIG_PURGE_LOOT_HISTORY", L.StrConfirmPurgeLootHistory, function()
-                module:RequestLoggerMaintenance("purge")
-            end)
-        end
-        return true
-    end
-
     local function showConfirmOrRun(popupKey, actionName)
-        if ensureLootHistoryConfirmPopups() and type(StaticPopup_Show) == "function" then
-            StaticPopup_Show(popupKey)
+        if
+            Popups
+            and Popups.ShowConfirm
+            and Popups.ShowConfirm(popupKey, L.StrConfirmPurgeLootHistory, function()
+                module:RequestLoggerMaintenance(actionName)
+            end)
+        then
             return
         end
         module:RequestLoggerMaintenance(actionName)
@@ -1542,8 +1440,6 @@ do
         Frames.SetScriptSafely(syncNowBtn, "OnClick", function()
             module:RequestLoggerSyncPanelAction("sync")
         end)
-
-        ensureLootHistoryConfirmPopups()
         lootHistoryPanelBound = true
     end
 
@@ -1615,36 +1511,29 @@ do
         return result
     end
 
-    local function ensureRaidWarningConfirmPopups()
-        if type(StaticPopupDialogs) ~= "table" then
-            return false
-        end
-        if not StaticPopupDialogs["KRT_CONFIG_CLEAR_RAID_WARNINGS"] then
-            StaticPopupDialogs["KRT_CONFIG_CLEAR_RAID_WARNINGS"] = {
-                text = L.StrConfirmClearRaidWarnings,
-                button1 = YES or "Yes",
-                button2 = NO or "No",
-                button3 = CANCEL or L.BtnCancel,
-                OnAccept = function()
-                    module:RequestRaidWarningPanelAction("clearSaved", true)
-                end,
-                OnCancel = function(_, _, reason)
-                    if reason == "clicked" then
-                        module:RequestRaidWarningPanelAction("clearSaved", false)
-                    end
-                end,
-                timeout = 0,
-                whileDead = 1,
-                hideOnEscape = 1,
-                cancels = "KRT_CONFIG_CLEAR_RAID_WARNINGS",
-            }
-        end
-        return true
-    end
-
     local function showRaidWarningConfirmOrRun(popupKey, actionName, includeStock)
-        if ensureRaidWarningConfirmPopups() and type(StaticPopup_Show) == "function" then
-            StaticPopup_Show(popupKey)
+        if
+            Popups
+            and Popups.ShowConfirm
+            and Popups.ShowConfirm(
+                popupKey,
+                L.StrConfirmClearRaidWarnings,
+                function()
+                    module:RequestRaidWarningPanelAction(actionName, true)
+                end,
+                popupKey,
+                {
+                    button1 = YES or "Yes",
+                    button2 = NO or "No",
+                    button3 = CANCEL or L.BtnCancel,
+                    onCancel = function(_, _, reason)
+                        if reason == "clicked" then
+                            module:RequestRaidWarningPanelAction(actionName, false)
+                        end
+                    end,
+                }
+            )
+        then
             return
         end
         module:RequestRaidWarningPanelAction(actionName, includeStock)
@@ -1668,8 +1557,6 @@ do
         Frames.SetScriptSafely(Frames.GetRef(content, "ClearSavedBtn"), "OnClick", function()
             showRaidWarningConfirmOrRun("KRT_CONFIG_CLEAR_RAID_WARNINGS", "clearSaved", false)
         end)
-
-        ensureRaidWarningConfirmPopups()
         raidWarningPanelBound = true
     end
 
