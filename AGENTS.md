@@ -38,6 +38,7 @@ Developer docs package:
 - Do not introduce new non-frame globals unless explicitly required and documented.
 - Code, comments, UI labels, chat text, and docs should be English and ASCII-only unless required otherwise.
 - User-facing strings go through `addon.L`; diagnostic templates go through `addon.Diagnose`.
+- Do not cite or name other addons as implementation references in code, comments, UI text, or docs.
 
 ---
 

@@ -4,7 +4,16 @@ All notable changes to !KRT will be documented in this file.
 
 ## Unreleased
 
-Release-Version: 0.7.1-beta.3
+Release-Version: 0.8.0-beta.1
+
+## [0.8.0-beta.1] - 2026-06-05
+
+### Documentation
+
+- **Debug command reference** - Added `debug/README.md` under the addon root
+  with all debug and related diagnostic slash commands plus copy-ready snippets
+  for timer stats, synthetic raid rolls, Master Loot grid previews, SoftRes
+  readiness, support reports, and performance spike capture.
 
 ### Fixes
 

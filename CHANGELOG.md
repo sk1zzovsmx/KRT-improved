@@ -3,7 +3,14 @@
 This project follows a simple rule: every user-visible or behavior change gets an entry here.
 Dates are in YYYY-MM-DD.
 
-## Unreleased
+## [0.8.0-beta.1] - 2026-06-05
+
+Release-Version: 0.8.0-beta.1
+
+- **Docs:** Added `!KRT/debug/README.md` with all debug and related
+  diagnostic slash commands plus copy-ready snippets for timer stats,
+  synthetic raid rolls, Master Loot grid previews, SoftRes readiness, support
+  reports, and performance spike capture.
 - **Tooling:** Release ZIP packaging now omits standalone embedded-library
   metadata files that KRT does not load at runtime, while keeping the vendored
   source tree intact.

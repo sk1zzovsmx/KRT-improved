@@ -1,4 +1,4 @@
-# KRT: Kader Raid Tools — Improved (Total Rework)
+# KRT: Kader Raid Tools - Improved (Total Rework)
 [![Download latest beta](https://img.shields.io/github/v/release/sk1zzovsmx/KRT-improved?include_prereleases&label=Download%20latest%20beta)](https://github.com/sk1zzovsmx/KRT-improved/releases) [![Downloads](https://img.shields.io/github/downloads/sk1zzovsmx/KRT-improved/total?label=Downloads)](https://github.com/sk1zzovsmx/KRT-improved/releases)
 
 Game Version: **Wrath of the Lich King 3.3.5a** (Interface **30300**)
@@ -11,17 +11,29 @@ It took a lot of time, effort for who isn't a code developer like ME. So please,
 
 ## Highlights
 
-- **Master Looter toolkit**: roll workflow (MS / OS / SR / Free), countdown, auto-award, and trade helpers.
+- **Master Looter toolkit**: roll workflow (MS / OS / SR / Free), countdown,
+  native assignment grid, multi-award, hold/bank/DE targets, and trade helpers.
+- **Master Loot automation**: optional boss-target Master Loot switching,
+  RollFor-style screen notice, opened-loot autospam, and SoftRes-aware loot
+  announce lines.
 - **SoftRes Reserves integration**:
+  - JSON imports for RaidRes / softres.it / Gargul payloads, plus CSV fallback
   - **Multi-reserve** support (players can reserve the same item multiple times / quantity > 1)
   - **Plus System (P+)** priority mode
-  - UI list grouped by **boss/source**, collapsible, with tooltips and chat-safe output
-- **Loot Counter**: track **MS loot wins per player** in the current raid session, with an editable UI.
-- **Loot History**: persistent raid sessions with roster, bosses, attendees, and loot. Includes safer internal IDs and filters.
+  - Name aliases, readiness checks, LootFrame reserve hints, and chat-safe output
+- **Raid loot-source database**: AtlasLoot-backed Vanilla, The Burning Crusade,
+  and Wrath raid sources for passive Group Loot / Need Before Greed logging.
+- **Loot Counter**: track **MS loot wins per player** in the current raid session,
+  with editable counters, reset confirmation, and grouped spam output.
+- **Loot History + Raid Attendance**: persistent raid sessions with roster,
+  bosses, attendance, loot, passive Group Loot metadata, CSV export, and sync.
+- **Interface Options panels**: KRT AddOns subpanels for Master Loot, Loot
+  History, LFM Spam, Raid Warning, and Help without Ace dependencies.
 - **Pre-saved Raid Warnings** for reusable raid calls.
 - **LFM Spammer** with composition builder and achievement ID helper.
 - **Minimap button menu** + consolidated **/krt** slash commands.
-- Built-in **debug / log levels** for troubleshooting.
+- Built-in **debug, performance, validation, version, and bug-report commands**
+  for troubleshooting.
 
 ---
 
@@ -51,7 +63,13 @@ It took a lot of time, effort for who isn't a code developer like ME. So please,
 
 - **Import SoftRes reserves**
   - `/krt res import`
+  - JSON imports are preferred for RaidRes / softres.it / Gargul exports.
+  - CSV imports remain available for classic SoftRes exports.
   - Or click the **Reserves** button in the Master Looter window (it opens Import if no reserves are loaded yet).
+
+- **Check raid history and attendance**
+  - `/krt history` opens Loot History.
+  - `/krt attendance` opens Raid Attendance.
 
 ---
 
@@ -66,6 +84,7 @@ It took a lot of time, effort for who isn't a code developer like ME. So please,
 - Agent skills + Mechanic companion workflow: `docs/AGENT_SKILLS.md`
 - Repo-local MCP server for skill/addon workflows: `docs/KRT_MCP.md`
 - UI/XML binding and template policy: `docs/ARCHITECTURE.md`
+- Addon debug command reference: `!KRT/debug/README.md`
 
 ---
 
@@ -79,12 +98,25 @@ Common commands:
 - `/krt config` — open config (`/krt config reset` restores defaults)
 - `/krt ml` — Master Looter window
 - `/krt counter` — Loot Counter window
-- `/krt history` — Loot Logger / History window
+- `/krt history` — Loot History window
+- `/krt attendance` — Raid Attendance window
+- `/krt logger req <raidId|raidNid> <player>` — request a raid snapshot
+- `/krt logger push <raidId|raidNid> <player>` — push a raid snapshot
+- `/krt logger sync` — sync matching current-raid history
 - `/krt rw` — Raid Warnings window (`/krt rw <ID>` announces a saved warning)
 - `/krt lfm` — LFM Spammer window (`/krt lfm start` / `/krt lfm stop`)
 - `/krt res` — Reserves list (`/krt res import` opens the import window)
+- `/krt res check` — local SoftRes readiness and name-match report
+- `/krt res alias <softres-name> <raid-name>` — map imported names to raid names
+- `/krt res sync|meta|clearcache` — runtime SoftRes sync diagnostics
 - `/krt minimap on|off|pos <deg>` — show/hide button or set position angle
 - `/krt debug on|off|level <name|num>` — toggle debug and/or set log level
+- `/krt debug raid seed|clear|rolls|roll` — synthetic raid/roll test helpers
+- `/krt debug mlgrid [1-40]` — Master Loot grid layout preview
+- `/krt perf on|off|threshold <ms>` — runtime slow-block diagnostics
+- `/krt validate raids [verbose]` — raid-history schema/invariant validation
+- `/krt version` — local and grouped KRT version details
+- `/krt bug` — local support summary for bug reports
 
 ---
 
@@ -310,13 +342,27 @@ You can also control it via:
 
 ## Debug / Troubleshooting
 
-KRT includes a lightweight logger with log levels.
+KRT includes runtime-only debug and diagnostic commands. The complete command
+reference and copy-ready snippets live in `!KRT/debug/README.md`.
 
 - Toggle debug:
   - `/krt debug on`
   - `/krt debug off`
 - Set log level:
   - `/krt debug level info|debug|trace|spam` (names/numbers supported)
+- Inspect timers:
+  - `/krt debug timers`
+  - `/krt debug timers reset`
+- Run layout and roll smoke helpers:
+  - `/krt debug mlgrid [1-40]`
+  - `/krt debug raid seed`
+  - `/krt debug raid rolls`
+- Capture local support state:
+  - `/krt bug`
+  - `/krt version local`
+- Check slow blocks and raid data:
+  - `/krt perf on|off|threshold <ms>`
+  - `/krt validate raids [verbose]`
 
 ---
 

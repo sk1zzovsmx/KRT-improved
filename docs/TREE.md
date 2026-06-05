@@ -22,6 +22,8 @@
 |   |   |-- DBRaidValidator.lua
 |   |   |-- DBSchema.lua
 |   |   \\-- DBSyncer.lua
+|   |-- debug
+|   |   \\-- README.md
 |   |-- EntryPoints
 |   |   |-- Minimap.lua
 |   |   |-- README.md
