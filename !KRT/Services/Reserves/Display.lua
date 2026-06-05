@@ -375,6 +375,322 @@ local function hasCurrentRaidPlayer(ctx, list, raidNum)
     return false, true
 end
 
+local function copyPlayers(players)
+    local out = {}
+    for i = 1, #(players or {}) do
+        out[i] = players[i]
+    end
+    return out
+end
+
+local function sortPlayerNames(players)
+    sort(players, function(a, b)
+        return tostring(a or "") < tostring(b or "")
+    end)
+    return players
+end
+
+local function buildTextForPlayers(ctx, itemId, players, counts, metaByName, showPlus, showMulti)
+    local tokens = buildPlayerTokens(ctx, itemId, copyPlayers(players), counts, metaByName, false, showPlus, showMulti)
+    local out = {}
+    for i = 1, #tokens do
+        out[i] = tokens[i]
+    end
+    return tconcat(out, ", ")
+end
+
+local function splitPresentAndMissingPlayers(ctx, players, raidNum)
+    local presentPlayers, filterApplied = filterPlayersByCurrentRaid(ctx, players, raidNum)
+    if not filterApplied then
+        return copyPlayers(players), {}, false
+    end
+
+    local presentByName = {}
+    for i = 1, #presentPlayers do
+        presentByName[presentPlayers[i]] = true
+    end
+
+    local missingPlayers = {}
+    for i = 1, #players do
+        local name = players[i]
+        if not presentByName[name] then
+            missingPlayers[#missingPlayers + 1] = name
+        end
+    end
+
+    return presentPlayers, missingPlayers, true
+end
+
+local function normalizeNameKey(name)
+    local key = Strings and Strings.NormalizeLower and Strings.NormalizeLower(name, true) or nil
+    if key and key ~= "" then
+        return key
+    end
+    if type(name) == "string" and name ~= "" then
+        return string.lower(name)
+    end
+    return nil
+end
+
+local function levenshteinDistance(left, right)
+    left = tostring(left or "")
+    right = tostring(right or "")
+
+    local leftLen = string.len(left)
+    local rightLen = string.len(right)
+    if left == right then
+        return 0
+    end
+    if leftLen == 0 then
+        return rightLen
+    end
+    if rightLen == 0 then
+        return leftLen
+    end
+
+    local previous = {}
+    local current = {}
+    for j = 0, rightLen do
+        previous[j] = j
+    end
+
+    for i = 1, leftLen do
+        current[0] = i
+        local leftByte = string.byte(left, i)
+        for j = 1, rightLen do
+            local cost = leftByte == string.byte(right, j) and 0 or 1
+            local deletion = previous[j] + 1
+            local insertion = current[j - 1] + 1
+            local substitution = previous[j - 1] + cost
+            current[j] = math.min(deletion, insertion, substitution)
+        end
+        previous, current = current, previous
+    end
+
+    return previous[rightLen] or rightLen
+end
+
+local function nameSimilarity(left, right, distance)
+    local maxLen = math.max(string.len(tostring(left or "")), string.len(tostring(right or "")))
+    if maxLen <= 0 then
+        return 1
+    end
+    local score = 1 - ((tonumber(distance) or maxLen) / maxLen)
+    if score < 0 then
+        return 0
+    end
+    return score
+end
+
+local function classifyNameMatch(distance, similarity)
+    if distance <= 1 and similarity >= 0.75 then
+        return "strong"
+    end
+    if distance <= 2 and similarity >= 0.30 then
+        return "weak"
+    end
+    return nil
+end
+
+local function buildNameMatch(reserveName, raidName, distance, similarity, strength)
+    return {
+        reserveName = reserveName,
+        raidName = raidName,
+        distance = distance,
+        similarity = similarity,
+        strength = strength,
+    }
+end
+
+local function compareNameMatch(a, b)
+    if a.reserveName ~= b.reserveName then
+        return tostring(a.reserveName) < tostring(b.reserveName)
+    end
+    if a.distance ~= b.distance then
+        return (tonumber(a.distance) or 0) < (tonumber(b.distance) or 0)
+    end
+    if a.similarity ~= b.similarity then
+        return (tonumber(a.similarity) or 0) > (tonumber(b.similarity) or 0)
+    end
+    return tostring(a.raidName) < tostring(b.raidName)
+end
+
+local function getReservePlayerNames(ctx)
+    local players = {}
+    for playerKey, player in pairs(ctx.reservesData or {}) do
+        if type(player) == "table" then
+            local displayName = ctx.resolvePlayerNameDisplay(playerKey, player, playerKey)
+            if displayName and displayName ~= "" then
+                players[#players + 1] = displayName
+            end
+        end
+    end
+    return sortPlayerNames(players)
+end
+
+local function getRaidPlayerNames(ctx, raidNum)
+    local raid = ctx.getRaidService()
+    local targetRaidNum = raidNum or ctx.getCurrentRaid()
+    local players = {}
+    if not (raid and raid.GetPlayers and targetRaidNum) then
+        return players, false
+    end
+
+    local raidPlayers = raid:GetPlayers(targetRaidNum) or {}
+    for i = 1, #raidPlayers do
+        local player = raidPlayers[i]
+        local name = player and player.name
+        if type(name) == "string" and name ~= "" then
+            players[#players + 1] = name
+        end
+    end
+    return sortPlayerNames(players), true
+end
+
+local function splitExactNameMatches(reservePlayers, raidPlayers)
+    local reserveByKey = {}
+    local raidByKey = {}
+    local reserveMissing = {}
+    local raidMissing = {}
+
+    for i = 1, #reservePlayers do
+        local name = reservePlayers[i]
+        local key = normalizeNameKey(name)
+        if key then
+            reserveByKey[key] = true
+        end
+    end
+    for i = 1, #raidPlayers do
+        local name = raidPlayers[i]
+        local key = normalizeNameKey(name)
+        if key then
+            raidByKey[key] = true
+        end
+    end
+
+    for i = 1, #reservePlayers do
+        local name = reservePlayers[i]
+        local key = normalizeNameKey(name)
+        if key and not raidByKey[key] then
+            reserveMissing[#reserveMissing + 1] = name
+        end
+    end
+    for i = 1, #raidPlayers do
+        local name = raidPlayers[i]
+        local key = normalizeNameKey(name)
+        if key and not reserveByKey[key] then
+            raidMissing[#raidMissing + 1] = name
+        end
+    end
+
+    return sortPlayerNames(reserveMissing), sortPlayerNames(raidMissing)
+end
+
+local function findBestNameCandidate(reserveName, raidPlayers, usedRaidNames)
+    local reserveKey = normalizeNameKey(reserveName)
+    local best
+
+    if not reserveKey then
+        return nil
+    end
+
+    for i = 1, #raidPlayers do
+        local raidName = raidPlayers[i]
+        local raidKey = normalizeNameKey(raidName)
+        if raidKey and not usedRaidNames[raidName] then
+            local distance = levenshteinDistance(reserveKey, raidKey)
+            local similarity = nameSimilarity(reserveKey, raidKey, distance)
+            local strength = classifyNameMatch(distance, similarity)
+            if strength then
+                local candidate = buildNameMatch(reserveName, raidName, distance, similarity, strength)
+                if not best or compareNameMatch(candidate, best) then
+                    best = candidate
+                end
+            end
+        end
+    end
+
+    return best
+end
+
+local function buildReadinessSummaryToken(report)
+    local itemContext = report.itemContext or {}
+    local rosterReport = report.rosterReport or {}
+    local nameMatchReport = report.nameMatchReport or {}
+
+    return tconcat({
+        tostring(report.itemId or ""),
+        report.hasReserveData and "1" or "0",
+        report.hasItemReserves and "1" or "0",
+        tostring(itemContext.totalReserveCount or ""),
+        tostring(rosterReport.totalReservePlayers or ""),
+        tostring(rosterReport.presentReservePlayers or ""),
+        tostring(rosterReport.missingReservePlayers or ""),
+        tostring(#(nameMatchReport.strongMatches or {})),
+        tostring(#(nameMatchReport.weakMatches or {})),
+        tostring(nameMatchReport.unmatchedReservePlayersText or ""),
+    }, "|")
+end
+
+local function buildReadinessHealth(report)
+    local itemContext = report.itemContext or {}
+    local rosterReport = report.rosterReport or {}
+    local nameMatchReport = report.nameMatchReport or {}
+    local health = {
+        severity = "ok",
+        issueCount = 0,
+        hasNoData = false,
+        hasCurrentItemIssue = false,
+        currentItemIssue = nil,
+        importedPlayersOutsideRaidCount = tonumber(rosterReport.missingReservePlayers) or 0,
+        raidPlayersWithoutReserveCount = #(nameMatchReport.raidPlayersWithoutReserve or {}),
+        suggestedNameMatchCount = #(nameMatchReport.strongMatches or {}) + #(nameMatchReport.weakMatches or {}),
+        unmatchedReserveCount = #(nameMatchReport.unmatchedReservePlayers or {}),
+        unmatchedRaidCount = #(nameMatchReport.unmatchedRaidPlayers or {}),
+    }
+
+    local function addIssue()
+        health.issueCount = health.issueCount + 1
+    end
+
+    if report.hasReserveData ~= true then
+        health.severity = "error"
+        health.hasNoData = true
+        addIssue()
+        return health
+    end
+
+    if report.itemId then
+        if report.hasItemReserves ~= true then
+            health.hasCurrentItemIssue = true
+            health.currentItemIssue = "no_reserves"
+            addIssue()
+        elseif report.hasEligibleItemReserve ~= true then
+            health.hasCurrentItemIssue = true
+            health.currentItemIssue = "no_eligible_reservers"
+            addIssue()
+        end
+    end
+
+    if health.importedPlayersOutsideRaidCount > 0 then
+        addIssue()
+    end
+    if health.suggestedNameMatchCount > 0 then
+        addIssue()
+    end
+    if health.unmatchedReserveCount > 0 then
+        addIssue()
+    end
+    if health.unmatchedRaidCount > 0 then
+        addIssue()
+    end
+
+    if health.issueCount > 0 then
+        health.severity = "warning"
+    end
+    return health
+end
+
 -- ----- Public methods ----- --
 function Display.FormatReserveItemIdLabel(itemId)
     return format(L.StrReservesItemIdLabel, tostring(itemId or "?"))
@@ -538,6 +854,162 @@ function Display.GetPlayersForItem(ctx, itemId, useColor, showPlus, showMulti, o
         out[i] = tokens[i]
     end
     return out
+end
+
+function Display.GetItemReserveContext(ctx, itemId, raidNum)
+    local context = {
+        itemId = itemId,
+        mode = ctx.isPlusSystem() and "plus" or "multi",
+        hasReserves = false,
+        hasPresentReserve = false,
+        totalReserveCount = 0,
+        presentReserveCount = 0,
+        missingReserveCount = 0,
+        presentPlayers = {},
+        missingPlayers = {},
+        presentPlayersText = "",
+        missingPlayersText = "",
+        isPlusSystem = ctx.isPlusSystem(),
+        isMultiReserve = ctx.isMultiReserve(),
+        rosterFilterApplied = false,
+    }
+    if not itemId then
+        return context
+    end
+
+    local list = ctx.reservesByItemID[itemId]
+    if type(list) ~= "table" or #list == 0 then
+        return context
+    end
+
+    local data = { players = {}, playerCounts = {}, playerMeta = {} }
+    for i = 1, #list do
+        local reserveEntry = list[i]
+        if type(reserveEntry) == "table" then
+            addReservePlayer(data, reserveEntry)
+        end
+    end
+
+    sortPlayersForDisplay(ctx, itemId, data.players, data.playerCounts, data.playerMeta)
+    local presentPlayers, missingPlayers, filterApplied = splitPresentAndMissingPlayers(ctx, data.players, raidNum)
+    context.hasReserves = #data.players > 0
+    context.hasPresentReserve = #presentPlayers > 0
+    context.totalReserveCount = #data.players
+    context.presentReserveCount = #presentPlayers
+    context.missingReserveCount = #missingPlayers
+    context.presentPlayers = presentPlayers
+    context.missingPlayers = missingPlayers
+    context.presentPlayersText = buildTextForPlayers(ctx, itemId, presentPlayers, data.playerCounts, data.playerMeta, true, true)
+    context.missingPlayersText = buildTextForPlayers(ctx, itemId, missingPlayers, data.playerCounts, data.playerMeta, true, true)
+    context.rosterFilterApplied = filterApplied == true
+    return context
+end
+
+function Display.GetRosterReserveMatchReport(ctx, raidNum)
+    local report = {
+        mode = ctx.isPlusSystem() and "plus" or "multi",
+        totalReservePlayers = 0,
+        presentReservePlayers = 0,
+        missingReservePlayers = 0,
+        presentPlayers = {},
+        missingPlayers = {},
+        presentPlayersText = "",
+        missingPlayersText = "",
+        rosterFilterApplied = false,
+    }
+    local players = getReservePlayerNames(ctx)
+    local presentPlayers, missingPlayers, filterApplied = splitPresentAndMissingPlayers(ctx, players, raidNum)
+    sortPlayerNames(presentPlayers)
+    sortPlayerNames(missingPlayers)
+
+    report.totalReservePlayers = #players
+    report.presentReservePlayers = #presentPlayers
+    report.missingReservePlayers = #missingPlayers
+    report.presentPlayers = presentPlayers
+    report.missingPlayers = missingPlayers
+    report.presentPlayersText = tconcat(presentPlayers, ", ")
+    report.missingPlayersText = tconcat(missingPlayers, ", ")
+    report.rosterFilterApplied = filterApplied == true
+    return report
+end
+
+function Display.GetNameMatchReport(ctx, raidNum)
+    local reservePlayers = getReservePlayerNames(ctx)
+    local raidPlayers, rosterFilterApplied = getRaidPlayerNames(ctx, raidNum)
+    local reserveMissing, raidMissing = splitExactNameMatches(reservePlayers, raidPlayers)
+    local usedRaidNames = {}
+    local usedReserveNames = {}
+    local strongMatches = {}
+    local weakMatches = {}
+    local unmatchedReservePlayers = {}
+    local unmatchedRaidPlayers = {}
+
+    for i = 1, #reserveMissing do
+        local reserveName = reserveMissing[i]
+        local candidate = findBestNameCandidate(reserveName, raidMissing, usedRaidNames)
+        if candidate then
+            usedReserveNames[reserveName] = true
+            usedRaidNames[candidate.raidName] = true
+            if candidate.strength == "strong" then
+                strongMatches[#strongMatches + 1] = candidate
+            else
+                weakMatches[#weakMatches + 1] = candidate
+            end
+        end
+    end
+
+    for i = 1, #reserveMissing do
+        local reserveName = reserveMissing[i]
+        if not usedReserveNames[reserveName] then
+            unmatchedReservePlayers[#unmatchedReservePlayers + 1] = reserveName
+        end
+    end
+    for i = 1, #raidMissing do
+        local raidName = raidMissing[i]
+        if not usedRaidNames[raidName] then
+            unmatchedRaidPlayers[#unmatchedRaidPlayers + 1] = raidName
+        end
+    end
+
+    sort(strongMatches, compareNameMatch)
+    sort(weakMatches, compareNameMatch)
+    sortPlayerNames(unmatchedReservePlayers)
+    sortPlayerNames(unmatchedRaidPlayers)
+
+    return {
+        reservePlayersOutsideRaid = reserveMissing,
+        raidPlayersWithoutReserve = raidMissing,
+        strongMatches = strongMatches,
+        weakMatches = weakMatches,
+        unmatchedReservePlayers = unmatchedReservePlayers,
+        unmatchedRaidPlayers = unmatchedRaidPlayers,
+        reservePlayersOutsideRaidText = tconcat(reserveMissing, ", "),
+        raidPlayersWithoutReserveText = tconcat(raidMissing, ", "),
+        unmatchedReservePlayersText = tconcat(unmatchedReservePlayers, ", "),
+        unmatchedRaidPlayersText = tconcat(unmatchedRaidPlayers, ", "),
+        rosterFilterApplied = rosterFilterApplied == true,
+    }
+end
+
+function Display.GetReadinessReport(ctx, itemId, raidNum)
+    local itemContext = Display.GetItemReserveContext(ctx, itemId, raidNum)
+    local rosterReport = Display.GetRosterReserveMatchReport(ctx, raidNum)
+    local nameMatchReport = Display.GetNameMatchReport(ctx, raidNum)
+    local report = {
+        itemId = itemId,
+        mode = ctx.isPlusSystem() and "plus" or "multi",
+        hasReserveData = (tonumber(rosterReport.totalReservePlayers) or 0) > 0,
+        hasItemReserves = itemContext.hasReserves == true,
+        hasEligibleItemReserve = itemContext.hasPresentReserve == true,
+        itemContext = itemContext,
+        rosterReport = rosterReport,
+        nameMatchReport = nameMatchReport,
+        rosterFilterApplied = itemContext.rosterFilterApplied == true or rosterReport.rosterFilterApplied == true or nameMatchReport.rosterFilterApplied == true,
+    }
+
+    report.summaryToken = buildReadinessSummaryToken(report)
+    report.health = buildReadinessHealth(report)
+    return report
 end
 
 function Display.GetDisplayList(ctx)

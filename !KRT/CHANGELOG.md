@@ -8,6 +8,37 @@ Release-Version: 0.7.1-beta.3
 
 ### Enhancements
 
+- **SoftRes roll eligibility** - SR rolls now accept only in-raid players
+  who reserved the current item, keep out-of-raid reservers visible as
+  ineligible context, and expose SR reserve counts through the roll display
+  model.
+- **SoftRes name-match report** - Reserves now exposes a read-only runtime
+  report for imported names that do not exactly match the current raid
+  roster, including strong/weak suggestions for local readiness checks.
+- **SoftRes readiness report** - Reserves now exposes a consolidated
+  read-only readiness report for item, roster, and name-match context.
+- **Roll visibility** - Duplicate roll attempts now stay out of resolver
+  candidates but remain visible on the accepted roll row with a `DUP` info
+  tag for easier Master Loot review.
+- **Duplicate roll detail** - Duplicate roll attempts now keep the last
+  ignored roll value, denial reason, and source in the roll display model for
+  diagnostics while leaving the Master roll list visually unchanged.
+- **SoftRes readiness command** - Added local `/krt res check` and
+  `/krt sr check` reports for current-item SoftRes coverage, roster/import
+  readiness, and possible name mismatches without announcing to raid or
+  changing imported reserve data.
+- **SoftRes health audit** - Extended the local SoftRes readiness report
+  with read-only health severity and issue counts for missing import data,
+  current-item coverage, imported names outside raid, raid members without
+  exact SoftRes, and suggested name matches.
+- **Master workflow state cleanup** - Master status rendering now uses a
+  named workflow-state model for ready, rolling, SR rolling, tie resolution,
+  inventory, trade, and multi-award states while preserving existing user
+  behavior and status text.
+- **Master workflow button state** - Master button and tooltip refresh now
+  consume the workflow-state capability model for roll starts, SR starts,
+  awards, reserve-list access, self-rolls, and loot spam visibility without
+  changing the existing gating behavior.
 - **Raid loot-source database** - Added a static item-to-NPC loot source
   resolver for Vanilla, The Burning Crusade, and Wrath raid boss/encounter
   drops so passive Group Loot and Need Before Greed logging can attribute
@@ -88,22 +119,22 @@ Release-Version: 0.7.1-beta.3
 - **Passive group-loot logger filter** - Group Loot and Need Before Greed
   passive logging now skips green-quality drops, gems, and recipes so DE/Greed
   filler items do not clutter the raid logger.
-- **Performance: Bus event dispatch** — Eliminated per-fire table allocation
+- **Performance: Bus event dispatch** - Eliminated per-fire table allocation
   in `Bus.TriggerEvent`; reuses a static dispatch buffer to reduce GC pressure
   during active raiding (dozens of events/second).
-- **Performance: Proc glow animation** — Throttled sparkle `OnUpdate` to ~30 FPS
+- **Performance: Proc glow animation** - Throttled sparkle `OnUpdate` to ~30 FPS
   (was unthrottled at 60 FPS), cutting `SetPoint` layout recalculations by half
   during glow effects.
-- **Performance: Roll UI model** — Decorated roll rows in-place instead of
+- **Performance: Roll UI model** - Decorated roll rows in-place instead of
   allocating + copying a new table per visible row per refresh; also simplified
   `copyVisibleRollRows` to reference existing rows directly.
-- **Performance: Loot window item info** — When loot-slot hints are available
+- **Performance: Loot window item info** - When loot-slot hints are available
   (loot window path), skip the blocking `GetItemInfo` call and defer tooltip-
   based item cache warming through a timer queue, avoiding micro-freezes on
   `LOOT_OPENED` with many items. Auto-loot suggestion metadata now follows the
   same deferred path, so BoE tooltip checks no longer run synchronously while
   the loot window opens.
-- **Performance: Passive group loot** — Reuse a static `numbers` buffer in
+- **Performance: Passive group loot** - Reuse a static `numbers` buffer in
   `extractGroupLootPatternValues` instead of allocating a new table per
   parsed loot message.
 

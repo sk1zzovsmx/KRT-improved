@@ -16,10 +16,12 @@ local Bus = feature.Bus
 local Core = feature.Core
 local Services = feature.Services
 local Comms = feature.Comms
+local Item = feature.Item
 
 local RT_COLOR = feature.RT_COLOR
 
 local pairs, ipairs = pairs, ipairs
+local tconcat = table.concat
 local format = string.format
 local upper = string.upper
 local type = type
@@ -102,7 +104,7 @@ module.sub = module.sub or {}
 local cmdAchiev, cmdLFM, cmdConfig = { "ach", "achi", "achiev", "achievement" }, { "pug", "lfm", "group", "grouper" }, { "config", "conf", "options", "opt" }
 local cmdChanges, cmdWarnings, cmdLogger = { "ms", "changes", "mschanges" }, { "warning", "warnings", "warn", "rw" }, { "logger", "history", "log" }
 local cmdDebug, cmdLoot, cmdCounter = { "debug", "dbg", "debugger" }, { "loot", "ml", "master" }, { "counter", "counters", "counts" }
-local cmdReserves, cmdMinimap, cmdValidate = { "res", "reserves", "reserve" }, { "minimap", "mm" }, { "validate" }
+local cmdReserves, cmdMinimap, cmdValidate = { "res", "reserves", "reserve", "sr", "softres" }, { "minimap", "mm" }, { "validate" }
 local cmdHelp, cmdBug, cmdVersion = { "help", "commands" }, { "bug", "report" }, { "version", "ver", "about" }
 local cmdPerf = { "perf", "performance" }
 local lootOnlySlashCommands = {}
@@ -752,6 +754,156 @@ local function handleCounterCommand(rest)
     end
 end
 
+local function formatReserveNameMatches(matches)
+    local out = {}
+    for i = 1, #(matches or {}) do
+        local match = matches[i]
+        if match and match.reserveName and match.raidName then
+            out[#out + 1] = L.StrSoftResReadinessNameMatch:format(tostring(match.reserveName), tostring(match.raidName))
+        end
+    end
+    return tconcat(out, ", ")
+end
+
+local function printReadinessLine(template, ...)
+    addon:info(template:format(...))
+end
+
+local function formatSoftResHealthSeverity(severity)
+    if severity == "error" then
+        return L.StrSoftResReadinessHealthError
+    end
+    if severity == "warning" then
+        return L.StrSoftResReadinessHealthWarning
+    end
+    return L.StrSoftResReadinessHealthOk
+end
+
+local function getCurrentSoftResItem()
+    local loot = Services and Services.Loot or nil
+    local link
+    local itemId
+
+    if loot and loot.GetItemLink then
+        link = loot:GetItemLink()
+    end
+    if link and Item and Item.GetItemIdFromLink then
+        itemId = Item.GetItemIdFromLink(link)
+    end
+    return itemId, link
+end
+
+local function printSoftResHealthReport(health)
+    if type(health) ~= "table" then
+        return
+    end
+
+    printReadinessLine(L.MsgSoftResReadinessHealth, formatSoftResHealthSeverity(health.severity))
+    if (tonumber(health.issueCount) or 0) <= 0 then
+        return
+    end
+
+    printReadinessLine(L.MsgSoftResReadinessIssues, tonumber(health.issueCount) or 0)
+    if health.currentItemIssue == "no_reserves" then
+        addon:info(L.MsgSoftResReadinessHealthItemNoReserves)
+    elseif health.currentItemIssue == "no_eligible_reservers" then
+        addon:info(L.MsgSoftResReadinessHealthItemNoEligible)
+    end
+    if (tonumber(health.importedPlayersOutsideRaidCount) or 0) > 0 then
+        printReadinessLine(L.MsgSoftResReadinessHealthImportedOutside, tonumber(health.importedPlayersOutsideRaidCount) or 0)
+    end
+    if (tonumber(health.raidPlayersWithoutReserveCount) or 0) > 0 then
+        printReadinessLine(L.MsgSoftResReadinessHealthRaidWithout, tonumber(health.raidPlayersWithoutReserveCount) or 0)
+    end
+    if (tonumber(health.suggestedNameMatchCount) or 0) > 0 then
+        printReadinessLine(L.MsgSoftResReadinessHealthNameMatches, tonumber(health.suggestedNameMatchCount) or 0)
+    end
+end
+
+local function printSoftResReadinessReport()
+    local reserves = Services and Services.Reserves or nil
+    local itemId
+    local itemLink
+    local report
+    local itemContext
+    local rosterReport
+    local nameMatchReport
+
+    if not (reserves and reserves.GetReadinessReport) then
+        addon:warn(L.MsgFeatureUnavailable, "Reserves", "check")
+        return
+    end
+
+    itemId, itemLink = getCurrentSoftResItem()
+    report = reserves:GetReadinessReport(itemId)
+    if type(report) ~= "table" then
+        addon:warn(L.MsgFeatureUnavailable, "Reserves", "check")
+        return
+    end
+
+    itemContext = report.itemContext or {}
+    rosterReport = report.rosterReport or {}
+    nameMatchReport = report.nameMatchReport or {}
+
+    addon:info(L.MsgSoftResReadinessTitle)
+    if itemLink and itemLink ~= "" then
+        printReadinessLine(L.MsgSoftResReadinessCurrentItem, itemLink)
+    else
+        printReadinessLine(L.MsgSoftResReadinessCurrentItem, L.StrNone)
+    end
+
+    if itemId then
+        if report.hasItemReserves == true then
+            printReadinessLine(L.MsgSoftResReadinessItemSummary, tonumber(itemContext.presentReserveCount) or 0, tonumber(itemContext.totalReserveCount) or 0)
+            if type(itemContext.presentPlayersText) == "string" and itemContext.presentPlayersText ~= "" then
+                printReadinessLine(L.MsgSoftResReadinessItemPresent, itemContext.presentPlayersText)
+            end
+            if type(itemContext.missingPlayersText) == "string" and itemContext.missingPlayersText ~= "" then
+                printReadinessLine(L.MsgSoftResReadinessItemMissing, itemContext.missingPlayersText)
+            end
+        else
+            addon:info(L.MsgSoftResReadinessItemNone)
+        end
+    end
+
+    if report.hasReserveData ~= true then
+        addon:info(L.MsgSoftResReadinessNoData)
+        printSoftResHealthReport(report.health)
+        return
+    end
+
+    printReadinessLine(
+        L.MsgSoftResReadinessRosterSummary,
+        tonumber(rosterReport.totalReservePlayers) or 0,
+        tonumber(rosterReport.presentReservePlayers) or 0,
+        tonumber(rosterReport.missingReservePlayers) or 0
+    )
+    if type(rosterReport.presentPlayersText) == "string" and rosterReport.presentPlayersText ~= "" then
+        printReadinessLine(L.MsgSoftResReadinessRosterPresent, rosterReport.presentPlayersText)
+    end
+    if type(rosterReport.missingPlayersText) == "string" and rosterReport.missingPlayersText ~= "" then
+        printReadinessLine(L.MsgSoftResReadinessRosterMissing, rosterReport.missingPlayersText)
+    end
+
+    printSoftResHealthReport(report.health)
+
+    local strongText = formatReserveNameMatches(nameMatchReport.strongMatches)
+    local weakText = formatReserveNameMatches(nameMatchReport.weakMatches)
+    local matchText = strongText
+    if weakText ~= "" then
+        matchText = matchText ~= "" and (matchText .. ", " .. weakText) or weakText
+    end
+    if matchText ~= "" then
+        printReadinessLine(L.MsgSoftResReadinessNameMatches, matchText)
+    end
+    if type(nameMatchReport.unmatchedReservePlayersText) == "string" and nameMatchReport.unmatchedReservePlayersText ~= "" then
+        printReadinessLine(L.MsgSoftResReadinessUnmatchedReserve, nameMatchReport.unmatchedReservePlayersText)
+    end
+    if type(nameMatchReport.unmatchedRaidPlayersText) == "string" and nameMatchReport.unmatchedRaidPlayersText ~= "" then
+        printReadinessLine(L.MsgSoftResReadinessUnmatchedRaid, nameMatchReport.unmatchedRaidPlayersText)
+    end
+end
+
 local function handleReservesCommand(rest)
     local sub = Strings.SplitArgs(rest)
     local reserves = Services and Services.Reserves or nil
@@ -760,6 +912,8 @@ local function handleReservesCommand(rest)
         callWidget("Reserves", "Toggle")
     elseif sub == "import" then
         callWidget("Reserves", "ToggleImport")
+    elseif sub == "check" or sub == "readiness" then
+        printSoftResReadinessReport()
     elseif sub == "sync" then
         if sync and sync.RequestMetadata then
             sync:RequestMetadata()
@@ -792,6 +946,7 @@ local function handleReservesCommand(rest)
         addon:info(format(L.StrCmdCommands, "krt res"), "KRT")
         printHelp("toggle", L.StrCmdToggle)
         printHelp("import", L.StrCmdReservesImport)
+        printHelp("check", L.StrCmdReservesCheck)
         printHelp("sync", L.StrCmdReservesSync)
         printHelp("meta", L.StrCmdReservesMeta)
         printHelp("clearcache", L.StrCmdReservesClearCache)

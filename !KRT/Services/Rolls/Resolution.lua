@@ -259,6 +259,10 @@ function Resolution.BuildRowInfoText(ctx, response, isTied)
     local responseStatus = ctx.responseStatus or {}
     local reasonCodes = ctx.reasonCodes or {}
 
+    if response and response.outOfFlowReason == reasonCodes.ROLL_LIMIT then
+        return L.StrRollDuplicateTag
+    end
+
     if response and response.isOutOfTime == true then
         return L.StrRollTimedOutTag
     end
@@ -276,6 +280,9 @@ function Resolution.BuildRowInfoText(ctx, response, isTied)
     elseif response.status == responseStatus.INELIGIBLE then
         if response.reason == reasonCodes.NOT_IN_RAID then
             return L.StrRollOutTag
+        end
+        if response.reason == reasonCodes.REROLL_FILTERED then
+            return L.StrRollRerollOnlyTag
         end
         return L.StrRollBlockedTag
     end

@@ -4,6 +4,26 @@ This project follows a simple rule: every user-visible or behavior change gets a
 Dates are in YYYY-MM-DD.
 
 ## Unreleased
+- **UI:** Master now summarizes current-item SoftRes coverage in status and
+  tooltips, including in-raid reservers and imported reserve names outside
+  the raid.
+- **Rolls:** SR roll intake now accepts only in-raid reservers for the
+  current item, keeps out-of-raid reservers visible as ineligible context,
+  and exposes SR reserve counts in the roll display model.
+- **SoftRes:** Reserves now exposes a read-only name-match report for
+  imported names that do not exactly match the current raid roster, with
+  strong/weak suggestions shown in Master tooltips.
+- **SoftRes:** Master now consumes a consolidated read-only readiness report
+  for current-item, roster, and name-match context instead of rebuilding those
+  pieces separately.
+- **Rolls:** Duplicate roll attempts stay excluded from resolver candidates
+  while the accepted roll row shows a `DUP` info tag for Master Loot review.
+- **SoftRes:** Added local `/krt res check` and `/krt sr check` readiness
+  reports for current-item coverage, roster/import state, and possible
+  name mismatches without announcing to raid or changing imported reserves.
+- **Internal:** Master status rendering now uses a named workflow-state model
+  for ready, rolling, SR rolling, tie resolution, inventory, trade, and
+  multi-award states while preserving existing behavior.
 - **UI:** Logger now exports copy-ready CSV for loot and raid attendance from
   the selected raid context.
 - **Bugfix:** Master now loads on Lua 5.1/WoW clients without hitting the

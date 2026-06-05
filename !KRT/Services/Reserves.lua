@@ -969,6 +969,22 @@ do
         return DisplayHelpers.HasCurrentRaidPlayersForItem(getDisplayContext(), itemId, raidNum)
     end
 
+    function Service:GetItemReserveContext(itemId, raidNum)
+        return DisplayHelpers.GetItemReserveContext(getDisplayContext(), itemId, raidNum)
+    end
+
+    function Service:GetRosterReserveMatchReport(raidNum)
+        return DisplayHelpers.GetRosterReserveMatchReport(getDisplayContext(), raidNum)
+    end
+
+    function Service:GetNameMatchReport(raidNum)
+        return DisplayHelpers.GetNameMatchReport(getDisplayContext(), raidNum)
+    end
+
+    function Service:GetReadinessReport(itemId, raidNum)
+        return DisplayHelpers.GetReadinessReport(getDisplayContext(), itemId, raidNum)
+    end
+
     -- ----- SR Announcement Formatting ----- --
 
     -- Returns a list of formatted player tokens for an item.
