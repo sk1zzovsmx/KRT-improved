@@ -229,8 +229,10 @@ local expectedWidgets = {
             "Database/DBOptions",
             "Modules/Events",
             "Modules/Bus",
+            "Modules/Strings",
             "Modules/UI/Facade",
             "Modules/UI/Frames",
+            "Modules/UI/OptionsLayout",
         },
         forbiddenPrefixes = { "Controllers/", "EntryPoints/", "Services/" },
         forbiddenDeps = { "EntryPoints/Minimap" },
@@ -305,6 +307,7 @@ local directRegistryModules = {
     { name = "Modules/UI/Frames", deps = { "Init", "Modules/ModuleRegistry" } },
     { name = "Modules/UI/ListController", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Visuals" } },
     { name = "Modules/UI/MultiSelect", deps = { "Init", "Modules/ModuleRegistry" } },
+    { name = "Modules/UI/OptionsLayout", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames" } },
     { name = "Modules/Bus", deps = { "Init", "Modules/ModuleRegistry" } },
 }
 
@@ -582,6 +585,7 @@ local moduleTocPaths = {
     ["Modules/UI/Frames"] = "Modules\\UI\\Frames.lua",
     ["Modules/UI/ListController"] = "Modules\\UI\\ListController.lua",
     ["Modules/UI/MultiSelect"] = "Modules\\UI\\MultiSelect.lua",
+    ["Modules/UI/OptionsLayout"] = "Modules\\UI\\OptionsLayout.lua",
     ["Modules/Bus"] = "Modules\\Bus.lua",
     ["Services/Chat"] = "Services\\Chat.lua",
     ["Services/Loot/Context"] = "Services\\Loot\\Context.lua",

@@ -57,6 +57,14 @@ local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS = tonumber(C.GROUP_LOOT_PENDING_AWARD
 local BOSS_EVENT_CONTEXT_TTL_SECONDS = tonumber(C.BOSS_EVENT_CONTEXT_TTL_SECONDS) or 30
 local UNCOMMON_ITEM_RARITY = 2
 local UNCOMMON_ITEM_LINK_COLOR = "ff1eff00"
+local DEFAULT_LOGGER_LOOT_QUALITY_THRESHOLD = 4
+local loggerLootQualityThresholds = {
+    [0] = true,
+    [2] = true,
+    [3] = true,
+    [4] = true,
+    [5] = true,
+}
 
 -- =========== Loot Helpers Module  =========== --
 -- Manages the loot window items (fetching from loot/inventory).
@@ -1022,12 +1030,35 @@ do
         return IgnoredItems.Contains(itemId)
     end
 
+    local function normalizeLoggerLootQualityThreshold(value)
+        local threshold = tonumber(value)
+        if threshold and loggerLootQualityThresholds[threshold] then
+            return threshold
+        end
+        return DEFAULT_LOGGER_LOOT_QUALITY_THRESHOLD
+    end
+
+    local function getRaidLootThreshold()
+        if type(GetLootThreshold) == "function" then
+            return tonumber(GetLootThreshold()) or 2
+        end
+        return 2
+    end
+
+    local function getEffectiveLoggerLootThreshold()
+        if addon.options and addon.options.ignoreSelectionThreshold == true then
+            return normalizeLoggerLootQualityThreshold(addon.options.loggerLootQualityThreshold)
+        end
+        return getRaidLootThreshold()
+    end
+
     local function shouldSkipLootEntry(itemRarity, itemId, itemLink)
         -- Ignore low-rarity and explicitly ignored items.
-        local lootThreshold = GetLootThreshold()
-        if itemRarity and itemRarity < lootThreshold then
+        local lootThreshold = getEffectiveLoggerLootThreshold()
+        local rarity = tonumber(itemRarity)
+        if rarity and rarity < lootThreshold then
             if addon.hasDebug then
-                addon:debug(Diag.D.LogLootIgnoredBelowThreshold:format(tostring(itemRarity), tonumber(lootThreshold) or -1, tostring(itemLink)))
+                addon:debug(Diag.D.LogLootIgnoredBelowThreshold:format(tostring(rarity), tonumber(lootThreshold) or -1, tostring(itemLink)))
             end
             return true
         end
@@ -1616,7 +1647,14 @@ do
         return lootNid
     end
 
+    local function shouldIgnoreGroupLoot()
+        return addon.options and addon.options.ignoreGroupLoot == true
+    end
+
     function module:ObservePassiveLootMessage(msg, winnerOnly)
+        if shouldIgnoreGroupLoot() then
+            return nil
+        end
         if winnerOnly then
             return PassiveGroupLoot.ObserveGroupLootWinnerMessage(self, msg)
         end
@@ -1624,14 +1662,23 @@ do
     end
 
     function module:AddPassiveLootRoll(rollId, rollTime)
+        if shouldIgnoreGroupLoot() then
+            return nil
+        end
         return PassiveGroupLoot.AddPassiveLootRoll(self, rollId, rollTime)
     end
 
     function module:AddGroupLootMessage(msg)
+        if shouldIgnoreGroupLoot() then
+            return nil
+        end
         return PassiveGroupLoot.AddGroupLootMessage(self, msg)
     end
 
     function module:GetGroupLootMessageResult(msg)
+        if shouldIgnoreGroupLoot() then
+            return nil
+        end
         return PassiveGroupLoot.ObserveGroupLootMessage(self, msg)
     end
 

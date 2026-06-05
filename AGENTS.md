@@ -170,6 +170,8 @@ Options:
 - Prefer the dominant `_G[frameName .. suffix]` named-frame access pattern.
 - Prefer simple role-gated UI without extra disabled-action tooltips unless requested.
 - Keep shared UI glue in `Init.lua` or `Modules/UI/*`; keep feature-specific UI in feature modules.
+- In options panels, rows with action buttons must reserve a fixed-width right command column.
+- Do not anchor button columns to variable-width or wrapped description text.
 
 Logger visual direction:
 - Wrath raid-log look inspired by MizusRaidTracker.

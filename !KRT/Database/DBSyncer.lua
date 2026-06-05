@@ -11,6 +11,7 @@ local Diag = feature.Diag
 
 local Events = feature.Events
 local Database = feature.Database
+local Options = feature.Options
 local Bus = feature.Bus
 local Strings = feature.Strings
 local Time = feature.Time
@@ -68,12 +69,27 @@ do
     local REQUEST_RATE_PRUNE_SECONDS = REQUEST_RATE_WINDOW_SECONDS * 2
     local SYNC_OFFICER_LOOKUP_GRACE_SECONDS = 2
     local PASSIVE_CLEANUP_INTERVAL_SECONDS = 5
+    local PERSISTENT_SYNC_INTERVAL_SECONDS = 120
+
+    local loggerOptions = Options.AddNamespace("Logger", {
+        persistentSync = false,
+        ignoreGroupLoot = false,
+        ignoreSelectionThreshold = true,
+        loggerLootQualityThreshold = 4,
+        syncRequirePlayer = "",
+        syncPushPlayer = "",
+    })
 
     module._incoming = module._incoming or {}
     module._pendingRequests = module._pendingRequests or {}
     module._requestRate = module._requestRate or {}
     module._nextRequestId = tonumber(module._nextRequestId) or 0
     module._nextPassiveCleanupAt = tonumber(module._nextPassiveCleanupAt) or 0
+    module._persistentSyncHandle = module._persistentSyncHandle or nil
+    module._persistentSyncCallbacksBound = module._persistentSyncCallbacksBound or false
+    if addon.Timer and addon.Timer.BindMixin then
+        addon.Timer.BindMixin(module, "Database/DBSyncer")
+    end
 
     -- ----- Private helpers ----- --
     local function nowSec()
@@ -350,6 +366,10 @@ do
         end
 
         return target
+    end
+
+    local function isPersistentSyncEnabled()
+        return loggerOptions and loggerOptions:Get("persistentSync") == true
     end
 
     local function nextRequestId(syncer)
@@ -1518,7 +1538,7 @@ do
         return true
     end
 
-    function module:RequestLoggerSync()
+    local function requestLoggerSync(syncer, quiet)
         if not ensureGroupSyncAvailable() then
             return false
         end
@@ -1530,9 +1550,9 @@ do
         end
 
         local signature = buildSignatureFromRaid(currentRaid)
-        local requestId = nextRequestId(self)
+        local requestId = nextRequestId(syncer)
 
-        trackPendingRequest(self, requestId, {
+        trackPendingRequest(syncer, requestId, {
             createdAt = nowSec(),
             mode = MODE_SYNC,
             signature = signature,
@@ -1543,9 +1563,85 @@ do
         })
 
         sendRequest(MODE_SYNC, requestId, tonumber(currentRaid.raidNid) or 0, signature)
-        addon:info(L.MsgLoggerSyncSent:format(tonumber(currentRaidId) or 0))
+        if quiet ~= true then
+            addon:info(L.MsgLoggerSyncSent:format(tonumber(currentRaidId) or 0))
+        end
         return true
     end
+
+    function module:RequestLoggerSync()
+        return requestLoggerSync(self, false)
+    end
+
+    function module:RequestLoggerPersistentSync()
+        if not isPersistentSyncEnabled() then
+            return false
+        end
+        if not (addon.IsInGroup and addon.IsInGroup()) then
+            return false
+        end
+        if not getCurrentRaidRecord() then
+            return false
+        end
+        return requestLoggerSync(self, true)
+    end
+
+    local function stopPersistentSync()
+        if module._persistentSyncHandle and module.CancelTimer then
+            module:CancelTimer(module._persistentSyncHandle)
+        end
+        module._persistentSyncHandle = nil
+    end
+
+    local function schedulePersistentSync(delay)
+        if not isPersistentSyncEnabled() then
+            stopPersistentSync()
+            return false
+        end
+        if module._persistentSyncHandle or not module.ScheduleTimer then
+            return module._persistentSyncHandle ~= nil
+        end
+
+        module._persistentSyncHandle = module:ScheduleTimer(function()
+            module._persistentSyncHandle = nil
+            module:RequestLoggerPersistentSync()
+            module:RefreshPersistentSync(PERSISTENT_SYNC_INTERVAL_SECONDS)
+        end, tonumber(delay) or PERSISTENT_SYNC_INTERVAL_SECONDS)
+        return module._persistentSyncHandle ~= nil
+    end
+
+    function module:RefreshPersistentSync(delay)
+        if not isPersistentSyncEnabled() then
+            stopPersistentSync()
+            return false
+        end
+        return schedulePersistentSync(delay)
+    end
+
+    local function bindPersistentSyncCallbacks()
+        if module._persistentSyncCallbacksBound or not (Bus and Bus.RegisterCallback) then
+            return
+        end
+
+        Bus.RegisterCallback(InternalEvents.OptionsLoaded, function()
+            module:RefreshPersistentSync(5)
+        end)
+        local persistentSyncEvent = (Events.GetConfigOptionChanged and Events.GetConfigOptionChanged("persistentSync")) or "ConfigpersistentSync"
+        Bus.RegisterCallback(persistentSyncEvent, function()
+            stopPersistentSync()
+            if isPersistentSyncEnabled() then
+                module:RequestLoggerPersistentSync()
+                module:RefreshPersistentSync(PERSISTENT_SYNC_INTERVAL_SECONDS)
+            end
+        end)
+        Bus.RegisterCallback(InternalEvents.RaidCreate, function()
+            module:RefreshPersistentSync(5)
+        end)
+
+        module._persistentSyncCallbacksBound = true
+    end
+
+    bindPersistentSyncCallbacks()
 
     function module:OnAddonMessage(prefix, msg, channel, sender)
         if prefix ~= COMM_PREFIX then
@@ -1638,6 +1734,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Database/DBRaidQueries",
             "Modules/Events",
             "Modules/Bus",
+            "Modules/Timer",
             "Modules/Strings",
             "Modules/Time",
             "Modules/Comms",

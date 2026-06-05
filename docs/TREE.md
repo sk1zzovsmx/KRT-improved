@@ -68,6 +68,7 @@
 |   |   |   |-- Frames.lua
 |   |   |   |-- ListController.lua
 |   |   |   |-- MultiSelect.lua
+|   |   |   |-- OptionsLayout.lua
 |   |   |   \\-- Visuals.lua
 |   |   |-- Base64.lua
 |   |   |-- Bus.lua
@@ -219,6 +220,7 @@
 |   |-- fixtures
 |   |   \\-- sv
 |   |       \\-- canonical-minimal-01.lua
+|   |-- config_interface_options_spec.lua
 |   |-- controllers_cleanup_spec.lua
 |   |-- logger_visual_refresh_spec.lua
 |   |-- module_registry_database_spec.lua

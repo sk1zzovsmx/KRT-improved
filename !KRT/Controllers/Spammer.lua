@@ -252,7 +252,11 @@ do
 
         if source.message and source.message ~= "" then
             tinsert(outBuf, " - ")
-            tinsert(outBuf, Strings.FindAchievement(source.message))
+            if Strings.FindAchievement then
+                tinsert(outBuf, Strings.FindAchievement(source.message))
+            else
+                tinsert(outBuf, source.message)
+            end
         end
 
         local output = tconcat(outBuf)
@@ -265,6 +269,34 @@ do
         local is25 = (name ~= "" and name:match("%f[%d]25%f[%D]")) ~= nil
         local maxSize = is25 and 25 or 10
         return output .. " (" .. (maxSize - total) .. "/" .. maxSize .. ")"
+    end
+
+    local function buildStateFromStore(store)
+        store = store or getSpammerStore()
+        return {
+            name = store.Name or "",
+            tank = tonumber(store.Tank) or 0,
+            tankClass = store.TankClass or "",
+            healer = tonumber(store.Healer) or 0,
+            healerClass = store.HealerClass or "",
+            melee = tonumber(store.Melee) or 0,
+            meleeClass = store.MeleeClass or "",
+            ranged = tonumber(store.Ranged) or 0,
+            rangedClass = store.RangedClass or "",
+            message = store.Message or "",
+            duration = tostring(store.Duration or DEFAULT_DURATION_STR),
+        }
+    end
+
+    local function buildPanelPreview()
+        local store = getSpammerStore()
+        local state = buildStateFromStore(store)
+        local output = buildSpammerOutput(state, DEFAULT_OUTPUT)
+        return {
+            output = output,
+            length = strlen(output),
+            duration = state.duration,
+        }
     end
 
     -- Deterministic: sync Duration immediately from UI/SV (no waiting for preview tick)
@@ -333,12 +365,18 @@ do
         end
     end
 
+    local function requestRefresh()
+        if module.RequestRefresh then
+            module:RequestRefresh()
+        end
+    end
+
     -- ----- Public methods ----- --
     local function loadSpammerFrame(frame)
         UI.FrameName = Frames.BindModuleFrame(module, frame, {
             enableDrag = true,
             hookOnShow = function()
-                module:RequestRefresh()
+                requestRefresh()
             end,
         }) or UI.FrameName
         UI.Loaded = UI.FrameName ~= nil
@@ -347,7 +385,7 @@ do
         end
 
         if frame:IsShown() then
-            module:RequestRefresh()
+            requestRefresh()
         end
     end
 
@@ -474,17 +512,17 @@ do
 
         loaded = false
         previewDirty = true
-        module:RequestRefresh()
+        requestRefresh()
     end
 
     -- Start/Stop/Pause
     local function refreshSpamUi()
-        module:RequestRefresh()
+        requestRefresh()
     end
 
     local function unlockSpamInputsAndRefresh()
         setInputsLocked(false)
-        module:RequestRefresh()
+        requestRefresh()
     end
 
     startSpam = function()
@@ -523,13 +561,13 @@ do
             })
         end
 
-        module:RequestRefresh()
+        requestRefresh()
     end
 
     stopSpam = function()
         ChatApi.StopSpamCycle(Chat, true, true)
         setInputsLocked(false)
-        module:RequestRefresh()
+        requestRefresh()
     end
 
     function module:RequestStart()
@@ -540,6 +578,15 @@ do
         return stopSpam()
     end
 
+    function module:RequestClear()
+        clearSpammer()
+        return buildPanelPreview()
+    end
+
+    function module:RequestPreview()
+        return buildPanelPreview()
+    end
+
     pauseSpam = function()
         local pausedOk = ChatApi.PauseSpamCycle(Chat)
         if not pausedOk then
@@ -547,7 +594,7 @@ do
         end
 
         setInputsLocked(false)
-        module:RequestRefresh()
+        requestRefresh()
     end
 
     -- Tab
@@ -665,7 +712,7 @@ do
                 end
                 if isUserInput then
                     previewDirty = true
-                    module:RequestRefresh()
+                    requestRefresh()
                 end
             end)
 
@@ -759,10 +806,13 @@ do
         local frame = getFrame()
         if frame then
             setInputsLocked(locked)
+            if UIPrimitives.SetText then
+                UIPrimitives.SetText(getNamedPart("StartBtn"), btnLabel, L.BtnStart, isStop)
+            end
+            if UIPrimitives.EnableDisable then
+                UIPrimitives.EnableDisable(getNamedPart("StartBtn"), canStart)
+            end
         end
-
-        UIPrimitives.SetText(getNamedPart("StartBtn"), btnLabel, L.BtnStart, isStop)
-        UIPrimitives.EnableDisable(getNamedPart("StartBtn"), canStart)
 
         lastControls.locked = locked
         lastControls.canStart = canStart

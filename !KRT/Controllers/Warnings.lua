@@ -19,9 +19,11 @@ local UIPrimitives = addon.UIPrimitives
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
 local _G = _G
+local tconcat = table.concat
 local tinsert, tremove = table.insert, table.remove
 
-local tonumber = tonumber
+local tonumber, tostring = tonumber, tostring
+local lower = string.lower
 
 local requireServiceMethod = Database.RequireServiceMethod
 
@@ -49,6 +51,44 @@ do
     local tempName, tempContent
     local saveWarning, editWarning, deleteWarning, announceWarning
     local isEdit = false
+    local defaultWarningTemplates = {
+        {
+            name = "StrRaidWarningTemplatePullName",
+            content = "StrRaidWarningTemplatePullContent",
+            fallbackName = "Pull",
+            fallbackContent = "Pull in 10 seconds.",
+        },
+        {
+            name = "StrRaidWarningTemplateSpreadName",
+            content = "StrRaidWarningTemplateSpreadContent",
+            fallbackName = "Spread",
+            fallbackContent = "Spread out.",
+        },
+        {
+            name = "StrRaidWarningTemplateStackName",
+            content = "StrRaidWarningTemplateStackContent",
+            fallbackName = "Stack",
+            fallbackContent = "Stack on marker.",
+        },
+        {
+            name = "StrRaidWarningTemplateStopDpsName",
+            content = "StrRaidWarningTemplateStopDpsContent",
+            fallbackName = "Stop DPS",
+            fallbackContent = "Stop DPS now.",
+        },
+        {
+            name = "StrRaidWarningTemplateBloodlustName",
+            content = "StrRaidWarningTemplateBloodlustContent",
+            fallbackName = "Bloodlust",
+            fallbackContent = "Use Bloodlust/Heroism now.",
+        },
+        {
+            name = "StrRaidWarningTemplateBreakName",
+            content = "StrRaidWarningTemplateBreakContent",
+            fallbackName = "Break",
+            fallbackContent = "Break time. Be back soon.",
+        },
+    }
 
     -- ----- Private helpers ----- --
     local function getWarningsStore()
@@ -56,6 +96,99 @@ do
             KRT_Warnings = {}
         end
         return KRT_Warnings
+    end
+
+    local function getTemplateValue(template, key, fallbackKey)
+        local value = template and L[template[key]]
+        if type(value) == "string" and value ~= "" and value ~= template[key] and value ~= ("L." .. template[key]) then
+            return value
+        end
+        return template and template[fallbackKey] or ""
+    end
+
+    local function normalizeTemplateName(value)
+        local text = Strings.TrimText(value or "")
+        return text ~= "" and lower(text) or nil
+    end
+
+    local function resetWarningState()
+        selectedID = nil
+        tempSelectedID = nil
+        lastSelectedID = false
+        lastEditBtnMode = nil
+        tempName = nil
+        tempContent = nil
+        isEdit = false
+    end
+
+    local function ensureDefaultTemplates(refreshReason)
+        local warnings = getWarningsStore()
+        local existing = {}
+        for i = 1, #warnings do
+            local key = normalizeTemplateName(warnings[i] and warnings[i].name)
+            if key then
+                existing[key] = true
+            end
+        end
+
+        local added = 0
+        for i = 1, #defaultWarningTemplates do
+            local template = defaultWarningTemplates[i]
+            local name = getTemplateValue(template, "name", "fallbackName")
+            local key = normalizeTemplateName(name)
+            if key and not existing[key] then
+                tinsert(warnings, {
+                    name = name,
+                    content = getTemplateValue(template, "content", "fallbackContent"),
+                })
+                existing[key] = true
+                added = added + 1
+            end
+        end
+
+        warningsDirty = true
+        fetched = false
+        if refreshReason ~= false and module.RequestRefresh then
+            module:RequestRefresh(refreshReason or "templates")
+        end
+        return {
+            added = added,
+            total = #warnings,
+        }
+    end
+
+    local function isDefaultTemplateWarning(warning)
+        if type(warning) ~= "table" then
+            return false
+        end
+        local warningName = normalizeTemplateName(warning.name)
+        local warningContent = tostring(warning.content or "")
+        for i = 1, #defaultWarningTemplates do
+            local template = defaultWarningTemplates[i]
+            local templateName = normalizeTemplateName(getTemplateValue(template, "name", "fallbackName"))
+            local templateContent = getTemplateValue(template, "content", "fallbackContent")
+            if warningName == templateName and warningContent == templateContent then
+                return true
+            end
+        end
+        return false
+    end
+
+    local function collectStockWarnings(warnings)
+        local stock = {}
+        if type(warnings) ~= "table" then
+            return stock
+        end
+        for i = 1, #warnings do
+            local warning = warnings[i]
+            if isDefaultTemplateWarning(warning) then
+                stock[#stock + 1] = {
+                    name = warning.name,
+                    content = warning.content,
+                }
+            end
+        end
+        return stock
     end
 
     function UI.AcquireRefs(frame)
@@ -314,6 +447,57 @@ do
         return announceWarning(wID)
     end
 
+    function module:RequestEnsureDefaultTemplates()
+        return ensureDefaultTemplates("templates")
+    end
+
+    function module:RequestTemplatePreview()
+        local warnings = getWarningsStore()
+        local lines = {}
+        for i = 1, #warnings do
+            local warning = warnings[i]
+            if warning then
+                lines[#lines + 1] = tostring(i) .. ". " .. tostring(warning.name or "") .. ": " .. tostring(warning.content or "")
+            end
+        end
+        if #lines == 0 then
+            lines[1] = L.StrConfigRaidWarningPreviewEmpty or ""
+        end
+        return {
+            text = tconcat(lines, "\n"),
+            total = #warnings,
+        }
+    end
+
+    function module:RequestClearSavedWarnings(includeStock)
+        local warnings = getWarningsStore()
+        local removed = #warnings
+        local keptStock = includeStock == false and collectStockWarnings(warnings) or nil
+        for i = #warnings, 1, -1 do
+            tremove(warnings, i)
+        end
+
+        resetWarningState()
+        if keptStock then
+            for i = 1, #keptStock do
+                tinsert(warnings, keptStock[i])
+            end
+            removed = removed - #keptStock
+            if removed < 0 then
+                removed = 0
+            end
+        end
+        warningsDirty = true
+        fetched = false
+        if module.RequestRefresh then
+            module:RequestRefresh("clear_saved")
+        end
+        return {
+            removed = removed,
+            total = #warnings,
+        }
+    end
+
     -- Localizing UI frame:
     function UI.Localize()
         if UI.Localized then
@@ -420,6 +604,11 @@ do
         fetched = false
         controller:Dirty()
         module:RequestRefresh()
+    end
+
+    if addon.State and addon.State.warningsSavedVariablesFresh == true then
+        module:RequestEnsureDefaultTemplates()
+        addon.State.warningsSavedVariablesFresh = false
     end
 end
 

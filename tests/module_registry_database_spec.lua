@@ -184,6 +184,7 @@ local postRegistryCoreModules = {
             "Database/DBRaidQueries",
             "Modules/Events",
             "Modules/Bus",
+            "Modules/Timer",
             "Modules/Strings",
             "Modules/Time",
             "Modules/Comms",

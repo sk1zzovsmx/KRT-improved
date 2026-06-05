@@ -39,6 +39,52 @@ Release-Version: 0.7.1-beta.3
 
 ### Enhancements
 
+- **Interface Options panel** - Added a KRT entry under
+  Interface > AddOns that mirrors the existing configuration controls while
+  keeping the Loot Master configuration popup available in its current workflow.
+  The AddOns entry now uses KRT subcategories for Master Loot, Loot History,
+  LFM Spam, Raid Warning, and Help, with the Master Loot options panel
+  scrollable and grouped slash-command guidance available under Help.
+- **Interface Options layout renderer** - Added a local AceConfig-style
+  options layout renderer with fixed text and command columns for every KRT
+  AddOns subpanel, without adding an Ace dependency.
+- **Interface Options overview** - Added a short overview to the root KRT
+  AddOns panel explaining what the addon does, how it works, and why to use it.
+- **Configuration popup footer** - Removed the old author/link footer from the
+  custom configuration popup and moved the bottom controls into the freed space.
+- **Countdown duration slider** - Changed countdown duration selection to snap
+  to a discrete 3-to-60 second ladder instead of fixed five-second steps.
+- **Master Loot option descriptions** - Added short explanations to each
+  Master Loot option in Interface > AddOns while keeping the custom popup compact.
+- **Master Loot preset layout** - Kept the Defaults preset in the preset button
+  row and moved the preset descriptions/buttons onto a fixed grid so they no
+  longer overlap the countdown slider area or each other in Interface Options.
+- **Raid Warning panel layout** - Narrowed the description and command columns
+  so text and buttons no longer clip inside Blizzard's AddOns options panel.
+- **Loot History maintenance panel** - Added Interface > AddOns commands to
+  show a live Loot History report, purge history, rebuild missing loot sources,
+  and run a cleanup popup for empty raid logs, non-epic loot rows, and
+  non-empty raids without boss encounters.
+- **Loot History cleanup popup layout** - Reworked the selectable cleanup
+  popup into fixed option rows so labels and descriptions no longer overlap.
+- **Loot History sync controls** - Added Interface Options controls for
+  persistent logger sync, passive Group Loot ignore, targeted require/push
+  player names, and a current-raid Sync Now command.
+- **Loot History quality threshold** - Added a Logger quality override in
+  Interface Options so Loot History can record only Poor, Uncommon, Rare,
+  Epic, or Legendary-and-above loot, defaulting to Epic instead of the raid's
+  current loot threshold.
+- **Interface Options control center** - Expanded the remaining KRT AddOns
+  subpanels with Loot History data-health reporting, Master Loot presets and
+  announcement preview, LFM Spam message preview and controls, Raid Warning
+  stock templates, saved-warning cleanup, and preview, plus command
+  permission/diagnostic guidance in Help.
+- **Raid Warning stock templates** - Fresh installs now start with the six
+  stock Raid Warning templates, the Add Templates command was removed from the
+  AddOns panel, and Clear All now asks whether stock warnings should be deleted.
+- **LFM Spam panel controls** - Added a Clear command beside Refresh in
+  Interface Options so the saved LFM message draft can be reset without opening
+  the custom spammer frame.
 - **LootFrame SoftRes hints** - Reserved loot items in the Blizzard loot
   window now show a colored reserve border and append a `Reserved by` section
   to the item tooltip with the reserving player names.

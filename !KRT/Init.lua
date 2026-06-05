@@ -439,6 +439,7 @@ do
     KRT_Raids = KRT_Raids or {}
     KRT_Players = KRT_Players or {}
     KRT_Reserves = (type(KRT_Reserves) == "table") and KRT_Reserves or {}
+    addon.State.warningsSavedVariablesFresh = type(KRT_Warnings) ~= "table"
     KRT_Warnings = KRT_Warnings or {}
     KRT_Spammer = KRT_Spammer or {}
     KRT_Options = KRT_Options or {}

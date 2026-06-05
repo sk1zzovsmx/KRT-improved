@@ -49,6 +49,11 @@ local expectedModules = {
         deps = { "Init", "Modules/ModuleRegistry" },
     },
     {
+        name = "Modules/UI/OptionsLayout",
+        path = "!KRT/Modules/UI/OptionsLayout.lua",
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames" },
+    },
+    {
         name = "Modules/Bus",
         path = "!KRT/Modules/Bus.lua",
         deps = { "Init", "Modules/ModuleRegistry" },

@@ -16,14 +16,30 @@ local Services = feature.Services
 local tinsert = table.insert
 local tremove = table.remove
 local ipairs = ipairs
+local pairs, type = pairs, type
 local tonumber, tostring = tonumber, tostring
+local format = string.format
+local lower = string.lower
+local abs = math.abs
 local time = time
+local EPIC_ITEM_RARITY = 4
+local ITEM_LINK_RARITIES = {
+    ff9d9d9d = 0,
+    ffffffff = 1,
+    ff1eff00 = 2,
+    ff0070dd = 3,
+    ffa335ee = 4,
+    ffff8000 = 5,
+    ffe6cc80 = 6,
+    ffe5cc80 = 6,
+}
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Logger", "Actions")
 local Actions = addon.Services.Logger.Actions
 local Store = addon.Services.Logger.Store
 local Helpers = addon.Services.Logger.Helpers
+local LootSources = feature.LootSources or addon.LootSources
 
 -- Controller binding (injected by Controllers/Logger.lua at setup time).
 local _controller = nil
@@ -33,6 +49,18 @@ local resolveLoggerLootEntry
 local applyLoggerLootMutation
 local verifyLoggerLootMutation
 local trimText
+local hasRaidData
+local getCurrentRaidNid
+local restoreCurrentRaidIndex
+local findBossByNid
+local findBossByName
+local findBossBySourceNpcId
+local shouldRebuildLootSource
+local resolveLootSource
+local findOrCreateStaticSourceBoss
+local applyStaticLootSource
+local playerExists
+local scanRaidHistory
 
 -- ----- Private helpers ----- --
 
@@ -52,6 +80,431 @@ local function removeFromList(list, value)
         tremove(list, i)
         i = addon.tIndexOf(list, value)
     end
+end
+
+local function hasTableEntries(value)
+    if type(value) ~= "table" then
+        return false
+    end
+    return next(value) ~= nil
+end
+
+local function countTableEntries(value)
+    if type(value) ~= "table" then
+        return 0
+    end
+    local count = 0
+    for _ in pairs(value) do
+        count = count + 1
+    end
+    return count
+end
+
+local function getRaidFirstTime(raid)
+    local best
+    local bosses = raid and raid.bossKills or {}
+    for i = 1, #bosses do
+        local ts = tonumber(bosses[i] and bosses[i].time)
+        if ts and ts > 0 and (not best or ts < best) then
+            best = ts
+        end
+    end
+    local lootRows = raid and raid.loot or {}
+    for i = 1, #lootRows do
+        local ts = tonumber(lootRows[i] and lootRows[i].time)
+        if ts and ts > 0 and (not best or ts < best) then
+            best = ts
+        end
+    end
+    return best or 0
+end
+
+hasRaidData = function(raid)
+    if type(raid) ~= "table" then
+        return false
+    end
+    return hasTableEntries(raid.players) or hasTableEntries(raid.bossKills) or hasTableEntries(raid.loot) or hasTableEntries(raid.attendance) or hasTableEntries(raid.changes)
+end
+
+local function getLootRarity(loot)
+    if type(loot) ~= "table" then
+        return nil
+    end
+    local rarity = tonumber(loot.itemRarity or loot.itemQuality or loot.quality or loot.rarity)
+    if rarity then
+        return rarity
+    end
+    local color = type(loot.itemLink) == "string" and loot.itemLink:match("|c(%x%x%x%x%x%x%x%x)|Hitem:") or nil
+    if color then
+        return ITEM_LINK_RARITIES[lower(color)]
+    end
+    return nil
+end
+
+local function isNonEpicLoot(loot)
+    local rarity = getLootRarity(loot)
+    return rarity ~= nil and rarity < EPIC_ITEM_RARITY
+end
+
+local function removeNonEpicLoot(raid)
+    local lootRows = type(raid) == "table" and raid.loot or nil
+    if type(lootRows) ~= "table" then
+        return 0
+    end
+    local removed = 0
+    for i = #lootRows, 1, -1 do
+        if isNonEpicLoot(lootRows[i]) then
+            tremove(lootRows, i)
+            removed = removed + 1
+        end
+    end
+    return removed
+end
+
+local function isRaidWithoutBossEncounter(raid)
+    return hasRaidData(raid) and countTableEntries(raid and raid.bossKills) <= 0
+end
+
+playerExists = function(raid, playerNid)
+    local queryNid = tonumber(playerNid)
+    if not (raid and queryNid and queryNid > 0) then
+        return false
+    end
+    local players = raid.players or {}
+    for i = 1, #players do
+        if tonumber(players[i] and players[i].playerNid) == queryNid then
+            return true
+        end
+    end
+    return false
+end
+
+getCurrentRaidNid = function(raidStore)
+    local currentRaid = Database.GetCurrentRaid and Database.GetCurrentRaid() or nil
+    if not currentRaid then
+        return nil
+    end
+    if Database.GetRaidNidById then
+        return Database.GetRaidNidById(currentRaid)
+    end
+    if raidStore and raidStore.GetRaidNidByIndex then
+        return raidStore:GetRaidNidByIndex(currentRaid)
+    end
+    return nil
+end
+
+restoreCurrentRaidIndex = function(raidStore, currentRaidNid)
+    if not Database.SetCurrentRaid then
+        return
+    end
+    if not currentRaidNid then
+        Database.SetCurrentRaid(nil)
+        if Database.SetLastBoss then
+            Database.SetLastBoss(nil)
+        end
+        return
+    end
+
+    local currentRaidId
+    if Database.GetRaidIdByNid then
+        currentRaidId = Database.GetRaidIdByNid(currentRaidNid)
+    elseif raidStore and raidStore.GetRaidIndexByNid then
+        currentRaidId = raidStore:GetRaidIndexByNid(currentRaidNid)
+    end
+    Database.SetCurrentRaid(currentRaidId)
+    if not currentRaidId and Database.SetLastBoss then
+        Database.SetLastBoss(nil)
+    end
+end
+
+findBossByNid = function(raid, bossNid)
+    local queryNid = tonumber(bossNid)
+    if not (raid and queryNid and queryNid > 0) then
+        return nil
+    end
+    local bosses = raid.bossKills or {}
+    for i = 1, #bosses do
+        local boss = bosses[i]
+        if boss and tonumber(boss.bossNid) == queryNid then
+            return boss
+        end
+    end
+    return nil
+end
+
+findBossByName = function(raid, bossName)
+    local queryName = trimText(bossName)
+    if queryName == "" then
+        return nil
+    end
+    local bosses = raid and raid.bossKills or {}
+    for i = 1, #bosses do
+        local boss = bosses[i]
+        local name = boss and trimText(boss.name or boss.boss)
+        if name == queryName then
+            return boss
+        end
+    end
+    return nil
+end
+
+findBossBySourceNpcId = function(raid, sourceNpcId)
+    local queryNpcId = tonumber(sourceNpcId) or 0
+    if queryNpcId <= 0 then
+        return nil
+    end
+    local bosses = raid and raid.bossKills or {}
+    for i = 1, #bosses do
+        local boss = bosses[i]
+        if boss and (tonumber(boss.sourceNpcId) or 0) == queryNpcId then
+            return boss
+        end
+    end
+    return nil
+end
+
+shouldRebuildLootSource = function(raid, loot)
+    if type(loot) ~= "table" then
+        return false
+    end
+
+    local boss = findBossByNid(raid, loot.bossNid)
+    local sourceName = boss and trimText(boss.name or boss.boss) or ""
+    return sourceName == ""
+end
+
+resolveLootSource = function(raid, loot)
+    local resolver = LootSources
+    if type(resolver) ~= "table" or type(resolver.FindSource) ~= "function" then
+        return nil
+    end
+
+    local itemId = tonumber(loot and loot.itemId)
+    if not itemId or itemId <= 0 then
+        return nil
+    end
+
+    local context = {
+        raid = raid and raid.zone or nil,
+        zoneName = raid and raid.zone or nil,
+        instanceName = raid and raid.zone or nil,
+        raidSize = tonumber(raid and raid.size) or 0,
+        difficulty = tonumber(raid and raid.difficulty) or 0,
+    }
+    local source = resolver.FindSource(itemId, context)
+    if type(source) ~= "table" or source.reason == "missing" or source.reason == "ambiguous" then
+        return nil
+    end
+    return source
+end
+
+findOrCreateStaticSourceBoss = function(raid, raidIndex, source, sourceTime)
+    if type(raid) ~= "table" or type(source) ~= "table" then
+        return 0, false
+    end
+
+    local sourceKind = source.kind
+    local sourceNpcId = tonumber(source.npcId) or 0
+    local sourceName = trimText(source.npcName)
+    if sourceName == "" then
+        return 0, false
+    end
+    if sourceKind ~= "shared" and sourceNpcId <= 0 then
+        return 0, false
+    end
+
+    local existingBoss = findBossBySourceNpcId(raid, sourceNpcId) or findBossByName(raid, sourceName)
+    local existingBossNid = tonumber(existingBoss and existingBoss.bossNid) or 0
+    if existingBossNid > 0 then
+        return existingBossNid, false
+    end
+
+    if Database.EnsureRaidSchema then
+        Database.EnsureRaidSchema(raid)
+    end
+    raid.bossKills = raid.bossKills or {}
+
+    local bossNid = tonumber(raid.nextBossNid) or 1
+    raid.nextBossNid = bossNid + 1
+
+    local difficulty = tonumber(raid.difficulty) or 0
+    local hashPrefix = tonumber(raid.raidNid) or tonumber(raidIndex) or 0
+    tinsert(raid.bossKills, {
+        bossNid = bossNid,
+        name = sourceName,
+        sourceNpcId = sourceNpcId,
+        sourceKind = sourceKind,
+        source = "LootSources",
+        difficulty = difficulty,
+        mode = (difficulty == 3 or difficulty == 4) and "h" or "n",
+        players = {},
+        time = tonumber(sourceTime) or time(),
+        hash = Base64.Encode(tostring(hashPrefix) .. "|" .. sourceName .. "|" .. tostring(bossNid)),
+    })
+    return bossNid, true
+end
+
+applyStaticLootSource = function(loot, source, bossNid)
+    loot.bossNid = bossNid
+    loot.lootSource = {
+        kind = source.kind,
+        bossNid = bossNid,
+        sourceNpcId = tonumber(source.npcId) or 0,
+        sourceName = trimText(source.npcName),
+    }
+end
+
+local function scanRaidPlayers(raid, result)
+    local seenNames = {}
+    local playersWithLoot = {}
+    local lootRows = raid.loot or {}
+
+    for i = 1, #lootRows do
+        local looterNid = tonumber(lootRows[i] and lootRows[i].looterNid) or 0
+        if looterNid > 0 then
+            playersWithLoot[looterNid] = true
+        end
+    end
+
+    local players = raid.players or {}
+    for i = 1, #players do
+        local player = players[i]
+        local playerNid = tonumber(player and player.playerNid) or 0
+        local playerName = trimText(player and player.name)
+        if playerNid > 0 and not playersWithLoot[playerNid] then
+            result.playersWithoutLoot = result.playersWithoutLoot + 1
+        end
+        if playerName ~= "" then
+            local key = lower(playerName)
+            local existing = seenNames[key]
+            if existing and existing ~= playerName then
+                result.playerNameConflicts = result.playerNameConflicts + 1
+            elseif not existing then
+                seenNames[key] = playerName
+            end
+        end
+    end
+end
+
+local function scanRaidBosses(raid, result)
+    local lootByBoss = {}
+    local lootRows = raid.loot or {}
+    for i = 1, #lootRows do
+        local bossNid = tonumber(lootRows[i] and lootRows[i].bossNid) or 0
+        if bossNid > 0 then
+            lootByBoss[bossNid] = true
+        end
+    end
+
+    local bosses = raid.bossKills or {}
+    for i = 1, #bosses do
+        local bossNid = tonumber(bosses[i] and bosses[i].bossNid) or 0
+        if bossNid > 0 and not lootByBoss[bossNid] then
+            result.bossesWithoutLoot = result.bossesWithoutLoot + 1
+        end
+    end
+end
+
+local function scanRaidLoot(raid, result)
+    local lootRows = raid.loot or {}
+    for i = 1, #lootRows do
+        local loot = lootRows[i]
+        if type(loot) == "table" then
+            result.lootRows = result.lootRows + 1
+            if isNonEpicLoot(loot) then
+                result.nonEpicLoot = result.nonEpicLoot + 1
+            end
+            local bossNid = tonumber(loot.bossNid) or 0
+            if bossNid <= 0 then
+                result.missingSources = result.missingSources + 1
+            elseif not findBossByNid(raid, bossNid) then
+                result.invalidSources = result.invalidSources + 1
+            end
+
+            local looterNid = tonumber(loot.looterNid) or 0
+            if looterNid > 0 and not playerExists(raid, looterNid) then
+                result.orphanLoot = result.orphanLoot + 1
+            end
+        end
+    end
+end
+
+local function scanRaidAttendance(raid, result)
+    local attendance = raid.attendance or {}
+    for _, row in pairs(attendance) do
+        local playerNid = tonumber(row and row.playerNid) or tonumber(row and row.nid) or 0
+        if playerNid > 0 and not playerExists(raid, playerNid) then
+            result.orphanAttendance = result.orphanAttendance + 1
+        end
+    end
+end
+
+local function countDuplicateRaidCandidates(raids)
+    local count = 0
+    for i = 1, #raids do
+        local left = raids[i]
+        if hasRaidData(left) then
+            local leftTime = getRaidFirstTime(left)
+            for j = i + 1, #raids do
+                local right = raids[j]
+                if
+                    hasRaidData(right)
+                    and trimText(left.zone) == trimText(right.zone)
+                    and (tonumber(left.size) or 0) == (tonumber(right.size) or 0)
+                    and (tonumber(left.difficulty) or 0) == (tonumber(right.difficulty) or 0)
+                then
+                    local rightTime = getRaidFirstTime(right)
+                    if leftTime <= 0 or rightTime <= 0 or abs(leftTime - rightTime) <= 1800 then
+                        count = count + 1
+                    end
+                end
+            end
+        end
+    end
+    return count
+end
+
+scanRaidHistory = function()
+    local requiredMethods = { "GetRawRaids" }
+    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.ScanRaidHistory", requiredMethods) or nil
+    local raids = raidStore and raidStore:GetRawRaids() or nil
+    local result = {
+        raids = 0,
+        emptyRaids = 0,
+        raidsWithoutBosses = 0,
+        lootRows = 0,
+        nonEpicLoot = 0,
+        missingSources = 0,
+        invalidSources = 0,
+        orphanLoot = 0,
+        orphanAttendance = 0,
+        playersWithoutLoot = 0,
+        bossesWithoutLoot = 0,
+        playerNameConflicts = 0,
+        duplicateRaidCandidates = 0,
+    }
+    if type(raids) ~= "table" then
+        return result
+    end
+
+    result.raids = #raids
+    for i = 1, #raids do
+        local raid = raids[i]
+        if type(raid) == "table" then
+            if not hasRaidData(raid) then
+                result.emptyRaids = result.emptyRaids + 1
+            end
+            if isRaidWithoutBossEncounter(raid) then
+                result.raidsWithoutBosses = result.raidsWithoutBosses + 1
+            end
+            scanRaidPlayers(raid, result)
+            scanRaidBosses(raid, result)
+            scanRaidLoot(raid, result)
+            scanRaidAttendance(raid, result)
+        end
+    end
+    result.duplicateRaidCandidates = countDuplicateRaidCandidates(raids)
+    return result
 end
 
 -- ----- Public methods ----- --
@@ -534,6 +987,139 @@ function Actions:DeleteRaidByNid(raidNid)
     end
 
     return true
+end
+
+function Actions:PurgeRaidHistory()
+    local requiredMethods = { "GetRawRaids", "GetAllRaids" }
+    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.PurgeRaidHistory", requiredMethods) or nil
+    local raids = raidStore and raidStore:GetRawRaids() or nil
+    local removed = type(raids) == "table" and #raids or 0
+    if raids then
+        for i = #raids, 1, -1 do
+            tremove(raids, i)
+        end
+        raidStore:GetAllRaids()
+    end
+
+    if Database.SetCurrentRaid then
+        Database.SetCurrentRaid(nil)
+    end
+    if Database.SetLastBoss then
+        Database.SetLastBoss(nil)
+    end
+
+    return {
+        removed = removed,
+    }
+end
+
+function Actions:DeleteEmptyRaids()
+    local result = self:CleanUpRaidHistory({
+        emptyRaids = true,
+    })
+    return {
+        removed = tonumber(result and result.emptyRaids) or 0,
+    }
+end
+
+function Actions:CleanUpRaidHistory(options)
+    options = (type(options) == "table") and options or {}
+    local requiredMethods = { "GetRawRaids", "GetAllRaids" }
+    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.CleanUpRaidHistory", requiredMethods) or nil
+    local raids = raidStore and raidStore:GetRawRaids() or nil
+    local result = {
+        emptyRaids = 0,
+        nonEpicLoot = 0,
+        noBossEncounter = 0,
+        raidsRemoved = 0,
+        lootRemoved = 0,
+    }
+    if type(raids) ~= "table" then
+        return result
+    end
+
+    local currentRaidNid = getCurrentRaidNid(raidStore)
+    local cleanEmptyRaids = options.emptyRaids == true
+    local cleanNonEpicLoot = options.nonEpicLoot == true
+    local cleanNoBossEncounter = options.noBossEncounter == true
+    for i = #raids, 1, -1 do
+        local raid = raids[i]
+        if cleanEmptyRaids and not hasRaidData(raid) then
+            tremove(raids, i)
+            result.emptyRaids = result.emptyRaids + 1
+            result.raidsRemoved = result.raidsRemoved + 1
+        elseif cleanNoBossEncounter and isRaidWithoutBossEncounter(raid) then
+            tremove(raids, i)
+            result.noBossEncounter = result.noBossEncounter + 1
+            result.raidsRemoved = result.raidsRemoved + 1
+        elseif cleanNonEpicLoot then
+            local removedLoot = removeNonEpicLoot(raid)
+            result.nonEpicLoot = result.nonEpicLoot + removedLoot
+            result.lootRemoved = result.lootRemoved + removedLoot
+        end
+    end
+
+    raidStore:GetAllRaids()
+    restoreCurrentRaidIndex(raidStore, currentRaidNid)
+
+    return result
+end
+
+function Actions:RebuildLootSources()
+    local requiredMethods = { "GetAllRaids" }
+    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.RebuildLootSources", requiredMethods) or nil
+    local raids = raidStore and raidStore:GetAllRaids() or nil
+    local result = {
+        raids = 0,
+        scanned = 0,
+        repaired = 0,
+        bossesCreated = 0,
+        unresolved = 0,
+    }
+    if type(raids) ~= "table" then
+        return result
+    end
+
+    for raidIndex = 1, #raids do
+        local raid = raids[raidIndex]
+        if type(raid) == "table" then
+            result.raids = result.raids + 1
+            local changed = false
+            local lootRows = raid.loot or {}
+            for lootIndex = 1, #lootRows do
+                local loot = lootRows[lootIndex]
+                if type(loot) == "table" then
+                    result.scanned = result.scanned + 1
+                    if shouldRebuildLootSource(raid, loot) then
+                        local source = resolveLootSource(raid, loot)
+                        local bossNid, created = findOrCreateStaticSourceBoss(raid, raidIndex, source, loot.time)
+                        if bossNid > 0 then
+                            applyStaticLootSource(loot, source, bossNid)
+                            result.repaired = result.repaired + 1
+                            if created then
+                                result.bossesCreated = result.bossesCreated + 1
+                            end
+                            changed = true
+                        else
+                            result.unresolved = result.unresolved + 1
+                        end
+                    end
+                end
+            end
+            if changed then
+                if Database.EnsureRaidSchema then
+                    Database.EnsureRaidSchema(raid)
+                end
+                Store._InvalidateIndexes(raid)
+            end
+        end
+    end
+
+    return result
+end
+
+function Actions:ScanRaidHistory()
+    return scanRaidHistory()
 end
 
 function Actions:SetCurrentRaid(rID)

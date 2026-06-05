@@ -3544,6 +3544,64 @@ test("db syncer routes requests through whisper and group transports", function(
     assertEqual(groupMessages[1].payload:sub(1, #syncPrefix), syncPrefix, "expected sync payload header to stay stable")
 end)
 
+test("db syncer persistent logger sync schedules current raid sync when enabled", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 77,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            realm = "TestRealm",
+            startTime = 1000,
+            players = {},
+            bossKills = {},
+            loot = {},
+            changes = {},
+        },
+    })
+
+    local groupMessages = {}
+    h.Database.GetCurrentRaid = function()
+        return 1
+    end
+    h.addon.IsInGroup = function()
+        return true
+    end
+    h.addon.IsInRaid = function()
+        return true
+    end
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/Modules/Base64.lua")
+    h:load("!KRT/Database/DBSyncer.lua")
+    h.addon.Comms.Sync = function(prefix, payload)
+        groupMessages[#groupMessages + 1] = {
+            prefix = prefix,
+            payload = payload,
+        }
+    end
+
+    local syncer = h.addon.DB.Syncer
+    h.addon.Options.Set("persistentSync", true)
+    syncer:RefreshPersistentSync(0)
+    h.addon._flushTimers()
+
+    assertEqual(#groupMessages, 1, "expected persistent sync to send one current-raid sync request")
+    assertEqual(groupMessages[1].prefix, "KRTLogSync", "expected persistent sync to use logger sync prefix")
+end)
+
+test("db syncer registers logger loot threshold defaults", function()
+    local h = newHarness()
+
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/Modules/Base64.lua")
+    h:load("!KRT/Database/DBSyncer.lua")
+
+    assertEqual(h.addon.options.ignoreSelectionThreshold, true, "expected logger threshold override to be enabled by default")
+    assertEqual(h.addon.options.loggerLootQualityThreshold, 4, "expected default logger threshold to be Epic")
+end)
+
 test("db syncer skips base64 work for empty snapshot text fields", function()
     local h = newHarness()
     h:installRaidStore({
@@ -4081,7 +4139,6 @@ test("logger view lists only bosses attended by selected raid player", function(
             nextLootNid = 1,
         },
     })
-
     h:load("!KRT/Services/Logger/Store.lua")
     h:load("!KRT/Services/Logger/View.lua")
 
@@ -4219,6 +4276,522 @@ test("logger actions resolve edit winner against boss attendees", function()
     local winner = Actions:ResolveLootEditWinner(1, 101, " bob ")
 
     assertEqual(winner, "Bob", "expected editor winner resolution to use boss attendees")
+end)
+
+test("logger maintenance deletes empty raids and purges history", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 10,
+            zone = "Empty One",
+            players = {},
+            bossKills = {},
+            loot = {},
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+        {
+            schemaVersion = 1,
+            raidNid = 20,
+            zone = "Naxxramas",
+            players = {
+                { playerNid = 1, name = "Alice" },
+            },
+            bossKills = {},
+            loot = {},
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 2,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+        {
+            schemaVersion = 1,
+            raidNid = 30,
+            zone = "Empty Two",
+            players = {},
+            bossKills = {},
+            loot = {},
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    h.addon.State.currentRaid = 2
+    h.addon.State.lastBoss = 99
+    h.Database.SetCurrentRaid = function(raidId)
+        h.addon.State.currentRaid = raidId
+        return raidId
+    end
+    h.Database.GetRaidNidById = function(raidId)
+        local raid = h.store:GetRaidByIndex(raidId)
+        return raid and raid.raidNid or nil
+    end
+    h.Database.GetRaidIdByNid = function(raidNid)
+        return h.store:GetRaidIndexByNid(raidNid)
+    end
+
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/Helpers.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
+
+    local Actions = h.addon.Services.Logger.Actions
+    local removedEmpty = Actions:DeleteEmptyRaids()
+
+    assertEqual(removedEmpty.removed, 2, "expected empty raid maintenance to delete two empty raids")
+    assertEqual(#_G.KRT_Raids, 1, "expected populated raid to remain after deleting empty raids")
+    assertEqual(_G.KRT_Raids[1].raidNid, 20, "expected populated raid nid to remain stable")
+    assertEqual(h.Database.GetCurrentRaid(), 1, "expected current raid index to follow the remaining current raid nid")
+
+    local purged = Actions:PurgeRaidHistory()
+
+    assertEqual(purged.removed, 1, "expected purge to remove remaining history")
+    assertEqual(#_G.KRT_Raids, 0, "expected purge to clear all raid logs")
+    assertEqual(h.Database.GetCurrentRaid(), nil, "expected purge to clear current raid selection")
+    assertEqual(h.Database.GetLastBoss(), nil, "expected purge to clear last boss selection")
+end)
+
+test("logger maintenance clean up removes selected low value history", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 10,
+            zone = "Empty Raid",
+            players = {},
+            bossKills = {},
+            loot = {},
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+        {
+            schemaVersion = 1,
+            raidNid = 20,
+            zone = "Naxxramas",
+            players = {
+                { playerNid = 1, name = "Alice" },
+            },
+            bossKills = {
+                { bossNid = 11, name = "Anub'Rekhan", time = 1000 },
+            },
+            loot = {
+                { lootNid = 1, itemName = "Epic Loot", itemRarity = 4, bossNid = 11, time = 1010 },
+                { lootNid = 2, itemName = "Rare Loot", itemRarity = 3, bossNid = 11, time = 1020 },
+                {
+                    lootNid = 3,
+                    itemName = "Legendary Loot",
+                    itemLink = "|cffff8000|Hitem:90003:0:0:0:0:0:0:0|h[Legendary Loot]|h|r",
+                    bossNid = 11,
+                    time = 1030,
+                },
+            },
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 2,
+            nextBossNid = 12,
+            nextLootNid = 4,
+        },
+        {
+            schemaVersion = 1,
+            raidNid = 30,
+            zone = "No Boss",
+            players = {
+                { playerNid = 1, name = "Alice" },
+            },
+            bossKills = {},
+            loot = {
+                { lootNid = 1, itemName = "Bossless Epic", itemRarity = 4, time = 1010 },
+            },
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 2,
+            nextBossNid = 1,
+            nextLootNid = 2,
+        },
+    })
+    h.addon.State.currentRaid = 2
+    h.Database.SetCurrentRaid = function(raidId)
+        h.addon.State.currentRaid = raidId
+        return raidId
+    end
+    h.Database.GetRaidNidById = function(raidId)
+        local raid = h.store:GetRaidByIndex(raidId)
+        return raid and raid.raidNid or nil
+    end
+    h.Database.GetRaidIdByNid = function(raidNid)
+        return h.store:GetRaidIndexByNid(raidNid)
+    end
+
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/Helpers.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
+
+    local Actions = h.addon.Services.Logger.Actions
+    local preview = Actions:ScanRaidHistory()
+
+    assertEqual(preview.emptyRaids, 1, "expected cleanup preview to count empty raids")
+    assertEqual(preview.nonEpicLoot, 1, "expected cleanup preview to count non-epic loot")
+    assertEqual(preview.raidsWithoutBosses, 1, "expected cleanup preview to count non-empty raids without boss encounters")
+
+    local result = Actions:CleanUpRaidHistory({
+        emptyRaids = true,
+        nonEpicLoot = true,
+        noBossEncounter = true,
+    })
+
+    assertEqual(result.emptyRaids, 1, "expected cleanup to remove the empty raid")
+    assertEqual(result.noBossEncounter, 1, "expected cleanup to remove the raid without boss encounters")
+    assertEqual(result.nonEpicLoot, 1, "expected cleanup to remove one non-epic loot row")
+    assertEqual(result.raidsRemoved, 2, "expected cleanup to report removed raid logs")
+    assertEqual(result.lootRemoved, 1, "expected cleanup to report removed loot rows")
+    assertEqual(#_G.KRT_Raids, 1, "expected only the raid with boss encounters to remain")
+    assertEqual(#_G.KRT_Raids[1].loot, 2, "expected only epic-or-better loot rows to remain")
+    assertEqual(_G.KRT_Raids[1].loot[1].itemName, "Epic Loot", "expected epic loot to remain")
+    assertEqual(_G.KRT_Raids[1].loot[2].itemName, "Legendary Loot", "expected legendary loot to remain")
+    assertEqual(h.Database.GetCurrentRaid(), 1, "expected current raid index to follow the remaining raid nid")
+end)
+
+test("logger maintenance no boss cleanup does not delete empty raids unless selected", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 10,
+            zone = "Empty Raid",
+            players = {},
+            bossKills = {},
+            loot = {},
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+        {
+            schemaVersion = 1,
+            raidNid = 20,
+            zone = "No Boss",
+            players = {
+                { playerNid = 1, name = "Alice" },
+            },
+            bossKills = {},
+            loot = {
+                { lootNid = 1, itemName = "Bossless Epic", itemRarity = 4, time = 1010 },
+            },
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 2,
+            nextBossNid = 1,
+            nextLootNid = 2,
+        },
+    })
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/Helpers.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
+
+    local result = h.addon.Services.Logger.Actions:CleanUpRaidHistory({
+        noBossEncounter = true,
+    })
+
+    assertEqual(result.emptyRaids, 0, "expected no-boss cleanup not to count empty raids")
+    assertEqual(result.noBossEncounter, 1, "expected no-boss cleanup to remove one non-empty no-boss raid")
+    assertEqual(#_G.KRT_Raids, 1, "expected the empty raid to remain when Empty Raid is not selected")
+    assertEqual(_G.KRT_Raids[1].raidNid, 10, "expected the remaining raid to be the empty raid")
+end)
+
+test("logger maintenance rebuilds missing loot sources from static source data", function()
+    local h = newHarness()
+    local link = h.registerItem(91730, "Resolver Boss Blade")
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            players = {},
+            bossKills = {},
+            loot = {
+                {
+                    lootNid = 101,
+                    itemId = 91730,
+                    itemLink = link,
+                    itemName = "Resolver Boss Blade",
+                    bossNid = 0,
+                    time = 1100,
+                },
+            },
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 102,
+        },
+    })
+
+    h:load("!KRT/Modules/LootSources.lua")
+    h.addon.LootSources._SetDataForTests({
+        [91730] = {
+            {
+                npcId = 15953,
+                npcName = "Grand Widow Faerlina",
+                raid = "Naxxramas",
+                kind = "boss",
+            },
+        },
+    })
+    h.feature.LootSources = h.addon.LootSources
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/Helpers.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
+
+    local Actions = h.addon.Services.Logger.Actions
+    local result = Actions:RebuildLootSources()
+    local raid = h.Database.EnsureRaidById(1)
+
+    assertEqual(result.repaired, 1, "expected one loot row to be repaired")
+    assertEqual(result.bossesCreated, 1, "expected source rebuild to create one static source record")
+    assertEqual(#raid.bossKills, 1, "expected static source boss to be stored on the raid")
+    assertEqual(raid.bossKills[1].name, "Grand Widow Faerlina", "expected static source boss name")
+    assertEqual(raid.loot[1].bossNid, raid.bossKills[1].bossNid, "expected missing loot source to bind to the rebuilt boss")
+    assertEqual(raid.loot[1].lootSource.kind, "boss", "expected rebuilt loot row to store provenance kind")
+    assertEqual(raid.loot[1].lootSource.sourceName, "Grand Widow Faerlina", "expected rebuilt loot row to store provenance name")
+end)
+
+test("logger maintenance scans history report metrics", function()
+    local h = newHarness()
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 101,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            players = {
+                { playerNid = 1, name = "Alice" },
+                { playerNid = 2, name = "alice" },
+            },
+            bossKills = {
+                { bossNid = 11, name = "Anub'Rekhan", time = 1000 },
+            },
+            loot = {
+                { lootNid = 1, itemId = 90001, itemName = "Valid Loot", bossNid = 11, looterNid = 1, time = 1010 },
+                { lootNid = 2, itemId = 90002, itemName = "Missing Source", itemRarity = 3, bossNid = 0, time = 1020 },
+                {
+                    lootNid = 3,
+                    itemId = 90003,
+                    itemName = "Invalid Source",
+                    bossNid = 999,
+                    looterNid = 99,
+                    time = 1030,
+                },
+            },
+            attendance = {
+                { playerNid = 88 },
+            },
+            changes = {},
+            nextPlayerNid = 3,
+            nextBossNid = 12,
+            nextLootNid = 4,
+        },
+        {
+            schemaVersion = 1,
+            raidNid = 102,
+            zone = "Naxxramas",
+            size = 25,
+            difficulty = 4,
+            players = {
+                { playerNid = 1, name = "Alice" },
+            },
+            bossKills = {
+                { bossNid = 11, name = "Anub'Rekhan", time = 1015 },
+            },
+            loot = {},
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 2,
+            nextBossNid = 12,
+            nextLootNid = 1,
+        },
+        {
+            schemaVersion = 1,
+            raidNid = 103,
+            zone = "Empty",
+            players = {},
+            bossKills = {},
+            loot = {},
+            attendance = {},
+            changes = {},
+            nextPlayerNid = 1,
+            nextBossNid = 1,
+            nextLootNid = 1,
+        },
+    })
+    _G.KRT_Raids[1].loot[3].looterNid = 99
+    _G.KRT_Raids[1].attendance = {
+        { playerNid = 88 },
+    }
+
+    h:load("!KRT/Services/Logger/Store.lua")
+    h:load("!KRT/Services/Logger/Helpers.lua")
+    h:load("!KRT/Services/Logger/Actions.lua")
+
+    local Actions = h.addon.Services.Logger.Actions
+    local result = Actions:ScanRaidHistory()
+
+    assertEqual(result.raids, 3, "expected scan to count all raids")
+    assertEqual(result.emptyRaids, 1, "expected scan to count empty raids")
+    assertEqual(result.raidsWithoutBosses, 0, "expected scan not to count empty raids as no-boss encounters")
+    assertEqual(result.lootRows, 3, "expected scan to count loot rows")
+    assertEqual(result.nonEpicLoot, 1, "expected scan to count non-epic loot")
+    assertEqual(result.missingSources, 1, "expected scan to count loot rows without a source")
+    assertEqual(result.invalidSources, 1, "expected scan to count loot rows pointing at missing bosses")
+    assertEqual(result.orphanLoot, 1, "expected scan to count loot rows pointing at missing looters")
+    assertEqual(result.orphanAttendance, 1, "expected scan to count attendance rows pointing at missing players")
+    assertEqual(result.playerNameConflicts, 1, "expected scan to count case-only player-name conflicts")
+    assertEqual(result.duplicateRaidCandidates, 1, "expected scan to count one nearby duplicate raid candidate")
+end)
+
+test("spammer panel preview reads the saved LFM draft", function()
+    local h = newHarness()
+    _G.KRT_Spammer = {
+        Name = "ICC 25",
+        Duration = "60",
+        Tank = "1",
+        Healer = "5",
+        Melee = "8",
+        Ranged = "10",
+        Message = "full clear",
+    }
+
+    h:load("!KRT/Controllers/Spammer.lua")
+
+    local Spammer = h.addon.Controllers.Spammer
+    local preview = Spammer:RequestPreview()
+
+    assertEqual(_G.KRT_Spammer.Name, "ICC 25", "expected preview to leave saved raid name unchanged")
+    assertEqual(_G.KRT_Spammer.Duration, "60", "expected preview to read saved duration")
+    assertTextContains(preview.output, "LFM ICC 25", "expected preview to use saved raid name")
+    assertTextContains(preview.output, "Need", "expected preview to include role needs")
+    assertTrue(preview.length > 3, "expected preview to report message length")
+
+    local cleared = Spammer:RequestClear()
+
+    assertEqual(_G.KRT_Spammer.Name, nil, "expected clear to remove saved raid name")
+    assertEqual(_G.KRT_Spammer.Message, nil, "expected clear to remove saved message")
+    assertEqual(_G.KRT_Spammer.Duration, "60", "expected clear to restore default duration")
+    assertEqual(cleared.output, "LFM", "expected clear to reset preview output")
+    assertEqual(cleared.length, 3, "expected clear to report the default preview length")
+end)
+
+test("warnings panel templates add default raid warnings without duplicates", function()
+    local h = newHarness()
+    _G.KRT_Warnings = {}
+    h.addon.UIScaffold.CreateListPanelScaffold = function()
+        return {
+            OnLoad = function(_, frame)
+                return frame and frame.GetName and frame:GetName() or "KRTWarnings"
+            end,
+            Refresh = function() end,
+        }
+    end
+
+    h:load("!KRT/Controllers/Warnings.lua")
+
+    local Warnings = h.addon.Controllers.Warnings
+    local result = Warnings:RequestEnsureDefaultTemplates()
+    local second = Warnings:RequestEnsureDefaultTemplates()
+    local preview = Warnings:RequestTemplatePreview()
+
+    assertEqual(result.added, 6, "expected missing default templates to be added")
+    assertEqual(second.added, 0, "expected template install to be idempotent")
+    assertEqual(#_G.KRT_Warnings, 6, "expected default warnings to be stored once")
+    assertTextContains(preview.text, "Pull", "expected template preview to include existing pull template")
+    assertTextContains(preview.text, "Stop DPS", "expected template preview to include default stop DPS template")
+end)
+
+test("warnings panel seeds stock templates for fresh saved variables", function()
+    local h = newHarness()
+    _G.KRT_Warnings = {}
+    h.addon.State.warningsSavedVariablesFresh = true
+    h.addon.UIScaffold.CreateListPanelScaffold = function()
+        return {
+            OnLoad = function(_, frame)
+                return frame and frame.GetName and frame:GetName() or "KRTWarnings"
+            end,
+            Refresh = function() end,
+        }
+    end
+
+    h:load("!KRT/Controllers/Warnings.lua")
+
+    assertEqual(#_G.KRT_Warnings, 6, "expected fresh saved variables to seed stock warning templates")
+    assertEqual(h.addon.State.warningsSavedVariablesFresh, false, "expected fresh warning seed flag to be consumed")
+end)
+
+test("warnings panel clear saved warnings removes every saved message", function()
+    local h = newHarness()
+    _G.KRT_Warnings = {
+        { name = "Pull", content = "Pull in 10 seconds." },
+        { name = "Stack", content = "Stack on marker." },
+    }
+    h.addon.L.StrConfigRaidWarningPreviewEmpty = "No raid warnings configured."
+    h.addon.UIScaffold.CreateListPanelScaffold = function()
+        return {
+            OnLoad = function(_, frame)
+                return frame and frame.GetName and frame:GetName() or "KRTWarnings"
+            end,
+            Refresh = function() end,
+        }
+    end
+
+    h:load("!KRT/Controllers/Warnings.lua")
+
+    local Warnings = h.addon.Controllers.Warnings
+    local result = Warnings:RequestClearSavedWarnings()
+    local preview = Warnings:RequestTemplatePreview()
+
+    assertEqual(result.removed, 2, "expected clear saved warnings to report removed messages")
+    assertEqual(result.total, 0, "expected clear saved warnings to report an empty store")
+    assertEqual(#_G.KRT_Warnings, 0, "expected clear saved warnings to empty KRT_Warnings")
+    assertTextContains(preview.text, "No raid warnings configured.", "expected preview to show the empty warning state")
+end)
+
+test("warnings panel clear saved warnings can keep stock templates", function()
+    local h = newHarness()
+    _G.KRT_Warnings = {}
+    h.addon.UIScaffold.CreateListPanelScaffold = function()
+        return {
+            OnLoad = function(_, frame)
+                return frame and frame.GetName and frame:GetName() or "KRTWarnings"
+            end,
+            Refresh = function() end,
+        }
+    end
+
+    h:load("!KRT/Controllers/Warnings.lua")
+
+    local Warnings = h.addon.Controllers.Warnings
+    Warnings:RequestEnsureDefaultTemplates()
+    table.insert(_G.KRT_Warnings, { name = "Custom", content = "Custom warning." })
+
+    local result = Warnings:RequestClearSavedWarnings(false)
+    local preview = Warnings:RequestTemplatePreview()
+
+    assertEqual(result.removed, 1, "expected clear saved warnings to report removed custom messages")
+    assertEqual(result.total, 6, "expected stock templates to be restored when stock deletion is declined")
+    assertEqual(#_G.KRT_Warnings, 6, "expected stock templates to remain after custom cleanup")
+    assertTextContains(preview.text, "Pull", "expected restored stock templates to include Pull")
+    assertTrue(preview.text:find("Custom", 1, true) == nil, "expected custom warnings to be removed")
 end)
 
 test("loot context helpers stay service-owned without Database backdoor", function()
@@ -6187,6 +6760,138 @@ test("loot service observes passive winner messages through one facade", functio
     assertEqual(observedType, "winner", "expected passive winner message to be observed through facade")
     assertEqual(parsedLoot.itemLink, link, "expected facade to return parsed passive loot payload")
     assertEqual(parsedLoot.rollValue, 88, "expected facade to preserve parsed roll value")
+end)
+
+test("loot service ignore group loot option suppresses passive group loot observation", function()
+    local h = newHarness()
+    local link = h.registerItem(915813, "Ignored Group Loot Blade")
+
+    h.addon.options.ignoreGroupLoot = true
+    _G.GetLootMethod = function()
+        return "group", nil, nil
+    end
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "greed-win-self" then
+            return 91, 88, link
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    local Loot = h.addon.Services.Loot
+
+    local observedType, parsedLoot = Loot:ObservePassiveLootMessage("greed-win-self", true)
+    assertEqual(observedType, nil, "expected Ignore GroupLoot to suppress passive winner recognition")
+    assertEqual(parsedLoot, nil, "expected Ignore GroupLoot to suppress parsed passive loot payload")
+    assertEqual(Loot:AddGroupLootMessage("greed-win-self"), nil, "expected Ignore GroupLoot to suppress group loot message capture")
+    assertEqual(Loot:AddPassiveLootRoll(91, 45000), nil, "expected Ignore GroupLoot to suppress passive roll capture")
+end)
+
+test("loot service logger quality override filters below selected threshold", function()
+    local h = newHarness()
+    local rareLink = h.registerItem(915814, "Rare Logger Blade", 3)
+    local epicLink = h.registerItem(915815, "Epic Logger Blade", 4)
+    h.addon.options.ignoreSelectionThreshold = true
+    h.addon.options.loggerLootQualityThreshold = 4
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Database.GetCurrentRaid = function()
+        return 1
+    end
+    h.Database.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetLootThreshold = function()
+        return 0
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "rare-loot-self" then
+            return rareLink
+        end
+        if pattern == _G.LOOT_ITEM_SELF and msg == "epic-loot-self" then
+            return epicLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    Raid:AddLoot("rare-loot-self")
+    Raid:AddLoot("epic-loot-self")
+
+    local raid = h.Database.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected configured Epic logger threshold to skip rare loot")
+    assertEqual(raid.loot[1].itemId, 915815, "expected configured Epic logger threshold to keep epic loot")
+end)
+
+test("loot service uses raid threshold when logger override is disabled", function()
+    local h = newHarness()
+    local rareLink = h.registerItem(915816, "Raid Threshold Rare", 3)
+    h.addon.options.ignoreSelectionThreshold = false
+    h.addon.options.loggerLootQualityThreshold = 4
+    h:installRaidStore({
+        {
+            schemaVersion = 1,
+            raidNid = 1,
+            players = {},
+            bossKills = {
+                { bossNid = 10, boss = "Sapphiron" },
+            },
+            loot = {},
+            nextPlayerNid = 1,
+            nextBossNid = 11,
+            nextLootNid = 1,
+        },
+    })
+    h.Database.GetCurrentRaid = function()
+        return 1
+    end
+    h.Database.GetLastBoss = function()
+        return 10
+    end
+    _G.GetLootMethod = function()
+        return "master", nil, nil
+    end
+    _G.GetLootThreshold = function()
+        return 3
+    end
+
+    h.addon.Deformat = function(msg, pattern)
+        if pattern == _G.LOOT_ITEM_SELF and msg == "rare-loot-self" then
+            return rareLink
+        end
+        return nil
+    end
+
+    h:load("!KRT/Services/Loot.lua")
+    h.feature.Services = h.addon.Services
+    h:load("!KRT/Services/Raid.lua")
+    local Raid = h.addon.Services.Raid
+
+    Raid:AddLoot("rare-loot-self")
+
+    local raid = h.Database.EnsureRaidById(1)
+    assertEqual(#raid.loot, 1, "expected disabled logger override to keep loot allowed by raid threshold")
+    assertEqual(raid.loot[1].itemId, 915816, "expected disabled logger override to ignore configured Epic threshold")
 end)
 
 test("passive group loot failed winner parse is reused when logging normal loot", function()

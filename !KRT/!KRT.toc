@@ -61,6 +61,7 @@ Modules\UI\Visuals.lua
 Modules\UI\Frames.lua
 Modules\UI\ListController.lua
 Modules\UI\MultiSelect.lua
+Modules\UI\OptionsLayout.lua
 Modules\Bus.lua
 
 # Layer 5 - Runtime modules (ordered by dependency)
