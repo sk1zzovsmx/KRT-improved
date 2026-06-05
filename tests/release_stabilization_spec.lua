@@ -2139,6 +2139,10 @@ local function newHarness()
                 "!KRT/Services/Loot/Rules.lua",
                 "!KRT/Services/Loot/Service.lua",
             }
+            local lootSourceFiles = {
+                "!KRT/Modules/LootSourcesData.lua",
+                "!KRT/Modules/LootSources.lua",
+            }
             local raidServiceFiles = {
                 "!KRT/Services/Raid/State.lua",
                 "!KRT/Services/Raid/Capabilities.lua",
@@ -2159,12 +2163,22 @@ local function newHarness()
                 end
             end
 
+            if path == "!KRT/Modules/LootSources.lua" then
+                loadFiles(lootSourceFiles)
+                feature.LootSources = addon.LootSources
+                return addon.LootSources
+            end
+
             if path == "!KRT/Services/Loot.lua" then
+                loadFiles(lootSourceFiles)
+                feature.LootSources = addon.LootSources
                 loadFiles(lootServiceFiles)
                 return addon.Services.Loot
             end
 
             if path == "!KRT/Services/Raid.lua" then
+                loadFiles(lootSourceFiles)
+                feature.LootSources = addon.LootSources
                 loadFiles(lootServiceFiles)
                 loadFiles(raidServiceFiles)
                 local raid = addon.Services.Raid
@@ -3559,6 +3573,112 @@ test("trade-only loot creates a reusable lootNid", function()
     assertEqual(raid.loot[1].rollValue, 77, "expected logger update to keep same entry")
 end)
 
+test("loot source resolver filters candidates by raid and mode", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/LootSources.lua")
+
+    h.addon.LootSources.SetDataForTests({
+        [91710] = {
+            {
+                npcId = 15953,
+                npcName = "Grand Widow Faerlina",
+                raid = "Naxxramas",
+                kind = "boss",
+                modes = { normal10 = true },
+            },
+            {
+                npcId = 36612,
+                npcName = "Lord Marrowgar",
+                raid = "Icecrown Citadel",
+                kind = "boss",
+                modes = { normal10 = true },
+            },
+            {
+                npcId = 15954,
+                npcName = "Noth the Plaguebringer",
+                raid = "Naxxramas",
+                kind = "boss",
+                modes = { normal25 = true },
+            },
+        },
+    })
+
+    local resolved = h.addon.LootSources.FindSource(91710, {
+        raid = "Naxxramas",
+        difficulty = 3,
+        raidSize = 10,
+    })
+
+    assertEqual(resolved.reason, nil, "expected a resolved source")
+    assertEqual(resolved.npcId, 15953, "expected the Naxxramas source to match")
+    assertEqual(resolved.npcName, "Grand Widow Faerlina", "expected resolved boss name")
+    assertEqual(resolved.kind, "boss", "expected boss source kind")
+    assertEqual(resolved.confidence, "exact", "expected exact source confidence")
+end)
+
+test("loot source resolver refuses ambiguous candidates without context", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/LootSources.lua")
+
+    h.addon.LootSources.SetDataForTests({
+        [91712] = {
+            { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "boss" },
+            { npcId = 15954, npcName = "Noth the Plaguebringer", raid = "Naxxramas", kind = "boss" },
+        },
+    })
+
+    local resolved = h.addon.LootSources.FindSource(91712)
+
+    assertEqual(resolved.reason, "ambiguous", "expected shared boss item to stay ambiguous")
+    assertEqual(#resolved.candidates, 2, "expected both candidates to be reported")
+end)
+
+test("loot source resolver ignores malformed candidates", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/LootSources.lua")
+
+    h.addon.LootSources.SetDataForTests({
+        [91713] = {
+            { kind = "boss" },
+            { npcId = 0, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "boss" },
+            { npcId = 15953, npcName = "", raid = "Naxxramas", kind = "boss" },
+            { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "", kind = "boss" },
+            { npcId = 15953, npcName = "Grand Widow Faerlina", raid = "Naxxramas", kind = "unknown" },
+        },
+    })
+
+    local resolved = h.addon.LootSources.FindSource(91713)
+
+    assertEqual(resolved.reason, "missing", "expected malformed candidates to be ignored")
+    assertEqual(#resolved.candidates, 0, "expected no malformed candidates to be reported")
+end)
+
+test("loot source candidates do not expose mutable mode data", function()
+    local h = newHarness()
+    h:load("!KRT/Modules/LootSources.lua")
+
+    h.addon.LootSources.SetDataForTests({
+        [91714] = {
+            {
+                npcId = 15953,
+                npcName = "Grand Widow Faerlina",
+                raid = "Naxxramas",
+                kind = "boss",
+                modes = { normal10 = true },
+            },
+        },
+    })
+
+    local candidates = h.addon.LootSources.GetCandidates(91714)
+    candidates[1].modes.normal10 = false
+    candidates[1].modes.heroic25 = true
+
+    local freshCandidates = h.addon.LootSources.GetCandidates(91714)
+
+    assertTrue(freshCandidates[1].modes.normal10 == true, "expected mode flags to be copied from backing data")
+    assertTrue(freshCandidates[1].modes.heroic25 == nil, "expected returned mode mutations not to affect backing data")
+end)
+
 test("group loot need selections log passive NE history on loot receipt", function()
     local h = newHarness()
     local link = h.registerItem(9150, "Needblade")
@@ -4365,12 +4485,23 @@ test("loot window recent trash death blocks boss event recovery without unit pro
     assertEqual(raid.loot[1].bossNid, 2, "expected recent trash loot to bind to TrashMob")
 end)
 
-test("loot source recovery does not load static item source tables", function()
+test("loot source modules load after item helpers and before ignored item tables", function()
     local file = assert(io.open("!KRT/!KRT.toc", "r"))
     local toc = file:read("*a")
     file:close()
 
-    assertTrue(string.find(toc, "Modules\\LootSources.lua", 1, true) == nil, "expected loot source recovery to avoid static item-to-boss tables")
+    local itemIndex = string.find(toc, "Modules\\Item.lua", 1, true)
+    local dataIndex = string.find(toc, "Modules\\LootSourcesData.lua", 1, true)
+    local resolverIndex = string.find(toc, "Modules\\LootSources.lua", 1, true)
+    local ignoredIndex = string.find(toc, "Modules\\IgnoredItems.lua", 1, true)
+
+    assertTrue(itemIndex ~= nil, "expected Item module in TOC")
+    assertTrue(dataIndex ~= nil, "expected LootSourcesData module in TOC")
+    assertTrue(resolverIndex ~= nil, "expected LootSources module in TOC")
+    assertTrue(ignoredIndex ~= nil, "expected IgnoredItems module in TOC")
+    assertTrue(itemIndex < dataIndex, "expected LootSourcesData to load after Item")
+    assertTrue(dataIndex < resolverIndex, "expected LootSources to load after LootSourcesData")
+    assertTrue(resolverIndex < ignoredIndex, "expected LootSources to load before IgnoredItems")
 end)
 
 test("loot window recent boss death resolves boss context without raid target probes", function()
