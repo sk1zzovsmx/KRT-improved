@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
@@ -36,10 +36,11 @@ local ITEM_LINK_RARITIES = {
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Logger", "Actions")
-local Actions = addon.Services.Logger.Actions
-local Store = addon.Services.Logger.Store
-local Helpers = addon.Services.Logger.Helpers
-local LootSources = feature.LootSources or addon.LootSources
+local Logger = Services.Logger
+local Actions = Logger.Actions
+local Store = Logger.Store
+local Helpers = Logger.Helpers
+local LootSources = feature.LootSources
 
 -- Controller binding (injected by Controllers/Logger.lua at setup time).
 local _controller = nil
@@ -466,7 +467,7 @@ end
 
 scanRaidHistory = function()
     local requiredMethods = { "GetRawRaids" }
-    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.ScanRaidHistory", requiredMethods) or nil
+    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.GetRaidHistoryScan", requiredMethods) or nil
     local raids = raidStore and raidStore:GetRawRaids() or nil
     local result = {
         raids = 0,
@@ -625,7 +626,7 @@ resolveLoggerLootEntry = function(raidID, lootNid)
     local lootCount = raid.loot and #raid.loot or 0
     local it = Store:GetLoot(raid, lootNid)
     if not it then
-        local rawItemMatch, rawItemMatches = addon.Services.Logger.Helpers.FindLootByItemId(raid, lootNid)
+        local rawItemMatch, rawItemMatches = Helpers.FindLootByItemId(raid, lootNid)
         if rawItemMatch and addon.error then
             addon:error(Diag.E.LogLoggerLootNidExpected:format(tostring(raidID), tostring(lootNid), tostring(rawItemMatch.itemLink), tonumber(rawItemMatches) or 0))
         end
@@ -1014,7 +1015,7 @@ function Actions:PurgeRaidHistory()
 end
 
 function Actions:DeleteEmptyRaids()
-    local result = self:CleanUpRaidHistory({
+    local result = self:RemoveRaidHistoryEntries({
         emptyRaids = true,
     })
     return {
@@ -1022,10 +1023,10 @@ function Actions:DeleteEmptyRaids()
     }
 end
 
-function Actions:CleanUpRaidHistory(options)
+function Actions:RemoveRaidHistoryEntries(options)
     options = (type(options) == "table") and options or {}
     local requiredMethods = { "GetRawRaids", "GetAllRaids" }
-    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.CleanUpRaidHistory", requiredMethods) or nil
+    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.RemoveRaidHistoryEntries", requiredMethods) or nil
     local raids = raidStore and raidStore:GetRawRaids() or nil
     local result = {
         emptyRaids = 0,
@@ -1065,9 +1066,9 @@ function Actions:CleanUpRaidHistory(options)
     return result
 end
 
-function Actions:RebuildLootSources()
+function Actions:EnsureLootSources()
     local requiredMethods = { "GetAllRaids" }
-    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.RebuildLootSources", requiredMethods) or nil
+    local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("Logger.Actions.EnsureLootSources", requiredMethods) or nil
     local raids = raidStore and raidStore:GetAllRaids() or nil
     local result = {
         raids = 0,
@@ -1118,7 +1119,7 @@ function Actions:RebuildLootSources()
     return result
 end
 
-function Actions:ScanRaidHistory()
+function Actions:GetRaidHistoryScan()
     return scanRaidHistory()
 end
 
@@ -1262,7 +1263,7 @@ function Actions:AddBossAttendee(rID, bossNid, nameRaw)
     return true
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Logger/Actions", {
         deps = {

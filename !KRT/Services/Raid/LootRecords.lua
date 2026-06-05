@@ -2,13 +2,14 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Database = feature.Database
 local Strings = feature.Strings
 local Item = feature.Item
+local Services = feature.Services
 
 local rollTypes = feature.rollTypes
 
@@ -17,7 +18,8 @@ local tostring, tonumber = tostring, tonumber
 
 do
     feature.EnsureServiceNamespace("Raid")
-    local module = addon.Services.Raid
+    local Raid = Services.Raid
+    local module = Raid
 
     -- ----- Internal state ----- --
 
@@ -196,7 +198,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Raid/LootRecords", {
         deps = {

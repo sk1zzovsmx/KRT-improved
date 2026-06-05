@@ -1,5 +1,6 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...); LibStub("LibCompat-1.0")
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Timer (mixin: ScheduleTimer/CancelTimer; static: RefreshStats/ShowStats)
 -- events: none (purely a timer mixin; does not emit Bus events)
 local addon = select(2, ...)
@@ -21,8 +22,8 @@ local lcNewTimer = libcompat.NewTimer
 local lcNewTicker = libcompat.NewTicker
 local lcCancelTimer = libcompat.CancelTimer
 
-addon.Timer = addon.Timer or {}
-local Timer = addon.Timer
+local Timer = feature.Timer or {}
+addon.Timer = Timer
 
 -- ----- Internal state ----- --
 local stats = {
@@ -174,7 +175,7 @@ function mixin:CancelTimer(handle)
     return false
 end
 
--- ----- Public static API ----- --
+-- ----- Public methods ----- --
 function Timer.BindMixin(target, name)
     if type(target) ~= "table" then
         error("Timer.BindMixin: target must be a table", 2)
@@ -275,7 +276,7 @@ end
 do
     local name = "Modules/Timer"
     local deps = { "Init" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

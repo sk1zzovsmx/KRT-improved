@@ -104,6 +104,12 @@ function Test-IsLuaMetamethod {
     return ($Name -cmatch "^__[A-Za-z0-9_]+$")
 }
 
+function Test-IsStaticDatasetNoPublicMethodsException {
+    param([string]$RelativePath)
+
+    return ($RelativePath -eq "!KRT/Modules/Dataset/LootSourcesData.lua")
+}
+
 function Test-IsAllowedPublicFunctionName {
     param([string]$Name)
 
@@ -136,7 +142,7 @@ function Test-IsAllowedPrivateFunctionName {
         (Test-IsLuaMetamethod -Name $Name)
 }
 
-Write-Host "Check 1/6: luacheck on KRT-owned Lua..."
+Write-Host "Check 1/10: luacheck on KRT-owned Lua..."
 $luacheckCmd = Get-Command luacheck -ErrorAction SilentlyContinue
 if (-not $luacheckCmd) {
     Add-SectionHeader "[luacheck]"
@@ -152,30 +158,38 @@ if (-not $luacheckCmd) {
     }
 }
 
-Write-Host "Check 2/6: canonical section headers in feature modules..."
-$stateHeader = "-- ----- Internal state ----- --"
-$helpersHeader = "-- ----- Private helpers ----- --"
-$publicHeader = "-- ----- Public methods ----- --"
-$headerTargets = @(
-    "!KRT/Controllers",
-    "!KRT/Services",
-    "!KRT/Widgets",
-    "!KRT/EntryPoints"
-)
-
-$headerFiles = New-Object System.Collections.Generic.List[System.IO.FileInfo]
-foreach ($target in $headerTargets) {
-    $path = Join-Path $repoRoot $target
-    if (-not (Test-Path -LiteralPath $path)) {
-        continue
+Write-Host "Check 2/10: KRT Lua Contract header and shared locals..."
+$contractProblems = New-Object System.Collections.Generic.List[string]
+$addonLuaFiles = Get-KrtAddonLuaFiles
+foreach ($file in $addonLuaFiles) {
+    $relativePath = ConvertTo-KrtRepoRelativePath -RepoRoot $repoRoot -Path $file.FullName -UseForwardSlashes
+    $text = Get-Content -LiteralPath $file.FullName -Raw
+    if (-not ($text -match "KRT Lua Contract")) {
+        $contractProblems.Add(("{0}: missing KRT Lua Contract header" -f $relativePath))
     }
-    foreach ($f in Get-ChildItem -LiteralPath $path -Recurse -File -Filter "*.lua") {
-        $headerFiles.Add($f)
+    if (-not ($text -match "local addon = select\(2, \.\.\.\)")) {
+        $contractProblems.Add(("{0}: missing local addon = select(2, ...)" -f $relativePath))
+    }
+    if (-not ($text -match "local feature = addon\.Database\.GetFeatureShared\(\)")) {
+        $contractProblems.Add(("{0}: missing local feature = addon.Database.GetFeatureShared()" -f $relativePath))
     }
 }
 
+if ($contractProblems.Count -gt 0) {
+    Add-SectionHeader "[KRT Lua Contract]"
+    foreach ($line in $contractProblems) {
+        Add-SectionLine $line
+    }
+}
+
+Write-Host "Check 3/10: canonical section headers in KRT-owned addon Lua..."
+$stateHeader = "-- ----- Internal state ----- --"
+$helpersHeader = "-- ----- Private helpers ----- --"
+$publicHeader = "-- ----- Public methods ----- --"
+
 $headerProblems = New-Object System.Collections.Generic.List[string]
-foreach ($file in $headerFiles) {
+foreach ($file in $addonLuaFiles) {
+    $relativePath = ConvertTo-KrtRepoRelativePath -RepoRoot $repoRoot -Path $file.FullName -UseForwardSlashes
     $lines = Get-Content -LiteralPath $file.FullName
     $stateIdx = -1
     $helpersIdx = -1
@@ -197,13 +211,18 @@ foreach ($file in $headerFiles) {
         }
     }
 
-    $hasAll = ($stateIdx -gt 0) -and ($helpersIdx -gt 0) -and ($publicIdx -gt 0)
-    $isOrdered = $hasAll -and ($stateIdx -lt $helpersIdx) -and ($helpersIdx -lt $publicIdx)
+    $publicRequired = -not (Test-IsStaticDatasetNoPublicMethodsException -RelativePath $relativePath)
+    $hasAll = ($stateIdx -gt 0) -and ($helpersIdx -gt 0) -and (($publicIdx -gt 0) -or (-not $publicRequired))
+    $isOrdered = $hasAll -and ($stateIdx -lt $helpersIdx) -and
+        ((($publicIdx -gt 0) -and ($helpersIdx -lt $publicIdx)) -or (-not $publicRequired))
     if (-not $isOrdered) {
-        $rel = ConvertTo-KrtRepoRelativePath -RepoRoot $repoRoot -Path $file.FullName -UseForwardSlashes
         $headerProblems.Add(
-            ("{0} (state={1}, helpers={2}, public={3})" -f $rel, $stateIdx, $helpersIdx, $publicIdx)
+            ("{0} (state={1}, helpers={2}, public={3})" -f $relativePath, $stateIdx, $helpersIdx, $publicIdx)
         )
+    }
+
+    if ((Test-IsStaticDatasetNoPublicMethodsException -RelativePath $relativePath) -and ($publicIdx -gt 0)) {
+        $headerProblems.Add(("{0}: static dataset exception must not declare a Public methods section" -f $relativePath))
     }
 }
 
@@ -214,7 +233,7 @@ if ($headerProblems.Count -gt 0) {
     }
 }
 
-Write-Host "Check 3/6: no tab-indent and no trailing whitespace..."
+Write-Host "Check 4/10: no tab-indent and no trailing whitespace..."
 $formatProblems = New-Object System.Collections.Generic.List[string]
 $codeFiles = Get-KrtOwnedLuaFiles
 foreach ($file in $codeFiles) {
@@ -246,7 +265,7 @@ if ($formatProblems.Count -gt 0) {
     }
 }
 
-Write-Host "Check 4/6: git EOL state (no w/crlf outside !KRT/Libs)..."
+Write-Host "Check 5/10: git EOL state (no w/crlf outside !KRT/Libs)..."
 $gitCmd = Get-Command git -ErrorAction SilentlyContinue
 if (-not $gitCmd) {
     Add-SectionHeader "[eol]"
@@ -284,9 +303,8 @@ if (-not $gitCmd) {
     }
 }
 
-Write-Host "Check 5/6: canonical public function naming..."
+Write-Host "Check 6/10: canonical public function naming..."
 $namingProblems = New-Object System.Collections.Generic.List[string]
-$addonLuaFiles = Get-KrtAddonLuaFiles
 foreach ($file in $addonLuaFiles) {
     $lines = Get-Content -LiteralPath $file.FullName
 
@@ -333,7 +351,7 @@ if ($namingProblems.Count -gt 0) {
     }
 }
 
-Write-Host "Check 6/6: private helper naming..."
+Write-Host "Check 7/10: private helper naming..."
 $privateNamingProblems = New-Object System.Collections.Generic.List[string]
 $ownedLuaFiles = Get-KrtOwnedLuaFiles
 foreach ($file in $ownedLuaFiles) {
@@ -375,6 +393,85 @@ if ($privateNamingProblems.Count -gt 0) {
     }
 }
 
+Write-Host "Check 8/10: no feature/addon double-binding fallbacks..."
+$fallbackProblems = New-Object System.Collections.Generic.List[string]
+$fallbackPattern = "feature\.[A-Za-z_][A-Za-z0-9_]*\s+or\s+addon\.|addon\.[A-Za-z_][A-Za-z0-9_]*\s+or\s+feature\."
+foreach ($file in $addonLuaFiles) {
+    $relativePath = ConvertTo-KrtRepoRelativePath -RepoRoot $repoRoot -Path $file.FullName -UseForwardSlashes
+    $lineNo = 0
+    foreach ($line in Get-Content -LiteralPath $file.FullName) {
+        $lineNo = $lineNo + 1
+        if ($line -cmatch $fallbackPattern) {
+            $fallbackProblems.Add(("{0}:{1}: {2}" -f $relativePath, $lineNo, $line.Trim()))
+        }
+    }
+}
+
+if ($fallbackProblems.Count -gt 0) {
+    Add-SectionHeader "[feature/addon fallback]"
+    foreach ($line in $fallbackProblems) {
+        Add-SectionLine $line
+    }
+}
+
+Write-Host "Check 9/10: options proxy and OnUpdate confinement..."
+$confinementProblems = New-Object System.Collections.Generic.List[string]
+$allowedOnUpdateFiles = @{
+    "!KRT/EntryPoints/Minimap.lua" = $true
+    "!KRT/Modules/UI/Effects.lua" = $true
+    "!KRT/Modules/UI/Frames.lua" = $true
+    "!KRT/Modules/UI/ListController.lua" = $true
+}
+foreach ($file in $addonLuaFiles) {
+    $relativePath = ConvertTo-KrtRepoRelativePath -RepoRoot $repoRoot -Path $file.FullName -UseForwardSlashes
+    $lineNo = 0
+    foreach ($line in Get-Content -LiteralPath $file.FullName) {
+        $lineNo = $lineNo + 1
+        if (($line -cmatch "addon\.options") -and ($relativePath -ne "!KRT/Database/DBOptions.lua")) {
+            $confinementProblems.Add(("{0}:{1}: addon.options is confined to DBOptions read-only proxy" -f $relativePath, $lineNo))
+        }
+        if (($line -cmatch "OnUpdate") -and (-not $allowedOnUpdateFiles.ContainsKey($relativePath))) {
+            $confinementProblems.Add(("{0}:{1}: OnUpdate is confined to minimap drag or shared UI drivers" -f $relativePath, $lineNo))
+        }
+    }
+}
+
+if ($confinementProblems.Count -gt 0) {
+    Add-SectionHeader "[runtime confinement]"
+    foreach ($line in $confinementProblems) {
+        Add-SectionLine $line
+    }
+}
+
+Write-Host "Check 10/10: WotLK/Lua 5.1 compatibility patterns..."
+$compatProblems = New-Object System.Collections.Generic.List[string]
+$compatPatterns = @(
+    @{ Name = "C_* namespace"; Pattern = "\bC_[A-Za-z0-9_]+" },
+    @{ Name = "C_Timer"; Pattern = "\bC_Timer\b" },
+    @{ Name = "Ace2/Ace3 dependency"; Pattern = "\bAce[23]\b|AceAddon|AceGUI|AceConfig" },
+    @{ Name = "Lua 5.2+ goto"; Pattern = "\bgoto\s+[A-Za-z_][A-Za-z0-9_]*|::[A-Za-z_][A-Za-z0-9_]*::" },
+    @{ Name = "Lua 5.2+ _ENV"; Pattern = "\b_ENV\b" }
+)
+foreach ($file in $addonLuaFiles) {
+    $relativePath = ConvertTo-KrtRepoRelativePath -RepoRoot $repoRoot -Path $file.FullName -UseForwardSlashes
+    $lineNo = 0
+    foreach ($line in Get-Content -LiteralPath $file.FullName) {
+        $lineNo = $lineNo + 1
+        foreach ($spec in $compatPatterns) {
+            if ($line -cmatch $spec.Pattern) {
+                $compatProblems.Add(("{0}:{1}: {2}: {3}" -f $relativePath, $lineNo, $spec.Name, $line.Trim()))
+            }
+        }
+    }
+}
+
+if ($compatProblems.Count -gt 0) {
+    Add-SectionHeader "[WotLK/Lua 5.1 compatibility]"
+    foreach ($line in $compatProblems) {
+        Add-SectionLine $line
+    }
+}
+
 if ($violations.Count -gt 0) {
     Write-Host "Lua uniformity checks failed." -ForegroundColor Red
     foreach ($line in $violations) {
@@ -386,8 +483,12 @@ if ($violations.Count -gt 0) {
 Write-Host "Lua uniformity checks passed." -ForegroundColor Green
 Write-Host "Confirmed:"
 Write-Host "  1) luacheck passes for !KRT, tools, and tests"
-Write-Host "  2) Canonical section headers are present and ordered"
-Write-Host "  3) No tab-indented lines and no trailing whitespace"
-Write-Host "  4) No w/crlf on tracked .lua files outside !KRT/Libs"
-Write-Host "  5) Public function naming matches canonical rules"
-Write-Host "  6) Private helper naming matches canonical rules"
+Write-Host "  2) KRT Lua Contract headers and shared locals are present on KRT-owned addon Lua"
+Write-Host "  3) Canonical section headers are present and ordered, with documented static dataset exceptions"
+Write-Host "  4) No tab-indented lines and no trailing whitespace"
+Write-Host "  5) No w/crlf on tracked .lua files outside !KRT/Libs"
+Write-Host "  6) Public function naming matches canonical rules"
+Write-Host "  7) Private helper naming matches canonical rules"
+Write-Host "  8) No feature/addon double-binding fallbacks remain"
+Write-Host "  9) addon.options and OnUpdate are confined to allowed compatibility/shared-driver paths"
+Write-Host "  10) WotLK/Lua 5.1 compatibility patterns are clean"

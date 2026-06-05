@@ -9,8 +9,8 @@ local feature = addon.Database.GetFeatureShared()
 
 local type, tostring = type, tostring
 
-addon.Events = addon.Events or feature.Events or {}
-local Events = addon.Events
+local Events = feature.Events or {}
+addon.Events = Events
 local Database = feature.Database
 
 -- ----- Internal state ----- --
@@ -59,7 +59,7 @@ end
 do
     local name = "Modules/Events"
     local deps = { "Init" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

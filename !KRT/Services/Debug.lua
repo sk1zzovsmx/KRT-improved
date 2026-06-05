@@ -2,16 +2,18 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: no direct bus events; publishes synthetic roster deltas through Services/Raid
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Diag = feature.Diag
 
 local Database = feature.Database
+local Options = feature.Options
+local Services = feature.Services
 local Strings = feature.Strings
 local Time = feature.Time
-local Services = feature.Services
+local coreState = feature.coreState
 
 local tinsert, tremove = table.insert, table.remove
 local pairs, type = pairs, type
@@ -22,7 +24,7 @@ local tostring, tonumber = tostring, tonumber
 -- Seeds a current raid with synthetic players and submits synthetic rolls.
 do
     feature.EnsureServiceNamespace("Debug")
-    local module = addon.Services.Debug
+    local module = Services.Debug
 
     -- ----- Internal state ----- --
     local syntheticProfiles = {
@@ -46,6 +48,14 @@ do
         return Services.Rolls
     end
 
+    local function getOption(namespace, key)
+        local cfg = Options and Options.Get and Options.Get(namespace)
+        if cfg and cfg.Get then
+            return cfg:Get(key)
+        end
+        return nil
+    end
+
     local function normalizeSyntheticName(name)
         return Strings and Strings.NormalizeName and Strings.NormalizeName(name, true) or name
     end
@@ -65,10 +75,9 @@ do
     end
 
     local function getDebugState()
-        addon.State = addon.State or {}
-        addon.State.debug = addon.State.debug or {}
-        addon.State.debug.syntheticByRaid = addon.State.debug.syntheticByRaid or {}
-        return addon.State.debug
+        coreState.debug = coreState.debug or {}
+        coreState.debug.syntheticByRaid = coreState.debug.syntheticByRaid or {}
+        return coreState.debug
     end
 
     local function getCurrentRaidId()
@@ -258,7 +267,7 @@ do
         local tiedIndexes = {}
         local tieCount = 0
         local tieRoll = 0
-        local wantLow = addon.options and addon.options.sortAscending == true or false
+        local wantLow = getOption("Master", "sortAscending") == true
 
         if tieMode and total > 1 then
             tieCount = random(2, 3)
@@ -492,7 +501,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Debug", {
         deps = {

@@ -2,13 +2,13 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
-addon.Time = addon.Time or feature.Time or {}
-local Time = addon.Time
+local Time = feature.Time or {}
+addon.Time = Time
 
 -- ----- Internal state ----- --
 
@@ -40,7 +40,7 @@ end
 do
     local name = "Modules/Time"
     local deps = { "Init" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

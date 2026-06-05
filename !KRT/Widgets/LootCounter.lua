@@ -2,17 +2,19 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: listens RaidRosterDelta, PlayerCountChanged, RaidCreate
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 
+local Widgets = feature.Widgets
 local Frames = feature.Frames
 local Colors = feature.Colors
-local UIScaffold = addon.UIScaffold
+local UIScaffold = feature.UIScaffold
 local Events = feature.Events
 local C = feature.C
+local Options = feature.Options
 local Database = feature.Database
 local Bus = feature.Bus
 local Services = feature.Services
@@ -29,9 +31,9 @@ local type, tostring, tonumber = type, tostring, tonumber
 local strlen = string.len
 
 local InternalEvents = Events.Internal
-local UIFacade = addon.UI
+local UIFacade = feature.UI
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Widgets/LootCounter", {
         deps = {
@@ -61,13 +63,13 @@ do
         return
     end
 
-    addon.Widgets.LootCounter = addon.Widgets.LootCounter or {}
-    local module = addon.Widgets.LootCounter
+    Widgets.LootCounter = Widgets.LootCounter or {}
+    local module = Widgets.LootCounter
     module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
     -- Namespace registration: LootCounter widget options.
-    addon.Options.AddNamespace("LootCounter", {
+    Options.AddNamespace("LootCounter", {
         showLootCounterDuringMSRoll = false,
     })
 
@@ -383,10 +385,10 @@ do
 
     local function getCurrentRaidPlayers()
         twipe(raidPlayers)
-        if not addon.Database.GetCurrentRaid() then
+        if not Database.GetCurrentRaid() then
             return raidPlayers
         end
-        return Services.Raid:GetLootCounterRows(addon.Database.GetCurrentRaid(), raidPlayers)
+        return Services.Raid:GetLootCounterRows(Database.GetCurrentRaid(), raidPlayers)
     end
 
     local function ensureRow(i, rowHeight)
@@ -478,14 +480,14 @@ do
                 sec.plus:SetScript("OnClick", function()
                     local nid = row._playerNid
                     if nid then
-                        Services.Raid:AddPlayerLootCountByNid(nid, lt, 1, addon.Database.GetCurrentRaid())
+                        Services.Raid:AddPlayerLootCountByNid(nid, lt, 1, Database.GetCurrentRaid())
                         module:RequestRefresh("count_changed")
                     end
                 end)
                 sec.minus:SetScript("OnClick", function()
                     local nid = row._playerNid
                     if nid then
-                        Services.Raid:AddPlayerLootCountByNid(nid, lt, -1, addon.Database.GetCurrentRaid())
+                        Services.Raid:AddPlayerLootCountByNid(nid, lt, -1, Database.GetCurrentRaid())
                         module:RequestRefresh("count_changed")
                     end
                 end)
@@ -494,7 +496,7 @@ do
             row.reset:SetScript("OnClick", function()
                 local nid = row._playerNid
                 if nid then
-                    local raidNum = addon.Database.GetCurrentRaid()
+                    local raidNum = Database.GetCurrentRaid()
                     Services.Raid:SetPlayerLootCountByNid(nid, "ms", 0, raidNum)
                     Services.Raid:SetPlayerLootCountByNid(nid, "os", 0, raidNum)
                     Services.Raid:SetPlayerLootCountByNid(nid, "free", 0, raidNum)
@@ -533,7 +535,7 @@ do
     end
 
     resetAllCounts = function()
-        local currentRaid = addon.Database.GetCurrentRaid()
+        local currentRaid = Database.GetCurrentRaid()
         if not currentRaid then
             return
         end

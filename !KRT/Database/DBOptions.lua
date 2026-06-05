@@ -1,18 +1,23 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.Options
 -- events: emits OptionChanged, OptionsReset, OptionsLoaded via addon.Bus
 local addon = select(2, ...)
+local feature = addon.Database.GetFeatureShared()
 
 local type, pairs, tostring = type, pairs, tostring
 local format = string.format
 
-addon.Options = addon.Options or {}
-local Options = addon.Options
+local Options = feature.Options or {}
+addon.Options = Options
+local Bus = feature.Bus
+local coreState = feature.coreState
 
-addon.Events = addon.Events or {}
-addon.Events.Internal = addon.Events.Internal or {}
-local Events = addon.Events.Internal
+local eventRoot = feature.Events
+addon.Events = eventRoot
+eventRoot.Internal = eventRoot.Internal or {}
+local Events = eventRoot.Internal
 Events.OptionChanged = Events.OptionChanged or "OptionChanged"
 Events.OptionsReset = Events.OptionsReset or "OptionsReset"
 Events.OptionsLoaded = Events.OptionsLoaded or "OptionsLoaded"
@@ -43,9 +48,8 @@ local function ensureSavedTable()
 end
 
 local function emit(eventName, ...)
-    local bus = addon.Bus
-    if bus and type(bus.TriggerEvent) == "function" then
-        bus.TriggerEvent(eventName, ...)
+    if Bus and type(Bus.TriggerEvent) == "function" then
+        Bus.TriggerEvent(eventName, ...)
     end
 end
 
@@ -145,7 +149,7 @@ function namespaceMt:Name()
     return self._name
 end
 
--- ----- Public API ----- --
+-- ----- Public methods ----- --
 function Options.AddNamespace(name, defaults)
     if type(name) ~= "string" or name == "" then
         error("Options.AddNamespace: name must be a non-empty string", 2)
@@ -242,15 +246,14 @@ function Options.Set(key, value)
 end
 
 -- ----- Debug toggle (not namespace-backed) ----- --
--- Controls only the runtime addon.State.debugEnabled flag and the log level.
+-- Controls only the runtime coreState.debugEnabled flag and the log level.
 -- This is not persisted to SavedVariables and resets to false on each load.
 function Options.IsDebugEnabled()
-    return addon and addon.State and addon.State.debugEnabled == true
+    return coreState and coreState.debugEnabled == true
 end
 
 function Options.SetDebugEnabled(enabled)
-    local state = addon.State
-    state.debugEnabled = enabled and true or false
+    coreState.debugEnabled = enabled and true or false
 
     local levels = addon and addon.Debugger and addon.Debugger.logLevels
     local level = enabled and (levels and levels.DEBUG) or (levels and levels.INFO)
@@ -262,6 +265,7 @@ end
 do
     local name = "Database/DBOptions"
     local deps = { "Init" }
+    -- Bootstrap exception: ModuleRegistry may not be loaded yet.
     local registry = addon.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })

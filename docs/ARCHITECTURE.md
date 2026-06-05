@@ -29,6 +29,10 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
   and global WoW event wiring. `Database.GetFeatureShared()` is the module-facing
   shared dependency contract, and `feature.EnsureServiceNamespace(...)` owns
   service namespace bootstrap for split service files.
+  KRT-owned Lua binds shared dependencies from `feature.*`; do not use
+  `feature.* or addon.*` double-binding fallbacks. When a root compatibility table
+  remains public, modules bind from `feature.*` and export the same table back to
+  `addon.*`.
 - `!KRT/Controllers/*.lua`
   Own top-level parent feature modules under `addon.Controllers.*`.
 - `!KRT/Services/*.lua`
@@ -72,7 +76,8 @@ The canonical layer order is declared in `!KRT/!KRT.toc`.
 - `!KRT/Modules/*.lua`
   Own reusable infra only, not parent feature logic.
   `Modules/Json.lua` owns the small native JSON decoder used by encoded SoftRes import parsing.
-  `Modules/LootSourcesData.lua` owns static raid item-source data.
+  `Modules/LootSourcesData.lua` owns static raid item-source data and is the documented
+  data-only exception to the otherwise required `Public methods` section.
   `Modules/LootSources.lua` owns the itemId -> raid source resolver.
   `Modules/Dataset/IgnoredMobs.lua` owns raid add/phase-ignore lookup and the canonical generic trash-mob
   name helpers consumed by Raid state, Logger, and raid validation.
@@ -98,7 +103,8 @@ compatibility exception is `addon:Print` for `LibLogger-1.0`.
 ### Guardrails
 
 - Services must not reference parent owners or parent frames.
-- Services must not own frame lifecycle (`OnLoad`, `Refresh`, `SetScript`, `Show`, `Hide`).
+- Services must not own frame lifecycle or UI setup (`OnLoad`, `Refresh`, `SetScript`,
+  `Show`, `Hide`, `UIScaffold`, `InterfaceOptions`, panel APIs, or UI handler hooks).
 - Controllers must not reference other parent owners directly.
 - Upward communication should use `addon.Bus` and canonical event names from `Modules/Events.lua`.
 - Prefer existing internal events (`SetItem`, `RaidRosterDelta`, etc.) over new micro-events.
@@ -152,6 +158,9 @@ endpoints, while `Minimap:*` methods are entrypoint-owned minimap lifecycle/stat
   `BindUI`, `EnsureUI`, `Toggle`, `Show`, `Hide`, `RequestRefresh`, `MarkDirty`.
 - Keep UI cache/state schema uniform under `module._ui`.
 - Optional widget routing goes through `addon.UI` (`Modules/UI/Facade.lua`) + `addon.Features`.
+- `OnUpdate` is allowed only for minimap drag and shared UI driver/effect modules.
+- Option access uses namespace configs (`cfg:Get`, `cfg:Set`); `addon.options` remains a
+  read-only compatibility proxy owned by `Database/DBOptions.lua`.
 
 ## Quick Layering Verification
 

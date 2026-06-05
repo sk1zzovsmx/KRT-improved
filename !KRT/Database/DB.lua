@@ -10,7 +10,10 @@ local Database = feature.Database
 local Diag = feature.Diag
 
 assert(type(addon.DB) == "table", "KRT DB bootstrap missing addon.DB")
-local DB = addon.DB
+local DB = feature.DB
+assert(type(DB) == "table", "KRT DB bootstrap missing feature.DB")
+addon.DB = DB
+local strsub = string.sub
 
 -- ----- Internal state ----- --
 DB._manager = DB._manager or nil
@@ -18,7 +21,7 @@ local missingRaidStoreWarned = {}
 
 -- ----- Private helpers ----- --
 local function getDefaultManager()
-    local dbManager = addon.DBManager
+    local dbManager = feature.DBManager
     if dbManager and type(dbManager.GetDefaultManager) == "function" then
         return dbManager.GetDefaultManager()
     end
@@ -59,6 +62,31 @@ local function warnMissingRaidStoreOnce(warnKey, template, fallbackFmt, arg1, ar
         addon:warn(fallbackFmt, arg1, arg2)
     end
 end
+
+-- ----- Package-internal helpers ----- --
+local function isBossFightRecord(boss)
+    if type(boss) ~= "table" then
+        return false
+    end
+
+    local sourceKind = boss.sourceKind
+    if sourceKind == "shared" or sourceKind == "trash" or sourceKind == "object" then
+        return false
+    end
+
+    if boss.source == "LootSources" then
+        return false
+    end
+
+    local name = boss.name or boss.boss
+    if type(name) == "string" and strsub(name, 1, 7) == "Shared:" then
+        return false
+    end
+
+    return true
+end
+
+Database._IsBossFightRecord = isBossFightRecord
 
 -- ----- Public methods ----- --
 function DB.SetManager(manager)
@@ -119,6 +147,7 @@ end
 do
     local name = "Database/DB"
     local deps = { "Init" }
+    -- Bootstrap exception: ModuleRegistry may not be loaded yet.
     local registry = addon.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })

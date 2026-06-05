@@ -4,6 +4,31 @@ Repo-wide cleanup program built on top of `docs/TECH_CLEANUP_WORKFLOW.md`.
 
 Status date: 2026-04-06
 
+## 1.0 Lua Canonical Uniformity Snapshot (2026-06-02)
+
+Final canonical Lua normalization status for KRT-owned addon files:
+
+- `102` Lua files exist under `!KRT`.
+- `12` vendored Lua files under `!KRT/Libs/**` are excluded from KRT-owned normalization.
+- `90` KRT-owned Lua files are in scope and are represented in `!KRT/!KRT.toc`.
+- All `90` KRT-owned files use the KRT Lua Contract header, `local addon = select(2, ...)`,
+  and `local feature = addon.Database.GetFeatureShared()`.
+- All `90` KRT-owned files have ordered `Internal state` and `Private helpers` sections.
+- `89/90` have `Public methods`; the sole exception is
+  `!KRT/Modules/Dataset/LootSourcesData.lua`, documented and tested as a static data-only dataset.
+- `feature.* or addon.*` and `addon.* or feature.*` double-binding fallbacks are closed out.
+- `addon.options` is confined to the read-only compatibility proxy in `Database/DBOptions.lua`.
+- `OnUpdate` is confined to the allowed minimap drag and shared UI driver/effect paths.
+- Services are UI-free under the strengthened layering check.
+
+Tooling now enforces the snapshot through:
+
+- `tools/check-lua-uniformity.ps1`
+- `tools/check-layering.ps1`
+- source-contract specs under `tests/module_registry*_spec.lua`
+- `tools/krt.py repo-quality-check --check lua_uniformity`
+- `tools/krt.py repo-quality-check --check layering`
+
 ## 1.1 Cleanup Snapshot (2026-04-06)
 
 Completed in this pass:

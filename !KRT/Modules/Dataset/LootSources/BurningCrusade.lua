@@ -1,13 +1,19 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: static raid loot source data for The Burning Crusade
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.LootSourcesData
+-- events: none
+-- notes: static raid loot source data for The Burning Crusade
 
 local addon = select(2, ...)
+local feature = addon.Database.GetFeatureShared()
 
-local LootSourcesData = addon.LootSourcesData or {}
+local LootSourcesData = feature.LootSourcesData or {}
 addon.LootSourcesData = LootSourcesData
 LootSourcesData.Raw = LootSourcesData.Raw or {}
+
+-- ----- Internal state ----- --
+-- name: Burning Crusade dataset
 
 local N10 = { normal10 = true }
 local N20 = { normal20 = true }
@@ -19,14 +25,12 @@ local N10_N25 = { normal10 = true, normal25 = true }
 local N25_H25 = { heroic25 = true, normal25 = true }
 local ALL_10_25 = { heroic10 = true, heroic25 = true, normal10 = true, normal25 = true }
 
+-- ----- Private helpers ----- --
 local function appendLootSources(lootSources)
     for i = 1, #lootSources do
         LootSourcesData.Raw[#LootSourcesData.Raw + 1] = lootSources[i]
     end
 end
-
--- ----- Internal state ----- --
--- name: Burning Crusade dataset
 
 appendLootSources({
     {

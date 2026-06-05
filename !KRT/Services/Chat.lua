@@ -2,16 +2,23 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: owns chat output helpers and LFM spam Timer ticker
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 
 local C = feature.C
-local Strings = feature.Strings
 local Comms = feature.Comms
+local Deformat = feature.Deformat
+local Options = feature.Options
 local Services = feature.Services
+local Strings = feature.Strings
+local Timer = feature.Timer
+
+local GetGroupTypeAndCount = feature.GetGroupTypeAndCount
+local UnitIsGroupAssistant = feature.UnitIsGroupAssistant
+local UnitIsGroupLeader = feature.UnitIsGroupLeader
 
 local find = string.find
 local len = string.len
@@ -24,10 +31,10 @@ local ipairs = ipairs
 -- =========== Chat Output Helpers  =========== --
 do
     feature.EnsureServiceNamespace("Chat")
-    local module = addon.Services.Chat
+    local module = Services.Chat
 
     -- Timer ownership: ticker for controlled LFM spammer output.
-    addon.Timer.BindMixin(module, "Chat")
+    Timer.BindMixin(module, "Chat")
 
     -- ----- Internal state ----- --
     local chatOutputFormat = C.CHAT_OUTPUT_FORMAT
@@ -55,7 +62,7 @@ do
 
     -- ----- Private helpers ----- --
     local function isCountdownMessage(text)
-        local seconds = addon.Deformat(text, L.ChatCountdownTic)
+        local seconds = Deformat(text, L.ChatCountdownTic)
         return (seconds ~= nil) or (find(text, L.ChatCountdownEnd) ~= nil)
     end
 
@@ -65,14 +72,20 @@ do
             return raidService:CanUseCapability("raid_warning")
         end
 
-        local leaderFn = addon.UnitIsGroupLeader or feature.UnitIsGroupLeader
-        local assistantFn = addon.UnitIsGroupAssistant or feature.UnitIsGroupAssistant
-        return (leaderFn and leaderFn("player")) or (assistantFn and assistantFn("player")) or false
+        return (UnitIsGroupLeader and UnitIsGroupLeader("player")) or (UnitIsGroupAssistant and UnitIsGroupAssistant("player")) or false
+    end
+
+    local function getOption(namespace, key)
+        local cfg = Options and Options.Get and Options.Get(namespace)
+        if cfg and cfg.Get then
+            return cfg:Get(key)
+        end
+        return nil
     end
 
     local function resolveGroupType()
-        if type(addon.GetGroupTypeAndCount) == "function" then
-            local groupType = addon.GetGroupTypeAndCount()
+        if type(GetGroupTypeAndCount) == "function" then
+            local groupType = GetGroupTypeAndCount()
             if groupType == "raid" or groupType == "party" then
                 return groupType
             end
@@ -108,11 +121,10 @@ do
 
         local groupType = resolveGroupType()
         if groupType == "raid" then
-            local options = addon.options or {}
-            if isCountdownMessage(text) and options.countdownSimpleRaidMsg then
+            if isCountdownMessage(text) and getOption("Rolls", "countdownSimpleRaidMsg") == true then
                 return "RAID"
             end
-            if options.useRaidWarning and canUseRaidWarning() then
+            if getOption("Master", "useRaidWarning") == true and canUseRaidWarning() then
                 return "RAID_WARNING"
             end
             return "RAID"
@@ -186,7 +198,7 @@ do
 
         local channelList = cloneChannels(channels)
         if #channelList <= 0 then
-            local groupType = addon.GetGroupTypeAndCount()
+            local groupType = GetGroupTypeAndCount()
             if groupType == "raid" then
                 Comms.SendChat(text, "RAID", nil, nil, true)
             elseif groupType == "party" then
@@ -284,7 +296,7 @@ do
             return false, "empty"
         end
 
-        if addon.IsInRaid and addon.IsInRaid() and addon.options and addon.options.useRaidWarning then
+        if addon.IsInRaid and addon.IsInRaid() and getOption("Master", "useRaidWarning") == true then
             local raidService = Services.Raid
             if raidService and type(raidService.CanUseCapability) == "function" and not raidService:CanUseCapability("raid_warning") then
                 addon:warn(L.WarnRaidWarningFallback)
@@ -367,7 +379,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Chat", {
         deps = {

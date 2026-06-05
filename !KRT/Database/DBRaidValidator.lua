@@ -7,6 +7,7 @@ local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
+local DB = feature.DB
 local Database = feature.Database
 local IgnoredMobs = feature.IgnoredMobs
 
@@ -16,8 +17,8 @@ local IsTrashMobName = IgnoredMobs.IsTrashMobName
 
 -- Read-only raid validation service.
 do
-    addon.DB.RaidValidator = addon.DB.RaidValidator or {}
-    local module = addon.DB.RaidValidator
+    DB.RaidValidator = DB.RaidValidator or {}
+    local module = DB.RaidValidator
 
     -- ----- Internal state ----- --
 
@@ -48,7 +49,7 @@ do
             return nil
         end
 
-        local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("DBRaidValidator.EnsureNormalizedClone", { "NormalizeRaidRecord" }) or nil
+        local raidStore = Database.GetRaidStoreOrNil("DBRaidValidator.EnsureNormalizedClone", { "NormalizeRaidRecord" })
         if raidStore then
             clone = raidStore:NormalizeRaidRecord(clone)
         end
@@ -341,13 +342,13 @@ do
             maxDetails = 1
         end
 
-        local currentSchemaVersion = Database.GetRaidSchemaVersion and Database.GetRaidSchemaVersion() or 1
+        local currentSchemaVersion = Database.GetRaidSchemaVersion() or 1
         currentSchemaVersion = tonumber(currentSchemaVersion) or 1
         if currentSchemaVersion < 1 then
             currentSchemaVersion = 1
         end
 
-        local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("DBRaidValidator.ValidateAllRaids", { "GetRawRaids" }) or nil
+        local raidStore = Database.GetRaidStoreOrNil("DBRaidValidator.ValidateAllRaids", { "GetRawRaids" })
         local raids = raidStore and raidStore:GetRawRaids() or {}
         raids = (type(raids) == "table") and raids or {}
         local report = {
@@ -389,7 +390,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Database/DBRaidValidator", {
         deps = { "Init", "Modules/ModuleRegistry", "Database/DB", "Database/DBSchema", "Database/DBRaidMigrations", "Database/DBRaidStore", "Modules/Dataset/IgnoredMobs" },

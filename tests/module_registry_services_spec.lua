@@ -13,6 +13,31 @@ local function assertNotContains(text, needle, message)
     assert(not text:find(needle, 1, true), message or ("unexpected: " .. needle))
 end
 
+local function countPlain(text, needle)
+    local count = 0
+    local startIndex = 1
+    while true do
+        local found = text:find(needle, startIndex, true)
+        if not found then
+            return count
+        end
+        count = count + 1
+        startIndex = found + #needle
+    end
+end
+
+local function assertNoLegacyOptionsProxy(path)
+    assertNotContains(read(path), "addon.options", path .. " must use namespace cfg:Get instead of addon.options")
+end
+
+local function assertNoRootCurrentRaidLookup(path)
+    assertNotContains(read(path), "addon.Database.GetCurrentRaid", path .. " must use local Database dependency for current raid lookup")
+end
+
+local function assertNoRootDependencyLookup(path, needle, dependencyName)
+    assertNotContains(read(path), needle, path .. " must use local " .. dependencyName .. " dependency")
+end
+
 local function assertBefore(text, first, second, message)
     local firstIndex = text:find(first, 1, true)
     local secondIndex = text:find(second, 1, true)
@@ -116,9 +141,9 @@ local preRegistryUtilityModules = {
 local directRegistryModules = {
     { name = "Modules/UI/Facade", deps = { "Init", "Modules/ModuleRegistry" } },
     { name = "Modules/UI/Effects", deps = { "Init", "Modules/ModuleRegistry" } },
-    { name = "Modules/UI/Visuals", deps = { "Init", "Modules/ModuleRegistry" } },
-    { name = "Modules/UI/Frames", deps = { "Init", "Modules/ModuleRegistry" } },
-    { name = "Modules/UI/ListController", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Visuals" } },
+    { name = "Modules/UI/Visuals", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Effects" } },
+    { name = "Modules/UI/Frames", deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Strings" } },
+    { name = "Modules/UI/ListController", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames", "Modules/UI/Visuals" } },
     { name = "Modules/UI/MultiSelect", deps = { "Init", "Modules/ModuleRegistry" } },
     { name = "Modules/Bus", deps = { "Init", "Modules/ModuleRegistry" } },
 }
@@ -187,6 +212,7 @@ local expectedService = {
         "Modules/Strings",
         "Modules/Comms",
     },
+    events = "-- events: owns chat output helpers and LFM spam Timer ticker",
 }
 
 local expectedRollServices = {
@@ -196,6 +222,8 @@ local expectedRollServices = {
         owner = "Countdown",
         separator = ".",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Timer", "Services/Chat" },
+        events = "-- events: announces countdown ticks through Services/Chat",
+        note = "-- notes: countdown runtime helpers for rolls service",
     },
     {
         name = "Services/Rolls/Sessions",
@@ -203,6 +231,8 @@ local expectedRollServices = {
         owner = "Sessions",
         separator = ".",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Item", "Modules/Strings" },
+        events = "-- events: none",
+        note = "-- notes: session and context helpers for rolls service",
     },
     {
         name = "Services/Rolls/History",
@@ -210,6 +240,8 @@ local expectedRollServices = {
         owner = "History",
         separator = ".",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Events", "Modules/Bus" },
+        events = "-- events: emits AddRoll via addon.Bus",
+        note = "-- notes: raw roll history and tracker helpers for rolls service",
     },
     {
         name = "Services/Rolls/Responses",
@@ -218,6 +250,8 @@ local expectedRollServices = {
         separator = ".",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Modules/Comms", "Services/Chat" },
         forbiddenDeps = { "Services/Raid", "Services/Reserves", "Services/Loot" },
+        events = "-- events: announces countdown blocks and whispers denial reasons",
+        note = "-- notes: response and eligibility helpers for rolls service",
     },
     {
         name = "Services/Rolls/Strategies",
@@ -225,6 +259,8 @@ local expectedRollServices = {
         owner = "Strategies",
         separator = ".",
         deps = { "Init", "Modules/ModuleRegistry" },
+        events = "-- events: none",
+        note = "-- notes: roll resolution strategy helpers",
     },
     {
         name = "Services/Rolls/Resolution",
@@ -232,6 +268,8 @@ local expectedRollServices = {
         owner = "Resolution",
         separator = ".",
         deps = { "Init", "Modules/ModuleRegistry", "Services/Rolls/Strategies" },
+        events = "-- events: none",
+        note = "-- notes: resolution and display helpers for rolls service",
     },
     {
         name = "Services/Rolls/Display",
@@ -239,6 +277,8 @@ local expectedRollServices = {
         owner = "Display",
         separator = ".",
         deps = { "Init", "Modules/ModuleRegistry", "Services/Rolls/Responses", "Services/Rolls/Resolution" },
+        events = "-- events: none",
+        note = "-- notes: display-model helpers for rolls service",
     },
     {
         name = "Services/Rolls/Service",
@@ -259,6 +299,7 @@ local expectedRollServices = {
             "Services/Rolls/Display",
         },
         forbiddenDeps = { "Services/Raid", "Services/Reserves", "Services/Loot" },
+        events = "-- events: emits AddRoll through History; owns countdown facade calls",
     },
 }
 
@@ -268,6 +309,8 @@ local expectedLootServices = {
         path = "!KRT/Services/Loot/Context.lua",
         owners = { { owner = "LootContext", separator = "." } },
         deps = { "Init", "Modules/ModuleRegistry" },
+        events = "-- events: no bus events; context helpers only",
+        note = "-- notes: bootstrap-sensitive internal loot helpers",
     },
     {
         name = "Services/Loot/State",
@@ -277,24 +320,32 @@ local expectedLootServices = {
             { owner = "Sessions", separator = "." },
         },
         deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Services/Loot/Context" },
+        events = "-- events: no bus events; state helpers only",
+        note = "-- notes: bootstrap-sensitive internal loot state helpers",
     },
     {
         name = "Services/Loot/Snapshots",
         path = "!KRT/Services/Loot/Snapshots.lua",
         owners = { { owner = "Snapshots", separator = "." } },
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Item", "Services/Loot/State", "Services/Loot/Context" },
+        events = "-- events: no bus events; snapshot helpers only",
+        note = "-- notes: internal loot-window snapshot helpers",
     },
     {
         name = "Services/Loot/PendingAwards",
         path = "!KRT/Services/Loot/PendingAwards.lua",
         owners = { { owner = "PendingAwards", separator = "." } },
         deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Item" },
+        events = "-- events: no bus events; pending-award helpers only",
+        note = "-- notes: pending-award helpers for loot service",
     },
     {
         name = "Services/Loot/PassiveGroupLoot",
         path = "!KRT/Services/Loot/PassiveGroupLoot.lua",
         owners = { { owner = "PassiveGroupLoot", separator = "." } },
         deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Item", "Modules/Strings" },
+        events = "-- events: no bus events; passive group-loot helpers only",
+        note = "-- notes: passive group-loot parser/state helpers for loot service",
     },
     {
         name = "Services/Loot/Tracking",
@@ -309,6 +360,8 @@ local expectedLootServices = {
             "Services/Loot/PassiveGroupLoot",
         },
         forbiddenDeps = { "Services/Raid" },
+        events = "-- events: no bus events; tracking helpers only",
+        note = "-- notes: tracking/snapshot helpers for loot service",
     },
     {
         name = "Services/Loot/Workflow",
@@ -316,6 +369,7 @@ local expectedLootServices = {
         owners = { { owner = "Workflow", separator = "." } },
         deps = { "Init", "Modules/ModuleRegistry" },
         forbiddenDeps = { "Services/Raid" },
+        events = "-- events: no bus events; shadow diagnostics only",
     },
     {
         name = "Services/Loot/Receipts",
@@ -323,6 +377,7 @@ local expectedLootServices = {
         owners = { { owner = "Receipts", separator = "." } },
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Item" },
         forbiddenDeps = { "Services/Raid" },
+        events = "-- events: no bus events; pure receipt classification helpers",
     },
     {
         name = "Services/Loot/Records",
@@ -330,6 +385,7 @@ local expectedLootServices = {
         owners = { { owner = "Records", separator = "." } },
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Time" },
         forbiddenDeps = { "Services/Raid" },
+        events = "-- events: no bus events; append/build helpers only",
     },
     {
         name = "Services/Loot/Reconcile",
@@ -337,12 +393,14 @@ local expectedLootServices = {
         owners = { { owner = "Reconcile", separator = "." } },
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Item", "Modules/Strings" },
         forbiddenDeps = { "Services/Raid" },
+        events = "-- events: no bus events; reconciliation helpers only",
     },
     {
         name = "Services/Loot/Rules",
         path = "!KRT/Services/Loot/Rules.lua",
         owners = { { owner = "Rules", separator = ":" } },
         deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Item", "Modules/Dataset/IgnoredItems" },
+        events = "-- events: no bus events; suggestion-only classification",
     },
     {
         name = "Services/Loot/DistributionSession",
@@ -350,6 +408,7 @@ local expectedLootServices = {
         owners = { { owner = "DistributionSession", separator = "." } },
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Events", "Modules/Bus", "Modules/Comms", "Modules/Item" },
         forbiddenDeps = { "Services/Raid" },
+        events = "-- events: LootDistributionSessionChanged",
     },
     {
         name = "Services/Loot/Service",
@@ -365,7 +424,6 @@ local expectedLootServices = {
             "Modules/Item",
             "Modules/Strings",
             "Modules/Time",
-            "Modules/Dataset/IgnoredItems",
             "Services/Loot/Context",
             "Services/Loot/PendingAwards",
             "Services/Loot/PassiveGroupLoot",
@@ -374,14 +432,15 @@ local expectedLootServices = {
             "Services/Loot/Receipts",
             "Services/Loot/Records",
             "Services/Loot/Reconcile",
+            "Services/Loot/Rules",
         },
         forbiddenDeps = {
             "Services/Raid",
             "Services/Chat",
             "Services/Rolls/Service",
-            "Services/Loot/Rules",
             "Services/Loot/DistributionSession",
         },
+        events = "-- events: emits SetItem/RaidLootUpdate; delegates distribution messages",
     },
 }
 
@@ -471,6 +530,7 @@ local expectedLoggerServices = {
         separator = ":",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" },
         forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
+        registryFromFeature = true,
     },
     {
         name = "Services/Logger/View",
@@ -479,6 +539,7 @@ local expectedLoggerServices = {
         separator = ":",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Sort", "Services/Logger/Store" },
         forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
+        registryFromFeature = true,
     },
     {
         name = "Services/Logger/Export",
@@ -487,6 +548,7 @@ local expectedLoggerServices = {
         separator = ":",
         deps = { "Init", "Modules/ModuleRegistry", "Services/Logger/Store" },
         forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
+        registryFromFeature = true,
     },
     {
         name = "Services/Logger/Helpers",
@@ -495,6 +557,7 @@ local expectedLoggerServices = {
         separator = ".",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Services/Logger/Store" },
         forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
+        registryFromFeature = true,
     },
     {
         name = "Services/Logger/Actions",
@@ -503,6 +566,7 @@ local expectedLoggerServices = {
         separator = ":",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Modules/Base64", "Services/Logger/Store", "Services/Logger/Helpers" },
         forbiddenDeps = { "Services/Raid", "Database/DBRaidQueries", "Database/DBRaidStore" },
+        registryFromFeature = true,
     },
 }
 
@@ -513,6 +577,9 @@ local expectedReservesServices = {
         metadataAfterNeedle = "ParseImport = parseImport,",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Modules/Base64", "Modules/Json" },
         forbiddenDeps = { "Services/Raid" },
+        registryFromFeature = true,
+        events = "-- events: no bus events; import parsing helpers only",
+        note = "-- notes: reserves import parsing helpers",
     },
     {
         name = "Services/Reserves/Aliases",
@@ -521,14 +588,20 @@ local expectedReservesServices = {
         separator = ".",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" },
         forbiddenDeps = { "Services/Raid", "Services/Reserves" },
+        registryFromFeature = true,
+        events = "-- events: no bus events; alias helpers only",
+        note = "-- notes: reserves name-alias helpers",
     },
     {
         name = "Services/Reserves/Display",
         path = "!KRT/Services/Reserves/Display.lua",
         owner = "Display",
         separator = ".",
-        deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Strings" },
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Strings", "Services/Reserves/Aliases" },
         forbiddenDeps = { "Services/Raid" },
+        registryFromFeature = true,
+        events = "-- events: no bus events; display helpers only",
+        note = "-- notes: reserves display/grouping helpers",
     },
     {
         name = "Services/Reserves/Sync",
@@ -537,6 +610,8 @@ local expectedReservesServices = {
         separator = ":",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Comms", "Modules/Strings" },
         forbiddenDeps = { "Services/Raid", "Services/Reserves" },
+        registryFromFeature = true,
+        events = "-- events: handles KRTResSync addon-message traffic",
     },
     {
         name = "Services/Reserves",
@@ -557,6 +632,8 @@ local expectedReservesServices = {
             "Services/Reserves/Display",
         },
         forbiddenDeps = { "Services/Reserves/Sync", "Services/Reserves/Chat", "Database/DBOptions" },
+        registryFromFeature = true,
+        events = "-- events: emits ReservesDataChanged via addon.Bus",
     },
     {
         name = "Services/Reserves/Chat",
@@ -565,6 +642,8 @@ local expectedReservesServices = {
         separator = ":",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Modules/Comms", "Modules/Events", "Modules/Bus" },
         forbiddenDeps = { "Services/Raid", "Services/Chat" },
+        registryFromFeature = true,
+        events = "-- events: listens to wow.CHAT_MSG_WHISPER and replies with opt-in SoftRes summaries",
     },
 }
 
@@ -576,6 +655,8 @@ local expectedDebugServices = {
         separator = ":",
         deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Modules/Time" },
         forbiddenDeps = { "Services/Raid", "Services/Rolls/Service" },
+        registryFromFeature = true,
+        events = "-- events: no direct bus events; publishes synthetic roster deltas through Services/Raid",
     },
 }
 
@@ -678,6 +759,243 @@ for i = 1, #expectedDebugServices do
     assertBefore(toc, "Modules\\ModuleRegistry.lua", moduleTocPaths[expectedDebugServices[i].name])
 end
 
+local namespaceOptionFiles = {
+    "!KRT/Services/Chat.lua",
+    "!KRT/Services/Debug.lua",
+    "!KRT/Services/Loot/Service.lua",
+    "!KRT/Services/Rolls/Responses.lua",
+    "!KRT/Services/Rolls/Service.lua",
+    "!KRT/Services/Reserves.lua",
+    "!KRT/Services/Reserves/Chat.lua",
+}
+
+for i = 1, #namespaceOptionFiles do
+    assertNoLegacyOptionsProxy(namespaceOptionFiles[i])
+end
+
+local currentRaidDependencyFiles = {
+    "!KRT/Services/Rolls/Service.lua",
+    "!KRT/Services/Reserves.lua",
+}
+for i = 1, #currentRaidDependencyFiles do
+    assertNoRootCurrentRaidLookup(currentRaidDependencyFiles[i])
+end
+
+assertNoRootDependencyLookup("!KRT/Services/Loot/Service.lua", "local services = addon.Services", "Services")
+assertNoRootDependencyLookup("!KRT/Services/Raid/State.lua", "addon.Services and addon.Services.Loot", "Services")
+assertNoRootDependencyLookup("!KRT/Services/Loot/Context.lua", "local core = addon.Database", "Database")
+assertNoRootDependencyLookup("!KRT/Services/Reserves/Import.lua", "feature.Base64 or addon.Base64", "Base64")
+assertNoRootDependencyLookup("!KRT/Services/Reserves/Import.lua", "feature.Json or addon.Json", "Json")
+assertNoRootDependencyLookup("!KRT/Services/Logger/Actions.lua", "feature.LootSources or addon.LootSources", "LootSources")
+assertNoRootDependencyLookup("!KRT/Services/Logger/Actions.lua", "addon.Services.Logger.Helpers.FindLootByItemId", "Helpers")
+assertNoRootDependencyLookup("!KRT/Services/Raid/State.lua", "addon.LootSources or feature.LootSources", "LootSources")
+
+local reservesChatSource = read("!KRT/Services/Reserves/Chat.lua")
+assert(countPlain(reservesChatSource, "-- ----- Private helpers ----- --") == 1, "Services/Reserves/Chat must keep a single canonical private-helper section marker")
+
+local raidStateSource = read("!KRT/Services/Raid/State.lua")
+assertContains(raidStateSource, "local GetGroupTypeAndCount = feature.GetGroupTypeAndCount", "Services/Raid/State must localize group type helper from feature shared")
+assertNotContains(raidStateSource, "local GetGroupTypeAndCount = addon.GetGroupTypeAndCount", "Services/Raid/State must not read group type helper directly from addon root")
+assertNotContains(raidStateSource, "addon.GetGroupTypeAndCount()", "Services/Raid/State must call local GetGroupTypeAndCount dependency")
+assertContains(raidStateSource, "local BossIDs = feature.BossIDs", "Services/Raid/State must localize BossIDs from feature shared")
+assertContains(raidStateSource, "local GetCreatureId = feature.GetCreatureId", "Services/Raid/State must localize GetCreatureId from feature shared")
+assertNotContains(raidStateSource, "addon.BossIDs", "Services/Raid/State must not read BossIDs directly from addon root")
+assertNotContains(raidStateSource, "addon.GetCreatureId", "Services/Raid/State must not read GetCreatureId directly from addon root")
+
+local raidRosterSource = read("!KRT/Services/Raid/Roster.lua")
+assertContains(raidRosterSource, "local coreState = feature.coreState", "Services/Raid/Roster must localize core state from feature shared")
+assertNotContains(raidRosterSource, "addon.State and addon.State.debug", "Services/Raid/Roster must use local coreState for debug lookup")
+assertNotContains(raidRosterSource, "addon.State and addon.State.selectedRaid", "Services/Raid/Roster must use local coreState for selected raid lookup")
+
+local debugServiceSource = read("!KRT/Services/Debug.lua")
+assertContains(debugServiceSource, "local coreState = feature.coreState", "Services/Debug must localize core state from feature shared")
+assertNotContains(debugServiceSource, "addon.State = addon.State or {}", "Services/Debug must not re-bootstrap root State")
+assertNotContains(debugServiceSource, "addon.State.debug", "Services/Debug must use local coreState for debug state")
+
+local initSource = read("!KRT/Init.lua")
+assertContains(initSource, "LootSources = addon.LootSources", "feature shared must expose LootSources")
+assertContains(initSource, "Timer = addon.Timer", "feature shared must expose Timer")
+assertContains(initSource, "GetClassColor = addon.GetClassColor", "feature shared must expose GetClassColor helper")
+assertContains(initSource, "BossIDs = addon.BossIDs", "feature shared must expose BossIDs")
+assertContains(initSource, "GetCreatureId = addon.GetCreatureId", "feature shared must expose GetCreatureId helper")
+
+local timerDependencyFiles = {
+    "!KRT/Services/Chat.lua",
+    "!KRT/Services/Reserves.lua",
+    "!KRT/Services/Rolls/Countdown.lua",
+    "!KRT/Services/Raid/Roster.lua",
+    "!KRT/Services/Loot/Service.lua",
+    "!KRT/Database/DBSyncer.lua",
+}
+for i = 1, #timerDependencyFiles do
+    local source = read(timerDependencyFiles[i])
+    assertContains(source, "local Timer = feature.Timer", timerDependencyFiles[i] .. " must localize Timer from feature shared")
+    assertNotContains(source, "addon.Timer", timerDependencyFiles[i] .. " must use the local Timer dependency")
+end
+
+assertNoRootDependencyLookup("!KRT/Services/Loot/State.lua", "addon.Time.GetCurrentTime", "Time")
+assertNoRootDependencyLookup("!KRT/Services/Loot/State.lua", "addon.C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS", "C")
+assertNoRootDependencyLookup("!KRT/Services/Loot/Snapshots.lua", "addon.Time.GetCurrentTime", "Time")
+assertNoRootDependencyLookup("!KRT/Services/Loot/DistributionSession.lua", "feature.Comms or addon.Comms", "Comms")
+assertNoRootDependencyLookup("!KRT/Services/Loot/Service.lua", "Item or addon.Item", "Item")
+
+local deformatServiceFiles = {
+    "!KRT/Services/Chat.lua",
+    "!KRT/Services/Rolls/Service.lua",
+    "!KRT/Services/Loot/PassiveGroupLoot.lua",
+    "!KRT/Services/Loot/Service.lua",
+}
+for i = 1, #deformatServiceFiles do
+    local path = deformatServiceFiles[i]
+    local source = read(path)
+    assertContains(source, "local Deformat = feature.Deformat", path .. " must localize Deformat from feature shared")
+    assertNotContains(source, "addon.Deformat", path .. " must use local Deformat dependency")
+end
+
+local loggerNamespaceFiles = {
+    "!KRT/Services/Logger/Store.lua",
+    "!KRT/Services/Logger/View.lua",
+    "!KRT/Services/Logger/Export.lua",
+    "!KRT/Services/Logger/Helpers.lua",
+    "!KRT/Services/Logger/Actions.lua",
+}
+for i = 1, #loggerNamespaceFiles do
+    local source = read(loggerNamespaceFiles[i])
+    assertContains(source, "local Services = feature.Services", loggerNamespaceFiles[i] .. " must localize Services from feature shared")
+    assertContains(source, "local Logger = Services.Logger", loggerNamespaceFiles[i] .. " must localize Logger namespace from Services")
+    assertNotContains(source, "= addon.Services.Logger", loggerNamespaceFiles[i] .. " must not localize Logger services from addon root")
+    assertContains(source, "-- events: none", loggerNamespaceFiles[i] .. " must document concrete event ownership in the Lua contract")
+    assertNotContains(source, "-- events: document inbound/outbound events in module body", loggerNamespaceFiles[i] .. " must not keep the generic event placeholder")
+end
+
+local reservesNamespaceFiles = {
+    "!KRT/Services/Reserves.lua",
+    "!KRT/Services/Reserves/Import.lua",
+    "!KRT/Services/Reserves/Aliases.lua",
+    "!KRT/Services/Reserves/Display.lua",
+    "!KRT/Services/Reserves/Sync.lua",
+    "!KRT/Services/Reserves/Chat.lua",
+}
+for i = 1, #reservesNamespaceFiles do
+    local source = read(reservesNamespaceFiles[i])
+    assertContains(source, "local Services = feature.Services", reservesNamespaceFiles[i] .. " must localize Services from feature shared")
+    assertContains(source, "local Reserves = Services.Reserves", reservesNamespaceFiles[i] .. " must localize Reserves namespace from Services")
+    assertContains(source, "local module = Reserves", reservesNamespaceFiles[i] .. " must bind module through the local Reserves namespace")
+    assertNotContains(source, "local module = addon.Services.Reserves", reservesNamespaceFiles[i] .. " must not localize Reserves from addon root")
+end
+
+local reservesDisplaySource = read("!KRT/Services/Reserves/Display.lua")
+assertContains(reservesDisplaySource, "local GetClassColor = feature.GetClassColor", "Services/Reserves/Display must localize GetClassColor from feature shared")
+assertNotContains(reservesDisplaySource, "addon.GetClassColor", "Services/Reserves/Display must use the local GetClassColor dependency")
+
+local rollsNamespaceFiles = {
+    "!KRT/Services/Rolls/Countdown.lua",
+    "!KRT/Services/Rolls/Sessions.lua",
+    "!KRT/Services/Rolls/History.lua",
+    "!KRT/Services/Rolls/Responses.lua",
+    "!KRT/Services/Rolls/Strategies.lua",
+    "!KRT/Services/Rolls/Resolution.lua",
+    "!KRT/Services/Rolls/Display.lua",
+    "!KRT/Services/Rolls/Service.lua",
+}
+for i = 1, #rollsNamespaceFiles do
+    local source = read(rollsNamespaceFiles[i])
+    assertContains(source, "local Services = feature.Services", rollsNamespaceFiles[i] .. " must localize Services from feature shared")
+    assertContains(source, "local Rolls = Services.Rolls", rollsNamespaceFiles[i] .. " must localize Rolls namespace from Services")
+    assertContains(source, "local module = Rolls", rollsNamespaceFiles[i] .. " must bind module through the local Rolls namespace")
+    assertNotContains(source, "local module = addon.Services.Rolls", rollsNamespaceFiles[i] .. " must not localize Rolls from addon root")
+end
+
+local lootNamespaceFiles = {
+    "!KRT/Services/Loot/Context.lua",
+    "!KRT/Services/Loot/State.lua",
+    "!KRT/Services/Loot/Snapshots.lua",
+    "!KRT/Services/Loot/PendingAwards.lua",
+    "!KRT/Services/Loot/PassiveGroupLoot.lua",
+    "!KRT/Services/Loot/Tracking.lua",
+    "!KRT/Services/Loot/Workflow.lua",
+    "!KRT/Services/Loot/Receipts.lua",
+    "!KRT/Services/Loot/Records.lua",
+    "!KRT/Services/Loot/Reconcile.lua",
+    "!KRT/Services/Loot/Rules.lua",
+    "!KRT/Services/Loot/DistributionSession.lua",
+    "!KRT/Services/Loot/Service.lua",
+}
+for i = 1, #lootNamespaceFiles do
+    local source = read(lootNamespaceFiles[i])
+    assertContains(source, "local Services = feature.Services", lootNamespaceFiles[i] .. " must localize Services from feature shared")
+    assertContains(source, "local Loot = Services.Loot", lootNamespaceFiles[i] .. " must localize Loot namespace from Services")
+    assertContains(source, "local module = Loot", lootNamespaceFiles[i] .. " must bind module through the local Loot namespace")
+    assertNotContains(source, "local module = addon.Services.Loot", lootNamespaceFiles[i] .. " must not localize Loot from addon root")
+end
+
+local raidNamespaceFiles = {
+    "!KRT/Services/Raid/State.lua",
+    "!KRT/Services/Raid/Capabilities.lua",
+    "!KRT/Services/Raid/Counts.lua",
+    "!KRT/Services/Raid/Roster.lua",
+    "!KRT/Services/Raid/Attendance.lua",
+    "!KRT/Services/Raid/LootRecords.lua",
+    "!KRT/Services/Raid/Session.lua",
+}
+for i = 1, #raidNamespaceFiles do
+    local source = read(raidNamespaceFiles[i])
+    assertContains(source, "local Services = feature.Services", raidNamespaceFiles[i] .. " must localize Services from feature shared")
+    assertContains(source, "local Raid = Services.Raid", raidNamespaceFiles[i] .. " must localize Raid namespace from Services")
+    assertContains(source, "local module = Raid", raidNamespaceFiles[i] .. " must bind module through the local Raid namespace")
+    assertNotContains(source, "local module = addon.Services.Raid", raidNamespaceFiles[i] .. " must not localize Raid from addon root")
+end
+
+local raidServiceEventHeaders = {
+    {
+        path = "!KRT/Services/Raid/State.lua",
+        events = "-- events: emits RaidCreate",
+    },
+    {
+        path = "!KRT/Services/Raid/Capabilities.lua",
+        events = "-- events: none",
+    },
+    {
+        path = "!KRT/Services/Raid/Counts.lua",
+        events = "-- events: emits PlayerCountChanged",
+    },
+    {
+        path = "!KRT/Services/Raid/Roster.lua",
+        events = "-- events: emits RaidRosterDelta",
+    },
+    {
+        path = "!KRT/Services/Raid/Attendance.lua",
+        events = "-- events: consumes RaidRosterDelta",
+    },
+    {
+        path = "!KRT/Services/Raid/LootRecords.lua",
+        events = "-- events: none",
+    },
+    {
+        path = "!KRT/Services/Raid/Session.lua",
+        events = "-- events: none",
+    },
+}
+
+for i = 1, #raidServiceEventHeaders do
+    local spec = raidServiceEventHeaders[i]
+    local source = read(spec.path)
+    assertContains(source, spec.events, spec.path .. " must document concrete event ownership in the Lua contract")
+    assertNotContains(source, "-- events: document inbound/outbound events in module body", spec.path .. " must not keep the generic event placeholder")
+end
+
+local singletonNamespaceFiles = {
+    { path = "!KRT/Services/Chat.lua", namespace = "Chat" },
+    { path = "!KRT/Services/Debug.lua", namespace = "Debug" },
+}
+for i = 1, #singletonNamespaceFiles do
+    local expected = singletonNamespaceFiles[i]
+    local source = read(expected.path)
+    assertContains(source, "local Services = feature.Services", expected.path .. " must localize Services from feature shared")
+    assertContains(source, "local module = Services." .. expected.namespace, expected.path .. " must bind module through the local Services namespace")
+    assertNotContains(source, "local module = addon.Services." .. expected.namespace, expected.path .. " must not localize " .. expected.namespace .. " from addon root")
+end
+
 assertBefore(toc, "Modules\\Strings.lua", "Services\\Logger\\Store.lua")
 assertBefore(toc, "Modules\\Sort.lua", "Services\\Logger\\View.lua")
 assertBefore(toc, "Modules\\Base64.lua", "Services\\Logger\\Actions.lua")
@@ -757,7 +1075,25 @@ local source = read(expectedService.path)
 local metadataStart = source:find('registry.AddModule("' .. expectedService.name .. '"', 1, true)
 local lastPublicMethod = findLastExportedFunction(source, expectedService.owner, expectedService.separator)
 
-assertContains(source, "local registry = addon.ModuleRegistry", "Services/Chat must use direct registry lookup")
+assertContains(source, "local registry = feature.ModuleRegistry", "Services/Chat must localize ModuleRegistry from feature shared")
+assertContains(source, expectedService.events, "Services/Chat must document concrete event ownership in the Lua contract")
+assertNotContains(source, "-- events: document inbound/outbound events in module body", "Services/Chat must not keep the generic event placeholder")
+assertNotContains(source, "local registry = addon.ModuleRegistry", "Services/Chat must not read ModuleRegistry directly from addon root")
+local sharedHelperSource = read("!KRT/Init.lua")
+assertContains(sharedHelperSource, "GetGroupTypeAndCount = addon.GetGroupTypeAndCount", "feature shared contract must expose group type helper")
+assertContains(source, "local GetGroupTypeAndCount = feature.GetGroupTypeAndCount", "Services/Chat must localize group type helper from feature shared")
+assertContains(source, "local UnitIsGroupLeader = feature.UnitIsGroupLeader", "Services/Chat must localize group leader helper from feature shared")
+assertContains(source, "local UnitIsGroupAssistant = feature.UnitIsGroupAssistant", "Services/Chat must localize group assistant helper from feature shared")
+assertNotContains(source, "local UnitIsGroupLeader = feature.UnitIsGroupLeader or addon.UnitIsGroupLeader", "Services/Chat must not fall back to addon root group leader helper")
+assertNotContains(
+    source,
+    "local UnitIsGroupAssistant = feature.UnitIsGroupAssistant or addon.UnitIsGroupAssistant",
+    "Services/Chat must not fall back to addon root group assistant helper"
+)
+assertNotContains(source, "local GetGroupTypeAndCount = addon.GetGroupTypeAndCount", "Services/Chat must not read group type helper directly from addon root")
+assertNotContains(source, "addon.GetGroupTypeAndCount()", "Services/Chat must call local GetGroupTypeAndCount dependency")
+assertNotContains(source, "local leaderFn = addon.UnitIsGroupLeader", "Services/Chat must use local UnitIsGroupLeader dependency")
+assertNotContains(source, "local assistantFn = addon.UnitIsGroupAssistant", "Services/Chat must use local UnitIsGroupAssistant dependency")
 assertContains(source, 'registry.AddModule("Services/Chat"', "Services/Chat must direct-register module metadata")
 assertContains(source, 'registry.SetLoaded("Services/Chat")', "Services/Chat must mark direct registry module loaded")
 assertNotContains(source, "ModuleRegistryPendingRegistrations", "Services/Chat must not use pending fallback")
@@ -779,7 +1115,13 @@ for i = 1, #expectedRollServices do
     local lastExportedFunction = findLastExportedFunction(rollSource, expected.owner, expected.separator)
     local deps = getPostRegistryDeps(rollSource, expected.name)
 
-    assertContains(rollSource, "local registry = addon.ModuleRegistry", expected.name .. " must use direct registry lookup")
+    assertContains(rollSource, "local registry = feature.ModuleRegistry", expected.name .. " must localize ModuleRegistry from feature shared")
+    if expected.note then
+        assertContains(rollSource, "-- shared: local feature = addon.Database.GetFeatureShared()", expected.name .. " must document its feature shared header dependency")
+        assertContains(rollSource, expected.note, expected.name .. " must document its helper role as a note")
+    end
+    assertContains(rollSource, expected.events, expected.name .. " must document its KRT Lua Contract events")
+    assertNotContains(rollSource, "local registry = addon.ModuleRegistry", expected.name .. " must not read ModuleRegistry directly from addon root")
     assertContains(rollSource, 'registry.AddModule("' .. expected.name .. '"', expected.name .. " must direct-register module metadata")
     assertContains(rollSource, 'registry.SetLoaded("' .. expected.name .. '")', expected.name .. " must mark direct registry module loaded")
     assertNotContains(rollSource, "ModuleRegistryPendingRegistrations", expected.name .. " must not use pending fallback")
@@ -808,7 +1150,13 @@ for i = 1, #expectedLootServices do
     local lastExportedFunction = findLastExportedFunctionAny(lootSource, expected.owners)
     local deps = getPostRegistryDeps(lootSource, expected.name)
 
-    assertContains(lootSource, "local registry = addon.ModuleRegistry", expected.name .. " must use direct registry lookup")
+    assertContains(lootSource, "local registry = feature.ModuleRegistry", expected.name .. " must localize ModuleRegistry from feature shared")
+    assertContains(lootSource, expected.events, expected.name .. " must document its KRT Lua Contract events")
+    if expected.note then
+        assertContains(lootSource, "-- shared: local feature = addon.Database.GetFeatureShared()", expected.name .. " must document its feature shared header dependency")
+        assertContains(lootSource, expected.note, expected.name .. " must document its helper role as a note")
+    end
+    assertNotContains(lootSource, "local registry = addon.ModuleRegistry", expected.name .. " must not read ModuleRegistry directly from addon root")
     assertContains(lootSource, 'registry.AddModule("' .. expected.name .. '"', expected.name .. " must direct-register module metadata")
     assertContains(lootSource, 'registry.SetLoaded("' .. expected.name .. '")', expected.name .. " must mark direct registry module loaded")
     assertNotContains(lootSource, "ModuleRegistryPendingRegistrations", expected.name .. " must not use pending fallback")
@@ -837,7 +1185,8 @@ for i = 1, #expectedRaidServices do
     local lastExportedFunction = findLastExportedFunctionAny(raidSource, expected.owners)
     local deps = getPostRegistryDeps(raidSource, expected.name)
 
-    assertContains(raidSource, "local registry = addon.ModuleRegistry", expected.name .. " must use direct registry lookup")
+    assertContains(raidSource, "local registry = feature.ModuleRegistry", expected.name .. " must localize ModuleRegistry from feature shared")
+    assertNotContains(raidSource, "local registry = addon.ModuleRegistry", expected.name .. " must not read ModuleRegistry directly from addon root")
     assertContains(raidSource, 'registry.AddModule("' .. expected.name .. '"', expected.name .. " must direct-register module metadata")
     assertContains(raidSource, 'registry.SetLoaded("' .. expected.name .. '")', expected.name .. " must mark direct registry module loaded")
     assertNotContains(raidSource, "ModuleRegistryPendingRegistrations", expected.name .. " must not use pending fallback")
@@ -865,7 +1214,19 @@ local function assertServiceRegistryContract(expected)
     local publicApiStart = findExpectedPublicApi(expectedSource, expected)
     local deps = getPostRegistryDeps(expectedSource, expected.name)
 
-    assertContains(expectedSource, "local registry = addon.ModuleRegistry", expected.name .. " must use direct registry lookup")
+    if expected.registryFromFeature then
+        assertContains(expectedSource, "local registry = feature.ModuleRegistry", expected.name .. " must localize ModuleRegistry from feature shared")
+        assertNotContains(expectedSource, "local registry = addon.ModuleRegistry", expected.name .. " must not read ModuleRegistry directly from addon root")
+    else
+        assertContains(expectedSource, "local registry = addon.ModuleRegistry", expected.name .. " must use direct registry lookup")
+    end
+    if expected.events then
+        assertContains(expectedSource, expected.events, expected.name .. " must document its KRT Lua Contract events")
+    end
+    if expected.note then
+        assertContains(expectedSource, "-- shared: local feature = addon.Database.GetFeatureShared()", expected.name .. " must document its feature shared header dependency")
+        assertContains(expectedSource, expected.note, expected.name .. " must document its helper role as a note")
+    end
     assertContains(expectedSource, 'registry.AddModule("' .. expected.name .. '"', expected.name .. " must direct-register module metadata")
     assertContains(expectedSource, 'registry.SetLoaded("' .. expected.name .. '")', expected.name .. " must mark direct registry module loaded")
     assertNotContains(expectedSource, "ModuleRegistryPendingRegistrations", expected.name .. " must not use pending fallback")

@@ -2,22 +2,23 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
+local Features = feature.Features
+
 local type = type
 
-addon.UI = addon.UI or {}
-local UI = addon.UI
+local UI = feature.UI or {}
+addon.UI = UI
 
 -- ----- Internal state ----- --
 UI._registry = UI._registry or {}
 
 -- ----- Private helpers ----- --
 local function isWidgetEnabled(widgetId)
-    local Features = addon.Features
     if type(Features) ~= "table" then
         return true
     end
@@ -77,7 +78,7 @@ function UI:Call(widgetId, methodName, ...)
     return fn(...)
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Modules/UI/Facade", { deps = { "Init", "Modules/ModuleRegistry" } })
     registry.SetLoaded("Modules/UI/Facade")

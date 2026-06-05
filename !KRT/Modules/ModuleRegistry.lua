@@ -9,8 +9,8 @@ local feature = addon.Database.GetFeatureShared()
 
 local type = type
 
-addon.ModuleRegistry = addon.ModuleRegistry or feature.ModuleRegistry or {}
-local ModuleRegistry = addon.ModuleRegistry
+local ModuleRegistry = feature.ModuleRegistry or {}
+addon.ModuleRegistry = ModuleRegistry
 
 -- ----- Internal state ----- --
 local modules = {}

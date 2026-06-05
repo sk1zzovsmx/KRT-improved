@@ -8,8 +8,8 @@ local feature = addon.Database.GetFeatureShared()
 
 local Database = feature.Database
 
-addon.DBSchema = addon.DBSchema or {}
-local DBSchema = addon.DBSchema
+local DBSchema = feature.DBSchema or {}
+addon.DBSchema = DBSchema
 
 -- ----- Internal state ----- --
 local DEFAULT_RAID_SCHEMA_VERSION = 5
@@ -39,6 +39,7 @@ end
 do
     local name = "Database/DBSchema"
     local deps = { "Init" }
+    -- Bootstrap exception: ModuleRegistry may not be loaded yet.
     local registry = addon.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })

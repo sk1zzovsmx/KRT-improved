@@ -1,9 +1,12 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: static raid item source data for Vanilla through Wrath of the Lich King
--- exports: addon.LootSourcesData
+-- shared: local feature = addon.Database.GetFeatureShared()
+-- exports: addon.LootSourcesData (static data tables; no public methods)
+-- events: none
+-- notes: static raid item source data for Vanilla through Wrath of the Lich King
 
 local addon = select(2, ...)
+local feature = addon.Database.GetFeatureShared()
 
 local pairs = pairs
 local tostring = tostring
@@ -12,12 +15,13 @@ local strlower = string.lower
 local gsub = string.gsub
 
 -- ----- Internal state ----- --
-addon.LootSourcesData = addon.LootSourcesData or {}
-addon.LootSourcesData.ByItemId = addon.LootSourcesData.ByItemId or {}
-addon.LootSourcesData.ByInstance = addon.LootSourcesData.ByInstance or {}
+local LootSourcesData = feature.LootSourcesData or {}
+addon.LootSourcesData = LootSourcesData
+LootSourcesData.ByItemId = LootSourcesData.ByItemId or {}
+LootSourcesData.ByInstance = LootSourcesData.ByInstance or {}
 
-local ByItemId = addon.LootSourcesData.ByItemId
-local ByInstance = addon.LootSourcesData.ByInstance
+local ByItemId = LootSourcesData.ByItemId
+local ByInstance = LootSourcesData.ByInstance
 local BOSS_SOURCE_KIND = "boss"
 local UNKNOWN_MODE_SIZE = 0
 local UNKNOWN_MODE_DIFFICULTY = "any"
@@ -184,7 +188,7 @@ end
 
 local function buildInstanceIndex()
     ByInstance = {}
-    addon.LootSourcesData.ByInstance = ByInstance
+    LootSourcesData.ByInstance = ByInstance
 
     for itemId, itemSources in pairs(ByItemId) do
         for i = 1, #itemSources do
@@ -214,7 +218,6 @@ local function loadRaidLootSources(raidLootSources)
     end
 end
 
-local LootSourcesData = addon.LootSourcesData or {}
 local RawSources = LootSourcesData.Raw or {}
 
 if #RawSources > 0 then
@@ -226,7 +229,7 @@ end
 do
     local name = "Modules/Dataset/LootSourcesData"
     local deps = { "Init" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

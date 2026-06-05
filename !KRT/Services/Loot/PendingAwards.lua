@@ -1,7 +1,9 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: pending-award helpers for loot service
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Loot._PendingAwards
+-- events: no bus events; pending-award helpers only
+-- notes: pending-award helpers for loot service
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -9,11 +11,13 @@ local feature = addon.Database.GetFeatureShared()
 local Diag = feature.Diag
 local C = feature.C
 local Item = feature.Item
+local Services = feature.Services
 local lootState = feature.lootState
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Loot")
-local module = addon.Services.Loot
+local Loot = Services.Loot
+local module = Loot
 module._PendingAwards = module._PendingAwards or {}
 
 local PendingAwards = module._PendingAwards
@@ -366,7 +370,7 @@ function PendingAwards.Purge(maxAge)
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Loot/PendingAwards", {
         deps = {

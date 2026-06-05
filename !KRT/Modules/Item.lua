@@ -2,16 +2,19 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
+-- events: no bus events; item cache polling uses the Timer dependency
 -- notes: consolidated item helpers + tooltip-based item metadata probing
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
+local Timer = feature.Timer
+local Deformat = feature.Deformat
 
-addon.Item = addon.Item or feature.Item or {}
-local Item = addon.Item
+local Item = feature.Item or {}
+addon.Item = Item
 
 -- Timer ownership: ticker for polling item-cache requests.
-addon.Timer.BindMixin(Item, "Item")
+Timer.BindMixin(Item, "Item")
 
 local _G = _G
 local type, tostring = type, tostring
@@ -183,7 +186,7 @@ local function scanSoulboundFlag(tip)
                 return true
             end
 
-            if addon.Deformat and addon.Deformat(text, BIND_TRADE_TIME_REMAINING) ~= nil then
+            if Deformat and Deformat(text, BIND_TRADE_TIME_REMAINING) ~= nil then
                 return false
             end
         end
@@ -236,7 +239,7 @@ function Item.GetItemIdFromLink(itemLink)
     if directId then
         return tonumber(directId)
     end
-    local _, itemId = addon.Deformat(itemLink, ITEM_LINK_FORMAT)
+    local _, itemId = Deformat(itemLink, ITEM_LINK_FORMAT)
     return itemId
 end
 
@@ -250,7 +253,7 @@ function Item.GetItemStringFromLink(itemLink)
         return itemString
     end
 
-    local _, itemId, rest = addon.Deformat(itemLink, ITEM_LINK_FORMAT)
+    local _, itemId, rest = Deformat(itemLink, ITEM_LINK_FORMAT)
     if itemId then
         if rest and rest ~= "" then
             return "item:" .. tostring(itemId) .. ":" .. tostring(rest)
@@ -380,7 +383,7 @@ end
 do
     local name = "Modules/Item"
     local deps = { "Init", "Modules/Timer", "Modules/Strings" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

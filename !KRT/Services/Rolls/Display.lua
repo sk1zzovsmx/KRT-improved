@@ -1,11 +1,14 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: display-model helpers for rolls service
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Rolls._Display
+-- events: none
+-- notes: display-model helpers for rolls service
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
+local Services = feature.Services
 local rollTypes = feature.rollTypes
 
 local sort = table.sort
@@ -14,7 +17,8 @@ local tostring, tonumber = tostring, tonumber
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Rolls")
-local module = addon.Services.Rolls
+local Rolls = Services.Rolls
+local module = Rolls
 module._Display = module._Display or {}
 
 local Display = module._Display
@@ -246,7 +250,7 @@ function Display.ShouldUseTieReroll(ctx, model)
     return resolution and resolution.requiresManualResolution == true and requiredWinnerCount == 1 and selectedCount <= 0
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Rolls/Display", {
         deps = {

@@ -7,14 +7,16 @@ local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Strings = feature.Strings
+local Services = feature.Services
 
 local tonumber = tonumber
 local ipairs = ipairs
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Logger", "Helpers")
-local Helpers = addon.Services.Logger.Helpers
-local Store = addon.Services.Logger.Store
+local Logger = Services.Logger
+local Helpers = Logger.Helpers
+local Store = Logger.Store
 
 -- ----- Private helpers ----- --
 
@@ -66,7 +68,7 @@ function Helpers.FindLoggerPlayer(normalizedName, raid, bossKill)
     return nil
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Logger/Helpers", {
         deps = {

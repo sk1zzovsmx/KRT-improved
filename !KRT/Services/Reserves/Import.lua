@@ -1,7 +1,9 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: reserves import parsing helpers
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Reserves._Import
+-- events: no bus events; import parsing helpers only
+-- notes: reserves import parsing helpers
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -9,8 +11,9 @@ local feature = addon.Database.GetFeatureShared()
 local L = feature.L
 local Diag = feature.Diag
 local Strings = feature.Strings
-local Base64 = feature.Base64 or addon.Base64
-local Json = feature.Json or addon.Json
+local Base64 = feature.Base64
+local Json = feature.Json
+local Services = feature.Services
 local _G = _G
 local pcall = pcall
 local tostring = tostring
@@ -20,7 +23,8 @@ local byte = string.byte
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Reserves")
-local module = addon.Services.Reserves
+local Reserves = Services.Reserves
+local module = Reserves
 module._Import = module._Import or {}
 
 local Import = module._Import
@@ -197,12 +201,12 @@ local function parseCSVRows(csv)
 end
 
 local function getBase64()
-    Base64 = Base64 or feature.Base64 or addon.Base64
+    Base64 = Base64 or feature.Base64
     return Base64
 end
 
 local function getJson()
-    Json = Json or feature.Json or addon.Json
+    Json = Json or feature.Json
     return Json
 end
 
@@ -609,7 +613,7 @@ function Import.BuildParser()
     }
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Reserves/Import", {
         deps = {

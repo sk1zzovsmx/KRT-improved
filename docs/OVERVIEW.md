@@ -29,9 +29,13 @@ For architecture guardrails, see `docs/ARCHITECTURE.md`.
 
 `Init.lua` also owns global WoW event wiring and bus forwarding.
 Modules consume shared dependencies through `addon.Database.GetFeatureShared()`.
+KRT-owned Lua should bind from `feature.*`; double-binding fallbacks such as
+`feature.X or addon.X` are intentionally blocked by local gates.
 Service submodules bootstrap owner tables through `feature.EnsureServiceNamespace(...)`
 so namespace creation stays centralized with the rest of bootstrap.
 `Database/DBOptions.lua` owns `addon.Options`, namespaced defaults, and strict schema-2 storage.
+The legacy `addon.options` surface is a read-only compatibility proxy only; new code uses
+namespace config objects with `cfg:Get(...)` and `cfg:Set(...)`.
 
 ## Runtime Module Map
 
@@ -137,6 +141,8 @@ Common infra under `!KRT/Modules/`:
 
 - Canonical owners are namespaced (`addon.Controllers.*`, `addon.Services.*`, `addon.Widgets.*`).
 - Retired top-level aliases (`addon.Master`, `addon.Logger`, ...) must not be reintroduced.
+- Root compatibility tables that remain public are exported after binding through `feature.*`;
+  do not read them through `feature.* or addon.*` fallback chains.
 - For announce and shared warning output, use `addon.Services.Chat`.
   For capability queries and shared master-only access guards, use
   `addon.Services.Raid`.

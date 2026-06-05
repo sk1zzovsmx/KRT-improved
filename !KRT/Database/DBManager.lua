@@ -6,8 +6,8 @@
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
-addon.DBManager = addon.DBManager or {}
-local DBManager = addon.DBManager
+local DBManager = feature.DBManager or {}
+addon.DBManager = DBManager
 
 -- ----- Internal state ----- --
 DBManager.SavedVariables = DBManager.SavedVariables or {}
@@ -15,7 +15,7 @@ local SavedVariablesManager = DBManager.SavedVariables
 
 -- ----- Private helpers ----- --
 local function getAddonDbStore(storeKey)
-    local db = addon.DB
+    local db = feature.DB
     if type(db) ~= "table" then
         return nil
     end
@@ -50,6 +50,7 @@ end
 do
     local name = "Database/DBManager"
     local deps = { "Init", "Database/DB" }
+    -- Bootstrap exception: ModuleRegistry may not be loaded yet.
     local registry = addon.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })

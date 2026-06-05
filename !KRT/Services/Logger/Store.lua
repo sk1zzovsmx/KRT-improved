@@ -2,18 +2,20 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Strings = feature.Strings
 local Database = feature.Database
+local Services = feature.Services
 
 local type, tostring, tonumber = type, tostring, tonumber
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Logger", "Store")
-local Store = addon.Services.Logger.Store
+local Logger = Services.Logger
+local Store = Logger.Store
 local bossIdx
 local lootIdx
 local playerIdx
@@ -207,7 +209,7 @@ function Store:FindRaidPlayerByNormName(raid, normalizedLower)
     return nil
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Logger/Store", {
         deps = {

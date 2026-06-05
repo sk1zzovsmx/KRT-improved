@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: defines addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: seeds Internal/Wow event names; marks Init bootstrap load
 
 local addon = select(2, ...)
 local addonName = select(1, ...)
@@ -44,6 +44,7 @@ local Diagnose = addon.Diagnose
 local DEFAULT_PERF_THRESHOLD_MS = 5
 
 local function markBootstrapModuleLoaded()
+    -- Bootstrap exception: ModuleRegistry may not be loaded yet.
     local registry = addon.ModuleRegistry
     if registry and type(registry.SetLoaded) == "function" then
         registry.SetLoaded("Init")
@@ -349,30 +350,39 @@ function Database.GetFeatureShared()
         C = constants,
         Database = core,
         DB = addon.DB,
+        DBManager = addon.DBManager,
+        DBSchema = addon.DBSchema,
+        ModuleRegistry = addon.ModuleRegistry,
         Bus = addon.Bus,
 
         Strings = addon.Strings,
         Colors = addon.Colors,
         Time = addon.Time,
+        Timer = addon.Timer,
         Base64 = addon.Base64,
         Json = addon.Json,
         Comms = addon.Comms,
         Sort = addon.Sort,
         Item = addon.Item,
+        LootSourcesData = addon.LootSourcesData,
+        LootSources = addon.LootSources,
         IgnoredItems = addon.IgnoredItems,
         IgnoredMobs = addon.IgnoredMobs,
 
         UI = addon.UI,
         Frames = addon.Frames,
+        UIEffects = addon.UIEffects,
         UIScaffold = addon.UIScaffold,
         UIPrimitives = addon.UIPrimitives,
         UIRowVisuals = addon.UIRowVisuals,
+        OptionsLayout = addon.OptionsLayout,
         ListController = addon.ListController,
         MultiSelect = addon.MultiSelect,
 
         Services = addon.Services,
         Controllers = addon.Controllers,
         Widgets = addon.Widgets,
+        Minimap = addon.Minimap,
 
         EnsureServiceNamespace = core.EnsureServiceNamespace,
         BindModuleRequestRefresh = core.BindModuleRequestRefresh,
@@ -381,6 +391,11 @@ function Database.GetFeatureShared()
 
         UnitIsGroupLeader = addon.UnitIsGroupLeader,
         UnitIsGroupAssistant = addon.UnitIsGroupAssistant,
+        GetGroupTypeAndCount = addon.GetGroupTypeAndCount,
+        GetClassColor = addon.GetClassColor,
+        Deformat = addon.Deformat,
+        BossIDs = addon.BossIDs,
+        GetCreatureId = addon.GetCreatureId,
         tContains = _G.tContains,
 
         ITEM_LINK_PATTERN = constants.ITEM_LINK_PATTERN,
@@ -406,7 +421,7 @@ do
     -- deps: local addon = select(2, ...)
     -- shared: local feature = addon.Database.GetFeatureShared()
     -- exports: publish module APIs on addon.*
-    -- events: document inbound/outbound events in module body
+    -- events: owns main WoW event dispatcher; forwards events to Bus and Services
 
     local addon = select(2, ...)
     local feature = addon.Database.GetFeatureShared()

@@ -7,14 +7,16 @@ local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Database = feature.Database
+local Services = feature.Services
 
 local tostring, tonumber, type = tostring, tonumber, type
 local date = date
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Logger", "Export")
-local Export = addon.Services.Logger.Export
-local Store = addon.Services.Logger.Store
+local Logger = Services.Logger
+local Export = Logger.Export
+local Store = Logger.Store
 
 local HEADER_LOOT = {
     "raidNid",
@@ -222,7 +224,7 @@ function Export:GetRaidAttendanceCSV(raid)
     return buildCSV(HEADER_RAID_ATTENDANCE, rows)
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Logger/Export", {
         deps = {

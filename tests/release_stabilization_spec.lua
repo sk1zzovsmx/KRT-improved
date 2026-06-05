@@ -1430,6 +1430,7 @@ local function newHarness()
         Frames = addon.Frames,
         Events = Events,
         C = C,
+        coreState = addon.State,
         Database = Database,
         Options = (function()
             -- Stub matching the namespace registry API. Registered options live
@@ -1604,11 +1605,14 @@ local function newHarness()
         feature.Frames = addon.Frames or feature.Frames
         feature.Events = addon.Events or feature.Events
         feature.C = addon.C or feature.C
+        feature.coreState = addon.State or feature.coreState
         feature.Database = addon.Database or Database
+        feature.DB = addon.DB or feature.DB
         feature.Options = addon.Options or feature.Options
         feature.Bus = addon.Bus or feature.Bus
         feature.Strings = addon.Strings or feature.Strings
         feature.Colors = addon.Colors or feature.Colors
+        feature.Timer = addon.Timer or feature.Timer
         feature.Base64 = addon.Base64 or feature.Base64
         feature.Json = addon.Json or feature.Json
         feature.Sort = addon.Sort or feature.Sort
@@ -1616,12 +1620,27 @@ local function newHarness()
         feature.MultiSelect = addon.MultiSelect or feature.MultiSelect
         feature.Comms = addon.Comms or feature.Comms
         feature.Item = addon.Item or feature.Item
+        feature.LootSourcesData = addon.LootSourcesData or feature.LootSourcesData
+        feature.LootSources = addon.LootSources or feature.LootSources
         feature.IgnoredItems = addon.IgnoredItems or feature.IgnoredItems
         feature.IgnoredMobs = addon.IgnoredMobs or feature.IgnoredMobs
+        feature.UI = addon.UI or feature.UI
+        feature.UIEffects = addon.UIEffects or feature.UIEffects
+        feature.UIScaffold = addon.UIScaffold or feature.UIScaffold
+        feature.UIPrimitives = addon.UIPrimitives or feature.UIPrimitives
+        feature.UIRowVisuals = addon.UIRowVisuals or feature.UIRowVisuals
+        feature.OptionsLayout = addon.OptionsLayout or feature.OptionsLayout
         feature.Services = addon.Services or feature.Services
         feature.Controllers = addon.Controllers or feature.Controllers
         feature.Widgets = addon.Widgets or feature.Widgets
         feature.Time = addon.Time or feature.Time
+        feature.Deformat = addon.Deformat or feature.Deformat
+        feature.GetClassColor = addon.GetClassColor or feature.GetClassColor
+        feature.GetCreatureId = addon.GetCreatureId or feature.GetCreatureId
+        feature.BossIDs = addon.BossIDs or feature.BossIDs
+        feature.GetGroupTypeAndCount = addon.GetGroupTypeAndCount or feature.GetGroupTypeAndCount
+        feature.UnitIsGroupLeader = addon.UnitIsGroupLeader or feature.UnitIsGroupLeader
+        feature.UnitIsGroupAssistant = addon.UnitIsGroupAssistant or feature.UnitIsGroupAssistant
         feature.EnsureServiceNamespace = Database.EnsureServiceNamespace
         return feature
     end
@@ -2284,6 +2303,24 @@ local function assertTextNotContains(text, needle, message)
     if string.find(tostring(text or ""), tostring(needle or ""), 1, true) then
         error(message or ("expected text not to contain '" .. tostring(needle) .. "'"), 0)
     end
+end
+
+local function readText(path)
+    local file = assert(io.open(path, "r"))
+    local text = file:read("*a")
+    file:close()
+    return text
+end
+
+local function setHarnessOption(h, namespace, key, value, defaults)
+    local cfg = h.addon.Options.AddNamespace(namespace, defaults or {})
+    cfg:Set(key, value)
+    return cfg
+end
+
+local function getHarnessOption(h, namespace, key)
+    local cfg = h.addon.Options.Get(namespace)
+    return cfg and cfg:Get(key) or nil
 end
 
 local function setupLoggerExportHarness(seedRaids)
@@ -2987,6 +3024,12 @@ local function test(name, fn)
     tests[#tests + 1] = { name = name, fn = fn }
 end
 
+test("release stabilization tests use namespace option helpers", function()
+    local source = readText("tests/release_stabilization_spec.lua")
+    assertTextNotContains(source, "h.addon." .. "options", "tests must use namespace cfg:Get/cfg:Set instead of direct option table access")
+    assertTextNotContains(source, "h.addon.Options." .. "Set(", "tests must use namespace cfg:Set instead of flat option writes")
+end)
+
 test("runtime cache reuses runtime until invalidated", function()
     local h = newHarness()
     h:load("!KRT/Database/DBRaidStore.lua")
@@ -3583,7 +3626,7 @@ test("db syncer persistent logger sync schedules current raid sync when enabled"
     end
 
     local syncer = h.addon.DB.Syncer
-    h.addon.Options.Set("persistentSync", true)
+    setHarnessOption(h, "Logger", "persistentSync", true, { persistentSync = false })
     syncer:RefreshPersistentSync(0)
     h.addon._flushTimers()
 
@@ -3598,8 +3641,8 @@ test("db syncer registers logger loot threshold defaults", function()
     h:load("!KRT/Modules/Base64.lua")
     h:load("!KRT/Database/DBSyncer.lua")
 
-    assertEqual(h.addon.options.ignoreSelectionThreshold, true, "expected logger threshold override to be enabled by default")
-    assertEqual(h.addon.options.loggerLootQualityThreshold, 4, "expected default logger threshold to be Epic")
+    assertEqual(getHarnessOption(h, "Logger", "ignoreSelectionThreshold"), true, "expected logger threshold override to be enabled by default")
+    assertEqual(getHarnessOption(h, "Logger", "loggerLootQualityThreshold"), 4, "expected default logger threshold to be Epic")
 end)
 
 test("db syncer skips base64 work for empty snapshot text fields", function()
@@ -4436,13 +4479,13 @@ test("logger maintenance clean up removes selected low value history", function(
     h:load("!KRT/Services/Logger/Actions.lua")
 
     local Actions = h.addon.Services.Logger.Actions
-    local preview = Actions:ScanRaidHistory()
+    local preview = Actions:GetRaidHistoryScan()
 
     assertEqual(preview.emptyRaids, 1, "expected cleanup preview to count empty raids")
     assertEqual(preview.nonEpicLoot, 1, "expected cleanup preview to count non-epic loot")
     assertEqual(preview.raidsWithoutBosses, 1, "expected cleanup preview to count non-empty raids without boss encounters")
 
-    local result = Actions:CleanUpRaidHistory({
+    local result = Actions:RemoveRaidHistoryEntries({
         emptyRaids = true,
         nonEpicLoot = true,
         noBossEncounter = true,
@@ -4498,7 +4541,7 @@ test("logger maintenance no boss cleanup does not delete empty raids unless sele
     h:load("!KRT/Services/Logger/Helpers.lua")
     h:load("!KRT/Services/Logger/Actions.lua")
 
-    local result = h.addon.Services.Logger.Actions:CleanUpRaidHistory({
+    local result = h.addon.Services.Logger.Actions:RemoveRaidHistoryEntries({
         noBossEncounter = true,
     })
 
@@ -4555,7 +4598,7 @@ test("logger maintenance rebuilds missing loot sources from static source data",
     h:load("!KRT/Services/Logger/Actions.lua")
 
     local Actions = h.addon.Services.Logger.Actions
-    local result = Actions:RebuildLootSources()
+    local result = Actions:EnsureLootSources()
     local raid = h.Database.EnsureRaidById(1)
 
     assertEqual(result.repaired, 1, "expected one loot row to be repaired")
@@ -4646,7 +4689,7 @@ test("logger maintenance scans history report metrics", function()
     h:load("!KRT/Services/Logger/Actions.lua")
 
     local Actions = h.addon.Services.Logger.Actions
-    local result = Actions:ScanRaidHistory()
+    local result = Actions:GetRaidHistoryScan()
 
     assertEqual(result.raids, 3, "expected scan to count all raids")
     assertEqual(result.emptyRaids, 1, "expected scan to count empty raids")
@@ -6765,8 +6808,13 @@ end)
 test("loot service ignore group loot option suppresses passive group loot observation", function()
     local h = newHarness()
     local link = h.registerItem(915813, "Ignored Group Loot Blade")
+    local loggerCfg = h.addon.Options.AddNamespace("Logger", {
+        ignoreGroupLoot = false,
+        ignoreSelectionThreshold = true,
+        loggerLootQualityThreshold = 4,
+    })
 
-    h.addon.options.ignoreGroupLoot = true
+    loggerCfg:Set("ignoreGroupLoot", true)
     _G.GetLootMethod = function()
         return "group", nil, nil
     end
@@ -6791,8 +6839,13 @@ test("loot service logger quality override filters below selected threshold", fu
     local h = newHarness()
     local rareLink = h.registerItem(915814, "Rare Logger Blade", 3)
     local epicLink = h.registerItem(915815, "Epic Logger Blade", 4)
-    h.addon.options.ignoreSelectionThreshold = true
-    h.addon.options.loggerLootQualityThreshold = 4
+    local loggerCfg = h.addon.Options.AddNamespace("Logger", {
+        ignoreGroupLoot = false,
+        ignoreSelectionThreshold = true,
+        loggerLootQualityThreshold = 4,
+    })
+    loggerCfg:Set("ignoreSelectionThreshold", true)
+    loggerCfg:Set("loggerLootQualityThreshold", 4)
     h:installRaidStore({
         {
             schemaVersion = 1,
@@ -6846,8 +6899,13 @@ end)
 test("loot service uses raid threshold when logger override is disabled", function()
     local h = newHarness()
     local rareLink = h.registerItem(915816, "Raid Threshold Rare", 3)
-    h.addon.options.ignoreSelectionThreshold = false
-    h.addon.options.loggerLootQualityThreshold = 4
+    local loggerCfg = h.addon.Options.AddNamespace("Logger", {
+        ignoreGroupLoot = false,
+        ignoreSelectionThreshold = true,
+        loggerLootQualityThreshold = 4,
+    })
+    loggerCfg:Set("ignoreSelectionThreshold", false)
+    loggerCfg:Set("loggerLootQualityThreshold", 4)
     h:installRaidStore({
         {
             schemaVersion = 1,
@@ -7118,9 +7176,20 @@ local function newGroupLootSourceResolverHarness(itemId, itemName, rollId, messa
         end
         return nil
     end
+    local deformatWinners = {
+        [message] = {
+            rollId = rollId,
+            rollValue = 88,
+            itemLink = link,
+        },
+    }
+    h._deformatWinners = deformatWinners
     h.addon.Deformat = function(msg, pattern)
-        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == message then
-            return rollId, 88, link
+        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED then
+            local entry = deformatWinners[msg]
+            if entry then
+                return entry.rollId, entry.rollValue, entry.itemLink
+            end
         end
         return nil
     end
@@ -7300,14 +7369,11 @@ test("group loot source resolver records shared static source for passive item",
         end
         return nil
     end
-    h.addon.Deformat = function(msg, pattern)
-        if pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "resolver-ambiguous-win" then
-            return 303, 88, ambiguousLink
-        elseif pattern == _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED and msg == "resolver-stale-boss-win" then
-            return 304, 88, staleBossLink
-        end
-        return nil
-    end
+    h._deformatWinners["resolver-stale-boss-win"] = {
+        rollId = 304,
+        rollValue = 88,
+        itemLink = staleBossLink,
+    }
     h.addon.LootSources._SetDataForTests({
         [91732] = ambiguousSourceData,
         [91733] = {
@@ -11099,7 +11165,7 @@ test("master roll intake reopens after announcing rolls with service-owned sessi
     local h = newHarness()
     local link = h.registerItem(9321, "Countdownblade")
 
-    h.addon.options.countdownDuration = 5
+    setHarnessOption(h, "Rolls", "countdownDuration", 5, { countdownDuration = 5 })
     h.addon.Services.Loot = {
         GetItem = function(index)
             if index ~= 1 then
@@ -13242,7 +13308,11 @@ test("row info tags stay separate from counter values", function()
     h.feature.lootState.lootCount = 1
     h.feature.lootState.selectedItemCount = 1
     h.feature.lootState.currentRollType = h.rollTypes.MAINSPEC
-    h.addon.options.showLootCounterDuringMSRoll = true
+    h.addon.Options
+        .AddNamespace("LootCounter", {
+            showLootCounterDuringMSRoll = false,
+        })
+        :Set("showLootCounterDuringMSRoll", true)
 
     Rolls:SetRollRecordingEnabled(true)
     Rolls:CHAT_MSG_SYSTEM("Alice 98")
@@ -13451,6 +13521,7 @@ test("reserves import accepts Base64 encoded RaidRes JSON", function()
     h:load("!KRT/Modules/Base64.lua")
     h:load("!KRT/Modules/Json.lua")
     h:load("!KRT/Services/Reserves/Import.lua")
+    h:load("!KRT/Services/Reserves/Aliases.lua")
     h:load("!KRT/Services/Reserves/Display.lua")
     h:load("!KRT/Services/Reserves.lua")
 
@@ -13473,6 +13544,7 @@ test("reserves import keeps plain CSV behavior before encoded fallback", functio
     h:load("!KRT/Modules/Base64.lua")
     h:load("!KRT/Modules/Json.lua")
     h:load("!KRT/Services/Reserves/Import.lua")
+    h:load("!KRT/Services/Reserves/Aliases.lua")
     h:load("!KRT/Services/Reserves/Display.lua")
     h:load("!KRT/Services/Reserves.lua")
 
@@ -13636,7 +13708,7 @@ test("reserves expose item and roster match context for master loot", function()
             },
         },
     }
-    h.addon.options.srImportMode = 1
+    setHarnessOption(h, "Reserves", "srImportMode", 1, { srImportMode = 0 })
     h.addon.Services.Raid = {
         GetPlayerID = function(_, name, raidNum)
             local rid = tonumber(raidNum) or 0
@@ -14801,7 +14873,7 @@ test("reserves whisper softres ignores requests while disabled", function()
             },
         },
     }
-    h.addon.options.softResWhisperReplies = false
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", false, { softResWhisperReplies = true })
     h.addon.Comms.SendWhisper = function(target, msg)
         sent[#sent + 1] = { target = target, msg = msg }
         return true
@@ -14829,7 +14901,7 @@ test("reserves whisper softres replies with player reserves for authorized holde
             },
         },
     }
-    h.addon.options.softResWhisperReplies = true
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
     h.addon.Comms.SendWhisper = function(target, msg)
         sent[#sent + 1] = { target = target, msg = msg }
         return true
@@ -14866,7 +14938,7 @@ test("reserves whisper softres accepts private-server-safe aliases", function()
             },
         },
     }
-    h.addon.options.softResWhisperReplies = true
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
     h.addon.Comms.SendWhisper = function(target, msg)
         sent[#sent + 1] = { target = target, msg = msg }
         return true
@@ -14903,7 +14975,7 @@ test("reserves whisper softres denies normal raiders even with reserve data", fu
             },
         },
     }
-    h.addon.options.softResWhisperReplies = true
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
     h.addon.Comms.SendWhisper = function(target, msg)
         sent[#sent + 1] = { target = target, msg = msg }
         return true
@@ -14925,7 +14997,7 @@ test("reserves whisper softres stays silent without reserve data", function()
     local h = newHarness()
     local sent = {}
     _G.KRT_Reserves = {}
-    h.addon.options.softResWhisperReplies = true
+    setHarnessOption(h, "Reserves", "softResWhisperReplies", true, { softResWhisperReplies = true })
     h.addon.Comms.SendWhisper = function(target, msg)
         sent[#sent + 1] = { target = target, msg = msg }
         return true

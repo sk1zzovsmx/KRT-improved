@@ -2,18 +2,19 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: owns spammer UI scripts; delegates ticker state to Services/Chat
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
+local Controllers = feature.Controllers
 local Database = feature.Database
 
 local Frames = feature.Frames
 local Strings = feature.Strings
 local Services = feature.Services
-local UIScaffold = addon.UIScaffold
-local UIPrimitives = addon.UIPrimitives
+local UIScaffold = feature.UIScaffold
+local UIPrimitives = feature.UIPrimitives
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
@@ -36,8 +37,8 @@ local ChatApi = {
 
 -- =========== LFM Spam Module  =========== --
 do
-    addon.Controllers.Spammer = addon.Controllers.Spammer or {}
-    local module = addon.Controllers.Spammer
+    Controllers.Spammer = Controllers.Spammer or {}
+    local module = Controllers.Spammer
     module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
     -- ----- Internal state ----- --
@@ -944,7 +945,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Controllers/Spammer", {
         deps = {

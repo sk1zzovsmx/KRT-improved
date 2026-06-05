@@ -2,20 +2,22 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: listens ReservesDataChanged and GET_ITEM_INFO_RECEIVED
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 
+local Widgets = feature.Widgets
 local Frames = feature.Frames
-local UIScaffold = addon.UIScaffold
-local UIPrimitives = addon.UIPrimitives
+local UIScaffold = feature.UIScaffold
+local UIPrimitives = feature.UIPrimitives
 local Events = feature.Events
 local C = feature.C
 local Options = feature.Options
 local Bus = feature.Bus
+local Services = feature.Services
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
@@ -26,9 +28,9 @@ local format = string.format
 local tostring, tonumber = tostring, tonumber
 
 local InternalEvents = Events.Internal
-local UIFacade = addon.UI
+local UIFacade = feature.UI
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Widgets/ReservesUI", {
         deps = {
@@ -51,11 +53,11 @@ do
         return
     end
 
-    addon.Widgets.ReservesUI = addon.Widgets.ReservesUI or {}
-    local module = addon.Widgets.ReservesUI
+    Widgets.ReservesUI = Widgets.ReservesUI or {}
+    local module = Widgets.ReservesUI
     module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
-    local Reserves = addon.Services and addon.Services.Reserves
+    local Reserves = Services and Services.Reserves
 
     -- ----- Internal state ----- --
 
@@ -672,11 +674,16 @@ do
         }
     end
 
+    local function getReservesOptions()
+        return Options and Options.Get and Options.Get("Reserves") or nil
+    end
+
     local function getImportModeString()
         if Reserves and Reserves.GetImportMode then
             return Reserves:GetImportMode()
         end
-        local value = addon.options and addon.options.srImportMode
+        local reservesNs = getReservesOptions()
+        local value = reservesNs and reservesNs:Get("srImportMode") or nil
         if value == MODE_PLUS then
             return "plus"
         end
@@ -814,7 +821,7 @@ do
         if Reserves and Reserves.SetImportMode then
             Reserves:SetImportMode(mode, true)
         else
-            local reservesNs = Options.Get("Reserves")
+            local reservesNs = getReservesOptions()
             if reservesNs then
                 reservesNs:Set("srImportMode", (mode == "plus") and MODE_PLUS or MODE_MULTI)
             end

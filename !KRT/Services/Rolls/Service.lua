@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: emits AddRoll through History; owns countdown facade calls
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
@@ -10,9 +10,11 @@ local L = feature.L
 local Diag = feature.Diag
 
 local Database = feature.Database
+local Deformat = feature.Deformat
 local Item = feature.Item
-local Strings = feature.Strings
+local Options = feature.Options
 local Services = feature.Services
+local Strings = feature.Strings
 
 local rollTypes = feature.rollTypes
 
@@ -84,10 +86,11 @@ end
 -- Manages roll tracking, response state, and winner determination.
 do
     feature.EnsureServiceNamespace("Rolls")
-    local module = addon.Services.Rolls
+    local Rolls = Services.Rolls
+    local module = Rolls
 
     -- Namespace registration: options that control countdown and roll-response policy.
-    addon.Options.AddNamespace("Rolls", {
+    Options.AddNamespace("Rolls", {
         countdownDuration = 5,
         countdownSimpleRaidMsg = false,
         countdownRollsBlock = true,
@@ -134,6 +137,14 @@ do
         return addon.hasDebug ~= nil
     end
 
+    local function getOption(namespace, key)
+        local cfg = Options and Options.Get and Options.Get(namespace)
+        if cfg and cfg.Get then
+            return cfg:Get(key)
+        end
+        return nil
+    end
+
     -- ============================================================================
     -- Session helpers
     -- ============================================================================
@@ -177,16 +188,7 @@ do
         return Sessions.GetManualExclusionEntry(getSessionsContext(), name)
     end
 
-    local function getManualExclusionKey(name)
-        local normalized = Strings and Strings.NormalizeLower and Strings.NormalizeLower(name) or nil
-        if normalized and normalized ~= "" then
-            return normalized
-        end
-        if type(name) == "string" and name ~= "" then
-            return string.lower(name)
-        end
-        return nil
-    end
+    local getManualExclusionKey = assert(Sessions._NormalizeCandidateKey, "Rolls session candidate-key normalizer is not initialized")
 
     local function getActiveRollType()
         return Sessions.GetActiveRollType(getSessionsContext())
@@ -283,7 +285,7 @@ do
                 return response and response.bestRoll or nil
             end,
             isSortAscending = function()
-                return addon.options.sortAscending == true
+                return getOption("Master", "sortAscending") == true
             end,
         }
         return historyContext
@@ -410,15 +412,15 @@ do
             getPlusForItem = getPlusForItem,
             isPlusSystemEnabled = isPlusSystemEnabled,
             isSortAscending = function()
-                return addon.options.sortAscending == true
+                return getOption("Master", "sortAscending") == true
             end,
             shouldShowLootCounterDuringMSRoll = function()
-                return addon.options.showLootCounterDuringMSRoll == true
+                return getOption("LootCounter", "showLootCounterDuringMSRoll") == true
             end,
             getRaidService = getRaidService,
             getItemReserveContext = getItemReserveContext,
             getCurrentRaid = function()
-                return addon.Database.GetCurrentRaid and addon.Database.GetCurrentRaid() or nil
+                return Database.GetCurrentRaid and Database.GetCurrentRaid() or nil
             end,
             getSourceRollType = function()
                 return state.tieReroll and state.tieReroll.sourceRollType or getActiveRollType()
@@ -520,7 +522,7 @@ do
         if not msg or not state.record then
             return
         end
-        local player, roll, min, max = addon.Deformat(msg, RANDOM_ROLL_RESULT)
+        local player, roll, min, max = Deformat(msg, RANDOM_ROLL_RESULT)
         if not player or not roll or min ~= 1 or max ~= 100 then
             return
         end
@@ -708,7 +710,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Rolls/Service", {
         deps = {

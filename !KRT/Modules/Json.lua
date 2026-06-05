@@ -2,6 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Json
+-- events: none
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -14,8 +15,8 @@ local tonumber = tonumber
 local type = type
 
 -- ----- Internal state ----- --
-addon.Json = addon.Json or feature.Json or {}
-local Json = addon.Json
+local Json = feature.Json or {}
+addon.Json = Json
 Json.NULL = Json.NULL or {}
 
 -- ----- Private helpers ----- --
@@ -326,7 +327,7 @@ end
 do
     local name = "Modules/Json"
     local deps = { "Init" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

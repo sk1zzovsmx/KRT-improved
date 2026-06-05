@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: owns addon.Bus callback registration and dispatch
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -12,8 +12,8 @@ local Diag = feature.Diag
 
 local type, pairs, pcall, tostring = type, pairs, pcall, tostring
 
-addon.Bus = addon.Bus or {}
-local Bus = addon.Bus
+local Bus = feature.Bus or {}
+addon.Bus = Bus
 
 -- ----- Internal state ----- --
 local events = Bus._events or {}
@@ -81,7 +81,7 @@ function Bus.TriggerEvent(eventName, ...)
     dispatchDepth = depth - 1
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if registry then
     registry.AddModule("Modules/Bus", { deps = { "Init", "Modules/ModuleRegistry" } })
     registry.SetLoaded("Modules/Bus")

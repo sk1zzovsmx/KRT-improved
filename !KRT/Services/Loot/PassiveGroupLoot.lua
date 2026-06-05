@@ -1,7 +1,9 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: passive group-loot parser/state helpers for loot service
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Loot._PassiveGroupLoot
+-- events: no bus events; passive group-loot helpers only
+-- notes: passive group-loot parser/state helpers for loot service
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -9,7 +11,9 @@ local feature = addon.Database.GetFeatureShared()
 local Diag = feature.Diag
 local C = feature.C
 local Database = feature.Database
+local Deformat = feature.Deformat
 local Item = feature.Item
+local Services = feature.Services
 local Strings = feature.Strings
 local raidState = feature.raidState
 local lootState = feature.lootState
@@ -18,7 +22,8 @@ local rollTypes = feature.rollTypes
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Loot")
-local module = addon.Services.Loot
+local Loot = Services.Loot
+local module = Loot
 module._PassiveGroupLoot = module._PassiveGroupLoot or {}
 
 local PassiveGroupLoot = module._PassiveGroupLoot
@@ -337,8 +342,8 @@ local function tryDeformatValues(pattern, msg)
         return nil
     end
 
-    if type(addon.Deformat) == "function" then
-        local values = packValues(addon.Deformat(msg, pattern))
+    if type(Deformat) == "function" then
+        local values = packValues(Deformat(msg, pattern))
         if values.n > 0 and values[1] ~= nil then
             return values
         end
@@ -959,7 +964,7 @@ function PassiveGroupLoot.AddGroupLootMessage(owner, msg)
     return observedType
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Loot/PassiveGroupLoot", {
         deps = {

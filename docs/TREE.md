@@ -205,6 +205,7 @@
 |   |-- FUNCTION_REGISTRY.csv
 |   |-- KRT_MCP.md
 |   |-- LOOT_SOURCES.md
+|   |-- LUA_ALIGNMENT_MATRIX.md
 |   |-- LUA_WRITING_RULES.md
 |   |-- OVERVIEW.md
 |   |-- RAID_SCHEMA.md

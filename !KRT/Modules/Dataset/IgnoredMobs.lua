@@ -2,6 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
+-- events: none
 -- notes: raid-only encounter helpers/adds from LibBossIDs that should not own loot context
 
 local addon = select(2, ...)
@@ -10,8 +11,8 @@ local feature = addon.Database.GetFeatureShared()
 local tonumber = tonumber
 local type = type
 
-addon.IgnoredMobs = addon.IgnoredMobs or feature.IgnoredMobs or {}
-local IgnoredMobs = addon.IgnoredMobs
+local IgnoredMobs = feature.IgnoredMobs or {}
+addon.IgnoredMobs = IgnoredMobs
 local L = feature.L
 
 -- ----- Internal state ----- --
@@ -138,8 +139,6 @@ IgnoredMobs.Ids = {
     [39899] = true, -- Baltharus the Warborn (clone)
 }
 
--- ----- Private helpers ----- --
-
 -- ----- Public methods ----- --
 function IgnoredMobs.GetTrashMobName()
     if cachedTrashMobName == nil then
@@ -160,7 +159,7 @@ end
 do
     local name = "Modules/Dataset/IgnoredMobs"
     local deps = { "Init" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

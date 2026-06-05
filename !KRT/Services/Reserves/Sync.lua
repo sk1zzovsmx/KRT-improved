@@ -20,7 +20,8 @@ local _G = _G
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Reserves")
-local module = addon.Services.Reserves
+local Reserves = Services.Reserves
+local module = Reserves
 module._Sync = module._Sync or {}
 
 local Sync = module._Sync
@@ -366,7 +367,7 @@ function Sync:HandleMessage(prefix, msg, channel, sender)
     return true
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Reserves/Sync", {
         deps = {

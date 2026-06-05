@@ -2,19 +2,21 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: owns warning UI scripts; sends announcements through Services/Chat
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
+local Controllers = feature.Controllers
+local coreState = feature.coreState
 local Database = feature.Database
 
 local ListController = feature.ListController
 local Frames = feature.Frames
 local Strings = feature.Strings
 local Services = feature.Services
-local UIScaffold = addon.UIScaffold
-local UIPrimitives = addon.UIPrimitives
+local UIScaffold = feature.UIScaffold
+local UIPrimitives = feature.UIPrimitives
 
 local makeModuleFrameGetter = feature.MakeModuleFrameGetter
 
@@ -34,8 +36,8 @@ local ChatApi = {
 
 -- =========== Warnings Frame Module  =========== --
 do
-    addon.Controllers.Warnings = addon.Controllers.Warnings or {}
-    local module = addon.Controllers.Warnings
+    Controllers.Warnings = Controllers.Warnings or {}
+    local module = Controllers.Warnings
     module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
@@ -606,13 +608,13 @@ do
         module:RequestRefresh()
     end
 
-    if addon.State and addon.State.warningsSavedVariablesFresh == true then
+    if coreState and coreState.warningsSavedVariablesFresh == true then
         module:RequestEnsureDefaultTemplates()
-        addon.State.warningsSavedVariablesFresh = false
+        coreState.warningsSavedVariablesFresh = false
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Controllers/Warnings", {
         deps = {

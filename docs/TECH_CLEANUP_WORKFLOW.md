@@ -31,6 +31,8 @@ This workflow is not for:
 5. Split Lua cleanup and XML cleanup when mixing them would raise risk.
 6. Run static gates before asking for in-game verification.
 7. Ask for `/reload` after addon changes and wait for confirmation.
+8. For canonical Lua cleanup, remove double-binding `feature.* or addon.*` fallbacks only
+   after proving the owner is available through `Database.GetFeatureShared()`.
 
 ## 3. Cleanup Unit
 
@@ -71,6 +73,7 @@ For the selected cleanup unit, map these first:
 5. Frame names and named child access patterns.
 6. SavedVariables touched by the module.
 7. Existing tests or targeted gates for the area.
+8. Legitimate exceptions, such as early ModuleRegistry bootstrap or static data-only files.
 
 Useful repo checks:
 
@@ -78,6 +81,8 @@ Useful repo checks:
 git status --short
 rg "UIScaffold|MakeModuleFrameGetter|FrameName|RefreshUI|_ui" !KRT -g "*.lua"
 rg "addon\\.(Master|Logger|Warnings|Changes|Spammer)" !KRT -g "*.lua"
+rg "feature\\.[A-Za-z_][A-Za-z0-9_]*\\s+or\\s+addon\\.|addon\\.[A-Za-z_][A-Za-z0-9_]*\\s+or\\s+feature\\." !KRT -g "*.lua" -g "!Libs/**"
+rg "addon\\.options|OnUpdate" !KRT -g "*.lua" -g "!Libs/**"
 rg "<Scripts>|<OnLoad>|<OnShow>|<OnClick>" !KRT/UI -g "*.xml"
 ```
 
@@ -168,6 +173,7 @@ Checklist:
 Target outcome:
 - one canonical owner per generic helper
 - no feature-specific leakage into `Modules/`
+- static dataset exceptions are explicit and data-only
 
 Checklist:
 
@@ -175,6 +181,8 @@ Checklist:
 2. Extract only after repeated usage proves it is shared.
 3. Do not revive catch-all utility files.
 4. Preserve plain-function style on infra namespaces.
+5. For static datasets, document `-- exports: ... (static data tables; no public methods)`
+   and keep public methods absent.
 
 ### 6.5 XML Files
 

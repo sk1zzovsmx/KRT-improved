@@ -1,17 +1,20 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: response and eligibility helpers for rolls service
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Rolls._Responses
+-- events: announces countdown blocks and whispers denial reasons
+-- notes: response and eligibility helpers for rolls service
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
-local Database = feature.Database
-local Strings = feature.Strings
 local Comms = feature.Comms
+local Database = feature.Database
+local Options = feature.Options
 local Services = feature.Services
+local Strings = feature.Strings
 local Chat = Services.Chat
 
 local twipe = table.wipe
@@ -20,7 +23,8 @@ local tostring, tonumber = tostring, tonumber
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Rolls")
-local module = addon.Services.Rolls
+local Rolls = Services.Rolls
+local module = Rolls
 module._Responses = module._Responses or {}
 local Responses = module._Responses
 
@@ -101,6 +105,14 @@ local RESPONSE_TRANSITIONS = {
 -- ----- Private helpers ----- --
 local function isDebugEnabled()
     return addon.hasDebug ~= nil
+end
+
+local function getOption(namespace, key)
+    local cfg = Options and Options.Get and Options.Get(namespace)
+    if cfg and cfg.Get then
+        return cfg:Get(key)
+    end
+    return nil
 end
 
 local function assertContext(ctx)
@@ -330,7 +342,7 @@ end
 local function applyAcceptedRollResponse(ctx, name, roll, eligibility, source, isOutOfTime)
     local _, state = assertContext(ctx)
     local response = getOrCreateResponse(state, name)
-    local wantLow = addon.options.sortAscending == true
+    local wantLow = getOption("Master", "sortAscending") == true
     local nextUsedRolls = (eligibility and tonumber(eligibility.usedRolls) or 0) + 1
 
     if response.bestRoll == nil then
@@ -771,7 +783,7 @@ function Responses.ValidateWinner(ctx, playerName, itemLink, rollType)
     return buildWinnerValidationResult(true, nil, playerName, eligibility, response)
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Rolls/Responses", {
         deps = {

@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()

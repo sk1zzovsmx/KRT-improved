@@ -23,7 +23,8 @@ local strfind, strsub = string.find, string.sub
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Loot")
-local module = addon.Services.Loot
+local Loot = Services.Loot
+local module = Loot
 module._DistributionSession = module._DistributionSession or {}
 
 local DistributionSession = module._DistributionSession
@@ -77,7 +78,6 @@ local function ensurePrefix()
 end
 
 local function getPayload()
-    Comms = feature.Comms or addon.Comms or Comms
     return Comms and Comms._Payload or nil
 end
 
@@ -368,7 +368,6 @@ local function clearState(sessionId)
 end
 
 local function sendMessage(...)
-    Comms = feature.Comms or addon.Comms or Comms
     if not (Comms and type(Comms.Sync) == "function") then
         return false
     end
@@ -885,7 +884,7 @@ end
 
 ensurePrefix()
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Loot/DistributionSession", {
         deps = {

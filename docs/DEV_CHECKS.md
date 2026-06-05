@@ -40,6 +40,10 @@ py -3 tools/krt.py api-catalog-check
 ```
 
 Expected: each command exits `0` and prints `... passed.` from the wrapped script.
+`lua_uniformity` now also verifies the full KRT Lua Contract on KRT-owned addon Lua,
+the static-dataset `Public methods` exception, absence of `feature.* or addon.*`
+fallbacks, `addon.options` confinement, allowed `OnUpdate` locations, and basic
+WotLK/Lua 5.1 compatibility patterns.
 
 ## 2) Common Runs via `tools/krt.py`
 
@@ -122,6 +126,10 @@ rg "addon\.(Master|Logger|Warnings|Changes|Spammer)" -n !KRT/Services -g "*.lua"
 rg "addon\.(Raid|Chat|Master|Logger|LootCounter|ReservesUI|Config|Warnings|Changes|Spammer|Loot|Rolls)" `
   -n !KRT -g "*.lua" -g "!Libs/**"
 rg "CreateFrame|SetScript|:Show\(|:Hide\(" -n !KRT/Services -g "*.lua" -g "!Loot.lua"
+rg "feature\.[A-Za-z_][A-Za-z0-9_]*\s+or\s+addon\.|addon\.[A-Za-z_][A-Za-z0-9_]*\s+or\s+feature\." `
+  -n !KRT -g "*.lua" -g "!Libs/**"
+rg "addon\.options" -n !KRT -g "*.lua" -g "!Libs/**"
+rg "OnUpdate" -n !KRT -g "*.lua" -g "!Libs/**"
 rg "<Scripts>|<On[A-Za-z]+>" -n !KRT/UI -g "*.xml"
 rg "PROTOCOL_VERSION|MSG_SNAPSHOT|MSG_ROLL_TICK|MSG_TIE_START|MSG_AWARDED" `
   -n !KRT/Services/Loot/DistributionSession.lua
@@ -136,6 +144,10 @@ Get-ChildItem -Recurse !KRT/Services -Filter *.lua |
 Get-ChildItem -Recurse !KRT/Services -Filter *.lua |
   Where-Object { $_.Name -ne "Loot.lua" } |
   Select-String -Pattern "CreateFrame|SetScript|:Show\(|:Hide\("
+
+Get-ChildItem -Recurse !KRT -Filter *.lua |
+  Where-Object { $_.FullName -notmatch "\\!KRT\\Libs\\" } |
+  Select-String -Pattern "feature\.[A-Za-z_][A-Za-z0-9_]*\s+or\s+addon\.|addon\.[A-Za-z_][A-Za-z0-9_]*\s+or\s+feature\."
 
 Get-ChildItem -Recurse !KRT/UI -Filter *.xml |
   Select-String -Pattern "<Scripts>|<On[A-Za-z]+>"

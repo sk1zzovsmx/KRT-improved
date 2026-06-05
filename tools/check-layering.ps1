@@ -122,7 +122,7 @@ Add-RgCheck `
 
 Add-RgCheck `
     -Name "Service direct UI frame APIs" `
-    -Pattern 'CreateFrame|SetScript|:Show\(|:Hide\(' `
+    -Pattern 'CreateFrame|SetScript|:Show\(|:Hide\(|UIScaffold|InterfaceOptions|ShowUIPanel|HideUIPanel|OnClick|OnShow|OnHide' `
     -Path "!KRT/Services" `
     -ExtraArgs @("--glob", "*.lua")
 

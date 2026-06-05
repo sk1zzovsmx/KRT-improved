@@ -1,20 +1,25 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: internal loot-window snapshot helpers
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Loot._Snapshots
+-- events: no bus events; snapshot helpers only
+-- notes: internal loot-window snapshot helpers
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
+local Services = feature.Services
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Loot")
-local module = addon.Services.Loot
+local Loot = Services.Loot
+local module = Loot
 module._Snapshots = module._Snapshots or {}
 
 local Snapshots = module._Snapshots
 local ContextState = assert(module._State, "Loot state helpers are not initialized")
 local ContextHelpers = assert(module._Context, "Loot context helpers are not initialized")
 local Item = feature.Item
+local Time = feature.Time
 
 local normalizeLootSnapshotState = assert(ContextHelpers.NormalizeLootSnapshotState, "Missing LootContext.NormalizeLootSnapshotState")
 
@@ -219,7 +224,7 @@ end
 
 function Snapshots.PurgeExpired(raidState, now, force)
     local state = getSnapshotState(raidState)
-    local currentTime = tonumber(now) or addon.Time.GetCurrentTime()
+    local currentTime = tonumber(now) or Time.GetCurrentTime()
     if force ~= true and (tonumber(state.nextPurgeAt) or 0) > currentTime then
         return state
     end
@@ -357,7 +362,7 @@ function Snapshots.ConsumeActive(raidState, itemLink, now)
     return tonumber(snapshot.bossNid) or 0
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Loot/Snapshots", {
         deps = {

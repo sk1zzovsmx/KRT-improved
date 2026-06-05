@@ -6,19 +6,20 @@
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
+local DB = feature.DB
+local coreState = feature.coreState
 local Database = feature.Database
 local Time = feature.Time
 
 local tinsert, tremove = table.insert, table.remove
 local pairs, type = pairs, type
 local tostring, tonumber = tostring, tonumber
-local strsub = string.sub
 local tconcat = table.concat
 
 -- Raid storage service.
 do
-    addon.DB.RaidStore = addon.DB.RaidStore or {}
-    local module = addon.DB.RaidStore
+    DB.RaidStore = DB.RaidStore or {}
+    local module = DB.RaidStore
 
     -- ----- Internal state ----- --
     local ROOT_RUNTIME_CACHE_KEYS = {
@@ -28,10 +29,10 @@ do
         _lootIdxByNid = true,
     }
 
-    local storeState = addon.State.raidStore
+    local storeState = coreState.raidStore
     if type(storeState) ~= "table" then
         storeState = {}
-        addon.State.raidStore = storeState
+        coreState.raidStore = storeState
     end
 
     -- ----- Private helpers ----- --
@@ -46,6 +47,10 @@ do
     end
 
     local function isBossFightRecord(boss)
+        if type(Database._IsBossFightRecord) == "function" then
+            return Database._IsBossFightRecord(boss)
+        end
+
         if type(boss) ~= "table" then
             return false
         end
@@ -60,7 +65,7 @@ do
         end
 
         local name = boss.name or boss.boss
-        if type(name) == "string" and strsub(name, 1, 7) == "Shared:" then
+        if type(name) == "string" and string.sub(name, 1, 7) == "Shared:" then
             return false
         end
 
@@ -110,7 +115,7 @@ do
     end
 
     local function getSchemaVersion()
-        local version = Database.GetRaidSchemaVersion and Database.GetRaidSchemaVersion() or 1
+        local version = Database.GetRaidSchemaVersion() or 1
         version = tonumber(version) or 1
         if version < 1 then
             version = 1
@@ -119,10 +124,7 @@ do
     end
 
     local function getMigrations()
-        if Database.GetRaidMigrations then
-            return Database.GetRaidMigrations()
-        end
-        return nil
+        return Database.GetRaidMigrations()
     end
 
     local function removeRootRuntimeCaches(raid)
@@ -756,7 +758,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Database/DBRaidStore", {
         deps = { "Init", "Modules/ModuleRegistry", "Database/DB", "Database/DBSchema", "Database/DBRaidMigrations", "Modules/Time", "Modules/Strings" },

@@ -2,35 +2,33 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Sort = feature.Sort
 local Database = feature.Database
+local Services = feature.Services
 
 local GetLootSortName = Sort.GetLootSortName
 
 local twipe = table.wipe
 local tostring, tonumber = tostring, tonumber
 local date, time = date, time
-local strsub = string.sub
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Logger", "View")
-local View = addon.Services.Logger.View
-local Store = addon.Services.Logger.Store
+local Logger = Services.Logger
+local View = Logger.View
+local Store = Logger.Store
 local buildRows
-
-local function getRaidQueries()
-    if Database.GetRaidQueries then
-        return Database.GetRaidQueries()
-    end
-    return nil
-end
 
 -- ----- Private helpers ----- --
 local function isBossFightRecord(boss)
+    if type(Database._IsBossFightRecord) == "function" then
+        return Database._IsBossFightRecord(boss)
+    end
+
     if type(boss) ~= "table" then
         return false
     end
@@ -45,11 +43,18 @@ local function isBossFightRecord(boss)
     end
 
     local name = boss.name or boss.boss
-    if type(name) == "string" and strsub(name, 1, 7) == "Shared:" then
+    if type(name) == "string" and string.sub(name, 1, 7) == "Shared:" then
         return false
     end
 
     return true
+end
+
+local function getRaidQueries()
+    if Database.GetRaidQueries then
+        return Database.GetRaidQueries()
+    end
+    return nil
 end
 
 -- ----- Public methods ----- --
@@ -250,7 +255,7 @@ function View:FillLootList(out, raid, bossNid, playerName)
     end)
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Logger/View", {
         deps = {

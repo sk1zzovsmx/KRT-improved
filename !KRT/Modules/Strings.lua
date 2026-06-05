@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -17,8 +17,8 @@ local GetAchievementLink = GetAchievementLink
 
 local Colors = feature.Colors or {}
 
-addon.Strings = addon.Strings or feature.Strings or {}
-local Strings = addon.Strings
+local Strings = feature.Strings or {}
+addon.Strings = Strings
 
 -- ----- Internal state ----- --
 
@@ -94,7 +94,7 @@ end
 do
     local name = "Modules/Strings"
     local deps = { "Init", "Modules/Colors" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

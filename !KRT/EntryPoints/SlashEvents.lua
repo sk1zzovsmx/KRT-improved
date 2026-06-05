@@ -2,12 +2,14 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: owns /krt slash command routing; dispatches Controller, Widget, and sync commands
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 
+local Features = feature.Features
+local coreState = feature.coreState
 local Options = feature.Options
 local Frames = feature.Frames
 local Colors = feature.Colors
@@ -16,6 +18,7 @@ local Database = feature.Database
 local Services = feature.Services
 local Comms = feature.Comms
 local Item = feature.Item
+local Timer = feature.Timer
 
 local RT_COLOR = feature.RT_COLOR
 
@@ -29,7 +32,7 @@ local tostring, tonumber = tostring, tonumber
 local floor = math.floor
 local _G = _G
 
-local UI = addon.UI
+local UI = feature.UI
 
 -- =========== Slash Commands  =========== --
 local function getDatabaseService(getterName)
@@ -120,6 +123,22 @@ markLootOnlyCommands(cmdReserves)
 local helpString = "%s: %s"
 local function printHelp(cmd, desc)
     addon:info("%s", helpString:format(addon.WrapTextInColorCode(cmd, Colors.NormalizeHexColor(RT_COLOR)), desc))
+end
+
+local function getOption(namespace, key)
+    local cfg = Options and Options.Get and Options.Get(namespace)
+    if cfg and cfg.Get then
+        return cfg:Get(key)
+    end
+    return nil
+end
+
+local function setOption(namespace, key, value)
+    local cfg = Options and Options.Get and Options.Get(namespace)
+    if cfg and cfg.Set then
+        return cfg:Set(key, value)
+    end
+    return false
 end
 
 local function showHelp()
@@ -296,9 +315,8 @@ local function handleDebugRaidCommand(arg)
 end
 
 local function getFeatureProfile()
-    local features = addon.Features
-    if type(features) == "table" then
-        return features.Profile or "full"
+    if type(Features) == "table" then
+        return Features.Profile or "full"
     end
     return "full"
 end
@@ -501,13 +519,13 @@ local function handleDebugCommand(rest)
 
     if subCmd == "timers" or subCmd == "timer" then
         if arg == "reset" then
-            if addon.Timer and addon.Timer.RefreshStats then
-                addon.Timer.RefreshStats()
+            if Timer and Timer.RefreshStats then
+                Timer.RefreshStats()
                 addon:info(L.MsgTimerStatsReset)
             end
         else
-            if addon.Timer and addon.Timer.ShowStats then
-                addon.Timer.ShowStats(arg)
+            if Timer and Timer.ShowStats then
+                Timer.ShowStats(arg)
             else
                 addon:warn(L.MsgTimerModuleUnavailable)
             end
@@ -544,7 +562,7 @@ local function formatPerfThreshold(value)
 end
 
 local function getPerfThreshold()
-    local threshold = tonumber(addon.State and addon.State.perfThresholdMs) or 5
+    local threshold = tonumber(coreState and coreState.perfThresholdMs) or 5
     if threshold < 0 then
         return 5
     end
@@ -552,14 +570,13 @@ local function getPerfThreshold()
 end
 
 local function isPerfEnabled()
-    return addon.State and addon.State.perfEnabled == true
+    return coreState and coreState.perfEnabled == true
 end
 
 local function setPerfEnabled(enabled)
-    addon.State = addon.State or {}
-    addon.State.perfEnabled = enabled and true or false
-    addon.hasPerf = addon.State.perfEnabled and true or nil
-    return addon.State.perfEnabled
+    coreState.perfEnabled = enabled and true or false
+    addon.hasPerf = coreState.perfEnabled and true or nil
+    return coreState.perfEnabled
 end
 
 local function setPerfThreshold(value)
@@ -567,8 +584,7 @@ local function setPerfThreshold(value)
     if not threshold or threshold < 0 then
         return nil
     end
-    addon.State = addon.State or {}
-    addon.State.perfThresholdMs = threshold
+    coreState.perfThresholdMs = threshold
     return threshold
 end
 
@@ -615,10 +631,10 @@ end
 local function handleMinimapCommand(rest)
     local sub, arg = Strings.SplitArgs(rest)
     if sub == "on" then
-        Options.Set("minimapButton", true)
+        setOption("Minimap", "minimapButton", true)
         Frames.SetShown(KRT_MINIMAP_GUI, true)
     elseif sub == "off" then
-        Options.Set("minimapButton", false)
+        setOption("Minimap", "minimapButton", false)
         Frames.SetShown(KRT_MINIMAP_GUI, false)
     elseif sub == "pos" and arg ~= "" then
         local angle = tonumber(arg)
@@ -627,7 +643,7 @@ local function handleMinimapCommand(rest)
             addon:info(L.MsgMinimapPosSet, angle)
         end
     elseif sub == "pos" then
-        addon:info(L.MsgMinimapPosSet, addon.options.minimapPos)
+        addon:info(L.MsgMinimapPosSet, getOption("Minimap", "minimapPos") or 325)
     else
         addon:info(format(L.StrCmdCommands, "krt minimap"), "KRT")
         printHelp("on", L.StrCmdToggle)
@@ -1140,7 +1156,7 @@ SlashCmdList["KRT"] = function(msg)
     handleSlashCommand(msg)
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("EntryPoints/SlashEvents", {
         deps = {

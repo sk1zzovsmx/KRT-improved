@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none; owns shared refresh driver
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -17,11 +17,15 @@ local _G = _G
 local CreateFrame = _G.CreateFrame
 local InCombatLockdown = _G.InCombatLockdown
 
-addon.Frames = addon.Frames or {}
-local Frames = addon.Frames
+local C = feature.C
+local Strings = feature.Strings
+local coreState = feature.coreState
 
-addon.UIScaffold = addon.UIScaffold or {}
-local UIScaffold = addon.UIScaffold
+local Frames = feature.Frames or {}
+addon.Frames = Frames
+
+local UIScaffold = feature.UIScaffold or {}
+addon.UIScaffold = UIScaffold
 local tooltipColor = HIGHLIGHT_FONT_COLOR
 
 -- ----- Internal state ----- --
@@ -115,7 +119,6 @@ function Frames.MakeEditBoxPopup(key, text, onAccept, onShow, validate)
             self.editBox:ClearFocus()
         end,
         OnAccept = function(self)
-            local Strings = addon.Strings
             local trimText = Strings and Strings.TrimText
             local value = trimText and trimText(self.editBox:GetText(), true) or self.editBox:GetText()
             if validate then
@@ -141,7 +144,7 @@ function Frames.SetFrameTitle(frameOrName, titleText, titleFormat)
     if not titleFrame then
         return
     end
-    local fmt = titleFormat or (addon.C and addon.C.titleString) or "%s"
+    local fmt = titleFormat or (C and C.titleString) or "%s"
     titleFrame:SetText(format(fmt, titleText))
 end
 
@@ -238,7 +241,7 @@ function Frames.SetScriptSafely(widget, scriptType, handler)
         return false
     end
     if handler ~= nil and type(handler) ~= "function" then
-        if addon.State and addon.State.debugEnabled then
+        if coreState and coreState.debugEnabled then
             error("Frames.SetScriptSafely: handler must be a function or nil")
         end
         return false
@@ -744,8 +747,8 @@ function Frames.BindEditBoxHandlers(frameName, specs, requestRefreshFn)
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
-    registry.AddModule("Modules/UI/Frames", { deps = { "Init", "Modules/ModuleRegistry" } })
+    registry.AddModule("Modules/UI/Frames", { deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Strings" } })
     registry.SetLoaded("Modules/UI/Frames")
 end

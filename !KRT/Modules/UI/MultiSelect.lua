@@ -2,17 +2,18 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Diag = feature.Diag
+local coreState = feature.coreState
 
 local pairs, tostring, tonumber, type = pairs, tostring, tonumber, type
 
-addon.MultiSelect = addon.MultiSelect or {}
-local MultiSelect = addon.MultiSelect
+local MultiSelect = feature.MultiSelect or {}
+addon.MultiSelect = MultiSelect
 
 -- ----- Internal state ----- --
 local stateByContext = MultiSelect._stateByContext or {}
@@ -60,7 +61,7 @@ if not modifierPolicyByScope._default then
 end
 
 local function isDebugEnabled()
-    return addon and addon.State and addon.State.debugEnabled == true
+    return coreState and coreState.debugEnabled == true
 end
 
 local function debugLog(msg)
@@ -324,7 +325,7 @@ function MultiSelect.GetSelected(contextKey)
     return out
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Modules/UI/MultiSelect", { deps = { "Init", "Modules/ModuleRegistry" } })
     registry.SetLoaded("Modules/UI/MultiSelect")

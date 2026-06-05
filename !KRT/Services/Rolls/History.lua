@@ -1,7 +1,9 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: raw roll history and tracker helpers for rolls service
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Rolls._History
+-- events: emits AddRoll via addon.Bus
+-- notes: raw roll history and tracker helpers for rolls service
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -9,6 +11,7 @@ local feature = addon.Database.GetFeatureShared()
 local Diag = feature.Diag
 local Events = feature.Events
 local Bus = feature.Bus
+local Services = feature.Services
 
 local rollTypes = feature.rollTypes
 local twipe = table.wipe
@@ -16,7 +19,8 @@ local tostring, tonumber = tostring, tonumber
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Rolls")
-local module = addon.Services.Rolls
+local Rolls = Services.Rolls
+local module = Rolls
 module._History = module._History or {}
 
 local History = module._History
@@ -208,7 +212,7 @@ function History.GetHighestRoll(ctx, name)
     return bestRoll or 0
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Rolls/History", {
         deps = {

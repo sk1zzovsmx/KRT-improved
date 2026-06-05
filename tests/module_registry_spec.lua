@@ -9,6 +9,10 @@ local function assertContains(text, needle, message)
     assert(text:find(needle, 1, true), message or ("missing: " .. needle))
 end
 
+local function assertNotContains(text, needle, message)
+    assert(not text:find(needle, 1, true), message or ("unexpected: " .. needle))
+end
+
 local function assertBefore(text, first, second, message)
     local firstIndex = text:find(first, 1, true)
     local secondIndex = text:find(second, 1, true)
@@ -23,6 +27,9 @@ local toc = read("!KRT/!KRT.toc")
 
 assertContains(source, "local addon = select(2, ...)", "ModuleRegistry must use the standard addon header")
 assertContains(source, "local feature = addon.Database.GetFeatureShared()", "ModuleRegistry must use the feature shared header")
+assertContains(source, "local ModuleRegistry = feature.ModuleRegistry or {}", "ModuleRegistry must bind owner table from feature shared")
+assertNotContains(source, "local ModuleRegistry = feature.ModuleRegistry or addon.ModuleRegistry or {}", "ModuleRegistry must not double-bind owner table through addon root")
+assert(not source:find("local ModuleRegistry = addon.ModuleRegistry", 1, true), "ModuleRegistry must not bind owner table directly from addon root")
 assertContains(source, "addon.ModuleRegistry", "ModuleRegistry must export addon.ModuleRegistry")
 assertContains(source, "-- ----- Internal state ----- --", "ModuleRegistry must use canonical internal-state header")
 assertContains(source, "-- ----- Private helpers ----- --", "ModuleRegistry must use canonical private-helper header")
@@ -35,6 +42,14 @@ assertContains(source, "function ModuleRegistry.GetStatus", "ModuleRegistry must
 assertContains(source, "function ModuleRegistry.GetModules", "ModuleRegistry must expose GetModules")
 
 assertContains(initSource, "ModuleRegistry", "Init.lua must include module-registry bootstrap marker handling")
+assertContains(initSource, "-- events: seeds Internal/Wow event names; marks Init bootstrap load", "Init.lua bootstrap contract must document early event ownership")
+assertContains(
+    initSource,
+    "-- events: owns main WoW event dispatcher; forwards events to Bus and Services",
+    "Init.lua dispatcher contract must document event forwarding ownership"
+)
+assertNotContains(initSource, "-- events: document inbound/outbound events in module body", "Init.lua must not keep generic event placeholders")
+assertContains(initSource, "Bootstrap exception: ModuleRegistry may not be loaded yet.", "Init.lua must document its bootstrap addon.ModuleRegistry lookup")
 assertContains(initSource, 'SetLoaded("Init")', "Init.lua must mark Init loaded when ModuleRegistry is available")
 assertContains(initSource, "ModuleRegistryPendingLoads", "Init.lua must queue Init when ModuleRegistry is not loaded yet")
 assertContains(source, "ModuleRegistryPendingLoads", "ModuleRegistry must consume queued bootstrap load markers")

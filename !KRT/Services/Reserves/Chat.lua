@@ -8,11 +8,12 @@ local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
-local Strings = feature.Strings
-local Comms = feature.Comms
-local Services = feature.Services
-local Events = feature.Events
 local Bus = feature.Bus
+local Comms = feature.Comms
+local Events = feature.Events
+local Options = feature.Options
+local Services = feature.Services
+local Strings = feature.Strings
 
 local format = string.format
 local len = string.len
@@ -23,7 +24,8 @@ local type = type
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Reserves")
-local module = addon.Services.Reserves
+local Reserves = Services.Reserves
+local module = Reserves
 module._Chat = module._Chat or {}
 
 local Chat = module._Chat
@@ -63,6 +65,14 @@ local function canReplyFromCurrentClient()
     end
 
     return role.isMasterLooter == true or raid:CanUseCapability("loot") or raid:CanUseCapability("raid_leadership")
+end
+
+local function getOption(namespace, key)
+    local cfg = Options and Options.Get and Options.Get(namespace)
+    if cfg and cfg.Get then
+        return cfg:Get(key)
+    end
+    return nil
 end
 
 local function buildFallbackItemText(entry)
@@ -129,7 +139,6 @@ local function registerWhisperHandler()
     end)
 end
 
--- ----- Private helpers ----- --
 requestWhisperReply = function(msg, sender)
     if not isRequest(msg) then
         return false
@@ -140,7 +149,7 @@ requestWhisperReply = function(msg, sender)
         return true
     end
 
-    if not (addon.options and addon.options.softResWhisperReplies == true) then
+    if getOption("Reserves", "softResWhisperReplies") ~= true then
         return true
     end
 
@@ -170,7 +179,7 @@ end
 
 registerWhisperHandler()
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Reserves/Chat", {
         deps = {

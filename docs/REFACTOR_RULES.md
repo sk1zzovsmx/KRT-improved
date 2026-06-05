@@ -17,9 +17,12 @@ Permanent guardrails for function mapping and unification work.
 3. New code should target owner modules directly, not retired aliases/facades.
 4. `addon:Print` is the only accepted root-method compatibility hook; do not reintroduce
    root addon method facades for chat/capability contracts.
-5. Keep Logger UI-local selection/edit/popup glue private; do not expose it as public
+5. Do not preserve compatibility by reading both `feature.X` and `addon.X`. Bind through
+   `feature.X`, then export the same owner table to `addon.X` only when root compatibility
+   remains a documented public surface.
+6. Keep Logger UI-local selection/edit/popup glue private; do not expose it as public
    controller API unless another module genuinely depends on that contract.
-6. If a helper crosses files but stays package-internal, expose it as an
+7. If a helper crosses files but stays package-internal, expose it as an
    underscore-prefixed owner-table field or keep it local; do not publish
    `*Internal` methods as public API.
 

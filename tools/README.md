@@ -39,7 +39,8 @@ control.
 - `check-retired-aliases.ps1`: rejects retired top-level `addon.*` aliases in KRT-owned Lua
 - `check-ui-binding.ps1`: binder absence and XML layout-only policy
 - `check-lua-syntax.ps1`: syntax-only validation for all Lua files
-- `check-lua-uniformity.ps1`: repo-specific naming, headers, whitespace, and line-ending checks
+- `check-lua-uniformity.ps1`: repo-specific Lua contract, naming, headers, whitespace,
+  line-ending, feature/addon fallback, `addon.options`, `OnUpdate`, and WotLK/Lua 5.1 checks
 - `check-api-nomenclature.ps1`: staged/new public API naming and verb-taxonomy guard
 - `check-raid-hardening.ps1`: DB/SV/UI hardening audits and fixture round-trip gate
 

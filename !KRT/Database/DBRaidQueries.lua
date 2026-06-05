@@ -6,24 +6,25 @@
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
+local DB = feature.DB
 local Database = feature.Database
 local Sort = feature.Sort
 local GetLootSortName = Sort and Sort.GetLootSortName
 
 local pairs, type = pairs, type
 local tonumber, tostring = tonumber, tostring
-local strsub = string.sub
+local isBossFightRecord = Database._IsBossFightRecord
 
 -- Raid read-only projection/query service.
 do
-    addon.DB.RaidQueries = addon.DB.RaidQueries or {}
-    local module = addon.DB.RaidQueries
+    DB.RaidQueries = DB.RaidQueries or {}
+    local module = DB.RaidQueries
 
     -- ----- Internal state ----- --
 
     -- ----- Private helpers ----- --
     local function normalizeRaid(raid)
-        local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("DBRaidQueries.NormalizeRaid", { "NormalizeRaidRecord" }) or nil
+        local raidStore = Database.GetRaidStoreOrNil("DBRaidQueries.NormalizeRaid", { "NormalizeRaidRecord" })
         if raidStore then
             return raidStore:NormalizeRaidRecord(raid)
         end
@@ -31,7 +32,7 @@ do
     end
 
     local function ensureRuntime(raid)
-        local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("DBRaidQueries.EnsureRuntime", { "EnsureRaidRuntime" }) or nil
+        local raidStore = Database.GetRaidStoreOrNil("DBRaidQueries.EnsureRuntime", { "EnsureRaidRuntime" })
         if raidStore then
             return raidStore:EnsureRaidRuntime(raid)
         end
@@ -112,28 +113,6 @@ do
             end
         end
         return nil
-    end
-
-    local function isBossFightRecord(boss)
-        if type(boss) ~= "table" then
-            return false
-        end
-
-        local sourceKind = boss.sourceKind
-        if sourceKind == "shared" or sourceKind == "trash" or sourceKind == "object" then
-            return false
-        end
-
-        if boss.source == "LootSources" then
-            return false
-        end
-
-        local name = boss.name or boss.boss
-        if type(name) == "string" and strsub(name, 1, 7) == "Shared:" then
-            return false
-        end
-
-        return true
     end
 
     local function summarizeAttendance(entry, fallbackJoin, fallbackLeave)
@@ -385,7 +364,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Database/DBRaidQueries", { deps = { "Init", "Modules/ModuleRegistry", "Database/DB", "Database/DBRaidStore", "Modules/Sort" } })
     registry.SetLoaded("Database/DBRaidQueries")

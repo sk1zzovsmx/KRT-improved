@@ -13,9 +13,10 @@ local _G = _G
 local type, tonumber = type, tonumber
 local max = math.max
 
-addon.OptionsLayout = addon.OptionsLayout or {}
-local OptionsLayout = addon.OptionsLayout
+local OptionsLayout = feature.OptionsLayout or {}
+addon.OptionsLayout = OptionsLayout
 
+-- ----- Internal state ----- --
 local defaults = {
     leftX = 16,
     topY = -16,
@@ -39,6 +40,7 @@ local defaults = {
     minHeight = 0,
 }
 
+-- ----- Private helpers ----- --
 local function getCfg(cfg, key)
     local value = cfg and cfg[key]
     if value == nil then
@@ -281,6 +283,7 @@ local function applyRow(frame, row, cfg, cursorY)
     return cursorY - numberOrDefault(height, 0) - rowGap(row, cfg)
 end
 
+-- ----- Public methods ----- --
 function OptionsLayout.Apply(frameOrName, rows, cfg)
     local frame = resolveFrame(frameOrName)
     if not (frame and type(rows) == "table") then
@@ -303,7 +306,7 @@ function OptionsLayout.Apply(frameOrName, rows, cfg)
     return height
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Modules/UI/OptionsLayout", { deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames" } })
     registry.SetLoaded("Modules/UI/OptionsLayout")

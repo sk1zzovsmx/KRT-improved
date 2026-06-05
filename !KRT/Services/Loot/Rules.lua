@@ -2,6 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Loot._Rules
+-- events: no bus events; suggestion-only classification
 -- notes: suggestion-only auto-loot classification; never awards or trades items
 
 local addon = select(2, ...)
@@ -10,12 +11,14 @@ local feature = addon.Database.GetFeatureShared()
 local C = feature.C
 local IgnoredItems = feature.IgnoredItems or {}
 local Item = feature.Item
+local Services = feature.Services
 
 local tonumber, tostring, type = tonumber, tostring, type
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Loot")
-local module = addon.Services.Loot
+local Loot = Services.Loot
+local module = Loot
 module._Rules = module._Rules or {}
 
 local Rules = module._Rules
@@ -96,6 +99,7 @@ end
 local function isIgnoredItem(itemId)
     return type(IgnoredItems.Contains) == "function" and IgnoredItems.Contains(itemId) == true
 end
+Rules._IsIgnoredItem = isIgnoredItem
 
 local function isEnchantingMaterial(itemId)
     return type(IgnoredItems.IsEnchantingMaterial) == "function" and IgnoredItems.IsEnchantingMaterial(itemId) == true
@@ -121,7 +125,7 @@ function Rules:GetItemSuggestion(item, opts)
     return buildDecision(ACTION_NONE, REASON_NONE)
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Loot/Rules", {
         deps = {

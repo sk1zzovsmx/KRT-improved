@@ -2,16 +2,18 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: listens Logger/Raid/Loot bus refresh events
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 
+local Controllers = feature.Controllers
+local coreState = feature.coreState
 local Frames = feature.Frames
-local UIScaffold = addon.UIScaffold
-local UIPrimitives = addon.UIPrimitives
+local UIScaffold = feature.UIScaffold
+local UIPrimitives = feature.UIPrimitives
 local Events = feature.Events
 local C = feature.C
 local Database = feature.Database
@@ -22,6 +24,7 @@ local MultiSelect = feature.MultiSelect
 local Strings = feature.Strings
 local Colors = feature.Colors
 local Base64 = feature.Base64
+local Timer = feature.Timer
 local Sort = feature.Sort
 local IgnoredMobs = feature.IgnoredMobs
 local Services = feature.Services
@@ -637,8 +640,8 @@ local function fillRaidListData(out, contextTag)
     end
 end
 
-addon.Controllers.Logger = addon.Controllers.Logger or {}
-local module = addon.Controllers.Logger
+Controllers.Logger = Controllers.Logger or {}
+local module = Controllers.Logger
 module._ui = UIScaffold.EnsureModuleUi(module)
 
 local function getCountTitle(baseText, count)
@@ -791,7 +794,7 @@ local function isValidRollValue(text)
 end
 
 -- Timer ownership: refresh debounce for roster-bound lists.
-addon.Timer.BindMixin(module, "Logger")
+Timer.BindMixin(module, "Logger")
 
 -- Logger frame module.
 do
@@ -799,7 +802,7 @@ do
     local UI = module._ui
     local getFrame = makeModuleFrameGetter(module, "KRTLogger")
     -- Import service modules (extracted to Services/Logger/).
-    local LoggerSvc = addon.Services.Logger
+    local LoggerSvc = Services.Logger
     local Store = LoggerSvc.Store
     local View = LoggerSvc.View
     local Export = LoggerSvc.Export
@@ -972,8 +975,7 @@ do
         else
             module.selectedRaid = tonumber(raidId) or raidId
         end
-        local state = addon.State
-        state.selectedRaid = module.selectedRaid
+        coreState.selectedRaid = module.selectedRaid
         return module.selectedRaid
     end
 
@@ -4146,7 +4148,7 @@ end
 
 module.Toggle = module.ToggleLootHistory
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Controllers/Logger", {
         deps = {

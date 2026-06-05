@@ -7,13 +7,15 @@ local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Item = feature.Item
+local Services = feature.Services
 
 local tonumber = tonumber
 local tostring = tostring
 local type = type
 
 feature.EnsureServiceNamespace("Loot")
-local module = addon.Services.Loot
+local Loot = Services.Loot
+local module = Loot
 module._Receipts = module._Receipts or {}
 
 local Receipts = module._Receipts
@@ -97,7 +99,7 @@ function Receipts.ShouldCreateRecord(receipt)
     return receipt.kind == "loot_received" or receipt.kind == "group_winner"
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Loot/Receipts", {
         deps = {

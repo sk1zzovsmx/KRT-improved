@@ -2,15 +2,16 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local type = type
 
-addon.Colors = addon.Colors or feature.Colors or {}
-local Colors = addon.Colors
+local GetClassColor = feature.GetClassColor
+local Colors = feature.Colors or {}
+addon.Colors = Colors
 
 -- ----- Internal state ----- --
 
@@ -39,14 +40,14 @@ function Colors.NormalizeHexColor(color)
 end
 
 function Colors.GetClassColor(className)
-    local r, g, b = addon.GetClassColor(className)
+    local r, g, b = GetClassColor(className)
     return (r or 1), (g or 1), (b or 1)
 end
 
 do
     local name = "Modules/Colors"
     local deps = { "Init" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

@@ -6,12 +6,14 @@
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
+local Services = feature.Services
 local tostring = tostring
 local tonumber = tonumber
 local type = type
 
 feature.EnsureServiceNamespace("Loot")
-local module = addon.Services.Loot
+local Loot = Services.Loot
+local module = Loot
 module._Workflow = module._Workflow or {}
 
 local Workflow = module._Workflow
@@ -184,7 +186,7 @@ function Workflow.BuildSnapshot(ctx)
     }
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Loot/Workflow", {
         deps = {

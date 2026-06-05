@@ -1,7 +1,9 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: reserves display/grouping helpers
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Reserves._Display
+-- events: no bus events; display helpers only
+-- notes: reserves display/grouping helpers
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -9,6 +11,8 @@ local feature = addon.Database.GetFeatureShared()
 local L = feature.L
 local C = feature.C
 local Strings = feature.Strings
+local Services = feature.Services
+local GetClassColor = feature.GetClassColor
 
 local format = string.format
 local sort = table.sort
@@ -17,10 +21,13 @@ local pairs, tostring, tonumber, type = pairs, tostring, tonumber, type
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Reserves")
-local module = addon.Services.Reserves
+local Reserves = Services.Reserves
+local module = Reserves
 module._Display = module._Display or {}
 
 local Display = module._Display
+local Aliases = assert(module._Aliases, "Reserves alias helpers are not initialized")
+local normalizeAliasKey = assert(Aliases._NormalizeKey, "Reserves alias key normalizer is not initialized")
 
 local RESERVE_ROW_MAX_PLAYERS_INLINE = 6
 local playerTextTemp = {}
@@ -47,7 +54,7 @@ local function getClassColorStr(className)
     if C and C.CLASS_COLORS and C.CLASS_COLORS[token] then
         return token, C.CLASS_COLORS[token]
     end
-    local _, _, _, colorStr = addon.GetClassColor(token)
+    local _, _, _, colorStr = GetClassColor(token)
     return token, colorStr
 end
 
@@ -317,17 +324,6 @@ local function getReserveSource(source)
         return source
     end
     return L.StrUnknown
-end
-
-local function normalizeAliasKey(name)
-    local key = Strings and Strings.NormalizeLower and Strings.NormalizeLower(name, true) or nil
-    if key and key ~= "" then
-        return key
-    end
-    if type(name) == "string" and name ~= "" then
-        return string.lower(name)
-    end
-    return nil
 end
 
 local function getAliasRaidNameForReserve(ctx, reserveName)
@@ -1082,7 +1078,7 @@ function Display.GetDisplayList(ctx)
     return ctx.reservesDisplayList
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Reserves/Display", {
         deps = {
@@ -1090,6 +1086,7 @@ if type(registry) == "table" and type(registry.AddModule) == "function" and type
             "Modules/ModuleRegistry",
             "Modules/C",
             "Modules/Strings",
+            "Services/Reserves/Aliases",
         },
     })
     registry.SetLoaded("Services/Reserves/Display")

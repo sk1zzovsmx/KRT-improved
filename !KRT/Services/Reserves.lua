@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: emits ReservesDataChanged via addon.Bus
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
@@ -14,8 +14,10 @@ local C = feature.C
 local Options = feature.Options
 local Bus = feature.Bus
 local Strings = feature.Strings
+local Database = feature.Database
 local Services = feature.Services
 local Item = feature.Item
+local Timer = feature.Timer
 
 local tconcat, twipe = table.concat, table.wipe
 local pairs, ipairs, type, next = pairs, ipairs, type, next
@@ -29,13 +31,14 @@ local InternalEvents = Events.Internal
 -- Manages item reserves, import, and display.
 do
     feature.EnsureServiceNamespace("Reserves")
-    local module = addon.Services.Reserves
+    local Reserves = Services.Reserves
+    local module = Reserves
     local Service = module
     module._Sync = module._Sync or {}
     local Sync = module._Sync
 
     -- Timer ownership: display refresh debounce for reserves.
-    addon.Timer.BindMixin(module, "Reserves")
+    Timer.BindMixin(module, "Reserves")
 
     -- Namespace registration: reserve options (whisper replies and import mode).
     local reservesNs = Options.AddNamespace("Reserves", {
@@ -519,7 +522,7 @@ do
                 return Services.Raid
             end,
             getCurrentRaid = function()
-                return addon.Database and addon.Database.GetCurrentRaid and addon.Database.GetCurrentRaid() or nil
+                return Database and Database.GetCurrentRaid and Database.GetCurrentRaid() or nil
             end,
             getAliasState = getAliasState,
             getAliasMatches = function(reservePlayers, raidPlayers)
@@ -705,7 +708,7 @@ do
             end
 
             if not inferred then
-                local optionValue = addon.options and addon.options.srImportMode
+                local optionValue = reservesNs:Get("srImportMode")
                 inferred = (optionValue == 1) and "plus" or "multi"
             end
 
@@ -1078,7 +1081,7 @@ do
     Service._HasPendingItem = hasPendingItem
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Reserves", {
         deps = {

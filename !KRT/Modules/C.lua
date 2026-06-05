@@ -2,12 +2,13 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
-local C = feature.C
+local C = feature.C or {}
+addon.C = C
 local L = feature.L
 
 -- ----- Internal state ----- --
@@ -118,7 +119,7 @@ C.RESERVES_QUERY_COOLDOWN_SECONDS = 2
 do
     local name = "Modules/C"
     local deps = { "Init" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

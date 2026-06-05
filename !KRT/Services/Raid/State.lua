@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: emits RaidCreate
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
@@ -15,9 +15,10 @@ local Database = feature.Database
 local Bus = feature.Bus
 local Strings = feature.Strings
 local Time = feature.Time
+local Services = feature.Services
 local Base64 = feature.Base64
 local IgnoredMobs = feature.IgnoredMobs or {}
-local LootSources = addon.LootSources or feature.LootSources
+local LootSources = feature.LootSources
 
 local InternalEvents = Events.Internal
 
@@ -34,12 +35,16 @@ local UnitGUID = UnitGUID
 local UnitIsDead = UnitIsDead
 local UnitName = UnitName
 local UnitRace = UnitRace
+local GetGroupTypeAndCount = feature.GetGroupTypeAndCount
+local BossIDs = feature.BossIDs
+local GetCreatureId = feature.GetCreatureId
 
 -- Raid helper module.
 -- Manages raid state, roster, boss kills, and loot logging.
 do
     feature.EnsureServiceNamespace("Raid")
-    local module = addon.Services.Raid
+    local Raid = Services.Raid
+    local module = Raid
     -- ----- Internal state ----- --
     local getRaidRosterInfo = GetRaidRosterInfo
     local masterLootCandidateCache = {
@@ -47,6 +52,8 @@ do
         rosterVersion = nil,
         indexByName = {},
     }
+    local UNKNOWN_OBJECT = _G.UNKNOWNOBJECT
+    local UNKNOWN_BEING = _G.UNKNOWNBEING or _G.UKNOWNBEING
 
     local function trimText(value, allowNil)
         if Strings and type(Strings.TrimText) == "function" then
@@ -64,7 +71,7 @@ do
     local RECENT_LOOT_DEATH_CONTEXT_TTL_SECONDS = tonumber(C.RECENT_LOOT_DEATH_CONTEXT_TTL_SECONDS) or 8
     local RECENT_TRASH_DEATH_CONTEXT_THROTTLE_SECONDS = tonumber(C.RECENT_TRASH_DEATH_CONTEXT_THROTTLE_SECONDS) or 1
     local LOOT_WINDOW_BOSS_CONTEXT_TTL_SECONDS = math.max(BOSS_EVENT_CONTEXT_TTL_SECONDS, GROUP_LOOT_PENDING_AWARD_TTL_SECONDS)
-    local LootService = addon.Services and addon.Services.Loot or {}
+    local LootService = Services and Services.Loot or {}
     local LootContextHelpers = assert(LootService._Context, "Loot context helpers are not initialized")
     local LootContextState = assert(LootService._State, "Loot state helpers are not initialized")
     local LootContextSessions = assert(LootService._Sessions, "Loot session helpers are not initialized")
@@ -82,6 +89,11 @@ do
     local function isTraceEnabled()
         return addon.hasTrace ~= nil
     end
+
+    local function isUnknownName(name)
+        return (not name) or name == "" or name == UNKNOWN_OBJECT or name == UNKNOWN_BEING
+    end
+    module._IsUnknownNameInternal = isUnknownName
 
     local function invalidateMasterLootCandidateCache()
         masterLootCandidateCache.itemLink = nil
@@ -199,7 +211,7 @@ do
             return "ignored", resolvedNpcId
         end
 
-        local bossLib = addon.BossIDs
+        local bossLib = BossIDs
         local bossIds = bossLib and bossLib.BossIDs
         if not bossIds then
             return "unknown", resolvedNpcId
@@ -456,7 +468,7 @@ do
             options = options or {}
 
             local guid = UnitGUID(unit)
-            local npcId = guid and addon.GetCreatureId and addon.GetCreatureId(guid) or 0
+            local npcId = guid and GetCreatureId and GetCreatureId(guid) or 0
             if npcId <= 0 then
                 return nil
             end
@@ -661,14 +673,6 @@ do
 
     local function resolveLootBossSession(raid, raidNum, rollSessionId, now)
         return LootContextSessions.Resolve(raidState, raid, raidNum, rollSessionId, now, findBossByNid)
-    end
-
-    local function isUnknownName(name)
-        local resolver = module._IsUnknownNameInternal
-        if type(resolver) == "function" then
-            return resolver(name)
-        end
-        return (not name) or name == ""
     end
 
     local function invalidateRaidRuntime(raid)
@@ -1575,7 +1579,7 @@ do
         if addon.IsInRaid() then
             return true
         end
-        local groupType = addon.GetGroupTypeAndCount()
+        local groupType = GetGroupTypeAndCount()
         if groupType == "raid" then
             return true
         end
@@ -1587,7 +1591,7 @@ do
 
     -- Returns raid size: 10 or 25.
     function module:GetRaidSize()
-        local _, _, members = addon.GetGroupTypeAndCount()
+        local _, _, members = GetGroupTypeAndCount()
         if members == 0 then
             return 0
         end
@@ -1662,7 +1666,7 @@ do
         end
 
         -- LibCompat embeds GetCreatureId with the 3.3.5a GUID parsing rules.
-        local npcId = destGUID and addon.GetCreatureId(destGUID)
+        local npcId = destGUID and GetCreatureId(destGUID)
         local sourceKind, sourceNpcId, sourceBossName = classifyNpcLootSource(npcId)
         if sourceKind == "ignored" then
             if isTraceEnabled() then
@@ -1692,7 +1696,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Raid/State", {
         deps = {

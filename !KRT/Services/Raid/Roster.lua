@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: emits RaidRosterDelta
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
@@ -11,8 +11,11 @@ local Diag = feature.Diag
 local Database = feature.Database
 local Events = feature.Events
 local Bus = feature.Bus
+local Services = feature.Services
 local Strings = feature.Strings
 local Time = feature.Time
+local Timer = feature.Timer
+local coreState = feature.coreState
 
 local InternalEvents = Events.Internal
 
@@ -27,12 +30,13 @@ local UnitRace, UnitSex = UnitRace, UnitSex
 
 do
     feature.EnsureServiceNamespace("Raid")
-    local module = addon.Services.Raid
+    local Raid = Services.Raid
+    local module = Raid
 
     -- Timer ownership: roster refresh debounce plus retry for pending units.
     -- Raid/State.lua and Raid/Session.lua share the same `addon.Services.Raid`
     -- table and reuse the mixin embedded here.
-    addon.Timer.BindMixin(module, "Raid")
+    Timer.BindMixin(module, "Raid")
 
     -- ----- Internal state ----- --
     local numRaid = 0
@@ -42,11 +46,10 @@ do
     local liveOnlineByName = {}
     local pendingUnits = {}
 
-    local UNKNOWN_OBJECT = _G.UNKNOWNOBJECT
-    local UNKNOWN_BEING = _G.UNKNOWNBEING or _G.UKNOWNBEING
     local RETRY_DELAY_SECONDS = 1
     local RETRY_MAX_ATTEMPTS = 5
     local ROSTER_REFRESH_DELAY_SECONDS = 2
+    local isUnknownName = assert(module._IsUnknownNameInternal, "Raid unknown-name helper is not initialized")
 
     -- ----- Private helpers ----- --
     local function isDebugEnabled()
@@ -160,7 +163,7 @@ do
     end
 
     local function getSyntheticRosterState(raidNum)
-        local debugState = addon.State and addon.State.debug or nil
+        local debugState = coreState and coreState.debug or nil
         local syntheticByRaid = debugState and debugState.syntheticByRaid or nil
         if type(syntheticByRaid) ~= "table" then
             return nil
@@ -195,11 +198,6 @@ do
         known.classL = classL
         known.sex = UnitSex(unitID) or 0
     end
-
-    local function isUnknownName(name)
-        return (not name) or name == "" or name == UNKNOWN_OBJECT or name == UNKNOWN_BEING
-    end
-    module._IsUnknownNameInternal = isUnknownName
 
     -- ----- Public methods ----- --
     local function setNumRaidInternal(value)
@@ -588,7 +586,7 @@ do
 
     function module:GetPlayerName(id, raidNum)
         local name
-        raidNum = raidNum or (addon.State and addon.State.selectedRaid) or Database.GetCurrentRaid()
+        raidNum = raidNum or (coreState and coreState.selectedRaid) or Database.GetCurrentRaid()
         local raid = raidNum and Database.EnsureRaidById(raidNum)
         if raid then
             local qid = tonumber(id) or id
@@ -689,7 +687,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Raid/Roster", {
         deps = {

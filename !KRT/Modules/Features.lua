@@ -9,8 +9,8 @@ local feature = addon.Database.GetFeatureShared()
 
 local type, pairs = type, pairs
 
-addon.Features = addon.Features or feature.Features or {}
-local Features = addon.Features
+local Features = feature.Features or {}
+addon.Features = Features
 
 -- ----- Internal state ----- --
 Features.WidgetFlags = Features.WidgetFlags or {}
@@ -52,7 +52,7 @@ applyDefaultProfile()
 do
     local name = "Modules/Features"
     local deps = { "Init" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

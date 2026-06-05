@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: owns minimap frame scripts; drag uses allowed OnUpdate exception
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
@@ -15,11 +15,12 @@ local Database = feature.Database
 local Services = feature.Services
 local K_COLOR = feature.K_COLOR
 
-local UIFacade = addon.UI
+local UIFacade = feature.UI
 
 -- =========== Minimap Button Module  =========== --
-addon.Minimap = addon.Minimap or {}
-local module = addon.Minimap
+feature.Minimap = feature.Minimap or {}
+addon.Minimap = feature.Minimap
+local module = feature.Minimap
 
 -- Namespace registration: minimap options (visibility and angular position).
 local minimapNs = Options.AddNamespace("Minimap", {
@@ -250,10 +251,11 @@ local function loadMinimapFrame(frame)
     end
 
     module.frame = frame
-    local options = addon.options or KRT_Options or {}
+    local minimapPos = minimapNs:Get("minimapPos") or 325
+    local minimapButton = minimapNs:Get("minimapButton")
     frame:SetUserPlaced(true)
-    module:SetPos(options.minimapPos or 325)
-    setMinimapShown(options.minimapButton ~= false)
+    module:SetPos(minimapPos)
+    setMinimapShown(minimapButton ~= false)
     frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     frame:SetScript("OnMouseDown", function(self, button)
         if button ~= "LeftButton" then
@@ -346,13 +348,12 @@ function module:ToggleMinimapButton()
     if not self:EnsureUI() then
         return
     end
-    local options = addon.options or KRT_Options or {}
-    local nextValue = not options.minimapButton
+    local nextValue = not minimapNs:Get("minimapButton")
     minimapNs:Set("minimapButton", nextValue)
     setMinimapShown(nextValue)
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("EntryPoints/Minimap", {
         deps = {

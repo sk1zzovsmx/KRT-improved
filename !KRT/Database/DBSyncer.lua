@@ -2,21 +2,24 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: handles KRTLogSync addon-message traffic; listens OptionsLoaded, ConfigpersistentSync, RaidCreate
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Diag = feature.Diag
 
+local DB = feature.DB
 local Events = feature.Events
 local Database = feature.Database
 local Options = feature.Options
 local Bus = feature.Bus
 local Strings = feature.Strings
 local Time = feature.Time
+local Timer = feature.Timer
 local Comms = feature.Comms
 local Services = feature.Services
+local coreState = feature.coreState
 
 local _G = _G
 local tinsert = table.insert
@@ -31,6 +34,8 @@ local GetTime = _G.GetTime
 local SendAddonMessage = _G.SendAddonMessage
 local GetNumRaidMembers = _G.GetNumRaidMembers
 local GetRaidRosterInfo = _G.GetRaidRosterInfo
+local UnitIsGroupAssistant = feature.UnitIsGroupAssistant
+local UnitIsGroupLeader = feature.UnitIsGroupLeader
 
 local NormalizeName = Strings.NormalizeName
 local NormalizeLower = Strings.NormalizeLower
@@ -41,8 +46,8 @@ local Payload = assert(Comms and Comms._Payload, "Comms payload helpers are not 
 
 -- Logger synchronization module.
 do
-    addon.DB.Syncer = addon.DB.Syncer or {}
-    local module = addon.DB.Syncer
+    DB.Syncer = DB.Syncer or {}
+    local module = DB.Syncer
 
     -- ----- Internal state ----- --
     local COMM_PREFIX = "KRTLogSync"
@@ -87,8 +92,8 @@ do
     module._nextPassiveCleanupAt = tonumber(module._nextPassiveCleanupAt) or 0
     module._persistentSyncHandle = module._persistentSyncHandle or nil
     module._persistentSyncCallbacksBound = module._persistentSyncCallbacksBound or false
-    if addon.Timer and addon.Timer.BindMixin then
-        addon.Timer.BindMixin(module, "Database/DBSyncer")
+    if Timer and Timer.BindMixin then
+        Timer.BindMixin(module, "Database/DBSyncer")
     end
 
     -- ----- Private helpers ----- --
@@ -329,10 +334,8 @@ do
             return raidService:CanUseCapability("raid_leadership")
         end
 
-        local leaderFn = addon.UnitIsGroupLeader
-        local assistantFn = addon.UnitIsGroupAssistant
-        local isLeader = leaderFn and leaderFn("player")
-        local isAssistant = assistantFn and assistantFn("player")
+        local isLeader = UnitIsGroupLeader and UnitIsGroupLeader("player")
+        local isAssistant = UnitIsGroupAssistant and UnitIsGroupAssistant("player")
         return (isLeader or isAssistant) and true or false
     end
 
@@ -416,7 +419,7 @@ do
         Database.EnsureRaidSchema(raid)
 
         local lines = {}
-        local schemaVersion = tonumber(raid.schemaVersion) or tonumber(Database.GetRaidSchemaVersion and Database.GetRaidSchemaVersion()) or 1
+        local schemaVersion = tonumber(raid.schemaVersion) or tonumber(Database.GetRaidSchemaVersion()) or 1
 
         lines[#lines + 1] = packFields(
             FIELD_SEP,
@@ -529,7 +532,7 @@ do
             return nil
         end
 
-        local currentSchemaVersion = Database.GetRaidSchemaVersion and Database.GetRaidSchemaVersion() or 1
+        local currentSchemaVersion = Database.GetRaidSchemaVersion() or 1
         currentSchemaVersion = tonumber(currentSchemaVersion) or 1
         if currentSchemaVersion < 1 then
             currentSchemaVersion = 1
@@ -836,7 +839,7 @@ do
             return nil, nil
         end
 
-        local selectedRaid = addon.State and addon.State.selectedRaid
+        local selectedRaid = coreState and coreState.selectedRaid
         if selectedRaid then
             local raid = Database.EnsureRaidById(selectedRaid)
             if raid then
@@ -1009,7 +1012,7 @@ do
             return nil, nil
         end
 
-        local raidStore = Database.GetRaidStoreOrNil and Database.GetRaidStoreOrNil("DBSyncer.ImportSnapshotAsNewRaid", { "CreateRaidRecord", "InsertRaid" }) or nil
+        local raidStore = Database.GetRaidStoreOrNil("DBSyncer.ImportSnapshotAsNewRaid", { "CreateRaidRecord", "InsertRaid" })
         if not raidStore then
             return nil, nil
         end
@@ -1259,7 +1262,7 @@ do
     end
 
     local function refreshLoggerUi(focusRaidId)
-        local selectedRaid = tonumber(focusRaidId) or tonumber(addon.State and addon.State.selectedRaid) or tonumber(Database.GetCurrentRaid())
+        local selectedRaid = tonumber(focusRaidId) or tonumber(coreState and coreState.selectedRaid) or tonumber(Database.GetCurrentRaid())
         Bus.TriggerEvent(InternalEvents.LoggerSelectRaid, selectedRaid, "sync")
     end
 
@@ -1722,7 +1725,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Database/DBSyncer", {
         deps = {

@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -14,8 +14,8 @@ local char, byte = string.char, string.byte
 -- ----- Internal state ----- --
 local BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
-addon.Base64 = addon.Base64 or feature.Base64 or {}
-local Base64 = addon.Base64
+local Base64 = feature.Base64 or {}
+addon.Base64 = Base64
 
 -- ----- Private helpers ----- --
 
@@ -70,7 +70,7 @@ end
 do
     local name = "Modules/Base64"
     local deps = { "Init" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

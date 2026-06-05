@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -11,11 +11,13 @@ local floor = math.floor
 local strmatch = string.match
 local tonumber, type = tonumber, type
 
-addon.UIPrimitives = addon.UIPrimitives or {}
-local UIPrimitives = addon.UIPrimitives
+local UIEffects = feature.UIEffects
 
-addon.UIRowVisuals = addon.UIRowVisuals or {}
-local UIRowVisuals = addon.UIRowVisuals
+local UIPrimitives = feature.UIPrimitives or {}
+addon.UIPrimitives = UIPrimitives
+
+local UIRowVisuals = feature.UIRowVisuals or {}
+addon.UIRowVisuals = UIRowVisuals
 
 -- ----- Internal state ----- --
 
@@ -181,9 +183,8 @@ function UIPrimitives.SetButtonCount(btn, baseText, n)
 end
 
 function UIPrimitives.SetButtonGlow(button, enabled, r, g, b, style, options)
-    local effects = addon.UIEffects
-    if effects and effects.SetButtonGlow then
-        effects.SetButtonGlow(button, enabled, r, g, b, style, options)
+    if UIEffects and UIEffects.SetButtonGlow then
+        UIEffects.SetButtonGlow(button, enabled, r, g, b, style, options)
     end
 end
 
@@ -261,8 +262,8 @@ function UIRowVisuals.SetRowFocused(row, cond)
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
-    registry.AddModule("Modules/UI/Visuals", { deps = { "Init", "Modules/ModuleRegistry" } })
+    registry.AddModule("Modules/UI/Visuals", { deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Effects" } })
     registry.SetLoaded("Modules/UI/Visuals")
 end

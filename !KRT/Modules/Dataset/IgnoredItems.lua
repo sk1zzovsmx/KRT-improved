@@ -2,6 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
+-- events: none
 -- notes: canonical lookup for non-loot raid items that KRT should ignore
 
 local addon = select(2, ...)
@@ -9,7 +10,7 @@ local feature = addon.Database.GetFeatureShared()
 
 local tonumber = tonumber
 
-local IgnoredItems = addon.IgnoredItems or feature.IgnoredItems or {}
+local IgnoredItems = feature.IgnoredItems or {}
 addon.IgnoredItems = IgnoredItems
 
 -- ----- Internal state ----- --
@@ -108,7 +109,7 @@ end
 do
     local name = "Modules/Dataset/IgnoredItems"
     local deps = { "Init" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

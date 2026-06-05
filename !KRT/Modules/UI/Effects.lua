@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none; owns UI effect OnUpdate drivers
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -12,8 +12,8 @@ local max = math.max
 local lower = string.lower
 local pairs = pairs
 
-addon.UIEffects = addon.UIEffects or {}
-local UIEffects = addon.UIEffects
+local UIEffects = feature.UIEffects or {}
+addon.UIEffects = UIEffects
 
 -- ----- Internal state ----- --
 local DEFAULT_GLOW_METHOD = "Proc"
@@ -605,7 +605,7 @@ function UIEffects.SetButtonGlow(button, enabled, r, g, b, methodName, options)
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Modules/UI/Effects", { deps = { "Init", "Modules/ModuleRegistry" } })
     registry.SetLoaded("Modules/UI/Effects")

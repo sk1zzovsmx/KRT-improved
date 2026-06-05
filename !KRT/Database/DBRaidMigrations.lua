@@ -6,15 +6,16 @@
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
+local DB = feature.DB
 local Database = feature.Database
 local Strings = feature.Strings
 
-local strsub = string.sub
+local isBossFightRecord = Database._IsBossFightRecord
 
 -- Current-schema raid persistence helpers.
 do
-    addon.DB.RaidMigrations = addon.DB.RaidMigrations or {}
-    local module = addon.DB.RaidMigrations
+    DB.RaidMigrations = DB.RaidMigrations or {}
+    local module = DB.RaidMigrations
 
     -- ----- Internal state ----- --
     local EMPTY_MIGRATIONS = {}
@@ -72,28 +73,6 @@ do
             return nil
         end
         return num
-    end
-
-    local function isBossFightRecord(boss)
-        if type(boss) ~= "table" then
-            return false
-        end
-
-        local sourceKind = boss.sourceKind
-        if sourceKind == "shared" or sourceKind == "trash" or sourceKind == "object" then
-            return false
-        end
-
-        if boss.source == "LootSources" then
-            return false
-        end
-
-        local name = boss.name or boss.boss
-        if type(name) == "string" and strsub(name, 1, 7) == "Shared:" then
-            return false
-        end
-
-        return true
     end
 
     local function compactChangesMap(changes)
@@ -325,7 +304,7 @@ do
 
     -- ----- Public methods ----- --
     function module:GetCurrentVersion()
-        local version = Database.GetRaidSchemaVersion and Database.GetRaidSchemaVersion() or 1
+        local version = Database.GetRaidSchemaVersion() or 1
         version = tonumber(version) or 1
         if version < 1 then
             version = 1
@@ -338,7 +317,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Database/DBRaidMigrations", { deps = { "Init", "Modules/ModuleRegistry", "Database/DB", "Database/DBSchema", "Modules/Strings" } })
     registry.SetLoaded("Database/DBRaidMigrations")

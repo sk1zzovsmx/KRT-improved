@@ -135,9 +135,9 @@ local preRegistryUtilityModules = {
 local directRegistryModules = {
     { name = "Modules/UI/Facade", deps = { "Init", "Modules/ModuleRegistry" } },
     { name = "Modules/UI/Effects", deps = { "Init", "Modules/ModuleRegistry" } },
-    { name = "Modules/UI/Visuals", deps = { "Init", "Modules/ModuleRegistry" } },
-    { name = "Modules/UI/Frames", deps = { "Init", "Modules/ModuleRegistry" } },
-    { name = "Modules/UI/ListController", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Visuals" } },
+    { name = "Modules/UI/Visuals", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Effects" } },
+    { name = "Modules/UI/Frames", deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Strings" } },
+    { name = "Modules/UI/ListController", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames", "Modules/UI/Visuals" } },
     { name = "Modules/UI/MultiSelect", deps = { "Init", "Modules/ModuleRegistry" } },
     { name = "Modules/Bus", deps = { "Init", "Modules/ModuleRegistry" } },
 }
@@ -190,6 +190,7 @@ local postRegistryCoreModules = {
             "Modules/Comms",
         },
         exports = { "function%s+module:[%w_]+%s*%(" },
+        events = "-- events: handles KRTLogSync addon-message traffic; listens OptionsLoaded, ConfigpersistentSync, RaidCreate",
     },
 }
 
@@ -210,10 +211,42 @@ for i = 1, #preRegistryModules do
     assert(lastPublicFunction, expected.path .. " must expose public functions before registry metadata")
     assert(lastPublicFunction < metadataStart, expected.path .. " registry metadata must appear after its last exported public function definition")
     assertContains(source, "ModuleRegistryPendingRegistrations", expected.path .. " must queue before registry load")
+    assertContains(source, "Bootstrap exception: ModuleRegistry may not be loaded yet.", expected.path .. " must document its pre-registry addon.ModuleRegistry lookup")
     assertContains(source, "loaded = true", expected.path .. " must mark pending entries loaded")
     assertContains(source, "registry.AddModule(name, { deps = deps })", expected.path .. " must register directly when registry exists")
     assertContains(source, "registry.SetLoaded(name)", expected.path .. " must mark directly when registry exists")
     assertDeps(getPreRegistryDeps(source), expected.deps, expected.name)
+end
+
+local preRegistryDbOwnerTables = {
+    {
+        path = "!KRT/Database/DB.lua",
+        name = "DB",
+    },
+    {
+        path = "!KRT/Database/DBManager.lua",
+        name = "DBManager",
+    },
+    {
+        path = "!KRT/Database/DBSchema.lua",
+        name = "DBSchema",
+    },
+    {
+        path = "!KRT/Database/DBOptions.lua",
+        name = "Options",
+    },
+}
+
+for i = 1, #preRegistryDbOwnerTables do
+    local expected = preRegistryDbOwnerTables[i]
+    local source = read(expected.path)
+    assertContains(source, "local " .. expected.name .. " = feature." .. expected.name, expected.path .. " must bind owner table from feature shared")
+    assertNotContains(
+        source,
+        "local " .. expected.name .. " = feature." .. expected.name .. " or addon." .. expected.name,
+        expected.path .. " must not double-bind owner table through addon root"
+    )
+    assertNotContains(source, "local " .. expected.name .. " = addon." .. expected.name, expected.path .. " must not bind owner table directly from addon root")
 end
 
 local coreDbSource = read("!KRT/Database/DB.lua")
@@ -225,6 +258,22 @@ end
 
 local dbManagerSource = read("!KRT/Database/DBManager.lua")
 assertDeps(getPreRegistryDeps(dbManagerSource), { "Init", "Database/DB" }, "Database/DBManager")
+assertContains(coreDbSource, "local dbManager = feature.DBManager", "Database/DB must read DBManager from feature shared")
+assertNotContains(coreDbSource, "local dbManager = addon.DBManager", "Database/DB must not read DBManager directly from addon root")
+assertContains(dbManagerSource, "local db = feature.DB", "Database/DBManager must read DB from feature shared")
+assertNotContains(dbManagerSource, "local db = addon.DB", "Database/DBManager must not read DB directly from addon root")
+
+local dbOptionsSource = read("!KRT/Database/DBOptions.lua")
+assertContains(dbOptionsSource, "-- shared: local feature = addon.Database.GetFeatureShared()", "Database/DBOptions must document its feature shared header dependency")
+assertContains(dbOptionsSource, "local Bus = feature.Bus", "Database/DBOptions must localize Bus from feature shared")
+assertNotContains(dbOptionsSource, "local bus = addon.Bus", "Database/DBOptions must not read Bus directly from addon root")
+assertContains(dbOptionsSource, "local eventRoot = feature.Events", "Database/DBOptions must localize Events from feature shared")
+assertNotContains(dbOptionsSource, "local eventRoot = feature.Events or addon.Events", "Database/DBOptions must not double-bind Events through addon root")
+assertContains(dbOptionsSource, "local coreState = feature.coreState", "Database/DBOptions must localize core state from feature shared")
+assertNotContains(dbOptionsSource, "local state = addon.State", "Database/DBOptions must not read State directly from addon root")
+assertNotContains(dbOptionsSource, "runtime addon.State.debugEnabled", "Database/DBOptions comments must describe coreState debug ownership")
+assertContains(dbOptionsSource, "-- ----- Public methods ----- --", "Database/DBOptions must use the canonical public-method header")
+assertNotContains(dbOptionsSource, "-- ----- Public API ----- --", "Database/DBOptions must not use the old public API section header")
 
 for i = 1, #postRegistryCoreModules do
     local expected = postRegistryCoreModules[i]
@@ -232,13 +281,33 @@ for i = 1, #postRegistryCoreModules do
     local metadataStart = source:find('registry.AddModule("' .. expected.name .. '"', 1, true)
     local lastPublicFunction = findLastExportedFunction(source, expected.exports)
 
-    assertContains(source, "local registry = addon.ModuleRegistry", expected.path .. " must use direct registry lookup")
+    assertContains(source, "local registry = feature.ModuleRegistry", expected.path .. " must localize ModuleRegistry from feature shared")
+    assertNotContains(source, "local registry = addon.ModuleRegistry", expected.path .. " must not read ModuleRegistry directly from addon root")
     assertContains(source, 'registry.AddModule("' .. expected.name .. '"', expected.path .. " must direct-register module metadata")
     assertContains(source, 'registry.SetLoaded("' .. expected.name .. '")', expected.path .. " must mark direct registry module loaded")
     assertNotContains(source, "ModuleRegistryPendingRegistrations", expected.path .. " must not use pending fallback after ModuleRegistry loads")
+    if expected.events then
+        assertContains(source, expected.events, expected.path .. " must document concrete event ownership in the Lua contract")
+        assertNotContains(source, "-- events: document inbound/outbound events in module body", expected.path .. " must not keep the generic event placeholder")
+    end
     assert(lastPublicFunction, expected.path .. " must expose public functions before registry metadata")
     assert(lastPublicFunction < metadataStart, expected.path .. " registry metadata must appear after its last exported public function definition")
     assertDeps(getPostRegistryDeps(source, expected.name), expected.deps, expected.name)
+end
+
+local postRegistryDbNamespaceFiles = {
+    { path = "!KRT/Database/DBRaidMigrations.lua", namespace = "RaidMigrations" },
+    { path = "!KRT/Database/DBRaidStore.lua", namespace = "RaidStore" },
+    { path = "!KRT/Database/DBRaidQueries.lua", namespace = "RaidQueries" },
+    { path = "!KRT/Database/DBRaidValidator.lua", namespace = "RaidValidator" },
+    { path = "!KRT/Database/DBSyncer.lua", namespace = "Syncer" },
+}
+for i = 1, #postRegistryDbNamespaceFiles do
+    local expected = postRegistryDbNamespaceFiles[i]
+    local source = read(expected.path)
+    assertContains(source, "local DB = feature.DB", expected.path .. " must localize DB from feature shared")
+    assertContains(source, "local module = DB." .. expected.namespace, expected.path .. " must bind module through the local DB namespace")
+    assertNotContains(source, "local module = addon.DB." .. expected.namespace, expected.path .. " must not bind module through addon.DB")
 end
 
 local syncerDeps = getPostRegistryDeps(read("!KRT/Database/DBSyncer.lua"), "Database/DBSyncer")
@@ -254,6 +323,39 @@ for i = 1, #syncerDeps do
 end
 assert(syncerHasBus, "Database/DBSyncer must depend on Modules/Bus")
 assert(syncerHasComms, "Database/DBSyncer must depend on Modules/Comms")
+
+local syncerSource = read("!KRT/Database/DBSyncer.lua")
+assertContains(syncerSource, "local coreState = feature.coreState", "Database/DBSyncer must localize core state from feature shared")
+assertContains(syncerSource, "local UnitIsGroupLeader = feature.UnitIsGroupLeader", "Database/DBSyncer must localize group leader helper from feature shared")
+assertContains(syncerSource, "local UnitIsGroupAssistant = feature.UnitIsGroupAssistant", "Database/DBSyncer must localize group assistant helper from feature shared")
+assertNotContains(
+    syncerSource,
+    "local UnitIsGroupLeader = feature.UnitIsGroupLeader or addon.UnitIsGroupLeader",
+    "Database/DBSyncer must not fall back to addon root group leader helper"
+)
+assertNotContains(
+    syncerSource,
+    "local UnitIsGroupAssistant = feature.UnitIsGroupAssistant or addon.UnitIsGroupAssistant",
+    "Database/DBSyncer must not fall back to addon root group assistant helper"
+)
+assertNotContains(
+    syncerSource,
+    "local UnitIsGroupLeader = addon.UnitIsGroupLeader or feature.UnitIsGroupLeader",
+    "Database/DBSyncer must not prefer addon root group leader helper"
+)
+assertNotContains(
+    syncerSource,
+    "local UnitIsGroupAssistant = addon.UnitIsGroupAssistant or feature.UnitIsGroupAssistant",
+    "Database/DBSyncer must not prefer addon root group assistant helper"
+)
+assertNotContains(syncerSource, "local leaderFn = addon.UnitIsGroupLeader", "Database/DBSyncer must use local UnitIsGroupLeader dependency")
+assertNotContains(syncerSource, "local assistantFn = addon.UnitIsGroupAssistant", "Database/DBSyncer must use local UnitIsGroupAssistant dependency")
+assertNotContains(syncerSource, "addon.State and addon.State.selectedRaid", "Database/DBSyncer must use local coreState for selected raid lookup")
+
+local raidStoreSource = read("!KRT/Database/DBRaidStore.lua")
+assertContains(raidStoreSource, "local coreState = feature.coreState", "Database/DBRaidStore must localize core state from feature shared")
+assertNotContains(raidStoreSource, "local coreState = feature.coreState or addon.State", "Database/DBRaidStore must not fall back to addon.State for core state")
+assertNotContains(raidStoreSource, "addon.State.raidStore", "Database/DBRaidStore must use local coreState for raid-store runtime cache")
 
 local pending = {}
 for i = 1, #preRegistryModules do

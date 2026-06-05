@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: listens forwarded loot/trade events and Master bus refresh events
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
@@ -13,8 +13,8 @@ local Frames = feature.Frames
 local Item = feature.Item
 local Colors = feature.Colors
 local Comms = feature.Comms
-local UIScaffold = addon.UIScaffold
-local UIPrimitives = addon.UIPrimitives
+local UIScaffold = feature.UIScaffold
+local UIPrimitives = feature.UIPrimitives
 local ListController = feature.ListController
 local Events = feature.Events
 local C = feature.C
@@ -37,7 +37,7 @@ local PENDING_AWARD_TTL_SECONDS = C.PENDING_AWARD_TTL_SECONDS
 local ML_MULTI_AWARD_TIMEOUT_SECONDS = C.ML_MULTI_AWARD_TIMEOUT_SECONDS
 local LOOT_CONTEXT_SESSION_TTL_SECONDS = math.max(tonumber(C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60, tonumber(C.BOSS_EVENT_CONTEXT_TTL_SECONDS) or 30)
 
-local UIFacade = addon.UI
+local UIFacade = feature.UI
 
 local function isDebugEnabled()
     return Options and Options.IsDebugEnabled and Options.IsDebugEnabled() == true
@@ -96,13 +96,13 @@ local RollsApi = {
 
 -- =========== Master Looter Frame Module  =========== --
 do
-    addon.Controllers.Master = addon.Controllers.Master or {}
-    local module = addon.Controllers.Master
+    feature.Controllers.Master = feature.Controllers.Master or {}
+    local module = feature.Controllers.Master
     module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
     -- Timer ownership: all Master controller timers (PendingCounter, multi-award timeout/delay, loot close).
-    addon.Timer.BindMixin(module, "Master")
+    feature.Timer.BindMixin(module, "Master")
 
     -- Namespace registrations owned by the Master controller. Stored on `module`
     -- to avoid extra upvalues because this file is near Lua 5.1's 200 local/upvalue limit.
@@ -932,7 +932,7 @@ do
     end
 
     Private.ShowHideFrame = function(frame, shown)
-        local primitives = addon.UIPrimitives or UIPrimitives
+        local primitives = UIPrimitives
         if primitives and primitives.ShowHide then
             primitives.ShowHide(frame, shown)
             return
@@ -1789,7 +1789,7 @@ do
         end
 
         if lootNid <= 0 and not lootState.fromInventory and session and session.id and Raid.GetLootNidByRollSessionId then
-            lootNid = Raid:GetLootNidByRollSessionId(session.id, addon.Database.GetCurrentRaid(), playerName)
+            lootNid = Raid:GetLootNidByRollSessionId(session.id, Database.GetCurrentRaid(), playerName)
         end
 
         local createdTradeOnly = false
@@ -1801,7 +1801,7 @@ do
                 rollValue,
                 awardedCount,
                 source,
-                addon.Database.GetCurrentRaid(),
+                Database.GetCurrentRaid(),
                 session and session.bossNid or nil,
                 session and session.id or nil
             ) or 0
@@ -2088,7 +2088,7 @@ do
             return false
         end
 
-        Raid:AddPlayerCountForRollType(pending.playerName, pending.rollType, pending.itemCount or 1, addon.Database.GetCurrentRaid())
+        Raid:AddPlayerCountForRollType(pending.playerName, pending.rollType, pending.itemCount or 1, Database.GetCurrentRaid())
         pending.counterApplied = true
         self:Remove(index)
         if addon.hasDebug then
@@ -3411,7 +3411,7 @@ do
 
     -- OnClick handler for dropdown menu items (consolidated from 3 similar branches).
     Private.OnClickDropDown = function(_button, owner, value)
-        if not owner or not value or not addon.Database.GetCurrentRaid() then
+        if not owner or not value or not Database.GetCurrentRaid() then
             return
         end
         UIDropDownMenu_SetText(owner, value)
@@ -3420,7 +3420,7 @@ do
         local field = findDropDownField(owner:GetName())
         if field then
             local raidStore = Database.GetRaidStoreOrNil("Master.OnClickDropDown", { "GetRaidByIndex" })
-            local raid = raidStore and raidStore:GetRaidByIndex(addon.Database.GetCurrentRaid()) or nil
+            local raid = raidStore and raidStore:GetRaidByIndex(Database.GetCurrentRaid()) or nil
             if raid then
                 raid[field.raidKey] = value
                 lootState[field.stateKey] = value
@@ -3436,7 +3436,7 @@ do
 
     -- Updates the text of the dropdowns to reflect the current selection (consolidated from 3 similar branches).
     function updateDropDowns(frame)
-        if not frame or not addon.Database.GetCurrentRaid() then
+        if not frame or not Database.GetCurrentRaid() then
             return
         end
 
@@ -3447,7 +3447,7 @@ do
 
         -- Sync state from raid data
         local raidStore = Database.GetRaidStoreOrNil("Master.UpdateDropDowns", { "GetRaidByIndex" })
-        local raid = raidStore and raidStore:GetRaidByIndex(addon.Database.GetCurrentRaid()) or nil
+        local raid = raidStore and raidStore:GetRaidByIndex(Database.GetCurrentRaid()) or nil
         if not raid then
             return
         end
@@ -3872,15 +3872,11 @@ do
                     addon:debug(Diag.D.LogTradeCompleted:format(tostring(lootState.currentRollItem), tostring(tradeWinner), tonumber(lootState.currentRollType) or -1, rollValue))
                 end
                 if lootNid > 0 then
-                    local ok = requestLoggerLootLog(lootNid, tradeWinner, lootState.currentRollType, rollValue, "TRADE_ACCEPT", addon.Database.GetCurrentRaid())
+                    local ok = requestLoggerLootLog(lootNid, tradeWinner, lootState.currentRollType, rollValue, "TRADE_ACCEPT", Database.GetCurrentRaid())
 
                     if not ok then
                         addon:error(
-                            Diag.E.LogTradeLoggerLogFailed:format(
-                                tostring(addon.Database.GetCurrentRaid()),
-                                tostring(lootNid),
-                                tostring(lootState.tradeItemLink or Loot.GetItemLink())
-                            )
+                            Diag.E.LogTradeLoggerLogFailed:format(tostring(Database.GetCurrentRaid()), tostring(lootNid), tostring(lootState.tradeItemLink or Loot.GetItemLink()))
                         )
                     end
                 else
@@ -4049,7 +4045,7 @@ do
 
         completeInventoryAwardProgress = function(completedWinner, rollType, awardedCount)
             if completedWinner and completedWinner ~= "" then
-                Raid:AddPlayerCountForRollType(completedWinner, rollType, awardedCount, addon.Database.GetCurrentRaid())
+                Raid:AddPlayerCountForRollType(completedWinner, rollType, awardedCount, Database.GetCurrentRaid())
             end
 
             local done = registerAwardedItem(awardedCount)
@@ -4259,11 +4255,11 @@ do
             local awardedCount = Loot:ResolveInventoryAwardedCount(lootState.selectedItemCount, lootState.fromInventory)
             local lootNid, createdTradeOnly = ensureTradeLootContext(itemLink, winnerName, rollType, rollValue, awardedCount, "TRADE_KEEP_NO_CONTEXT")
             if lootNid <= 0 then
-                addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Database.GetCurrentRaid()), tostring(lootNid), tostring(itemLink)))
+                addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(Database.GetCurrentRaid()), tostring(lootNid), tostring(itemLink)))
             elseif createdTradeOnly ~= true then
-                local ok = requestLoggerLootLog(lootNid, winnerName, rollType, rollValue, "TRADE_KEEP", addon.Database.GetCurrentRaid())
+                local ok = requestLoggerLootLog(lootNid, winnerName, rollType, rollValue, "TRADE_KEEP", Database.GetCurrentRaid())
                 if not ok then
-                    addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(addon.Database.GetCurrentRaid()), tostring(lootNid), tostring(itemLink)))
+                    addon:error(Diag.E.LogTradeKeepLoggerFailed:format(tostring(Database.GetCurrentRaid()), tostring(lootNid), tostring(itemLink)))
                 end
             end
 
@@ -4406,7 +4402,7 @@ do
     end)
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Controllers/Master", {
         deps = {

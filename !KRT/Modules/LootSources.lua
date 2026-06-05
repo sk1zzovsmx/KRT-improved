@@ -2,6 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.LootSources
+-- events: none
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
@@ -14,10 +15,11 @@ local strlower = string.lower
 local gsub = string.gsub
 local concat = table.concat
 
-addon.LootSourcesData = addon.LootSourcesData or {}
-addon.LootSourcesData.ByItemId = addon.LootSourcesData.ByItemId or {}
-addon.LootSources = addon.LootSources or {}
-local LootSources = addon.LootSources
+local LootSourcesData = feature.LootSourcesData or {}
+addon.LootSourcesData = LootSourcesData
+LootSourcesData.ByItemId = LootSourcesData.ByItemId or {}
+local LootSources = feature.LootSources or {}
+addon.LootSources = LootSources
 
 -- ----- Internal state ----- --
 local GET_CANDIDATES_CACHE_SIZE_LIMIT = 2048
@@ -298,7 +300,7 @@ local function filterCandidates(candidates, context, modeKey)
 end
 
 local function getIndexedCandidates(itemId, context, modeKey)
-    local index = addon.LootSourcesData.ByInstance
+    local index = LootSourcesData.ByInstance
     if type(index) ~= "table" then
         return nil
     end
@@ -492,8 +494,8 @@ local function getCachedCandidates(itemId, sources)
 end
 
 local function setDataForTests(byItemId)
-    addon.LootSourcesData.ByItemId = byItemId or {}
-    addon.LootSourcesData.ByInstance = {}
+    LootSourcesData.ByItemId = byItemId or {}
+    LootSourcesData.ByInstance = {}
     GET_CANDIDATES_CACHE = {}
     GET_CANDIDATES_CACHE_HIT = {}
     GET_CANDIDATES_CACHE_SIZE = 0
@@ -519,7 +521,7 @@ function LootSources.GetCandidates(itemId, context, modeKey)
         end
     end
 
-    local sources = addon.LootSourcesData.ByItemId[numericItemId]
+    local sources = LootSourcesData.ByItemId[numericItemId]
     if type(sources) ~= "table" then
         return {}
     end
@@ -577,7 +579,7 @@ LootSources._SetDataForTests = setDataForTests
 do
     local name = "Modules/LootSources"
     local deps = { "Init", "Modules/Strings", "Modules/Dataset/LootSourcesData" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

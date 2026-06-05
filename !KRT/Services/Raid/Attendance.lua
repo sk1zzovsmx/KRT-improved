@@ -9,6 +9,7 @@ local feature = addon.Database.GetFeatureShared()
 local Database = feature.Database
 local Events = feature.Events
 local Bus = feature.Bus
+local Services = feature.Services
 local Time = feature.Time
 
 local InternalEvents = Events.Internal
@@ -18,7 +19,8 @@ local type, tonumber = type, tonumber
 
 do
     feature.EnsureServiceNamespace("Raid")
-    local module = addon.Services.Raid
+    local Raid = Services.Raid
+    local module = Raid
 
     -- ----- Internal state ----- --
 
@@ -196,7 +198,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Raid/Attendance", {
         deps = {

@@ -1,14 +1,19 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: bootstrap-sensitive internal loot helpers
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Loot._Context
+-- events: no bus events; context helpers only
+-- notes: bootstrap-sensitive internal loot helpers
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
+local Database = feature.Database
+local Services = feature.Services
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Loot")
-local module = addon.Services.Loot
+local Loot = Services.Loot
+local module = Loot
 module._Context = module._Context or {}
 
 local LootContext = module._Context
@@ -233,7 +238,7 @@ function LootContext.ProjectLootSourceState(context)
 end
 
 function LootContext.ResolveRaidRecord(raidNum)
-    local core = addon.Database
+    local core = Database
     local resolvedRaidNum = raidNum
     if not resolvedRaidNum and core and type(core.GetCurrentRaid) == "function" then
         resolvedRaidNum = core.GetCurrentRaid()
@@ -271,7 +276,7 @@ function LootContext.CopyLootSource(context, bossNidOverride)
     }
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Loot/Context", {
         deps = {

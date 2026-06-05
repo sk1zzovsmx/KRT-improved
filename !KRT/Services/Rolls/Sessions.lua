@@ -1,12 +1,15 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: session and context helpers for rolls service
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Rolls._Sessions
+-- events: none
+-- notes: session and context helpers for rolls service
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Item = feature.Item
+local Services = feature.Services
 local Strings = feature.Strings
 
 local rollTypes = feature.rollTypes
@@ -15,7 +18,8 @@ local next = next
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Rolls")
-local module = addon.Services.Rolls
+local Rolls = Services.Rolls
+local module = Rolls
 module._Sessions = module._Sessions or {}
 
 local Sessions = module._Sessions
@@ -38,6 +42,8 @@ local function normalizeCandidateKey(name)
     end
     return nil
 end
+
+Sessions._NormalizeCandidateKey = normalizeCandidateKey
 
 -- ----- Public methods ----- --
 
@@ -357,7 +363,7 @@ function Sessions.GetCurrentRollContext(ctx, itemLink, rollType)
     }
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Rolls/Sessions", {
         deps = {

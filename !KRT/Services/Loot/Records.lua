@@ -6,6 +6,7 @@
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
+local Services = feature.Services
 local Time = feature.Time
 
 local tinsert = table.insert
@@ -13,7 +14,8 @@ local tonumber = tonumber
 local type = type
 
 feature.EnsureServiceNamespace("Loot")
-local module = addon.Services.Loot
+local Loot = Services.Loot
+local module = Loot
 module._Records = module._Records or {}
 
 local Records = module._Records
@@ -76,7 +78,7 @@ function Records.Append(raid, args)
     return row, lootNid, #raid.loot
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Loot/Records", {
         deps = {

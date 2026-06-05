@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: emits SetItem/RaidLootUpdate; delegates distribution messages
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
@@ -13,10 +13,12 @@ local Events = feature.Events
 local C = feature.C
 local Database = feature.Database
 local Bus = feature.Bus
+local Deformat = feature.Deformat
 local Item = feature.Item
+local Options = feature.Options
 local Strings = feature.Strings
 local Time = feature.Time
-local IgnoredItems = feature.IgnoredItems or {}
+local Timer = feature.Timer
 
 local NormalizeName = Strings.NormalizeName
 
@@ -70,10 +72,11 @@ local loggerLootQualityThresholds = {
 -- Manages the loot window items (fetching from loot/inventory).
 do
     feature.EnsureServiceNamespace("Loot")
-    local module = addon.Services.Loot
+    local Loot = Services.Loot
+    local module = Loot
 
     -- Timer ownership: cache-warm scheduling for loot items.
-    addon.Timer.BindMixin(module, "Loot")
+    Timer.BindMixin(module, "Loot")
 
     local PendingAwards = assert(module._PendingAwards, "Loot pending-award helpers are not initialized")
     local PassiveGroupLoot = assert(module._PassiveGroupLoot, "Loot passive group-loot helpers are not initialized")
@@ -82,8 +85,10 @@ do
     local Receipts = assert(module._Receipts, "Loot receipt helpers are not initialized")
     local Records = assert(module._Records, "Loot record helpers are not initialized")
     local Reconcile = assert(module._Reconcile, "Loot reconcile helpers are not initialized")
+    local Rules = assert(module._Rules, "Loot rules helpers are not initialized")
     local ContextHelpers = assert(module._Context, "Loot context helpers are not initialized")
     local resolveRaidRecord = assert(ContextHelpers.ResolveRaidRecord, "Missing LootContext.ResolveRaidRecord")
+    local isIgnoredItem = assert(Rules._IsIgnoredItem, "Missing LootRules._IsIgnoredItem")
 
     -- ----- Internal state ----- --
     local lootTable = {}
@@ -107,6 +112,14 @@ do
 
     local function noopFalse()
         return false
+    end
+
+    local function getOption(namespace, key)
+        local cfg = Options and Options.Get and Options.Get(namespace)
+        if cfg and cfg.Get then
+            return cfg:Get(key)
+        end
+        return nil
     end
 
     local function buildEmptyDistributionModel()
@@ -144,7 +157,7 @@ do
     end
 
     local function warmItemCacheNow(itemLink)
-        local probe = Item or addon.Item
+        local probe = Item
         if probe and probe.WarmItemCache then
             probe.WarmItemCache(itemLink)
         end
@@ -236,7 +249,7 @@ do
     end
 
     requestLootItemInfo = function(index, itemLink)
-        local probe = Item or addon.Item
+        local probe = Item
         if not (probe and type(probe.RequestItemInfo) == "function" and type(itemLink) == "string") then
             return false
         end
@@ -286,7 +299,7 @@ do
     end
 
     local function isBagItemSoulbound(bag, slot)
-        local probe = Item or addon.Item
+        local probe = Item
         if probe and probe.IsBagItemSoulbound then
             return probe.IsBagItemSoulbound(bag, slot)
         end
@@ -958,18 +971,18 @@ do
 
     local function parseLootChatMessage(msg, rollType, rollValue, parsedGroupLoot)
         -- Parse loot chat variants ("receives loot" and "receives item").
-        local player, itemLink, count = addon.Deformat(msg, LOOT_ITEM_MULTIPLE)
+        local player, itemLink, count = Deformat(msg, LOOT_ITEM_MULTIPLE)
         local itemCount = count or 1
 
         if not player then
-            player, itemLink = addon.Deformat(msg, LOOT_ITEM)
+            player, itemLink = Deformat(msg, LOOT_ITEM)
             itemCount = 1
         end
 
         -- Self loot path (no player name in the string).
         if not itemLink then
             local link
-            link, count = addon.Deformat(msg, LOOT_ITEM_SELF_MULTIPLE)
+            link, count = Deformat(msg, LOOT_ITEM_SELF_MULTIPLE)
             if link then
                 itemLink = link
                 itemCount = count or 1
@@ -978,7 +991,7 @@ do
         end
 
         if not itemLink then
-            local link = addon.Deformat(msg, LOOT_ITEM_SELF)
+            local link = Deformat(msg, LOOT_ITEM_SELF)
             if link then
                 itemLink = link
                 itemCount = 1
@@ -1023,13 +1036,6 @@ do
         return itemString, itemName, itemRarity, itemTexture, tonumber(itemId), itemType
     end
 
-    local function isIgnoredItem(itemId)
-        if type(IgnoredItems.Contains) ~= "function" then
-            return false
-        end
-        return IgnoredItems.Contains(itemId)
-    end
-
     local function normalizeLoggerLootQualityThreshold(value)
         local threshold = tonumber(value)
         if threshold and loggerLootQualityThresholds[threshold] then
@@ -1046,8 +1052,8 @@ do
     end
 
     local function getEffectiveLoggerLootThreshold()
-        if addon.options and addon.options.ignoreSelectionThreshold == true then
-            return normalizeLoggerLootQualityThreshold(addon.options.loggerLootQualityThreshold)
+        if getOption("Logger", "ignoreSelectionThreshold") == true then
+            return normalizeLoggerLootQualityThreshold(getOption("Logger", "loggerLootQualityThreshold"))
         end
         return getRaidLootThreshold()
     end
@@ -1104,15 +1110,11 @@ do
     end
 
     evaluateAutoLootSuggestion = function(itemLink, itemRarity, allowExpensiveMetadata)
-        local rules = module._Rules
-        if not (rules and rules.GetItemSuggestion) then
-            return nil
-        end
         local opts
         if allowExpensiveMetadata == false then
             opts = CHEAP_SUGGESTION_OPTS
         end
-        return rules:GetItemSuggestion({
+        return Rules:GetItemSuggestion({
             itemId = Item.GetItemIdFromLink(itemLink),
             itemLink = itemLink,
             itemRarity = itemRarity,
@@ -1286,7 +1288,7 @@ do
             if passiveGroupLoot then
                 rollValue = 0
             else
-                local services = addon.Services
+                local services = Services
                 local rollsService = services and services.Rolls or nil
                 rollValue = rollsService and rollsService:GetHighestRoll() or 0
             end
@@ -1648,7 +1650,7 @@ do
     end
 
     local function shouldIgnoreGroupLoot()
-        return addon.options and addon.options.ignoreGroupLoot == true
+        return getOption("Logger", "ignoreGroupLoot") == true
     end
 
     function module:ObservePassiveLootMessage(msg, winnerOnly)
@@ -2040,7 +2042,7 @@ do
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Loot/Service", {
         deps = {
@@ -2053,7 +2055,6 @@ if registry and type(registry.AddModule) == "function" and type(registry.SetLoad
             "Modules/Item",
             "Modules/Strings",
             "Modules/Time",
-            "Modules/Dataset/IgnoredItems",
             "Services/Loot/Context",
             "Services/Loot/PendingAwards",
             "Services/Loot/PassiveGroupLoot",
@@ -2062,6 +2063,7 @@ if registry and type(registry.AddModule) == "function" and type(registry.SetLoad
             "Services/Loot/Receipts",
             "Services/Loot/Records",
             "Services/Loot/Reconcile",
+            "Services/Loot/Rules",
         },
     })
     registry.SetLoaded("Services/Loot/Service")

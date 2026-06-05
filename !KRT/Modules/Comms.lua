@@ -2,7 +2,7 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: owns addon-message send helpers and KRTVersion payload handling
 
 local addonName = ...
 local addon = select(2, ...)
@@ -15,8 +15,8 @@ local strfind, strsub = string.find, string.sub
 local tconcat = table.concat
 local _G = _G
 
-addon.Comms = addon.Comms or feature.Comms or {}
-local Comms = addon.Comms
+local Comms = feature.Comms or {}
+addon.Comms = Comms
 Comms._Payload = Comms._Payload or {}
 local Payload = Comms._Payload
 local L = feature.L
@@ -35,7 +35,11 @@ local function getUnknownText()
 end
 
 local function getBase64()
-    return addon.Base64 or feature.Base64
+    if Database and type(Database.GetFeatureShared) == "function" then
+        local shared = Database.GetFeatureShared()
+        return shared and shared.Base64
+    end
+    return feature.Base64
 end
 
 Payload._EncodeText = function(value)
@@ -267,7 +271,7 @@ end
 do
     local name = "Modules/Comms"
     local deps = { "Init" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

@@ -35,11 +35,19 @@ dependencies. Prefer direct `feature.X` locals over `feature.X or addon.X`
 fallbacks. For service-table bootstrap, use `feature.EnsureServiceNamespace(...)`
 instead of open-coded `addon.Services.* = addon.Services.* or {}` guards.
 
-Feature files under `Controllers/`, `Services/`, `Widgets/`, `EntryPoints/` should keep this section order:
+KRT-owned addon Lua files should keep this section order:
 
 1. `-- ----- Internal state ----- --`
 2. `-- ----- Private helpers ----- --`
 3. `-- ----- Public methods ----- --`
+
+Static dataset files may omit `Public methods` only when the file contract explicitly says that the
+export is data-only and tests verify that no public methods exist. The canonical current exception is
+`!KRT/Modules/Dataset/LootSourcesData.lua`.
+
+Do not use double-binding fallbacks such as `feature.X or addon.X` or `addon.X or feature.X`.
+`feature.X` is the canonical local dependency source. If root compatibility remains required, bind
+from `feature.X` and then export the same table back to `addon.X`.
 
 ## 2) Naming Policy
 
@@ -114,6 +122,9 @@ Prefer stable, scoped diffs over mass reformatting untouched code.
 - For Controllers/Widgets, prefer `UIScaffold.DefineModuleUi(cfg)` as canonical UI contract.
 - Keep module-local UI state under `module._ui` with uniform fields.
 - Prefer event-driven redraw (`RequestRefresh`/`Refresh`) over polling `OnUpdate` loops.
+- `OnUpdate` is confined to minimap drag and shared UI driver/effect modules.
+- `addon.options` is confined to the read-only compatibility proxy in `Database/DBOptions.lua`.
+  New option reads/writes use namespace `cfg:Get(...)` and `cfg:Set(...)`.
 - Do not add new public Controller/Widget `OnLoad`, `RefreshUI`, or `Refresh` exports without an
   architecture change. Prefer scaffold callbacks or local hooks.
 

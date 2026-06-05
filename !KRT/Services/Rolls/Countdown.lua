@@ -1,23 +1,27 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: countdown runtime helpers for rolls service
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Rolls._Countdown
+-- events: announces countdown ticks through Services/Chat
+-- notes: countdown runtime helpers for rolls service
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 local Services = feature.Services
+local Timer = feature.Timer
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Rolls")
-local module = addon.Services.Rolls
+local Rolls = Services.Rolls
+local module = Rolls
 module._Countdown = module._Countdown or {}
 
 local Countdown = module._Countdown
 
 -- Countdown owns both runtime timers: the announcement ticker and the close timer.
-addon.Timer.BindMixin(Countdown, "Rolls.Countdown")
+Timer.BindMixin(Countdown, "Rolls.Countdown")
 
 local Chat = Services.Chat
 local tonumber = tonumber
@@ -107,7 +111,7 @@ function Countdown.IsRunning(state)
     return state.countdownRunning == true
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Rolls/Countdown", {
         deps = {

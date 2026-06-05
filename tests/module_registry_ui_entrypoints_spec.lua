@@ -69,6 +69,8 @@ local expectedControllers = {
         path = "!KRT/Controllers/Master.lua",
         owner = "module",
         separator = ":",
+        registryFromFeature = true,
+        events = "-- events: listens forwarded loot/trade events and Master bus refresh events",
         deps = {
             "Init",
             "Modules/ModuleRegistry",
@@ -112,6 +114,8 @@ local expectedControllers = {
         owner = "module",
         separator = ":",
         noPublicApi = true,
+        registryFromFeature = true,
+        events = "-- events: listens Logger/Raid/Loot bus refresh events",
         deps = {
             "Init",
             "Modules/ModuleRegistry",
@@ -143,6 +147,8 @@ local expectedControllers = {
         path = "!KRT/Controllers/Warnings.lua",
         owner = "module",
         separator = ":",
+        registryFromFeature = true,
+        events = "-- events: owns warning UI scripts; sends announcements through Services/Chat",
         deps = {
             "Init",
             "Modules/ModuleRegistry",
@@ -160,6 +166,8 @@ local expectedControllers = {
         path = "!KRT/Controllers/Spammer.lua",
         owner = "module",
         separator = ":",
+        registryFromFeature = true,
+        events = "-- events: owns spammer UI scripts; delegates ticker state to Services/Chat",
         deps = {
             "Init",
             "Modules/ModuleRegistry",
@@ -178,6 +186,7 @@ local expectedWidgets = {
         name = "Widgets/LootCounter",
         path = "!KRT/Widgets/LootCounter.lua",
         gate = 'UIFacade:IsEnabled("LootCounter")',
+        registryFromFeature = true,
         deps = {
             "Init",
             "Modules/ModuleRegistry",
@@ -200,6 +209,7 @@ local expectedWidgets = {
         name = "Widgets/ReservesUI",
         path = "!KRT/Widgets/ReservesUI.lua",
         gate = 'UIFacade:IsEnabled("Reserves")',
+        registryFromFeature = true,
         deps = {
             "Init",
             "Modules/ModuleRegistry",
@@ -214,6 +224,7 @@ local expectedWidgets = {
         forbiddenPrefixes = { "Controllers/", "EntryPoints/" },
         forbiddenDeps = {
             "Services/Reserves/Import",
+            "Services/Reserves/Aliases",
             "Services/Reserves/Display",
             "Services/Reserves/Sync",
             "Services/Reserves/Chat",
@@ -223,6 +234,7 @@ local expectedWidgets = {
         name = "Widgets/Config",
         path = "!KRT/Widgets/Config.lua",
         gate = 'UIFacade:IsEnabled("Config")',
+        registryFromFeature = true,
         deps = {
             "Init",
             "Modules/ModuleRegistry",
@@ -245,6 +257,7 @@ local expectedEntryPoints = {
         path = "!KRT/EntryPoints/Minimap.lua",
         owner = "module",
         separator = ":",
+        registryFromFeature = true,
         deps = {
             "Init",
             "Modules/ModuleRegistry",
@@ -254,11 +267,13 @@ local expectedEntryPoints = {
             "Modules/UI/Frames",
             "Modules/UI/Facade",
         },
+        events = "-- events: owns minimap frame scripts; drag uses allowed OnUpdate exception",
     },
     {
         name = "EntryPoints/SlashEvents",
         path = "!KRT/EntryPoints/SlashEvents.lua",
         metadataAfterNeedle = 'SlashCmdList["KRT"] = function(msg)',
+        registryFromFeature = true,
         deps = {
             "Init",
             "Modules/ModuleRegistry",
@@ -272,6 +287,7 @@ local expectedEntryPoints = {
             "Modules/UI/Facade",
         },
         forbiddenDeps = { "EntryPoints/Minimap", "Database/DBSyncer", "Database/DBRaidValidator" },
+        events = "-- events: owns /krt slash command routing; dispatches Controller, Widget, and sync commands",
     },
 }
 
@@ -303,9 +319,9 @@ local preRegistryUtilityModules = {
 local directRegistryModules = {
     { name = "Modules/UI/Facade", deps = { "Init", "Modules/ModuleRegistry" } },
     { name = "Modules/UI/Effects", deps = { "Init", "Modules/ModuleRegistry" } },
-    { name = "Modules/UI/Visuals", deps = { "Init", "Modules/ModuleRegistry" } },
-    { name = "Modules/UI/Frames", deps = { "Init", "Modules/ModuleRegistry" } },
-    { name = "Modules/UI/ListController", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Visuals" } },
+    { name = "Modules/UI/Visuals", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Effects" } },
+    { name = "Modules/UI/Frames", deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Strings" } },
+    { name = "Modules/UI/ListController", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames", "Modules/UI/Visuals" } },
     { name = "Modules/UI/MultiSelect", deps = { "Init", "Modules/ModuleRegistry" } },
     { name = "Modules/UI/OptionsLayout", deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames" } },
     { name = "Modules/Bus", deps = { "Init", "Modules/ModuleRegistry" } },
@@ -508,7 +524,11 @@ local expectedDebugServices = {
 
 local expectedReservesServices = {
     { name = "Services/Reserves/Import", deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" } },
-    { name = "Services/Reserves/Display", deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Strings" } },
+    { name = "Services/Reserves/Aliases", deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings" } },
+    {
+        name = "Services/Reserves/Display",
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/C", "Modules/Strings", "Services/Reserves/Aliases" },
+    },
     { name = "Services/Reserves/Sync", deps = { "Init", "Modules/ModuleRegistry", "Modules/Comms", "Modules/Strings" } },
     {
         name = "Services/Reserves",
@@ -537,7 +557,7 @@ local expectedLoggerServices = {
     { name = "Services/Logger/Export", deps = { "Init", "Modules/ModuleRegistry", "Services/Logger/Store" } },
     {
         name = "Services/Logger/Helpers",
-        deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Services/Logger/Store", "Services/Logger/View" },
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/Strings", "Services/Logger/Store" },
     },
     {
         name = "Services/Logger/Actions",
@@ -613,6 +633,7 @@ local moduleTocPaths = {
     ["Services/Rolls/Service"] = "Services\\Rolls\\Service.lua",
     ["Services/Debug"] = "Services\\Debug.lua",
     ["Services/Reserves/Import"] = "Services\\Reserves\\Import.lua",
+    ["Services/Reserves/Aliases"] = "Services\\Reserves\\Aliases.lua",
     ["Services/Reserves/Display"] = "Services\\Reserves\\Display.lua",
     ["Services/Reserves/Sync"] = "Services\\Reserves\\Sync.lua",
     ["Services/Reserves"] = "Services\\Reserves.lua",
@@ -675,9 +696,18 @@ end
 local function assertDirectRegistryContract(expected, source)
     local metadataStart = source:find('registry.AddModule("' .. expected.name .. '"', 1, true)
     assert(metadataStart, expected.name .. " must direct-register module metadata")
-    assertContains(source, "local registry = addon.ModuleRegistry", expected.name .. " must use direct registry lookup")
+    if expected.registryFromFeature then
+        assertContains(source, "local registry = feature.ModuleRegistry", expected.name .. " must localize ModuleRegistry from feature shared")
+        assertNotContains(source, "local registry = addon.ModuleRegistry", expected.name .. " must not read ModuleRegistry directly from addon root")
+    else
+        assertContains(source, "local registry = addon.ModuleRegistry", expected.name .. " must use direct registry lookup")
+    end
     assertContains(source, 'registry.SetLoaded("' .. expected.name .. '")', expected.name .. " must mark module loaded")
     assertNotContains(source, "ModuleRegistryPendingRegistrations", expected.name .. " must not use pending fallback")
+    if expected.events then
+        assertContains(source, expected.events, expected.name .. " must document concrete event ownership in the Lua contract")
+        assertNotContains(source, "-- events: document inbound/outbound events in module body", expected.name .. " must not keep the generic event placeholder")
+    end
 
     local deps = getPostRegistryDeps(source, expected.name)
     assertDeps(deps, expected.deps, expected.name)
@@ -736,6 +766,16 @@ local controllerPaths = {
     Master = "!KRT/Controllers/Master.lua",
     Spammer = "!KRT/Controllers/Spammer.lua",
     Warnings = "!KRT/Controllers/Warnings.lua",
+}
+
+local scaffoldedControllerNamespacePaths = {
+    Logger = "!KRT/Controllers/Logger.lua",
+    Spammer = "!KRT/Controllers/Spammer.lua",
+    Warnings = "!KRT/Controllers/Warnings.lua",
+}
+
+local localLimitControllerNamespacePaths = {
+    Master = "!KRT/Controllers/Master.lua",
 }
 
 local widgetPaths = {
@@ -880,6 +920,135 @@ local function assertMinimapRaidMenuContract()
     assertBefore(source, "L.StrLFMSpam", "L.StrClearIcons", "minimap menu must list LFM Spam before Clear Icons")
 end
 
+local function assertEntryPointOptionContracts()
+    local paths = {
+        "!KRT/EntryPoints/SlashEvents.lua",
+        "!KRT/EntryPoints/Minimap.lua",
+    }
+    for i = 1, #paths do
+        assertNotContains(read(paths[i]), "addon.options", paths[i] .. " must use namespace cfg:Get/cfg:Set instead of addon.options")
+    end
+end
+
+local function assertReservesWidgetOptionContract()
+    assertNotContains(read("!KRT/Widgets/ReservesUI.lua"), "addon.options", "!KRT/Widgets/ReservesUI.lua must use namespace cfg:Get/cfg:Set instead of addon.options")
+end
+
+local function assertLootCounterDependencyLocalContract()
+    local source = read("!KRT/Widgets/LootCounter.lua")
+    assertContains(source, "local Options = feature.Options", "LootCounter must localize Options from feature shared")
+    assertNotContains(source, "addon.Options", "LootCounter must use the local Options dependency")
+    assertNotContains(source, "addon.Database.GetCurrentRaid", "LootCounter must use the local Database dependency")
+end
+
+local function assertWidgetFeatureUiDependencyContract()
+    local widgetSources = {
+        {
+            path = "!KRT/Widgets/LootCounter.lua",
+            needsPrimitives = false,
+        },
+        {
+            path = "!KRT/Widgets/ReservesUI.lua",
+            needsPrimitives = true,
+        },
+        {
+            path = "!KRT/Widgets/Config.lua",
+            needsPrimitives = false,
+        },
+    }
+
+    for i = 1, #widgetSources do
+        local spec = widgetSources[i]
+        local source = read(spec.path)
+        assertContains(source, "local UIScaffold = feature.UIScaffold", spec.path .. " must localize UIScaffold from feature shared")
+        assertContains(source, "local UIFacade = feature.UI", spec.path .. " must localize UI facade from feature shared")
+        assertNotContains(source, "local UIScaffold = addon.UIScaffold", spec.path .. " must not read UIScaffold from addon root")
+        assertNotContains(source, "local UIFacade = addon.UI", spec.path .. " must not read UI facade from addon root")
+        if spec.needsPrimitives then
+            assertContains(source, "local UIPrimitives = feature.UIPrimitives", spec.path .. " must localize UIPrimitives from feature shared")
+            assertNotContains(source, "local UIPrimitives = addon.UIPrimitives", spec.path .. " must not read UIPrimitives from addon root")
+        end
+    end
+
+    local reservesSource = read("!KRT/Widgets/ReservesUI.lua")
+    assertContains(reservesSource, "local Services = feature.Services", "ReservesUI must localize Services from feature shared")
+    assertNotContains(reservesSource, "addon.Services and addon.Services.Reserves", "ReservesUI must not read Reserves service from addon root")
+end
+
+local function assertWidgetNamespaceContracts()
+    for widgetName, path in pairs(widgetPaths) do
+        local source = read(path)
+        assertContains(source, "local Widgets = feature.Widgets", path .. " must localize Widgets from feature shared")
+        assertContains(source, "local module = Widgets." .. widgetName, path .. " must bind module through the local Widgets namespace")
+        assertNotContains(source, "local module = addon.Widgets." .. widgetName, path .. " must not bind module through addon.Widgets")
+    end
+end
+
+local function assertWidgetEventHeaderContracts()
+    local headers = {
+        {
+            path = "!KRT/Widgets/Config.lua",
+            events = "-- events: emits option-specific events; listens OptionsLoaded",
+        },
+        {
+            path = "!KRT/Widgets/LootCounter.lua",
+            events = "-- events: listens RaidRosterDelta, PlayerCountChanged, RaidCreate",
+        },
+        {
+            path = "!KRT/Widgets/ReservesUI.lua",
+            events = "-- events: listens ReservesDataChanged and GET_ITEM_INFO_RECEIVED",
+        },
+    }
+
+    for i = 1, #headers do
+        local spec = headers[i]
+        local source = read(spec.path)
+        assertContains(source, spec.events, spec.path .. " must document concrete event ownership in the Lua contract")
+        assertNotContains(source, "-- events: document inbound/outbound events in module body", spec.path .. " must not keep the generic event placeholder")
+    end
+end
+
+local function assertEntryPointFeatureUiDependencyContract()
+    local entryPointSources = {
+        {
+            path = "!KRT/EntryPoints/Minimap.lua",
+            localName = "UIFacade",
+        },
+        {
+            path = "!KRT/EntryPoints/SlashEvents.lua",
+            localName = "UI",
+        },
+    }
+
+    for i = 1, #entryPointSources do
+        local spec = entryPointSources[i]
+        local source = read(spec.path)
+        assertContains(source, "local " .. spec.localName .. " = feature.UI", spec.path .. " must localize UI facade from feature shared")
+        assertNotContains(source, "local " .. spec.localName .. " = addon.UI", spec.path .. " must not read UI facade from addon root")
+    end
+
+    local slashSource = read("!KRT/EntryPoints/SlashEvents.lua")
+    assertContains(slashSource, "local Timer = feature.Timer", "SlashEvents must localize Timer from feature shared")
+    assertNotContains(slashSource, "addon.Timer", "SlashEvents must use the local Timer dependency")
+    assertContains(slashSource, "local Features = feature.Features", "SlashEvents must localize Features from feature shared")
+    assertNotContains(slashSource, "local features = addon.Features", "SlashEvents must use the local Features dependency")
+    assertContains(slashSource, "local coreState = feature.coreState", "SlashEvents must localize core state from feature shared")
+    assertNotContains(slashSource, "local coreState = feature.coreState or addon.State", "SlashEvents must not fall back to addon.State for core state")
+    assertNotContains(slashSource, "addon.State and addon.State.perfThresholdMs", "SlashEvents must use local coreState for perf threshold")
+    assertNotContains(slashSource, "addon.State and addon.State.perfEnabled", "SlashEvents must use local coreState for perf enabled")
+end
+
+local function assertEntryPointOwnerTableContracts()
+    local initSource = read("!KRT/Init.lua")
+    assertContains(initSource, "Minimap = addon.Minimap", "feature shared contract must expose the Minimap entrypoint owner table")
+
+    local minimapSource = read("!KRT/EntryPoints/Minimap.lua")
+    assertContains(minimapSource, "local module = feature.Minimap", "Minimap must bind its owner table from feature shared")
+    assertContains(minimapSource, "feature.Minimap = feature.Minimap or {}", "Minimap must initialize its owner table from feature shared")
+    assertNotContains(minimapSource, "feature.Minimap = feature.Minimap or addon.Minimap or {}", "Minimap must not double-bind its owner table through addon root")
+    assertNotContains(minimapSource, "local module = addon.Minimap", "Minimap must not bind its owner table directly from addon root")
+end
+
 local function assertSyncerDispatchContracts()
     local slashSource = read("!KRT/EntryPoints/SlashEvents.lua")
     local syncerSource = read("!KRT/Database/DBSyncer.lua")
@@ -925,6 +1094,40 @@ local function assertMasterWowForwardedContracts()
     assert(total > 0, "Master wow-forwarded dispatch sweep must find literal dispatch pairs")
 end
 
+local function assertScaffoldedControllerNamespaceContracts()
+    for controllerName, path in pairs(scaffoldedControllerNamespacePaths) do
+        local source = read(path)
+        assertContains(source, "local Controllers = feature.Controllers", path .. " must localize Controllers from feature shared")
+        assertContains(source, "local module = Controllers." .. controllerName, path .. " must bind module through the local Controllers namespace")
+        assertNotContains(source, "local module = addon.Controllers." .. controllerName, path .. " must not bind module through addon.Controllers")
+    end
+
+    local loggerSource = read("!KRT/Controllers/Logger.lua")
+    assertContains(loggerSource, "local coreState = feature.coreState", "Logger must localize core state from feature shared")
+    assertNotContains(loggerSource, "local coreState = feature.coreState or addon.State", "Logger must not fall back to addon.State for core state")
+    assertNotContains(loggerSource, "local state = addon.State", "Logger must use local coreState for selected raid state")
+    assertNotContains(loggerSource, "state.selectedRaid", "Logger must use coreState for selected raid state")
+
+    local warningsSource = read("!KRT/Controllers/Warnings.lua")
+    assertContains(warningsSource, "local coreState = feature.coreState", "Warnings must localize core state from feature shared")
+    assertNotContains(warningsSource, "local coreState = feature.coreState or addon.State", "Warnings must not fall back to addon.State for core state")
+    assertNotContains(warningsSource, "addon.State and addon.State.warningsSavedVariablesFresh", "Warnings must use local coreState for fresh SavedVariables flag")
+    assertNotContains(warningsSource, "addon.State.warningsSavedVariablesFresh", "Warnings must use local coreState for fresh SavedVariables flag writes")
+end
+
+local function assertLocalLimitControllerNamespaceContracts()
+    for controllerName, path in pairs(localLimitControllerNamespacePaths) do
+        local source = read(path)
+        assertContains(
+            source,
+            "feature.Controllers." .. controllerName .. " = feature.Controllers." .. controllerName .. " or {}",
+            path .. " must bind through feature.Controllers without adding a top-level Controllers local"
+        )
+        assertContains(source, "local module = feature.Controllers." .. controllerName, path .. " must localize module from feature.Controllers")
+        assertNotContains(source, "local module = addon.Controllers." .. controllerName, path .. " must not bind module through addon.Controllers")
+    end
+end
+
 local toc = read("!KRT/!KRT.toc")
 
 for i = 1, #expectedControllers do
@@ -942,8 +1145,18 @@ end
 assertControllerDispatchContracts()
 assertWidgetDispatchContracts()
 assertMinimapRaidMenuContract()
+assertEntryPointOptionContracts()
+assertReservesWidgetOptionContract()
+assertLootCounterDependencyLocalContract()
+assertWidgetFeatureUiDependencyContract()
+assertWidgetNamespaceContracts()
+assertWidgetEventHeaderContracts()
+assertEntryPointFeatureUiDependencyContract()
+assertEntryPointOwnerTableContracts()
 assertSyncerDispatchContracts()
 assertMasterWowForwardedContracts()
+assertScaffoldedControllerNamespaceContracts()
+assertLocalLimitControllerNamespaceContracts()
 
 local pending = {}
 for i = 1, #preRegistryCoreModules do

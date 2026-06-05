@@ -2,12 +2,15 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none; owns deferred list refresh driver
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local Diag = feature.Diag
+local Frames = feature.Frames
+local UIRowVisuals = feature.UIRowVisuals
+local UIPrimitives = feature.UIPrimitives
 
 local _G = _G
 local type, pairs, tostring = type, pairs, tostring
@@ -15,18 +18,18 @@ local twipe = table.wipe
 
 local CreateFrame = _G.CreateFrame
 
-addon.ListController = addon.ListController or {}
-local ListController = addon.ListController
+local ListController = feature.ListController or {}
+addon.ListController = ListController
 
 -- ----- Internal state ----- --
 
 -- ----- Private helpers ----- --
 local function getRowVisuals()
-    return addon.UIRowVisuals or {}
+    return UIRowVisuals or {}
 end
 
 local function getUIPrimitives()
-    return addon.UIPrimitives or {}
+    return UIPrimitives or {}
 end
 
 local function getListDiag(bucketName, keyName)
@@ -488,7 +491,6 @@ function ListController.MakeListController(cfg)
         postUpdate()
     end
 
-    local Frames = addon.Frames
     if Frames then
         self._makeConfirmPopup = Frames.MakeConfirmPopup
     end
@@ -505,10 +507,10 @@ function ListController.BindListController(module, controller)
     end
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Modules/UI/ListController", {
-        deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Visuals" },
+        deps = { "Init", "Modules/ModuleRegistry", "Modules/UI/Frames", "Modules/UI/Visuals" },
     })
     registry.SetLoaded("Modules/UI/ListController")
 end

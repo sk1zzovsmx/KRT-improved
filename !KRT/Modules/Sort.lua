@@ -2,15 +2,15 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: none
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local type, tonumber, tostring = type, tonumber, tostring
 
-addon.Sort = addon.Sort or feature.Sort or {}
-local Sort = addon.Sort
+local Sort = feature.Sort or {}
+addon.Sort = Sort
 
 -- ----- Internal state ----- --
 
@@ -56,7 +56,7 @@ end
 do
     local name = "Modules/Sort"
     local deps = { "Init" }
-    local registry = addon.ModuleRegistry
+    local registry = feature.ModuleRegistry
     if registry then
         registry.AddModule(name, { deps = deps })
         registry.SetLoaded(name)

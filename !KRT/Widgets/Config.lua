@@ -2,18 +2,19 @@
 -- deps: local addon = select(2, ...)
 -- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: publish module APIs on addon.*
--- events: document inbound/outbound events in module body
+-- events: emits option-specific events; listens OptionsLoaded
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
 
 local L = feature.L
 
+local Widgets = feature.Widgets
 local Database = feature.Database
 local Options = feature.Options
 local Frames = feature.Frames
 local Strings = feature.Strings
-local UIScaffold = addon.UIScaffold
-local OptionsLayout = addon.OptionsLayout
+local UIScaffold = feature.UIScaffold
+local OptionsLayout = feature.OptionsLayout
 local Events = feature.Events
 local Bus = feature.Bus
 local Services = feature.Services
@@ -27,9 +28,9 @@ local strlen = string.len
 local strsub = string.sub
 local type, tostring, tonumber = type, tostring, tonumber
 
-local UIFacade = addon.UI
+local UIFacade = feature.UI
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if type(registry) == "table" and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Widgets/Config", {
         deps = {
@@ -53,8 +54,8 @@ do
         return
     end
 
-    addon.Widgets.Config = addon.Widgets.Config or {}
-    local module = addon.Widgets.Config
+    Widgets.Config = Widgets.Config or {}
+    local module = Widgets.Config
     module._ui = UIScaffold.EnsureModuleUi(module)
     local UI = module._ui
 
@@ -116,6 +117,31 @@ do
         "minimapButton",
     }
 
+    local optionNamespaces = {
+        announceOnBank = "Master",
+        announceOnDisenchant = "Master",
+        announceOnHold = "Master",
+        announceOnWin = "Master",
+        countdownDuration = "Rolls",
+        countdownRollsBlock = "Rolls",
+        countdownSimpleRaidMsg = "Rolls",
+        ignoreGroupLoot = "Logger",
+        ignoreSelectionThreshold = "Logger",
+        ignoreStacks = "Loot",
+        loggerLootQualityThreshold = "Logger",
+        lootWhispers = "Loot",
+        minimapButton = "Minimap",
+        persistentSync = "Logger",
+        screenReminder = "Master",
+        showLootCounterDuringMSRoll = "LootCounter",
+        showTooltips = "UI",
+        softResWhisperReplies = "Reserves",
+        sortAscending = "Master",
+        syncPushPlayer = "Logger",
+        syncRequirePlayer = "Logger",
+        useRaidWarning = "Master",
+    }
+
     -- ----- Private helpers ----- --
     local function collectConfigRefs(frame, includeClose)
         local refs = {
@@ -135,6 +161,27 @@ do
 
     function UI.AcquireRefs(frame)
         return collectConfigRefs(frame, true)
+    end
+
+    local function getOptionConfig(key)
+        local namespace = optionNamespaces[key]
+        return namespace and Options and Options.Get and Options.Get(namespace) or nil
+    end
+
+    local function getOption(key)
+        local cfg = getOptionConfig(key)
+        if cfg and cfg.Get then
+            return cfg:Get(key)
+        end
+        return nil
+    end
+
+    local function setOption(key, value)
+        local cfg = getOptionConfig(key)
+        if cfg and cfg.Set then
+            return cfg:Set(key, value)
+        end
+        return false
     end
 
     -- ----- Public methods ----- --
@@ -625,25 +672,25 @@ do
         if not frameName then
             return
         end
-        local channel = (addon.options.useRaidWarning == true) and (RAID_WARNING or "Raid Warning") or "RAID"
-        local countdownMode = (addon.options.countdownSimpleRaidMsg == true) and L.StrConfigMasterLootPreviewSimple or L.StrConfigMasterLootPreviewDetailed
-        local countdownDuration = tostring(addon.options.countdownDuration or 5)
+        local channel = (getOption("useRaidWarning") == true) and (RAID_WARNING or "Raid Warning") or "RAID"
+        local countdownMode = (getOption("countdownSimpleRaidMsg") == true) and L.StrConfigMasterLootPreviewSimple or L.StrConfigMasterLootPreviewDetailed
+        local countdownDuration = tostring(getOption("countdownDuration") or 5)
         local lines = {
             format(L.StrConfigMasterLootPreviewWin or "Winner announce: %s", channel),
-            format(L.StrConfigMasterLootPreviewHold or "Hold announce: %s", addon.options.announceOnHold and "on" or "off"),
-            format(L.StrConfigMasterLootPreviewBank or "Bank announce: %s", addon.options.announceOnBank and "on" or "off"),
-            format(L.StrConfigMasterLootPreviewDisenchant or "Disenchant announce: %s", addon.options.announceOnDisenchant and "on" or "off"),
+            format(L.StrConfigMasterLootPreviewHold or "Hold announce: %s", getOption("announceOnHold") and "on" or "off"),
+            format(L.StrConfigMasterLootPreviewBank or "Bank announce: %s", getOption("announceOnBank") and "on" or "off"),
+            format(L.StrConfigMasterLootPreviewDisenchant or "Disenchant announce: %s", getOption("announceOnDisenchant") and "on" or "off"),
             format(L.StrConfigMasterLootPreviewCountdown or "Countdown: %s sec, %s", countdownDuration, countdownMode),
         }
         setText(frameName, "AnnouncementPreviewBody", table.concat(lines, "\n"))
     end
 
     local function setOptions(values)
-        if not (Options and Options.Set and type(values) == "table") then
+        if type(values) ~= "table" then
             return
         end
         for key, value in pairs(values) do
-            Options.Set(key, value)
+            setOption(key, value)
             local eventName = Events.GetConfigOptionChanged and Events.GetConfigOptionChanged(key)
             if eventName then
                 Bus.TriggerEvent(eventName, value)
@@ -859,25 +906,25 @@ do
             return
         end
 
-        setChecked(frameName, "sortAscending", addon.options.sortAscending == true)
-        setChecked(frameName, "useRaidWarning", addon.options.useRaidWarning == true)
-        setChecked(frameName, "announceOnWin", addon.options.announceOnWin == true)
-        setChecked(frameName, "announceOnHold", addon.options.announceOnHold == true)
-        setChecked(frameName, "announceOnBank", addon.options.announceOnBank == true)
-        setChecked(frameName, "announceOnDisenchant", addon.options.announceOnDisenchant == true)
-        setChecked(frameName, "lootWhispers", addon.options.lootWhispers == true)
-        setChecked(frameName, "softResWhisperReplies", addon.options.softResWhisperReplies == true)
-        setChecked(frameName, "countdownRollsBlock", addon.options.countdownRollsBlock == true)
-        setChecked(frameName, "screenReminder", addon.options.screenReminder == true)
-        setChecked(frameName, "ignoreStacks", addon.options.ignoreStacks == true)
-        setChecked(frameName, "showTooltips", addon.options.showTooltips == true)
-        setChecked(frameName, "showLootCounterDuringMSRoll", addon.options.showLootCounterDuringMSRoll == true)
-        setChecked(frameName, "minimapButton", addon.options.minimapButton == true)
-        setChecked(frameName, "countdownSimpleRaidMsg", addon.options.countdownSimpleRaidMsg == true)
+        setChecked(frameName, "sortAscending", getOption("sortAscending") == true)
+        setChecked(frameName, "useRaidWarning", getOption("useRaidWarning") == true)
+        setChecked(frameName, "announceOnWin", getOption("announceOnWin") == true)
+        setChecked(frameName, "announceOnHold", getOption("announceOnHold") == true)
+        setChecked(frameName, "announceOnBank", getOption("announceOnBank") == true)
+        setChecked(frameName, "announceOnDisenchant", getOption("announceOnDisenchant") == true)
+        setChecked(frameName, "lootWhispers", getOption("lootWhispers") == true)
+        setChecked(frameName, "softResWhisperReplies", getOption("softResWhisperReplies") == true)
+        setChecked(frameName, "countdownRollsBlock", getOption("countdownRollsBlock") == true)
+        setChecked(frameName, "screenReminder", getOption("screenReminder") == true)
+        setChecked(frameName, "ignoreStacks", getOption("ignoreStacks") == true)
+        setChecked(frameName, "showTooltips", getOption("showTooltips") == true)
+        setChecked(frameName, "showLootCounterDuringMSRoll", getOption("showLootCounterDuringMSRoll") == true)
+        setChecked(frameName, "minimapButton", getOption("minimapButton") == true)
+        setChecked(frameName, "countdownSimpleRaidMsg", getOption("countdownSimpleRaidMsg") == true)
 
-        setCountdownDurationDisplay(frameName, addon.options.countdownDuration)
+        setCountdownDurationDisplay(frameName, getOption("countdownDuration"))
 
-        local useRaidWarning = addon.options.useRaidWarning == true
+        local useRaidWarning = getOption("useRaidWarning") == true
         local countdownSimpleRaidMsgBtn = _G[frameName .. "countdownSimpleRaidMsg"]
         local countdownSimpleRaidMsgStr = _G[frameName .. "countdownSimpleRaidMsgStr"]
 
@@ -988,9 +1035,7 @@ do
         end
 
         name = strsub(name, strlen(frameName) + 1)
-        if Options and Options.Set then
-            Options.Set(name, value)
-        end
+        setOption(name, value)
         local eventName = Events.GetConfigOptionChanged and Events.GetConfigOptionChanged(name)
         if eventName then
             Bus.TriggerEvent(eventName, value)
@@ -1033,8 +1078,8 @@ do
 
     local function scanCleanupPreview()
         local actions = getLoggerActions()
-        if actions and actions.ScanRaidHistory then
-            return actions:ScanRaidHistory()
+        if actions and actions.GetRaidHistoryScan then
+            return actions:GetRaidHistoryScan()
         end
         return nil
     end
@@ -1062,23 +1107,23 @@ do
 
     local function refreshLootHistoryReport()
         local actions = getLoggerActions()
-        if not (actions and actions.ScanRaidHistory) then
+        if not (actions and actions.GetRaidHistoryScan) then
             setText(lootHistoryContentFrameName, "ReportSummary", formatLootHistoryReport(nil))
             return nil
         end
-        local result = actions:ScanRaidHistory()
+        local result = actions:GetRaidHistoryScan()
         setText(lootHistoryContentFrameName, "ReportSummary", formatLootHistoryReport(result))
         return result
     end
 
     local function refreshLootHistorySyncControls()
-        local thresholdOverride = addon.options.ignoreSelectionThreshold == true
-        setChecked(lootHistoryContentFrameName, "PersistentSyncCheck", addon.options.persistentSync == true)
-        setChecked(lootHistoryContentFrameName, "IgnoreGroupLootCheck", addon.options.ignoreGroupLoot == true)
+        local thresholdOverride = getOption("ignoreSelectionThreshold") == true
+        setChecked(lootHistoryContentFrameName, "PersistentSyncCheck", getOption("persistentSync") == true)
+        setChecked(lootHistoryContentFrameName, "IgnoreGroupLootCheck", getOption("ignoreGroupLoot") == true)
         setChecked(lootHistoryContentFrameName, "IgnoreSelectionThresholdCheck", thresholdOverride)
-        setEditBoxText(lootHistoryContentFrameName, "RequireDatabaseEditBox", addon.options.syncRequirePlayer or "")
-        setEditBoxText(lootHistoryContentFrameName, "PushDatabaseEditBox", addon.options.syncPushPlayer or "")
-        setLoggerLootQualityDropDown(Frames.GetRef(lootHistoryContentFrameName, "LoggerLootQualityDropDown"), addon.options.loggerLootQualityThreshold, thresholdOverride)
+        setEditBoxText(lootHistoryContentFrameName, "RequireDatabaseEditBox", getOption("syncRequirePlayer") or "")
+        setEditBoxText(lootHistoryContentFrameName, "PushDatabaseEditBox", getOption("syncPushPlayer") or "")
+        setLoggerLootQualityDropDown(Frames.GetRef(lootHistoryContentFrameName, "LoggerLootQualityDropDown"), getOption("loggerLootQualityThreshold"), thresholdOverride)
     end
 
     local function refreshLootHistoryPanel()
@@ -1109,9 +1154,9 @@ do
 
         local currentRaid = Database.GetCurrentRaid and Database.GetCurrentRaid() or nil
         if actionName == "require" and syncer.RequestLoggerReq then
-            return syncer:RequestLoggerReq(currentRaid, addon.options.syncRequirePlayer)
+            return syncer:RequestLoggerReq(currentRaid, getOption("syncRequirePlayer"))
         elseif actionName == "push" and syncer.BroadcastLoggerPush then
-            return syncer:BroadcastLoggerPush(currentRaid, addon.options.syncPushPlayer)
+            return syncer:BroadcastLoggerPush(currentRaid, getOption("syncPushPlayer"))
         elseif actionName == "sync" and syncer.RequestLoggerSync then
             return syncer:RequestLoggerSync()
         end
@@ -1128,7 +1173,7 @@ do
         end
 
         local result
-        if actionName == "scan" and actions.ScanRaidHistory then
+        if actionName == "scan" and actions.GetRaidHistoryScan then
             result = refreshLootHistoryReport()
             addon:info(
                 L.MsgLoggerHistoryScanned:format(
@@ -1141,8 +1186,8 @@ do
         elseif actionName == "purge" and actions.PurgeRaidHistory then
             result = actions:PurgeRaidHistory()
             addon:info(L.MsgLoggerHistoryPurged:format(tonumber(result and result.removed) or 0))
-        elseif actionName == "rebuildSources" and actions.RebuildLootSources then
-            result = actions:RebuildLootSources()
+        elseif actionName == "rebuildSources" and actions.EnsureLootSources then
+            result = actions:EnsureLootSources()
             addon:info(
                 L.MsgLoggerLootSourcesRebuilt:format(
                     tonumber(result and result.repaired) or 0,
@@ -1150,13 +1195,13 @@ do
                     tonumber(result and result.unresolved) or 0
                 )
             )
-        elseif actionName == "cleanUp" and actions.CleanUpRaidHistory then
+        elseif actionName == "cleanUp" and actions.RemoveRaidHistoryEntries then
             options = options or {}
             if options.emptyRaids ~= true and options.nonEpicLoot ~= true and options.noBossEncounter ~= true then
                 addon:warn(L.MsgLoggerCleanupNoSelection)
                 return nil
             end
-            result = actions:CleanUpRaidHistory(options)
+            result = actions:RemoveRaidHistoryEntries(options)
             addon:info(L.MsgLoggerCleanupDone:format(tonumber(result and result.raidsRemoved) or 0, tonumber(result and result.lootRemoved) or 0))
         else
             addon:warn(L.MsgLoggerMaintenanceUnavailable)
@@ -1261,7 +1306,7 @@ do
         local threshold = normalizeLoggerLootQualityThreshold(value)
         saveLootHistoryOption("loggerLootQualityThreshold", threshold)
         if owner then
-            setLoggerLootQualityDropDown(owner, threshold, addon.options.ignoreSelectionThreshold == true)
+            setLoggerLootQualityDropDown(owner, threshold, getOption("ignoreSelectionThreshold") == true)
         end
         if CloseDropDownMenus then
             CloseDropDownMenus()
@@ -1300,7 +1345,7 @@ do
             })
         end)
         Frames.SetScriptSafely(editBox, "OnEscapePressed", function(self)
-            self:SetText(addon.options[optionKey] or "")
+            self:SetText(getOption(optionKey) or "")
             self:ClearFocus()
         end)
     end

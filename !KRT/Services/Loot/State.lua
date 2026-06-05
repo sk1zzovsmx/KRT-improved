@@ -1,14 +1,20 @@
 -- ----- KRT Lua Contract ----- --
 -- deps: local addon = select(2, ...)
--- shared: bootstrap-sensitive internal loot state helpers
+-- shared: local feature = addon.Database.GetFeatureShared()
 -- exports: addon.Services.Loot._State
+-- events: no bus events; state helpers only
+-- notes: bootstrap-sensitive internal loot state helpers
 
 local addon = select(2, ...)
 local feature = addon.Database.GetFeatureShared()
+local C = feature.C
+local Services = feature.Services
+local Time = feature.Time
 
 -- ----- Internal state ----- --
 feature.EnsureServiceNamespace("Loot")
-local module = addon.Services.Loot
+local Loot = Services.Loot
+local module = Loot
 module._State = module._State or {}
 
 local ContextState = module._State
@@ -120,7 +126,7 @@ function ContextState.ClearSource(raidState)
 end
 
 function ContextState.ResolveExpiry(now, ttlSeconds, defaultTtl, minTtl)
-    local resolvedNow = tonumber(now) or addon.Time.GetCurrentTime()
+    local resolvedNow = tonumber(now) or Time.GetCurrentTime()
     local ttl = tonumber(ttlSeconds) or tonumber(defaultTtl) or 0
     local resolvedMinTtl = tonumber(minTtl) or tonumber(defaultTtl) or 0
     if ttl < resolvedMinTtl then
@@ -152,7 +158,7 @@ end
 module._Sessions = module._Sessions or {}
 local Sessions = module._Sessions
 
-local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS_SESSION = tonumber(addon.C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60
+local GROUP_LOOT_PENDING_AWARD_TTL_SECONDS_SESSION = tonumber(C.GROUP_LOOT_PENDING_AWARD_TTL_SECONDS) or 60
 
 local function getSessionState(raidState)
     local state = ContextState.SyncField(raidState, "sessions", normalizeLootSessionState)
@@ -167,7 +173,7 @@ end
 
 function Sessions.PurgeExpired(raidState, now)
     local state = getSessionState(raidState)
-    local currentTime = tonumber(now) or addon.Time.GetCurrentTime()
+    local currentTime = tonumber(now) or Time.GetCurrentTime()
 
     for sessionId, entry in pairs(state.bySessionId) do
         local expiresAt = tonumber(entry and entry.expiresAt) or 0
@@ -225,7 +231,7 @@ function Sessions.Resolve(raidState, raid, raidNum, rollSessionId, now, findBoss
     return 0
 end
 
-local registry = addon.ModuleRegistry
+local registry = feature.ModuleRegistry
 if registry and type(registry.AddModule) == "function" and type(registry.SetLoaded) == "function" then
     registry.AddModule("Services/Loot/State", {
         deps = {
