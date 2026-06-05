@@ -15677,6 +15677,48 @@ test("slash reserves alias commands persist aliases and print list", function()
     assertTrue(_G.KRT_Options.Reserves.nameAliases.alicee == nil, "expected alias to be cleared")
 end)
 
+test("slash reserves list and import bypass master loot access gate", function()
+    local h = newHarness()
+    local gateCalls = 0
+    local uiCalls = {}
+    _G.SlashCmdList = {}
+
+    h.addon.Services.Raid = {
+        EnsureMasterOnlyAccess = function()
+            gateCalls = gateCalls + 1
+            return false
+        end,
+    }
+    h.feature.Services = h.addon.Services
+    h.addon.UI.Widgets.IsEnabled = function()
+        return true
+    end
+    h.addon.UI.Widgets.IsRegistered = function(widgetId)
+        return widgetId == "Reserves"
+    end
+    h.addon.UI.Widgets.Call = function(widgetId, methodName)
+        uiCalls[#uiCalls + 1] = {
+            widgetId = widgetId,
+            methodName = methodName,
+        }
+        return true
+    end
+
+    h:load("!KRT/Localization/localization.en.lua")
+    h:load("!KRT/Modules/Comms.lua")
+    h:load("!KRT/EntryPoints/SlashEvents.lua")
+
+    SlashCmdList.KRT("res")
+    SlashCmdList.KRT("sr import")
+
+    assertEqual(gateCalls, 0, "expected reserve commands to stay available outside Master Loot")
+    assertEqual(#uiCalls, 2, "expected reserve list and import widget calls")
+    assertEqual(uiCalls[1].widgetId, "Reserves", "expected reserve list widget id")
+    assertEqual(uiCalls[1].methodName, "Toggle", "expected reserve list toggle call")
+    assertEqual(uiCalls[2].widgetId, "Reserves", "expected reserve import widget id")
+    assertEqual(uiCalls[2].methodName, "ToggleImport", "expected reserve import call")
+end)
+
 test("slash reserves check prints current item softres readiness", function()
     local h = newHarness()
     local link = h.registerItem(1201, "Readiness Blade")

@@ -6,6 +6,12 @@ All notable changes to !KRT will be documented in this file.
 
 Release-Version: 0.8.0-beta.1
 
+### Fixes
+
+- **Group Loot SoftRes access** - Reserve list and import slash commands remain
+  available while the raid uses Group Loot, while Master Loot action checks stay
+  scoped to the protected loot flows.
+
 ## [0.8.0-beta.1] - 2026-06-05
 
 ### Documentation

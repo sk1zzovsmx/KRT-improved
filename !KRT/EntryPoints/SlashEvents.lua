@@ -106,18 +106,6 @@ local cmdDebug, cmdLoot, cmdCounter = { "debug", "dbg", "debugger" }, { "loot", 
 local cmdReserves, cmdMinimap, cmdValidate = { "res", "reserves", "reserve", "sr", "softres" }, { "minimap", "mm" }, { "validate" }
 local cmdHelp, cmdBug, cmdVersion = { "help", "commands" }, { "bug", "report" }, { "version", "ver", "about" }
 local cmdPerf = { "perf", "performance" }
-local lootOnlySlashCommands = {}
-
-local function markLootOnlyCommands(list)
-    for i = 1, #list do
-        local command = list[i]
-        if type(command) == "string" and command ~= "" then
-            lootOnlySlashCommands[command] = true
-        end
-    end
-end
-
-markLootOnlyCommands(cmdReserves)
 
 -- ----- Private helpers ----- --
 local helpString = "%s: %s"
@@ -1149,12 +1137,6 @@ local function handleSlashCommand(msg)
     local cmd, rest = Strings.SplitArgs(msg)
     if isBlank(cmd) then
         showHelp()
-        return
-    end
-
-    local requiresLootAccess = (lootOnlySlashCommands[cmd] == true)
-    local raid = Services and Services.Raid or nil
-    if requiresLootAccess and raid and raid.EnsureMasterOnlyAccess and not raid:EnsureMasterOnlyAccess() then
         return
     end
 
